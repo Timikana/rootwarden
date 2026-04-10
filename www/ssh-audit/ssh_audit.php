@@ -3,6 +3,7 @@
  * ssh-audit/ssh_audit.php — Audit de configuration SSH des serveurs distants.
  *
  * Permissions : lecteur (1), admin (2), superadmin (3) + can_audit_ssh
+ * La securite des actions (fix, save, reload) est geree cote backend (@require_role).
  */
 require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
@@ -11,16 +12,9 @@ require_once __DIR__ . '/../includes/lang.php';
 checkAuth([1, 2, 3]);
 checkPermission('can_audit_ssh');
 
-// Chargement des serveurs (selon role)
-$role = (int) ($_SESSION['role_id'] ?? 0);
-if ($role >= 2) {
-    $stmt = $pdo->query("SELECT id, name, ip, port FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' ORDER BY name");
-} else {
-    $stmt = $pdo->prepare("SELECT m.id, m.name, m.ip, m.port FROM machines m INNER JOIN user_machine_access uma ON m.id = uma.machine_id WHERE uma.user_id = ? AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived') ORDER BY m.name");
-    $stmt->execute([$_SESSION['user_id']]);
-}
+// Chargement des serveurs
+$stmt = $pdo->query("SELECT id, name, ip, port FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' ORDER BY name");
 $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-$isAdmin = (int) $_SESSION['role_id'] >= 2;
 ?>
 <!DOCTYPE html>
 <html lang="<?= getLang() ?>">
@@ -58,17 +52,14 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     <?= t('ssh_audit.btn_scan') ?>
                 </button>
-                <?php if ($isAdmin): ?>
                 <button type="button" onclick="scanAll()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-medium transition-colors text-sm whitespace-nowrap">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                     <?= t('ssh_audit.btn_scan_all') ?>
                 </button>
-                <?php endif; ?>
             </div>
         </div>
 
-        <!-- Action bar (visible once server selected, admin only) -->
-        <?php if ($isAdmin): ?>
+        <!-- Action bar (visible once server selected) -->
         <div id="action-bar" class="hidden flex flex-wrap items-center gap-2 mb-4">
             <button onclick="openEditor()" class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -83,7 +74,6 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                 <?= t('ssh_audit.btn_backups') ?>
             </button>
         </div>
-        <?php endif; ?>
 
         <!-- Score card (hidden until scan) -->
         <div id="score-card" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
@@ -108,15 +98,10 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                     </span>
                 </div>
             </div>
-            <div class="mt-4 text-right">
+            <div class="mt-4 flex flex-wrap gap-2 justify-end">
                 <button type="button" onclick="viewConfig()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <?= t('ssh_audit.btn_view_config') ?>
                 </button>
-                <?php if ($isAdmin): ?>
-                <button onclick="openEditor()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"><?= t('ssh_audit.btn_edit') ?></button>
-                <button onclick="reloadSshd()" class="text-xs px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors font-medium"><?= t('ssh_audit.btn_reload') ?></button>
-                <button onclick="loadBackups()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"><?= t('ssh_audit.btn_backups') ?></button>
-                <?php endif; ?>
             </div>
         </div>
 
@@ -133,9 +118,7 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                             <th class="py-2 px-3"><?= t('ssh_audit.th_recommended') ?></th>
                             <th class="py-2 px-3"><?= t('ssh_audit.th_description') ?></th>
                             <th class="py-2 px-3"><?= t('ssh_audit.th_status') ?></th>
-                            <?php if ($isAdmin): ?>
                             <th class="py-2 px-3 text-right"><?= t('ssh_audit.th_action') ?></th>
-                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody id="findings-tbody"></tbody>
@@ -144,8 +127,7 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
             </div>
         </div>
 
-        <!-- Policies section (admin only, collapsible) -->
-        <?php if ($isAdmin): ?>
+        <!-- Policies section (collapsible) -->
         <details id="policies-section" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
             <summary class="cursor-pointer p-5 text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
                 <?= t('ssh_audit.policies_title') ?>
@@ -157,23 +139,19 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                 </div>
             </div>
         </details>
-        <?php endif; ?>
 
         <!-- Config viewer modal -->
         <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-full max-w-3xl mx-4">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100"><?= t('ssh_audit.config_title') ?></h3>
-                    <button type="button" onclick="closeConfigModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
+                    <button type="button" onclick="closeConfigModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">&times;</button>
                 </div>
                 <pre id="config-content" class="bg-gray-900 text-green-400 text-xs p-4 rounded-lg overflow-x-auto overflow-y-auto max-h-96 font-mono"></pre>
             </div>
         </div>
 
-        <!-- Fleet view section (admin only, hidden until scan-all) -->
-        <?php if ($isAdmin): ?>
+        <!-- Fleet view section (hidden until scan-all) -->
         <div id="fleet-container" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-6">
             <h2 class="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide"><?= t('ssh_audit.fleet_title') ?></h2>
             <div class="overflow-x-auto">
@@ -192,7 +170,6 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                 </table>
             </div>
         </div>
-        <?php endif; ?>
 
         <!-- History section -->
         <div id="history-container" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-6">
@@ -209,7 +186,7 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
 
     </div>
 
-    <!-- Editor modal (admin) -->
+    <!-- Editor modal -->
     <div id="editor-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -229,7 +206,7 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
         </div>
     </div>
 
-    <!-- Backups modal (admin) -->
+    <!-- Backups modal -->
     <div id="backups-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -242,7 +219,6 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
         </div>
     </div>
 
-    <script>window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;</script>
     <script src="/ssh-audit/js/sshAudit.js?v=<?= filemtime(__DIR__ . '/js/sshAudit.js') ?>"></script>
 
     <?php require_once __DIR__ . '/../footer.php'; ?>

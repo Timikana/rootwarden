@@ -48,8 +48,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
     $totp = TOTP::create($totpPlain);
 
     if ($totp->verify($code)) {
-        echo "<h1>" . t('confirm_2fa.success_title') . "</h1>";
-        echo "<p>" . t('confirm_2fa.success_msg') . "</p>";
+        // Charger les donnees user completes et initialiser la session
+        $stmtUser = $pdo->prepare("SELECT id, name, role_id FROM users WHERE id = ?");
+        $stmtUser->execute([$_SESSION['user_id']]);
+        $fullUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
+        if ($fullUser) {
+            initializeUserSession($fullUser);
+        }
+        // Rediriger vers le dashboard
+        header("Location: /index.php");
+        exit();
     } else {
         error_log("Code TOTP incorrect pour user " . $_SESSION['user_id']);
         echo "<h1>" . t('confirm_2fa.invalid_title') . "</h1>";
