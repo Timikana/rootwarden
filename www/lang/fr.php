@@ -1331,6 +1331,7 @@ return [
     'js.audit_toggled' => 'Directive :key :action',
     'js.audit_editor_loading' => 'Chargement de sshd_config dans l\'editeur...',
     'js.audit_rescanning_after_reload' => 'Re-scan apres reload...',
+    'js.audit_server_selected' => 'Serveur :server selectionne — chargement de l\'historique...',
     'js.audit_directive_enabled' => 'Active',
     'js.audit_directive_disabled' => 'Desactive',
 
