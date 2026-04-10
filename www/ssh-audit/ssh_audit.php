@@ -45,7 +45,7 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
             <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4">
                 <div class="flex-1 w-full">
                     <label for="server" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"><?= t('ssh_audit.server_target') ?></label>
-                    <select id="server" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="server" onchange="onServerChange()" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value=""><?= t('ssh_audit.select_server') ?></option>
                         <?php foreach ($servers as $s): ?>
                             <option value="<?= htmlspecialchars(json_encode($s)) ?>">
@@ -66,6 +66,24 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Action bar (visible once server selected, admin only) -->
+        <?php if ($isAdmin): ?>
+        <div id="action-bar" class="hidden flex flex-wrap items-center gap-2 mb-4">
+            <button onclick="openEditor()" class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                <?= t('ssh_audit.btn_edit') ?>
+            </button>
+            <button onclick="reloadSshd()" class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <?= t('ssh_audit.btn_reload') ?>
+            </button>
+            <button onclick="loadBackups()" class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <?= t('ssh_audit.btn_backups') ?>
+            </button>
+        </div>
+        <?php endif; ?>
 
         <!-- Score card (hidden until scan) -->
         <div id="score-card" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">

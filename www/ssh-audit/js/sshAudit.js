@@ -4,6 +4,29 @@ let _currentServer = null;
 let _lastFindings = [];
 let _lastScore = null;
 
+// ── Server selection change ─────────────────────────────────────────────────
+
+function onServerChange() {
+    const srv = getServer();
+    if (!srv) {
+        _currentServer = null;
+        // Hide action bar
+        const bar = document.getElementById('action-bar');
+        if (bar) bar.classList.add('hidden');
+        return;
+    }
+    _currentServer = srv;
+    // Show action bar
+    const bar = document.getElementById('action-bar');
+    if (bar) bar.classList.remove('hidden');
+    // Show history container and load history
+    document.getElementById('history-container').classList.remove('hidden');
+    loadHistory(srv.id);
+    // Load policies if admin
+    if (window.IS_ADMIN) loadPolicies(srv.id);
+    appendLog(__('audit_server_selected', { server: srv.name }));
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getServer() {
