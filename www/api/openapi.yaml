@@ -1750,6 +1750,95 @@ paths:
       responses:
         '200': { description: Politique mise a jour }
 
+  /ssh-audit/save-config:
+    post:
+      tags: [SSH Audit]
+      summary: Sauvegarder sshd_config
+      description: Remplace le contenu de sshd_config (backup auto + validation sshd -t). Admin requis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, config]
+              properties:
+                machine_id: { type: integer }
+                config: { type: string, description: "Contenu complet sshd_config" }
+      responses:
+        '200': { description: Config sauvegardee }
+        '500': { description: Config invalide (rollback auto) }
+
+  /ssh-audit/toggle:
+    post:
+      tags: [SSH Audit]
+      summary: Activer/desactiver une directive
+      description: Commente ou decommmente une directive dans sshd_config. Admin requis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, directive, enable]
+              properties:
+                machine_id: { type: integer }
+                directive: { type: string, example: "X11Forwarding" }
+                enable: { type: boolean }
+      responses:
+        '200': { description: Directive modifiee }
+
+  /ssh-audit/backups:
+    post:
+      tags: [SSH Audit]
+      summary: Lister les backups sshd_config
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Liste des backups }
+
+  /ssh-audit/restore:
+    post:
+      tags: [SSH Audit]
+      summary: Restaurer un backup sshd_config
+      description: Restaure un fichier backup (validation sshd -t). Admin requis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, backup_name]
+              properties:
+                machine_id: { type: integer }
+                backup_name: { type: string, example: "sshd_config.bak.20260410120000" }
+      responses:
+        '200': { description: Backup restaure }
+
+  /ssh-audit/reload:
+    post:
+      tags: [SSH Audit]
+      summary: Recharger le service sshd
+      description: Reload (ou restart) sshd pour appliquer les modifications. Admin requis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: sshd recharged }
+
   # ── Admin ────────────────────────────────────────────────────────────────
 
   /server_lifecycle:

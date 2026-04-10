@@ -121,6 +121,11 @@ $routes = [
     ['SSH Audit History',      'GET',  "/ssh_audit/history?machine_id=$machineId", null, t('ssh_audit.history')],
     ['SSH Audit Fleet',        'GET',  '/ssh_audit/fleet', null, t('ssh_audit.fleet_view')],
     ['SSH Audit Policies',     'GET',  '/ssh_audit/policies', null, t('ssh_audit.policies_title')],
+    ['SSH Audit Save Config',  'POST', '/ssh-audit/save-config', ['machine_id' => $machineId, 'config' => 'test'], 'Sauvegarder sshd_config'],
+    ['SSH Audit Toggle',       'POST', '/ssh-audit/toggle', ['machine_id' => $machineId, 'directive' => 'X11Forwarding', 'enable' => false], 'Toggle directive ON/OFF'],
+    ['SSH Audit Backups',      'POST', '/ssh-audit/backups', ['machine_id' => $machineId], 'Lister backups sshd_config'],
+    ['SSH Audit Restore',      'POST', '/ssh-audit/restore', ['machine_id' => $machineId, 'backup_name' => 'test'], 'Restaurer un backup'],
+    ['SSH Audit Reload',       'POST', '/ssh-audit/reload', ['machine_id' => $machineId], 'Recharger sshd'],
 
     // ── Services systemd ─────────────────────────────────────────────────
     ['Services List',          'POST', '/services/list', ['machine_id' => $machineId], 'Liste services systemd'],

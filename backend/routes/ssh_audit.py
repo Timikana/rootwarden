@@ -23,6 +23,7 @@ from ssh_utils import ssh_session
 from ssh_audit import (
     get_sshd_config, get_ssh_version, audit_sshd_config,
     backup_sshd_config, apply_fix,
+    save_sshd_config, toggle_directive, list_backups, restore_backup, reload_sshd,
     ALLOWED_DIRECTIVES, VALUE_RE,
 )
 
@@ -433,4 +434,152 @@ def ssh_audit_policies_set():
         return jsonify({'success': True, 'message': f"Policy '{directive}' definie a '{policy}'."})
     except Exception as e:
         logger.error("[ssh-audit/policies] %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/ssh-audit/save-config', methods=['POST'])
+@require_api_key
+@require_machine_access
+@require_role(2)
+@threaded_route
+def ssh_audit_save_config():
+    """Remplace sshd_config avec un nouveau contenu (backup + validation)."""
+    data = request.get_json(silent=True) or {}
+    config = data.get('config', '').strip()
+    if not config:
+        return jsonify({'success': False, 'message': 'config requis'}), 400
+
+    ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+
+    try:
+        with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+            success, message = save_sshd_config(client, root_pass, config)
+
+            audited_by = request.headers.get('X-User-ID', 'admin')
+            _log_audit_action(mid, 'save_config', message, audited_by)
+
+            if not success:
+                return jsonify({'success': False, 'message': message}), 500
+
+            return jsonify({'success': True, 'message': message, 'machine_id': mid})
+    except Exception as e:
+        logger.error("[ssh-audit/save-config] %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/ssh-audit/toggle', methods=['POST'])
+@require_api_key
+@require_machine_access
+@require_role(2)
+@threaded_route
+def ssh_audit_toggle():
+    """Active ou desactive une directive dans sshd_config."""
+    data = request.get_json(silent=True) or {}
+    directive = data.get('directive', '').strip()
+    enable = data.get('enable')
+
+    if not directive or enable is None:
+        return jsonify({'success': False, 'message': 'directive et enable (bool) requis'}), 400
+
+    enable = bool(enable)
+
+    ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+
+    try:
+        with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+            success, message = toggle_directive(client, root_pass, directive, enable)
+
+            audited_by = request.headers.get('X-User-ID', 'admin')
+            _log_audit_action(mid, 'toggle', f'{directive} enable={enable} -> {message}', audited_by)
+
+            if not success:
+                return jsonify({'success': False, 'message': message}), 500
+
+            return jsonify({'success': True, 'message': message, 'machine_id': mid})
+    except Exception as e:
+        logger.error("[ssh-audit/toggle] %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/ssh-audit/backups', methods=['POST'])
+@require_api_key
+@require_machine_access
+@threaded_route
+def ssh_audit_backups():
+    """Liste les fichiers de backup sshd_config."""
+    data = request.get_json(silent=True) or {}
+    ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+
+    try:
+        with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+            backups = list_backups(client, root_pass)
+            return jsonify({'success': True, 'backups': backups, 'total': len(backups), 'machine_id': mid})
+    except Exception as e:
+        logger.error("[ssh-audit/backups] %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/ssh-audit/restore', methods=['POST'])
+@require_api_key
+@require_machine_access
+@require_role(2)
+@threaded_route
+def ssh_audit_restore():
+    """Restaure un backup sshd_config."""
+    data = request.get_json(silent=True) or {}
+    backup_name = data.get('backup_name', '').strip()
+    if not backup_name:
+        return jsonify({'success': False, 'message': 'backup_name requis'}), 400
+
+    ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+
+    try:
+        with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+            success, message = restore_backup(client, root_pass, backup_name)
+
+            audited_by = request.headers.get('X-User-ID', 'admin')
+            _log_audit_action(mid, 'restore', f'{backup_name} -> {message}', audited_by)
+
+            if not success:
+                return jsonify({'success': False, 'message': message}), 500
+
+            return jsonify({'success': True, 'message': message, 'machine_id': mid})
+    except Exception as e:
+        logger.error("[ssh-audit/restore] %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/ssh-audit/reload', methods=['POST'])
+@require_api_key
+@require_machine_access
+@require_role(2)
+@threaded_route
+def ssh_audit_reload():
+    """Recharge le service sshd."""
+    data = request.get_json(silent=True) or {}
+    ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+
+    try:
+        with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+            success, message = reload_sshd(client, root_pass)
+
+            audited_by = request.headers.get('X-User-ID', 'admin')
+            _log_audit_action(mid, 'reload', message, audited_by)
+
+            if not success:
+                return jsonify({'success': False, 'message': message}), 500
+
+            return jsonify({'success': True, 'message': message, 'machine_id': mid})
+    except Exception as e:
+        logger.error("[ssh-audit/reload] %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500

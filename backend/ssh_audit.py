@@ -335,3 +335,134 @@ def apply_fix(client, root_pass, key, value):
 
     _log.info("Directive %s corrigee a '%s' et sshd reloaded avec succes", key, value)
     return True, f"{key} modifie a '{value}' et sshd reloaded avec succes."
+
+
+# ── Save / Toggle / Backups / Restore / Reload ──────────────────────────────
+
+def save_sshd_config(client, root_pass, new_config):
+    """Replace sshd_config with new content. Backup first, validate with sshd -t, rollback if invalid."""
+    import base64
+    # Backup
+    try:
+        backup_path = backup_sshd_config(client, root_pass)
+    except RuntimeError as e:
+        return False, str(e)
+
+    # Write new config via base64 to avoid shell injection
+    b64 = base64.b64encode(new_config.encode()).decode()
+    cmd = f"echo {b64} | base64 -d > /etc/ssh/sshd_config"
+    _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
+    if rc != 0:
+        execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
+        return False, f"Write failed: {stderr}"
+
+    # Validate
+    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    if rc_t != 0:
+        _log.warning("sshd -t failed after save — restoring backup")
+        execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
+        return False, f"Config invalid (sshd -t): {stderr_t}"
+
+    return True, f"Config saved and validated. Backup: {backup_path}"
+
+
+def toggle_directive(client, root_pass, key, enable):
+    """Comment out (disable) or uncomment (enable) a directive in sshd_config."""
+    ok, err = _validate_directive(key)
+    if not ok:
+        return False, err
+
+    try:
+        backup_path = backup_sshd_config(client, root_pass)
+    except RuntimeError as e:
+        return False, str(e)
+
+    if enable:
+        # Uncomment: remove leading # from lines matching the key
+        cmd = f"sed -i 's/^\\s*#\\s*\\({key}\\b\\)/\\1/' /etc/ssh/sshd_config"
+    else:
+        # Comment: add # before lines matching the key
+        cmd = f"sed -i 's/^\\s*\\({key}\\b\\)/# \\1/' /etc/ssh/sshd_config"
+
+    _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
+    if rc != 0:
+        execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
+        return False, f"Toggle failed: {stderr}"
+
+    # Validate
+    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    if rc_t != 0:
+        execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
+        return False, f"Config invalid after toggle: {stderr_t}"
+
+    action = "enabled" if enable else "disabled"
+    return True, f"{key} {action}"
+
+
+def list_backups(client, root_pass):
+    """List sshd_config backup files in /etc/ssh/."""
+    out, _, rc = execute_as_root(
+        client, "ls -la /etc/ssh/sshd_config.bak.* 2>/dev/null || echo 'NONE'",
+        root_pass, logger=_log, timeout=5)
+    if 'NONE' in out or rc != 0:
+        return []
+
+    backups = []
+    _BACKUP_LINE_RE = re.compile(r'(\S+)\s+(\d+)\s+\S+\s+\S+\s+(\d+)\s+(\S+\s+\d+\s+[\d:]+)\s+(.+)$')
+    for line in out.strip().splitlines():
+        m = _BACKUP_LINE_RE.search(line)
+        if m:
+            filename = m.group(5).strip().split('/')[-1]
+            size = int(m.group(3))
+            date_str = m.group(4).strip()
+            backups.append({'filename': filename, 'size': size, 'date': date_str})
+    return sorted(backups, key=lambda b: b['filename'], reverse=True)
+
+
+_BACKUP_NAME_RE = re.compile(r'^sshd_config\.bak\.\d{14}$')
+
+def restore_backup(client, root_pass, backup_name):
+    """Restore a backup file to sshd_config. Validate with sshd -t."""
+    # Validate backup name (anti path-traversal)
+    if not _BACKUP_NAME_RE.match(backup_name):
+        return False, f"Invalid backup name: {backup_name}"
+
+    backup_path = f"/etc/ssh/{backup_name}"
+
+    # Check backup exists
+    _, _, rc = execute_as_root(client, f"test -f {backup_path}", root_pass, logger=_log, timeout=5)
+    if rc != 0:
+        return False, f"Backup not found: {backup_name}"
+
+    # Backup current config before restoring
+    current_backup = None
+    try:
+        current_backup = backup_sshd_config(client, root_pass)
+    except RuntimeError:
+        pass  # Not critical
+
+    # Restore
+    _, stderr, rc = execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
+    if rc != 0:
+        return False, f"Restore failed: {stderr}"
+
+    # Validate
+    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    if rc_t != 0:
+        # Restore the current backup we just made
+        if current_backup:
+            execute_as_root(client, f"cp {current_backup} /etc/ssh/sshd_config", root_pass, logger=_log)
+        return False, f"Restored config invalid (sshd -t): {stderr_t}"
+
+    return True, f"Backup {backup_name} restored"
+
+
+def reload_sshd(client, root_pass):
+    """Reload (or restart) the sshd service."""
+    _, stderr, rc = execute_as_root(
+        client,
+        "systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null",
+        root_pass, logger=_log, timeout=15)
+    if rc != 0:
+        return False, f"Reload/restart sshd failed: {stderr}"
+    return True, "sshd reloaded"
