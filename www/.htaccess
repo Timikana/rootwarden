@@ -1,0 +1,7 @@
+# Bloquer l'accès aux fichiers de test/debug/config
+<FilesMatch "(test_|\.env|\.log|\.sql|\.gz|\.bak|\.yaml|\.yml|seed_|\.gitignore|composer\.(json|lock))">
+    Require all denied
+</FilesMatch>
+
+# Bloquer l'accès au dossier .git (si présent par erreur)
+RedirectMatch 404 /\.git

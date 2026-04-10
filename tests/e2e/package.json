@@ -1,0 +1,16 @@
+{
+  "name": "rootwarden-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "test:login": "node --test 01-login.test.mjs",
+    "test:admin": "node --test 02-admin-users.test.mjs",
+    "test:permissions": "node --test 03-permissions.test.mjs",
+    "test:ssh": "node --test 04-ssh-preflight.test.mjs",
+    "test:cve": "node --test 05-cve-scan.test.mjs"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

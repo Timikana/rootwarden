@@ -1,0 +1,1619 @@
+openapi: 3.0.3
+info:
+  title: RootWarden API
+  description: |
+    API REST du backend Flask de RootWarden — plateforme de gestion centralisee
+    de serveurs Linux (cles SSH, mises a jour, iptables, scan CVE).
+
+    **Authentification** : header `X-API-KEY` obligatoire sur toutes les routes (sauf /test).
+    Le frontend PHP utilise `/api_proxy.php` qui injecte la cle automatiquement.
+  version: 1.11.0
+  contact:
+    name: RootWarden
+    url: https://github.com/Timikana/rootwarden
+
+servers:
+  - url: https://localhost:5000
+    description: Backend direct (dev)
+  - url: /api_proxy.php
+    description: Via proxy PHP (production)
+
+tags:
+  - name: Monitoring
+    description: Health check, statut serveurs, versions OS, tendances CVE
+  - name: SSH
+    description: Deploiement cles SSH, keypair plateforme, gestion users distants
+  - name: Updates
+    description: Mises a jour Linux (APT), Zabbix, planification
+  - name: CVE
+    description: Scan de vulnerabilites, whitelist, remediation, planification
+  - name: Iptables
+    description: Gestion du pare-feu iptables (regles, historique, rollback)
+  - name: Fail2ban
+    description: Gestion Fail2ban (statut, jails, ban/unban, installation, services)
+  - name: Admin
+    description: Backups, lifecycle serveur, permissions temporaires
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "Erreur description"
+    Machine:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        ip: { type: string }
+        port: { type: integer }
+        user: { type: string }
+        online_status: { type: string, enum: [ONLINE, OFFLINE, Inconnu] }
+    CveFinding:
+      type: object
+      properties:
+        cve_id: { type: string, example: "CVE-2024-1234" }
+        package_name: { type: string }
+        cvss_score: { type: number, format: float }
+        severity: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW, NONE] }
+        summary: { type: string }
+    TempPermission:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        user_name: { type: string }
+        permission: { type: string }
+        machine_id: { type: integer, nullable: true }
+        granted_by_name: { type: string }
+        reason: { type: string }
+        expires_at: { type: string, format: date-time }
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /test:
+    get:
+      tags: [Monitoring]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string }
+
+  /list_machines:
+    get:
+      tags: [Monitoring]
+      summary: Liste des machines (filtree par role)
+      description: |
+        Admins voient tout. Users voient uniquement les machines
+        assignees dans user_machine_access. Exclut les serveurs archived.
+      responses:
+        '200':
+          description: Liste des machines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  machines:
+                    type: array
+                    items: { $ref: '#/components/schemas/Machine' }
+
+  /server_status:
+    post:
+      tags: [Monitoring]
+      summary: Verifie le statut online/offline d'un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip: { type: string, example: "10.0.0.1" }
+                port: { type: integer, default: 22 }
+      responses:
+        '200':
+          description: Statut du serveur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  ip: { type: string }
+                  status: { type: string, enum: [online, offline] }
+        '400': { description: IP manquante, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /deploy:
+    post:
+      tags: [SSH]
+      summary: Lance le deploiement des cles SSH
+      description: |
+        Execute configure_servers.py en arriere-plan.
+        Verifie l'acces machine pour les users role < 2.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machines]
+              properties:
+                machines:
+                  type: array
+                  items: { type: integer }
+                  example: [1, 2, 3]
+      responses:
+        '200': { description: Deploiement lance }
+        '400': { description: Aucune machine selectionnee }
+        '403': { description: Acces refuse a une machine }
+
+  /preflight_check:
+    post:
+      tags: [SSH]
+      summary: Verification pre-deploiement
+      description: Connectivite SSH, version OS, espace disque, users manquants.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machines]
+              properties:
+                machines:
+                  type: array
+                  items: { type: integer }
+      responses:
+        '200':
+          description: Resultats de la verification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  users_with_keys: { type: integer }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        machine_id: { type: integer }
+                        name: { type: string }
+                        ssh_ok: { type: boolean }
+                        auth_method: { type: string }
+                        os_version: { type: string }
+                        disk_free: { type: string }
+                        errors: { type: array, items: { type: string } }
+
+  /filter_servers:
+    get:
+      tags: [Monitoring]
+      summary: Filtre les serveurs par environnement, criticite, reseau, tag
+      parameters:
+        - { name: environment, in: query, schema: { type: string } }
+        - { name: criticality, in: query, schema: { type: string } }
+        - { name: networkType, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Serveurs filtres }
+
+  /linux_version:
+    post:
+      tags: [Monitoring]
+      summary: Version Linux distante via SSH
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Version retournee }
+
+  /last_reboot:
+    post:
+      tags: [Monitoring]
+      summary: Date du dernier redemarrage + indicateur reboot_required
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Date et statut reboot }
+
+  /cve_trends:
+    get:
+      tags: [Monitoring]
+      summary: Tendances CVE 30 jours (histogramme)
+      responses:
+        '200': { description: Donnees tendance par jour }
+
+  /platform_key:
+    get:
+      tags: [SSH]
+      summary: Cle publique Ed25519 de la plateforme
+      responses:
+        '200':
+          description: Cle publique
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  public_key: { type: string }
+        '404': { description: Keypair non generee }
+
+  /deploy_platform_key:
+    post:
+      tags: [SSH]
+      summary: Deploie la keypair plateforme sur des serveurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_ids]
+              properties:
+                machine_ids: { type: array, items: { type: integer } }
+      responses:
+        '200': { description: Deploiement termine }
+
+  /test_platform_key:
+    post:
+      tags: [SSH]
+      summary: Teste la connexion via keypair sur un serveur
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Test OK avec methode d'auth utilisee }
+
+  /regenerate_platform_key:
+    post:
+      tags: [SSH]
+      summary: Regenere la keypair Ed25519 de la plateforme
+      responses:
+        '200': { description: Nouvelle keypair generee }
+
+  /deploy_service_account:
+    post:
+      tags: [SSH]
+      summary: Deploie le compte service rootwarden (NOPASSWD sudo)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_ids]
+              properties:
+                machine_ids: { type: array, items: { type: integer } }
+      responses:
+        '200': { description: Deploiement SA termine }
+
+  /remove_ssh_password:
+    post:
+      tags: [SSH]
+      summary: Supprime les mots de passe SSH/root en BDD
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Mots de passe supprimes }
+
+  /reenter_ssh_password:
+    post:
+      tags: [SSH]
+      summary: Re-saisir les mots de passe SSH/root
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, password]
+              properties:
+                machine_id: { type: integer }
+                password: { type: string }
+                root_password: { type: string }
+      responses:
+        '200': { description: Mots de passe mis a jour }
+
+  /scan_server_users:
+    post:
+      tags: [SSH]
+      summary: Liste les utilisateurs SSH sur un serveur distant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Liste des users avec cles SSH }
+
+  /remove_user_keys:
+    post:
+      tags: [SSH]
+      summary: Supprime les cles SSH d'un user distant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, username]
+              properties:
+                machine_id: { type: integer }
+                username: { type: string }
+      responses:
+        '200': { description: Cles supprimees }
+
+  /delete_remote_user:
+    post:
+      tags: [SSH]
+      summary: Supprime un utilisateur Linux distant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, username]
+              properties:
+                machine_id: { type: integer }
+                username: { type: string }
+      responses:
+        '200': { description: Utilisateur supprime }
+
+  # ── Mises a jour ──────────────────────────────────────────────────────
+
+  /update:
+    post:
+      tags: [Updates]
+      summary: Mise a jour APT full-upgrade (streaming)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Flux text/plain streaming }
+
+  /security_updates:
+    post:
+      tags: [Updates]
+      summary: Mises a jour de securite uniquement (streaming)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Flux streaming }
+
+  /dry_run_update:
+    post:
+      tags: [Updates]
+      summary: Simulation de mise a jour (apt --dry-run)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Liste des paquets a mettre a jour }
+
+  /pending_packages:
+    post:
+      tags: [Updates]
+      summary: Liste des paquets en attente de mise a jour
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Paquets disponibles }
+
+  /apt_check_lock:
+    post:
+      tags: [Updates]
+      summary: Verifie si apt/dpkg est verrouille
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200':
+          description: Statut lock
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  locked: { type: boolean }
+                  details: { type: string }
+
+  /dpkg_repair:
+    post:
+      tags: [Updates]
+      summary: Kill apt/dpkg bloques + dpkg --configure -a
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Reparation terminee }
+
+  /update_zabbix:
+    post:
+      tags: [Updates]
+      summary: Met a jour l'agent Zabbix sur des serveurs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_ids]
+              properties:
+                machine_ids: { type: array, items: { type: integer } }
+                version: { type: string, example: "7.0" }
+      responses:
+        '200': { description: Flux streaming MAJ Zabbix }
+
+  /schedule_update:
+    post:
+      tags: [Updates]
+      summary: Planifie une mise a jour periodique (cron)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, interval_minutes]
+              properties:
+                machine_id: { type: integer }
+                interval_minutes: { type: integer, minimum: 1, maximum: 10080 }
+      responses:
+        '200': { description: Planification enregistree }
+
+  /schedule_advanced_update:
+    post:
+      tags: [Updates]
+      summary: Planification avancee MAJ (date/heure/recurrence)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, date, time, repeat]
+              properties:
+                machine_id: { type: integer }
+                date: { type: string, format: date }
+                time: { type: string, example: "03:00" }
+                repeat: { type: string, enum: [none, daily, weekly, monthly] }
+      responses:
+        '200': { description: Planification enregistree }
+
+  /schedule_advanced_security_update:
+    post:
+      tags: [Updates]
+      summary: Planification avancee MAJ securite
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, date, time, repeat]
+              properties:
+                machine_id: { type: integer }
+                date: { type: string, format: date }
+                time: { type: string, example: "03:00" }
+                repeat: { type: string, enum: [none, daily, weekly, monthly] }
+      responses:
+        '200': { description: Planification enregistree }
+
+  /custom_update:
+    post:
+      tags: [Updates]
+      summary: Mise a jour personnalisee (paquets specifiques + exclusions)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, method]
+              properties:
+                machine_id: { type: integer }
+                method: { type: string, enum: [full, security, specific] }
+                packages: { type: array, items: { type: string } }
+                exclusions: { type: array, items: { type: string } }
+      responses:
+        '200': { description: Resultat de la mise a jour }
+
+  # ── Iptables ──────────────────────────────────────────────────────────
+
+  /iptables:
+    post:
+      tags: [Iptables]
+      summary: Charger les regles iptables d'un serveur
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, action]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                ssh_password: { type: string }
+                root_password: { type: string }
+                action: { type: string, enum: [get] }
+      responses:
+        '200': { description: Regles IPv4+IPv6 }
+
+  /iptables-validate:
+    post:
+      tags: [Iptables]
+      summary: Valide les regles iptables (dry-run iptables-restore --test)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, rules_v4]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                rules_v4: { type: string }
+                rules_v6: { type: string }
+      responses:
+        '200': { description: Validation OK ou erreur syntaxe }
+
+  /iptables-apply:
+    post:
+      tags: [Iptables]
+      summary: Applique les regles iptables sur un serveur
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, rules_v4]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                rules_v4: { type: string }
+                rules_v6: { type: string }
+                change_reason: { type: string }
+      responses:
+        '200': { description: Regles appliquees }
+
+  /iptables-restore:
+    post:
+      tags: [Iptables]
+      summary: Restaure les regles iptables depuis la BDD
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+      responses:
+        '200': { description: Regles restaurees }
+
+  /iptables-history:
+    get:
+      tags: [Iptables]
+      summary: Historique des modifications iptables
+      parameters:
+        - { name: server_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: Liste historique (20 dernieres) }
+
+  /iptables-rollback:
+    post:
+      tags: [Iptables]
+      summary: Rollback vers une version anterieure des regles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [history_id]
+              properties:
+                history_id: { type: integer }
+      responses:
+        '200': { description: Rollback effectue }
+
+  # ── CVE ───────────────────────────────────────────────────────────────
+
+  /cve_scan:
+    post:
+      tags: [CVE]
+      summary: Scan CVE sur un ou plusieurs serveurs
+      description: Retourne un flux JSON-lines (text/plain).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id:
+                  oneOf:
+                    - type: integer
+                    - type: array
+                      items: { type: integer }
+                min_cvss: { type: number, default: 7.0 }
+      responses:
+        '200':
+          description: Flux JSON-lines
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /cve_results:
+    get:
+      tags: [CVE]
+      summary: Resultats du dernier scan CVE
+      parameters:
+        - name: machine_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Scan et findings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  scan: { type: object }
+                  findings:
+                    type: array
+                    items: { $ref: '#/components/schemas/CveFinding' }
+
+  /cve_schedules:
+    get:
+      tags: [CVE]
+      summary: Liste des planifications de scans CVE
+      responses:
+        '200':
+          description: Planifications
+    post:
+      tags: [CVE]
+      summary: Creer une planification de scan CVE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, example: "Scan nightly" }
+                cron_expression: { type: string, default: "0 3 * * *" }
+                min_cvss: { type: number, default: 7.0 }
+                target_type: { type: string, enum: [all, tag, machines], default: all }
+                target_value: { type: string }
+      responses:
+        '200':
+          description: Planification creee
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  id: { type: integer }
+
+  /cve_scan_all:
+    post:
+      tags: [CVE]
+      summary: Scan CVE sur TOUS les serveurs (streaming)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                min_cvss: { type: number, default: 7.0 }
+                per_machine_cvss: { type: object, additionalProperties: { type: number } }
+      responses:
+        '200': { description: Flux JSON-lines }
+
+  /cve_history:
+    get:
+      tags: [CVE]
+      summary: Historique des scans CVE d'un serveur
+      parameters:
+        - { name: machine_id, in: query, required: true, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer, default: 10 } }
+      responses:
+        '200': { description: Liste des scans }
+
+  /cve_compare:
+    get:
+      tags: [CVE]
+      summary: Compare deux scans CVE (diff ajoutees/supprimees)
+      parameters:
+        - { name: machine_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: CVE ajoutees et supprimees entre les 2 derniers scans }
+
+  /cve_test_connection:
+    get:
+      tags: [CVE]
+      summary: Teste la connexion au service OpenCVE
+      responses:
+        '200': { description: Connexion OK avec URL et methode d'auth }
+
+  /cve_remediation:
+    get:
+      tags: [CVE]
+      summary: Liste des remediations CVE en cours
+      parameters:
+        - { name: machine_id, in: query, schema: { type: integer } }
+      responses:
+        '200': { description: Remediations }
+    post:
+      tags: [CVE]
+      summary: Creer ou mettre a jour une remediation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, cve_id, status]
+              properties:
+                machine_id: { type: integer }
+                cve_id: { type: string }
+                status: { type: string, enum: [open, in_progress, resolved] }
+                assignee: { type: string }
+                deadline: { type: string, format: date }
+                resolution_note: { type: string }
+      responses:
+        '200': { description: Remediation mise a jour }
+
+  /cve_remediation/stats:
+    get:
+      tags: [CVE]
+      summary: Statistiques des remediations (open, in_progress, resolved, overdue)
+      responses:
+        '200': { description: Stats par statut }
+
+  /cve_whitelist:
+    get:
+      tags: [CVE]
+      summary: Liste des CVE en whitelist
+      responses:
+        '200': { description: Whitelist }
+    post:
+      tags: [CVE]
+      summary: Ajouter une CVE en whitelist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cve_id, reason]
+              properties:
+                cve_id: { type: string, example: "CVE-2024-1234" }
+                reason: { type: string }
+                machine_id: { type: integer, nullable: true }
+                expires_at: { type: string, format: date }
+      responses:
+        '200': { description: Ajoute }
+        '400': { description: Champs manquants }
+
+  /admin/backups:
+    get:
+      tags: [Admin]
+      summary: Liste des sauvegardes BDD
+      responses:
+        '200':
+          description: Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  backups: { type: array, items: { type: string } }
+    post:
+      tags: [Admin]
+      summary: Creer une sauvegarde BDD
+      responses:
+        '200':
+          description: Backup cree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  path: { type: string }
+
+  /admin/temp_permissions:
+    get:
+      tags: [Admin]
+      summary: Liste des permissions temporaires actives
+      responses:
+        '200':
+          description: Permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  permissions:
+                    type: array
+                    items: { $ref: '#/components/schemas/TempPermission' }
+    post:
+      tags: [Admin]
+      summary: Accorder une permission temporaire
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, permission]
+              properties:
+                user_id: { type: integer }
+                permission: { type: string, example: "can_deploy_keys" }
+                hours: { type: integer, minimum: 1, maximum: 720, default: 24 }
+                machine_id: { type: integer, nullable: true }
+                reason: { type: string }
+      responses:
+        '200': { description: Permission accordee }
+        '400': { description: Champs manquants ou duree invalide }
+
+  # ── Fail2ban ──────────────────────────────────────────────────────────────
+
+  /fail2ban/status:
+    post:
+      tags: [Fail2ban]
+      summary: Statut global Fail2ban sur un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user]
+              properties:
+                server_ip: { type: string }
+                server_port: { type: integer, default: 22 }
+                ssh_user: { type: string }
+                ssh_password: { type: string }
+                root_password: { type: string }
+      responses:
+        '200':
+          description: Statut retourne
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  installed: { type: boolean }
+                  running: { type: boolean }
+                  jails:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string, example: "sshd" }
+                        currently_banned: { type: integer }
+                        total_banned: { type: integer }
+
+  /fail2ban/jail:
+    post:
+      tags: [Fail2ban]
+      summary: Detail d'un jail (IPs bannies + config)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, jail]
+              properties:
+                server_ip: { type: string }
+                server_port: { type: integer, default: 22 }
+                ssh_user: { type: string }
+                ssh_password: { type: string }
+                root_password: { type: string }
+                jail: { type: string, example: "sshd" }
+      responses:
+        '200':
+          description: Detail du jail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  jail: { type: string }
+                  currently_banned: { type: integer }
+                  total_banned: { type: integer }
+                  banned_ips: { type: array, items: { type: string } }
+                  config:
+                    type: object
+                    properties:
+                      maxretry: { type: integer }
+                      bantime: { type: integer }
+                      findtime: { type: integer }
+
+  /fail2ban/install:
+    post:
+      tags: [Fail2ban]
+      summary: Installe fail2ban sur un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                ssh_password: { type: string }
+                root_password: { type: string }
+      responses:
+        '200': { description: Installation terminee }
+
+  /fail2ban/ban:
+    post:
+      tags: [Fail2ban]
+      summary: Bannir une IP dans un jail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, jail, ip]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                jail: { type: string, example: "sshd" }
+                ip: { type: string, example: "1.2.3.4" }
+      responses:
+        '200': { description: IP bannie }
+        '400': { description: IP ou jail invalide }
+
+  /fail2ban/unban:
+    post:
+      tags: [Fail2ban]
+      summary: Debannir une IP d'un jail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, jail, ip]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                jail: { type: string }
+                ip: { type: string }
+      responses:
+        '200': { description: IP debannie }
+
+  /fail2ban/restart:
+    post:
+      tags: [Fail2ban]
+      summary: Redemarrer le service fail2ban
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+      responses:
+        '200': { description: Service redemarre }
+
+  /fail2ban/config:
+    post:
+      tags: [Fail2ban]
+      summary: Lire le contenu de jail.local
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+      responses:
+        '200':
+          description: Contenu du fichier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  config: { type: string }
+
+  /fail2ban/history:
+    get:
+      tags: [Fail2ban]
+      summary: Historique des bans/unbans
+      parameters:
+        - name: server_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Liste des actions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        jail: { type: string }
+                        ip_address: { type: string }
+                        action: { type: string, enum: [ban, unban] }
+                        performed_by: { type: string }
+                        created_at: { type: string, format: date-time }
+
+  /fail2ban/services:
+    post:
+      tags: [Fail2ban]
+      summary: Detecter les services installes et jails disponibles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+      responses:
+        '200':
+          description: Services detectes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  services:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        service: { type: string, example: "apache2" }
+                        installed: { type: boolean }
+                        log_path: { type: string }
+                        jails:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name: { type: string }
+                              available: { type: boolean }
+                              enabled: { type: boolean }
+
+  /fail2ban/enable_jail:
+    post:
+      tags: [Fail2ban]
+      summary: Activer un jail avec configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, jail]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                jail: { type: string }
+                maxretry: { type: integer, default: 5 }
+                bantime: { type: integer, default: 3600 }
+                findtime: { type: integer, default: 600 }
+      responses:
+        '200': { description: Jail active }
+        '400': { description: Parametres invalides }
+
+  /fail2ban/disable_jail:
+    post:
+      tags: [Fail2ban]
+      summary: Desactiver un jail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_ip, ssh_user, jail]
+              properties:
+                server_ip: { type: string }
+                ssh_user: { type: string }
+                jail: { type: string }
+      responses:
+        '200': { description: Jail desactive }
+
+  /fail2ban/whitelist:
+    post:
+      tags: [Fail2ban]
+      summary: Gerer la whitelist ignoreip (list/add/remove)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, action]
+              properties:
+                machine_id: { type: integer }
+                action: { type: string, enum: [list, add, remove] }
+                ip: { type: string }
+      responses:
+        '200':
+          description: Liste des IPs whitelistees
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  ips: { type: array, items: { type: string } }
+
+  /fail2ban/unban_all:
+    post:
+      tags: [Fail2ban]
+      summary: Debannir toutes les IPs d'un jail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, jail]
+              properties:
+                machine_id: { type: integer }
+                jail: { type: string }
+      responses:
+        '200': { description: Toutes IPs debannies }
+
+  /fail2ban/ban_all_servers:
+    post:
+      tags: [Fail2ban]
+      summary: Bannir une IP sur tous les serveurs (admin+)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip, jail]
+              properties:
+                ip: { type: string }
+                jail: { type: string, default: sshd }
+      responses:
+        '200':
+          description: Resultats par serveur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  results: { type: array, items: { type: object, properties: { server: { type: string }, success: { type: boolean } } } }
+
+  /fail2ban/templates:
+    get:
+      tags: [Fail2ban]
+      summary: Retourne les templates de config (permissif/modere/strict)
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  templates: { type: object }
+
+  /fail2ban/logs:
+    post:
+      tags: [Fail2ban]
+      summary: Lit les dernieres lignes de /var/log/fail2ban.log
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+                lines: { type: integer, default: 50 }
+      responses:
+        '200':
+          description: Contenu du log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  logs: { type: string }
+
+  /fail2ban/stats:
+    get:
+      tags: [Fail2ban]
+      summary: Stats bans/unbans par jour (timeline)
+      parameters:
+        - { name: server_id, in: query, required: true, schema: { type: integer } }
+        - { name: days, in: query, schema: { type: integer, default: 30 } }
+      responses:
+        '200':
+          description: Stats par jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  stats: { type: array, items: { type: object, properties: { day: { type: string }, action: { type: string }, count: { type: integer } } } }
+
+  /fail2ban/install_all:
+    post:
+      tags: [Fail2ban]
+      summary: Installer fail2ban sur tous les serveurs sans (admin+)
+      responses:
+        '200':
+          description: Resultats par serveur
+
+  /fail2ban/geoip:
+    post:
+      tags: [Fail2ban]
+      summary: Lookup GeoIP (pays) d'une IP
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip: { type: string, example: "8.8.8.8" }
+      responses:
+        '200':
+          description: Pays et code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  country: { type: string, example: "United States" }
+                  countryCode: { type: string, example: "US" }
+                  ip: { type: string }
+
+  # ── Services (systemd) ──────────────────────────────────────────────────
+
+  /services/list:
+    post:
+      tags: [Services]
+      summary: Liste des services systemd
+      description: Liste tous les services systemd sur un serveur avec statut, categorie et enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer, example: 1 }
+      responses:
+        '200':
+          description: Liste des services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  services:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string, example: "nginx" }
+                        active: { type: string, example: "active" }
+                        sub: { type: string, example: "running" }
+                        unit_file_state: { type: string, example: "enabled" }
+                        description: { type: string }
+                        category: { type: string, example: "web" }
+                        protected: { type: boolean }
+
+  /services/status:
+    post:
+      tags: [Services]
+      summary: Detail d'un service
+      description: Retourne le statut detaille (PID, memoire, uptime, description).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+      responses:
+        '200':
+          description: Detail du service
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  ActiveState: { type: string, example: "active" }
+                  SubState: { type: string, example: "running" }
+                  MainPID: { type: string, example: "1234" }
+                  MemoryCurrent: { type: string, example: "905216" }
+                  Description: { type: string }
+
+  /services/start:
+    post:
+      tags: [Services]
+      summary: Demarrer un service
+      description: Demarre un service systemd. Bloque si service protege (sshd, dbus).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+      responses:
+        '200':
+          description: Resultat
+        '403':
+          description: Service protege
+
+  /services/stop:
+    post:
+      tags: [Services]
+      summary: Arreter un service
+      description: Arrete un service systemd. Bloque si service protege.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+      responses:
+        '200':
+          description: Resultat
+        '403':
+          description: Service protege
+
+  /services/restart:
+    post:
+      tags: [Services]
+      summary: Redemarrer un service
+      description: Redemarre un service systemd. Bloque si service protege.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+      responses:
+        '200':
+          description: Resultat
+        '403':
+          description: Service protege
+
+  /services/enable:
+    post:
+      tags: [Services]
+      summary: Activer un service au boot
+      description: Active un service au demarrage (systemctl enable). Bloque si protege.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+      responses:
+        '200':
+          description: Resultat
+        '403':
+          description: Service protege
+
+  /services/disable:
+    post:
+      tags: [Services]
+      summary: Desactiver un service au boot
+      description: Desactive un service au demarrage (systemctl disable). Bloque si protege.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+      responses:
+        '200':
+          description: Resultat
+        '403':
+          description: Service protege
+
+  /services/logs:
+    post:
+      tags: [Services]
+      summary: Logs journalctl d'un service
+      description: Lit les dernieres lignes du journal systemd (journalctl -u).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, service]
+              properties:
+                machine_id: { type: integer, example: 1 }
+                service: { type: string, example: "nginx" }
+                lines: { type: integer, example: 100, default: 50 }
+      responses:
+        '200':
+          description: Logs du service
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  logs: { type: string }
+
+  /exclude_user:
+    post:
+      tags: [Admin]
+      summary: Exclure un utilisateur d'un serveur
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, machine_id]
+              properties:
+                user_id: { type: integer }
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Exclusion appliquee }
+
+  # ── Admin ────────────────────────────────────────────────────────────────
+
+  /server_lifecycle:
+    post:
+      tags: [Admin]
+      summary: Change le statut lifecycle d'un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, lifecycle_status]
+              properties:
+                machine_id: { type: integer }
+                lifecycle_status: { type: string, enum: [active, retiring, archived] }
+                retire_date: { type: string, format: date }
+      responses:
+        '200': { description: Mis a jour }
+        '400': { description: Parametres invalides }

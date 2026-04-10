@@ -1,0 +1,79 @@
+# =============================================================================
+# apache-http.conf.tmpl — Template VirtualHost HTTP (SSL_MODE=disabled)
+# =============================================================================
+#
+# Ce fichier est un TEMPLATE — il n'est pas lu directement par Apache.
+# entrypoint.sh le traite via envsubst au démarrage du conteneur pour
+# produire /etc/apache2/sites-available/000-default.conf.
+#
+# Utilisé quand RootWarden est déployé derrière un reverse proxy
+# (Nginx, Traefik, Caddy, HAProxy...) qui gère lui-même le TLS.
+# Dans ce scénario, le conteneur PHP ne reçoit que du trafic HTTP interne.
+#
+# Différences avec apache-ssl.conf.tmpl :
+#   - Un seul VirtualHost (port 80 uniquement — pas de port 443)
+#   - Pas de directives SSLEngine / SSLCertificateFile / SSLCertificateKeyFile
+#   - Pas de redirection HTTP → HTTPS (le proxy s'en charge)
+#   - Pas de header HSTS (Strict-Transport-Security) — c'est le proxy qui le pose,
+#     l'ajouter ici aussi créerait un doublon et pourrait casser la navigation
+#   - Ajout de SetEnvIf X-Forwarded-Proto pour que PHP sache qu'il est derrière HTTPS
+#
+# Variables substituées par entrypoint.sh :
+#   ${SERVER_NAME}  : FQDN ou IP du serveur
+#   ${SERVER_ADMIN} : adresse email de l'administrateur Apache
+#
+# Variable NON substituée (gérée par Apache lui-même) :
+#   ${APACHE_LOG_DIR} : résolu par /etc/apache2/envvars (/var/log/apache2)
+# =============================================================================
+
+# ── VirtualHost HTTP (port 80) ────────────────────────────────────────────────
+# Seul bloc présent en mode disabled. Pas de redirection HTTPS ici :
+# c'est le reverse proxy en amont qui assure la terminaison TLS et
+# qui redirige éventuellement les clients HTTP vers HTTPS.
+<VirtualHost *:80>
+    # Nom de domaine du serveur — doit correspondre à ce que le proxy envoie
+    ServerName ${SERVER_NAME}
+    # Email affiché dans les pages d'erreur Apache
+    ServerAdmin ${SERVER_ADMIN}
+    # Répertoire racine de l'application PHP RootWarden
+    DocumentRoot /var/www/html
+
+    # Permissions sur le répertoire web :
+    #   AllowOverride All  : les fichiers .htaccess peuvent modifier la config
+    #   Require all granted : accès ouvert (contrôle géré par l'application PHP)
+    <Directory /var/www/html>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # Transmission de l'information HTTPS depuis le reverse proxy.
+    # Quand le proxy reçoit une requête HTTPS et la retransmet en HTTP interne,
+    # il ajoute l'en-tête X-Forwarded-Proto: https.
+    # SetEnvIf positionne la variable d'env HTTPS=on pour que PHP et Apache
+    # considèrent la connexion comme sécurisée (important pour session.cookie_secure,
+    # les redirections PHP, etc.).
+    SetEnvIf X-Forwarded-Proto "https" HTTPS=on
+
+    # ── Headers de sécurité HTTP ─────────────────────────────────────────────
+    # Note : HSTS (Strict-Transport-Security) est volontairement ABSENT ici.
+    # En mode reverse proxy, c'est le proxy qui doit poser ce header sur sa
+    # propre réponse HTTPS. L'ajouter ici (sur du HTTP interne) serait sans effet
+    # et pourrait créer des doublons si le proxy le repose ensuite.
+    <IfModule mod_headers.c>
+        # Empêche le navigateur de détecter le type MIME automatiquement.
+        # Protège contre les attaques XSS via fichiers mal typés.
+        Header always set X-Content-Type-Options "nosniff"
+
+        # Interdit l'affichage de la page dans un <iframe>.
+        # Protège contre le clickjacking.
+        Header always set X-Frame-Options "DENY"
+
+        # Contrôle l'en-tête Referer lors des navigations cross-origin.
+        # Envoie uniquement l'origine (pas l'URL complète) vers d'autres domaines.
+        Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    </IfModule>
+
+    # Journaux Apache — ${APACHE_LOG_DIR} est substitué par Apache (pas par envsubst)
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>

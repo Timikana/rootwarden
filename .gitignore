@@ -1,0 +1,66 @@
+# Dependances
+__pycache__/
+*.pyc
+*.pyo
+node_modules/
+package-lock.json
+vendor/
+!vendor/composer/
+
+# Secrets — NE JAMAIS commiter ces fichiers
+srv-docker.env
+*.env
+!srv-docker.env.example
+!*.env.example
+.first_run_credentials
+www/.first_run_credentials
+
+# Certificats SSL generes localement
+certs/*.pem
+certs/*.crt
+certs/*.key
+ssl/
+backend/ssl/
+
+# Logs — generes au runtime
+*.log
+backend/logs/
+www/logs/
+
+# Backups — generes automatiquement
+backend/backups/
+backups/
+
+# Base de donnees locale
+mysql/data/
+
+# Cache Python
+backend/__pycache__/
+backend/routes/__pycache__/
+backend/tests/__pycache__/
+
+# Fichiers IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+.mcp.json
+
+# Flag premier demarrage (genere par install.sh)
+www/.installed
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend build
+frontend/node_modules/
+
+# Fichiers sensibles generes
+*.sql.gz
+*.bak
+*.dump
+fernet.key

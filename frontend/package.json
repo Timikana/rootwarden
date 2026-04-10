@@ -1,0 +1,11 @@
+{
+  "name": "rootwarden-frontend",
+  "private": true,
+  "scripts": {
+    "build": "npx tailwindcss -i ./src/styles.css -o ../www/assets/css/tailwind.css --minify",
+    "watch": "npx tailwindcss -i ./src/styles.css -o ../www/assets/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4"
+  }
+}

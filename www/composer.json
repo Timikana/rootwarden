@@ -1,0 +1,13 @@
+{
+  "require": {
+      "endroid/qr-code": "^6",
+      "bacon/bacon-qr-code": "^3.0",
+      "php": "^8.2",
+      "spomky-labs/otphp": "^11",
+      "ext-mbstring": "*",
+      "paragonie/constant_time_encoding": "^2.0 || ^3.0",
+      "psr/clock": "^1.0",
+      "symfony/deprecation-contracts": "^3.2",
+      "phpmailer/phpmailer": "^6.9"
+  }
+}

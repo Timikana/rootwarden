@@ -1,0 +1,27 @@
+# Ruff configuration for RootWarden backend
+# https://docs.astral.sh/ruff/configuration/
+
+line-length = 140
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",   # Line too long — SQL queries are verbose
+    "E402",   # Module level import not at top — conftest mocks before imports
+    "E701",   # Multiple statements on one line — used in compact score mapping
+    "E711",   # Comparison to None — used in SQL-style code
+    "E712",   # Comparison to True/False
+    "E722",   # Bare except — used in legacy decryption fallbacks
+    "E731",   # Lambda assignment — used in mail template builder
+    "E741",   # Ambiguous variable name (l) — used in list comprehensions
+    "F401",   # Imported but unused — re-exports in helpers.py
+    "F541",   # f-string without placeholders — multiline string concatenation
+    "F811",   # Redefinition of unused import — conditional imports
+    "F841",   # Local variable assigned but unused — exception variables
+    "W291",   # Trailing whitespace
+    "W293",   # Blank line contains whitespace
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["E402", "F811"]

@@ -1,0 +1,24 @@
+# Tests et outils dev
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+ruff.toml
+
+# Logs (montes en volume)
+logs/
+
+# Documentation
+*.md
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+*.env

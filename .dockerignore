@@ -1,0 +1,33 @@
+# Git
+.git
+.github/
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+ARCHITECTURE.md
+
+# Backend (construit separement)
+backend/tests/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/logs/
+backend/ruff.toml
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# Env
+srv-docker.env
+*.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Dev containers
+mock-opencve/
+test-server/
