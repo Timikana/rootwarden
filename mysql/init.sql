@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS permissions (
     can_schedule_cve        BOOLEAN NOT NULL DEFAULT FALSE,
     can_manage_fail2ban     BOOLEAN NOT NULL DEFAULT FALSE,
     can_manage_services     BOOLEAN NOT NULL DEFAULT FALSE,
+    can_audit_ssh           BOOLEAN NOT NULL DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -239,8 +240,8 @@ INSERT INTO users (name, password, ssh_key, role_id, active, sudo) VALUES
 --     (2, 1);
 
 -- Insertion des permissions utilisateur
-INSERT INTO permissions (user_id, can_deploy_keys, can_update_linux, can_manage_iptables, can_admin_portal, can_scan_cve, can_manage_remote_users, can_manage_platform_key, can_view_compliance, can_manage_backups, can_schedule_cve, can_manage_fail2ban, can_manage_services) VALUES
-    (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1); -- superadmin : accès total
+INSERT INTO permissions (user_id, can_deploy_keys, can_update_linux, can_manage_iptables, can_admin_portal, can_scan_cve, can_manage_remote_users, can_manage_platform_key, can_view_compliance, can_manage_backups, can_schedule_cve, can_manage_fail2ban, can_manage_services, can_audit_ssh) VALUES
+    (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1); -- superadmin : accès total
 
 -- Insertion d'exemples dans package_exclusions
 INSERT INTO package_exclusions (package_name, added_by) VALUES
@@ -414,7 +415,8 @@ INSERT IGNORE INTO schema_migrations (version, filename, description) VALUES
     ('017', '017_service_account.sql', 'Service account rootwarden'),
     ('018', '018_force_password_change.sql', 'Force password change flag'),
     ('019', '019_fail2ban.sql', 'Fail2ban permission + history + status'),
-    ('020', '020_services.sql', 'Services systemd permission');
+    ('020', '020_services.sql', 'Services systemd permission'),
+    ('021', '021_ssh_audit.sql', 'SSH audit permission + results + policies');
 
 -- Table des permissions temporaires
 CREATE TABLE IF NOT EXISTS temporary_permissions (
@@ -460,6 +462,37 @@ CREATE TABLE IF NOT EXISTS notifications (
     INDEX idx_user_read (user_id, read_at),
     INDEX idx_type (type),
     INDEX idx_created (created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SSH Audit — résultats des scans et politiques d'exclusion
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS ssh_audit_results (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    machine_id INT NOT NULL,
+    score INT NOT NULL DEFAULT 0,
+    grade VARCHAR(5) NOT NULL DEFAULT 'F',
+    ssh_version VARCHAR(100) DEFAULT NULL,
+    findings_json TEXT,
+    scanned_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
+    FOREIGN KEY (scanned_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_machine_date (machine_id, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ssh_audit_policies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    machine_id INT NULL,
+    directive VARCHAR(100) NOT NULL,
+    action ENUM('audit','ignore') DEFAULT 'audit',
+    reason VARCHAR(255) DEFAULT '',
+    updated_by INT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY uniq_machine_directive (machine_id, directive)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Attribution des privilèges MySQL pour l'utilisateur applicatif 'ssh_user'

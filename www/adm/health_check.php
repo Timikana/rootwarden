@@ -113,6 +113,15 @@ $routes = [
     ['Fail2ban Install All',   'POST', '/fail2ban/install_all', [], t('health.route_f2b_install_all')],
     ['Fail2ban GeoIP',         'POST', '/fail2ban/geoip', ['ip' => '8.8.8.8'], t('health.route_f2b_geoip')],
 
+    // ── SSH Audit ────────────────────────────────────────────────────────
+    ['SSH Audit Scan',         'POST', '/ssh_audit/scan', ['machine_id' => $machineId], t('ssh_audit.scan')],
+    ['SSH Audit Scan All',     'POST', '/ssh_audit/scan_all', [], t('ssh_audit.scan_all')],
+    ['SSH Audit Fix',          'POST', '/ssh_audit/fix', ['machine_id' => $machineId, 'key' => 'PermitRootLogin', 'value' => 'no'], t('ssh_audit.fix')],
+    ['SSH Audit Config',       'POST', '/ssh_audit/config', ['machine_id' => $machineId], t('ssh_audit.view_config')],
+    ['SSH Audit History',      'GET',  "/ssh_audit/history?machine_id=$machineId", null, t('ssh_audit.history')],
+    ['SSH Audit Fleet',        'GET',  '/ssh_audit/fleet', null, t('ssh_audit.fleet_view')],
+    ['SSH Audit Policies',     'GET',  '/ssh_audit/policies', null, t('ssh_audit.policies_title')],
+
     // ── Services systemd ─────────────────────────────────────────────────
     ['Services List',          'POST', '/services/list', ['machine_id' => $machineId], 'Liste services systemd'],
     ['Service Status',         'POST', '/services/status', ['machine_id' => $machineId, 'service' => 'cron'], 'Detail service (PID, memoire)'],

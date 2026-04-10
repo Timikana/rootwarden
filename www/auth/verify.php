@@ -183,6 +183,7 @@ if (!isset($_SESSION['permissions'])) {
         'can_schedule_cve'        => 0,
         'can_manage_fail2ban'     => 0,
         'can_manage_services'    => 0,
+        'can_audit_ssh'          => 0,
     ];
 }
 

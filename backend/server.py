@@ -12,6 +12,7 @@ Les routes sont decoupees en modules dans le dossier routes/ :
   - routes/iptables.py    : regles firewall, validation, historique, rollback
   - routes/ssh.py         : deploy, logs, preflight, keypair plateforme, scan users
   - routes/admin.py       : backups, lifecycle serveur, exclusions
+  - routes/ssh_audit.py   : audit sshd_config, fix, policies
 
 Helpers partages dans routes/helpers.py :
   require_api_key, threaded_route, get_db_connection, server_decrypt_password
@@ -63,6 +64,7 @@ from routes.ssh import bp as ssh_bp
 from routes.updates import bp as updates_bp
 from routes.fail2ban import bp as fail2ban_bp
 from routes.services import bp as services_bp
+from routes.ssh_audit import bp as ssh_audit_bp
 
 app.register_blueprint(monitoring_bp)
 app.register_blueprint(iptables_bp)
@@ -72,6 +74,7 @@ app.register_blueprint(ssh_bp)
 app.register_blueprint(updates_bp)
 app.register_blueprint(fail2ban_bp)
 app.register_blueprint(services_bp)
+app.register_blueprint(ssh_audit_bp)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS manuel (compatible Hypercorn ASGI)
