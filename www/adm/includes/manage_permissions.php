@@ -39,8 +39,13 @@ $permGroups = [
         'can_schedule_cve'    => ['label' => 'Planif. CVE','desc' => 'Planifier les scans automatiques'],
     ],
 ];
-$canEdit = $_SESSION['role_id'] >= 3;
-$canEditPartial = $_SESSION['role_id'] >= 2;
+// Lire le role depuis la BDD (fiable, $_SESSION['role_id'] peut etre incorrect apres le flow 2FA)
+$_permRoleStmt = $pdo->prepare("SELECT role_id FROM users WHERE id = ?");
+$_permRoleStmt->execute([$_SESSION['user_id']]);
+$_permRoleRow = $_permRoleStmt->fetch(PDO::FETCH_ASSOC);
+$_currentRole = $_permRoleRow ? (int)$_permRoleRow['role_id'] : 0;
+$canEdit = $_currentRole >= 3;
+$canEditPartial = $_currentRole >= 2;
 ?>
 
 <div class="flex items-center justify-between mb-2">
