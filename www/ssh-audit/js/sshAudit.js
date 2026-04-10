@@ -23,7 +23,7 @@ function onServerChange() {
     document.getElementById('history-container').classList.remove('hidden');
     loadHistory(srv.id);
     // Load policies if admin
-    if (window.IS_ADMIN) loadPolicies(srv.id);
+    loadPolicies(srv.id);
     appendLog(__('audit_server_selected', { server: srv.name }));
 }
 
@@ -133,7 +133,7 @@ async function scanServer() {
         loadHistory(srv.id);
 
         // Load policies if admin
-        if (window.IS_ADMIN) {
+        {
             loadPolicies(srv.id);
         }
 
@@ -149,7 +149,7 @@ async function scanServer() {
 // ── Scan all servers (admin) ────────────────────────────────────────────────
 
 async function scanAll() {
-    if (!window.IS_ADMIN) return;
+    
 
     clearLogs();
     appendLog(__('audit_scanning_all'));
@@ -209,7 +209,7 @@ function closeConfigModal() {
 // ── Fix directive (admin) ───────────────────────────────────────────────────
 
 async function fixDirective(key, value) {
-    if (!_currentServer || !window.IS_ADMIN) return;
+    if (!_currentServer ) return;
     if (!confirm(__('audit_fix_confirm', { key: key, value: value, server: _currentServer.name }))) return;
 
     appendLog(__('audit_fixing', { key: key, server: _currentServer.name }));
@@ -273,7 +273,7 @@ async function loadHistory(machineId) {
 // ── Policies (admin) ────────────────────────────────────────────────────────
 
 async function loadPolicies(machineId) {
-    if (!window.IS_ADMIN) return;
+    
 
     try {
         const d = await apiGet(`/ssh-audit/policies?machine_id=${encodeURIComponent(machineId)}`);
@@ -313,7 +313,7 @@ async function loadPolicies(machineId) {
 }
 
 async function togglePolicy(directive, policy) {
-    if (!_currentServer || !window.IS_ADMIN) return;
+    if (!_currentServer ) return;
 
     let reason = '';
     if (policy === 'ignore') {
@@ -387,7 +387,7 @@ function renderFindings(findings) {
             : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
 
         let actionHtml = '';
-        if (window.IS_ADMIN && f.fixable) {
+        if (true && f.fixable) {
             actionHtml = `<button onclick="fixDirective('${escAttr(f.directive)}', '${escAttr(f.recommended)}')" class="text-xs px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium">${escHtml(__('audit_btn_fix'))}</button>`;
         }
 
@@ -399,14 +399,14 @@ function renderFindings(findings) {
                 <td class="py-2 px-3 text-xs font-mono text-green-600 dark:text-green-400">${escHtml(f.recommended || '')}</td>
                 <td class="py-2 px-3 text-xs text-gray-500 dark:text-gray-400 max-w-xs">${escHtml(f.description || '')}</td>
                 <td class="py-2 px-3">
-                    ${window.IS_ADMIN
+                    ${true
                         ? `<button onclick="toggleDirective('${escAttr(f.directive)}', ${f.current !== '(absent)'})"
                              class="text-xs px-2 py-1 rounded ${f.current !== '(absent)' ? 'bg-green-100 dark:bg-green-900/30 text-green-700' : 'bg-gray-100 dark:bg-gray-600 text-gray-500'} transition-colors"
                              title="${f.current !== '(absent)' ? escAttr(__('audit_toggle_disable', {key: f.directive})) : escAttr(__('audit_toggle_enable', {key: f.directive}))}"
                             >${f.current !== '(absent)' ? escHtml(__('audit_directive_enabled')) : escHtml(__('audit_directive_disabled'))}</button>`
                         : `<span class="px-2 py-0.5 rounded-full text-xs font-bold ${policyCls}">${escHtml(policyLabel)}</span>`}
                 </td>
-                ${window.IS_ADMIN ? `<td class="py-2 px-3 text-right">${actionHtml}</td>` : ''}
+                ${true ? `<td class="py-2 px-3 text-right">${actionHtml}</td>` : ''}
             </tr>`;
     }).join('');
 }
