@@ -25,6 +25,7 @@ $permGroups = [
         'can_manage_iptables' => ['label' => 'Iptables',      'desc' => 'Regles de pare-feu'],
         'can_manage_fail2ban' => ['label' => 'Fail2ban',      'desc' => 'Gestion des bans IP'],
         'can_manage_services' => ['label' => t('perms.label_services'), 'desc' => t('perms.desc_services')],
+        'can_audit_ssh'       => ['label' => t('perms.label_ssh_audit'), 'desc' => t('perms.desc_ssh_audit')],
         'can_scan_cve'        => ['label' => 'Scan CVE',      'desc' => 'Scanner les vulnerabilites'],
     ],
     'Administration' => [

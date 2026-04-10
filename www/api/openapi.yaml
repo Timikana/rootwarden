@@ -31,6 +31,8 @@ tags:
     description: Gestion du pare-feu iptables (regles, historique, rollback)
   - name: Fail2ban
     description: Gestion Fail2ban (statut, jails, ban/unban, installation, services)
+  - name: SSH Audit
+    description: Audit de la configuration sshd_config (scan, fix, historique, politiques)
   - name: Admin
     description: Backups, lifecycle serveur, permissions temporaires
 
@@ -1596,6 +1598,157 @@ paths:
                 machine_id: { type: integer }
       responses:
         '200': { description: Exclusion appliquee }
+
+  # ── SSH Audit ─────────────────────────────────────────────────────────────
+
+  /ssh_audit/scan:
+    post:
+      tags: [SSH Audit]
+      summary: Scanner la configuration sshd_config d'un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200':
+          description: Resultat du scan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  score: { type: integer }
+                  grade: { type: string }
+                  findings: { type: array, items: { type: object } }
+
+  /ssh_audit/scan_all:
+    post:
+      tags: [SSH Audit]
+      summary: Scanner la configuration SSH de tous les serveurs
+      responses:
+        '200':
+          description: Resultats agrégés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  results: { type: array, items: { type: object } }
+
+  /ssh_audit/fix:
+    post:
+      tags: [SSH Audit]
+      summary: Corriger une directive sshd_config et recharger sshd
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, key, value]
+              properties:
+                machine_id: { type: integer }
+                key: { type: string }
+                value: { type: string }
+      responses:
+        '200': { description: Directive corrigee }
+        '400': { description: Parametres invalides }
+
+  /ssh_audit/config:
+    post:
+      tags: [SSH Audit]
+      summary: Recuperer le contenu de sshd_config d'un serveur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200':
+          description: Contenu du fichier sshd_config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  config: { type: string }
+
+  /ssh_audit/history:
+    get:
+      tags: [SSH Audit]
+      summary: Historique des scans SSH d'un serveur
+      parameters:
+        - name: machine_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Liste des scans precedents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  history: { type: array, items: { type: object } }
+
+  /ssh_audit/fleet:
+    get:
+      tags: [SSH Audit]
+      summary: Vue du parc — dernier score SSH de chaque serveur
+      responses:
+        '200':
+          description: Scores par serveur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  servers: { type: array, items: { type: object } }
+
+  /ssh_audit/policies:
+    get:
+      tags: [SSH Audit]
+      summary: Lister les politiques d'audit SSH
+      parameters:
+        - name: machine_id
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Politiques d'exclusion par directive
+    post:
+      tags: [SSH Audit]
+      summary: Mettre a jour une politique d'audit SSH
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [directive, action]
+              properties:
+                machine_id: { type: integer }
+                directive: { type: string }
+                action: { type: string, enum: [audit, ignore] }
+                reason: { type: string }
+      responses:
+        '200': { description: Politique mise a jour }
 
   # ── Admin ────────────────────────────────────────────────────────────────
 

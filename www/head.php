@@ -177,7 +177,7 @@ function toast(message, type = 'info', duration = 4000) {
         if (gPressed) {
             gPressed = false;
             const routes = {h: '/', s: '/services/services_manager.php', S: '/ssh/ssh_management.php', u: '/update/linux_updates.php',
-                           c: '/security/cve_scan.php', a: '/adm/admin_page.php', i: '/iptables/iptables_manager.php',
+                           c: '/security/cve_scan.php', a: '/adm/admin_page.php', A: '/ssh-audit/ssh_audit.php', i: '/iptables/iptables_manager.php',
                            d: '/documentation.php', p: '/profile.php', r: '/security/compliance_report.php',
                            k: '/adm/platform_keys.php', m: '/adm/server_users.php'};
             if (routes[e.key]) { window.location.href = routes[e.key]; return; }
@@ -203,6 +203,7 @@ function toast(message, type = 'info', duration = 4000) {
                         <div class="flex justify-between"><span class="text-gray-500">Scan CVE</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g c</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Iptables</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g i</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Administration</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g a</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Audit SSH</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g A</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Profil</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g p</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Rapport conformite</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g r</span></div>
                         <div class="flex justify-between"><span class="text-gray-500">Users distants</span><span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">g m</span></div>

@@ -124,6 +124,12 @@ if ($oldKeys > 0) {
     $alerts[] = ['type' => 'error', 'msg' => t('dashboard.alert_old_keys', ['count' => $oldKeys]) . " : $names", 'link' => '/adm/admin_page.php#tab-users'];
 }
 
+// SSH Audit alerts
+try {
+    $lowSshScore = (int) $pdo->query("SELECT COUNT(*) FROM ssh_audit_results r INNER JOIN (SELECT machine_id, MAX(id) as last_id FROM ssh_audit_results GROUP BY machine_id) l ON r.id = l.last_id WHERE r.score < 50")->fetchColumn();
+    if ($lowSshScore > 0) $alerts[] = ['type' => 'error', 'msg' => t('dashboard.alert_ssh_audit', ['count' => $lowSshScore]), 'link' => '/ssh-audit/ssh_audit.php'];
+} catch (\Exception $e) {}
+
 // Fail2ban alerts (calculees apres le query dashboard)
 // Seront evaluees plus bas apres les queries fail2ban_status
 ?>

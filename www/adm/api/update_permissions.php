@@ -99,6 +99,7 @@ $allowedPermissions = [
     'can_schedule_cve',
     'can_manage_fail2ban',
     'can_manage_services',
+    'can_audit_ssh',
 ];
 
 // Rejet immédiat si la permission n'est pas dans la liste autorisée
@@ -136,6 +137,7 @@ if ($success) {
             'can_schedule_cve' => ['Planif. CVE', 'Scans planifies'],
             'can_manage_fail2ban' => ['Fail2ban', 'Bans IP serveurs'],
             'can_manage_services' => ['Services', 'Services systemd'],
+            'can_audit_ssh' => ['Audit SSH', 'Audit config SSH'],
         ];
         $info = $permLabels[$permission] ?? [$permission, ''];
         $checkedAttr = $checked ? 'checked' : '';
