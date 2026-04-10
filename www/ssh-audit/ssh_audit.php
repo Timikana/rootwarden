@@ -94,6 +94,11 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
                 <button type="button" onclick="viewConfig()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <?= t('ssh_audit.btn_view_config') ?>
                 </button>
+                <?php if ($isAdmin): ?>
+                <button onclick="openEditor()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"><?= t('ssh_audit.btn_edit') ?></button>
+                <button onclick="reloadSshd()" class="text-xs px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors font-medium"><?= t('ssh_audit.btn_reload') ?></button>
+                <button onclick="loadBackups()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"><?= t('ssh_audit.btn_backups') ?></button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -184,6 +189,39 @@ $isAdmin = (int) $_SESSION['role_id'] >= 2;
             <div id="logs-container" class="bg-gray-900 text-green-400 text-xs p-4 rounded-lg font-mono max-h-64 overflow-y-auto"></div>
         </div>
 
+    </div>
+
+    <!-- Editor modal (admin) -->
+    <div id="editor-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200"><?= t('ssh_audit.editor_title') ?></h3>
+                <button onclick="closeEditor()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            <div class="px-6 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                <p class="text-xs text-amber-700 dark:text-amber-400"><?= t('ssh_audit.editor_warning') ?></p>
+            </div>
+            <div class="flex-1 overflow-hidden p-4">
+                <textarea id="editor-content" class="w-full h-full min-h-[400px] font-mono text-sm bg-gray-900 text-green-400 p-4 rounded-lg border border-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" spellcheck="false"></textarea>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                <button onclick="closeEditor()" class="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"><?= t('common.cancel') ?></button>
+                <button onclick="saveConfig()" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"><?= t('ssh_audit.btn_save_config') ?></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backups modal (admin) -->
+    <div id="backups-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200"><?= t('ssh_audit.backups_title') ?></h3>
+                <button onclick="document.getElementById('backups-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            <div class="p-6 max-h-80 overflow-y-auto" id="backups-list">
+                <p class="text-sm text-gray-400"><?= t('common.loading') ?></p>
+            </div>
+        </div>
     </div>
 
     <script>window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;</script>

@@ -375,7 +375,14 @@ function renderFindings(findings) {
                 <td class="py-2 px-3 text-xs font-mono text-red-600 dark:text-red-400">${escHtml(f.current || '')}</td>
                 <td class="py-2 px-3 text-xs font-mono text-green-600 dark:text-green-400">${escHtml(f.recommended || '')}</td>
                 <td class="py-2 px-3 text-xs text-gray-500 dark:text-gray-400 max-w-xs">${escHtml(f.description || '')}</td>
-                <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-xs font-bold ${policyCls}">${escHtml(policyLabel)}</span></td>
+                <td class="py-2 px-3">
+                    ${window.IS_ADMIN
+                        ? `<button onclick="toggleDirective('${escAttr(f.directive)}', ${f.current !== '(absent)'})"
+                             class="text-xs px-2 py-1 rounded ${f.current !== '(absent)' ? 'bg-green-100 dark:bg-green-900/30 text-green-700' : 'bg-gray-100 dark:bg-gray-600 text-gray-500'} transition-colors"
+                             title="${f.current !== '(absent)' ? escAttr(__('audit_toggle_disable', {key: f.directive})) : escAttr(__('audit_toggle_enable', {key: f.directive}))}"
+                            >${f.current !== '(absent)' ? escHtml(__('audit_directive_enabled')) : escHtml(__('audit_directive_disabled'))}</button>`
+                        : `<span class="px-2 py-0.5 rounded-full text-xs font-bold ${policyCls}">${escHtml(policyLabel)}</span>`}
+                </td>
                 ${window.IS_ADMIN ? `<td class="py-2 px-3 text-right">${actionHtml}</td>` : ''}
             </tr>`;
     }).join('');
@@ -436,4 +443,121 @@ function escAttr(s) {
     return String(s).replace(/&/g, '&amp;').replace(/'/g, '&#39;')
                      .replace(/"/g, '&quot;').replace(/</g, '&lt;')
                      .replace(/>/g, '&gt;').replace(/\\/g, '\\\\');
+}
+
+// ── Editor ──────────────────────────────────────────────────────────────────
+
+async function openEditor() {
+    if (!_currentServer) { toast(__('audit_select_server'), 'warning'); return; }
+    appendLog(__('audit_editor_loading', { server: _currentServer.name }));
+    try {
+        const d = await apiPost('/ssh-audit/config', serverPayload());
+        if (!d.success) { toast(d.message, 'error'); return; }
+        document.getElementById('editor-content').value = d.config || '';
+        document.getElementById('editor-modal').classList.remove('hidden');
+    } catch (e) { toast(__('exception_with_msg', { msg: e }), 'error'); }
+}
+
+function closeEditor() {
+    document.getElementById('editor-modal').classList.add('hidden');
+}
+
+async function saveConfig() {
+    if (!_currentServer) return;
+    if (!confirm(__('audit_save_confirm', { server: _currentServer.name }))) return;
+    const config = document.getElementById('editor-content').value;
+    appendLog(__('audit_saving_config', { server: _currentServer.name }));
+    try {
+        const d = await apiPost('/ssh-audit/save-config', { ...serverPayload(), config });
+        if (d.success) {
+            toast(__('audit_saved'), 'success');
+            appendLog(__('audit_saved'));
+            closeEditor();
+        } else {
+            toast(__('audit_save_error', { msg: d.message }), 'error');
+            appendLog(__('audit_save_error', { msg: d.message }));
+        }
+    } catch (e) { toast(__('exception_with_msg', { msg: e }), 'error'); }
+}
+
+// ── Toggle directive ON/OFF ─────────────────────────────────────────────────
+
+async function toggleDirective(key, currentlyEnabled) {
+    if (!_currentServer) return;
+    const action = currentlyEnabled ? 'disable' : 'enable';
+    const confirmKey = currentlyEnabled ? 'audit_toggle_disable' : 'audit_toggle_enable';
+    if (!confirm(__(confirmKey, { key }))) return;
+
+    appendLog(__('audit_toggling', { key, action }));
+    try {
+        const d = await apiPost('/ssh-audit/toggle', { ...serverPayload(), directive: key, enable: !currentlyEnabled });
+        if (d.success) {
+            toast(__('audit_toggled', { key, action }), 'success');
+            appendLog(__('audit_toggled', { key, action }));
+            scanServer(); // Refresh findings
+        } else {
+            toast(d.message, 'error');
+        }
+    } catch (e) { toast(__('exception_with_msg', { msg: e }), 'error'); }
+}
+
+// ── Backups ─────────────────────────────────────────────────────────────────
+
+async function loadBackups() {
+    if (!_currentServer) { toast(__('audit_select_server'), 'warning'); return; }
+    document.getElementById('backups-modal').classList.remove('hidden');
+    const list = document.getElementById('backups-list');
+    list.innerHTML = `<p class="text-sm text-gray-400">${escHtml(__('audit_loading_backups'))}</p>`;
+
+    try {
+        const d = await apiPost('/ssh-audit/backups', serverPayload());
+        if (!d.success || !d.backups || d.backups.length === 0) {
+            list.innerHTML = `<p class="text-sm text-gray-400">${escHtml(__('audit_no_backups'))}</p>`;
+            return;
+        }
+        list.innerHTML = d.backups.map(b => `
+            <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 mb-2">
+                <div>
+                    <span class="text-sm font-mono text-gray-700 dark:text-gray-300">${escHtml(b.filename)}</span>
+                    <span class="text-xs text-gray-400 ml-2">${escHtml(b.date)}</span>
+                    <span class="text-xs text-gray-400 ml-2">${Math.round(b.size / 1024)} KB</span>
+                </div>
+                <button onclick="restoreBackup('${escAttr(b.filename)}')" class="text-xs px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white">${escHtml(__('audit_btn_restore'))}</button>
+            </div>
+        `).join('');
+    } catch (e) { list.innerHTML = `<p class="text-sm text-red-400">Error</p>`; }
+}
+
+async function restoreBackup(backupName) {
+    if (!_currentServer) return;
+    if (!confirm(__('audit_restore_confirm', { name: backupName, server: _currentServer.name }))) return;
+
+    try {
+        const d = await apiPost('/ssh-audit/restore', { ...serverPayload(), backup_name: backupName });
+        toast(d.success ? __('audit_restored') : d.message, d.success ? 'success' : 'error');
+        appendLog(d.success ? __('audit_restored') : d.message);
+        if (d.success) document.getElementById('backups-modal').classList.add('hidden');
+    } catch (e) { toast(__('exception_with_msg', { msg: e }), 'error'); }
+}
+
+// ── Reload sshd ─────────────────────────────────────────────────────────────
+
+async function reloadSshd() {
+    if (!_currentServer) { toast(__('audit_select_server'), 'warning'); return; }
+    if (!confirm(__('audit_reload_confirm', { server: _currentServer.name }))) return;
+
+    appendLog(__('audit_reloading', { server: _currentServer.name }));
+    try {
+        const d = await apiPost('/ssh-audit/reload', serverPayload());
+        if (d.success) {
+            toast(__('audit_reloaded'), 'success');
+            appendLog(__('audit_reloaded'));
+            // Auto rescan after reload
+            appendLog(__('audit_rescanning_after_reload'));
+            scanServer();
+        } else {
+            toast(__('audit_reload_error', { msg: d.message }), 'error');
+            appendLog(__('audit_reload_error', { msg: d.message }));
+        }
+    } catch (e) { toast(__('exception_with_msg', { msg: e }), 'error'); }
 }
