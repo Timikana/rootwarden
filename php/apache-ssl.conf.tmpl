@@ -1,0 +1,94 @@
+# =============================================================================
+# apache-ssl.conf.tmpl — Template VirtualHost HTTPS (SSL_MODE=auto ou custom)
+# =============================================================================
+#
+# Ce fichier est un TEMPLATE — il n'est pas lu directement par Apache.
+# entrypoint.sh le traite via envsubst au démarrage du conteneur pour
+# produire /etc/apache2/sites-available/000-default.conf.
+#
+# Variables substituées par entrypoint.sh :
+#   ${SERVER_NAME}     : FQDN ou IP du serveur (ex: rootwarden.example.com)
+#   ${SERVER_ADMIN}    : adresse email de l'administrateur Apache
+#   ${SSL_CERT_PATH}   : chemin absolu vers le certificat SSL (.crt)
+#   ${SSL_KEY_PATH}    : chemin absolu vers la clé privée SSL (.pem)
+#
+# Variable NON substituée (gérée par Apache lui-même) :
+#   ${APACHE_LOG_DIR}  : résolu par /etc/apache2/envvars (/var/log/apache2)
+#                        Ne jamais l'inclure dans la liste envsubst.
+# =============================================================================
+
+# ── VirtualHost HTTP (port 80) ────────────────────────────────────────────────
+# En mode SSL, ce bloc n'a qu'un rôle : rediriger toutes les requêtes HTTP
+# vers leur équivalent HTTPS. Aucun contenu n'est servi en clair.
+<VirtualHost *:80>
+    # Nom de domaine principal du serveur — doit correspondre au CN du certificat
+    ServerName ${SERVER_NAME}
+    # Email affiché dans les pages d'erreur Apache
+    ServerAdmin ${SERVER_ADMIN}
+    # Répertoire racine des sources PHP (même valeur que le VirtualHost 443)
+    DocumentRoot /var/www/html
+
+    # Redirection permanente HTTP → HTTPS (code 301 = mise en cache par le navigateur)
+    # RewriteCond : ne s'applique que si HTTPS n'est pas déjà actif
+    # RewriteRule : redirige toute URL vers la version HTTPS du même hôte
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^/?(.*) https://%{HTTP_HOST}/$1 [R=301,L]
+
+    # Journaux Apache — ${APACHE_LOG_DIR} est substitué par Apache (pas par envsubst)
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+
+
+# ── VirtualHost HTTPS (port 443) ─────────────────────────────────────────────
+# Bloc principal servi aux clients. Requiert que le module ssl soit activé
+# (a2enmod ssl — fait dans le Dockerfile).
+<VirtualHost *:443>
+    # Nom de domaine — doit correspondre exactement au CN ou SAN du certificat SSL
+    ServerName ${SERVER_NAME}
+    ServerAdmin ${SERVER_ADMIN}
+    DocumentRoot /var/www/html
+
+    # Activation du moteur SSL pour ce VirtualHost
+    SSLEngine on
+    # Chemin vers le certificat public (.crt ou .pem) présenté au navigateur
+    SSLCertificateFile    ${SSL_CERT_PATH}
+    # Chemin vers la clé privée associée — ne doit JAMAIS être accessible publiquement
+    SSLCertificateKeyFile ${SSL_KEY_PATH}
+
+    # Permissions sur le répertoire web :
+    #   AllowOverride All  : les fichiers .htaccess peuvent modifier la config
+    #   Require all granted : accès ouvert (contrôle d'accès géré par l'appli PHP)
+    <Directory /var/www/html>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # ── Headers de sécurité HTTP ─────────────────────────────────────────────
+    # Appliqués uniquement si le module headers est chargé (a2enmod headers).
+    <IfModule mod_headers.c>
+        # HSTS : force le navigateur à utiliser HTTPS pour ce domaine pendant 1 an.
+        # includeSubDomains : s'applique aussi aux sous-domaines.
+        # preload : permet l'inscription dans la liste de préchargement des navigateurs.
+        # ATTENTION : ne pas activer si le domaine n'est pas encore 100% HTTPS.
+        Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+        # Empêche le navigateur de détecter ("sniffer") le type MIME automatiquement.
+        # Protège contre certaines attaques XSS via des fichiers mal typés.
+        Header always set X-Content-Type-Options "nosniff"
+
+        # Interdit l'affichage de la page dans un <iframe> ou <frame>.
+        # Protège contre le clickjacking.
+        Header always set X-Frame-Options "DENY"
+
+        # Contrôle les informations envoyées dans l'en-tête Referer lors des navigations.
+        # "strict-origin-when-cross-origin" : envoie l'origine seule vers d'autres domaines,
+        # l'URL complète uniquement vers le même domaine (bon équilibre sécurité/analytics).
+        Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    </IfModule>
+
+    # Journaux Apache séparés pour les erreurs et les accès
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>

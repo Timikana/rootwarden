@@ -1,0 +1,21 @@
+-- ============================================================
+-- Migration 001 — Schéma initial
+-- Version : 1.0.0
+-- Date    : 2025-01-01
+-- Auteur  : RootWarden
+-- ============================================================
+-- Ce fichier est un MARQUEUR de migration.
+-- Le schéma initial est défini dans mysql/init.sql qui est
+-- exécuté automatiquement par Docker au premier démarrage.
+-- Les nouvelles installations marquent cette migration comme
+-- déjà appliquée via init.sql (INSERT INTO schema_migrations).
+--
+-- Tables couvertes :
+--   roles, users, remember_tokens, login_attempts, machines,
+--   update_schedules, user_machine_access, permissions,
+--   iptables_rules, linux_versions, package_exclusions,
+--   user_logs, user_exclusions
+-- ============================================================
+
+-- (intentionnellement vide — voir mysql/init.sql)
+SELECT 1;

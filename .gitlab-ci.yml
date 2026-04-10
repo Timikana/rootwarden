@@ -1,0 +1,19 @@
+#.gitlab-ci.yml
+stages:
+  - deploy
+
+deploy_to_srv_docker:
+  stage: deploy
+  script:
+    - echo "Déploiement sur Gestion_SSH_KEY..."
+    - cd /srv/Gestion_SSH_KEY
+    - sudo chown -R gitlab-runner:gitlab-runner /srv/Gestion_SSH_KEY/
+    - sudo chmod -R 755 /srv/Gestion_SSH_KEY/
+    - git reset --hard HEAD  # Supprime toutes les modifications locales pour éviter le conflit
+    - git clean -fd  # Supprime les fichiers non suivis pour éviter tout conflit
+    - git pull origin main --force  # Force la mise à jour sans conflit
+    - docker-compose down
+    - docker-compose build
+    - docker-compose up -d
+  only:
+    - main
