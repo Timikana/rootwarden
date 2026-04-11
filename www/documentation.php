@@ -8,7 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-checkAuth([1, 2, 3]); // Tous les utilisateurs connectés
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]); // Tous les utilisateurs connectés
 
 $appVersion = trim(@file_get_contents(__DIR__ . '/version.txt') ?: '1.x');
 $appName    = htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden');

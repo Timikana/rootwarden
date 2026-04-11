@@ -12,7 +12,7 @@
  */
 require_once __DIR__ . '/../../auth/verify.php';
 require_once __DIR__ . '/../../db.php';
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 header('Content-Type: application/json');
 
@@ -22,17 +22,11 @@ $roleId = (int)($_SESSION['role_id'] ?? 0);
 // Determiner l'action
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-// Pour les POST, accepter aussi le JSON body
+// Pour les POST, accepter aussi le JSON body + validation CSRF centralisee
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    checkCsrfToken();
     $data = json_decode(file_get_contents('php://input'), true) ?: [];
     if (empty($action)) $action = $data['action'] ?? '';
-    // Validation CSRF (htmx auto-inject ou body)
-    $csrfToken = $_POST['csrf_token'] ?? $data['csrf_token'] ?? '';
-    if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Token CSRF invalide']);
-        exit;
-    }
 }
 
 // Condition WHERE : notifications pour cet utilisateur OU broadcasts (user_id=0) pour admins

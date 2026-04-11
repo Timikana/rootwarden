@@ -5,6 +5,67 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.12.0] — 2026-04-11
+
+### Rework complet authentification et controle d'acces
+
+- **ZERO TRUST SESSION** — `checkAuth()` verifie desormais en DB que l'utilisateur
+  existe, est actif (`active=1`), et synchronise le `role_id` session/DB a chaque requete.
+  Un user desactive entre deux requetes est immediatement deconnecte.
+- **`checkPermission()` verifie en DB** — Plus jamais de lecture `$_SESSION['permissions']`
+  pour une decision de securite. Combine permissions permanentes + temporaires non expirees.
+  Met a jour le cache session apres chaque check. Log les refus dans `user_logs`.
+- **`api_proxy.php` securise** — Le `role_id` transmis au backend Python est verifie en DB
+  (plus lu depuis la session). Nouveau header `X-User-Permissions` avec les permissions JSON.
+- **Backend Python renforce** — Nouveau decorateur `@require_permission('can_xxx')` qui
+  parse le header `X-User-Permissions`. Logging des refus d'acces (IP + user_id + route).
+- **Superadmin toujours 13/13** — Les superadmins ont toutes les permissions par bypass.
+  Leurs permissions sont affichees comme toujours cochees et non-editables dans l'interface.
+  L'API rejette toute tentative de modification.
+- **Anti-escalation renforcee** — Ajout de protections self-edit sur tous les endpoints
+  admin : `update_permissions`, `toggle_sudo`, `toggle_user`, `update_user`, `update_user_status`.
+  Protection dernier superadmin actif sur `toggle_user` et `delete_user`.
+- **CSRF unifie** — `checkCsrfToken()` centralise supporte POST body, header `X-CSRF-TOKEN`,
+  et body JSON (`php://input`). Tous les endpoints utilisent la fonction centralisee.
+  Corrige une comparaison timing-unsafe (`!==`) dans `update_server_access.php`.
+- **Pattern uniforme** — Toutes les pages utilisent `checkAuth([ROLE_*])` + `checkPermission()`.
+  Constantes `ROLE_USER`, `ROLE_ADMIN`, `ROLE_SUPERADMIN` partout (plus de `[1,2,3]` ou `['1','2','3']`).
+- **Login durci** — Verification `active=1` avant `password_verify()`. Verification DB
+  apres TOTP reussi (user desactive entre login et 2FA = rejete).
+- **Logout propre** — Suppression `active_sessions` en DB, cookie secure SameSite=Strict.
+- **Remember-me durci** — Restauration force re-2FA + verification user actif en DB.
+- **Fix htmx 2.0.4** — `hx-vals="js:{...}"` remplace par `hx-vals` statiques +
+  `htmx:configRequest` listener (le prefixe `js:` est casse dans htmx 2.0).
+
+### Fix SSH mode password (`_su_exec`)
+
+- **Approche temp script** — `_su_exec()` ecrit la commande dans `/tmp/.rw_{uuid}.sh`
+  et execute `su root -c 'sh /tmp/script.sh'`. Les pipes et redirections fonctionnent
+  car `sh` les interprete, pas le PTY. Stdout propre via markers, vrai exit code.
+- **`execute_as_root_stream()`** — Meme approche temp script pour le streaming
+  (MAJ APT, MAJ SECU). Detection sudo via `sudo -S -p '' true` avec le vrai mot de
+  passe (evite les faux positifs de `sudo -n`).
+- **PATH complet** — `export PATH=/usr/local/sbin:...:/bin` en tete de chaque script
+  (resout `iptables: not found`, `sshd: not found`).
+- **Backups sshd_config** — `LC_ALL=C` sur `ls -la` pour forcer les dates en anglais
+  (le parsing regex echouait avec les dates en francais "avril").
+
+### CGU et Confidentialite
+
+- **terms.php reecrit** — 8 sections professionnelles (objet, auth 2FA, responsabilites,
+  activites interdites, tracabilite, limites, modifications, contact).
+- **privacy.php reecrit** — 7 sections RGPD (donnees collectees, finalites, stockage/securite,
+  conservation, partage self-hosted, droits, contact DPO) + exercice des droits en ligne.
+- **118 cles i18n ajoutees** en parite FR/EN.
+
+### Fichiers modifies
+
+- 53 fichiers PHP/Python/JS modifies, 6 reecrits de zero.
+- `backend/ssh_utils.py` : `_su_exec()` + `execute_as_root_stream()` fixes.
+- `backend/ssh_audit.py` : `/usr/sbin/sshd -t`, `printf`, CRLF normalisation, `LC_ALL=C`.
+
+---
+
 ## [1.11.0] — 2026-04-10
 
 ### Gestion des services systemd

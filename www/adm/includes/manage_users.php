@@ -23,7 +23,7 @@ require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/crypto.php'; // On peut le laisser même si on n'utilise plus encryptPassword ici
 
 // Autorise les utilisateurs ayant le rôle admin (2) ou superadmin (3)
-checkAuth([2, 3]);
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

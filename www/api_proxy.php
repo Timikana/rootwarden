@@ -20,18 +20,21 @@
  *             new EventSource(`${API_URL}/logs`)
  */
 require_once __DIR__ . '/auth/verify.php';
-checkAuth([1, 2, 3]);
+// checkAuth verifie en DB que l'user existe + active=1 + synchronise role_id en session
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 $api_key    = getenv('API_KEY') ?: '';
 $python_url = 'https://python:5000';
 
-// Headers d'identite utilisateur (transmis au backend Python)
-$userId  = (int) ($_SESSION['user_id'] ?? 0);
-$roleId  = (int) ($_SESSION['role_id'] ?? 0);
+// Role et permissions deja synchronises par checkAuth() — utiliser la session
+$userId = (int) $_SESSION['user_id'];
+$roleId = (int) $_SESSION['role_id'];
+
 $userHeaders = [
     "X-API-KEY: $api_key",
     "X-User-ID: $userId",
     "X-User-Role: $roleId",
+    "X-User-Permissions: " . json_encode($_SESSION['permissions'] ?? []),
 ];
 
 // Liberer le lock de session AVANT le curl vers le backend.

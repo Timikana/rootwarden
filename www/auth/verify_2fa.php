@@ -62,32 +62,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
     $codeHash = hash('sha256', $code . floor(time() / 30));
     if (isset($_SESSION['last_totp_hash']) && $_SESSION['last_totp_hash'] === $codeHash) {
         $error = t('2fa.error_reused');
-    } elseif ($totp->verify($code, null, 1)) { // null = heure actuelle, 1 = tolérance d'une période
+    } elseif ($totp->verify($code, null, 1)) { // null = heure actuelle, 1 = tolerance d'une periode
         $_SESSION['last_totp_hash'] = $codeHash;
-        // Connexion réussie
-        // Initialiser la session utilisateur avec les données temporaires
-        initializeUserSession([
-            'id' => $_SESSION['temp_user']['id'],
-            'name' => $_SESSION['temp_user']['username'],
-            'role_id' => $_SESSION['temp_user']['role_id']
-        ]);
 
-        // Charger les permissions depuis la base de données
-        $stmt = $pdo->prepare("SELECT * FROM permissions WHERE user_id = ?");
-        $stmt->execute([$_SESSION['user_id']]);
-        $_SESSION['permissions'] = $stmt->fetch(PDO::FETCH_ASSOC) ?: [
-            'can_deploy_keys' => 0,
-            'can_update_linux' => 0,
-            'can_manage_iptables' => 0,
-            'can_admin_portal' => 0
-        ];
+        // Verifier que l'utilisateur existe et est actif en DB (ZERO TRUST)
+        $stmtUser = $pdo->prepare("SELECT id, name, role_id, active, force_password_change FROM users WHERE id = ? AND active = 1");
+        $stmtUser->execute([$_SESSION['temp_user']['id']]);
+        $userData = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-        unset($_SESSION['temp_user'], $_SESSION['2fa_required'], $_SESSION['2fa_pending']);
+        if (!$userData) {
+            // Utilisateur desactive entre le login et le 2FA
+            session_unset();
+            session_destroy();
+            header("Location: login.php");
+            exit();
+        }
 
-        // Vérifier si l'utilisateur doit changer son mot de passe
-        $stmtFpc = $pdo->prepare("SELECT force_password_change FROM users WHERE id = ?");
-        $stmtFpc->execute([$_SESSION['user_id']]);
-        if ((int)$stmtFpc->fetchColumn() === 1) {
+        // Initialiser la session definitive avec les donnees verifiees en DB
+        initializeUserSession($userData);
+
+        // Nettoyer les variables temporaires
+        unset($_SESSION['temp_user'], $_SESSION['2fa_required'], $_SESSION['2fa_pending'],
+              $_SESSION['2fa_attempts'], $_SESSION['last_totp_hash']);
+
+        // Verifier si l'utilisateur doit changer son mot de passe
+        if ((int)($userData['force_password_change'] ?? 0) === 1) {
             $_SESSION['force_password_change'] = true;
             header("Location: ../profile.php?force_change=1");
             exit();

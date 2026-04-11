@@ -6,6 +6,7 @@ Importe depuis chaque module de route :
 """
 
 import os
+import json
 import hmac
 import logging
 import mysql.connector
@@ -73,8 +74,46 @@ def require_role(min_role):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            _, role_id = get_current_user()
+            user_id, role_id = get_current_user()
             if role_id < min_role:
+                logger.warning(
+                    "Acces refuse (role %d < %d) pour user_id=%d sur %s depuis %s",
+                    role_id, min_role, user_id, request.path, request.remote_addr
+                )
+                return jsonify({'success': False, 'message': 'Permission insuffisante'}), 403
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def get_user_permissions():
+    """Parse les permissions utilisateur depuis le header X-User-Permissions (JSON).
+    Retourne un dict vide si le header est absent ou invalide."""
+    raw = request.headers.get('X-User-Permissions', '{}')
+    try:
+        perms = json.loads(raw)
+        return perms if isinstance(perms, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def require_permission(permission):
+    """Decorateur : verifie que l'utilisateur possede la permission specifique.
+    Les permissions sont transmises par le proxy PHP via X-User-Permissions (JSON).
+    Superadmin (role_id >= 3) bypass la verification."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            user_id, role_id = get_current_user()
+            # Superadmin bypass
+            if role_id >= 3:
+                return func(*args, **kwargs)
+            perms = get_user_permissions()
+            if not perms.get(permission):
+                logger.warning(
+                    "Permission refusee (%s) pour user_id=%d role=%d sur %s depuis %s",
+                    permission, user_id, role_id, request.path, request.remote_addr
+                )
                 return jsonify({'success': False, 'message': 'Permission insuffisante'}), 403
             return func(*args, **kwargs)
         return wrapper
@@ -109,6 +148,11 @@ def require_machine_access(func):
         machine_id = (data.get('machine_id') or request.args.get('machine_id')
                        or data.get('server_id') or request.args.get('server_id'))
         if machine_id and not check_machine_access(machine_id):
+            user_id, role_id = get_current_user()
+            logger.warning(
+                "Acces machine refuse (machine_id=%s) pour user_id=%d role=%d sur %s depuis %s",
+                machine_id, user_id, role_id, request.path, request.remote_addr
+            )
             return jsonify({'success': False, 'message': 'Acces refuse a cette machine'}), 403
         return func(*args, **kwargs)
     return wrapper

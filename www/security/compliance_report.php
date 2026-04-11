@@ -16,7 +16,7 @@ require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_view_compliance');
 
 $appName = htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden');

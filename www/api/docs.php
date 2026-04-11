@@ -6,7 +6,7 @@
  * Charge la spec OpenAPI depuis /api/openapi.php.
  */
 require_once __DIR__ . '/../auth/verify.php';
-checkAuth([3]); // Superadmin uniquement — expose la structure complete de l'API
+checkAuth([ROLE_SUPERADMIN]);
 ?>
 <!DOCTYPE html>
 <html lang="fr">

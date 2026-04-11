@@ -321,11 +321,11 @@ def apply_fix(client, root_pass, key, value):
         return False, f"Echec de la modification: {stderr}"
 
     # Validation de la config
-    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
-        _log.warning("sshd -t echoue apres modification de %s: %s — restauration du backup", key, stderr_t)
+        _log.warning("sshd -t echoue apres modification de %s: %s — restauration du backup", key, sshd_err)
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
-        return False, f"Configuration invalide apres modification: {stderr_t}"
+        return False, f"Configuration invalide apres modification: {sshd_err}"
 
     # Reload sshd (plus sur que restart)
     _, stderr_r, rc_r = execute_as_root(client, "systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null", root_pass, logger=_log)
@@ -335,6 +335,7 @@ def apply_fix(client, root_pass, key, value):
 
     _log.info("Directive %s corrigee a '%s' et sshd reloaded avec succes", key, value)
     return True, f"{key} modifie a '{value}' et sshd reloaded avec succes."
+
 
 
 # ── Save / Toggle / Backups / Restore / Reload ──────────────────────────────
@@ -349,19 +350,21 @@ def save_sshd_config(client, root_pass, new_config):
         return False, str(e)
 
     # Write new config via base64 to avoid shell injection
+    # Normaliser les fins de ligne en LF (Windows textarea envoie CRLF)
+    new_config = new_config.replace('\r\n', '\n').replace('\r', '\n')
     b64 = base64.b64encode(new_config.encode()).decode()
-    cmd = f"echo {b64} | base64 -d > /etc/ssh/sshd_config"
+    cmd = f"printf '%s' '{b64}' | base64 -d > /etc/ssh/sshd_config"
     _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
     if rc != 0:
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Write failed: {stderr}"
 
     # Validate
-    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
         _log.warning("sshd -t failed after save — restoring backup")
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
-        return False, f"Config invalid (sshd -t): {stderr_t}"
+        return False, f"Config invalid (sshd -t): {sshd_err}"
 
     return True, f"Config saved and validated. Backup: {backup_path}"
 
@@ -390,10 +393,10 @@ def toggle_directive(client, root_pass, key, enable):
         return False, f"Toggle failed: {stderr}"
 
     # Validate
-    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
-        return False, f"Config invalid after toggle: {stderr_t}"
+        return False, f"Config invalid after toggle: {sshd_err}"
 
     action = "enabled" if enable else "disabled"
     return True, f"{key} {action}"
@@ -401,8 +404,9 @@ def toggle_directive(client, root_pass, key, enable):
 
 def list_backups(client, root_pass):
     """List sshd_config backup files in /etc/ssh/."""
+    # LC_ALL=C force le format anglais pour ls (evite les dates en francais)
     out, _, rc = execute_as_root(
-        client, "ls -la /etc/ssh/sshd_config.bak.* 2>/dev/null || echo 'NONE'",
+        client, "LC_ALL=C ls -la /etc/ssh/sshd_config.bak.* 2>/dev/null || echo 'NONE'",
         root_pass, logger=_log, timeout=5)
     if 'NONE' in out or rc != 0:
         return []
@@ -447,12 +451,12 @@ def restore_backup(client, root_pass, backup_name):
         return False, f"Restore failed: {stderr}"
 
     # Validate
-    _, stderr_t, rc_t = execute_as_root(client, "sshd -t", root_pass, logger=_log)
+    _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
         # Restore the current backup we just made
         if current_backup:
             execute_as_root(client, f"cp {current_backup} /etc/ssh/sshd_config", root_pass, logger=_log)
-        return False, f"Restored config invalid (sshd -t): {stderr_t}"
+        return False, f"Restored config invalid (sshd -t): {sshd_err}"
 
     return True, f"Backup {backup_name} restored"
 

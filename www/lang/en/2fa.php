@@ -1,0 +1,26 @@
+<?php
+// lang/en/2fa.php — 22 cles
+return [
+    '2fa.title' => 'Two-Factor Authentication',
+    '2fa.subtitle' => 'TOTP Code',
+    '2fa.instruction' => 'Enter the 6-digit code from your authenticator app.',
+    '2fa.submit' => 'Verify',
+    '2fa.error_invalid' => 'Invalid TOTP code. Please try again.',
+    '2fa.error_rate_limit' => 'Too many attempts. Please wait 1 minute.',
+    '2fa.error_reused' => 'This code has already been used. Wait for the next one.',
+    '2fa.error_no_secret' => 'Error: No TOTP secret configured.',
+    'enable_2fa.title' => 'Set up 2FA',
+    'enable_2fa.subtitle' => 'Two-factor authentication setup',
+    'enable_2fa.instruction' => 'Scan the QR code with your authenticator app (Google Authenticator, Authy...)',
+    'enable_2fa.manual' => 'Manual entry',
+    'enable_2fa.secret_label' => 'Secret code:',
+    'enable_2fa.account' => 'Account:',
+    'enable_2fa.code_label' => 'Enter the 6-digit code:',
+    'enable_2fa.submit' => 'Enable 2FA',
+    'enable_2fa.error_user' => 'Unable to find this user in the database.',
+    'confirm_2fa.success_title' => '2FA enabled',
+    'confirm_2fa.success_msg' => 'Two-factor authentication has been successfully enabled for your account.',
+    'confirm_2fa.invalid_title' => 'Invalid code',
+    'confirm_2fa.invalid_msg' => 'The TOTP code is incorrect. Please try again.',
+    'confirm_2fa.no_secret' => 'Error: No TOTP secret found. Please restart the 2FA setup.',
+];

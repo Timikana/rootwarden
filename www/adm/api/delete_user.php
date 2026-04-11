@@ -39,7 +39,7 @@ header('Content-Type: application/json');
 
 // --- Contrôle d'accès ---
 // Seuls les admins et superadmins peuvent supprimer des comptes.
-checkAuth([2, 3]);
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 // --- Vérification de la méthode HTTP ---
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -70,7 +70,8 @@ if ($user_id === (int)$_SESSION['user_id']) {
 $stmtCheck = $pdo->prepare("SELECT role_id FROM users WHERE id = ?");
 $stmtCheck->execute([$user_id]);
 $targetRole = (int)$stmtCheck->fetchColumn();
-if ($_SESSION['role_id'] === 2 && $targetRole === 3) {
+$currentRoleId = getUserRole((int) $_SESSION['user_id']);
+if ($currentRoleId === 2 && $targetRole === 3) {
     echo json_encode(['success' => false, 'message' => 'Un admin ne peut pas supprimer un superadmin.']);
     exit;
 }

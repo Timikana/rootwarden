@@ -5,7 +5,7 @@
  */
 require_once __DIR__ . '/../../auth/verify.php';
 require_once __DIR__ . '/../../db.php';
-checkAuth([2, 3]); // Admin et superadmin uniquement
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]); // Admin et superadmin uniquement
 
 header('Content-Type: application/json');
 

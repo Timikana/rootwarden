@@ -44,7 +44,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // --- Contrôle d'accès ---
 // Seuls les superadmins peuvent modifier des permissions (empeche auto-elevation admin).
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
 
 // --- Vérification de la méthode HTTP ---
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -52,17 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-// --- Validation CSRF (body ou htmx auto-inject) ---
-$csrfToken = $_POST['csrf_token'] ?? '';
-if (!$csrfToken) {
-    $jsonBody = json_decode(file_get_contents('php://input'), true) ?: [];
-    $csrfToken = $jsonBody['csrf_token'] ?? '';
-}
-if (empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF invalide']);
-    exit();
-}
+// --- Validation CSRF (POST, header htmx, ou body JSON) ---
+checkCsrfToken();
 
 // --- Lecture du body (JSON ou form-urlencoded pour htmx) ---
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
@@ -78,12 +69,29 @@ if (!isset($data['user_id'], $data['permission'], $data['value'])) {
     exit();
 }
 
-// Conversion des types pour sécuriser les paramètres liés
+// Conversion des types pour securiser les parametres lies
 $user_id    = intval($data['user_id']);
 $permission = $data['permission'];
 $value      = intval($data['value']);
 
-// --- Whitelist des colonnes autorisées (protection contre l'injection de colonne SQL) ---
+// --- Anti-escalation : un superadmin ne peut PAS modifier SES PROPRES permissions ---
+if ($user_id === (int) $_SESSION['user_id']) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Impossible de modifier vos propres permissions']);
+    exit();
+}
+
+// --- Protection : les superadmins ont TOUTES les permissions par bypass, on ne touche pas ---
+$targetRoleStmt = $pdo->prepare("SELECT role_id FROM users WHERE id = ?");
+$targetRoleStmt->execute([$user_id]);
+$targetRoleId = (int) $targetRoleStmt->fetchColumn();
+if ($targetRoleId === 3) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Les superadmins ont toutes les permissions par defaut']);
+    exit();
+}
+
+// --- Whitelist des colonnes autorisees (protection contre l'injection de colonne SQL) ---
 // IMPORTANT : le nom de la permission est interpolé dans la requête SQL car PDO
 // ne permet pas de paramétrer un nom de colonne. La whitelist est donc critique.
 $allowedPermissions = [
@@ -146,7 +154,7 @@ if ($success) {
 <label class="flex items-center gap-2 px-3 py-2 rounded-lg border {$checkCls} cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
     <input type="checkbox" data-user-id="{$user_id}" data-permission="{$permission}"
            hx-post="api/update_permissions.php" hx-trigger="change" hx-target="closest label" hx-swap="outerHTML"
-           hx-vals='js:{"user_id": this.dataset.userId, "permission": this.dataset.permission, "value": this.checked ? 1 : 0}'
+           hx-vals='{"user_id": "{$user_id}", "permission": "{$permission}"}'
            {$checkedAttr}
            class="form-checkbox h-3.5 w-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0">
     <div class="min-w-0">

@@ -32,40 +32,13 @@
  *   - APP_NAME     : nom de l'application affiché dans le titre
  */
 require_once __DIR__ . '/../auth/verify.php';
-require_once __DIR__ . '/../auth/functions.php';
 require_once __DIR__ . '/../db.php';
 
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
+checkPermission('can_scan_cve');
 
-// Autorise tous les rôles (1 = user, 2 = admin, 3 = superadmin) à atteindre
-// cette page ; le filtrage fin par permission can_scan_cve se fait ensuite.
-checkAuth([1, 2, 3]);
-
-// Lecture du rôle et de la permission can_scan_cve depuis la session
-$role       = (int) ($_SESSION['role_id'] ?? 0);
-$canScanCve = (bool) ($_SESSION['permissions']['can_scan_cve'] ?? 0);
-
-// Bloque l'accès si l'utilisateur n'est pas superadmin ET n'a pas la permission CVE
-if (!$canScanCve && $role < 3) {
-    http_response_code(403);
-    require_once __DIR__ . '/../head.php';
-    echo '<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">';
-    require_once __DIR__ . '/../menu.php';
-    echo '<div class="max-w-md mx-auto mt-12">
-            <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-8 text-center">
-                <div class="text-5xl mb-4">🔒</div>
-                <h1 class="text-2xl font-bold mb-2 text-red-700 dark:text-red-300">' . t('common.access_denied') . '</h1>
-                <p class="text-red-600 dark:text-red-400">' . t('cve.no_permission') . '</p>
-            </div>
-          </div>';
-    require_once __DIR__ . '/../footer.php';
-    echo '</body></html>';
-    exit();
-}
-
-// Récupération de la liste des serveurs accessibles à l'utilisateur courant :
-// • admin (role_id >= 2) et superadmin : tous les serveurs de la table machines
-// • user  (role_id = 1) : uniquement les serveurs assignés via user_machine_access
+// Recuperation de la liste des serveurs accessibles a l'utilisateur courant
+$role = (int) ($_SESSION['role_id'] ?? 0);
 if ($role >= 2) {
     $stmt = $pdo->query(
         "SELECT id, name, ip, environment, criticality FROM machines WHERE (lifecycle_status IS NULL OR lifecycle_status != 'archived') ORDER BY name"

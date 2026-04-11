@@ -49,7 +49,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Restreint l'accès aux administrateurs (2) et superadmins (3)
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_update_linux');
 
 // Récupération des machines avec filtrage par acces utilisateur

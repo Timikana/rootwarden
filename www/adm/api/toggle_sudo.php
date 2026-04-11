@@ -23,7 +23,7 @@
  */
 
 require_once __DIR__ . '/../../auth/verify.php';
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
 require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . "/../includes/audit_log.php";
 
@@ -40,7 +40,13 @@ checkCsrfToken();
 // --- Traitement de la requête POST ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
     try {
-        $user_id = $_POST['user_id'];
+        $user_id = (int) $_POST['user_id'];
+
+        // --- Anti-escalation : pas sur soi-meme ---
+        if ($user_id === (int) $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Impossible de modifier votre propre sudo']);
+            exit();
+        }
 
         // --- Lecture du statut sudo actuel ---
         $stmt = $pdo->prepare("SELECT sudo FROM users WHERE id = ?");

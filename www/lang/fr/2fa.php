@@ -1,0 +1,26 @@
+<?php
+// lang/fr/2fa.php — 22 cles
+return [
+    '2fa.title' => 'Verification en deux etapes',
+    '2fa.subtitle' => 'Code TOTP',
+    '2fa.instruction' => 'Entrez le code a 6 chiffres de votre application d\'authentification.',
+    '2fa.submit' => 'Verifier',
+    '2fa.error_invalid' => 'Code TOTP invalide. Veuillez reessayer.',
+    '2fa.error_rate_limit' => 'Trop de tentatives. Patientez 1 minute.',
+    '2fa.error_reused' => 'Ce code a deja ete utilise. Attendez le prochain code.',
+    '2fa.error_no_secret' => 'Erreur : Aucun secret TOTP configure.',
+    'enable_2fa.title' => 'Configurer 2FA',
+    'enable_2fa.subtitle' => 'Configuration de l\'authentification a deux facteurs',
+    'enable_2fa.instruction' => 'Scannez le QR code avec votre application d\'authentification (Google Authenticator, Authy...)',
+    'enable_2fa.manual' => 'Saisie manuelle',
+    'enable_2fa.secret_label' => 'Code secret :',
+    'enable_2fa.account' => 'Compte :',
+    'enable_2fa.code_label' => 'Entrez le code a 6 chiffres :',
+    'enable_2fa.submit' => 'Activer le 2FA',
+    'enable_2fa.error_user' => 'Impossible de retrouver cet utilisateur en base.',
+    'confirm_2fa.no_secret' => 'Erreur : Aucun secret TOTP configure pour cet utilisateur.',
+    'confirm_2fa.success_title' => '2FA active avec succes',
+    'confirm_2fa.success_msg' => 'L\'authentification a deux facteurs est maintenant active pour votre compte.',
+    'confirm_2fa.invalid_title' => 'Code TOTP invalide',
+    'confirm_2fa.invalid_msg' => 'Le code saisi est incorrect. Veuillez reessayer avec un nouveau code depuis votre application.',
+];

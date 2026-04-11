@@ -1,0 +1,28 @@
+<?php
+// lang/en/cve.php — 24 cles
+return [
+    'cve.title' => 'CVE Scan',
+    'cve.desc' => 'Scan for known vulnerabilities (CVE) on your servers via OpenCVE. Filter by CVSS severity and export results to CSV.',
+    'cve.cvss_tooltip' => 'CVSS Score: vulnerability severity scale from 0 (low) to 10 (critical)',
+    'cve.no_permission' => 'You do not have permission to access CVE scanning.',
+    'cve.btn_scan' => 'Scan',
+    'cve.btn_scan_all' => 'Scan all',
+    'cve.cvss_threshold' => 'CVSS threshold',
+    'cve.cvss_all' => 'All',
+    'cve.cvss_medium' => 'Medium (4.0+)',
+    'cve.cvss_high' => 'High (7.0+)',
+    'cve.cvss_critical' => 'Critical (9.0+)',
+    'cve.fleet_summary' => 'Fleet summary',
+    'cve.servers_scanned' => 'Servers scanned',
+    'cve.total_cves' => 'Total CVEs',
+    'cve.scan_in_progress' => 'Scan in progress...',
+    'cve.no_servers' => 'No servers available for scanning.',
+    'cve.scheduled_scans' => 'Scheduled scans',
+    'cve.sched_add' => 'Add schedule',
+    'cve.sched_name' => 'Schedule name',
+    'cve.sched_target' => 'Target',
+    'cve.sched_all_servers' => 'All servers',
+    'cve.sched_cron' => 'Cron expression',
+    'cve.sched_cron_hint' => 'e.g. 0 2 * * 1 (every Monday at 2:00)',
+    'cve.sched_cvss_min' => 'Minimum CVSS',
+];

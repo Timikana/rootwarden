@@ -36,10 +36,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// --- Contrôle d'accès (niveau 1) ---
-// Autorise l'accès aux rôles admin (2) et superadmin (3) ; les visiteurs non authentifiés
-// sont redirigés vers la page de connexion par checkAuth().
-checkAuth([2, 3]);
+// Controle d'acces : admin/superadmin + permission can_admin_portal
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
+checkPermission('can_admin_portal');
 
 // --- Import CSV (traitement POST) ---
 require_once __DIR__ . '/includes/import_csv.php';
@@ -59,32 +58,9 @@ if (!isset($_SESSION['user_id'])) {
 // Journalisation de l'ID de l'utilisateur actif pour le débogage applicatif.
 error_log("ID utilisateur connecté : " . $_SESSION['user_id']);
 
-// --- Contrôle d'accès (niveau 2) : restriction superadmin stricte ---
-// La jointure avec la table `roles` permet de vérifier le nom du rôle en base
-// plutôt que de se fier uniquement à la valeur de session (plus robuste).
-try {
-    $stmt = $pdo->prepare("
-        SELECT r.name AS role_name
-        FROM users u
-        INNER JOIN roles r ON u.role_id = r.id
-        WHERE u.id = ?
-    ");
-    $stmt->execute([$_SESSION['user_id']]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user) {
-        die(t('admin.error_user_not_found'));
-    }
-} catch (PDOException $e) {
-    error_log("[RootWarden] Erreur SQL admin_page: " . $e->getMessage());
-    die(t('admin.error_internal'));
-}
-
-// Seul un superadmin peut accéder à cette page ; tout autre rôle est bloqué ici.
-if ($user['role_name'] !== 'superadmin') {
-    echo t('admin.error_access_denied');
-    exit();
-}
+// Controle d'acces deja assure par checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])
+// + checkPermission('can_admin_portal') en haut du fichier.
+// Le role et les permissions sont verifies en DB par ces fonctions.
 
 // --- Chargement de la liste des serveurs ---
 // Utilisée notamment par manage_access et manage_servers pour construire

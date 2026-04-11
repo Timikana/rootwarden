@@ -64,43 +64,6 @@ function recordFailedLoginAttempt(PDO $pdo): void {
         ->execute([$ip]);
 }
 
-/**
- * Initialise la session utilisateur après une authentification réussie (mot de passe validé).
- * Régénère l'ID de session, génère un nouveau jeton CSRF et charge les permissions depuis la BDD.
- *
- * @param array $user  Tableau associatif de l'utilisateur (id, name, role_id, ...).
- * @param PDO   $pdo   Instance de connexion à la base de données.
- * @return void
- */
-function initializeUserSessionLogin(array $user, PDO $pdo): void {
-    $_SESSION['user_id']  = $user['id'];
-    $_SESSION['username'] = $user['name'];
-    $_SESSION['role_id']  = (int) $user['role_id'];
-
-    // Régénérer l'ID de session pour prévenir la fixation de session
-    session_regenerate_id(true);
-
-    // Nouveau jeton CSRF après connexion
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-
-    $stmt = $pdo->prepare("SELECT * FROM permissions WHERE user_id = ?");
-    $stmt->execute([$user['id']]);
-    $permissions = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    $_SESSION['permissions'] = $permissions ?: [
-        'can_deploy_keys'         => 0,
-        'can_update_linux'        => 0,
-        'can_manage_iptables'     => 0,
-        'can_admin_portal'        => 0,
-        'can_scan_cve'            => 0,
-        'can_manage_remote_users' => 0,
-        'can_manage_platform_key' => 0,
-        'can_view_compliance'     => 0,
-        'can_manage_backups'      => 0,
-        'can_schedule_cve'        => 0,
-    ];
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     checkCsrfToken();
 
@@ -111,11 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!checkLoginRateLimit($pdo)) {
         $error = t('login.error_rate_limit');
     } else {
-        $stmt = $pdo->prepare("SELECT id, name, password, role_id, totp_secret FROM users WHERE name = ?");
+        $stmt = $pdo->prepare("SELECT id, name, password, role_id, totp_secret, active FROM users WHERE name = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && password_verify($password, $user['password'])) {
+        if ($user && (int)($user['active'] ?? 0) !== 1) {
+            // Compte desactive — message generique (pas d'enumeration)
+            recordFailedLoginAttempt($pdo);
+            $error = t('login.error_credentials');
+        } elseif ($user && password_verify($password, $user['password'])) {
             // NE PAS initialiser la session complete avant le 2FA !
             // Seul temp_user est set ici. La session definitive est initialisee
             // dans verify_2fa.php apres verification du code TOTP.

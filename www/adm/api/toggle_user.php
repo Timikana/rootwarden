@@ -23,7 +23,7 @@
  */
 
 require_once __DIR__ . '/../../auth/verify.php';
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
 require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/../includes/audit_log.php';
 
@@ -43,20 +43,39 @@ checkCsrfToken();
 // --- Traitement de la requête POST ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
     try {
-        $user_id = $_POST['user_id'];
+        $user_id = (int) $_POST['user_id'];
 
-        // Journal : confirmation de l'ID reçu côté serveur
-        file_put_contents('php://stderr', "User ID : $user_id\n", FILE_APPEND);
+        // --- Anti-escalation : pas sur soi-meme ---
+        if ($user_id === (int) $_SESSION['user_id']) {
+            echo json_encode(['success' => false, 'message' => 'Impossible de desactiver votre propre compte']);
+            exit();
+        }
 
-        // --- Lecture du statut actuel ---
-        // Récupère uniquement la colonne `active` pour minimiser la charge
-        $stmt = $pdo->prepare("SELECT active FROM users WHERE id = ?");
+        // --- Lecture du statut actuel et du role ---
+        $stmt = $pdo->prepare("SELECT active, role_id FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
-        $current_status = $stmt->fetchColumn();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // --- Inversion du statut ---
-        // 1 (actif) → 0 (inactif) ; 0 (inactif) → 1 (actif)
+        if (!$row) {
+            echo json_encode(['success' => false, 'message' => 'Utilisateur introuvable']);
+            exit();
+        }
+
+        $current_status = (int) $row['active'];
+        $targetRoleId   = (int) $row['role_id'];
+
+        // Inversion du statut : 1 -> 0 ou 0 -> 1
         $new_status = $current_status ? 0 : 1;
+
+        // --- Protection : empecher la desactivation du dernier superadmin ---
+        if ($new_status === 0 && $targetRoleId === 3) {
+            $saCount = $pdo->prepare("SELECT COUNT(*) FROM users WHERE role_id = 3 AND active = 1");
+            $saCount->execute();
+            if ((int) $saCount->fetchColumn() <= 1) {
+                echo json_encode(['success' => false, 'message' => 'Impossible de desactiver le dernier superadmin actif']);
+                exit();
+            }
+        }
 
         // --- Mise à jour en base ---
         $stmt = $pdo->prepare("UPDATE users SET active = ? WHERE id = ?");

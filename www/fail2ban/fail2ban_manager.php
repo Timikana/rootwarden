@@ -7,7 +7,7 @@
 require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
 
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_manage_fail2ban');
 
 // Chargement des serveurs (selon role)

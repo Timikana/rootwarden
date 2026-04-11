@@ -28,7 +28,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Autorise les utilisateurs ayant le rôle admin (2) ou superadmin (3)
-checkAuth([2, 3]);
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 /**
  * Valide une donnée d'entrée pour la gestion des utilisateurs portail.

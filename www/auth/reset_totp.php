@@ -11,7 +11,7 @@ require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
 
 // Superadmin uniquement
-checkAuth([3]);
+checkAuth([ROLE_SUPERADMIN]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
     checkCsrfToken();
