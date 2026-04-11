@@ -109,7 +109,6 @@ $allowedPermissions = [
     'can_manage_services',
     'can_audit_ssh',
     'can_manage_supervision',
-    'can_cyber_audit',
 ];
 
 // Rejet immédiat si la permission n'est pas dans la liste autorisée
@@ -149,7 +148,6 @@ if ($success) {
             'can_manage_services' => ['Services', 'Services systemd'],
             'can_audit_ssh' => ['Audit SSH', 'Audit config SSH'],
             'can_manage_supervision' => ['Supervision', 'Deploiement agents monitoring'],
-            'can_cyber_audit' => ['Audit Cyber', 'Score securite serveurs'],
         ];
         $info = $permLabels[$permission] ?? [$permission, ''];
         $checkedAttr = $checked ? 'checked' : '';
