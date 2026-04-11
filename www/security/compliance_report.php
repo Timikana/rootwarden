@@ -59,6 +59,32 @@ $nbActive2FA = count(array_filter($users, fn($u) => !empty($u['totp_secret']) &&
 $nbActiveUsers = count(array_filter($users, fn($u) => $u['active']));
 $nbOldKeys = count(array_filter($users, fn($u) => $u['active'] && $u['ssh_key'] && $u['ssh_key_updated_at'] && strtotime($u['ssh_key_updated_at']) < strtotime('-90 days')));
 
+// 6. SSH Audit — derniers scores
+$sshAuditResults = [];
+try {
+    $sshAuditResults = $pdo->query("
+        SELECT r.machine_id, m.name, m.ip, r.score, r.grade, r.critical_count, r.high_count, r.audited_at
+        FROM ssh_audit_results r
+        INNER JOIN machines m ON r.machine_id = m.id
+        WHERE r.id = (SELECT MAX(r2.id) FROM ssh_audit_results r2 WHERE r2.machine_id = r.machine_id)
+        ORDER BY r.score ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (\Exception $e) {}
+
+// 7. Supervision — agents deployes
+$supervisionAgents = [];
+try {
+    $supervisionAgents = $pdo->query("
+        SELECT sa.machine_id, m.name, m.ip, sa.platform, sa.agent_version, sa.config_deployed
+        FROM supervision_agents sa
+        INNER JOIN machines m ON sa.machine_id = m.id
+        ORDER BY m.name, sa.platform
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (\Exception $e) {}
+
+$nbWithAgent = count(array_unique(array_column($supervisionAgents, 'machine_id')));
+$sshAuditAvg = count($sshAuditResults) > 0 ? (int)(array_sum(array_column($sshAuditResults, 'score')) / count($sshAuditResults)) : 0;
+
 // Hash du rapport pour preuve d'integrite
 $reportData = json_encode(compact('servers', 'users', 'remStats', 'date'));
 $reportHash = hash('sha256', $reportData);
@@ -128,7 +154,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'csv') {
     <!-- 1. Resume executif -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
         <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4"><?= t('compliance.section_summary') ?></h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div class="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
                 <div class="text-2xl font-bold text-blue-600"><?= $nbServers ?></div>
                 <div class="text-xs text-gray-500"><?= t('compliance.servers') ?> (<?= $nbOnline ?> <?= t('compliance.online') ?>)</div>
@@ -144,6 +170,14 @@ if (isset($_GET['format']) && $_GET['format'] === 'csv') {
             <div class="text-center p-3 rounded-lg <?= $remStats['overdue'] > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-green-50 dark:bg-green-900/20' ?>">
                 <div class="text-2xl font-bold <?= $remStats['overdue'] > 0 ? 'text-red-600' : 'text-green-600' ?>"><?= $remStats['overdue'] ?></div>
                 <div class="text-xs text-gray-500"><?= t('compliance.overdue_deadlines') ?></div>
+            </div>
+            <div class="text-center p-3 rounded-lg <?= $sshAuditAvg >= 75 ? 'bg-green-50 dark:bg-green-900/20' : ($sshAuditAvg >= 50 ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-red-50 dark:bg-red-900/20') ?>">
+                <div class="text-2xl font-bold <?= $sshAuditAvg >= 75 ? 'text-green-600' : ($sshAuditAvg >= 50 ? 'text-yellow-600' : 'text-red-600') ?>"><?= count($sshAuditResults) > 0 ? $sshAuditAvg . '/100' : '—' ?></div>
+                <div class="text-xs text-gray-500"><?= t('compliance.ssh_audit_avg') ?></div>
+            </div>
+            <div class="text-center p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+                <div class="text-2xl font-bold text-indigo-600"><?= $nbWithAgent ?>/<?= $nbServers ?></div>
+                <div class="text-xs text-gray-500"><?= t('compliance.supervision_coverage') ?></div>
             </div>
         </div>
     </div>
@@ -239,6 +273,85 @@ if (isset($_GET['format']) && $_GET['format'] === 'csv') {
                 <span class="text-xs text-gray-500"><?= t('compliance.by') ?> <?= htmlspecialchars($h['changed_by'] ?? 'admin') ?></span>
             </div>
             <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- 6. SSH Audit -->
+    <?php if (!empty($sshAuditResults)): ?>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6 print-break">
+        <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4"><?= t('compliance.section_ssh_audit') ?></h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="px-3 py-2 text-left"><?= t('compliance.th_server') ?></th>
+                        <th class="px-3 py-2"><?= t('compliance.th_score') ?></th>
+                        <th class="px-3 py-2"><?= t('compliance.th_grade') ?></th>
+                        <th class="px-3 py-2">Critical</th>
+                        <th class="px-3 py-2">High</th>
+                        <th class="px-3 py-2"><?= t('compliance.th_date') ?></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <?php foreach ($sshAuditResults as $sa):
+                        $gradeColor = match($sa['grade']) { 'A' => 'text-green-600', 'B' => 'text-blue-600', 'C' => 'text-yellow-600', default => 'text-red-600' };
+                    ?>
+                    <tr>
+                        <td class="px-3 py-2 font-medium"><?= htmlspecialchars($sa['name']) ?> <span class="text-xs text-gray-400 font-mono"><?= htmlspecialchars($sa['ip']) ?></span></td>
+                        <td class="px-3 py-2 text-center font-bold"><?= $sa['score'] ?></td>
+                        <td class="px-3 py-2 text-center font-extrabold text-lg <?= $gradeColor ?>"><?= $sa['grade'] ?></td>
+                        <td class="px-3 py-2 text-center <?= ($sa['critical_count'] ?? 0) > 0 ? 'text-red-600 font-bold' : '' ?>"><?= $sa['critical_count'] ?? 0 ?></td>
+                        <td class="px-3 py-2 text-center <?= ($sa['high_count'] ?? 0) > 0 ? 'text-orange-500 font-bold' : '' ?>"><?= $sa['high_count'] ?? 0 ?></td>
+                        <td class="px-3 py-2 text-center text-xs text-gray-400"><?= $sa['audited_at'] ? date('d/m/Y H:i', strtotime($sa['audited_at'])) : '—' ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- 7. Supervision agents -->
+    <?php if (!empty($supervisionAgents)): ?>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+        <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4"><?= t('compliance.section_supervision') ?></h2>
+        <?php
+        $badgeColors = [
+            'zabbix' => 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+            'centreon' => 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+            'prometheus' => 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+            'telegraf' => 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
+        ];
+        $agentsByMachine = [];
+        foreach ($supervisionAgents as $a) { $agentsByMachine[$a['machine_id']]['name'] = $a['name']; $agentsByMachine[$a['machine_id']]['ip'] = $a['ip']; $agentsByMachine[$a['machine_id']]['agents'][] = $a; }
+        ?>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-700 text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="px-3 py-2 text-left"><?= t('compliance.th_server') ?></th>
+                        <th class="px-3 py-2">Agents</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <?php foreach ($agentsByMachine as $mid => $info): ?>
+                    <tr>
+                        <td class="px-3 py-2 font-medium"><?= htmlspecialchars($info['name']) ?> <span class="text-xs text-gray-400 font-mono"><?= htmlspecialchars($info['ip']) ?></span></td>
+                        <td class="px-3 py-2">
+                            <div class="flex flex-wrap gap-1">
+                                <?php foreach ($info['agents'] as $ag): ?>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold <?= $badgeColors[$ag['platform']] ?? 'bg-gray-100 text-gray-600' ?>">
+                                    <?= strtoupper(substr($ag['platform'], 0, 1)) ?> <?= htmlspecialchars($ag['agent_version'] ?? '') ?>
+                                    <?= $ag['config_deployed'] ? '' : ' <span class="text-[9px] opacity-60">(no cfg)</span>' ?>
+                                </span>
+                                <?php endforeach; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
     <?php endif; ?>

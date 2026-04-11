@@ -36,4 +36,11 @@ return [
     'compliance.rem_resolved' => 'Resolved',
     'compliance.rem_accepted' => 'Accepted',
     'compliance.rem_wont_fix' => 'Won\'t fix',
+    'compliance.section_ssh_audit' => 'SSH Audit — Security Scores',
+    'compliance.section_supervision' => 'Supervision — Monitoring Agents Deployed',
+    'compliance.ssh_audit_avg' => 'Avg SSH Score',
+    'compliance.supervision_coverage' => 'Monitoring coverage',
+    'compliance.th_score' => 'Score',
+    'compliance.th_grade' => 'Grade',
+    'compliance.th_date' => 'Date',
 ];

@@ -36,4 +36,11 @@ return [
     'compliance.section_firewall' => 'Pare-feu (derniers changements)',
     'compliance.by' => 'par',
     'compliance.footer_generated' => 'Rapport genere le',
+    'compliance.section_ssh_audit' => 'Audit SSH — Scores de securite',
+    'compliance.section_supervision' => 'Supervision — Agents de monitoring deployes',
+    'compliance.ssh_audit_avg' => 'Score SSH moyen',
+    'compliance.supervision_coverage' => 'Couverture monitoring',
+    'compliance.th_score' => 'Score',
+    'compliance.th_grade' => 'Note',
+    'compliance.th_date' => 'Date',
 ];
