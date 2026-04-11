@@ -26,7 +26,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-checkAuth(['2','3']);
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 try {
   $stmt = $pdo->query("

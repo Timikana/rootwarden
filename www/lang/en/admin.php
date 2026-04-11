@@ -216,6 +216,8 @@ return [
     'perms.desc_services' => 'Manage systemd services',
     'perms.label_ssh_audit' => 'SSH Audit',
     'perms.desc_ssh_audit' => 'Audit SSH configuration on servers',
+    'perms.label_supervision' => 'Supervision',
+    'perms.desc_supervision' => 'Deploy and configure monitoring agents',
     'audit.title' => 'Audit Log',
     'audit.desc' => 'History of all actions performed on the platform. Filter by user, action or date.',
     'audit.th_date' => 'Date',

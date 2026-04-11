@@ -173,7 +173,8 @@ def ssh_audit_scan():
             })
     except Exception as e:
         logger.error("[ssh-audit/scan] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/scan-all', methods=['POST'])
@@ -278,7 +279,8 @@ def ssh_audit_results():
         return jsonify({'success': True, 'results': rows, 'total': len(rows)})
     except Exception as e:
         logger.error("[ssh-audit/results] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/config', methods=['POST'])
@@ -300,7 +302,8 @@ def ssh_audit_config():
             return jsonify({'success': True, 'config': config_text, 'machine_id': mid})
     except Exception as e:
         logger.error("[ssh-audit/config] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/fix', methods=['POST'])
@@ -359,7 +362,8 @@ def ssh_audit_fix():
             })
     except Exception as e:
         logger.error("[ssh-audit/fix] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/policies', methods=['GET'])
@@ -394,7 +398,8 @@ def ssh_audit_policies_get():
         return jsonify({'success': True, 'policies': rows, 'total': len(rows)})
     except Exception as e:
         logger.error("[ssh-audit/policies] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/policies', methods=['POST'])
@@ -434,7 +439,8 @@ def ssh_audit_policies_set():
         return jsonify({'success': True, 'message': f"Policy '{directive}' definie a '{policy}'."})
     except Exception as e:
         logger.error("[ssh-audit/policies] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/save-config', methods=['POST'])
@@ -466,7 +472,8 @@ def ssh_audit_save_config():
             return jsonify({'success': True, 'message': message, 'machine_id': mid})
     except Exception as e:
         logger.error("[ssh-audit/save-config] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/toggle', methods=['POST'])
@@ -502,7 +509,8 @@ def ssh_audit_toggle():
             return jsonify({'success': True, 'message': message, 'machine_id': mid})
     except Exception as e:
         logger.error("[ssh-audit/toggle] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/backups', methods=['POST'])
@@ -522,7 +530,8 @@ def ssh_audit_backups():
             return jsonify({'success': True, 'backups': backups, 'total': len(backups), 'machine_id': mid})
     except Exception as e:
         logger.error("[ssh-audit/backups] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/restore', methods=['POST'])
@@ -554,7 +563,8 @@ def ssh_audit_restore():
             return jsonify({'success': True, 'message': message, 'machine_id': mid})
     except Exception as e:
         logger.error("[ssh-audit/restore] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/reload', methods=['POST'])
@@ -582,4 +592,5 @@ def ssh_audit_reload():
             return jsonify({'success': True, 'message': message, 'machine_id': mid})
     except Exception as e:
         logger.error("[ssh-audit/reload] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error("[ssh_audit] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500

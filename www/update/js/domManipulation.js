@@ -18,7 +18,7 @@
  *
  * Dépendances :
  *   - window.API_URL  : URL de base du backend Python (définie dans head.php)
- *   - apiCalls.js     : fonctions updateSingleMachine(), zabbixUpdateSingle(),
+ *   - apiCalls.js     : fonctions updateSingleMachine(),
  *                       openScheduleModal() appelées depuis les boutons d'action
  */
 
@@ -106,7 +106,7 @@ function updateMachineVersionDOM(machineId, linuxVersion) {
  *
  * @param {Object} serverData - Objet machine contenant les propriétés :
  *   id, name, ip, port, linux_version, last_checked, online_status,
- *   zabbix_agent_version, environment, criticality, network_type
+ *   environment, criticality, network_type
  * @returns {HTMLTableRowElement} La ligne <tr> prête à être insérée dans le DOM
  */
 function createMachineRow(serverData) {
@@ -154,13 +154,7 @@ function createMachineRow(serverData) {
     tdStatus.textContent = serverData.online_status || __('unknown');
     tr.appendChild(tdStatus);
 
-    // 7) Version Zabbix
-    const tdZabbix = document.createElement('td');
-    tdZabbix.classList.add('p-2', 'zabbix-version', 'text-center');
-    tdZabbix.textContent = serverData.zabbix_agent_version || 'N/A';
-    tr.appendChild(tdZabbix);
-
-    // 8) MàJ sécurité - Planifier
+    // 7) MàJ sécurité - Planifier
     tr.appendChild(createTd(serverData.maj_secu_date || 'N/A', ['maj-secu-date', 'text-center']));
 
     // 9) Data de dernière exécution
@@ -191,14 +185,6 @@ function createMachineRow(serverData) {
     btnUpdate.textContent = __('update_btn');
     btnUpdate.onclick = () => updateSingleMachine(serverData.id);
     tdActions.appendChild(btnUpdate);
-
-    // Bouton Zabbix
-    const btnZabbix = document.createElement('button');
-    btnZabbix.type = 'button';
-    btnZabbix.classList.add('bg-purple-500', 'text-white', 'px-2', 'py-1', 'rounded', 'block');
-    btnZabbix.textContent = 'Zabbix';
-    btnZabbix.onclick = () => zabbixUpdateSingle(serverData.id);
-    tdActions.appendChild(btnZabbix);
 
     // Bouton Planifier
     const btnSchedule = document.createElement('button');
@@ -237,7 +223,7 @@ function createTd(text, classes = []) {
  * Les IDs sont parsés en entiers et les entrées avec ID invalide sont ignorées.
  *
  * @param {Object[]} machines - Tableau d'objets machine (propriétés : id, name, ip, port,
- *   linux_version, last_checked, online_status, zabbix_agent_version,
+ *   linux_version, last_checked, online_status,
  *   maj_secu_date, maj_secu_last_exec_date, last_reboot,
  *   environment, criticality, network_type)
  * @returns {void}
@@ -276,7 +262,6 @@ function populateMachineTable(machines) {
         tr.appendChild(createTd(m.last_checked ?? __('not_checked'), ['last-checked']));
         tr.appendChild(createTd(`${m.ip ?? ""}:${m.port ?? ""}`, []));
         tr.appendChild(createTd(m.online_status ?? __('unknown'), ['online-status']));
-        tr.appendChild(createTd(m.zabbix_agent_version ?? "N/A", ['zabbix-version', 'text-center']));
         tr.appendChild(createTd(m.maj_secu_date ?? "N/A", ['maj-secu-date', 'text-center']));
         tr.appendChild(createTd(m.maj_secu_last_exec_date ?? "N/A", ['maj-secu-lastexec-date', 'text-center']));
 

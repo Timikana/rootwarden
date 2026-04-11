@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.12.0
+# 🔐 RootWarden v1.13.0
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -17,6 +17,7 @@
 - **Fail2ban** — Detection services (SSH/FTP/Apache/Nginx/Mail), activation jails, ban/unban IP, installation auto
 - **Services systemd** — Demarrer, arreter, redemarrer les services Linux. Logs journalctl, categorisation automatique, services proteges
 - **Audit SSH** — Scanner sshd_config, scoring securite (A-F), correctifs en 1 clic, editeur config, backups/restore, toggle directives ON/OFF, reload sshd
+- **Supervision multi-agent** — Deploiement et configuration d'agents de monitoring via SSH. Supporte Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter et Telegraf. Config globale par plateforme, overrides par serveur, editeur de config distant, backups/restore, badges multi-agent, scan tous agents en 1 clic
 - **Tags personnalisés** — Étiquetez vos serveurs (web, bdd, production, dmz…) et filtrez par tag
 
 ### Scan de vulnérabilités CVE
@@ -37,7 +38,7 @@
 - **HKDF key derivation** — Cles derivees distinctes pour mots de passe (rootwarden-aes) et secrets TOTP (rootwarden-totp)
 - **Chiffrement TOTP en BDD** — Secrets 2FA chiffres (Sodium/AES), retrocompatible plaintext
 - **2FA TOTP** — Authentification multi-facteurs obligatoire
-- **RBAC** — 3 rôles (user, admin, superadmin) + 13 permissions granulaires
+- **RBAC** — 3 rôles (user, admin, superadmin) + 14 permissions granulaires
 - **Auth DB-verified** — checkAuth/checkPermission verifient en base a chaque requete, session = cache UI uniquement
 - **Anti-escalation** — Protection self-edit sur tous les endpoints admin, SA non-modifiable, dernier SA protege
 - **CSRF unifie** — checkCsrfToken() supporte POST body, header X-CSRF-TOKEN, body JSON (timing-safe)

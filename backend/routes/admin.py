@@ -38,7 +38,7 @@ def create_backup():
         cleanup_old_backups()
         return jsonify({'success': True, 'path': path})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/server_lifecycle', methods=['POST'])
