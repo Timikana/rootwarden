@@ -79,7 +79,7 @@ $routes = [
     ['Pending Packages',       'POST', '/pending_packages', ['machine_id' => $machineId], t('health.route_pending_packages')],
     ['Apt Check Lock',         'POST', '/apt_check_lock', ['machine_id' => $machineId], t('health.route_apt_check_lock')],
     ['Dpkg Repair',            'POST', '/dpkg_repair', ['machine_id' => $machineId], t('health.route_dpkg_repair')],
-    ['Update Zabbix',          'POST', '/update_zabbix', ['machine_ids' => []], t('health.route_update_zabbix')],
+    ['Update Zabbix (redirect)','POST', '/update_zabbix', ['machine_ids' => []], 'Redirect vers /supervision/zabbix/deploy'],
     ['Schedule Update',        'POST', '/schedule_update', ['machine_id' => $machineId, 'interval_minutes' => 0], t('health.route_schedule_update')],
     ['Update Logs SSE',        'GET',  '/update-logs', null, t('health.route_update_logs_sse'), true],
 
@@ -112,6 +112,14 @@ $routes = [
     ['Fail2ban Stats',         'GET',  "/fail2ban/stats?server_id=$machineId&days=7", null, t('health.route_f2b_stats')],
     ['Fail2ban Install All',   'POST', '/fail2ban/install_all', [], t('health.route_f2b_install_all')],
     ['Fail2ban GeoIP',         'POST', '/fail2ban/geoip', ['ip' => '8.8.8.8'], t('health.route_f2b_geoip')],
+
+    // ── Supervision ─────────────────────────────────────────────────────
+    ['Supervision Config',     'GET',  '/supervision/config', null, 'Configuration globale supervision'],
+    ['Supervision Machines',   'GET',  '/supervision/machines', null, 'Liste machines avec statut agent'],
+    ['Supervision Zabbix Ver', 'POST', '/supervision/zabbix/version', ['machine_id' => $machineId], 'Detection version agent Zabbix'],
+    ['Supervision Config Read','POST', '/supervision/zabbix/config/read', ['machine_id' => $machineId], 'Lecture config agent distant'],
+    ['Supervision Backups',    'POST', '/supervision/zabbix/backups', ['machine_id' => $machineId], 'Liste backups config agent'],
+    ['Supervision Overrides',  'GET',  "/supervision/overrides/$machineId", null, 'Overrides par serveur'],
 
     // ── SSH Audit ────────────────────────────────────────────────────────
     ['SSH Audit Scan',         'POST', '/ssh_audit/scan', ['machine_id' => $machineId], t('ssh_audit.scan')],

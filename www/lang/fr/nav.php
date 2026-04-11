@@ -38,6 +38,8 @@ return [
     'nav.tip_profile' => 'Gerez votre compte et vos preferences',
     'nav.ssh_audit' => 'Audit SSH',
     'nav.tip_ssh_audit' => 'Auditer la configuration SSH de vos serveurs',
+    'nav.supervision' => 'Supervision',
+    'nav.tip_supervision' => 'Deployer et configurer les agents de monitoring (Zabbix)',
     'breadcrumb.dashboard' => 'Dashboard',
     'breadcrumb.admin' => 'Administration',
     'footer.terms' => 'CGU',
