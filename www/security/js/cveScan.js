@@ -291,18 +291,20 @@ function renderResults(machineId, findings, meta) {
     }
 
     // Boutons de filtre par sévérité : déduplique les niveaux présents dans les findings
+    const _mid = parseInt(machineId) || 0;
     const sevs = [...new Set(findings.map(f => f.severity||'NONE'))];
     const filterBtns = [
-        `<button onclick="filterFindings(${machineId},'ALL')" data-sev="ALL"
+        `<button onclick="filterFindings(${_mid},'ALL')" data-sev="ALL"
                  class="sev-btn text-xs font-bold px-2.5 py-1 rounded-full
                         bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">
              Tout (${findings.length})
          </button>`,
         ...sevs.map(s => {
             const cnt = findings.filter(f=>(f.severity||'NONE')===s).length;
-            return `<button onclick="filterFindings(${machineId},'${s}')" data-sev="${s}"
-                            class="sev-btn text-xs font-bold px-2.5 py-1 rounded-full ${SEV_STYLES[s].badge}">
-                        ${s} (${cnt})
+            const safeSev = String(s).replace(/[^A-Z_-]/g, '');
+            return `<button onclick="filterFindings(${_mid},'${safeSev}')" data-sev="${safeSev}"
+                            class="sev-btn text-xs font-bold px-2.5 py-1 rounded-full ${SEV_STYLES[s]?.badge || ''}">
+                        ${safeSev} (${cnt})
                     </button>`;
         })
     ].join('');
@@ -323,7 +325,7 @@ function renderResults(machineId, findings, meta) {
     });
     const yearBtns = Object.entries(yearCounts)
         .sort(([a],[b]) => b.localeCompare(a))
-        .map(([y,c]) => `<button onclick="filterFindings(${machineId},'YEAR-${y}')" class="sev-btn text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900">${y} (${c})</button>`)
+        .map(([y,c]) => { const safeY = String(y).replace(/[^0-9?]/g, ''); return `<button onclick="filterFindings(${_mid},'YEAR-${safeY}')" class="sev-btn text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900">${safeY} (${c})</button>`; })
         .join('');
 
     // Stocker les findings pour la pagination
@@ -370,9 +372,9 @@ function renderResults(machineId, findings, meta) {
     // Résumé cliquable (toujours visible)
     container.innerHTML = `
         <div class="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-             onclick="toggleCveDetail(${machineId})">
+             onclick="toggleCveDetail(${_mid})">
             <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <svg id="cve-chevron-${machineId}" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <svg id="cve-chevron-${_mid}" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 <span>${findings.length} CVE</span>
                 <span class="text-gray-300 dark:text-gray-600">|</span>
                 ${Object.entries(yearCounts).sort(([a],[b]) => b.localeCompare(a)).slice(0,5).map(([y,c]) => `<span>${y}: ${c}</span>`).join(' · ')}

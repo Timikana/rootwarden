@@ -107,7 +107,7 @@ def validate_iptables():
             return jsonify({"success": False, "message": "Regles IPv4 vides."}), 400
         with ssh_session(server_ip, server_port, ssh_user, ssh_password, service_account=svc_account) as client:
             encoded = base64.b64encode(rules_v4.encode()).decode()
-            test_cmd = f"echo '{encoded}' | base64 -d > /tmp/_ipt_test.rules && iptables-restore --test /tmp/_ipt_test.rules 2>&1; echo EXIT_CODE=$?"
+            test_cmd = f"printf '%s' '{encoded}' | base64 -d > /tmp/_ipt_test.rules && iptables-restore --test /tmp/_ipt_test.rules 2>&1; echo EXIT_CODE=$?"
             output_lines = list(execute_as_root_stream(client, test_cmd, root_password, logger=logger))
             output = '\n'.join(output_lines)
             exit_code = 0 if any('EXIT_CODE=0' in l for l in output_lines) else 1
@@ -242,7 +242,7 @@ def iptables_rollback():
         return jsonify({'success': True, 'message': 'Regles restaurees'})
     except Exception as e:
         logger.error("[iptables-rollback] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
     finally:
         conn.close()
 

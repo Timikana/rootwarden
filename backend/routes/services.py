@@ -12,6 +12,7 @@ Routes :
     POST /services/logs     — Logs journalctl d'un service
 """
 
+import re
 import logging
 from flask import Blueprint, jsonify, request
 
@@ -28,6 +29,18 @@ from services_manager import (
 )
 
 bp = Blueprint('services', __name__)
+
+_SAFE_SERVICE_RE = re.compile(r'^[a-zA-Z0-9@._:-]+$')
+
+
+def _validate_service_name(name):
+    """Valide un nom de service systemd. Retourne (name, error_response)."""
+    name = (name or '').strip()
+    if not name:
+        return None, (jsonify({'success': False, 'message': 'service requis'}), 400)
+    if not _SAFE_SERVICE_RE.match(name) or len(name) > 200:
+        return None, (jsonify({'success': False, 'message': 'Nom de service invalide'}), 400)
+    return name, None
 
 
 # ── Helper : resolution credentials SSH ────────────────────────────────────
@@ -107,7 +120,7 @@ def services_list():
             return jsonify({'success': True, 'services': services, 'total': len(services)})
     except Exception as e:
         logger.error("[services/list] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/status', methods=['POST'])
@@ -117,9 +130,9 @@ def services_list():
 def services_status():
     """Statut detaille d'un service."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
 
     ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
     if err:
@@ -133,7 +146,7 @@ def services_status():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/status] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/start', methods=['POST'])
@@ -143,9 +156,9 @@ def services_status():
 def services_start():
     """Demarre un service."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
 
     base = service.replace('.service', '')
     if base in PROTECTED_SERVICES:
@@ -169,7 +182,7 @@ def services_start():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/start] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/stop', methods=['POST'])
@@ -179,9 +192,9 @@ def services_start():
 def services_stop():
     """Arrete un service."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
 
     base = service.replace('.service', '')
     if base in PROTECTED_SERVICES:
@@ -205,7 +218,7 @@ def services_stop():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/stop] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/restart', methods=['POST'])
@@ -215,9 +228,9 @@ def services_stop():
 def services_restart():
     """Redemarre un service."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
 
     base = service.replace('.service', '')
     if base in PROTECTED_SERVICES:
@@ -241,7 +254,7 @@ def services_restart():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/restart] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/enable', methods=['POST'])
@@ -251,9 +264,9 @@ def services_restart():
 def services_enable():
     """Active un service au demarrage."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
 
     base = service.replace('.service', '')
     if base in PROTECTED_SERVICES:
@@ -277,7 +290,7 @@ def services_enable():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/enable] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/disable', methods=['POST'])
@@ -287,9 +300,9 @@ def services_enable():
 def services_disable():
     """Desactive un service au demarrage."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
 
     base = service.replace('.service', '')
     if base in PROTECTED_SERVICES:
@@ -313,7 +326,7 @@ def services_disable():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/disable] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/services/logs', methods=['POST'])
@@ -323,9 +336,9 @@ def services_disable():
 def services_logs():
     """Lit les dernieres lignes du journal d'un service."""
     data = request.get_json(silent=True) or {}
-    service = data.get('service', '').strip()
-    if not service:
-        return jsonify({'success': False, 'message': 'service requis'}), 400
+    service, svc_err = _validate_service_name(data.get('service'))
+    if svc_err:
+        return svc_err
     try:
         lines = max(10, min(500, int(data.get('lines', 50))))
     except (TypeError, ValueError):
@@ -343,4 +356,4 @@ def services_logs():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/logs] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500

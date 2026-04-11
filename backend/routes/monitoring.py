@@ -15,7 +15,7 @@ import re
 import socket
 from flask import Blueprint, jsonify, request
 
-from routes.helpers import require_api_key, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
 
 from ssh_utils import ssh_session, validate_machine_id
 from server_checks import parse_os_release
@@ -55,6 +55,7 @@ def list_machines():
 
 @bp.route('/server_status', methods=['POST'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def server_status():
     data = request.json or {}
@@ -89,7 +90,7 @@ def server_status():
         return jsonify({'success': True, 'ip': ip, 'status': status})
     except Exception as e:
         logger.error("[server_status] Erreur: %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/linux_version', methods=['POST'])
@@ -160,7 +161,7 @@ def last_reboot():
             conn.commit()
         return jsonify({'success': True, 'last_reboot': last_reboot_time, 'reboot_required': reboot_required}), 200
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/filter_servers', methods=['GET'])

@@ -70,7 +70,9 @@ switch ($action) {
         $countStmt->execute($params);
         $total = (int)$countStmt->fetchColumn();
 
-        $stmt = $pdo->prepare("SELECT n.id, n.type, n.title, n.message, n.link, n.read_at, n.created_at FROM notifications n WHERE {$where} ORDER BY n.created_at DESC LIMIT {$perPage} OFFSET {$offset}");
+        $perPage = (int)$perPage;
+        $offset = max(0, (int)$offset);
+        $stmt = $pdo->prepare("SELECT n.id, n.type, n.title, n.message, n.link, n.read_at, n.created_at FROM notifications n WHERE {$where} ORDER BY n.created_at DESC LIMIT " . $perPage . " OFFSET " . $offset);
         $stmt->execute($params);
         $notifs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

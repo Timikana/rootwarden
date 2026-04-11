@@ -27,7 +27,7 @@ import time
 import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption
 from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
 
 bp = Blueprint('ssh', __name__)
@@ -340,21 +340,25 @@ def deploy_platform_key():
             # Connexion en password (force) pour deployer la cle
             with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, force_password=True) as client:
                 ssh_user = m['user']
-                # Deployer pour l'utilisateur SSH
-                deploy_cmd = f"""
-                mkdir -p ~/.ssh && chmod 700 ~/.ssh
-                grep -qF '{pubkey}' ~/.ssh/authorized_keys 2>/dev/null || echo '{pubkey}' >> ~/.ssh/authorized_keys
-                chmod 600 ~/.ssh/authorized_keys
-                """
+                # Deployer pour l'utilisateur SSH (base64 safe — evite injection via pubkey)
+                import base64 as _b64
+                _key_b64 = _b64.b64encode((pubkey + '\n').encode()).decode()
+                deploy_cmd = (
+                    "mkdir -p ~/.ssh && chmod 700 ~/.ssh && "
+                    f"printf '%s' '{_key_b64}' | base64 -d >> ~/.ssh/authorized_keys && "
+                    "sort -u ~/.ssh/authorized_keys -o ~/.ssh/authorized_keys && "
+                    "chmod 600 ~/.ssh/authorized_keys"
+                )
                 stdin, stdout, stderr = client.exec_command(deploy_cmd, timeout=15)
                 stdout.read()
 
                 # Deployer pour root (via sudo/su)
-                root_cmd = f"""
-                mkdir -p /root/.ssh && chmod 700 /root/.ssh
-                grep -qF '{pubkey}' /root/.ssh/authorized_keys 2>/dev/null || echo '{pubkey}' >> /root/.ssh/authorized_keys
-                chmod 600 /root/.ssh/authorized_keys
-                """
+                root_cmd = (
+                    "mkdir -p /root/.ssh && chmod 700 /root/.ssh && "
+                    f"printf '%s' '{_key_b64}' | base64 -d >> /root/.ssh/authorized_keys && "
+                    "sort -u /root/.ssh/authorized_keys -o /root/.ssh/authorized_keys && "
+                    "chmod 600 /root/.ssh/authorized_keys"
+                )
                 try:
                     execute_as_root(client, root_cmd, root_pass, logger=logger)
                 except Exception as root_err:
@@ -385,6 +389,8 @@ def deploy_platform_key():
                     sa_ok = False
                     try:
                         sa_name = 'rootwarden'
+                        if not re.match(r'^[a-z][a-z0-9_-]+$', sa_name):
+                            raise ValueError(f"Nom de compte invalide: {sa_name}")
                         # Installer sudo si absent (utilise su - avec root_password)
                         try:
                             ensure_sudo_installed(client, root_pass, logger=logger)
@@ -698,6 +704,7 @@ def reenter_ssh_password():
 
 @bp.route('/regenerate_platform_key', methods=['POST'])
 @require_api_key
+@require_role(3)
 @threaded_route
 def regenerate_platform_key_route():
     """Regenere la keypair plateforme. ATTENTION : necessite re-deploiement."""
@@ -760,6 +767,10 @@ def scan_server_users():
                     continue
                 uname, home, shell = parts[0], parts[1], parts[2]
 
+                # Valider le path home (anti-injection)
+                if not re.match(r'^/[a-zA-Z0-9/_.-]+$', home):
+                    continue
+
                 # Verifier authorized_keys
                 ak_cmd = f"cat {home}/.ssh/authorized_keys 2>/dev/null || echo ''"
                 stdin2, stdout2, stderr2 = client.exec_command(ak_cmd, timeout=10)
@@ -794,7 +805,7 @@ def scan_server_users():
 
         return jsonify({'success': True, 'machine_id': m['id'], 'machine_name': m['name'], 'users': users})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)[:200]}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/remove_user_keys', methods=['POST'])
@@ -841,9 +852,13 @@ def remove_user_keys():
 
             ak_path = f"{home}/.ssh/authorized_keys"
 
+            # Valider le path (anti-injection)
+            if not re.match(r'^/[a-zA-Z0-9/_.-]+$', ak_path):
+                return jsonify({'success': False, 'message': 'Chemin invalide'}), 400
+
             if mode == 'all':
                 # Supprimer TOUTES les cles (vider le fichier)
-                cmd = f"> {ak_path}"
+                cmd = f"printf '' > {ak_path}"
                 execute_as_root(client, cmd, root_pass, logger=logger)
                 return jsonify({'success': True, 'message': f"Toutes les cles de '{username}' supprimees"})
             else:
@@ -854,7 +869,7 @@ def remove_user_keys():
 
     except Exception as e:
         logger.error("[remove_user_keys] %s", e)
-        return jsonify({'success': False, 'message': str(e)[:200]}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/delete_remote_user', methods=['POST'])
@@ -926,4 +941,4 @@ def delete_remote_user():
 
     except Exception as e:
         logger.error("[delete_remote_user] %s", e)
-        return jsonify({'success': False, 'message': str(e)[:200]}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
