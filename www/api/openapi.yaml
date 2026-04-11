@@ -3,11 +3,11 @@ info:
   title: RootWarden API
   description: |
     API REST du backend Flask de RootWarden — plateforme de gestion centralisee
-    de serveurs Linux (cles SSH, mises a jour, iptables, scan CVE).
+    de serveurs Linux (cles SSH, mises a jour, iptables, scan CVE, supervision multi-agent).
 
     **Authentification** : header `X-API-KEY` obligatoire sur toutes les routes (sauf /test).
     Le frontend PHP utilise `/api_proxy.php` qui injecte la cle automatiquement.
-  version: 1.11.0
+  version: 1.13.0
   contact:
     name: RootWarden
     url: https://github.com/Timikana/rootwarden
@@ -511,18 +511,10 @@ paths:
   /update_zabbix:
     post:
       tags: [Updates]
-      summary: Met a jour l'agent Zabbix sur des serveurs
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [machine_ids]
-              properties:
-                machine_ids: { type: array, items: { type: integer } }
-                version: { type: string, example: "7.0" }
+      summary: "[DEPRECATED] Redirige vers /supervision/zabbix/deploy"
+      deprecated: true
       responses:
-        '200': { description: Flux streaming MAJ Zabbix }
+        '307': { description: Redirect vers /supervision/zabbix/deploy }
 
   /schedule_update:
     post:
@@ -1859,3 +1851,290 @@ paths:
       responses:
         '200': { description: Mis a jour }
         '400': { description: Parametres invalides }
+
+  # ── Supervision (multi-agent) ──────────────────────────────────────────────
+
+  /supervision/config:
+    get:
+      tags: [Supervision]
+      summary: Recupere la configuration globale Zabbix
+      responses:
+        '200': { description: Configuration globale }
+    post:
+      tags: [Supervision]
+      summary: Sauvegarde la configuration globale Zabbix
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [zabbix_server]
+              properties:
+                agent_type: { type: string, enum: [zabbix-agent, zabbix-agent2] }
+                agent_version: { type: string, example: "7.0" }
+                zabbix_server: { type: string }
+                zabbix_server_active: { type: string }
+                listen_port: { type: integer, default: 10050 }
+                hostname_pattern: { type: string, default: "{machine.name}" }
+                tls_connect: { type: string, enum: [unencrypted, psk, cert] }
+                tls_accept: { type: string, enum: [unencrypted, psk, cert] }
+                tls_psk_identity: { type: string }
+                tls_psk_value: { type: string }
+                host_metadata_template: { type: string }
+                extra_config: { type: string }
+      responses:
+        '200': { description: Configuration sauvegardee }
+
+  /supervision/config/{platform}:
+    get:
+      tags: [Supervision]
+      summary: Recupere la configuration globale pour une plateforme
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      responses:
+        '200': { description: Configuration plateforme }
+    post:
+      tags: [Supervision]
+      summary: Sauvegarde la configuration pour une plateforme
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname_pattern: { type: string }
+                centreon_host: { type: string }
+                centreon_port: { type: integer }
+                prometheus_listen: { type: string }
+                prometheus_collectors: { type: string }
+                telegraf_output_url: { type: string }
+                telegraf_output_token: { type: string }
+                telegraf_output_org: { type: string }
+                telegraf_output_bucket: { type: string }
+                telegraf_inputs: { type: string }
+                extra_config: { type: string }
+      responses:
+        '200': { description: Configuration sauvegardee }
+
+  /supervision/{platform}/deploy:
+    post:
+      tags: [Supervision]
+      summary: Deploie un agent sur des serveurs (streaming)
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine_ids: { type: array, items: { type: integer } }
+      responses:
+        '200': { description: Flux streaming deploiement }
+
+  /supervision/{platform}/version:
+    post:
+      tags: [Supervision]
+      summary: Detecte la version d'un agent installe
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Version detectee }
+
+  /supervision/{platform}/uninstall:
+    post:
+      tags: [Supervision]
+      summary: Desinstalle un agent (streaming)
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Flux streaming desinstallation }
+
+  /supervision/{platform}/reconfigure:
+    post:
+      tags: [Supervision]
+      summary: Reconfigure un agent sans reinstaller (streaming)
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machine_ids: { type: array, items: { type: integer } }
+      responses:
+        '200': { description: Flux streaming reconfiguration }
+
+  /supervision/{platform}/config/read:
+    post:
+      tags: [Supervision]
+      summary: Lit le fichier de config agent distant
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Contenu du fichier de configuration }
+
+  /supervision/{platform}/config/save:
+    post:
+      tags: [Supervision]
+      summary: Sauvegarde le fichier de config agent distant (backup auto + restart)
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, config]
+              properties:
+                machine_id: { type: integer }
+                config: { type: string }
+      responses:
+        '200': { description: Config sauvegardee et agent redemarre }
+
+  /supervision/{platform}/backups:
+    post:
+      tags: [Supervision]
+      summary: Liste les backups de config agent
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: Liste des backups }
+
+  /supervision/{platform}/restore:
+    post:
+      tags: [Supervision]
+      summary: Restaure un backup de config agent
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string, enum: [zabbix, centreon, prometheus, telegraf] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, backup_name]
+              properties:
+                machine_id: { type: integer }
+                backup_name: { type: string }
+      responses:
+        '200': { description: Backup restaure }
+
+  /supervision/agents:
+    get:
+      tags: [Supervision]
+      summary: Liste tous les agents installes groupes par machine
+      responses:
+        '200': { description: Agents par machine }
+
+  /supervision/agents/{machine_id}:
+    get:
+      tags: [Supervision]
+      summary: Liste les agents installes sur une machine
+      parameters:
+        - name: machine_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Agents de la machine }
+
+  /supervision/overrides/{machine_id}:
+    get:
+      tags: [Supervision]
+      summary: Liste les overrides de config pour une machine
+      parameters:
+        - name: machine_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Overrides }
+    post:
+      tags: [Supervision]
+      summary: Sauvegarde les overrides pour une machine
+      parameters:
+        - name: machine_id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                overrides: { type: object }
+      responses:
+        '200': { description: Overrides sauvegardes }
+
+  /supervision/machines:
+    get:
+      tags: [Supervision]
+      summary: Liste des machines avec statut agents
+      responses:
+        '200': { description: Liste machines }

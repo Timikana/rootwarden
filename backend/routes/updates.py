@@ -1,5 +1,8 @@
 """
-routes/updates.py — Routes de mises a jour Linux (APT, Zabbix, scheduling).
+routes/updates.py — Routes de mises a jour Linux (APT, scheduling).
+
+Note: Les routes Zabbix ont ete deplacees dans routes/supervision.py.
+L'ancienne route /update_zabbix redirige vers /supervision/zabbix/deploy.
 """
 import os
 import re
@@ -8,7 +11,6 @@ import logging
 from flask import Blueprint, jsonify, request, Response
 from routes.helpers import require_api_key, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
-from packaging import version
 
 bp = Blueprint('updates', __name__)
 
@@ -131,7 +133,8 @@ def dpkg_repair():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Zabbix agent update
+# Zabbix agent update — DEPRECATED : redirect vers /supervision/zabbix/deploy
+# Conserve pour retrocompatibilite temporaire.
 # ─────────────────────────────────────────────────────────────────────────────
 
 @bp.route('/update_zabbix', methods=['POST'])
@@ -139,201 +142,9 @@ def dpkg_repair():
 @require_machine_access
 @threaded_route
 def update_zabbix():
-    """
-    Met à jour l'agent Zabbix sur une ou plusieurs machines en renvoyant des logs en temps réel.
-    """
-    data = request.json
-    logging.info(f"[update_zabbix] Received data: {data}")
-
-    machine_ids = data.get('machine_ids', [])
-    if not machine_ids:
-        machine_id = data.get('machine_id')
-        if machine_id:
-            machine_ids = [machine_id]
-
-    zabbix_version = data.get('zabbix_version', '').strip()
-
-    if not machine_ids:
-        logging.warning("[update_zabbix] Missing data: machine_ids.")
-        return jsonify({"success": False, "message": "Missing data: machine_ids."}), 400
-    if not zabbix_version or not re.match(r'^\d+\.\d+(\.\d+)?$', zabbix_version):
-        logging.warning("[update_zabbix] Invalid Zabbix version: %s", zabbix_version)
-        return jsonify({"success": False, "message": "Missing Zabbix version."}), 400
-
-    def generate():
-        for machine_id in machine_ids:
-            try:
-                yield f"START_MACHINE::{machine_id}::Début de la mise à jour Zabbix.\n"
-
-                # Récupération des infos de la machine depuis la BDD
-                with get_db_connection() as conn:
-                    cursor = conn.cursor(dictionary=True)
-                    cursor.execute("""
-                        SELECT name, ip, port, user, password, root_password, linux_version, network_type, zabbix_rsa_key, service_account_deployed
-                        FROM machines
-                        WHERE id = %s
-                        """, (machine_id,))
-                    row = cursor.fetchone()
-
-                if not row:
-                    yield f"ERROR_MACHINE::{machine_id}::Machine non trouvée.\n"
-                    continue
-
-                machine_name = row['name']
-                ip = row['ip']
-                port = row['port']
-                ssh_user = row['user']
-                ssh_password = server_decrypt_password(row['password'], logger=logger)
-                root_password = server_decrypt_password(row['root_password'], logger=logger)
-                linux_version_full = row['linux_version']
-                network_type = row['network_type']
-                zabbix_rsa_key = row['zabbix_rsa_key']
-
-                # Détermination de la distribution et de la version
-                if "Debian" in linux_version_full:
-                    os_version = "debian12" if "12" in linux_version_full else "debian11"
-                elif "Ubuntu" in linux_version_full:
-                    os_version = "ubuntu22.04" if "22.04" in linux_version_full else "ubuntu20.04"
-                else:
-                    yield f"ERROR_MACHINE::{machine_id}::OS non supporté: {linux_version_full}\n"
-                    continue
-
-                # Gestion de l'URL du dépôt Zabbix
-                from packaging import version
-                release_segment = "release/" if version.parse(zabbix_version) >= version.parse("7.2") else ""
-                zabbix_repo_url = (
-                    f"https://repo.zabbix.com/zabbix/{zabbix_version}/{release_segment}debian/"
-                    f"pool/main/z/zabbix-release/zabbix-release_latest_{zabbix_version}+{os_version}_all.deb"
-                )
-
-                zabbix_server_ip = '192.168.70.236' if network_type == 'INTERNE' else '192.168.0.240'
-                host_metadata = 'LinuxInterne' if network_type == 'INTERNE' else 'LinuxExterne'
-
-                # Connexion SSH et exécution des commandes en root
-                install_repo_command = (
-                    f"export DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFOLD=1 && "
-                    f"mv /etc/zabbix/zabbix_agent2.conf /etc/zabbix/zabbix_agent2.conf.old 2>/dev/null || true && "
-                    f"apt-get purge -y --allow-change-held-packages zabbix-agent zabbix-agent2 2>/dev/null || true && "
-                    f"rm -f /etc/zabbix/zabbix_agent2.d/plugins.d/postgresql.conf "
-                    f"/etc/zabbix/zabbix_agent2.d/plugins.d/mssql.conf "
-                    f"/etc/zabbix/zabbix_agent2.d/plugins.d/mongodb.conf 2>/dev/null || true && "
-                    f"wget --no-verbose {zabbix_repo_url} -O /tmp/zabbix-release_latest.deb && "
-                    f"while fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 3; done && "
-                    f"echo 'N' | dpkg -i --force-confdef --force-confold /tmp/zabbix-release_latest.deb"
-                )
-                full_command = (
-                    f"export DEBIAN_FRONTEND=noninteractive && "
-                    f"apt-get update -y && "
-                    f"apt-get install -y -o Dpkg::Options::='--force-confold' "
-                    f"-o Dpkg::Options::='--force-confdef' "
-                    f"--allow-downgrades --allow-remove-essential --allow-change-held-packages "
-                    f"zabbix-agent2 zabbix-agent2-plugin-* && "
-                    f"dpkg --configure -a --force-confold --force-confdef"
-                )
-
-                # Écriture sécurisée de la clé PSK via base64
-                import base64 as _b64
-                psk_encoded = _b64.b64encode(zabbix_rsa_key.encode('utf-8')).decode('ascii')
-                write_psk_cmd = (
-                    f"rm -f /etc/zabbix/zabbix_agent2.d/server.key && "
-                    f"printf '%s' '{psk_encoded}' | base64 -d > /etc/zabbix/zabbix_agent2.d/server.key && "
-                    f"chmod 640 /etc/zabbix/zabbix_agent2.d/server.key"
-                )
-
-                config_lines = {
-                    "Server":          zabbix_server_ip,
-                    "ServerActive":    zabbix_server_ip,
-                    "Hostname":        machine_name,
-                    "HostMetadata":    host_metadata,
-                    "TLSConnect":      "psk",
-                    "TLSAccept":       "psk",
-                    "TLSPSKIdentity":  "ZBX-AGENT-PSK-ID",
-                    "TLSPSKFile":      "/etc/zabbix/zabbix_agent2.d/server.key",
-                }
-
-                with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
-                    yield from execute_as_root_stream(client, install_repo_command, root_password, logger=logger)
-                    yield from execute_as_root_stream(client, full_command, root_password, logger=logger)
-                    execute_as_root(client, write_psk_cmd, root_password, logger=logger)
-                    yield from update_zabbix_config_stream(client, root_password,
-                                                           "/etc/zabbix/zabbix_agent2.conf", config_lines)
-                    yield from execute_as_root_stream(client,
-                        "systemctl restart zabbix-agent2 && systemctl enable zabbix-agent2",
-                        root_password, logger=logger)
-
-                # Mise à jour de la BDD
-                try:
-                    with get_db_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("""
-                            UPDATE machines
-                            SET zabbix_agent_version = %s
-                            WHERE id = %s
-                        """, (zabbix_version, machine_id))
-                        conn.commit()
-                    yield f"SUCCESS_MACHINE::{machine_id}::Mise à jour Zabbix réussie pour {machine_name}.\n"
-                except Exception as db_err:
-                    yield f"ERROR_MACHINE::{machine_id}::Échec de la mise à jour BDD: {db_err}\n"
-
-            except Exception as e:
-                yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
-
-    return Response(generate(), mimetype='text/plain')
-
-
-def update_zabbix_config_exec(client, file_path, config_lines, root_password):
-    """
-    Met à jour le fichier de configuration Zabbix en exécutant les commandes nécessaires
-    via exec_command. Renvoie la sortie ligne par ligne.
-    """
-    from ssh_utils import execute_command_as_root_exec
-    for key, value in config_lines.items():
-        # Échapper la valeur pour éviter les conflits avec les apostrophes
-        escaped_value = value.replace("'", "\\'")
-        grep_regex = f"^[#[:space:]]*{key}[[:space:]]*="
-        check_command = f"grep -E '{grep_regex}' {file_path}"
-        # Vérifier si la clé existe
-        output = "".join(execute_command_as_root_exec(client, check_command, root_password))
-        if output.strip():
-            delete_command = f"sed -i '/{grep_regex}/d' {file_path}"
-            for line in execute_command_as_root_exec(client, delete_command, root_password):
-                yield line
-            yield f"INFO: Clé existante '{key}' supprimée.\n"
-        else:
-            yield f"INFO: Clé '{key}' non trouvée, ajout.\n"
-        import base64
-        line_content = f"{key}={value}\n"
-        encoded = base64.b64encode(line_content.encode('utf-8')).decode('ascii')
-        append_command = f"printf '%s' '{encoded}' | base64 -d >> {file_path}"
-        for line in execute_command_as_root_exec(client, append_command, root_password):
-            yield line
-        yield f"INFO: Clé '{key}' ajoutée avec la valeur '{value}'.\n"
-    yield f"INFO: Le fichier {file_path} a été mis à jour.\n"
-
-
-def update_zabbix_config_stream(client, root_password: str,
-                                file_path: str, config_lines: dict):
-    """
-    Met à jour le fichier de configuration Zabbix en streaming.
-    Chaque valeur est écrite via base64 pour éviter toute injection shell.
-    """
-    import base64
-    try:
-        for key, value in config_lines.items():
-            grep_regex = f"^[#[:space:]]*{re.escape(key)}[[:space:]]*="
-            delete_cmd = f"sed -i -E '/{grep_regex}/d' {file_path}"
-            execute_as_root(client, delete_cmd, root_password)
-            yield f"INFO: Clé '{key}' purgée.\n"
-
-            line    = f"{key}={value}\n"
-            encoded = base64.b64encode(line.encode('utf-8')).decode('ascii')
-            execute_as_root(client,
-                f"printf '%s' '{encoded}' | base64 -d >> {file_path}", root_password)
-            yield f"INFO: Clé '{key}' définie à '{value}'.\n"
-
-        yield f"INFO: Fichier {file_path} mis à jour avec succès.\n"
-    except Exception as e:
-        yield f"ERROR: update_zabbix_config_stream: {e}\n"
+    """Redirect temporaire vers le nouveau module supervision."""
+    from flask import redirect
+    return redirect('/supervision/zabbix/deploy', code=307)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

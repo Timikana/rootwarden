@@ -8,7 +8,6 @@
  *     - Filtrage par environnement (PROD/DEV/TEST/OTHER), criticité et type réseau
  *     - Vérification des versions Linux installées et des statuts en ligne
  *     - Lancement de mises à jour globales (apt update/upgrade) ou de sécurité
- *     - Mise à jour de l'agent Zabbix sur les machines sélectionnées
  *     - Planification de mises à jour de sécurité (date + heure + récurrence)
  *     - Affichage des logs de mise à jour par serveur (fenêtres séparées)
  *
@@ -21,7 +20,6 @@
  *   - auth/verify.php           : fonctions checkAuth() et gestion de session
  *   - update/functions/machines.php    : fonctions de récupération/rafraîchissement des machines
  *   - update/functions/scheduling.php  : gestion de la planification des mises à jour
- *   - update/functions/zabbix.php      : fonctions spécifiques à l'agent Zabbix
  *   - update/functions/filter.php      : logique de filtrage des serveurs
  *   - db.php                    : connexion PDO ($pdo)
  *   - head.php / menu.php / footer.php : gabarits HTML communs
@@ -32,7 +30,7 @@
  *
  * Colonnes chargées depuis la BDD :
  *   id, name, ip, port, linux_version, last_checked, online_status,
- *   zabbix_agent_version, maj_secu_date, maj_secu_last_exec_date,
+ *   maj_secu_date, maj_secu_last_exec_date,
  *   last_reboot, environment, criticality, network_type
  */
 
@@ -40,7 +38,6 @@
 require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/functions/machines.php';    // Fonctions CRUD et rafraîchissement machines
 require_once __DIR__ . '/functions/scheduling.php';  // Planification des mises à jour
-require_once __DIR__ . '/functions/zabbix.php';      // Mise à jour agent Zabbix
 require_once __DIR__ . '/functions/filter.php';      // Filtrage serveurs (env/criticité/réseau)
 require_once __DIR__ . '/../db.php';
 
@@ -54,13 +51,14 @@ checkPermission('can_update_linux');
 
 // Récupération des machines avec filtrage par acces utilisateur
 $role = (int) ($_SESSION['role_id'] ?? 0);
+$userId = (int) ($_SESSION['user_id'] ?? 0);
 $machineQuery = "SELECT m.id, m.name, m.ip, m.port, m.linux_version, m.last_checked,
-    m.online_status, m.zabbix_agent_version, m.maj_secu_date, m.maj_secu_last_exec_date,
+    m.online_status, m.maj_secu_date, m.maj_secu_last_exec_date,
     m.last_reboot, m.environment, m.criticality, m.network_type
     FROM machines m";
 if ($role < 2) {
     $machineQuery = "SELECT m.id, m.name, m.ip, m.port, m.linux_version, m.last_checked,
-        m.online_status, m.zabbix_agent_version, m.maj_secu_date, m.maj_secu_last_exec_date,
+        m.online_status, m.maj_secu_date, m.maj_secu_last_exec_date,
         m.last_reboot, m.environment, m.criticality, m.network_type
         FROM machines m
         INNER JOIN user_machine_access uma ON m.id = uma.machine_id
@@ -186,12 +184,6 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button onclick="dpkgRepair()" class="text-xs px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors font-medium" title="<?= t('updates.tip_dpkg_repair') ?>"><?= t('updates.btn_dpkg_repair') ?></button>
                 </div>
             </div>
-            <!-- Zabbix compact -->
-            <div class="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                <span class="text-xs font-medium text-purple-600 dark:text-purple-400 whitespace-nowrap"><?= t('updates.zabbix_agent') ?></span>
-                <input type="text" id="zabbix-version" placeholder="7.0" class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 w-24">
-                <button onclick="updateZabbix()" class="text-xs px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-colors"><?= t('updates.btn_update_zabbix') ?></button>
-            </div>
         </div>
 
         <div class="flex gap-3 text-[10px] text-gray-400 mt-1 mb-2">
@@ -218,7 +210,6 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th class="p-2"><?= t('updates.th_last_check') ?></th>
                         <th class="p-2"><?= t('updates.th_ip_port') ?></th>
                         <th class="p-2"><?= t('updates.th_status') ?></th>
-                        <th class="p-2"><?= t('updates.th_zabbix') ?></th>
                         <th class="p-2"><?= t('updates.th_secu_schedule') ?></th>
                         <th class="p-2"><?= t('updates.th_last_exec') ?></th>
                         <th class="p-2"><?= t('updates.th_last_reboot') ?></th>
@@ -243,7 +234,6 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td class="p-2 last-checked"><?= htmlspecialchars($m['last_checked'] ?? t('updates.not_checked')) ?></td>
                             <td class="p-2"><?= htmlspecialchars($m['ip']) ?>:<?= htmlspecialchars($m['port']) ?></td>
                             <td class="p-2 online-status"><?= htmlspecialchars($m['online_status'] ?? t('updates.unknown')) ?></td>
-                            <td class="p-2 zabbix-version text-center"><?= htmlspecialchars($m['zabbix_agent_version'] ?? 'N/A') ?></td>
                             <td class="p-2 maj-secu-date text-center"><?= htmlspecialchars($m['maj_secu_date'] ?? 'N/A') ?></td>
                             <td class="p-2 maj-secu-lastexec-date text-center"><?= htmlspecialchars($m['maj_secu_last_exec_date'] ?? 'N/A') ?></td>
                             <td class="p-2 last-reboot" id="last-reboot-<?= htmlspecialchars($m['id']) ?>"><?= htmlspecialchars($m['last_reboot'] ?? 'N/A') ?></td>
