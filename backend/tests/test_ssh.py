@@ -41,8 +41,8 @@ class TestRegeneratePlatformKey:
         resp = client.post('/regenerate_platform_key')
         assert resp.status_code == 401
 
-    def test_regenerate_success(self, client, admin_headers, mock_db):
-        resp = client.post('/regenerate_platform_key', headers=admin_headers)
+    def test_regenerate_success(self, client, superadmin_headers, mock_db):
+        resp = client.post('/regenerate_platform_key', headers=superadmin_headers)
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['success'] is True
