@@ -980,13 +980,15 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
         root_cmd = f"sudo -S -p '' sh -c {shlex.quote(command)}"
     else:
         # Fallback su : ecrire un script temp pour les memes raisons que _su_exec
-        import base64 as _b64, uuid as _uuid
+        import base64 as _b64
+        import uuid as _uuid
         _tmp = f"/tmp/.rw_stream_{_uuid.uuid4().hex[:8]}.sh"
         _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{command}\n"
         _b64s = _b64.b64encode(_script.encode()).decode()
         _wcmd = f"printf '%s' '{_b64s}' | base64 -d > {_tmp} && chmod 700 {_tmp}"
         _ws, _wo, _we = client.exec_command(_wcmd, timeout=10)
-        _wo.read(); _wo.channel.recv_exit_status()
+        _wo.read()
+        _wo.channel.recv_exit_status()
         root_cmd = f"su root -c {shlex.quote('sh ' + _tmp)}"
     _log.info("execute_as_root_stream: %s (mode=%s)", command[:60], 'sudo' if can_sudo else 'su')
 
