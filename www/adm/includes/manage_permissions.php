@@ -27,7 +27,6 @@ $permGroups = [
         'can_manage_services' => ['label' => t('perms.label_services'), 'desc' => t('perms.desc_services')],
         'can_audit_ssh'       => ['label' => t('perms.label_ssh_audit'), 'desc' => t('perms.desc_ssh_audit')],
         'can_manage_supervision' => ['label' => t('perms.label_supervision'), 'desc' => t('perms.desc_supervision')],
-        'can_cyber_audit'     => ['label' => t('perms.label_cyber_audit'), 'desc' => t('perms.desc_cyber_audit')],
         'can_scan_cve'        => ['label' => 'Scan CVE',      'desc' => 'Scanner les vulnerabilites'],
     ],
     'Administration' => [

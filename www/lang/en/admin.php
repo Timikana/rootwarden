@@ -218,8 +218,6 @@ return [
     'perms.desc_ssh_audit' => 'Audit SSH configuration on servers',
     'perms.label_supervision' => 'Supervision',
     'perms.desc_supervision' => 'Deploy and configure monitoring agents',
-    'perms.label_cyber_audit' => 'Cyber Audit',
-    'perms.desc_cyber_audit' => 'Scan server security (accounts, ports, SUID)',
     'audit.title' => 'Audit Log',
     'audit.desc' => 'History of all actions performed on the platform. Filter by user, action or date.',
     'audit.th_date' => 'Date',

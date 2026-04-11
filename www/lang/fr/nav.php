@@ -40,8 +40,6 @@ return [
     'nav.tip_ssh_audit' => 'Auditer la configuration SSH de vos serveurs',
     'nav.supervision' => 'Supervision',
     'nav.tip_supervision' => 'Deployer et configurer les agents de monitoring (Zabbix)',
-    'nav.cyber_audit' => 'Audit Cyber',
-    'nav.tip_cyber_audit' => 'Score de securite et conformite de vos serveurs',
     'breadcrumb.dashboard' => 'Dashboard',
     'breadcrumb.admin' => 'Administration',
     'footer.terms' => 'CGU',
