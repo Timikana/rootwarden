@@ -83,6 +83,9 @@ sys.modules['db_backup'] = mock_db_backup
 # Mock cve_scanner
 sys.modules['cve_scanner'] = MagicMock()
 
+# Mock cyber_audit
+sys.modules['cyber_audit'] = MagicMock()
+
 # Mock mail_utils
 sys.modules['mail_utils'] = MagicMock()
 
@@ -183,6 +186,7 @@ def app():
     from routes.iptables import bp as iptables_bp
     from routes.updates import bp as updates_bp
     from routes.supervision import bp as supervision_bp
+    from routes.cyber_audit import bp as cyber_audit_bp
 
     test_app = Flask(__name__)
     test_app.config['TESTING'] = True
@@ -194,6 +198,7 @@ def app():
     test_app.register_blueprint(iptables_bp)
     test_app.register_blueprint(updates_bp)
     test_app.register_blueprint(supervision_bp)
+    test_app.register_blueprint(cyber_audit_bp)
 
     return test_app
 
