@@ -44,6 +44,7 @@ async function apiPost(endpoint, body) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
 }
 

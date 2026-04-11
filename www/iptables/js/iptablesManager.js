@@ -436,17 +436,30 @@ COMMIT`
                 container.innerHTML = '<p class="text-xs text-gray-400">' + __('ipt_no_history') + '</p>';
                 return;
             }
-            container.innerHTML = d.history.map(h => {
+            container.innerHTML = '';
+            d.history.forEach(function(h) {
                 const date = new Date(h.created_at).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-                const reason = h.change_reason ? ` — ${h.change_reason}` : '';
-                return `<div class="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                    <div class="flex-1 min-w-0">
-                        <span class="text-xs font-mono text-gray-500">${date}</span>
-                        <span class="text-xs text-gray-400 ml-2">${__('ipt_by', {user: _escHtml(h.changed_by || 'admin')})}${_escHtml(reason)}</span>
-                    </div>
-                    <button onclick="rollbackRules(${h.id})" class="text-[10px] px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200 flex-shrink-0">${__('restore')}</button>
-                </div>`;
-            }).join('');
+                const reason = h.change_reason ? ' — ' + h.change_reason : '';
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0';
+                const info = document.createElement('div');
+                info.className = 'flex-1 min-w-0';
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'text-xs font-mono text-gray-500';
+                dateSpan.textContent = date;
+                const bySpan = document.createElement('span');
+                bySpan.className = 'text-xs text-gray-400 ml-2';
+                bySpan.textContent = (h.changed_by || 'admin') + reason;
+                info.appendChild(dateSpan);
+                info.appendChild(bySpan);
+                const btn = document.createElement('button');
+                btn.className = 'text-[10px] px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 hover:bg-orange-200 flex-shrink-0';
+                btn.textContent = __('restore');
+                btn.addEventListener('click', (function(id) { return function() { rollbackRules(id); }; })(parseInt(h.id)));
+                row.appendChild(info);
+                row.appendChild(btn);
+                container.appendChild(row);
+            });
         } catch(e) {
             container.innerHTML = '<p class="text-xs text-red-400">' + __('error_with_msg', {msg: _escHtml(e.message)}) + '</p>';
         }

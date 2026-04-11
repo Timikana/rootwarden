@@ -305,13 +305,14 @@ def apply_fix(client, root_pass, key, value):
         return False, str(e)
 
     # Modification : commenter l'ancienne directive + ajouter la nouvelle en fin de fichier
-    # Utilise grep + printf pour eviter toute injection sed
+    # Utilise grep + printf + base64 pour eviter toute injection sed/shell
     import base64
+    escaped_key = re.escape(key)
     new_line = f"{key} {value}"
     b64_line = base64.b64encode(new_line.encode()).decode()
     fix_cmd = (
-        f"grep -qiE '^\\s*#?\\s*{key}\\b' /etc/ssh/sshd_config && "
-        f"sed -i '/^\\s*#*\\s*{key}\\b/s/^/# /' /etc/ssh/sshd_config; "
+        f"grep -qiE '^\\s*#?\\s*{escaped_key}\\b' /etc/ssh/sshd_config && "
+        f"sed -i '/^\\s*#*\\s*{escaped_key}\\b/s/^/# /' /etc/ssh/sshd_config; "
         f"printf '%s\\n' \"$(echo {b64_line} | base64 -d)\" >> /etc/ssh/sshd_config"
     )
     _, stderr, rc = execute_as_root(client, fix_cmd, root_pass, logger=_log)
@@ -380,12 +381,13 @@ def toggle_directive(client, root_pass, key, enable):
     except RuntimeError as e:
         return False, str(e)
 
+    escaped_key = re.escape(key)
     if enable:
         # Uncomment: remove leading # from lines matching the key
-        cmd = f"sed -i 's/^\\s*#\\s*\\({key}\\b\\)/\\1/' /etc/ssh/sshd_config"
+        cmd = f"sed -i 's/^\\s*#\\s*\\({escaped_key}\\b\\)/\\1/' /etc/ssh/sshd_config"
     else:
         # Comment: add # before lines matching the key
-        cmd = f"sed -i 's/^\\s*\\({key}\\b\\)/# \\1/' /etc/ssh/sshd_config"
+        cmd = f"sed -i 's/^\\s*\\({escaped_key}\\b\\)/# \\1/' /etc/ssh/sshd_config"
 
     _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
     if rc != 0:

@@ -137,7 +137,7 @@ def fail2ban_status():
             return jsonify({'success': True, **status})
     except Exception as e:
         logger.error("[fail2ban/status] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/jail', methods=['POST'])
@@ -161,7 +161,7 @@ def fail2ban_jail():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[fail2ban/jail] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/install', methods=['POST'])
@@ -186,7 +186,7 @@ def fail2ban_install_route():
             })
     except Exception as e:
         logger.error("[fail2ban/install] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/ban', methods=['POST'])
@@ -215,7 +215,7 @@ def fail2ban_ban():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[fail2ban/ban] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/unban', methods=['POST'])
@@ -244,7 +244,7 @@ def fail2ban_unban():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[fail2ban/unban] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/restart', methods=['POST'])
@@ -267,7 +267,7 @@ def fail2ban_restart():
             })
     except Exception as e:
         logger.error("[fail2ban/restart] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/config', methods=['POST'])
@@ -287,7 +287,7 @@ def fail2ban_config():
             return jsonify({'success': True, 'config': config})
     except Exception as e:
         logger.error("[fail2ban/config] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/history', methods=['GET'])
@@ -321,7 +321,7 @@ def fail2ban_history():
         return jsonify({'success': True, 'history': history})
     except Exception as e:
         logger.error("[fail2ban/history] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/services', methods=['POST'])
@@ -341,7 +341,7 @@ def fail2ban_services():
             return jsonify({'success': True, 'services': services})
     except Exception as e:
         logger.error("[fail2ban/services] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/enable_jail', methods=['POST'])
@@ -374,7 +374,7 @@ def fail2ban_enable_jail():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[fail2ban/enable_jail] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/fail2ban/disable_jail', methods=['POST'])
@@ -400,7 +400,7 @@ def fail2ban_disable_jail():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[fail2ban/disable_jail] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 # ── Whitelist ───────────────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ def fail2ban_whitelist():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[fail2ban/whitelist] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 # ── Unban All ───────────────────────────────────────────────────────────────
@@ -456,7 +456,7 @@ def fail2ban_unban_all():
             return jsonify({'success': True, 'message': f'Toutes les IPs debannies de {jail}', 'output': out})
     except Exception as e:
         logger.error("[fail2ban/unban_all] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 # ── Ban cross-serveur ───────────────────────────────────────────────────────
@@ -487,7 +487,7 @@ def fail2ban_ban_all_servers():
         machines = cur.fetchall()
         conn.close()
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
     results = []
     for m in machines:
@@ -543,7 +543,7 @@ def fail2ban_logs():
             return jsonify({'success': True, 'logs': logs})
     except Exception as e:
         logger.error("[fail2ban/logs] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 # ── Stats timeline ──────────────────────────────────────────────────────────
@@ -580,7 +580,7 @@ def fail2ban_stats():
         return jsonify({'success': True, 'stats': rows})
     except Exception as e:
         logger.error("[fail2ban/stats] %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 # ── Install all ─────────────────────────────────────────────────────────────
@@ -604,7 +604,7 @@ def fail2ban_install_all():
         machines = cur.fetchall()
         conn.close()
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
     if not machines:
         return jsonify({'success': True, 'message': 'Tous les serveurs ont deja Fail2ban', 'results': []})
@@ -649,4 +649,4 @@ def fail2ban_geoip():
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
