@@ -1,7 +1,8 @@
-# 🔐 RootWarden v1.11.0
+# 🔐 RootWarden v1.12.0
 
-> **RootWarden** est une plateforme **DevSecOps self-hosted** pour gérer vos serveurs Linux :
-> SSH, mises à jour, firewall, Fail2ban et vulnérabilités CVE — le tout centralisé.
+> **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
+> Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
+> services systemd, audit sshd_config et vulnerabilites CVE — depuis une interface unique.
 
 ---
 
@@ -13,6 +14,7 @@
 - **Pare-feu iptables** — Consultation, édition, sauvegarde/restauration depuis la BDD
 - **Fail2ban** — Detection services (SSH/FTP/Apache/Nginx/Mail), activation jails, ban/unban IP, installation auto
 - **Services systemd** — Demarrer, arreter, redemarrer les services Linux. Logs journalctl, categorisation automatique, services proteges
+- **Audit SSH** — Scanner sshd_config, scoring securite (A-F), correctifs en 1 clic, editeur config, backups/restore, toggle directives ON/OFF, reload sshd
 - **Tags personnalisés** — Étiquetez vos serveurs (web, bdd, production, dmz…) et filtrez par tag
 
 ### Scan de vulnérabilités CVE
@@ -33,12 +35,17 @@
 - **HKDF key derivation** — Cles derivees distinctes pour mots de passe (rootwarden-aes) et secrets TOTP (rootwarden-totp)
 - **Chiffrement TOTP en BDD** — Secrets 2FA chiffres (Sodium/AES), retrocompatible plaintext
 - **2FA TOTP** — Authentification multi-facteurs obligatoire
-- **RBAC** — 3 rôles (user, admin, superadmin) + permissions granulaires
+- **RBAC** — 3 rôles (user, admin, superadmin) + 13 permissions granulaires
+- **Auth DB-verified** — checkAuth/checkPermission verifient en base a chaque requete, session = cache UI uniquement
+- **Anti-escalation** — Protection self-edit sur tous les endpoints admin, SA non-modifiable, dernier SA protege
+- **CSRF unifie** — checkCsrfToken() supporte POST body, header X-CSRF-TOKEN, body JSON (timing-safe)
+- **SSH dual auth** — Mode keypair (sudo NOPASSWD) + mode password (su -c via temp script), detection automatique
 - **Expiration mots de passe** — Configurable par utilisateur (Global/Exempt/30-365j)
 - **Session timeout** — Déconnexion automatique après inactivité (configurable)
 - **Journal d'audit** — Toutes les actions admin loguées, export CSV, filtres
 - **Historique de login** — Toutes les tentatives tracées (IP, user-agent, statut)
 - **Rapport de conformité** — HTML imprimable + CSV avec hash SHA-256
+- **CGU et Confidentialite** — Pages professionnelles avec RGPD (acces/rectification/effacement/portabilite)
 - **Backup BDD automatique** — mysqldump compressé, rétention configurable
 - **Tailwind compile localement** — CSP sans unsafe-eval, pas de CDN externe
 - **Reseau Docker isole** — BDD sur reseau interne uniquement, pas d'acces internet
@@ -67,6 +74,7 @@
 | Reseau Docker | Dual (interne + externe) |
 | Chiffrement | libsodium (PyNaCl) + AES-256-CBC |
 | Proxy API | PHP → Python (élimine CORS, masque API_KEY) |
+| i18n | 1424 cles FR/EN, 19 modules par langue |
 | Tests | pytest (139 tests), ruff (linter Python), php -l (lint PHP) |
 | CI/CD | GitHub Actions (lint → test → build Docker) |
 
@@ -260,4 +268,4 @@ MIT
 
 ---
 
-*RootWarden v1.11.0 — 2026-04-10*
+*RootWarden v1.12.0 — 2026-04-11*
