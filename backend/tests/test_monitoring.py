@@ -93,7 +93,7 @@ class TestLinuxVersion:
         ssh_utils.validate_machine_id.side_effect = ValueError("machine_id invalide")
         resp = client.post('/linux_version', headers=admin_headers, json={})
         assert resp.status_code == 400
-        ssh_utils.validate_machine_id.side_effect = lambda x: int(x)
+        ssh_utils.validate_machine_id.side_effect = lambda x: int(x) if x is not None else (_ for _ in ()).throw(ValueError('machine_id requis'))
 
     def test_linux_version_machine_not_found(self, client, admin_headers, mock_cursor):
         mock_cursor._results = []

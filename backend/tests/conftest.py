@@ -61,7 +61,11 @@ mock_ssh_utils.db_config = {
     'database': 'test_db', 'port': 3306,
 }
 mock_ssh_utils.ssh_session = MagicMock()
-mock_ssh_utils.validate_machine_id.side_effect = lambda x: int(x)
+def _mock_validate_machine_id(x):
+    if x is None:
+        raise ValueError('machine_id requis')
+    return int(x)
+mock_ssh_utils.validate_machine_id.side_effect = _mock_validate_machine_id
 sys.modules['ssh_utils'] = mock_ssh_utils
 
 # Mock server_checks
@@ -178,6 +182,7 @@ def app():
     from routes.cve import bp as cve_bp
     from routes.iptables import bp as iptables_bp
     from routes.updates import bp as updates_bp
+    from routes.supervision import bp as supervision_bp
 
     test_app = Flask(__name__)
     test_app.config['TESTING'] = True
@@ -188,6 +193,7 @@ def app():
     test_app.register_blueprint(cve_bp)
     test_app.register_blueprint(iptables_bp)
     test_app.register_blueprint(updates_bp)
+    test_app.register_blueprint(supervision_bp)
 
     return test_app
 
