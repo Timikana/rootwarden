@@ -5,6 +5,67 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.13.0] — 2026-04-11
+
+### Nouveau module Supervision multi-agent
+
+**Extraction complete de Zabbix du module Updates** vers un module autonome `/supervision/`
+qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exporter et Telegraf.
+
+#### Architecture
+
+- **Backend `routes/supervision.py`** — Routes generiques multi-agent via `/{platform}/deploy`,
+  `/{platform}/version`, `/{platform}/uninstall`, `/{platform}/reconfigure`,
+  `/{platform}/config/read`, `/{platform}/config/save`, `/{platform}/backups`,
+  `/{platform}/restore`. Registre d'agents (`AGENT_REGISTRY`) avec les specs de chaque
+  plateforme (service, config path, commandes install/version/uninstall).
+- **Table `supervision_agents`** — Tracking multi-agent par serveur (machine_id + platform).
+  Un serveur peut avoir Zabbix ET Prometheus ET Telegraf en meme temps. Badges visuels
+  dans le tableau (Z=violet, C=rouge, P=orange, T=bleu).
+- **Table `supervision_config`** — Configuration globale par plateforme (colonne `platform`).
+  Chaque agent a ses propres parametres : Zabbix (Server, TLS/PSK, metadata),
+  Centreon (host gRPC, port 4317), Prometheus (listen address, collectors),
+  Telegraf (InfluxDB v2 URL/token/org/bucket, inputs).
+- **Table `supervision_overrides`** — Surcharge par serveur (Hostname, ServerActive, etc.).
+- **Permission `can_manage_supervision`** — Admin + superadmin. Interface dans la page
+  d'administration des permissions.
+
+#### Frontend
+
+- **Selecteur de plateforme** en haut a droite — switch instantane entre Zabbix/Centreon/
+  Prometheus/Telegraf. Change dynamiquement le formulaire de config, les couleurs des
+  boutons, le badge plateforme, le compteur d'agents et le chemin du fichier editeur.
+- **3 onglets** — Configuration globale (formulaire specifique par agent), Deploiement
+  agents (tableau 40+ serveurs avec badges multi-agent, filtre, scroll sticky, actions
+  masse), Editeur de configuration distant (load/save/backup/restore).
+- **Badges multi-agent** dans le tableau — Chaque serveur affiche tous ses agents
+  installes avec version (ex: "Z 7.0.13 | P 1.8.2 | T 1.33.0").
+- **Bouton "Scanner tous les agents"** — Detection des 4 plateformes en une passe.
+- **Compteur** — "12/41 serveurs avec zabbix" adapte a la plateforme active.
+- **UX 40+ serveurs** — Thead sticky, scroll smooth, filtre de recherche, compteur
+  de selection, detection auto des versions apres deploiement.
+
+#### Deploiement agents
+
+- **Zabbix Agent 2** — Repo officiel, paquet + plugins, config INI, PSK chiffre en DB,
+  streaming SSH temps reel. Supporte Debian 11/12/13 et Ubuntu 20.04/22.04.
+- **Centreon Monitoring Agent** — Repo packages.centreon.com, config YAML, gRPC port 4317.
+- **Prometheus Node Exporter** — Paquet apt standard, config flags systemd, pull-based.
+- **Telegraf** — Repo InfluxData, config TOML, outputs InfluxDB v2 ou Prometheus format.
+
+#### Technique
+
+- **Migrations** — `022_supervision.sql` (tables config + overrides + permission),
+  `023_supervision_multi_agent.sql` (colonne platform + colonnes Centreon/Prometheus/Telegraf),
+  `024_supervision_agents.sql` (table supervision_agents + migration donnees Zabbix).
+- **Retrocompat** — L'ancienne route `/update_zabbix` redirige (307) vers `/supervision/zabbix/deploy`.
+- **i18n** — 107+ cles FR + EN dans `lang/fr|en/supervision.php`.
+- **Menu sidebar** — Lien Supervision, raccourci clavier `g v`.
+- **Health check** — 6 routes supervision testees dans le diagnostic.
+- **Health check** — 6 nouvelles routes testees dans le diagnostic.
+
+---
+
 ## [1.12.0] — 2026-04-11
 
 ### Rework complet authentification et controle d'acces

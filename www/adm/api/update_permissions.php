@@ -108,10 +108,11 @@ $allowedPermissions = [
     'can_manage_fail2ban',
     'can_manage_services',
     'can_audit_ssh',
+    'can_manage_supervision',
 ];
 
 // Rejet immédiat si la permission n'est pas dans la liste autorisée
-if (!in_array($permission, $allowedPermissions)) {
+if (!in_array($permission, $allowedPermissions, true)) {
     echo json_encode(['success' => false, 'message' => 'Permission non valide']);
     exit();
 }
@@ -146,6 +147,7 @@ if ($success) {
             'can_manage_fail2ban' => ['Fail2ban', 'Bans IP serveurs'],
             'can_manage_services' => ['Services', 'Services systemd'],
             'can_audit_ssh' => ['Audit SSH', 'Audit config SSH'],
+            'can_manage_supervision' => ['Supervision', 'Deploiement agents monitoring'],
         ];
         $info = $permLabels[$permission] ?? [$permission, ''];
         $checkedAttr = $checked ? 'checked' : '';

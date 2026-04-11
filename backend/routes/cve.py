@@ -282,6 +282,7 @@ def cve_test_connection():
 
 @bp.route('/cve_schedules', methods=['GET'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def list_cve_schedules():
     """Liste toutes les planifications de scans CVE."""
@@ -301,6 +302,7 @@ def list_cve_schedules():
 
 @bp.route('/cve_schedules', methods=['POST'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def create_cve_schedule():
     """Cree une planification de scan CVE."""
@@ -339,6 +341,7 @@ def create_cve_schedule():
 
 @bp.route('/cve_schedules/<int:schedule_id>', methods=['PUT'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def update_cve_schedule(schedule_id):
     """Met a jour une planification existante."""
@@ -378,6 +381,7 @@ def update_cve_schedule(schedule_id):
 
 @bp.route('/cve_schedules/<int:schedule_id>', methods=['DELETE'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def delete_cve_schedule(schedule_id):
     """Supprime une planification."""
@@ -393,6 +397,7 @@ def delete_cve_schedule(schedule_id):
 
 @bp.route('/cve_whitelist', methods=['GET'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def list_cve_whitelist():
     """Liste les CVE en whitelist."""
@@ -416,6 +421,7 @@ def list_cve_whitelist():
 
 @bp.route('/cve_whitelist', methods=['POST'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def add_cve_whitelist():
     """Ajoute une CVE en whitelist (faux positif accepte)."""
@@ -446,6 +452,7 @@ def add_cve_whitelist():
 
 @bp.route('/cve_whitelist/<int:whitelist_id>', methods=['DELETE'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def delete_cve_whitelist(whitelist_id):
     """Supprime une entree de la whitelist CVE."""
@@ -461,6 +468,7 @@ def delete_cve_whitelist(whitelist_id):
 
 @bp.route('/cve_remediation', methods=['GET'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def list_cve_remediation():
     """Liste les remediations filtrees par statut."""
@@ -495,6 +503,7 @@ def list_cve_remediation():
 
 @bp.route('/cve_remediation', methods=['POST'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def upsert_cve_remediation():
     """Cree ou met a jour une remediation CVE."""
@@ -533,6 +542,7 @@ def upsert_cve_remediation():
 
 @bp.route('/cve_remediation/stats', methods=['GET'])
 @require_api_key
+@require_role(2)
 @threaded_route
 def cve_remediation_stats():
     """Compteurs de remediation par statut."""

@@ -16,7 +16,8 @@ if (strlen($q) < 2) {
 }
 
 $results = [];
-$like = "%{$q}%";
+$q_escaped = str_replace(['%', '_'], ['\\%', '\\_'], $q);
+$like = "%{$q_escaped}%";
 
 // Serveurs
 $stmt = $pdo->prepare("SELECT id, name, ip, environment, online_status FROM machines WHERE name LIKE ? OR ip LIKE ? LIMIT 5");

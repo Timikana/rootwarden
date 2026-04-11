@@ -1,6 +1,6 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.12.0
+# RootWarden v1.13.0
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
@@ -17,6 +17,7 @@
 - **Fail2ban** — Service detection (SSH/FTP/Apache/Nginx/Mail), jail activation, ban/unban IP, auto-install
 - **systemd Services** — Start, stop, restart Linux services. journalctl logs, auto-categorization, protected services
 - **SSH Audit** — Scan sshd_config, security scoring (A-F), one-click fixes, config editor, backups/restore, toggle directives ON/OFF, reload sshd
+- **Multi-agent Supervision** — Deploy and configure monitoring agents via SSH. Supports Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter and Telegraf. Global config per platform, per-server overrides, remote config editor, backups/restore, multi-agent badges, scan all agents in one click
 - **Custom Tags** — Label your servers (web, db, production, dmz...) and filter by tag
 
 ### CVE Vulnerability Scanning

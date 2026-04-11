@@ -396,80 +396,6 @@ function dryRunUpdate() {
 }
 
 /**
- * Lance la mise à jour Zabbix pour les machines sélectionnées.
- * Pour chaque machine, une requête est envoyée à l'endpoint /update_zabbix et les logs reçus en streaming
- * sont affichés dans une fenêtre dédiée identifiée par le nom du serveur.
- */
-function updateZabbix() {
-    const machineIds = getSelectedMachineIds();
-    if (machineIds.length === 0) {
-        toast(__('select_machine'), 'warning');
-        return;
-    }
-
-    clearLogs(); // Effacer toutes les fenêtres de logs
-
-    machineIds.forEach(id => {
-        // Récupérer le nom du serveur depuis le DOM (la ligne du tableau)
-        const row = document.querySelector(`tr[data-machine-id="${id}"]`);
-        const serverName = row ? row.querySelector('.server-name').textContent : `Machine ${id}`;
-
-        fetch(`${window.API_URL}/update_zabbix`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-API-KEY":  window.API_KEY
-            },
-            body: JSON.stringify({
-                machine_ids: [id],
-                zabbix_version: document.getElementById('zabbix-version').value.trim()
-            })
-        })
-        .then(response => {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-
-            function read() {
-                return reader.read().then(({ done, value }) => {
-                    if (done) {
-                        appendLog(__('upd_stream_end'), "info", serverName);
-                        return;
-                    }
-                    const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk.split("\n");
-                    lines.forEach(line => {
-                        if (line.trim() === "") return;
-                        // Traitement des préfixes pour distinguer les types de message.
-                        if (line.startsWith("ERROR_MACHINE::")) {
-                            const parts = line.split("::");
-                            appendLog(parts.slice(2).join("::"), "error", serverName);
-                        } else if (line.startsWith("SUCCESS_MACHINE::")) {
-                            const parts = line.split("::");
-                            appendLog(parts.slice(2).join("::"), "success", serverName);
-                        } else if (line.startsWith("START_MACHINE::")) {
-                            const parts = line.split("::");
-                            appendLog(parts.slice(2).join("::"), "info", serverName);
-                        } else {
-                            // Détection d'une progression si un pourcentage est présent
-                            if (line.match(/\d+%/)) {
-                                appendLog(line, "progress", serverName);
-                            } else {
-                                appendLog(line, "info", serverName);
-                            }
-                        }
-                    });
-                    return read();
-                });
-            }
-            return read();
-        })
-        .catch(err => {
-            appendLog(__('exception_with_msg', {msg: err}), "error", serverName);
-        });
-    });
-}
-
-/**
  * Planifie une mise à jour pour les machines sélectionnées
  */
 function scheduleUpdate() {
@@ -650,65 +576,6 @@ function updateSingleMachine(machineId) {
 }
 
 /**
- * Met à jour Zabbix pour une seule machine via l'endpoint /update_zabbix.
- * La réponse est du streaming text/plain (JSON-lines) — on utilise un reader
- * plutôt que apiFetch() qui attend du JSON.
- * @param {number} machineId - ID de la machine à mettre à jour Zabbix
- */
-function zabbixUpdateSingle(machineId) {
-    appendLog("\n" + __('upd_zabbix_single', {id: machineId}) + "\n");
-
-    const zabbixVersion = document.getElementById('zabbix-version').value.trim() || '7.0';
-    const serverName = `Machine ${machineId}`;
-
-    fetch(`${window.API_URL}/update_zabbix`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-API-KEY": window.API_KEY || ""
-        },
-        body: JSON.stringify({ machine_ids: [machineId], zabbix_version: zabbixVersion })
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.text().then(txt => {
-                throw new Error(`HTTP ${response.status}: ${txt.slice(0, 200)}`);
-            });
-        }
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        function read() {
-            return reader.read().then(({ done, value }) => {
-                if (done) return;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split("\n");
-                buffer = lines.pop();
-                lines.forEach(line => {
-                    if (!line.trim()) return;
-                    try {
-                        const data = JSON.parse(line);
-                        if (data.type === "log" || data.type === "info") {
-                            appendLog(data.message, "info", serverName);
-                        } else if (data.type === "error") {
-                            appendLog(data.message, "error", serverName);
-                        }
-                    } catch (_) {
-                        appendLog(line, "info", serverName);
-                    }
-                });
-                return read();
-            });
-        }
-        return read();
-    })
-    .catch(err => {
-        appendLog(__('upd_machine_exception', {id: machineId, msg: err}), "error", serverName);
-    });
-}
-
-/**
  * Filtrer les serveurs en fonction des critères sélectionnés
  */
 function filterServers() {
@@ -853,10 +720,15 @@ function fetchLastReboot(machineId) {
         if(data.success) {
             const el = document.getElementById('last-reboot-' + machineId);
             if (el) {
-                el.textContent = data.last_reboot;
-                // Indicateur reboot required
+                el.textContent = '';
+                var txt = document.createTextNode(data.last_reboot);
+                el.appendChild(txt);
                 if (data.reboot_required) {
-                    el.innerHTML += ' <span class="inline-block px-1.5 py-0.5 text-[10px] font-bold bg-red-600 text-white rounded-full ml-1 animate-pulse" title="Reboot necessaire apres mise a jour">REBOOT</span>';
+                    var badge = document.createElement('span');
+                    badge.className = 'inline-block px-1.5 py-0.5 text-[10px] font-bold bg-red-600 text-white rounded-full ml-1 animate-pulse';
+                    badge.title = 'Reboot necessaire apres mise a jour';
+                    badge.textContent = 'REBOOT';
+                    el.appendChild(badge);
                 }
             }
         } else {

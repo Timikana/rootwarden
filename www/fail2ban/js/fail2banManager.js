@@ -42,11 +42,13 @@ async function apiPost(endpoint, body) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
 }
 
 async function apiGet(endpoint) {
     const r = await fetch(`${API}${endpoint}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
 }
 
@@ -438,7 +440,12 @@ async function loadWhitelist() {
         (d.ips || []).forEach(ip => {
             const span = document.createElement('span');
             span.className = 'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
-            span.innerHTML = `${escHtml(ip)} <button onclick="removeWhitelistIp('${escAttr(ip)}')" class="ml-1 text-red-500 hover:text-red-700">&times;</button>`;
+            span.appendChild(document.createTextNode(ip + ' '));
+            const btn = document.createElement('button');
+            btn.className = 'ml-1 text-red-500 hover:text-red-700';
+            btn.textContent = '\u00d7';
+            btn.addEventListener('click', (function(v) { return function() { removeWhitelistIp(v); }; })(ip));
+            span.appendChild(btn);
             list.appendChild(span);
         });
     } catch (_) {}
