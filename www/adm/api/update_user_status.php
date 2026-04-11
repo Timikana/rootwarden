@@ -29,7 +29,7 @@
  */
 
 require_once __DIR__ . '/../../auth/verify.php';
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
 require_once __DIR__ . '/../../db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -39,20 +39,21 @@ if (session_status() === PHP_SESSION_NONE) {
 // --- Validation CSRF ---
 checkCsrfToken();
 
-// --- Traitement de la mise à jour de clé SSH (formulaire POST classique) ---
+// --- Traitement de la mise a jour de cle SSH (formulaire POST classique) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'], $_POST['ssh_key'])) {
-    $user_id = $_POST['user_id'];
+    $user_id = (int) $_POST['user_id'];
     $ssh_key = $_POST['ssh_key'];
 
-    // Mise à jour de la clé SSH publique pour l'utilisateur ciblé
+    // Anti-escalation : mise a jour cle SSH OK, pas de self role/status change
+
+    // Mise a jour de la cle SSH publique pour l'utilisateur cible
     $stmt = $pdo->prepare("UPDATE users SET ssh_key = ?, ssh_key_updated_at = NOW() WHERE id = ?");
     $stmt->execute([$ssh_key, $user_id]);
 
     require_once __DIR__ . '/../includes/audit_log.php';
     audit_log($pdo, "Mise a jour cle SSH user #$user_id");
 
-    // Redirection PRG (Post/Redirect/Get) pour éviter la re-soumission
-    header("Location: admin_page.php");
+    // Redirection PRG (Post/Redirect/Get) pour eviter la re-soumission
+    header("Location: ../admin_page.php");
     exit();
 }
-?>

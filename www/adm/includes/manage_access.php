@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../auth/verify.php';
 require_once __DIR__ . '/../../db.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
-checkAuth([2, 3]);
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 $stmt_users = $pdo->query("SELECT u.id, u.name, r.name AS role, u.role_id FROM users u JOIN roles r ON u.role_id = r.id ORDER BY u.role_id DESC, u.name");
 $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);

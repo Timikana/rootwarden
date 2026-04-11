@@ -700,12 +700,49 @@ switch_to_root = _switch_to_root_shell
 def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
              logger=None, timeout: int = 120):
     """
-    Exécute une commande en root via ``su root -c`` (fallback si sudo absent).
-    Attend le prompt "Password:" avant d'envoyer le mot de passe via le PTY.
+    Execute une commande en root via ``su`` (fallback si sudo absent).
+
+    Strategie **temp script** pour contourner les 3 bugs PTY :
+      1. Ecrit la commande dans un script temporaire (en tant que user normal,
+         pas de root, pas de PTY)
+      2. Execute le script via ``su root -c 'sh /tmp/.rw_xxx.sh'`` (PTY pour le
+         mot de passe su uniquement)
+      3. Parse la sortie entre des markers pour extraire le vrai stdout et le
+         vrai exit code — les markers ne sont QUE dans le script, jamais dans
+         l'echo PTY de la ligne de commande
+
+    Pourquoi ca marche :
+      - Les pipes/redirections sont dans le script .sh, interpretes par ``sh``,
+        pas par le PTY → les ecritures fonctionnent reellement
+      - Les markers ``RW_BEGIN`` / ``RW_END_N`` n'apparaissent qu'une fois
+        (output du echo dans le script), pas dans l'echo PTY (qui n'affiche
+        que ``su root -c 'sh /tmp/.rw_xxx.sh'``)
+      - Le vrai exit code est capture dans le script via ``$?``
     """
     _log = logger or logging.getLogger(__name__)
-    su_cmd = f"su root -c {shlex.quote(command)}"
+    import base64
+    import uuid
+
+    _MARKER_BEGIN = 'RW_BEGIN_d4e5f6'
+    _MARKER_END   = 'RW_END_d4e5f6'
+    tmp_name = f"/tmp/.rw_{uuid.uuid4().hex[:12]}.sh"
+
     try:
+        # ── Etape 1 : ecrire le script temp (user normal, pas de PTY) ────────
+        script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\necho {_MARKER_BEGIN}\n{command}\n_rc=$?\necho {_MARKER_END}_$_rc\nexit $_rc\n"
+        b64_script = base64.b64encode(script.encode()).decode()
+        write_cmd = f"printf '%s' '{b64_script}' | base64 -d > {tmp_name} && chmod 700 {tmp_name}"
+
+        w_stdin, w_stdout, w_stderr = client.exec_command(write_cmd, timeout=10)
+        w_stdout.read()
+        w_rc = w_stdout.channel.recv_exit_status()
+        if w_rc != 0:
+            w_err = w_stderr.read().decode('utf-8', errors='replace')
+            _log.error("_su_exec: echec ecriture script temp: %s", w_err)
+            return "", w_err, w_rc
+
+        # ── Etape 2 : executer le script en root via su (PTY pour le mdp) ────
+        su_cmd = f"su root -c {shlex.quote('sh ' + tmp_name)}"
         stdin, stdout, stderr = client.exec_command(su_cmd, get_pty=True, timeout=timeout)
 
         # Attendre le prompt de mot de passe (max 5 s)
@@ -719,13 +756,13 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
                 if any(k in prompt_buf.lower() for k in ('password', 'mot de passe', 'assword:')):
                     break
             elif prompt_buf:
-                break  # Données reçues mais pas de prompt → peut-être pas de mdp requis
+                break
 
         stdin.write(root_password + '\n')
         stdin.flush()
 
-        # Lire la sortie jusqu'à la fin de la commande
-        out = ""
+        # Lire la sortie jusqu'a la fin
+        raw = ""
         last_data = time.time()
         deadline_cmd = time.time() + timeout
         while time.time() < deadline_cmd:
@@ -734,24 +771,65 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
                 chunk = stdout.channel.recv(4096).decode('utf-8', errors='replace')
                 if not chunk:
                     break
-                out += chunk
+                raw += chunk
                 last_data = time.time()
             elif stdout.channel.exit_status_ready():
                 while stdout.channel.recv_ready():
                     chunk = stdout.channel.recv(4096).decode('utf-8', errors='replace')
                     if chunk:
-                        out += chunk
+                        raw += chunk
                 break
-            elif out and (time.time() - last_data) >= 3.0:
+            elif raw and (time.time() - last_data) >= 3.0:
                 break
 
-        code = stdout.channel.recv_exit_status()
-        _log.info("_su_exec code=%d cmd='%s...'", code, command[:60])
-        return clean_output(out), "", code
+        stdout.channel.recv_exit_status()
+
+        # ── Etape 3 : parser la sortie ───────────────────────────────────────
+        # Nettoyer \r, null bytes, sequences ANSI
+        raw = raw.replace('\r\n', '\n').replace('\r', '').replace('\x00', '')
+        ansi_re = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        raw = ansi_re.sub('', raw)
+
+        real_code = 0
+        out = ""
+
+        # Chercher les markers — ils n'apparaissent qu'une fois (dans le script)
+        lines = raw.split('\n')
+        begin_idx = None
+        end_idx = None
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped == _MARKER_BEGIN and begin_idx is None:
+                begin_idx = i
+            elif _MARKER_END in stripped and begin_idx is not None:
+                end_idx = i
+                break
+
+        if begin_idx is not None and end_idx is not None:
+            out = '\n'.join(lines[begin_idx + 1:end_idx])
+            # Extraire le vrai exit code
+            end_content = lines[end_idx].strip()
+            m = re.search(r'_(\d+)$', end_content)
+            if m:
+                real_code = int(m.group(1))
+        else:
+            # Fallback : sortie brute (ne devrait pas arriver)
+            out = raw
+            _log.warning("_su_exec: markers non trouves pour cmd='%s...'", command[:60])
+
+        _log.info("_su_exec code=%d cmd='%s...'", real_code, command[:60])
+        return clean_output(out), "", real_code
 
     except Exception as e:
         _log.error("_su_exec '%s': %s", command[:60], e)
         raise
+
+    finally:
+        # ── Etape 4 : nettoyage du script temp (best effort) ────────────────
+        try:
+            client.exec_command(f"rm -f {tmp_name}", timeout=5)
+        except Exception:
+            pass
 
 
 # Erreurs stderr qui indiquent que sudo n'est pas utilisable sur ce serveur
@@ -884,21 +962,37 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
             yield f"ERROR: {e}\n"
         return
 
-    # Détecte si sudo est disponible sur le serveur
-    _, check_out, _ = client.exec_command("which sudo 2>/dev/null", timeout=5)
-    has_sudo = bool(check_out.read().decode().strip())
+    # Detecte si sudo est utilisable : envoyer le mot de passe via sudo -S
+    # et verifier si stderr contient un message d'erreur connu (sudoers, etc.)
+    _sin, _sout, _serr = client.exec_command("sudo -S -p '' true", timeout=5)
+    _sin.write(root_password + '\n')
+    _sin.flush()
+    try:
+        _sin.channel.shutdown_write()
+    except Exception:
+        pass
+    _sudo_out = _sout.read().decode('utf-8', errors='replace')
+    _sudo_err = _serr.read().decode('utf-8', errors='replace')
+    _sudo_rc = _sout.channel.recv_exit_status()
+    can_sudo = _sudo_rc == 0 and not any(msg in _sudo_err for msg in _SUDO_UNAVAILABLE)
 
-    if has_sudo:
+    if can_sudo:
         root_cmd = f"sudo -S -p '' sh -c {shlex.quote(command)}"
     else:
-        # Fallback su -c pour les serveurs sans sudo
-        escaped = command.replace("'", "'\\''")
-        root_cmd = f"su - root -c '{escaped}'"
-    _log.info("execute_as_root_stream: %s (mode=%s)", command[:60], 'sudo' if has_sudo else 'su')
+        # Fallback su : ecrire un script temp pour les memes raisons que _su_exec
+        import base64 as _b64, uuid as _uuid
+        _tmp = f"/tmp/.rw_stream_{_uuid.uuid4().hex[:8]}.sh"
+        _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{command}\n"
+        _b64s = _b64.b64encode(_script.encode()).decode()
+        _wcmd = f"printf '%s' '{_b64s}' | base64 -d > {_tmp} && chmod 700 {_tmp}"
+        _ws, _wo, _we = client.exec_command(_wcmd, timeout=10)
+        _wo.read(); _wo.channel.recv_exit_status()
+        root_cmd = f"su root -c {shlex.quote('sh ' + _tmp)}"
+    _log.info("execute_as_root_stream: %s (mode=%s)", command[:60], 'sudo' if can_sudo else 'su')
 
     try:
         stdin, stdout, stderr = client.exec_command(root_cmd, get_pty=True)
-        if not has_sudo:
+        if not can_sudo:
             # su affiche "Mot de passe :" — attendre l'invite avant d'envoyer
             import time as _time
             _time.sleep(1)
@@ -939,6 +1033,13 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
 
         code = stdout.channel.recv_exit_status()
         yield f"\nExécution terminée (code {code}).\n"
+
+        # Nettoyage du script temp (mode su)
+        if not can_sudo and '_tmp' in dir():
+            try:
+                client.exec_command(f"rm -f {_tmp}", timeout=5)
+            except Exception:
+                pass
 
     except Exception as e:
         _log.error("execute_as_root_stream '%s': %s", command[:60], e)

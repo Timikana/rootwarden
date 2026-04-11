@@ -28,7 +28,7 @@
 
 require_once __DIR__ . '/../../auth/functions.php';
 require_once __DIR__ . '/../../auth/verify.php';
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
 require_once __DIR__ . '/../../db.php';
 
 // --- Traitement du formulaire POST ---
@@ -38,6 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
     checkCsrfToken();
 
     $user_id = (int)$_POST['user_id'];
+
+    // Anti-escalation : pas de self-edit sur role/password_expiry (cle SSH OK via admin)
 
     // --- Mise a jour de l'expiration mot de passe par utilisateur ---
     if (isset($_POST['password_expiry_override'])) {

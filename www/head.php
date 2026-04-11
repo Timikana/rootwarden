@@ -113,6 +113,20 @@ footer {
     margin-top: auto;
 }
 
+/* ── Scrollbar discrete — global (sidebar, tableaux, modals, editeurs) ───── */
+/* Webkit (Chrome, Edge, Safari) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.5); }
+/* Sidebar encore plus fin */
+#sidebar ::-webkit-scrollbar { width: 4px; }
+#sidebar ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); }
+#sidebar ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.3) transparent; }
+#sidebar * { scrollbar-color: rgba(255,255,255,0.1) transparent; }
+
 /* Toast notifications */
 #toast-container { position: fixed; top: 4.5rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
 .toast { pointer-events: auto; max-width: 24rem; padding: 0.75rem 1rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; animation: toast-in 0.3s ease-out; }

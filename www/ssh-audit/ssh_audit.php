@@ -9,7 +9,7 @@ require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/lang.php';
 
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_audit_ssh');
 
 // Chargement des serveurs
@@ -193,8 +193,8 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200"><?= t('ssh_audit.editor_title') ?></h3>
                 <button onclick="closeEditor()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
             </div>
-            <div class="px-6 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-                <p class="text-xs text-amber-700 dark:text-amber-400"><?= t('ssh_audit.editor_warning') ?></p>
+            <div class="px-6 py-2 bg-amber-50 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-700">
+                <p class="text-xs text-amber-800 dark:text-amber-300 font-medium"><?= t('ssh_audit.editor_warning') ?></p>
             </div>
             <div class="flex-1 overflow-hidden p-4">
                 <textarea id="editor-content" class="w-full h-full min-h-[400px] font-mono text-sm bg-gray-900 text-green-400 p-4 rounded-lg border border-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" spellcheck="false"></textarea>

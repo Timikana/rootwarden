@@ -34,7 +34,7 @@
  */
 
 require_once __DIR__ . '/../../auth/verify.php';
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 require_once __DIR__ . '/../../db.php';
 
 // Toutes les réponses sont en JSON
@@ -44,21 +44,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// --- Validation CSRF (header OU body JSON OU POST form) ---
-$csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-$rawBody = file_get_contents('php://input');
-$bodyData = json_decode($rawBody, true) ?: [];
-$csrfBody = $bodyData['csrf_token'] ?? $_POST['csrf_token'] ?? '';
-$csrfSession = $_SESSION['csrf_token'] ?? '';
-$csrf = $csrfHeader ?: $csrfBody;
-if (empty($csrfSession) || $csrf !== $csrfSession) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF invalide.']);
-    exit;
-}
+// --- Validation CSRF (POST, header htmx, ou body JSON — timing-safe) ---
+checkCsrfToken();
 
-// --- Lecture du body (deja decode plus haut pour CSRF) ---
-$data = $bodyData;
+// --- Lecture du body JSON ---
+$data = json_decode(file_get_contents('php://input'), true) ?: [];
 
 // --- Validation de la présence des champs obligatoires ---
 if (isset($data['user_id'], $data['machine_id'], $data['action'])) {

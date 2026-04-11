@@ -1,0 +1,28 @@
+<?php
+// lang/fr/cve.php — 24 cles
+return [
+    'cve.title' => 'Scan CVE',
+    'cve.desc' => 'Scanner les vulnerabilites connues (CVE) sur vos serveurs via OpenCVE. Filtrez par severite CVSS et exportez les resultats en CSV.',
+    'cve.cvss_tooltip' => 'Score CVSS : echelle de severite des vulnerabilites de 0 (faible) a 10 (critique)',
+    'cve.no_permission' => 'Vous n\'avez pas la permission d\'acceder au scan CVE.',
+    'cve.btn_scan' => 'Scanner',
+    'cve.btn_scan_all' => 'Scanner tout (:count serveurs)',
+    'cve.cvss_threshold' => 'Seuil CVSS',
+    'cve.cvss_all' => 'Tout (0+)',
+    'cve.cvss_medium' => 'MEDIUM+ (4+)',
+    'cve.cvss_high' => 'HIGH+ (7+)',
+    'cve.cvss_critical' => 'CRITICAL (9+)',
+    'cve.fleet_summary' => 'Resume du parc',
+    'cve.servers_scanned' => 'serveur(s) scanne(s)',
+    'cve.total_cves' => 'CVE au total',
+    'cve.scan_in_progress' => 'Scan en cours...',
+    'cve.no_servers' => 'Aucun serveur disponible. Contactez un administrateur pour obtenir l\'acces.',
+    'cve.scheduled_scans' => 'Scans planifies',
+    'cve.sched_add' => 'Ajouter',
+    'cve.sched_name' => 'Nom',
+    'cve.sched_target' => 'Cible',
+    'cve.sched_all_servers' => 'Tous les serveurs',
+    'cve.sched_cron' => 'Expression cron',
+    'cve.sched_cron_hint' => 'Syntaxe cron : minute heure jour mois jour_semaine. Ex: 0 3 * * * = tous les jours a 3h',
+    'cve.sched_cvss_min' => 'CVSS min',
+];

@@ -42,7 +42,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Réservé au superadmin uniquement (role_id = 3)
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_manage_iptables');
 
 // Récuperation des serveurs avec filtrage par acces utilisateur

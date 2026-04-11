@@ -32,7 +32,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 // Restreint l'accès aux administrateurs (2) et superadmins (3)
-checkAuth([1, 2, 3]);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_deploy_keys');
 
 // Récupère les machines avec filtrage par acces utilisateur

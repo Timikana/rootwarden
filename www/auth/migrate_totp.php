@@ -13,7 +13,7 @@ require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/totp_crypto.php';
 
-checkAuth([3]); // Superadmin uniquement
+checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
 
 header('Content-Type: text/plain; charset=utf-8');
 

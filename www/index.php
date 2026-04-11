@@ -34,7 +34,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Vérifie que l'utilisateur a l'un des rôles autorisés (1=user, 2=admin, 3=superadmin)
-checkAuth(['1','2', '3']);
+checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 // Sécurité : si le username n'est plus en session, renvoyer vers le login
 if (!isset($_SESSION['username'])) {

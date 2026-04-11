@@ -85,24 +85,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
         $error = t('2fa.error_reused');
     } elseif ($totpVerify->verify($code, null, 1)) {
         $_SESSION['last_totp_hash'] = $codeHash;
-        // Connexion réussie, on active le TOTP
-        // -------------------------------------------------------
-        // 1) Récupérer les informations de l'utilisateur en base
-        $stmtUser = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+
+        // Verifier que l'utilisateur existe et est actif en DB (ZERO TRUST)
+        $stmtUser = $pdo->prepare("SELECT id, name, role_id, active, force_password_change FROM users WHERE id = ? AND active = 1");
         $stmtUser->execute([$userid]);
         $userData = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
         if (!$userData) {
             $error = t('enable_2fa.error_user');
         } else {
-            // 2) Initialiser la session avec les vraies infos
-            //    (Fonction que vous avez peut-être déjà : initializeUserSession() )
+            // Initialiser la session definitive avec les donnees verifiees en DB
             initializeUserSession($userData);
 
-            // 3) Détruire la session temporaire
-            unset($_SESSION['temp_user'], $_SESSION['2fa_required'], $_SESSION['2fa_pending']);
+            // Nettoyer les variables temporaires
+            unset($_SESSION['temp_user'], $_SESSION['2fa_required'], $_SESSION['2fa_pending'],
+                  $_SESSION['last_totp_hash']);
 
-            // 4) Rediriger
+            // Verifier si l'utilisateur doit changer son mot de passe
+            if ((int)($userData['force_password_change'] ?? 0) === 1) {
+                $_SESSION['force_password_change'] = true;
+                header("Location: ../profile.php?force_change=1");
+                exit();
+            }
+
             header("Location: ../terms.php");
             exit();
         }

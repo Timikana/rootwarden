@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../auth/verify.php';
 require_once __DIR__ . '/../../db.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
-checkAuth([2, 3]);
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 if (!function_exists('getPermissions')) {
     function getPermissions($pdo, $user_id) {
@@ -61,20 +61,26 @@ $canEditPartial = $_currentRole >= 2;
 <div class="space-y-3">
 <?php foreach ($users as $user):
     $permissions = getPermissions($pdo, $user['id']);
-    $isEditable = ($canEdit) || ($canEditPartial && $user['role_id'] < 3);
+    $isSuperadminTarget = ((int)$user['role_id'] === 3);
+    // Superadmins ont toutes les permissions par bypass — non editable
+    $isEditable = !$isSuperadminTarget && (($canEdit) || ($canEditPartial && $user['role_id'] < 3));
     $roleCls = match((int)$user['role_id']) {
         3 => 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
         2 => 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
         default => 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
     };
-    // Compter les permissions actives
-    $activeCount = 0;
-    foreach ($permGroups as $perms) {
-        foreach ($perms as $key => $info) {
-            if ($permissions[$key] ?? 0) $activeCount++;
+    // Compter les permissions actives (SA = toujours tout)
+    $totalPerms = array_sum(array_map('count', $permGroups));
+    if ($isSuperadminTarget) {
+        $activeCount = $totalPerms;
+    } else {
+        $activeCount = 0;
+        foreach ($permGroups as $perms) {
+            foreach ($perms as $key => $info) {
+                if ($permissions[$key] ?? 0) $activeCount++;
+            }
         }
     }
-    $totalPerms = array_sum(array_map('count', $permGroups));
 ?>
 <details class="perm-card bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden"
          data-name="<?= htmlspecialchars(strtolower($user['name'])) ?>">
@@ -96,14 +102,15 @@ $canEditPartial = $_currentRole >= 2;
             <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5"><?= $groupName ?></div>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 <?php foreach ($perms as $permKey => $permInfo):
-                    $checked = ($permissions[$permKey] ?? 0) ? true : false;
+                    // Superadmin = toutes permissions par bypass, toujours affiche comme coche
+                    $checked = $isSuperadminTarget ? true : (($permissions[$permKey] ?? 0) ? true : false);
                     $checkCls = $checked ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/30 border-gray-200 dark:border-gray-700';
                 ?>
-                <label class="flex items-center gap-2 px-3 py-2 rounded-lg border <?= $checkCls ?> cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 transition-colors">
+                <label class="flex items-center gap-2 px-3 py-2 rounded-lg border <?= $checkCls ?> <?= $isEditable ? 'cursor-pointer hover:border-blue-300 dark:hover:border-blue-600' : '' ?> transition-colors">
                     <?php if ($isEditable): ?>
                     <input type="checkbox" data-user-id="<?= $user['id'] ?>" data-permission="<?= $permKey ?>"
                            hx-post="api/update_permissions.php" hx-trigger="change" hx-target="closest label" hx-swap="outerHTML"
-                           hx-vals='js:{"user_id": this.dataset.userId, "permission": this.dataset.permission, "value": this.checked ? 1 : 0}'
+                           hx-vals='{"user_id": "<?= $user['id'] ?>", "permission": "<?= $permKey ?>"}'
                            <?= $checked ? 'checked' : '' ?>
                            class="form-checkbox h-3.5 w-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0">
                     <?php else: ?>
@@ -131,7 +138,13 @@ $canEditPartial = $_currentRole >= 2;
 </div>
 
 <script>
-// updatePermission() est maintenant gere par htmx (hx-post sur les checkboxes)
+// Injecter la valeur dynamique "value" (checked 0/1) dans chaque requete htmx permission
+document.addEventListener('htmx:configRequest', function(evt) {
+    const elt = evt.detail.elt;
+    if (elt && elt.type === 'checkbox' && elt.dataset.permission) {
+        evt.detail.parameters['value'] = elt.checked ? 1 : 0;
+    }
+});
 
 function setAllPerms(userId, enable) {
     const card = document.querySelector(`.perm-card [data-user-id="${userId}"]`)?.closest('.perm-card');
@@ -139,7 +152,7 @@ function setAllPerms(userId, enable) {
     card.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         if (cb.checked !== enable) {
             cb.checked = enable;
-            htmx.trigger(cb, 'change'); // Declenche le hx-trigger="change"
+            htmx.trigger(cb, 'change');
         }
     });
 }

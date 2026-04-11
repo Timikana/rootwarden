@@ -26,7 +26,7 @@ if (!function_exists('checkAuth')) {
     require_once __DIR__ . '/crypto.php';
     
     // Autorise les utilisateurs ayant le rôle admin (2) ou superadmin (3)
-    checkAuth([2, 3]);
+    checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
     
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
