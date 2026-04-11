@@ -124,10 +124,23 @@ if ($oldKeys > 0) {
     $alerts[] = ['type' => 'error', 'msg' => t('dashboard.alert_old_keys', ['count' => $oldKeys]) . " : $names", 'link' => '/adm/admin_page.php#tab-users'];
 }
 
-// SSH Audit alerts
+// SSH Audit alerts + stats
+$sshAuditAvg = 0;
+$sshAuditCount = 0;
 try {
     $lowSshScore = (int) $pdo->query("SELECT COUNT(*) FROM ssh_audit_results r INNER JOIN (SELECT machine_id, MAX(id) as last_id FROM ssh_audit_results GROUP BY machine_id) l ON r.id = l.last_id WHERE r.score < 50")->fetchColumn();
     if ($lowSshScore > 0) $alerts[] = ['type' => 'error', 'msg' => t('dashboard.alert_ssh_audit', ['count' => $lowSshScore]), 'link' => '/ssh-audit/ssh_audit.php'];
+    $sshAuditRow = $pdo->query("SELECT AVG(r.score) as avg_score, COUNT(DISTINCT r.machine_id) as cnt FROM ssh_audit_results r INNER JOIN (SELECT machine_id, MAX(id) as last_id FROM ssh_audit_results GROUP BY machine_id) l ON r.id = l.last_id")->fetch(PDO::FETCH_ASSOC);
+    $sshAuditAvg = (int)($sshAuditRow['avg_score'] ?? 0);
+    $sshAuditCount = (int)($sshAuditRow['cnt'] ?? 0);
+} catch (\Exception $e) {}
+
+// Supervision stats
+$nbZabbixAgents = 0;
+$nbSupAgentsTotal = 0;
+try {
+    $nbZabbixAgents = (int) $pdo->query("SELECT COUNT(*) FROM supervision_agents WHERE platform = 'zabbix'")->fetchColumn();
+    $nbSupAgentsTotal = (int) $pdo->query("SELECT COUNT(*) FROM supervision_agents")->fetchColumn();
 } catch (\Exception $e) {}
 
 // Fail2ban alerts (calculees apres le query dashboard)
@@ -180,7 +193,7 @@ try {
         <?php endif; ?>
 
         <!-- ── Cartes statistiques ────────────────────────────────────── -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center" title="<?= t('dashboard.tip_servers') ?>">
                 <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"><?= $nbOnline ?><span class="text-sm font-normal text-gray-400">/<?= $nbMachines ?></span></div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.servers_online') ?></div>
@@ -202,6 +215,20 @@ try {
                 <div class="text-2xl font-bold <?= $remTotal > 0 ? 'text-orange-500' : 'text-green-600 dark:text-green-400' ?>"><?= $remTotal ?></div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.remediations') ?></div>
                 <?php if ($remStats['overdue'] ?? 0 > 0): ?><div class="text-[10px] text-red-500 mt-0.5"><?= $remStats['overdue'] ?> <?= t('dashboard.overdue') ?></div><?php endif; ?>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center" title="<?= t('dashboard.tip_ssh_audit') ?>">
+                <?php
+                $sshGrade = $sshAuditAvg >= 90 ? 'A' : ($sshAuditAvg >= 75 ? 'B' : ($sshAuditAvg >= 60 ? 'C' : ($sshAuditAvg >= 40 ? 'D' : 'F')));
+                $sshColor = match($sshGrade) { 'A' => 'text-green-600 dark:text-green-400', 'B' => 'text-blue-600 dark:text-blue-400', 'C' => 'text-yellow-600 dark:text-yellow-400', default => 'text-red-600 dark:text-red-400' };
+                ?>
+                <div class="text-2xl font-bold <?= $sshColor ?>"><?= $sshAuditCount > 0 ? $sshGrade : '—' ?></div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.ssh_audit_score') ?></div>
+                <?php if ($sshAuditCount > 0): ?><div class="text-[10px] text-gray-400 mt-0.5"><?= $sshAuditAvg ?>/100 (<?= $sshAuditCount ?> <?= t('dashboard.servers_scanned') ?>)</div><?php endif; ?>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center" title="<?= t('dashboard.tip_supervision') ?>">
+                <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400"><?= $nbSupAgentsTotal ?></div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.agents_deployed') ?></div>
+                <?php if ($nbZabbixAgents > 0): ?><div class="text-[10px] text-gray-400 mt-0.5"><?= $nbZabbixAgents ?> Zabbix</div><?php endif; ?>
             </div>
         </div>
 
@@ -312,6 +339,10 @@ try {
                 $shortcuts[] = ['url' => '/security/cve_scan.php', 'label' => t('dashboard.sc_cve'), 'desc' => t('dashboard.sc_cve_desc')];
             if ($permissions['can_admin_portal'] ?? false || $roleId >= 3)
                 $shortcuts[] = ['url' => '/adm/admin_page.php', 'label' => t('dashboard.sc_admin'), 'desc' => t('dashboard.sc_admin_desc')];
+            if ($permissions['can_manage_supervision'] ?? false || $roleId >= 3)
+                $shortcuts[] = ['url' => '/supervision/supervision.php', 'label' => t('dashboard.sc_supervision'), 'desc' => t('dashboard.sc_supervision_desc')];
+            if ($permissions['can_audit_ssh'] ?? false || $roleId >= 3)
+                $shortcuts[] = ['url' => '/ssh-audit/ssh_audit.php', 'label' => t('dashboard.sc_ssh_audit'), 'desc' => t('dashboard.sc_ssh_audit_desc')];
             if ($permissions['can_view_compliance'] ?? false || $roleId >= 3)
                 $shortcuts[] = ['url' => '/security/compliance_report.php', 'label' => t('dashboard.sc_compliance'), 'desc' => t('dashboard.sc_compliance_desc')];
             $shortcuts[] = ['url' => '/documentation.php', 'label' => t('dashboard.sc_docs'), 'desc' => t('dashboard.sc_docs_desc')];
