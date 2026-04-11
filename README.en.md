@@ -1,3 +1,5 @@
+[🇫🇷 Version francaise](README.md)
+
 # RootWarden v1.12.0
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.

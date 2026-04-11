@@ -1,3 +1,5 @@
+[🇬🇧 English version](README.en.md)
+
 # 🔐 RootWarden v1.12.0
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
