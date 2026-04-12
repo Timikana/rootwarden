@@ -162,6 +162,30 @@ def ssh_audit_scan():
             _save_audit_result(mid, result, config_text, ssh_version, audited_by)
             _log_audit_action(mid, 'scan', 'Audit SSH', audited_by)
 
+            # Notifications ciblees via preferences utilisateur
+            try:
+                from notify import notify_subscribed
+                grade = result.get('grade', '?')
+                score = result.get('score', 0)
+                machine_name = data.get('machine_name', f'machine #{mid}')
+                notify_subscribed(
+                    event_type='ssh_audit',
+                    title=f"Audit SSH : {machine_name} — {grade} ({score}/100)",
+                    message=f"Grade {grade}, score {score}/100, {result.get('counts', {}).get('fail', 0)} echec(s)",
+                    link='/ssh-audit/ssh_audit.php',
+                    machine_id=mid,
+                )
+                if grade in ('D', 'E', 'F'):
+                    notify_subscribed(
+                        event_type='security_alert',
+                        title=f"Audit SSH critique : {machine_name} — Grade {grade}",
+                        message=f"Score {score}/100 — Action requise",
+                        link='/ssh-audit/ssh_audit.php',
+                        machine_id=mid,
+                    )
+            except Exception:
+                pass
+
             return jsonify({
                 'success': True,
                 'score': result['score'],

@@ -67,23 +67,36 @@ def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
                     if event['type'] == 'finding':
                         all_findings.append(event)
                     elif event['type'] == 'done' and all_findings:
-                        # Envoyer rapport email si activé
+                        # Envoyer rapport email via MAIL_TO global (legacy)
                         send_cve_report(
                             machine_name=m['name'],
                             ip=m['ip'],
                             findings=all_findings,
                             min_cvss=min_cvss,
                         )
-                        # Notification in-app si CVE critiques
+                        # Notifications ciblees via preferences utilisateur
+                        try:
+                            from notify import notify_subscribed
+                            notify_subscribed(
+                                event_type='cve_scan',
+                                title=f"Scan CVE : {len(all_findings)} finding(s) sur {m['name']}",
+                                message=f"{m['name']} ({m['ip']}) — {len(all_findings)} CVE detectee(s)",
+                                link='/security/cve_scan.php',
+                                machine_id=m['id'],
+                            )
+                        except Exception:
+                            pass
+                        # Alerte securite si CVE critiques
                         criticals = [f for f in all_findings if f.get('severity') == 'CRITICAL']
                         if criticals:
                             try:
-                                from notify import notify_admins
-                                notify_admins(
-                                    type='cve_critical',
+                                from notify import notify_subscribed as _ns
+                                _ns(
+                                    event_type='security_alert',
                                     title=f"{len(criticals)} CVE critique(s) sur {m['name']}",
                                     message=f"{criticals[0].get('cve_id', '?')} (CVSS {criticals[0].get('cvss_score', '?')}) + {len(criticals)-1} autre(s)" if len(criticals) > 1 else f"{criticals[0].get('cve_id', '?')} — CVSS {criticals[0].get('cvss_score', '?')}",
                                     link='/security/cve_scan.php',
+                                    machine_id=m['id'],
                                 )
                             except Exception:
                                 pass
@@ -549,7 +562,7 @@ def cve_remediation_stats():
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT status, COUNT(*) as cnt FROM cve_remediation GROUP BY status")
+        cur.execute("SELECT status, COUNT(*) as cnt FROM cve_remediation GROUP BY status ORDER BY status")
         rows = cur.fetchall()
         stats = {r['status']: r['cnt'] for r in rows}
         # Deadlines expirees
