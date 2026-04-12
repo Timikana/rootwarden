@@ -17,7 +17,7 @@ from flask import Blueprint, jsonify, request
 
 from routes.helpers import (
     require_api_key, require_role, require_machine_access, threaded_route, get_db_connection,
-    server_decrypt_password, logger,
+    server_decrypt_password, get_current_user, logger,
 )
 from ssh_utils import ssh_session
 from ssh_audit import (
