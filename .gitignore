@@ -56,6 +56,12 @@ www/.installed
 .DS_Store
 Thumbs.db
 
+# Screenshots E2E (generes par Puppeteer)
+tests/e2e/screenshots/
+
+# Artefacts temporaires
+www/_ul
+
 # Frontend build
 frontend/node_modules/
 
