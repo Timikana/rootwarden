@@ -95,7 +95,7 @@ services:
   # Pour accéder depuis un client SQL local, décommentez "ports".
   # ─────────────────────────────────────────────────────────────
   db:
-    image: mysql:9.1
+    image: mysql:9.2
     container_name: gestion_ssh_key_db
     restart: always
     # ports:                            # ← Décommentez uniquement pour le débogage local
@@ -128,7 +128,7 @@ services:
   #   docker-compose run --rm composer-update
   # ─────────────────────────────────────────────────────────────
   composer:
-    image: composer:latest
+    image: composer:2
     container_name: gestion_ssh_key_composer
     working_dir: /app
     volumes:
@@ -140,7 +140,7 @@ services:
       rootwarden_external:
 
   composer-update:
-    image: composer:latest
+    image: composer:2
     container_name: gestion_ssh_key_composer_update
     working_dir: /app
     volumes:

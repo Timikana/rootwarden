@@ -57,6 +57,15 @@
     # Chemin vers la clé privée associée — ne doit JAMAIS être accessible publiquement
     SSLCertificateKeyFile ${SSL_KEY_PATH}
 
+    # ── TLS Hardening ────────────────────────────────────────────────────────
+    # Forcer TLS 1.2 minimum — TLS 1.0 et 1.1 sont obsoletes et vulnerables.
+    SSLProtocol -all +TLSv1.2 +TLSv1.3
+    # Suite de ciphers forte — ECDHE pour le forward secrecy, AESGCM/CHACHA20 pour le chiffrement
+    SSLCipherSuite ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS
+    SSLHonorCipherOrder on
+    # Desactiver la compression SSL (protection CRIME/BREACH)
+    SSLCompression off
+
     # Permissions sur le répertoire web :
     #   AllowOverride All  : les fichiers .htaccess peuvent modifier la config
     #   Require all granted : accès ouvert (contrôle d'accès géré par l'appli PHP)
@@ -86,6 +95,14 @@
         # "strict-origin-when-cross-origin" : envoie l'origine seule vers d'autres domaines,
         # l'URL complète uniquement vers le même domaine (bon équilibre sécurité/analytics).
         Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Content-Security-Policy — restreint les sources de contenu executables.
+        # 'self' : uniquement le meme domaine. 'unsafe-inline' tolere pour les styles
+        # Tailwind inline et les scripts toast/dark-mode.
+        Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+
+        # Permissions-Policy — desactive les APIs navigateur non utilisees
+        Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
     </IfModule>
 
     # Journaux Apache séparés pour les erreurs et les accès

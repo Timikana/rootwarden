@@ -9,6 +9,8 @@ Routes :
     GET  /admin/temp_permissions      — Liste les permissions temporaires actives
     POST /admin/temp_permissions      — Accorde une permission temporaire
     DELETE /admin/temp_permissions/<id> — Revoque une permission temporaire
+    GET  /admin/notification_prefs    — Liste les preferences de notification par user
+    POST /admin/notification_prefs    — Toggle une preference de notification
 """
 
 from flask import Blueprint, jsonify, request
@@ -169,5 +171,86 @@ def revoke_temp_permission(perm_id):
         cur.execute("DELETE FROM temporary_permissions WHERE id = %s", (perm_id,))
         conn.commit()
         return jsonify({'success': True, 'deleted': cur.rowcount > 0})
+    finally:
+        conn.close()
+
+
+# ── Notification preferences ────────────────────────────────────────────
+
+VALID_EVENT_TYPES = (
+    'cve_scan', 'ssh_audit', 'compliance_report',
+    'security_alert', 'backup_status', 'update_status',
+)
+
+
+@bp.route('/admin/notification_prefs', methods=['GET'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def list_notification_prefs():
+    """Liste les preferences de notification de tous les users actifs."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT u.id AS user_id, u.name, u.email, u.role_id,
+                   np.event_type, np.channel, np.enabled
+            FROM users u
+            LEFT JOIN notification_preferences np ON u.id = np.user_id
+            WHERE u.active = 1
+            ORDER BY u.role_id DESC, u.name, np.event_type
+        """)
+        rows = cur.fetchall()
+
+        users = {}
+        for r in rows:
+            uid = r['user_id']
+            if uid not in users:
+                users[uid] = {
+                    'user_id': uid,
+                    'name': r['name'],
+                    'email': r['email'] or '',
+                    'role_id': r['role_id'],
+                    'prefs': {},
+                }
+            if r['event_type']:
+                users[uid]['prefs'][r['event_type']] = {
+                    'enabled': bool(r['enabled']),
+                    'channel': r['channel'] or 'both',
+                }
+
+        return jsonify({
+            'success': True,
+            'users': list(users.values()),
+            'event_types': list(VALID_EVENT_TYPES),
+        })
+    finally:
+        conn.close()
+
+
+@bp.route('/admin/notification_prefs', methods=['POST'])
+@require_api_key
+@require_role(3)
+@threaded_route
+def toggle_notification_pref():
+    """Toggle une preference de notification pour un user."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    event_type = (data.get('event_type') or '').strip()
+    enabled = int(data.get('value', 0))
+
+    if not user_id or event_type not in VALID_EVENT_TYPES:
+        return jsonify({'success': False, 'message': 'user_id et event_type valides requis'}), 400
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO notification_preferences (user_id, event_type, enabled)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE enabled = %s, updated_at = NOW()
+        """, (int(user_id), event_type, enabled, enabled))
+        conn.commit()
+        return jsonify({'success': True, 'enabled': bool(enabled)})
     finally:
         conn.close()

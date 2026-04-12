@@ -65,6 +65,84 @@ def notify_all_users(type: str, title: str, message: str, link: str = None):
         logger.warning("Echec creation notifications broadcast: %s", e)
 
 
+def get_subscribed_emails(event_type: str, machine_id: int = None) -> list[str]:
+    """Retourne les emails des users abonnes a un type d'evenement.
+
+    Filtre par machine_access si machine_id est fourni (users role=1
+    ne recoivent que les notifs de leurs serveurs assignes).
+    """
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("""
+                SELECT DISTINCT u.id, u.email, u.role_id
+                FROM notification_preferences np
+                JOIN users u ON np.user_id = u.id
+                WHERE np.event_type = %s
+                  AND np.enabled = 1
+                  AND np.channel IN ('email', 'both')
+                  AND u.active = 1
+                  AND u.email IS NOT NULL
+                  AND u.email != ''
+            """, (event_type,))
+            rows = cur.fetchall()
+
+            emails = []
+            for r in rows:
+                if machine_id and r['role_id'] < 2:
+                    cur.execute(
+                        "SELECT 1 FROM user_machine_access WHERE user_id = %s AND machine_id = %s",
+                        (r['id'], machine_id)
+                    )
+                    if not cur.fetchone():
+                        continue
+                emails.append(r['email'])
+            return emails
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("get_subscribed_emails(%s): %s", event_type, e)
+        return []
+
+
+def notify_subscribed(event_type: str, title: str, message: str,
+                      link: str = None, machine_id: int = None):
+    """Cree des notifications in-app pour les users abonnes a l'event_type."""
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("""
+                SELECT np.user_id, u.role_id
+                FROM notification_preferences np
+                JOIN users u ON np.user_id = u.id
+                WHERE np.event_type = %s
+                  AND np.enabled = 1
+                  AND np.channel IN ('inapp', 'both')
+                  AND u.active = 1
+            """, (event_type,))
+            rows = cur.fetchall()
+
+            for r in rows:
+                if machine_id and r['role_id'] < 2:
+                    cur.execute(
+                        "SELECT 1 FROM user_machine_access WHERE user_id = %s AND machine_id = %s",
+                        (r['user_id'], machine_id)
+                    )
+                    if not cur.fetchone():
+                        continue
+                cur.execute(
+                    "INSERT INTO notifications (user_id, type, title, message, link) VALUES (%s, %s, %s, %s, %s)",
+                    (r['user_id'], event_type, title[:255], message[:2000], link)
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("notify_subscribed(%s): %s", event_type, e)
+
+
 def cleanup_old_notifications(days: int = 90):
     """Supprime les notifications lues de plus de N jours."""
     try:

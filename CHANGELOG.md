@@ -5,6 +5,56 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.13.1] — 2026-04-12
+
+### Preferences de notifications email par utilisateur
+
+- **Table `notification_preferences`** — Migration 027. Chaque utilisateur peut etre
+  abonne a 6 types d'evenements : scan CVE, audit SSH, alertes securite, conformite,
+  backups, mises a jour. Canaux : email, in-app, ou les deux.
+- **Admin > Acces & Permissions** — Nouvelle section "Notifications email" avec le meme
+  pattern card accordeon que les droits fonctionnels. Grille de checkboxes par user,
+  groupees par categorie (Securite / Rapports), toggle htmx, Tout activer/desactiver.
+- **Notifications ciblees** — Les scans CVE et audits SSH envoient maintenant des
+  notifications in-app uniquement aux users abonnes (via `notify_subscribed()`),
+  avec filtrage par `machine_access` pour les users role=1.
+- **Alertes securite automatiques** — CVE CRITICAL et grades SSH D/E/F declenchent
+  une notification `security_alert` en plus de la notification standard.
+- **Helper `get_subscribed_emails()`** — Retourne les emails des users abonnes a un
+  type d'evenement, filtre par machine_access. Pret pour l'envoi SMTP cible.
+- **i18n FR + EN** — Fichiers `lang/fr/notif_pref.php` et `lang/en/notif_pref.php`.
+
+### Migration stack — PHP 8.4 / Python 3.13 / MySQL 9.2
+
+- **PHP 8.2.30 → 8.4.20** — Image Docker `php:8.4-apache`. Aucun breaking change
+  detecte dans le code (signatures nullable deja conformes `?Type`). Extensions
+  inchangees : gd, imagick, pdo_mysql, mysqli, curl.
+- **Python 3.12.13 → 3.13.13** — Image Docker `python:3.13-slim` (builder + runtime).
+  Toutes les dependances pip installees sans erreur. 169 tests pytest passes.
+- **MySQL 9.1.0 → 9.2.0** — Upgrade in-place automatique du data dictionary
+  (v90000 → v90200) et du serveur (v90100 → v90200). Volume de donnees compatible.
+- **CI/CD** — `python-version` 3.12 → 3.13, `php-version` 8.2 → 8.4 dans
+  `.github/workflows/ci.yml`.
+
+### Hardening securite post-migration
+
+- **Apache TLS** — Force TLS 1.2+, cipher suite ECDHE+AESGCM/CHACHA20,
+  `SSLCompression off`, `SSLHonorCipherOrder on`. Negocie TLS 1.3 + AES-256-GCM.
+- **CSP** — `Content-Security-Policy` ajoute sur les 2 templates Apache (SSL + HTTP).
+  `default-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`.
+- **Permissions-Policy** — Desactive geolocation, camera, microphone, payment, USB.
+- **ServerTokens Prod + ServerSignature Off** — Version Apache masquee dans les
+  headers HTTP et les pages d'erreur.
+- **php.ini** — `open_basedir` restreint a `/var/www/html:/var/www/sessions:/tmp`,
+  `allow_url_include = Off` explicite, `E_STRICT` retire de `error_reporting` (supprime en 8.4).
+- **Python deps pinnees** — flask>=3.0.0, werkzeug>=3.0.0, flask-cors>=4.0.0,
+  marshmallow>=3.20.0, cryptography>=42.0.0, requests>=2.31.0.
+- **MySQL 9.2 compat** — `ORDER BY` ajoute sur `GROUP BY status` dans cve_remediation
+  (ordre non garanti en MySQL 9.2 sans ORDER BY explicite).
+- **Docker** — `composer:latest` remplace par `composer:2` (image pinnee).
+
+---
+
 ## [1.13.0] — 2026-04-12
 
 ### Planification SSH Audit + Tendances + Export PDF
