@@ -594,3 +594,142 @@ def ssh_audit_reload():
         logger.error("[ssh-audit/reload] %s", e)
         logger.error("[ssh_audit] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+# ── Routes : Planification scans SSH Audit ───────────────────────────────────
+
+@bp.route('/ssh-audit/schedules', methods=['GET'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def list_ssh_schedules():
+    """Liste les planifications de scans SSH Audit."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM ssh_audit_schedules ORDER BY id")
+        rows = cur.fetchall()
+        conn.close()
+        for r in rows:
+            if r.get('last_run'): r['last_run'] = str(r['last_run'])
+            if r.get('next_run'): r['next_run'] = str(r['next_run'])
+            if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        return jsonify({'success': True, 'schedules': rows})
+    except Exception as e:
+        logger.error("[ssh-audit/schedules] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/ssh-audit/schedules', methods=['POST'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def create_ssh_schedule():
+    """Cree une planification de scan SSH Audit."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or 'Scan SSH periodique').strip()[:100]
+    cron_expr = (data.get('cron_expression') or '').strip()
+    if not cron_expr:
+        return jsonify({'success': False, 'message': 'Expression cron requise'}), 400
+
+    try:
+        from croniter import croniter
+        from datetime import datetime
+        next_run = croniter(cron_expr).get_next(datetime)
+    except Exception:
+        return jsonify({'success': False, 'message': 'Expression cron invalide'}), 400
+
+    user_id, _ = get_current_user()
+    target_type = data.get('target_type', 'all')
+    target_value = data.get('target_value') or None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO ssh_audit_schedules (name, cron_expression, target_type, target_value, next_run, created_by) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (name, cron_expr, target_type, target_value, next_run, user_id))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Planification creee', 'next_run': str(next_run)})
+    except Exception as e:
+        logger.error("[ssh-audit/schedules POST] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/ssh-audit/schedules/<int:schedule_id>', methods=['DELETE'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def delete_ssh_schedule(schedule_id):
+    """Supprime une planification de scan SSH Audit."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM ssh_audit_schedules WHERE id = %s", (schedule_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Planification supprimee'})
+    except Exception as e:
+        logger.error("[ssh-audit/schedules DELETE] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/ssh-audit/schedules/<int:schedule_id>/toggle', methods=['POST'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def toggle_ssh_schedule(schedule_id):
+    """Active/desactive une planification."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE ssh_audit_schedules SET enabled = NOT enabled WHERE id = %s", (schedule_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Planification mise a jour'})
+    except Exception as e:
+        logger.error("[ssh-audit/schedules toggle] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+# ── Route : Historique scores (tendances) ────────────────────────────────────
+
+@bp.route('/ssh-audit/trends', methods=['GET'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def ssh_audit_trends():
+    """Retourne l'evolution des scores SSH Audit sur les 30 derniers jours."""
+    machine_id = request.args.get('machine_id')
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(dictionary=True)
+        if machine_id:
+            cur.execute("""
+                SELECT DATE(audited_at) as day, AVG(score) as avg_score,
+                       SUM(critical_count) as total_critical, SUM(high_count) as total_high,
+                       COUNT(*) as scan_count
+                FROM ssh_audit_results
+                WHERE machine_id = %s AND audited_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                GROUP BY DATE(audited_at) ORDER BY day
+            """, (int(machine_id),))
+        else:
+            cur.execute("""
+                SELECT DATE(audited_at) as day, AVG(score) as avg_score,
+                       SUM(critical_count) as total_critical, SUM(high_count) as total_high,
+                       COUNT(*) as scan_count
+                FROM ssh_audit_results
+                WHERE audited_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                GROUP BY DATE(audited_at) ORDER BY day
+            """)
+        rows = cur.fetchall()
+        conn.close()
+        for r in rows:
+            r['day'] = str(r['day'])
+            r['avg_score'] = round(float(r['avg_score']), 1)
+        return jsonify({'success': True, 'trends': rows})
+    except Exception as e:
+        logger.error("[ssh-audit/trends] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500

@@ -43,4 +43,5 @@ return [
     'compliance.th_score' => 'Score',
     'compliance.th_grade' => 'Note',
     'compliance.th_date' => 'Date',
+    'compliance.btn_pdf' => 'Export PDF',
 ];

@@ -119,6 +119,96 @@ if (isset($_GET['format']) && $_GET['format'] === 'csv') {
     fclose($out);
     exit;
 }
+
+// ── Export PDF (dompdf) ──────────────────────────────────────────────────
+if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
+    $dompdfAutoload = __DIR__ . '/../vendor/autoload.php';
+    if (!file_exists($dompdfAutoload)) {
+        http_response_code(500);
+        die('PDF: dependance dompdf manquante. Executez composer install.');
+    }
+    require_once $dompdfAutoload;
+
+    // Capturer le HTML du rapport
+    ob_start();
+    // On inclut la meme page en mode "render" pour capturer le HTML
+    $_GET['_pdf_render'] = true;
+    // On va generer un HTML simplifie pour le PDF
+    $pdfHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        body { font-family: DejaVu Sans, sans-serif; font-size: 11px; color: #333; margin: 20px; }
+        h1 { font-size: 20px; color: #1e40af; margin-bottom: 5px; }
+        h2 { font-size: 14px; color: #374151; margin: 15px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+        th { background: #f3f4f6; text-align: left; padding: 4px 6px; border: 1px solid #e5e7eb; font-weight: bold; }
+        td { padding: 4px 6px; border: 1px solid #e5e7eb; }
+        .stat-box { display: inline-block; width: 22%; text-align: center; padding: 8px; margin: 4px 1%; border: 1px solid #e5e7eb; border-radius: 4px; }
+        .stat-num { font-size: 18px; font-weight: bold; }
+        .critical { color: #dc2626; } .high { color: #ea580c; } .green { color: #16a34a; } .blue { color: #2563eb; }
+        .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #9ca3af; }
+    </style></head><body>';
+    $pdfHtml .= "<h1>{$appName} — Rapport de Conformite</h1>";
+    $pdfHtml .= "<p>Genere le {$date} par {$generatedBy}</p>";
+
+    // Resume
+    $pdfHtml .= '<h2>Resume</h2>';
+    $pdfHtml .= "<div class='stat-box'><div class='stat-num blue'>{$nbServers}</div><div>Serveurs ({$nbOnline} en ligne)</div></div>";
+    $pdfHtml .= "<div class='stat-box'><div class='stat-num'>{$nbActive2FA}/{$nbActiveUsers}</div><div>2FA actif</div></div>";
+    $pdfHtml .= "<div class='stat-box'><div class='stat-num'>{$nbOldKeys}</div><div>Cles SSH &gt; 90j</div></div>";
+    $pdfHtml .= "<div class='stat-box'><div class='stat-num'>" . $remStats['overdue'] . "</div><div>Deadlines depassees</div></div>";
+
+    // Serveurs
+    $pdfHtml .= '<h2>Vulnerabilites CVE par serveur</h2><table><tr><th>Serveur</th><th>IP</th><th>Statut</th><th>Env</th><th>CVE</th><th>Crit</th><th>High</th><th>Dernier scan</th></tr>';
+    foreach ($servers as $s) {
+        $critCls = ($s['critical_count'] ?? 0) > 0 ? ' class="critical"' : '';
+        $pdfHtml .= '<tr><td>' . htmlspecialchars($s['name']) . '</td><td>' . htmlspecialchars($s['ip']) . '</td>';
+        $pdfHtml .= '<td>' . htmlspecialchars($s['online_status'] ?? '') . '</td><td>' . htmlspecialchars($s['environment'] ?? '') . '</td>';
+        $pdfHtml .= '<td>' . ($s['cve_count'] ?? 0) . '</td><td' . $critCls . '>' . ($s['critical_count'] ?? 0) . '</td>';
+        $pdfHtml .= '<td>' . ($s['high_count'] ?? 0) . '</td><td>' . ($s['last_scan'] ?? '-') . '</td></tr>';
+    }
+    $pdfHtml .= '</table>';
+
+    // Utilisateurs
+    $pdfHtml .= '<h2>Comptes utilisateurs</h2><table><tr><th>Nom</th><th>Role</th><th>Actif</th><th>2FA</th><th>Cle SSH</th></tr>';
+    foreach ($users as $u) {
+        $pdfHtml .= '<tr><td>' . htmlspecialchars($u['name']) . '</td><td>' . htmlspecialchars($u['role_name']) . '</td>';
+        $pdfHtml .= '<td>' . ($u['active'] ? 'Oui' : 'Non') . '</td>';
+        $pdfHtml .= '<td>' . (!empty($u['totp_secret']) ? 'Oui' : 'Non') . '</td>';
+        $pdfHtml .= '<td>' . ($u['ssh_key'] ? 'Oui' : 'Non') . '</td></tr>';
+    }
+    $pdfHtml .= '</table>';
+
+    // SSH Audit
+    if (!empty($sshAuditResults)) {
+        $pdfHtml .= '<h2>Audit SSH — Scores</h2><table><tr><th>Serveur</th><th>Score</th><th>Note</th><th>Critical</th><th>High</th></tr>';
+        foreach ($sshAuditResults as $sa) {
+            $pdfHtml .= '<tr><td>' . htmlspecialchars($sa['name']) . '</td><td>' . $sa['score'] . '</td>';
+            $pdfHtml .= '<td><strong>' . $sa['grade'] . '</strong></td>';
+            $pdfHtml .= '<td>' . ($sa['critical_count'] ?? 0) . '</td><td>' . ($sa['high_count'] ?? 0) . '</td></tr>';
+        }
+        $pdfHtml .= '</table>';
+    }
+
+    // Supervision
+    if (!empty($supervisionAgents)) {
+        $pdfHtml .= '<h2>Supervision — Agents deployes</h2><table><tr><th>Serveur</th><th>Agents</th></tr>';
+        $agByM = [];
+        foreach ($supervisionAgents as $a) { $agByM[$a['name']][] = strtoupper(substr($a['platform'],0,1)) . ' ' . ($a['agent_version'] ?? ''); }
+        foreach ($agByM as $name => $agents) {
+            $pdfHtml .= '<tr><td>' . htmlspecialchars($name) . '</td><td>' . htmlspecialchars(implode(', ', $agents)) . '</td></tr>';
+        }
+        $pdfHtml .= '</table>';
+    }
+
+    $pdfHtml .= "<div class='footer'>SHA-256 : {$reportHash}<br>{$appName} — {$date}</div>";
+    $pdfHtml .= '</body></html>';
+
+    $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => false, 'defaultFont' => 'sans-serif']);
+    $dompdf->loadHtml($pdfHtml);
+    $dompdf->setPaper('A4', 'landscape');
+    $dompdf->render();
+    $dompdf->stream('rapport_conformite_' . date('Y-m-d') . '.pdf', ['Attachment' => true]);
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -147,6 +237,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'csv') {
         </div>
         <div class="flex gap-2 no-print">
             <button onclick="window.print()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium"><?= t('compliance.btn_print') ?></button>
+            <a href="?format=pdf" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium"><?= t('compliance.btn_pdf') ?></a>
             <a href="?format=csv" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium"><?= t('compliance.btn_csv') ?></a>
         </div>
     </div>

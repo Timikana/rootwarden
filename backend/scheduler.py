@@ -111,15 +111,78 @@ def _run_scheduled_scan(schedule: dict):
         pass
 
 
+def _run_scheduled_ssh_audit(schedule: dict):
+    """Execute un scan SSH Audit planifie."""
+    from encryption import Encryption
+    from ssh_audit import get_sshd_config, get_ssh_version, audit_sshd_config
+
+    encryption = Encryption()
+    _log.info("Scheduler SSH Audit: demarrage '%s' (id=%s)", schedule['name'], schedule['id'])
+
+    conn = _get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+
+        if schedule['target_type'] == 'tag' and schedule.get('target_value'):
+            cur.execute(
+                "SELECT m.id, m.name, m.ip, m.port, m.user, m.password, m.root_password, "
+                "m.service_account_deployed FROM machines m "
+                "INNER JOIN machine_tags mt ON m.id = mt.machine_id "
+                "WHERE mt.tag = %s AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')",
+                (schedule['target_value'],))
+        elif schedule['target_type'] == 'environment' and schedule.get('target_value'):
+            cur.execute(
+                "SELECT id, name, ip, port, user, password, root_password, service_account_deployed "
+                "FROM machines WHERE environment = %s AND (lifecycle_status IS NULL OR lifecycle_status != 'archived')",
+                (schedule['target_value'],))
+        else:
+            cur.execute(
+                "SELECT id, name, ip, port, user, password, root_password, service_account_deployed "
+                "FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'")
+
+        machines = cur.fetchall()
+        scanned = 0
+        for m in machines:
+            try:
+                ssh_pass = encryption.decrypt_password(m.get('password') or '')
+                root_pass = encryption.decrypt_password(m.get('root_password') or '')
+                svc = m.get('service_account_deployed', False)
+                with ssh_session(m['ip'], m['port'], m['user'], ssh_pass,
+                                 logger=_log, service_account=svc) as client:
+                    config = get_sshd_config(client, root_pass)
+                    ssh_ver = get_ssh_version(client, root_pass)
+                    result = audit_sshd_config(config)
+                    # Save result
+                    import json
+                    cur.execute(
+                        "INSERT INTO ssh_audit_results (machine_id, score, grade, critical_count, high_count, "
+                        "medium_count, low_count, findings_json, config_raw, ssh_version, audited_by) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (m['id'], result['score'], result['grade'],
+                         result['counts']['critical'], result['counts']['high'],
+                         result['counts']['medium'], result['counts']['low'],
+                         json.dumps(result['findings'], ensure_ascii=False),
+                         config, ssh_ver, 'scheduler'))
+                    conn.commit()
+                    scanned += 1
+            except Exception as e:
+                _log.warning("Scheduler SSH Audit: %s echoue: %s", m['name'], e)
+
+        _log.info("Scheduler SSH Audit: '%s' termine — %d/%d serveurs", schedule['name'], scanned, len(machines))
+    finally:
+        conn.close()
+
+
 def _scheduler_loop():
     """Boucle principale du scheduler — tourne en daemon thread."""
-    _log.info("Scheduler CVE demarre (intervalle: %ds)", _CHECK_INTERVAL)
+    _log.info("Scheduler demarre (CVE + SSH Audit, intervalle: %ds)", _CHECK_INTERVAL)
     while True:
         try:
             conn = _get_db()
             cur = conn.cursor(dictionary=True)
             now = datetime.now()
 
+            # CVE scans planifies
             cur.execute(
                 "SELECT * FROM cve_scan_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
                 (now,)
@@ -132,7 +195,6 @@ def _scheduler_loop():
                 except Exception as e:
                     _log.error("Scheduler: erreur execution %s : %s", sched['name'], e)
 
-                # Met a jour last_run et next_run
                 try:
                     next_run = _compute_next_run(sched['cron_expression'], now)
                     cur.execute(
@@ -142,6 +204,30 @@ def _scheduler_loop():
                     conn.commit()
                 except Exception as e:
                     _log.error("Scheduler: erreur mise a jour next_run pour %s : %s", sched['name'], e)
+
+            # SSH Audit scans planifies
+            try:
+                cur.execute(
+                    "SELECT * FROM ssh_audit_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
+                    (now,)
+                )
+                ssh_schedules = cur.fetchall()
+                for sched in ssh_schedules:
+                    try:
+                        _run_scheduled_ssh_audit(sched)
+                    except Exception as e:
+                        _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
+                    try:
+                        next_run = _compute_next_run(sched['cron_expression'], now)
+                        cur.execute(
+                            "UPDATE ssh_audit_schedules SET last_run = %s, next_run = %s WHERE id = %s",
+                            (now, next_run, sched['id'])
+                        )
+                        conn.commit()
+                    except Exception as e:
+                        _log.error("Scheduler SSH: erreur next_run %s : %s", sched['name'], e)
+            except Exception as e:
+                _log.debug("Scheduler SSH Audit: table pas encore creee: %s", e)
 
             conn.close()
         except Exception as e:
