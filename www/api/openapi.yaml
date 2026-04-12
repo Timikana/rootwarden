@@ -2138,3 +2138,64 @@ paths:
       summary: Liste des machines avec statut agents
       responses:
         '200': { description: Liste machines }
+
+  # ── SSH Audit Scheduling ───────────────────────────────────────────────
+
+  /ssh-audit/schedules:
+    get:
+      tags: [SSH Audit]
+      summary: Liste les planifications de scans SSH Audit
+      responses:
+        '200': { description: Liste des planifications }
+    post:
+      tags: [SSH Audit]
+      summary: Cree une planification de scan SSH Audit
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cron_expression]
+              properties:
+                name: { type: string, example: "Scan SSH hebdo" }
+                cron_expression: { type: string, example: "0 3 * * 1" }
+                target_type: { type: string, enum: [all, tag, environment] }
+                target_value: { type: string }
+      responses:
+        '200': { description: Planification creee }
+
+  /ssh-audit/schedules/{id}:
+    delete:
+      tags: [SSH Audit]
+      summary: Supprime une planification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Supprimee }
+
+  /ssh-audit/schedules/{id}/toggle:
+    post:
+      tags: [SSH Audit]
+      summary: Active/desactive une planification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Mise a jour }
+
+  /ssh-audit/trends:
+    get:
+      tags: [SSH Audit]
+      summary: Tendances des scores SSH Audit (30 derniers jours)
+      parameters:
+        - name: machine_id
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        '200': { description: Scores moyens par jour }

@@ -5,7 +5,27 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
-## [1.13.0] — 2026-04-11
+## [1.13.0] — 2026-04-12
+
+### Planification SSH Audit + Tendances + Export PDF
+
+- **Planification scans SSH Audit** — Table `ssh_audit_schedules` avec expressions cron.
+  Le scheduler execute automatiquement les scans SSH sur le parc (par tag, env, ou all).
+  Routes CRUD : `/ssh-audit/schedules` GET/POST/DELETE/toggle.
+- **Tendances SSH Audit** — Route `/ssh-audit/trends` retourne les scores moyens sur
+  30 jours (global ou par machine). Pret pour graphiques frontend.
+- **Export PDF compliance** — Bouton "Export PDF" via dompdf, rapport A4 paysage avec
+  toutes les sections : resume, CVE, utilisateurs, SSH audit, supervision, hash SHA-256.
+- **Dashboard enrichi** — 6 cards (ajout SSH Audit score A-F + Agents deployes),
+  raccourcis Supervision et SSH Audit dans les acces rapides.
+- **Compliance report enrichi** — Sections SSH Audit (scores par serveur) et Supervision
+  (badges multi-agent par serveur) ajoutees. Resume executif 6 cards.
+
+### Audit securite global (68 failles corrigees)
+
+- 11 CRITICAL, 22 HIGH, 35 MEDIUM corriges sur tout le projet
+- Injection shell pubkey SSH, auth manquante, str(e) info leak, XSS onclick, SQL dynamique
+- Voir commit `a282f4d` pour le detail complet
 
 ### Nouveau module Supervision multi-agent
 
