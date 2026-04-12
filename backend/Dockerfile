@@ -9,7 +9,7 @@
 ################################################
 
 # ── Stage 1 : Builder ────────────────────────────────────────
-FROM python:3.12-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /build
 
@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 
 # ── Stage 2 : Runtime ────────────────────────────────────────
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 

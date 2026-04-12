@@ -1,7 +1,7 @@
 ################################################
 # Dockerfile — Image PHP/Apache pour RootWarden
 #
-# Image unique PHP 8.2 + Apache avec les sources www/.
+# Image unique PHP 8.4 + Apache avec les sources www/.
 # Tailwind CSS est charge via CDN en runtime.
 #
 # Variables d’environnement attendues au runtime (via docker-compose / .env) :
@@ -14,11 +14,11 @@
 
 ################################################
 # (2) Étape finale : PHP + Apache
-# Image officielle PHP 8.2 avec Apache intégré.
+# Image officielle PHP 8.4 avec Apache intégré.
 # Toutes les extensions et dépendances système
 # sont installées dans cette section.
 ################################################
-FROM php:8.2-apache
+FROM php:8.4-apache
 
 # Timezone par défaut du conteneur
 ENV TZ=Europe/Paris
@@ -73,6 +73,14 @@ COPY php/apache-http.conf.tmpl /etc/apache2/sites-available/apache-http.conf.tmp
 #   env       : manipulation des variables d’environnement Apache
 #   setenvif  : conditions sur les headers entrants (ex: X-Forwarded-Proto)
 RUN a2enmod rewrite ssl headers env setenvif
+
+# ── Apache Hardening ─────────────────────────────────────────────────────────
+# Masquer la version d’Apache et l’OS dans les headers HTTP et pages d’erreur.
+# ServerTokens Prod   : affiche uniquement "Apache" (pas la version)
+# ServerSignature Off  : supprime le footer des pages d’erreur
+RUN echo "ServerTokens Prod" >> /etc/apache2/conf-available/security.conf && \
+    echo "ServerSignature Off" >> /etc/apache2/conf-available/security.conf && \
+    a2enconf security
 
 # Répertoire des certificats SSL — créé à l’image build,
 # le contenu (cert + clé) est généré ou monté à l’entrypoint.

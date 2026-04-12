@@ -265,6 +265,8 @@ function getPermissions($pdo, $user_id) {
                 <?php require_once __DIR__ . '/includes/manage_access.php'; ?>
                 <hr class="my-8 border-gray-200 dark:border-gray-700">
                 <?php require_once __DIR__ . '/includes/manage_permissions.php'; ?>
+                <hr class="my-8 border-gray-200 dark:border-gray-700">
+                <?php require_once __DIR__ . '/includes/manage_notifications.php'; ?>
             </div>
 
             <!-- Exclusions gerees dans /adm/server_users.php -->
