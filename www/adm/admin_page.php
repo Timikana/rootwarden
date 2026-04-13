@@ -210,6 +210,12 @@ function getPermissions($pdo, $user_id) {
 
             <!-- ── Tab 1 : Utilisateurs ───────────────────────────────── -->
             <div class="tab-panel active p-6" id="panel-users">
+<?php
+$tipId = 'admin-setup'; $tipTitle = t('tip.admin_title'); $tipSteps = [
+    t('tip.admin_step1'), t('tip.admin_step2'), t('tip.admin_step3'),
+    t('tip.admin_step4'), t('tip.admin_step5'),
+]; require __DIR__ . '/../includes/howto_tip.php';
+?>
                 <!-- Import CSV utilisateurs -->
                 <details class="mb-6 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
                     <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600">

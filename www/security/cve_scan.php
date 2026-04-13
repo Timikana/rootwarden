@@ -107,6 +107,11 @@ curl_close($ch);
             </p>
         </div>
 
+<?php
+$tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
+    t('tip.cve_step1'), t('tip.cve_step2'), t('tip.cve_step3'), t('tip.cve_step4'),
+]; require __DIR__ . '/../includes/howto_tip.php';
+?>
         <!-- Contrôles globaux -->
         <div class="flex flex-wrap items-center gap-3">
 

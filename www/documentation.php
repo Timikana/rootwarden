@@ -40,6 +40,7 @@ $isAdmin    = $role >= 2;
             <div class="px-4 py-2 text-xs font-bold uppercase text-gray-400 tracking-wider">Navigation</div>
             <ul class="text-sm space-y-1 px-2">
                 <li><a href="#intro"         class="block px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400">Introduction</a></li>
+                <li><a href="#getting-started" class="block px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-gray-700 text-green-600 dark:text-green-400 font-medium">Prise en main</a></li>
                 <li><a href="#architecture"  class="block px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400">Architecture</a></li>
                 <li><a href="#stack"         class="block px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400">Stack technique</a></li>
                 <li><a href="#auth"          class="block px-3 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400">Authentification & 2FA</a></li>
@@ -106,6 +107,48 @@ $isAdmin    = $role >= 2;
                     <li>Session timeout configurable + alertes sécurité sur le dashboard</li>
                     <li>Suivi d'âge des clés SSH (alerte > 90 jours)</li>
                 </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- 1b. Prise en main                         -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="getting-started" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3"><?= t('guide.title') ?></h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-6"><?= t('guide.intro') ?></p>
+
+                <div class="space-y-4">
+                    <?php
+                    $guideSteps = [
+                        ['title' => t('guide.step1_title'), 'text' => t('guide.step1_text'), 'icon' => '🔐'],
+                        ['title' => t('guide.step2_title'), 'text' => t('guide.step2_text'), 'icon' => '🖥️'],
+                        ['title' => t('guide.step3_title'), 'text' => t('guide.step3_text'), 'icon' => '👥'],
+                        ['title' => t('guide.step4_title'), 'text' => t('guide.step4_text'), 'icon' => '🔑'],
+                        ['title' => t('guide.step5_title'), 'text' => t('guide.step5_text'), 'icon' => '🛡️'],
+                        ['title' => t('guide.step6_title'), 'text' => t('guide.step6_text'), 'icon' => '🚀'],
+                        ['title' => t('guide.step7_title'), 'text' => t('guide.step7_text'), 'icon' => '🔔'],
+                    ];
+                    foreach ($guideSteps as $step):
+                    ?>
+                    <div class="flex gap-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
+                        <span class="text-2xl flex-shrink-0"><?= $step['icon'] ?></span>
+                        <div>
+                            <h3 class="font-bold text-sm text-gray-800 dark:text-gray-200 mb-1"><?= $step['title'] ?></h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400"><?= $step['text'] ?></p>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                    <h3 class="font-bold text-sm text-blue-800 dark:text-blue-300 mb-2"><?= t('guide.security_title') ?></h3>
+                    <ul class="list-disc list-inside space-y-1 text-sm text-blue-700 dark:text-blue-400">
+                        <li><?= t('guide.sec_1') ?></li>
+                        <li><?= t('guide.sec_2') ?></li>
+                        <li><?= t('guide.sec_3') ?></li>
+                        <li><?= t('guide.sec_4') ?></li>
+                        <li><?= t('guide.sec_5') ?></li>
+                    </ul>
+                </div>
             </section>
 
             <!-- ────────────────────────────────────────── -->

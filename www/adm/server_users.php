@@ -42,6 +42,12 @@ foreach ($servers as $s) { if ($s['id'] == $selectedId) $selectedName = $s['name
         </div>
     </div>
 
+<?php
+$tipId = 'server-users'; $tipTitle = t('tip.users_title'); $tipSteps = [
+    t('tip.users_step1'), t('tip.users_step2'), t('tip.users_step3'), t('tip.users_step4'),
+]; require __DIR__ . '/../includes/howto_tip.php';
+?>
+
     <!-- Selecteur serveur -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
         <div class="flex flex-wrap items-center gap-3">

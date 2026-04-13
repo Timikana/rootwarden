@@ -81,6 +81,12 @@ $allEnvs = array_unique(array_filter(array_column($machines, 'environment')));
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= count($machines) ?> <?= t('ssh.servers_available') ?></p>
                 <p class="text-xs text-gray-400 mt-0.5"><?= t('ssh.desc') ?></p>
             </div>
+<?php
+$tipId = 'ssh-deploy'; $tipTitle = t('tip.ssh_title'); $tipSteps = [
+    t('tip.ssh_step1'), t('tip.ssh_step2'), t('tip.ssh_step3'),
+    t('tip.ssh_step4'), t('tip.ssh_step5'),
+]; require __DIR__ . '/../includes/howto_tip.php';
+?>
             <div class="flex flex-wrap items-center gap-2">
                 <?php if (!empty($allTags)): ?>
                 <select id="filter-tag" onchange="filterMachines()" class="text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800">
