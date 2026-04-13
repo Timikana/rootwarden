@@ -652,11 +652,10 @@ class ServerConfigurator:
                 update_root_bashrc(root_channel, logger=self.logger)
             else:
                 self.logger.info("[bashrc] Deploiement .bashrc desactive pour cette machine.")
-            # Nettoyage des utilisateurs non autorises (configurable par machine)
-            if self.machine.get('cleanup_users', True):
-                self.clean_up_users(root_channel)
-            else:
-                self.logger.info("[cleanup] Nettoyage utilisateurs desactive pour cette machine.")
+            # Le nettoyage automatique des utilisateurs est DESACTIVE.
+            # La suppression de comptes se fait uniquement depuis
+            # Administration > Utilisateurs distants (action explicite).
+            # Le deploiement ne fait que deployer/retirer les cles SSH.
             self.configure_users(root_channel)
         self.logger.info(f"=== Configuration terminée pour la machine : {self.name} ===")
 
@@ -739,17 +738,45 @@ class ServerConfigurator:
 
     def configure_users(self, channel):
         """
-        Configure l'ensemble des utilisateurs autorisés sur la machine courante.
+        Configure les utilisateurs sur la machine courante.
 
-        Itère sur ``all_users`` et délègue à ``configure_user`` pour chaque
-        utilisateur dont l'id de machine figure dans ``allowed_servers``.
-
-        Args:
-            channel: Channel SSH root.
+        - Users autorises (dans allowed_servers) : deploie cles + config
+        - Users managed dans l'inventaire mais qui ont perdu l'acces :
+          retire la cle SSH et le sudo SANS supprimer le compte
         """
+        mid = self.machine['id']
+        authorized_names = set()
+
+        # 1. Deployer les users autorises
         for user in self.all_users:
-            if self.machine['id'] in user.get('allowed_servers', []):
+            if mid in user.get('allowed_servers', []):
+                authorized_names.add(user.get('name'))
                 self.configure_user(channel, user)
+
+        # 2. Retirer les cles des users managed qui ont perdu l'acces
+        try:
+            import mysql.connector
+            with mysql.connector.connect(**Config.DB_CONFIG) as conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(
+                    "SELECT username FROM server_user_inventory "
+                    "WHERE machine_id = %s AND status = 'managed' AND managed_by = 'rootwarden'",
+                    (mid,)
+                )
+                managed_users = {r['username'] for r in cursor.fetchall()}
+        except Exception as e:
+            self.logger.warning(f"Impossible de charger l'inventaire : {e}")
+            managed_users = set()
+
+        revoked = managed_users - authorized_names
+        for uname in revoked:
+            self.logger.info(f"[{uname}] Acces revoque — retrait cle SSH et sudo (compte conserve).")
+            try:
+                ak_path = f"/home/{uname}/.ssh/authorized_keys"
+                execute_command_as_root(channel, f"rm -f {ak_path}", logger=self.logger)
+                remove_from_sudoers(channel, uname, logger=self.logger)
+            except Exception as e:
+                self.logger.error(f"[{uname}] Erreur retrait acces : {e}")
 
     def configure_user(self, channel, user: dict):
         """

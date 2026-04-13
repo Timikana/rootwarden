@@ -254,3 +254,75 @@ def toggle_notification_pref():
         return jsonify({'success': True, 'enabled': bool(enabled)})
     finally:
         conn.close()
+
+
+# ── Server user inventory ───────────────────────────────────────────────
+
+VALID_INVENTORY_STATUS = ('managed', 'excluded', 'unmanaged')
+
+
+@bp.route('/admin/user_inventory/classify', methods=['POST'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def classify_inventory_user():
+    """Classifie un user dans l'inventaire serveur."""
+    data = request.get_json(silent=True) or {}
+    machine_id = data.get('machine_id')
+    username = (data.get('username') or '').strip()
+    status = (data.get('status') or '').strip()
+    notes = (data.get('notes') or '').strip()
+
+    if not machine_id or not username:
+        return jsonify({'success': False, 'message': 'machine_id et username requis'}), 400
+    if status not in VALID_INVENTORY_STATUS:
+        return jsonify({'success': False, 'message': f"Statut invalide, doit etre : {', '.join(VALID_INVENTORY_STATUS)}"}), 400
+
+    reviewed_by = int(request.headers.get('X-User-ID', 0))
+    managed_by = 'rootwarden' if status == 'managed' else ('manual' if status == 'excluded' else 'external')
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE server_user_inventory
+            SET status = %s, managed_by = %s, notes = %s,
+                reviewed_by = %s, reviewed_at = NOW()
+            WHERE machine_id = %s AND username = %s
+        """, (status, managed_by, notes or None, reviewed_by, int(machine_id), username))
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'message': 'Utilisateur non trouve dans l\'inventaire'}), 404
+        return jsonify({'success': True, 'status': status})
+    finally:
+        conn.close()
+
+
+@bp.route('/admin/user_inventory/classify_bulk', methods=['POST'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def classify_inventory_bulk():
+    """Classifie tous les pending_review d'une machine en un statut."""
+    data = request.get_json(silent=True) or {}
+    machine_id = data.get('machine_id')
+    status = (data.get('status') or '').strip()
+
+    if not machine_id or status not in VALID_INVENTORY_STATUS:
+        return jsonify({'success': False, 'message': 'machine_id et statut valide requis'}), 400
+
+    reviewed_by = int(request.headers.get('X-User-ID', 0))
+    managed_by = 'rootwarden' if status == 'managed' else ('manual' if status == 'excluded' else 'external')
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE server_user_inventory
+            SET status = %s, managed_by = %s, reviewed_by = %s, reviewed_at = NOW()
+            WHERE machine_id = %s AND status = 'pending_review'
+        """, (status, managed_by, reviewed_by, int(machine_id)))
+        conn.commit()
+        return jsonify({'success': True, 'updated': cur.rowcount})
+    finally:
+        conn.close()
