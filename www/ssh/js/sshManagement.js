@@ -131,11 +131,46 @@ function deploySSH() {
             logWindow.innerHTML += `[${r.ssh_ok ? 'OK' : 'FAIL'}] ${_escHtml(r.name)} (${_escHtml(r.ip)})${_escHtml(auth)}${_escHtml(os)}${_escHtml(disk)}\n`;
             if (r.errors && r.errors.length > 0) {
                 r.errors.forEach(e => { logWindow.innerHTML += `     \u274c ${_escHtml(e)}\n`; });
+                if (r.scan_required) {
+                    logWindow.innerHTML += `     \u27a1 <a href="/adm/server_users.php" style="color:#60a5fa;text-decoration:underline">Ouvrir Utilisateurs distants</a>\n`;
+                }
                 allOk = false;
                 failedNames.push(r.name);
             }
-            if (r.warnings && r.warnings.length > 0) {
-                r.warnings.forEach(w => { logWindow.innerHTML += `     \u26a0 ${_escHtml(w)}\n`; });
+            // Audit utilisateurs depuis l'inventaire
+            if (r.user_impact && r.user_impact.length > 0) {
+                logWindow.innerHTML += `\n     \u{1F464} INVENTAIRE UTILISATEURS — ${_escHtml(r.name)}\n`;
+                logWindow.innerHTML += `     ${'─'.repeat(50)}\n`;
+
+                const groups = {managed: [], excluded: [], unmanaged: [], pending_review: []};
+                r.user_impact.forEach(u => { if (groups[u.status]) groups[u.status].push(u); });
+
+                if (groups.managed.length) {
+                    logWindow.innerHTML += `     \u2705 Geres par RootWarden (cles deployees) :\n`;
+                    groups.managed.forEach(u => { logWindow.innerHTML += `        ${_escHtml(u.name)}\n`; });
+                }
+                if (groups.excluded.length) {
+                    logWindow.innerHTML += `     \u{1F512} Exclus (jamais modifies) :\n`;
+                    groups.excluded.forEach(u => { logWindow.innerHTML += `        ${_escHtml(u.name)}\n`; });
+                }
+                if (groups.unmanaged.length) {
+                    logWindow.innerHTML += `     \u2796 Non geres (ignores au deploiement) :\n`;
+                    groups.unmanaged.forEach(u => { logWindow.innerHTML += `        ${_escHtml(u.name)}\n`; });
+                }
+
+                // Users a creer
+                if (r.users_to_create && r.users_to_create.length) {
+                    logWindow.innerHTML += `     \u2795 Comptes qui seront crees :\n`;
+                    r.users_to_create.forEach(u => { logWindow.innerHTML += `        ${_escHtml(u)}\n`; });
+                }
+
+                // Users qui perdent l'acces (cle retiree, compte conserve)
+                if (r.users_revoked && r.users_revoked.length) {
+                    logWindow.innerHTML += `     \u26a0 Acces revoque (cle SSH retiree, compte conserve) :\n`;
+                    r.users_revoked.forEach(u => { logWindow.innerHTML += `        ${_escHtml(u)}\n`; });
+                }
+
+                logWindow.innerHTML += `     ${'─'.repeat(50)}\n`;
             }
         });
 
@@ -153,6 +188,7 @@ function deploySSH() {
             resetDeployBtn();
             return;
         }
+
 
         // Tout est OK — lancer le deploiement
         logWindow.innerHTML += '\n\u2705 Tous les checks OK — Deploiement en cours...\n\n';
@@ -210,7 +246,7 @@ function fetchLogs() {
         return;
     }
 
-    logWindow.innerHTML = "Connexion aux logs...\n";
+    logWindow.innerHTML += "\nConnexion aux logs...\n";
 
     // Ouvre la connexion SSE via le proxy PHP générique (évite CORS avec Hypercorn)
     const eventSource = new EventSource(`${window.API_URL}/logs`);

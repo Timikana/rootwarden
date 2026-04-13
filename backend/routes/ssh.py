@@ -175,7 +175,7 @@ def preflight_check():
         cur = conn.cursor(dictionary=True)
         fmt = ','.join(['%s'] * len(machine_ids))
         cur.execute(
-            f"SELECT id, name, ip, port, user, password, platform_key_deployed, service_account_deployed FROM machines WHERE id IN ({fmt})",
+            f"SELECT id, name, ip, port, user, password, platform_key_deployed, service_account_deployed, users_scanned_at, cleanup_users FROM machines WHERE id IN ({fmt})",
             machine_ids
         )
         machines = cur.fetchall()
@@ -202,6 +202,37 @@ def preflight_check():
             'disk_free': None,
             'errors': [],
         }
+
+        # Bloquer si le serveur n'a jamais ete scanne
+        if not m.get('users_scanned_at'):
+            result['errors'].append(
+                "Scan utilisateurs requis avant le premier deploiement. "
+                "Allez dans Utilisateurs distants pour scanner ce serveur."
+            )
+            result['scan_required'] = True
+            results.append(result)
+            continue
+
+        # Bloquer si des users sont en pending_review
+        conn_pending = get_db_connection()
+        try:
+            cur_p = conn_pending.cursor(dictionary=True)
+            cur_p.execute(
+                "SELECT COUNT(*) as cnt FROM server_user_inventory "
+                "WHERE machine_id = %s AND status = 'pending_review'",
+                (m['id'],)
+            )
+            pending = cur_p.fetchone()['cnt']
+            if pending > 0:
+                result['errors'].append(
+                    f"{pending} utilisateur(s) en attente de classification. "
+                    "Classifiez-les dans Utilisateurs distants avant de deployer."
+                )
+                result['scan_required'] = True
+                results.append(result)
+                continue
+        finally:
+            conn_pending.close()
 
         ssh_pass = server_decrypt_password(m.get('password', '')) or ''
         has_keypair = m.get('service_account_deployed') or m.get('platform_key_deployed', False)
@@ -239,35 +270,47 @@ def preflight_check():
                 except Exception:
                     pass
 
-                # Verification des users RootWarden sur ce serveur
+                # ── Audit d'impact depuis l'inventaire ────────────────────
                 try:
-                    stdin, stdout, stderr = client.exec_command(
-                        "awk -F: '$7 !~ /(nologin|false|sync|halt|shutdown)/ {print $1}' /etc/passwd",
-                        timeout=10
-                    )
-                    remote_users = set(stdout.read().decode().strip().split('\n'))
-
-                    # Users RootWarden qui ont acces a cette machine
-                    conn_check = get_db_connection()
+                    conn_inv = get_db_connection()
                     try:
-                        cur_check = conn_check.cursor(dictionary=True)
-                        cur_check.execute(
+                        cur_inv = conn_inv.cursor(dictionary=True)
+                        cur_inv.execute(
+                            "SELECT username, status, managed_by FROM server_user_inventory "
+                            "WHERE machine_id = %s", (m['id'],)
+                        )
+                        inventory = cur_inv.fetchall()
+
+                        cur_inv.execute(
                             "SELECT u.name FROM users u "
                             "JOIN user_machine_access uma ON u.id = uma.user_id "
-                            "WHERE uma.machine_id = %s AND u.active = 1 AND u.ssh_key IS NOT NULL AND u.ssh_key != ''",
+                            "WHERE uma.machine_id = %s AND u.active = 1",
                             (m['id'],)
                         )
-                        rootwarden_users = [r['name'] for r in cur_check.fetchall()]
+                        authorized = {r['name'] for r in cur_inv.fetchall()}
                     finally:
-                        conn_check.close()
+                        conn_inv.close()
 
-                    missing_users = [u for u in rootwarden_users if u not in remote_users]
-                    if missing_users:
-                        result['warnings'] = result.get('warnings', [])
-                        for mu in missing_users:
-                            result['warnings'].append(f"User '{mu}' n'existe pas sur ce serveur")
-                except Exception:
-                    pass
+                    user_impact = []
+                    for row in inventory:
+                        user_impact.append({
+                            'name': row['username'],
+                            'status': row['status'],
+                            'managed_by': row['managed_by'],
+                        })
+
+                    result['user_impact'] = user_impact
+
+                    # Users RootWarden absents du serveur (seront crees)
+                    inv_names = {r['username'] for r in inventory}
+                    result['users_to_create'] = sorted(authorized - inv_names)
+
+                    # Users managed qui perdent l'acces (cle retiree, compte conserve)
+                    managed_names = {r['username'] for r in inventory if r['status'] == 'managed' and r['managed_by'] == 'rootwarden'}
+                    result['users_revoked'] = sorted(managed_names - authorized)
+
+                except Exception as ex:
+                    logger.warning("Preflight inventory audit (%s): %s", m['name'], ex)
 
         except Exception as e:
             result['errors'].append(f"Connexion SSH echouee: {str(e)[:100]}")
@@ -744,34 +787,33 @@ def scan_server_users():
     if not m:
         return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
 
+    mid = int(machine_id)
     ssh_pass = server_decrypt_password(m['password'])
 
     try:
         with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
-            # Lister les users avec shell valide
-            cmd = "awk -F: '$7 !~ /(nologin|false|sync|halt|shutdown)/ {print $1\":\"$6\":\"$7}' /etc/passwd"
+            # Lister les users avec shell valide + UID
+            cmd = "awk -F: '$7 !~ /(nologin|false|sync|halt|shutdown)/ {print $1\":\"$3\":\"$6\":\"$7}' /etc/passwd"
             stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
             passwd_output = stdout.read().decode('utf-8', errors='replace')
 
-            # Recuperer la pubkey plateforme pour detection
             from ssh_key_manager import get_platform_public_key
             platform_pubkey = get_platform_public_key() or ''
             platform_fragment = platform_pubkey.split()[1] if len(platform_pubkey.split()) > 1 else ''
 
-            users = []
+            scanned_users = []
             for line in passwd_output.strip().split('\n'):
                 if not line.strip():
                     continue
                 parts = line.strip().split(':')
-                if len(parts) < 3:
+                if len(parts) < 4:
                     continue
-                uname, home, shell = parts[0], parts[1], parts[2]
+                uname, uid_str, home, shell = parts[0], parts[1], parts[2], parts[3]
+                uid = int(uid_str) if uid_str.isdigit() else 0
 
-                # Valider le path home (anti-injection)
                 if not re.match(r'^/[a-zA-Z0-9/_.-]+$', home):
                     continue
 
-                # Verifier authorized_keys
                 ak_cmd = f"cat {home}/.ssh/authorized_keys 2>/dev/null || echo ''"
                 stdin2, stdout2, stderr2 = client.exec_command(ak_cmd, timeout=10)
                 ak_content = stdout2.read().decode('utf-8', errors='replace').strip()
@@ -779,32 +821,104 @@ def scan_server_users():
                 keys = [k.strip() for k in ak_content.split('\n') if k.strip() and k.strip().startswith('ssh-')]
                 has_platform = any(platform_fragment in k for k in keys) if platform_fragment else False
 
-                # Detecter les cles RootWarden (par commentaire)
-                rootwarden_keys = [k.split()[-1] for k in keys if '@' in (k.split()[-1] if len(k.split()) >= 3 else '')]
-
-                users.append({
+                scanned_users.append({
                     'name': uname,
+                    'uid': uid,
                     'home': home,
                     'shell': shell,
                     'keys_count': len(keys),
                     'has_platform_key': has_platform,
-                    'rootwarden_keys': rootwarden_keys,
                 })
 
-        # Charger les exclusions existantes pour ce serveur
-        conn_ex = get_db_connection()
+        # Peupler server_user_inventory
+        conn_inv = get_db_connection()
         try:
-            cur_ex = conn_ex.cursor(dictionary=True)
-            cur_ex.execute("SELECT username FROM user_exclusions WHERE machine_id = %s", (int(machine_id),))
-            excluded = {r['username'] for r in cur_ex.fetchall()}
+            cur = conn_inv.cursor(dictionary=True)
+
+            # Charger l'inventaire existant
+            cur.execute("SELECT username, status FROM server_user_inventory WHERE machine_id = %s", (mid,))
+            existing = {r['username']: r['status'] for r in cur.fetchall()}
+
+            # Users RootWarden autorises
+            cur.execute(
+                "SELECT u.name FROM users u JOIN user_machine_access uma ON u.id = uma.user_id "
+                "WHERE uma.machine_id = %s AND u.active = 1", (mid,)
+            )
+            rw_authorized = {r['name'] for r in cur.fetchall()}
+
+            # Comptes systeme proteges
+            sys_users = {'root', 'daemon', 'bin', 'sys', 'sync', 'nobody',
+                         'www-data', 'sshd', 'rootwarden', m['user']}
+
+            for u in scanned_users:
+                uname = u['name']
+                if uname in existing:
+                    # Mettre a jour les infos (last_seen, keys)
+                    cur.execute("""
+                        UPDATE server_user_inventory
+                        SET uid = %s, home_dir = %s, shell = %s, keys_count = %s,
+                            has_platform_key = %s, last_seen_at = NOW()
+                        WHERE machine_id = %s AND username = %s
+                    """, (u['uid'], u['home'], u['shell'], u['keys_count'],
+                          u['has_platform_key'], mid, uname))
+                else:
+                    # Nouveau user — classifier automatiquement
+                    if uname in sys_users or uname.lower() in sys_users:
+                        auto_status = 'excluded'
+                        auto_managed = 'manual'
+                        auto_notes = 'Compte systeme (auto-classifie)'
+                    elif uname in rw_authorized:
+                        auto_status = 'managed'
+                        auto_managed = 'rootwarden'
+                        auto_notes = 'Utilisateur RootWarden (auto-classifie)'
+                    else:
+                        auto_status = 'pending_review'
+                        auto_managed = None
+                        auto_notes = None
+
+                    cur.execute("""
+                        INSERT INTO server_user_inventory
+                            (machine_id, username, uid, home_dir, shell, keys_count,
+                             has_platform_key, status, managed_by, notes)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (mid, uname, u['uid'], u['home'], u['shell'], u['keys_count'],
+                          u['has_platform_key'], auto_status, auto_managed, auto_notes))
+
+            conn_inv.commit()
+
+            # Marquer scanne
+            cur.execute("UPDATE machines SET users_scanned_at = NOW() WHERE id = %s", (mid,))
+            conn_inv.commit()
+
+            # Recharger l'inventaire complet pour la reponse
+            cur.execute("""
+                SELECT username, uid, home_dir, shell, keys_count, has_platform_key,
+                       status, managed_by, notes, reviewed_by, reviewed_at,
+                       first_seen_at, last_seen_at
+                FROM server_user_inventory WHERE machine_id = %s
+                ORDER BY FIELD(status, 'pending_review', 'managed', 'excluded', 'unmanaged'), username
+            """, (mid,))
+            inventory = cur.fetchall()
+            for row in inventory:
+                for k in ('reviewed_at', 'first_seen_at', 'last_seen_at'):
+                    if row.get(k) and hasattr(row[k], 'isoformat'):
+                        row[k] = row[k].isoformat()
+
+            # Compter les pending
+            pending_count = sum(1 for r in inventory if r['status'] == 'pending_review')
+
         finally:
-            conn_ex.close()
+            conn_inv.close()
 
-        for u in users:
-            u['excluded'] = u['name'] in excluded
-
-        return jsonify({'success': True, 'machine_id': m['id'], 'machine_name': m['name'], 'users': users})
+        return jsonify({
+            'success': True,
+            'machine_id': m['id'],
+            'machine_name': m['name'],
+            'users': inventory,
+            'pending_count': pending_count,
+        })
     except Exception as e:
+        logger.error("scan_server_users(%s): %s", machine_id, e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
