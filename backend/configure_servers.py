@@ -278,67 +278,55 @@ def user_exists(channel, username: str, logger=None) -> bool:
 
 def manage_ssh_keys(channel, user: dict, logger=None):
     """
-    Gère le déploiement de la clé SSH de l'utilisateur.
-    Si l'utilisateur est actif et qu'une clé SSH est fournie, elle est écrite dans
-    /home/{username}/.ssh/authorized_keys avec les permissions appropriées.
-    Sinon, le fichier authorized_keys est supprimé.
+    Gere le deploiement de la cle SSH de l'utilisateur.
+    Utilise base64 pour ecrire la cle sans interpolation shell (protection injection).
     """
+    import base64 as _b64
     username = user.get('name')
     ssh_key = (user.get('ssh_key') or '').strip()
     active = user.get('active', False)
 
     if not username:
         if logger:
-            logger.error("Nom d'utilisateur manquant dans la définition de l'utilisateur.")
+            logger.error("Nom d'utilisateur manquant dans la definition de l'utilisateur.")
         return
 
     authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
-    
+
     try:
         if active and ssh_key:
             if logger:
-                logger.info(f"[{username}] Déploiement de la clé SSH.")
+                logger.info(f"[{username}] Deploiement de la cle SSH.")
 
-            # Créer le dossier .ssh avec les permissions correctes
             mkdir_command = (
                 f"mkdir -p /home/{username}/.ssh && "
                 f"chown {username}:{username} /home/{username}/.ssh && "
                 f"chmod 700 /home/{username}/.ssh"
             )
             execute_command_as_root(channel, mkdir_command, logger=logger)
-            
-            # Échapper la clé pour éviter les problèmes de shell
-            escaped_key = ssh_key.replace("'", "'\\''")
-            
-            # Écrire la clé dans authorized_keys (en écrasant le contenu existant)
+
+            # Ecriture via base64 — aucune interpolation shell possible
+            b64_key = _b64.b64encode(ssh_key.encode()).decode()
             key_command = (
-                f"echo '{escaped_key}' > {authorized_keys_path} && "
+                f"printf '%s' '{b64_key}' | base64 -d > {authorized_keys_path} && "
                 f"chown {username}:{username} {authorized_keys_path} && "
                 f"chmod 600 {authorized_keys_path}"
             )
             execute_command_as_root(channel, key_command, logger=logger)
         else:
             if logger:
-                logger.info(f"[{username}] Suppression de la clé SSH.")
-            # Supprimer le fichier authorized_keys s'il existe
+                logger.info(f"[{username}] Suppression de la cle SSH.")
             execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
     except Exception as e:
         if logger:
-            logger.error(f"[{username}] Erreur lors du déploiement de la clé SSH : {e}")
+            logger.error(f"[{username}] Erreur lors du deploiement de la cle SSH : {e}")
 
-def deploy_user_config(channel, user: dict, logger=None):
+def deploy_user_config(channel, user: dict, logger=None, deploy_bashrc=True):
     """
-    Met à jour la configuration de l'utilisateur en une seule opération.
-    
-    - Si l'utilisateur est actif et possède une clé SSH, il :
-      • Crée (ou s'assure de l'existence de) le dossier ~/.ssh avec les permissions adéquates.
-      • Écrit la clé dans le fichier authorized_keys.
-    - Sinon, il supprime le fichier authorized_keys.
-    
-    Ensuite, il supprime l'ancien fichier ~/.bashrc de l'utilisateur, déploie le nouveau contenu
-    (celui que vous avez fourni) et le charge dans la session.
-    
-    Les opérations sont effectuées via des commandes exécutées en root grâce à `execute_command_as_root`.
+    Met a jour la configuration de l'utilisateur en une seule operation.
+
+    - Deploie la cle SSH (ou la supprime si inactif).
+    - Deploie le .bashrc ameliore si deploy_bashrc=True.
     """
     username = user.get('name')
     if not username:
@@ -346,37 +334,39 @@ def deploy_user_config(channel, user: dict, logger=None):
             logger.error("Nom d'utilisateur manquant dans la définition de l'utilisateur.")
         return
 
-    # --- Gestion de la clé SSH ---
+    # --- Gestion de la cle SSH ---
+    import base64 as _b64
     authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
-    if user.get('active') and (user.get('ssh_key') or '').strip():
+    ssh_key = (user.get('ssh_key') or '').strip()
+    if user.get('active') and ssh_key:
         if logger:
-            logger.info(f"[{username}] Déploiement de la clé SSH.")
-        # Création du dossier .ssh avec les permissions appropriées
+            logger.info(f"[{username}] Deploiement de la cle SSH.")
         mkdir_command = (
             f"mkdir -p /home/{username}/.ssh && "
             f"chown {username}:{username} /home/{username}/.ssh && "
             f"chmod 700 /home/{username}/.ssh"
         )
         execute_command_as_root(channel, mkdir_command, logger=logger)
-        
-        # Échappement de la clé pour éviter tout problème avec les caractères spéciaux
-        ssh_key = (user.get('ssh_key') or '').strip()
-        escaped_key = ssh_key.replace("'", "'\\''")
-        
-        # Écriture de la clé dans authorized_keys
+
+        # Ecriture via base64 — aucune interpolation shell possible
+        b64_key = _b64.b64encode(ssh_key.encode()).decode()
         key_command = (
-            f"echo '{escaped_key}' > {authorized_keys_path} && "
+            f"printf '%s' '{b64_key}' | base64 -d > {authorized_keys_path} && "
             f"chown {username}:{username} {authorized_keys_path} && "
             f"chmod 600 {authorized_keys_path}"
         )
         execute_command_as_root(channel, key_command, logger=logger)
     else:
         if logger:
-            logger.info(f"[{username}] Suppression de la clé SSH.")
+            logger.info(f"[{username}] Suppression de la cle SSH.")
         execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
     
-    # --- Mise à jour du fichier .bashrc ---
-    # Contenu du nouveau .bashrc à déployer
+    # --- Mise a jour du fichier .bashrc (configurable) ---
+    if not deploy_bashrc:
+        if logger:
+            logger.info(f"[{username}] Deploiement .bashrc desactive pour cette machine.")
+        return
+
     new_bashrc = """# ~/.bashrc - version améliorée avec couleurs
 
 # Si non interactif, ne rien faire
@@ -657,9 +647,16 @@ class ServerConfigurator:
             # Si service account, sudo est deja disponible — pas besoin de ensure_sudo
             if not use_sa:
                 ensure_sudo_installed(ssh_client, self.decrypted_root, logger=self.logger)
-            # Mise à jour du .bashrc pour root, une seule fois pour la machine
-            update_root_bashrc(root_channel, logger=self.logger)
-            self.clean_up_users(root_channel)
+            # Mise a jour du .bashrc pour root (configurable par machine)
+            if self.machine.get('deploy_bashrc', True):
+                update_root_bashrc(root_channel, logger=self.logger)
+            else:
+                self.logger.info("[bashrc] Deploiement .bashrc desactive pour cette machine.")
+            # Nettoyage des utilisateurs non autorises (configurable par machine)
+            if self.machine.get('cleanup_users', True):
+                self.clean_up_users(root_channel)
+            else:
+                self.logger.info("[cleanup] Nettoyage utilisateurs desactive pour cette machine.")
             self.configure_users(root_channel)
         self.logger.info(f"=== Configuration terminée pour la machine : {self.name} ===")
 
@@ -787,8 +784,9 @@ class ServerConfigurator:
             else:
                 self.logger.info(f"[{username}] Utilisateur inactif, configuration limitée.")
 
-            # Déploiement complet de la configuration (clé SSH et .bashrc)
-            deploy_user_config(channel, user, logger=self.logger)
+            # Deploiement complet de la configuration (cle SSH + bashrc si active)
+            deploy_user_config(channel, user, logger=self.logger,
+                               deploy_bashrc=self.machine.get('deploy_bashrc', True))
 
             # Gestion des droits sudo
             if active:
