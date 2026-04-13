@@ -36,6 +36,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('fail2ban.title') ?></h1>
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('fail2ban.desc') ?></p>
+<?php $tipId = 'fail2ban'; $tipTitle = t('tip.fail2ban_title'); $tipSteps = [t('tip.fail2ban_step1'), t('tip.fail2ban_step2'), t('tip.fail2ban_step3')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
 
         <!-- Selection serveur + actions -->

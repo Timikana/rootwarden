@@ -68,6 +68,7 @@ $typeLabels = [
             <div>
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Notifications</h1>
                 <p class="text-sm text-gray-500"><?= $unreadCount ?> non lue<?= $unreadCount > 1 ? 's' : '' ?> sur <?= $total ?> total</p>
+<?php $tipId = 'notifications'; $tipTitle = t('tip.notif_title'); $tipSteps = [t('tip.notif_step1'), t('tip.notif_step2'), t('tip.notif_step3')]; require __DIR__ . '/includes/howto_tip.php'; ?>
             </div>
             <?php if ($unreadCount > 0): ?>
             <button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read_all"}' hx-swap="none"

@@ -73,6 +73,7 @@ try {
             <div>
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('supervision.title') ?></h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('supervision.subtitle') ?></p>
+<?php $tipId = 'supervision'; $tipTitle = t('tip.supervision_title'); $tipSteps = [t('tip.supervision_step1'), t('tip.supervision_step2'), t('tip.supervision_step3'), t('tip.supervision_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
             </div>
             <div class="flex items-center gap-3">
                 <label class="text-xs font-medium text-gray-500 dark:text-gray-400"><?= t('supervision.agent_platform') ?></label>

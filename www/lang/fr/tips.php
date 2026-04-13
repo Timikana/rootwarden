@@ -55,4 +55,69 @@ return [
     'guide.sec_3' => 'Chaque action est tracee dans le journal d\'audit.',
     'guide.sec_4' => 'L\'authentification 2FA (TOTP) est obligatoire pour tous les comptes.',
     'guide.sec_5' => 'Les comptes serveur doivent etre classifies avant tout deploiement.',
+
+    // Page Mises a jour
+    'tip.updates_title' => 'Comment fonctionnent les mises a jour ?',
+    'tip.updates_step1' => '<strong>Selectionnez</strong> les serveurs a mettre a jour en cochant les cases.',
+    'tip.updates_step2' => '<strong>MaJ APT</strong> lance un <code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">apt update && apt upgrade</code> complet.',
+    'tip.updates_step3' => '<strong>MaJ Secu</strong> installe uniquement les correctifs de securite (<code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">unattended-upgrades</code>).',
+    'tip.updates_step4' => '<strong>Planifier</strong> permet de programmer des mises a jour automatiques via cron.',
+
+    // Page Iptables
+    'tip.iptables_title' => 'Comment gerer les regles iptables ?',
+    'tip.iptables_step1' => '<strong>Selectionnez</strong> un serveur dans la liste deroulante.',
+    'tip.iptables_step2' => '<strong>Charger</strong> recupere les regles IPv4/IPv6 actuelles du serveur.',
+    'tip.iptables_step3' => 'Modifiez les regles dans l\'editeur, puis <strong>Valider</strong> verifie la syntaxe sans appliquer.',
+    'tip.iptables_step4' => '<strong>Appliquer</strong> envoie les regles sur le serveur. <strong>Sauvegarder</strong> les persiste en BDD pour restauration.',
+
+    // Page Fail2ban
+    'tip.fail2ban_title' => 'Comment gerer Fail2ban ?',
+    'tip.fail2ban_step1' => '<strong>Selectionnez</strong> un serveur et cliquez "Charger le statut".',
+    'tip.fail2ban_step2' => 'Visualisez les <strong>jails actives</strong>, les IPs bannies et l\'historique des bans.',
+    'tip.fail2ban_step3' => 'Debannissez une IP ou ajoutez-la en whitelist directement depuis l\'interface.',
+
+    // Page Services
+    'tip.services_title' => 'Comment gerer les services systemd ?',
+    'tip.services_step1' => '<strong>Selectionnez</strong> un serveur et cliquez "Charger les services".',
+    'tip.services_step2' => 'Visualisez l\'etat de chaque service (actif, inactif, en echec).',
+    'tip.services_step3' => '<strong>Demarrez</strong>, <strong>arretez</strong> ou <strong>redemarrez</strong> un service en un clic.',
+
+    // Page Audit SSH
+    'tip.audit_title' => 'Comment fonctionne l\'audit SSH ?',
+    'tip.audit_step1' => 'Le scan analyse la configuration <code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">sshd_config</code> de chaque serveur.',
+    'tip.audit_step2' => 'Chaque parametre est evalue et un <strong>score de securite</strong> (A a F) est attribue.',
+    'tip.audit_step3' => 'Les <strong>politiques d\'audit</strong> permettent de personnaliser les seuils par parametre.',
+    'tip.audit_step4' => '<strong>Scanner tous</strong> lance l\'audit sur l\'ensemble du parc en une fois.',
+
+    // Page Supervision
+    'tip.supervision_title' => 'Comment deployer les agents de monitoring ?',
+    'tip.supervision_step1' => '<strong>Choisissez</strong> la plateforme (Zabbix, Centreon, Prometheus, Telegraf) en haut a droite.',
+    'tip.supervision_step2' => 'Configurez le <strong>template global</strong> (serveur, port, TLS) dans l\'onglet Configuration.',
+    'tip.supervision_step3' => 'Dans l\'onglet <strong>Deploiement</strong>, selectionnez les serveurs et deployez l\'agent.',
+    'tip.supervision_step4' => 'L\'<strong>editeur de configuration</strong> permet de modifier le fichier de config a distance.',
+
+    // Page Cle SSH plateforme
+    'tip.platform_title' => 'Comment fonctionne la cle plateforme ?',
+    'tip.platform_step1' => 'La <strong>keypair Ed25519</strong> est generee automatiquement et stockee de facon persistante.',
+    'tip.platform_step2' => '<strong>Deployer keypair</strong> installe la cle publique sur les serveurs selectionnes.',
+    'tip.platform_step3' => 'Une fois deployee, RootWarden se connecte <strong>sans mot de passe</strong> (authentification par cle).',
+    'tip.platform_step4' => '<strong>Supprimer le password</strong> desactive l\'authentification par mot de passe sur le serveur (plus securise).',
+
+    // Page Conformite
+    'tip.compliance_title' => 'A quoi sert le rapport de conformite ?',
+    'tip.compliance_step1' => 'Le rapport agrege les donnees de securite de tout votre parc : CVE, SSH, 2FA, cles.',
+    'tip.compliance_step2' => '<strong>Export PDF</strong> genere un document A4 paysage avec hash SHA-256 (preuve d\'integrite).',
+    'tip.compliance_step3' => '<strong>Export CSV</strong> permet l\'import dans des outils tiers (SIEM, tableur).',
+
+    // Page Notifications
+    'tip.notif_title' => 'Comment fonctionnent les notifications ?',
+    'tip.notif_step1' => 'Les notifications in-app apparaissent via l\'icone cloche dans la barre de navigation.',
+    'tip.notif_step2' => 'Filtrez par type (CVE, audit, securite) ou par statut (lue / non lue).',
+    'tip.notif_step3' => 'Les preferences email se configurent dans <a href="/adm/admin_page.php" class="text-blue-600 underline">Admin > Acces & Permissions</a>.',
+
+    // Page Profil
+    'tip.profile_title' => 'Comment configurer votre profil ?',
+    'tip.profile_step1' => 'Ajoutez votre <strong>email</strong> pour recevoir les notifications (scan CVE, alertes securite).',
+    'tip.profile_step2' => 'Collez votre <strong>cle SSH publique</strong> (ed25519 ou RSA) — elle sera deployee sur vos serveurs assignes.',
+    'tip.profile_step3' => 'Changez votre <strong>mot de passe</strong> regulierement (politique d\'expiration configurable par l\'admin).',
 ];

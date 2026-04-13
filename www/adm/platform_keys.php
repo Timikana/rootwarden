@@ -47,6 +47,7 @@ $nbServiceAccount = count(array_filter($servers, fn($s) => $s['service_account_d
         <div>
             <h1 class="text-2xl font-bold"><?= t('platform.title') ?></h1>
             <p class="text-xs text-gray-400 mt-0.5"><?= t('platform.desc') ?></p>
+<?php $tipId = 'platform-key'; $tipTitle = t('tip.platform_title'); $tipSteps = [t('tip.platform_step1'), t('tip.platform_step2'), t('tip.platform_step3'), t('tip.platform_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
         <div class="flex gap-2">
             <button onclick="deployAll()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg font-medium" title="<?= t('platform.tip_deploy_all') ?>">

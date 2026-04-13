@@ -50,4 +50,59 @@ return [
     'guide.sec_3' => 'Every action is logged in the audit trail.',
     'guide.sec_4' => '2FA authentication (TOTP) is mandatory for all accounts.',
     'guide.sec_5' => 'Server accounts must be classified before any deployment.',
+
+    'tip.updates_title' => 'How do updates work?',
+    'tip.updates_step1' => '<strong>Select</strong> the servers to update by checking the boxes.',
+    'tip.updates_step2' => '<strong>APT Update</strong> runs a full <code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">apt update && apt upgrade</code>.',
+    'tip.updates_step3' => '<strong>Security Update</strong> installs security patches only (<code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">unattended-upgrades</code>).',
+    'tip.updates_step4' => '<strong>Schedule</strong> allows you to set up automatic updates via cron.',
+
+    'tip.iptables_title' => 'How to manage iptables rules?',
+    'tip.iptables_step1' => '<strong>Select</strong> a server from the dropdown.',
+    'tip.iptables_step2' => '<strong>Load</strong> fetches the current IPv4/IPv6 rules from the server.',
+    'tip.iptables_step3' => 'Edit the rules in the editor, then <strong>Validate</strong> checks syntax without applying.',
+    'tip.iptables_step4' => '<strong>Apply</strong> sends rules to the server. <strong>Save</strong> persists them in DB for restoration.',
+
+    'tip.fail2ban_title' => 'How to manage Fail2ban?',
+    'tip.fail2ban_step1' => '<strong>Select</strong> a server and click "Load status".',
+    'tip.fail2ban_step2' => 'View <strong>active jails</strong>, banned IPs and ban history.',
+    'tip.fail2ban_step3' => 'Unban an IP or add it to the whitelist directly from the interface.',
+
+    'tip.services_title' => 'How to manage systemd services?',
+    'tip.services_step1' => '<strong>Select</strong> a server and click "Load services".',
+    'tip.services_step2' => 'View the state of each service (active, inactive, failed).',
+    'tip.services_step3' => '<strong>Start</strong>, <strong>stop</strong> or <strong>restart</strong> a service with one click.',
+
+    'tip.audit_title' => 'How does SSH audit work?',
+    'tip.audit_step1' => 'The scan analyzes <code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">sshd_config</code> on each server.',
+    'tip.audit_step2' => 'Each parameter is evaluated and a <strong>security score</strong> (A to F) is assigned.',
+    'tip.audit_step3' => '<strong>Audit policies</strong> allow you to customize thresholds per parameter.',
+    'tip.audit_step4' => '<strong>Scan all</strong> runs the audit across your entire fleet at once.',
+
+    'tip.supervision_title' => 'How to deploy monitoring agents?',
+    'tip.supervision_step1' => '<strong>Choose</strong> the platform (Zabbix, Centreon, Prometheus, Telegraf) in the top right.',
+    'tip.supervision_step2' => 'Configure the <strong>global template</strong> (server, port, TLS) in the Configuration tab.',
+    'tip.supervision_step3' => 'In the <strong>Deployment</strong> tab, select servers and deploy the agent.',
+    'tip.supervision_step4' => 'The <strong>config editor</strong> allows remote editing of the agent config file.',
+
+    'tip.platform_title' => 'How does the platform key work?',
+    'tip.platform_step1' => 'The <strong>Ed25519 keypair</strong> is auto-generated and persistently stored.',
+    'tip.platform_step2' => '<strong>Deploy keypair</strong> installs the public key on selected servers.',
+    'tip.platform_step3' => 'Once deployed, RootWarden connects <strong>without password</strong> (key authentication).',
+    'tip.platform_step4' => '<strong>Remove password</strong> disables password authentication on the server (more secure).',
+
+    'tip.compliance_title' => 'What is the compliance report for?',
+    'tip.compliance_step1' => 'The report aggregates security data across your fleet: CVEs, SSH, 2FA, keys.',
+    'tip.compliance_step2' => '<strong>PDF Export</strong> generates an A4 landscape document with SHA-256 hash (integrity proof).',
+    'tip.compliance_step3' => '<strong>CSV Export</strong> allows import into third-party tools (SIEM, spreadsheets).',
+
+    'tip.notif_title' => 'How do notifications work?',
+    'tip.notif_step1' => 'In-app notifications appear via the bell icon in the navigation bar.',
+    'tip.notif_step2' => 'Filter by type (CVE, audit, security) or status (read / unread).',
+    'tip.notif_step3' => 'Email preferences are configured in <a href="/adm/admin_page.php" class="text-blue-600 underline">Admin > Access & Permissions</a>.',
+
+    'tip.profile_title' => 'How to configure your profile?',
+    'tip.profile_step1' => 'Add your <strong>email</strong> to receive notifications (CVE scan, security alerts).',
+    'tip.profile_step2' => 'Paste your <strong>SSH public key</strong> (ed25519 or RSA) — it will be deployed on your assigned servers.',
+    'tip.profile_step3' => 'Change your <strong>password</strong> regularly (expiration policy configurable by admin).',
 ];

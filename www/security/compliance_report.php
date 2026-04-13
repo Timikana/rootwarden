@@ -234,6 +234,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
             <h1 class="text-2xl font-bold"><?= t('compliance.title') ?></h1>
             <p class="text-xs text-blue-100/70 mt-0.5"><?= t('compliance.desc') ?></p>
             <p class="text-blue-200 text-sm mt-1"><?= $appName ?> — <?= t('compliance.generated_by') ?> <?= $date ?> — <?= $generatedBy ?></p>
+<?php $tipId = 'compliance'; $tipTitle = t('tip.compliance_title'); $tipSteps = [t('tip.compliance_step1'), t('tip.compliance_step2'), t('tip.compliance_step3')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
         <div class="flex gap-2 no-print">
             <button onclick="window.print()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium"><?= t('compliance.btn_print') ?></button>
