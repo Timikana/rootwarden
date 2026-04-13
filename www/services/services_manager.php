@@ -37,6 +37,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('services.title') ?></h1>
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('services.desc') ?></p>
+<?php $tipId = 'services'; $tipTitle = t('tip.services_title'); $tipSteps = [t('tip.services_step1'), t('tip.services_step2'), t('tip.services_step3')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
 
         <!-- Selection serveur -->

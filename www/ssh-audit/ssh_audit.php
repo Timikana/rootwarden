@@ -32,6 +32,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('ssh_audit.title') ?></h1>
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('ssh_audit.desc') ?></p>
+<?php $tipId = 'ssh-audit'; $tipTitle = t('tip.audit_title'); $tipSteps = [t('tip.audit_step1'), t('tip.audit_step2'), t('tip.audit_step3'), t('tip.audit_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
 
         <!-- Server selector + buttons -->

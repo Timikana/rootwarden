@@ -198,6 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="p-8 max-w-screen-xl mx-auto w-full">
         <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1"><?= t('profile.title') ?></h1>
         <p class="text-xs text-gray-400 mt-0.5 mb-6"><?= t('profile.desc') ?></p>
+<?php $tipId = 'profile'; $tipTitle = t('tip.profile_title'); $tipSteps = [t('tip.profile_step1'), t('tip.profile_step2'), t('tip.profile_step3')]; require __DIR__ . '/includes/howto_tip.php'; ?>
 
         <?php if (isset($_GET['force_change'])): ?>
             <div class="bg-amber-50 dark:bg-amber-900/30 border-2 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200 p-5 rounded-xl mb-6 flex items-center gap-3">

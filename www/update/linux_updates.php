@@ -127,6 +127,7 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('updates.title') ?></h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('updates.subtitle') ?></p>
                 <p class="text-xs text-gray-400 mt-0.5"><?= t('updates.desc') ?></p>
+<?php $tipId = 'updates'; $tipTitle = t('tip.updates_title'); $tipSteps = [t('tip.updates_step1'), t('tip.updates_step2'), t('tip.updates_step3'), t('tip.updates_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
             </div>
             <div class="flex items-center gap-2">
                 <button type="button" onclick="selectAll(true)" class="text-xs px-3 py-1.5 rounded-lg border border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"><?= t('updates.btn_check_all') ?></button>

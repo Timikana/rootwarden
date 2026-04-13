@@ -230,6 +230,7 @@ function restoreRulesToServer($pdo, $serverId) {
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('iptables.title') ?></h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('iptables.subtitle') ?></p>
                 <p class="text-xs text-gray-400 mt-0.5"><?= t('iptables.desc') ?></p>
+<?php $tipId = 'iptables'; $tipTitle = t('tip.iptables_title'); $tipSteps = [t('tip.iptables_step1'), t('tip.iptables_step2'), t('tip.iptables_step3'), t('tip.iptables_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
             </div>
         </div>
 
