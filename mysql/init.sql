@@ -416,7 +416,15 @@ INSERT IGNORE INTO schema_migrations (version, filename, description) VALUES
     ('018', '018_force_password_change.sql', 'Force password change flag'),
     ('019', '019_fail2ban.sql', 'Fail2ban permission + history + status'),
     ('020', '020_services.sql', 'Services systemd permission'),
-    ('021', '021_ssh_audit.sql', 'SSH audit permission + results + policies');
+    ('021', '021_ssh_audit.sql', 'SSH audit permission + results + policies'),
+    ('022', '022_supervision.sql', 'Supervision config + overrides + permission'),
+    ('023', '023_supervision_multi_agent.sql', 'Multi-agent supervision (Zabbix/Centreon/Prometheus/Telegraf)'),
+    ('024', '024_supervision_agents.sql', 'Supervision agents table'),
+    ('026', '026_ssh_audit_schedules.sql', 'SSH audit schedules'),
+    ('027', '027_notification_preferences.sql', 'Notification preferences per user'),
+    ('028', '028_machine_deploy_options.sql', 'Machine deploy options (bashrc, cleanup_users)'),
+    ('029', '029_users_scanned_flag.sql', 'Users scanned timestamp'),
+    ('030', '030_server_user_inventory.sql', 'Server user inventory');
 
 -- Table des permissions temporaires
 CREATE TABLE IF NOT EXISTS temporary_permissions (

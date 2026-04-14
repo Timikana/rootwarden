@@ -1,2 +1,5 @@
-ALTER TABLE machines
-    ADD COLUMN users_scanned_at TIMESTAMP NULL DEFAULT NULL AFTER cleanup_users;
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'machines' AND COLUMN_NAME = 'users_scanned_at');
+SET @sql = IF(@col = 0, 'ALTER TABLE machines ADD COLUMN users_scanned_at TIMESTAMP NULL DEFAULT NULL AFTER cleanup_users', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

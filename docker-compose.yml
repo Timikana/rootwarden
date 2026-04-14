@@ -8,7 +8,9 @@ services:
       context: .
       dockerfile: ./php/Dockerfile
     container_name: gestion_ssh_key_php
-    restart: always
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "${HTTP_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
@@ -27,6 +29,12 @@ services:
         condition: service_healthy
       python:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsk", "https://localhost:443/", "-o", "/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -47,7 +55,9 @@ services:
   python:
     build: ./backend
     container_name: gestion_ssh_key_python
-    restart: always
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./backend:/app
       - ./backend/logs:/app/logs
@@ -95,9 +105,11 @@ services:
   # Pour accéder depuis un client SQL local, décommentez "ports".
   # ─────────────────────────────────────────────────────────────
   db:
-    image: mysql:9.2
+    image: mysql:9.2.0
     container_name: gestion_ssh_key_db
-    restart: always
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     # ports:                            # ← Décommentez uniquement pour le débogage local
     #   - "${MYSQL_PORT:-3306}:3306"
     volumes:
@@ -161,10 +173,17 @@ services:
     container_name: gestion_ssh_key_mock_opencve
     hostname: mock-opencve
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     profiles:
       - preprod
     expose:
       - "9090"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
     networks:
       rootwarden_internal:
 
@@ -178,8 +197,15 @@ services:
     container_name: gestion_ssh_key_test_server
     hostname: test-server
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     profiles:
       - preprod
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
     networks:
       rootwarden_internal:
         ipv4_address: 10.10.10.10

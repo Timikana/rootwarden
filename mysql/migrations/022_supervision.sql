@@ -27,4 +27,8 @@ CREATE TABLE IF NOT EXISTS supervision_overrides (
     CONSTRAINT fk_supervision_overrides_machine FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE
 );
 
-ALTER TABLE permissions ADD COLUMN can_manage_supervision BOOLEAN NOT NULL DEFAULT FALSE;
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'permissions' AND COLUMN_NAME = 'can_manage_supervision');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE permissions ADD COLUMN can_manage_supervision BOOLEAN NOT NULL DEFAULT FALSE', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

@@ -215,7 +215,7 @@ def ssh_audit_scan_all():
         conn.close()
     except Exception as e:
         logger.error("[ssh-audit/scan-all] BDD: %s", e)
-        return jsonify({'success': False, 'message': f'Erreur BDD: {e}'}), 500
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
     results = []
     errors = []
