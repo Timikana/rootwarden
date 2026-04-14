@@ -11,6 +11,11 @@
 # ── Stage 1 : Builder ────────────────────────────────────────
 FROM python:3.13-slim AS builder
 
+LABEL maintainer="Timikana" \
+      org.opencontainers.image.title="RootWarden Python Backend" \
+      org.opencontainers.image.description="Backend Flask/Hypercorn pour RootWarden" \
+      org.opencontainers.image.source="https://github.com/Timikana/rootwarden"
+
 WORKDIR /build
 
 # Dependances systeme pour compiler les packages C (paramiko, pynacl, cryptography)

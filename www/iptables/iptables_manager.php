@@ -57,6 +57,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Traitement des actions AJAX POST : load_from_db, save_to_db, restore
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    checkCsrfToken();
     $action   = $_POST['action'];
     $serverId = $_POST['server_id'] ?? null;
 

@@ -229,7 +229,7 @@ def decrypt_password(encrypted_password: str, logger=None) -> str:
                         encrypted_data = bytes.fromhex(encrypted_password)
                         # Ajouter IV factice et recoder en base64
                         encrypted_password = b64encode(fake_iv + encrypted_data).decode('ascii')
-                except:
+                except Exception:
                     pass
             
             # Si la longueur décodée n'est pas un multiple de 16, compléter avec du padding
@@ -245,7 +245,7 @@ def decrypt_password(encrypted_password: str, logger=None) -> str:
                     padded_data = data + bytes([padding_needed] * padding_needed)
                     # Reconstruire la chaîne base64
                     encrypted_password = b64encode(iv + padded_data).decode('ascii')
-            except:
+            except Exception:
                 pass
         except Exception as e:
             if logger:
@@ -265,7 +265,7 @@ def decrypt_password(encrypted_password: str, logger=None) -> str:
                     # Données hex sans IV: ajouter un IV factice
                     if len(data) % 16 == 0:
                         data = b'\x00' * 16 + data
-            except:
+            except Exception:
                 return ""
                 
         if len(data) < 16:
@@ -303,7 +303,7 @@ def decrypt_password(encrypted_password: str, logger=None) -> str:
             try:
                 # Essayer comme hex au cas où
                 keys_to_try.append(("OLD_SECRET_KEY hex", bytes.fromhex(Config.OLD_SECRET_KEY)))
-            except:
+            except Exception:
                 pass
         
         # Stocker tous les résultats potentiels pour les évaluer à la fin

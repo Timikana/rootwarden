@@ -96,10 +96,16 @@ function validateInput($data, $type) {
     }
 }
 
-// Tags : requêtes JSON (sans CSRF classique, mais session requise)
+// Tags : requêtes JSON — vérification CSRF via header ou body
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 if (strpos($contentType, 'application/json') !== false) {
     $jsonInput = json_decode(file_get_contents('php://input'), true);
+    // Vérifier le token CSRF (header X-CSRF-Token ou champ csrf_token dans le JSON)
+    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($jsonInput['csrf_token'] ?? '');
+    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], (string)$csrfToken)) {
+        echo json_encode(['success' => false, 'message' => 'Token CSRF invalide']);
+        exit;
+    }
     if ($jsonInput && isset($jsonInput['action'])) {
         $tagAction = $jsonInput['action'];
         $machineId = (int)($jsonInput['machine_id'] ?? 0);
@@ -140,7 +146,7 @@ if (strpos($contentType, 'application/json') !== false) {
 }
 
 // Vérification du jeton CSRF (formulaires classiques)
-if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
     $response['message'] = 'Token CSRF invalide';
     echo json_encode($response);
     exit;

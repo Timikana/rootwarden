@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
 
             // Mise à jour en base : seul le compte de l'utilisateur connecté est affecté
-            $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE WHERE id = ?");
+            $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE, password_updated_at = NOW() WHERE id = ?");
             $stmt->execute([$hashed_password, $_SESSION['user_id']]);
             unset($_SESSION['force_password_change']);
             require_once __DIR__ . '/../includes/audit_log.php';

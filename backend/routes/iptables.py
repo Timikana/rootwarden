@@ -89,7 +89,7 @@ def manage_iptables():
                 return jsonify({"success": False, "message": "Action non reconnue."}), 400
     except Exception as e:
         logger.error("[iptables] %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/iptables-validate', methods=['POST'])
@@ -117,7 +117,7 @@ def validate_iptables():
                 return jsonify({"success": False, "message": "Erreur de syntaxe.", "output": output})
     except Exception as e:
         logger.error("[iptables-validate] %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/iptables-apply', methods=['POST'])
@@ -162,7 +162,7 @@ def manage_iptables_apply():
                 return jsonify({"success": False, "message": "Action non reconnue."}), 400
     except Exception as e:
         logger.error("[iptables-apply] %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/iptables-restore', methods=['POST'])
@@ -189,7 +189,7 @@ def manage_iptables_restore():
         return jsonify({"success": True, "message": "Regles restaurees."})
     except Exception as e:
         logger.error("[iptables-restore] %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/iptables-history', methods=['GET'])

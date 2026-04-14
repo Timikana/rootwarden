@@ -73,6 +73,8 @@ SUPERADMIN_PASS="${INIT_SUPERADMIN_PASSWORD:-$(generate_password)}"
 # ── Hash bcrypt + insertion en BDD via PHP CLI ───────────────────────────────
 echo "[RootWarden] Configuration du compte superadmin..."
 
+export TEMP_SUPERADMIN_PASS="${SUPERADMIN_PASS}"
+
 php -r "
     \$pdo = new PDO(
         'mysql:host=' . getenv('DB_HOST') . ';dbname=' . getenv('DB_NAME'),
@@ -82,7 +84,7 @@ php -r "
     );
 
     // Superadmin — hash + force changement au premier login
-    \$hash = password_hash('${SUPERADMIN_PASS}', PASSWORD_BCRYPT);
+    \$hash = password_hash(getenv('TEMP_SUPERADMIN_PASS'), PASSWORD_BCRYPT);
     \$stmt = \$pdo->prepare('UPDATE users SET password = ?, force_password_change = 1 WHERE name = ?');
     \$stmt->execute([\$hash, 'superadmin']);
     echo \"[RootWarden] Compte superadmin configure (\" . \$stmt->rowCount() . \" ligne(s) mise(s) a jour)\n\";

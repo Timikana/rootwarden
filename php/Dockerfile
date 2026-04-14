@@ -20,6 +20,11 @@
 ################################################
 FROM php:8.4-apache
 
+LABEL maintainer="Timikana" \
+      org.opencontainers.image.title="RootWarden PHP/Apache" \
+      org.opencontainers.image.description="Frontend PHP 8.4 + Apache pour RootWarden" \
+      org.opencontainers.image.source="https://github.com/Timikana/rootwarden"
+
 # Timezone par défaut du conteneur
 ENV TZ=Europe/Paris
 
@@ -92,7 +97,7 @@ RUN mkdir -p /var/www/certs
 COPY php/php.ini /usr/local/etc/php/php.ini
 
 # Création du fichier de log PHP avec permissions en écriture pour Apache
-RUN touch /var/log/php_errors.log && chmod 666 /var/log/php_errors.log
+RUN touch /var/log/php_errors.log && chown www-data:www-data /var/log/php_errors.log && chmod 644 /var/log/php_errors.log
 
 # Répertoire de stockage des sessions PHP sur le système de fichiers
 # (session.save_path dans php.ini). Propriétaire www-data, accès restreint (700).
@@ -138,9 +143,7 @@ COPY php/update-dependencies.sh /usr/local/bin/update-dependencies
 RUN chmod +x /usr/local/bin/update-dependencies
 
 # ── Tâches cron ──────────────────────────────────────────────────────────────
-# Synchronisation NTP toutes les heures pour maintenir l’horloge du conteneur
-# à l’heure (important pour les timestamps des logs et la crypto TOTP).
-RUN echo "0 * * * * root ntpdate -s time.nist.gov" > /etc/cron.d/ntpdate
+# NTP : le conteneur herite l’horloge de l’hote Docker (pas besoin de ntpdate)
 
 # Mise à jour automatique des dépendances Composer tous les jours à 3h du matin.
 # Exécuté hors heures de pointe pour limiter l’impact sur les performances.

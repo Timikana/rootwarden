@@ -727,8 +727,10 @@ class ServerConfigurator:
                 except Exception as e:
                     self.logger.error(f"[{username}] Échec de la suppression : {e}")
                     try:
+                        import base64 as _b64
                         random_password = generate_random_password()
-                        execute_command_as_root(channel, f"echo '{username}:{random_password}' | chpasswd", logger=self.logger)
+                        _payload = _b64.b64encode(f"{username}:{random_password}".encode()).decode()
+                        execute_command_as_root(channel, f"printf '%s' '{_payload}' | base64 -d | chpasswd", logger=self.logger)
                         self.logger.info(f"[{username}] Mot de passe réinitialisé.")
                         remove_from_sudoers(channel, username, logger=self.logger)
                     except Exception as inner_e:
@@ -823,8 +825,10 @@ class ServerConfigurator:
                     remove_from_sudoers(channel, username, logger=self.logger)
             else:
                 # Pour les utilisateurs inactifs, on réinitialise le mot de passe et on retire le sudo
+                import base64 as _b64
                 random_password = generate_random_password()
-                execute_command_as_root(channel, f"echo '{username}:{random_password}' | chpasswd", logger=self.logger)
+                _payload = _b64.b64encode(f"{username}:{random_password}".encode()).decode()
+                execute_command_as_root(channel, f"printf '%s' '{_payload}' | base64 -d | chpasswd", logger=self.logger)
                 self.logger.info(f"[{username}] Mot de passe réinitialisé pour utilisateur inactif.")
                 remove_from_sudoers(channel, username, logger=self.logger)
         except Exception as e:

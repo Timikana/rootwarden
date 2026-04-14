@@ -50,7 +50,7 @@ def list_machines():
         return jsonify({"success": True, "machines": machines}), 200
     except Exception as e:
         logger.error("[list_machines] Erreur: %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/server_status', methods=['POST'])
@@ -122,7 +122,7 @@ def check_linux_version():
         return jsonify({"success": True, "machine_id": machine_id, "version": version_str})
     except Exception as e:
         logger.error("[linux_version] Erreur: %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/last_reboot', methods=['POST'])
@@ -207,7 +207,7 @@ def filter_servers_route():
         return jsonify({"success": True, "machines": machines})
     except Exception as e:
         logger.error("[filter_servers] Erreur: %s", e)
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success": False, "message": "Erreur interne"}), 500
 
 
 @bp.route('/cve_trends', methods=['GET'])

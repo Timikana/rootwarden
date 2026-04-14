@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
 
                     // Mettre a jour le mot de passe et effacer le flag force_password_change
                     $hash = password_hash($newPassword, PASSWORD_BCRYPT);
-                    $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE, password_updated_at = NOW() WHERE id = ?");
                     $stmt->execute([$hash, $uid]);
 
                     // Mettre a jour password_expires_at si politique active

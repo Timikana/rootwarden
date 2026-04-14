@@ -328,7 +328,7 @@ class Encryption:
         # Décoder le base64 pour obtenir les données
         try:
             decoded_data = b64decode(encrypted_password)
-        except:
+        except Exception:
             raise ValueError("Données base64 invalides")
             
         if len(decoded_data) < 16:
@@ -377,13 +377,13 @@ class Encryption:
                     null_pos = raw_data.find(b'\x00')
                     if null_pos > 0:
                         return raw_data[:null_pos].decode('utf-8')
-                except:
+                except Exception:
                     pass
                     
                 # Dernier recours: essayer de décoder tel quel
                 try:
                     return raw_data.decode('utf-8', errors='ignore').rstrip('\x00')
-                except:
+                except Exception:
                     pass
                     
             except Exception as e:
@@ -421,7 +421,7 @@ class Encryption:
         # Décoder le base64
         try:
             decoded_data = b64decode(encrypted_password)
-        except:
+        except Exception:
             _log.debug("Erreur de décodage base64")
             return ""
         
@@ -457,7 +457,7 @@ class Encryption:
                     result = unpadded.decode('utf-8', errors='ignore')
                     if result:
                         return result
-                except:
+                except Exception:
                     pass
                 
                 # 2. Essayer sans unpad
@@ -465,7 +465,7 @@ class Encryption:
                     result = decrypted.decode('utf-8', errors='ignore')
                     if result:
                         return result
-                except:
+                except Exception:
                     pass
                 
                 # 3. Essayer jusqu'au premier null byte
@@ -473,7 +473,7 @@ class Encryption:
                     null_pos = decrypted.find(b'\0')
                     if null_pos > 0:
                         return decrypted[:null_pos].decode('utf-8', errors='ignore')
-                except:
+                except Exception:
                     pass
             except ImportError:
                 pass
@@ -494,11 +494,11 @@ class Encryption:
                     result = unpadded.decode('utf-8', errors='ignore')
                     if result:
                         return result
-                except:
+                except Exception:
                     pass
-            except:
+            except Exception:
                 pass
-        except:
+        except Exception:
             pass
         
         # Essayer avec l'ancienne clé (non-hexadécimale)
@@ -516,21 +516,21 @@ class Encryption:
                         result = unpadded.decode('utf-8', errors='ignore')
                         if result:
                             return result
-                    except:
+                    except Exception:
                         pass
                     
                     try:
                         result = decrypted.decode('utf-8', errors='ignore')
                         if result:
                             return result
-                    except:
+                    except Exception:
                         pass
                     
                     try:
                         null_pos = decrypted.find(b'\0')
                         if null_pos > 0:
                             return decrypted[:null_pos].decode('utf-8', errors='ignore')
-                    except:
+                    except Exception:
                         pass
                 except ImportError:
                     pass
@@ -551,11 +551,11 @@ class Encryption:
                         result = unpadded.decode('utf-8', errors='ignore')
                         if result:
                             return result
-                    except:
+                    except Exception:
                         pass
-                except:
+                except Exception:
                     pass
-            except:
+            except Exception:
                 pass
         
         # Si aucune méthode n'a fonctionné
