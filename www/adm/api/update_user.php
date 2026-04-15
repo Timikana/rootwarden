@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
         $stmt = $pdo->prepare("UPDATE users SET ssh_key = ?, ssh_key_updated_at = NOW() WHERE id = ?");
         $stmt->execute([$ssh_key, $user_id]);
 
-        header("Location: admin_page.php");
+        header("Location: /adm/admin_page.php");
         exit();
     }
 }

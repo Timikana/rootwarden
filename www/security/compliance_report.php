@@ -63,12 +63,19 @@ $nbOldKeys = count(array_filter($users, fn($u) => $u['active'] && $u['ssh_key'] 
 $sshAuditResults = [];
 try {
     $sshAuditResults = $pdo->query("
-        SELECT r.machine_id, m.name, m.ip, r.score, r.grade, r.critical_count, r.high_count, r.audited_at
+        SELECT r.machine_id, m.name, m.ip, r.score, r.grade, r.findings_json, r.created_at AS audited_at
         FROM ssh_audit_results r
         INNER JOIN machines m ON r.machine_id = m.id
         WHERE r.id = (SELECT MAX(r2.id) FROM ssh_audit_results r2 WHERE r2.machine_id = r.machine_id)
         ORDER BY r.score ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($sshAuditResults as &$sa) {
+        $findings = json_decode($sa['findings_json'] ?? '[]', true) ?: [];
+        $sa['critical_count'] = count(array_filter($findings, fn($f) => ($f['severity'] ?? '') === 'critical' || ($f['level'] ?? '') === 'FAIL'));
+        $sa['high_count'] = count(array_filter($findings, fn($f) => ($f['severity'] ?? '') === 'high' || ($f['level'] ?? '') === 'WARN'));
+        unset($sa['findings_json']);
+    }
+    unset($sa);
 } catch (\Exception $e) {}
 
 // 7. Supervision — agents deployes

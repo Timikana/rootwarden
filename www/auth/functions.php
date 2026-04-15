@@ -25,6 +25,7 @@ define('DEFAULT_PERMISSIONS', [
     'can_manage_fail2ban'     => 0,
     'can_manage_services'     => 0,
     'can_audit_ssh'           => 0,
+    'can_manage_supervision'  => 0,
 ]);
 
 /**
