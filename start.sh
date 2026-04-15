@@ -84,19 +84,29 @@ if [ "$WARNINGS" -gt 0 ]; then
     fi
 fi
 
+# ── Detection du mode debug ──────────────────────────────────────────────────
+# Si DEBUG_MODE=true dans srv-docker.env, active le profile preprod
+# (mock-opencve + test-server) automatiquement.
+PROFILE_FLAG=""
+DEBUG_MODE=$(grep "^DEBUG_MODE=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d'=' -f2-)
+if [ "${DEBUG_MODE}" = "true" ]; then
+    PROFILE_FLAG="--profile preprod"
+    echo -e "${YELLOW}[RootWarden]${NC} Mode DEBUG actif → mock-opencve + test-server actives"
+fi
+
 # ── Lancement Docker Compose ─────────────────────────────────────────────────
 cd "${SCRIPT_DIR}"
 
 case "${1:-up}" in
     down|stop)
         echo -e "${GREEN}[RootWarden]${NC} Arret des conteneurs..."
-        docker-compose --env-file "${ENV_FILE}" down "${@:2}"
+        docker-compose --env-file "${ENV_FILE}" ${PROFILE_FLAG} down "${@:2}"
         ;;
     logs)
-        docker-compose --env-file "${ENV_FILE}" logs "${@:2}"
+        docker-compose --env-file "${ENV_FILE}" ${PROFILE_FLAG} logs "${@:2}"
         ;;
     *)
         echo -e "${GREEN}[RootWarden]${NC} Lancement des conteneurs..."
-        docker-compose --env-file "${ENV_FILE}" up "$@"
+        docker-compose --env-file "${ENV_FILE}" ${PROFILE_FLAG} up "$@"
         ;;
 esac
