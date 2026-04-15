@@ -237,7 +237,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     </div>
 
-    <script src="/fail2ban/js/fail2banManager.js?v=<?= filemtime(__DIR__ . '/js/fail2banManager.js') ?>"></script>
+    <script src="/fail2ban/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 
     <?php require_once __DIR__ . '/../footer.php'; ?>
 

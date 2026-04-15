@@ -191,7 +191,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     </div>
 
-    <script src="/services/js/servicesManager.js?v=<?= filemtime(__DIR__ . '/js/servicesManager.js') ?>"></script>
+    <script src="/services/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 
     <?php require_once __DIR__ . '/../footer.php'; ?>
 

@@ -381,7 +381,7 @@ window._cveConfig = {
     username: '<?= htmlspecialchars($_SESSION['username'] ?? 'admin') ?>'
 };
 </script>
-<script src="/security/js/cveScan.js?v=<?= filemtime(__DIR__ . '/js/cveScan.js') ?>"></script>
+<script src="/security/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 
 
 <?php require_once __DIR__ . '/../footer.php'; ?>

@@ -285,7 +285,7 @@ Gestion_SSH_KEY/
     │   │                            activation/désactivation jails avec config modal,
     │   │                            viewer jail.local, historique bans.
     │   └── 📁 js/
-    │       └── 📄 fail2banManager.js  Interactions API : loadStatus(), loadJailDetail(),
+    │       └── 📄 main.js             Interactions API : loadStatus(), loadJailDetail(),
     │                                  installFail2ban(), banIp(), unbanIp(), loadServices(),
     │                                  openJailModal(), enableJail(), disableJail().
     │                                  XSS-safe (textContent, escHtml())
@@ -297,7 +297,7 @@ Gestion_SSH_KEY/
     │   │                            logs journalctl, detail service (PID, memoire),
     │   │                            filtres par statut/categorie, services proteges.
     │   └── 📁 js/
-    │       └── 📄 servicesManager.js  Interactions API : loadServices(), startService(),
+    │       └── 📄 main.js             Interactions API : loadServices(), startService(),
     │                                  stopService(), restartService(), enableService(),
     │                                  disableService(), viewLogs(), viewDetail().
     │                                  XSS-safe (textContent, escHtml())
@@ -701,7 +701,7 @@ docker-compose up -d
 ├── 📄 backend/services_manager.py         Helpers SSH services systemd (list, actions,
 │                                          logs, categories, services proteges)
 ├── 📄 www/services/index.php              Interface gestion services systemd
-├── 📄 www/services/js/servicesManager.js  Interactions JS API services
+├── 📄 www/services/js/main.js             Interactions JS API services
 └── 📄 mysql/migrations/020_services.sql   Permission can_manage_services
 ```
 
