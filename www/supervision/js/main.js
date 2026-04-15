@@ -1,5 +1,5 @@
 /**
- * supervision/js/supervision.js — Logique JS du module Supervision.
+ * supervision/js/main.js — Logique JS du module Supervision.
  *
  * Gestion des onglets, configuration globale, deploiement agents,
  * editeur de config distant, backups, streaming logs.

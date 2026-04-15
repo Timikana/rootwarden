@@ -177,7 +177,7 @@ $tipId = 'ssh-deploy'; $tipTitle = t('tip.ssh_title'); $tipSteps = [
 // Variables PHP injectees
 const availableMachines = <?= json_encode($machines) ?>;
 </script>
-<script src="/ssh/js/sshManagement.js?v=<?= filemtime(__DIR__ . '/js/sshManagement.js') ?>"></script>
+<script src="/ssh/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 </body>
 <?php require_once __DIR__ . '/../footer.php'; ?>
 </html>

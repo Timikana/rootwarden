@@ -220,7 +220,7 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <script src="/ssh-audit/js/sshAudit.js?v=<?= filemtime(__DIR__ . '/js/sshAudit.js') ?>"></script>
+    <script src="/ssh-audit/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 
     <?php require_once __DIR__ . '/../footer.php'; ?>
 

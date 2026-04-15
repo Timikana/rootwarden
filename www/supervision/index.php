@@ -488,7 +488,7 @@ try {
 
     </div>
 
-    <script src="/supervision/js/supervision.js?v=<?= filemtime(__DIR__ . '/js/supervision.js') ?>"></script>
+    <script src="/supervision/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
     <?php require_once __DIR__ . '/../footer.php'; ?>
 </body>
 </html>

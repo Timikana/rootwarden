@@ -348,7 +348,7 @@ function restoreRulesToServer($pdo, $serverId) {
     </div>
 
     <!-- Scripts -->
-    <script src="/iptables/js/iptablesManager.js?v=<?= filemtime(__DIR__ . '/js/iptablesManager.js') ?>"></script>
+    <script src="/iptables/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 </body>
 <?php require_once __DIR__ . '/../footer.php'; ?>
 </html>
