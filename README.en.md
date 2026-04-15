@@ -1,6 +1,6 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.13.0
+# RootWarden v1.13.1
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
@@ -70,9 +70,9 @@
 
 | Component | Technology |
 |-----------|-----------|
-| Frontend | PHP 8.2 + Apache, Tailwind CSS (locally compiled), htmx 2.0.4, vanilla JS |
-| Backend API | Python 3.11, Flask, Hypercorn (ASGI) |
-| Database | MySQL 9.1 |
+| Frontend | PHP 8.4 + Apache, Tailwind CSS (locally compiled), htmx 2.0.4, vanilla JS |
+| Backend API | Python 3.13, Flask, Hypercorn (ASGI) |
+| Database | MySQL 9.2 |
 | Containerization | Docker Compose |
 | Docker Network | Dual (internal + external) |
 | Encryption | libsodium (PyNaCl) + AES-256-CBC |
@@ -245,4 +245,4 @@ MIT
 
 ---
 
-*RootWarden v1.12.0 — 2026-04-11*
+*RootWarden v1.13.1 — 2026-04-16*
