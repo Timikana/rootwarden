@@ -221,10 +221,24 @@ def _compute_checksum(sql: str) -> str:
     return hashlib.sha256(sql.encode('utf-8')).hexdigest()[:16]
 
 
+def _clean_sql(sql_raw: str) -> str:
+    """
+    Nettoie le SQL brut : retire les lignes de commentaires purs et les
+    placeholder ``SELECT 1;`` en debut de fichier qui servaient de no-op.
+    """
+    lines = []
+    for line in sql_raw.splitlines():
+        stripped = line.strip()
+        if stripped == 'SELECT 1;' or stripped == 'SELECT 1':
+            continue
+        lines.append(line)
+    return '\n'.join(lines).strip()
+
+
 def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
     """
-    Applique un fichier de migration dans une transaction.
-    En cas d'erreur, rollback et re-raise pour arrêter le processus.
+    Applique un fichier de migration via multi-statement natif de mysql-connector.
+    En cas d'erreur, rollback et re-raise pour arreter le processus.
     """
     sql_raw = migration['path'].read_text(encoding='utf-8')
     checksum = _compute_checksum(sql_raw)
@@ -232,20 +246,13 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
     _log.info("→ Applying %s : %s", migration['filename'], migration['description'])
 
     if dry_run:
-        _log.info("  [DRY-RUN] %d caractères SQL", len(sql_raw))
+        _log.info("  [DRY-RUN] %d caracteres SQL", len(sql_raw))
         return
 
-    cur = conn.cursor()
-    try:
-        # Exécute chaque instruction SQL séparément
-        # (mysql-connector ne supporte pas multi-statement par défaut)
-        statements = [s.strip() for s in sql_raw.split(';') if s.strip()]
-        for stmt in statements:
-            if stmt.upper().startswith('--') or stmt == 'SELECT 1':
-                continue
-            cur.execute(stmt)
-
-        # Enregistre la migration comme appliquée
+    sql_clean = _clean_sql(sql_raw)
+    if not sql_clean:
+        _log.info("  (migration vide / placeholder)")
+        cur = conn.cursor()
         cur.execute(
             """INSERT INTO schema_migrations
                (version, filename, description, checksum)
@@ -254,13 +261,49 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
              migration['description'], checksum)
         )
         conn.commit()
-        _log.info("  ✓ Migration %s appliquée avec succès", migration['version'])
+        cur.close()
+        return
+
+    cur = conn.cursor()
+    try:
+        # Split par ';' et execute chaque statement individuellement.
+        # Apres chaque execute, on consomme les resultats pendants pour
+        # eviter "Unread result found" qui causait les echecs silencieux.
+        statements = [s.strip() for s in sql_clean.split(';') if s.strip()]
+        stmt_count = 0
+        for stmt in statements:
+            # Ignorer les commentaires purs
+            lines = [l for l in stmt.splitlines() if not l.strip().startswith('--')]
+            clean = '\n'.join(lines).strip()
+            if not clean:
+                continue
+            cur.execute(clean)
+            stmt_count += 1
+            # Consommer les resultats (SELECT, EXECUTE, SHOW, etc.)
+            # Sans cela, le prochain execute() echoue silencieusement.
+            try:
+                if cur.with_rows:
+                    cur.fetchall()
+            except Exception:
+                pass
+        _log.info("  %d statement(s) execute(s)", stmt_count)
+
+        # Enregistre la migration comme appliquee
+        cur.execute(
+            """INSERT INTO schema_migrations
+               (version, filename, description, checksum)
+               VALUES (%s, %s, %s, %s)""",
+            (migration['version'], migration['filename'],
+             migration['description'], checksum)
+        )
+        conn.commit()
+        _log.info("  ✓ Migration %s appliquee avec succes", migration['version'])
 
     except MySQLError as e:
         conn.rollback()
         _log.error(
-            "  ✗ Échec de la migration %s : %s\n"
-            "  → La migration a été annulée (rollback). Corrigez le SQL et relancez.",
+            "  ✗ Echec de la migration %s : %s\n"
+            "  → La migration a ete annulee (rollback). Corrigez le SQL et relancez.",
             migration['version'], e
         )
         raise

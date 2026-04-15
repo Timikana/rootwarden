@@ -1,4 +1,4 @@
-# Architecture & Carte des fichiers — RootWarden v1.11.0
+# Architecture & Carte des fichiers — RootWarden v1.13.1
 
 > Référence complète de chaque fichier du projet. Mise à jour à chaque version.
 
@@ -342,7 +342,7 @@ Gestion_SSH_KEY/
 | `users` | Utilisateurs : name, password (bcrypt), role_id, active, sudo, ssh_key, totp_secret |
 | `roles` | 3 rôles : user(1), admin(2), superadmin(3) |
 | `machines` | Serveurs gérés : name, ip, port, user, password (chiffré), root_password (chiffré), environment, criticality, network_type, online_status, zabbix_agent_version |
-| `permissions` | 1 ligne/user : can_deploy_keys, can_update_linux, can_manage_iptables, can_admin_portal, can_scan_cve, can_manage_remote_users, can_manage_platform_key, can_view_compliance, can_manage_backups, can_schedule_cve, can_manage_fail2ban, can_manage_services |
+| `permissions` | 1 ligne/user : can_deploy_keys, can_update_linux, can_manage_iptables, can_admin_portal, can_scan_cve, can_manage_remote_users, can_manage_platform_key, can_view_compliance, can_manage_backups, can_schedule_cve, can_manage_fail2ban, can_manage_services, can_audit_ssh, can_manage_supervision |
 | `user_machine_access` | Many-to-many : quel user accède à quel serveur |
 | `user_exclusions` | Exclusions explicites user ↔ machine |
 | `remember_tokens` | Tokens "Se souvenir de moi" (hash bcrypt + expiry) |
@@ -707,4 +707,85 @@ docker-compose up -d
 
 ---
 
-*RootWarden v1.11.0 — Derniere mise a jour : 2026-04-10*
+---
+
+## Fichiers ajoutes en v1.12.0 → v1.13.1
+
+```
+├── 📁 www/ssh-audit/
+│   └── 📄 index.php              Interface SSH Audit : scan, scores, politiques, corrections
+├── 📁 www/supervision/
+│   └── 📄 index.php              Module Supervision multi-agent (Zabbix/Centreon/Prometheus/Telegraf)
+├── 📄 www/notifications.php       Centre de notifications in-app
+├── 📄 www/adm/includes/manage_notifications.php  Preferences notifications email par user
+├── 📄 www/adm/api/update_notification_prefs.php  Endpoint htmx toggle notification pref
+├── 📄 www/adm/api/global_search.php  Recherche cross-entites (serveurs, users, CVE)
+├── 📄 www/includes/totp_crypto.php   encryptTotpSecret/decryptTotpSecret (label HKDF rootwarden-totp)
+├── 📁 www/lang/fr/ + www/lang/en/    i18n complet FR/EN (1181+ cles)
+├── 📄 www/includes/lang.php          Chargement i18n + fonction t() + getLang()
+├── 📄 backend/routes/ssh_audit.py    Routes SSH Audit (scan, fix, config, policies, history)
+├── 📄 backend/routes/supervision.py  Routes Supervision (config, deploy, agents, overrides)
+└── 📁 mysql/migrations/
+    ├── 📄 021_ssh_audit.sql          Tables ssh_audit_results + ssh_audit_policies + permission
+    ├── 📄 022_supervision.sql        Tables supervision_config + supervision_overrides + permission
+    ├── 📄 023_supervision_multi_agent.sql  Colonnes multi-plateforme sur supervision_config
+    ├── 📄 024_supervision_agents.sql      Table supervision_agents (agents deployes par machine)
+    ├── 📄 025_placeholder.sql             Placeholder (numero reserve)
+    ├── 📄 026_ssh_audit_schedules.sql     Ajout can_audit_ssh permission
+    ├── 📄 027_notification_preferences.sql Table notification_preferences
+    ├── 📄 028_machine_deploy_options.sql   Colonnes deploy_bashrc + cleanup_users (machines)
+    ├── 📄 029_users_scanned_flag.sql       Colonne users_scanned_at (machines)
+    └── 📄 030_server_user_inventory.sql    Table server_user_inventory (inventaire users distants)
+```
+
+## Tables MySQL (ajoutees en v1.12.0 → v1.13.1)
+
+| Table | Description |
+|---|---|
+| `ssh_audit_results` | Resultats scans SSH Audit par machine (score, grade, findings JSON) |
+| `ssh_audit_policies` | Politiques SSH par machine (directive, action, reason) |
+| `supervision_config` | Configuration globale agents supervision (Zabbix/Centreon/Prometheus/Telegraf) |
+| `supervision_overrides` | Overrides de config par machine (param_name, param_value) |
+| `supervision_agents` | Agents installes par machine et plateforme (version, deploiement) |
+| `notification_preferences` | Preferences notification email/in-app par user et type d'evenement |
+| `server_user_inventory` | Inventaire users Linux distants par serveur (classification, statut) |
+
+## Colonnes ajoutees (v1.12.0 → v1.13.1)
+
+| Table | Colonne | Type | Description |
+|---|---|---|---|
+| `permissions` | `can_audit_ssh` | BOOLEAN | Autorisation scans SSH Audit |
+| `permissions` | `can_manage_supervision` | BOOLEAN | Autorisation gestion Supervision |
+| `machines` | `deploy_bashrc` | BOOLEAN DEFAULT TRUE | Deployer .bashrc custom lors du deploy SSH |
+| `machines` | `cleanup_users` | BOOLEAN DEFAULT TRUE | Nettoyer les users non geres lors du deploy |
+| `machines` | `users_scanned_at` | TIMESTAMP NULL | Date dernier scan users distants |
+| `supervision_config` | `platform` | ENUM | Plateforme (zabbix, centreon, prometheus, telegraf) |
+| `supervision_config` | `centreon_*` | VARCHAR | Config Centreon (host, port) |
+| `supervision_config` | `prometheus_*` | VARCHAR/TEXT | Config Prometheus (listen, collectors) |
+| `supervision_config` | `telegraf_*` | VARCHAR/TEXT | Config Telegraf (url, token, org, bucket, inputs) |
+
+## Corrections v1.13.1 (2026-04-16)
+
+### Migration runner (backend/db_migrate.py)
+Le runner naif splittait par `;` sans consommer les resultats (`fetchall()`) apres chaque `execute()`.
+Les SELECT/EXECUTE retournant des rows causaient "Unread result found" silencieux, empechant
+les DDL suivants de s'executer. Fix : `cur.fetchall()` apres chaque statement + nettoyage `SELECT 1;`.
+
+### Redirections PHP cassees
+| Fichier | Avant (cassé) | Apres (corrigé) |
+|---|---|---|
+| `adm/api/update_user.php` | `Location: admin_page.php` → `/adm/api/admin_page.php` | `Location: /adm/admin_page.php` |
+| `adm/api/change_password.php` | `Location: login.php` → `/adm/api/login.php` | `Location: /auth/login.php` |
+| `auth/confirm_2fa.php` | `Location: auth/login.php` → `/auth/auth/login.php` | `Location: login.php` |
+
+### PHP code fixes
+| Fichier | Fix |
+|---|---|
+| `auth/functions.php` | Ajout `can_manage_supervision` dans DEFAULT_PERMISSIONS (14 → 15 perms) |
+| `adm/includes/manage_users.php` | INSERT permissions complet (4 → 15 colonnes) |
+| `adm/includes/import_csv.php` | INSERT permissions complet (5 → 15 colonnes) |
+| `security/compliance_report.php` | Remplacement colonnes ssh_audit inexistantes par calcul depuis findings_json |
+
+---
+
+*RootWarden v1.13.1 — Derniere mise a jour : 2026-04-16*

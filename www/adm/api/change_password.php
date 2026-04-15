@@ -33,7 +33,7 @@ require_once __DIR__ . '/../../auth/verify.php';
 // --- Contrôle d'accès ---
 // Si aucun utilisateur n'est connecté, on redirige vers la page de connexion.
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+    header("Location: /auth/login.php");
     exit();
 }
 

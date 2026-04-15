@@ -26,7 +26,7 @@ require_once __DIR__ . '/../includes/totp_crypto.php';
 use OTPHP\TOTP;
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: auth/login.php");
+    header("Location: login.php");
     exit();
 }
 
