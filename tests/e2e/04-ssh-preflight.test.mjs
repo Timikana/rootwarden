@@ -26,7 +26,7 @@ describe('04 — SSH Preflight', () => {
     });
 
     it('should navigate to SSH management page', async () => {
-        await page.goto(`${BASE_URL}/ssh/ssh_management.php`, { waitUntil: 'networkidle2' });
+        await page.goto(`${BASE_URL}/ssh/`, { waitUntil: 'networkidle2' });
         const content = await page.content();
         assert.ok(content.includes('Deploiement des cles SSH'), 'Expected SSH deployment heading');
     });

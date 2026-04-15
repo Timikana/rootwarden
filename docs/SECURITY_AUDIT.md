@@ -26,7 +26,7 @@
 | 2 | `INIT_SUPERADMIN_PASSWORD=` vide par defaut | Plus de mot de passe previsible |
 | 3 | Masquage mot de passe dans Docker logs | `sup***min` au lieu du clair, fichier chmod 600 |
 | 4 | `start.sh` — chmod 600 automatique | .env non lisible par autres users du host |
-| 5 | MySQL GRANT restreints | `ssh_user` sans ALL PRIVILEGES |
+| 5 | MySQL GRANT restreints | `rootwarden_user` sans ALL PRIVILEGES |
 | 6 | Detection secrets par defaut | Warning si SECRET_KEY/API_KEY non changes |
 
 ### Limites inherentes (non fixables au niveau applicatif)

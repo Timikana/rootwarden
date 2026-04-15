@@ -1,6 +1,6 @@
 <?php
 /**
- * ssh/ssh_management.php — Interface de déploiement des clés SSH
+ * ssh/index.php — Interface de déploiement des clés SSH
  *
  * Rôle :
  *   Affiche la liste de toutes les machines disponibles et permet à

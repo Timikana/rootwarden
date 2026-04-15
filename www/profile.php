@@ -276,6 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <label for="new_password" class="block text-gray-700 dark:text-gray-300 mt-6 mb-3"><?= t('profile.password_new') ?></label>
                 <input type="password" id="new_password" name="new_password" class="w-full p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><?= t('profile.password_policy_hint') ?></p>
 
                 <label for="confirm_password" class="block text-gray-700 dark:text-gray-300 mt-6 mb-3"><?= t('profile.password_confirm') ?></label>
                 <input type="password" id="confirm_password" name="confirm_password" class="w-full p-4 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">

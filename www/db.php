@@ -11,9 +11,9 @@
  *
  * Variables d'environnement lues :
  *   DB_HOST     — Hôte MySQL (défaut : 'db', nom du service Docker)
- *   DB_NAME     — Nom de la base de données (défaut : 'ssh_key_management')
- *   DB_USER     — Utilisateur MySQL (défaut : 'ssh_user')
- *   DB_PASSWORD — Mot de passe MySQL (défaut : 'ssh_password')
+ *   DB_NAME     — Nom de la base de données (défaut : 'rootwarden')
+ *   DB_USER     — Utilisateur MySQL (défaut : 'rootwarden_user')
+ *   DB_PASSWORD — Mot de passe MySQL (défaut : 'rootwarden_password')
  *   DB_PORT     — Port MySQL (non utilisé explicitement dans le DSN ici,
  *                 géré par le service Docker)
  *
@@ -31,9 +31,9 @@
 
 // ── Lecture des paramètres de connexion depuis les variables d'environnement ──
 $host     = getenv('DB_HOST')     ?: 'db';                  // Service MySQL dans Docker
-$dbname   = getenv('DB_NAME')     ?: 'ssh_key_management';  // Base de données cible
-$username = getenv('DB_USER')     ?: 'ssh_user';            // Utilisateur MySQL applicatif
-$password = getenv('DB_PASSWORD') ?: 'ssh_password';        // Mot de passe MySQL applicatif
+$dbname   = getenv('DB_NAME')     ?: 'rootwarden';          // Base de données cible
+$username = getenv('DB_USER')     ?: 'rootwarden_user';     // Utilisateur MySQL applicatif
+$password = getenv('DB_PASSWORD') ?: 'rootwarden_password'; // Mot de passe MySQL applicatif
 
 try {
     // Création de la connexion PDO avec charset UTF-8 pour les échanges client/serveur

@@ -8,8 +8,8 @@
 -- et le système de migration (backend/db_migrate.py).
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS ssh_key_management;
-USE ssh_key_management;
+CREATE DATABASE IF NOT EXISTS rootwarden;
+USE rootwarden;
 
 -- Table des rôles
 CREATE TABLE IF NOT EXISTS roles (
@@ -503,10 +503,10 @@ CREATE TABLE IF NOT EXISTS ssh_audit_policies (
     UNIQUE KEY uniq_machine_directive (machine_id, directive)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Attribution des privilèges MySQL pour l'utilisateur applicatif 'ssh_user'
+-- Attribution des privilèges MySQL pour l'utilisateur applicatif 'rootwarden_user'
 -- Principe du moindre privilege : SELECT/INSERT/UPDATE/DELETE + CREATE/ALTER pour les migrations.
 -- Pas de SUPER, FILE, PROCESS, GRANT OPTION, DROP (sauf tables temporaires).
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE
-    ON ssh_key_management.* TO 'ssh_user'@'%';
+    ON rootwarden.* TO 'rootwarden_user'@'%';
 FLUSH PRIVILEGES;
 

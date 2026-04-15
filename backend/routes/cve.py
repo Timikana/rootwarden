@@ -81,7 +81,7 @@ def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
                                 event_type='cve_scan',
                                 title=f"Scan CVE : {len(all_findings)} finding(s) sur {m['name']}",
                                 message=f"{m['name']} ({m['ip']}) — {len(all_findings)} CVE detectee(s)",
-                                link='/security/cve_scan.php',
+                                link='/security/',
                                 machine_id=m['id'],
                             )
                         except Exception:
@@ -95,7 +95,7 @@ def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
                                     event_type='security_alert',
                                     title=f"{len(criticals)} CVE critique(s) sur {m['name']}",
                                     message=f"{criticals[0].get('cve_id', '?')} (CVSS {criticals[0].get('cvss_score', '?')}) + {len(criticals)-1} autre(s)" if len(criticals) > 1 else f"{criticals[0].get('cve_id', '?')} — CVSS {criticals[0].get('cvss_score', '?')}",
-                                    link='/security/cve_scan.php',
+                                    link='/security/',
                                     machine_id=m['id'],
                                 )
                             except Exception:

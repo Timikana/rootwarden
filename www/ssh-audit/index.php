@@ -1,6 +1,6 @@
 <?php
 /**
- * ssh-audit/ssh_audit.php — Audit de configuration SSH des serveurs distants.
+ * ssh-audit/index.php — Audit de configuration SSH des serveurs distants.
  *
  * Permissions : lecteur (1), admin (2), superadmin (3) + can_audit_ssh
  * La securite des actions (fix, save, reload) est geree cote backend (@require_role).

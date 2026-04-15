@@ -1,6 +1,6 @@
 <?php
 /**
- * iptables/iptables_manager.php — Interface de gestion des règles iptables
+ * iptables/index.php — Interface de gestion des règles iptables
  *
  * Rôle :
  *   Permet au superadmin de visualiser, modifier, sauvegarder et restaurer

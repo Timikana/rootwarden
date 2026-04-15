@@ -1,6 +1,6 @@
 <?php
 /**
- * fail2ban/fail2ban_manager.php — Gestion Fail2ban sur les serveurs distants.
+ * fail2ban/index.php — Gestion Fail2ban sur les serveurs distants.
  *
  * Permissions : admin (2), superadmin (3) + can_manage_fail2ban
  */

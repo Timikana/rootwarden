@@ -233,7 +233,7 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
   - `chmod 600` automatique sur `srv-docker.env` et certificats
   - Detection des secrets par defaut (SECRET_KEY, API_KEY, DB_PASSWORD, MYSQL_ROOT_PASSWORD)
   - Warning rouge + confirmation avant demarrage si secrets non changes
-- **Privileges MySQL restreints** — L'utilisateur applicatif `ssh_user` n'a plus
+- **Privileges MySQL restreints** — L'utilisateur applicatif `rootwarden_user` n'a plus
   `ALL PRIVILEGES`. Remplace par : SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX,
   CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE (principe du moindre privilege)
 - **INIT_SUPERADMIN_PASSWORD vide par defaut** — Plus de mot de passe previsible
@@ -253,7 +253,7 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 - `php/install.sh` — force_password_change + masquage logs + fichier credentials
 - `srv-docker.env` — INIT_SUPERADMIN_PASSWORD vide, INIT_ADMIN_PASSWORD supprime
 - `srv-docker.env.example` — Warning securite en en-tete (6 points)
-- `mysql/init.sql` — GRANT restreints pour ssh_user
+- `mysql/init.sql` — GRANT restreints pour rootwarden_user
 - `start.sh` — Nouveau script demarrage securise
 - `www/adm/includes/manage_access.php` — Alignement + descriptions
 - `www/adm/includes/manage_permissions.php` — Alignement + descriptions + labels
@@ -970,12 +970,12 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 ### Migrations DB requises (installation existante)
 ```bash
 # Via le runner Python (recommandé)
-docker exec gestion_ssh_key_python python /app/db_migrate.py
+docker exec rootwarden_python python /app/db_migrate.py
 
 # Via MySQL directement
-docker exec -i gestion_ssh_key_db mysql -u ssh_user -p ssh_key_management \
+docker exec -i rootwarden_db mysql -u rootwarden_user -p rootwarden \
   < mysql/migrations/002_cve_tables.sql
-docker exec -i gestion_ssh_key_db mysql -u ssh_user -p ssh_key_management \
+docker exec -i rootwarden_db mysql -u rootwarden_user -p rootwarden \
   < mysql/migrations/003_add_can_scan_cve.sql
 ```
 
@@ -1002,8 +1002,8 @@ docker exec -i gestion_ssh_key_db mysql -u ssh_user -p ssh_key_management \
 
 ```bash
 # 1. Sauvegarder la base de données
-docker exec gestion_ssh_key_db \
-  mysqldump -u root -p ssh_key_management > backup_$(date +%Y%m%d).sql
+docker exec rootwarden_db \
+  mysqldump -u root -p rootwarden > backup_$(date +%Y%m%d).sql
 
 # 2. Récupérer la nouvelle version
 git pull
@@ -1015,14 +1015,14 @@ docker-compose build --no-cache
 docker-compose up -d
 
 # 5. Vérifier l'état des migrations
-docker exec gestion_ssh_key_python python /app/db_migrate.py --status
+docker exec rootwarden_python python /app/db_migrate.py --status
 ```
 
 ### Vérification post-mise à jour
 
 ```bash
 # Consulter les logs du backend (migrations + erreurs éventuelles)
-docker logs gestion_ssh_key_python
+docker logs rootwarden_python
 
 # Tester la connectivité OpenCVE (si configurée)
 curl -s -H "X-API-KEY: $API_KEY" https://localhost:8443/api/cve_test_connection

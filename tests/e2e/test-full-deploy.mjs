@@ -19,7 +19,7 @@ console.log('    URL:', page.url());
 
 // Onglet Config Globale
 console.log('[2] Config globale...');
-await page.goto(`${BASE_URL}/supervision/supervision.php`, { waitUntil: 'networkidle2' });
+await page.goto(`${BASE_URL}/supervision/`, { waitUntil: 'networkidle2' });
 await sleep(500);
 
 // Remplir le formulaire

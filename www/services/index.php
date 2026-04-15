@@ -1,6 +1,6 @@
 <?php
 /**
- * services/services_manager.php — Gestion des services systemd sur les serveurs distants.
+ * services/index.php — Gestion des services systemd sur les serveurs distants.
  *
  * Permissions : lecteur (1), admin (2), superadmin (3) + can_manage_services
  */

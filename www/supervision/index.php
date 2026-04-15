@@ -1,6 +1,6 @@
 <?php
 /**
- * supervision/supervision.php — Module Supervision : deploiement et configuration agents Zabbix.
+ * supervision/index.php — Module Supervision : deploiement et configuration agents.
  *
  * 4 onglets :
  *   1. Configuration globale — template agent (Server, TLS, PSK, metadata)

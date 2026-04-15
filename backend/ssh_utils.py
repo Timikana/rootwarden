@@ -62,9 +62,9 @@ db_config = Config.DB_CONFIG
 
 # db_config = {
 #     'host': 'db',          # Ou "localhost" si vous n'êtes pas en Docker
-#     'user': 'ssh_user',
-#     'password': 'ssh_password',
-#     'database': 'ssh_key_management'
+#     'user': 'rootwarden_user',
+#     'password': 'rootwarden_password',
+#     'database': 'rootwarden'
 # }
 
 # ===================================================

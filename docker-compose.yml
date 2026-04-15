@@ -1,3 +1,5 @@
+name: rootwarden
+
 services:
 
   # ─────────────────────────────────────────────────────────────
@@ -7,7 +9,7 @@ services:
     build:
       context: .
       dockerfile: ./php/Dockerfile
-    container_name: gestion_ssh_key_php
+    container_name: rootwarden_php
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -15,7 +17,7 @@ services:
       - "${HTTP_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
     volumes:
-      - gestion_ssh_key_php_sessions:/var/www/sessions
+      - php_sessions:/var/www/sessions
       - ./www:/var/www/html
       - ./www/logs:/var/www/html/logs
       - ./php/php.ini:/usr/local/etc/php/php.ini
@@ -43,8 +45,8 @@ services:
         reservations:
           memory: 128M
     networks:
-      rootwarden_internal:
-      rootwarden_external:
+      internal:
+      external:
 
   # ─────────────────────────────────────────────────────────────
   # Backend Python (Flask) — réseau interne uniquement
@@ -54,7 +56,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   python:
     build: ./backend
-    container_name: gestion_ssh_key_python
+    container_name: rootwarden_python
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -96,8 +98,8 @@ services:
         reservations:
           memory: 128M
     networks:
-      rootwarden_internal:
-      rootwarden_external:
+      internal:
+      external:
 
   # ─────────────────────────────────────────────────────────────
   # Base de données MySQL — réseau interne uniquement
@@ -106,7 +108,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   db:
     image: mysql:9.2.0
-    container_name: gestion_ssh_key_db
+    container_name: rootwarden_db
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -131,7 +133,7 @@ services:
         reservations:
           memory: 256M
     networks:
-      rootwarden_internal:          # DB isolee sur reseau interne uniquement
+      internal:          # DB isolee sur reseau interne uniquement
 
   # ─────────────────────────────────────────────────────────────
   # Outils Composer (one-shot, ne tournent pas en continu)
@@ -141,7 +143,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   composer:
     image: composer:2
-    container_name: gestion_ssh_key_composer
+    container_name: rootwarden_composer
     working_dir: /app
     volumes:
       - ./www:/app
@@ -149,11 +151,11 @@ services:
     profiles:
       - tools
     networks:
-      rootwarden_external:
+      external:
 
   composer-update:
     image: composer:2
-    container_name: gestion_ssh_key_composer_update
+    container_name: rootwarden_composer_update
     working_dir: /app
     volumes:
       - ./www:/app
@@ -161,7 +163,7 @@ services:
     profiles:
       - tools
     networks:
-      rootwarden_external:
+      external:
 
   # ─────────────────────────────────────────────────────────────
   # Mock OpenCVE API (preprod uniquement)
@@ -170,7 +172,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   mock-opencve:
     build: ./mock-opencve
-    container_name: gestion_ssh_key_mock_opencve
+    container_name: rootwarden_mock_opencve
     hostname: mock-opencve
     restart: unless-stopped
     security_opt:
@@ -185,7 +187,7 @@ services:
           memory: 128M
           cpus: '0.5'
     networks:
-      rootwarden_internal:
+      internal:
 
   # ─────────────────────────────────────────────────────────────
   # Serveur Debian de test (preprod uniquement)
@@ -194,7 +196,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   test-server:
     build: ./test-server
-    container_name: gestion_ssh_key_test_server
+    container_name: rootwarden_test_server
     hostname: test-server
     restart: unless-stopped
     security_opt:
@@ -207,18 +209,18 @@ services:
           memory: 256M
           cpus: '0.5'
     networks:
-      rootwarden_internal:
+      internal:
         ipv4_address: 10.10.10.10
 
 volumes:
   db_data:
-  gestion_ssh_key_php_sessions:
+  php_sessions:
   platform_ssh_keys:            # Keypair Ed25519 de la plateforme (persiste entre restarts)
 
 networks:
   # Reseau interne : communication inter-conteneurs (db ↔ python ↔ php)
   # internal: true → pas d'acces internet, DB completement isolee
-  rootwarden_internal:
+  internal:
     driver: bridge
     internal: true
     ipam:
@@ -226,5 +228,5 @@ networks:
         - subnet: 10.10.10.0/24
   # Reseau externe : acces internet sortant (SMTP, OpenCVE, SSH serveurs distants)
   # Seuls php et python y sont connectes
-  rootwarden_external:
+  external:
     driver: bridge

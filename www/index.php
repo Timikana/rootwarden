@@ -129,7 +129,7 @@ $sshAuditAvg = 0;
 $sshAuditCount = 0;
 try {
     $lowSshScore = (int) $pdo->query("SELECT COUNT(*) FROM ssh_audit_results r INNER JOIN (SELECT machine_id, MAX(id) as last_id FROM ssh_audit_results GROUP BY machine_id) l ON r.id = l.last_id WHERE r.score < 50")->fetchColumn();
-    if ($lowSshScore > 0) $alerts[] = ['type' => 'error', 'msg' => t('dashboard.alert_ssh_audit', ['count' => $lowSshScore]), 'link' => '/ssh-audit/ssh_audit.php'];
+    if ($lowSshScore > 0) $alerts[] = ['type' => 'error', 'msg' => t('dashboard.alert_ssh_audit', ['count' => $lowSshScore]), 'link' => '/ssh-audit/'];
     $sshAuditRow = $pdo->query("SELECT AVG(r.score) as avg_score, COUNT(DISTINCT r.machine_id) as cnt FROM ssh_audit_results r INNER JOIN (SELECT machine_id, MAX(id) as last_id FROM ssh_audit_results GROUP BY machine_id) l ON r.id = l.last_id")->fetch(PDO::FETCH_ASSOC);
     $sshAuditAvg = (int)($sshAuditRow['avg_score'] ?? 0);
     $sshAuditCount = (int)($sshAuditRow['cnt'] ?? 0);
@@ -330,19 +330,19 @@ try {
             <?php
             $shortcuts = [];
             if ($permissions['can_deploy_keys'] ?? false || $roleId >= 3)
-                $shortcuts[] = ['url' => '/ssh/ssh_management.php', 'label' => t('dashboard.sc_ssh_keys'), 'desc' => t('dashboard.sc_ssh_desc')];
+                $shortcuts[] = ['url' => '/ssh/', 'label' => t('dashboard.sc_ssh_keys'), 'desc' => t('dashboard.sc_ssh_desc')];
             if ($permissions['can_update_linux'] ?? false || $roleId >= 3)
-                $shortcuts[] = ['url' => '/update/linux_updates.php', 'label' => t('dashboard.sc_updates'), 'desc' => t('dashboard.sc_updates_desc')];
+                $shortcuts[] = ['url' => '/update/', 'label' => t('dashboard.sc_updates'), 'desc' => t('dashboard.sc_updates_desc')];
             if ($permissions['can_manage_iptables'] ?? false || $roleId >= 3)
-                $shortcuts[] = ['url' => '/iptables/iptables_manager.php', 'label' => t('dashboard.sc_iptables'), 'desc' => t('dashboard.sc_iptables_desc')];
+                $shortcuts[] = ['url' => '/iptables/', 'label' => t('dashboard.sc_iptables'), 'desc' => t('dashboard.sc_iptables_desc')];
             if ($permissions['can_scan_cve'] ?? false || $roleId >= 3)
-                $shortcuts[] = ['url' => '/security/cve_scan.php', 'label' => t('dashboard.sc_cve'), 'desc' => t('dashboard.sc_cve_desc')];
+                $shortcuts[] = ['url' => '/security/', 'label' => t('dashboard.sc_cve'), 'desc' => t('dashboard.sc_cve_desc')];
             if ($permissions['can_admin_portal'] ?? false || $roleId >= 3)
                 $shortcuts[] = ['url' => '/adm/admin_page.php', 'label' => t('dashboard.sc_admin'), 'desc' => t('dashboard.sc_admin_desc')];
             if ($permissions['can_manage_supervision'] ?? false || $roleId >= 3)
-                $shortcuts[] = ['url' => '/supervision/supervision.php', 'label' => t('dashboard.sc_supervision'), 'desc' => t('dashboard.sc_supervision_desc')];
+                $shortcuts[] = ['url' => '/supervision/', 'label' => t('dashboard.sc_supervision'), 'desc' => t('dashboard.sc_supervision_desc')];
             if ($permissions['can_audit_ssh'] ?? false || $roleId >= 3)
-                $shortcuts[] = ['url' => '/ssh-audit/ssh_audit.php', 'label' => t('dashboard.sc_ssh_audit'), 'desc' => t('dashboard.sc_ssh_audit_desc')];
+                $shortcuts[] = ['url' => '/ssh-audit/', 'label' => t('dashboard.sc_ssh_audit'), 'desc' => t('dashboard.sc_ssh_audit_desc')];
             if ($permissions['can_view_compliance'] ?? false || $roleId >= 3)
                 $shortcuts[] = ['url' => '/security/compliance_report.php', 'label' => t('dashboard.sc_compliance'), 'desc' => t('dashboard.sc_compliance_desc')];
             $shortcuts[] = ['url' => '/documentation.php', 'label' => t('dashboard.sc_docs'), 'desc' => t('dashboard.sc_docs_desc')];
