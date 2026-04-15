@@ -2,7 +2,7 @@
  * 06-supervision.test.mjs — Test E2E du module Supervision
  *
  * Verifie :
- *   - Page /supervision/supervision.php accessible apres login
+ *   - Page /supervision/ accessible apres login
  *   - 4 onglets presents et fonctionnels
  *   - Formulaire configuration globale affiche
  *   - Tableau deploiement affiche
@@ -43,8 +43,8 @@ async function run() {
     console.log('    OK — logged in');
 
     // Navigate to supervision
-    console.log('[2] Navigation vers /supervision/supervision.php...');
-    await page.goto(`${BASE_URL}/supervision/supervision.php`, { waitUntil: 'networkidle2' });
+    console.log('[2] Navigation vers /supervision/...');
+    await page.goto(`${BASE_URL}/supervision/`, { waitUntil: 'networkidle2' });
     await sleep(1000);
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-01-config.png`, fullPage: true });
     console.log('    Screenshot: supervision-01-config.png');
@@ -93,7 +93,7 @@ async function run() {
 
     // Retour onglet config et verif page updates
     console.log('[6] Verification page Updates (pas de Zabbix)...');
-    await page.goto(`${BASE_URL}/update/linux_updates.php`, { waitUntil: 'networkidle2' });
+    await page.goto(`${BASE_URL}/update/`, { waitUntil: 'networkidle2' });
     await sleep(1000);
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-05-updates-no-zabbix.png`, fullPage: true });
     console.log('    Screenshot: supervision-05-updates-no-zabbix.png');
@@ -105,7 +105,7 @@ async function run() {
 
     // Check menu
     console.log('[7] Verification lien Supervision dans le menu...');
-    const menuLink = await page.$('a[href="/supervision/supervision.php"]');
+    const menuLink = await page.$('a[href="/supervision/"]');
     if (!menuLink) throw new Error('Lien Supervision absent du menu');
     console.log('    OK — lien menu present');
 

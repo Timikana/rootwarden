@@ -86,10 +86,10 @@ class Config:
 
     # Database Configuration
     DB_CONFIG = {
-        'user':     os.getenv('DB_USER', 'ssh_user'),
-        'password': os.getenv('DB_PASSWORD', 'ssh_password'),
+        'user':     os.getenv('DB_USER', 'rootwarden_user'),
+        'password': os.getenv('DB_PASSWORD', 'rootwarden_password'),
         'host':     os.getenv('DB_HOST', 'db'),
-        'database': os.getenv('DB_NAME', 'ssh_key_management'),
+        'database': os.getenv('DB_NAME', 'rootwarden'),
         'port':     int(os.getenv('DB_PORT', 3306)),
     }
 

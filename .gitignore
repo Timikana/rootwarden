@@ -70,3 +70,4 @@ frontend/node_modules/
 *.bak
 *.dump
 fernet.key
+.ruff_cache/

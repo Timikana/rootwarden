@@ -1,6 +1,6 @@
 <?php
 /**
- * security/cve_scan.php — Interface de scan de vulnérabilités CVE
+ * security/index.php — Interface de scan de vulnérabilités CVE
  *
  * Rôle :
  *   Affiche la liste des serveurs accessibles à l'utilisateur et permet de

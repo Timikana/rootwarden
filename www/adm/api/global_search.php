@@ -53,7 +53,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         'type' => 'cve',
         'label' => $row['cve_id'],
         'sub' => $row['package_name'] . ' · ' . $row['severity'] . ' ' . $row['cvss_score'],
-        'url' => '/security/cve_scan.php',
+        'url' => '/security/',
         'status' => strtolower($row['severity']),
     ];
 }

@@ -14,7 +14,7 @@ Usage :
     # Notification broadcast pour tous les admins (user_id=0)
     notify_admins(type='cve_critical', title='CVE critique detectee',
                   message='CVE-2024-1234 (CVSS 9.8) sur srv-web',
-                  link='/security/cve_scan.php')
+                  link='/security/')
 """
 
 import logging

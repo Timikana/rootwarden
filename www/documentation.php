@@ -161,14 +161,14 @@ $isAdmin    = $role >= 2;
 └───────────────────────┬──────────────────────────────────┘
                         │ HTTPS / HTTP
 ┌───────────────────────▼──────────────────────────────────┐
-│  PHP 8.2 + Apache  (gestion_ssh_key_php)                │
+│  PHP 8.4 + Apache  (rootwarden_php)                │
 │  www/ : auth/ adm/ security/ update/ ssh/ iptables/     │
-│  Réseau interne Docker : gestion_ssh_key_network         │
+│  Réseau interne Docker : rootwarden_internal         │
 └─────────────┬──────────────────────────┬─────────────────┘
               │ HTTP interne :5000        │ PDO / MySQL
 ┌─────────────▼────────────┐  ┌──────────▼──────────────────┐
-│  Python 3.11 + Flask     │  │  MySQL 9.1                  │
-│  (gestion_ssh_key_python) │  │  (gestion_ssh_key_db)       │
+│  Python 3.13 + Flask     │  │  MySQL 9.2                  │
+│  (rootwarden_python) │  │  (rootwarden_db)       │
 │  /api/* — non exposé     │  │  Port interne seulement     │
 └─────────────┬────────────┘  └─────────────────────────────┘
               │ SSH (Paramiko)
@@ -555,7 +555,7 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                 </ul>
 
                 <h3 class="font-semibold mt-3 mb-2">Accès</h3>
-                <p class="text-sm">Page : <code>/security/cve_scan.php</code> · Permission : <code>can_scan_cve</code> (ou superadmin)<br>
+                <p class="text-sm">Page : <code>/security/</code> · Permission : <code>can_scan_cve</code> (ou superadmin)<br>
                 Les utilisateurs de rôle <em>user</em> ne voient que leurs serveurs assignés dans <code>user_machine_access</code>.</p>
             </section>
 
@@ -747,13 +747,13 @@ SESSION_TIMEOUT=30   # En minutes (défaut : 30)</div>
                 </p>
                 <?php if ($isAdmin): ?>
                 <div class="code-block"># État des migrations
-docker exec gestion_ssh_key_python python /app/db_migrate.py --status
+docker exec rootwarden_python python /app/db_migrate.py --status
 
 # Simuler sans appliquer
-docker exec gestion_ssh_key_python python /app/db_migrate.py --dry-run
+docker exec rootwarden_python python /app/db_migrate.py --dry-run
 
 # Appliquer (mode strict = arrêt à la 1ère erreur)
-docker exec gestion_ssh_key_python python /app/db_migrate.py --strict</div>
+docker exec rootwarden_python python /app/db_migrate.py --strict</div>
                 <?php endif; ?>
                 <h3 class="font-semibold mt-4 mb-2">Convention de nommage</h3>
                 <div class="code-block">NNN_description_courte.sql   ← numéro séquentiel 3 chiffres + snake_case
@@ -1001,11 +1001,11 @@ docker-compose --profile preprod stop test-server mock-opencve</div>
                     <div class="border-l-4 border-yellow-500 pl-4">
                         <p class="font-semibold">Impossible de se connecter en SSH à un serveur</p>
                         <p class="text-gray-600 dark:text-gray-400">Vérifiez que le port 22 est ouvert, que l'utilisateur SSH existe, et que le mot de passe stocké est correct.
-                        Consultez les logs Python : <code>docker logs gestion_ssh_key_python</code></p>
+                        Consultez les logs Python : <code>docker logs rootwarden_python</code></p>
                     </div>
                     <div class="border-l-4 border-yellow-500 pl-4">
                         <p class="font-semibold">Les règles iptables ne s'appliquent pas</p>
-                        <p class="text-gray-600 dark:text-gray-400">Vérifiez que le backend Python tourne : <code>docker logs gestion_ssh_key_python</code>.
+                        <p class="text-gray-600 dark:text-gray-400">Vérifiez que le backend Python tourne : <code>docker logs rootwarden_python</code>.
                         Vérifiez que l'utilisateur SSH possède les droits sudo ou que le mot de passe root est correct.</p>
                     </div>
                     <div class="border-l-4 border-yellow-500 pl-4">
@@ -1016,12 +1016,12 @@ docker-compose --profile preprod stop test-server mock-opencve</div>
                     <div class="border-l-4 border-yellow-500 pl-4">
                         <p class="font-semibold">Erreur de déchiffrement des mots de passe</p>
                         <p class="text-gray-600 dark:text-gray-400">Si vous avez changé la <code>SECRET_KEY</code>, renseignez l'ancienne dans <code>OLD_SECRET_KEY</code>
-                        et lancez le script de migration : <code>docker exec gestion_ssh_key_php php /var/www/html/auth/migrate_crypto.php</code></p>
+                        et lancez le script de migration : <code>docker exec rootwarden_php php /var/www/html/auth/migrate_crypto.php</code></p>
                     </div>
                     <div class="border-l-4 border-yellow-500 pl-4">
                         <p class="font-semibold">La base de données ne démarre pas</p>
                         <p class="text-gray-600 dark:text-gray-400">Attendez que le healthcheck MySQL passe (jusqu'à 60 s au premier démarrage).
-                        Consultez : <code>docker logs gestion_ssh_key_db</code>.
+                        Consultez : <code>docker logs rootwarden_db</code>.
                         En dernier recours : <code>docker-compose down -v && docker-compose up -d</code> (⚠ efface les données)</p>
                     </div>
                     <?php if ($isAdmin): ?>

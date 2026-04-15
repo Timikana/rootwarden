@@ -205,7 +205,7 @@
             const rulesV6 = document.getElementById("file-rules-v6").value;
 
             try {
-                const response = await fetch("iptables_manager.php", {
+                const response = await fetch("index.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
                     body: new URLSearchParams({
@@ -242,7 +242,7 @@
             const server = JSON.parse(serverData);
 
             try {
-                const response = await fetch("iptables_manager.php", {
+                const response = await fetch("index.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
                     body: new URLSearchParams({

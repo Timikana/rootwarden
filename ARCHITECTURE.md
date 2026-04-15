@@ -317,8 +317,6 @@ Gestion_SSH_KEY/
     │   │   ├── 📄 scheduling.php  scheduleMachineUpdate(machineId, intervalMinutes)
     │   │   │                      → INSERT/UPDATE update_schedules.
     │   │   │                      getScheduleForMachine(machineId)
-    │   │   └── 📄 zabbix.php      updateZabbixVersion(machineId, version)
-    │   │                          → machines.zabbix_agent_version
     │   └── 📁 js/
     │       ├── 📄 apiCalls.js     Appels API backend Python. Gestion streaming
     │       │                      ReadableStream. currentSecurityMachineId global.

@@ -172,7 +172,7 @@ def ssh_audit_scan():
                     event_type='ssh_audit',
                     title=f"Audit SSH : {machine_name} — {grade} ({score}/100)",
                     message=f"Grade {grade}, score {score}/100, {result.get('counts', {}).get('fail', 0)} echec(s)",
-                    link='/ssh-audit/ssh_audit.php',
+                    link='/ssh-audit/',
                     machine_id=mid,
                 )
                 if grade in ('D', 'E', 'F'):
@@ -180,7 +180,7 @@ def ssh_audit_scan():
                         event_type='security_alert',
                         title=f"Audit SSH critique : {machine_name} — Grade {grade}",
                         message=f"Score {score}/100 — Action requise",
-                        link='/ssh-audit/ssh_audit.php',
+                        link='/ssh-audit/',
                         machine_id=mid,
                     )
             except Exception:

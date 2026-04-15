@@ -46,6 +46,7 @@ return [
     'profile.error_ssh_update' => 'Erreur lors de la mise a jour de la cle SSH.',
     'profile.error_wrong_password' => 'Mot de passe actuel incorrect.',
     'profile.error_password_mismatch' => 'Les mots de passe ne correspondent pas.',
+    'profile.password_policy_hint' => 'Le mot de passe doit contenir au minimum 15 caracteres, dont au moins : 1 majuscule, 1 minuscule, 1 chiffre et 1 caractere special.',
     'profile.error_password_policy' => 'Le mot de passe doit contenir au moins 15 caracteres, une majuscule, une minuscule, un chiffre et un caractere special.',
     'profile.password_updated' => 'Mot de passe modifie avec succes.',
     'profile.error_password_update' => 'Erreur lors de la modification du mot de passe.',

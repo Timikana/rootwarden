@@ -190,10 +190,10 @@ function toast(message, type = 'info', duration = 4000) {
         }
         if (gPressed) {
             gPressed = false;
-            const routes = {h: '/', s: '/services/services_manager.php', S: '/ssh/ssh_management.php', u: '/update/linux_updates.php',
-                           c: '/security/cve_scan.php', a: '/adm/admin_page.php', A: '/ssh-audit/ssh_audit.php', i: '/iptables/iptables_manager.php',
+            const routes = {h: '/', s: '/services/', S: '/ssh/', u: '/update/',
+                           c: '/security/', a: '/adm/admin_page.php', A: '/ssh-audit/', i: '/iptables/',
                            d: '/documentation.php', p: '/profile.php', r: '/security/compliance_report.php',
-                           k: '/adm/platform_keys.php', m: '/adm/server_users.php', v: '/supervision/supervision.php'};
+                           k: '/adm/platform_keys.php', m: '/adm/server_users.php', v: '/supervision/'};
             if (routes[e.key]) { window.location.href = routes[e.key]; return; }
         }
 

@@ -29,8 +29,8 @@ echo "Attente du démarrage de MySQL..."
 
 # Charger les variables d'environnement avec valeurs par défaut
 # Ces valeurs doivent correspondre à celles définies dans docker-compose.yml
-DB_USER=${DB_USER:-ssh_user}
-DB_PASSWORD=${DB_PASSWORD:-ssh_password}
+DB_USER=${DB_USER:-rootwarden_user}
+DB_PASSWORD=${DB_PASSWORD:-rootwarden_password}
 DB_HOST=${DB_HOST:-db}       # "db" est le nom du service MySQL dans docker-compose
 
 # Nombre maximum de tentatives avant d'abandonner (30 x 2s = 60s max)

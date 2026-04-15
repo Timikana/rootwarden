@@ -135,10 +135,10 @@ See `srv-docker.env.example` for the full list.
 
 ```bash
 # Check migration status
-docker exec gestion_ssh_key_python python /app/db_migrate.py --status
+docker exec rootwarden_python python /app/db_migrate.py --status
 
 # Apply pending migrations
-docker exec gestion_ssh_key_python python /app/db_migrate.py
+docker exec rootwarden_python python /app/db_migrate.py
 ```
 
 ---

@@ -2,7 +2,7 @@
 /**
  * Script d'insertion du serveur de test en BDD.
  * À exécuter dans le conteneur PHP après le démarrage du test-server :
- *   docker exec gestion_ssh_key_php php /var/www/html/test-server/seed_test_machine.php
+ *   docker exec rootwarden_php php /var/www/html/test-server/seed_test_machine.php
  *
  * Chiffre les mots de passe via crypto.php (compatible backend Python)
  * et attribue le serveur au superadmin + admin.
