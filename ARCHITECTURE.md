@@ -223,7 +223,7 @@ Gestion_SSH_KEY/
     │   │                          includes : manage_users, manage_servers,
     │   │                          manage_access, manage_permissions, user_exclusions.
     │   ├── 📄 docs.php            Redirection 301 → /documentation.php (compatibilité)
-    │   ├── 📄 cve_scan.php        Redirection 301 → /security/cve_scan.php (compatibilité)
+    │   ├── 📄 cve_scan.php        Redirection 301 → /security/ (compatibilité)
     │   ├── 📄 change_password.php Changement mdp utilisateur (vérifie ancien mdp, bcrypt).
     │   ├── 📄 delete_user.php     Suppression utilisateur (POST + CSRF, protège superadmin).
     │   ├── 📄 toggle_user.php     Active/désactive compte (AJAX JSON, inverse users.active).
@@ -270,15 +270,15 @@ Gestion_SSH_KEY/
     │                               configurable. Streaming temps réel. Historique scans.
     │
     ├── 📁 ssh/
-    │   └── 📄 ssh_management.php  Interface déploiement clés SSH. Sélection machines,
+    │   └── 📄 index.php           Interface déploiement clés SSH. Sélection machines,
     │                              appel POST /deploy_keys, streaming résultats.
     │
     ├── 📁 iptables/
-    │   └── 📄 iptables_manager.php  Interface gestion iptables. Règles IPv4+IPv6
+    │   └── 📄 index.php             Interface gestion iptables. Règles IPv4+IPv6
     │                                actuelles + fichiers rules.v4/v6. Éditeur règles.
     │
     ├── 📁 fail2ban/
-    │   ├── 📄 fail2ban_manager.php  Interface gestion Fail2ban. Sélecteur serveur,
+    │   ├── 📄 index.php             Interface gestion Fail2ban. Sélecteur serveur,
     │   │                            statut service, grille jails, détail jail (config,
     │   │                            IPs bannies, ban/unban), installation auto,
     │   │                            détection services (SSH/FTP/Apache/Nginx/Mail),
@@ -291,7 +291,7 @@ Gestion_SSH_KEY/
     │                                  XSS-safe (textContent, escHtml())
     │
     ├── 📁 services/
-    │   ├── 📄 services_manager.php  Interface gestion services systemd. Selecteur serveur,
+    │   ├── 📄 index.php             Interface gestion services systemd. Selecteur serveur,
     │   │                            liste services avec statut/categorie, actions
     │   │                            start/stop/restart, enable/disable au boot,
     │   │                            logs journalctl, detail service (PID, memoire),
@@ -303,8 +303,8 @@ Gestion_SSH_KEY/
     │                                  XSS-safe (textContent, escHtml())
     │
     ├── 📁 update/
-    │   ├── 📄 linux_updates.php   Interface principale mises à jour. Filtres serveurs,
-    │   │                          sélection, streaming apt update/upgrade, onglet Zabbix.
+    │   ├── 📄 index.php           Interface principale mises à jour. Filtres serveurs,
+    │   │                          sélection, streaming apt update/upgrade.
     │   ├── 📁 functions/
     │   │   ├── 📄 filter.php      getFilteredServers(?env, ?criticality, ?networkType)
     │   │   │                      Requête WHERE dynamique sur machines.
@@ -389,7 +389,7 @@ Browser
 ### Scan CVE streaming
 
 ```
-Browser → fetch /security/cve_scan.php (PHP)
+Browser → fetch /security/ (PHP index.php)
 PHP     → curl POST http://python:5000/cve_scan
 Python  → SSH → dpkg-query (liste paquets sans root)
         → OpenCVE API (avec cache TTL)
@@ -443,7 +443,7 @@ Python → decrypt_password() essaie OLD_SECRET_KEY en fallback
 2. CRUD via `www/adm/includes/server_actions.php` (JSON body: add_tag / remove_tag)
 3. Affichage dans `www/adm/includes/manage_servers.php` (badges indigo + champ "+ tag")
 4. Filtrage backend dans `backend/server.py` route `/filter_servers?tag=X`
-5. Dropdown de filtre dans `www/update/linux_updates.php`
+5. Dropdown de filtre dans `www/update/index.php`
 
 ---
 
@@ -700,7 +700,7 @@ docker-compose up -d
 │                                          restart, enable, disable, logs
 ├── 📄 backend/services_manager.py         Helpers SSH services systemd (list, actions,
 │                                          logs, categories, services proteges)
-├── 📄 www/services/services_manager.php   Interface gestion services systemd
+├── 📄 www/services/index.php              Interface gestion services systemd
 ├── 📄 www/services/js/servicesManager.js  Interactions JS API services
 └── 📄 mysql/migrations/020_services.sql   Permission can_manage_services
 ```
