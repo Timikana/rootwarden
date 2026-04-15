@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.13.0
+# 🔐 RootWarden v1.13.1
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -38,7 +38,7 @@
 - **HKDF key derivation** — Cles derivees distinctes pour mots de passe (rootwarden-aes) et secrets TOTP (rootwarden-totp)
 - **Chiffrement TOTP en BDD** — Secrets 2FA chiffres (Sodium/AES), retrocompatible plaintext
 - **2FA TOTP** — Authentification multi-facteurs obligatoire
-- **RBAC** — 3 rôles (user, admin, superadmin) + 14 permissions granulaires
+- **RBAC** — 3 rôles (user, admin, superadmin) + 15 permissions granulaires
 - **Auth DB-verified** — checkAuth/checkPermission verifient en base a chaque requete, session = cache UI uniquement
 - **Anti-escalation** — Protection self-edit sur tous les endpoints admin, SA non-modifiable, dernier SA protege
 - **CSRF unifie** — checkCsrfToken() supporte POST body, header X-CSRF-TOKEN, body JSON (timing-safe)
@@ -70,9 +70,9 @@
 
 | Composant | Technologie |
 |-----------|------------|
-| Frontend | PHP 8.2 + Apache, Tailwind CSS (compile localement), htmx 2.0.4, vanilla JS |
-| Backend API | Python 3.11, Flask, Hypercorn (ASGI) |
-| Base de données | MySQL 9.1 |
+| Frontend | PHP 8.4 + Apache, Tailwind CSS (compile localement), htmx 2.0.4, vanilla JS |
+| Backend API | Python 3.13, Flask, Hypercorn (ASGI) |
+| Base de données | MySQL 9.2 |
 | Conteneurisation | Docker Compose |
 | Reseau Docker | Dual (interne + externe) |
 | Chiffrement | libsodium (PyNaCl) + AES-256-CBC |
@@ -271,4 +271,4 @@ MIT
 
 ---
 
-*RootWarden v1.12.0 — 2026-04-11*
+*RootWarden v1.13.1 — 2026-04-16*
