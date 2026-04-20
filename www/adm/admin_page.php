@@ -131,7 +131,7 @@ function getPermissions($pdo, $user_id) {
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('admin.title') ?></h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400"><?= $nbUsers ?> <?= t('admin.stats_users') ?> &middot; <?= $nbServers ?> <?= t('admin.stats_servers') ?> (<?= $nbOnline ?> <?= t('admin.stats_online') ?>)<?php if ($nbRetiring > 0): ?> &middot; <span class="text-yellow-500"><?= $nbRetiring ?> <?= t('admin.stats_retiring') ?></span><?php endif; ?><?php if ($nbArchived > 0): ?> &middot; <span class="text-red-400"><?= $nbArchived ?> <?= t('admin.stats_archived') ?></span><?php endif; ?></p>
+                <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('admin.stats_users', ['count' => $nbUsers]) ?> &middot; <?= t('admin.stats_servers', ['count' => $nbServers]) ?> (<?= t('admin.stats_online', ['count' => $nbOnline]) ?>)<?php if ($nbRetiring > 0): ?> &middot; <span class="text-yellow-500"><?= t('admin.stats_retiring', ['count' => $nbRetiring]) ?></span><?php endif; ?><?php if ($nbArchived > 0): ?> &middot; <span class="text-red-400"><?= t('admin.stats_archived', ['count' => $nbArchived]) ?></span><?php endif; ?></p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="/adm/audit_log.php" title="<?= t('admin.tip_journal') ?>" class="inline-flex items-center gap-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
