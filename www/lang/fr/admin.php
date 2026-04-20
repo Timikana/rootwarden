@@ -70,6 +70,8 @@ return [
     'perms.desc_ssh_audit' => 'Auditer la configuration SSH des serveurs',
     'perms.label_supervision' => 'Supervision',
     'perms.desc_supervision' => 'Deployer et configurer les agents de monitoring',
+    'perms.label_bashrc' => 'Bashrc',
+    'perms.desc_bashrc' => 'Deployer un .bashrc standardise par utilisateur',
     'users.title' => 'Cles SSH & Comptes',
     'users.desc' => 'Cles SSH publiques des utilisateurs du portail. Ajoutez ou modifiez les cles pour le deploiement automatique.',
     'users.empty' => 'Aucun utilisateur. Ajoutez-en un depuis le formulaire ci-dessous.',

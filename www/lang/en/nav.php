@@ -40,6 +40,8 @@ return [
     'nav.tip_ssh_audit' => 'Audit SSH configuration on your servers',
     'nav.supervision' => 'Supervision',
     'nav.tip_supervision' => 'Deploy and configure monitoring agents (Zabbix)',
+    'nav.bashrc' => 'Bashrc',
+    'nav.tip_bashrc' => 'Deploy a standardized .bashrc on Linux accounts',
     'breadcrumb.dashboard' => 'Dashboard',
     'breadcrumb.admin' => 'Administration',
     'footer.terms' => 'Terms',

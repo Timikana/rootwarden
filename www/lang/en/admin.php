@@ -223,6 +223,8 @@ return [
     'perms.desc_ssh_audit' => 'Audit SSH configuration on servers',
     'perms.label_supervision' => 'Supervision',
     'perms.desc_supervision' => 'Deploy and configure monitoring agents',
+    'perms.label_bashrc' => 'Bashrc',
+    'perms.desc_bashrc' => 'Deploy a standardized .bashrc per user',
     'audit.title' => 'Audit Log',
     'audit.desc' => 'History of all actions performed on the platform. Filter by user, action or date.',
     'audit.th_date' => 'Date',

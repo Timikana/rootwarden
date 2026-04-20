@@ -67,6 +67,7 @@ from routes.fail2ban import bp as fail2ban_bp
 from routes.services import bp as services_bp
 from routes.ssh_audit import bp as ssh_audit_bp
 from routes.supervision import bp as supervision_bp
+from routes.bashrc import bp as bashrc_bp
 
 app.register_blueprint(monitoring_bp)
 app.register_blueprint(iptables_bp)
@@ -78,6 +79,7 @@ app.register_blueprint(fail2ban_bp)
 app.register_blueprint(services_bp)
 app.register_blueprint(ssh_audit_bp)
 app.register_blueprint(supervision_bp)
+app.register_blueprint(bashrc_bp)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS manuel (compatible Hypercorn ASGI)
