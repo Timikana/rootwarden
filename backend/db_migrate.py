@@ -144,6 +144,51 @@ def _load_migration_files() -> list[dict]:
 # Lecture des migrations déjà appliquées
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _heal_bogus_premarks(conn) -> int:
+    """
+    Self-heal : purge les lignes de `schema_migrations` pre-marquees par
+    `mysql/init.sql` (checksum NULL) dont le fichier .sql existe sur disque.
+
+    Contexte : historiquement `init.sql` inserait les versions 001..030 dans
+    `schema_migrations` sans executer leur contenu. Si une migration n'etait
+    pas folded dans init.sql (ex: 022 supervision, 027 notification_preferences),
+    le runner la croyait appliquee et sautait son execution -> tables/colonnes
+    manquantes en prod.
+
+    Les migrations etant idempotentes (IF NOT EXISTS, conditional ALTER),
+    supprimer les faux marquages force leur re-application sans risque.
+
+    Returns:
+        int : nombre de lignes purgees (0 si rien a faire).
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT version FROM schema_migrations WHERE checksum IS NULL")
+    bogus = [r[0] for r in cur.fetchall()]
+    if not bogus:
+        cur.close()
+        return 0
+
+    files_on_disk = {m['version'] for m in _load_migration_files()}
+    to_delete = [v for v in bogus if v in files_on_disk]
+    if not to_delete:
+        cur.close()
+        return 0
+
+    _log.warning(
+        "Self-heal : %d migration(s) pre-marquee(s) sans checksum : %s. "
+        "Purge pour re-application (idempotente).",
+        len(to_delete), ', '.join(to_delete)
+    )
+    placeholders = ', '.join(['%s'] * len(to_delete))
+    cur.execute(
+        f"DELETE FROM schema_migrations WHERE version IN ({placeholders})",
+        to_delete
+    )
+    conn.commit()
+    cur.close()
+    return len(to_delete)
+
+
 def _get_applied_versions(conn) -> set[str]:
     """
     Récupère l'ensemble des versions de migrations déjà appliquées.
@@ -288,11 +333,16 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
                 pass
         _log.info("  %d statement(s) execute(s)", stmt_count)
 
-        # Enregistre la migration comme appliquee
+        # Enregistre la migration comme appliquee. ON DUPLICATE KEY UPDATE
+        # gere les migrations qui s'auto-inserent dans schema_migrations
+        # (pattern legacy : 004, 005) et les pre-marques sans checksum.
         cur.execute(
             """INSERT INTO schema_migrations
                (version, filename, description, checksum)
-               VALUES (%s, %s, %s, %s)""",
+               VALUES (%s, %s, %s, %s)
+               ON DUPLICATE KEY UPDATE
+                 checksum = VALUES(checksum),
+                 applied_at = CURRENT_TIMESTAMP""",
             (migration['version'], migration['filename'],
              migration['description'], checksum)
         )
@@ -339,6 +389,8 @@ def run_migrations(dry_run: bool = False, strict: bool = False) -> bool:
 
     try:
         _ensure_tracking_table(conn)
+        if not dry_run:
+            _heal_bogus_premarks(conn)
         available = _load_migration_files()
 
         if not available:
