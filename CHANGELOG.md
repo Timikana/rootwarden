@@ -5,6 +5,39 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.1] — 2026-04-20
+
+### Hardening auth : lockout per-user + backoff progressif + detection password spraying
+
+Couche ajoutee au-dessus du rate limiting IP existant (`login_attempts`,
+5/10min) pour couvrir les angles morts identifies dans l'audit DevSecOps
+du 2026-04-20 (finding #1).
+
+- **Per-user lockout** : colonnes `users.failed_attempts` + `users.locked_until`
+  + `users.last_failed_login_at` (migration 035). Le compteur s'incremente a
+  chaque echec et verrouille le compte avec un **backoff progressif** :
+  3 echecs = 1min, 4 = 5min, 5 = 15min, 6 = 1h, 7+ = 4h. Reset a 0 au succes.
+- **Password spraying detection** : `login_attempts.username` + `success`
+  (migration 035) permettent de detecter une IP testant >= 5 usernames
+  distincts en 10min. Audit log `[security]` prefix au superadmin.
+- **Notification ecrit dans `user_logs`** au 5eme echec consecutif d'un user,
+  avec IP source.
+- **Oracle-safe** : password non verifie si `locked_until > NOW()` — evite
+  d'exposer une difference de timing entre "password correct + verrou" et
+  "password incorrect + verrou".
+- **Admin UI** (superadmin only) :
+  - Badge rouge `🔒 Verrouille X min` + badge orange `N ⚠` (3+ echecs) dans
+    la liste des users (`adm/includes/manage_users.php`)
+  - Bouton `🔓 Deverrouiller` cree la route `POST /adm/api/unlock_user.php`
+    → reset `failed_attempts = 0, locked_until = NULL` + audit log
+- **i18n FR/EN** parite 270=270 (admin) et 37=37 (login), nouvelles cles :
+  `login.error_user_locked`, `users.badge_locked`, `users.btn_unlock`, etc.
+
+Note : le rate limiting IP existant (`login_attempts`, 5/10min) est conserve
+inchange — il agit en premiere ligne contre les attaques distribuees.
+
+---
+
 ## [1.14.0] — 2026-04-20
 
 ### Module Bashrc — deploiement standardise du .bashrc par utilisateur + template editable

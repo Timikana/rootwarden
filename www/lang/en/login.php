@@ -10,6 +10,7 @@ return [
     'login.error_credentials' => 'Invalid username or password.',
     'login.error_rate_limit' => 'Too many login attempts. Please try again in 10 minutes.',
     'login.error_locked' => 'Account temporarily locked. Too many failed attempts. Try again in :minutes minute(s).',
+    'login.error_user_locked' => 'This account is locked after multiple consecutive failures. Try again in :minutes minute(s) or contact an administrator.',
     'login.session_expired' => 'Your session has expired. Please sign in again.',
     'login.password_expired' => 'Your password has expired. Change it in your profile after signing in.',
     'forgot.title' => 'Reset Password',
