@@ -7,6 +7,21 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ## [1.14.0] — 2026-04-20
 
+### Module Bashrc — deploiement standardise du .bashrc par utilisateur + template editable
+
+- **Template editable via UI** — Migration 032 cree la table
+  `bashrc_templates(name, content, updated_by, updated_at)`. L'onglet "Template"
+  devient un editeur textarea live : chargement GET, modification, bouton
+  Sauvegarder (+ indicateur "modifie"), bouton "Annuler modifs". Routes
+  `GET /bashrc/template` et `POST /bashrc/template`.
+- **Fallback fichier** — Au premier boot, le contenu du fichier
+  `backend/templates/bashrc_standard.sh` est auto-seed en BDD. Ensuite la
+  BDD fait foi.
+- **Cleanup legacy** — Suppression de `deploy_bashrc` (checkbox admin) et
+  `zabbix_rsa_key` (champ formulaire + fallback PSK) devenus obsoletes avec
+  les nouveaux modules `/bashrc/` et `supervision_config.tls_psk_value`.
+  Colonnes DB laissees dormantes (pas de DROP pour preserver la compat prod).
+
 ### Module Bashrc — deploiement standardise du .bashrc par utilisateur
 
 - **Nouveau blueprint Flask** — `backend/routes/bashrc.py`. 6 routes :

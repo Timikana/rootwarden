@@ -17,6 +17,8 @@ Routes :
     POST /bashrc/deploy         — Deploie le .bashrc (overwrite|merge)
     POST /bashrc/restore        — Restaure .bashrc.bak.* le plus recent
     GET  /bashrc/backups        — Liste des backups dispo par user
+    GET  /bashrc/template       — Lit le template actif (BDD)
+    POST /bashrc/template       — Sauvegarde le template (editable via UI)
 
 Securite :
     - Contenu transfere exclusivement en base64 (pas d'injection shell)
@@ -55,19 +57,58 @@ _BACKUP_NAME_RE = re.compile(r'^\.bashrc\.bak\.\d{8}_\d{6}$')
 _VALID_MODES = {'overwrite', 'merge'}
 
 # ── Template standard ────────────────────────────────────────────────────────
+# Source DB prioritaire (editable via UI /bashrc/ onglet Template).
+# Fallback : fichier backend/templates/bashrc_standard.sh si la DB est vide.
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / 'templates' / 'bashrc_standard.sh'
+_DEFAULT_TEMPLATE_NAME = 'default'
 
 
-def _load_template() -> str:
-    """Charge le template .bashrc standardise depuis le disque."""
+def _load_template_from_file() -> str:
+    """Charge le template .bashrc standardise depuis le disque (fallback)."""
     if not _TEMPLATE_PATH.is_file():
         raise FileNotFoundError(f"Template introuvable : {_TEMPLATE_PATH}")
     return _TEMPLATE_PATH.read_text(encoding='utf-8')
 
 
-def _template_sha256() -> str:
-    """SHA256 du template standard (pour l'idempotence)."""
-    return hashlib.sha256(_load_template().encode('utf-8')).hexdigest()
+def _load_template(name: str = _DEFAULT_TEMPLATE_NAME) -> str:
+    """Charge le template depuis la BDD. Si vide, seed depuis le fichier."""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT content FROM bashrc_templates WHERE name = %s", (name,))
+            row = cur.fetchone()
+            if row and row.get('content'):
+                return row['content']
+            # Auto-seed : premier chargement → lit le fichier et le persiste
+            file_content = _load_template_from_file()
+            cur2 = conn.cursor()
+            cur2.execute(
+                "INSERT INTO bashrc_templates (name, content) VALUES (%s, %s) "
+                "ON DUPLICATE KEY UPDATE content = VALUES(content)",
+                (name, file_content)
+            )
+            conn.commit()
+            return file_content
+    except Exception as e:
+        logger.warning("Lecture template DB echouee (%s), fallback fichier : %s", name, e)
+        return _load_template_from_file()
+
+
+def _save_template(name: str, content: str, user_id: int) -> None:
+    """Sauvegarde un template en BDD."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO bashrc_templates (name, content, updated_by) VALUES (%s, %s, %s) "
+            "ON DUPLICATE KEY UPDATE content = VALUES(content), updated_by = VALUES(updated_by)",
+            (name, content, user_id or None)
+        )
+        conn.commit()
+
+
+def _template_sha256(name: str = _DEFAULT_TEMPLATE_NAME) -> str:
+    """SHA256 du template (pour l'idempotence)."""
+    return hashlib.sha256(_load_template(name).encode('utf-8')).hexdigest()
 
 
 # ── Helpers DB ───────────────────────────────────────────────────────────────
@@ -579,6 +620,60 @@ def restore():
     except Exception as e:
         logger.exception("Erreur restore bashrc : %s", e)
         return jsonify({'success': False, 'message': f"Erreur SSH : {e}"}), 500
+
+
+@bp.route('/bashrc/template', methods=['GET'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_bashrc')
+@threaded_route
+def get_template():
+    """Retourne le template actif (BDD)."""
+    try:
+        content = _load_template()
+        return jsonify({
+            'success': True,
+            'name': _DEFAULT_TEMPLATE_NAME,
+            'content': content,
+            'sha8': _template_sha256()[:8],
+            'lines': content.count('\n') + 1,
+            'bytes': len(content.encode('utf-8')),
+        })
+    except Exception as e:
+        logger.exception("Erreur get_template : %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/bashrc/template', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_bashrc')
+@threaded_route
+def save_template():
+    """Sauvegarde le template (edition via UI)."""
+    data = request.get_json(silent=True) or {}
+    content = data.get('content', '')
+    if not isinstance(content, str) or len(content) == 0:
+        return jsonify({'success': False, 'message': 'Contenu vide'}), 400
+    if len(content) > 512 * 1024:
+        return jsonify({'success': False, 'message': 'Contenu trop volumineux (512 Ko max)'}), 400
+
+    user_id, _ = get_current_user()
+    try:
+        _save_template(_DEFAULT_TEMPLATE_NAME, content, user_id)
+        sha8 = hashlib.sha256(content.encode('utf-8')).hexdigest()[:8]
+        _audit_log(user_id, 'save_template',
+                   f"name={_DEFAULT_TEMPLATE_NAME} sha8={sha8} bytes={len(content)}")
+        return jsonify({
+            'success': True,
+            'name': _DEFAULT_TEMPLATE_NAME,
+            'sha8': sha8,
+            'bytes': len(content.encode('utf-8')),
+            'lines': content.count('\n') + 1,
+        })
+    except Exception as e:
+        logger.exception("Erreur save_template : %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @bp.route('/bashrc/backups', methods=['GET'])

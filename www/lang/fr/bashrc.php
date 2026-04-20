@@ -65,6 +65,13 @@ return [
 
     // Template
     'bashrc.template_title' => 'Template .bashrc standardise',
-    'bashrc.template_desc' => 'Contenu du .bashrc qui sera deploye. Version 3.0 — maintenue par l\'equipe Admin.Sys.',
+    'bashrc.template_desc' => 'Editez le contenu du .bashrc qui sera deploye. Version persistee en BDD, source de verite pour tous les deploiements.',
     'bashrc.template_lines' => 'Lignes',
+    'bashrc.template_save' => 'Sauvegarder',
+    'bashrc.template_reset' => 'Annuler modifs',
+    'bashrc.template_dirty' => 'Modifications non sauvegardees',
+    'bashrc.template_saved' => 'Template sauvegarde.',
+    'bashrc.saving' => 'Sauvegarde…',
+    'bashrc.confirm_save_template' => 'Sauvegarder le nouveau template ? Les prochains deploiements utiliseront ce contenu.',
+    'bashrc.confirm_reset_template' => 'Annuler les modifications locales et restaurer la derniere version sauvegardee ?',
 ];
