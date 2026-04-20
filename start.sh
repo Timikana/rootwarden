@@ -27,6 +27,16 @@ NC='\033[0m'
 
 echo -e "${GREEN}[RootWarden]${NC} Demarrage securise..."
 
+# ── Detection Docker Compose (v2 plugin ou v1 standalone) ────────────────────
+if docker compose version >/dev/null 2>&1; then
+    DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+    DC="docker-compose"
+else
+    echo -e "${RED}[RootWarden]${NC} Ni 'docker compose' (v2) ni 'docker-compose' (v1) detecte." >&2
+    exit 1
+fi
+
 # ── Verification du fichier .env ─────────────────────────────────────────────
 if [ ! -f "${ENV_FILE}" ]; then
     echo -e "${RED}[ERREUR]${NC} Fichier srv-docker.env introuvable."
@@ -100,13 +110,13 @@ cd "${SCRIPT_DIR}"
 case "${1:-up}" in
     down|stop)
         echo -e "${GREEN}[RootWarden]${NC} Arret des conteneurs..."
-        docker-compose --env-file "${ENV_FILE}" ${PROFILE_FLAG} down "${@:2}"
+        ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} down "${@:2}"
         ;;
     logs)
-        docker-compose --env-file "${ENV_FILE}" ${PROFILE_FLAG} logs "${@:2}"
+        ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} logs "${@:2}"
         ;;
     *)
         echo -e "${GREEN}[RootWarden]${NC} Lancement des conteneurs..."
-        docker-compose --env-file "${ENV_FILE}" ${PROFILE_FLAG} up "$@"
+        ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up "$@"
         ;;
 esac
