@@ -163,9 +163,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'add_server') {
     $environment = validateInput($_POST['environment'], 'environment');
     $criticality = validateInput($_POST['criticality'], 'criticality');
     $network_type = validateInput($_POST['network_type'], 'network_type');
-    $zabbix_rsa_key = validateInput($_POST['zabbix_rsa_key'], 'rsa_key');
 
-    if (!$name || !$ip || !$user || !$port || !$environment || !$criticality || !$network_type || !$zabbix_rsa_key) {
+    if (!$name || !$ip || !$user || !$port || !$environment || !$criticality || !$network_type) {
         $error_fields = [];
         if (!$name) $error_fields[] = "Nom";
         if (!$ip) $error_fields[] = "IP";
@@ -174,13 +173,12 @@ if (isset($_POST['action']) && $_POST['action'] === 'add_server') {
         if (!$environment) $error_fields[] = "Environnement";
         if (!$criticality) $error_fields[] = "Criticité";
         if (!$network_type) $error_fields[] = "Réseau";
-        if (!$zabbix_rsa_key) $error_fields[] = "Clé RSA";
-        
+
         $response['message'] = "Données invalides fournies. Vérifiez les champs suivants : " . implode(', ', $error_fields);
     } else {
         try {
-            $stmt = $pdo->prepare("INSERT INTO machines (name, ip, user, password, root_password, port, environment, criticality, network_type, zabbix_rsa_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type, $zabbix_rsa_key]);
+            $stmt = $pdo->prepare("INSERT INTO machines (name, ip, user, password, root_password, port, environment, criticality, network_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type]);
             $response['success'] = true;
             $response['message'] = "Serveur ajouté avec succès.";
             $response['server_id'] = $pdo->lastInsertId();
@@ -203,9 +201,8 @@ elseif (isset($_POST['action']) && $_POST['action'] === 'update_server') {
     $environment = validateInput($_POST['environment'], 'environment');
     $criticality = validateInput($_POST['criticality'], 'criticality');
     $network_type = validateInput($_POST['network_type'], 'network_type');
-    $zabbix_rsa_key = validateInput($_POST['zabbix_rsa_key'], 'rsa_key');
 
-    if (!$server_id || !$name || !$ip || !$user || !$port || !$environment || !$criticality || !$network_type || !$zabbix_rsa_key) {
+    if (!$server_id || !$name || !$ip || !$user || !$port || !$environment || !$criticality || !$network_type) {
         $error_fields = [];
         if (!$server_id) $error_fields[] = "ID Serveur";
         if (!$name) $error_fields[] = "Nom";
@@ -215,8 +212,7 @@ elseif (isset($_POST['action']) && $_POST['action'] === 'update_server') {
         if (!$environment) $error_fields[] = "Environnement";
         if (!$criticality) $error_fields[] = "Criticité";
         if (!$network_type) $error_fields[] = "Réseau";
-        if (!$zabbix_rsa_key) $error_fields[] = "Clé RSA";
-        
+
         $response['message'] = "Données invalides fournies. Vérifiez les champs suivants : " . implode(', ', $error_fields);
     } else {
         $stmt = $pdo->prepare("SELECT password, root_password FROM machines WHERE id = ?");
@@ -230,8 +226,8 @@ elseif (isset($_POST['action']) && $_POST['action'] === 'update_server') {
             $root_password = empty($_POST['root_password']) ? $current_passwords['root_password'] : encryptPassword(trim($_POST['root_password']), false);
 
             try {
-                $stmt = $pdo->prepare("UPDATE machines SET name = ?, ip = ?, user = ?, password = ?, root_password = ?, port = ?, environment = ?, criticality = ?, network_type = ?, zabbix_rsa_key = ? WHERE id = ?");
-                $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type, $zabbix_rsa_key, $server_id]);
+                $stmt = $pdo->prepare("UPDATE machines SET name = ?, ip = ?, user = ?, password = ?, root_password = ?, port = ?, environment = ?, criticality = ?, network_type = ? WHERE id = ?");
+                $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type, $server_id]);
                 $response['success'] = true;
                 $response['message'] = "Informations du serveur mises à jour.";
             } catch (PDOException $e) {
