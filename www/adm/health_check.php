@@ -121,6 +121,10 @@ $routes = [
     ['Supervision Backups',    'POST', '/supervision/zabbix/backups', ['machine_id' => $machineId], 'Liste backups config agent'],
     ['Supervision Overrides',  'GET',  "/supervision/overrides/$machineId", null, 'Overrides par serveur'],
 
+    // ── Bashrc ───────────────────────────────────────────────────────────
+    ['Bashrc Users',           'GET',  "/bashrc/users?machine_id=$machineId", null, 'Liste users + etat .bashrc'],
+    ['Bashrc Backups',         'GET',  "/bashrc/backups?machine_id=$machineId&user=root", null, 'Liste backups .bashrc.bak.* pour root'],
+
     // ── SSH Audit ────────────────────────────────────────────────────────
     ['SSH Audit Scan',         'POST', '/ssh_audit/scan', ['machine_id' => $machineId], t('ssh_audit.scan')],
     ['SSH Audit Scan All',     'POST', '/ssh_audit/scan_all', [], t('ssh_audit.scan_all')],

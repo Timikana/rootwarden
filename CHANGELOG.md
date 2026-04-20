@@ -5,6 +5,41 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.0] — 2026-04-20
+
+### Module Bashrc — deploiement standardise du .bashrc par utilisateur
+
+- **Nouveau blueprint Flask** — `backend/routes/bashrc.py`. 6 routes :
+  `GET /bashrc/users`, `POST /bashrc/prerequisites`, `POST /bashrc/preview`,
+  `POST /bashrc/deploy`, `POST /bashrc/restore`, `GET /bashrc/backups`.
+  Decorateurs : `@require_api_key`, `@require_role(2)`, `@require_permission('can_manage_bashrc')`,
+  `@require_machine_access`, `@threaded_route`.
+- **Template versionne** — `backend/templates/bashrc_standard.sh` (v3.0).
+  Banniere figlet, tableau sysinfo 3/4 lignes (auto HA keepalived), 10 alertes
+  (disque, RAM, swap, MAJ securite, reboot requis, services failed, zombies,
+  tentatives SSH, reboot recent, session root), prompt git-aware, 40+ alias,
+  10 fonctions utilitaires, sourcage `~/.bashrc.local`.
+- **Mode merge intelligent** — Detecte les blocs `# >>> USER CUSTOM >>>` dans
+  l'ancien .bashrc et les reinjecte dans `~/.bashrc.local` (sourcee section 13).
+- **Prerequis figlet** — Detection + installation `apt install -y figlet` via
+  `execute_as_root` (meme chemin que le module `updates`).
+- **Idempotence** — Pas de backup ni de reecriture si sha256 identique au template.
+- **Securite** — Usernames valides `^[a-z_][a-z0-9_-]*$`, contenu transfere
+  exclusivement en base64 (`printf '%s' '{b64}' | base64 -d > ~/.bashrc`),
+  validation syntaxique `bash -n` post-deploiement, backup `.bashrc.bak.YYYYMMDD_HHMMSS`
+  avec `chmod 600`.
+- **Frontend** — `www/bashrc/index.php` avec 3 onglets (Deploiement / Historique /
+  Template). Tableau utilisateurs : UID, home, shell, taille, sha8, status,
+  badge custom detecte. Modal de preview avec diff colorise (unified diff).
+- **Migration 031** — Colonne `can_manage_bashrc` dans `permissions`.
+- **i18n FR + EN** — `www/lang/{fr,en}/bashrc.php` + cles nav + perms dans admin.php.
+- **Audit log** — Chaque `install_figlet`, `deploy`, `restore` journalise dans `user_logs`.
+- **Tests E2E** — `tests/e2e/go-bashrc.mjs` : login superadmin, select serveur,
+  preview dry_run, deploy mode merge, verify backup via SSH (pas docker exec),
+  restore, verification `bash -n` post-deploiement.
+
+---
+
 ## [1.13.1] — 2026-04-12
 
 ### Preferences de notifications email par utilisateur
