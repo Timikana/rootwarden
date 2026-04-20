@@ -5,6 +5,49 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.3] — 2026-04-20
+
+### CI — SAST + SCA + secrets scan + Trivy filesystem
+
+Reponse au gap #7 de l'audit DevSecOps. Note : Trivy image scan et
+auto-tagging existaient deja dans `.github/workflows/ci.yml`. Ce qui
+manquait (ajoute ici) : secrets commit scan, SAST Python, SCA Python + PHP,
+et Trivy fs (scan repo en amont des images).
+
+5 nouveaux jobs CI :
+- **secrets-scan** (gitleaks) — scanne tous les commits (fetch-depth: 0)
+  pour detecter clef AWS/GitHub/Stripe/Slack/SSH committee par accident.
+  Bloquant sur PR et main.
+- **sast-python** (bandit[toml]) — SAST Python avec config
+  `backend/bandit.yml` (skip B101/B404/B603/B607 car patterns legitimes
+  du projet, B608 conserve actif). Warning en PR, bloquant sur main.
+- **sca-python** (pip-audit) — CVE check sur requirements.txt fige.
+  Warning en PR, strict sur main.
+- **sca-php** (composer audit --locked) — CVE check sur composer.lock.
+  Warning en PR, strict sur main.
+- **trivy-fs** (aquasecurity/trivy-action) — scan repo (requirements,
+  composer.lock, Dockerfiles, docker-compose, secrets, misconfig IaC).
+  Complement au `security-scan` existant qui ne scanne que les images
+  apres build.
+
+Configuration :
+- `.gitleaks.toml` : baseline par defaut + allowlist des fichiers
+  `.example`, README, CHANGELOG, helpers.mjs (TOTP de test documente),
+  vendor/, backend/tests/. Regex pour filtrer les placeholders
+  `change_me`, `replace_me`, etc.
+- `backend/bandit.yml` : skips documentes des regles non-pertinentes
+  pour ce projet (subprocess SSH legitime, assert en non-test).
+
+Chainage :
+- `auto-tag` depend desormais de `[build-docker, security-scan,
+  secrets-scan, sast-python, sca-python, sca-php, trivy-fs]` → une
+  fuite de secret, un CVE critique ou une vuln filesystem empeche le
+  tag automatique.
+
+Version 1.14.2 -> 1.14.3.
+
+---
+
 ## [1.14.2] — 2026-04-20
 
 ### Audit log tamper-evident — hash chain SHA2-256
