@@ -263,7 +263,7 @@ class TestSupervisionBackups:
         mock_db._cursor._results = [{'id': 1, 'name': 'test', 'ip': '10.0.0.1', 'port': 22,
                                      'user': 'admin', 'password': 'enc', 'root_password': 'enc',
                                      'linux_version': 'Debian 12', 'network_type': 'INTERNE',
-                                     'zabbix_agent_version': None, 'zabbix_rsa_key': None,
+                                     'zabbix_agent_version': None,
                                      'service_account_deployed': False, 'environment': 'DEV'}]
         headers = self._headers(admin_headers)
         resp = client.post('/supervision/zabbix/restore',
@@ -277,7 +277,7 @@ class TestSupervisionBackups:
         mock_db._cursor._results = [{'id': 1, 'name': 'test', 'ip': '10.0.0.1', 'port': 22,
                                      'user': 'admin', 'password': 'enc', 'root_password': 'enc',
                                      'linux_version': 'Debian 12', 'network_type': 'INTERNE',
-                                     'zabbix_agent_version': None, 'zabbix_rsa_key': None,
+                                     'zabbix_agent_version': None,
                                      'service_account_deployed': False, 'environment': 'DEV'}]
         resp = client.post('/supervision/zabbix/restore',
                           headers=headers,

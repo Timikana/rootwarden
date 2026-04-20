@@ -103,7 +103,7 @@ def _resolve_machine(machine_id):
         cur = conn.cursor(dictionary=True)
         cur.execute(
             "SELECT id, name, ip, port, user, password, root_password, "
-            "linux_version, network_type, zabbix_agent_version, zabbix_rsa_key, "
+            "linux_version, network_type, zabbix_agent_version, "
             "service_account_deployed, environment "
             "FROM machines WHERE id = %s", (mid,))
         row = cur.fetchone()
@@ -598,11 +598,8 @@ def zabbix_deploy():
                     enc = Encryption()
                     try:
                         psk_value = enc.decrypt_password(global_cfg['tls_psk_value'])
-                    except Exception:
-                        # Fallback sur zabbix_rsa_key de la machine
-                        psk_value = row.get('zabbix_rsa_key')
-                elif row.get('zabbix_rsa_key'):
-                    psk_value = row['zabbix_rsa_key']
+                    except Exception as e:
+                        logger.warning("Dechiffrement PSK supervision echoue : %s", e)
 
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
@@ -799,10 +796,8 @@ def zabbix_reconfigure():
                         enc = Encryption()
                         try:
                             psk_value = enc.decrypt_password(global_cfg['tls_psk_value'])
-                        except Exception:
-                            psk_value = row.get('zabbix_rsa_key')
-                    elif row.get('zabbix_rsa_key'):
-                        psk_value = row['zabbix_rsa_key']
+                        except Exception as e:
+                            logger.warning("Dechiffrement PSK reconfigure echoue : %s", e)
 
                     if psk_value:
                         psk_b64 = base64.b64encode(psk_value.encode('utf-8')).decode('ascii')
