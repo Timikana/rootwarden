@@ -43,6 +43,8 @@ return [
     'dashboard.sc_compliance_desc' => 'Security report',
     'dashboard.sc_supervision' => 'Supervision',
     'dashboard.sc_supervision_desc' => 'Deploy and manage monitoring agents',
+    'dashboard.sc_bashrc' => 'Bashrc',
+    'dashboard.sc_bashrc_desc' => 'Deploy a standardized .bashrc',
     'dashboard.sc_ssh_audit' => 'SSH Audit',
     'dashboard.sc_ssh_audit_desc' => 'Scan SSH security config',
     'dashboard.sc_docs' => 'Documentation',
