@@ -2375,40 +2375,40 @@ paths:
         '200': { description: Template sauvegarde }
         '400': { description: Contenu vide ou trop volumineux }
 
-  # ── Graylog ────────────────────────────────────────────────────────────
+  # ── Graylog (rsyslog forwarding) ───────────────────────────────────────
 
   /graylog/config:
     get:
       tags: [Graylog]
-      summary: Retourne la config serveur Graylog (token masque)
+      summary: Config serveur Graylog
       responses:
         '200': { description: Config }
     post:
       tags: [Graylog]
-      summary: Sauvegarde config serveur
+      summary: Sauvegarde config (host/port/protocol/TLS/rate limit)
       requestBody:
         content:
           application/json:
             schema:
               type: object
-              required: [server_url]
+              required: [server_host]
               properties:
-                server_url: { type: string }
-                api_token: { type: string }
-                tls_verify: { type: boolean }
-                sidecar_version: { type: string }
-      responses:
-        '200': { description: OK }
+                server_host: { type: string }
+                server_port: { type: integer }
+                protocol: { type: string, enum: [udp, tcp, tls, relp] }
+                tls_ca_path: { type: string }
+                ratelimit_burst: { type: integer }
+                ratelimit_interval: { type: integer }
 
   /graylog/servers:
     get:
       tags: [Graylog]
-      summary: Liste des machines avec etat sidecar
+      summary: Liste machines + etat forwarding rsyslog
 
-  /graylog/install:
+  /graylog/deploy:
     post:
       tags: [Graylog]
-      summary: Installe le sidecar Graylog sur une machine
+      summary: Installe rsyslog si absent + ecrit forward conf + push templates
       requestBody:
         content:
           application/json:
@@ -2417,25 +2417,24 @@ paths:
               required: [machine_id]
               properties:
                 machine_id: { type: integer }
-                collector: { type: string, enum: [filebeat, nxlog, winlogbeat] }
+
+  /graylog/test:
+    post:
+      tags: [Graylog]
+      summary: Envoie un logger test depuis le serveur (tag horodate)
 
   /graylog/uninstall:
     post:
       tags: [Graylog]
-      summary: Desinstalle le sidecar Graylog
+      summary: Retire les fichiers RootWarden de /etc/rsyslog.d/
 
-  /graylog/register:
-    post:
-      tags: [Graylog]
-      summary: Verifie le status du sidecar distant
-
-  /graylog/collectors:
+  /graylog/templates:
     get:
       tags: [Graylog]
-      summary: Liste les collector templates (metas)
+      summary: Liste les templates rsyslog (metas)
     post:
       tags: [Graylog]
-      summary: Cree ou met a jour un collector (validation YAML si filebeat)
+      summary: Cree ou met a jour un template rsyslog
       requestBody:
         content:
           application/json:
@@ -2444,14 +2443,14 @@ paths:
               required: [name, content]
               properties:
                 name: { type: string, pattern: '^[a-zA-Z0-9_-]{1,100}$' }
-                collector_type: { type: string, enum: [filebeat, nxlog, winlogbeat] }
+                description: { type: string }
                 content: { type: string }
-                tags: { type: string }
+                enabled: { type: boolean }
 
-  /graylog/collectors/{name}:
+  /graylog/templates/{name}:
     get:
       tags: [Graylog]
-      summary: Retourne un collector (contenu complet)
+      summary: Retourne un template (contenu complet)
       parameters:
         - name: name
           in: path
@@ -2459,7 +2458,7 @@ paths:
           schema: { type: string }
     delete:
       tags: [Graylog]
-      summary: Supprime un collector
+      summary: Supprime un template
       parameters:
         - name: name
           in: path

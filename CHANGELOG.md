@@ -7,19 +7,31 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ## [1.15.0] — 2026-04-20
 
-### Module Graylog — deploiement du Sidecar + collectors editables
+### Module Graylog — forwarding rsyslog + templates editables
 
-- **Nouveau blueprint Flask** `backend/routes/graylog.py` avec 8 routes :
-  `GET /graylog/config`, `POST /graylog/config`, `GET /graylog/servers`,
-  `POST /graylog/install|uninstall|register`, `GET /graylog/collectors`,
-  `GET/POST/DELETE /graylog/collectors/<name>`.
-- **Installation via SSH root** : repo Graylog + `apt install graylog-sidecar`,
-  config `/etc/graylog/sidecar/sidecar.yml` ecrite en base64, `systemctl enable --now`.
-- **3 tables** : `graylog_config` (URL, token chiffre, TLS), `graylog_collectors`
-  (templates filebeat/nxlog/winlogbeat editables via UI avec validation YAML),
-  `graylog_sidecars` (etat par machine).
-- **UI 4 onglets** : Configuration, Deploiement (tableau serveurs + install/uninstall),
-  Collectors (liste + editeur textarea + save/delete), Historique.
+Approche rsyslog native (pas de sidecar Graylog) : plus simple, footprint
+minimal, streams et extractors geres cote admin directement sur Graylog.
+
+- **Nouveau blueprint Flask** `backend/routes/graylog.py` avec 9 routes :
+  `GET/POST /graylog/config`, `GET /graylog/servers`, `POST /graylog/deploy|test|uninstall`,
+  `GET /graylog/templates`, `GET/POST/DELETE /graylog/templates/<name>`.
+- **Deploiement via SSH root** : installe rsyslog si absent (`apt install rsyslog`,
+  `rsyslog-gnutls` si protocol=tls), ecrit `/etc/rsyslog.d/99-rootwarden-graylog-forward.conf`
+  avec la regle `*.* @host:port` adaptee au protocole, valide syntaxe (`rsyslogd -N1`),
+  redemarre `systemctl restart rsyslog`.
+- **4 protocoles supportes** : UDP (default 514, lossy), TCP (514, reliable),
+  TLS (6514, chiffre, CA configurable), RELP (20514, ACK applicatif via omrelp).
+- **Rate limiting optionnel** : `$SystemLogRateLimitBurst` / `Interval`.
+- **3 tables** : `graylog_config` (host, port, protocol, TLS CA, rate limit),
+  `graylog_templates` (snippets rsyslog editables via UI, 4 seeds dont
+  apache-access, mysql-slow, auth-log), `graylog_rsyslog` (etat par machine).
+- **Templates** : chaque template est pousse dans
+  `/etc/rsyslog.d/50-rootwarden-<name>.conf` au deploiement si `enabled=TRUE`.
+- **Test de forwarding** : `logger -t rootwarden-test` depuis le serveur distant
+  avec tag horodate a rechercher dans Graylog Search.
+- **UI 4 onglets** : Configuration (host/port/proto/TLS), Deploiement
+  (tableau serveurs + deploy/test/uninstall), Templates (liste + editeur +
+  toggle enabled + save/delete), Historique.
 - **Permission `can_manage_graylog`** (migration 033).
 
 ### Module Wazuh — agent SIEM + rules/decoders/CDB editables

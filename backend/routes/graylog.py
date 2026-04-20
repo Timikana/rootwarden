@@ -1,31 +1,39 @@
 """
-routes/graylog.py — Module Graylog : deploiement du Sidecar + collectors editables.
+routes/graylog.py — Module Graylog : forwarding rsyslog + templates editables.
 
 Maintenu : Equipe Admin.Sys RootWarden
 Version  : 1.15.0
 Modifie  : 2026-04-20
 
-Objectif :
-    Installer / desinstaller le Graylog Sidecar (filebeat/nxlog) sur les
-    serveurs du parc, gerer les collectors configs en BDD (editables via UI),
-    et les pousser au serveur Graylog via son API REST.
+Approche rsyslog (pas de sidecar) :
+    On configure rsyslog cote client pour forward les logs vers le serveur
+    Graylog. Les streams/extractors/dashboards sont geres par l'admin
+    directement sur le serveur Graylog.
+
+    Sur chaque serveur on ecrit deux fichiers dans /etc/rsyslog.d/ :
+      - 99-rootwarden-graylog-forward.conf : la regle de forwarding globale
+        (*.* @host:port) generee depuis graylog_config
+      - 50-rootwarden-<template>.conf : un fichier par snippet pousse
+        depuis graylog_templates (enabled=TRUE)
 
 Routes :
-    GET  /graylog/config          — Lit la config serveur Graylog
-    POST /graylog/config          — Sauvegarde config (url, token, tls)
-    GET  /graylog/servers         — Liste machines + etat sidecar
-    POST /graylog/install         — Installe le sidecar sur une ou plusieurs machines
-    POST /graylog/uninstall       — Desinstalle le sidecar
-    POST /graylog/register        — Enregistre le sidecar aupres de Graylog
-    GET  /graylog/collectors      — Liste des collector templates
-    POST /graylog/collectors      — Cree ou sauvegarde un collector
+    GET  /graylog/config           — Lit la config serveur
+    POST /graylog/config           — Sauvegarde (host, port, protocol, TLS)
+    GET  /graylog/servers          — Liste machines + etat forwarding
+    POST /graylog/deploy           — Installe rsyslog si manquant + ecrit confs
+    POST /graylog/test             — Envoie un logger test au serveur
+    POST /graylog/uninstall        — Retire les confs RootWarden (garde rsyslog)
+    GET  /graylog/templates        — Liste templates rsyslog
+    GET  /graylog/templates/<name> — Contenu d'un template
+    POST /graylog/templates        — Cree ou sauvegarde un template
+    DELETE /graylog/templates/<n>  — Supprime un template
 
 Securite :
-    - Zero trust : @require_api_key + @require_role(2) + @require_permission +
-      @require_machine_access (si machine_id) + @threaded_route
-    - api_token chiffre via Encryption (prefix aes:)
-    - Contenu collector transmis exclusivement en base64 vers le sidecar
-    - Validation YAML basique cote backend (yaml.safe_load) pour filebeat
+    - Zero trust : @require_api_key + @require_role(2) + @require_permission
+      + @require_machine_access (si machine_id) + @threaded_route
+    - Contenu rsyslog transmis exclusivement en base64 vers le serveur
+    - Validation stricte host (ip ou fqdn), port 1..65535
+    - Audit log prefix [graylog] sur chaque action
 """
 
 import re
@@ -40,13 +48,15 @@ from routes.helpers import (
     threaded_route, get_db_connection, server_decrypt_password, get_current_user, logger,
 )
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root
-from encryption import Encryption
 
 bp = Blueprint('graylog', __name__)
 
 _NAME_RE = re.compile(r'^[a-zA-Z0-9_-]{1,100}$')
-_URL_RE = re.compile(r'^https?://[a-zA-Z0-9.:/_-]+$')
-_VALID_COLLECTOR_TYPES = {'filebeat', 'nxlog', 'winlogbeat'}
+_HOST_RE = re.compile(r'^[a-zA-Z0-9._-]{1,253}$')
+_VALID_PROTOCOLS = {'udp', 'tcp', 'tls', 'relp'}
+
+_RW_CONF_PREFIX = '/etc/rsyslog.d/50-rootwarden-'
+_RW_FORWARD_CONF = '/etc/rsyslog.d/99-rootwarden-graylog-forward.conf'
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,28 +106,73 @@ def _get_ssh_creds(row):
     )
 
 
-def _update_sidecar_state(machine_id, **fields):
+def _upsert_state(machine_id, **fields):
     if not fields:
         return
     cols = list(fields.keys())
     vals = list(fields.values())
-    placeholders = ', '.join(f"{c} = %s" for c in cols)
     with get_db_connection() as conn:
         cur = conn.cursor()
-        # Upsert
         cur.execute(
-            "INSERT INTO graylog_sidecars (machine_id) VALUES (%s) "
-            "ON DUPLICATE KEY UPDATE machine_id = machine_id",
-            (machine_id,)
-        )
+            "INSERT INTO graylog_rsyslog (machine_id) VALUES (%s) "
+            "ON DUPLICATE KEY UPDATE machine_id = machine_id", (machine_id,))
+        placeholders = ', '.join(f"{c} = %s" for c in cols)
         cur.execute(
-            f"UPDATE graylog_sidecars SET {placeholders} WHERE machine_id = %s",
-            (*vals, machine_id)
-        )
+            f"UPDATE graylog_rsyslog SET {placeholders} WHERE machine_id = %s",
+            (*vals, machine_id))
         conn.commit()
 
 
-# ── Routes Config ────────────────────────────────────────────────────────────
+def _build_forward_conf(cfg):
+    """Construit le fichier 99-rootwarden-graylog-forward.conf depuis la config."""
+    host = cfg['server_host']
+    port = int(cfg['server_port'])
+    proto = cfg['protocol']
+    rl_burst = int(cfg.get('ratelimit_burst') or 0)
+    rl_interval = int(cfg.get('ratelimit_interval') or 0)
+
+    # rsyslog syntax :
+    #   UDP :  *.* @host:port
+    #   TCP :  *.* @@host:port
+    #   TLS :  *.* @@(o)host:port;RSYSLOG_SyslogProtocol23Format (+ settings TLS)
+    #   RELP : action(type="omrelp" target="host" port="port")
+    lines = [
+        "# Configuration rsyslog geree par RootWarden — ne pas editer a la main",
+        f"# Serveur Graylog : {host}:{port} ({proto})",
+        f"# Genere le {datetime.datetime.now().isoformat(timespec='seconds')}",
+        "",
+    ]
+    if rl_burst > 0 and rl_interval > 0:
+        lines.append(f'$SystemLogRateLimitBurst {rl_burst}')
+        lines.append(f'$SystemLogRateLimitInterval {rl_interval}')
+        lines.append("")
+
+    if proto == 'udp':
+        lines.append(f'*.* @{host}:{port}')
+    elif proto == 'tcp':
+        lines.append(f'*.* @@{host}:{port}')
+    elif proto == 'tls':
+        ca = cfg.get('tls_ca_path') or '/etc/ssl/certs/ca-certificates.crt'
+        lines.extend([
+            '# TLS : necessite rsyslog-gnutls installe',
+            '$DefaultNetstreamDriver gtls',
+            f'$DefaultNetstreamDriverCAFile {ca}',
+            '$ActionSendStreamDriverMode 1',
+            '$ActionSendStreamDriverAuthMode x509/name',
+            f'$ActionSendStreamDriverPermittedPeer {host}',
+            f'*.* @@(o){host}:{port};RSYSLOG_SyslogProtocol23Format',
+        ])
+    elif proto == 'relp':
+        lines.extend([
+            'module(load="omrelp")',
+            f'action(type="omrelp" target="{host}" port="{port}")',
+        ])
+
+    lines.append('')
+    return '\n'.join(lines)
+
+
+# ── Config ───────────────────────────────────────────────────────────────────
 
 @bp.route('/graylog/config', methods=['GET'])
 @require_api_key
@@ -126,12 +181,6 @@ def _update_sidecar_state(machine_id, **fields):
 @threaded_route
 def get_config():
     cfg = _get_config() or {}
-    # Ne jamais renvoyer le token en clair
-    if cfg.get('api_token'):
-        cfg['api_token_set'] = True
-        cfg['api_token'] = ''
-    else:
-        cfg['api_token_set'] = False
     return jsonify({'success': True, 'config': cfg})
 
 
@@ -142,62 +191,56 @@ def get_config():
 @threaded_route
 def save_config():
     data = request.get_json(silent=True) or {}
-    server_url = (data.get('server_url') or '').strip()
-    api_token = data.get('api_token', '')
-    tls_verify = bool(data.get('tls_verify', True))
-    sidecar_version = (data.get('sidecar_version') or 'latest').strip()
+    host = (data.get('server_host') or '').strip()
+    try:
+        port = int(data.get('server_port') or 514)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Port invalide'}), 400
+    protocol = (data.get('protocol') or 'udp').lower()
+    tls_ca = (data.get('tls_ca_path') or '').strip() or None
+    rl_burst = int(data.get('ratelimit_burst') or 0)
+    rl_interval = int(data.get('ratelimit_interval') or 0)
 
-    if not _URL_RE.match(server_url):
-        return jsonify({'success': False, 'message': 'URL invalide'}), 400
-    if not re.match(r'^[a-zA-Z0-9._-]{1,20}$', sidecar_version):
-        return jsonify({'success': False, 'message': 'Version invalide'}), 400
+    if not _HOST_RE.match(host):
+        return jsonify({'success': False, 'message': 'Host invalide'}), 400
+    if not (1 <= port <= 65535):
+        return jsonify({'success': False, 'message': 'Port hors bornes'}), 400
+    if protocol not in _VALID_PROTOCOLS:
+        return jsonify({'success': False, 'message': f'Protocole invalide : {protocol}'}), 400
+    if tls_ca and (len(tls_ca) > 255 or not tls_ca.startswith('/')):
+        return jsonify({'success': False, 'message': 'tls_ca_path invalide'}), 400
+    if rl_burst < 0 or rl_interval < 0 or rl_burst > 1_000_000 or rl_interval > 86400:
+        return jsonify({'success': False, 'message': 'Rate limit hors bornes'}), 400
 
     user_id, _ = get_current_user()
-    enc = Encryption()
-    token_enc = None
-    if api_token:
-        if len(api_token) > 4096:
-            return jsonify({'success': False, 'message': 'Token trop long'}), 400
-        token_enc = 'aes:' + enc.encrypt_password(api_token)
-
     try:
         with get_db_connection() as conn:
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT id, api_token FROM graylog_config ORDER BY id DESC LIMIT 1")
+            cur.execute("SELECT id FROM graylog_config ORDER BY id DESC LIMIT 1")
             existing = cur.fetchone()
+            cur2 = conn.cursor()
             if existing:
-                # Si token non fourni, on conserve l'ancien
-                if token_enc is None:
-                    cur2 = conn.cursor()
-                    cur2.execute(
-                        "UPDATE graylog_config SET server_url=%s, tls_verify=%s, "
-                        "sidecar_version=%s, updated_by=%s WHERE id=%s",
-                        (server_url, tls_verify, sidecar_version, user_id or None, existing['id'])
-                    )
-                else:
-                    cur2 = conn.cursor()
-                    cur2.execute(
-                        "UPDATE graylog_config SET server_url=%s, api_token=%s, tls_verify=%s, "
-                        "sidecar_version=%s, updated_by=%s WHERE id=%s",
-                        (server_url, token_enc, tls_verify, sidecar_version,
-                         user_id or None, existing['id'])
-                    )
-            else:
-                cur2 = conn.cursor()
                 cur2.execute(
-                    "INSERT INTO graylog_config (server_url, api_token, tls_verify, "
-                    "sidecar_version, updated_by) VALUES (%s, %s, %s, %s, %s)",
-                    (server_url, token_enc, tls_verify, sidecar_version, user_id or None)
-                )
+                    "UPDATE graylog_config SET server_host=%s, server_port=%s, protocol=%s, "
+                    "tls_ca_path=%s, ratelimit_burst=%s, ratelimit_interval=%s, updated_by=%s "
+                    "WHERE id=%s",
+                    (host, port, protocol, tls_ca, rl_burst, rl_interval,
+                     user_id or None, existing['id']))
+            else:
+                cur2.execute(
+                    "INSERT INTO graylog_config (server_host, server_port, protocol, "
+                    "tls_ca_path, ratelimit_burst, ratelimit_interval, updated_by) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (host, port, protocol, tls_ca, rl_burst, rl_interval, user_id or None))
             conn.commit()
-        _audit(user_id, 'save_config', f"url={server_url} version={sidecar_version}")
-        return jsonify({'success': True, 'message': 'Configuration enregistree.'})
+        _audit(user_id, 'save_config', f"host={host}:{port}/{protocol}")
+        return jsonify({'success': True})
     except Exception as e:
         logger.exception("Erreur save_config graylog : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-# ── Routes Servers / Sidecar ─────────────────────────────────────────────────
+# ── Servers ──────────────────────────────────────────────────────────────────
 
 @bp.route('/graylog/servers', methods=['GET'])
 @require_api_key
@@ -209,9 +252,9 @@ def list_servers():
         cur = conn.cursor(dictionary=True)
         cur.execute("""
             SELECT m.id, m.name, m.ip, m.port, m.environment, m.online_status,
-                   s.sidecar_id, s.version, s.status, s.last_seen, s.installed_at
+                   r.rsyslog_version, r.forward_deployed, r.last_deploy_at
             FROM machines m
-            LEFT JOIN graylog_sidecars s ON s.machine_id = m.id
+            LEFT JOIN graylog_rsyslog r ON r.machine_id = m.id
             WHERE m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived'
             ORDER BY m.name
         """)
@@ -219,97 +262,137 @@ def list_servers():
     return jsonify({'success': True, 'servers': servers})
 
 
-@bp.route('/graylog/install', methods=['POST'])
+@bp.route('/graylog/deploy', methods=['POST'])
 @require_api_key
 @require_role(2)
 @require_permission('can_manage_graylog')
 @require_machine_access
 @threaded_route
-def install():
+def deploy():
+    """Deploie rsyslog + push forward conf + push templates enabled."""
     data = request.get_json(silent=True) or {}
-    machine_id = data.get('machine_id')
-    collector = (data.get('collector') or 'filebeat').lower()
-    if collector not in _VALID_COLLECTOR_TYPES:
-        return jsonify({'success': False, 'message': f'collector invalide : {collector}'}), 400
-
-    cfg = _get_config()
-    if not cfg or not cfg.get('server_url'):
-        return jsonify({'success': False, 'message': 'Config Graylog absente (voir onglet Configuration)'}), 400
-
-    row, err = _resolve_machine(machine_id)
+    row, err = _resolve_machine(data.get('machine_id'))
     if err:
         return err
 
+    cfg = _get_config()
+    if not cfg or not cfg.get('server_host'):
+        return jsonify({'success': False, 'message': 'Config Graylog absente (onglet Configuration)'}), 400
+
+    # Charger les templates enabled
+    with get_db_connection() as conn:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT name, content FROM graylog_templates WHERE enabled = TRUE ORDER BY name")
+        templates = cur.fetchall()
+
     user_id, _ = get_current_user()
-    ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
-    server_url = cfg['server_url']
+    ip, port, ssh_user, pwd, root_pwd, svc = _get_ssh_creds(row)
+    forward_conf = _build_forward_conf(cfg)
 
-    # Token en clair (uniquement pour envoyer au sidecar)
-    token_plain = ''
-    if cfg.get('api_token'):
-        try:
-            enc = Encryption()
-            val = cfg['api_token']
-            if val.startswith('aes:'):
-                val = val[4:]
-            token_plain = enc.decrypt_password(val) or ''
-        except Exception as e:
-            logger.warning("Dechiffrement token graylog echec : %s", e)
-
-    # Installation Debian/Ubuntu
     install_cmd = (
         "export DEBIAN_FRONTEND=noninteractive && "
-        "curl -sSL https://packages.graylog2.org/repo/debian/gpg.key | gpg --dearmor -o /usr/share/keyrings/graylog-archive-keyring.gpg && "
-        "echo 'deb [signed-by=/usr/share/keyrings/graylog-archive-keyring.gpg] "
-        "https://packages.graylog2.org/repo/debian/ stable 5.2' > /etc/apt/sources.list.d/graylog.list && "
-        "apt-get update -qq && "
-        "apt-get install -y graylog-sidecar"
-    )
-
-    # Config sidecar
-    sidecar_conf = (
-        f"server_url: \"{server_url}\"\n"
-        f"server_api_token: \"{token_plain}\"\n"
-        f"node_id: file:/etc/graylog/sidecar/node-id\n"
-        f"tls_skip_verify: {'true' if not cfg.get('tls_verify', True) else 'false'}\n"
-        f"send_status: true\n"
-        f"log_path: /var/log/graylog-sidecar\n"
-        f"collector_configuration_directory: /var/lib/graylog-sidecar/generated\n"
-    )
-    b64 = base64.b64encode(sidecar_conf.encode('utf-8')).decode('ascii')
-    deploy_cmd = (
-        f"mkdir -p /etc/graylog/sidecar && "
-        f"printf '%s' '{b64}' | base64 -d > /etc/graylog/sidecar/sidecar.yml && "
-        f"chmod 640 /etc/graylog/sidecar/sidecar.yml && "
-        f"graylog-sidecar -service install 2>/dev/null || true && "
-        f"systemctl enable --now graylog-sidecar"
+        "if ! command -v rsyslogd >/dev/null 2>&1; then "
+        "apt-get update -qq && apt-get install -y rsyslog; "
+        f"fi && {'apt-get install -y rsyslog-gnutls' if cfg['protocol'] == 'tls' else 'true'}"
     )
 
     try:
-        with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
-            out, err_out, code = execute_as_root(client, install_cmd, root_pwd, logger=logger, timeout=300)
+        with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
+            # Install rsyslog si absent
+            out, err_out, code = execute_as_root(client, install_cmd, root_pwd, logger=logger, timeout=180)
             if code != 0:
-                _audit(user_id, 'install_fail', f"machine_id={row['id']} apt_code={code}")
-                return jsonify({'success': False, 'message': 'Installation apt echouee',
-                                'stderr': (err_out or '')[-1000:]}), 500
+                _audit(user_id, 'deploy_fail_install', f"machine_id={row['id']} code={code}")
+                return jsonify({'success': False, 'message': 'Installation rsyslog echouee',
+                                'stderr': (err_out or '')[-1500:]}), 500
 
-            out2, err2, code2 = execute_as_root(client, deploy_cmd, root_pwd, logger=logger, timeout=60)
-            if code2 != 0:
-                _audit(user_id, 'configure_fail', f"machine_id={row['id']} code={code2}")
-                return jsonify({'success': False, 'message': 'Ecriture config sidecar echouee',
-                                'stderr': (err2 or '')[-1000:]}), 500
-
-            # Detection version installee
+            # Detection version
             v_out, _, _ = execute_as_root(client,
-                "graylog-sidecar -version 2>&1 | head -1 || echo unknown",
-                root_pwd, logger=logger, timeout=10)
-            version = (v_out or 'unknown').strip()[:20]
+                "rsyslogd -v 2>&1 | head -1 || echo unknown",
+                root_pwd, logger=logger, timeout=5)
+            version = (v_out or '').strip()[:40]
 
-        _update_sidecar_state(row['id'], version=version, status='running')
-        _audit(user_id, 'install', f"machine_id={row['id']} collector={collector} version={version}")
-        return jsonify({'success': True, 'message': 'Sidecar installe et demarre.', 'version': version})
+            # Ecriture conf forward
+            b64 = base64.b64encode(forward_conf.encode('utf-8')).decode('ascii')
+            write_cmd = (
+                f"printf '%s' '{b64}' | base64 -d > {_RW_FORWARD_CONF} && "
+                f"chmod 644 {_RW_FORWARD_CONF}"
+            )
+            _, err2, code2 = execute_as_root(client, write_cmd, root_pwd, logger=logger, timeout=10)
+            if code2 != 0:
+                _audit(user_id, 'deploy_fail_write', f"machine_id={row['id']} code={code2}")
+                return jsonify({'success': False, 'message': 'Ecriture conf echouee',
+                                'stderr': (err2 or '')[-1500:]}), 500
+
+            # Nettoyer anciens snippets RootWarden puis pousser ceux enabled
+            execute_as_root(client, f"rm -f {_RW_CONF_PREFIX}*.conf",
+                            root_pwd, logger=logger, timeout=5)
+
+            pushed = []
+            for tpl in templates:
+                if not _NAME_RE.match(tpl['name']):
+                    continue
+                path = f"{_RW_CONF_PREFIX}{tpl['name']}.conf"
+                b = base64.b64encode((tpl['content'] or '').encode('utf-8')).decode('ascii')
+                execute_as_root(client,
+                    f"printf '%s' '{b}' | base64 -d > {path} && chmod 644 {path}",
+                    root_pwd, logger=logger, timeout=10)
+                pushed.append(tpl['name'])
+
+            # Validation syntaxique
+            _, chk_err, chk_code = execute_as_root(client,
+                "rsyslogd -N1 2>&1 | head -40",
+                root_pwd, logger=logger, timeout=15)
+            syntax_ok = (chk_code == 0)
+
+            # Redemarrage
+            _, rst_err, rst_code = execute_as_root(client,
+                "systemctl restart rsyslog", root_pwd, logger=logger, timeout=30)
+            restart_ok = (rst_code == 0)
+
+        _upsert_state(row['id'], rsyslog_version=version,
+                      forward_deployed=True,
+                      last_deploy_at=datetime.datetime.now())
+        _audit(user_id, 'deploy',
+               f"machine_id={row['id']} version={version} templates={len(pushed)} "
+               f"syntax={syntax_ok} restart={restart_ok}")
+        return jsonify({
+            'success': restart_ok and syntax_ok,
+            'rsyslog_version': version,
+            'templates_pushed': pushed,
+            'syntax_ok': syntax_ok,
+            'restart_ok': restart_ok,
+            'stderr': (rst_err or chk_err or '')[-1000:] if not (syntax_ok and restart_ok) else '',
+        })
     except Exception as e:
-        logger.exception("Erreur install graylog : %s", e)
+        logger.exception("Erreur deploy graylog : %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/graylog/test', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_graylog')
+@require_machine_access
+@threaded_route
+def test_forward():
+    """Envoie un logger test depuis le serveur distant vers Graylog."""
+    data = request.get_json(silent=True) or {}
+    row, err = _resolve_machine(data.get('machine_id'))
+    if err:
+        return err
+    user_id, _ = get_current_user()
+    ip, port, ssh_user, pwd, root_pwd, svc = _get_ssh_creds(row)
+    tag = f"rootwarden-test-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+    try:
+        with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
+            _, err_out, code = execute_as_root(client,
+                f"logger -t '{tag}' 'ping depuis RootWarden {row['name']}'",
+                root_pwd, logger=logger, timeout=5)
+        _audit(user_id, 'test_forward', f"machine_id={row['id']} tag={tag}")
+        return jsonify({'success': code == 0, 'tag': tag,
+                        'hint': "Cherche le tag ci-dessus dans Graylog Search"})
+    except Exception as e:
+        logger.exception("Erreur test_forward : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -320,178 +403,121 @@ def install():
 @require_machine_access
 @threaded_route
 def uninstall():
+    """Retire les fichiers RootWarden dans /etc/rsyslog.d/ (garde rsyslog)."""
     data = request.get_json(silent=True) or {}
     row, err = _resolve_machine(data.get('machine_id'))
     if err:
         return err
-
     user_id, _ = get_current_user()
-    ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
-
-    cmd = (
-        "export DEBIAN_FRONTEND=noninteractive && "
-        "systemctl stop graylog-sidecar 2>/dev/null || true && "
-        "graylog-sidecar -service uninstall 2>/dev/null || true && "
-        "apt-get purge -y graylog-sidecar 2>/dev/null || true && "
-        "rm -rf /etc/graylog/sidecar /var/lib/graylog-sidecar"
-    )
+    ip, port, ssh_user, pwd, root_pwd, svc = _get_ssh_creds(row)
     try:
-        with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
-            out, err_out, code = execute_as_root(client, cmd, root_pwd, logger=logger, timeout=180)
-        _update_sidecar_state(row['id'], status='never_registered', version=None, sidecar_id=None)
-        _audit(user_id, 'uninstall', f"machine_id={row['id']} code={code}")
-        return jsonify({'success': code == 0, 'message': 'Sidecar desinstalle.' if code == 0 else 'Desinstallation partielle'})
+        with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
+            execute_as_root(client,
+                f"rm -f {_RW_FORWARD_CONF} {_RW_CONF_PREFIX}*.conf && systemctl restart rsyslog",
+                root_pwd, logger=logger, timeout=30)
+        _upsert_state(row['id'], forward_deployed=False)
+        _audit(user_id, 'uninstall', f"machine_id={row['id']}")
+        return jsonify({'success': True})
     except Exception as e:
         logger.exception("Erreur uninstall graylog : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@bp.route('/graylog/register', methods=['POST'])
-@require_api_key
-@require_role(2)
-@require_permission('can_manage_graylog')
-@require_machine_access
-@threaded_route
-def register():
-    """Marque le sidecar comme registered (verif heartbeat simple).
+# ── Templates ────────────────────────────────────────────────────────────────
 
-    En v1 on ne fait qu'un status check SSH. Une v2 pourrait appeler
-    l'API Graylog pour verifier la presence du sidecar.
-    """
-    data = request.get_json(silent=True) or {}
-    row, err = _resolve_machine(data.get('machine_id'))
-    if err:
-        return err
-
-    user_id, _ = get_current_user()
-    ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
-
-    try:
-        with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
-            out, _, code = execute_as_root(client,
-                "systemctl is-active graylog-sidecar 2>/dev/null || echo inactive",
-                root_pwd, logger=logger, timeout=10)
-            status = 'running' if 'active' in (out or '').strip() else 'stopped'
-
-        _update_sidecar_state(row['id'], status=status,
-                              last_seen=datetime.datetime.now())
-        _audit(user_id, 'register', f"machine_id={row['id']} status={status}")
-        return jsonify({'success': True, 'status': status})
-    except Exception as e:
-        logger.exception("Erreur register graylog : %s", e)
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-# ── Routes Collectors (templates editables) ──────────────────────────────────
-
-@bp.route('/graylog/collectors', methods=['GET'])
+@bp.route('/graylog/templates', methods=['GET'])
 @require_api_key
 @require_role(2)
 @require_permission('can_manage_graylog')
 @threaded_route
-def list_collectors():
+def list_templates():
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
         cur.execute("""
-            SELECT id, name, collector_type, tags,
-                   LENGTH(content) AS bytes,
-                   SHA2(content, 256) AS sha_full,
-                   updated_at
-            FROM graylog_collectors ORDER BY name
+            SELECT id, name, description, enabled, LENGTH(content) AS bytes,
+                   SHA2(content, 256) AS sha_full, updated_at
+            FROM graylog_templates ORDER BY name
         """)
         rows = cur.fetchall()
     for r in rows:
         r['sha8'] = (r.pop('sha_full') or '')[:8]
-    return jsonify({'success': True, 'collectors': rows})
+    return jsonify({'success': True, 'templates': rows})
 
 
-@bp.route('/graylog/collectors/<name>', methods=['GET'])
+@bp.route('/graylog/templates/<name>', methods=['GET'])
 @require_api_key
 @require_role(2)
 @require_permission('can_manage_graylog')
 @threaded_route
-def get_collector(name):
+def get_template(name):
     if not _NAME_RE.match(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM graylog_collectors WHERE name = %s", (name,))
+        cur.execute("SELECT * FROM graylog_templates WHERE name = %s", (name,))
         row = cur.fetchone()
     if not row:
-        return jsonify({'success': False, 'message': 'Collector introuvable'}), 404
-    return jsonify({'success': True, 'collector': row})
+        return jsonify({'success': False, 'message': 'Template introuvable'}), 404
+    return jsonify({'success': True, 'template': row})
 
 
-@bp.route('/graylog/collectors', methods=['POST'])
+@bp.route('/graylog/templates', methods=['POST'])
 @require_api_key
 @require_role(2)
 @require_permission('can_manage_graylog')
 @threaded_route
-def save_collector():
+def save_template():
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
-    ctype = (data.get('collector_type') or 'filebeat').lower()
+    description = (data.get('description') or '').strip()[:255]
     content = data.get('content', '')
-    tags = (data.get('tags') or '').strip()
+    enabled = bool(data.get('enabled', False))
 
     if not _NAME_RE.match(name):
         return jsonify({'success': False, 'message': 'Nom invalide (^[a-zA-Z0-9_-]{1,100}$)'}), 400
-    if ctype not in _VALID_COLLECTOR_TYPES:
-        return jsonify({'success': False, 'message': f'collector_type invalide : {ctype}'}), 400
     if not isinstance(content, str):
         return jsonify({'success': False, 'message': 'Contenu invalide'}), 400
-    if len(content) > 512 * 1024:
-        return jsonify({'success': False, 'message': 'Contenu trop volumineux (512 Ko max)'}), 400
-    if len(tags) > 255:
-        return jsonify({'success': False, 'message': 'Tags trop longs'}), 400
-
-    # Validation YAML best-effort (non bloquant si lib absente)
-    if content and ctype == 'filebeat':
-        try:
-            import yaml  # type: ignore
-            yaml.safe_load(content)
-        except ImportError:
-            pass
-        except Exception as e:
-            return jsonify({'success': False, 'message': f'YAML invalide : {e}'}), 400
+    if len(content) > 128 * 1024:
+        return jsonify({'success': False, 'message': 'Contenu trop volumineux (128 Ko max)'}), 400
 
     user_id, _ = get_current_user()
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
             cur.execute(
-                "INSERT INTO graylog_collectors (name, collector_type, content, tags, updated_by) "
+                "INSERT INTO graylog_templates (name, description, content, enabled, updated_by) "
                 "VALUES (%s, %s, %s, %s, %s) "
-                "ON DUPLICATE KEY UPDATE collector_type=VALUES(collector_type), "
-                "content=VALUES(content), tags=VALUES(tags), updated_by=VALUES(updated_by)",
-                (name, ctype, content, tags or None, user_id or None)
-            )
+                "ON DUPLICATE KEY UPDATE description=VALUES(description), "
+                "content=VALUES(content), enabled=VALUES(enabled), updated_by=VALUES(updated_by)",
+                (name, description or None, content, enabled, user_id or None))
             conn.commit()
         sha8 = hashlib.sha256(content.encode('utf-8')).hexdigest()[:8]
-        _audit(user_id, 'save_collector', f"name={name} type={ctype} sha8={sha8} bytes={len(content)}")
-        return jsonify({'success': True, 'name': name, 'sha8': sha8, 'bytes': len(content.encode('utf-8'))})
+        _audit(user_id, 'save_template',
+               f"name={name} enabled={enabled} sha8={sha8} bytes={len(content)}")
+        return jsonify({'success': True, 'name': name, 'sha8': sha8,
+                        'bytes': len(content.encode('utf-8'))})
     except Exception as e:
-        logger.exception("Erreur save_collector : %s", e)
+        logger.exception("Erreur save_template graylog : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@bp.route('/graylog/collectors/<name>', methods=['DELETE'])
+@bp.route('/graylog/templates/<name>', methods=['DELETE'])
 @require_api_key
 @require_role(2)
 @require_permission('can_manage_graylog')
 @threaded_route
-def delete_collector(name):
+def delete_template(name):
     if not _NAME_RE.match(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     user_id, _ = get_current_user()
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
-            cur.execute("DELETE FROM graylog_collectors WHERE name = %s", (name,))
+            cur.execute("DELETE FROM graylog_templates WHERE name = %s", (name,))
             deleted = cur.rowcount
             conn.commit()
-        _audit(user_id, 'delete_collector', f"name={name} deleted={deleted}")
+        _audit(user_id, 'delete_template', f"name={name} deleted={deleted}")
         return jsonify({'success': deleted > 0, 'deleted': deleted})
     except Exception as e:
-        logger.exception("Erreur delete_collector : %s", e)
+        logger.exception("Erreur delete_template : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
