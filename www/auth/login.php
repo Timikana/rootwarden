@@ -41,11 +41,11 @@ function checkLoginRateLimit(PDO $pdo): bool {
     $windowSeconds = 600; // 10 minutes
     $maxAttempts = 5;
 
-    // Nettoyage des tentatives expirées
-    $pdo->prepare("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)")
-        ->execute([$windowSeconds]);
+    // Nettoyage des tentatives expirées (au-dela de 24h pour preserver l'analyse spraying)
+    $pdo->prepare("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 86400 SECOND)")
+        ->execute();
 
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND success = 0 AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)");
     $stmt->execute([$ip, $windowSeconds]);
     $count = (int) $stmt->fetchColumn();
 
@@ -53,15 +53,57 @@ function checkLoginRateLimit(PDO $pdo): bool {
 }
 
 /**
- * Enregistre une tentative de connexion échouée pour l'IP courante.
- *
- * @param PDO $pdo Instance de connexion à la base de données.
- * @return void
+ * Detection password spraying : meme IP teste plus de 5 usernames distincts en 10min.
+ * Retourne le nombre de usernames testes (>= 5 = suspect).
  */
-function recordFailedLoginAttempt(PDO $pdo): void {
+function detectPasswordSpraying(PDO $pdo): int {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $pdo->prepare("INSERT INTO login_attempts (ip_address, attempted_at) VALUES (?, NOW())")
-        ->execute([$ip]);
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(DISTINCT username) FROM login_attempts
+         WHERE ip_address = ? AND success = 0 AND username IS NOT NULL
+         AND attempted_at >= DATE_SUB(NOW(), INTERVAL 600 SECOND)"
+    );
+    $stmt->execute([$ip]);
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * Enregistre une tentative de connexion (succes ou echec) avec username.
+ */
+function recordLoginAttempt(PDO $pdo, ?string $username, bool $success): void {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $pdo->prepare("INSERT INTO login_attempts (ip_address, username, success, attempted_at) VALUES (?, ?, ?, NOW())")
+        ->execute([$ip, $username ? substr($username, 0, 100) : null, $success ? 1 : 0]);
+}
+
+/** Backward-compat alias utilise ailleurs dans le code. */
+function recordFailedLoginAttempt(PDO $pdo, ?string $username = null): void {
+    recordLoginAttempt($pdo, $username, false);
+}
+
+/**
+ * Calcule la duree de lockout per-user en fonction du nombre d'echecs consecutifs.
+ * Progression : 1min → 5min → 15min → 60min → 240min (max).
+ */
+function computeUserLockoutSeconds(int $failedAttempts): int {
+    if ($failedAttempts < 3) return 0;
+    return match ($failedAttempts) {
+        3 => 60,
+        4 => 300,
+        5 => 900,
+        6 => 3600,
+        default => 14400, // 4h pour 7+ echecs
+    };
+}
+
+/**
+ * Notifie le superadmin via user_logs d'une activite suspecte (password spraying detecte).
+ */
+function notifySpraying(PDO $pdo, string $ip, int $distinctUsers): void {
+    try {
+        $pdo->prepare("INSERT INTO user_logs (user_id, action, created_at) VALUES (0, ?, NOW())")
+            ->execute([sprintf("[security] Password spraying detecte — IP=%s usernames=%d/10min", $ip, $distinctUsers)]);
+    } catch (\Exception $e) {}
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -72,17 +114,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error    = null;
 
     if (!checkLoginRateLimit($pdo)) {
+        // Detection password spraying : alerter si > 5 usernames distincts testes
+        $sprayed = detectPasswordSpraying($pdo);
+        if ($sprayed >= 5) {
+            notifySpraying($pdo, $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', $sprayed);
+        }
         $error = t('login.error_rate_limit');
     } else {
-        $stmt = $pdo->prepare("SELECT id, name, password, role_id, totp_secret, active FROM users WHERE name = ?");
+        $stmt = $pdo->prepare("SELECT id, name, password, role_id, totp_secret, active, failed_attempts, locked_until FROM users WHERE name = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && (int)($user['active'] ?? 0) !== 1) {
+        // Lockout per-user avec backoff progressif
+        $isUserLocked = false;
+        $userLockRemaining = 0;
+        if ($user && !empty($user['locked_until'])) {
+            $lockTs = strtotime($user['locked_until']);
+            if ($lockTs > time()) {
+                $isUserLocked = true;
+                $userLockRemaining = $lockTs - time();
+            }
+        }
+
+        if ($isUserLocked) {
+            // On NE verifie PAS le password — evite oracle sur le lockout
+            recordLoginAttempt($pdo, $username, false);
+            $mins = (int)ceil($userLockRemaining / 60);
+            $error = t('login.error_user_locked', ['minutes' => $mins]);
+        } elseif ($user && (int)($user['active'] ?? 0) !== 1) {
             // Compte desactive — message generique (pas d'enumeration)
-            recordFailedLoginAttempt($pdo);
+            recordLoginAttempt($pdo, $username, false);
             $error = t('login.error_credentials');
         } elseif ($user && password_verify($password, $user['password'])) {
+            // Reset du compteur per-user au succes
+            try {
+                $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
+                    ->execute([$user['id']]);
+            } catch (\Exception $e) {}
+            recordLoginAttempt($pdo, $username, true);
+
             // NE PAS initialiser la session complete avant le 2FA !
             // Seul temp_user est set ici. La session definitive est initialisee
             // dans verify_2fa.php apres verification du code TOTP.
@@ -144,14 +214,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
 
         } else {
-            recordFailedLoginAttempt($pdo);
-            // Historique de login : echec
+            recordLoginAttempt($pdo, $username, false);
+
+            // Incrementer failed_attempts + calculer lockout per-user
             if ($user) {
+                try {
+                    $newFailed = (int)($user['failed_attempts'] ?? 0) + 1;
+                    $lockSec = computeUserLockoutSeconds($newFailed);
+                    if ($lockSec > 0) {
+                        $pdo->prepare(
+                            "UPDATE users SET failed_attempts = ?, locked_until = DATE_ADD(NOW(), INTERVAL ? SECOND), "
+                            . "last_failed_login_at = NOW() WHERE id = ?"
+                        )->execute([$newFailed, $lockSec, $user['id']]);
+                        // Notification superadmin au 5eme echec consecutif
+                        if ($newFailed === 5) {
+                            $pdo->prepare("INSERT INTO user_logs (user_id, action, created_at) VALUES (?, ?, NOW())")
+                                ->execute([$user['id'], sprintf(
+                                    "[security] Compte verrouille apres %d echecs consecutifs — IP=%s",
+                                    $newFailed, $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
+                                )]);
+                        }
+                    } else {
+                        $pdo->prepare(
+                            "UPDATE users SET failed_attempts = ?, last_failed_login_at = NOW() WHERE id = ?"
+                        )->execute([$newFailed, $user['id']]);
+                    }
+                } catch (\Exception $e) {}
+
+                // Historique de login : echec
                 try {
                     $pdo->prepare("INSERT INTO login_history (user_id, ip_address, user_agent, status) VALUES (?, ?, ?, 'failed_password')")
                         ->execute([$user['id'], $_SERVER['REMOTE_ADDR'] ?? '', substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500)]);
                 } catch (\Exception $e) {}
             }
+
+            // Detection password spraying
+            $sprayed = detectPasswordSpraying($pdo);
+            if ($sprayed >= 5) {
+                notifySpraying($pdo, $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0', $sprayed);
+            }
+
             // Message générique pour éviter l'énumération d'utilisateurs
             $error = t('login.error_credentials');
         }
