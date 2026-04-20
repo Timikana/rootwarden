@@ -137,6 +137,120 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────
+  # Job 4.1 : Gitleaks — detection de secrets commit (API keys, tokens)
+  # ─────────────────────────────────────────────────────────────
+  secrets-scan:
+    name: Secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # full history pour scanner tous les commits
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Si le repo n'a pas de config, gitleaks utilise sa baseline par defaut
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 4.2 : Bandit — SAST Python (SQL inj, shell inj, hardcoded secrets)
+  # ─────────────────────────────────────────────────────────────
+  sast-python:
+    name: SAST Python (bandit)
+    runs-on: ubuntu-latest
+    needs: lint-python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install bandit
+        run: pip install bandit[toml]
+      - name: Run bandit
+        working-directory: backend
+        # -ll = low severity minimum, -ii = medium confidence minimum
+        # Exclut les repertoires de tests (faux-positifs frequents)
+        run: |
+          bandit -r . -ll -ii --exclude ./tests,./__pycache__ --format txt || EXIT=$?
+          # Non-bloquant en PR, bloquant sur main
+          if [ "${{ github.event_name }}" = "pull_request" ]; then exit 0; fi
+          exit ${EXIT:-0}
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 4.3 : SCA Python (safety + pip-audit — CVE sur dependencies)
+  # ─────────────────────────────────────────────────────────────
+  sca-python:
+    name: SCA Python (pip-audit)
+    runs-on: ubuntu-latest
+    needs: lint-python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run pip-audit on requirements
+        working-directory: backend
+        # Scan du requirements.txt fige. --strict = fail si CVE detectee.
+        # On reste en mode warning sur PR pour ne pas bloquer la velocite.
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pip-audit -r requirements.txt --desc || true
+          else
+            pip-audit -r requirements.txt --desc --strict
+          fi
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 4.4 : SCA PHP (composer audit — CVE sur dependances Composer)
+  # ─────────────────────────────────────────────────────────────
+  sca-php:
+    name: SCA PHP (composer audit)
+    runs-on: ubuntu-latest
+    needs: lint-php
+    steps:
+      - uses: actions/checkout@v5
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer
+      - name: Composer install (sans scripts pour eviter hooks arbitraires)
+        working-directory: www
+        run: composer install --no-scripts --no-interaction --no-progress
+      - name: Composer audit
+        working-directory: www
+        # --locked force le scan des versions exactes pinnees dans composer.lock
+        # --format=plain pour output GitHub-friendly
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            composer audit --locked --format=plain || true
+          else
+            composer audit --locked --format=plain
+          fi
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 4.5 : Trivy fs — scan vulnerabilites au niveau du repo
+  # (complement au scan des images Docker plus bas)
+  # ─────────────────────────────────────────────────────────────
+  trivy-fs:
+    name: Trivy filesystem scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Trivy fs (requirements + composer + misconfig IaC)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          # Scanne : requirements.txt, composer.lock, Dockerfiles, docker-compose.yml
+          scanners: vuln,secret,misconfig
+
+  # ─────────────────────────────────────────────────────────────
   # Job 5 : Scan securite images Docker (Trivy)
   # ─────────────────────────────────────────────────────────────
   security-scan:
@@ -194,7 +308,7 @@ jobs:
   auto-tag:
     name: Auto tag version
     runs-on: ubuntu-latest
-    needs: [build-docker, security-scan]
+    needs: [build-docker, security-scan, secrets-scan, sast-python, sca-python, sca-php, trivy-fs]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write

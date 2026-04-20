@@ -1,0 +1,26 @@
+# Bandit config — SAST Python RootWarden
+# Doc : https://bandit.readthedocs.io/en/latest/config.html
+
+# Exclure les repertoires non-source
+exclude_dirs:
+  - /tests
+  - /__pycache__
+  - /backups
+  - /ssl
+  - /logs
+  - /platform_ssh
+
+# Niveaux d'alerte
+skips:
+  # B101 : use of assert — OK dans le code (non test) ou justifie
+  - B101
+  # B404 : import subprocess — utilise legitimement pour execute_as_root SSH
+  - B404
+  # B603, B607 : subprocess sans shell=True — deja safe par design
+  - B603
+  - B607
+  # B608 : hardcoded SQL — on utilise des parametres prepared PDO systematiquement
+  # mais bandit flag parfois les f-strings SQL safe (ex: ORDER BY col whitelistee)
+  # → on garde B608 actif, a gerer au cas par cas
+
+# Rappel : les vrais enjeux restent SQL injection (B608) et shell injection (B602)
