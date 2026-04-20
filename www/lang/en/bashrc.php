@@ -74,4 +74,6 @@ return [
     'bashrc.saving' => 'Saving…',
     'bashrc.confirm_save_template' => 'Save the new template? Future deployments will use this content.',
     'bashrc.confirm_reset_template' => 'Discard local changes and restore the last saved version?',
+    'bashrc.template_danger' => 'Potentially destructive patterns detected',
+    'bashrc.template_danger_confirm' => 'WARNING: the template contains dangerous patterns. Confirm anyway?',
 ];

@@ -39,6 +39,8 @@ import base64
 import hashlib
 import datetime
 import difflib
+import subprocess
+import tempfile
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
@@ -644,13 +646,36 @@ def get_template():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+def _validate_bash_syntax(content: str):
+    """Valide la syntaxe bash via `bash -n`. Retourne (ok, error_msg)."""
+    try:
+        with tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False, encoding='utf-8') as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            res = subprocess.run(['bash', '-n', tmp_path],
+                                 capture_output=True, text=True, timeout=10)
+            if res.returncode != 0:
+                return False, (res.stderr or 'Syntaxe invalide').strip()[:500]
+            return True, ''
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+    except subprocess.TimeoutExpired:
+        return False, 'Validation bash -n timeout'
+    except Exception as e:
+        return False, f'Erreur validation : {e}'
+
+
 @bp.route('/bashrc/template', methods=['POST'])
 @require_api_key
 @require_role(2)
 @require_permission('can_manage_bashrc')
 @threaded_route
 def save_template():
-    """Sauvegarde le template (edition via UI)."""
+    """Sauvegarde le template (edition via UI). Valide la syntaxe bash avant write."""
     data = request.get_json(silent=True) or {}
     content = data.get('content', '')
     if not isinstance(content, str) or len(content) == 0:
@@ -658,18 +683,35 @@ def save_template():
     if len(content) > 512 * 1024:
         return jsonify({'success': False, 'message': 'Contenu trop volumineux (512 Ko max)'}), 400
 
+    # Validation syntaxe bash
+    ok, err = _validate_bash_syntax(content)
+    if not ok:
+        return jsonify({'success': False, 'message': f"Syntaxe bash invalide : {err}"}), 400
+
     user_id, _ = get_current_user()
     try:
+        # Diff pour audit log
+        old_content = _load_template(_DEFAULT_TEMPLATE_NAME)
+        diff_lines = list(difflib.unified_diff(
+            old_content.splitlines(), content.splitlines(),
+            fromfile='before', tofile='after', lineterm='', n=0,
+        ))
+        diff_summary = (
+            f"+{sum(1 for l in diff_lines if l.startswith('+') and not l.startswith('+++'))}/"
+            f"-{sum(1 for l in diff_lines if l.startswith('-') and not l.startswith('---'))}"
+        )
+
         _save_template(_DEFAULT_TEMPLATE_NAME, content, user_id)
         sha8 = hashlib.sha256(content.encode('utf-8')).hexdigest()[:8]
         _audit_log(user_id, 'save_template',
-                   f"name={_DEFAULT_TEMPLATE_NAME} sha8={sha8} bytes={len(content)}")
+                   f"name={_DEFAULT_TEMPLATE_NAME} sha8={sha8} bytes={len(content)} diff={diff_summary}")
         return jsonify({
             'success': True,
             'name': _DEFAULT_TEMPLATE_NAME,
             'sha8': sha8,
             'bytes': len(content.encode('utf-8')),
             'lines': content.count('\n') + 1,
+            'diff_summary': diff_summary,
         })
     except Exception as e:
         logger.exception("Erreur save_template : %s", e)

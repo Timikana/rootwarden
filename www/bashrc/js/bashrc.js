@@ -280,6 +280,17 @@ async function bashrcTemplateLoad(force = false) {
     bashrcTemplateUpdateMeta(res);
     if (status) status.textContent = '';
     bashrcTemplateSetDirty(false);
+    // Scan initial pour badge danger (si le template en DB contient deja des patterns)
+    const warnEl = document.getElementById('tpl-danger');
+    if (warnEl) {
+        const hits = bashrcTemplateScanDanger(ed.value);
+        if (hits.length) {
+            warnEl.textContent = '⚠ ' + __('bashrc.template_danger') + ' : ' + hits.join(', ');
+            warnEl.classList.remove('hidden');
+        } else {
+            warnEl.classList.add('hidden');
+        }
+    }
 }
 
 function bashrcTemplateUpdateMeta(info) {
@@ -291,10 +302,40 @@ function bashrcTemplateUpdateMeta(info) {
     if (b) b.textContent = info.bytes ?? '—';
 }
 
+// Patterns destructeurs courants — alerte UI (pas un blocage)
+const _TPL_DANGER_PATTERNS = [
+    { re: /\brm\s+-[rRf]+\s+\/(\s|$)/,          name: 'rm -rf /' },
+    { re: /\bdd\s+if=.*of=\/dev\/[sh]d[a-z]/,   name: 'dd vers disque' },
+    { re: /:\(\)\s*\{[^}]*\|\s*:\s*&[^}]*\};\s*:/, name: 'fork bomb' },
+    { re: /\bmkfs\.\w+\s+\/dev\//,               name: 'mkfs' },
+    { re: /\b>\s*\/dev\/[sh]d[a-z]/,             name: 'redirect vers disque' },
+    { re: /\bchmod\s+-R\s+0*777\s+\//,           name: 'chmod 777 /' },
+    { re: /\bcurl[^|]*\|\s*(sudo\s+)?(ba)?sh\b/, name: 'curl|sh' },
+    { re: /\bwget[^|]*\|\s*(sudo\s+)?(ba)?sh\b/, name: 'wget|sh' },
+];
+
+function bashrcTemplateScanDanger(content) {
+    const hits = [];
+    for (const p of _TPL_DANGER_PATTERNS) {
+        if (p.re.test(content)) hits.push(p.name);
+    }
+    return hits;
+}
+
 function bashrcTemplateDirty() {
     const ed = document.getElementById('tpl-editor');
     if (!ed) return;
     bashrcTemplateSetDirty(ed.value !== _tplOriginal);
+    // Scan live pour alerte visuelle
+    const warnEl = document.getElementById('tpl-danger');
+    if (!warnEl) return;
+    const hits = bashrcTemplateScanDanger(ed.value);
+    if (hits.length) {
+        warnEl.textContent = '⚠ ' + __('bashrc.template_danger') + ' : ' + hits.join(', ');
+        warnEl.classList.remove('hidden');
+    } else {
+        warnEl.classList.add('hidden');
+    }
 }
 
 function bashrcTemplateSetDirty(dirty) {
@@ -307,7 +348,10 @@ function bashrcTemplateSetDirty(dirty) {
 async function bashrcTemplateSave() {
     const ed = document.getElementById('tpl-editor');
     if (!ed || !ed.value) return;
-    if (!confirm(__('bashrc.confirm_save_template'))) return;
+    const hits = bashrcTemplateScanDanger(ed.value);
+    if (hits.length) {
+        if (!confirm(__('bashrc.template_danger_confirm') + '\n\n• ' + hits.join('\n• '))) return;
+    } else if (!confirm(__('bashrc.confirm_save_template'))) return;
     const btn = document.getElementById('btn-tpl-save');
     const status = document.getElementById('tpl-status');
     if (btn) btn.disabled = true;
