@@ -1,5 +1,5 @@
 /**
- * graylog.js — Frontend module Graylog.
+ * graylog.js — Frontend module Graylog (rsyslog forwarding).
  * Maintenu : Equipe Admin.Sys RootWarden — v1.15.0
  */
 const API = window.API_URL || '/api_proxy.php';
@@ -8,10 +8,7 @@ function escHtml(s) { const d = document.createElement('div'); d.textContent = s
 function escAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\/g, '&#92;'); }
 function __(k) { return (window._i18n && window._i18n[k]) || k; }
 
-function getCsrfToken() {
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute('content') : '';
-}
+function getCsrfToken() { const m = document.querySelector('meta[name="csrf-token"]'); return m ? m.getAttribute('content') : ''; }
 
 async function apiFetch(path, opts = {}) {
     const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -19,41 +16,40 @@ async function apiFetch(path, opts = {}) {
     if (csrf) headers['X-CSRF-TOKEN'] = csrf;
     const res = await fetch(`${API}${path}`, Object.assign({ headers }, opts));
     const text = await res.text();
-    try { return JSON.parse(text); }
-    catch { return { success: false, message: text || `HTTP ${res.status}` }; }
+    try { return JSON.parse(text); } catch { return { success: false, message: text || `HTTP ${res.status}` }; }
 }
 
-// ── Config ────────────────────────────────────────────────────
+// ── Config ─────────────────────────────────────
 
 async function glLoadConfig() {
     const r = await apiFetch('/graylog/config');
     if (!r.success || !r.config) return;
     const c = r.config;
-    document.getElementById('gl-server-url').value = c.server_url || '';
-    document.getElementById('gl-sidecar-version').value = c.sidecar_version || 'latest';
-    document.getElementById('gl-tls-verify').checked = c.tls_verify !== false;
-    const ts = document.getElementById('gl-token-status');
-    if (ts) ts.textContent = c.api_token_set ? ('(' + __('graylog.token_set') + ')') : ('(' + __('graylog.token_not_set') + ')');
+    document.getElementById('gl-host').value = c.server_host || '';
+    document.getElementById('gl-port').value = c.server_port || 514;
+    document.getElementById('gl-proto').value = c.protocol || 'udp';
+    document.getElementById('gl-tls-ca').value = c.tls_ca_path || '';
+    document.getElementById('gl-rl-burst').value = c.ratelimit_burst || 0;
+    document.getElementById('gl-rl-interval').value = c.ratelimit_interval || 0;
 }
 
 async function glSaveConfig() {
     const body = {
-        server_url: document.getElementById('gl-server-url').value.trim(),
-        sidecar_version: document.getElementById('gl-sidecar-version').value.trim(),
-        tls_verify: document.getElementById('gl-tls-verify').checked,
-        api_token: document.getElementById('gl-api-token').value,
+        server_host: document.getElementById('gl-host').value.trim(),
+        server_port: parseInt(document.getElementById('gl-port').value, 10) || 514,
+        protocol: document.getElementById('gl-proto').value,
+        tls_ca_path: document.getElementById('gl-tls-ca').value.trim(),
+        ratelimit_burst: parseInt(document.getElementById('gl-rl-burst').value, 10) || 0,
+        ratelimit_interval: parseInt(document.getElementById('gl-rl-interval').value, 10) || 0,
     };
     const status = document.getElementById('gl-config-status');
     status.textContent = __('graylog.saving');
     const r = await apiFetch('/graylog/config', { method: 'POST', body: JSON.stringify(body) });
     status.textContent = r.success ? ('✓ ' + __('graylog.saved')) : ('✗ ' + escHtml(r.message || 'Erreur'));
-    if (r.success) {
-        document.getElementById('gl-api-token').value = '';
-        glLoadConfig();
-    }
+    if (r.success) glLoadConfig();
 }
 
-// ── Servers / sidecar ────────────────────────────────────────
+// ── Servers ────────────────────────────────────
 
 async function glLoadServers() {
     const c = document.getElementById('gl-servers-container');
@@ -65,21 +61,21 @@ async function glLoadServers() {
         '<th class="text-left px-3 py-2">Name</th><th class="text-left px-3 py-2">IP</th>' +
         `<th class="text-left px-3 py-2">${escHtml(__('graylog.col_status'))}</th>` +
         `<th class="text-left px-3 py-2">${escHtml(__('graylog.col_version'))}</th>` +
+        `<th class="text-left px-3 py-2">${escHtml(__('graylog.col_last_deploy'))}</th>` +
         `<th class="text-left px-3 py-2">${escHtml(__('graylog.col_actions'))}</th></tr></thead><tbody class="divide-y divide-gray-100 dark:divide-gray-700">`;
     for (const s of r.servers) {
-        const badge = ({
-            running: `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">${escHtml(__('graylog.status_running'))}</span>`,
-            stopped: `<span class="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40">${escHtml(__('graylog.status_stopped'))}</span>`,
-            never_registered: `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700">${escHtml(__('graylog.status_never'))}</span>`,
-        })[s.status] || `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">${escHtml(s.status || '—')}</span>`;
+        const badge = s.forward_deployed
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40">${escHtml(__('graylog.status_forwarding'))}</span>`
+            : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700">${escHtml(__('graylog.status_not_deployed'))}</span>`;
         html += `<tr>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.name)}</td>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.ip)}</td>
             <td class="px-3 py-2">${badge}</td>
-            <td class="px-3 py-2 mono text-xs">${escHtml(s.version || '—')}</td>
+            <td class="px-3 py-2 mono text-[11px]">${escHtml(s.rsyslog_version || '—')}</td>
+            <td class="px-3 py-2 mono text-xs">${escHtml(s.last_deploy_at || '—')}</td>
             <td class="px-3 py-2 whitespace-nowrap">
-                <button onclick="glInstall(${s.id})" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('graylog.btn_install'))}</button>
-                <button onclick="glRegister(${s.id})" class="text-xs text-green-500 hover:text-green-700 ml-2">${escHtml(__('graylog.btn_register'))}</button>
+                <button onclick="glDeploy(${s.id})" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('graylog.btn_deploy'))}</button>
+                <button onclick="glTest(${s.id})" class="text-xs text-green-500 hover:text-green-700 ml-2">${escHtml(__('graylog.btn_test'))}</button>
                 <button onclick="glUninstall(${s.id})" class="text-xs text-red-500 hover:text-red-700 ml-2">${escHtml(__('graylog.btn_uninstall'))}</button>
             </td>
         </tr>`;
@@ -88,99 +84,98 @@ async function glLoadServers() {
     c.innerHTML = html;
 }
 
-async function glInstall(machineId) {
-    if (!confirm(__('graylog.confirm_install'))) return;
-    const r = await apiFetch('/graylog/install', { method: 'POST', body: JSON.stringify({ machine_id: machineId, collector: 'filebeat' }) });
-    alert((r.message || (r.success ? 'OK' : 'Echec')) + (r.version ? ' — v' + r.version : ''));
+async function glDeploy(mid) {
+    if (!confirm(__('graylog.confirm_deploy'))) return;
+    const r = await apiFetch('/graylog/deploy', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
+    const parts = [];
+    if (r.rsyslog_version) parts.push('rsyslog=' + r.rsyslog_version);
+    if (r.templates_pushed) parts.push('templates=' + r.templates_pushed.length);
+    if (r.syntax_ok !== undefined) parts.push('syntax=' + (r.syntax_ok ? 'OK' : 'KO'));
+    if (r.restart_ok !== undefined) parts.push('restart=' + (r.restart_ok ? 'OK' : 'KO'));
+    alert((r.success ? '✓ OK' : '✗ Echec') + '\n\n' + parts.join('  ') + (r.stderr ? '\n\n' + r.stderr : ''));
     glLoadServers();
 }
 
-async function glUninstall(machineId) {
+async function glTest(mid) {
+    const r = await apiFetch('/graylog/test', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
+    alert((r.success ? '✓ ' : '✗ ') + __('graylog.test_sent') + '\n\ntag=' + (r.tag || '—') + '\n\n' + (r.hint || r.message || ''));
+}
+
+async function glUninstall(mid) {
     if (!confirm(__('graylog.confirm_uninstall'))) return;
-    const r = await apiFetch('/graylog/uninstall', { method: 'POST', body: JSON.stringify({ machine_id: machineId }) });
-    alert(r.message || (r.success ? 'OK' : 'Echec'));
+    const r = await apiFetch('/graylog/uninstall', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
+    alert(r.success ? 'OK' : (r.message || 'Echec'));
     glLoadServers();
 }
 
-async function glRegister(machineId) {
-    const r = await apiFetch('/graylog/register', { method: 'POST', body: JSON.stringify({ machine_id: machineId }) });
-    alert('status=' + (r.status || '—'));
-    glLoadServers();
-}
+// ── Templates ──────────────────────────────────
 
-// ── Collectors ────────────────────────────────────────────────
-
-let _glCurrentCollector = null;
-
-async function glLoadCollectors() {
-    const list = document.getElementById('gl-collectors-list');
-    if (!list) return;
-    const r = await apiFetch('/graylog/collectors');
+async function glLoadTemplates() {
+    const list = document.getElementById('gl-templates-list');
+    const r = await apiFetch('/graylog/templates');
     if (!r.success) { list.innerHTML = `<div class="text-xs text-red-500 p-2">${escHtml(r.message || 'Erreur')}</div>`; return; }
-    if (!r.collectors.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">—</div>`; return; }
-    list.innerHTML = r.collectors.map(c => `
+    if (!r.templates.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">—</div>`; return; }
+    list.innerHTML = r.templates.map(t => `
         <div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/40 cursor-pointer text-xs"
-             onclick="glSelectCollector('${escAttr(c.name)}')">
+             onclick="glSelectTemplate('${escAttr(t.name)}')">
             <div class="flex items-center gap-2 min-w-0">
-                <span class="font-medium truncate">${escHtml(c.name)}</span>
-                <span class="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">${escHtml(c.collector_type)}</span>
+                <span class="font-medium truncate">${escHtml(t.name)}</span>
+                ${t.enabled
+                    ? `<span class="text-[10px] px-1 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40">${escHtml(__('graylog.enabled'))}</span>`
+                    : `<span class="text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-gray-700">${escHtml(__('graylog.disabled'))}</span>`}
             </div>
-            <span class="text-[10px] text-gray-400 mono">${c.bytes}o</span>
+            <span class="text-[10px] text-gray-400 mono">${t.bytes}o</span>
         </div>`).join('');
 }
 
-async function glSelectCollector(name) {
-    const r = await apiFetch('/graylog/collectors/' + encodeURIComponent(name));
+async function glSelectTemplate(name) {
+    const r = await apiFetch('/graylog/templates/' + encodeURIComponent(name));
     if (!r.success) { alert(r.message); return; }
-    _glCurrentCollector = name;
-    document.getElementById('gl-col-name').value = r.collector.name;
-    document.getElementById('gl-col-type').value = r.collector.collector_type;
-    document.getElementById('gl-col-tags').value = r.collector.tags || '';
-    document.getElementById('gl-col-editor').value = r.collector.content || '';
-    document.getElementById('gl-col-status').textContent = `sha=${r.collector ? '' : ''} bytes=${(r.collector.content || '').length}`;
+    document.getElementById('gl-tpl-name').value = r.template.name;
+    document.getElementById('gl-tpl-description').value = r.template.description || '';
+    document.getElementById('gl-tpl-enabled').checked = !!r.template.enabled;
+    document.getElementById('gl-tpl-editor').value = r.template.content || '';
+    document.getElementById('gl-tpl-status').textContent = `bytes=${(r.template.content || '').length}`;
 }
 
-function glNewCollector() {
-    _glCurrentCollector = null;
-    document.getElementById('gl-col-name').value = '';
-    document.getElementById('gl-col-type').value = 'filebeat';
-    document.getElementById('gl-col-tags').value = '';
-    document.getElementById('gl-col-editor').value = '';
-    document.getElementById('gl-col-status').textContent = '';
+function glNewTemplate() {
+    document.getElementById('gl-tpl-name').value = '';
+    document.getElementById('gl-tpl-description').value = '';
+    document.getElementById('gl-tpl-enabled').checked = false;
+    document.getElementById('gl-tpl-editor').value = '';
+    document.getElementById('gl-tpl-status').textContent = '';
 }
 
-async function glSaveCollector() {
+async function glSaveTemplate() {
     const body = {
-        name: document.getElementById('gl-col-name').value.trim(),
-        collector_type: document.getElementById('gl-col-type').value,
-        content: document.getElementById('gl-col-editor').value,
-        tags: document.getElementById('gl-col-tags').value.trim(),
+        name: document.getElementById('gl-tpl-name').value.trim(),
+        description: document.getElementById('gl-tpl-description').value.trim(),
+        content: document.getElementById('gl-tpl-editor').value,
+        enabled: document.getElementById('gl-tpl-enabled').checked,
     };
-    const status = document.getElementById('gl-col-status');
+    const status = document.getElementById('gl-tpl-status');
     status.textContent = __('graylog.saving');
-    const r = await apiFetch('/graylog/collectors', { method: 'POST', body: JSON.stringify(body) });
+    const r = await apiFetch('/graylog/templates', { method: 'POST', body: JSON.stringify(body) });
     if (!r.success) { status.textContent = '✗ ' + escHtml(r.message || 'Erreur'); return; }
     status.textContent = `✓ ${__('graylog.saved')} — sha=${r.sha8} ${r.bytes}o`;
-    _glCurrentCollector = body.name;
-    glLoadCollectors();
+    glLoadTemplates();
 }
 
-async function glDeleteCollector() {
-    const name = document.getElementById('gl-col-name').value.trim();
+async function glDeleteTemplate() {
+    const name = document.getElementById('gl-tpl-name').value.trim();
     if (!name) return;
-    if (!confirm(__('graylog.confirm_delete_collector') + '\n\n' + name)) return;
-    const r = await apiFetch('/graylog/collectors/' + encodeURIComponent(name), { method: 'DELETE' });
+    if (!confirm(__('graylog.confirm_delete_template') + '\n\n' + name)) return;
+    const r = await apiFetch('/graylog/templates/' + encodeURIComponent(name), { method: 'DELETE' });
     alert(r.success ? 'OK' : (r.message || 'Echec'));
-    if (r.success) { glNewCollector(); glLoadCollectors(); }
+    if (r.success) { glNewTemplate(); glLoadTemplates(); }
 }
 
-// Auto-init onglets
 document.addEventListener('DOMContentLoaded', () => {
     glLoadConfig();
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.tab-btn');
         if (!btn) return;
         if (btn.dataset.tab === 'deploy') glLoadServers();
-        if (btn.dataset.tab === 'collectors') glLoadCollectors();
+        if (btn.dataset.tab === 'templates') glLoadTemplates();
     });
 });

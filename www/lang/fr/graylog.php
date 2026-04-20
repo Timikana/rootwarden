@@ -1,63 +1,68 @@
 <?php
-// lang/fr/graylog.php — Module Graylog (Sidecar + collectors)
+// lang/fr/graylog.php — Module Graylog (rsyslog forwarding + templates)
 return [
     'graylog.title' => 'Graylog',
-    'graylog.subtitle' => 'Deploiement du Graylog Sidecar et gestion des collectors de logs.',
+    'graylog.subtitle' => 'Forwarding rsyslog vers votre serveur Graylog et templates editables par source.',
 
     // Onglets
     'graylog.tab_config' => 'Configuration',
     'graylog.tab_deploy' => 'Deploiement',
-    'graylog.tab_collectors' => 'Collectors',
+    'graylog.tab_templates' => 'Templates rsyslog',
     'graylog.tab_history' => 'Historique',
 
     // Configuration
     'graylog.config_title' => 'Configuration serveur Graylog',
-    'graylog.config_desc' => 'URL du serveur, token API et version du sidecar a deployer sur les machines.',
-    'graylog.server_url' => 'URL du serveur',
-    'graylog.api_token' => 'Token API',
-    'graylog.api_token_placeholder' => 'Laisser vide pour ne pas modifier',
-    'graylog.tls_verify' => 'Verifier le certificat TLS',
-    'graylog.sidecar_version' => 'Version sidecar',
-    'graylog.token_set' => 'defini',
-    'graylog.token_not_set' => 'non defini',
-
-    // Deploiement
-    'graylog.deploy_title' => 'Deploiement du sidecar',
-    'graylog.refresh' => 'Rafraichir',
-    'graylog.no_servers' => 'Aucun serveur disponible.',
-    'graylog.col_status' => 'Statut',
-    'graylog.col_version' => 'Version',
-    'graylog.col_actions' => 'Actions',
-    'graylog.status_running' => 'Actif',
-    'graylog.status_stopped' => 'Arrete',
-    'graylog.status_never' => 'Non installe',
-
-    'graylog.btn_install' => 'Installer',
-    'graylog.btn_uninstall' => 'Desinstaller',
-    'graylog.btn_restart' => 'Redemarrer',
-    'graylog.btn_register' => 'Verifier',
-
-    'graylog.confirm_install' => 'Installer le sidecar Graylog (filebeat) sur ce serveur ?',
-    'graylog.confirm_uninstall' => 'Desinstaller le sidecar ? Les logs ne seront plus remontes.',
-    'graylog.installing' => 'Installation en cours…',
-
-    // Collectors
-    'graylog.collectors_list' => 'Collectors',
-    'graylog.new' => 'Nouveau',
-    'graylog.col_name' => 'Nom du collector',
-    'graylog.col_tags' => 'Tags (CSV)',
+    'graylog.config_desc' => 'Les logs des machines seront forwardes vers ce serveur. Streams et extractors sont geres sur Graylog directement.',
+    'graylog.server_host' => 'Host Graylog (IP/FQDN)',
+    'graylog.server_port' => 'Port',
+    'graylog.protocol' => 'Protocole',
+    'graylog.tls_ca' => 'Chemin CA (TLS)',
+    'graylog.rl_burst' => 'Rate limit burst (0 = off)',
+    'graylog.rl_interval' => 'Rate limit interval (sec)',
     'graylog.save' => 'Sauvegarder',
-    'graylog.delete' => 'Supprimer',
     'graylog.saving' => 'Sauvegarde…',
     'graylog.saved' => 'Sauvegarde.',
-    'graylog.confirm_delete_collector' => 'Supprimer ce collector ?',
 
-    // Historique
-    'graylog.history_title' => 'Historique (100 dernieres actions)',
-    'graylog.history_empty' => 'Aucune action enregistree.',
+    // Deploiement
+    'graylog.deploy_title' => 'Deploiement rsyslog',
+    'graylog.deploy_desc' => 'Installe rsyslog si absent, ecrit la regle de forwarding dans /etc/rsyslog.d/ et redemarre le service. Les templates activees sont egalement pousses.',
+    'graylog.refresh' => 'Rafraichir',
+    'graylog.loading' => 'Chargement…',
+    'graylog.no_servers' => 'Aucun serveur disponible.',
+
+    'graylog.col_status' => 'Statut',
+    'graylog.col_version' => 'Version rsyslog',
+    'graylog.col_last_deploy' => 'Dernier deploy',
+    'graylog.col_actions' => 'Actions',
     'graylog.col_date' => 'Date',
     'graylog.col_user' => 'Utilisateur',
     'graylog.col_action' => 'Action',
 
-    'graylog.loading' => 'Chargement…',
+    'graylog.status_forwarding' => 'Forwarding actif',
+    'graylog.status_not_deployed' => 'Non deploye',
+
+    'graylog.btn_deploy' => 'Deployer',
+    'graylog.btn_test' => 'Test',
+    'graylog.btn_uninstall' => 'Retirer',
+
+    'graylog.confirm_deploy' => 'Deployer la config rsyslog sur ce serveur (install si absent + redemarrage) ?',
+    'graylog.confirm_uninstall' => 'Retirer les fichiers RootWarden de /etc/rsyslog.d/ et redemarrer ?',
+    'graylog.deploying' => 'Deploiement…',
+    'graylog.test_sent' => 'Logger envoye',
+
+    // Templates
+    'graylog.templates_list' => 'Templates rsyslog',
+    'graylog.new' => 'Nouveau',
+    'graylog.tpl_name' => 'Nom (ex: apache-access)',
+    'graylog.tpl_desc' => 'Description (optionnel)',
+    'graylog.tpl_enabled' => 'Pousser au deploy',
+    'graylog.tpl_editor_hint' => 'Snippet rsyslog pousse dans /etc/rsyslog.d/50-rootwarden-<nom>.conf lors du prochain deploy.',
+    'graylog.delete' => 'Supprimer',
+    'graylog.confirm_delete_template' => 'Supprimer ce template ?',
+    'graylog.enabled' => 'actif',
+    'graylog.disabled' => 'inactif',
+
+    // Historique
+    'graylog.history_title' => 'Historique (100 dernieres actions)',
+    'graylog.history_empty' => 'Aucune action enregistree.',
 ];
