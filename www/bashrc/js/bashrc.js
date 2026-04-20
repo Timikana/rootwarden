@@ -256,6 +256,91 @@ async function bashrcRestore(user) {
     if (res.success) bashrcLoadUsers();
 }
 
+// ─────────────────────────────────────────────────────────────
+// Template editor (onglet Template)
+// ─────────────────────────────────────────────────────────────
+
+let _tplLoaded = false;
+let _tplOriginal = '';
+
+async function bashrcTemplateLoad(force = false) {
+    const ed = document.getElementById('tpl-editor');
+    if (!ed) return;
+    if (_tplLoaded && !force) return;
+    const status = document.getElementById('tpl-status');
+    if (status) status.textContent = __('bashrc.loading');
+    const res = await apiFetch('/bashrc/template');
+    if (!res.success) {
+        if (status) status.textContent = res.message || 'Erreur';
+        return;
+    }
+    _tplOriginal = res.content || '';
+    ed.value = _tplOriginal;
+    _tplLoaded = true;
+    bashrcTemplateUpdateMeta(res);
+    if (status) status.textContent = '';
+    bashrcTemplateSetDirty(false);
+}
+
+function bashrcTemplateUpdateMeta(info) {
+    const l = document.getElementById('tpl-lines');
+    const s = document.getElementById('tpl-sha');
+    const b = document.getElementById('tpl-bytes');
+    if (l) l.textContent = info.lines ?? '—';
+    if (s) s.textContent = info.sha8 ?? '—';
+    if (b) b.textContent = info.bytes ?? '—';
+}
+
+function bashrcTemplateDirty() {
+    const ed = document.getElementById('tpl-editor');
+    if (!ed) return;
+    bashrcTemplateSetDirty(ed.value !== _tplOriginal);
+}
+
+function bashrcTemplateSetDirty(dirty) {
+    const btn = document.getElementById('btn-tpl-save');
+    const status = document.getElementById('tpl-status');
+    if (btn) btn.disabled = !dirty;
+    if (status) status.textContent = dirty ? ('● ' + __('bashrc.template_dirty')) : '';
+}
+
+async function bashrcTemplateSave() {
+    const ed = document.getElementById('tpl-editor');
+    if (!ed || !ed.value) return;
+    if (!confirm(__('bashrc.confirm_save_template'))) return;
+    const btn = document.getElementById('btn-tpl-save');
+    const status = document.getElementById('tpl-status');
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = __('bashrc.saving');
+    const res = await apiFetch('/bashrc/template', {
+        method: 'POST',
+        body: JSON.stringify({ content: ed.value }),
+    });
+    if (!res.success) {
+        if (status) status.textContent = '✗ ' + escHtml(res.message || 'Erreur');
+        if (btn) btn.disabled = false;
+        return;
+    }
+    _tplOriginal = ed.value;
+    bashrcTemplateUpdateMeta(res);
+    bashrcTemplateSetDirty(false);
+    if (status) status.textContent = '✓ ' + __('bashrc.template_saved');
+}
+
+function bashrcTemplateReset() {
+    if (!confirm(__('bashrc.confirm_reset_template'))) return;
+    const ed = document.getElementById('tpl-editor');
+    if (!ed) return;
+    ed.value = _tplOriginal;
+    bashrcTemplateSetDirty(false);
+}
+
+// Auto-load quand on clique l'onglet template
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (btn && btn.dataset.tab === 'template') bashrcTemplateLoad();
+});
+
 // Bridge i18n : __('bashrc.foo') → window._i18n['bashrc.foo']
 function __(key) {
     return (window._i18n && window._i18n[key]) || key;

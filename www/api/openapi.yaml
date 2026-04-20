@@ -2341,3 +2341,36 @@ paths:
       responses:
         '200':
           description: Liste des backups tries par date desc
+
+  /bashrc/template:
+    get:
+      tags: [Bashrc]
+      summary: Retourne le template actif depuis la BDD
+      responses:
+        '200':
+          description: Template actif
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  name: { type: string }
+                  content: { type: string }
+                  sha8: { type: string }
+                  lines: { type: integer }
+                  bytes: { type: integer }
+    post:
+      tags: [Bashrc]
+      summary: Sauvegarde le template (edition via UI)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, description: Contenu brut du .bashrc, max 512 Ko }
+      responses:
+        '200': { description: Template sauvegarde }
+        '400': { description: Contenu vide ou trop volumineux }

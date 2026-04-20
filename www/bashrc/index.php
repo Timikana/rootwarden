@@ -41,13 +41,9 @@ $historyStmt = $pdo->prepare("
 $historyStmt->execute();
 $history = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Template (lecture du fichier backend pour affichage onglet 3)
-$templatePath = __DIR__ . '/../../backend/templates/bashrc_standard.sh';
-$templateContent = file_exists($templatePath)
-    ? file_get_contents($templatePath)
-    : "# Template introuvable : $templatePath";
-$templateLines = substr_count($templateContent, "\n") + 1;
-$templateSha = substr(hash('sha256', $templateContent), 0, 8);
+// Cache-busting hash pour le JS (basé sur mtime du JS local)
+$jsPath = __DIR__ . '/js/bashrc.js';
+$jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsPath)), 0, 8) : 'dev';
 ?>
 <!DOCTYPE html>
 <html lang="<?= getLang() ?>">
@@ -182,20 +178,34 @@ $templateSha = substr(hash('sha256', $templateContent), 0, 8);
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════════
-             ONGLET 3 : Template
+             ONGLET 3 : Template editable
              ═══════════════════════════════════════════════════════════════ -->
         <div class="tab-panel" data-panel="template">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-lg font-bold"><?= t('bashrc.template_title') ?></h3>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                        <span class="mono"><?= t('bashrc.template_lines') ?>: <?= (int)$templateLines ?></span>
-                        &middot;
-                        <span class="mono">sha256: <?= htmlspecialchars($templateSha) ?></span>
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <div>
+                        <h3 class="text-lg font-bold"><?= t('bashrc.template_title') ?></h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('bashrc.template_desc') ?></p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                            <span class="mono"><?= t('bashrc.template_lines') ?>: <span id="tpl-lines">—</span></span>
+                            &middot;
+                            <span class="mono">sha8: <span id="tpl-sha">—</span></span>
+                            &middot;
+                            <span class="mono"><span id="tpl-bytes">—</span> o</span>
+                        </div>
+                        <button id="btn-tpl-reset" onclick="bashrcTemplateReset()" class="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"><?= t('bashrc.template_reset') ?></button>
+                        <button id="btn-tpl-save" onclick="bashrcTemplateSave()" class="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg" disabled><?= t('bashrc.template_save') ?></button>
                     </div>
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2"><?= t('bashrc.template_desc') ?></p>
-                <pre class="bashrc-log mono text-xs bg-gray-50 dark:bg-gray-900 rounded-lg p-3 whitespace-pre-wrap"><?= htmlspecialchars($templateContent) ?></pre>
+                <textarea id="tpl-editor"
+                          spellcheck="false"
+                          class="w-full bashrc-log mono text-xs bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          rows="25"
+                          oninput="bashrcTemplateDirty()"
+                          placeholder="<?= htmlspecialchars(t('bashrc.loading')) ?>"></textarea>
+                <div id="tpl-status" class="text-xs text-gray-400 mt-2"></div>
             </div>
         </div>
 
@@ -214,6 +224,8 @@ $jsKeys = [
     'bashrc.confirm_dry', 'bashrc.confirm_deploy', 'bashrc.confirm_restore',
     'bashrc.deploying', 'bashrc.preview_empty', 'bashrc.dry_would_run',
     'bashrc.ok', 'bashrc.failed', 'bashrc.skipped',
+    'bashrc.saving', 'bashrc.template_dirty', 'bashrc.template_saved',
+    'bashrc.confirm_save_template', 'bashrc.confirm_reset_template',
 ];
 foreach ($jsKeys as $k) {
     echo "  " . json_encode($k) . ": " . json_encode(t($k)) . ",\n";
@@ -221,7 +233,7 @@ foreach ($jsKeys as $k) {
 ?>
 });
 </script>
-<script src="/bashrc/js/bashrc.js?v=<?= htmlspecialchars($templateSha) ?>"></script>
+<script src="/bashrc/js/bashrc.js?v=<?= htmlspecialchars($jsVersion) ?>"></script>
 <script>
 // Tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
