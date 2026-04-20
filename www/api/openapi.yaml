@@ -2199,3 +2199,178 @@ paths:
           schema: { type: integer }
       responses:
         '200': { description: Scores moyens par jour }
+
+  # ── Bashrc ─────────────────────────────────────────────────────────────
+
+  /bashrc/users:
+    get:
+      tags: [Bashrc]
+      summary: Liste les utilisateurs Linux et l'etat de leur .bashrc
+      parameters:
+        - name: machine_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Liste users + etat bashrc
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  machine_id: { type: integer }
+                  figlet_present: { type: boolean }
+                  template_sha8: { type: string }
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        uid: { type: integer }
+                        home: { type: string }
+                        shell: { type: string }
+                        exists: { type: boolean }
+                        size: { type: integer }
+                        mtime: { type: integer }
+                        sha8: { type: string }
+                        has_custom: { type: boolean }
+                        matches_template: { type: boolean }
+        '403': { description: Permission insuffisante }
+        '404': { description: Machine introuvable }
+
+  /bashrc/prerequisites:
+    post:
+      tags: [Bashrc]
+      summary: Installe figlet sur le serveur si absent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+      responses:
+        '200': { description: figlet installe ou deja present }
+        '500': { description: Echec d'installation }
+
+  /bashrc/preview:
+    post:
+      tags: [Bashrc]
+      summary: Retourne un diff entre le bashrc actuel et le template
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, users]
+              properties:
+                machine_id: { type: integer }
+                users:
+                  type: array
+                  items: { type: string, pattern: '^[a-z_][a-z0-9_-]*$' }
+                mode:
+                  type: string
+                  enum: [overwrite, merge]
+                  default: overwrite
+      responses:
+        '200': { description: Diff par utilisateur }
+        '400': { description: Parametres invalides }
+
+  /bashrc/deploy:
+    post:
+      tags: [Bashrc]
+      summary: Deploie le .bashrc standardise sur les utilisateurs selectionnes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, users]
+              properties:
+                machine_id: { type: integer }
+                users:
+                  type: array
+                  items: { type: string, pattern: '^[a-z_][a-z0-9_-]*$' }
+                mode:
+                  type: string
+                  enum: [overwrite, merge]
+                  default: overwrite
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Rapport par utilisateur (backup cree, syntaxe OK, skipped)
+        '400': { description: Parametres invalides }
+
+  /bashrc/restore:
+    post:
+      tags: [Bashrc]
+      summary: Restaure le backup .bashrc.bak.* le plus recent (ou specifique)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, user]
+              properties:
+                machine_id: { type: integer }
+                user: { type: string, pattern: '^[a-z_][a-z0-9_-]*$' }
+                backup:
+                  type: string
+                  description: Nom de backup optionnel, ex .bashrc.bak.20260420_143022
+      responses:
+        '200': { description: Backup restaure }
+        '404': { description: Aucun backup dispo }
+
+  /bashrc/backups:
+    get:
+      tags: [Bashrc]
+      summary: Liste les backups .bashrc.bak.* pour un utilisateur
+      parameters:
+        - name: machine_id
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: user
+          in: query
+          required: true
+          schema: { type: string, pattern: '^[a-z_][a-z0-9_-]*$' }
+      responses:
+        '200':
+          description: Liste des backups tries par date desc
+
+  /bashrc/template:
+    get:
+      tags: [Bashrc]
+      summary: Retourne le template actif depuis la BDD
+      responses:
+        '200':
+          description: Template actif
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  name: { type: string }
+                  content: { type: string }
+                  sha8: { type: string }
+                  lines: { type: integer }
+                  bytes: { type: integer }
+    post:
+      tags: [Bashrc]
+      summary: Sauvegarde le template (edition via UI)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, description: Contenu brut du .bashrc, max 512 Ko }
+      responses:
+        '200': { description: Template sauvegarde }
+        '400': { description: Contenu vide ou trop volumineux }

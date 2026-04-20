@@ -168,7 +168,6 @@ $all_servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </th>
                 <th class="py-3 px-4 text-left">Mot de Passe</th>
                 <th class="py-3 px-4 text-left">Mot de Passe Root</th>
-                <th class="py-3 px-4 text-left">Clé RSA Zabbix</th>
                 <th class="py-3 px-4 text-left">
                     <a href="#" class="sort-link flex items-center text-white" data-column="environment">
                         Environnement
@@ -250,10 +249,6 @@ $all_servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <!-- Mot de Passe Root -->
                         <td class="py-3 px-4">
                             <input type="password" name="root_password" placeholder="Laisser vide pour ne pas modifier" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </td>
-                        <!-- Clé RSA Zabbix -->
-                        <td class="py-3 px-4">
-                            <input type="text" name="zabbix_rsa_key" value="<?= htmlspecialchars($server['zabbix_rsa_key']) ?>" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </td>
                         <!-- Environnement -->
                         <td class="py-3 px-4">

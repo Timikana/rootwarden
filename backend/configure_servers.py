@@ -321,12 +321,15 @@ def manage_ssh_keys(channel, user: dict, logger=None):
         if logger:
             logger.error(f"[{username}] Erreur lors du deploiement de la cle SSH : {e}")
 
-def deploy_user_config(channel, user: dict, logger=None, deploy_bashrc=True):
+def deploy_user_config(channel, user: dict, logger=None):
     """
     Met a jour la configuration de l'utilisateur en une seule operation.
 
     - Deploie la cle SSH (ou la supprime si inactif).
-    - Deploie le .bashrc ameliore si deploy_bashrc=True.
+
+    Note : le deploiement du .bashrc est gere exclusivement par le module
+    dedie /bashrc/ (blueprint backend/routes/bashrc.py). Plus de deploiement
+    implicite ici.
     """
     username = user.get('name')
     if not username:
@@ -361,179 +364,6 @@ def deploy_user_config(channel, user: dict, logger=None, deploy_bashrc=True):
             logger.info(f"[{username}] Suppression de la cle SSH.")
         execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
     
-    # --- Mise a jour du fichier .bashrc (configurable) ---
-    if not deploy_bashrc:
-        if logger:
-            logger.info(f"[{username}] Deploiement .bashrc desactive pour cette machine.")
-        return
-
-    new_bashrc = """# ~/.bashrc - version améliorée avec couleurs
-
-# Si non interactif, ne rien faire
-[[ $- != *i* ]] && return
-
-# Couleurs pour le prompt (root = orange, user = vert)
-if [ "$(id -u)" -eq 0 ]; then
-    PS1='\\[\\e[38;5;208m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ '
-else
-    PS1='\\[\\e[38;5;82m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ '
-fi
-
-# Historique avec horodatage
-export HISTTIMEFORMAT="%F %T "
-
-# Activer les couleurs pour ls
-export LS_OPTIONS='--color=auto'
-eval "$(dircolors -b)"
-alias ls='ls $LS_OPTIONS'
-alias ll='ls $LS_OPTIONS -lh'
-alias la='ls $LS_OPTIONS -lah'
-alias l='ls $LS_OPTIONS -lhA'
-
-# Alias courants sécurisés
-alias rm='rm -i'
-alias cp='cp -i'
-alias mv='mv -i'
-
-# Grep avec couleurs
-alias grep='grep --color=auto'
-alias egrep='egrep --color=auto'
-alias fgrep='fgrep --color=auto'
-
-# Utilitaires utiles
-alias cls='clear'
-alias ..='cd ..'
-alias ...='cd ../..'
-
-# Git dans le prompt si dispo
-if [ -f /etc/bash_completion.d/git-prompt ]; then
-    source /etc/bash_completion.d/git-prompt
-    PS1='${debian_chroot:+($debian_chroot)}\\[\\e[38;5;82m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0;33m\\]$(__git_ps1 " (%s)")\\[\\e[0m\\]\\$ '
-fi
-
-# Autocomplétion bash si dispo
-if [ -f /etc/bash_completion ]; then
-    . /etc/bash_completion
-elif [ -f /usr/share/bash-completion/bash_completion ]; then
-    . /usr/share/bash-completion/bash_completion
-fi
-
-# Affichage du terminal en UTF-8
-export LANG="fr_FR.UTF-8"
-export LC_ALL="fr_FR.UTF-8"
-
-# Correction orthographique dans cd
-shopt -s cdspell
-
-# Ajout du PATH perso si nécessaire
-export PATH="$HOME/bin:$PATH" """
-    
-    bashrc_path = f"/home/{username}/.bashrc"
-    try:
-        if logger:
-            logger.info(f"[{username}] Suppression de l'ancien .bashrc.")
-        # Supprimer l'ancien fichier .bashrc s'il existe
-        execute_command_as_root(channel, f"rm -f {bashrc_path}", logger=logger)
-        
-        # Déployer le nouveau .bashrc via here-document pour gérer proprement les caractères spéciaux
-        bashrc_command = f"cat << 'EOF' > {bashrc_path}\n{new_bashrc}\nEOF"
-        if logger:
-            logger.info(f"[{username}] Déploiement du nouveau .bashrc.")
-        execute_command_as_root(channel, bashrc_command, logger=logger)
-        
-        # Correction des permissions et propriété
-        execute_command_as_root(channel, f"chown {username}:{username} {bashrc_path} && chmod 644 {bashrc_path}", logger=logger)
-        
-        # Charger le nouveau .bashrc (l'effet immédiat dépendra de la session, mais il sera appliqué pour les futures connexions)
-        execute_command_as_root(channel, f". {bashrc_path}", logger=logger)
-        
-        if logger:
-            logger.info(f"[{username}] .bashrc mis à jour et chargé avec succès.")
-    except Exception as e:
-        if logger:
-            logger.error(f"[{username}] Erreur lors de la mise à jour de .bashrc : {e}")
-
-def update_root_bashrc(channel, logger=None):
-    """
-    Met à jour le .bashrc pour le compte root (/root/.bashrc) avec le contenu défini.
-    Cette opération est exécutée une seule fois pour toute la machine.
-    """
-    new_bashrc = """# /root/.bashrc - version améliorée avec couleurs
-
-# Si non interactif, ne rien faire
-[[ $- != *i* ]] && return
-
-# Couleurs pour le prompt (root = orange, user = vert)
-if [ "$(id -u)" -eq 0 ]; then
-    PS1='\\[\\e[38;5;208m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ '
-else
-    PS1='\\[\\e[38;5;82m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ '
-fi
-
-# Historique avec horodatage
-export HISTTIMEFORMAT="%F %T "
-
-# Activer les couleurs pour ls
-export LS_OPTIONS='--color=auto'
-eval "$(dircolors -b)"
-alias ls='ls $LS_OPTIONS'
-alias ll='ls $LS_OPTIONS -lh'
-alias la='ls $LS_OPTIONS -lah'
-alias l='ls $LS_OPTIONS -lhA'
-
-# Alias courants sécurisés
-alias rm='rm -i'
-alias cp='cp -i'
-alias mv='mv -i'
-
-# Grep avec couleurs
-alias grep='grep --color=auto'
-alias egrep='egrep --color=auto'
-alias fgrep='fgrep --color=auto'
-
-# Utilitaires utiles
-alias cls='clear'
-alias ..='cd ..'
-alias ...='cd ../..'
-
-# Git dans le prompt si dispo
-if [ -f /etc/bash_completion.d/git-prompt ]; then
-    source /etc/bash_completion.d/git-prompt
-    PS1='${debian_chroot:+($debian_chroot)}\\[\\e[38;5;82m\\]\\u@\\h\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0;33m\\]$(__git_ps1 " (%s)")\\[\\e[0m\\]\\$ '
-fi
-
-# Autocomplétion bash si dispo
-if [ -f /etc/bash_completion ]; then
-    . /etc/bash_completion
-elif [ -f /usr/share/bash-completion/bash_completion ]; then
-    . /usr/share/bash-completion/bash_completion
-fi
-
-# Affichage du terminal en UTF-8
-export LANG="fr_FR.UTF-8"
-export LC_ALL="fr_FR.UTF-8"
-
-# Correction orthographique dans cd
-shopt -s cdspell
-
-# Ajout du PATH perso si nécessaire
-export PATH="/root/bin:$PATH" """
-    
-    bashrc_path = "/root/.bashrc"
-    try:
-        if logger:
-            logger.info("[root] Mise à jour de .bashrc.")
-        execute_command_as_root(channel, f"rm -f {bashrc_path}", logger=logger)
-        bashrc_command = f"cat << 'EOF' > {bashrc_path}\n{new_bashrc}\nEOF"
-        execute_command_as_root(channel, bashrc_command, logger=logger)
-        execute_command_as_root(channel, f"chown root:root {bashrc_path} && chmod 644 {bashrc_path}", logger=logger)
-        execute_command_as_root(channel, f". {bashrc_path}", logger=logger)
-        if logger:
-            logger.info("[root] .bashrc mis à jour et chargé avec succès.")
-    except Exception as e:
-        if logger:
-            logger.error(f"[root] Erreur lors de la mise à jour de .bashrc : {e}")
-
 def generate_random_password(length: int = 16) -> str:
     """
     Génère un mot de passe aléatoire cryptographiquement sûr.
@@ -629,9 +459,10 @@ class ServerConfigurator:
         Ouvre une session SSH root via le context manager ``ssh_connection``,
         puis appelle dans l'ordre :
           1. ensure_sudo_installed   : installe sudo si absent
-          2. update_root_bashrc      : déploie le .bashrc amélioré pour root
-          3. clean_up_users          : supprime les comptes non autorisés
-          4. configure_users         : crée/met à jour les comptes autorisés
+          2. configure_users         : crée/met à jour les comptes autorisés
+
+        Note : le deploiement du .bashrc est gere exclusivement par le module
+        dedie /bashrc/ (blueprint backend/routes/bashrc.py).
         """
         self.logger.info(f"=== Configuration de la machine : {self.name} ({self.ip}:{self.port}) ===")
         use_sa = self.machine.get('service_account_deployed', False)
@@ -647,11 +478,7 @@ class ServerConfigurator:
             # Si service account, sudo est deja disponible — pas besoin de ensure_sudo
             if not use_sa:
                 ensure_sudo_installed(ssh_client, self.decrypted_root, logger=self.logger)
-            # Mise a jour du .bashrc pour root (configurable par machine)
-            if self.machine.get('deploy_bashrc', True):
-                update_root_bashrc(root_channel, logger=self.logger)
-            else:
-                self.logger.info("[bashrc] Deploiement .bashrc desactive pour cette machine.")
+            # Le deploiement du .bashrc est gere par le module dedie /bashrc/.
             # Le nettoyage automatique des utilisateurs est DESACTIVE.
             # La suppression de comptes se fait uniquement depuis
             # Administration > Utilisateurs distants (action explicite).
@@ -813,9 +640,8 @@ class ServerConfigurator:
             else:
                 self.logger.info(f"[{username}] Utilisateur inactif, configuration limitée.")
 
-            # Deploiement complet de la configuration (cle SSH + bashrc si active)
-            deploy_user_config(channel, user, logger=self.logger,
-                               deploy_bashrc=self.machine.get('deploy_bashrc', True))
+            # Deploiement de la cle SSH uniquement (le .bashrc est gere par /bashrc/)
+            deploy_user_config(channel, user, logger=self.logger)
 
             # Gestion des droits sudo
             if active:

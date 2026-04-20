@@ -512,6 +512,54 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- 8.5 Bashrc standardise                    -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="bashrc" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Bashrc standardise</h2>
+                <p class="text-sm mb-3">Deploiement d'un <code>.bashrc</code> uniforme sur chaque utilisateur Linux des serveurs du parc. Banniere figlet, tableau sysinfo (OS / IP / RAM / disque / uptime / HA keepalived), 10 alertes automatiques, prompt git-aware, 40+ alias et 10 fonctions utilitaires.</p>
+
+                <h3 class="font-semibold mb-2">Prerequis</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>figlet</code> sur le serveur cible (banniere ASCII). Installe en 1 clic via <strong>Installer figlet</strong> (apt-get).</li>
+                    <li>Permission <code>can_manage_bashrc</code> ou role superadmin.</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">Modes</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Overwrite</strong> — Remplace integralement le <code>.bashrc</code> par le template standard. Le fichier existant est backupe dans <code>~/.bashrc.bak.YYYYMMDD_HHMMSS</code> (chmod 600).</li>
+                    <li><strong>Merge</strong> — Detecte les blocs marques <code># &gt;&gt;&gt; USER CUSTOM &gt;&gt;&gt;</code> / <code># &lt;&lt;&lt; USER CUSTOM &lt;&lt;&lt;</code> dans l'ancien fichier et les reinjecte dans <code>~/.bashrc.local</code> (sourcee en section 13 du nouveau template).</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">Flux</h3>
+                <ol class="list-decimal list-inside text-sm space-y-1 mb-3">
+                    <li>Choisir un serveur dans la liste deroulante.</li>
+                    <li>Si la banniere jaune signale figlet manquant : cliquer <strong>Installer figlet</strong>.</li>
+                    <li>Cocher les utilisateurs cibles. Consulter le statut (Conforme / Different / Absent) et le badge "Custom" si des blocs personnalises sont detectes.</li>
+                    <li>Cliquer <strong>Apercu (diff)</strong> pour voir les changements ou <strong>Dry run</strong> pour simuler sans modifier.</li>
+                    <li>Cliquer <strong>Deployer</strong>. Un backup est cree, le fichier ecrit, la syntaxe validee (<code>bash -n</code>).</li>
+                    <li>En cas d'erreur : bouton <strong>Restaurer</strong> sur chaque ligne pour revenir au backup le plus recent.</li>
+                </ol>
+
+                <h3 class="font-semibold mb-2">Securite</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Contenu transmis exclusivement en base64 (pas d'injection shell possible).</li>
+                    <li>Usernames valides par regex stricte <code>^[a-z_][a-z0-9_-]*$</code>.</li>
+                    <li>Chaque action journalisee dans <code>user_logs</code> (prefixe <code>[bashrc]</code>).</li>
+                    <li>Idempotence : si le sha256 actuel == sha256 du template, l'operation est ignoree.</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">API</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><span class="badge-get">GET</span> <code>/bashrc/users?machine_id=X</code> — Liste users + etat.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/prerequisites</code> — Installe figlet.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/preview</code> — Diff avant deploy.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/deploy</code> — Deploie le template.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/restore</code> — Restaure le backup le plus recent.</li>
+                    <li><span class="badge-get">GET</span> <code>/bashrc/backups?machine_id=X&amp;user=Y</code> — Liste des backups.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- 9. Scan CVE                               -->
             <!-- ────────────────────────────────────────── -->
             <section id="cve" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">

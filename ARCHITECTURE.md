@@ -1,3 +1,51 @@
+# Architecture & Carte des fichiers — RootWarden v1.14.0
+
+## Module Bashrc (v1.14.0)
+
+Nouveau module dedie au deploiement d'un `.bashrc` standardise par utilisateur
+sur les serveurs du parc.
+
+### Fichiers
+- `backend/routes/bashrc.py` — Blueprint Flask (6 routes).
+- `backend/templates/bashrc_standard.sh` — Template v3.0 (banniere figlet, sysinfo,
+  alertes, prompt git-aware, 40+ alias, 10 fonctions utilitaires, HA keepalived).
+- `mysql/migrations/031_bashrc_permission.sql` — Ajoute la colonne
+  `can_manage_bashrc` dans `permissions`.
+- `www/bashrc/index.php` — Frontend 3 onglets (Deploiement / Historique / Template).
+- `www/bashrc/js/bashrc.js` — Logique client (select users, preview diff, deploy, restore).
+- `www/lang/fr/bashrc.php` + `www/lang/en/bashrc.php` — i18n complete.
+- `tests/e2e/go-bashrc.mjs` — Tests E2E Puppeteer.
+
+### Flux deploy
+1. Liste users Linux via SSH (`awk` sur `/etc/passwd`, UID >= 1000 ou root,
+   shells interactifs uniquement).
+2. Inspection de chaque `~/.bashrc` : taille, mtime, sha256 (8 premiers chars),
+   detection blocs `# >>> USER CUSTOM >>>`.
+3. Preview optionnelle : diff unifie (difflib cote Python).
+4. Deploy :
+   - Backup `cp -a ~/.bashrc ~/.bashrc.bak.YYYYMMDD_HHMMSS && chmod 600` si fichier present.
+   - Ecriture via `printf '%s' '{b64}' | base64 -d > ~/.bashrc` (pattern SSH securise).
+   - `chmod 644` + `chown {user}:{user}`.
+   - Validation syntaxique `bash -n ~/.bashrc`.
+   - Mode merge : blocs custom extraits et appendus dans `~/.bashrc.local` (sourcee
+     section 13 du nouveau template).
+5. Idempotence : skip si sha256 actuel == sha256 template.
+
+### Flux restore
+- Par defaut : dernier `.bashrc.bak.*` trouve via `ls -1t`.
+- Optionnellement : `backup` precis valide par regex `^\.bashrc\.bak\.\d{8}_\d{6}$`.
+
+### Securite
+- Username : regex stricte `^[a-z_][a-z0-9_-]{0,31}$` (aucune autre valeur acceptee).
+- Contenu bashrc : exclusivement base64 (impossible d'injecter du shell).
+- Verifications distantes : via SSH uniquement (pas docker exec — namespaces differents
+  sur le test-server Docker).
+- Zero trust : `checkAuth` + `checkPermission('can_manage_bashrc')` en DB.
+- Prerequis figlet installe via `execute_as_root` (sudo -S / su -c temp script).
+- Chaque action journalisee dans `user_logs` (prefixe `[bashrc]`).
+
+---
+
 # Architecture & Carte des fichiers — RootWarden v1.13.1
 
 > Référence complète de chaque fichier du projet. Mise à jour à chaque version.
