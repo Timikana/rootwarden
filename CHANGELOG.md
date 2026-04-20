@@ -5,6 +5,62 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.15.0] — 2026-04-20
+
+### Module Graylog — deploiement du Sidecar + collectors editables
+
+- **Nouveau blueprint Flask** `backend/routes/graylog.py` avec 8 routes :
+  `GET /graylog/config`, `POST /graylog/config`, `GET /graylog/servers`,
+  `POST /graylog/install|uninstall|register`, `GET /graylog/collectors`,
+  `GET/POST/DELETE /graylog/collectors/<name>`.
+- **Installation via SSH root** : repo Graylog + `apt install graylog-sidecar`,
+  config `/etc/graylog/sidecar/sidecar.yml` ecrite en base64, `systemctl enable --now`.
+- **3 tables** : `graylog_config` (URL, token chiffre, TLS), `graylog_collectors`
+  (templates filebeat/nxlog/winlogbeat editables via UI avec validation YAML),
+  `graylog_sidecars` (etat par machine).
+- **UI 4 onglets** : Configuration, Deploiement (tableau serveurs + install/uninstall),
+  Collectors (liste + editeur textarea + save/delete), Historique.
+- **Permission `can_manage_graylog`** (migration 033).
+
+### Module Wazuh — agent SIEM + rules/decoders/CDB editables
+
+- **Nouveau blueprint Flask** `backend/routes/wazuh.py` avec 11 routes :
+  `GET/POST /wazuh/config`, `GET /wazuh/servers`, `POST /wazuh/install|uninstall|restart|group`,
+  `GET/POST /wazuh/options`, `GET /wazuh/rules`, `GET/POST/DELETE /wazuh/rules/<name>`.
+- **Installation agent via SSH** : repo Wazuh + `apt install wazuh-agent` avec
+  `WAZUH_MANAGER` / `WAZUH_REGISTRATION_PASSWORD` / `WAZUH_AGENT_GROUP` en env.
+- **4 tables** : `wazuh_config` (manager IP/port, password enrolement chiffre,
+  default group, API manager), `wazuh_rules` (rules/decoders/CDB editables avec
+  validation `xmllint` backend), `wazuh_agents` (etat agent par machine),
+  `wazuh_machine_options` (FIM paths, active response, SCA, rootcheck, log_format,
+  syscheck_frequency).
+- **UI 5 onglets** : Configuration (manager + API), Deploiement (tableau agents
+  avec badges statut + install/restart/uninstall/setgroup), Options (FIM paths
+  par serveur + toggles SCA/rootcheck/active response), Rules & Decoders
+  (editeur XML avec validation xmllint), Historique.
+- **Permission `can_manage_wazuh`** (migration 034).
+
+### Securite
+
+- Zero trust : `@require_api_key` + `@require_role(2)` + `@require_permission`
+  + `@require_machine_access` + `@threaded_route` sur toutes les routes
+- Tous les passwords chiffres via `Encryption` (prefix `aes:`, label HKDF
+  `rootwarden-aes`) — jamais renvoyes au client en clair
+- Validation stricte : regex noms (`^[a-zA-Z0-9_-]{1,100}$`), IPs/FQDN, groupes
+- Contenu configs/rules transmis exclusivement en base64 via SSH
+- Validation `xmllint --noout` pour rules/decoders Wazuh
+- Validation YAML best-effort pour collectors filebeat Graylog
+- audit_log (prefix `[graylog]` / `[wazuh]`) sur chaque action
+
+### Cohérence
+
+- 2 nouvelles cards dans le dashboard (conditionnelles sur permissions)
+- Entrees sidebar desktop + mobile + case manage_permissions
+- API proxy allowlist mise a jour (2 nouvelles permissions)
+- Version `1.14.0` → `1.15.0`
+
+---
+
 ## [1.14.0] — 2026-04-20
 
 ### Module Bashrc — deploiement standardise du .bashrc par utilisateur + template editable
