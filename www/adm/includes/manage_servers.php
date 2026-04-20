@@ -82,7 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $environment = validateInput($_POST['environment'], 'environment');
         $criticality = validateInput($_POST['criticality'], 'criticality');
         $network_type = validateInput($_POST['network_type'], 'network_type');
-        $zabbix_rsa_key = validateInput($_POST['zabbix_rsa_key'] ?? '', 'rsa_key');
 
         $invalidFields = array_filter([
             !$name         ? t('servers.field_name')        : null,
@@ -98,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = t('servers.error_invalid_fields') . ' ' . implode(', ', $invalidFields) . ".";
         } else {
             try {
-                $stmt = $pdo->prepare("INSERT INTO machines (name, ip, user, password, root_password, port, environment, criticality, network_type, zabbix_rsa_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type, $zabbix_rsa_key]);
+                $stmt = $pdo->prepare("INSERT INTO machines (name, ip, user, password, root_password, port, environment, criticality, network_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type]);
                 $successSERVER = t('servers.added_success');
             } catch (PDOException $e) {
                 if ($e->getCode() == 23000) {
@@ -121,7 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $environment = validateInput($_POST['environment'], 'environment');
         $criticality = validateInput($_POST['criticality'], 'criticality');
         $network_type = validateInput($_POST['network_type'], 'network_type');
-        $zabbix_rsa_key = validateInput($_POST['zabbix_rsa_key'] ?? '', 'rsa_key');
 
         $invalidFields = array_filter([
             !$server_id    ? t('servers.field_server_id')   : null,
@@ -148,10 +146,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $root_password = empty($_POST['root_password']) ? $current_passwords['root_password'] : encryptPassword(trim($_POST['root_password']), false);
     
                 try {
-                    $deploy_bashrc = isset($_POST['deploy_bashrc']) ? 1 : 0;
                     $cleanup_users = isset($_POST['cleanup_users']) ? 1 : 0;
-                    $stmt = $pdo->prepare("UPDATE machines SET name = ?, ip = ?, user = ?, password = ?, root_password = ?, port = ?, environment = ?, criticality = ?, network_type = ?, zabbix_rsa_key = ?, deploy_bashrc = ?, cleanup_users = ? WHERE id = ?");
-                    $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type, $zabbix_rsa_key, $deploy_bashrc, $cleanup_users, $server_id]);
+                    $stmt = $pdo->prepare("UPDATE machines SET name = ?, ip = ?, user = ?, password = ?, root_password = ?, port = ?, environment = ?, criticality = ?, network_type = ?, cleanup_users = ? WHERE id = ?");
+                    $stmt->execute([$name, $ip, $user, $password, $root_password, $port, $environment, $criticality, $network_type, $cleanup_users, $server_id]);
                     $successSERVER = t('servers.updated_success');
                 } catch (PDOException $e) {
                     if ($e->getCode() == 23000) {
@@ -324,10 +321,6 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
                             <option value="INTERNE" selected><?= t('servers.net_internal') ?></option><option value="EXTERNE"><?= t('servers.net_external') ?></option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1"><?= t('servers.field_zabbix_rsa') ?> <span class="text-gray-400">(<?= t('servers.optional') ?>)</span></label>
-                        <input type="text" name="zabbix_rsa_key" value="<?= htmlspecialchars(getenv('DEFAULT_RSA_KEY') ?: '') ?>" class="w-full px-3 py-2 text-xs font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500">
-                    </div>
                 </div>
                 <button type="submit" name="add_server" class="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"><?= t('servers.btn_add_server') ?></button>
                 <p class="text-[10px] text-gray-400 mt-1"><?= t('servers.required_fields') ?></p>
@@ -413,20 +406,9 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
                                         <option value="EXTERNE" <?= ($server['network_type'] ?? '') === 'EXTERNE' ? 'selected' : '' ?>><?= t('servers.net_external') ?></option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('servers.field_zabbix_rsa') ?></label>
-                                    <input type="text" name="zabbix_rsa_key" value="<?= htmlspecialchars($server['zabbix_rsa_key'] ?? '') ?>" class="w-full px-3 py-2 text-xs font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500">
-                                </div>
                             </div>
                             <div class="text-[10px] text-gray-400 uppercase tracking-wider mt-3 mb-1.5"><?= t('servers.deploy_options') ?></div>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                                <label class="flex items-center gap-2 px-3 py-2 rounded-lg border <?= ($server['deploy_bashrc'] ?? 1) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/30 border-gray-200 dark:border-gray-700' ?> cursor-pointer transition-colors">
-                                    <input type="checkbox" name="deploy_bashrc" value="1" <?= ($server['deploy_bashrc'] ?? 1) ? 'checked' : '' ?> class="form-checkbox h-3.5 w-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
-                                    <div class="min-w-0">
-                                        <div class="text-xs font-medium text-gray-700 dark:text-gray-300"><?= t('servers.opt_bashrc') ?></div>
-                                        <div class="text-[10px] text-gray-400 truncate"><?= t('servers.opt_bashrc_desc') ?></div>
-                                    </div>
-                                </label>
                                 <label class="flex items-center gap-2 px-3 py-2 rounded-lg border <?= ($server['cleanup_users'] ?? 1) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/30 border-gray-200 dark:border-gray-700' ?> cursor-pointer transition-colors">
                                     <input type="checkbox" name="cleanup_users" value="1" <?= ($server['cleanup_users'] ?? 1) ? 'checked' : '' ?> class="form-checkbox h-3.5 w-3.5 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
                                     <div class="min-w-0">
@@ -805,8 +787,6 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
                     showNotification(data.message, 'success');
                     // Vider le formulaire
                     this.reset();
-                    // Réinitialiser la valeur par défaut de la clé RSA
-                    document.getElementById('zabbix_rsa_key').value = '<?= getenv('DEFAULT_RSA_KEY') ?>';
                     // Recharger la table
                     loadServersTable();
                 } else {
