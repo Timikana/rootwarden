@@ -15,6 +15,7 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/../adm/includes/crypto.php';
+require_once __DIR__ . '/../adm/includes/audit_log.php';
 require_once __DIR__ . '/../includes/lang.php';
 
 header("X-Content-Type-Options: nosniff");
@@ -101,8 +102,10 @@ function computeUserLockoutSeconds(int $failedAttempts): int {
  */
 function notifySpraying(PDO $pdo, string $ip, int $distinctUsers): void {
     try {
-        $pdo->prepare("INSERT INTO user_logs (user_id, action, created_at) VALUES (0, ?, NOW())")
-            ->execute([sprintf("[security] Password spraying detecte — IP=%s usernames=%d/10min", $ip, $distinctUsers)]);
+        audit_log_raw($pdo, 0, sprintf(
+            "[security] Password spraying detecte — IP=%s usernames=%d/10min",
+            $ip, $distinctUsers
+        ));
     } catch (\Exception $e) {}
 }
 
@@ -181,10 +184,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
 
-            // Audit log : connexion réussie
+            // Audit log : connexion réussie (hash chain)
             try {
-                $logStmt = $pdo->prepare("INSERT INTO user_logs (user_id, action) VALUES (?, ?)");
-                $logStmt->execute([$user['id'], 'Connexion reussie']);
+                audit_log_raw($pdo, (int)$user['id'], 'Connexion reussie');
             } catch (\Exception $e) {}
 
             // Historique de login (login_history)
@@ -226,13 +228,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             "UPDATE users SET failed_attempts = ?, locked_until = DATE_ADD(NOW(), INTERVAL ? SECOND), "
                             . "last_failed_login_at = NOW() WHERE id = ?"
                         )->execute([$newFailed, $lockSec, $user['id']]);
-                        // Notification superadmin au 5eme echec consecutif
+                        // Notification superadmin au 5eme echec consecutif (hash chain)
                         if ($newFailed === 5) {
-                            $pdo->prepare("INSERT INTO user_logs (user_id, action, created_at) VALUES (?, ?, NOW())")
-                                ->execute([$user['id'], sprintf(
-                                    "[security] Compte verrouille apres %d echecs consecutifs — IP=%s",
-                                    $newFailed, $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
-                                )]);
+                            audit_log_raw($pdo, (int)$user['id'], sprintf(
+                                "[security] Compte verrouille apres %d echecs consecutifs — IP=%s",
+                                $newFailed, $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
+                            ));
                         }
                     } else {
                         $pdo->prepare(

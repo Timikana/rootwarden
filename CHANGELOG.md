@@ -5,6 +5,69 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.2] — 2026-04-20
+
+### Audit log tamper-evident — hash chain SHA2-256
+
+Reponse au gap #3 de l'audit DevSecOps (2026-04-20) : la table user_logs
+etait alterable silencieusement en cas de compromission DB. Chaque ligne
+est desormais scellee par une chaine de hash SHA2-256 detectable en cas
+de modification.
+
+Migration 036 :
+- user_logs.prev_hash CHAR(64), user_logs.self_hash CHAR(64)
+- Index idx_self_hash (id, self_hash) pour LAG rapide
+
+Algo :
+- self_hash = SHA2-256( prev_hash | user_id | action | unix_ts )
+- prev_hash = self_hash de la ligne precedente (ORDER BY id DESC LIMIT 1)
+- Premiere ligne : prev_hash = 'GENESIS' (constante)
+
+Implementation app-level (pas de trigger MySQL — contrainte SUPER
+privilege dans le container). Le hash est calcule par :
+- PHP : nouveau helper audit_log_raw() dans www/adm/includes/audit_log.php
+  + audit_log() existant refactore pour passer par audit_log_raw
+- Refactoring de 4 INSERTs directs vers le helper :
+  www/auth/login.php (connexion reussie, spraying, verrouillage) et
+  www/adm/api/unlock_user.php (deverrouillage)
+
+Endpoints :
+- POST /adm/api/audit_seal.php : scelle les lignes orphelines (self_hash
+  NULL venant d'INSERTs legacy) en continuant la chaine existante.
+  GET = dry-run (compte sans modifier)
+- GET /adm/api/audit_verify.php : walks toute la chaine, recompute chaque
+  hash, signale la PREMIERE incoherence (MISMATCH ou PREV_BROKEN).
+  Superadmin-only, read-only.
+
+UI (www/adm/audit_log.php) — superadmin uniquement :
+- Bouton "🔒 Verifier integrite" → affiche status chaine (OK / BROKEN)
+  avec id + type de l'erreur
+- Bouton "🖋 Sceller orphelines" → seal des lignes legacy
+
+Modele d'attaque couvert :
+- Modification action/user_id/created_at d'une ligne scellee → detection
+  immediate au verify (hash ne matche plus)
+- Suppression d'une ligne → detection (prev_hash de la suivante ne matche
+  plus la nouvelle ORDER BY)
+- Insertion d'une ligne au milieu → detection (prev_hash ne matche plus)
+
+Limitations connues (documentees dans l'audit) :
+- Un attaquant avec acces DB + lecture du code source peut recalculer la
+  chaine entiere apres modification. Contre-mesure future : sceller le
+  hash de tete dans un KMS externe (ou exporter WORM off-site).
+
+i18n FR/EN parite 274=274 : nouvelles cles audit.btn_verify /
+audit.btn_verify_tip / audit.btn_seal / audit.btn_seal_tip.
+
+Tests manuels :
+- Insert 3 lignes via helper → chain valide OK
+- UPDATE action d'une ligne → verify detecte MISMATCH sur cette ligne
+- DELETE d'une ligne → verify detecte PREV_BROKEN sur la suivante
+
+Version 1.14.1 -> 1.14.2 (patch de securite).
+
+---
+
 ## [1.14.1] — 2026-04-20
 
 ### Hardening auth : lockout per-user + backoff progressif + detection password spraying

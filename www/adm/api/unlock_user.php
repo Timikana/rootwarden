@@ -16,6 +16,7 @@
 require_once __DIR__ . '/../../auth/verify.php';
 require_once __DIR__ . '/../../auth/functions.php';
 require_once __DIR__ . '/../../db.php';
+require_once __DIR__ . '/../includes/audit_log.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
@@ -58,11 +59,10 @@ try {
         ->execute([$user_id]);
 
     $actor_id = (int)($_SESSION['user_id'] ?? 0);
-    $pdo->prepare("INSERT INTO user_logs (user_id, action, created_at) VALUES (?, ?, NOW())")
-        ->execute([$actor_id, sprintf(
-            "[security] Deverrouillage manuel du compte %s (id=%d, %d echecs effaces)",
-            $u['name'], $user_id, (int)$u['failed_attempts']
-        )]);
+    audit_log_raw($pdo, $actor_id, sprintf(
+        "[security] Deverrouillage manuel du compte %s (id=%d, %d echecs effaces)",
+        $u['name'], $user_id, (int)$u['failed_attempts']
+    ));
 
     echo json_encode([
         'success' => true,
