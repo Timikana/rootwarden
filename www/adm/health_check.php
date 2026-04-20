@@ -124,6 +124,17 @@ $routes = [
     // ── Bashrc ───────────────────────────────────────────────────────────
     ['Bashrc Users',           'GET',  "/bashrc/users?machine_id=$machineId", null, 'Liste users + etat .bashrc'],
     ['Bashrc Backups',         'GET',  "/bashrc/backups?machine_id=$machineId&user=root", null, 'Liste backups .bashrc.bak.* pour root'],
+    ['Bashrc Template',        'GET',  '/bashrc/template', null, 'Template bashrc actif'],
+
+    // ── Graylog ──────────────────────────────────────────────────────────
+    ['Graylog Config',         'GET',  '/graylog/config', null, 'Config serveur Graylog'],
+    ['Graylog Servers',        'GET',  '/graylog/servers', null, 'Liste machines + etat sidecar'],
+    ['Graylog Collectors',     'GET',  '/graylog/collectors', null, 'Templates collector'],
+
+    // ── Wazuh ────────────────────────────────────────────────────────────
+    ['Wazuh Config',           'GET',  '/wazuh/config', null, 'Config Wazuh manager'],
+    ['Wazuh Servers',          'GET',  '/wazuh/servers', null, 'Liste agents'],
+    ['Wazuh Rules',            'GET',  '/wazuh/rules', null, 'Rules/decoders/CDB'],
 
     // ── SSH Audit ────────────────────────────────────────────────────────
     ['SSH Audit Scan',         'POST', '/ssh_audit/scan', ['machine_id' => $machineId], t('ssh_audit.scan')],

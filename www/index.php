@@ -344,6 +344,10 @@ try {
                 $shortcuts[] = ['url' => '/supervision/', 'label' => t('dashboard.sc_supervision'), 'desc' => t('dashboard.sc_supervision_desc')];
             if (($permissions['can_manage_bashrc'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/bashrc/', 'label' => t('dashboard.sc_bashrc'), 'desc' => t('dashboard.sc_bashrc_desc')];
+            if (($permissions['can_manage_graylog'] ?? false) || $isSA)
+                $shortcuts[] = ['url' => '/graylog/', 'label' => t('dashboard.sc_graylog'), 'desc' => t('dashboard.sc_graylog_desc')];
+            if (($permissions['can_manage_wazuh'] ?? false) || $isSA)
+                $shortcuts[] = ['url' => '/wazuh/', 'label' => t('dashboard.sc_wazuh'), 'desc' => t('dashboard.sc_wazuh_desc')];
             if (($permissions['can_audit_ssh'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/ssh-audit/', 'label' => t('dashboard.sc_ssh_audit'), 'desc' => t('dashboard.sc_ssh_audit_desc')];
             if (($permissions['can_view_compliance'] ?? false) || $isSA)

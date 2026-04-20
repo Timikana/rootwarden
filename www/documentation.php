@@ -560,6 +560,84 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- 8.6 Graylog                               -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="graylog" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Graylog (Sidecar + collectors)</h2>
+                <p class="text-sm mb-3">Deploie le <code>graylog-sidecar</code> sur vos serveurs pour expedier les logs vers un serveur Graylog central. Gere les collectors (templates filebeat/nxlog/winlogbeat) directement depuis l'UI.</p>
+
+                <h3 class="font-semibold mb-2">Prerequis</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Un serveur Graylog accessible depuis les machines cibles</li>
+                    <li>Un token API Graylog (onglet Configuration)</li>
+                    <li>Permission <code>can_manage_graylog</code> ou superadmin</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">Flux</h3>
+                <ol class="list-decimal list-inside text-sm space-y-1 mb-3">
+                    <li>Onglet <strong>Configuration</strong> : URL du serveur + token API + version sidecar</li>
+                    <li>Onglet <strong>Deploiement</strong> : cliquer <strong>Installer</strong> sur chaque serveur cible. Le sidecar est installe via APT et s'enregistre aupres du serveur Graylog avec le token.</li>
+                    <li>Onglet <strong>Collectors</strong> : editer les templates YAML (filebeat) ou XML (nxlog). Ces configurations peuvent ensuite etre appliquees aux sidecars via l'interface Graylog.</li>
+                    <li>Bouton <strong>Verifier</strong> : controle le status du service sur le serveur distant (running/stopped).</li>
+                </ol>
+
+                <h3 class="font-semibold mb-2">Securite</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Token API chiffre en BDD (<code>aes:</code>), jamais renvoye en clair au client</li>
+                    <li>Validation <code>yaml.safe_load</code> sur les collectors filebeat</li>
+                    <li>Contenu config sidecar transmis en base64 vers le serveur</li>
+                    <li>Audit log prefix <code>[graylog]</code></li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- 8.7 Wazuh                                 -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="wazuh" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Wazuh (Agent SIEM + rules)</h2>
+                <p class="text-sm mb-3">Deploie l'agent Wazuh sur vos serveurs, gere les groupes, les options par serveur (FIM, active response, SCA, rootcheck) et edite les rules/decoders/CDB lists pousses au manager.</p>
+
+                <h3 class="font-semibold mb-2">Prerequis</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Un manager Wazuh accessible (port 1514/tcp par defaut, 1515/tcp pour l'enrolement)</li>
+                    <li>Mot de passe d'enrolement configure sur le manager (recommande)</li>
+                    <li>Facultatif : acces API manager (port 55000) pour push des rules</li>
+                    <li>Permission <code>can_manage_wazuh</code> ou superadmin</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">Flux deploiement</h3>
+                <ol class="list-decimal list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Configuration</strong> : manager IP, ports, registration password, default group, version</li>
+                    <li><strong>Deploiement</strong> : <strong>Installer</strong> sur un serveur → APT + enrolement automatique via env vars <code>WAZUH_MANAGER</code>/<code>WAZUH_REGISTRATION_PASSWORD</code>/<code>WAZUH_AGENT_GROUP</code></li>
+                    <li><strong>Changer groupe</strong> : assigne l'agent a un autre groupe (avec redemarrage)</li>
+                    <li><strong>Redemarrer</strong> / <strong>Desinstaller</strong> : actions SSH root</li>
+                </ol>
+
+                <h3 class="font-semibold mb-2">Options par serveur</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>FIM paths</strong> : chemins surveilles par Syscheck (1 par ligne, doit commencer par /)</li>
+                    <li><strong>log_format</strong> : syslog, json, multi-line, snort-full, squid, nmapg</li>
+                    <li><strong>syscheck_frequency</strong> : intervalle en secondes (60 a 604800)</li>
+                    <li><strong>Active Response</strong>, <strong>SCA</strong>, <strong>Rootcheck</strong> : toggles on/off</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">Rules & Decoders editables</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>3 types : <code>rules</code>, <code>decoders</code>, <code>cdb</code> (CDB lists)</li>
+                    <li>Validation <code>xmllint --noout</code> cote backend pour rules et decoders</li>
+                    <li>Taille max : 512 Ko par rule</li>
+                    <li>Push manuel au manager via son API (v2)</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">Securite</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Registration password + API password chiffres (<code>aes:</code>)</li>
+                    <li>Validation stricte des FIM paths (pas de caracteres shell)</li>
+                    <li>Audit log prefix <code>[wazuh]</code></li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- 9. Scan CVE                               -->
             <!-- ────────────────────────────────────────── -->
             <section id="cve" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
