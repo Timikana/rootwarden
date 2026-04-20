@@ -5,6 +5,57 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.4] — 2026-04-20
+
+### API keys segmentees avec scope regex + last_used tracking
+
+Reponse au gap #4 de l'audit DevSecOps : un seul API_KEY partage =
+compromission = acces backend total sans revocation fine.
+
+Migration 037 :
+- Table api_keys(id, name UNIQUE, key_prefix, key_hash CHAR(64), scope_json,
+  created_by, created_at, revoked_at, last_used_at, last_used_ip)
+- Permission can_manage_api_keys (superadmin auto)
+
+Backend (backend/routes/helpers.py) :
+- require_api_key refactore : priorite table api_keys > fallback Config.API_KEY
+- _validate_api_key_from_db(raw_key, route_path) :
+  - Hash SHA-256 puis lookup
+  - Check revoked_at
+  - Scope JSON : liste de regex → la route doit matcher au moins 1
+  - Update last_used_at + last_used_ip en best-effort (UPDATE separe)
+- Mode fallback legacy : si table api_keys vide (premier boot), Config.API_KEY
+  reste valide. Des la premiere cle creee, Config.API_KEY devient invalide
+  automatiquement — transition zero-downtime.
+
+UI (www/adm/api_keys.php, superadmin + can_manage_api_keys) :
+- Creation : genere rw_live_XXXXXX_... (48 hex chars), affiche UNE SEULE FOIS
+  le secret en clair + bouton Copier. Stocke le SHA-256.
+- Scope : 1 regex par ligne (textarea), validation PHP preg_match avant save
+- Revocation : soft-delete via revoked_at = NOW(). Cles revoquees visibles
+  mais separees en bas de liste.
+- Display : name, prefix (rw_live_XXXX…), scope resume (3 premieres regex),
+  created_at, last_used_at + last_used_ip, statut Active/Revoquee
+
+Tests E2E valides :
+- Cle in-scope /list_machines → HTTP 200 ✓
+- Cle out-of-scope /cve_trends → HTTP 401 ✓
+- Cle legacy API_KEY env → HTTP 401 (car table non-vide) ✓
+- last_used_at et last_used_ip mis a jour correctement ✓
+
+Audit log : creation et revocation de cle loggees via audit_log() standard
+(hash chain 036 → tracabilite forte).
+
+Note compat : les api_proxy.php et consommateurs existants ne cassent pas
+au deploy — tant qu'aucune cle n'est creee, la legacy API_KEY fonctionne.
+Apres creation de la premiere cle, l'admin DOIT creer une cle nommee
+"php-proxy" (ou equivalent) et la configurer dans srv-docker.env pour
+remplacer l'ancienne API_KEY. Documente dans README.
+
+Version 1.14.3 -> 1.14.4.
+
+---
+
 ## [1.14.3] — 2026-04-20
 
 ### CI — SAST + SCA + secrets scan + Trivy filesystem
