@@ -115,24 +115,36 @@ def _load_policies(machine_id=None):
 
 
 def _save_audit_result(machine_id, result, config_raw, ssh_version, audited_by):
-    """Persiste un resultat d'audit en BDD."""
+    """Persiste un resultat d'audit en BDD.
+
+    Retourne (ok: bool, error: str|None). Le caller peut remonter `error`
+    dans la reponse du scan pour que l'admin voit immediatement pourquoi
+    le dashboard / compliance resterait vide (sinon le swallow silencieux
+    donne l'impression que tout marche, mais les rows ne s'ecrivent jamais).
+    """
     try:
         conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO ssh_audit_results "
-            "(machine_id, score, grade, critical_count, high_count, medium_count, low_count, "
-            "findings_json, config_raw, ssh_version, audited_by) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (int(machine_id), result['score'], result['grade'],
-             result['counts']['critical'], result['counts']['high'],
-             result['counts']['medium'], result['counts']['low'],
-             json.dumps(result['findings'], ensure_ascii=False),
-             config_raw, ssh_version, audited_by))
-        conn.commit()
-        conn.close()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO ssh_audit_results "
+                "(machine_id, score, grade, critical_count, high_count, medium_count, low_count, "
+                "findings_json, config_raw, ssh_version, audited_by) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (int(machine_id), result['score'], result['grade'],
+                 result['counts']['critical'], result['counts']['high'],
+                 result['counts']['medium'], result['counts']['low'],
+                 json.dumps(result['findings'], ensure_ascii=False),
+                 config_raw, ssh_version, audited_by))
+            conn.commit()
+            return True, None
+        finally:
+            conn.close()
     except Exception as e:
-        logger.error("Echec sauvegarde resultat ssh_audit: %s", e)
+        import traceback
+        logger.error("Echec sauvegarde resultat ssh_audit (machine=%s) : %s\n%s",
+                     machine_id, e, traceback.format_exc())
+        return False, str(e)
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
@@ -159,7 +171,7 @@ def ssh_audit_scan():
             result = audit_sshd_config(config_text, policies)
 
             audited_by = request.headers.get('X-User-ID', 'admin')
-            _save_audit_result(mid, result, config_text, ssh_version, audited_by)
+            persisted, persist_err = _save_audit_result(mid, result, config_text, ssh_version, audited_by)
             _log_audit_action(mid, 'scan', 'Audit SSH', audited_by)
 
             # Notifications ciblees via preferences utilisateur
@@ -194,6 +206,8 @@ def ssh_audit_scan():
                 'counts': result['counts'],
                 'ssh_version': ssh_version,
                 'machine_id': mid,
+                'persisted': persisted,
+                'persistence_error': persist_err,
             })
     except Exception as e:
         logger.error("[ssh-audit/scan] %s", e)
@@ -239,14 +253,19 @@ def ssh_audit_scan_all():
                 ssh_version = get_ssh_version(client, root_pass)
                 policies = _load_policies(mid)
                 result = audit_sshd_config(config_text, policies)
-                _save_audit_result(mid, result, config_text, ssh_version, audited_by)
+                persisted, persist_err = _save_audit_result(
+                    mid, result, config_text, ssh_version, audited_by)
 
-                results.append({
+                row = {
                     'machine_id': mid,
                     'score': result['score'],
                     'grade': result['grade'],
                     'counts': result['counts'],
-                })
+                    'persisted': persisted,
+                }
+                if persist_err:
+                    row['persistence_error'] = persist_err
+                results.append(row)
         except Exception as e:
             logger.error("[ssh-audit/scan-all] machine #%s: %s", mid, e)
             errors.append({'machine_id': mid, 'error': str(e)})
@@ -374,7 +393,7 @@ def ssh_audit_fix():
             ssh_version = get_ssh_version(client, root_pass)
             policies = _load_policies(mid)
             result = audit_sshd_config(config_text, policies)
-            _save_audit_result(mid, result, config_text, ssh_version, audited_by)
+            _save_audit_result(mid, result, config_text, ssh_version, audited_by)  # best-effort apres fix
 
             return jsonify({
                 'success': True,

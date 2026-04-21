@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.15.1
+# 🔐 RootWarden v1.16.1
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -17,7 +17,7 @@
 - **Fail2ban** - Detection services (SSH/FTP/Apache/Nginx/Mail), activation jails, ban/unban IP, installation auto
 - **Services systemd** - Demarrer, arreter, redemarrer les services Linux. Logs journalctl, categorisation automatique, services proteges
 - **Audit SSH** - Scanner sshd_config, scoring securite (A-F), correctifs en 1 clic, editeur config, backups/restore, toggle directives ON/OFF, reload sshd
-- **Supervision multi-agent** - Deploiement et configuration d'agents de monitoring via SSH. Supporte Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter et Telegraf. Config globale par plateforme, overrides par serveur, editeur de config distant, backups/restore, badges multi-agent, scan tous agents en 1 clic
+- **Supervision multi-agent** - Deploiement et configuration d'agents de monitoring via SSH. Supporte Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter et Telegraf. Config globale par plateforme, **profils reutilisables** (LinuxInterne / LinuxExterne / presets custom) assignes par dropdown pour auto-registration Zabbix, overrides par serveur avec interpolation `{machine.name}` / `{machine.ip}`, editeur de config distant, backups/restore, badges multi-agent, scan tous agents en 1 clic. Support Ubuntu/Debian generique (annees paires LTS + Debian 11+).
 - **Bashrc standardise** - Deploiement d'un `.bashrc` unifie par utilisateur (banniere figlet, tableau sysinfo, alertes, prompt git-aware, alias). Mode overwrite ou merge (preservation blocs custom via `~/.bashrc.local`). Backup automatique, restore en 1 clic, validation syntaxique post-deploy, idempotence sha256, preview diff colorise.
 - **Graylog Sidecar** - Deploiement du Graylog Sidecar (filebeat/nxlog/winlogbeat) via SSH. Configuration serveur centralisee, collectors (templates YAML/XML) editables en base avec validation YAML, enregistrement automatique aupres du manager Graylog.
 - **Wazuh Agent** - Deploiement + enrolement de l'agent Wazuh aupres du manager. Gestion groupes, options FIM/active response/SCA/rootcheck par serveur, rules/decoders/CDB lists editables (validation xmllint). Integration API manager pour push des rules.
@@ -58,7 +58,7 @@
 - **Privileges MySQL restreints** - User applicatif sans ALL PRIVILEGES (SELECT/INSERT/UPDATE/DELETE + migrations)
 - **Brute-force protection 2 couches** - Rate limit par IP (5/10min) + lockout per-user avec **backoff progressif** (3=1min, 4=5min, 5=15min, 6=1h, 7+=4h). Password spraying detection (>= 5 usernames distincts/10min depuis meme IP = alerte superadmin). Bouton "Deverrouiller" admin.
 - **Audit log tamper-evident** - Chaque ligne `user_logs` scellee par chaine de hash SHA2-256 (prev_hash | user_id | action | unix_ts). Endpoint `/adm/api/audit_verify.php` recalcule la chaine et detecte toute alteration (MISMATCH / PREV_BROKEN). Bouton "Verifier integrite" dans l'audit log.
-- **API keys segmentees** - Table `api_keys` avec scope par regex de route (ex: `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stocke en SHA-256. UI CRUD superadmin avec rotation + revocation soft + `last_used_at`/`last_used_ip` tracking. Fallback zero-downtime sur `Config.API_KEY` legacy tant que la table est vide.
+- **API keys segmentees** - Table `api_keys` avec scope par regex de route (ex: `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stocke en SHA-256. UI CRUD superadmin avec rotation + revocation soft + `last_used_at`/`last_used_ip` tracking. **Auto-register** de la cle legacy `Config.API_KEY` a la 1re creation de cle utilisateur (entree `proxy-internal-legacy` taggee `AUTO`, banniere de rappel pour rotation) - evite que le proxy PHP se casse silencieusement apres le remplissage de la table.
 - **CI supply chain security** - gitleaks (secrets commit), bandit (SAST Python), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depend de tous les scans → pas de release sur CVE critique.
 - **Session revocation server-side** - `verify.php` verifie `active_sessions` a chaque requete → un clic "Revoquer" / "Deconnecter les autres" a un effet immediat, invalide les cookies voles.
 - **Password history + HIBP** - Refuse la reutilisation des 5 derniers mots de passe (table `password_history`). Verification opt-in contre HaveIBeenPwned via k-anonymity API (5 premiers hex SHA1 envoyes, seuil configurable).
@@ -281,4 +281,4 @@ MIT
 
 ---
 
-*RootWarden v1.13.1 - 2026-04-16*
+*RootWarden v1.16.1 - 2026-04-21*
