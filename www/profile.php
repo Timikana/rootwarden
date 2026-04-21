@@ -448,6 +448,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- RGPD : export des donnees personnelles -->
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg mt-6">
+            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">🔐 <?= t('profile.rgpd_title') ?></h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                <?= t('profile.rgpd_desc') ?>
+            </p>
+            <a href="/profile/export.php"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
+                📥 <?= t('profile.btn_rgpd_export') ?>
+            </a>
+            <p class="text-[10px] text-gray-400 mt-2">
+                <?= t('profile.rgpd_export_note') ?>
+            </p>
+        </div>
     </div>
     <?php require_once __DIR__ . '/footer.php'; ?>
 </body>

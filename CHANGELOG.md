@@ -5,6 +5,50 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.7] — 2026-04-20
+
+### RGPD : export JSON des donnees personnelles + anonymisation admin
+
+Reponse au gap #15 de l'audit DevSecOps. Conformite RGPD art. 15
+(droit d'acces), art. 17 (effacement), art. 20 (portabilite).
+
+Nouveau endpoint self-service /profile/export.php :
+- Acces : n'importe quel user connecte, dump de SES donnees uniquement
+- Format JSON UTF-8 telechargeable (Content-Disposition attachment)
+- Contenu : user profile, permissions, user_machine_access, user_logs
+  (avec 16 premiers chars du self_hash pour tracabilite), login_history,
+  active_sessions (session_id masque), notification_preferences,
+  password_history (metas changed_at seulement, PAS les hashes).
+  Superadmin : inclut aussi les api_keys creees (sans le secret).
+- Audit log [rgpd] de chaque demande d export
+- Filename : rootwarden-export-user-{id}-{YYYYMMDD-HHMMSS}.json
+
+Nouveau endpoint admin /adm/api/anonymize_user.php :
+- Acces : superadmin uniquement, CSRF obligatoire
+- Soft-delete preservant l'integrite des audit logs pour tracabilite
+  legale (interet legitime de securite, RGPD art. 17.3.e)
+- Effacement : name -> "deleted-{id}", email/company/ssh_key/totp_secret
+  = NULL, password = NULL, active = 0, sudo = 0
+- Revocation : active_sessions, remember_tokens, password_history,
+  notification_preferences, permissions, user_machine_access
+- Protections :
+  * Pas d'auto-anonymisation (user ne peut s'anonymiser lui-meme)
+  * Pas d'anonymisation du dernier superadmin actif
+- Audit log [rgpd] avec original_name + id
+- user_logs et login_history CONSERVES (tracabilite securite)
+
+UI profile.php : nouvelle card "Donnees personnelles (RGPD)" avec
+bouton d'export + note explicative.
+
+i18n FR+EN parite 58=58 :
+- profile.rgpd_title
+- profile.rgpd_desc
+- profile.btn_rgpd_export
+- profile.rgpd_export_note
+
+Version 1.14.6 -> 1.14.7.
+
+---
 ## [1.14.6] — 2026-04-20
 
 ### Password history + HIBP k-anonymity check
