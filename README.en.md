@@ -1,6 +1,6 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.14.0
+# RootWarden v1.14.4
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
@@ -54,6 +54,10 @@
 - **Locally Compiled Tailwind** — CSP without unsafe-eval, no external CDN
 - **Isolated Docker Network** — Database on internal network only, no internet access
 - **Restricted MySQL Privileges** — Application user without ALL PRIVILEGES (SELECT/INSERT/UPDATE/DELETE + migrations)
+- **Two-layer brute-force protection** — IP rate limit (5/10min) + per-user lockout with **progressive backoff** (3=1min, 4=5min, 5=15min, 6=1h, 7+=4h). Password spraying detection (>= 5 distinct usernames/10min from same IP → superadmin alert). Admin "Unlock" button.
+- **Tamper-evident audit log** — Every `user_logs` row sealed with an SHA2-256 hash chain (prev_hash | user_id | action | unix_ts). `/adm/api/audit_verify.php` recomputes the chain and flags any alteration (MISMATCH / PREV_BROKEN). "Verify integrity" button in audit log.
+- **Segmented API keys** — `api_keys` table with route-regex scope (e.g. `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stored as SHA-256. Superadmin CRUD UI with rotation + soft revocation + `last_used_at`/`last_used_ip` tracking. Zero-downtime fallback to legacy `Config.API_KEY` until the table is populated.
+- **CI supply-chain security** — gitleaks (committed secrets), bandit (Python SAST), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depends on all scans → no release on critical CVE.
 - **28+ Security Fixes (3 Audits)** — SQLi, CSRF, XSS, timing attack, etc.
 
 ### Notifications

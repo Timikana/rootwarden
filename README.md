@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.14.0
+# 🔐 RootWarden v1.14.4
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -54,6 +54,10 @@
 - **Tailwind compile localement** — CSP sans unsafe-eval, pas de CDN externe
 - **Reseau Docker isole** — BDD sur reseau interne uniquement, pas d'acces internet
 - **Privileges MySQL restreints** — User applicatif sans ALL PRIVILEGES (SELECT/INSERT/UPDATE/DELETE + migrations)
+- **Brute-force protection 2 couches** — Rate limit par IP (5/10min) + lockout per-user avec **backoff progressif** (3=1min, 4=5min, 5=15min, 6=1h, 7+=4h). Password spraying detection (>= 5 usernames distincts/10min depuis meme IP = alerte superadmin). Bouton "Deverrouiller" admin.
+- **Audit log tamper-evident** — Chaque ligne `user_logs` scellee par chaine de hash SHA2-256 (prev_hash | user_id | action | unix_ts). Endpoint `/adm/api/audit_verify.php` recalcule la chaine et detecte toute alteration (MISMATCH / PREV_BROKEN). Bouton "Verifier integrite" dans l'audit log.
+- **API keys segmentees** — Table `api_keys` avec scope par regex de route (ex: `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stocke en SHA-256. UI CRUD superadmin avec rotation + revocation soft + `last_used_at`/`last_used_ip` tracking. Fallback zero-downtime sur `Config.API_KEY` legacy tant que la table est vide.
+- **CI supply chain security** — gitleaks (secrets commit), bandit (SAST Python), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depend de tous les scans → pas de release sur CVE critique.
 - **28+ failles de securite corrigees (3 audits)** — SQLi, CSRF, XSS, timing attack, etc.
 
 ### Notifications
