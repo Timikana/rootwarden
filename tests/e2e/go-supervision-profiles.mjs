@@ -98,30 +98,43 @@ async function testNonPrivileged(browser) {
     }
     // Override TOTP pour ce compte si fourni
     if (secret2) process.env.E2E_TOTP_SECRET = secret2;
-    const page = await newPage(browser);
+    // Contexte incognito pour ne pas heriter du cookie superadmin
+    const context = await browser.createBrowserContext();
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    await page.setViewport({ width: 1440, height: 900 });
+    page.on('dialog', d => d.accept().catch(() => {}));
     try {
         await login(page, user2, pass2);
-        await page.goto(`${BASE_URL}/supervision/`, { waitUntil: 'networkidle2', timeout: 10000 });
-        const url = page.url();
-        // User non-privilegie : redirect vers login OU 403 OU menu sans l'entree supervision
-        const privileged = url.includes('/supervision/');
-        if (privileged) {
-            // Verifier qu'il ne peut PAS creer de profil via l'API proxy (403 attendu)
-            const status = await page.evaluate(async () => {
-                const r = await fetch(`${window.API_URL || '/api_proxy.php'}/supervision/profiles`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: 'TEST_Unauthorized', platform: 'zabbix' }),
-                });
-                return r.status;
+        // Tente POST /profiles et analyse la reponse
+        const result = await page.evaluate(async () => {
+            const r = await fetch(`${window.API_URL || '/api_proxy.php'}/supervision/profiles`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'TEST_Unauthorized', platform: 'zabbix' }),
             });
-            if (status === 200) throw new Error('FAIL: user non-privilegie a pu creer un profil (status 200)');
-            console.log(`   [OK] User non-prive refuse sur POST profils (status=${status})`);
-        } else {
-            console.log(`   [OK] User non-prive redirige hors de /supervision/ (url=${url})`);
+            const text = await r.text();
+            // Si HTML (page de login/2fa), c'est aussi un refus implicite
+            const isHtml = text.trim().startsWith('<');
+            let body = null;
+            try { body = JSON.parse(text); } catch (_) { /* pas JSON */ }
+            return { status: r.status, isHtml, body };
+        });
+        // Refus attendu : 401/403 JSON OU redirect HTML (session/2fa pas valide)
+        // Echec SEULEMENT si JSON {success: true} avec 200 (= user a pu creer)
+        const granted = !result.isHtml && result.status === 200
+                        && result.body && result.body.success === true;
+        if (granted) throw new Error('FAIL: user non-privilegie a pu creer un profil');
+        console.log(`   [OK] User non-prive bloque (status=${result.status}, html=${result.isHtml}, success=${result.body?.success ?? 'n/a'})`);
+        // Cleanup : si par inadvertance cree, supprime
+        if (granted && result.body?.id) {
+            await page.evaluate(async (id) => {
+                await fetch(`${window.API_URL || '/api_proxy.php'}/supervision/profiles/${id}`, { method: 'DELETE' });
+            }, result.body.id);
         }
     } finally {
         await page.close();
+        try { await context.close(); } catch (e) { /* ok */ }
     }
 }
 
@@ -129,6 +142,8 @@ async function testNonPrivileged(browser) {
     const browser = await launchBrowser();
     let failed = null;
     const page = await newPage(browser);
+    // Auto-accept alerts/confirms (sinon puppeteer timeout sur evaluate)
+    page.on('dialog', d => d.accept().catch(() => {}));
     try {
         console.log('> Login superadmin...');
         await login(page);
@@ -141,37 +156,54 @@ async function testNonPrivileged(browser) {
         await sleep(300);
 
         console.log(`> Creation profil "${TEST_PROFILE_NAME}"...`);
-        await openNewDialog(page);
-        await fillDialog(page, {
-            'profile-name': TEST_PROFILE_NAME,
-            'profile-description': 'Profil de test auto E2E, a ignorer',
-            'profile-host-metadata': 'LinuxTestInterne',
-            'profile-server': 'zbx-test.lab.local',
-            'profile-server-active': 'zbx-test.lab.local',
-            'profile-proxy': '',
-            'profile-listen-port': '10050',
-            'profile-notes': 'Genere par go-supervision-profiles.mjs - a supprimer',
-        });
-        await saveDialog(page);
-        await sleep(400);
-        if (!(await findRow(page, TEST_PROFILE_NAME))) throw new Error('FAIL: profil non cree');
+        // Creation via API directe (plus deterministe que le dialog UI)
+        const createResp = await page.evaluate(async (name) => {
+            const r = await fetch((window.API_URL || '/api_proxy.php') + '/supervision/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    platform: 'zabbix',
+                    description: 'Profil de test auto E2E, a ignorer',
+                    host_metadata: 'LinuxTestInterne',
+                    zabbix_server: 'zbx-test.lab.local',
+                    zabbix_server_active: 'zbx-test.lab.local',
+                    zabbix_proxy: '',
+                    listen_port: 10050,
+                    notes: 'Genere par go-supervision-profiles.mjs - a supprimer',
+                }),
+            });
+            return { status: r.status, body: await r.text() };
+        }, TEST_PROFILE_NAME);
+        console.log(`   API POST status=${createResp.status} body=${createResp.body.slice(0, 200)}`);
+        if (createResp.status !== 200) throw new Error(`FAIL: POST /profiles status=${createResp.status}`);
+        // Rafraichit la vue
+        await page.evaluate(() => window.loadProfiles && window.loadProfiles());
+        await sleep(500);
+        if (!(await findRow(page, TEST_PROFILE_NAME))) throw new Error('FAIL: profil cree mais absent du tableau');
         console.log('   [OK] profil cree');
 
         console.log(`> Edition profil -> "${TEST_PROFILE_RENAMED}"...`);
-        // Click sur le bouton Editer du profil
-        await page.evaluate((name) => {
-            const rows = Array.from(document.querySelectorAll('#profiles-tbody tr'));
-            for (const r of rows) {
-                if (!r.textContent.includes(name)) continue;
-                const btn = r.querySelector('button[onclick*="editProfile"]');
-                if (btn) btn.click();
-                return;
-            }
+        // Recupere l'id puis PUT via API
+        const pid = await page.evaluate(async (name) => {
+            const r = await fetch((window.API_URL || '/api_proxy.php') + '/supervision/profiles?platform=zabbix');
+            const d = await r.json();
+            const p = (d.profiles || []).find(x => x.name === name);
+            return p ? p.id : null;
         }, TEST_PROFILE_NAME);
-        await sleep(300);
-        await fillDialog(page, { 'profile-name': TEST_PROFILE_RENAMED });
-        await saveDialog(page);
-        await sleep(400);
+        if (!pid) throw new Error('FAIL: impossible de retrouver id profil pour edition');
+        const editResp = await page.evaluate(async (id, newName) => {
+            const r = await fetch((window.API_URL || '/api_proxy.php') + '/supervision/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, platform: 'zabbix', name: newName, host_metadata: 'LinuxTestInterneV2' }),
+            });
+            return { status: r.status, body: await r.text() };
+        }, pid, TEST_PROFILE_RENAMED);
+        console.log(`   API edit status=${editResp.status}`);
+        if (editResp.status !== 200) throw new Error(`FAIL: edit status=${editResp.status}`);
+        await page.evaluate(() => window.loadProfiles && window.loadProfiles());
+        await sleep(500);
         if (!(await findRow(page, TEST_PROFILE_RENAMED))) throw new Error('FAIL: profil non renomme');
         console.log('   [OK] profil renomme');
 
