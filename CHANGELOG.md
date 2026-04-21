@@ -5,6 +5,49 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.6] — 2026-04-20
+
+### Password history + HIBP k-anonymity check
+
+Reponse au gap #14 de l'audit DevSecOps. La politique de complexite
+(15 chars + 4 classes) existait deja mais rien n'empechait un user de
+remettre son ancien password lors d'un changement force, ni de choisir
+un mot de passe present dans les fuites publiques.
+
+Migration 038 :
+- Table password_history(user_id, password_hash, changed_at) + index user_changed + FK ON DELETE CASCADE
+
+Nouveau helper www/auth/password_policy.php :
+- passwordPolicyCheckComplexity() : 15 chars + 4 classes (existait, centralise)
+- passwordPolicyCheckHistory() : refuse reutilisation des 5 derniers
+  (verifie aussi vs le hash courant)
+- passwordPolicyCheckHIBP() : k-anonymity via api.pwnedpasswords.com
+  * Opt-in via env HIBP_ENABLED=true (off par defaut)
+  * Seuil configurable via HIBP_THRESHOLD (defaut 10 fuites)
+  * SHA1 + envoi des 5 premiers hex uniquement (privacy-preserving)
+  * Timeout 3s, fail-open si API injoignable (pas de blocage user)
+- passwordPolicyValidateAll() : pipeline en une passe
+- passwordPolicyRecordOld() : archive l'ancien hash dans password_history
+  + purge automatique a 10 entrees par user (rotation)
+
+Integration :
+- www/profile.php : le password change passe par la politique complete
+- www/auth/reset_password.php : idem pour le flow forgot password (la
+  check existante strlen<8 est remplacee par la politique complete,
+  coherence FR/EN message)
+
+i18n FR+EN parite 54=54 :
+- profile.error_password_reuse
+- profile.error_password_pwned
+
+Tests manuels : un user qui tente de remettre son password courant est
+refuse avec "deja utilise recemment". Si HIBP_ENABLED=true, un password
+commun (ex: "Password123!") est refuse avec "apparait dans une fuite".
+
+Version 1.14.5 -> 1.14.6.
+
+---
+
 ## [1.14.5] — 2026-04-20
 
 ### Session revocation server-side + "Deconnecter les autres sessions"

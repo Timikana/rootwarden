@@ -43,6 +43,8 @@ return [
     'profile.error_password_mismatch' => 'Passwords do not match.',
     'profile.password_policy_hint' => 'Password must be at least 15 characters and include: 1 uppercase, 1 lowercase, 1 digit, and 1 special character.',
     'profile.error_password_policy' => 'Password must be at least 15 characters and include: 1 uppercase, 1 lowercase, 1 digit, and 1 special character.',
+    'profile.error_password_reuse' => 'This password has been used recently. Pick a new one not among your last 5.',
+    'profile.error_password_pwned' => 'This password appears in a public data breach (HaveIBeenPwned). Please choose another.',
     'profile.error_password_update' => 'Error updating password.',
     'profile.error_revoke' => 'Error revoking session.',
     'profile.login_success' => 'Successful login',

@@ -157,16 +157,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Étape 2 : vérification de la correspondance nouveau/confirmation
             } elseif ($newPassword !== $confirmPassword) {
                 $error = t('profile.error_password_mismatch');
-            // Étape 3 : vérification de la politique de complexité du mot de passe
-            } elseif (
-                strlen($newPassword) < 15 ||              // Minimum 15 caractères
-                !preg_match('/[a-z]/', $newPassword) ||   // Au moins une minuscule
-                !preg_match('/[A-Z]/', $newPassword) ||   // Au moins une majuscule
-                !preg_match('/[0-9]/', $newPassword) ||   // Au moins un chiffre
-                !preg_match('/[^a-zA-Z0-9]/', $newPassword) // Au moins un caractère spécial
-            ) {
-                $error = t('profile.error_password_policy');
             } else {
+                // Étape 3 : politique centralisee (complexite + historique + HIBP)
+                require_once __DIR__ . '/auth/password_policy.php';
+                $policyError = passwordPolicyValidateAll($pdo, $userId, $newPassword);
+                if ($policyError !== null) {
+                    $error = t($policyError);
+                }
+            }
+            if (!$error && password_verify($currentPassword, $storedPassword)
+                && $newPassword === $confirmPassword) {
+                // Sauvegarde l'ANCIEN hash dans password_history (pour la non-reutilisation future)
+                passwordPolicyRecordOld($pdo, $userId, $storedPassword);
                 // Hachage bcrypt du nouveau mot de passe (PASSWORD_DEFAULT = bcrypt)
                 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
                 // Calcul de la date d'expiration (per-user override > global)
