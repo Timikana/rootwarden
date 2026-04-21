@@ -1,0 +1,107 @@
+{
+  "collapse-filter": true,
+  "search": "",
+  "showTags": true,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "tag:#auth",
+      "color": {
+        "a": 1,
+        "rgb": 14701131
+      }
+    },
+    {
+      "query": "tag:#security",
+      "color": {
+        "a": 1,
+        "rgb": 14518041
+      }
+    },
+    {
+      "query": "tag:#ci",
+      "color": {
+        "a": 1,
+        "rgb": 2201331
+      }
+    },
+    {
+      "query": "tag:#db",
+      "color": {
+        "a": 1,
+        "rgb": 9922482
+      }
+    },
+    {
+      "query": "tag:#frontend",
+      "color": {
+        "a": 1,
+        "rgb": 15780932
+      }
+    },
+    {
+      "query": "tag:#backend",
+      "color": {
+        "a": 1,
+        "rgb": 3050327
+      }
+    },
+    {
+      "query": "tag:#module/graylog",
+      "color": {
+        "a": 1,
+        "rgb": 5301420
+      }
+    },
+    {
+      "query": "tag:#module/wazuh",
+      "color": {
+        "a": 1,
+        "rgb": 4113254
+      }
+    },
+    {
+      "query": "tag:#rgpd",
+      "color": {
+        "a": 1,
+        "rgb": 15895499
+      }
+    },
+    {
+      "query": "tag:#audit",
+      "color": {
+        "a": 1,
+        "rgb": 9127187
+      }
+    },
+    {
+      "query": "tag:#concept",
+      "color": {
+        "a": 1,
+        "rgb": 10395294
+      }
+    },
+    {
+      "query": "tag:#test",
+      "color": {
+        "a": 1,
+        "rgb": 7385154
+      }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1.04427083333333,
+  "lineSizeMultiplier": 1.01875,
+  "collapse-forces": false,
+  "centerStrength": 0.5,
+  "repelStrength": 12,
+  "linkStrength": 1,
+  "linkDistance": 220,
+  "scale": 0.12923628358100622,
+  "close": true
+}
