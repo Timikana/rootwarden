@@ -31,6 +31,8 @@ paths = [
     '''mysql/init\.sql''',
     '''www/vendor/''',
     '''backend/tests/''',
+    '''obsidian-rootwarden/''',       # vault documentation : placeholders pedagogiques (openssl rand, etc.)
+    '''docs/''',                       # documentation technique avec exemples de commandes
 ]
 
 # Commentaires explicites "not-a-secret"
