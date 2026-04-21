@@ -14,6 +14,9 @@ exclude_dirs:
 skips:
   # B101 : use of assert — OK dans le code (non test) ou justifie
   - B101
+  # B103 : chmod 0o755 — intentionnel sur PLATFORM_SSH_DIR, dossier doit etre
+  # traversable par le process du container (uid non-root)
+  - B103
   # B404 : import subprocess — utilise legitimement pour execute_as_root SSH
   - B404
   # B603, B607 : subprocess sans shell=True — deja safe par design

@@ -11,7 +11,7 @@ useDefault = true
 [[rules]]
 id = "rootwarden-example-secret"
 description = "Placeholder strings dans srv-docker.env.example et docs"
-regex = '''(?i)(change[_-]?me|replace[_-]?me|your[_-]?key[_-]?here|openssl[[:space:]]+rand)'''
+regex = '''(?i)\b(change[_-]?me|replace[_-]?me|your[_-]?key[_-]?here|openssl[[:space:]]+rand)\b'''
 # Ces chaines apparaissent dans les .example — pas de secret reel
 [rules.allowlist]
 regexes = ['''(?i)example''']
@@ -26,6 +26,7 @@ paths = [
     '''README(\.[a-z]+)?\.md''',
     '''CHANGELOG\.md''',
     '''ARCHITECTURE\.md''',
+    '''backend/bandit\.yml''',        # config scanner, contient des justifications prose
     '''tests/e2e/helpers\.mjs''',     # contient un TOTP_SECRET de test documente
     '''mysql/init\.sql''',
     '''www/vendor/''',

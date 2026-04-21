@@ -37,6 +37,15 @@ Fixes :
     les VALEURS utilisent des prepared statements `%s` mysql-connector
 - B602 (subprocess shell=True), B105/B106 (passwords hardcodes), B303-B306
   (cryptos faibles) restent actifs et bloquants.
+- B103 ajoute aux skips : `chmod 0o755` sur `PLATFORM_SSH_DIR` est
+  intentionnel (dossier traversable par le process container uid non-root).
+
+### CI : fix gitleaks faux positif
+
+La rule custom `rootwarden-example-secret` matchait "replacement" dans
+la prose des docs via `replace[_-]?me` sans word boundary. Ajout de `\b`
+autour + `backend/bandit.yml` ajoute a l'allowlist paths (fichier de
+config scanner, pas du code applicatif).
 
 Version 1.15.0 -> 1.15.1 (patch CI).
 
