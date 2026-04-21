@@ -19,6 +19,11 @@ skips:
   # B603, B607 : subprocess sans shell=True — deja safe par design
   - B603
   - B607
+  # B108 : hardcoded /tmp — chemins sur serveurs distants via SSH, pas sur le host backend
+  - B108
+  # B601 : paramiko exec_command — legitime, pattern SSH commande a distance du projet
+  # entrees validees en amont (shlex.quote + whitelists) ; B602 (shell=True) reste actif
+  - B601
   # B608 : hardcoded SQL — on utilise des parametres prepared PDO systematiquement
   # mais bandit flag parfois les f-strings SQL safe (ex: ORDER BY col whitelistee)
   # → on garde B608 actif, a gerer au cas par cas
