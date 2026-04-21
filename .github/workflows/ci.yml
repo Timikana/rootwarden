@@ -172,7 +172,7 @@ jobs:
         # -ll = low severity minimum, -ii = medium confidence minimum
         # Exclut les repertoires de tests (faux-positifs frequents)
         run: |
-          bandit -r . -ll -ii --exclude ./tests,./__pycache__ --format txt || EXIT=$?
+          bandit -r . -ll -ii -c bandit.yml --exclude ./tests,./__pycache__ --format txt || EXIT=$?
           # Non-bloquant en PR, bloquant sur main
           if [ "${{ github.event_name }}" = "pull_request" ]; then exit 0; fi
           exit ${EXIT:-0}
