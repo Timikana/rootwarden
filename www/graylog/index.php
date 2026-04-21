@@ -50,6 +50,7 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
             <div>
                 <h1 class="text-2xl font-bold"><?= t('graylog.title') ?></h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('graylog.subtitle') ?></p>
+<?php $tipId = 'graylog'; $tipTitle = t('tip.graylog_title'); $tipSteps = [t('tip.graylog_step1'), t('tip.graylog_step2'), t('tip.graylog_step3'), t('tip.graylog_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
             </div>
         </div>
 

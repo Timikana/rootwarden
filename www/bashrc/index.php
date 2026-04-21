@@ -72,6 +72,7 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
             <div>
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('bashrc.title') ?></h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('bashrc.subtitle') ?></p>
+<?php $tipId = 'bashrc'; $tipTitle = t('tip.bashrc_title'); $tipSteps = [t('tip.bashrc_step1'), t('tip.bashrc_step2'), t('tip.bashrc_step3'), t('tip.bashrc_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
             </div>
         </div>
 

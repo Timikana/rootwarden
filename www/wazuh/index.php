@@ -56,6 +56,7 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
             <div>
                 <h1 class="text-2xl font-bold"><?= t('wazuh.title') ?></h1>
                 <p class="text-sm text-gray-500"><?= t('wazuh.subtitle') ?></p>
+<?php $tipId = 'wazuh'; $tipTitle = t('tip.wazuh_title'); $tipSteps = [t('tip.wazuh_step1'), t('tip.wazuh_step2'), t('tip.wazuh_step3'), t('tip.wazuh_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
             </div>
         </div>
 

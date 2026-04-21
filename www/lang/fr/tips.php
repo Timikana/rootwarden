@@ -92,9 +92,30 @@ return [
     // Page Supervision
     'tip.supervision_title' => 'Comment deployer les agents de monitoring ?',
     'tip.supervision_step1' => '<strong>Choisissez</strong> la plateforme (Zabbix, Centreon, Prometheus, Telegraf) en haut a droite.',
-    'tip.supervision_step2' => 'Configurez le <strong>template global</strong> (serveur, port, TLS) dans l\'onglet Configuration.',
-    'tip.supervision_step3' => 'Dans l\'onglet <strong>Deploiement</strong>, selectionnez les serveurs et deployez l\'agent.',
-    'tip.supervision_step4' => 'L\'<strong>editeur de configuration</strong> permet de modifier le fichier de config a distance.',
+    'tip.supervision_step2' => 'Dans l\'onglet <strong>Configuration</strong>, reglez le template global (serveur, port, TLS).',
+    'tip.supervision_step3' => 'Creez vos <strong>Profils</strong> (LinuxInterne, LinuxExterne...) avec HostMetadata pour l\'auto-registration Zabbix, puis assignez-les par serveur dans l\'onglet Deploiement.',
+    'tip.supervision_step4' => 'Selectionnez les serveurs et <strong>deployez l\'agent</strong>. L\'editeur de config distant permet d\'ajuster au cas par cas.',
+
+    // Page Bashrc
+    'tip.bashrc_title' => 'Comment deployer un bashrc standardise ?',
+    'tip.bashrc_step1' => 'Selectionnez les <strong>serveurs cibles</strong> et les <strong>utilisateurs Linux</strong> (UID >= 1000 ou root, shells interactifs uniquement).',
+    'tip.bashrc_step2' => 'Cliquez <strong>Preview</strong> pour voir un diff colorise avant deploiement - aucune modification a cette etape.',
+    'tip.bashrc_step3' => 'Choisissez le mode : <strong>Overwrite</strong> remplace tout (backup auto), <strong>Merge</strong> preserve les blocs <code>&gt;&gt;&gt; USER CUSTOM &gt;&gt;&gt;</code> dans <code>~/.bashrc.local</code>.',
+    'tip.bashrc_step4' => '<strong>Restore</strong> revient au dernier backup en 1 clic. Idempotent via sha256 : skip si deja deploye.',
+
+    // Page Graylog
+    'tip.graylog_title' => 'Comment deployer le Graylog Sidecar ?',
+    'tip.graylog_step1' => 'Configurez l\'URL du <strong>serveur Graylog</strong> + le token API dans l\'onglet Configuration (token chiffre en base).',
+    'tip.graylog_step2' => 'Editez les <strong>collectors</strong> (filebeat / nxlog / winlogbeat) : templates YAML/XML reutilisables, validation YAML cote backend.',
+    'tip.graylog_step3' => 'Selectionnez les serveurs et cliquez <strong>Installer</strong> : ajout du repo, install du paquet, enrolement automatique aupres du manager.',
+    'tip.graylog_step4' => 'L\'onglet <strong>Sidecars</strong> affiche le statut par machine (running / stopped / version). Relance a distance possible.',
+
+    // Page Wazuh
+    'tip.wazuh_title' => 'Comment deployer l\'agent Wazuh ?',
+    'tip.wazuh_step1' => 'Renseignez le <strong>manager Wazuh</strong> (IP/port), le <strong>mot de passe d\'enrolement</strong> (chiffre) et le groupe par defaut.',
+    'tip.wazuh_step2' => 'Definissez les <strong>rules / decoders / CDB lists</strong> : textarea XML valide par <code>xmllint --noout</code>, CDB en plain text.',
+    'tip.wazuh_step3' => 'Configurez les <strong>options par serveur</strong> (FIM paths, active response, SCA, rootcheck, log_format, syscheck_frequency 60-604800s).',
+    'tip.wazuh_step4' => 'Installez l\'agent : enrolement via <code>agent-auth</code> automatique, agent_id recupere depuis <code>/var/ossec/etc/client.keys</code>.',
 
     // Page Cle SSH plateforme
     'tip.platform_title' => 'Comment fonctionne la cle plateforme ?',
