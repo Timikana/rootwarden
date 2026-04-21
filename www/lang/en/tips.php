@@ -81,9 +81,30 @@ return [
 
     'tip.supervision_title' => 'How to deploy monitoring agents?',
     'tip.supervision_step1' => '<strong>Choose</strong> the platform (Zabbix, Centreon, Prometheus, Telegraf) in the top right.',
-    'tip.supervision_step2' => 'Configure the <strong>global template</strong> (server, port, TLS) in the Configuration tab.',
-    'tip.supervision_step3' => 'In the <strong>Deployment</strong> tab, select servers and deploy the agent.',
-    'tip.supervision_step4' => 'The <strong>config editor</strong> allows remote editing of the agent config file.',
+    'tip.supervision_step2' => 'In the <strong>Configuration</strong> tab, set the global template (server, port, TLS).',
+    'tip.supervision_step3' => 'Create your <strong>Profiles</strong> (LinuxInternal, LinuxExternal...) with HostMetadata for Zabbix auto-registration, then assign them per server in the Deployment tab.',
+    'tip.supervision_step4' => 'Select servers and <strong>deploy the agent</strong>. The remote config editor allows per-server tuning.',
+
+    // Bashrc page
+    'tip.bashrc_title' => 'How to deploy a standardized bashrc?',
+    'tip.bashrc_step1' => 'Select <strong>target servers</strong> and <strong>Linux users</strong> (UID >= 1000 or root, interactive shells only).',
+    'tip.bashrc_step2' => 'Click <strong>Preview</strong> to see a colored diff before deployment - nothing is modified at this stage.',
+    'tip.bashrc_step3' => 'Pick mode: <strong>Overwrite</strong> replaces everything (auto backup), <strong>Merge</strong> preserves <code>&gt;&gt;&gt; USER CUSTOM &gt;&gt;&gt;</code> blocks into <code>~/.bashrc.local</code>.',
+    'tip.bashrc_step4' => '<strong>Restore</strong> rolls back to the last backup in 1 click. Idempotent via sha256: skip if already deployed.',
+
+    // Graylog page
+    'tip.graylog_title' => 'How to deploy the Graylog Sidecar?',
+    'tip.graylog_step1' => 'Configure the <strong>Graylog server</strong> URL + API token in the Configuration tab (token encrypted in DB).',
+    'tip.graylog_step2' => 'Edit <strong>collectors</strong> (filebeat / nxlog / winlogbeat): reusable YAML/XML templates, backend YAML validation.',
+    'tip.graylog_step3' => 'Select servers and click <strong>Install</strong>: repo added, package installed, automatic enrolment with the manager.',
+    'tip.graylog_step4' => 'The <strong>Sidecars</strong> tab shows status per machine (running / stopped / version). Remote restart available.',
+
+    // Wazuh page
+    'tip.wazuh_title' => 'How to deploy the Wazuh agent?',
+    'tip.wazuh_step1' => 'Set the <strong>Wazuh manager</strong> (IP/port), the <strong>enrolment password</strong> (encrypted), and the default group.',
+    'tip.wazuh_step2' => 'Define <strong>rules / decoders / CDB lists</strong>: XML textarea validated by <code>xmllint --noout</code>, CDB in plain text.',
+    'tip.wazuh_step3' => 'Configure <strong>per-server options</strong> (FIM paths, active response, SCA, rootcheck, log_format, syscheck_frequency 60-604800s).',
+    'tip.wazuh_step4' => 'Install the agent: automatic enrolment via <code>agent-auth</code>, agent_id retrieved from <code>/var/ossec/etc/client.keys</code>.',
 
     'tip.platform_title' => 'How does the platform key work?',
     'tip.platform_step1' => 'The <strong>Ed25519 keypair</strong> is auto-generated and persistently stored.',
