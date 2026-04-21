@@ -72,6 +72,16 @@ frontend/node_modules/
 fernet.key
 .ruff_cache/
 
-# Obsidian vault (notes perso, hors repo)
-obsidian-rootwarden/
-**/.obsidian/
+# Obsidian vault : partage les notes + config graph/templates,
+# ignore les preferences perso (workspace, app, appearance).
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/workspace.json
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/workspace-mobile.json
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/workspaces.json
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/app.json
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/appearance.json
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/hotkeys.json
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/cache
+# Le junction Windows Code/ -> racine repo ne doit JAMAIS etre committee
+# (autoreference infinie quand clone depuis un autre OS).
+obsidian-rootwarden/obsidian-rootwarden-vault/Code
+obsidian-rootwarden/Code
