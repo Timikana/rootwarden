@@ -72,4 +72,6 @@ frontend/node_modules/
 fernet.key
 .ruff_cache/
 
-obsidian-rootwarden
+# Obsidian vault (notes perso, hors repo)
+obsidian-rootwarden/
+**/.obsidian/
