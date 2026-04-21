@@ -71,3 +71,5 @@ frontend/node_modules/
 *.dump
 fernet.key
 .ruff_cache/
+
+obsidian-rootwarden

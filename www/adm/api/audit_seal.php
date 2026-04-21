@@ -26,35 +26,52 @@ if (!$dryRun) {
 }
 
 try {
-    // Dernier hash connu (reference pour continuer la chaine)
-    $lastHash = (string)($pdo->query(
-        "SELECT self_hash FROM user_logs
-         WHERE self_hash IS NOT NULL
-         ORDER BY id DESC LIMIT 1"
-    )->fetchColumn() ?: AUDIT_LOG_GENESIS);
-
-    // Toutes les lignes non scellees, par ID croissant
+    // Rebuild complet de la chaine a partir de la ligne ID 1 (GENESIS).
+    // Cela garantit une chaine consistante meme quand des lignes orphelines
+    // sont intercalees avec des lignes deja scellees (cas des INSERTs
+    // legacy arrivant apres des lignes recentes scellees).
+    //
+    // Trade-off : les signatures deja calculees peuvent changer. La
+    // tamper-evidence est preservee pour l'avenir (une modif post-seal
+    // sera detectee), et la comparaison avec un export ou un backup
+    // externe reste possible.
     $stmt = $pdo->query(
-        "SELECT id, user_id, action, UNIX_TIMESTAMP(created_at) AS ts
-         FROM user_logs
-         WHERE self_hash IS NULL
-         ORDER BY id ASC"
+        "SELECT id, user_id, action, UNIX_TIMESTAMP(created_at) AS ts,
+                self_hash AS current_self
+         FROM user_logs ORDER BY id ASC"
     );
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $allRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $lastHash = AUDIT_LOG_GENESIS;
+    $orphanCount = 0;
+    $rewrittenCount = 0;
+    $pending = [];  // [id, prev, self] pour update batch
+
+    foreach ($allRows as $r) {
+        $self = audit_log_compute_hash(
+            $lastHash,
+            (int)$r['user_id'],
+            (string)$r['action'],
+            (int)$r['ts']
+        );
+        $prevSelf = $r['current_self'];
+        if ($prevSelf === null) {
+            $orphanCount++;
+        } elseif ($prevSelf !== $self) {
+            $rewrittenCount++;
+        }
+        if ($prevSelf !== $self) {
+            $pending[] = [(int)$r['id'], $lastHash, $self];
+        }
+        $lastHash = $self;
+    }
 
     $sealed = 0;
-    if (!$dryRun && count($rows) > 0) {
+    if (!$dryRun && count($pending) > 0) {
         $pdo->beginTransaction();
         $upd = $pdo->prepare("UPDATE user_logs SET prev_hash = ?, self_hash = ? WHERE id = ?");
-        foreach ($rows as $r) {
-            $self = audit_log_compute_hash(
-                $lastHash,
-                (int)$r['user_id'],
-                (string)$r['action'],
-                (int)$r['ts']
-            );
-            $upd->execute([$lastHash, $self, (int)$r['id']]);
-            $lastHash = $self;
+        foreach ($pending as [$id, $prev, $self]) {
+            $upd->execute([$prev, $self, $id]);
             $sealed++;
         }
         $pdo->commit();
@@ -63,7 +80,9 @@ try {
     echo json_encode([
         'success' => true,
         'dry_run' => $dryRun,
-        'unsealed_count' => count($rows),
+        'total_rows' => count($allRows),
+        'unsealed_count' => $orphanCount,
+        'rewritten_sealed' => $rewrittenCount,
         'sealed' => $sealed,
         'latest_hash' => substr($lastHash, 0, 16) . '…',
     ]);
