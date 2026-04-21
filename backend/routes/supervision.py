@@ -45,7 +45,7 @@ AGENT_REGISTRY = {
     'zabbix': {
         'service': 'zabbix-agent2',
         'config_path': '/etc/zabbix/zabbix_agent2.conf',
-        'version_cmd': "zabbix_agent2 -V 2>/dev/null | head -1 || zabbix_agentd -V 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
+        'version_cmd': "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 || command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
         'uninstall_cmd': (
             "export DEBIAN_FRONTEND=noninteractive && "
             "systemctl stop zabbix-agent2 2>/dev/null || true && "
@@ -57,7 +57,7 @@ AGENT_REGISTRY = {
     'centreon': {
         'service': 'centreon-monitoring-agent',
         'config_path': '/etc/centreon-monitoring-agent/centagent.yaml',
-        'version_cmd': "centreon-monitoring-agent --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
+        'version_cmd': "command -v centreon-monitoring-agent >/dev/null 2>&1 && centreon-monitoring-agent --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
         'uninstall_cmd': (
             "export DEBIAN_FRONTEND=noninteractive && "
             "systemctl stop centreon-monitoring-agent 2>/dev/null || true && "
@@ -68,7 +68,10 @@ AGENT_REGISTRY = {
     'prometheus': {
         'service': 'prometheus-node-exporter',
         'config_path': '/etc/default/prometheus-node-exporter',
-        'version_cmd': "node_exporter --version 2>&1 | head -1 || echo 'NOT_INSTALLED'",
+        # node_exporter ecrit sa version sur stderr -> on MERGE (2>&1) mais on
+        # vérifie d'abord que le binaire existe, sinon `sh: 1: not found` fuit
+        # dans la sortie et est interprete comme version.
+        'version_cmd': "command -v node_exporter >/dev/null 2>&1 && node_exporter --version 2>&1 | head -1 || echo 'NOT_INSTALLED'",
         'uninstall_cmd': (
             "export DEBIAN_FRONTEND=noninteractive && "
             "systemctl stop prometheus-node-exporter 2>/dev/null || true && "
@@ -79,7 +82,7 @@ AGENT_REGISTRY = {
     'telegraf': {
         'service': 'telegraf',
         'config_path': '/etc/telegraf/telegraf.conf',
-        'version_cmd': "telegraf --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
+        'version_cmd': "command -v telegraf >/dev/null 2>&1 && telegraf --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
         'uninstall_cmd': (
             "export DEBIAN_FRONTEND=noninteractive && "
             "systemctl stop telegraf 2>/dev/null || true && "
@@ -742,9 +745,12 @@ def zabbix_version():
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
-            # Essayer zabbix_agent2 d'abord
+            # Essayer zabbix_agent2 d'abord, fallback zabbix_agentd.
+            # command -v evite "sh: not found" qui polluerait la sortie si absent.
             out, _, rc = execute_as_root(client,
-                "zabbix_agent2 -V 2>/dev/null | head -1 || zabbix_agentd -V 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
+                "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 "
+                "|| command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 "
+                "|| echo 'NOT_INSTALLED'",
                 root_pass, timeout=15)
             out = out.strip()
 
