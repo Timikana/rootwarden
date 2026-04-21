@@ -66,7 +66,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->prepare("DELETE FROM active_sessions WHERE session_id = ? AND user_id = ?")
                 ->execute([$revokeId, $userId]);
+            // Audit via helper hash chain (migration 036)
+            require_once __DIR__ . '/adm/includes/audit_log.php';
+            audit_log_raw($pdo, $userId, '[security] Revocation session ' . substr((string)$revokeId, 0, 12) . '...');
             $message = t('profile.session_revoked');
+        } catch (\Exception $e) {
+            $error = t('profile.error_revoke');
+        }
+    }
+
+    // ── Revocation de toutes les autres sessions ───────────────────────
+    // Supprime toutes les active_sessions du user sauf la courante.
+    // Apres cette action, les autres navigateurs seront force-logout au
+    // prochain request (verify.php check active_sessions).
+    if (isset($_POST['revoke_all_others'])) {
+        try {
+            $stmt = $pdo->prepare(
+                "DELETE FROM active_sessions WHERE user_id = ? AND session_id != ?"
+            );
+            $stmt->execute([$userId, session_id()]);
+            $affected = $stmt->rowCount();
+            require_once __DIR__ . '/adm/includes/audit_log.php';
+            audit_log_raw($pdo, $userId, sprintf(
+                '[security] Revocation de %d autre(s) session(s) (session courante conservee)',
+                $affected
+            ));
+            $message = t('profile.all_others_revoked', ['count' => $affected]);
         } catch (\Exception $e) {
             $error = t('profile.error_revoke');
         }
@@ -329,7 +354,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ?>
         <?php if (!empty($sessions)): ?>
         <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4"><?= t('profile.sessions') ?></h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200"><?= t('profile.sessions') ?></h2>
+                <?php if (count($sessions) > 1): ?>
+                <form method="POST" onsubmit="return confirm('<?= htmlspecialchars(t('profile.confirm_revoke_all_others')) ?>')">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                    <button type="submit" name="revoke_all_others" value="1"
+                            class="text-xs px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg">
+                        🚪 <?= t('profile.btn_revoke_all_others') ?>
+                    </button>
+                </form>
+                <?php endif; ?>
+            </div>
             <div class="space-y-2">
                 <?php foreach ($sessions as $sess):
                     $isCurrent = ($sess['session_id'] === session_id());

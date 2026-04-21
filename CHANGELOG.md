@@ -5,6 +5,50 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.5] — 2026-04-20
+
+### Session revocation server-side + "Deconnecter les autres sessions"
+
+Reponse au gap #9 de l'audit DevSecOps. Correction importante :
+le profile.php avait DEJA un bouton "Revoquer" qui DELETE de active_sessions,
+mais verify.php ne verifiait JAMAIS active_sessions → la revocation etait
+sans effet cote serveur. L'utilisateur revoque restait connecte.
+
+Changements :
+
+www/auth/verify.php :
+- Apres le check de timeout, AJOUT d'une verification DB :
+  `SELECT 1 FROM active_sessions WHERE session_id = ? AND user_id = ?`
+- Si absent → session_destroy + redirect login (session revoquee)
+- Skip du check si 2fa_required actif (pour ne pas casser le flow login)
+- Fail-open en cas d'erreur DB (log error, pas de lockout)
+
+www/auth/functions.php (initializeUserSession) :
+- Ajout REPLACE INTO active_sessions apres session_regenerate_id
+- Garantit que le nouveau session_id est enregistre cote DB apres 2FA
+- Sans ca, le check de verify.php aurait lockout l'utilisateur
+  immediatement apres login
+
+www/profile.php :
+- Nouveau POST handler revoke_all_others : DELETE sauf session courante
+- Bouton UI "🚪 Deconnecter les autres" visible si count(sessions) > 1
+- Confirmation explicite
+- Audit log via audit_log_raw() (hash chain 036)
+
+i18n FR+EN parite 52=52 :
+- profile.btn_revoke_all_others
+- profile.confirm_revoke_all_others
+- profile.all_others_revoked
+
+Modele d'attaque couvert :
+- Vol de cookie session → victime clique "Deconnecter les autres" dans
+  profile → le cookie vole est invalide au prochain request
+- Auparavant : le DELETE existait mais etait un no-op cote serveur
+
+Version 1.14.4 -> 1.14.5.
+
+---
+
 ## [1.14.4] — 2026-04-20
 
 ### API keys segmentees avec scope regex + last_used tracking
