@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($isUserLocked) {
             // On NE verifie PAS le password — evite oracle sur le lockout
             recordLoginAttempt($pdo, $username, false);
-            $mins = (int)ceil($userLockRemaining / 60);
+            $mins = max(1, (int)ceil($userLockRemaining / 60));
             $error = t('login.error_user_locked', ['minutes' => $mins]);
         } elseif ($user && (int)($user['active'] ?? 0) !== 1) {
             // Compte desactive — message generique (pas d'enumeration)
@@ -320,13 +320,17 @@ $loginAppCompany = htmlspecialchars(getenv('APP_COMPANY') ?: '');
             if (($lockInfo['cnt'] ?? 0) >= 5):
                 $lastAttempt = strtotime($lockInfo['last_attempt']);
                 $unlockAt = $lastAttempt + 600;
-                $remaining = max(0, $unlockAt - time());
-                $minutes = (int)ceil($remaining / 60);
+                $remaining = $unlockAt - time();
+                if ($remaining > 0):
+                    // Arrondi UP, minimum 1 (pour eviter "0 minute(s)" quand il reste < 60s)
+                    $minutes = max(1, (int)ceil($remaining / 60));
             ?>
             <div class="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg text-red-700 text-sm text-center">
                 &#128274; <?= t('login.error_locked', ['minutes' => $minutes]) ?>
             </div>
-            <?php endif; ?>
+            <?php
+                endif;
+            endif; ?>
 
             <?php if (isset($error)): ?>
             <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg
