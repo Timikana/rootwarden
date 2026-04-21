@@ -55,4 +55,8 @@ return [
     'profile.error_password_pwned' => 'Ce mot de passe apparait dans une fuite de donnees publique (HaveIBeenPwned). Choisissez-en un autre.',
     'profile.password_updated' => 'Mot de passe modifie avec succes.',
     'profile.error_password_update' => 'Erreur lors de la modification du mot de passe.',
+    'profile.rgpd_title' => 'Donnees personnelles (RGPD)',
+    'profile.rgpd_desc' => 'Conformement aux articles 15 (droit d\'acces) et 20 (portabilite) du RGPD, vous pouvez telecharger l\'integralite de vos donnees personnelles au format JSON.',
+    'profile.btn_rgpd_export' => 'Telecharger mes donnees (JSON)',
+    'profile.rgpd_export_note' => 'Le fichier contient : profil, permissions, historique des actions, tentatives de connexion, sessions, preferences. Pas de donnees sensibles (pas de hash de mot de passe, session_id masque).',
 ];
