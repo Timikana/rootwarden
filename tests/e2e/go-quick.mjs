@@ -1,5 +1,5 @@
 /**
- * go-quick.mjs — Login + 2FA + password change + go to admin
+ * go-quick.mjs - Login + 2FA + password change + go to admin
  * Navigateur visible, reste ouvert sur admin_page.php
  */
 import puppeteer from 'puppeteer';

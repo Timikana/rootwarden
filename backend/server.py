@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-server.py — Coeur de l'API Flask du projet RootWarden.
+server.py - Coeur de l'API Flask du projet RootWarden.
 
 Initialise l'application Flask, enregistre les Blueprints de routes,
 configure CORS, les logs, les migrations et le scheduler.
@@ -27,7 +27,7 @@ from flask import Flask, Response, request
 from config import Config
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Migrations de base de donnees — executees au demarrage
+# Migrations de base de donnees - executees au demarrage
 # ─────────────────────────────────────────────────────────────────────────────
 try:
     from db_migrate import run_migrations
@@ -129,7 +129,7 @@ server_log_file = os.path.join(log_dir, "server.log")
 
 _log_level = getattr(logging, Config.LOG_LEVEL, logging.INFO)
 _log_format = (
-    '%(asctime)s [%(levelname)s] %(name)s %(funcName)s:%(lineno)d — %(message)s'
+    '%(asctime)s [%(levelname)s] %(name)s %(funcName)s:%(lineno)d - %(message)s'
     if Config.DEBUG else
     '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 )
@@ -145,7 +145,7 @@ logger = logging.getLogger(__name__)
 
 if Config.DEBUG:
     logger.warning(
-        "⚠️  DEBUG_MODE activé — NE PAS utiliser en production. "
+        "⚠️  DEBUG_MODE activé - NE PAS utiliser en production. "
         "Les traces détaillées et les informations sensibles sont visibles dans les logs."
     )
 

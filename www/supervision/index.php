@@ -1,12 +1,12 @@
 <?php
 /**
- * supervision/index.php — Module Supervision : deploiement et configuration agents.
+ * supervision/index.php - Module Supervision : deploiement et configuration agents.
  *
  * 4 onglets :
- *   1. Configuration globale — template agent (Server, TLS, PSK, metadata)
- *   2. Deploiement agents   — tableau serveurs, deploy/reconfigure/uninstall
- *   3. Editeur de config    — charge/modifie/sauvegarde le fichier agent distant
- *   4. Monitoring           — placeholder pour integration API Zabbix (Phase 3)
+ *   1. Configuration globale - template agent (Server, TLS, PSK, metadata)
+ *   2. Deploiement agents   - tableau serveurs, deploy/reconfigure/uninstall
+ *   3. Editeur de config    - charge/modifie/sauvegarde le fichier agent distant
+ *   4. Monitoring           - placeholder pour integration API Zabbix (Phase 3)
  *
  * Permissions : admin (2) + superadmin (3) + can_manage_supervision
  */
@@ -90,6 +90,7 @@ try {
         <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
             <nav class="flex gap-6">
                 <button class="tab-btn active px-1 py-3 text-sm" data-tab="config"><?= t('supervision.tab_config') ?></button>
+                <button class="tab-btn px-1 py-3 text-sm text-gray-500 dark:text-gray-400" data-tab="profiles"><?= t('supervision.tab_profiles') ?></button>
                 <button class="tab-btn px-1 py-3 text-sm text-gray-500 dark:text-gray-400" data-tab="deploy"><?= t('supervision.tab_deploy') ?></button>
                 <button class="tab-btn px-1 py-3 text-sm text-gray-500 dark:text-gray-400" data-tab="editor"><?= t('supervision.tab_editor') ?></button>
             </nav>
@@ -342,7 +343,115 @@ try {
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════════════
-             ONGLET 2 : Deploiement agents
+             ONGLET 2 : Profils de supervision (catalogue metadata)
+             ═══════════════════════════════════════════════════════════════════ -->
+        <div id="tab-profiles" class="tab-panel">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div class="flex items-start justify-between mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold"><?= t('supervision.profiles_title') ?></h2>
+                        <p class="text-xs text-gray-400 mt-1"><?= t('supervision.profiles_desc') ?></p>
+                    </div>
+                    <button type="button" onclick="openProfileDialog()"
+                            class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                        + <?= t('supervision.profile_new') ?>
+                    </button>
+                </div>
+                <div id="profiles-empty" class="hidden py-8 text-center text-sm text-gray-400">
+                    <?= t('supervision.profiles_empty') ?>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-xs uppercase text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                            <tr>
+                                <th class="text-left py-2"><?= t('supervision.profile_name') ?></th>
+                                <th class="text-left py-2"><?= t('supervision.profile_host_metadata') ?></th>
+                                <th class="text-left py-2"><?= t('supervision.profile_server') ?></th>
+                                <th class="text-left py-2"><?= t('supervision.profile_proxy') ?></th>
+                                <th class="text-center py-2"><?= t('supervision.profile_machines') ?></th>
+                                <th class="text-right py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="profiles-tbody"></tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-gray-500 mt-3">
+                    <?= t('supervision.profiles_interp_hint') ?>
+                </p>
+            </div>
+
+            <!-- Dialog CRUD profil -->
+            <div id="profile-dialog" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+                        <h3 class="text-lg font-bold" id="profile-dialog-title"><?= t('supervision.profile_new') ?></h3>
+                        <button onclick="closeProfileDialog()" class="text-gray-400 hover:text-gray-600">&times;</button>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <input type="hidden" id="profile-id" value="">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1"><?= t('supervision.profile_name') ?> *</label>
+                                <input type="text" id="profile-name" placeholder="LinuxInterne"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                                <p class="text-xs text-gray-400 mt-0.5"><?= t('supervision.profile_name_hint') ?></p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1"><?= t('supervision.profile_host_metadata') ?></label>
+                                <input type="text" id="profile-host-metadata" placeholder="LinuxInterne"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                                <p class="text-xs text-gray-400 mt-0.5"><?= t('supervision.profile_host_metadata_hint') ?></p>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1"><?= t('supervision.profile_description') ?></label>
+                            <input type="text" id="profile-description"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Server (override)</label>
+                                <input type="text" id="profile-server" placeholder="(vide = config globale)"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">ServerActive (override)</label>
+                                <input type="text" id="profile-server-active" placeholder="(vide = config globale)"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Zabbix Proxy (informatif)</label>
+                                <input type="text" id="profile-proxy" placeholder="proxy.example.com"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">ListenPort</label>
+                                <input type="number" id="profile-listen-port" placeholder="10050"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1"><?= t('supervision.profile_notes') ?></label>
+                            <textarea id="profile-notes" rows="3"
+                                      class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"></textarea>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 p-5 border-t border-gray-200 dark:border-gray-700">
+                        <button onclick="closeProfileDialog()"
+                                class="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <?= t('common.cancel') ?>
+                        </button>
+                        <button onclick="saveProfile()"
+                                class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                            <?= t('common.save') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ONGLET 3 : Deploiement agents
              ═══════════════════════════════════════════════════════════════════ -->
         <div id="tab-deploy" class="tab-panel">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4">
@@ -489,6 +598,7 @@ try {
     </div>
 
     <script src="/supervision/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
+    <script src="/supervision/js/profiles.js?v=<?= file_exists(__DIR__ . '/js/profiles.js') ? filemtime(__DIR__ . '/js/profiles.js') : 0 ?>"></script>
     <?php require_once __DIR__ . '/../footer.php'; ?>
 </body>
 </html>

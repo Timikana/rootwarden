@@ -1,15 +1,15 @@
 """
-ssh_audit.py — Helpers pour l'audit de configuration SSH (sshd_config) sur serveurs distants.
+ssh_audit.py - Helpers pour l'audit de configuration SSH (sshd_config) sur serveurs distants.
 
 Fonctions pures qui prennent un client Paramiko + root_password et executent
 des commandes d'analyse via execute_as_root().
 
 Fonctions principales :
-    get_sshd_config()       — Recupere le contenu de /etc/ssh/sshd_config
-    get_ssh_version()       — Recupere la version d'OpenSSH
-    audit_sshd_config()     — Analyse la config contre les regles de securite
-    backup_sshd_config()    — Cree un backup date de sshd_config
-    apply_fix()             — Applique un correctif + validation + reload
+    get_sshd_config()       - Recupere le contenu de /etc/ssh/sshd_config
+    get_ssh_version()       - Recupere la version d'OpenSSH
+    audit_sshd_config()     - Analyse la config contre les regles de securite
+    backup_sshd_config()    - Cree un backup date de sshd_config
+    apply_fix()             - Applique un correctif + validation + reload
 """
 import re
 import logging
@@ -324,14 +324,14 @@ def apply_fix(client, root_pass, key, value):
     # Validation de la config
     _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
-        _log.warning("sshd -t echoue apres modification de %s: %s — restauration du backup", key, sshd_err)
+        _log.warning("sshd -t echoue apres modification de %s: %s - restauration du backup", key, sshd_err)
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Configuration invalide apres modification: {sshd_err}"
 
     # Reload sshd (plus sur que restart)
     _, stderr_r, rc_r = execute_as_root(client, "systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null", root_pass, logger=_log)
     if rc_r != 0:
-        _log.warning("Reload sshd echoue: %s — la config est valide, reload manuel necessaire", stderr_r)
+        _log.warning("Reload sshd echoue: %s - la config est valide, reload manuel necessaire", stderr_r)
         return True, f"{key} modifie avec succes. Attention : reload echoue ({stderr_r}), reload manuel necessaire."
 
     _log.info("Directive %s corrigee a '%s' et sshd reloaded avec succes", key, value)
@@ -363,7 +363,7 @@ def save_sshd_config(client, root_pass, new_config):
     # Validate
     _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
-        _log.warning("sshd -t failed after save — restoring backup")
+        _log.warning("sshd -t failed after save - restoring backup")
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Config invalid (sshd -t): {sshd_err}"
 

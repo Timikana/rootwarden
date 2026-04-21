@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: RootWarden API
   description: |
-    API REST du backend Flask de RootWarden — plateforme de gestion centralisee
+    API REST du backend Flask de RootWarden - plateforme de gestion centralisee
     de serveurs Linux (cles SSH, mises a jour, iptables, scan CVE, supervision multi-agent).
 
     **Authentification** : header `X-API-KEY` obligatoire sur toutes les routes (sauf /test).
@@ -1700,7 +1700,7 @@ paths:
   /ssh_audit/fleet:
     get:
       tags: [SSH Audit]
-      summary: Vue du parc — dernier score SSH de chaque serveur
+      summary: Vue du parc - dernier score SSH de chaque serveur
       responses:
         '200':
           description: Scores par serveur

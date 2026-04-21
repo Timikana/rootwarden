@@ -1,6 +1,6 @@
 <?php
 /**
- * profile.php — Page de profil utilisateur
+ * profile.php - Page de profil utilisateur
  *
  * Rôle       : Permet à un utilisateur connecté de :
  *                1. Mettre à jour sa clé SSH publique (validation de format)
@@ -9,8 +9,8 @@
  *              Chaque modification réussie est enregistrée dans la table user_logs.
  *
  * Dépendances :
- *   - auth/verify.php : checkAuth(), checkCsrfToken() — authentification et CSRF
- *   - db.php          : $pdo — connexion PDO MySQL
+ *   - auth/verify.php : checkAuth(), checkCsrfToken() - authentification et CSRF
+ *   - db.php          : $pdo - connexion PDO MySQL
  *   - head.php        : balises <head> communes
  *   - menu.php        : barre de navigation
  *   - footer.php      : pied de page
@@ -57,7 +57,7 @@ $error   = null;
 
 // ── Traitement des formulaires POST ──────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Vérification du jeton CSRF — stoppe l'exécution si invalide
+    // Vérification du jeton CSRF - stoppe l'exécution si invalide
     checkCsrfToken();
 
     // ── Revocation de session ──────────────────────────────────────────
@@ -255,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </p>
                 </div>
                 <div class="text-right text-xs text-gray-400 dark:text-gray-500 space-y-1">
-                    <div><?= t('profile.account_created') ?> <?= $user['created_at'] ? date('d/m/Y', strtotime($user['created_at'])) : '—' ?></div>
+                    <div><?= t('profile.account_created') ?> <?= $user['created_at'] ? date('d/m/Y', strtotime($user['created_at'])) : '-' ?></div>
                     <div><?= t('profile.2fa') ?> : <?= $has2FA
                         ? '<span class="text-green-600 dark:text-green-400 font-semibold">' . t('profile.2fa_active') . '</span>'
                         : '<span class="text-red-500 font-semibold">' . t('profile.2fa_inactive') . '</span>' ?>

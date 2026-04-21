@@ -1,5 +1,5 @@
 /**
- * 01-login.test.mjs — E2E : Login + 2FA TOTP → Dashboard visible
+ * 01-login.test.mjs - E2E : Login + 2FA TOTP → Dashboard visible
  *
  * Valide :
  *  - Page login accessible
@@ -14,7 +14,7 @@ import { launchBrowser, newPage, login, BASE_URL } from './helpers.mjs';
 
 let browser, page;
 
-describe('01 — Login + TOTP → Dashboard', () => {
+describe('01 - Login + TOTP → Dashboard', () => {
     before(async () => {
         browser = await launchBrowser();
         page = await newPage(browser);
@@ -59,7 +59,7 @@ describe('01 — Login + TOTP → Dashboard', () => {
     });
 
     it('should display the notification badge', async () => {
-        // Le badge se charge en async — attendre un peu
+        // Le badge se charge en async - attendre un peu
         await page.waitForFunction(() => {
             const badge = document.getElementById('notif-badge');
             return badge && !badge.classList.contains('hidden');

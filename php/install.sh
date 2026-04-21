@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# install.sh — Script de premier demarrage RootWarden
+# install.sh - Script de premier demarrage RootWarden
 # =============================================================================
 #
 # Execute une seule fois par entrypoint.sh au premier lancement du conteneur.
@@ -11,7 +11,7 @@
 #   INIT_ADMIN_PASSWORD      : mot de passe souhaite pour l'admin
 #   (si vides, des mots de passe aleatoires sont generes)
 #
-# Flag : /var/www/html/.installed — empeche la re-execution.
+# Flag : /var/www/html/.installed - empeche la re-execution.
 # =============================================================================
 
 set -e
@@ -21,12 +21,12 @@ FLAG_FILE="${APP_DIR}/.installed"
 
 # ── Idempotence : ne pas re-executer si deja installe ───────────────────────
 if [ -f "${FLAG_FILE}" ]; then
-    echo "[RootWarden] Installation deja effectuee — install.sh ignore"
+    echo "[RootWarden] Installation deja effectuee - install.sh ignore"
     exit 0
 fi
 
 echo "[RootWarden] =============================================="
-echo "[RootWarden]  PREMIER DEMARRAGE — Installation en cours..."
+echo "[RootWarden]  PREMIER DEMARRAGE - Installation en cours..."
 echo "[RootWarden] =============================================="
 
 # ── Attente de MySQL (retry loop PDO) ────────────────────────────────────────
@@ -58,7 +58,7 @@ for i in $(seq 1 $MAX_RETRIES); do
         exit 1
     fi
 
-    echo "[RootWarden] MySQL pas encore pret — nouvelle tentative dans ${RETRY_DELAY}s (${i}/${MAX_RETRIES})"
+    echo "[RootWarden] MySQL pas encore pret - nouvelle tentative dans ${RETRY_DELAY}s (${i}/${MAX_RETRIES})"
     sleep $RETRY_DELAY
 done
 
@@ -83,7 +83,7 @@ php -r "
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 
-    // Superadmin — hash + force changement au premier login
+    // Superadmin - hash + force changement au premier login
     \$hash = password_hash(getenv('TEMP_SUPERADMIN_PASS'), PASSWORD_BCRYPT);
     \$stmt = \$pdo->prepare('UPDATE users SET password = ?, force_password_change = 1 WHERE name = ?');
     \$stmt->execute([\$hash, 'superadmin']);
@@ -104,7 +104,7 @@ php -r "
 CREDS_FILE="${APP_DIR}/.first_run_credentials"
 cat > "${CREDS_FILE}" <<CREDS_EOF
 ========================================
- ROOTWARDEN — Identifiants initiaux
+ ROOTWARDEN - Identifiants initiaux
 ========================================
  Login    : superadmin
  Password : ${SUPERADMIN_PASS}
@@ -144,4 +144,4 @@ echo ""
 
 # ── Marquer l'installation comme terminee ────────────────────────────────────
 touch "${FLAG_FILE}"
-echo "[RootWarden] Installation terminee — flag ${FLAG_FILE} cree"
+echo "[RootWarden] Installation terminee - flag ${FLAG_FILE} cree"

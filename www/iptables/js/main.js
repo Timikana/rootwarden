@@ -429,7 +429,7 @@ COMMIT`
         container.innerHTML = '<p class="text-xs text-gray-400">' + __('loading') + '</p>';
 
         try {
-            // On a besoin du server_id, pas de l'IP — recupérons-le via une query
+            // On a besoin du server_id, pas de l'IP - recupérons-le via une query
             const r = await fetch(`${window.API_URL}/iptables-history?server_id=${server.id || ''}`);
             const d = await r.json();
             if (!d.success || !d.history || d.history.length === 0) {
@@ -439,7 +439,7 @@ COMMIT`
             container.innerHTML = '';
             d.history.forEach(function(h) {
                 const date = new Date(h.created_at).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-                const reason = h.change_reason ? ' — ' + h.change_reason : '';
+                const reason = h.change_reason ? ' - ' + h.change_reason : '';
                 const row = document.createElement('div');
                 row.className = 'flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0';
                 const info = document.createElement('div');

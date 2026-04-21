@@ -1,6 +1,6 @@
 <?php
 /**
- * includes/totp_crypto.php — Chiffrement/dechiffrement des secrets TOTP.
+ * includes/totp_crypto.php - Chiffrement/dechiffrement des secrets TOTP.
  *
  * Approche retrocompatible :
  *   - encryptTotpSecret() retourne "totp:" + chiffre (sodium ou AES)
@@ -21,11 +21,11 @@ function encryptTotpSecret(string $secret): string
 
     $secretKey = getenv('SECRET_KEY');
     if (empty($secretKey)) {
-        error_log("[RootWarden] SECRET_KEY absente — TOTP secret non chiffre");
+        error_log("[RootWarden] SECRET_KEY absente - TOTP secret non chiffre");
         return $secret; // Fallback plaintext si pas de cle
     }
 
-    // Sodium (prioritaire) — cle HKDF derivee avec info label "rootwarden-totp"
+    // Sodium (prioritaire) - cle HKDF derivee avec info label "rootwarden-totp"
     if (function_exists('sodium_crypto_secretbox')) {
         try {
             $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
@@ -41,7 +41,7 @@ function encryptTotpSecret(string $secret): string
         }
     }
 
-    // AES-256-CBC (fallback) — cle HKDF derivee
+    // AES-256-CBC (fallback) - cle HKDF derivee
     $rawKey = substr(hex2bin($secretKey), 0, 32);
     if (strlen($rawKey) < 32) $rawKey = str_pad($rawKey, 32, "\0");
     $key = hash_hkdf('sha256', $rawKey, 32, 'rootwarden-totp');
@@ -64,14 +64,14 @@ function decryptTotpSecret(string $value): string
 {
     if (empty($value)) return '';
 
-    // Plaintext legacy — pas de prefixe "totp:"
+    // Plaintext legacy - pas de prefixe "totp:"
     if (strpos($value, 'totp:') !== 0) {
         return $value;
     }
 
     $secretKey = getenv('SECRET_KEY');
     if (empty($secretKey)) {
-        error_log("[RootWarden] SECRET_KEY absente — impossible de dechiffrer TOTP");
+        error_log("[RootWarden] SECRET_KEY absente - impossible de dechiffrer TOTP");
         return '';
     }
 
@@ -122,7 +122,7 @@ function decryptTotpSecret(string $value): string
         return $decrypted;
     }
 
-    // Prefixe inconnu — retourner vide par securite
+    // Prefixe inconnu - retourner vide par securite
     error_log("[RootWarden] TOTP unknown prefix: " . substr($value, 0, 20));
     return '';
 }

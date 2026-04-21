@@ -1,5 +1,5 @@
 <?php
-// lang/en/profile.php — 48 cles
+// lang/en/profile.php - 48 cles
 return [
     'profile.title' => 'My Profile',
     'profile.desc' => 'Manage your account: email, SSH key, password and two-factor authentication.',

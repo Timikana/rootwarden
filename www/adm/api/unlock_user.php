@@ -1,6 +1,6 @@
 <?php
 /**
- * unlock_user.php — Deverrouille manuellement un compte verrouille apres N echecs consecutifs.
+ * unlock_user.php - Deverrouille manuellement un compte verrouille apres N echecs consecutifs.
  *
  * Acces : superadmin uniquement (role_id = 3).
  *

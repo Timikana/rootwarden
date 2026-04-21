@@ -1,6 +1,6 @@
 <?php
 /**
- * security/health_check.php — Page de diagnostic des routes backend
+ * security/health_check.php - Page de diagnostic des routes backend
  *
  * Teste chaque route API Python depuis PHP (server-side) et affiche
  * un tableau de bord visuel avec le statut de chaque endpoint.
@@ -189,7 +189,7 @@ foreach ($routes as $route) {
 
     $url = $base_url . $path;
     [$ok, $code, $ms, $preview] = testRoute($url, $method, $api_key, $body, $sse);
-    // SSE/streaming routes timeout by design — mark as OK
+    // SSE/streaming routes timeout by design - mark as OK
     if ($sse && !$ok && $ms >= 9000) {
         $ok = true;
         $preview = t('health.sse_active');
@@ -272,7 +272,7 @@ $totalFail = count($results) - $totalOk;
                         </span>
                     </td>
                     <td class="px-4 py-3 font-mono <?= $r['code'] >= 200 && $r['code'] < 400 ? 'text-green-600' : 'text-yellow-600' ?>">
-                        <?= $r['code'] ?: '—' ?>
+                        <?= $r['code'] ?: '-' ?>
                     </td>
                     <td class="px-4 py-3 text-right font-mono">
                         <?= $r['ms'] ?> ms
@@ -290,7 +290,7 @@ $totalFail = count($results) - $totalOk;
     </div>
 
     <p class="text-xs text-gray-400 mt-4 text-right">
-        <?= t('health.generated_at') ?> <?= date('d/m/Y H:i:s') ?> — <?= t('health.total_time') ?> : <?= array_sum(array_column($results, 'ms')) ?> ms
+        <?= t('health.generated_at') ?> <?= date('d/m/Y H:i:s') ?> - <?= t('health.total_time') ?> : <?= array_sum(array_column($results, 'ms')) ?> ms
     </p>
 </main>
 

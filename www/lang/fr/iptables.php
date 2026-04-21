@@ -1,12 +1,12 @@
 <?php
-// lang/fr/iptables.php — 42 cles
+// lang/fr/iptables.php - 42 cles
 return [
     'iptables.title' => 'Gestion iptables',
     'iptables.desc' => 'Regles de pare-feu iptables. Consultez, editez et sauvegardez les regles IPv4 et IPv6 de vos serveurs.',
     'iptables.load_rules' => 'Charger les regles',
     'iptables.rules_ipv4' => 'Regles IPv4',
     'iptables.rules_ipv6' => 'Regles IPv6',
-    'iptables.subtitle' => 'Regles iptables IPv4 / IPv6 — lecture, edition, sauvegarde',
+    'iptables.subtitle' => 'Regles iptables IPv4 / IPv6 - lecture, edition, sauvegarde',
     'iptables.server_target' => 'Serveur cible',
     'iptables.select_server' => '-- Selectionner un serveur --',
     'iptables.current_rules_v4' => 'Regles actuelles IPv4',

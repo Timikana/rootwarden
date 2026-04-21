@@ -1,5 +1,5 @@
 """
-test_permissions.py — Tests de la matrice de permissions (API key, roles, machine access).
+test_permissions.py - Tests de la matrice de permissions (API key, roles, machine access).
 
 Verifie que :
     - Les routes protegees refusent les requetes sans X-API-KEY (401)

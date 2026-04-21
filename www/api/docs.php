@@ -1,6 +1,6 @@
 <?php
 /**
- * api/docs.php — Swagger UI pour la documentation de l'API RootWarden
+ * api/docs.php - Swagger UI pour la documentation de l'API RootWarden
  *
  * Accessible uniquement aux admins et superadmins.
  * Charge la spec OpenAPI depuis /api/openapi.php.
@@ -13,7 +13,7 @@ checkAuth([ROLE_SUPERADMIN]);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Docs — RootWarden</title>
+    <title>API Docs - RootWarden</title>
     <link rel="stylesheet" href="/api/swagger/swagger-ui.css">
     <style>
         body { margin: 0; background: #fafafa; }

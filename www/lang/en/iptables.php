@@ -1,5 +1,5 @@
 <?php
-// lang/en/iptables.php — 42 cles
+// lang/en/iptables.php - 42 cles
 return [
     'iptables.title' => 'Iptables Management',
     'iptables.subtitle' => 'Firewall rule management',

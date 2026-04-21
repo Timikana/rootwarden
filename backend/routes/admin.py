@@ -1,16 +1,16 @@
 """
-routes/admin.py — Routes d'administration.
+routes/admin.py - Routes d'administration.
 
 Routes :
-    GET  /admin/backups               — Liste les backups
-    POST /admin/backups               — Cree un backup
-    POST /server_lifecycle            — Met a jour le statut lifecycle
-    POST /exclude_user                — Exclut un user de la synchronisation
-    GET  /admin/temp_permissions      — Liste les permissions temporaires actives
-    POST /admin/temp_permissions      — Accorde une permission temporaire
-    DELETE /admin/temp_permissions/<id> — Revoque une permission temporaire
-    GET  /admin/notification_prefs    — Liste les preferences de notification par user
-    POST /admin/notification_prefs    — Toggle une preference de notification
+    GET  /admin/backups               - Liste les backups
+    POST /admin/backups               - Cree un backup
+    POST /server_lifecycle            - Met a jour le statut lifecycle
+    POST /exclude_user                - Exclut un user de la synchronisation
+    GET  /admin/temp_permissions      - Liste les permissions temporaires actives
+    POST /admin/temp_permissions      - Accorde une permission temporaire
+    DELETE /admin/temp_permissions/<id> - Revoque une permission temporaire
+    GET  /admin/notification_prefs    - Liste les preferences de notification par user
+    POST /admin/notification_prefs    - Toggle une preference de notification
 """
 
 from flask import Blueprint, jsonify, request
@@ -149,7 +149,7 @@ def grant_temp_permission():
             notify(
                 user_id=int(user_id), type='perm_granted',
                 title=f"Permission temporaire accordee",
-                message=f"'{permission}' pour {hours}h — {reason or 'sans raison'}",
+                message=f"'{permission}' pour {hours}h - {reason or 'sans raison'}",
                 link='/adm/admin_page.php#permissions',
             )
         except Exception:

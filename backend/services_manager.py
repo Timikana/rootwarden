@@ -1,5 +1,5 @@
 """
-services_manager.py — Helpers SSH pour la gestion des services systemd sur serveurs distants.
+services_manager.py - Helpers SSH pour la gestion des services systemd sur serveurs distants.
 
 Fonctions pures qui prennent un client Paramiko + root_password et executent
 des commandes systemctl via execute_as_root().

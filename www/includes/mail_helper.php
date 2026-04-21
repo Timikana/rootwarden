@@ -59,7 +59,7 @@ function createMailer(): PHPMailer
         $mail->SMTPAutoTLS = false;
     }
 
-    // Auth SMTP (optionnel — si vide, envoie sans auth pour les relais IP-whitelistés)
+    // Auth SMTP (optionnel - si vide, envoie sans auth pour les relais IP-whitelistés)
     $user = getenv('MAIL_SMTP_USER');
     $pass = getenv('MAIL_SMTP_PASSWORD');
     if ($user && $pass) {
@@ -87,7 +87,7 @@ function createMailer(): PHPMailer
 function sendPasswordResetEmail(string $to, string $resetUrl, string $username): bool
 {
     if (!isMailEnabled()) {
-        error_log("[RootWarden] Mail disabled — reset email not sent to {$to}");
+        error_log("[RootWarden] Mail disabled - reset email not sent to {$to}");
         return false;
     }
 
@@ -180,7 +180,7 @@ HTML;
 function sendWelcomeEmail(string $to, string $username, string $plainPassword): bool
 {
     if (!isMailEnabled()) {
-        error_log("[RootWarden] Mail disabled — welcome email not sent to {$to}");
+        error_log("[RootWarden] Mail disabled - welcome email not sent to {$to}");
         return false;
     }
 
@@ -277,7 +277,7 @@ HTML;
 function sendActivationEmail(string $to, string $activationUrl, string $username): bool
 {
     if (!isMailEnabled()) {
-        error_log("[RootWarden] Mail disabled — activation email not sent to {$to}");
+        error_log("[RootWarden] Mail disabled - activation email not sent to {$to}");
         return false;
     }
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * audit_log.php — Fonction centralisée de logging des actions admin.
+ * audit_log.php - Fonction centralisée de logging des actions admin.
  *
  * Insère une entrée dans la table user_logs avec l'IP et les détails.
  * À appeler après chaque action sensible.
@@ -9,7 +9,7 @@
  *   Chaque ligne inclut prev_hash + self_hash = SHA2-256(prev_hash | user_id | action | unix_ts).
  *   audit_log() calcule et renseigne les deux colonnes atomiquement
  *   (SELECT derniere self_hash FOR UPDATE puis INSERT dans la meme transaction).
- *   Les INSERTs legacy qui n'utilisent pas ce helper laissent self_hash NULL —
+ *   Les INSERTs legacy qui n'utilisent pas ce helper laissent self_hash NULL -
  *   /adm/api/audit_seal.php les seale en arriere-plan.
  */
 
@@ -39,7 +39,7 @@ function audit_log(PDO $pdo, string $action, ?int $targetId = null, string $deta
     // Enrichir l'action avec le contexte (targetId, IP, details)
     $fullAction = $action;
     if ($targetId !== null) $fullAction .= " [cible=#$targetId]";
-    if ($details) $fullAction .= " — $details";
+    if ($details) $fullAction .= " - $details";
     $fullAction .= " (IP: $ip)";
     $fullAction = substr($fullAction, 0, 255);
 

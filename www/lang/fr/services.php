@@ -1,5 +1,5 @@
 <?php
-// lang/fr/services.php — 59 cles
+// lang/fr/services.php - 59 cles
 return [
     'services.title' => 'Gestion des services',
     'services.desc' => 'Demarrer, arreter et surveiller les services systemd sur vos serveurs.',

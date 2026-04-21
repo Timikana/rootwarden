@@ -1,5 +1,5 @@
 -- ============================================================
--- RootWarden — Schéma initial de la base de données
+-- RootWarden - Schéma initial de la base de données
 -- Version : 1.5.0
 --
 -- Ce fichier est exécuté UNE SEULE FOIS à la création du
@@ -249,7 +249,7 @@ INSERT INTO package_exclusions (package_name, added_by) VALUES
     ('docker', 'admin');
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Tables CVE — historique des scans de vulnérabilités (module OpenCVE)
+-- Tables CVE - historique des scans de vulnérabilités (module OpenCVE)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Un enregistrement par scan (résumé statistique)
@@ -472,7 +472,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- SSH Audit — résultats des scans et politiques d'exclusion
+-- SSH Audit - résultats des scans et politiques d'exclusion
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS ssh_audit_results (

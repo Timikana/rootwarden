@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_role'])) {
             throw new Exception(t('roles.error_user_not_found'));
         }
 
-        // Vérifier les permissions — empecher l'escalade de privileges
+        // Vérifier les permissions - empecher l'escalade de privileges
         if ($_SESSION['role_id'] === 2 && $user['role_id'] === 3) {
             throw new Exception(t('roles.error_cannot_edit_superadmin_role'));
         }

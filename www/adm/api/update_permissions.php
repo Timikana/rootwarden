@@ -1,12 +1,12 @@
 <?php
 /**
- * update_permissions.php — Mise à jour d'une permission fonctionnelle (endpoint AJAX JSON)
+ * update_permissions.php - Mise à jour d'une permission fonctionnelle (endpoint AJAX JSON)
  *
  * Rôle : modifie une permission spécifique d'un utilisateur dans la table `permissions`.
  *        Utilise un INSERT ... ON DUPLICATE KEY UPDATE pour créer la ligne si elle
  *        n'existe pas encore, ou mettre à jour la valeur existante.
  *
- * Accès requis : rôle admin (2) ou superadmin (3) — vérifié par checkAuth().
+ * Accès requis : rôle admin (2) ou superadmin (3) - vérifié par checkAuth().
  *
  * Méthode HTTP : POST avec body JSON (Content-Type: application/json).
  *
@@ -20,7 +20,7 @@
  * Réponse JSON :
  *   { "success": bool, "message": string }
  *
- * Sécurité SQL — whitelist stricte sur le nom de colonne :
+ * Sécurité SQL - whitelist stricte sur le nom de colonne :
  *   Le nom de la permission est interpolé directement dans la requête SQL
  *   (impossible de l'utiliser comme paramètre lié PDO pour un nom de colonne).
  *   La whitelist $allowedPermissions est la seule protection contre l'injection

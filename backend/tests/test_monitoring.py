@@ -1,5 +1,5 @@
 """
-test_monitoring.py — Tests des routes monitoring (health, list_machines, server_status, etc.)
+test_monitoring.py - Tests des routes monitoring (health, list_machines, server_status, etc.)
 """
 
 import json
@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 
 class TestHealthCheck:
-    """GET /test — health check basique."""
+    """GET /test - health check basique."""
 
     def test_health_check_ok(self, client, admin_headers):
         resp = client.get('/test', headers=admin_headers)
@@ -18,13 +18,13 @@ class TestHealthCheck:
 
     def test_health_check_no_api_key(self, client):
         resp = client.get('/test', headers={'Content-Type': 'application/json'})
-        # /test n'a pas @require_api_key dans le code actuel — il est public
+        # /test n'a pas @require_api_key dans le code actuel - il est public
         # Si le code change, adapter ce test
         assert resp.status_code == 200
 
 
 class TestListMachines:
-    """GET /list_machines — liste filtree par role."""
+    """GET /list_machines - liste filtree par role."""
 
     def test_admin_sees_all_machines(self, client, admin_headers, mock_cursor):
         mock_cursor._results = [
@@ -53,7 +53,7 @@ class TestListMachines:
 
 
 class TestServerStatus:
-    """POST /server_status — check online/offline."""
+    """POST /server_status - check online/offline."""
 
     def test_server_status_missing_ip(self, client, admin_headers, mock_db):
         resp = client.post('/server_status', headers=admin_headers, json={})
@@ -86,7 +86,7 @@ class TestServerStatus:
 
 
 class TestLinuxVersion:
-    """POST /linux_version — recupere la version OS via SSH."""
+    """POST /linux_version - recupere la version OS via SSH."""
 
     def test_linux_version_missing_machine_id(self, client, admin_headers, mock_db):
         import ssh_utils
@@ -118,7 +118,7 @@ class TestLinuxVersion:
 
 
 class TestLastReboot:
-    """POST /last_reboot — dernier boot + reboot required."""
+    """POST /last_reboot - dernier boot + reboot required."""
 
     def test_last_reboot_missing_machine_id(self, client, admin_headers, mock_db):
         resp = client.post('/last_reboot', headers=admin_headers, json={})
@@ -131,7 +131,7 @@ class TestLastReboot:
 
 
 class TestFilterServers:
-    """GET /filter_servers — filtrage par environment, criticality, tag."""
+    """GET /filter_servers - filtrage par environment, criticality, tag."""
 
     def test_filter_servers_no_filter(self, client, admin_headers, mock_cursor):
         mock_cursor._results = [

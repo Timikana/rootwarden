@@ -1,5 +1,5 @@
 <?php
-// lang/fr/profile.php — 48 cles
+// lang/fr/profile.php - 48 cles
 return [
     'profile.title' => 'Mon Profil',
     'profile.desc' => 'Gerez votre compte : email, cle SSH, mot de passe et authentification a deux facteurs.',

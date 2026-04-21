@@ -1,20 +1,20 @@
 """
-routes/supervision.py — Routes du module Supervision (deploiement et configuration agents Zabbix).
+routes/supervision.py - Routes du module Supervision (deploiement et configuration agents Zabbix).
 
 Routes :
-    GET  /supervision/config              — Recupere la configuration globale
-    POST /supervision/config              — Sauvegarde la configuration globale
-    POST /supervision/zabbix/deploy       — Deploie l'agent Zabbix sur une ou plusieurs machines
-    POST /supervision/zabbix/version      — Detecte la version de l'agent Zabbix installe
-    POST /supervision/zabbix/uninstall    — Desinstalle l'agent Zabbix
-    POST /supervision/zabbix/reconfigure  — Re-pousse la config sans reinstaller
-    POST /supervision/zabbix/config/read  — Lit le fichier de config agent sur un serveur
-    POST /supervision/zabbix/config/save  — Sauvegarde le fichier de config agent sur un serveur
-    POST /supervision/zabbix/backups      — Liste les backups de config agent
-    POST /supervision/zabbix/restore      — Restaure un backup de config agent
-    GET  /supervision/overrides/<mid>     — Liste les overrides pour une machine
-    POST /supervision/overrides/<mid>     — Sauvegarde les overrides pour une machine
-    GET  /supervision/machines            — Liste des machines avec statut agent
+    GET  /supervision/config              - Recupere la configuration globale
+    POST /supervision/config              - Sauvegarde la configuration globale
+    POST /supervision/zabbix/deploy       - Deploie l'agent Zabbix sur une ou plusieurs machines
+    POST /supervision/zabbix/version      - Detecte la version de l'agent Zabbix installe
+    POST /supervision/zabbix/uninstall    - Desinstalle l'agent Zabbix
+    POST /supervision/zabbix/reconfigure  - Re-pousse la config sans reinstaller
+    POST /supervision/zabbix/config/read  - Lit le fichier de config agent sur un serveur
+    POST /supervision/zabbix/config/save  - Sauvegarde le fichier de config agent sur un serveur
+    POST /supervision/zabbix/backups      - Liste les backups de config agent
+    POST /supervision/zabbix/restore      - Restaure un backup de config agent
+    GET  /supervision/overrides/<mid>     - Liste les overrides pour une machine
+    POST /supervision/overrides/<mid>     - Sauvegarde les overrides pour une machine
+    GET  /supervision/machines            - Liste des machines avec statut agent
 """
 
 import re
@@ -141,43 +141,116 @@ def _get_overrides(machine_id):
         return {row['param_name']: row['param_value'] for row in cur.fetchall()}
 
 
+def _get_machine_profile(machine_id, platform='zabbix'):
+    """Charge le profil de supervision assigne a une machine (ou None)."""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT p.* FROM supervision_metadata_profiles p "
+                "INNER JOIN machine_supervision_profile m ON m.profile_id = p.id "
+                "WHERE m.machine_id = %s AND m.platform = %s LIMIT 1",
+                (int(machine_id), platform))
+            return cur.fetchone()
+    except Exception as e:
+        logger.debug("Chargement profil supervision echoue: %s", e)
+        return None
+
+
 def _sanitize_hostname(name):
     """Nettoie un hostname pour eviter toute injection shell/config."""
     sanitized = re.sub(r'[^a-zA-Z0-9._-]', '-', name)
     return sanitized[:255]
 
 
-def _build_config_lines(global_cfg, machine_row, overrides=None):
-    """Construit les lignes de configuration agent a partir de la config globale + overrides."""
+def _interpolate(value, machine_row):
+    """Remplace {machine.name} et {machine.ip} dans une valeur d'override."""
+    if not isinstance(value, str):
+        return value
+    safe_name = _sanitize_hostname(machine_row.get('name') or '')
+    safe_ip = machine_row.get('ip') or ''
+    return (value
+            .replace('{machine.name}', safe_name)
+            .replace('{machine.ip}', safe_ip))
+
+
+def _build_config_lines(global_cfg, machine_row, overrides=None, profile=None):
+    """Construit les lignes de configuration agent : profil -> overrides -> global.
+
+    Ordre de precedence (fort > faible) :
+      1. overrides par machine (supervision_overrides)
+      2. profil assigne a la machine (supervision_metadata_profiles)
+      3. config globale (supervision_config)
+
+    Substitution `{machine.name}` et `{machine.ip}` appliquee sur TOUTES les
+    valeurs string (overrides ET profil ET config globale).
+    """
     overrides = overrides or {}
-    hostname = overrides.get('Hostname') or global_cfg['hostname_pattern'].replace(
+    profile = profile or {}
+
+    def _pick(key_override, key_profile=None, default=None):
+        """Retourne la valeur selon la precedence override > profil > default."""
+        v = overrides.get(key_override)
+        if v:
+            return _interpolate(v, machine_row)
+        if key_profile and profile.get(key_profile):
+            return _interpolate(profile[key_profile], machine_row)
+        if default is not None:
+            return _interpolate(default, machine_row) if isinstance(default, str) else default
+        return None
+
+    hostname_default = global_cfg['hostname_pattern'].replace(
         '{machine.name}', _sanitize_hostname(machine_row['name']))
-    server_active = (overrides.get('ServerActive')
-                     or global_cfg.get('zabbix_server_active')
-                     or global_cfg['zabbix_server'])
-    host_metadata = overrides.get('HostMetadata') or global_cfg.get('host_metadata_template') or ''
+    hostname = _pick('Hostname', default=hostname_default)
+
+    server_default = global_cfg['zabbix_server']
+    server = _pick('Server', 'zabbix_server', default=server_default)
+
+    server_active_default = global_cfg.get('zabbix_server_active') or server_default
+    server_active = _pick('ServerActive', 'zabbix_server_active', default=server_active_default)
+
+    host_metadata = _pick('HostMetadata', 'host_metadata',
+                          default=global_cfg.get('host_metadata_template') or '')
+
+    listen_port = (overrides.get('ListenPort')
+                   or profile.get('listen_port')
+                   or global_cfg.get('listen_port', 10050))
 
     lines = {
-        'Server': overrides.get('Server') or global_cfg['zabbix_server'],
+        'Server': server,
         'ServerActive': server_active,
         'Hostname': hostname,
-        'ListenPort': str(overrides.get('ListenPort') or global_cfg.get('listen_port', 10050)),
+        'ListenPort': str(listen_port),
     }
 
     if host_metadata:
         lines['HostMetadata'] = host_metadata
 
-    # TLS
-    tls_connect = overrides.get('TLSConnect') or global_cfg.get('tls_connect', 'unencrypted')
-    tls_accept = overrides.get('TLSAccept') or global_cfg.get('tls_accept', 'unencrypted')
+    # TLS — precedence overrides > profil > global
+    tls_connect = (overrides.get('TLSConnect')
+                   or profile.get('tls_connect')
+                   or global_cfg.get('tls_connect', 'unencrypted'))
+    tls_accept = (overrides.get('TLSAccept')
+                  or profile.get('tls_accept')
+                  or global_cfg.get('tls_accept', 'unencrypted'))
     lines['TLSConnect'] = tls_connect
     lines['TLSAccept'] = tls_accept
 
     if tls_connect == 'psk' or tls_accept == 'psk':
         psk_identity = overrides.get('TLSPSKIdentity') or global_cfg.get('tls_psk_identity') or ''
         if psk_identity:
-            lines['TLSPSKIdentity'] = psk_identity
+            lines['TLSPSKIdentity'] = _interpolate(psk_identity, machine_row)
             lines['TLSPSKFile'] = '/etc/zabbix/zabbix_agent2.d/server.key'
+
+    # Overrides libres non pris en charge ci-dessus : injection directe avec interpolation.
+    _handled = {'Hostname', 'Server', 'ServerActive', 'HostMetadata', 'ListenPort',
+                'TLSConnect', 'TLSAccept', 'TLSPSKIdentity'}
+    for key, value in overrides.items():
+        if key in _handled or not value:
+            continue
+        if not _SAFE_PARAM_RE.match(key):
+            continue  # cle invalide (anti-injection)
+        lines[key] = _interpolate(value, machine_row)
 
     return lines
 
@@ -433,7 +506,7 @@ def save_config():
             existing = cur.fetchone()
 
             if existing:
-                # UPDATE — conserver l'ancien PSK si non modifie
+                # UPDATE - conserver l'ancien PSK si non modifie
                 if psk_value == '********' or not psk_value:
                     psk_final = existing.get('tls_psk_value')
                 else:
@@ -537,19 +610,22 @@ def zabbix_deploy():
                 ip, port, ssh_user, ssh_pass, root_pass, svc_account = _get_ssh_creds(row)
                 linux_version = row.get('linux_version') or ''
 
-                # Detection OS
+                # Detection OS - generique, aligne sur repo.zabbix.com
+                # Debian  : debianNN (11 min, pas de plafond)
+                # Ubuntu  : ubuntuXX.04 LTS (snap sur l'annee paire la plus proche <=)
                 if 'Debian' in linux_version:
-                    import re as _re
-                    _deb_match = _re.search(r'(\d+)', linux_version)
+                    _deb_match = re.search(r'(\d+)', linux_version)
                     _deb_ver = int(_deb_match.group(1)) if _deb_match else 12
-                    if _deb_ver >= 13:
-                        os_version = 'debian13'
-                    elif _deb_ver >= 12:
-                        os_version = 'debian12'
-                    else:
-                        os_version = 'debian11'
+                    os_version = f'debian{max(_deb_ver, 11)}'
                 elif 'Ubuntu' in linux_version:
-                    os_version = 'ubuntu22.04' if '22.04' in linux_version else 'ubuntu20.04'
+                    _ub_match = re.search(r'(\d+)\.(\d+)', linux_version)
+                    if _ub_match:
+                        _maj = int(_ub_match.group(1))
+                        # LTS = annee paire .04 ; non-LTS retombe sur LTS precedente
+                        _lts_major = _maj if _maj % 2 == 0 else _maj - 1
+                        os_version = f'ubuntu{_lts_major}.04'
+                    else:
+                        os_version = 'ubuntu22.04'
                 else:
                     yield f"ERROR_MACHINE::{machine_id}::OS non supporte: {linux_version}\n"
                     continue
@@ -589,7 +665,8 @@ def zabbix_deploy():
                 install_pkg_cmd += " && dpkg --configure -a --force-confold --force-confdef"
 
                 overrides = _get_overrides(machine_id)
-                config_lines = _build_config_lines(global_cfg, row, overrides)
+                profile = _get_machine_profile(machine_id, platform='zabbix')
+                config_lines = _build_config_lines(global_cfg, row, overrides, profile)
 
                 # PSK : ecriture securisee via base64
                 psk_value = None
@@ -775,7 +852,8 @@ def zabbix_reconfigure():
 
                 ip, port, ssh_user, ssh_pass, root_pass, svc_account = _get_ssh_creds(row)
                 overrides = _get_overrides(machine_id)
-                config_lines = _build_config_lines(global_cfg, row, overrides)
+                profile = _get_machine_profile(machine_id, platform='zabbix')
+                config_lines = _build_config_lines(global_cfg, row, overrides, profile)
 
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
@@ -1616,4 +1694,160 @@ def save_platform_config(platform):
         return jsonify({'success': True, 'message': f'Configuration {platform} sauvegardee'})
     except Exception as e:
         logger.error("[supervision/config/%s POST] %s", platform, e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+# Routes Profils de supervision (catalogue metadata)
+# Appendues a la fin de supervision.py
+_PROFILE_NAME_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,99}$')
+
+
+def _profile_fields(data):
+    name = (data.get('name') or '').strip()
+    if not _PROFILE_NAME_RE.match(name):
+        return None, 'Nom de profil invalide (alphanumerique, _, -, commence par lettre).'
+    platform = (data.get('platform') or 'zabbix').strip()
+    if platform not in _VALID_PLATFORMS:
+        return None, f'Plateforme invalide : {platform}'
+    return {
+        'platform': platform,
+        'name': name,
+        'description': (data.get('description') or None),
+        'host_metadata': (data.get('host_metadata') or None),
+        'zabbix_server': (data.get('zabbix_server') or None),
+        'zabbix_server_active': (data.get('zabbix_server_active') or None),
+        'zabbix_proxy': (data.get('zabbix_proxy') or None),
+        'listen_port': int(data['listen_port']) if data.get('listen_port') else None,
+        'tls_connect': (data.get('tls_connect') or None),
+        'tls_accept': (data.get('tls_accept') or None),
+        'notes': (data.get('notes') or None),
+    }, None
+
+
+@bp.route('/supervision/profiles', methods=['GET'])
+@require_api_key
+@require_permission('can_manage_supervision')
+def list_profiles():
+    """Liste les profils de supervision d'une plateforme."""
+    platform = request.args.get('platform', 'zabbix')
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT * FROM supervision_metadata_profiles WHERE platform = %s ORDER BY name",
+                (platform,))
+            profiles = cur.fetchall()
+            cur.execute(
+                "SELECT profile_id, COUNT(*) AS cnt FROM machine_supervision_profile "
+                "WHERE platform = %s GROUP BY profile_id",
+                (platform,))
+            counts = {row['profile_id']: row['cnt'] for row in cur.fetchall()}
+            for p in profiles:
+                p['machine_count'] = counts.get(p['id'], 0)
+        return jsonify({'success': True, 'profiles': profiles})
+    except Exception as e:
+        logger.error("[supervision/profiles GET] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/supervision/profiles', methods=['POST'])
+@require_api_key
+@require_permission('can_manage_supervision')
+def upsert_profile():
+    """Cree ou met a jour un profil (id absent = create)."""
+    data = request.get_json(silent=True) or {}
+    fields, err = _profile_fields(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+    profile_id = data.get('id')
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            if profile_id:
+                cur.execute(
+                    "UPDATE supervision_metadata_profiles SET "
+                    "name=%s, description=%s, host_metadata=%s, "
+                    "zabbix_server=%s, zabbix_server_active=%s, zabbix_proxy=%s, "
+                    "listen_port=%s, tls_connect=%s, tls_accept=%s, notes=%s "
+                    "WHERE id=%s AND platform=%s",
+                    (fields['name'], fields['description'], fields['host_metadata'],
+                     fields['zabbix_server'], fields['zabbix_server_active'], fields['zabbix_proxy'],
+                     fields['listen_port'], fields['tls_connect'], fields['tls_accept'], fields['notes'],
+                     int(profile_id), fields['platform']))
+            else:
+                cur.execute(
+                    "INSERT INTO supervision_metadata_profiles "
+                    "(platform, name, description, host_metadata, zabbix_server, "
+                    "zabbix_server_active, zabbix_proxy, listen_port, tls_connect, tls_accept, notes) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (fields['platform'], fields['name'], fields['description'], fields['host_metadata'],
+                     fields['zabbix_server'], fields['zabbix_server_active'], fields['zabbix_proxy'],
+                     fields['listen_port'], fields['tls_connect'], fields['tls_accept'], fields['notes']))
+                profile_id = cur.lastrowid
+            conn.commit()
+        return jsonify({'success': True, 'id': profile_id})
+    except Exception as e:
+        logger.error("[supervision/profiles POST] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne (nom deja pris ?)'}), 500
+
+
+@bp.route('/supervision/profiles/<int:pid>', methods=['DELETE'])
+@require_api_key
+@require_permission('can_manage_supervision')
+def delete_profile(pid):
+    """Supprime un profil (cascade sur les assignations machine)."""
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM supervision_metadata_profiles WHERE id=%s", (int(pid),))
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error("[supervision/profiles DELETE] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/supervision/machines/<int:mid>/profile', methods=['GET', 'POST', 'DELETE'])
+@require_api_key
+@require_permission('can_manage_supervision')
+@require_machine_access
+def machine_profile(mid):
+    """GET : profil assigne. POST {profile_id} : assigne. DELETE : desassigne."""
+    platform = (request.args.get('platform') or 'zabbix')
+    if platform not in _VALID_PLATFORMS:
+        return jsonify({'success': False, 'message': 'Plateforme invalide'}), 400
+    try:
+        if request.method == 'GET':
+            with get_db_connection() as conn:
+                cur = conn.cursor(dictionary=True)
+                cur.execute(
+                    "SELECT p.* FROM supervision_metadata_profiles p "
+                    "INNER JOIN machine_supervision_profile m ON m.profile_id = p.id "
+                    "WHERE m.machine_id=%s AND m.platform=%s",
+                    (int(mid), platform))
+                row = cur.fetchone()
+                return jsonify({'success': True, 'profile': row})
+        if request.method == 'DELETE':
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "DELETE FROM machine_supervision_profile WHERE machine_id=%s AND platform=%s",
+                    (int(mid), platform))
+                conn.commit()
+            return jsonify({'success': True})
+        # POST
+        data = request.get_json(silent=True) or {}
+        profile_id = data.get('profile_id')
+        if not profile_id:
+            return jsonify({'success': False, 'message': 'profile_id requis'}), 400
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO machine_supervision_profile (machine_id, platform, profile_id) "
+                "VALUES (%s, %s, %s) "
+                "ON DUPLICATE KEY UPDATE profile_id=VALUES(profile_id), assigned_at=CURRENT_TIMESTAMP",
+                (int(mid), platform, int(profile_id)))
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error("[supervision/machines/%s/profile] %s", mid, e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500

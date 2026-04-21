@@ -1,6 +1,6 @@
 <?php
 /**
- * howto_tip.php — Composant tip contextuel pliable pour les pages RootWarden.
+ * howto_tip.php - Composant tip contextuel pliable pour les pages RootWarden.
  *
  * Usage :
  *   <?php $tipId = 'ssh-deploy'; $tipSteps = [

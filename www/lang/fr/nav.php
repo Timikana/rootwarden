@@ -1,5 +1,5 @@
 <?php
-// lang/fr/nav.php — 41 cles
+// lang/fr/nav.php - 41 cles
 return [
     'nav.section_navigation' => 'NAVIGATION',
     'nav.section_admin' => 'ADMINISTRATION',

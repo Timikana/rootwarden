@@ -1,4 +1,4 @@
--- Migration 013 — Nouvelles permissions granulaires
+-- Migration 013 - Nouvelles permissions granulaires
 
 -- can_manage_remote_users : supprimer cles/users distants
 SET @c1 = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'permissions' AND COLUMN_NAME = 'can_manage_remote_users');

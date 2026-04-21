@@ -1,7 +1,7 @@
 SELECT 1;
 
--- Migration 034 : Module Wazuh — Agent + rules/decoders/CDB editables
--- Maintenu : Equipe Admin.Sys RootWarden — v1.15.0 — 2026-04-20
+-- Migration 034 : Module Wazuh - Agent + rules/decoders/CDB editables
+-- Maintenu : Equipe Admin.Sys RootWarden - v1.15.0 - 2026-04-20
 
 -- Config globale (singleton)
 CREATE TABLE IF NOT EXISTS wazuh_config (
@@ -34,9 +34,9 @@ CREATE TABLE IF NOT EXISTS wazuh_rules (
 
 -- Seed : 3 fichiers types (vides, editables via UI)
 INSERT IGNORE INTO wazuh_rules (name, rule_type, content) VALUES
-    ('local_rules',       'rules',    '<!-- Local rules — chargees par le manager -->\n<group name="local,syslog,">\n</group>'),
+    ('local_rules',       'rules',    '<!-- Local rules - chargees par le manager -->\n<group name="local,syslog,">\n</group>'),
     ('local_decoders',    'decoders', '<!-- Local decoders -->'),
-    ('custom_cdb',        'cdb',      '# Custom CDB list — cle:valeur par ligne');
+    ('custom_cdb',        'cdb',      '# Custom CDB list - cle:valeur par ligne');
 
 -- Etat agent par machine
 CREATE TABLE IF NOT EXISTS wazuh_agents (

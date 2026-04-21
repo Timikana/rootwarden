@@ -1,6 +1,6 @@
 <?php
 /**
- * import_csv.php — Import CSV de serveurs et d'utilisateurs
+ * import_csv.php - Import CSV de serveurs et d'utilisateurs
  * Inclus dans admin_page.php via les onglets Serveurs et Utilisateurs.
  */
 

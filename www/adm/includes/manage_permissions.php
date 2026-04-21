@@ -66,7 +66,7 @@ $canEditPartial = $_currentRole >= 2;
 <?php foreach ($users as $user):
     $permissions = getPermissions($pdo, $user['id']);
     $isSuperadminTarget = ((int)$user['role_id'] === 3);
-    // Superadmins ont toutes les permissions par bypass — non editable
+    // Superadmins ont toutes les permissions par bypass - non editable
     $isEditable = !$isSuperadminTarget && (($canEdit) || ($canEditPartial && $user['role_id'] < 3));
     $roleCls = match((int)$user['role_id']) {
         3 => 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
@@ -237,7 +237,7 @@ async function loadTempPerms() {
                     <span class="text-sm font-medium text-gray-800 dark:text-gray-200">${escHtml(p.user_name)}</span>
                     <span class="text-xs text-yellow-600 dark:text-yellow-400 ml-2">${escHtml(p.permission)}</span>
                     ${p.machine_name ? `<span class="text-[10px] text-gray-400 ml-1">${__('temp_on')} ${escHtml(p.machine_name)}</span>` : ''}
-                    <div class="text-[10px] text-gray-400">${__('temp_by')} ${escHtml(p.granted_by_name)} — ${escHtml(p.reason || __('temp_no_reason'))}</div>
+                    <div class="text-[10px] text-gray-400">${__('temp_by')} ${escHtml(p.granted_by_name)} - ${escHtml(p.reason || __('temp_no_reason'))}</div>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <span class="text-xs font-mono ${hoursLeft < 4 ? 'text-red-500' : 'text-yellow-600'}">${hoursLeft}${__('temp_hours_left')}</span>

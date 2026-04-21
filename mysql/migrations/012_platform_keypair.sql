@@ -1,4 +1,4 @@
--- Migration 012 — Support keypair plateforme pour l'auth SSH
+-- Migration 012 - Support keypair plateforme pour l'auth SSH
 -- RootWarden se connecte aux serveurs par keypair Ed25519 au lieu de password
 
 SET @col1 = (SELECT COUNT(*) FROM information_schema.COLUMNS

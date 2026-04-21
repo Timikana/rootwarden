@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# bump-version.sh — Bump automatique de version RootWarden
+# bump-version.sh - Bump automatique de version RootWarden
 #
 # Usage:
 #   ./scripts/bump-version.sh patch   # 1.13.0 -> 1.13.1
@@ -63,7 +63,7 @@ echo "$NEW_VERSION" > "$VERSION_FILE"
 
 # --- Ajouter le placeholder dans le CHANGELOG ---
 # Insere apres la ligne "---" (premiere occurrence = separateur avant la premiere version)
-CHANGELOG_ENTRY="## [${NEW_VERSION}] — ${TODAY}\n\n### \n\n- \n\n---"
+CHANGELOG_ENTRY="## [${NEW_VERSION}] - ${TODAY}\n\n### \n\n- \n\n---"
 
 # Remplacer le premier "---" (apres le header) par le nouveau bloc + "---"
 sed -i "0,/^---$/s/^---$/${CHANGELOG_ENTRY}/" "$CHANGELOG_FILE"

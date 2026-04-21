@@ -1,7 +1,7 @@
 SELECT 1;
 
 -- Migration 031 : Ajout de la permission can_manage_bashrc
--- Module Bashrc — deploiement standardise du .bashrc sur les comptes Linux distants
+-- Module Bashrc - deploiement standardise du .bashrc sur les comptes Linux distants
 
 SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()

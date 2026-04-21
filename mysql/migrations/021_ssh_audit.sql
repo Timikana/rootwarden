@@ -1,4 +1,4 @@
--- Migration 021 — Audit SSH configuration : permission + tables resultats et policies
+-- Migration 021 - Audit SSH configuration : permission + tables resultats et policies
 -- ============================================================================
 
 -- 1. Ajout permission can_audit_ssh

@@ -1,4 +1,4 @@
-// services/js/main.js — Interactions JS pour la page Services systemd
+// services/js/main.js - Interactions JS pour la page Services systemd
 const API = window.API_URL || '/api_proxy.php';
 const PROTECTED_SERVICES = ['sshd', 'ssh', 'systemd-journald', 'systemd-logind', 'dbus', 'dbus-broker'];
 let _currentServer = null;

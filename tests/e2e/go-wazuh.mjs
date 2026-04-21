@@ -1,5 +1,5 @@
 /**
- * go-wazuh.mjs — Tests E2E module Wazuh.
+ * go-wazuh.mjs - Tests E2E module Wazuh.
  * Flux : login, config save, options save, rules CRUD (incl. xmllint).
  */
 import puppeteer from 'puppeteer';

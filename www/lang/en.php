@@ -1,6 +1,6 @@
 <?php
 /**
- * lang/en.php — English translations (modular loader)
+ * lang/en.php - English translations (modular loader)
  *
  * Loads all translation files from lang/en/*.php
  * and returns a merged associative array.

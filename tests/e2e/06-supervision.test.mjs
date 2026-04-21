@@ -1,5 +1,5 @@
 /**
- * 06-supervision.test.mjs — Test E2E du module Supervision
+ * 06-supervision.test.mjs - Test E2E du module Supervision
  *
  * Verifie :
  *   - Page /supervision/ accessible apres login
@@ -26,7 +26,7 @@ async function run() {
     page.setDefaultTimeout(15000);
     await page.setViewport({ width: 1400, height: 900 });
 
-    // Login — credentials via env ou defaults
+    // Login - credentials via env ou defaults
     const user = process.env.E2E_USER || 'superadmin';
     const pass = process.env.E2E_PASS || 'superadmin';
     console.log(`[1] Login as ${user}...`);
@@ -35,12 +35,12 @@ async function run() {
     console.log('    URL after login:', urlAfterLogin);
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-00-after-login.png`, fullPage: true });
     if (urlAfterLogin.includes('login')) {
-        console.error('    ERREUR: login echoue — verifier E2E_USER / E2E_PASS / E2E_TOTP_SECRET');
+        console.error('    ERREUR: login echoue - verifier E2E_USER / E2E_PASS / E2E_TOTP_SECRET');
         console.error('    Usage: E2E_USER=xxx E2E_PASS=yyy E2E_TOTP_SECRET=zzz node tests/e2e/06-supervision.test.mjs');
         await browser.close();
         process.exit(1);
     }
-    console.log('    OK — logged in');
+    console.log('    OK - logged in');
 
     // Navigate to supervision
     console.log('[2] Navigation vers /supervision/...');
@@ -51,18 +51,18 @@ async function run() {
 
     // Check page title
     await assertTextPresent(page, 'Supervision');
-    console.log('    OK — titre present');
+    console.log('    OK - titre present');
 
     // Check 4 tabs exist
     const tabs = await page.$$('.tab-btn');
     if (tabs.length !== 4) throw new Error(`Expected 4 tabs, got ${tabs.length}`);
-    console.log('    OK — 4 onglets');
+    console.log('    OK - 4 onglets');
 
     // Onglet 1 : Configuration globale
     await assertSelector(page, '#cfg-zabbix-server');
     await assertSelector(page, '#cfg-agent-type');
     await assertSelector(page, '#cfg-tls-connect');
-    console.log('    OK — formulaire config globale');
+    console.log('    OK - formulaire config globale');
 
     // Onglet 2 : Deploiement
     console.log('[3] Onglet Deploiement...');
@@ -71,7 +71,7 @@ async function run() {
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-02-deploy.png`, fullPage: true });
     console.log('    Screenshot: supervision-02-deploy.png');
     await assertSelector(page, '#deploy-table-body');
-    console.log('    OK — tableau deploiement');
+    console.log('    OK - tableau deploiement');
 
     // Onglet 3 : Editeur
     console.log('[4] Onglet Editeur...');
@@ -81,7 +81,7 @@ async function run() {
     console.log('    Screenshot: supervision-03-editor.png');
     await assertSelector(page, '#editor-content');
     await assertSelector(page, '#editor-server');
-    console.log('    OK — editeur de config');
+    console.log('    OK - editeur de config');
 
     // Onglet 4 : Monitoring
     console.log('[5] Onglet Monitoring...');
@@ -89,7 +89,7 @@ async function run() {
     await sleep(500);
     await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-04-monitoring.png`, fullPage: true });
     console.log('    Screenshot: supervision-04-monitoring.png');
-    console.log('    OK — placeholder monitoring');
+    console.log('    OK - placeholder monitoring');
 
     // Retour onglet config et verif page updates
     console.log('[6] Verification page Updates (pas de Zabbix)...');
@@ -101,13 +101,13 @@ async function run() {
     // Verifier que le bouton Zabbix n'est plus present
     const zabbixBtn = await page.$('#zabbix-version');
     if (zabbixBtn) throw new Error('Le champ zabbix-version est encore present dans Updates !');
-    console.log('    OK — plus de Zabbix dans Updates');
+    console.log('    OK - plus de Zabbix dans Updates');
 
     // Check menu
     console.log('[7] Verification lien Supervision dans le menu...');
     const menuLink = await page.$('a[href="/supervision/"]');
     if (!menuLink) throw new Error('Lien Supervision absent du menu');
-    console.log('    OK — lien menu present');
+    console.log('    OK - lien menu present');
 
     console.log('\n=== TOUS LES TESTS OK ===');
     await browser.close();

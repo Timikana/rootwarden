@@ -1,7 +1,7 @@
 SELECT 1;
 
 -- Migration 035 : Hardening login (per-user lockout + password spraying tracking)
--- Maintenu : Equipe Admin.Sys RootWarden — v1.14.1 — 2026-04-20
+-- Maintenu : Equipe Admin.Sys RootWarden - v1.14.1 - 2026-04-20
 --
 -- Complete la protection existante :
 --   - login_attempts (par IP, 5/10min) : existe deja

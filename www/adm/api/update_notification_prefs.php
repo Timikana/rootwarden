@@ -1,6 +1,6 @@
 <?php
 /**
- * update_notification_prefs.php — Toggle une preference de notification (endpoint htmx)
+ * update_notification_prefs.php - Toggle une preference de notification (endpoint htmx)
  *
  * Pattern identique a update_permissions.php : retourne le label HTML mis a jour.
  * Acces requis : superadmin (role_id = 3).

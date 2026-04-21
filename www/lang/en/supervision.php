@@ -1,5 +1,5 @@
 <?php
-// lang/en/supervision.php — Supervision module (Zabbix agent deployment)
+// lang/en/supervision.php - Supervision module (Zabbix agent deployment)
 return [
     // Page
     'supervision.title' => 'Supervision',
@@ -94,7 +94,7 @@ return [
 
     // Monitoring (placeholder)
     'supervision.monitoring_title' => 'Monitoring',
-    'supervision.monitoring_desc' => 'Zabbix API integration (statuses, alerts, graphs) — coming soon.',
+    'supervision.monitoring_desc' => 'Zabbix API integration (statuses, alerts, graphs) - coming soon.',
     'supervision.monitoring_placeholder' => 'This section will be available in a future release with Zabbix and Centreon API integration.',
 
     // General messages
@@ -132,4 +132,21 @@ return [
     'supervision.telegraf_inputs_hint' => 'Comma-separated (e.g. cpu,mem,disk,diskio,net,system)',
     'supervision.telegraf_interval' => 'Collection interval',
     'supervision.telegraf_no_influx' => 'Without InfluxDB URL, Telegraf exposes metrics in Prometheus format on :9273',
+
+    // Supervision profiles (metadata catalog)
+    'supervision.tab_profiles' => 'Profiles',
+    'supervision.profiles_title' => 'Supervision profiles',
+    'supervision.profiles_desc' => 'Reusable presets (HostMetadata, Server, proxy). Avoids free-form input per machine: the admin defines the catalog once, others assign each server to a profile.',
+    'supervision.profiles_empty' => 'No profile defined. Click "New profile" to create one.',
+    'supervision.profiles_interp_hint' => 'Tip: fields can contain {machine.name} or {machine.ip} - substituted at deployment time.',
+    'supervision.profile_new' => 'New profile',
+    'supervision.profile_name' => 'Name',
+    'supervision.profile_name_hint' => 'Must match a Zabbix auto-registration regex (e.g. LinuxInternal, LinuxExternal).',
+    'supervision.profile_host_metadata' => 'HostMetadata',
+    'supervision.profile_host_metadata_hint' => 'Value sent to Zabbix for auto-registration. Leave empty to use global config.',
+    'supervision.profile_description' => 'Description',
+    'supervision.profile_server' => 'Server',
+    'supervision.profile_proxy' => 'Proxy',
+    'supervision.profile_machines' => 'Machines',
+    'supervision.profile_notes' => 'Notes (help for other admins)',
 ];

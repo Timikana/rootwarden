@@ -1,6 +1,6 @@
 <?php
 /**
- * manage_access.php — Attribution des serveurs aux utilisateurs
+ * manage_access.php - Attribution des serveurs aux utilisateurs
  * Design : cartes par user avec serveurs en badges toggle
  */
 require_once __DIR__ . '/../../auth/functions.php';

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ssh_utils.py — Utilitaires SSH et base de données pour le projet RootWarden.
+ssh_utils.py - Utilitaires SSH et base de données pour le projet RootWarden.
 
 Rôle :
     Centralise toutes les primitives SSH (connexion, élévation de privilèges,
@@ -8,27 +8,27 @@ Rôle :
     utilisées par server.py, configure_servers.py et iptables_manager.py.
 
 Fonctions principales :
-    connect_ssh()              — Ouvre une connexion SSH Paramiko (authentification par mot de passe).
-    ssh_session()              — Context manager : connexion SSH avec fermeture garantie.
-    execute_as_root()          — Exécute une commande en root via sudo -S (fallback : su -c).
-    execute_as_root_stream()   — Idem, en streaming (générateur de chunks pour réponses SSE/plain).
-    decrypt_password()         — Déchiffre un mot de passe AES/libsodium stocké en BDD.
-    load_data_from_db()        — Charge machines + utilisateurs depuis MySQL.
-    load_selected_machines()   — Charge un sous-ensemble de machines par IDs.
-    ensure_sudo_installed()    — Installe sudo via su- si absent (bootstrap Debian minimal).
-    validate_machine_id()      — Valide et convertit un machine_id reçu en requête.
-    clean_output()             — Supprime les séquences ANSI d'une sortie shell.
+    connect_ssh()              - Ouvre une connexion SSH Paramiko (authentification par mot de passe).
+    ssh_session()              - Context manager : connexion SSH avec fermeture garantie.
+    execute_as_root()          - Exécute une commande en root via sudo -S (fallback : su -c).
+    execute_as_root_stream()   - Idem, en streaming (générateur de chunks pour réponses SSE/plain).
+    decrypt_password()         - Déchiffre un mot de passe AES/libsodium stocké en BDD.
+    load_data_from_db()        - Charge machines + utilisateurs depuis MySQL.
+    load_selected_machines()   - Charge un sous-ensemble de machines par IDs.
+    ensure_sudo_installed()    - Installe sudo via su- si absent (bootstrap Debian minimal).
+    validate_machine_id()      - Valide et convertit un machine_id reçu en requête.
+    clean_output()             - Supprime les séquences ANSI d'une sortie shell.
 
 Élévation de privilèges :
-    1. Méthode recommandée : ``sudo -S -p ''`` — le mot de passe est envoyé via stdin,
+    1. Méthode recommandée : ``sudo -S -p ''`` - le mot de passe est envoyé via stdin,
        jamais dans la commande. Retourne un exit code réel.
-    2. Fallback : ``su root -c`` — utilisé sur les systèmes sans sudo (Debian minimal).
-    3. Bootstrap uniquement : ``_switch_to_root_shell()`` — ouvre un shell interactif
+    2. Fallback : ``su root -c`` - utilisé sur les systèmes sans sudo (Debian minimal).
+    3. Bootstrap uniquement : ``_switch_to_root_shell()`` - ouvre un shell interactif
        via ``su -`` pour installer sudo si absent.
 
 Sécurité :
     - Le mot de passe root est transmis exclusivement via stdin (jamais en argument).
-    - Les clés de chiffrement sont lues depuis Config — jamais codées en dur.
+    - Les clés de chiffrement sont lues depuis Config - jamais codées en dur.
     - ``decrypt_password()`` tente plusieurs méthodes pour maximiser la compatibilité
       avec les valeurs chiffrées par PHP, sans exposer la clé dans les logs.
 
@@ -535,7 +535,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 logger=None, force_password: bool = False,
                 service_account: bool = False) -> paramiko.SSHClient:
     """
-    Etablit une connexion SSH — essaie d'abord la keypair plateforme,
+    Etablit une connexion SSH - essaie d'abord la keypair plateforme,
     puis tombe en fallback sur le password.
 
     Ordre d'authentification :
@@ -585,7 +585,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 _logger.info("SSH service account auth OK → %s:%d", host, port)
                 return client
         except paramiko.AuthenticationException:
-            _logger.debug("SSH service account auth echouee pour %s:%d — fallback", host, port)
+            _logger.debug("SSH service account auth echouee pour %s:%d - fallback", host, port)
             try:
                 client.close()
             except Exception:
@@ -593,7 +593,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         except Exception as e:
-            _logger.debug("SSH service account non disponible (%s) — fallback", e)
+            _logger.debug("SSH service account non disponible (%s) - fallback", e)
             try:
                 client.close()
             except Exception:
@@ -617,7 +617,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 _logger.info("SSH keypair auth OK → %s:%d (user=%s)", host, port, username)
                 return client
         except paramiko.AuthenticationException:
-            _logger.debug("SSH keypair auth echouee pour %s:%d — fallback password", host, port)
+            _logger.debug("SSH keypair auth echouee pour %s:%d - fallback password", host, port)
             # Fermer et recreer le client pour le fallback
             try:
                 client.close()
@@ -626,7 +626,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         except Exception as e:
-            _logger.debug("SSH keypair non disponible (%s) — fallback password", e)
+            _logger.debug("SSH keypair non disponible (%s) - fallback password", e)
             try:
                 client.close()
             except Exception:
@@ -708,7 +708,7 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
       2. Execute le script via ``su root -c 'sh /tmp/.rw_xxx.sh'`` (PTY pour le
          mot de passe su uniquement)
       3. Parse la sortie entre des markers pour extraire le vrai stdout et le
-         vrai exit code — les markers ne sont QUE dans le script, jamais dans
+         vrai exit code - les markers ne sont QUE dans le script, jamais dans
          l'echo PTY de la ligne de commande
 
     Pourquoi ca marche :
@@ -793,7 +793,7 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
         real_code = 0
         out = ""
 
-        # Chercher les markers — ils n'apparaissent qu'une fois (dans le script)
+        # Chercher les markers - ils n'apparaissent qu'une fois (dans le script)
         lines = raw.split('\n')
         begin_idx = None
         end_idx = None
@@ -861,7 +861,7 @@ def execute_as_root(client: paramiko.SSHClient, command: str, root_password: str
        exécute directement ``sudo sh -c`` sans envoyer de mot de passe.
     1. Essaie ``sudo -S`` (recommandé, exit code réel, pas de prompt à détecter).
     2. Si sudo est absent ou l'utilisateur n'est pas dans les sudoers,
-       retombe sur ``su root -c`` — compatible avec Debian sans sudo configuré.
+       retombe sur ``su root -c`` - compatible avec Debian sans sudo configuré.
 
     Le mot de passe est toujours transmis via stdin, jamais dans la commande.
 
@@ -995,7 +995,7 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     try:
         stdin, stdout, stderr = client.exec_command(root_cmd, get_pty=True)
         if not can_sudo:
-            # su affiche "Mot de passe :" — attendre l'invite avant d'envoyer
+            # su affiche "Mot de passe :" - attendre l'invite avant d'envoyer
             import time as _time
             _time.sleep(1)
         stdin.write(root_password + '\n')
@@ -1136,8 +1136,8 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
     Charge toutes les machines et tous les utilisateurs depuis la base de données.
 
     Effectue deux requêtes :
-        1. ``SELECT … FROM machines`` — toutes les machines avec identifiants SSH.
-        2. Jointure ``users LEFT JOIN user_machine_access`` — tous les utilisateurs
+        1. ``SELECT … FROM machines`` - toutes les machines avec identifiants SSH.
+        2. Jointure ``users LEFT JOIN user_machine_access`` - tous les utilisateurs
            avec leur liste de machine_ids autorisés (regroupés par user_id).
 
     Args:
@@ -1238,7 +1238,7 @@ def ensure_sudo_installed(client: paramiko.SSHClient, root_password: str,
                 "dpkg-query -W -f='${Status}' sudo 2>/dev/null || echo 'missing'",
                 logger=_log)
             if "install ok installed" not in out:
-                _log.info("'sudo' absent — installation en cours.")
+                _log.info("'sudo' absent - installation en cours.")
                 execute_command_as_root(channel,
                     "apt-get update && apt-get install -y sudo", logger=_log)
                 _log.info("'sudo' installé.")

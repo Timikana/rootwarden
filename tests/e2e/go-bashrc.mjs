@@ -1,5 +1,5 @@
 /**
- * go-bashrc.mjs — Tests E2E module Bashrc
+ * go-bashrc.mjs - Tests E2E module Bashrc
  *
  * Flux teste :
  *   1. Login superadmin + TOTP
@@ -7,7 +7,7 @@
  *   3. Liste users pour le premier serveur
  *   4. Preview dry_run
  *   5. Deploy mode merge (sur un user unique)
- *   6. Verification backup via SSH (pas docker exec — namespaces differents)
+ *   6. Verification backup via SSH (pas docker exec - namespaces differents)
  *   7. Verification syntaxe bash -n post-deploy
  *   8. Restore depuis le backup le plus recent
  *

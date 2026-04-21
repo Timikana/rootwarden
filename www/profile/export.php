@@ -1,6 +1,6 @@
 <?php
 /**
- * profile/export.php — Export RGPD des donnees personnelles du user connecte.
+ * profile/export.php - Export RGPD des donnees personnelles du user connecte.
  *
  * Fournit un fichier JSON telechargeable contenant toutes les donnees
  * personnelles identifiables par l'utilisateur (art. 15 RGPD : droit

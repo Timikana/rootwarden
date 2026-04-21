@@ -1,5 +1,5 @@
 <?php
-// lang/fr/cve.php — 24 cles
+// lang/fr/cve.php - 24 cles
 return [
     'cve.title' => 'Scan CVE',
     'cve.desc' => 'Scanner les vulnerabilites connues (CVE) sur vos serveurs via OpenCVE. Filtrez par severite CVSS et exportez les resultats en CSV.',

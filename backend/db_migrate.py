@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# db_migrate.py — Système de migration de base de données pour RootWarden
+# db_migrate.py - Système de migration de base de données pour RootWarden
 #
 # Principe :
 #   • Les fichiers de migration sont nommés NNN_description.sql
@@ -63,7 +63,7 @@ def _connect(retries: int = 5, delay: float = 3.0):
         except MySQLError as e:
             if attempt < retries:
                 _log.warning(
-                    "DB non disponible (tentative %d/%d) — nouvel essai dans %.0fs : %s",
+                    "DB non disponible (tentative %d/%d) - nouvel essai dans %.0fs : %s",
                     attempt, retries, delay, e
                 )
                 time.sleep(delay)
@@ -409,7 +409,7 @@ def run_migrations(dry_run: bool = False, strict: bool = False) -> bool:
         )
 
         if not pending:
-            _log.info("✓ Base de données à jour — aucune migration à appliquer")
+            _log.info("✓ Base de données à jour - aucune migration à appliquer")
             return True
 
         for migration in pending:
@@ -454,7 +454,7 @@ def _cli_status():
         sys.exit(1)
 
     print("\n╔══════════════════════════════════════════════════════════╗")
-    print(  "║              ROOTWARDEN — État des migrations             ║")
+    print(  "║              ROOTWARDEN - État des migrations             ║")
     print(  "╠═══════╦══════════════════════════════════╦═══════════════╣")
     print(  "║  Ver. ║ Description                      ║ Statut        ║")
     print(  "╠═══════╬══════════════════════════════════╬═══════════════╣")
@@ -479,7 +479,7 @@ if __name__ == '__main__':
     )
 
     parser = argparse.ArgumentParser(
-        description='RootWarden — Gestionnaire de migrations de base de données'
+        description='RootWarden - Gestionnaire de migrations de base de données'
     )
     parser.add_argument(
         '--status',   action='store_true',

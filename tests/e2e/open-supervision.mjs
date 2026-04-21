@@ -16,6 +16,6 @@ console.log('URL:', page.url());
 
 console.log('Navigation vers /supervision/...');
 await page.goto(`${BASE_URL}/supervision/`, { waitUntil: 'networkidle2' });
-console.log('Page ouverte — navigateur visible. Ctrl+C pour fermer.');
+console.log('Page ouverte - navigateur visible. Ctrl+C pour fermer.');
 
 await new Promise(() => {});

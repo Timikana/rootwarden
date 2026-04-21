@@ -1,18 +1,18 @@
 """
-routes/ssh.py — Routes SSH : deploiement, logs SSE, keypair plateforme, scan users.
+routes/ssh.py - Routes SSH : deploiement, logs SSE, keypair plateforme, scan users.
 
 Routes :
-    POST /deploy                  — Lance le script de deploiement
-    GET  /logs                    — Stream SSE du deployment.log
-    POST /preflight_check         — Verifie connectivite SSH avant deploiement
-    GET  /platform_key            — Retourne la cle publique plateforme
-    POST /deploy_platform_key     — Deploie la pubkey plateforme sur les serveurs
-    POST /deploy_service_account  — Deploie le compte rootwarden (NOPASSWD sudo)
-    POST /test_platform_key       — Teste la connexion keypair sur un serveur
-    POST /remove_ssh_password     — Supprime le password SSH d un serveur
-    POST /reenter_ssh_password    — Re-saisit un password SSH
-    POST /regenerate_platform_key — Regenere la keypair plateforme
-    POST /scan_server_users       — Scanne les utilisateurs sur un serveur distant
+    POST /deploy                  - Lance le script de deploiement
+    GET  /logs                    - Stream SSE du deployment.log
+    POST /preflight_check         - Verifie connectivite SSH avant deploiement
+    GET  /platform_key            - Retourne la cle publique plateforme
+    POST /deploy_platform_key     - Deploie la pubkey plateforme sur les serveurs
+    POST /deploy_service_account  - Deploie le compte rootwarden (NOPASSWD sudo)
+    POST /test_platform_key       - Teste la connexion keypair sur un serveur
+    POST /remove_ssh_password     - Supprime le password SSH d un serveur
+    POST /reenter_ssh_password    - Re-saisit un password SSH
+    POST /regenerate_platform_key - Regenere la keypair plateforme
+    POST /scan_server_users       - Scanne les utilisateurs sur un serveur distant
 """
 
 import os
@@ -383,7 +383,7 @@ def deploy_platform_key():
             # Connexion en password (force) pour deployer la cle
             with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, force_password=True) as client:
                 ssh_user = m['user']
-                # Deployer pour l'utilisateur SSH (base64 safe — evite injection via pubkey)
+                # Deployer pour l'utilisateur SSH (base64 safe - evite injection via pubkey)
                 import base64 as _b64
                 _key_b64 = _b64.b64encode((pubkey + '\n').encode()).decode()
                 deploy_cmd = (
@@ -493,7 +493,7 @@ def deploy_platform_key():
                     if sa_ok:
                         r['message'] = 'Keypair + service account deployes OK'
                     else:
-                        r['message'] = 'Keypair deployee OK (service account echoue — deployer manuellement)'
+                        r['message'] = 'Keypair deployee OK (service account echoue - deployer manuellement)'
 
                     # Webhook notification
                     try:
@@ -567,7 +567,7 @@ def deploy_service_account():
                 except Exception as sudo_err:
                     logger.warning("Installation sudo echouee pour %s: %s", m['name'], sudo_err)
 
-                # Commandes separees (pas de && — su -c casse le chainage)
+                # Commandes separees (pas de && - su -c casse le chainage)
                 import base64 as _b64
 
                 # 1. Creer l'utilisateur rootwarden s'il n'existe pas
@@ -708,7 +708,7 @@ def remove_ssh_password():
         if not m:
             return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
         if not m.get('service_account_deployed'):
-            return jsonify({'success': False, 'message': 'Service account non deploye — impossible de supprimer les passwords'}), 400
+            return jsonify({'success': False, 'message': 'Service account non deploye - impossible de supprimer les passwords'}), 400
 
         cur.execute(
             "UPDATE machines SET password = '', root_password = '', ssh_password_required = FALSE WHERE id = %s",
@@ -762,7 +762,7 @@ def regenerate_platform_key_route():
     finally:
         conn.close()
     from ssh_key_manager import get_platform_public_key
-    return jsonify({'success': True, 'message': 'Keypair regeneree — re-deploiement requis', 'public_key': get_platform_public_key()})
+    return jsonify({'success': True, 'message': 'Keypair regeneree - re-deploiement requis', 'public_key': get_platform_public_key()})
 
 
 @bp.route('/scan_server_users', methods=['POST'])
@@ -862,7 +862,7 @@ def scan_server_users():
                     """, (u['uid'], u['home'], u['shell'], u['keys_count'],
                           u['has_platform_key'], mid, uname))
                 else:
-                    # Nouveau user — classifier automatiquement
+                    # Nouveau user - classifier automatiquement
                     if uname in sys_users or uname.lower() in sys_users:
                         auto_status = 'excluded'
                         auto_managed = 'manual'
@@ -1024,7 +1024,7 @@ def delete_remote_user():
 
     # Protection : ne pas supprimer l'utilisateur SSH de connexion
     if username == m['user']:
-        return jsonify({'success': False, 'message': f"'{username}' est l'utilisateur SSH de connexion — suppression interdite"}), 400
+        return jsonify({'success': False, 'message': f"'{username}' est l'utilisateur SSH de connexion - suppression interdite"}), 400
 
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m['root_password'])
@@ -1040,7 +1040,7 @@ def delete_remote_user():
             if 'no such user' in output_str.lower():
                 return jsonify({'success': False, 'message': f"'{username}' n'existe pas sur ce serveur"})
 
-            # Verifier le exit code — 0 = succes, sinon echec
+            # Verifier le exit code - 0 = succes, sinon echec
             if exit_code and int(exit_code) != 0:
                 logger.warning("userdel '%s' sur %s: exit=%s output=%s", username, m['name'], exit_code, output_str)
                 return jsonify({'success': False, 'message': f"Echec suppression: {output_str.strip()}"})
@@ -1048,7 +1048,7 @@ def delete_remote_user():
             # Verifier que l'utilisateur n'existe plus
             check, _, _ = execute_as_root(client, f"id {shlex.quote(username)} 2>&1", root_pass, timeout=5)
             if 'no such user' not in (check or '').lower() and username in (check or ''):
-                return jsonify({'success': False, 'message': f"'{username}' existe toujours apres userdel — process actif ?"})
+                return jsonify({'success': False, 'message': f"'{username}' existe toujours apres userdel - process actif ?"})
 
             logger.info("User '%s' supprime sur %s (remove_home=%s)", username, m['name'], remove_home)
             return jsonify({'success': True, 'message': f"Utilisateur '{username}' supprime de {m['name']}"})

@@ -1,4 +1,4 @@
--- Migration 009 — Suivi de remediation CVE + statut serveur (decommissionnement)
+-- Migration 009 - Suivi de remediation CVE + statut serveur (decommissionnement)
 
 -- Suivi du cycle de vie des CVE (Open -> In Progress -> Resolved)
 CREATE TABLE IF NOT EXISTS cve_remediation (

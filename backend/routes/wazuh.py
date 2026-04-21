@@ -1,5 +1,5 @@
 """
-routes/wazuh.py — Module Wazuh : deploiement agent + rules/decoders/CDB editables.
+routes/wazuh.py - Module Wazuh : deploiement agent + rules/decoders/CDB editables.
 
 Maintenu : Equipe Admin.Sys RootWarden
 Version  : 1.15.0
@@ -12,19 +12,19 @@ Objectif :
     CDB editables en BDD (pousses au manager via l'API REST au besoin).
 
 Routes :
-    GET  /wazuh/config           — Config manager (IP, port, password, group)
-    POST /wazuh/config           — Sauvegarde config
-    GET  /wazuh/servers          — Liste machines + etat agent
-    POST /wazuh/install          — Install agent + registration auprès du manager
-    POST /wazuh/uninstall        — Desinstalle l'agent
-    POST /wazuh/restart          — Restart agent
-    POST /wazuh/group            — Assigne un groupe a un agent
-    GET  /wazuh/options          — Lit options par serveur (FIM, active response...)
-    POST /wazuh/options          — Sauvegarde options
-    GET  /wazuh/rules            — Liste rules/decoders/CDB
-    GET  /wazuh/rules/<name>     — Lit un rule specifique
-    POST /wazuh/rules            — Cree ou sauvegarde un rule (xmllint valide)
-    DELETE /wazuh/rules/<name>   — Supprime un rule
+    GET  /wazuh/config           - Config manager (IP, port, password, group)
+    POST /wazuh/config           - Sauvegarde config
+    GET  /wazuh/servers          - Liste machines + etat agent
+    POST /wazuh/install          - Install agent + registration auprès du manager
+    POST /wazuh/uninstall        - Desinstalle l'agent
+    POST /wazuh/restart          - Restart agent
+    POST /wazuh/group            - Assigne un groupe a un agent
+    GET  /wazuh/options          - Lit options par serveur (FIM, active response...)
+    POST /wazuh/options          - Sauvegarde options
+    GET  /wazuh/rules            - Liste rules/decoders/CDB
+    GET  /wazuh/rules/<name>     - Lit un rule specifique
+    POST /wazuh/rules            - Cree ou sauvegarde un rule (xmllint valide)
+    DELETE /wazuh/rules/<name>   - Supprime un rule
 
 Securite :
     - Zero trust : decorateurs standards
@@ -68,7 +68,7 @@ def _audit(user_id, action, details):
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id, f"[wazuh] {action} — {details}")
+                (user_id, f"[wazuh] {action} - {details}")
             )
             conn.commit()
     except Exception as e:

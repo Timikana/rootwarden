@@ -1,5 +1,5 @@
 /**
- * bashrc.js — Frontend pour le module Bashrc.
+ * bashrc.js - Frontend pour le module Bashrc.
  * Maintenu : Equipe Admin.Sys RootWarden
  */
 
@@ -41,7 +41,7 @@ function fmtSize(n) {
     return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
 }
 function fmtTime(ts) {
-    if (!ts) return '—';
+    if (!ts) return '-';
     const d = new Date(Number(ts) * 1000);
     return d.toLocaleString();
 }
@@ -188,7 +188,7 @@ async function bashrcPreview() {
             html += `<div class="text-red-500 text-xs">${escHtml(r.error)}</div></div>`;
             continue;
         }
-        html += `<div class="text-xs text-gray-500 mb-1">${escHtml(r.home)} — ${r.current_bytes} o → ${r.new_bytes} o${r.custom_detected ? ` — ${escHtml(__('bashrc.has_custom'))}` : ''}</div>`;
+        html += `<div class="text-xs text-gray-500 mb-1">${escHtml(r.home)} - ${r.current_bytes} o → ${r.new_bytes} o${r.custom_detected ? ` - ${escHtml(__('bashrc.has_custom'))}` : ''}</div>`;
         html += '<div class="bg-gray-900 text-gray-100 p-2 rounded">';
         for (const line of (r.diff || '').split('\n')) {
             let cls = '';
@@ -237,7 +237,7 @@ async function bashrcDeploy(dryRun) {
             <td class="px-2 py-1 mono">${escHtml(r.user)}</td>
             <td class="px-2 py-1">${r.ok ? '✓' : '✗'}</td>
             <td class="px-2 py-1 mono text-[11px]">${escHtml(r.backup || '')}</td>
-            <td class="px-2 py-1">${r.syntax_ok ? '✓' : (r.syntax_ok === false ? '✗' : '—')}</td>
+            <td class="px-2 py-1">${r.syntax_ok ? '✓' : (r.syntax_ok === false ? '✗' : '-')}</td>
             <td class="px-2 py-1 text-gray-500">${escHtml(detail)}</td>
         </tr>`;
     }
@@ -297,12 +297,12 @@ function bashrcTemplateUpdateMeta(info) {
     const l = document.getElementById('tpl-lines');
     const s = document.getElementById('tpl-sha');
     const b = document.getElementById('tpl-bytes');
-    if (l) l.textContent = info.lines ?? '—';
-    if (s) s.textContent = info.sha8 ?? '—';
-    if (b) b.textContent = info.bytes ?? '—';
+    if (l) l.textContent = info.lines ?? '-';
+    if (s) s.textContent = info.sha8 ?? '-';
+    if (b) b.textContent = info.bytes ?? '-';
 }
 
-// Patterns destructeurs courants — alerte UI (pas un blocage)
+// Patterns destructeurs courants - alerte UI (pas un blocage)
 const _TPL_DANGER_PATTERNS = [
     { re: /\brm\s+-[rRf]+\s+\/(\s|$)/,          name: 'rm -rf /' },
     { re: /\bdd\s+if=.*of=\/dev\/[sh]d[a-z]/,   name: 'dd vers disque' },

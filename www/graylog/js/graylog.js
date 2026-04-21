@@ -1,6 +1,6 @@
 /**
- * graylog.js — Frontend module Graylog (rsyslog forwarding).
- * Maintenu : Equipe Admin.Sys RootWarden — v1.15.0
+ * graylog.js - Frontend module Graylog (rsyslog forwarding).
+ * Maintenu : Equipe Admin.Sys RootWarden - v1.15.0
  */
 const API = window.API_URL || '/api_proxy.php';
 
@@ -71,8 +71,8 @@ async function glLoadServers() {
             <td class="px-3 py-2 mono text-xs">${escHtml(s.name)}</td>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.ip)}</td>
             <td class="px-3 py-2">${badge}</td>
-            <td class="px-3 py-2 mono text-[11px]">${escHtml(s.rsyslog_version || '—')}</td>
-            <td class="px-3 py-2 mono text-xs">${escHtml(s.last_deploy_at || '—')}</td>
+            <td class="px-3 py-2 mono text-[11px]">${escHtml(s.rsyslog_version || '-')}</td>
+            <td class="px-3 py-2 mono text-xs">${escHtml(s.last_deploy_at || '-')}</td>
             <td class="px-3 py-2 whitespace-nowrap">
                 <button onclick="glDeploy(${s.id})" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('graylog.btn_deploy'))}</button>
                 <button onclick="glTest(${s.id})" class="text-xs text-green-500 hover:text-green-700 ml-2">${escHtml(__('graylog.btn_test'))}</button>
@@ -98,7 +98,7 @@ async function glDeploy(mid) {
 
 async function glTest(mid) {
     const r = await apiFetch('/graylog/test', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
-    alert((r.success ? '✓ ' : '✗ ') + __('graylog.test_sent') + '\n\ntag=' + (r.tag || '—') + '\n\n' + (r.hint || r.message || ''));
+    alert((r.success ? '✓ ' : '✗ ') + __('graylog.test_sent') + '\n\ntag=' + (r.tag || '-') + '\n\n' + (r.hint || r.message || ''));
 }
 
 async function glUninstall(mid) {
@@ -114,7 +114,7 @@ async function glLoadTemplates() {
     const list = document.getElementById('gl-templates-list');
     const r = await apiFetch('/graylog/templates');
     if (!r.success) { list.innerHTML = `<div class="text-xs text-red-500 p-2">${escHtml(r.message || 'Erreur')}</div>`; return; }
-    if (!r.templates.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">—</div>`; return; }
+    if (!r.templates.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">-</div>`; return; }
     list.innerHTML = r.templates.map(t => `
         <div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/40 cursor-pointer text-xs"
              onclick="glSelectTemplate('${escAttr(t.name)}')">
@@ -157,7 +157,7 @@ async function glSaveTemplate() {
     status.textContent = __('graylog.saving');
     const r = await apiFetch('/graylog/templates', { method: 'POST', body: JSON.stringify(body) });
     if (!r.success) { status.textContent = '✗ ' + escHtml(r.message || 'Erreur'); return; }
-    status.textContent = `✓ ${__('graylog.saved')} — sha=${r.sha8} ${r.bytes}o`;
+    status.textContent = `✓ ${__('graylog.saved')} - sha=${r.sha8} ${r.bytes}o`;
     glLoadTemplates();
 }
 

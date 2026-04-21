@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cve_scanner.py — Scan de vulnérabilités CVE via l'API REST OpenCVE pour RootWarden.
+cve_scanner.py - Scan de vulnérabilités CVE via l'API REST OpenCVE pour RootWarden.
 
 Rôle :
     Ce module interroge l'API OpenCVE pour détecter les CVE affectant les packages
@@ -22,7 +22,7 @@ Note de sécurité :
     L'authentification auprès d'OpenCVE utilise HTTP Basic Auth sur HTTPS.
     Les credentials ne transitent pas en clair si OPENCVE_URL utilise https://.
 """
-# cve_scanner.py — Intégration OpenCVE pour RootWarden
+# cve_scanner.py - Intégration OpenCVE pour RootWarden
 #
 # Supporte :
 #   - OpenCVE cloud   (https://app.opencve.io)
@@ -111,8 +111,8 @@ class OpenCVEClient:
     Client REST pour OpenCVE (cloud opencve.io ou instance on-prem v2).
 
     Modes d'authentification (priorité) :
-        1. Bearer token (OPENCVE_TOKEN) — OpenCVE v2 on-prem
-        2. Basic Auth (OPENCVE_USERNAME + OPENCVE_PASSWORD) — opencve.io cloud / mock
+        1. Bearer token (OPENCVE_TOKEN) - OpenCVE v2 on-prem
+        2. Basic Auth (OPENCVE_USERNAME + OPENCVE_PASSWORD) - opencve.io cloud / mock
 
     Configuration via variables d'environnement :
         OPENCVE_URL       → URL de base (ex: https://app.opencve.io)
@@ -298,7 +298,7 @@ def get_installed_packages(ssh_client) -> list[dict]:
             continue
         clean_name = name.split(':')[0]  # retirer :amd64 etc.
         if clean_name in seen:
-            continue  # Déjà vu — skip le doublon multiarch
+            continue  # Déjà vu - skip le doublon multiarch
         # Nettoyer le numéro de version (epoch + suffixe Debian)
         clean = _EPOCH_RE.sub('', version)
         clean = _DISTRO_RE.sub('', clean)
@@ -388,7 +388,7 @@ def get_system_components(ssh_client) -> list[dict]:
     except Exception as e:
         _log.debug("Distro detection failed: %s", e)
 
-    # 3. OpenSSH (version du serveur SSH — cible frequente de CVE)
+    # 3. OpenSSH (version du serveur SSH - cible frequente de CVE)
     try:
         _, stdout, _ = ssh_client.exec_command(
             "ssh -V 2>&1 | head -1", timeout=10
@@ -408,7 +408,7 @@ def get_system_components(ssh_client) -> list[dict]:
     except Exception as e:
         _log.debug("OpenSSH detection failed: %s", e)
 
-    # 4. OpenSSL (librairie crypto — CVE critiques frequentes)
+    # 4. OpenSSL (librairie crypto - CVE critiques frequentes)
     try:
         _, stdout, _ = ssh_client.exec_command(
             "openssl version 2>/dev/null | head -1", timeout=10
@@ -497,7 +497,7 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
                'system_components': len(system_components), 'dpkg_packages': len(packages)}
 
         yield {'type': 'progress', 'machine_id': machine_id,
-               'step': 'scan', 'message': f'{len(system_components)} composant(s) + {len(packages)} paquet(s) — interrogation OpenCVE...',
+               'step': 'scan', 'message': f'{len(system_components)} composant(s) + {len(packages)} paquet(s) - interrogation OpenCVE...',
                'total_packages': total}
 
         # Mapping vendor OpenCVE pour les composants systeme

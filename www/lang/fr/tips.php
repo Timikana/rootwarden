@@ -7,7 +7,7 @@ return [
     'tip.ssh_step1' => '<strong>Prerequis :</strong> ajoutez votre cle SSH publique dans <a href="/profile.php" class="text-blue-600 underline">votre profil</a>.',
     'tip.ssh_step2' => '<strong>Scannez</strong> les utilisateurs du serveur dans <a href="/adm/server_users.php" class="text-blue-600 underline">Utilisateurs distants</a> et classifiez chaque compte.',
     'tip.ssh_step3' => '<strong>Cochez</strong> les serveurs cibles dans la liste ci-dessous.',
-    'tip.ssh_step4' => '<strong>Cliquez</strong> sur "Deployer les cles" — le preflight verifie la connexion et affiche l\'inventaire des comptes.',
+    'tip.ssh_step4' => '<strong>Cliquez</strong> sur "Deployer les cles" - le preflight verifie la connexion et affiche l\'inventaire des comptes.',
     'tip.ssh_step5' => 'Le deploiement ne <strong>supprime jamais</strong> de compte. Il deploie uniquement les cles SSH des utilisateurs autorises.',
 
     // Page Utilisateurs distants
@@ -18,7 +18,7 @@ return [
     'tip.users_step4' => 'La suppression d\'un compte se fait <strong>uniquement</strong> via le bouton "Supprimer" (action explicite, jamais automatique).',
 
     // Page Admin
-    'tip.admin_title' => 'Premier demarrage — les etapes',
+    'tip.admin_title' => 'Premier demarrage - les etapes',
     'tip.admin_step1' => '<strong>Ajoutez</strong> vos serveurs dans l\'onglet "Serveurs" (IP, port, identifiants SSH).',
     'tip.admin_step2' => '<strong>Creez</strong> les utilisateurs dans l\'onglet "Utilisateurs" et attribuez leurs cles SSH.',
     'tip.admin_step3' => '<strong>Assignez</strong> les serveurs a chaque utilisateur dans "Acces & Permissions".',
@@ -50,7 +50,7 @@ return [
     'guide.step7_title' => '7. Configurer les notifications',
     'guide.step7_text' => 'Dans <strong>Admin > Acces & Permissions > Notifications email</strong>, configurez qui recoit les alertes pour chaque type d\'evenement (scan CVE, audit SSH, etc.).',
     'guide.security_title' => 'Principes de securite',
-    'guide.sec_1' => 'Aucun mot de passe n\'est stocke en clair — chiffrement AES-256 + libsodium.',
+    'guide.sec_1' => 'Aucun mot de passe n\'est stocke en clair - chiffrement AES-256 + libsodium.',
     'guide.sec_2' => 'Le deploiement ne supprime <strong>jamais</strong> de compte automatiquement.',
     'guide.sec_3' => 'Chaque action est tracee dans le journal d\'audit.',
     'guide.sec_4' => 'L\'authentification 2FA (TOTP) est obligatoire pour tous les comptes.',
@@ -118,6 +118,6 @@ return [
     // Page Profil
     'tip.profile_title' => 'Comment configurer votre profil ?',
     'tip.profile_step1' => 'Ajoutez votre <strong>email</strong> pour recevoir les notifications (scan CVE, alertes securite).',
-    'tip.profile_step2' => 'Collez votre <strong>cle SSH publique</strong> (ed25519 ou RSA) — elle sera deployee sur vos serveurs assignes.',
+    'tip.profile_step2' => 'Collez votre <strong>cle SSH publique</strong> (ed25519 ou RSA) - elle sera deployee sur vos serveurs assignes.',
     'tip.profile_step3' => 'Changez votre <strong>mot de passe</strong> regulierement (politique d\'expiration configurable par l\'admin).',
 ];

@@ -1,15 +1,15 @@
 """
-routes/services.py — Routes de gestion des services systemd sur serveurs distants.
+routes/services.py - Routes de gestion des services systemd sur serveurs distants.
 
 Routes :
-    POST /services/list     — Liste tous les services avec statut et categorie
-    POST /services/status   — Statut detaille d'un service
-    POST /services/start    — Demarrer un service
-    POST /services/stop     — Arreter un service
-    POST /services/restart  — Redemarrer un service
-    POST /services/enable   — Activer un service au demarrage
-    POST /services/disable  — Desactiver un service au demarrage
-    POST /services/logs     — Logs journalctl d'un service
+    POST /services/list     - Liste tous les services avec statut et categorie
+    POST /services/status   - Statut detaille d'un service
+    POST /services/start    - Demarrer un service
+    POST /services/stop     - Arreter un service
+    POST /services/restart  - Redemarrer un service
+    POST /services/enable   - Activer un service au demarrage
+    POST /services/disable  - Desactiver un service au demarrage
+    POST /services/logs     - Logs journalctl d'un service
 """
 
 import re
@@ -47,7 +47,7 @@ def _validate_service_name(name):
 
 def _resolve_ssh_creds(data):
     """
-    Lookup credentials SSH en BDD via machine_id (securise — pas de credentials dans le HTML).
+    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials dans le HTML).
     Retourne (ip, port, user, ssh_pass, root_pass, svc_account, machine_id, error).
     """
     machine_id = data.get('machine_id')

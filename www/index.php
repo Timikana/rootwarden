@@ -1,6 +1,6 @@
 <?php
 /**
- * index.php — Page d'accueil post-authentification (portail principal)
+ * index.php - Page d'accueil post-authentification (portail principal)
  *
  * Rôle       : Point d'entrée principal après connexion. Affiche un message de
  *              bienvenue personnalisé et un raccourci vers la documentation.
@@ -8,9 +8,9 @@
  *              dans menu.php en fonction des permissions stockées en session.
  *
  * Dépendances :
- *   - auth/verify.php   : checkAuth() — vérifie l'authentification et les rôles
- *   - auth/functions.php: initializeUserSession() — réhydrate la session depuis BDD
- *   - db.php            : $pdo — connexion PDO MySQL
+ *   - auth/verify.php   : checkAuth() - vérifie l'authentification et les rôles
+ *   - auth/functions.php: initializeUserSession() - réhydrate la session depuis BDD
+ *   - db.php            : $pdo - connexion PDO MySQL
  *   - head.php          : balises <head> communes (Tailwind CDN, variables JS)
  *   - menu.php          : barre de navigation sticky avec liens conditionnels
  *   - footer.php        : pied de page avec logos et liens légaux
@@ -115,7 +115,7 @@ try {
     if ($nbPasswordAuth > 0) $alerts[] = ['type' => 'warning', 'msg' => t('dashboard.alert_password', ['count' => $nbPasswordAuth]), 'link' => '/adm/platform_keys.php'];
 } catch (\Exception $e) {}
 
-// Clés SSH anciennes (> 90 jours) — avec noms pour l'alerte actionnable
+// Clés SSH anciennes (> 90 jours) - avec noms pour l'alerte actionnable
 $oldKeysStmt = $pdo->query("SELECT name, DATEDIFF(NOW(), ssh_key_updated_at) as age_days FROM users WHERE active = 1 AND ssh_key IS NOT NULL AND ssh_key != '' AND ssh_key_updated_at IS NOT NULL AND ssh_key_updated_at < DATE_SUB(NOW(), INTERVAL 90 DAY) ORDER BY ssh_key_updated_at LIMIT 5");
 $oldKeysData = $oldKeysStmt->fetchAll(PDO::FETCH_ASSOC);
 $oldKeys = count($oldKeysData);
@@ -204,7 +204,7 @@ try {
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.users_active') ?></div>
             </div>
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center" title="<?= t('dashboard.tip_cve') ?>">
-                <div class="text-2xl font-bold <?= ($lastCveCount ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' ?>"><?= $lastCveCount ?? '—' ?></div>
+                <div class="text-2xl font-bold <?= ($lastCveCount ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' ?>"><?= $lastCveCount ?? '-' ?></div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.cve_detected') ?></div>
                 <?php if ($lastScan): ?><div class="text-[10px] text-gray-400 mt-0.5">Scan <?= date('d/m H:i', strtotime($lastScan)) ?></div><?php endif; ?>
             </div>
@@ -221,7 +221,7 @@ try {
                 $sshGrade = $sshAuditAvg >= 90 ? 'A' : ($sshAuditAvg >= 75 ? 'B' : ($sshAuditAvg >= 60 ? 'C' : ($sshAuditAvg >= 40 ? 'D' : 'F')));
                 $sshColor = match($sshGrade) { 'A' => 'text-green-600 dark:text-green-400', 'B' => 'text-blue-600 dark:text-blue-400', 'C' => 'text-yellow-600 dark:text-yellow-400', default => 'text-red-600 dark:text-red-400' };
                 ?>
-                <div class="text-2xl font-bold <?= $sshColor ?>"><?= $sshAuditCount > 0 ? $sshGrade : '—' ?></div>
+                <div class="text-2xl font-bold <?= $sshColor ?>"><?= $sshAuditCount > 0 ? $sshGrade : '-' ?></div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.ssh_audit_score') ?></div>
                 <?php if ($sshAuditCount > 0): ?><div class="text-[10px] text-gray-400 mt-0.5"><?= $sshAuditAvg ?>/100 (<?= $sshAuditCount ?> <?= t('dashboard.servers_scanned') ?>)</div><?php endif; ?>
             </div>

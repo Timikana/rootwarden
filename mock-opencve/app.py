@@ -1,9 +1,9 @@
 """
-Mock OpenCVE API — Simule l'API REST OpenCVE pour les tests preprod.
+Mock OpenCVE API - Simule l'API REST OpenCVE pour les tests preprod.
 
 Endpoints implémentés :
-  GET /api/cve          — Liste CVE filtrée par vendor/product (pagination)
-  GET /api/cve/<cve_id> — Détail d'une CVE
+  GET /api/cve          - Liste CVE filtrée par vendor/product (pagination)
+  GET /api/cve/<cve_id> - Détail d'une CVE
 
 Auth : Basic Auth (n'importe quel user/pass accepté)
 

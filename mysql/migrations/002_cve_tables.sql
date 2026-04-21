@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 002 — Tables de scan CVE (module OpenCVE)
+-- Migration 002 - Tables de scan CVE (module OpenCVE)
 -- Version : 1.5.0
 -- Date    : 2026-03-31
 -- Auteur  : RootWarden

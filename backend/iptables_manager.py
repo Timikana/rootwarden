@@ -1,5 +1,5 @@
 """
-iptables_manager.py — Gestion des règles iptables/ip6tables pour RootWarden.
+iptables_manager.py - Gestion des règles iptables/ip6tables pour RootWarden.
 
 Rôle :
     Lecture et application des règles iptables (IPv4 et IPv6) sur des serveurs

@@ -1,7 +1,7 @@
 SELECT 1;
 
 -- Migration 038 : Historique des mots de passe (anti-recyclage)
--- Maintenu : Equipe Admin.Sys RootWarden — v1.14.6 — 2026-04-20
+-- Maintenu : Equipe Admin.Sys RootWarden - v1.14.6 - 2026-04-20
 --
 -- Empêche la reutilisation des N derniers mots de passe (N = 5 par defaut).
 -- Complementaire a l'expiration des mots de passe existante : sans cette

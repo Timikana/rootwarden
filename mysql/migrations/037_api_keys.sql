@@ -1,14 +1,14 @@
 SELECT 1;
 
 -- Migration 037 : API keys segmentees avec scope + rotation + last_used
--- Maintenu : Equipe Admin.Sys RootWarden — v1.14.3 — 2026-04-20
+-- Maintenu : Equipe Admin.Sys RootWarden - v1.14.3 - 2026-04-20
 --
 -- Reponse au gap #4 de l'audit DevSecOps : un seul API_KEY partage
 -- (proxy PHP + tests + scripts) = compromission = acces total backend
 -- sans revocation fine. Nouvelle table api_keys avec :
 --   - prefix visuel (rw_live_XXXX) pour identification en log
 --   - hash SHA-256 stocke (pas le plaintext)
---   - scope JSON (routes autorisees) — null = ALL (retrocompat)
+--   - scope JSON (routes autorisees) - null = ALL (retrocompat)
 --   - revoked_at pour revocation soft
 --   - last_used_at pour detection cles dormantes
 --

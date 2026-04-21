@@ -1,10 +1,10 @@
-# Audit Securite OWASP Top 10 — RootWarden v1.8.0
+# Audit Securite OWASP Top 10 - RootWarden v1.8.0
 
 > Date : 2026-04-04 | Scope : 58 routes Python + ~40 pages PHP
 
 ---
 
-## Audit 4 — Pentest interne (2026-04-10)
+## Audit 4 - Pentest interne (2026-04-10)
 
 ### Chaine d'attaque testee
 
@@ -25,14 +25,14 @@
 | 1 | `force_password_change=1` a l'install | Attaquant bloque sur page profil, doit changer le mdp |
 | 2 | `INIT_SUPERADMIN_PASSWORD=` vide par defaut | Plus de mot de passe previsible |
 | 3 | Masquage mot de passe dans Docker logs | `sup***min` au lieu du clair, fichier chmod 600 |
-| 4 | `start.sh` — chmod 600 automatique | .env non lisible par autres users du host |
+| 4 | `start.sh` - chmod 600 automatique | .env non lisible par autres users du host |
 | 5 | MySQL GRANT restreints | `rootwarden_user` sans ALL PRIVILEGES |
 | 6 | Detection secrets par defaut | Warning si SECRET_KEY/API_KEY non changes |
 
 ### Limites inherentes (non fixables au niveau applicatif)
 
 - **Acces root Docker host** = game over (docker exec, lecture volumes)
-- **TOTP necessite shared secret** — par design, DB + cle = code valide
+- **TOTP necessite shared secret** - par design, DB + cle = code valide
 - **Recommandation** : limiter l'acces SSH au host Docker, utiliser Docker Secrets en production
 
 ### Score mis a jour
@@ -57,18 +57,18 @@
 | Headers + Misc | 12 | 0 | 2 | 2 | 1 | 7 |
 | **TOTAL** | **40** | **5** | **10** | **9** | **2** | **16** |
 
-**Score global : 16/40 OK (40%)** — Les fondamentaux sont solides (auth, bcrypt, prepared statements, CORS) mais les couches de defense en profondeur (escaping JS, CSRF, CSP) ont des failles.
+**Score global : 16/40 OK (40%)** - Les fondamentaux sont solides (auth, bcrypt, prepared statements, CORS) mais les couches de defense en profondeur (escaping JS, CSRF, CSP) ont des failles.
 
 ---
 
-## CRITIQUES (5) — Corriger immediatement
+## CRITIQUES (5) - Corriger immediatement
 
-### C1. OS Command Injection — `remove_user_keys`
+### C1. OS Command Injection - `remove_user_keys`
 **Fichier :** `backend/routes/ssh.py:614,623,628`
 **Risque :** RCE en tant que root via nom d'utilisateur malveillant
 
 ```python
-# VULNERABLE — username non echappe dans exec_command
+# VULNERABLE - username non echappe dans exec_command
 stdin, stdout, stderr = client.exec_command(f"getent passwd {username} | cut -d: -f6")
 cmd = f"> {ak_path}"   # ak_path derive de username
 cmd = f"sed -i '/rootwarden/d' {ak_path} 2>/dev/null; echo OK"
@@ -84,7 +84,7 @@ client.exec_command(f"getent passwd {shlex.quote(username)} | cut -d: -f6")
 
 ---
 
-### C2. OS Command Injection — `delete_remote_user`
+### C2. OS Command Injection - `delete_remote_user`
 **Fichier :** `backend/routes/ssh.py:681`
 **Risque :** RCE en tant que root via `userdel {username}`
 
@@ -97,7 +97,7 @@ cmd = f"userdel {flag} {username} 2>&1"
 
 ---
 
-### C3. OS Command Injection — `configure_servers.py`
+### C3. OS Command Injection - `configure_servers.py`
 **Fichier :** `backend/configure_servers.py:194,244,304,455`
 **Risque :** RCE via nom d'utilisateur stocke en BDD
 
@@ -107,12 +107,12 @@ Les noms d'utilisateurs de la table `users` sont utilises directement dans des c
 
 ---
 
-### C4. XSS — `server_users.php` innerHTML sans escaping
+### C4. XSS - `server_users.php` innerHTML sans escaping
 **Fichier :** `www/adm/server_users.php:136-147`
 **Risque :** Stored XSS via nom d'utilisateur Linux malveillant
 
 ```javascript
-// VULNERABLE — u.name et u.home non echappes
+// VULNERABLE - u.name et u.home non echappes
 html += `<span class="font-medium">${u.name}</span>`;
 html += `<button onclick="deleteUser('${u.name}')">`;
 ```
@@ -126,12 +126,12 @@ html += `<button data-user="${esc(u.name)}" onclick="deleteUser(this.dataset.use
 
 ---
 
-### C5. CSRF — `update_permissions.php` sans validation token
+### C5. CSRF - `update_permissions.php` sans validation token
 **Fichier :** `www/adm/api/update_permissions.php:49-100`
 **Risque :** Un attaquant peut modifier les permissions d'un utilisateur via CSRF
 
 ```php
-// VULNERABLE — aucune validation CSRF avant INSERT/UPDATE permissions
+// VULNERABLE - aucune validation CSRF avant INSERT/UPDATE permissions
 $stmt = $pdo->prepare("INSERT INTO permissions (user_id, $permission) VALUES (?, ?)...");
 ```
 
@@ -139,15 +139,15 @@ $stmt = $pdo->prepare("INSERT INTO permissions (user_id, $permission) VALUES (?,
 
 ---
 
-## HAUTES (10) — Corriger avant mise en prod
+## HAUTES (10) - Corriger avant mise en prod
 
 | # | Categorie | Finding | Fichier:Ligne | Fix |
 |---|-----------|---------|---------------|-----|
-| H1 | XSS | `platform_keys.php` — user data innerHTML | `www/adm/platform_keys.php:327-342` | Escaper `u.name`, `u.home` |
-| H2 | XSS | `manage_permissions.php` — temp perms innerHTML | `www/adm/includes/manage_permissions.php:209-225` | Escaper `user_name`, `reason` |
-| H3 | XSS | `menu.php` — search results innerHTML | `www/menu.php:230-239` | Escaper `r.label`, `r.sub` |
-| H4 | CSRF | `change_password.php` — POST sans CSRF | `www/adm/api/change_password.php:41` | Ajouter `checkCsrfToken()` |
-| H5 | CSRF | `notifications.php` — POST sans CSRF | `www/adm/api/notifications.php:85` | Ajouter validation CSRF |
+| H1 | XSS | `platform_keys.php` - user data innerHTML | `www/adm/platform_keys.php:327-342` | Escaper `u.name`, `u.home` |
+| H2 | XSS | `manage_permissions.php` - temp perms innerHTML | `www/adm/includes/manage_permissions.php:209-225` | Escaper `user_name`, `reason` |
+| H3 | XSS | `menu.php` - search results innerHTML | `www/menu.php:230-239` | Escaper `r.label`, `r.sub` |
+| H4 | CSRF | `change_password.php` - POST sans CSRF | `www/adm/api/change_password.php:41` | Ajouter `checkCsrfToken()` |
+| H5 | CSRF | `notifications.php` - POST sans CSRF | `www/adm/api/notifications.php:85` | Ajouter validation CSRF |
 | H6 | Auth | TOTP code reuse possible | `www/auth/verify_2fa.php:50` | Stocker le dernier code accepte |
 | H7 | Data | DEBUG_MODE=true en preprod | `srv-docker.env` | Mettre `false` en production |
 | H8 | Headers | CSP `unsafe-inline` + `unsafe-eval` | `www/auth/verify.php:86` | Retirer ou utiliser des nonces |
@@ -160,11 +160,11 @@ $stmt = $pdo->prepare("INSERT INTO permissions (user_id, $permission) VALUES (?,
 
 | # | Categorie | Finding | Fichier:Ligne |
 |---|-----------|---------|---------------|
-| M1 | Injection | `ssh_utils.py:892` — `sudo -S {command}` sans quote | `backend/ssh_utils.py:892` |
-| M2 | Injection | `notifications.php` — WHERE dynamique | `www/notifications.php:32` |
-| M3 | XSS | `head.php` — toast() message non echappe | `www/head.php:138` |
-| M4 | XSS | `manage_servers.php` — error.message dans innerHTML | `www/adm/includes/manage_servers.php:663` |
-| M5 | CSRF | `update_server_access.php` — CSRF header seulement | `www/adm/api/update_server_access.php:47` |
+| M1 | Injection | `ssh_utils.py:892` - `sudo -S {command}` sans quote | `backend/ssh_utils.py:892` |
+| M2 | Injection | `notifications.php` - WHERE dynamique | `www/notifications.php:32` |
+| M3 | XSS | `head.php` - toast() message non echappe | `www/head.php:138` |
+| M4 | XSS | `manage_servers.php` - error.message dans innerHTML | `www/adm/includes/manage_servers.php:663` |
+| M5 | CSRF | `update_server_access.php` - CSRF header seulement | `www/adm/api/update_server_access.php:47` |
 | M6 | Data | Logs debug avec noms de cles de dechiffrement | `backend/ssh_utils.py:310,330` |
 | M7 | Headers | X-Frame-Options inconsistant (DENY vs SAMEORIGIN) | `apache-ssl.conf vs verify.php` |
 | M8 | Audit | `audit_log()` ignore `$targetId` et `$details` | `www/adm/includes/audit_log.php:15` |
@@ -172,7 +172,7 @@ $stmt = $pdo->prepare("INSERT INTO permissions (user_id, $permission) VALUES (?,
 
 ---
 
-## OK (16) — Securise
+## OK (16) - Securise
 
 | Categorie | Finding |
 |-----------|---------|
@@ -197,28 +197,28 @@ $stmt = $pdo->prepare("INSERT INTO permissions (user_id, $permission) VALUES (?,
 
 ## Plan de remediation
 
-### Sprint 1 — Critiques (avant prod)
+### Sprint 1 - Critiques (avant prod)
 
-1. **Validation username** — Creer un helper `validate_username(name)` utilise dans :
+1. **Validation username** - Creer un helper `validate_username(name)` utilise dans :
    - `ssh.py` : `remove_user_keys`, `delete_remote_user`, `scan_server_users`
    - `configure_servers.py` : toutes les fonctions
    - `manage_users.php` : creation d'utilisateur
    - Regex : `^[a-zA-Z0-9._-]{1,32}$`
 
-2. **Escaping JS** — Creer un helper `escHtml()` dans un fichier partage et l'utiliser dans :
+2. **Escaping JS** - Creer un helper `escHtml()` dans un fichier partage et l'utiliser dans :
    - `server_users.php`, `platform_keys.php`, `manage_permissions.php`, `menu.php`
 
-3. **CSRF** — Ajouter `checkCsrfToken()` dans :
+3. **CSRF** - Ajouter `checkCsrfToken()` dans :
    - `update_permissions.php`, `change_password.php`, `notifications.php`
 
-### Sprint 2 — Hautes (semaine suivante)
+### Sprint 2 - Hautes (semaine suivante)
 
-4. **TOTP anti-replay** — Stocker `last_totp_code_hash` dans la session
-5. **CSP** — Retirer `unsafe-inline` / `unsafe-eval`, migrer vers nonces
-6. **Audit log** — Appeler `audit_log()` dans les 7 endpoints manquants
+4. **TOTP anti-replay** - Stocker `last_totp_code_hash` dans la session
+5. **CSP** - Retirer `unsafe-inline` / `unsafe-eval`, migrer vers nonces
+6. **Audit log** - Appeler `audit_log()` dans les 7 endpoints manquants
 7. **DEBUG_MODE=false** en production
 
-### Sprint 3 — Moyennes (maintenance)
+### Sprint 3 - Moyennes (maintenance)
 
 8. Toast `textContent` au lieu de `innerHTML`
 9. SRI hashes sur les assets CDN

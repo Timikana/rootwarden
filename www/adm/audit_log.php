@@ -1,6 +1,6 @@
 <?php
 /**
- * adm/audit_log.php — Journal d'activité complet
+ * adm/audit_log.php - Journal d'activité complet
  *
  * Affiche toutes les actions loguées dans user_logs avec filtres.
  * Accès : superadmin uniquement.
@@ -117,10 +117,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             el.classList.remove('border-gray-300', 'bg-gray-50', 'text-gray-600');
             if (d.integrity === 'OK') {
                 el.classList.add('border-green-300', 'bg-green-50', 'text-green-700');
-                el.innerHTML = `✅ Chaine intacte — <b>${d.sealed}</b> lignes scellees, <b>${d.unsealed}</b> non scellees, tete=<code>${d.chain_head || 'aucune'}</code>`;
+                el.innerHTML = `✅ Chaine intacte - <b>${d.sealed}</b> lignes scellees, <b>${d.unsealed}</b> non scellees, tete=<code>${d.chain_head || 'aucune'}</code>`;
             } else {
                 el.classList.add('border-red-300', 'bg-red-50', 'text-red-700');
-                el.innerHTML = `❌ <b>INCOHERENCE DETECTEE</b> — type=<code>${d.error.type}</code> ligne #${d.error.id}<br><small>${d.error.message}</small>`;
+                el.innerHTML = `❌ <b>INCOHERENCE DETECTEE</b> - type=<code>${d.error.type}</code> ligne #${d.error.id}<br><small>${d.error.message}</small>`;
             }
         } catch (e) {
             el.classList.add('border-red-300', 'bg-red-50', 'text-red-700');

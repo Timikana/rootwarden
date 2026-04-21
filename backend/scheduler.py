@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scheduler.py — Planificateur de scans CVE periodiques pour RootWarden.
+scheduler.py - Planificateur de scans CVE periodiques pour RootWarden.
 
 Demarre un thread daemon qui verifie toutes les 60s si un scan planifie
 doit etre lance (next_run <= now). Utilise croniter pour calculer le
@@ -101,7 +101,7 @@ def _run_scheduled_scan(schedule: dict):
         except Exception as e:
             _log.warning("Scheduler: erreur scan %s : %s", m['name'], e)
 
-    _log.info("Scheduler: scan '%s' termine — %d serveurs, %d CVE", schedule['name'], scanned, total_findings)
+    _log.info("Scheduler: scan '%s' termine - %d serveurs, %d CVE", schedule['name'], scanned, total_findings)
 
     # Webhook notification
     try:
@@ -168,13 +168,13 @@ def _run_scheduled_ssh_audit(schedule: dict):
             except Exception as e:
                 _log.warning("Scheduler SSH Audit: %s echoue: %s", m['name'], e)
 
-        _log.info("Scheduler SSH Audit: '%s' termine — %d/%d serveurs", schedule['name'], scanned, len(machines))
+        _log.info("Scheduler SSH Audit: '%s' termine - %d/%d serveurs", schedule['name'], scanned, len(machines))
     finally:
         conn.close()
 
 
 def _scheduler_loop():
-    """Boucle principale du scheduler — tourne en daemon thread."""
+    """Boucle principale du scheduler - tourne en daemon thread."""
     _log.info("Scheduler demarre (CVE + SSH Audit, intervalle: %ds)", _CHECK_INTERVAL)
     while True:
         try:
@@ -324,7 +324,7 @@ _PURGE_INTERVAL = 60  # toutes les 60 iterations = 1h
 
 
 def _weekly_user_scan():
-    """Scan hebdomadaire des utilisateurs distants — detecte les cles orphelines."""
+    """Scan hebdomadaire des utilisateurs distants - detecte les cles orphelines."""
     import os
     from datetime import datetime as dt
 
@@ -378,7 +378,7 @@ def _weekly_user_scan():
             try:
                 from webhooks import send_webhook
                 send_webhook('server_offline', {
-                    'title': 'Scan hebdomadaire — cles SSH detectees',
+                    'title': 'Scan hebdomadaire - cles SSH detectees',
                     'message': f'{orphan_count} cles SSH trouvees sur le parc. Verifiez les cles orphelines.',
                 })
             except Exception:

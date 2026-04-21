@@ -1,7 +1,7 @@
 SELECT 1;
 
 -- Migration 036 : Audit log tamper-evident (hash chain SHA2-256)
--- Maintenu : Equipe Admin.Sys RootWarden — v1.14.1 — 2026-04-20
+-- Maintenu : Equipe Admin.Sys RootWarden - v1.14.1 - 2026-04-20
 --
 -- Scellement des lignes user_logs par hash chaine SHA2-256.
 -- Implementation app-level (pas de trigger, contrainte SUPER privilege).

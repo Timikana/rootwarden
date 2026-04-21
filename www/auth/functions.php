@@ -1,10 +1,10 @@
 <?php
 /**
- * auth/functions.php — Utilitaires d'authentification et de controle d'acces.
+ * auth/functions.php - Utilitaires d'authentification et de controle d'acces.
  *
  * Toutes les fonctions liees a la gestion de session, CSRF, permissions
  * et verification utilisateur. Principe ZERO TRUST : ne jamais faire
- * confiance a $_SESSION pour les decisions de securite — toujours
+ * confiance a $_SESSION pour les decisions de securite - toujours
  * verifier en base de donnees.
  *
  * @package RootWarden\Auth
@@ -138,7 +138,7 @@ function restoreSessionFromToken(): bool
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
-        // Utilisateur inexistant ou desactive — supprimer le token
+        // Utilisateur inexistant ou desactive - supprimer le token
         $pdo->prepare("DELETE FROM remember_tokens WHERE user_id = ?")->execute([$uid]);
         resetSession();
         return false;
@@ -176,7 +176,7 @@ function checkCsrfToken(): void
         $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     }
 
-    // 3. Body JSON (php://input — rerereadable en PHP 8.2)
+    // 3. Body JSON (php://input - rerereadable en PHP 8.2)
     if (empty($token)) {
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
         if (str_contains($contentType, 'application/json')) {
@@ -241,7 +241,7 @@ function getVerifiedUser(int $userId): ?array
 
 /**
  * Retourne les permissions d'un utilisateur depuis la base de donnees.
- * C'est la SOURCE DE VERITE pour les permissions — ne jamais utiliser
+ * C'est la SOURCE DE VERITE pour les permissions - ne jamais utiliser
  * $_SESSION['permissions'] pour une decision de securite.
  *
  * @param  int   $userId  ID de l'utilisateur.

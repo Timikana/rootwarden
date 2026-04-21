@@ -1,11 +1,11 @@
 <?php
 /**
- * toggle_user.php — Activation / désactivation d'un compte utilisateur (endpoint AJAX)
+ * toggle_user.php - Activation / désactivation d'un compte utilisateur (endpoint AJAX)
  *
  * Rôle : inverse la valeur du champ `active` dans la table `users` pour un
  *        utilisateur donné. Un compte désactivé ne peut plus se connecter au portail.
  *
- * Accès requis : session valide (verify.php) — aucun contrôle de rôle supplémentaire
+ * Accès requis : session valide (verify.php) - aucun contrôle de rôle supplémentaire
  *                dans ce fichier ; l'appelant (admin_page.php) est réservé aux admins.
  *
  * Méthode HTTP : POST.

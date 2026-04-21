@@ -1,5 +1,5 @@
 """
-routes/updates.py — Routes de mises a jour Linux (APT, scheduling).
+routes/updates.py - Routes de mises a jour Linux (APT, scheduling).
 
 Note: Les routes Zabbix ont ete deplacees dans routes/supervision.py.
 L'ancienne route /update_zabbix redirige vers /supervision/zabbix/deploy.
@@ -133,7 +133,7 @@ def dpkg_repair():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Zabbix agent update — DEPRECATED : redirect vers /supervision/zabbix/deploy
+# Zabbix agent update - DEPRECATED : redirect vers /supervision/zabbix/deploy
 # Conserve pour retrocompatibilite temporaire.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -693,7 +693,7 @@ def update_security_exec():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SSE — update logs streaming
+# SSE - update logs streaming
 # ─────────────────────────────────────────────────────────────────────────────
 
 update_log_file = "/app/logs/update_servers.log"
@@ -723,7 +723,7 @@ def stream_update_logs():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Dry-run APT — Simulation de mise a jour sans rien appliquer
+# Dry-run APT - Simulation de mise a jour sans rien appliquer
 # ─────────────────────────────────────────────────────────────────────────────
 
 @bp.route('/dry_run_update', methods=['POST'])
@@ -772,7 +772,7 @@ def dry_run_update():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Pending packages — Liste des paquets upgradables sans rien toucher
+# Pending packages - Liste des paquets upgradables sans rien toucher
 # ─────────────────────────────────────────────────────────────────────────────
 
 @bp.route('/pending_packages', methods=['POST'])

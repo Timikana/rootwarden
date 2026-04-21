@@ -1,5 +1,5 @@
 <?php
-// lang/fr/fail2ban.php — 43 cles
+// lang/fr/fail2ban.php - 43 cles
 return [
     'fail2ban.title' => 'Gestion Fail2ban',
     'fail2ban.desc' => 'Gestion du service Fail2ban sur vos serveurs : detection des services, jails actives, IPs bannies, installation et configuration.',

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# entrypoint.sh — Script de démarrage du conteneur PHP RootWarden
+# entrypoint.sh - Script de démarrage du conteneur PHP RootWarden
 # =============================================================================
 #
 # Rôle : point d'entrée unique du conteneur. Exécuté avant apache2-foreground.
@@ -34,7 +34,7 @@ SERVER_ADMIN="${SERVER_ADMIN:-admin@localhost}"
 CERT_DIR="/var/www/certs"   # Répertoire des certificats SSL dans le conteneur
 APP_DIR="/var/www/html"     # Racine de l'application PHP montée par Docker
 
-echo "[RootWarden] Démarrage — SSL_MODE=${SSL_MODE}, SERVER_NAME=${SERVER_NAME}"
+echo "[RootWarden] Démarrage - SSL_MODE=${SSL_MODE}, SERVER_NAME=${SERVER_NAME}"
 
 # ── Bootstrap des dépendances PHP (Composer) ─────────────────────────────────
 # Le README annonce qu'un simple "docker compose up -d" suffit.
@@ -42,7 +42,7 @@ echo "[RootWarden] Démarrage — SSL_MODE=${SSL_MODE}, SERVER_NAME=${SERVER_NAM
 # ou avec un vendor/ partiel. On bootstrap donc automatiquement les dépendances
 # au premier démarrage si vendor/autoload.php est absent.
 if [ -f "${APP_DIR}/composer.json" ] && [ ! -f "${APP_DIR}/vendor/autoload.php" ]; then
-    echo "[RootWarden] vendor/autoload.php introuvable — installation Composer..."
+    echo "[RootWarden] vendor/autoload.php introuvable - installation Composer..."
     composer install \
         --working-dir="${APP_DIR}" \
         --no-dev \
@@ -80,13 +80,13 @@ case "$SSL_MODE" in
         # Mode reverse proxy : le TLS est géré en amont (Nginx, Traefik, Caddy...).
         # On utilise le template HTTP simple, sans aucune directive SSL.
         # Le module ssl est désactivé pour libérer des ressources.
-        echo "[RootWarden] Mode reverse proxy — HTTP seulement, SSL désactivé"
+        echo "[RootWarden] Mode reverse proxy - HTTP seulement, SSL désactivé"
         # On substitue uniquement les variables qu'on maîtrise (pas ${APACHE_LOG_DIR})
         SSL_CERT_PATH="" SSL_KEY_PATH="" \
         envsubst '${SERVER_NAME} ${SERVER_ADMIN}' \
             < /etc/apache2/sites-available/apache-http.conf.tmpl \
             > /etc/apache2/sites-available/000-default.conf
-        # Désactivation du module ssl — la commande peut échouer si déjà désactivé,
+        # Désactivation du module ssl - la commande peut échouer si déjà désactivé,
         # on ignore l'erreur avec "|| true" pour ne pas interrompre le démarrage.
         a2dismod ssl 2>/dev/null || true
         ;;
@@ -94,7 +94,7 @@ case "$SSL_MODE" in
     custom)
         # Mode SSL avec certificats fournis par l'utilisateur via un volume Docker.
         # Les chemins des certificats doivent être montés dans CERT_DIR.
-        echo "[RootWarden] Mode SSL custom — certificats fournis par l'utilisateur"
+        echo "[RootWarden] Mode SSL custom - certificats fournis par l'utilisateur"
         # Résolution des chemins : priorité aux variables d'env, sinon valeurs par défaut
         SSL_CERT="${SSL_CERT_PATH:-${CERT_DIR}/custom.crt}"
         SSL_KEY="${SSL_KEY_PATH:-${CERT_DIR}/custom.pem}"
@@ -121,13 +121,13 @@ case "$SSL_MODE" in
         # Mode SSL automatique (défaut) : génération d'un certificat auto-signé
         # RSA 2048 bits via openssl si le fichier n'existe pas encore.
         # En production, préférer SSL_MODE=custom avec un certificat Let's Encrypt.
-        echo "[RootWarden] Mode SSL auto — génération du certificat auto-signé"
+        echo "[RootWarden] Mode SSL auto - génération du certificat auto-signé"
         mkdir -p "$CERT_DIR"
         # Nommage du certificat d'après SERVER_NAME pour faciliter l'identification
         SSL_CERT="${CERT_DIR}/${SERVER_NAME}.crt"
         SSL_KEY="${CERT_DIR}/${SERVER_NAME}.pem"
         if [ ! -f "$SSL_CERT" ]; then
-            # Sujet du certificat — personnalisable via CERT_INFO, sinon valeur par défaut
+            # Sujet du certificat - personnalisable via CERT_INFO, sinon valeur par défaut
             CERT_SUBJ="${CERT_INFO:-/C=FR/ST=IDF/L=Paris/O=RootWarden/OU=IT/CN=${SERVER_NAME}}"
             # Génération d'un certificat auto-signé valable 365 jours :
             #   -x509    : auto-signé (pas de CSR intermédiaire)
@@ -158,5 +158,5 @@ esac
 # "exec" remplace le processus shell par apache2-foreground (PID 1).
 # Cela garantit que les signaux Docker (SIGTERM, SIGINT) sont bien transmis
 # à Apache, permettant un arrêt propre du conteneur.
-echo "[RootWarden] Config Apache générée — démarrage du serveur"
+echo "[RootWarden] Config Apache générée - démarrage du serveur"
 exec apache2-foreground

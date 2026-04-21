@@ -1,11 +1,11 @@
-# Architecture & Carte des fichiers — RootWarden v1.15.1
+# Architecture & Carte des fichiers - RootWarden v1.15.1
 
-## CI/CD — SAST bandit fix (v1.15.1)
+## CI/CD - SAST bandit fix (v1.15.1)
 
 - `.github/workflows/ci.yml` : ajoute `-c bandit.yml` a la commande bandit,
   le fichier config n'etait pas charge auparavant.
 - `backend/bandit.yml` skips etendus (B108, B601, B413, B507, B608) avec
-  justifications inline — cf CHANGELOG v1.15.1.
+  justifications inline - cf CHANGELOG v1.15.1.
 - Jobs CI actuels : `lint-python` (ruff), `lint-php`, `secrets-scan`
   (gitleaks), `sast-python` (bandit), `sca-python` (pip-audit), `sca-php`
   (composer audit --locked), `trivy-fs`, `tests-pytest`, `build-docker`,
@@ -13,7 +13,7 @@
 
 ---
 
-# Architecture & Carte des fichiers — RootWarden v1.15.0
+# Architecture & Carte des fichiers - RootWarden v1.15.0
 
 ## Security hardening v1.14.5 → v1.14.7 (suite audit DevSecOps)
 
@@ -58,7 +58,7 @@
 
 ---
 
-# Architecture & Carte des fichiers — RootWarden v1.14.4
+# Architecture & Carte des fichiers - RootWarden v1.14.4
 
 ## Security hardening v1.14.1 → v1.14.4 (audit DevSecOps response)
 
@@ -114,16 +114,16 @@ Remplace `Config.API_KEY` unique par table multi-key avec scope.
 Deux nouveaux modules orientes collecte de logs et securite SIEM, calques sur
 le pattern editable-template de Bashrc.
 
-### Graylog — `/graylog/`
+### Graylog - `/graylog/`
 
 **Fichiers** : `backend/routes/graylog.py` (8 routes), `www/graylog/index.php`,
 `www/graylog/js/graylog.js`, `mysql/migrations/033_graylog.sql`,
 `www/lang/{fr,en}/graylog.php`.
 
 **Tables** :
-- `graylog_config` — singleton (url, token chiffre, TLS, version)
-- `graylog_collectors` — templates YAML/XML editables (filebeat/nxlog/winlogbeat)
-- `graylog_sidecars` — etat par machine
+- `graylog_config` - singleton (url, token chiffre, TLS, version)
+- `graylog_collectors` - templates YAML/XML editables (filebeat/nxlog/winlogbeat)
+- `graylog_sidecars` - etat par machine
 
 **Flux install** :
 1. Repo `packages.graylog2.org` + `apt install graylog-sidecar`
@@ -135,18 +135,18 @@ le pattern editable-template de Bashrc.
 **Editeur collector** : textarea YAML/XML, validation `yaml.safe_load` backend
 si type=filebeat, audit log `[graylog] save_collector`.
 
-### Wazuh — `/wazuh/`
+### Wazuh - `/wazuh/`
 
 **Fichiers** : `backend/routes/wazuh.py` (11 routes), `www/wazuh/index.php`,
 `www/wazuh/js/wazuh.js`, `mysql/migrations/034_wazuh.sql`,
 `www/lang/{fr,en}/wazuh.php`.
 
 **Tables** :
-- `wazuh_config` — singleton (manager IP/port, reg password chiffre, default
+- `wazuh_config` - singleton (manager IP/port, reg password chiffre, default
   group, agent version, active response global, API URL/user/pwd chiffre)
-- `wazuh_rules` — editable ruleset (rules/decoders/cdb)
-- `wazuh_agents` — etat par machine (agent_id, version, group, status)
-- `wazuh_machine_options` — options par serveur (FIM, AR, SCA, rootcheck, format)
+- `wazuh_rules` - editable ruleset (rules/decoders/cdb)
+- `wazuh_agents` - etat par machine (agent_id, version, group, status)
+- `wazuh_machine_options` - options par serveur (FIM, AR, SCA, rootcheck, format)
 
 **Flux install** :
 1. Repo `packages.wazuh.com/4.x/apt/` + `apt install wazuh-agent`
@@ -174,7 +174,7 @@ checkboxes active_response / SCA / rootcheck.
 
 ---
 
-# Architecture & Carte des fichiers — RootWarden v1.14.0
+# Architecture & Carte des fichiers - RootWarden v1.14.0
 
 ## Module Bashrc (v1.14.0)
 
@@ -182,15 +182,15 @@ Nouveau module dedie au deploiement d'un `.bashrc` standardise par utilisateur
 sur les serveurs du parc.
 
 ### Fichiers
-- `backend/routes/bashrc.py` — Blueprint Flask (6 routes).
-- `backend/templates/bashrc_standard.sh` — Template v3.0 (banniere figlet, sysinfo,
+- `backend/routes/bashrc.py` - Blueprint Flask (6 routes).
+- `backend/templates/bashrc_standard.sh` - Template v3.0 (banniere figlet, sysinfo,
   alertes, prompt git-aware, 40+ alias, 10 fonctions utilitaires, HA keepalived).
-- `mysql/migrations/031_bashrc_permission.sql` — Ajoute la colonne
+- `mysql/migrations/031_bashrc_permission.sql` - Ajoute la colonne
   `can_manage_bashrc` dans `permissions`.
-- `www/bashrc/index.php` — Frontend 3 onglets (Deploiement / Historique / Template).
-- `www/bashrc/js/bashrc.js` — Logique client (select users, preview diff, deploy, restore).
-- `www/lang/fr/bashrc.php` + `www/lang/en/bashrc.php` — i18n complete.
-- `tests/e2e/go-bashrc.mjs` — Tests E2E Puppeteer.
+- `www/bashrc/index.php` - Frontend 3 onglets (Deploiement / Historique / Template).
+- `www/bashrc/js/bashrc.js` - Logique client (select users, preview diff, deploy, restore).
+- `www/lang/fr/bashrc.php` + `www/lang/en/bashrc.php` - i18n complete.
+- `tests/e2e/go-bashrc.mjs` - Tests E2E Puppeteer.
 
 ### Flux deploy
 1. Liste users Linux via SSH (`awk` sur `/etc/passwd`, UID >= 1000 ou root,
@@ -214,7 +214,7 @@ sur les serveurs du parc.
 ### Securite
 - Username : regex stricte `^[a-z_][a-z0-9_-]{0,31}$` (aucune autre valeur acceptee).
 - Contenu bashrc : exclusivement base64 (impossible d'injecter du shell).
-- Verifications distantes : via SSH uniquement (pas docker exec — namespaces differents
+- Verifications distantes : via SSH uniquement (pas docker exec - namespaces differents
   sur le test-server Docker).
 - Zero trust : `checkAuth` + `checkPermission('can_manage_bashrc')` en DB.
 - Prerequis figlet installe via `execute_as_root` (sudo -S / su -c temp script).
@@ -222,7 +222,7 @@ sur les serveurs du parc.
 
 ---
 
-# Architecture & Carte des fichiers — RootWarden v1.13.1
+# Architecture & Carte des fichiers - RootWarden v1.13.1
 
 > Référence complète de chaque fichier du projet. Mise à jour à chaque version.
 
@@ -234,11 +234,11 @@ sur les serveurs du parc.
 Gestion_SSH_KEY/
 │
 ├── 📄 docker-compose.yml          Orchestration : php, python, db, composer (profile=tools)
-├── 📄 srv-docker.env              Variables actives (jamais commité — .gitignore)
+├── 📄 srv-docker.env              Variables actives (jamais commité - .gitignore)
 ├── 📄 srv-docker.env.example      Template commenté de toutes les variables
 ├── 📄 README.md                   Documentation publique (installation, usage, FAQ)
 ├── 📄 start.sh                    Script demarrage securise (chmod .env, check secrets)
-├── 📄 ARCHITECTURE.md             Ce fichier — carte de tous les fichiers
+├── 📄 ARCHITECTURE.md             Ce fichier - carte de tous les fichiers
 ├── 📄 CHANGELOG.md                Historique des versions (Semantic Versioning)
 ├── 📄 LICENSE                     Licence MIT
 ├── 📄 .gitignore                  Exclut : srv-docker.env, logs, vendor, __pycache__
@@ -248,20 +248,20 @@ Gestion_SSH_KEY/
 │   └── 📄 ci.yml                  4 jobs : lint-python (ruff), lint-php (php -l),
 │                                   test-python (139 pytest), build-docker (images)
 │
-├── 📁 backend/                    API Python (Flask) — réseau Docker interne uniquement
+├── 📁 backend/                    API Python (Flask) - réseau Docker interne uniquement
 │   ├── 📄 Dockerfile              Image python:3, installe requirements.txt + croniter
 │   ├── 📄 ruff.toml               Configuration linter ruff (E/F/W, ignore E501/E402)
-│   ├── 📁 tests/                  Suite pytest — 139 tests, 7 fichiers
+│   ├── 📁 tests/                  Suite pytest - 139 tests, 7 fichiers
 │   │   ├── 📄 conftest.py         Fixtures : app Flask, client HTTP, mock DB, headers
-│   │   ├── 📄 test_permissions.py 17 tests — matrice API key, machine access, roles
-│   │   ├── 📄 test_monitoring.py  15 tests — health, list_machines, server_status
-│   │   ├── 📄 test_admin.py       18 tests — backups, lifecycle, temp_permissions
-│   │   ├── 📄 test_cve.py         34 tests — scan, results, whitelist, schedules
-│   │   ├── 📄 test_ssh.py         38 tests — deploy, keypair, scan_users, delete_user
-│   │   └── 📄 test_iptables.py    16 tests — manage, validate, history, rollback
+│   │   ├── 📄 test_permissions.py 17 tests - matrice API key, machine access, roles
+│   │   ├── 📄 test_monitoring.py  15 tests - health, list_machines, server_status
+│   │   ├── 📄 test_admin.py       18 tests - backups, lifecycle, temp_permissions
+│   │   ├── 📄 test_cve.py         34 tests - scan, results, whitelist, schedules
+│   │   ├── 📄 test_ssh.py         38 tests - deploy, keypair, scan_users, delete_user
+│   │   └── 📄 test_iptables.py    16 tests - manage, validate, history, rollback
 │   ├── 📄 server.py               ★ Core Flask (163 lignes) : app init, blueprints,
 │   │                              CORS, logs, migrations, keypair init, scheduler
-│   ├── 📁 routes/                 Flask Blueprints — 77 routes en 8 modules
+│   ├── 📁 routes/                 Flask Blueprints - 77 routes en 8 modules
 │   │   ├── 📄 __init__.py         Package init
 │   │   ├── 📄 helpers.py          Decorateurs partages : require_api_key, threaded_route,
 │   │   │                          get_db_connection, server_decrypt_password
@@ -291,7 +291,7 @@ Gestion_SSH_KEY/
 │   │   │                          remove/reenter_ssh_password, regenerate, scan_server_users
 │   │   └── 📄 admin.py            7 routes : admin/backups, server_lifecycle, exclude_user,
 │   │                              grant/revoke temp_permissions, list temp_permissions
-│   ├── 📄 config.py               Classe Config — charge toutes les env vars.
+│   ├── 📄 config.py               Classe Config - charge toutes les env vars.
 │   │                              _require_env() → sys.exit(1) si var obligatoire absente.
 │   │                              Gère : SECRET_KEY, ENCRYPTION_KEY, API_KEY, DB, SSH,
 │   │                              OPENCVE, MAIL, DEBUG_MODE, LOG_LEVEL.
@@ -357,7 +357,7 @@ Gestion_SSH_KEY/
 │   ├── 📄 requirements.txt        Dépendances Python : Flask, paramiko, PyNaCl,
 │   │                              cryptography, pycryptodome, mysql-connector, hypercorn…
 │   ├── 📄 test_decrypt.py         Script debug déchiffrement. Ne pas déployer en prod.
-│   ├── 📄 fernet.key              Clé Fernet legacy. Fichier sensible — ne pas commiter.
+│   ├── 📄 fernet.key              Clé Fernet legacy. Fichier sensible - ne pas commiter.
 │   └── 📁 ssl/
 │       ├── 📄 srv-docker.pem      Certificat TLS Hypercorn (backend)
 │       └── 📄 srv-docker-key.pem  Clé privée TLS Hypercorn
@@ -554,7 +554,7 @@ Gestion_SSH_KEY/
     └── 📁 img/
         ├── 📄 favicon.png / favicon.webp
         └── 📁 logos/              PHP, Python, TailwindCSS, JavaScript, Docker,
-                                   Sodium, AES256 — utilisés dans footer.php
+                                   Sodium, AES256 - utilisés dans footer.php
 ```
 
 ---
@@ -743,14 +743,14 @@ Python → decrypt_password() essaie OLD_SECRET_KEY en fallback
 │   └── 📄 ci.yml                     Pipeline CI/CD GitHub Actions (4 jobs)
 ├── 📁 backend/tests/                  Suite pytest (139 tests)
 │   ├── 📄 conftest.py                 Fixtures : app, client, mock DB, headers par role
-│   ├── 📄 test_permissions.py         17 tests — API key matrice, machine access
-│   ├── 📄 test_monitoring.py          15 tests — health, list_machines, server_status
-│   ├── 📄 test_admin.py               18 tests — backups, lifecycle, temp_permissions
-│   ├── 📄 test_cve.py                 34 tests — scan, results, whitelist, schedules
-│   ├── 📄 test_ssh.py                 38 tests — deploy, keypair, scan_users, delete_user
-│   └── 📄 test_iptables.py            16 tests — manage, validate, history, rollback
+│   ├── 📄 test_permissions.py         17 tests - API key matrice, machine access
+│   ├── 📄 test_monitoring.py          15 tests - health, list_machines, server_status
+│   ├── 📄 test_admin.py               18 tests - backups, lifecycle, temp_permissions
+│   ├── 📄 test_cve.py                 34 tests - scan, results, whitelist, schedules
+│   ├── 📄 test_ssh.py                 38 tests - deploy, keypair, scan_users, delete_user
+│   └── 📄 test_iptables.py            16 tests - manage, validate, history, rollback
 ├── 📄 backend/ruff.toml               Configuration linter Python (ruff)
-└── 📄 www/js/htmx.min.js              htmx 2.0.4 (50 KB) — interactions declaratives
+└── 📄 www/js/htmx.min.js              htmx 2.0.4 (50 KB) - interactions declaratives
 ```
 
 ## Flux de données ajoutés
@@ -1012,4 +1012,4 @@ les DDL suivants de s'executer. Fix : `cur.fetchall()` apres chaque statement + 
 
 ---
 
-*RootWarden v1.13.1 — Derniere mise a jour : 2026-04-16*
+*RootWarden v1.13.1 - Derniere mise a jour : 2026-04-16*

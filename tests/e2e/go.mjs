@@ -1,5 +1,5 @@
 /**
- * go.mjs — Test E2E COMPLET RootWarden v1.13.1
+ * go.mjs - Test E2E COMPLET RootWarden v1.13.1
  * Login + 2FA + password change + 28 pages + admin tabs debug + interactions
  * Navigateur visible 1440x900, reste ouvert. RIEN ne crash.
  *
@@ -68,7 +68,7 @@ async function testPage(page, num, name, path, expects=[]) {
     if(st>=400){log(num,name,'FAIL',`HTTP ${st}`);return false}
     if(/Fatal error|Parse error/.test(html)){log(num,name,'FAIL','erreur PHP');return false}
     const found=expects.length===0||expects.some(e=>html.toLowerCase().includes(e.toLowerCase()));
-    log(num,name,found?'OK':'WARN',`HTTP ${st}${found?'':' — contenu attendu absent'}`);
+    log(num,name,found?'OK':'WARN',`HTTP ${st}${found?'':' - contenu attendu absent'}`);
     return true;
   }catch(e){log(num,name,'FAIL',e.message.slice(0,60));return false}
 }
@@ -90,7 +90,7 @@ page.on('requestfailed', r=>{const msg=`${r.failure()?.errorText||'unknown'} ${r
 
 console.log('');
 console.log('============================================================');
-console.log('  RootWarden v1.13.1 — Test E2E complet');
+console.log('  RootWarden v1.13.1 - Test E2E complet');
 console.log('============================================================\n');
 
 // =====================================================================
@@ -148,7 +148,7 @@ try {
       }
     } else { log(2,'2FA Enrollment','FAIL','secret introuvable'); }
   } else if(page.url().includes('verify_2fa')){
-    log(2,'2FA Enrollment','FAIL','verify_2fa — secret inconnu');
+    log(2,'2FA Enrollment','FAIL','verify_2fa - secret inconnu');
   } else { log(2,'2FA Enrollment','OK','skip (pas demande)'); }
 } catch(e) { log(2,'2FA Enrollment','FAIL',e.message.slice(0,60)); }
 
@@ -272,7 +272,7 @@ try {
           log(15,'Tab Serveurs',s1b?'WARN':'FAIL',s1b?'via injection (switchTab KO)':'');
         }
       } else {
-        // switchTab pas defini — injection seule
+        // switchTab pas defini - injection seule
         console.log('      switchTab pas defini, injection...');
         await page.evaluate(()=>{
           document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -374,14 +374,14 @@ console.log('\n--- AUTRES PAGES ---\n');
 await testPage(page,25,'Profil','/profile.php',['mot de passe','password']);
 await testPage(page,26,'Notifications','/notifications.php',['notification']);
 await testPage(page,27,'Compliance','/security/compliance_report.php',['compliance','conformit']);
-// CVE Export requiert machine_id ou scan_id — tester avec machine_id=1 (si existe) sinon verifier le 400
+// CVE Export requiert machine_id ou scan_id - tester avec machine_id=1 (si existe) sinon verifier le 400
 try {
   const r28=await page.goto(`${BASE}/security/cve_export.php?machine_id=1`,{waitUntil:'networkidle2',timeout:15000});
   const st28=r28.status();
   await shot(page,'28-cve-export');
   if(st28===200){log(28,'CVE Export','OK',`HTTP ${st28}`)}
   else if(st28===400||st28===404){
-    // Pas de machine ou pas de scan — verifier que la page sans param retourne bien 400
+    // Pas de machine ou pas de scan - verifier que la page sans param retourne bien 400
     const r28b=await page.goto(`${BASE}/security/cve_export.php`,{waitUntil:'networkidle2',timeout:10000});
     log(28,'CVE Export',r28b.status()===400?'OK':'WARN',`needs machine_id (${st28}), sans param=${r28b.status()}`);
   }
@@ -405,7 +405,7 @@ for(const e of reqFailed) console.log(`    ${e}`);
 console.log(`\n  Screenshots: ${SHOTS}/`);
 console.log(fail>0?'\n  >>> DES TESTS ONT ECHOUE <<<':'\n  >>> TOUS LES TESTS PASSENT <<<');
 console.log('\n============================================================');
-console.log('  Navigateur ouvert — navigue, teste. Ctrl+C pour fermer.');
+console.log('  Navigateur ouvert - navigue, teste. Ctrl+C pour fermer.');
 console.log('============================================================\n');
 
 // Retour dashboard pour naviguer

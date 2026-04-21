@@ -1,5 +1,5 @@
 <?php
-// lang/fr/bashrc.php — Module Bashrc (deploiement standardise du .bashrc)
+// lang/fr/bashrc.php - Module Bashrc (deploiement standardise du .bashrc)
 return [
     // Page
     'bashrc.title' => 'Bashrc',
@@ -12,7 +12,7 @@ return [
 
     // Selection / config
     'bashrc.server' => 'Serveur cible',
-    'bashrc.select_server' => '— Choisir un serveur —',
+    'bashrc.select_server' => '- Choisir un serveur -',
     'bashrc.mode' => 'Mode',
     'bashrc.mode_overwrite' => 'Ecraser',
     'bashrc.mode_merge' => 'Fusionner (conserver blocs custom)',

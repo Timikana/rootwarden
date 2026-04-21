@@ -1,6 +1,6 @@
 <?php
 /**
- * admin_page.php — Page d'administration principale (superadmin uniquement)
+ * admin_page.php - Page d'administration principale (superadmin uniquement)
  *
  * Rôle : tableau de bord central réservé aux superadmins. Orchestre l'affichage
  *        de six sections métier incluses dynamiquement :
@@ -18,8 +18,8 @@
  * Type de réponse : HTML (page complète avec layout Tailwind CSS).
  *
  * Endpoints AJAX appelés depuis cette page :
- *   POST update_user_status.php   — active/désactive un utilisateur
- *   POST update_server_access.php — ajoute ou retire un accès machine
+ *   POST update_user_status.php   - active/désactive un utilisateur
+ *   POST update_server_access.php - ajoute ou retire un accès machine
  */
 
 // --- Dépendances ---
@@ -102,7 +102,7 @@ function getPermissions($pdo, $user_id) {
 <head>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <?php require_once __DIR__ . '/../head.php'; ?>
-    <title>Administration — <?= htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden') ?></title>
+    <title>Administration - <?= htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden') ?></title>
     <style>
         .tab-btn { transition: all 0.15s; }
         .tab-btn.active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 600; }
@@ -187,7 +187,7 @@ function getPermissions($pdo, $user_id) {
                     <svg class="w-4 h-4 inline mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     <?= t('admin.tab_access') ?>
                 </button>
-                <!-- Exclusions supprimees — gerees dans /adm/server_users.php -->
+                <!-- Exclusions supprimees - gerees dans /adm/server_users.php -->
             </div>
 
             <?php if ($importResult): ?>

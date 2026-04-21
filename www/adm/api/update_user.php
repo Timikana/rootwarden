@@ -1,6 +1,6 @@
 <?php
 /**
- * update_user.php — Mise à jour de la clé SSH publique d'un utilisateur
+ * update_user.php - Mise à jour de la clé SSH publique d'un utilisateur
  *
  * Rôle : met à jour la colonne `ssh_key` dans la table `users` pour un utilisateur
  *        donné. Ce fichier est appelé depuis le formulaire de la section manage_users

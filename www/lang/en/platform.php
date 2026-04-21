@@ -1,7 +1,7 @@
 <?php
-// lang/en/platform.php — 50 cles
+// lang/en/platform.php - 50 cles
 return [
-    'platform.title' => 'SSH Security — Platform Key',
+    'platform.title' => 'SSH Security - Platform Key',
     'platform.desc' => 'Ed25519 platform keypair. Deploy it on your servers for passwordless SSH authentication.',
     'platform.pubkey_label' => 'Public key',
     'platform.btn_copy' => 'Copy',

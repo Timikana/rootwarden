@@ -1,6 +1,6 @@
 <?php
 /**
- * auth/verify.php — Garde central d'authentification et d'autorisation.
+ * auth/verify.php - Garde central d'authentification et d'autorisation.
  *
  * DOIT etre inclus (require_once) en tete de CHAQUE page protegee.
  * Responsabilites :
@@ -56,7 +56,7 @@ if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) >
 $_SESSION['last_activity'] = time();
 
 // ── Revocation server-side : verifie que la session est toujours dans active_sessions ──
-// Sans ce check, un DELETE depuis /profile.php (bouton "Revoquer") n'a aucun effet —
+// Sans ce check, un DELETE depuis /profile.php (bouton "Revoquer") n'a aucun effet -
 // la session cookie continue de fonctionner tant que PHP n'a pas timeout.
 // Refuse aussi les sessions pour lesquelles /logout.php aurait ete appele
 // depuis un autre navigateur, ou que l'admin aurait force-revoke (future UI).
@@ -91,14 +91,14 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token'])) {
         header("Location: /auth/login.php");
         exit();
     }
-    // Session restauree — forcer la re-verification 2FA
+    // Session restauree - forcer la re-verification 2FA
     $currentPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (!in_array($currentPage, ['verify_2fa.php', 'enable_2fa.php', 'login.php', 'logout.php'])) {
         $stmtTotp = $pdo->prepare("SELECT totp_secret FROM users WHERE id = ? AND active = 1");
         $stmtTotp->execute([$_SESSION['user_id']]);
         $totpSecret = $stmtTotp->fetchColumn();
         if ($totpSecret) {
-            // L'utilisateur a le 2FA actif — exiger re-verification
+            // L'utilisateur a le 2FA actif - exiger re-verification
             $_SESSION['temp_user'] = [
                 'id'       => $_SESSION['user_id'],
                 'username' => $_SESSION['username'] ?? '',
@@ -298,7 +298,7 @@ function checkPermission(string $permission, bool $die = true): bool
         return true;
     }
 
-    // Permission refusee — logger le refus
+    // Permission refusee - logger le refus
     try {
         $logStmt = $pdo->prepare("INSERT INTO user_logs (user_id, action) VALUES (?, ?)");
         $logStmt->execute([$userId, "Permission refusee : $permission"]);

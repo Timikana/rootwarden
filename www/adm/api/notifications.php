@@ -1,14 +1,14 @@
 <?php
 /**
- * api/notifications.php — API AJAX pour les notifications in-app
+ * api/notifications.php - API AJAX pour les notifications in-app
  *
  * Actions :
- *   GET  ?action=count              — Nombre de notifications non lues
- *   GET  ?action=list&limit=10      — Dernieres notifications (lues + non lues)
- *   GET  ?action=list_all&page=1    — Historique pagine (20/page)
- *   POST action=read&id=<int>       — Marquer une notification comme lue
- *   POST action=read_all            — Marquer toutes comme lues
- *   POST action=delete&id=<int>     — Supprimer une notification
+ *   GET  ?action=count              - Nombre de notifications non lues
+ *   GET  ?action=list&limit=10      - Dernieres notifications (lues + non lues)
+ *   GET  ?action=list_all&page=1    - Historique pagine (20/page)
+ *   POST action=read&id=<int>       - Marquer une notification comme lue
+ *   POST action=read_all            - Marquer toutes comme lues
+ *   POST action=delete&id=<int>     - Supprimer une notification
  */
 require_once __DIR__ . '/../../auth/verify.php';
 require_once __DIR__ . '/../../db.php';

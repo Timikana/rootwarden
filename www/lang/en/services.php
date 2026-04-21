@@ -1,5 +1,5 @@
 <?php
-// lang/en/services.php — 59 cles
+// lang/en/services.php - 59 cles
 return [
     'services.title' => 'Service Management',
     'services.desc' => 'Start, stop and monitor systemd services on your servers.',

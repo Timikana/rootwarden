@@ -1,6 +1,6 @@
 <?php
 /**
- * update/index.php — Interface principale de gestion des mises à jour Linux
+ * update/index.php - Interface principale de gestion des mises à jour Linux
  *
  * Rôle :
  *   Tableau de bord permettant aux admins de visualiser, filtrer et opérer sur

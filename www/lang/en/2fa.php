@@ -1,5 +1,5 @@
 <?php
-// lang/en/2fa.php — 22 cles
+// lang/en/2fa.php - 22 cles
 return [
     '2fa.title' => 'Two-Factor Authentication',
     '2fa.subtitle' => 'TOTP Code',

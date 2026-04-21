@@ -89,6 +89,6 @@ await sleep(3000);
 await page.screenshot({ path: `${SCREENSHOTS}/full-04-version-detected.png`, fullPage: true });
 console.log('    Screenshot: full-04-version-detected.png');
 
-console.log('\n=== Test complet termine — navigateur ouvert pour debug ===');
+console.log('\n=== Test complet termine - navigateur ouvert pour debug ===');
 console.log('Ctrl+C pour fermer.');
 await new Promise(() => {});

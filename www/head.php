@@ -1,6 +1,6 @@
 <?php
 /**
- * head.php — Fragment <head> commun à toutes les pages de l'application
+ * head.php - Fragment <head> commun à toutes les pages de l'application
  *
  * Rôle       : Inclus par require_once dans le <head> de chaque page PHP.
  *              Charge Tailwind CSS (CDN), configure le dark mode, et injecte
@@ -12,17 +12,17 @@
  *               d'environnement Docker/système.
  *
  * Sécurité   : Toutes les valeurs exposées au JS sont passées par json_encode()
- *              qui échappe les caractères spéciaux (HTML et Unicode) — pas de
+ *              qui échappe les caractères spéciaux (HTML et Unicode) - pas de
  *              risque d'injection XSS via les variables d'environnement.
  *
  * Variables d'environnement lues :
- *   API_URL      — URL de base de l'API Python backend
- *   URL_HTTP     — URL HTTP publique de l'application
- *   URL_HTTPS    — URL HTTPS publique de l'application
- *   API_KEY      — Clé d'authentification vers l'API backend
- *   APP_NAME     — Nom de l'application (white-label, défaut : RootWarden)
- *   APP_TAGLINE  — Accroche affichée sous le nom (white-label)
- *   APP_COMPANY  — Nom de l'entreprise cliente (white-label)
+ *   API_URL      - URL de base de l'API Python backend
+ *   URL_HTTP     - URL HTTP publique de l'application
+ *   URL_HTTPS    - URL HTTPS publique de l'application
+ *   API_KEY      - Clé d'authentification vers l'API backend
+ *   APP_NAME     - Nom de l'application (white-label, défaut : RootWarden)
+ *   APP_TAGLINE  - Accroche affichée sous le nom (white-label)
+ *   APP_COMPANY  - Nom de l'entreprise cliente (white-label)
  */
 require_once __DIR__ . '/includes/lang.php';
 ?>
@@ -58,13 +58,13 @@ $_headVars = [
     'API_URL_DIRECT' => getenv('API_URL')     ?: '',
     'URL_HTTP'       => getenv('URL_HTTP')    ?: '',
     'URL_HTTPS'      => getenv('URL_HTTPS')   ?: '',
-    'API_KEY'        => '',  // Masquée côté client — le proxy PHP injecte la clé côté serveur
+    'API_KEY'        => '',  // Masquée côté client - le proxy PHP injecte la clé côté serveur
     'APP_NAME'       => getenv('APP_NAME')    ?: 'RootWarden',
     'APP_TAGLINE'    => getenv('APP_TAGLINE') ?: 'Gestion SSH centralisée',
     'APP_COMPANY'    => getenv('APP_COMPANY') ?: '',
 ];
 // Injection sécurisée : json_encode() échappe les guillemets, balises et
-// caractères Unicode — aucune valeur d'env ne peut injecter du JS arbitraire.
+// caractères Unicode - aucune valeur d'env ne peut injecter du JS arbitraire.
 echo '<script>';
 foreach ($_headVars as $k => $v) {
     echo "window.{$k} = " . json_encode((string) $v) . ";\n";
@@ -125,7 +125,7 @@ footer {
     margin-top: auto;
 }
 
-/* ── Scrollbar discrete — global (sidebar, tableaux, modals, editeurs) ───── */
+/* ── Scrollbar discrete - global (sidebar, tableaux, modals, editeurs) ───── */
 /* Webkit (Chrome, Edge, Safari) */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

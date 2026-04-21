@@ -1,4 +1,4 @@
--- Migration 011 — Notes/commentaires sur les serveurs
+-- Migration 011 - Notes/commentaires sur les serveurs
 -- Permet aux admins d'ajouter des notes libres (maintenance, contacts, etc.)
 
 CREATE TABLE IF NOT EXISTS server_notes (

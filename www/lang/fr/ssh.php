@@ -1,5 +1,5 @@
 <?php
-// lang/fr/ssh.php — 13 cles
+// lang/fr/ssh.php - 13 cles
 return [
     'ssh.title' => 'Deploiement cles SSH',
     'ssh.desc' => 'Deployer les cles SSH publiques des utilisateurs sur les serveurs selectionnes. Le deploiement utilise la keypair plateforme ou les identifiants SSH.',

@@ -1,5 +1,5 @@
 """
-test_ssh.py — Tests des routes SSH (deploy, preflight, keypair, scan_users, delete_user).
+test_ssh.py - Tests des routes SSH (deploy, preflight, keypair, scan_users, delete_user).
 """
 
 import json
@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 # ── Platform Key ─────────────────────────────────────────────────────────────
 
 class TestPlatformKey:
-    """GET /platform_key — cle publique plateforme."""
+    """GET /platform_key - cle publique plateforme."""
 
     def test_platform_key_success(self, client, admin_headers):
         resp = client.get('/platform_key', headers=admin_headers)
@@ -35,7 +35,7 @@ class TestPlatformKey:
 
 
 class TestRegeneratePlatformKey:
-    """POST /regenerate_platform_key — regeneration de la keypair."""
+    """POST /regenerate_platform_key - regeneration de la keypair."""
 
     def test_regenerate_no_api_key(self, client):
         resp = client.post('/regenerate_platform_key')
@@ -52,7 +52,7 @@ class TestRegeneratePlatformKey:
 # ── Deploy ───────────────────────────────────────────────────────────────────
 
 class TestDeploy:
-    """POST /deploy — deploiement des cles SSH."""
+    """POST /deploy - deploiement des cles SSH."""
 
     def test_deploy_no_api_key(self, client):
         resp = client.post('/deploy', json={'machines': [1]})
@@ -83,7 +83,7 @@ class TestDeploy:
 # ── Preflight Check ──────────────────────────────────────────────────────────
 
 class TestPreflight:
-    """POST /preflight_check — verification connectivite SSH."""
+    """POST /preflight_check - verification connectivite SSH."""
 
     def test_preflight_no_api_key(self, client):
         resp = client.post('/preflight_check', json={'machines': [1]})
@@ -101,7 +101,7 @@ class TestPreflight:
 # ── Deploy Platform Key ──────────────────────────────────────────────────────
 
 class TestDeployPlatformKey:
-    """POST /deploy_platform_key — deploie la pubkey sur les serveurs."""
+    """POST /deploy_platform_key - deploie la pubkey sur les serveurs."""
 
     def test_deploy_platform_key_no_api_key(self, client):
         resp = client.post('/deploy_platform_key', json={'machine_ids': [1]})
@@ -115,7 +115,7 @@ class TestDeployPlatformKey:
 # ── Test Platform Key ────────────────────────────────────────────────────────
 
 class TestTestPlatformKey:
-    """POST /test_platform_key — teste la connexion keypair."""
+    """POST /test_platform_key - teste la connexion keypair."""
 
     def test_test_platform_key_no_api_key(self, client):
         resp = client.post('/test_platform_key', json={'machine_id': 1})
@@ -134,7 +134,7 @@ class TestTestPlatformKey:
 # ── Remove / Reenter SSH Password ────────────────────────────────────────────
 
 class TestRemoveSshPassword:
-    """POST /remove_ssh_password — suppression du password SSH."""
+    """POST /remove_ssh_password - suppression du password SSH."""
 
     def test_remove_no_api_key(self, client):
         resp = client.post('/remove_ssh_password', json={'machine_id': 1})
@@ -156,7 +156,7 @@ class TestRemoveSshPassword:
 
 
 class TestReenterSshPassword:
-    """POST /reenter_ssh_password — re-saisie du password SSH."""
+    """POST /reenter_ssh_password - re-saisie du password SSH."""
 
     def test_reenter_no_api_key(self, client):
         resp = client.post('/reenter_ssh_password', json={'machine_id': 1, 'password': 'test'})
@@ -178,7 +178,7 @@ class TestReenterSshPassword:
 # ── Scan Server Users ────────────────────────────────────────────────────────
 
 class TestScanServerUsers:
-    """POST /scan_server_users — scan des utilisateurs distants."""
+    """POST /scan_server_users - scan des utilisateurs distants."""
 
     def test_scan_no_api_key(self, client):
         resp = client.post('/scan_server_users', json={'machine_id': 1})
@@ -197,7 +197,7 @@ class TestScanServerUsers:
 # ── Remove User Keys ─────────────────────────────────────────────────────────
 
 class TestRemoveUserKeys:
-    """POST /remove_user_keys — suppression des cles SSH d'un user distant."""
+    """POST /remove_user_keys - suppression des cles SSH d'un user distant."""
 
     def test_remove_keys_no_api_key(self, client):
         resp = client.post('/remove_user_keys', json={'machine_id': 1, 'username': 'test'})
@@ -218,7 +218,7 @@ class TestRemoveUserKeys:
 # ── Delete Remote User ───────────────────────────────────────────────────────
 
 class TestDeleteRemoteUser:
-    """POST /delete_remote_user — suppression d'un utilisateur Linux."""
+    """POST /delete_remote_user - suppression d'un utilisateur Linux."""
 
     def test_delete_no_api_key(self, client):
         resp = client.post('/delete_remote_user', json={'machine_id': 1, 'username': 'test'})

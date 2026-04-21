@@ -1,5 +1,5 @@
 """
-routes/graylog.py — Module Graylog : forwarding rsyslog + templates editables.
+routes/graylog.py - Module Graylog : forwarding rsyslog + templates editables.
 
 Maintenu : Equipe Admin.Sys RootWarden
 Version  : 1.15.0
@@ -17,16 +17,16 @@ Approche rsyslog (pas de sidecar) :
         depuis graylog_templates (enabled=TRUE)
 
 Routes :
-    GET  /graylog/config           — Lit la config serveur
-    POST /graylog/config           — Sauvegarde (host, port, protocol, TLS)
-    GET  /graylog/servers          — Liste machines + etat forwarding
-    POST /graylog/deploy           — Installe rsyslog si manquant + ecrit confs
-    POST /graylog/test             — Envoie un logger test au serveur
-    POST /graylog/uninstall        — Retire les confs RootWarden (garde rsyslog)
-    GET  /graylog/templates        — Liste templates rsyslog
-    GET  /graylog/templates/<name> — Contenu d'un template
-    POST /graylog/templates        — Cree ou sauvegarde un template
-    DELETE /graylog/templates/<n>  — Supprime un template
+    GET  /graylog/config           - Lit la config serveur
+    POST /graylog/config           - Sauvegarde (host, port, protocol, TLS)
+    GET  /graylog/servers          - Liste machines + etat forwarding
+    POST /graylog/deploy           - Installe rsyslog si manquant + ecrit confs
+    POST /graylog/test             - Envoie un logger test au serveur
+    POST /graylog/uninstall        - Retire les confs RootWarden (garde rsyslog)
+    GET  /graylog/templates        - Liste templates rsyslog
+    GET  /graylog/templates/<name> - Contenu d'un template
+    POST /graylog/templates        - Cree ou sauvegarde un template
+    DELETE /graylog/templates/<n>  - Supprime un template
 
 Securite :
     - Zero trust : @require_api_key + @require_role(2) + @require_permission
@@ -67,7 +67,7 @@ def _audit(user_id, action, details):
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id, f"[graylog] {action} — {details}")
+                (user_id, f"[graylog] {action} - {details}")
             )
             conn.commit()
     except Exception as e:
@@ -137,7 +137,7 @@ def _build_forward_conf(cfg):
     #   TLS :  *.* @@(o)host:port;RSYSLOG_SyslogProtocol23Format (+ settings TLS)
     #   RELP : action(type="omrelp" target="host" port="port")
     lines = [
-        "# Configuration rsyslog geree par RootWarden — ne pas editer a la main",
+        "# Configuration rsyslog geree par RootWarden - ne pas editer a la main",
         f"# Serveur Graylog : {host}:{port} ({proto})",
         f"# Genere le {datetime.datetime.now().isoformat(timespec='seconds')}",
         "",

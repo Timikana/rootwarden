@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mail_utils.py — Envoi de rapports CVE par email au format HTML pour RootWarden.
+mail_utils.py - Envoi de rapports CVE par email au format HTML pour RootWarden.
 
 Rôle :
     Génère un email HTML récapitulant les vulnérabilités CVE détectées sur un serveur
@@ -21,7 +21,7 @@ Sujet de l'email :
       - "[HIGH]"     si aucune critique mais au moins une HIGH
       - sinon pas de préfixe de sévérité
 """
-# mail_utils.py — Envoi de rapports CVE par email (RootWarden)
+# mail_utils.py - Envoi de rapports CVE par email (RootWarden)
 #
 # Configuration (srv-docker.env) :
 #   MAIL_ENABLED      true / false
@@ -120,7 +120,7 @@ def _build_html(machine_name: str, ip: str, findings: list[dict],
         🔐 Rapport de vulnérabilités CVE
       </h1>
       <p style="margin:4px 0 0;color:#93c5fd;font-size:14px">
-        RootWarden — Scan du {scan_date}
+        RootWarden - Scan du {scan_date}
       </p>
     </div>
 
@@ -149,7 +149,7 @@ def _build_html(machine_name: str, ip: str, findings: list[dict],
       {badge('MEDIUM',   counts['MEDIUM'])}
       {badge('LOW',      counts['LOW'])}
       <span style="font-size:13px;color:#6b7280">
-        — {len(findings)} vulnérabilité(s) au total
+        - {len(findings)} vulnérabilité(s) au total
       </span>
     </div>
 
@@ -170,7 +170,7 @@ def _build_html(machine_name: str, ip: str, findings: list[dict],
 
     <div style="padding:16px 32px;background:#f9fafb;
                 font-size:12px;color:#9ca3af;text-align:center">
-      Généré par <strong>RootWarden</strong> — Gestion SSH centralisée
+      Généré par <strong>RootWarden</strong> - Gestion SSH centralisée
     </div>
   </div>
 </body>
@@ -217,7 +217,7 @@ def send_cve_report(machine_name: str, ip: str, findings: list[dict],
     critical = sum(1 for f in findings if f.get('severity') == 'CRITICAL')
     high     = sum(1 for f in findings if f.get('severity') == 'HIGH')
 
-    subject = f"[RootWarden] CVE — {machine_name} ({ip}) — {len(findings)} finding(s)"
+    subject = f"[RootWarden] CVE - {machine_name} ({ip}) - {len(findings)} finding(s)"
     if critical:
         subject = f"[CRITICAL] {subject}"
     elif high:

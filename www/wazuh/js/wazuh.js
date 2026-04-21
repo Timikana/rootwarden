@@ -1,6 +1,6 @@
 /**
- * wazuh.js — Frontend module Wazuh.
- * Maintenu : Equipe Admin.Sys RootWarden — v1.15.0
+ * wazuh.js - Frontend module Wazuh.
+ * Maintenu : Equipe Admin.Sys RootWarden - v1.15.0
  */
 const API = window.API_URL || '/api_proxy.php';
 
@@ -91,10 +91,10 @@ async function wzLoadServers() {
         html += `<tr>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.name)}</td>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.ip)}</td>
-            <td class="px-3 py-2 mono text-xs">${escHtml(s.agent_id || '—')}</td>
+            <td class="px-3 py-2 mono text-xs">${escHtml(s.agent_id || '-')}</td>
             <td class="px-3 py-2">${badge}</td>
-            <td class="px-3 py-2 mono text-xs">${escHtml(s.version || '—')}</td>
-            <td class="px-3 py-2 mono text-xs">${escHtml(s.group_name || '—')}</td>
+            <td class="px-3 py-2 mono text-xs">${escHtml(s.version || '-')}</td>
+            <td class="px-3 py-2 mono text-xs">${escHtml(s.group_name || '-')}</td>
             <td class="px-3 py-2 whitespace-nowrap">
                 <button onclick="wzInstall(${s.id})" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('wazuh.btn_install'))}</button>
                 <button onclick="wzRestart(${s.id})" class="text-xs text-green-500 hover:text-green-700 ml-2">${escHtml(__('wazuh.btn_restart'))}</button>
@@ -179,7 +179,7 @@ async function wzLoadRules() {
     const list = document.getElementById('wz-rules-list');
     const r = await apiFetch('/wazuh/rules');
     if (!r.success) { list.innerHTML = `<div class="text-xs text-red-500 p-2">${escHtml(r.message || 'Erreur')}</div>`; return; }
-    if (!r.rules.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">—</div>`; return; }
+    if (!r.rules.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">-</div>`; return; }
     const colors = { rules: 'red', decoders: 'blue', cdb: 'purple' };
     list.innerHTML = r.rules.map(rl => {
         const col = colors[rl.rule_type] || 'gray';
@@ -220,7 +220,7 @@ async function wzSaveRule() {
     status.textContent = __('wazuh.saving');
     const r = await apiFetch('/wazuh/rules', { method: 'POST', body: JSON.stringify(body) });
     if (!r.success) { status.textContent = '✗ ' + escHtml(r.message || 'Erreur'); return; }
-    status.textContent = `✓ ${__('wazuh.saved')} — sha=${r.sha8} ${r.bytes}o`;
+    status.textContent = `✓ ${__('wazuh.saved')} - sha=${r.sha8} ${r.bytes}o`;
     wzLoadRules();
 }
 

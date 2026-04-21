@@ -1,6 +1,6 @@
 <?php
 /**
- * server_users.php — Inventaire et classification des utilisateurs distants
+ * server_users.php - Inventaire et classification des utilisateurs distants
  * Workflow : Scan → Classification → Deploy autorise
  */
 require_once __DIR__ . '/../auth/verify.php';
@@ -22,7 +22,7 @@ foreach ($servers as $s) { if ($s['id'] == $selectedId) $selectedName = $s['name
 <head>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <?php require_once __DIR__ . '/../head.php'; ?>
-    <title><?= t('server_users.title') ?> — <?= $appName ?></title>
+    <title><?= t('server_users.title') ?> - <?= $appName ?></title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
 <?php require_once __DIR__ . '/../menu.php'; ?>
@@ -140,7 +140,7 @@ function renderUsers(users, pendingCount) {
     if (pendingCount > 0) {
         alert.classList.remove('hidden');
         document.getElementById('pending-text').textContent =
-            `${pendingCount} compte(s) en attente de classification — le deploiement SSH est bloque.`;
+            `${pendingCount} compte(s) en attente de classification - le deploiement SSH est bloque.`;
     } else {
         alert.classList.add('hidden');
     }

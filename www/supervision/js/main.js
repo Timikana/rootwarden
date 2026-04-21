@@ -1,5 +1,5 @@
 /**
- * supervision/js/main.js — Logique JS du module Supervision.
+ * supervision/js/main.js - Logique JS du module Supervision.
  *
  * Gestion des onglets, configuration globale, deploiement agents,
  * editeur de config distant, backups, streaming logs.
@@ -574,7 +574,7 @@ function loadBackups() {
                     fnSpan.textContent = b.filename;
                     var dtSpan = document.createElement('span');
                     dtSpan.className = 'text-xs text-gray-400 ml-2';
-                    dtSpan.textContent = b.date + ' — ' + b.size + ' B';
+                    dtSpan.textContent = b.date + ' - ' + b.size + ' B';
                     info.appendChild(fnSpan);
                     info.appendChild(dtSpan);
 

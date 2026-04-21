@@ -1,5 +1,5 @@
 <?php
-// documentation.php — Documentation technique de RootWarden (accessible à tous les rôles connectés)
+// documentation.php - Documentation technique de RootWarden (accessible à tous les rôles connectés)
 require_once __DIR__ . '/auth/verify.php';
 require_once __DIR__ . '/auth/functions.php';
 require_once __DIR__ . '/db.php';
@@ -19,7 +19,7 @@ $isAdmin    = $role >= 2;
 <html lang="fr">
 <head>
     <?php require_once __DIR__ . '/head.php'; ?>
-    <title><?= $appName ?> — Documentation</title>
+    <title><?= $appName ?> - Documentation</title>
     <style>
         .doc-anchor { scroll-margin-top: 5rem; }
         .code-block  { background: #1e293b; color: #e2e8f0; border-radius: .5rem; padding: 1rem; font-size: .8rem; overflow-x: auto; white-space: pre; }
@@ -92,7 +92,7 @@ $isAdmin    = $role >= 2;
                 <p class="mb-3">
                     <strong><?= $appName ?></strong> est une plateforme web de gestion centralisée de serveurs Linux.
                     Elle permet à une équipe IT de déployer des clés SSH, lancer des mises à jour APT,
-                    gérer les règles de pare-feu, scanner les vulnérabilités CVE et superviser via Zabbix —
+                    gérer les règles de pare-feu, scanner les vulnérabilités CVE et superviser via Zabbix -
                     le tout depuis une interface sécurisée, sans jamais stocker de mot de passe en clair.
                 </p>
                 <ul class="list-disc list-inside space-y-1 text-sm">
@@ -169,15 +169,15 @@ $isAdmin    = $role >= 2;
 ┌─────────────▼────────────┐  ┌──────────▼──────────────────┐
 │  Python 3.13 + Flask     │  │  MySQL 9.2                  │
 │  (rootwarden_python) │  │  (rootwarden_db)       │
-│  /api/* — non exposé     │  │  Port interne seulement     │
+│  /api/* - non exposé     │  │  Port interne seulement     │
 └─────────────┬────────────┘  └─────────────────────────────┘
               │ SSH (Paramiko)
               ▼
         Serveurs Linux gérés (Debian / Ubuntu)</div>
                 <ul class="mt-4 space-y-1 text-sm">
-                    <li>Le backend Python est <strong>uniquement accessible depuis le réseau Docker</strong> — non exposé sur l'hôte.</li>
+                    <li>Le backend Python est <strong>uniquement accessible depuis le réseau Docker</strong> - non exposé sur l'hôte.</li>
                     <li>Toutes les routes Python exigent le header <code>X-API-KEY</code>.</li>
-                    <li>MySQL est lui aussi interne — pas de port exposé en production.</li>
+                    <li>MySQL est lui aussi interne - pas de port exposé en production.</li>
                     <li>Les mots de passe root SSH sont chiffrés en BDD avant tout stockage.</li>
                 </ul>
             </section>
@@ -190,8 +190,8 @@ $isAdmin    = $role >= 2;
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                     <?php
                     $stack = [
-                        ['PHP 8.2', 'Frontend — sessions, CSRF, PDO', '/img/logos/new-php-logo.svg'],
-                        ['Python 3.11', 'Backend Flask — SSH, CVE, iptables', '/img/logos/python-logo.png'],
+                        ['PHP 8.2', 'Frontend - sessions, CSRF, PDO', '/img/logos/new-php-logo.svg'],
+                        ['Python 3.11', 'Backend Flask - SSH, CVE, iptables', '/img/logos/python-logo.png'],
                         ['MySQL 9.1', 'Base de données relationnelle', null],
                         ['TailwindCSS', 'UI responsive + dark mode', '/img/logos/Tailwind_CSS_Logo.svg'],
                         ['JavaScript', 'Streaming, dynamisme UI', '/img/logos/JavaScript-logo.png'],
@@ -240,7 +240,7 @@ $isAdmin    = $role >= 2;
                 <h3 class="font-semibold mt-4 mb-2">Protection des sessions</h3>
                 <ul class="list-disc list-inside text-sm space-y-1">
                     <li>Régénération de l'ID de session à chaque login (protection fixation de session)</li>
-                    <li>CSRF token sur tous les formulaires POST — vérifié avec <code>hash_equals()</code></li>
+                    <li>CSRF token sur tous les formulaires POST - vérifié avec <code>hash_equals()</code></li>
                     <li>Rate limiting : max 5 tentatives / 10 min par IP (table <code>login_attempts</code>)</li>
                     <li>Session timeout : déconnexion automatique après inactivité (<code>SESSION_TIMEOUT</code>, défaut 30 min)</li>
                     <li>Headers de sécurité : CSP, X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy</li>
@@ -292,7 +292,7 @@ $isAdmin    = $role >= 2;
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
                     Le superadmin court-circuite toujours la verification de permissions.<br>
                     Gestion : <strong>Administration &rarr; Droits d'acces</strong> (10 permissions, checkboxes)<br>
-                    PHP : <code>checkPermission('can_scan_cve')</code> — affiche une page 403 stylisee si refuse.<br>
+                    PHP : <code>checkPermission('can_scan_cve')</code> - affiche une page 403 stylisee si refuse.<br>
                     <strong>Filtrage par machine</strong> : les users (role=1) ne voient que les serveurs
                     de <code>user_machine_access</code>. Les admins/superadmins voient tout.<br>
                     <strong>Proxy API securise</strong> : <code>api_proxy.php</code> transmet <code>X-User-ID</code>
@@ -355,12 +355,12 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                 presents sur un serveur distant et de verifier quelles cles sont deployees.</p>
                 <h3 class="font-semibold mb-2">API</h3>
                 <ul class="list-disc list-inside text-sm space-y-1">
-                    <li><code>GET /platform_key</code> — Recupere la pubkey de la plateforme</li>
-                    <li><code>POST /deploy_platform_key</code> — Deploie la pubkey sur les serveurs selectionnes</li>
-                    <li><code>POST /test_platform_key</code> — Teste la connexion keypair</li>
-                    <li><code>POST /remove_ssh_password</code> — Supprime le password SSH de la BDD</li>
-                    <li><code>POST /regenerate_platform_key</code> — Regenere la keypair (re-deploiement requis)</li>
-                    <li><code>POST /scan_server_users</code> — Liste les utilisateurs distants avec leurs cles</li>
+                    <li><code>GET /platform_key</code> - Recupere la pubkey de la plateforme</li>
+                    <li><code>POST /deploy_platform_key</code> - Deploie la pubkey sur les serveurs selectionnes</li>
+                    <li><code>POST /test_platform_key</code> - Teste la connexion keypair</li>
+                    <li><code>POST /remove_ssh_password</code> - Supprime le password SSH de la BDD</li>
+                    <li><code>POST /regenerate_platform_key</code> - Regenere la keypair (re-deploiement requis)</li>
+                    <li><code>POST /scan_server_users</code> - Liste les utilisateurs distants avec leurs cles</li>
                 </ul>
                 <p class="text-xs text-gray-500 mt-3">
                     Page admin : <code>/adm/platform_keys.php</code> ·
@@ -381,13 +381,13 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                 </p>
                 <h3 class="font-semibold mb-2">Actions disponibles</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li><strong>Supprimer les cles RootWarden</strong> — Retire uniquement les cles deployees
+                    <li><strong>Supprimer les cles RootWarden</strong> - Retire uniquement les cles deployees
                         par RootWarden (<code>sed -i '/rootwarden/d' authorized_keys</code>)</li>
-                    <li><strong>Supprimer toutes les cles</strong> — Vide completement le fichier
+                    <li><strong>Supprimer toutes les cles</strong> - Vide completement le fichier
                         <code>authorized_keys</code> de l'utilisateur</li>
-                    <li><strong>Supprimer l'utilisateur</strong> — Execute <code>userdel</code> sur le serveur
+                    <li><strong>Supprimer l'utilisateur</strong> - Execute <code>userdel</code> sur le serveur
                         distant, avec option <code>-r</code> pour supprimer le home si demande</li>
-                    <li><strong>Exclure</strong> — Ajoute l'utilisateur a la table <code>user_exclusions</code>
+                    <li><strong>Exclure</strong> - Ajoute l'utilisateur a la table <code>user_exclusions</code>
                         pour ne plus le cibler lors des synchronisations</li>
                 </ul>
                 <h3 class="font-semibold mb-2">Protections</h3>
@@ -398,9 +398,9 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                 </ul>
                 <h3 class="font-semibold mb-2">API</h3>
                 <ul class="list-disc list-inside text-sm space-y-1">
-                    <li><code>POST /scan_server_users</code> — Scanne les users (avec champ <code>excluded</code>)</li>
-                    <li><code>POST /remove_user_keys</code> — Supprime les cles (mode <code>all</code> ou <code>rootwarden_only</code>)</li>
-                    <li><code>POST /delete_remote_user</code> — Supprime l'utilisateur Linux (<code>userdel</code>)</li>
+                    <li><code>POST /scan_server_users</code> - Scanne les users (avec champ <code>excluded</code>)</li>
+                    <li><code>POST /remove_user_keys</code> - Supprime les cles (mode <code>all</code> ou <code>rootwarden_only</code>)</li>
+                    <li><code>POST /delete_remote_user</code> - Supprime l'utilisateur Linux (<code>userdel</code>)</li>
                 </ul>
                 <p class="text-xs text-gray-500 mt-3">
                     Page admin : <code>/adm/server_users.php</code> · Backend : <code>routes/ssh.py</code>
@@ -434,7 +434,7 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                 <ul class="list-disc list-inside text-sm space-y-1">
                     <li><strong>Lecture</strong> : <code>iptables -L -v -n</code> + <code>ip6tables</code> + lecture des fichiers <code>rules.v4</code> / <code>rules.v6</code></li>
                     <li><strong>Écriture</strong> : les règles sont encodées en base64 et écrites via <code>printf | base64 -d ></code> (pas d'injection possible)</li>
-                    <li><strong>Application</strong> : <code>iptables-restore &lt; rules.v4</code> — persistant au redémarrage</li>
+                    <li><strong>Application</strong> : <code>iptables-restore &lt; rules.v4</code> - persistant au redémarrage</li>
                     <li>IPv4 et IPv6 supportés simultanément</li>
                     <li>Permissions requises : <code>can_manage_iptables</code></li>
                 </ul>
@@ -526,8 +526,8 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
 
                 <h3 class="font-semibold mb-2">Modes</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li><strong>Overwrite</strong> — Remplace integralement le <code>.bashrc</code> par le template standard. Le fichier existant est backupe dans <code>~/.bashrc.bak.YYYYMMDD_HHMMSS</code> (chmod 600).</li>
-                    <li><strong>Merge</strong> — Detecte les blocs marques <code># &gt;&gt;&gt; USER CUSTOM &gt;&gt;&gt;</code> / <code># &lt;&lt;&lt; USER CUSTOM &lt;&lt;&lt;</code> dans l'ancien fichier et les reinjecte dans <code>~/.bashrc.local</code> (sourcee en section 13 du nouveau template).</li>
+                    <li><strong>Overwrite</strong> - Remplace integralement le <code>.bashrc</code> par le template standard. Le fichier existant est backupe dans <code>~/.bashrc.bak.YYYYMMDD_HHMMSS</code> (chmod 600).</li>
+                    <li><strong>Merge</strong> - Detecte les blocs marques <code># &gt;&gt;&gt; USER CUSTOM &gt;&gt;&gt;</code> / <code># &lt;&lt;&lt; USER CUSTOM &lt;&lt;&lt;</code> dans l'ancien fichier et les reinjecte dans <code>~/.bashrc.local</code> (sourcee en section 13 du nouveau template).</li>
                 </ul>
 
                 <h3 class="font-semibold mb-2">Flux</h3>
@@ -550,12 +550,12 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
 
                 <h3 class="font-semibold mb-2">API</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li><span class="badge-get">GET</span> <code>/bashrc/users?machine_id=X</code> — Liste users + etat.</li>
-                    <li><span class="badge-post">POST</span> <code>/bashrc/prerequisites</code> — Installe figlet.</li>
-                    <li><span class="badge-post">POST</span> <code>/bashrc/preview</code> — Diff avant deploy.</li>
-                    <li><span class="badge-post">POST</span> <code>/bashrc/deploy</code> — Deploie le template.</li>
-                    <li><span class="badge-post">POST</span> <code>/bashrc/restore</code> — Restaure le backup le plus recent.</li>
-                    <li><span class="badge-get">GET</span> <code>/bashrc/backups?machine_id=X&amp;user=Y</code> — Liste des backups.</li>
+                    <li><span class="badge-get">GET</span> <code>/bashrc/users?machine_id=X</code> - Liste users + etat.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/prerequisites</code> - Installe figlet.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/preview</code> - Diff avant deploy.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/deploy</code> - Deploie le template.</li>
+                    <li><span class="badge-post">POST</span> <code>/bashrc/restore</code> - Restaure le backup le plus recent.</li>
+                    <li><span class="badge-get">GET</span> <code>/bashrc/backups?machine_id=X&amp;user=Y</code> - Liste des backups.</li>
                 </ul>
             </section>
 
@@ -671,13 +671,13 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
 
                 <h3 class="font-semibold mt-3 mb-2">Interface (v1.6.0)</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li><strong>Résumé global</strong> — Bandeau en haut de page avec total CRITICAL / HIGH / MEDIUM</li>
-                    <li><strong>Cards collapsées</strong> — 1 ligne par serveur = résumé par année, cliquez pour détailler</li>
-                    <li><strong>Filtres par année</strong> — Boutons cliquables qui reconstruisent le tableau depuis la mémoire</li>
-                    <li><strong>Recherche</strong> — Par CVE-ID ou nom de paquet dans toutes les findings</li>
-                    <li><strong>Pagination</strong> — 50 résultats par page + bouton "Voir plus"</li>
-                    <li><strong>Export CSV</strong> — Bouton par serveur (<code>/security/cve_export.php</code>)</li>
-                    <li><strong>Déduplication</strong> — Les paquets multiarch (ex: libc6:amd64 + libc6:i386) ne sont scannés qu'une fois</li>
+                    <li><strong>Résumé global</strong> - Bandeau en haut de page avec total CRITICAL / HIGH / MEDIUM</li>
+                    <li><strong>Cards collapsées</strong> - 1 ligne par serveur = résumé par année, cliquez pour détailler</li>
+                    <li><strong>Filtres par année</strong> - Boutons cliquables qui reconstruisent le tableau depuis la mémoire</li>
+                    <li><strong>Recherche</strong> - Par CVE-ID ou nom de paquet dans toutes les findings</li>
+                    <li><strong>Pagination</strong> - 50 résultats par page + bouton "Voir plus"</li>
+                    <li><strong>Export CSV</strong> - Bouton par serveur (<code>/security/cve_export.php</code>)</li>
+                    <li><strong>Déduplication</strong> - Les paquets multiarch (ex: libc6:amd64 + libc6:i386) ne sont scannés qu'une fois</li>
                 </ul>
 
                 <h3 class="font-semibold mt-3 mb-2">Accès</h3>
@@ -710,9 +710,9 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                 </div>
                 <h3 class="font-semibold mb-2">Ciblage</h3>
                 <ul class="list-disc list-inside text-sm space-y-1">
-                    <li><strong>Tous les serveurs</strong> — Scan global (defaut)</li>
-                    <li><strong>Par tag</strong> — Ex: tag "production" pour ne scanner que les serveurs de prod</li>
-                    <li><strong>Selection manuelle</strong> — Liste d'IDs de machines (JSON)</li>
+                    <li><strong>Tous les serveurs</strong> - Scan global (defaut)</li>
+                    <li><strong>Par tag</strong> - Ex: tag "production" pour ne scanner que les serveurs de prod</li>
+                    <li><strong>Selection manuelle</strong> - Liste d'IDs de machines (JSON)</li>
                 </ul>
                 <p class="text-xs text-gray-500 mt-3">
                     API : <code>GET/POST/PUT/DELETE /cve_schedules</code> · Table : <code>cve_scan_schedules</code> · Backend : <code>scheduler.py</code>
@@ -767,9 +767,9 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                 </p>
                 <h3 class="font-semibold mb-2">Utilisation</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li><strong>Ajout / suppression</strong> — Dans chaque carte serveur de l'administration (badges indigo cliquables)</li>
-                    <li><strong>Filtrage MàJ Linux</strong> — Dropdown de tags dans la barre de filtres pour ne cibler qu'un groupe</li>
-                    <li><strong>API</strong> — <code>GET /filter_servers?tag=production</code> retourne les serveurs filtrés</li>
+                    <li><strong>Ajout / suppression</strong> - Dans chaque carte serveur de l'administration (badges indigo cliquables)</li>
+                    <li><strong>Filtrage MàJ Linux</strong> - Dropdown de tags dans la barre de filtres pour ne cibler qu'un groupe</li>
+                    <li><strong>API</strong> - <code>GET /filter_servers?tag=production</code> retourne les serveurs filtrés</li>
                 </ul>
                 <h3 class="font-semibold mb-2">Stockage</h3>
                 <p class="text-sm">Table <code>machine_tags</code> (machine_id INT, tag VARCHAR(50)) avec clé unique <code>(machine_id, tag)</code>.
@@ -795,9 +795,9 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                 </ul>
                 <h3 class="font-semibold mb-2">Fonctionnalités</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li><strong>Filtres</strong> — Par utilisateur et par type d'action</li>
-                    <li><strong>Pagination</strong> — 50 entrées par page</li>
-                    <li><strong>Export CSV</strong> — Téléchargement complet du journal (<code>?export=csv</code>)</li>
+                    <li><strong>Filtres</strong> - Par utilisateur et par type d'action</li>
+                    <li><strong>Pagination</strong> - 50 entrées par page</li>
+                    <li><strong>Export CSV</strong> - Téléchargement complet du journal (<code>?export=csv</code>)</li>
                 </ul>
                 <p class="text-xs text-gray-500">
                     Page : <code>/adm/audit_log.php</code> · Fonction helper : <code>audit_log($action, $details)</code> dans <code>/adm/includes/audit_log.php</code>
@@ -1002,7 +1002,7 @@ mysql/migrations/
                         </tr>
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td class="p-2 font-mono font-bold">disabled</td>
-                            <td class="p-2">HTTP uniquement — port 443 inactif</td>
+                            <td class="p-2">HTTP uniquement - port 443 inactif</td>
                             <td class="p-2">Derrière Nginx / Traefik / Caddy</td>
                         </tr>
                     </tbody>
@@ -1019,7 +1019,7 @@ mysql/migrations/
             <!-- ────────────────────────────────────────── -->
             <section id="branding" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
                 <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">White-label / Branding</h2>
-                <p class="text-sm mb-3">Personnalisez l'interface sans modifier le code — uniquement via les variables d'environnement :</p>
+                <p class="text-sm mb-3">Personnalisez l'interface sans modifier le code - uniquement via les variables d'environnement :</p>
                 <div class="overflow-x-auto">
                 <table class="w-full text-sm border-collapse">
                     <thead class="bg-blue-800 text-white">
@@ -1253,7 +1253,7 @@ LOG_LEVEL=DEBUG
                     Les contributions sont les bienvenues ! Soumettez vos idées et correctifs via GitHub.
                 </p>
                 <ul class="list-disc list-inside text-sm space-y-1">
-                    <li>Forkez le dépôt sur <a href="https://github.com/Timikana/Gestion_SSH_KEY" target="_blank" class="text-blue-500 hover:underline">github.com/Timikana/Gestion_SSH_KEY</a></li>
+                    <li>Forkez le dépôt sur <a href="https://github.com/Timikana/rootwarden" target="_blank" class="text-blue-500 hover:underline">github.com/Timikana/rootwarden</a></li>
                     <li>Créez une branche : <code>git checkout -b feature/ma-fonctionnalite</code></li>
                     <li>Respectez les conventions de nommage des migrations SQL (<code>NNN_description.sql</code>)</li>
                     <li>Documentez toute nouvelle route API et toute nouvelle variable d'environnement</li>

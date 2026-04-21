@@ -1,5 +1,5 @@
 <?php
-// lang/fr/updates.php — 58 cles
+// lang/fr/updates.php - 58 cles
 return [
     'updates.title' => 'Mises a jour Linux',
     'updates.desc' => 'Mises a jour APT des serveurs Linux. Simulation, installation de paquets et planification automatique.',

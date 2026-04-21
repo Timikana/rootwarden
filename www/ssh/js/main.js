@@ -139,7 +139,7 @@ function deploySSH() {
             }
             // Audit utilisateurs depuis l'inventaire
             if (r.user_impact && r.user_impact.length > 0) {
-                logWindow.innerHTML += `\n     \u{1F464} INVENTAIRE UTILISATEURS — ${_escHtml(r.name)}\n`;
+                logWindow.innerHTML += `\n     \u{1F464} INVENTAIRE UTILISATEURS - ${_escHtml(r.name)}\n`;
                 logWindow.innerHTML += `     ${'─'.repeat(50)}\n`;
 
                 const groups = {managed: [], excluded: [], unmanaged: [], pending_review: []};
@@ -190,8 +190,8 @@ function deploySSH() {
         }
 
 
-        // Tout est OK — lancer le deploiement
-        logWindow.innerHTML += '\n\u2705 Tous les checks OK — Deploiement en cours...\n\n';
+        // Tout est OK - lancer le deploiement
+        logWindow.innerHTML += '\n\u2705 Tous les checks OK - Deploiement en cours...\n\n';
         label.textContent = 'Deploiement en cours...';
 
         fetch(`${window.API_URL}/deploy`, {

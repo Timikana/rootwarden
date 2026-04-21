@@ -1,5 +1,5 @@
 """
-routes/bashrc.py — Module Bashrc : deploiement standardise du .bashrc par utilisateur.
+routes/bashrc.py - Module Bashrc : deploiement standardise du .bashrc par utilisateur.
 
 Maintenu  : Equipe Admin.Sys RootWarden
 Version   : 1.14.0
@@ -11,19 +11,19 @@ Objectif :
     retravaillant les residus de configuration preexistants.
 
 Routes :
-    GET  /bashrc/users          — Liste des utilisateurs + etat bashrc
-    POST /bashrc/prerequisites  — Installe figlet si manquant
-    POST /bashrc/preview        — Diff avant deploiement
-    POST /bashrc/deploy         — Deploie le .bashrc (overwrite|merge)
-    POST /bashrc/restore        — Restaure .bashrc.bak.* le plus recent
-    GET  /bashrc/backups        — Liste des backups dispo par user
-    GET  /bashrc/template       — Lit le template actif (BDD)
-    POST /bashrc/template       — Sauvegarde le template (editable via UI)
+    GET  /bashrc/users          - Liste des utilisateurs + etat bashrc
+    POST /bashrc/prerequisites  - Installe figlet si manquant
+    POST /bashrc/preview        - Diff avant deploiement
+    POST /bashrc/deploy         - Deploie le .bashrc (overwrite|merge)
+    POST /bashrc/restore        - Restaure .bashrc.bak.* le plus recent
+    GET  /bashrc/backups        - Liste des backups dispo par user
+    GET  /bashrc/template       - Lit le template actif (BDD)
+    POST /bashrc/template       - Sauvegarde le template (editable via UI)
 
 Securite :
     - Contenu transfere exclusivement en base64 (pas d'injection shell)
     - Usernames valides via regex stricte ^[a-z_][a-z0-9_-]*$
-    - Toutes les verifications via SSH (pas docker exec) — le test-server
+    - Toutes les verifications via SSH (pas docker exec) - le test-server
       Docker a des namespaces filesystem differents
     - Idempotence : pas de backup si sha256 identique au template deploye
 
@@ -151,7 +151,7 @@ def _audit_log(user_id: int, action: str, details: str):
             cur = conn.cursor()
             cur.execute(
                 "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id, f"[bashrc] {action} — {details}")
+                (user_id, f"[bashrc] {action} - {details}")
             )
             conn.commit()
     except Exception as e:

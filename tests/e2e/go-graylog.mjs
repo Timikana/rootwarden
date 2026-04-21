@@ -1,5 +1,5 @@
 /**
- * go-graylog.mjs — Tests E2E module Graylog.
+ * go-graylog.mjs - Tests E2E module Graylog.
  * Flux : login, config save, list servers, collectors CRUD.
  */
 import puppeteer from 'puppeteer';

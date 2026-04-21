@@ -1,4 +1,4 @@
--- 017_service_account.sql — Compte de service rootwarden sur les serveurs distants
+-- 017_service_account.sql - Compte de service rootwarden sur les serveurs distants
 --
 -- Ajoute les colonnes de suivi du deploiement du compte de service 'rootwarden'
 -- sur chaque machine geree. Ce compte dispose de sudo NOPASSWD:ALL et permet

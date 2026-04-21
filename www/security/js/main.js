@@ -211,7 +211,7 @@ function handleEvent(ev, findingsMap, metaMap) {
             } else if (ev.current && ev.total) {
                 // Scan des paquets : barre de progression
                 const pct = ev.percent || (ev.total > 0 ? Math.round(ev.current / ev.total * 100) : 0);
-                const cveInfo = ev.total_cve_found !== undefined ? ` — ${ev.total_cve_found} CVE` : '';
+                const cveInfo = ev.total_cve_found !== undefined ? ` - ${ev.total_cve_found} CVE` : '';
                 setText(`progress-label-${id}`, `${ev.package} (${ev.current}/${ev.total})${cveInfo}`);
                 setText(`progress-pct-${id}`, `${pct} %`);
                 setWidth(`progress-bar-${id}`, pct);
@@ -356,7 +356,7 @@ function renderResults(machineId, findings, meta) {
                 <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-xs truncate" title="${esc(f.summary||'')}">${esc((f.summary||'').slice(0,120))}</td>
                 <td class="px-3 py-2 whitespace-nowrap">
                     <select onchange="setCveRemediation('${esc(f.cve_id)}', ${machineId}, this.value)" class="text-[10px] border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700">
-                        <option value="">—</option>
+                        <option value="">-</option>
                         <option value="open">Open</option>
                         <option value="in_progress">En cours</option>
                         <option value="accepted">Accepte</option>
@@ -621,7 +621,7 @@ async function loadSchedules() {
         list.innerHTML = d.schedules.map(s => {
             const enabled = s.enabled == 1;
             const lastRun = s.last_run ? new Date(s.last_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Jamais';
-            const nextRun = s.next_run ? new Date(s.next_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+            const nextRun = s.next_run ? new Date(s.next_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
             const target = s.target_type === 'all' ? 'Tous' : (s.target_type === 'tag' ? 'Tag: ' + esc(s.target_value) : 'Selection');
             return `<div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${enabled ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700/30 opacity-60'}">
                 <div class="flex-1 min-w-0">

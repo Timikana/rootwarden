@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# start.sh — Demarrage securise de RootWarden
+# start.sh - Demarrage securise de RootWarden
 # =============================================================================
 #
 # Utiliser ce script au lieu de "docker-compose up" directement.

@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $sudo = validateInputSSH(isset($_POST['sudo']), 'bool');
     $role_id = in_array((int)($_POST['role_id'] ?? 1), [1, 2, 3]) ? (int)$_POST['role_id'] : 1;
 
-    // Placeholder password — impossible de se connecter avec (pas de mdp en clair)
+    // Placeholder password - impossible de se connecter avec (pas de mdp en clair)
     $password = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
 
     if (!$name) {
@@ -168,7 +168,7 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
 
     <?php if (isset($successSSH)): ?>
         <?php if (isset($plainPassword)): ?>
-            <!-- Mot de passe généré — affiché dans un bandeau persistant -->
+            <!-- Mot de passe généré - affiché dans un bandeau persistant -->
             <div class="mb-4 p-4 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg">
                 <p class="text-sm text-green-700 dark:text-green-300"><?= t('users.created_success') ?></p>
                 <div class="flex items-center gap-3 mt-2">

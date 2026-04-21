@@ -1,5 +1,5 @@
 """
-webhooks.py — Envoi de notifications via webhook (Slack, Teams, Discord, generic).
+webhooks.py - Envoi de notifications via webhook (Slack, Teams, Discord, generic).
 
 Supporte :
   - Slack (Incoming Webhooks)
@@ -73,7 +73,7 @@ def send_webhook(title: str, message: str, event: str = '', severity: str = 'inf
             _log.info("Webhook sent: %s [%s]", event, title[:50])
             return True
         else:
-            _log.warning("Webhook failed: HTTP %d — %s", resp.status_code, resp.text[:200])
+            _log.warning("Webhook failed: HTTP %d - %s", resp.status_code, resp.text[:200])
             return False
 
     except Exception as e:

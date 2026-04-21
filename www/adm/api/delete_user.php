@@ -1,11 +1,11 @@
 <?php
 /**
- * delete_user.php — Suppression d'un compte utilisateur portail (endpoint AJAX)
+ * delete_user.php - Suppression d'un compte utilisateur portail (endpoint AJAX)
  *
  * Rôle : supprime un utilisateur et toutes ses données associées (accès machines,
  *        permissions fonctionnelles). Opération destructive et irréversible.
  *
- * Accès requis : rôle admin (2) ou superadmin (3) — vérifié par checkAuth().
+ * Accès requis : rôle admin (2) ou superadmin (3) - vérifié par checkAuth().
  *
  * Méthode HTTP : POST uniquement (toute autre méthode retourne une erreur JSON).
  *
@@ -19,9 +19,9 @@
  *   { "success": bool, "message": string }
  *
  * Tables affectées (ordre d'exécution) :
- *   1. users              — suppression du compte principal
- *   2. user_machine_access — suppression des accès machines liés
- *   3. permissions         — suppression des droits fonctionnels liés
+ *   1. users              - suppression du compte principal
+ *   2. user_machine_access - suppression des accès machines liés
+ *   3. permissions         - suppression des droits fonctionnels liés
  *
  * Note : la suppression du compte dans `users` peut échouer si des contraintes
  *        de clé étrangère sont actives sur les tables enfants ; dans ce cas,

@@ -1,6 +1,6 @@
 <?php
 /**
- * lang/fr.php — Traductions francaises (loader modulaire)
+ * lang/fr.php - Traductions francaises (loader modulaire)
  *
  * Charge tous les fichiers de traduction depuis lang/fr/*.php
  * et retourne un tableau associatif fusionne.

@@ -1,15 +1,15 @@
 """
-routes/fail2ban.py — Routes de gestion Fail2ban sur serveurs distants.
+routes/fail2ban.py - Routes de gestion Fail2ban sur serveurs distants.
 
 Routes :
-    POST /fail2ban/status   — Statut global (installed, running, jails)
-    POST /fail2ban/jail     — Detail d'un jail (IPs bannies, config)
-    POST /fail2ban/install  — Installer fail2ban
-    POST /fail2ban/ban      — Bannir une IP
-    POST /fail2ban/unban    — Debannir une IP
-    POST /fail2ban/restart  — Redemarrer le service
-    POST /fail2ban/config   — Lire jail.local
-    GET  /fail2ban/history  — Historique des bans depuis la BDD
+    POST /fail2ban/status   - Statut global (installed, running, jails)
+    POST /fail2ban/jail     - Detail d'un jail (IPs bannies, config)
+    POST /fail2ban/install  - Installer fail2ban
+    POST /fail2ban/ban      - Bannir une IP
+    POST /fail2ban/unban    - Debannir une IP
+    POST /fail2ban/restart  - Redemarrer le service
+    POST /fail2ban/config   - Lire jail.local
+    GET  /fail2ban/history  - Historique des bans depuis la BDD
 """
 
 import json
@@ -36,7 +36,7 @@ bp = Blueprint('fail2ban', __name__)
 
 def _resolve_ssh_creds(data):
     """
-    Lookup credentials SSH en BDD via machine_id (securise — pas de credentials dans le HTML).
+    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials dans le HTML).
     Retourne (ip, port, user, ssh_pass, root_pass, svc_account, machine_id, error).
     """
     machine_id = data.get('machine_id')

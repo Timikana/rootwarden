@@ -1,6 +1,6 @@
 <?php
 /**
- * compliance_report.php — Rapport de conformite securite du parc
+ * compliance_report.php - Rapport de conformite securite du parc
  *
  * Genere un rapport complet HTML (imprimable) ou CSV couvrant :
  * - Etat des vulnerabilites CVE
@@ -59,7 +59,7 @@ $nbActive2FA = count(array_filter($users, fn($u) => !empty($u['totp_secret']) &&
 $nbActiveUsers = count(array_filter($users, fn($u) => $u['active']));
 $nbOldKeys = count(array_filter($users, fn($u) => $u['active'] && $u['ssh_key'] && $u['ssh_key_updated_at'] && strtotime($u['ssh_key_updated_at']) < strtotime('-90 days')));
 
-// 6. SSH Audit — derniers scores
+// 6. SSH Audit - derniers scores
 $sshAuditResults = [];
 try {
     $sshAuditResults = $pdo->query("
@@ -78,7 +78,7 @@ try {
     unset($sa);
 } catch (\Exception $e) {}
 
-// 7. Supervision — agents deployes
+// 7. Supervision - agents deployes
 $supervisionAgents = [];
 try {
     $supervisionAgents = $pdo->query("
@@ -153,7 +153,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
         .critical { color: #dc2626; } .high { color: #ea580c; } .green { color: #16a34a; } .blue { color: #2563eb; }
         .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #9ca3af; }
     </style></head><body>';
-    $pdfHtml .= "<h1>{$appName} — Rapport de Conformite</h1>";
+    $pdfHtml .= "<h1>{$appName} - Rapport de Conformite</h1>";
     $pdfHtml .= "<p>Genere le {$date} par {$generatedBy}</p>";
 
     // Resume
@@ -186,7 +186,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
 
     // SSH Audit
     if (!empty($sshAuditResults)) {
-        $pdfHtml .= '<h2>Audit SSH — Scores</h2><table><tr><th>Serveur</th><th>Score</th><th>Note</th><th>Critical</th><th>High</th></tr>';
+        $pdfHtml .= '<h2>Audit SSH - Scores</h2><table><tr><th>Serveur</th><th>Score</th><th>Note</th><th>Critical</th><th>High</th></tr>';
         foreach ($sshAuditResults as $sa) {
             $pdfHtml .= '<tr><td>' . htmlspecialchars($sa['name']) . '</td><td>' . $sa['score'] . '</td>';
             $pdfHtml .= '<td><strong>' . $sa['grade'] . '</strong></td>';
@@ -197,7 +197,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
 
     // Supervision
     if (!empty($supervisionAgents)) {
-        $pdfHtml .= '<h2>Supervision — Agents deployes</h2><table><tr><th>Serveur</th><th>Agents</th></tr>';
+        $pdfHtml .= '<h2>Supervision - Agents deployes</h2><table><tr><th>Serveur</th><th>Agents</th></tr>';
         $agByM = [];
         foreach ($supervisionAgents as $a) { $agByM[$a['name']][] = strtoupper(substr($a['platform'],0,1)) . ' ' . ($a['agent_version'] ?? ''); }
         foreach ($agByM as $name => $agents) {
@@ -206,7 +206,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
         $pdfHtml .= '</table>';
     }
 
-    $pdfHtml .= "<div class='footer'>SHA-256 : {$reportHash}<br>{$appName} — {$date}</div>";
+    $pdfHtml .= "<div class='footer'>SHA-256 : {$reportHash}<br>{$appName} - {$date}</div>";
     $pdfHtml .= '</body></html>';
 
     $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => false, 'defaultFont' => 'sans-serif']);
@@ -221,7 +221,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
 <html lang="fr">
 <head>
     <?php require_once __DIR__ . '/../head.php'; ?>
-    <title>Rapport de conformite — <?= $appName ?></title>
+    <title>Rapport de conformite - <?= $appName ?></title>
     <style>
         @media print {
             nav, .no-print, #toast-container { display: none !important; }
@@ -240,7 +240,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
         <div>
             <h1 class="text-2xl font-bold"><?= t('compliance.title') ?></h1>
             <p class="text-xs text-blue-100/70 mt-0.5"><?= t('compliance.desc') ?></p>
-            <p class="text-blue-200 text-sm mt-1"><?= $appName ?> — <?= t('compliance.generated_by') ?> <?= $date ?> — <?= $generatedBy ?></p>
+            <p class="text-blue-200 text-sm mt-1"><?= $appName ?> - <?= t('compliance.generated_by') ?> <?= $date ?> - <?= $generatedBy ?></p>
 <?php $tipId = 'compliance'; $tipTitle = t('tip.compliance_title'); $tipSteps = [t('tip.compliance_step1'), t('tip.compliance_step2'), t('tip.compliance_step3')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
         <div class="flex gap-2 no-print">
@@ -271,7 +271,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
                 <div class="text-xs text-gray-500"><?= t('compliance.overdue_deadlines') ?></div>
             </div>
             <div class="text-center p-3 rounded-lg <?= $sshAuditAvg >= 75 ? 'bg-green-50 dark:bg-green-900/20' : ($sshAuditAvg >= 50 ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'bg-red-50 dark:bg-red-900/20') ?>">
-                <div class="text-2xl font-bold <?= $sshAuditAvg >= 75 ? 'text-green-600' : ($sshAuditAvg >= 50 ? 'text-yellow-600' : 'text-red-600') ?>"><?= count($sshAuditResults) > 0 ? $sshAuditAvg . '/100' : '—' ?></div>
+                <div class="text-2xl font-bold <?= $sshAuditAvg >= 75 ? 'text-green-600' : ($sshAuditAvg >= 50 ? 'text-yellow-600' : 'text-red-600') ?>"><?= count($sshAuditResults) > 0 ? $sshAuditAvg . '/100' : '-' ?></div>
                 <div class="text-xs text-gray-500"><?= t('compliance.ssh_audit_avg') ?></div>
             </div>
             <div class="text-center p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
@@ -350,9 +350,9 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
                         <td class="px-3 py-2 font-medium"><?= htmlspecialchars($u['name']) ?></td>
                         <td class="px-3 py-2 text-center text-xs"><?= htmlspecialchars($u['role_name']) ?></td>
                         <td class="px-3 py-2 text-center"><?= !empty($u['totp_secret']) ? '<span class="text-green-500">&#10003;</span>' : '<span class="text-red-500">&#10007;</span>' ?></td>
-                        <td class="px-3 py-2 text-center"><?= $u['ssh_key'] ? '<span class="text-green-500">&#10003;</span>' : '<span class="text-gray-400">—</span>' ?></td>
-                        <td class="px-3 py-2 text-center text-xs <?= $keyAge !== null && $keyAge > 90 ? 'text-red-600 font-bold' : 'text-gray-500' ?>"><?= $keyAge !== null ? "{$keyAge}j" : '—' ?></td>
-                        <td class="px-3 py-2 text-xs text-gray-400"><?= $u['password_updated_at'] ? date('d/m/Y', strtotime($u['password_updated_at'])) : '—' ?></td>
+                        <td class="px-3 py-2 text-center"><?= $u['ssh_key'] ? '<span class="text-green-500">&#10003;</span>' : '<span class="text-gray-400">-</span>' ?></td>
+                        <td class="px-3 py-2 text-center text-xs <?= $keyAge !== null && $keyAge > 90 ? 'text-red-600 font-bold' : 'text-gray-500' ?>"><?= $keyAge !== null ? "{$keyAge}j" : '-' ?></td>
+                        <td class="px-3 py-2 text-xs text-gray-400"><?= $u['password_updated_at'] ? date('d/m/Y', strtotime($u['password_updated_at'])) : '-' ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -402,7 +402,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
                         <td class="px-3 py-2 text-center font-extrabold text-lg <?= $gradeColor ?>"><?= $sa['grade'] ?></td>
                         <td class="px-3 py-2 text-center <?= ($sa['critical_count'] ?? 0) > 0 ? 'text-red-600 font-bold' : '' ?>"><?= $sa['critical_count'] ?? 0 ?></td>
                         <td class="px-3 py-2 text-center <?= ($sa['high_count'] ?? 0) > 0 ? 'text-orange-500 font-bold' : '' ?>"><?= $sa['high_count'] ?? 0 ?></td>
-                        <td class="px-3 py-2 text-center text-xs text-gray-400"><?= $sa['audited_at'] ? date('d/m/Y H:i', strtotime($sa['audited_at'])) : '—' ?></td>
+                        <td class="px-3 py-2 text-center text-xs text-gray-400"><?= $sa['audited_at'] ? date('d/m/Y H:i', strtotime($sa['audited_at'])) : '-' ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -457,7 +457,7 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
 
     <!-- Footer avec hash -->
     <div class="text-center text-xs text-gray-400 mb-8">
-        <p><?= t('compliance.footer_generated') ?> <?= $date ?> — <?= $appName ?></p>
+        <p><?= t('compliance.footer_generated') ?> <?= $date ?> - <?= $appName ?></p>
         <p class="font-mono mt-1">SHA-256 : <?= $reportHash ?></p>
     </div>
 </div>

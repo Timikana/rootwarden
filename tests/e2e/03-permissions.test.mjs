@@ -1,5 +1,5 @@
 /**
- * 03-permissions.test.mjs — E2E : Permissions toggle via htmx
+ * 03-permissions.test.mjs - E2E : Permissions toggle via htmx
  *
  * Valide :
  *  - Page Acces & Droits accessible
@@ -14,7 +14,7 @@ import { launchBrowser, newPage, login, sleep, BASE_URL } from './helpers.mjs';
 let browser, page;
 const TARGET_USER_ID = '1'; // admin
 
-describe('03 — Permissions htmx toggle', () => {
+describe('03 - Permissions htmx toggle', () => {
     before(async () => {
         browser = await launchBrowser();
         page = await newPage(browser);
@@ -70,7 +70,7 @@ describe('03 — Permissions htmx toggle', () => {
         }, TARGET_USER_ID);
 
         if (!permKey) {
-            // Toutes cochees — decocher la premiere
+            // Toutes cochees - decocher la premiere
             const firstPerm = await page.evaluate((userId) => {
                 const cb = document.querySelector(`input[data-user-id="${userId}"][hx-post]:checked`);
                 return cb?.dataset.permission;

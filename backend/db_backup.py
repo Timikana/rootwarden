@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-db_backup.py — Sauvegarde automatique de la base de donnees MySQL.
+db_backup.py - Sauvegarde automatique de la base de donnees MySQL.
 
 Cree un dump mysqldump compresse (.sql.gz) dans /app/backups/ avec
 rotation automatique (suppression des anciens fichiers selon BACKUP_RETENTION_DAYS).
@@ -11,9 +11,9 @@ Peut etre lance manuellement :
 Ou automatiquement via le scheduler (scheduler.py) si BACKUP_ENABLED=true.
 
 Variables d'environnement :
-    BACKUP_ENABLED        — true/false (defaut: false)
-    BACKUP_RETENTION_DAYS — jours de conservation (defaut: 30)
-    DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — credentials MySQL
+    BACKUP_ENABLED        - true/false (defaut: false)
+    BACKUP_RETENTION_DAYS - jours de conservation (defaut: 30)
+    DB_HOST, DB_USER, DB_PASSWORD, DB_NAME - credentials MySQL
 """
 
 import os

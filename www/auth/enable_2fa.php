@@ -125,7 +125,7 @@ $_appCompany = htmlspecialchars(getenv('APP_COMPANY') ?: '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= t('enable_2fa.title') ?> — <?= $_appName ?></title>
+    <title><?= t('enable_2fa.title') ?> - <?= $_appName ?></title>
     <link rel="stylesheet" href="/assets/css/tailwind.css">
 </head>
 <body class="bg-gradient-to-br from-blue-900 to-blue-700 min-h-screen flex items-center justify-center px-4 py-8">
