@@ -1,6 +1,6 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.14.4
+# RootWarden v1.14.7
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
@@ -58,6 +58,9 @@
 - **Tamper-evident audit log** — Every `user_logs` row sealed with an SHA2-256 hash chain (prev_hash | user_id | action | unix_ts). `/adm/api/audit_verify.php` recomputes the chain and flags any alteration (MISMATCH / PREV_BROKEN). "Verify integrity" button in audit log.
 - **Segmented API keys** — `api_keys` table with route-regex scope (e.g. `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stored as SHA-256. Superadmin CRUD UI with rotation + soft revocation + `last_used_at`/`last_used_ip` tracking. Zero-downtime fallback to legacy `Config.API_KEY` until the table is populated.
 - **CI supply-chain security** — gitleaks (committed secrets), bandit (Python SAST), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depends on all scans → no release on critical CVE.
+- **Server-side session revocation** — `verify.php` checks `active_sessions` on every request → "Revoke" / "Sign out others" has an immediate effect, invalidating stolen cookies.
+- **Password history + HIBP** — Refuses reuse of the last 5 passwords (`password_history` table). Opt-in HaveIBeenPwned check via k-anonymity API (first 5 SHA1 hex sent, configurable threshold).
+- **GDPR self-service** — `/profile/export.php` route: any user downloads their personal data as JSON (profile + logs + sessions + prefs, hashes masked). Admin endpoint `/adm/api/anonymize_user.php`: soft-delete preserving audit log (art. 17.3.e).
 - **28+ Security Fixes (3 Audits)** — SQLi, CSRF, XSS, timing attack, etc.
 
 ### Notifications

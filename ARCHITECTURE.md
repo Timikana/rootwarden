@@ -1,3 +1,48 @@
+# Architecture & Carte des fichiers — RootWarden v1.14.7
+
+## Security hardening v1.14.5 → v1.14.7 (suite audit DevSecOps)
+
+### Session revocation server-side (v1.14.5, commit 036956d)
+
+- `active_sessions` table + `last_activity` existaient, MAIS aucun check serveur
+  → la revocation UI etait un no-op.
+- `www/auth/verify.php` : check `SELECT 1 FROM active_sessions WHERE session_id = ? AND user_id = ?`
+  apres le check de timeout. Skip si `2fa_required`. Fail-open en cas d'erreur DB.
+- `www/auth/functions.php::initializeUserSession()` : REPLACE INTO apres
+  `session_regenerate_id` → garantit la presence de la row pour le nouveau
+  session_id.
+- `www/profile.php` : nouveau `revoke_all_others` → DELETE sauf session courante,
+  bouton UI visible si > 1 session active.
+
+### Password history + HIBP (v1.14.6, commit d4effb5)
+
+- Migration 038 : `password_history(user_id, password_hash, changed_at)` + index + FK CASCADE.
+- `www/auth/password_policy.php` : helper centralise
+  - `passwordPolicyCheckComplexity()` : 15 chars + 4 classes
+  - `passwordPolicyCheckHistory()` : refuse les 5 derniers + courant via `password_verify`
+  - `passwordPolicyCheckHIBP()` : k-anonymity, opt-in `HIBP_ENABLED=true`,
+    SHA1 + 5 hex + timeout 3s + fail-open
+  - `passwordPolicyValidateAll()` : pipeline
+  - `passwordPolicyRecordOld()` : archive l'ancien hash + purge a 10 entrees/user
+- Integre dans `profile.php` (change password) et `reset_password.php` (forgot flow).
+
+### RGPD self-service (v1.14.7, commit edfb383)
+
+- `www/profile/export.php` : dump JSON des donnees du user connecte, couvre
+  users, permissions, user_machine_access, user_logs (16 premiers chars du
+  self_hash), login_history, active_sessions (session_id masque),
+  notification_preferences, password_history metas. Superadmin : +api_keys.
+  Content-Disposition attachment + audit log `[rgpd]`.
+- `www/adm/api/anonymize_user.php` : soft-delete PII conservant l'audit log.
+  Effacement : `name=deleted-{id}`, email/company/ssh_key/totp/password = NULL,
+  active=0. Revocation : sessions, tokens, password_history, prefs, permissions,
+  machine_access. Protections : pas d'auto-anonymisation, pas de dernier SA.
+  Justifie RGPD art. 17.3.e (interet legitime securite).
+- UI : card "Donnees personnelles (RGPD)" dans profile.php avec bouton
+  d'export + note sur le contenu.
+
+---
+
 # Architecture & Carte des fichiers — RootWarden v1.14.4
 
 ## Security hardening v1.14.1 → v1.14.4 (audit DevSecOps response)

@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.14.4
+# 🔐 RootWarden v1.14.7
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -58,6 +58,9 @@
 - **Audit log tamper-evident** — Chaque ligne `user_logs` scellee par chaine de hash SHA2-256 (prev_hash | user_id | action | unix_ts). Endpoint `/adm/api/audit_verify.php` recalcule la chaine et detecte toute alteration (MISMATCH / PREV_BROKEN). Bouton "Verifier integrite" dans l'audit log.
 - **API keys segmentees** — Table `api_keys` avec scope par regex de route (ex: `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stocke en SHA-256. UI CRUD superadmin avec rotation + revocation soft + `last_used_at`/`last_used_ip` tracking. Fallback zero-downtime sur `Config.API_KEY` legacy tant que la table est vide.
 - **CI supply chain security** — gitleaks (secrets commit), bandit (SAST Python), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depend de tous les scans → pas de release sur CVE critique.
+- **Session revocation server-side** — `verify.php` verifie `active_sessions` a chaque requete → un clic "Revoquer" / "Deconnecter les autres" a un effet immediat, invalide les cookies voles.
+- **Password history + HIBP** — Refuse la reutilisation des 5 derniers mots de passe (table `password_history`). Verification opt-in contre HaveIBeenPwned via k-anonymity API (5 premiers hex SHA1 envoyes, seuil configurable).
+- **RGPD self-service** — Route `/profile/export.php` : tout user telecharge ses donnees personnelles au format JSON (profil + logs + sessions + prefs, hashes masques). Endpoint admin `/adm/api/anonymize_user.php` : soft-delete preservant l'audit log (art. 17.3.e).
 - **28+ failles de securite corrigees (3 audits)** — SQLi, CSRF, XSS, timing attack, etc.
 
 ### Notifications

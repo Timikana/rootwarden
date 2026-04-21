@@ -770,6 +770,41 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                     <li><strong>trivy fs</strong> : scan filesystem complet (vuln + secret + misconfig IaC)</li>
                     <li>Chainage : <code>auto-tag</code> depend de tous ces jobs → une CVE critique bloque le release tag</li>
                 </ul>
+
+                <h3 class="font-semibold mb-2">🚪 Session revocation server-side (v1.14.5)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>verify.php</code> verifie <code>active_sessions</code> a chaque requete. Une revocation UI a un effet immediat.</li>
+                    <li>Bouton "🚪 Deconnecter les autres sessions" dans le profile (si >1 session active)</li>
+                    <li>Vol de cookie session → victime clique "Revoquer" → le cookie vole est invalide au prochain request</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">🔁 Password history + HIBP (v1.14.6)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Table <code>password_history</code> : refuse la reutilisation des <strong>5 derniers</strong> mots de passe</li>
+                    <li>Verifie aussi contre le password courant (ne pas remettre le meme)</li>
+                    <li>HaveIBeenPwned check <strong>opt-in</strong> via <code>HIBP_ENABLED=true</code> :
+                        <ul class="list-disc list-inside ml-4 text-xs text-gray-500">
+                            <li>K-anonymity : envoi uniquement des 5 premiers hex du SHA1 du password</li>
+                            <li>Seuil configurable <code>HIBP_THRESHOLD</code> (defaut 10 fuites)</li>
+                            <li>Timeout 3s, fail-open si API injoignable</li>
+                        </ul>
+                    </li>
+                    <li>S'applique a <code>/profile.php</code> (change password) et <code>/auth/reset_password.php</code> (forgot flow)</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">📥 RGPD self-service (v1.14.7)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Route <code>/profile/export.php</code> : tout user telecharge ses donnees personnelles au format JSON</li>
+                    <li>Contenu : profil, permissions, user_machine_access, user_logs (metas + 16 chars de self_hash), login_history, active_sessions (session_id masque), notification_preferences, password_history metas</li>
+                    <li>Aucune donnee sensible : pas de hash de mot de passe, session_id tronques</li>
+                    <li>Endpoint admin <code>/adm/api/anonymize_user.php</code> (superadmin) : <strong>soft-delete</strong> RGPD art. 17 preservant les user_logs pour tracabilite securite (art. 17.3.e)
+                        <ul class="list-disc list-inside ml-4 text-xs text-gray-500">
+                            <li>Effacement : name = <code>deleted-{id}</code>, email/company/ssh_key/totp = NULL, active=0</li>
+                            <li>Revocation : toutes sessions + remember_tokens + password_history + prefs + permissions + machine_access</li>
+                            <li>Protections : pas d'auto-anonymisation + pas de dernier superadmin</li>
+                        </ul>
+                    </li>
+                </ul>
             </section>
 
             <!-- ────────────────────────────────────────── -->
