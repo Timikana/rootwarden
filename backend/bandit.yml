@@ -17,6 +17,9 @@ skips:
   # B103 : chmod 0o755 — intentionnel sur PLATFORM_SSH_DIR, dossier doit etre
   # traversable par le process du container (uid non-root)
   - B103
+  # B104 : bind 0.0.0.0 — intentionnel, serveur API Flask/Hypercorn expose
+  # dans le container (isolation reseau geree au niveau Docker Compose + reverse proxy)
+  - B104
   # B404 : import subprocess — utilise legitimement pour execute_as_root SSH
   - B404
   # B603, B607 : subprocess sans shell=True — deja safe par design
