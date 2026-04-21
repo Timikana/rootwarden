@@ -55,6 +55,34 @@ if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) >
 }
 $_SESSION['last_activity'] = time();
 
+// ── Revocation server-side : verifie que la session est toujours dans active_sessions ──
+// Sans ce check, un DELETE depuis /profile.php (bouton "Revoquer") n'a aucun effet —
+// la session cookie continue de fonctionner tant que PHP n'a pas timeout.
+// Refuse aussi les sessions pour lesquelles /logout.php aurait ete appele
+// depuis un autre navigateur, ou que l'admin aurait force-revoke (future UI).
+if (isset($_SESSION['user_id']) && !empty($_SESSION['2fa_required']) === false) {
+    try {
+        $_sessChk = $pdo->prepare(
+            "SELECT 1 FROM active_sessions WHERE session_id = ? AND user_id = ? LIMIT 1"
+        );
+        $_sessChk->execute([session_id(), (int)$_SESSION['user_id']]);
+        if (!$_sessChk->fetchColumn()) {
+            // Session n'est plus enregistree → revoquee (UI profile) ou jamais
+            // instanciee (edge case : restoration de cookie remember_me sans
+            // active_sessions row). Dans les deux cas, on force un re-login.
+            session_unset();
+            session_destroy();
+            header("Location: /auth/login.php?expired=1");
+            exit();
+        }
+    } catch (\Exception $e) {
+        // DB indisponible : on ne BLOQUE PAS l'utilisateur (fail-open pour la
+        // dispo, fail-closed serait plus strict mais casserait le service en
+        // cas de glitch DB). Log pour detection.
+        error_log('verify.php active_sessions check failed: ' . $e->getMessage());
+    }
+}
+
 // ── Remember-me : restauration de session depuis le cookie ───────────────────
 // Si pas connecte mais cookie present → tenter la restauration
 if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token'])) {

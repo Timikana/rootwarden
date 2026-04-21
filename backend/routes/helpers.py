@@ -30,17 +30,95 @@ logger = logging.getLogger('rootwarden')
 SSH_TIMEOUT = int(os.getenv('SSH_TIMEOUT', 360))
 
 
+def _validate_api_key_from_db(raw_key: str, route_path: str):
+    """
+    Verifie la cle X-API-KEY contre la table api_keys (segmentation + scope).
+    Retourne (ok, api_key_id_or_none) :
+      - ok=False si la cle est inconnue ou revoquee
+      - ok=False si le scope n'autorise pas route_path (si scope defini)
+    Si la table api_keys est vide, retourne (None, None) pour signaler
+    au caller qu'il doit fallback sur Config.API_KEY (mode boot/compat).
+    """
+    import hashlib
+    import json
+    import re
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT COUNT(*) AS cnt FROM api_keys WHERE revoked_at IS NULL")
+            if (cur.fetchone() or {}).get('cnt', 0) == 0:
+                return None, None  # table vide = fallback autorise
+            key_hash = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+            cur.execute(
+                "SELECT id, name, scope_json, revoked_at FROM api_keys "
+                "WHERE key_hash = %s LIMIT 1",
+                (key_hash,)
+            )
+            row = cur.fetchone()
+            if not row or row.get('revoked_at'):
+                return False, None
+            # Scope check
+            scope = row.get('scope_json')
+            if scope:
+                try:
+                    patterns = json.loads(scope)
+                    if isinstance(patterns, list) and patterns:
+                        if not any(re.search(p, route_path or '') for p in patterns):
+                            return False, row['id']
+                except Exception:
+                    pass  # scope corrompu = denied
+            # Update last_used (best-effort, ne bloque pas si erreur)
+            try:
+                ip = request.remote_addr if request else None
+                cur2 = conn.cursor()
+                cur2.execute(
+                    "UPDATE api_keys SET last_used_at = NOW(), last_used_ip = %s WHERE id = %s",
+                    (ip, row['id'])
+                )
+                conn.commit()
+            except Exception as e:
+                logger.warning("API key last_used update failed: %s", e)
+            return True, row['id']
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error("API key DB lookup failed: %s", e)
+        return None, None  # fallback en cas de DB down
+
+
 def require_api_key(func):
-    """Verifie la presence et la validite du header X-API-KEY."""
+    """
+    Verifie la presence et la validite du header X-API-KEY.
+    Priorite : table api_keys (avec scope) > Config.API_KEY (fallback legacy).
+    """
     @wraps(func)
     def decorated(*args, **kwargs):
         if request.method == 'OPTIONS':
             return func(*args, **kwargs)
         key = request.headers.get('X-API-KEY', '')
-        if not key or not hmac.compare_digest(key, Config.API_KEY):
-            logger.warning("Requete refusee : X-API-KEY invalide depuis %s", request.remote_addr)
+        if not key:
+            logger.warning("Requete refusee : X-API-KEY absent depuis %s", request.remote_addr)
             return jsonify({'success': False, 'message': 'Non autorise'}), 401
-        return func(*args, **kwargs)
+
+        # Priorite 1 : table api_keys (nouvelle architecture segmentee)
+        db_ok, key_id = _validate_api_key_from_db(key, request.path)
+        if db_ok is True:
+            return func(*args, **kwargs)
+        if db_ok is False:
+            logger.warning(
+                "API key refusee (DB) : key_id=%s path=%s depuis %s",
+                key_id, request.path, request.remote_addr
+            )
+            return jsonify({'success': False, 'message': 'Non autorise'}), 401
+
+        # Priorite 2 (fallback) : Config.API_KEY legacy
+        # Actif uniquement si la table api_keys est vide (premier boot).
+        if db_ok is None and hmac.compare_digest(key, Config.API_KEY):
+            return func(*args, **kwargs)
+
+        logger.warning("Requete refusee : X-API-KEY invalide depuis %s", request.remote_addr)
+        return jsonify({'success': False, 'message': 'Non autorise'}), 401
     return decorated
 
 

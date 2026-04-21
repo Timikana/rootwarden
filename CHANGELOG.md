@@ -5,6 +5,327 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.14.7] — 2026-04-20
+
+### RGPD : export JSON des donnees personnelles + anonymisation admin
+
+Reponse au gap #15 de l'audit DevSecOps. Conformite RGPD art. 15
+(droit d'acces), art. 17 (effacement), art. 20 (portabilite).
+
+Nouveau endpoint self-service /profile/export.php :
+- Acces : n'importe quel user connecte, dump de SES donnees uniquement
+- Format JSON UTF-8 telechargeable (Content-Disposition attachment)
+- Contenu : user profile, permissions, user_machine_access, user_logs
+  (avec 16 premiers chars du self_hash pour tracabilite), login_history,
+  active_sessions (session_id masque), notification_preferences,
+  password_history (metas changed_at seulement, PAS les hashes).
+  Superadmin : inclut aussi les api_keys creees (sans le secret).
+- Audit log [rgpd] de chaque demande d export
+- Filename : rootwarden-export-user-{id}-{YYYYMMDD-HHMMSS}.json
+
+Nouveau endpoint admin /adm/api/anonymize_user.php :
+- Acces : superadmin uniquement, CSRF obligatoire
+- Soft-delete preservant l'integrite des audit logs pour tracabilite
+  legale (interet legitime de securite, RGPD art. 17.3.e)
+- Effacement : name -> "deleted-{id}", email/company/ssh_key/totp_secret
+  = NULL, password = NULL, active = 0, sudo = 0
+- Revocation : active_sessions, remember_tokens, password_history,
+  notification_preferences, permissions, user_machine_access
+- Protections :
+  * Pas d'auto-anonymisation (user ne peut s'anonymiser lui-meme)
+  * Pas d'anonymisation du dernier superadmin actif
+- Audit log [rgpd] avec original_name + id
+- user_logs et login_history CONSERVES (tracabilite securite)
+
+UI profile.php : nouvelle card "Donnees personnelles (RGPD)" avec
+bouton d'export + note explicative.
+
+i18n FR+EN parite 58=58 :
+- profile.rgpd_title
+- profile.rgpd_desc
+- profile.btn_rgpd_export
+- profile.rgpd_export_note
+
+Version 1.14.6 -> 1.14.7.
+
+---
+## [1.14.6] — 2026-04-20
+
+### Password history + HIBP k-anonymity check
+
+Reponse au gap #14 de l'audit DevSecOps. La politique de complexite
+(15 chars + 4 classes) existait deja mais rien n'empechait un user de
+remettre son ancien password lors d'un changement force, ni de choisir
+un mot de passe present dans les fuites publiques.
+
+Migration 038 :
+- Table password_history(user_id, password_hash, changed_at) + index user_changed + FK ON DELETE CASCADE
+
+Nouveau helper www/auth/password_policy.php :
+- passwordPolicyCheckComplexity() : 15 chars + 4 classes (existait, centralise)
+- passwordPolicyCheckHistory() : refuse reutilisation des 5 derniers
+  (verifie aussi vs le hash courant)
+- passwordPolicyCheckHIBP() : k-anonymity via api.pwnedpasswords.com
+  * Opt-in via env HIBP_ENABLED=true (off par defaut)
+  * Seuil configurable via HIBP_THRESHOLD (defaut 10 fuites)
+  * SHA1 + envoi des 5 premiers hex uniquement (privacy-preserving)
+  * Timeout 3s, fail-open si API injoignable (pas de blocage user)
+- passwordPolicyValidateAll() : pipeline en une passe
+- passwordPolicyRecordOld() : archive l'ancien hash dans password_history
+  + purge automatique a 10 entrees par user (rotation)
+
+Integration :
+- www/profile.php : le password change passe par la politique complete
+- www/auth/reset_password.php : idem pour le flow forgot password (la
+  check existante strlen<8 est remplacee par la politique complete,
+  coherence FR/EN message)
+
+i18n FR+EN parite 54=54 :
+- profile.error_password_reuse
+- profile.error_password_pwned
+
+Tests manuels : un user qui tente de remettre son password courant est
+refuse avec "deja utilise recemment". Si HIBP_ENABLED=true, un password
+commun (ex: "Password123!") est refuse avec "apparait dans une fuite".
+
+Version 1.14.5 -> 1.14.6.
+
+---
+
+## [1.14.5] — 2026-04-20
+
+### Session revocation server-side + "Deconnecter les autres sessions"
+
+Reponse au gap #9 de l'audit DevSecOps. Correction importante :
+le profile.php avait DEJA un bouton "Revoquer" qui DELETE de active_sessions,
+mais verify.php ne verifiait JAMAIS active_sessions → la revocation etait
+sans effet cote serveur. L'utilisateur revoque restait connecte.
+
+Changements :
+
+www/auth/verify.php :
+- Apres le check de timeout, AJOUT d'une verification DB :
+  `SELECT 1 FROM active_sessions WHERE session_id = ? AND user_id = ?`
+- Si absent → session_destroy + redirect login (session revoquee)
+- Skip du check si 2fa_required actif (pour ne pas casser le flow login)
+- Fail-open en cas d'erreur DB (log error, pas de lockout)
+
+www/auth/functions.php (initializeUserSession) :
+- Ajout REPLACE INTO active_sessions apres session_regenerate_id
+- Garantit que le nouveau session_id est enregistre cote DB apres 2FA
+- Sans ca, le check de verify.php aurait lockout l'utilisateur
+  immediatement apres login
+
+www/profile.php :
+- Nouveau POST handler revoke_all_others : DELETE sauf session courante
+- Bouton UI "🚪 Deconnecter les autres" visible si count(sessions) > 1
+- Confirmation explicite
+- Audit log via audit_log_raw() (hash chain 036)
+
+i18n FR+EN parite 52=52 :
+- profile.btn_revoke_all_others
+- profile.confirm_revoke_all_others
+- profile.all_others_revoked
+
+Modele d'attaque couvert :
+- Vol de cookie session → victime clique "Deconnecter les autres" dans
+  profile → le cookie vole est invalide au prochain request
+- Auparavant : le DELETE existait mais etait un no-op cote serveur
+
+Version 1.14.4 -> 1.14.5.
+
+---
+
+## [1.14.4] — 2026-04-20
+
+### API keys segmentees avec scope regex + last_used tracking
+
+Reponse au gap #4 de l'audit DevSecOps : un seul API_KEY partage =
+compromission = acces backend total sans revocation fine.
+
+Migration 037 :
+- Table api_keys(id, name UNIQUE, key_prefix, key_hash CHAR(64), scope_json,
+  created_by, created_at, revoked_at, last_used_at, last_used_ip)
+- Permission can_manage_api_keys (superadmin auto)
+
+Backend (backend/routes/helpers.py) :
+- require_api_key refactore : priorite table api_keys > fallback Config.API_KEY
+- _validate_api_key_from_db(raw_key, route_path) :
+  - Hash SHA-256 puis lookup
+  - Check revoked_at
+  - Scope JSON : liste de regex → la route doit matcher au moins 1
+  - Update last_used_at + last_used_ip en best-effort (UPDATE separe)
+- Mode fallback legacy : si table api_keys vide (premier boot), Config.API_KEY
+  reste valide. Des la premiere cle creee, Config.API_KEY devient invalide
+  automatiquement — transition zero-downtime.
+
+UI (www/adm/api_keys.php, superadmin + can_manage_api_keys) :
+- Creation : genere rw_live_XXXXXX_... (48 hex chars), affiche UNE SEULE FOIS
+  le secret en clair + bouton Copier. Stocke le SHA-256.
+- Scope : 1 regex par ligne (textarea), validation PHP preg_match avant save
+- Revocation : soft-delete via revoked_at = NOW(). Cles revoquees visibles
+  mais separees en bas de liste.
+- Display : name, prefix (rw_live_XXXX…), scope resume (3 premieres regex),
+  created_at, last_used_at + last_used_ip, statut Active/Revoquee
+
+Tests E2E valides :
+- Cle in-scope /list_machines → HTTP 200 ✓
+- Cle out-of-scope /cve_trends → HTTP 401 ✓
+- Cle legacy API_KEY env → HTTP 401 (car table non-vide) ✓
+- last_used_at et last_used_ip mis a jour correctement ✓
+
+Audit log : creation et revocation de cle loggees via audit_log() standard
+(hash chain 036 → tracabilite forte).
+
+Note compat : les api_proxy.php et consommateurs existants ne cassent pas
+au deploy — tant qu'aucune cle n'est creee, la legacy API_KEY fonctionne.
+Apres creation de la premiere cle, l'admin DOIT creer une cle nommee
+"php-proxy" (ou equivalent) et la configurer dans srv-docker.env pour
+remplacer l'ancienne API_KEY. Documente dans README.
+
+Version 1.14.3 -> 1.14.4.
+
+---
+
+## [1.14.3] — 2026-04-20
+
+### CI — SAST + SCA + secrets scan + Trivy filesystem
+
+Reponse au gap #7 de l'audit DevSecOps. Note : Trivy image scan et
+auto-tagging existaient deja dans `.github/workflows/ci.yml`. Ce qui
+manquait (ajoute ici) : secrets commit scan, SAST Python, SCA Python + PHP,
+et Trivy fs (scan repo en amont des images).
+
+5 nouveaux jobs CI :
+- **secrets-scan** (gitleaks) — scanne tous les commits (fetch-depth: 0)
+  pour detecter clef AWS/GitHub/Stripe/Slack/SSH committee par accident.
+  Bloquant sur PR et main.
+- **sast-python** (bandit[toml]) — SAST Python avec config
+  `backend/bandit.yml` (skip B101/B404/B603/B607 car patterns legitimes
+  du projet, B608 conserve actif). Warning en PR, bloquant sur main.
+- **sca-python** (pip-audit) — CVE check sur requirements.txt fige.
+  Warning en PR, strict sur main.
+- **sca-php** (composer audit --locked) — CVE check sur composer.lock.
+  Warning en PR, strict sur main.
+- **trivy-fs** (aquasecurity/trivy-action) — scan repo (requirements,
+  composer.lock, Dockerfiles, docker-compose, secrets, misconfig IaC).
+  Complement au `security-scan` existant qui ne scanne que les images
+  apres build.
+
+Configuration :
+- `.gitleaks.toml` : baseline par defaut + allowlist des fichiers
+  `.example`, README, CHANGELOG, helpers.mjs (TOTP de test documente),
+  vendor/, backend/tests/. Regex pour filtrer les placeholders
+  `change_me`, `replace_me`, etc.
+- `backend/bandit.yml` : skips documentes des regles non-pertinentes
+  pour ce projet (subprocess SSH legitime, assert en non-test).
+
+Chainage :
+- `auto-tag` depend desormais de `[build-docker, security-scan,
+  secrets-scan, sast-python, sca-python, sca-php, trivy-fs]` → une
+  fuite de secret, un CVE critique ou une vuln filesystem empeche le
+  tag automatique.
+
+Version 1.14.2 -> 1.14.3.
+
+---
+
+## [1.14.2] — 2026-04-20
+
+### Audit log tamper-evident — hash chain SHA2-256
+
+Reponse au gap #3 de l'audit DevSecOps (2026-04-20) : la table user_logs
+etait alterable silencieusement en cas de compromission DB. Chaque ligne
+est desormais scellee par une chaine de hash SHA2-256 detectable en cas
+de modification.
+
+Migration 036 :
+- user_logs.prev_hash CHAR(64), user_logs.self_hash CHAR(64)
+- Index idx_self_hash (id, self_hash) pour LAG rapide
+
+Algo :
+- self_hash = SHA2-256( prev_hash | user_id | action | unix_ts )
+- prev_hash = self_hash de la ligne precedente (ORDER BY id DESC LIMIT 1)
+- Premiere ligne : prev_hash = 'GENESIS' (constante)
+
+Implementation app-level (pas de trigger MySQL — contrainte SUPER
+privilege dans le container). Le hash est calcule par :
+- PHP : nouveau helper audit_log_raw() dans www/adm/includes/audit_log.php
+  + audit_log() existant refactore pour passer par audit_log_raw
+- Refactoring de 4 INSERTs directs vers le helper :
+  www/auth/login.php (connexion reussie, spraying, verrouillage) et
+  www/adm/api/unlock_user.php (deverrouillage)
+
+Endpoints :
+- POST /adm/api/audit_seal.php : scelle les lignes orphelines (self_hash
+  NULL venant d'INSERTs legacy) en continuant la chaine existante.
+  GET = dry-run (compte sans modifier)
+- GET /adm/api/audit_verify.php : walks toute la chaine, recompute chaque
+  hash, signale la PREMIERE incoherence (MISMATCH ou PREV_BROKEN).
+  Superadmin-only, read-only.
+
+UI (www/adm/audit_log.php) — superadmin uniquement :
+- Bouton "🔒 Verifier integrite" → affiche status chaine (OK / BROKEN)
+  avec id + type de l'erreur
+- Bouton "🖋 Sceller orphelines" → seal des lignes legacy
+
+Modele d'attaque couvert :
+- Modification action/user_id/created_at d'une ligne scellee → detection
+  immediate au verify (hash ne matche plus)
+- Suppression d'une ligne → detection (prev_hash de la suivante ne matche
+  plus la nouvelle ORDER BY)
+- Insertion d'une ligne au milieu → detection (prev_hash ne matche plus)
+
+Limitations connues (documentees dans l'audit) :
+- Un attaquant avec acces DB + lecture du code source peut recalculer la
+  chaine entiere apres modification. Contre-mesure future : sceller le
+  hash de tete dans un KMS externe (ou exporter WORM off-site).
+
+i18n FR/EN parite 274=274 : nouvelles cles audit.btn_verify /
+audit.btn_verify_tip / audit.btn_seal / audit.btn_seal_tip.
+
+Tests manuels :
+- Insert 3 lignes via helper → chain valide OK
+- UPDATE action d'une ligne → verify detecte MISMATCH sur cette ligne
+- DELETE d'une ligne → verify detecte PREV_BROKEN sur la suivante
+
+Version 1.14.1 -> 1.14.2 (patch de securite).
+
+---
+
+## [1.14.1] — 2026-04-20
+
+### Hardening auth : lockout per-user + backoff progressif + detection password spraying
+
+Couche ajoutee au-dessus du rate limiting IP existant (`login_attempts`,
+5/10min) pour couvrir les angles morts identifies dans l'audit DevSecOps
+du 2026-04-20 (finding #1).
+
+- **Per-user lockout** : colonnes `users.failed_attempts` + `users.locked_until`
+  + `users.last_failed_login_at` (migration 035). Le compteur s'incremente a
+  chaque echec et verrouille le compte avec un **backoff progressif** :
+  3 echecs = 1min, 4 = 5min, 5 = 15min, 6 = 1h, 7+ = 4h. Reset a 0 au succes.
+- **Password spraying detection** : `login_attempts.username` + `success`
+  (migration 035) permettent de detecter une IP testant >= 5 usernames
+  distincts en 10min. Audit log `[security]` prefix au superadmin.
+- **Notification ecrit dans `user_logs`** au 5eme echec consecutif d'un user,
+  avec IP source.
+- **Oracle-safe** : password non verifie si `locked_until > NOW()` — evite
+  d'exposer une difference de timing entre "password correct + verrou" et
+  "password incorrect + verrou".
+- **Admin UI** (superadmin only) :
+  - Badge rouge `🔒 Verrouille X min` + badge orange `N ⚠` (3+ echecs) dans
+    la liste des users (`adm/includes/manage_users.php`)
+  - Bouton `🔓 Deverrouiller` cree la route `POST /adm/api/unlock_user.php`
+    → reset `failed_attempts = 0, locked_until = NULL` + audit log
+- **i18n FR/EN** parite 270=270 (admin) et 37=37 (login), nouvelles cles :
+  `login.error_user_locked`, `users.badge_locked`, `users.btn_unlock`, etc.
+
+Note : le rate limiting IP existant (`login_attempts`, 5/10min) est conserve
+inchange — il agit en premiere ligne contre les attaques distribuees.
+
+---
+
 ## [1.14.0] — 2026-04-20
 
 ### Module Bashrc — deploiement standardise du .bashrc par utilisateur + template editable

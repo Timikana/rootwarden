@@ -1,3 +1,99 @@
+# Architecture & Carte des fichiers — RootWarden v1.14.7
+
+## Security hardening v1.14.5 → v1.14.7 (suite audit DevSecOps)
+
+### Session revocation server-side (v1.14.5, commit 036956d)
+
+- `active_sessions` table + `last_activity` existaient, MAIS aucun check serveur
+  → la revocation UI etait un no-op.
+- `www/auth/verify.php` : check `SELECT 1 FROM active_sessions WHERE session_id = ? AND user_id = ?`
+  apres le check de timeout. Skip si `2fa_required`. Fail-open en cas d'erreur DB.
+- `www/auth/functions.php::initializeUserSession()` : REPLACE INTO apres
+  `session_regenerate_id` → garantit la presence de la row pour le nouveau
+  session_id.
+- `www/profile.php` : nouveau `revoke_all_others` → DELETE sauf session courante,
+  bouton UI visible si > 1 session active.
+
+### Password history + HIBP (v1.14.6, commit d4effb5)
+
+- Migration 038 : `password_history(user_id, password_hash, changed_at)` + index + FK CASCADE.
+- `www/auth/password_policy.php` : helper centralise
+  - `passwordPolicyCheckComplexity()` : 15 chars + 4 classes
+  - `passwordPolicyCheckHistory()` : refuse les 5 derniers + courant via `password_verify`
+  - `passwordPolicyCheckHIBP()` : k-anonymity, opt-in `HIBP_ENABLED=true`,
+    SHA1 + 5 hex + timeout 3s + fail-open
+  - `passwordPolicyValidateAll()` : pipeline
+  - `passwordPolicyRecordOld()` : archive l'ancien hash + purge a 10 entrees/user
+- Integre dans `profile.php` (change password) et `reset_password.php` (forgot flow).
+
+### RGPD self-service (v1.14.7, commit edfb383)
+
+- `www/profile/export.php` : dump JSON des donnees du user connecte, couvre
+  users, permissions, user_machine_access, user_logs (16 premiers chars du
+  self_hash), login_history, active_sessions (session_id masque),
+  notification_preferences, password_history metas. Superadmin : +api_keys.
+  Content-Disposition attachment + audit log `[rgpd]`.
+- `www/adm/api/anonymize_user.php` : soft-delete PII conservant l'audit log.
+  Effacement : `name=deleted-{id}`, email/company/ssh_key/totp/password = NULL,
+  active=0. Revocation : sessions, tokens, password_history, prefs, permissions,
+  machine_access. Protections : pas d'auto-anonymisation, pas de dernier SA.
+  Justifie RGPD art. 17.3.e (interet legitime securite).
+- UI : card "Donnees personnelles (RGPD)" dans profile.php avec bouton
+  d'export + note sur le contenu.
+
+---
+
+# Architecture & Carte des fichiers — RootWarden v1.14.4
+
+## Security hardening v1.14.1 → v1.14.4 (audit DevSecOps response)
+
+### Brute-force protection (v1.14.1, commit 7e990f5)
+
+Couche **per-user** ajoutee au rate limit IP existant.
+
+- Migration 035 : `users.failed_attempts`, `users.locked_until`, `users.last_failed_login_at`.
+  `login_attempts.username`, `login_attempts.success`, index `idx_ip_username_time`.
+- `www/auth/login.php::computeUserLockoutSeconds()` : 3=60s, 4=300s, 5=900s, 6=3600s, 7+=14400s.
+- `detectPasswordSpraying()` : `COUNT(DISTINCT username)` par IP/10min, seuil 5 → log `[security]`.
+- Check `locked_until > NOW()` **avant** `password_verify` → pas d'oracle sur le verrou.
+- `www/adm/api/unlock_user.php` (superadmin only) : reset `failed_attempts=0`, `locked_until=NULL`.
+- UI `manage_users.php` : badge `🔒 Verrouille X min`, badge `N ⚠` (3+ echecs), bouton `🔓 Deverrouiller`.
+
+### Audit log tamper-evident (v1.14.2, commit 62ea0f0)
+
+Hash chain SHA2-256 sur `user_logs`.
+
+- Migration 036 : `user_logs.prev_hash`, `user_logs.self_hash`, index `idx_self_hash`.
+- Algo : `self_hash = SHA2-256(prev_hash | user_id | action | unix_ts)`, genesis = `'GENESIS'`.
+- Helper PHP `www/adm/includes/audit_log.php::audit_log_raw()` : transaction + `SELECT … FOR UPDATE` sur la derniere `self_hash` + INSERT scelle.
+- Endpoints superadmin :
+  - `POST /adm/api/audit_seal.php` : walks `WHERE self_hash IS NULL ORDER BY id ASC` et seale en chaine.
+  - `GET /adm/api/audit_verify.php` : recompute toute la chaine, retourne `integrity: OK` ou `BROKEN` avec `error.type` (MISMATCH | PREV_BROKEN) + `id`.
+- UI `www/adm/audit_log.php` : boutons `🔒 Verifier integrite` + `🖋 Sceller orphelines`.
+- Limitation connue : pas de KMS externe, un attaquant avec DB+code peut recalculer. Mitigation future : cloud WORM.
+
+### CI security (v1.14.3, commit cc56755)
+
+Addition a `.github/workflows/ci.yml` des scans manquants.
+
+- **secrets-scan** (gitleaks) : `fetch-depth: 0`, config `.gitleaks.toml` avec allowlist `.example` / README / helpers.mjs / vendor.
+- **sast-python** (bandit) : config `backend/bandit.yml` (skip B101/B404/B603/B607 legitimes, garde B608).
+- **sca-python** (pip-audit) : warning en PR, strict sur main.
+- **sca-php** (composer audit --locked) : warning en PR, strict sur main.
+- **trivy-fs** : scan repo (requirements, composer.lock, Dockerfiles, secrets, misconfig).
+- `auto-tag` depend de tous ces jobs → une CVE critique empeche le tag de release.
+
+### API keys segmentees (v1.14.4, commit 5c04d2e)
+
+Remplace `Config.API_KEY` unique par table multi-key avec scope.
+
+- Migration 037 : `api_keys(id, name, key_prefix, key_hash, scope_json, revoked_at, last_used_at, last_used_ip)`. Permission `can_manage_api_keys`.
+- `backend/routes/helpers.py::_validate_api_key_from_db(raw_key, route_path)` : hash SHA-256, check `revoked_at`, scope = liste de regex dont au moins une doit match `request.path`. Update `last_used_at` best-effort.
+- Fallback legacy : tant que la table est vide, `Config.API_KEY` reste valide → transition zero-downtime.
+- UI `www/adm/api_keys.php` : generation format `rw_live_XXXXXX_...`, affichage du secret en clair **une seule fois**, revocation soft.
+
+---
+
 # Architecture & Carte des fichiers — RootWarden v1.14.0
 
 ## Module Bashrc (v1.14.0)

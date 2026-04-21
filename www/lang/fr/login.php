@@ -10,6 +10,7 @@ return [
     'login.error_credentials' => 'Nom d\'utilisateur ou mot de passe incorrect.',
     'login.error_rate_limit' => 'Trop de tentatives de connexion. Reessayez dans 10 minutes.',
     'login.error_locked' => 'Compte temporairement verrouille. Trop de tentatives echouees. Reessayez dans :minutes minute(s).',
+    'login.error_user_locked' => 'Ce compte est verrouille apres plusieurs echecs consecutifs. Reessayez dans :minutes minute(s) ou contactez un administrateur.',
     'login.session_expired' => 'Votre session a expire. Veuillez vous reconnecter.',
     'login.password_expired' => 'Votre mot de passe a expire. Changez-le dans votre profil apres connexion.',
     'forgot.title' => 'Reinitialisation du mot de passe',

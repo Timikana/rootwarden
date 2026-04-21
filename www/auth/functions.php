@@ -72,6 +72,23 @@ function initializeUserSession(array $user): void
 
     // Charger les permissions depuis la base de donnees (source de verite)
     $_SESSION['permissions'] = getVerifiedPermissions($_SESSION['user_id']);
+
+    // Enregistrer la session cote DB avec le NOUVEAU session_id (post-regenerate).
+    // Indispensable pour que le check active_sessions dans verify.php passe ET
+    // pour que le bouton "Revoquer" de profile.php ait un effet server-side reel.
+    try {
+        $stmt = $pdo->prepare(
+            "REPLACE INTO active_sessions (session_id, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)"
+        );
+        $stmt->execute([
+            session_id(),
+            (int)$_SESSION['user_id'],
+            $_SERVER['REMOTE_ADDR'] ?? '',
+            substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500)
+        ]);
+    } catch (\Exception $e) {
+        error_log('initializeUserSession: active_sessions REPLACE failed: ' . $e->getMessage());
+    }
 }
 
 /**

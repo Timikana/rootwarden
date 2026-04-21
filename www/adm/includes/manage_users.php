@@ -149,7 +149,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Récupérer les utilisateurs
-$stmt = $pdo->query("SELECT u.id, u.name, u.company, u.email, u.ssh_key, u.ssh_key_updated_at, u.active, u.sudo, u.totp_secret, u.created_at, u.password_expiry_override, u.password_updated_at, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id ORDER BY u.name");
+$stmt = $pdo->query("SELECT u.id, u.name, u.company, u.email, u.ssh_key, u.ssh_key_updated_at, u.active, u.sudo, u.totp_secret, u.created_at, u.password_expiry_override, u.password_updated_at, u.failed_attempts, u.locked_until, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id ORDER BY u.name");
+// Role courant pour afficher/masquer le bouton de deverrouillage (superadmin only)
+$_mu_isSA = (int)($_SESSION['role_id'] ?? 0) === 3;
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Récupérer les serveurs (si vous en avez besoin pour l'affichage)
@@ -218,6 +220,17 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
                     <?php if ($hasKey): ?>
                         <span class="text-[10px] px-1.5 py-0.5 rounded-full <?= $keyOld ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' ?>"><?= $keyOld ? t('users.badge_ssh_key_old', ['days' => $keyAge]) : t('users.badge_ssh_key') ?></span>
                     <?php endif; ?>
+                    <?php
+                    // Badge compte verrouille (per-user lockout, migration 035)
+                    $_lockedUntilTs = !empty($user['locked_until']) ? strtotime($user['locked_until']) : 0;
+                    $_isLocked = $_lockedUntilTs > time();
+                    if ($_isLocked):
+                        $_lockMin = (int)ceil(($_lockedUntilTs - time()) / 60);
+                    ?>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-200 text-red-800 dark:bg-red-900/60 dark:text-red-200" title="<?= t('users.locked_tooltip') ?>">🔒 <?= t('users.badge_locked', ['minutes' => $_lockMin]) ?></span>
+                    <?php elseif ((int)($user['failed_attempts'] ?? 0) >= 3): ?>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" title="<?= t('users.failed_tooltip') ?>"><?= (int)$user['failed_attempts'] ?> ⚠</span>
+                    <?php endif; ?>
                 </div>
             </summary>
             <!-- Detail (visible quand ouvert) -->
@@ -251,6 +264,11 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
                                 class="text-xs px-3 py-1 rounded border <?= $user['active'] ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30' : 'border-green-300 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/30' ?> transition-colors"><?= $user['active'] ? t('users.btn_deactivate') : t('users.btn_activate') ?></button>
                         <button hx-post="api/toggle_sudo.php" hx-vals='{"user_id": <?= (int)$user['id'] ?>}' hx-swap="outerHTML"
                                 class="text-xs px-3 py-1 rounded border border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors"><?= $user['sudo'] ? t('users.btn_remove_sudo') : t('users.btn_grant_sudo') ?></button>
+                        <?php if ($_mu_isSA && ($_isLocked || (int)($user['failed_attempts'] ?? 0) > 0)): ?>
+                        <button onclick="unlockUser(<?= (int)$user['id'] ?>, '<?= htmlspecialchars(addslashes($user['name'])) ?>')"
+                                class="text-xs px-3 py-1 rounded border border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-900/30 transition-colors"
+                                title="<?= t('users.btn_unlock_tip') ?>">🔓 <?= t('users.btn_unlock') ?></button>
+                        <?php endif; ?>
                         <button onclick="deleteUser(<?= (int)$user['id'] ?>, '<?= htmlspecialchars(addslashes($user['name'])) ?>')" class="text-xs px-3 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"><?= t('users.btn_delete') ?></button>
                     </div>
                 </div>
@@ -339,6 +357,29 @@ function filterUserCards(query) {
 
     // toggleUserStatus() et toggleSudo() sont maintenant geres par htmx
     // (hx-post sur les boutons dans le template PHP)
+
+    async function unlockUser(userId, userName) {
+        if (!confirm((__('users.confirm_unlock') || 'Deverrouiller ce compte et effacer le compteur d echecs ?') + '\n\n' + userName)) return;
+        try {
+            const res = await fetch('/adm/api/unlock_user.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    csrf_token: '<?= htmlspecialchars($_SESSION['csrf_token']) ?>',
+                    user_id: userId
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                (typeof showNotification === 'function' ? showNotification : alert)(__('users.unlocked_success') || 'Compte deverrouille.', 'success');
+                setTimeout(() => location.reload(), 600);
+            } else {
+                alert(data.message || 'Echec');
+            }
+        } catch (e) {
+            alert('Erreur: ' + e.message);
+        }
+    }
 
     function deleteUser(userId, userName) {
         if (!confirm(__('users.confirm_delete_user', {name: userName}))) {
