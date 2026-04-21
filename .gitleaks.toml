@@ -1,0 +1,39 @@
+title = "RootWarden gitleaks config"
+
+# Utilise la baseline par defaut de gitleaks (regex pour AWS keys, GitHub tokens,
+# stripe keys, slack tokens, generic private keys, etc.) et ajoute nos patterns.
+
+[extend]
+useDefault = true
+
+# ── Allowlist : patterns qui peuvent matcher mais qu'on veut ignorer ──────────
+
+[[rules]]
+id = "rootwarden-example-secret"
+description = "Placeholder strings dans srv-docker.env.example et docs"
+regex = '''(?i)(change[_-]?me|replace[_-]?me|your[_-]?key[_-]?here|openssl[[:space:]]+rand)'''
+# Ces chaines apparaissent dans les .example — pas de secret reel
+[rules.allowlist]
+regexes = ['''(?i)example''']
+
+# ── Allowlist globale ─────────────────────────────────────────────────────────
+
+[allowlist]
+# Fichiers systematiquement ignores
+paths = [
+    '''(?i)\.example$''',
+    '''srv-docker\.env\.example''',
+    '''README(\.[a-z]+)?\.md''',
+    '''CHANGELOG\.md''',
+    '''ARCHITECTURE\.md''',
+    '''tests/e2e/helpers\.mjs''',     # contient un TOTP_SECRET de test documente
+    '''mysql/init\.sql''',
+    '''www/vendor/''',
+    '''backend/tests/''',
+]
+
+# Commentaires explicites "not-a-secret"
+regexes = [
+    '''not[_-]?a[_-]?secret''',
+    '''test[_-]?(api[_-]?)?key[_-]?for[_-]?ci''',
+]

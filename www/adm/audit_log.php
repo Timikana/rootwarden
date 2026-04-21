@@ -82,6 +82,18 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= $total ?> <?= t('audit.entries_total') ?></p>
         </div>
         <div class="flex gap-2">
+            <?php if ((int)($_SESSION['role_id'] ?? 0) === 3): ?>
+            <button onclick="auditVerifyIntegrity()" id="btn-verify-audit"
+                    class="inline-flex items-center gap-1 text-sm px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                    title="<?= t('audit.btn_verify_tip') ?>">
+                🔒 <?= t('audit.btn_verify') ?>
+            </button>
+            <button onclick="auditSealOrphans()" id="btn-seal-audit"
+                    class="inline-flex items-center gap-1 text-sm px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                    title="<?= t('audit.btn_seal_tip') ?>">
+                🖋 <?= t('audit.btn_seal') ?>
+            </button>
+            <?php endif; ?>
             <a href="?export=csv&user=<?= urlencode($filterUser) ?>&action=<?= urlencode($filterAction) ?>"
                class="inline-flex items-center gap-1 text-sm px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -90,6 +102,53 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             <a href="/adm/admin_page.php" class="text-sm px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"><?= t('audit.btn_back_admin') ?></a>
         </div>
     </div>
+
+    <div id="audit-verify-result" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <script>
+    async function auditVerifyIntegrity() {
+        const el = document.getElementById('audit-verify-result');
+        el.classList.remove('hidden', 'bg-green-50', 'bg-red-50', 'bg-yellow-50', 'text-green-700', 'text-red-700', 'text-yellow-700', 'border-green-300', 'border-red-300', 'border-yellow-300', 'border');
+        el.classList.add('border', 'border-gray-300', 'bg-gray-50', 'text-gray-600');
+        el.textContent = '⏳ Verification de la chaine de hash en cours...';
+        try {
+            const r = await fetch('/adm/api/audit_verify.php');
+            const d = await r.json();
+            el.classList.remove('border-gray-300', 'bg-gray-50', 'text-gray-600');
+            if (d.integrity === 'OK') {
+                el.classList.add('border-green-300', 'bg-green-50', 'text-green-700');
+                el.innerHTML = `✅ Chaine intacte — <b>${d.sealed}</b> lignes scellees, <b>${d.unsealed}</b> non scellees, tete=<code>${d.chain_head || 'aucune'}</code>`;
+            } else {
+                el.classList.add('border-red-300', 'bg-red-50', 'text-red-700');
+                el.innerHTML = `❌ <b>INCOHERENCE DETECTEE</b> — type=<code>${d.error.type}</code> ligne #${d.error.id}<br><small>${d.error.message}</small>`;
+            }
+        } catch (e) {
+            el.classList.add('border-red-300', 'bg-red-50', 'text-red-700');
+            el.textContent = '✗ Erreur : ' + e.message;
+        }
+    }
+
+    async function auditSealOrphans() {
+        const el = document.getElementById('audit-verify-result');
+        el.classList.remove('hidden');
+        el.className = 'mb-4 p-3 rounded-lg text-sm border border-gray-300 bg-gray-50 text-gray-600';
+        el.textContent = '⏳ Scellement des lignes orphelines...';
+        const csrf = '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
+        try {
+            const r = await fetch('/adm/api/audit_seal.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+                body: JSON.stringify({ csrf_token: csrf })
+            });
+            const d = await r.json();
+            el.className = 'mb-4 p-3 rounded-lg text-sm border border-yellow-300 bg-yellow-50 text-yellow-700';
+            el.innerHTML = `🖋 Scelle : <b>${d.sealed}</b> lignes sur ${d.unsealed_count} orphelines. Tete=<code>${d.latest_hash}</code>`;
+        } catch (e) {
+            el.className = 'mb-4 p-3 rounded-lg text-sm border border-red-300 bg-red-50 text-red-700';
+            el.textContent = '✗ Erreur : ' + e.message;
+        }
+    }
+    </script>
 
     <!-- Filtres -->
     <form class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 flex items-end gap-4">

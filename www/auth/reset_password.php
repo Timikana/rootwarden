@@ -94,11 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
         $newPassword     = $_POST['password'] ?? '';
         $confirmPassword = $_POST['password_confirm'] ?? '';
 
-        if (strlen($newPassword) < 8) {
-            $message = t('reset.error_short');
-            $messageType = 'error';
-        } elseif ($newPassword !== $confirmPassword) {
+        // Politique centralisee : complexite (15 chars + 4 classes) + historique + HIBP
+        require_once __DIR__ . '/password_policy.php';
+        $policyError = null;
+        if ($newPassword !== $confirmPassword) {
             $message = t('reset.error_mismatch');
+            $messageType = 'error';
+        } elseif (($policyError = passwordPolicyValidateAll($pdo, $uid, $newPassword)) !== null) {
+            $message = t($policyError);
             $messageType = 'error';
         } else {
             try {
@@ -110,6 +113,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
                     $tokenValid = false;
                 } else {
                     $pdo->beginTransaction();
+
+                    // Enregistrer l'ANCIEN hash dans password_history avant l'UPDATE
+                    $oldHashRow = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+                    $oldHashRow->execute([$uid]);
+                    $oldHash = $oldHashRow->fetchColumn();
+                    if ($oldHash) passwordPolicyRecordOld($pdo, (int)$uid, (string)$oldHash);
 
                     // Mettre a jour le mot de passe et effacer le flag force_password_change
                     $hash = password_hash($newPassword, PASSWORD_BCRYPT);

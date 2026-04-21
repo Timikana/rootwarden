@@ -727,6 +727,87 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- 9d-bis. Hardening v1.14.1+ (audit DevSecOps) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="hardening-v1-14" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Hardening securite v1.14.1 → v1.14.4</h2>
+                <p class="text-sm mb-3">4 ameliorations issues de l'audit DevSecOps 2026-04-20. Chacune est retrocompatible (pas de breaking change) et deploye automatiquement via migrations 035-037.</p>
+
+                <h3 class="font-semibold mb-2">🔒 Brute-force per-user avec backoff progressif</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Couche per-user en plus du rate limit IP existant (5 tentatives / 10 min)</li>
+                    <li>Progression : 3 echecs = 1 min, 4 = 5 min, 5 = 15 min, 6 = 1h, 7+ = 4h</li>
+                    <li>Detection <strong>password spraying</strong> : une IP testant &ge; 5 usernames distincts en 10 min declenche une alerte superadmin dans l'audit log (<code>[security]</code> prefix)</li>
+                    <li>Check <code>locked_until</code> <strong>avant</strong> <code>password_verify</code> → pas d'oracle sur le verrou</li>
+                    <li>UI : badge <code>🔒 Verrouille</code> + bouton <code>🔓 Deverrouiller</code> (superadmin) dans la liste des users</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">🛡 Audit log tamper-evident (hash chain)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Chaque ligne <code>user_logs</code> scellee par SHA2-256(<code>prev_hash | user_id | action | unix_ts</code>)</li>
+                    <li>Helper <code>audit_log_raw()</code> dans <code>www/adm/includes/audit_log.php</code> calcule et ecrit le hash atomiquement</li>
+                    <li>Bouton <strong>🔒 Verifier integrite</strong> dans l'audit log (superadmin) : detecte MISMATCH (ligne modifiee) ou PREV_BROKEN (ligne inseree/supprimee)</li>
+                    <li>Bouton <strong>🖋 Sceller orphelines</strong> : pour les INSERTs legacy (Python blueprints) qui laissent <code>self_hash</code> NULL</li>
+                    <li>Endpoints : <code>GET /adm/api/audit_verify.php</code> + <code>POST /adm/api/audit_seal.php</code></li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">🔑 API keys segmentees avec scope</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Nouvelle UI <code>/adm/api_keys.php</code> (superadmin + permission <code>can_manage_api_keys</code>)</li>
+                    <li>Creation genere un secret au format <code>rw_live_XXXXXX_&lt;40hex&gt;</code> stocke en SHA-256 (secret affiche <strong>une seule fois</strong>)</li>
+                    <li>Scope = liste de regex de route (1 par ligne). Ex : <code>^/cve/</code> autorise uniquement <code>/cve_scan</code>, <code>/cve_results</code>, etc. Vide = ALL</li>
+                    <li>Tracking <code>last_used_at</code> + <code>last_used_ip</code> (detection cles dormantes)</li>
+                    <li>Revocation soft via <code>revoked_at</code>, cle rejetee au prochain usage</li>
+                    <li><strong>Compat</strong> : <code>Config.API_KEY</code> legacy fonctionne tant que la table est vide (zero-downtime)</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">⚙ CI supply-chain security</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>gitleaks</strong> : detecte les secrets commit par accident (cle AWS/GitHub/Stripe/Slack/SSH)</li>
+                    <li><strong>bandit</strong> : SAST Python (SQL injection, shell injection, hardcoded secrets)</li>
+                    <li><strong>pip-audit</strong> : CVE sur <code>backend/requirements.txt</code></li>
+                    <li><strong>composer audit</strong> : CVE sur <code>www/composer.lock</code></li>
+                    <li><strong>trivy fs</strong> : scan filesystem complet (vuln + secret + misconfig IaC)</li>
+                    <li>Chainage : <code>auto-tag</code> depend de tous ces jobs → une CVE critique bloque le release tag</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">🚪 Session revocation server-side (v1.14.5)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>verify.php</code> verifie <code>active_sessions</code> a chaque requete. Une revocation UI a un effet immediat.</li>
+                    <li>Bouton "🚪 Deconnecter les autres sessions" dans le profile (si >1 session active)</li>
+                    <li>Vol de cookie session → victime clique "Revoquer" → le cookie vole est invalide au prochain request</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">🔁 Password history + HIBP (v1.14.6)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Table <code>password_history</code> : refuse la reutilisation des <strong>5 derniers</strong> mots de passe</li>
+                    <li>Verifie aussi contre le password courant (ne pas remettre le meme)</li>
+                    <li>HaveIBeenPwned check <strong>opt-in</strong> via <code>HIBP_ENABLED=true</code> :
+                        <ul class="list-disc list-inside ml-4 text-xs text-gray-500">
+                            <li>K-anonymity : envoi uniquement des 5 premiers hex du SHA1 du password</li>
+                            <li>Seuil configurable <code>HIBP_THRESHOLD</code> (defaut 10 fuites)</li>
+                            <li>Timeout 3s, fail-open si API injoignable</li>
+                        </ul>
+                    </li>
+                    <li>S'applique a <code>/profile.php</code> (change password) et <code>/auth/reset_password.php</code> (forgot flow)</li>
+                </ul>
+
+                <h3 class="font-semibold mb-2">📥 RGPD self-service (v1.14.7)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Route <code>/profile/export.php</code> : tout user telecharge ses donnees personnelles au format JSON</li>
+                    <li>Contenu : profil, permissions, user_machine_access, user_logs (metas + 16 chars de self_hash), login_history, active_sessions (session_id masque), notification_preferences, password_history metas</li>
+                    <li>Aucune donnee sensible : pas de hash de mot de passe, session_id tronques</li>
+                    <li>Endpoint admin <code>/adm/api/anonymize_user.php</code> (superadmin) : <strong>soft-delete</strong> RGPD art. 17 preservant les user_logs pour tracabilite securite (art. 17.3.e)
+                        <ul class="list-disc list-inside ml-4 text-xs text-gray-500">
+                            <li>Effacement : name = <code>deleted-{id}</code>, email/company/ssh_key/totp = NULL, active=0</li>
+                            <li>Revocation : toutes sessions + remember_tokens + password_history + prefs + permissions + machine_access</li>
+                            <li>Protections : pas d'auto-anonymisation + pas de dernier superadmin</li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- 9e. Session & timeout                     -->
             <!-- ────────────────────────────────────────── -->
             <section id="session" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
