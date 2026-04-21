@@ -19,7 +19,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # Job 1 : Lint Python (ruff — plus rapide que flake8)
+  # Job 1 : Lint Python (ruff - plus rapide que flake8)
   # ─────────────────────────────────────────────────────────────
   lint-python:
     name: Lint Python (ruff)
@@ -40,10 +40,10 @@ jobs:
 
       - name: Ruff format check
         run: ruff format --check backend/ || true
-        # Non-bloquant pour l'instant — format progressif
+        # Non-bloquant pour l'instant - format progressif
 
   # ─────────────────────────────────────────────────────────────
-  # Job 2 : Lint PHP (php -l — verifie la syntaxe)
+  # Job 2 : Lint PHP (php -l - verifie la syntaxe)
   # ─────────────────────────────────────────────────────────────
   lint-php:
     name: Lint PHP (syntax check)
@@ -104,7 +104,7 @@ jobs:
           path: test-results.xml
 
   # ─────────────────────────────────────────────────────────────
-  # Job 4 : Build Docker images (sans push — validation only)
+  # Job 4 : Build Docker images (sans push - validation only)
   # ─────────────────────────────────────────────────────────────
   build-docker:
     name: Build Docker images
@@ -137,7 +137,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────
-  # Job 4.1 : Gitleaks — detection de secrets commit (API keys, tokens)
+  # Job 4.1 : Gitleaks - detection de secrets commit (API keys, tokens)
   # ─────────────────────────────────────────────────────────────
   secrets-scan:
     name: Secrets scan (gitleaks)
@@ -154,7 +154,7 @@ jobs:
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
 
   # ─────────────────────────────────────────────────────────────
-  # Job 4.2 : Bandit — SAST Python (SQL inj, shell inj, hardcoded secrets)
+  # Job 4.2 : Bandit - SAST Python (SQL inj, shell inj, hardcoded secrets)
   # ─────────────────────────────────────────────────────────────
   sast-python:
     name: SAST Python (bandit)
@@ -178,7 +178,7 @@ jobs:
           exit ${EXIT:-0}
 
   # ─────────────────────────────────────────────────────────────
-  # Job 4.3 : SCA Python (safety + pip-audit — CVE sur dependencies)
+  # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
   # ─────────────────────────────────────────────────────────────
   sca-python:
     name: SCA Python (pip-audit)
@@ -203,7 +203,7 @@ jobs:
           fi
 
   # ─────────────────────────────────────────────────────────────
-  # Job 4.4 : SCA PHP (composer audit — CVE sur dependances Composer)
+  # Job 4.4 : SCA PHP (composer audit - CVE sur dependances Composer)
   # ─────────────────────────────────────────────────────────────
   sca-php:
     name: SCA PHP (composer audit)
@@ -230,7 +230,7 @@ jobs:
           fi
 
   # ─────────────────────────────────────────────────────────────
-  # Job 4.5 : Trivy fs — scan vulnerabilites au niveau du repo
+  # Job 4.5 : Trivy fs - scan vulnerabilites au niveau du repo
   # (complement au scan des images Docker plus bas)
   # ─────────────────────────────────────────────────────────────
   trivy-fs:
