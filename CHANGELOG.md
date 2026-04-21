@@ -326,6 +326,74 @@ inchange — il agit en premiere ligne contre les attaques distribuees.
 
 ---
 
+## [1.15.0] — 2026-04-20
+
+### Module Graylog — forwarding rsyslog + templates editables
+
+Approche rsyslog native (pas de sidecar Graylog) : plus simple, footprint
+minimal, streams et extractors geres cote admin directement sur Graylog.
+
+- **Nouveau blueprint Flask** `backend/routes/graylog.py` avec 9 routes :
+  `GET/POST /graylog/config`, `GET /graylog/servers`, `POST /graylog/deploy|test|uninstall`,
+  `GET /graylog/templates`, `GET/POST/DELETE /graylog/templates/<name>`.
+- **Deploiement via SSH root** : installe rsyslog si absent (`apt install rsyslog`,
+  `rsyslog-gnutls` si protocol=tls), ecrit `/etc/rsyslog.d/99-rootwarden-graylog-forward.conf`
+  avec la regle `*.* @host:port` adaptee au protocole, valide syntaxe (`rsyslogd -N1`),
+  redemarre `systemctl restart rsyslog`.
+- **4 protocoles supportes** : UDP (default 514, lossy), TCP (514, reliable),
+  TLS (6514, chiffre, CA configurable), RELP (20514, ACK applicatif via omrelp).
+- **Rate limiting optionnel** : `$SystemLogRateLimitBurst` / `Interval`.
+- **3 tables** : `graylog_config` (host, port, protocol, TLS CA, rate limit),
+  `graylog_templates` (snippets rsyslog editables via UI, 4 seeds dont
+  apache-access, mysql-slow, auth-log), `graylog_rsyslog` (etat par machine).
+- **Templates** : chaque template est pousse dans
+  `/etc/rsyslog.d/50-rootwarden-<name>.conf` au deploiement si `enabled=TRUE`.
+- **Test de forwarding** : `logger -t rootwarden-test` depuis le serveur distant
+  avec tag horodate a rechercher dans Graylog Search.
+- **UI 4 onglets** : Configuration (host/port/proto/TLS), Deploiement
+  (tableau serveurs + deploy/test/uninstall), Templates (liste + editeur +
+  toggle enabled + save/delete), Historique.
+- **Permission `can_manage_graylog`** (migration 033).
+
+### Module Wazuh — agent SIEM + rules/decoders/CDB editables
+
+- **Nouveau blueprint Flask** `backend/routes/wazuh.py` avec 11 routes :
+  `GET/POST /wazuh/config`, `GET /wazuh/servers`, `POST /wazuh/install|uninstall|restart|group`,
+  `GET/POST /wazuh/options`, `GET /wazuh/rules`, `GET/POST/DELETE /wazuh/rules/<name>`.
+- **Installation agent via SSH** : repo Wazuh + `apt install wazuh-agent` avec
+  `WAZUH_MANAGER` / `WAZUH_REGISTRATION_PASSWORD` / `WAZUH_AGENT_GROUP` en env.
+- **4 tables** : `wazuh_config` (manager IP/port, password enrolement chiffre,
+  default group, API manager), `wazuh_rules` (rules/decoders/CDB editables avec
+  validation `xmllint` backend), `wazuh_agents` (etat agent par machine),
+  `wazuh_machine_options` (FIM paths, active response, SCA, rootcheck, log_format,
+  syscheck_frequency).
+- **UI 5 onglets** : Configuration (manager + API), Deploiement (tableau agents
+  avec badges statut + install/restart/uninstall/setgroup), Options (FIM paths
+  par serveur + toggles SCA/rootcheck/active response), Rules & Decoders
+  (editeur XML avec validation xmllint), Historique.
+- **Permission `can_manage_wazuh`** (migration 034).
+
+### Securite
+
+- Zero trust : `@require_api_key` + `@require_role(2)` + `@require_permission`
+  + `@require_machine_access` + `@threaded_route` sur toutes les routes
+- Tous les passwords chiffres via `Encryption` (prefix `aes:`, label HKDF
+  `rootwarden-aes`) — jamais renvoyes au client en clair
+- Validation stricte : regex noms (`^[a-zA-Z0-9_-]{1,100}$`), IPs/FQDN, groupes
+- Contenu configs/rules transmis exclusivement en base64 via SSH
+- Validation `xmllint --noout` pour rules/decoders Wazuh
+- Validation YAML best-effort pour collectors filebeat Graylog
+- audit_log (prefix `[graylog]` / `[wazuh]`) sur chaque action
+
+### Cohérence
+
+- 2 nouvelles cards dans le dashboard (conditionnelles sur permissions)
+- Entrees sidebar desktop + mobile + case manage_permissions
+- API proxy allowlist mise a jour (2 nouvelles permissions)
+- Version `1.14.0` → `1.15.0`
+
+---
+
 ## [1.14.0] — 2026-04-20
 
 ### Module Bashrc — deploiement standardise du .bashrc par utilisateur + template editable

@@ -2374,3 +2374,204 @@ paths:
       responses:
         '200': { description: Template sauvegarde }
         '400': { description: Contenu vide ou trop volumineux }
+
+  # ── Graylog (rsyslog forwarding) ───────────────────────────────────────
+
+  /graylog/config:
+    get:
+      tags: [Graylog]
+      summary: Config serveur Graylog
+      responses:
+        '200': { description: Config }
+    post:
+      tags: [Graylog]
+      summary: Sauvegarde config (host/port/protocol/TLS/rate limit)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_host]
+              properties:
+                server_host: { type: string }
+                server_port: { type: integer }
+                protocol: { type: string, enum: [udp, tcp, tls, relp] }
+                tls_ca_path: { type: string }
+                ratelimit_burst: { type: integer }
+                ratelimit_interval: { type: integer }
+
+  /graylog/servers:
+    get:
+      tags: [Graylog]
+      summary: Liste machines + etat forwarding rsyslog
+
+  /graylog/deploy:
+    post:
+      tags: [Graylog]
+      summary: Installe rsyslog si absent + ecrit forward conf + push templates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+
+  /graylog/test:
+    post:
+      tags: [Graylog]
+      summary: Envoie un logger test depuis le serveur (tag horodate)
+
+  /graylog/uninstall:
+    post:
+      tags: [Graylog]
+      summary: Retire les fichiers RootWarden de /etc/rsyslog.d/
+
+  /graylog/templates:
+    get:
+      tags: [Graylog]
+      summary: Liste les templates rsyslog (metas)
+    post:
+      tags: [Graylog]
+      summary: Cree ou met a jour un template rsyslog
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, content]
+              properties:
+                name: { type: string, pattern: '^[a-zA-Z0-9_-]{1,100}$' }
+                description: { type: string }
+                content: { type: string }
+                enabled: { type: boolean }
+
+  /graylog/templates/{name}:
+    get:
+      tags: [Graylog]
+      summary: Retourne un template (contenu complet)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+    delete:
+      tags: [Graylog]
+      summary: Supprime un template
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+
+  # ── Wazuh ──────────────────────────────────────────────────────────────
+
+  /wazuh/config:
+    get:
+      tags: [Wazuh]
+      summary: Config Wazuh manager (passwords masques)
+    post:
+      tags: [Wazuh]
+      summary: Sauvegarde config manager
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manager_ip]
+              properties:
+                manager_ip: { type: string }
+                manager_port: { type: integer }
+                registration_port: { type: integer }
+                registration_password: { type: string }
+                default_group: { type: string }
+                agent_version: { type: string }
+                enable_active_response: { type: boolean }
+                api_url: { type: string }
+                api_user: { type: string }
+                api_password: { type: string }
+
+  /wazuh/servers:
+    get:
+      tags: [Wazuh]
+      summary: Liste des machines avec etat agent
+
+  /wazuh/install:
+    post:
+      tags: [Wazuh]
+      summary: Installe + enrole l'agent Wazuh
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+                group: { type: string }
+
+  /wazuh/uninstall:
+    post:
+      tags: [Wazuh]
+      summary: Desinstalle l'agent
+
+  /wazuh/restart:
+    post:
+      tags: [Wazuh]
+      summary: Redemarre le service wazuh-agent
+
+  /wazuh/group:
+    post:
+      tags: [Wazuh]
+      summary: Assigne un groupe a un agent
+
+  /wazuh/options:
+    get:
+      tags: [Wazuh]
+      summary: Options par serveur (FIM, AR, SCA, rootcheck)
+    post:
+      tags: [Wazuh]
+      summary: Sauvegarde options par serveur
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+                fim_paths:
+                  type: array
+                  items: { type: string }
+                active_response_enabled: { type: boolean }
+                log_format: { type: string }
+                sca_enabled: { type: boolean }
+                rootcheck_enabled: { type: boolean }
+                syscheck_frequency: { type: integer }
+
+  /wazuh/rules:
+    get:
+      tags: [Wazuh]
+      summary: Liste les rules/decoders/CDB
+    post:
+      tags: [Wazuh]
+      summary: Cree ou sauvegarde un rule (validation xmllint si rules/decoders)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, content]
+              properties:
+                name: { type: string }
+                rule_type: { type: string, enum: [rules, decoders, cdb] }
+                content: { type: string }
+
+  /wazuh/rules/{name}:
+    get:
+      tags: [Wazuh]
+      summary: Retourne un rule (contenu complet)
+    delete:
+      tags: [Wazuh]
+      summary: Supprime un rule

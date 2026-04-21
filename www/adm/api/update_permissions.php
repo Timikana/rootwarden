@@ -110,6 +110,8 @@ $allowedPermissions = [
     'can_audit_ssh',
     'can_manage_supervision',
     'can_manage_bashrc',
+    'can_manage_graylog',
+    'can_manage_wazuh',
 ];
 
 // Rejet immédiat si la permission n'est pas dans la liste autorisée
@@ -150,6 +152,8 @@ if ($success) {
             'can_audit_ssh' => ['Audit SSH', 'Audit config SSH'],
             'can_manage_supervision' => ['Supervision', 'Deploiement agents monitoring'],
             'can_manage_bashrc' => ['Bashrc', 'Deploiement .bashrc standardise'],
+            'can_manage_graylog' => ['Graylog', 'Sidecar + collectors'],
+            'can_manage_wazuh' => ['Wazuh', 'Agent SIEM + rules'],
         ];
         $info = $permLabels[$permission] ?? [$permission, ''];
         $checkedAttr = $checked ? 'checked' : '';

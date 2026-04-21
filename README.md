@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.14.7
+# 🔐 RootWarden v1.15.0
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -19,6 +19,8 @@
 - **Audit SSH** — Scanner sshd_config, scoring securite (A-F), correctifs en 1 clic, editeur config, backups/restore, toggle directives ON/OFF, reload sshd
 - **Supervision multi-agent** — Deploiement et configuration d'agents de monitoring via SSH. Supporte Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter et Telegraf. Config globale par plateforme, overrides par serveur, editeur de config distant, backups/restore, badges multi-agent, scan tous agents en 1 clic
 - **Bashrc standardise** — Deploiement d'un `.bashrc` unifie par utilisateur (banniere figlet, tableau sysinfo, alertes, prompt git-aware, alias). Mode overwrite ou merge (preservation blocs custom via `~/.bashrc.local`). Backup automatique, restore en 1 clic, validation syntaxique post-deploy, idempotence sha256, preview diff colorise.
+- **Graylog Sidecar** — Deploiement du Graylog Sidecar (filebeat/nxlog/winlogbeat) via SSH. Configuration serveur centralisee, collectors (templates YAML/XML) editables en base avec validation YAML, enregistrement automatique aupres du manager Graylog.
+- **Wazuh Agent** — Deploiement + enrolement de l'agent Wazuh aupres du manager. Gestion groupes, options FIM/active response/SCA/rootcheck par serveur, rules/decoders/CDB lists editables (validation xmllint). Integration API manager pour push des rules.
 - **Tags personnalisés** — Étiquetez vos serveurs (web, bdd, production, dmz…) et filtrez par tag
 
 ### Scan de vulnérabilités CVE

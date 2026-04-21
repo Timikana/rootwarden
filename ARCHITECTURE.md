@@ -1,4 +1,4 @@
-# Architecture & Carte des fichiers — RootWarden v1.14.7
+# Architecture & Carte des fichiers — RootWarden v1.15.0
 
 ## Security hardening v1.14.5 → v1.14.7 (suite audit DevSecOps)
 
@@ -91,6 +91,71 @@ Remplace `Config.API_KEY` unique par table multi-key avec scope.
 - `backend/routes/helpers.py::_validate_api_key_from_db(raw_key, route_path)` : hash SHA-256, check `revoked_at`, scope = liste de regex dont au moins une doit match `request.path`. Update `last_used_at` best-effort.
 - Fallback legacy : tant que la table est vide, `Config.API_KEY` reste valide → transition zero-downtime.
 - UI `www/adm/api_keys.php` : generation format `rw_live_XXXXXX_...`, affichage du secret en clair **une seule fois**, revocation soft.
+
+---
+
+## Modules Graylog + Wazuh (v1.15.0)
+
+Deux nouveaux modules orientes collecte de logs et securite SIEM, calques sur
+le pattern editable-template de Bashrc.
+
+### Graylog — `/graylog/`
+
+**Fichiers** : `backend/routes/graylog.py` (8 routes), `www/graylog/index.php`,
+`www/graylog/js/graylog.js`, `mysql/migrations/033_graylog.sql`,
+`www/lang/{fr,en}/graylog.php`.
+
+**Tables** :
+- `graylog_config` — singleton (url, token chiffre, TLS, version)
+- `graylog_collectors` — templates YAML/XML editables (filebeat/nxlog/winlogbeat)
+- `graylog_sidecars` — etat par machine
+
+**Flux install** :
+1. Repo `packages.graylog2.org` + `apt install graylog-sidecar`
+2. Ecriture `/etc/graylog/sidecar/sidecar.yml` via base64 (URL + token + TLS)
+3. `graylog-sidecar -service install` + `systemctl enable --now`
+4. Detection version via `graylog-sidecar -version`
+5. Upsert `graylog_sidecars` avec status=running
+
+**Editeur collector** : textarea YAML/XML, validation `yaml.safe_load` backend
+si type=filebeat, audit log `[graylog] save_collector`.
+
+### Wazuh — `/wazuh/`
+
+**Fichiers** : `backend/routes/wazuh.py` (11 routes), `www/wazuh/index.php`,
+`www/wazuh/js/wazuh.js`, `mysql/migrations/034_wazuh.sql`,
+`www/lang/{fr,en}/wazuh.php`.
+
+**Tables** :
+- `wazuh_config` — singleton (manager IP/port, reg password chiffre, default
+  group, agent version, active response global, API URL/user/pwd chiffre)
+- `wazuh_rules` — editable ruleset (rules/decoders/cdb)
+- `wazuh_agents` — etat par machine (agent_id, version, group, status)
+- `wazuh_machine_options` — options par serveur (FIM, AR, SCA, rootcheck, format)
+
+**Flux install** :
+1. Repo `packages.wazuh.com/4.x/apt/` + `apt install wazuh-agent`
+2. Env vars `WAZUH_MANAGER` / `WAZUH_REGISTRATION_PASSWORD` / `WAZUH_AGENT_GROUP`
+   appliquees au `apt install` → enrolement automatique via agent-auth
+3. `systemctl enable --now wazuh-agent`
+4. Lecture `/var/ossec/etc/client.keys` pour recuperer agent_id
+5. Upsert `wazuh_agents` avec status=pending
+
+**Editeur rules** : textarea XML (rules/decoders) ou plain text (CDB),
+validation `xmllint --noout` subprocess (temp file) pour XML, audit log.
+
+**Options par serveur** : FIM paths (JSON array, chaque path valide regex
+`^/[^;&|$\`]`), log_format whitelist, syscheck_frequency bornes [60..604800],
+checkboxes active_response / SCA / rootcheck.
+
+### Securite commune
+
+- Decorateurs complets sur chaque route
+- Passwords chiffres (`aes:` + HKDF `rootwarden-aes`), jamais renvoyes en clair
+- Usernames, groupes, noms : regex `^[a-zA-Z0-9_-]{1,100}$`
+- Contenu transmis exclusivement en base64 vers les serveurs SSH
+- audit_log prefix `[graylog]` / `[wazuh]` sur toute action (install, uninstall,
+  save_config, save_rule/collector, set_group, save_options)
 
 ---
 

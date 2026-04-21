@@ -39,8 +39,9 @@ FROM python:3.13-slim
 WORKDIR /app
 
 # Dependances runtime uniquement (pas de compilateur)
+# libxml2-utils : fournit xmllint pour la validation XML (module Wazuh)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl curl gosu \
+    openssl curl gosu libxml2-utils \
  && rm -rf /var/lib/apt/lists/*
 
 # Copier le virtualenv depuis le builder

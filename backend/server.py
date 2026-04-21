@@ -68,6 +68,8 @@ from routes.services import bp as services_bp
 from routes.ssh_audit import bp as ssh_audit_bp
 from routes.supervision import bp as supervision_bp
 from routes.bashrc import bp as bashrc_bp
+from routes.graylog import bp as graylog_bp
+from routes.wazuh import bp as wazuh_bp
 
 app.register_blueprint(monitoring_bp)
 app.register_blueprint(iptables_bp)
@@ -80,6 +82,8 @@ app.register_blueprint(services_bp)
 app.register_blueprint(ssh_audit_bp)
 app.register_blueprint(supervision_bp)
 app.register_blueprint(bashrc_bp)
+app.register_blueprint(graylog_bp)
+app.register_blueprint(wazuh_bp)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS manuel (compatible Hypercorn ASGI)
