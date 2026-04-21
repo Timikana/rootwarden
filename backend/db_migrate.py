@@ -309,6 +309,13 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
         cur.close()
         return
 
+    # Codes d'erreur MySQL tolerables dans les migrations (permet aux
+    # migrations idempotentes d'ajouter des colonnes/index meme si l'admin
+    # les a creees manuellement avant le run).
+    # 1060 : Duplicate column name ; 1061 : Duplicate key name ;
+    # 1091 : Can't drop ; 1826 : Duplicate foreign key.
+    IDEMPOTENT_ERROR_CODES = {1060, 1061, 1091, 1826}
+
     cur = conn.cursor()
     try:
         # Split par ';' et execute chaque statement individuellement.
@@ -316,13 +323,21 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
         # eviter "Unread result found" qui causait les echecs silencieux.
         statements = [s.strip() for s in sql_clean.split(';') if s.strip()]
         stmt_count = 0
+        tolerated = 0
         for stmt in statements:
             # Ignorer les commentaires purs
             lines = [l for l in stmt.splitlines() if not l.strip().startswith('--')]
             clean = '\n'.join(lines).strip()
             if not clean:
                 continue
-            cur.execute(clean)
+            try:
+                cur.execute(clean)
+            except mysql.connector.Error as e:
+                if getattr(e, 'errno', None) in IDEMPOTENT_ERROR_CODES:
+                    tolerated += 1
+                    _log.debug("  (tolere %s : %s)", e.errno, str(e)[:100])
+                    continue
+                raise
             stmt_count += 1
             # Consommer les resultats (SELECT, EXECUTE, SHOW, etc.)
             # Sans cela, le prochain execute() echoue silencieusement.
@@ -331,7 +346,11 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
                     cur.fetchall()
             except Exception:
                 pass
-        _log.info("  %d statement(s) execute(s)", stmt_count)
+        if tolerated:
+            _log.info("  %d statement(s) execute(s), %d tolere(s) idempotent(s)",
+                      stmt_count, tolerated)
+        else:
+            _log.info("  %d statement(s) execute(s)", stmt_count)
 
         # Enregistre la migration comme appliquee. ON DUPLICATE KEY UPDATE
         # gere les migrations qui s'auto-inserent dans schema_migrations
