@@ -226,7 +226,7 @@ def _build_config_lines(global_cfg, machine_row, overrides=None, profile=None):
     if host_metadata:
         lines['HostMetadata'] = host_metadata
 
-    # TLS — precedence overrides > profil > global
+    # TLS - precedence overrides > profil > global
     tls_connect = (overrides.get('TLSConnect')
                    or profile.get('tls_connect')
                    or global_cfg.get('tls_connect', 'unencrypted'))
