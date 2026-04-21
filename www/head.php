@@ -31,6 +31,18 @@ require_once __DIR__ . '/includes/lang.php';
 <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon.png">
 <link rel="apple-touch-icon" href="/img/favicon.png">
 <meta name="theme-color" content="#ffffff">
+<?php
+// CSRF token expose en meta pour les fetch JS et les tests E2E.
+// Utilise par htmx (via configRequest ligne 75), par les scripts des modules
+// (bashrc.js, graylog.js, wazuh.js, etc.) et par les endpoints PHP appelant
+// checkCsrfToken() qui supporte le header X-CSRF-TOKEN.
+// Session garantie active car lang.php a appele session_start() en amont.
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+?>
+<meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
 <link rel="stylesheet" href="/assets/css/tailwind.css?v=<?= filemtime(__DIR__ . '/assets/css/tailwind.css') ?>">
 <script src="/js/htmx.min.js"></script>
 <?php
