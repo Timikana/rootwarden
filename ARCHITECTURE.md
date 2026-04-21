@@ -1,3 +1,18 @@
+# Architecture & Carte des fichiers — RootWarden v1.15.1
+
+## CI/CD — SAST bandit fix (v1.15.1)
+
+- `.github/workflows/ci.yml` : ajoute `-c bandit.yml` a la commande bandit,
+  le fichier config n'etait pas charge auparavant.
+- `backend/bandit.yml` skips etendus (B108, B601, B413, B507, B608) avec
+  justifications inline — cf CHANGELOG v1.15.1.
+- Jobs CI actuels : `lint-python` (ruff), `lint-php`, `secrets-scan`
+  (gitleaks), `sast-python` (bandit), `sca-python` (pip-audit), `sca-php`
+  (composer audit --locked), `trivy-fs`, `tests-pytest`, `build-docker`,
+  `security-scan` (Trivy image), `auto-tag` (depend de tous).
+
+---
+
 # Architecture & Carte des fichiers — RootWarden v1.15.0
 
 ## Security hardening v1.14.5 → v1.14.7 (suite audit DevSecOps)

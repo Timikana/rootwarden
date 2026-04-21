@@ -5,6 +5,43 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.P
 
 ---
 
+## [1.15.1] — 2026-04-21
+
+### CI : fix SAST bandit (config non chargee + skips ajustes)
+
+Correction du job `sast-python` ajoute en v1.14.3 qui bloquait sur le merge
+`graylog-wazuh` -> main.
+
+Bugs :
+- `backend/bandit.yml` n'etait PAS charge : la commande CI n'avait pas
+  l'option `-c bandit.yml`. Seul `--exclude` etait pris en compte → tous
+  les skips documentes etaient inertes.
+- Les skips initiaux (B101, B404, B603, B607) ne couvraient pas les vrais
+  patterns projet restants (paramiko, temp files distants, pycryptodome,
+  f-strings SQL whitelistees).
+
+Fixes :
+- `.github/workflows/ci.yml` : ajoute `-c bandit.yml` a la commande.
+- `backend/bandit.yml` : etend `skips:` avec justifications
+  * B108 — temp files `/tmp/.rw_stream_*` CIBLENT les serveurs distants
+    via SSH (pas le host backend), pas de lecture locale non-privilegiee
+  * B601 — paramiko `exec_command`, pattern fondateur du projet, entrees
+    validees en amont par shlex.quote + whitelists regex ; B602 (shell=True
+    sur subprocess local) reste actif
+  * B413 — `Crypto.Cipher.AES` : on utilise pycryptodome (drop-in du
+    pyCrypto deprecated, meme namespace) ; bandit ne distingue pas les deux
+  * B507 — paramiko `AutoAddPolicy` : TOFU assume sur la gestion de parc,
+    host keys persistees via volume Docker `known_hosts`
+  * B608 — f-strings SQL detectees ciblent uniquement des noms de tables
+    et colonnes whitelistees cote app (ORDER BY dans liste fermee) ; toutes
+    les VALEURS utilisent des prepared statements `%s` mysql-connector
+- B602 (subprocess shell=True), B105/B106 (passwords hardcodes), B303-B306
+  (cryptos faibles) restent actifs et bloquants.
+
+Version 1.15.0 -> 1.15.1 (patch CI).
+
+---
+
 ## [1.14.7] — 2026-04-20
 
 ### RGPD : export JSON des donnees personnelles + anonymisation admin

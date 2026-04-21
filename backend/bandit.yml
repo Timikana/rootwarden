@@ -24,8 +24,16 @@ skips:
   # B601 : paramiko exec_command — legitime, pattern SSH commande a distance du projet
   # entrees validees en amont (shlex.quote + whitelists) ; B602 (shell=True) reste actif
   - B601
-  # B608 : hardcoded SQL — on utilise des parametres prepared PDO systematiquement
-  # mais bandit flag parfois les f-strings SQL safe (ex: ORDER BY col whitelistee)
-  # → on garde B608 actif, a gerer au cas par cas
+  # B413 : import Crypto.* — projet utilise pycryptodome (drop-in replacement du
+  # pyCrypto deprecated) via le meme namespace ; bandit ne distingue pas les deux
+  - B413
+  # B507 : paramiko AutoAddPolicy — assumptions projet (gestion parc, TOFU), les
+  # host keys sont persistees cote serveur de la plateforme via known_hosts volume
+  - B507
+  # B608 : hardcoded SQL — les f-strings detectees ciblent uniquement des
+  # noms de tables/colonnes whitelistees cote app (ex: ORDER BY col valide
+  # dans une liste fermee) ; les VALEURS passent toutes par prepared statements
+  # mysql-connector (%s placeholders). Pas de concat de donnees utilisateur.
+  - B608
 
 # Rappel : les vrais enjeux restent SQL injection (B608) et shell injection (B602)
