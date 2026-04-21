@@ -13,6 +13,7 @@ Routes :
 
 import json
 import logging
+import datetime
 from flask import Blueprint, jsonify, request
 
 from routes.helpers import (
@@ -224,7 +225,7 @@ def ssh_audit_scan_all():
     try:
         conn = get_db_connection()
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id FROM machines")
+        cur.execute("SELECT id, name, ip FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'")
         machines = cur.fetchall()
         conn.close()
     except Exception as e:
@@ -258,9 +259,17 @@ def ssh_audit_scan_all():
 
                 row = {
                     'machine_id': mid,
+                    'name': machine.get('name'),
+                    'server': machine.get('name'),  # alias pour le rendu front
+                    'ip': machine.get('ip'),
                     'score': result['score'],
                     'grade': result['grade'],
                     'counts': result['counts'],
+                    'critical_count': result['counts'].get('critical', 0),
+                    'high_count': result['counts'].get('high', 0),
+                    'ssh_version': ssh_version,
+                    'scanned_at': datetime.datetime.utcnow().isoformat() + 'Z',
+                    'last_scan': datetime.datetime.utcnow().isoformat() + 'Z',
                     'persisted': persisted,
                 }
                 if persist_err:

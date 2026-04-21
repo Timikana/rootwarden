@@ -156,6 +156,11 @@ try {
     <?php require_once 'menu.php'; ?>
 
     <main class="flex-grow p-8 max-w-screen-2xl mx-auto w-full">
+        <!-- Wizard d'onboarding (auto-detecte les etapes, dismissable) -->
+        <?php if (($_SESSION['role_id'] ?? 0) >= ROLE_ADMIN) {
+            require __DIR__ . '/includes/onboarding.php';
+        } ?>
+
         <!-- ── En-tête + alertes ──────────────────────────────────────── -->
         <div class="flex items-center justify-between mb-6">
             <div>
