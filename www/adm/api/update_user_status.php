@@ -1,6 +1,6 @@
 <?php
 /**
- * update_user_status.php — Mise à jour du statut d'un utilisateur (endpoint AJAX)
+ * update_user_status.php - Mise à jour du statut d'un utilisateur (endpoint AJAX)
  *
  * Rôle : met à jour un champ booléen (`active`, `sudo`, etc.) d'un utilisateur
  *        dans la table `users`. Cet endpoint est appelé depuis la fonction JavaScript

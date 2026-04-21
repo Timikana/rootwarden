@@ -1,4 +1,4 @@
-# hypercorn_config.py — Configuration du serveur ASGI Hypercorn
+# hypercorn_config.py - Configuration du serveur ASGI Hypercorn
 #
 # Hypercorn est utilisé comme serveur de production ASGI/WSGI pour Flask.
 # Il écoute sur toutes les interfaces du conteneur (:5000), uniquement accessible

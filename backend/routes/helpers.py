@@ -1,5 +1,5 @@
 """
-helpers.py — Decorateurs et fonctions partagees par tous les Blueprints.
+helpers.py - Decorateurs et fonctions partagees par tous les Blueprints.
 
 Importe depuis chaque module de route :
     from routes.helpers import require_api_key, threaded_route, get_db_connection, server_decrypt_password, logger

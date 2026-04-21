@@ -1,6 +1,6 @@
 <?php
 /**
- * menu.php — Sidebar de navigation verticale
+ * menu.php - Sidebar de navigation verticale
  * Fixe a gauche sur desktop, drawer sur mobile.
  */
 if (session_status() === PHP_SESSION_NONE) { session_start(); }

@@ -1,14 +1,14 @@
 """
-routes/ssh_audit.py — Routes d'audit de configuration SSH (sshd_config).
+routes/ssh_audit.py - Routes d'audit de configuration SSH (sshd_config).
 
 Routes :
-    POST /ssh-audit/scan        — Audit SSH d'un serveur unique
-    POST /ssh-audit/scan-all    — Audit SSH de toutes les machines (admin)
-    GET  /ssh-audit/results     — Historique des resultats d'audit
-    POST /ssh-audit/config      — Recupere la config sshd_config brute
-    POST /ssh-audit/fix         — Applique un correctif sur une directive
-    GET  /ssh-audit/policies    — Liste les policies d'audit
-    POST /ssh-audit/policies    — Definit une policy (audit/ignore)
+    POST /ssh-audit/scan        - Audit SSH d'un serveur unique
+    POST /ssh-audit/scan-all    - Audit SSH de toutes les machines (admin)
+    GET  /ssh-audit/results     - Historique des resultats d'audit
+    POST /ssh-audit/config      - Recupere la config sshd_config brute
+    POST /ssh-audit/fix         - Applique un correctif sur une directive
+    GET  /ssh-audit/policies    - Liste les policies d'audit
+    POST /ssh-audit/policies    - Definit une policy (audit/ignore)
 """
 
 import json
@@ -34,7 +34,7 @@ bp = Blueprint('ssh_audit', __name__)
 
 def _resolve_ssh_creds(data):
     """
-    Lookup credentials SSH en BDD via machine_id (securise — pas de credentials dans le HTML).
+    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials dans le HTML).
     Retourne (ip, port, user, ssh_pass, root_pass, svc_account, machine_id, error).
     """
     machine_id = data.get('machine_id')
@@ -170,7 +170,7 @@ def ssh_audit_scan():
                 machine_name = data.get('machine_name', f'machine #{mid}')
                 notify_subscribed(
                     event_type='ssh_audit',
-                    title=f"Audit SSH : {machine_name} — {grade} ({score}/100)",
+                    title=f"Audit SSH : {machine_name} - {grade} ({score}/100)",
                     message=f"Grade {grade}, score {score}/100, {result.get('counts', {}).get('fail', 0)} echec(s)",
                     link='/ssh-audit/',
                     machine_id=mid,
@@ -178,8 +178,8 @@ def ssh_audit_scan():
                 if grade in ('D', 'E', 'F'):
                     notify_subscribed(
                         event_type='security_alert',
-                        title=f"Audit SSH critique : {machine_name} — Grade {grade}",
-                        message=f"Score {score}/100 — Action requise",
+                        title=f"Audit SSH critique : {machine_name} - Grade {grade}",
+                        message=f"Score {score}/100 - Action requise",
                         link='/ssh-audit/',
                         machine_id=mid,
                     )

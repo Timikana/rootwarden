@@ -1,4 +1,4 @@
-# Bandit config — SAST Python RootWarden
+# Bandit config - SAST Python RootWarden
 # Doc : https://bandit.readthedocs.io/en/latest/config.html
 
 # Exclure les repertoires non-source
@@ -12,31 +12,31 @@ exclude_dirs:
 
 # Niveaux d'alerte
 skips:
-  # B101 : use of assert — OK dans le code (non test) ou justifie
+  # B101 : use of assert - OK dans le code (non test) ou justifie
   - B101
-  # B103 : chmod 0o755 — intentionnel sur PLATFORM_SSH_DIR, dossier doit etre
+  # B103 : chmod 0o755 - intentionnel sur PLATFORM_SSH_DIR, dossier doit etre
   # traversable par le process du container (uid non-root)
   - B103
-  # B104 : bind 0.0.0.0 — intentionnel, serveur API Flask/Hypercorn expose
+  # B104 : bind 0.0.0.0 - intentionnel, serveur API Flask/Hypercorn expose
   # dans le container (isolation reseau geree au niveau Docker Compose + reverse proxy)
   - B104
-  # B404 : import subprocess — utilise legitimement pour execute_as_root SSH
+  # B404 : import subprocess - utilise legitimement pour execute_as_root SSH
   - B404
-  # B603, B607 : subprocess sans shell=True — deja safe par design
+  # B603, B607 : subprocess sans shell=True - deja safe par design
   - B603
   - B607
-  # B108 : hardcoded /tmp — chemins sur serveurs distants via SSH, pas sur le host backend
+  # B108 : hardcoded /tmp - chemins sur serveurs distants via SSH, pas sur le host backend
   - B108
-  # B601 : paramiko exec_command — legitime, pattern SSH commande a distance du projet
+  # B601 : paramiko exec_command - legitime, pattern SSH commande a distance du projet
   # entrees validees en amont (shlex.quote + whitelists) ; B602 (shell=True) reste actif
   - B601
-  # B413 : import Crypto.* — projet utilise pycryptodome (drop-in replacement du
+  # B413 : import Crypto.* - projet utilise pycryptodome (drop-in replacement du
   # pyCrypto deprecated) via le meme namespace ; bandit ne distingue pas les deux
   - B413
-  # B507 : paramiko AutoAddPolicy — assumptions projet (gestion parc, TOFU), les
+  # B507 : paramiko AutoAddPolicy - assumptions projet (gestion parc, TOFU), les
   # host keys sont persistees cote serveur de la plateforme via known_hosts volume
   - B507
-  # B608 : hardcoded SQL — les f-strings detectees ciblent uniquement des
+  # B608 : hardcoded SQL - les f-strings detectees ciblent uniquement des
   # noms de tables/colonnes whitelistees cote app (ex: ORDER BY col valide
   # dans une liste fermee) ; les VALEURS passent toutes par prepared statements
   # mysql-connector (%s placeholders). Pas de concat de donnees utilisateur.

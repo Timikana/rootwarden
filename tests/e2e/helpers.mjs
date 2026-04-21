@@ -1,5 +1,5 @@
 /**
- * helpers.mjs — Fonctions partagees pour les tests E2E RootWarden
+ * helpers.mjs - Fonctions partagees pour les tests E2E RootWarden
  *
  * Fournit : TOTP generation, login flow, browser setup, assertions.
  */
@@ -87,17 +87,20 @@ export async function login(page, user = SUPERADMIN_USER, pass = SUPERADMIN_PASS
         ]);
     }
 
-    // CGU si affichee — bouton "J'accepte les conditions"
-    const acceptBtn = await page.evaluateHandle(() => {
-        const btns = document.querySelectorAll('button');
-        for (const b of btns) if (b.textContent.includes('accepte')) return b;
-        return null;
-    });
-    if (acceptBtn && acceptBtn.asElement()) {
-        await Promise.all([
-            acceptBtn.asElement().click(),
-            page.waitForNavigation({ waitUntil: 'networkidle2' }),
-        ]);
+    // CGU si affichee - verifie qu'on est sur terms.php avant de chercher le bouton
+    // (sinon matche par erreur d'autres boutons "accepte" sur le dashboard)
+    if (page.url().includes('/terms.php')) {
+        const acceptBtn = await page.evaluateHandle(() => {
+            const btns = document.querySelectorAll('button[name="accept_terms"], button[type="submit"]');
+            for (const b of btns) if (b.textContent.toLowerCase().includes('accept')) return b;
+            return null;
+        });
+        if (acceptBtn && acceptBtn.asElement()) {
+            await Promise.all([
+                acceptBtn.asElement().click(),
+                page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}),
+            ]);
+        }
     }
 
     return page;

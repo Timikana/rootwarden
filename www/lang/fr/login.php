@@ -1,5 +1,5 @@
 <?php
-// lang/fr/login.php — 36 cles
+// lang/fr/login.php - 36 cles
 return [
     'login.title' => 'Connexion',
     'login.username' => 'Nom d\'utilisateur',

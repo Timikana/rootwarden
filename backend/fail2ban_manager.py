@@ -1,5 +1,5 @@
 """
-fail2ban_manager.py — Helpers SSH pour la gestion Fail2ban sur serveurs distants.
+fail2ban_manager.py - Helpers SSH pour la gestion Fail2ban sur serveurs distants.
 
 Fonctions pures qui prennent un client Paramiko + root_password et executent
 des commandes fail2ban-client via execute_as_root().

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# update-dependencies.sh — Mise à jour des dépendances PHP et rechargement Apache
+# update-dependencies.sh - Mise à jour des dépendances PHP et rechargement Apache
 # =============================================================================
 #
 # Rôle :
@@ -24,7 +24,7 @@
 # Évite de continuer dans un état incohérent (ex: Composer a planté mais Apache redémarre quand même).
 set -e # Arrête le script en cas d'erreur
 
-# Fichier de log dédié — accessible dans le conteneur et potentiellement
+# Fichier de log dédié - accessible dans le conteneur et potentiellement
 # monté sur le host via un volume Docker pour consultation externe.
 LOG_FILE="/var/log/update-dependencies.log"
 
@@ -49,7 +49,7 @@ cd /var/www/html || { echo "Impossible de trouver /var/www/html" >> "$LOG_FILE";
 #   --no-dev             : exclut les dépendances de développement (tests, debug...)
 #                          pour garder l'image de production légère et sécurisée
 #   --optimize-autoloader : génère un autoloader statique (classmap) plus performant
-#                          qu'un autoloader PSR-4 dynamique — recommandé en production
+#                          qu'un autoloader PSR-4 dynamique - recommandé en production
 # Toutes les sorties de Composer (incluant les erreurs) sont ajoutées au fichier de log.
 if composer update --no-dev --optimize-autoloader >> "$LOG_FILE" 2>&1; then
     echo "Mise à jour réussie" >> "$LOG_FILE"

@@ -6,7 +6,7 @@ return [
     'tip.ssh_step1' => '<strong>Prerequisite:</strong> add your SSH public key in <a href="/profile.php" class="text-blue-600 underline">your profile</a>.',
     'tip.ssh_step2' => '<strong>Scan</strong> server users in <a href="/adm/server_users.php" class="text-blue-600 underline">Remote Users</a> and classify each account.',
     'tip.ssh_step3' => '<strong>Check</strong> the target servers in the list below.',
-    'tip.ssh_step4' => '<strong>Click</strong> "Deploy keys" — the preflight checks connectivity and shows the account inventory.',
+    'tip.ssh_step4' => '<strong>Click</strong> "Deploy keys" - the preflight checks connectivity and shows the account inventory.',
     'tip.ssh_step5' => 'Deployment <strong>never deletes</strong> any account. It only deploys SSH keys for authorized users.',
 
     'tip.users_title' => 'Account classification workflow',
@@ -15,7 +15,7 @@ return [
     'tip.users_step3' => 'As long as accounts are <span class="text-orange-600 font-medium">pending review</span>, SSH deployment is blocked.',
     'tip.users_step4' => 'Account deletion is <strong>only</strong> done via the "Delete" button (explicit action, never automatic).',
 
-    'tip.admin_title' => 'First setup — steps',
+    'tip.admin_title' => 'First setup - steps',
     'tip.admin_step1' => '<strong>Add</strong> your servers in the "Servers" tab (IP, port, SSH credentials).',
     'tip.admin_step2' => '<strong>Create</strong> users in the "Users" tab and assign their SSH keys.',
     'tip.admin_step3' => '<strong>Assign</strong> servers to each user in "Access & Permissions".',
@@ -45,7 +45,7 @@ return [
     'guide.step7_title' => '7. Configure notifications',
     'guide.step7_text' => 'In <strong>Admin > Access & Permissions > Email notifications</strong>, configure who receives alerts for each event type (CVE scan, SSH audit, etc.).',
     'guide.security_title' => 'Security principles',
-    'guide.sec_1' => 'No password is stored in plain text — AES-256 + libsodium encryption.',
+    'guide.sec_1' => 'No password is stored in plain text - AES-256 + libsodium encryption.',
     'guide.sec_2' => 'Deployment <strong>never</strong> automatically deletes accounts.',
     'guide.sec_3' => 'Every action is logged in the audit trail.',
     'guide.sec_4' => '2FA authentication (TOTP) is mandatory for all accounts.',
@@ -103,6 +103,6 @@ return [
 
     'tip.profile_title' => 'How to configure your profile?',
     'tip.profile_step1' => 'Add your <strong>email</strong> to receive notifications (CVE scan, security alerts).',
-    'tip.profile_step2' => 'Paste your <strong>SSH public key</strong> (ed25519 or RSA) — it will be deployed on your assigned servers.',
+    'tip.profile_step2' => 'Paste your <strong>SSH public key</strong> (ed25519 or RSA) - it will be deployed on your assigned servers.',
     'tip.profile_step3' => 'Change your <strong>password</strong> regularly (expiration policy configurable by admin).',
 ];

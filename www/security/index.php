@@ -1,6 +1,6 @@
 <?php
 /**
- * security/index.php — Interface de scan de vulnérabilités CVE
+ * security/index.php - Interface de scan de vulnérabilités CVE
  *
  * Rôle :
  *   Affiche la liste des serveurs accessibles à l'utilisateur et permet de
@@ -86,7 +86,7 @@ curl_close($ch);
 <head>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <?php require_once __DIR__ . '/../head.php'; ?>
-    <title>Scan CVE — <?= htmlspecialchars($app_name) ?></title>
+    <title>Scan CVE - <?= htmlspecialchars($app_name) ?></title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
 <?php require_once __DIR__ . '/../menu.php'; ?>
@@ -102,7 +102,7 @@ curl_close($ch);
             <p class="text-xs text-gray-400 mt-0.5"><?= t('cve.desc') ?></p>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Via <span class="font-mono text-xs"><?= htmlspecialchars($opencve_url) ?></span>
-                &nbsp;—&nbsp;
+                &nbsp;-&nbsp;
                 <span id="conn-status" class="<?= $connOk ? 'text-green-600 dark:text-green-400' : 'text-red-500' ?> font-medium text-xs"><?= $connOk ? '✓' : '✗' ?> <?= htmlspecialchars($connMsg) ?></span>
             </p>
         </div>

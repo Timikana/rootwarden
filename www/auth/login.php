@@ -103,7 +103,7 @@ function computeUserLockoutSeconds(int $failedAttempts): int {
 function notifySpraying(PDO $pdo, string $ip, int $distinctUsers): void {
     try {
         audit_log_raw($pdo, 0, sprintf(
-            "[security] Password spraying detecte — IP=%s usernames=%d/10min",
+            "[security] Password spraying detecte - IP=%s usernames=%d/10min",
             $ip, $distinctUsers
         ));
     } catch (\Exception $e) {}
@@ -140,12 +140,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($isUserLocked) {
-            // On NE verifie PAS le password — evite oracle sur le lockout
+            // On NE verifie PAS le password - evite oracle sur le lockout
             recordLoginAttempt($pdo, $username, false);
             $mins = max(1, (int)ceil($userLockRemaining / 60));
             $error = t('login.error_user_locked', ['minutes' => $mins]);
         } elseif ($user && (int)($user['active'] ?? 0) !== 1) {
-            // Compte desactive — message generique (pas d'enumeration)
+            // Compte desactive - message generique (pas d'enumeration)
             recordLoginAttempt($pdo, $username, false);
             $error = t('login.error_credentials');
         } elseif ($user && password_verify($password, $user['password'])) {
@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Notification superadmin au 5eme echec consecutif (hash chain)
                         if ($newFailed === 5) {
                             audit_log_raw($pdo, (int)$user['id'], sprintf(
-                                "[security] Compte verrouille apres %d echecs consecutifs — IP=%s",
+                                "[security] Compte verrouille apres %d echecs consecutifs - IP=%s",
                                 $newFailed, $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
                             ));
                         }
@@ -276,7 +276,7 @@ $loginAppCompany = htmlspecialchars(getenv('APP_COMPANY') ?: '');
     <link rel="icon" type="image/png" sizes="32x32" href="../img/favicon.png">
     <link rel="apple-touch-icon" href="../img/favicon.png">
     <meta name="theme-color" content="#ffffff">
-    <title><?= t('login.title') ?> — <?= $loginAppName ?></title>
+    <title><?= t('login.title') ?> - <?= $loginAppName ?></title>
     <link rel="stylesheet" href="/assets/css/tailwind.css">
 </head>
 <body class="bg-gradient-to-br from-blue-900 to-blue-700 min-h-screen

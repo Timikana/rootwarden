@@ -1,7 +1,7 @@
 <?php
-// lang/fr/platform.php — 50 cles
+// lang/fr/platform.php - 50 cles
 return [
-    'platform.title' => 'Securite SSH — Cle plateforme',
+    'platform.title' => 'Securite SSH - Cle plateforme',
     'platform.desc' => 'Keypair Ed25519 de la plateforme. Deployez-la sur vos serveurs pour une authentification SSH sans mot de passe.',
     'platform.tip_deploy_all' => 'Deployer la keypair sur tous les serveurs sans keypair',
     'platform.btn_deploy_keypair' => 'Deployer keypair',
@@ -20,7 +20,7 @@ return [
     'platform.stat_password_removed' => 'Password supprime',
     'platform.migration_progress' => 'Progression de la migration',
     'platform.migration_done' => 'Migration terminee !',
-    'platform.migration_remove_passwords' => 'Keypair OK — supprimez les mots de passe',
+    'platform.migration_remove_passwords' => 'Keypair OK - supprimez les mots de passe',
     'platform.migration_servers_remaining' => 'serveur(s) restant(s)',
     'platform.legend_password_only' => 'Password uniquement',
     'platform.legend_keypair_pwd' => 'Keypair + password',

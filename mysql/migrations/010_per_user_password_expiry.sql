@@ -1,4 +1,4 @@
--- Migration 010 — Expiration mot de passe configurable par utilisateur
+-- Migration 010 - Expiration mot de passe configurable par utilisateur
 --
 -- password_expiry_override :
 --   NULL  = utilise la valeur globale (PASSWORD_EXPIRY_DAYS env var)

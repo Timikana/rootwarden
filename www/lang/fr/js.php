@@ -1,5 +1,5 @@
 <?php
-// lang/fr/js.php — 379 cles
+// lang/fr/js.php - 379 cles
 return [
     'js.toast_success' => 'Succes',
     'js.toast_error' => 'Erreur',
@@ -51,7 +51,7 @@ return [
     'js.f2b_logs_loaded' => 'Logs charges.',
     'js.f2b_loading_status' => 'Chargement du statut Fail2ban sur :server...',
     'js.f2b_jails_found' => ':count jail(s) trouves',
-    'js.f2b_jail_summary' => 'Jail :name — :banned banni(s)',
+    'js.f2b_jail_summary' => 'Jail :name - :banned banni(s)',
     'js.f2b_total' => 'Total : :count IPs bannies',
     'js.f2b_loading_jail' => 'Chargement du jail :name...',
     'js.f2b_banning' => 'Ban de l\'IP en cours...',
@@ -126,7 +126,7 @@ return [
     'js.svc_cat_ftp' => 'FTP',
     'js.svc_cat_other' => 'Autre',
     'js.audit_scanning' => 'Scan SSH en cours...',
-    'js.audit_scanned' => 'Scan termine — Score :score/100 (:grade)',
+    'js.audit_scanned' => 'Scan termine - Score :score/100 (:grade)',
     'js.audit_fix_confirm' => 'Modifier :key a :value sur :server et recharger sshd ?',
     'js.audit_fixed' => ':key modifie avec succes',
     'js.audit_fix_error' => 'Erreur : :msg',
@@ -145,7 +145,7 @@ return [
     'js.audit_no_findings' => 'Configuration securisee',
     'js.audit_select_server' => 'Selectionnez un serveur',
     'js.audit_invalid_server' => 'Serveur invalide',
-    'js.audit_scan_complete' => 'Scan termine — Score :score/100 (:grade)',
+    'js.audit_scan_complete' => 'Scan termine - Score :score/100 (:grade)',
     'js.audit_scan_all_complete' => ':count serveur(s) scanne(s)',
     'js.audit_config_loaded' => 'sshd_config charge',
     'js.audit_fixing' => 'Correction de :key...',
@@ -194,7 +194,7 @@ return [
     'js.audit_toggled' => 'Directive :key :action',
     'js.audit_editor_loading' => 'Chargement de sshd_config dans l\'editeur...',
     'js.audit_rescanning_after_reload' => 'Re-scan apres reload...',
-    'js.audit_server_selected' => 'Serveur :server selectionne — chargement de l\'historique...',
+    'js.audit_server_selected' => 'Serveur :server selectionne - chargement de l\'historique...',
     'js.audit_directive_enabled' => 'Active',
     'js.audit_directive_disabled' => 'Desactive',
     'js.confirm_rollback' => 'Restaurer les regles selectionnees ? Les regles actuelles seront remplacees.',

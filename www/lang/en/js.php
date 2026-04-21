@@ -1,5 +1,5 @@
 <?php
-// lang/en/js.php — 379 cles
+// lang/en/js.php - 379 cles
 return [
     'js.error' => 'Error',
     'js.error_network' => 'Network error',
@@ -54,7 +54,7 @@ return [
     'js.f2b_currently_banned' => 'Currently banned',
     'js.f2b_no_active_jail' => 'No active jail',
     'js.f2b_jails_found' => ':count jail(s) found',
-    'js.f2b_jail_summary' => 'Jail :name — :banned banned',
+    'js.f2b_jail_summary' => 'Jail :name - :banned banned',
     'js.f2b_total' => 'Total: :count banned IPs',
     'js.f2b_loading_jail' => 'Loading jail :name...',
     'js.f2b_installing' => 'Installing Fail2ban...',
@@ -143,7 +143,7 @@ return [
     'js.svc_cat_ftp' => 'FTP',
     'js.svc_cat_other' => 'Other',
     'js.audit_scanning' => 'SSH scan in progress...',
-    'js.audit_scanned' => 'Scan complete — Score :score/100 (:grade)',
+    'js.audit_scanned' => 'Scan complete - Score :score/100 (:grade)',
     'js.audit_fix_confirm' => 'Change :key to :value on :server and reload sshd?',
     'js.audit_fixed' => ':key updated successfully',
     'js.audit_fix_error' => 'Error: :msg',
@@ -162,7 +162,7 @@ return [
     'js.audit_no_findings' => 'Secure configuration',
     'js.audit_select_server' => 'Select a server',
     'js.audit_invalid_server' => 'Invalid server',
-    'js.audit_scan_complete' => 'Scan complete — Score :score/100 (:grade)',
+    'js.audit_scan_complete' => 'Scan complete - Score :score/100 (:grade)',
     'js.audit_scan_all_complete' => ':count server(s) scanned',
     'js.audit_config_loaded' => 'sshd_config loaded',
     'js.audit_fixing' => 'Fixing :key...',
@@ -211,7 +211,7 @@ return [
     'js.audit_toggled' => 'Directive :key :action',
     'js.audit_editor_loading' => 'Loading sshd_config in editor...',
     'js.audit_rescanning_after_reload' => 'Rescanning after reload...',
-    'js.audit_server_selected' => 'Server :server selected — loading history...',
+    'js.audit_server_selected' => 'Server :server selected - loading history...',
     'js.audit_directive_enabled' => 'Enabled',
     'js.audit_directive_disabled' => 'Disabled',
     'js.ipt_loading_rules_for' => 'Loading rules for :name (:ip)...',

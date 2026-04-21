@@ -1,6 +1,6 @@
 <?php
 /**
- * platform_keys.php — Gestion de la cle plateforme + audit users distants
+ * platform_keys.php - Gestion de la cle plateforme + audit users distants
  * Acces : superadmin uniquement
  */
 require_once __DIR__ . '/../auth/verify.php';
@@ -29,7 +29,7 @@ $nbServiceAccount = count(array_filter($servers, fn($s) => $s['service_account_d
 <head>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
     <?php require_once __DIR__ . '/../head.php'; ?>
-    <title>Securite SSH — <?= $appName ?></title>
+    <title>Securite SSH - <?= $appName ?></title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
 <?php require_once __DIR__ . '/../menu.php'; ?>
@@ -178,7 +178,7 @@ $nbServiceAccount = count(array_filter($servers, fn($s) => $s['service_account_d
                             <?= $pwRequired ? '<span class="text-orange-500">' . t('platform.status_present') . '</span>' : '<span class="text-green-500">' . t('platform.status_removed') . '</span>' ?>
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-400">
-                            <?= $s['platform_key_deployed_at'] ? date('d/m/Y H:i', strtotime($s['platform_key_deployed_at'])) : '—' ?>
+                            <?= $s['platform_key_deployed_at'] ? date('d/m/Y H:i', strtotime($s['platform_key_deployed_at'])) : '-' ?>
                         </td>
                         <td class="px-4 py-3">
                             <div class="flex gap-1">
@@ -434,7 +434,7 @@ async function scanUsers(machineId) {
         const isSystemUser = ['root','daemon','bin','sys','www-data','nobody'].includes(u.name);
         const safeName = escHtml(u.name);
         const safeHome = escHtml(u.home);
-        const safeKeys = escHtml(u.rootwarden_keys.join(', ') || '—');
+        const safeKeys = escHtml(u.rootwarden_keys.join(', ') || '-');
         html += `<tr class="${cls}">
             <td class="px-4 py-2 font-medium">${safeName}${isSystemUser ? ' <span class="text-[9px] text-gray-400">(sys)</span>' : ''}</td>
             <td class="px-4 py-2 text-xs text-gray-400 font-mono">${safeHome}</td>

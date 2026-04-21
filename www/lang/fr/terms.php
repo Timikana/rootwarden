@@ -1,5 +1,5 @@
 <?php
-// lang/fr/terms.php — 87 cles
+// lang/fr/terms.php - 87 cles
 return [
     'terms.page_title' => 'Conditions Generales d\'Utilisation',
     'terms.accept' => 'J\'accepte les conditions',

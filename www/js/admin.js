@@ -3,10 +3,10 @@
  * @description Fonctions JavaScript partagees pour l'administration.
  *
  * Fonctions :
- *   - escHtml()          — Echappe les caracteres HTML (prevention XSS)
- *   - deleteUser()       — Supprime un utilisateur via AJAX
- *   - updateUserStatus() — Met a jour un champ utilisateur (actif, sudo)
- *   - showNotification() — Affiche une notification temporaire
+ *   - escHtml()          - Echappe les caracteres HTML (prevention XSS)
+ *   - deleteUser()       - Supprime un utilisateur via AJAX
+ *   - updateUserStatus() - Met a jour un champ utilisateur (actif, sudo)
+ *   - showNotification() - Affiche une notification temporaire
  */
 
 /**

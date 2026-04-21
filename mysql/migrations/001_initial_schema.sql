@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 001 — Schéma initial
+-- Migration 001 - Schéma initial
 -- Version : 1.0.0
 -- Date    : 2025-01-01
 -- Auteur  : RootWarden
@@ -17,5 +17,5 @@
 --   user_logs, user_exclusions
 -- ============================================================
 
--- (intentionnellement vide — voir mysql/init.sql)
+-- (intentionnellement vide - voir mysql/init.sql)
 SELECT 1;

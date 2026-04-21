@@ -1,4 +1,4 @@
--- Migration 014 — Permissions temporaires
+-- Migration 014 - Permissions temporaires
 -- Permet d'accorder un acces pour une duree limitee (ex: prestataire 24h)
 
 CREATE TABLE IF NOT EXISTS temporary_permissions (

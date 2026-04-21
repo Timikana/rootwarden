@@ -1,6 +1,6 @@
 <?php
 /**
- * audit_seal.php — Seale les lignes user_logs orphelines (self_hash NULL).
+ * audit_seal.php - Seale les lignes user_logs orphelines (self_hash NULL).
  *
  * Scenario : un INSERT legacy (blueprint Python, code ancien) ecrit une ligne
  * sans passer par audit_log_raw() → self_hash reste NULL. Cet endpoint walks

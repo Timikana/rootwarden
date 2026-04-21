@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration 003 — Permission can_scan_cve
+-- Migration 003 - Permission can_scan_cve
 -- Version : 1.5.0
 -- Date    : 2026-03-31
 -- Auteur  : RootWarden

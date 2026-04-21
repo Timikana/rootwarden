@@ -1,6 +1,6 @@
 <?php
 /**
- * footer.php — Pied de page compact
+ * footer.php - Pied de page compact
  *
  * Affiche : copyright, logos techno en ligne, liens legaux.
  * Le script dark mode est geere dans menu.php.

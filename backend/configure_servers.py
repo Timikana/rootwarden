@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-configure_servers.py — Déploiement de la configuration SSH en masse pour RootWarden.
+configure_servers.py - Déploiement de la configuration SSH en masse pour RootWarden.
 
 Rôle :
     Ce module orchestre la configuration automatique d'un ensemble de serveurs Linux
@@ -71,8 +71,8 @@ class AddMachineFilter(logging.Filter):
     """
     Filtre de log qui ajoute silencieusement l'attribut 'machine' si absent.
 
-    Utilisé sur le logger racine pour s'assurer que tous les messages — y compris
-    ceux générés par des bibliothèques non instrumentées — passent le formatage
+    Utilisé sur le logger racine pour s'assurer que tous les messages - y compris
+    ceux générés par des bibliothèques non instrumentées - passent le formatage
     sans erreur.
     """
 
@@ -305,7 +305,7 @@ def manage_ssh_keys(channel, user: dict, logger=None):
             )
             execute_command_as_root(channel, mkdir_command, logger=logger)
 
-            # Ecriture via base64 — aucune interpolation shell possible
+            # Ecriture via base64 - aucune interpolation shell possible
             b64_key = _b64.b64encode(ssh_key.encode()).decode()
             key_command = (
                 f"printf '%s' '{b64_key}' | base64 -d > {authorized_keys_path} && "
@@ -351,7 +351,7 @@ def deploy_user_config(channel, user: dict, logger=None):
         )
         execute_command_as_root(channel, mkdir_command, logger=logger)
 
-        # Ecriture via base64 — aucune interpolation shell possible
+        # Ecriture via base64 - aucune interpolation shell possible
         b64_key = _b64.b64encode(ssh_key.encode()).decode()
         key_command = (
             f"printf '%s' '{b64_key}' | base64 -d > {authorized_keys_path} && "
@@ -475,7 +475,7 @@ class ServerConfigurator:
             logger=self.logger,
             service_account=use_sa
         ) as (root_channel, ssh_client):
-            # Si service account, sudo est deja disponible — pas besoin de ensure_sudo
+            # Si service account, sudo est deja disponible - pas besoin de ensure_sudo
             if not use_sa:
                 ensure_sudo_installed(ssh_client, self.decrypted_root, logger=self.logger)
             # Le deploiement du .bashrc est gere par le module dedie /bashrc/.
@@ -524,7 +524,7 @@ class ServerConfigurator:
             valid_existing_users = [user for user in existing_users if all(c.isalnum() or c in '-_.@' for c in user)]
             self.logger.info(f"Utilisateurs existants : {valid_existing_users}")
 
-            # Utilisateurs systeme proteges — ne JAMAIS les supprimer
+            # Utilisateurs systeme proteges - ne JAMAIS les supprimer
             _PROTECTED_USERS = frozenset({
                 'root', 'daemon', 'bin', 'sys', 'sync', 'games', 'man', 'lp',
                 'mail', 'news', 'uucp', 'proxy', 'www-data', 'backup', 'list',
@@ -599,7 +599,7 @@ class ServerConfigurator:
 
         revoked = managed_users - authorized_names
         for uname in revoked:
-            self.logger.info(f"[{uname}] Acces revoque — retrait cle SSH et sudo (compte conserve).")
+            self.logger.info(f"[{uname}] Acces revoque - retrait cle SSH et sudo (compte conserve).")
             try:
                 ak_path = f"/home/{uname}/.ssh/authorized_keys"
                 execute_command_as_root(channel, f"rm -f {ak_path}", logger=self.logger)
@@ -695,7 +695,7 @@ def ssh_connection(ip, user, password, port=22, root_password=None, logger=None,
         service_account (bool): Utiliser le compte rootwarden (NOPASSWD sudo).
 
     Yields:
-        (channel_or_client, ssh_client) — Channel root ou client SSH selon le mode.
+        (channel_or_client, ssh_client) - Channel root ou client SSH selon le mode.
 
     Raises:
         Exception: Propage toute erreur de connexion après l'avoir loguée.

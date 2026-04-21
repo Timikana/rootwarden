@@ -1,5 +1,5 @@
 <?php
-// lang/fr/2fa.php — 22 cles
+// lang/fr/2fa.php - 22 cles
 return [
     '2fa.title' => 'Verification en deux etapes',
     '2fa.subtitle' => 'Code TOTP',

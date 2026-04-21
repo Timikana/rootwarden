@@ -34,7 +34,7 @@ function isSodiumAvailable() {
 
 /**
  * Prépare une clé pour les opérations AES-256-CBC (32 bytes).
- * Identique à prepareKeyForSodium() — même logique hex2bin — pour garantir
+ * Identique à prepareKeyForSodium() - même logique hex2bin - pour garantir
  * la compatibilité avec Python (encryption.py fait bytes.fromhex() si la clé est hex).
  *
  * @param  string $key  Clé brute ou hexadécimale (32 ou 64 chars).
@@ -187,7 +187,7 @@ function decryptPassword($encryptedPassword) {
     
     // Détecter la méthode de chiffrement utilisée
     if (strpos($encryptedPassword, 'sodium:') === 0 && isSodiumAvailable()) {
-        // Methode Sodium — essaie cle HKDF derivee puis cle brute (fallback legacy)
+        // Methode Sodium - essaie cle HKDF derivee puis cle brute (fallback legacy)
         $data = base64_decode(substr($encryptedPassword, 7));
         $nonce = substr($data, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
         $ciphertext = substr($data, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);

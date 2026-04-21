@@ -1,14 +1,14 @@
 """
-routes/monitoring.py — Routes de surveillance et d'etat du parc.
+routes/monitoring.py - Routes de surveillance et d'etat du parc.
 
 Routes :
-    GET  /test              — Health check
-    GET  /list_machines     — Liste des machines (hors archived)
-    POST /server_status     — Statut online/offline
-    POST /linux_version     — Version OS via SSH
-    POST /last_reboot       — Dernier boot + reboot required
-    GET  /filter_servers    — Filtrage par env/criticality/tag
-    GET  /cve_trends        — Tendances CVE 30 jours
+    GET  /test              - Health check
+    GET  /list_machines     - Liste des machines (hors archived)
+    POST /server_status     - Statut online/offline
+    POST /linux_version     - Version OS via SSH
+    POST /last_reboot       - Dernier boot + reboot required
+    GET  /filter_servers    - Filtrage par env/criticality/tag
+    GET  /cve_trends        - Tendances CVE 30 jours
 """
 
 import re

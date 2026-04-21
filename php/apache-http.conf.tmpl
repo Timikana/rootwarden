@@ -1,8 +1,8 @@
 # =============================================================================
-# apache-http.conf.tmpl — Template VirtualHost HTTP (SSL_MODE=disabled)
+# apache-http.conf.tmpl - Template VirtualHost HTTP (SSL_MODE=disabled)
 # =============================================================================
 #
-# Ce fichier est un TEMPLATE — il n'est pas lu directement par Apache.
+# Ce fichier est un TEMPLATE - il n'est pas lu directement par Apache.
 # entrypoint.sh le traite via envsubst au démarrage du conteneur pour
 # produire /etc/apache2/sites-available/000-default.conf.
 #
@@ -11,10 +11,10 @@
 # Dans ce scénario, le conteneur PHP ne reçoit que du trafic HTTP interne.
 #
 # Différences avec apache-ssl.conf.tmpl :
-#   - Un seul VirtualHost (port 80 uniquement — pas de port 443)
+#   - Un seul VirtualHost (port 80 uniquement - pas de port 443)
 #   - Pas de directives SSLEngine / SSLCertificateFile / SSLCertificateKeyFile
 #   - Pas de redirection HTTP → HTTPS (le proxy s'en charge)
-#   - Pas de header HSTS (Strict-Transport-Security) — c'est le proxy qui le pose,
+#   - Pas de header HSTS (Strict-Transport-Security) - c'est le proxy qui le pose,
 #     l'ajouter ici aussi créerait un doublon et pourrait casser la navigation
 #   - Ajout de SetEnvIf X-Forwarded-Proto pour que PHP sache qu'il est derrière HTTPS
 #
@@ -31,7 +31,7 @@
 # c'est le reverse proxy en amont qui assure la terminaison TLS et
 # qui redirige éventuellement les clients HTTP vers HTTPS.
 <VirtualHost *:80>
-    # Nom de domaine du serveur — doit correspondre à ce que le proxy envoie
+    # Nom de domaine du serveur - doit correspondre à ce que le proxy envoie
     ServerName ${SERVER_NAME}
     # Email affiché dans les pages d'erreur Apache
     ServerAdmin ${SERVER_ADMIN}
@@ -72,14 +72,14 @@
         # Envoie uniquement l'origine (pas l'URL complète) vers d'autres domaines.
         Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
-        # Content-Security-Policy — meme politique que le template SSL
+        # Content-Security-Policy - meme politique que le template SSL
         Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
 
-        # Permissions-Policy — desactive les APIs navigateur non utilisees
+        # Permissions-Policy - desactive les APIs navigateur non utilisees
         Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
     </IfModule>
 
-    # Journaux Apache — ${APACHE_LOG_DIR} est substitué par Apache (pas par envsubst)
+    # Journaux Apache - ${APACHE_LOG_DIR} est substitué par Apache (pas par envsubst)
     ErrorLog ${APACHE_LOG_DIR}/error.log
     CustomLog ${APACHE_LOG_DIR}/access.log combined
 </VirtualHost>

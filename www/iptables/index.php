@@ -1,6 +1,6 @@
 <?php
 /**
- * iptables/index.php — Interface de gestion des règles iptables
+ * iptables/index.php - Interface de gestion des règles iptables
  *
  * Rôle :
  *   Permet au superadmin de visualiser, modifier, sauvegarder et restaurer
@@ -11,7 +11,7 @@
  *   pour une restauration ultérieure.
  *
  * Permissions :
- *   - superadmin (role_id = 3) uniquement — accès refusé à tous les autres rôles
+ *   - superadmin (role_id = 3) uniquement - accès refusé à tous les autres rôles
  *
  * Dépendances PHP :
  *   - auth/verify.php : fonctions checkAuth() et gestion de session

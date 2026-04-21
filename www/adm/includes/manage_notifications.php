@@ -1,6 +1,6 @@
 <?php
 /**
- * manage_notifications.php — Preferences de notification email/in-app.
+ * manage_notifications.php - Preferences de notification email/in-app.
  *
  * Inclus dans admin_page.php (onglet Acces & Permissions).
  * Pattern identique a manage_permissions.php : cards details/summary par user,

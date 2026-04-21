@@ -1,7 +1,7 @@
 SELECT 1;
 
--- Migration 033 : Module Graylog — forwarding rsyslog + templates editables
--- Maintenu : Equipe Admin.Sys RootWarden — v1.15.0 — 2026-04-20
+-- Migration 033 : Module Graylog - forwarding rsyslog + templates editables
+-- Maintenu : Equipe Admin.Sys RootWarden - v1.15.0 - 2026-04-20
 --
 -- Approche rsyslog (pas de sidecar) : on configure rsyslog cote client pour
 -- forward les logs vers le serveur Graylog. Les streams/extractors/dashboards
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS graylog_templates (
 );
 
 -- Nettoyer ancienne table graylog_collectors si elle existait (elle a ete
--- remplacee conceptuellement par graylog_templates — structure legerement
+-- remplacee conceptuellement par graylog_templates - structure legerement
 -- differente).
 DROP TABLE IF EXISTS graylog_collectors;
 
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS graylog_rsyslog (
 INSERT IGNORE INTO graylog_templates (name, description, content, enabled) VALUES
     ('syslog-base', 'Forwarding syslog basique (tous facilities)',
      '# Forward tous les logs au serveur Graylog (genere par RootWarden)\n'
-     '# Le *.* @...:port est ecrit par le module Graylog — ne pas dupliquer ici\n',
+     '# Le *.* @...:port est ecrit par le module Graylog - ne pas dupliquer ici\n',
      TRUE),
     ('apache-access', 'Apache access.log en imfile',
      'module(load="imfile")\n'
@@ -95,7 +95,7 @@ INSERT IGNORE INTO graylog_templates (name, description, content, enabled) VALUE
      '      Facility="local1")\n',
      FALSE),
     ('auth-log', 'Auth log (SSH, sudo)',
-     '# auth.log deja capture par imuxsock/facility auth — pas d input supplementaire\n'
+     '# auth.log deja capture par imuxsock/facility auth - pas d input supplementaire\n'
      '# Exemple : filtrer et taguer differemment\n'
      'if $programname == "sshd" then stop\n',
      FALSE);

@@ -1,5 +1,5 @@
 <?php
-// lang/fr/graylog.php — Module Graylog (rsyslog forwarding + templates)
+// lang/fr/graylog.php - Module Graylog (rsyslog forwarding + templates)
 return [
     'graylog.title' => 'Graylog',
     'graylog.subtitle' => 'Forwarding rsyslog vers votre serveur Graylog et templates editables par source.',

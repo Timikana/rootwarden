@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-server_checks.py — Utilitaires de surveillance et d'interrogation des serveurs pour RootWarden.
+server_checks.py - Utilitaires de surveillance et d'interrogation des serveurs pour RootWarden.
 
 Rôle :
     Fournit des fonctions de bas niveau pour vérifier la disponibilité réseau d'un
@@ -125,7 +125,7 @@ def check_for_cve(version_str):
     """
     Vérifie naïvement si une version d'OS est vulnérable à des CVE.
 
-    Implémentation simplifiée à titre d'exemple — Ubuntu 20.04 est considéré
+    Implémentation simplifiée à titre d'exemple - Ubuntu 20.04 est considéré
     non vulnérable ; toute autre version retourne True. Cette fonction est
     destinée à être remplacée par une intégration avec cve_scanner.py.
 

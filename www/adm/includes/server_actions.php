@@ -96,7 +96,7 @@ function validateInput($data, $type) {
     }
 }
 
-// Tags : requêtes JSON — vérification CSRF via header ou body
+// Tags : requêtes JSON - vérification CSRF via header ou body
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 if (strpos($contentType, 'application/json') !== false) {
     $jsonInput = json_decode(file_get_contents('php://input'), true);

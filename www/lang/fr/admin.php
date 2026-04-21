@@ -1,5 +1,5 @@
 <?php
-// lang/fr/admin.php — 246 cles
+// lang/fr/admin.php - 246 cles
 return [
     'admin.title' => 'Administration',
     'admin.tab_users' => 'Utilisateurs',
@@ -87,7 +87,7 @@ return [
     'users.created_success' => 'Utilisateur cree avec succes.',
     'users.error_sql' => 'Erreur SQL :',
     'users.generated_password' => 'Mot de passe genere :',
-    'users.password_warning' => 'Notez ce mot de passe — il ne sera plus affiche.',
+    'users.password_warning' => 'Notez ce mot de passe - il ne sera plus affiche.',
     'users.search_placeholder' => 'Rechercher un utilisateur...',
     'users.badge_active' => 'Actif',
     'users.badge_inactive' => 'Inactif',

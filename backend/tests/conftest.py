@@ -1,5 +1,5 @@
 """
-conftest.py — Fixtures pytest partagees pour toute la suite de tests.
+conftest.py - Fixtures pytest partagees pour toute la suite de tests.
 
 Fournit :
     - Variables d'environnement factices (SECRET_KEY, API_KEY, DB_*)

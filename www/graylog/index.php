@@ -1,6 +1,6 @@
 <?php
 /**
- * graylog/index.php — Module Graylog : forwarding rsyslog + templates editables.
+ * graylog/index.php - Module Graylog : forwarding rsyslog + templates editables.
  *
  * Maintenu : Equipe Admin.Sys RootWarden
  * Version  : 1.15.0
@@ -168,7 +168,7 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                             <?php foreach ($history as $h): ?>
                             <tr>
                                 <td class="px-3 py-2 mono text-xs"><?= htmlspecialchars($h['created_at']) ?></td>
-                                <td class="px-3 py-2"><?= htmlspecialchars($h['user_name'] ?? '—') ?></td>
+                                <td class="px-3 py-2"><?= htmlspecialchars($h['user_name'] ?? '-') ?></td>
                                 <td class="px-3 py-2 mono text-xs break-all"><?= htmlspecialchars($h['action']) ?></td>
                             </tr>
                             <?php endforeach; ?>

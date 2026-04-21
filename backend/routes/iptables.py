@@ -1,14 +1,14 @@
 """
-routes/iptables.py — Routes de gestion du pare-feu iptables.
+routes/iptables.py - Routes de gestion du pare-feu iptables.
 
 Routes :
-    POST /iptables           — Charger les regles
-    POST /iptables-validate  — Valider (dry-run)
-    POST /iptables-apply     — Appliquer
-    POST /iptables-restore   — Restaurer depuis BDD
-    GET  /iptables-history   — Historique des modifications
-    POST /iptables-rollback  — Restaurer une version
-    GET  /iptables-logs      — Streaming SSE des logs
+    POST /iptables           - Charger les regles
+    POST /iptables-validate  - Valider (dry-run)
+    POST /iptables-apply     - Appliquer
+    POST /iptables-restore   - Restaurer depuis BDD
+    GET  /iptables-history   - Historique des modifications
+    POST /iptables-rollback  - Restaurer une version
+    GET  /iptables-logs      - Streaming SSE des logs
 """
 
 import time
@@ -25,7 +25,7 @@ bp = Blueprint('iptables', __name__)
 
 def _resolve_ssh_creds(data):
     """
-    Lookup credentials SSH en BDD via machine_id (securise — pas de credentials cote client).
+    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials cote client).
     Retourne (server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, error_msg).
     """
     machine_id = data.get('machine_id')

@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# wait-for-db.sh — Script d'attente de disponibilité MySQL (OBSOLETE)
+# wait-for-db.sh - Script d'attente de disponibilité MySQL (OBSOLETE)
 # =============================================================================
 #
-# STATUT : OBSOLETE — ce script n'est plus utilisé en production.
+# STATUT : OBSOLETE - ce script n'est plus utilisé en production.
 #
 # Historique :
 #   Ce script était appelé en ENTRYPOINT du conteneur PHP pour retarder

@@ -1,15 +1,15 @@
 # utils/encryption.py
 """
-encryption.py — Chiffrement et déchiffrement des mots de passe (RootWarden).
+encryption.py - Chiffrement et déchiffrement des mots de passe (RootWarden).
 
 Rôle :
     Fournit la classe ``Encryption`` qui implémente un double mécanisme de chiffrement
     compatible avec le code PHP du frontend (openssl_encrypt / openssl_decrypt).
 
 Algorithmes supportés :
-    1. libsodium / PyNaCl (préfixe "sodium:") — recommandé, AEAD (nonce inclus).
+    1. libsodium / PyNaCl (préfixe "sodium:") - recommandé, AEAD (nonce inclus).
        Utilise ``nacl.secret.SecretBox`` (XSalsa20-Poly1305).
-    2. AES-256-CBC (préfixe "aes:") — fallback si PyNaCl absent.
+    2. AES-256-CBC (préfixe "aes:") - fallback si PyNaCl absent.
        Format : base64(IV[16] + ciphertext), padding PKCS7.
 
 Compatibilité PHP :
@@ -20,7 +20,7 @@ Compatibilité PHP :
 
 Sécurité :
     - Ne jamais logguer le mot de passe en clair ni la clé.
-    - Passer le mot de passe uniquement via stdin ou mémoire — jamais en argument de commande.
+    - Passer le mot de passe uniquement via stdin ou mémoire - jamais en argument de commande.
     - L'ancienne clé (OLD_SECRET_KEY) est uniquement utilisée pour le déchiffrement
       (migration transparente) ; le re-chiffrement utilise toujours SECRET_KEY.
 
@@ -69,7 +69,7 @@ class Encryption:
 
         from config import Config
         self.secret_key_raw = self._prepare_key(Config.SECRET_KEY)
-        # HKDF derivation — separe les usages (passwords vs TOTP)
+        # HKDF derivation - separe les usages (passwords vs TOTP)
         self.secret_key = self._derive_key(self.secret_key_raw, b'rootwarden-aes')
         self.old_secret_key = Config.OLD_SECRET_KEY
 
@@ -235,7 +235,7 @@ class Encryption:
 
     def decrypt_password(self, encrypted_password: str) -> str:
         """
-        Point d'entrée principal du déchiffrement — détecte automatiquement le format.
+        Point d'entrée principal du déchiffrement - détecte automatiquement le format.
 
         Stratégie :
             1. Préfixe "sodium:" → déchiffrement libsodium (SecretBox.decrypt).
@@ -258,7 +258,7 @@ class Encryption:
         
         # Détecter la méthode de chiffrement utilisée
         if encrypted_password.startswith("sodium:") and self.is_sodium_available:
-            # Déchiffrement avec Sodium — essaie cle HKDF puis cle brute (fallback legacy)
+            # Déchiffrement avec Sodium - essaie cle HKDF puis cle brute (fallback legacy)
             import nacl.secret
             from base64 import b64decode
 
@@ -563,7 +563,7 @@ class Encryption:
 
     def test_decryption(self, encrypted_password):
         """
-        Utilitaire de diagnostic — tente de déchiffrer un mot de passe sans lever d'exception.
+        Utilitaire de diagnostic - tente de déchiffrer un mot de passe sans lever d'exception.
 
         Pratique pour les scripts de test (test_decrypt.py, test_crypto.php) ou pour
         vérifier rapidement si une valeur stockée en BDD est déchiffrable avec la clé actuelle.

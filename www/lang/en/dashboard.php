@@ -1,5 +1,5 @@
 <?php
-// lang/en/dashboard.php — 42 cles
+// lang/en/dashboard.php - 42 cles
 return [
     'dashboard.greeting' => 'Hello, :name',
     'dashboard.role_super' => 'Super Administrator',

@@ -1,6 +1,6 @@
 <?php
 /**
- * global_search.php — Recherche globale cross-entites (AJAX JSON)
+ * global_search.php - Recherche globale cross-entites (AJAX JSON)
  * Cherche dans : serveurs (name, ip), utilisateurs (name, email), CVE (cve_id)
  */
 require_once __DIR__ . '/../../auth/verify.php';

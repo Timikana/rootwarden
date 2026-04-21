@@ -1,4 +1,4 @@
--- Migration 007 — Table de planification des scans CVE automatiques
+-- Migration 007 - Table de planification des scans CVE automatiques
 -- Permet de configurer des scans périodiques (ex: quotidien à 03h00)
 
 CREATE TABLE IF NOT EXISTS cve_scan_schedules (

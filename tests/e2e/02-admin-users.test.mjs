@@ -1,5 +1,5 @@
 /**
- * 02-admin-users.test.mjs — E2E : Admin user CRUD
+ * 02-admin-users.test.mjs - E2E : Admin user CRUD
  *
  * Valide :
  *  - Page admin accessible
@@ -14,7 +14,7 @@ import { launchBrowser, newPage, login, sleep, BASE_URL } from './helpers.mjs';
 const TEST_USER = `e2e_test_${Date.now()}`;
 let browser, page;
 
-describe('02 — Admin Users CRUD', () => {
+describe('02 - Admin Users CRUD', () => {
     before(async () => {
         browser = await launchBrowser();
         page = await newPage(browser);

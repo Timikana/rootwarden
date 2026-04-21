@@ -1,5 +1,5 @@
 <?php
-// lang/en/ssh_audit.php — 79 cles
+// lang/en/ssh_audit.php - 79 cles
 return [
     'ssh_audit.title' => 'SSH Audit',
     'ssh_audit.desc' => 'Scan sshd_config on your servers and detect security vulnerabilities.',
@@ -9,7 +9,7 @@ return [
     'ssh_audit.score' => 'Score',
     'ssh_audit.grade' => 'Grade',
     'ssh_audit.findings' => 'Issues found',
-    'ssh_audit.no_findings' => 'No issues found — secure configuration',
+    'ssh_audit.no_findings' => 'No issues found - secure configuration',
     'ssh_audit.fix' => 'Fix',
     'ssh_audit.view_config' => 'View sshd_config',
     'ssh_audit.history' => 'Scan history',

@@ -1,4 +1,4 @@
-// fail2ban/js/main.js — Interactions JS pour la page Fail2ban
+// fail2ban/js/main.js - Interactions JS pour la page Fail2ban
 const API = window.API_URL || '/api_proxy.php';
 let _currentJail = null;
 let _currentServer = null;

@@ -1,15 +1,15 @@
 <?php
 /**
- * bashrc/index.php — Module Bashrc : deploiement standardise du .bashrc.
+ * bashrc/index.php - Module Bashrc : deploiement standardise du .bashrc.
  *
  * Maintenu  : Equipe Admin.Sys RootWarden
  * Version   : 1.14.0
  * Modifie   : 2026-04-20
  *
  * 3 onglets :
- *   1. Deploiement — selection serveur + users, preview, deploy
- *   2. Historique — audit log des deploiements (lecture user_logs)
- *   3. Templates  — affichage du template standard embarque
+ *   1. Deploiement - selection serveur + users, preview, deploy
+ *   2. Historique - audit log des deploiements (lecture user_logs)
+ *   3. Templates  - affichage du template standard embarque
  *
  * Permissions : admin (2) + superadmin (3) + can_manage_bashrc
  */
@@ -166,7 +166,7 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                             <?php foreach ($history as $h): ?>
                             <tr>
                                 <td class="px-3 py-2 mono text-xs"><?= htmlspecialchars($h['created_at']) ?></td>
-                                <td class="px-3 py-2"><?= htmlspecialchars($h['user_name'] ?? '—') ?></td>
+                                <td class="px-3 py-2"><?= htmlspecialchars($h['user_name'] ?? '-') ?></td>
                                 <td class="px-3 py-2 mono text-xs break-all"><?= htmlspecialchars($h['action']) ?></td>
                             </tr>
                             <?php endforeach; ?>
@@ -189,11 +189,11 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="text-xs text-gray-500 dark:text-gray-400">
-                            <span class="mono"><?= t('bashrc.template_lines') ?>: <span id="tpl-lines">—</span></span>
+                            <span class="mono"><?= t('bashrc.template_lines') ?>: <span id="tpl-lines">-</span></span>
                             &middot;
-                            <span class="mono">sha8: <span id="tpl-sha">—</span></span>
+                            <span class="mono">sha8: <span id="tpl-sha">-</span></span>
                             &middot;
-                            <span class="mono"><span id="tpl-bytes">—</span> o</span>
+                            <span class="mono"><span id="tpl-bytes">-</span> o</span>
                         </div>
                         <button id="btn-tpl-reset" onclick="bashrcTemplateReset()" class="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg"><?= t('bashrc.template_reset') ?></button>
                         <button id="btn-tpl-save" onclick="bashrcTemplateSave()" class="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg" disabled><?= t('bashrc.template_save') ?></button>

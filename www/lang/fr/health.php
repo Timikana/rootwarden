@@ -1,5 +1,5 @@
 <?php
-// lang/fr/health.php — 76 cles
+// lang/fr/health.php - 76 cles
 return [
     'health.title' => 'Diagnostic systeme',
     'health.desc' => 'Verification de sante de toutes les routes API backend et services. Vert = OK, Rouge = erreur.',

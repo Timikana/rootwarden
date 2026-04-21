@@ -1,6 +1,6 @@
 <?php
 /**
- * toggle_sudo.php — Activation / désactivation des droits sudo d'un utilisateur (endpoint AJAX)
+ * toggle_sudo.php - Activation / désactivation des droits sudo d'un utilisateur (endpoint AJAX)
  *
  * Rôle : inverse la valeur du champ `sudo` dans la table `users` pour un
  *        utilisateur donné. Le droit sudo détermine si l'utilisateur peut exécuter

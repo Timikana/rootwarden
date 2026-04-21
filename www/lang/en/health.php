@@ -1,5 +1,5 @@
 <?php
-// lang/en/health.php — 76 cles
+// lang/en/health.php - 76 cles
 return [
     'health.title' => 'System Health Check',
     'health.desc' => 'Health check of all backend API routes and services. Green = OK, Red = error.',

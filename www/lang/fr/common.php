@@ -1,5 +1,5 @@
 <?php
-// lang/fr/common.php — 44 cles
+// lang/fr/common.php - 44 cles
 return [
     'common.filter' => 'Filtrer...',
     'common.save' => 'Enregistrer',

@@ -1,10 +1,10 @@
 <?php
 /**
- * security/cve_export.php — Export CSV des résultats CVE
+ * security/cve_export.php - Export CSV des résultats CVE
  *
  * Paramètres GET :
- *   machine_id (int) — Exporte le dernier scan de cette machine
- *   scan_id (int)    — Exporte un scan spécifique (optionnel)
+ *   machine_id (int) - Exporte le dernier scan de cette machine
+ *   scan_id (int)    - Exporte un scan spécifique (optionnel)
  */
 require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../db.php';
@@ -54,7 +54,7 @@ $out = fopen('php://output', 'w');
 fwrite($out, "\xEF\xBB\xBF");
 
 // Metadata
-fputcsv($out, ['# Rapport CVE — ' . $scan['machine_name']]);
+fputcsv($out, ['# Rapport CVE - ' . $scan['machine_name']]);
 fputcsv($out, ['# Date du scan : ' . $scan['scan_date']]);
 fputcsv($out, ['# Paquets scannes : ' . $scan['packages_scanned']]);
 fputcsv($out, ['# Seuil CVSS : ' . $scan['min_cvss']]);

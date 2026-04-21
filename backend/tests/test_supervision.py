@@ -1,5 +1,5 @@
 """
-test_supervision.py — Tests du module Supervision (multi-agent).
+test_supervision.py - Tests du module Supervision (multi-agent).
 
 Couvre :
   - Auth/permission sur chaque route
@@ -157,7 +157,7 @@ class TestSupervisionConfig:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Deploy — validation
+# Deploy - validation
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestSupervisionDeploy:

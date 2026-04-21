@@ -1,5 +1,5 @@
 """
-test_admin.py — Tests des routes d'administration (backups, lifecycle, temp_permissions).
+test_admin.py - Tests des routes d'administration (backups, lifecycle, temp_permissions).
 """
 
 import json
@@ -30,7 +30,7 @@ class TestBackups:
 
 
 class TestServerLifecycle:
-    """POST /server_lifecycle — mise a jour du statut lifecycle."""
+    """POST /server_lifecycle - mise a jour du statut lifecycle."""
 
     def test_lifecycle_update_active(self, client, admin_headers, mock_db):
         resp = client.post('/server_lifecycle', headers=admin_headers, json={
@@ -66,7 +66,7 @@ class TestServerLifecycle:
 
 
 class TestExcludeUser:
-    """POST /exclude_user — exclusion d'un user de la synchro SSH."""
+    """POST /exclude_user - exclusion d'un user de la synchro SSH."""
 
     def test_exclude_user_success(self, client, admin_headers, mock_db):
         resp = client.post('/exclude_user', headers=admin_headers, json={

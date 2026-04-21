@@ -1,6 +1,6 @@
 <?php
 /**
- * terms.php — Conditions Generales d'Utilisation (CGU)
+ * terms.php - Conditions Generales d'Utilisation (CGU)
  *
  * @package RootWarden
  */
@@ -22,7 +22,7 @@ $contactEmail = htmlspecialchars(getenv('SERVER_ADMIN') ?: 'admin@localhost');
 <html lang="<?= getLang() ?>">
 <head>
     <?php require_once __DIR__ . '/head.php'; ?>
-    <title><?= t('terms.page_title') ?> — <?= $appName ?></title>
+    <title><?= t('terms.page_title') ?> - <?= $appName ?></title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
 <?php require_once __DIR__ . '/menu.php'; ?>

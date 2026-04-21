@@ -21,6 +21,6 @@ CREATE TABLE IF NOT EXISTS server_user_inventory (
 
 INSERT IGNORE INTO server_user_inventory (machine_id, username, status, managed_by, notes, first_seen_at)
 SELECT machine_id, username, 'excluded', 'manual',
-       CONCAT('Migration depuis user_exclusions — ', COALESCE(reason, 'sans raison')),
+       CONCAT('Migration depuis user_exclusions - ', COALESCE(reason, 'sans raison')),
        created_at
 FROM user_exclusions;

@@ -1,11 +1,72 @@
-# Changelog — RootWarden
+# Changelog - RootWarden
 
 Toutes les modifications notables sont documentées ici.  
-Format : [Semantic Versioning](https://semver.org/lang/fr/) — `MAJEUR.MINEUR.PATCH`
+Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PATCH`
 
 ---
 
-## [1.15.1] — 2026-04-21
+## [1.16.0] - 2026-04-21
+
+### Feat : Profils de supervision (catalogue metadata)
+
+Evite la saisie libre de HostMetadata/Server/ServerActive par machine. L'admin
+cree un catalogue (LinuxInterne, LinuxExterne...) une fois, les autres admins
+assignent chaque serveur via un dropdown.
+
+- Migration `039_supervision_metadata_profiles.sql` :
+  * Table `supervision_metadata_profiles(platform, name, description,
+    host_metadata, zabbix_server, zabbix_server_active, zabbix_proxy,
+    listen_port, tls_connect, tls_accept, notes)`.
+  * Table `machine_supervision_profile(machine_id, platform, profile_id)`
+    avec FK CASCADE pour decouplage propre.
+  * Seed : 2 profils par defaut `LinuxInterne` / `LinuxExterne`.
+- Routes Flask dans `backend/routes/supervision.py` :
+  * `GET/POST /supervision/profiles` (permission `can_manage_supervision`).
+  * `DELETE /supervision/profiles/<id>`.
+  * `GET/POST/DELETE /supervision/machines/<mid>/profile` : assignation.
+- `_build_config_lines()` refactore pour gerer la precedence
+  `overrides > profil > global`.
+- Substitution `{machine.name}` et `{machine.ip}` etendue a **tous** les
+  overrides (plus seulement `Hostname`). Accepte aussi les cles d'override
+  libres validees par `_SAFE_PARAM_RE`.
+- UI : nouvel onglet "Profils" dans `www/supervision/index.php` + dialogue
+  CRUD + lang FR/EN.
+- Test E2E : `tests/e2e/go-supervision-profiles.mjs` couvre
+  creation/edition/suppression + verification compte non-privilegie.
+
+### Fix : Ubuntu/Debian support generique pour agent Zabbix
+
+`backend/routes/supervision.py` detectait uniquement `ubuntu20.04` /
+`ubuntu22.04`. Ubuntu 24.04 LTS tombait en fallback sur 20.04 (repo
+inexistant → install silencieusement echouee).
+
+- Debian : extraction du MAJOR, plancher 11, pas de plafond → supporte
+  debian11+ y compris versions futures.
+- Ubuntu : extraction `X.Y`, snap sur l'annee paire .04 la plus proche vers
+  le bas (24.04, 26.04, etc.). Versions non-LTS retombent sur la LTS
+  precedente, alignee avec la politique Zabbix.
+
+### Fix : Documentation - lien repository
+
+`/documentation.php#contribute` pointait toujours sur
+`github.com/Timikana/Gestion_SSH_KEY`. Corrige en `github.com/Timikana/rootwarden`.
+
+### Chore : purge em-dash U+2014
+
+Caractere `-` em-dash remplace par le hyphen-minus dans **1712 fichiers**
+(code, docs, lang, commentaires). Alignement stylistique, aucun impact
+fonctionnel.
+
+### Branches merged supprimees
+
+- Local : `feature/bashrc-deploy`, `feature/brute-force-protection`,
+  `feature/graylog-wazuh`, `refactor/rename-rootwarden`.
+- Remote : `origin/feature/brute-force-protection`,
+  `origin/feature/graylog-wazuh`, `origin/feature/supervision`.
+
+---
+
+## [1.15.1] - 2026-04-21
 
 ### CI : fix SAST bandit (config non chargee + skips ajustes)
 
@@ -23,16 +84,16 @@ Bugs :
 Fixes :
 - `.github/workflows/ci.yml` : ajoute `-c bandit.yml` a la commande.
 - `backend/bandit.yml` : etend `skips:` avec justifications
-  * B108 — temp files `/tmp/.rw_stream_*` CIBLENT les serveurs distants
+  * B108 - temp files `/tmp/.rw_stream_*` CIBLENT les serveurs distants
     via SSH (pas le host backend), pas de lecture locale non-privilegiee
-  * B601 — paramiko `exec_command`, pattern fondateur du projet, entrees
+  * B601 - paramiko `exec_command`, pattern fondateur du projet, entrees
     validees en amont par shlex.quote + whitelists regex ; B602 (shell=True
     sur subprocess local) reste actif
-  * B413 — `Crypto.Cipher.AES` : on utilise pycryptodome (drop-in du
+  * B413 - `Crypto.Cipher.AES` : on utilise pycryptodome (drop-in du
     pyCrypto deprecated, meme namespace) ; bandit ne distingue pas les deux
-  * B507 — paramiko `AutoAddPolicy` : TOFU assume sur la gestion de parc,
+  * B507 - paramiko `AutoAddPolicy` : TOFU assume sur la gestion de parc,
     host keys persistees via volume Docker `known_hosts`
-  * B608 — f-strings SQL detectees ciblent uniquement des noms de tables
+  * B608 - f-strings SQL detectees ciblent uniquement des noms de tables
     et colonnes whitelistees cote app (ORDER BY dans liste fermee) ; toutes
     les VALEURS utilisent des prepared statements `%s` mysql-connector
 - B602 (subprocess shell=True), B105/B106 (passwords hardcodes), B303-B306
@@ -51,7 +112,7 @@ Version 1.15.0 -> 1.15.1 (patch CI).
 
 ---
 
-## [1.14.7] — 2026-04-20
+## [1.14.7] - 2026-04-20
 
 ### RGPD : export JSON des donnees personnelles + anonymisation admin
 
@@ -95,7 +156,7 @@ i18n FR+EN parite 58=58 :
 Version 1.14.6 -> 1.14.7.
 
 ---
-## [1.14.6] — 2026-04-20
+## [1.14.6] - 2026-04-20
 
 ### Password history + HIBP k-anonymity check
 
@@ -138,7 +199,7 @@ Version 1.14.5 -> 1.14.6.
 
 ---
 
-## [1.14.5] — 2026-04-20
+## [1.14.5] - 2026-04-20
 
 ### Session revocation server-side + "Deconnecter les autres sessions"
 
@@ -182,7 +243,7 @@ Version 1.14.4 -> 1.14.5.
 
 ---
 
-## [1.14.4] — 2026-04-20
+## [1.14.4] - 2026-04-20
 
 ### API keys segmentees avec scope regex + last_used tracking
 
@@ -203,7 +264,7 @@ Backend (backend/routes/helpers.py) :
   - Update last_used_at + last_used_ip en best-effort (UPDATE separe)
 - Mode fallback legacy : si table api_keys vide (premier boot), Config.API_KEY
   reste valide. Des la premiere cle creee, Config.API_KEY devient invalide
-  automatiquement — transition zero-downtime.
+  automatiquement - transition zero-downtime.
 
 UI (www/adm/api_keys.php, superadmin + can_manage_api_keys) :
 - Creation : genere rw_live_XXXXXX_... (48 hex chars), affiche UNE SEULE FOIS
@@ -224,7 +285,7 @@ Audit log : creation et revocation de cle loggees via audit_log() standard
 (hash chain 036 → tracabilite forte).
 
 Note compat : les api_proxy.php et consommateurs existants ne cassent pas
-au deploy — tant qu'aucune cle n'est creee, la legacy API_KEY fonctionne.
+au deploy - tant qu'aucune cle n'est creee, la legacy API_KEY fonctionne.
 Apres creation de la premiere cle, l'admin DOIT creer une cle nommee
 "php-proxy" (ou equivalent) et la configurer dans srv-docker.env pour
 remplacer l'ancienne API_KEY. Documente dans README.
@@ -233,9 +294,9 @@ Version 1.14.3 -> 1.14.4.
 
 ---
 
-## [1.14.3] — 2026-04-20
+## [1.14.3] - 2026-04-20
 
-### CI — SAST + SCA + secrets scan + Trivy filesystem
+### CI - SAST + SCA + secrets scan + Trivy filesystem
 
 Reponse au gap #7 de l'audit DevSecOps. Note : Trivy image scan et
 auto-tagging existaient deja dans `.github/workflows/ci.yml`. Ce qui
@@ -243,17 +304,17 @@ manquait (ajoute ici) : secrets commit scan, SAST Python, SCA Python + PHP,
 et Trivy fs (scan repo en amont des images).
 
 5 nouveaux jobs CI :
-- **secrets-scan** (gitleaks) — scanne tous les commits (fetch-depth: 0)
+- **secrets-scan** (gitleaks) - scanne tous les commits (fetch-depth: 0)
   pour detecter clef AWS/GitHub/Stripe/Slack/SSH committee par accident.
   Bloquant sur PR et main.
-- **sast-python** (bandit[toml]) — SAST Python avec config
+- **sast-python** (bandit[toml]) - SAST Python avec config
   `backend/bandit.yml` (skip B101/B404/B603/B607 car patterns legitimes
   du projet, B608 conserve actif). Warning en PR, bloquant sur main.
-- **sca-python** (pip-audit) — CVE check sur requirements.txt fige.
+- **sca-python** (pip-audit) - CVE check sur requirements.txt fige.
   Warning en PR, strict sur main.
-- **sca-php** (composer audit --locked) — CVE check sur composer.lock.
+- **sca-php** (composer audit --locked) - CVE check sur composer.lock.
   Warning en PR, strict sur main.
-- **trivy-fs** (aquasecurity/trivy-action) — scan repo (requirements,
+- **trivy-fs** (aquasecurity/trivy-action) - scan repo (requirements,
   composer.lock, Dockerfiles, docker-compose, secrets, misconfig IaC).
   Complement au `security-scan` existant qui ne scanne que les images
   apres build.
@@ -276,9 +337,9 @@ Version 1.14.2 -> 1.14.3.
 
 ---
 
-## [1.14.2] — 2026-04-20
+## [1.14.2] - 2026-04-20
 
-### Audit log tamper-evident — hash chain SHA2-256
+### Audit log tamper-evident - hash chain SHA2-256
 
 Reponse au gap #3 de l'audit DevSecOps (2026-04-20) : la table user_logs
 etait alterable silencieusement en cas de compromission DB. Chaque ligne
@@ -294,7 +355,7 @@ Algo :
 - prev_hash = self_hash de la ligne precedente (ORDER BY id DESC LIMIT 1)
 - Premiere ligne : prev_hash = 'GENESIS' (constante)
 
-Implementation app-level (pas de trigger MySQL — contrainte SUPER
+Implementation app-level (pas de trigger MySQL - contrainte SUPER
 privilege dans le container). Le hash est calcule par :
 - PHP : nouveau helper audit_log_raw() dans www/adm/includes/audit_log.php
   + audit_log() existant refactore pour passer par audit_log_raw
@@ -310,7 +371,7 @@ Endpoints :
   hash, signale la PREMIERE incoherence (MISMATCH ou PREV_BROKEN).
   Superadmin-only, read-only.
 
-UI (www/adm/audit_log.php) — superadmin uniquement :
+UI (www/adm/audit_log.php) - superadmin uniquement :
 - Bouton "🔒 Verifier integrite" → affiche status chaine (OK / BROKEN)
   avec id + type de l'erreur
 - Bouton "🖋 Sceller orphelines" → seal des lignes legacy
@@ -339,7 +400,7 @@ Version 1.14.1 -> 1.14.2 (patch de securite).
 
 ---
 
-## [1.14.1] — 2026-04-20
+## [1.14.1] - 2026-04-20
 
 ### Hardening auth : lockout per-user + backoff progressif + detection password spraying
 
@@ -356,7 +417,7 @@ du 2026-04-20 (finding #1).
   distincts en 10min. Audit log `[security]` prefix au superadmin.
 - **Notification ecrit dans `user_logs`** au 5eme echec consecutif d'un user,
   avec IP source.
-- **Oracle-safe** : password non verifie si `locked_until > NOW()` — evite
+- **Oracle-safe** : password non verifie si `locked_until > NOW()` - evite
   d'exposer une difference de timing entre "password correct + verrou" et
   "password incorrect + verrou".
 - **Admin UI** (superadmin only) :
@@ -368,13 +429,13 @@ du 2026-04-20 (finding #1).
   `login.error_user_locked`, `users.badge_locked`, `users.btn_unlock`, etc.
 
 Note : le rate limiting IP existant (`login_attempts`, 5/10min) est conserve
-inchange — il agit en premiere ligne contre les attaques distribuees.
+inchange - il agit en premiere ligne contre les attaques distribuees.
 
 ---
 
-## [1.15.0] — 2026-04-20
+## [1.15.0] - 2026-04-20
 
-### Module Graylog — forwarding rsyslog + templates editables
+### Module Graylog - forwarding rsyslog + templates editables
 
 Approche rsyslog native (pas de sidecar Graylog) : plus simple, footprint
 minimal, streams et extractors geres cote admin directement sur Graylog.
@@ -401,7 +462,7 @@ minimal, streams et extractors geres cote admin directement sur Graylog.
   toggle enabled + save/delete), Historique.
 - **Permission `can_manage_graylog`** (migration 033).
 
-### Module Wazuh — agent SIEM + rules/decoders/CDB editables
+### Module Wazuh - agent SIEM + rules/decoders/CDB editables
 
 - **Nouveau blueprint Flask** `backend/routes/wazuh.py` avec 11 routes :
   `GET/POST /wazuh/config`, `GET /wazuh/servers`, `POST /wazuh/install|uninstall|restart|group`,
@@ -424,7 +485,7 @@ minimal, streams et extractors geres cote admin directement sur Graylog.
 - Zero trust : `@require_api_key` + `@require_role(2)` + `@require_permission`
   + `@require_machine_access` + `@threaded_route` sur toutes les routes
 - Tous les passwords chiffres via `Encryption` (prefix `aes:`, label HKDF
-  `rootwarden-aes`) — jamais renvoyes au client en clair
+  `rootwarden-aes`) - jamais renvoyes au client en clair
 - Validation stricte : regex noms (`^[a-zA-Z0-9_-]{1,100}$`), IPs/FQDN, groupes
 - Contenu configs/rules transmis exclusivement en base64 via SSH
 - Validation `xmllint --noout` pour rules/decoders Wazuh
@@ -440,120 +501,120 @@ minimal, streams et extractors geres cote admin directement sur Graylog.
 
 ---
 
-## [1.14.0] — 2026-04-20
+## [1.14.0] - 2026-04-20
 
-### Module Bashrc — deploiement standardise du .bashrc par utilisateur + template editable
+### Module Bashrc - deploiement standardise du .bashrc par utilisateur + template editable
 
-- **Template editable via UI** — Migration 032 cree la table
+- **Template editable via UI** - Migration 032 cree la table
   `bashrc_templates(name, content, updated_by, updated_at)`. L'onglet "Template"
   devient un editeur textarea live : chargement GET, modification, bouton
   Sauvegarder (+ indicateur "modifie"), bouton "Annuler modifs". Routes
   `GET /bashrc/template` et `POST /bashrc/template`.
-- **Fallback fichier** — Au premier boot, le contenu du fichier
+- **Fallback fichier** - Au premier boot, le contenu du fichier
   `backend/templates/bashrc_standard.sh` est auto-seed en BDD. Ensuite la
   BDD fait foi.
-- **Cleanup legacy** — Suppression de `deploy_bashrc` (checkbox admin) et
+- **Cleanup legacy** - Suppression de `deploy_bashrc` (checkbox admin) et
   `zabbix_rsa_key` (champ formulaire + fallback PSK) devenus obsoletes avec
   les nouveaux modules `/bashrc/` et `supervision_config.tls_psk_value`.
   Colonnes DB laissees dormantes (pas de DROP pour preserver la compat prod).
 
-### Module Bashrc — deploiement standardise du .bashrc par utilisateur
+### Module Bashrc - deploiement standardise du .bashrc par utilisateur
 
-- **Nouveau blueprint Flask** — `backend/routes/bashrc.py`. 6 routes :
+- **Nouveau blueprint Flask** - `backend/routes/bashrc.py`. 6 routes :
   `GET /bashrc/users`, `POST /bashrc/prerequisites`, `POST /bashrc/preview`,
   `POST /bashrc/deploy`, `POST /bashrc/restore`, `GET /bashrc/backups`.
   Decorateurs : `@require_api_key`, `@require_role(2)`, `@require_permission('can_manage_bashrc')`,
   `@require_machine_access`, `@threaded_route`.
-- **Template versionne** — `backend/templates/bashrc_standard.sh` (v3.0).
+- **Template versionne** - `backend/templates/bashrc_standard.sh` (v3.0).
   Banniere figlet, tableau sysinfo 3/4 lignes (auto HA keepalived), 10 alertes
   (disque, RAM, swap, MAJ securite, reboot requis, services failed, zombies,
   tentatives SSH, reboot recent, session root), prompt git-aware, 40+ alias,
   10 fonctions utilitaires, sourcage `~/.bashrc.local`.
-- **Mode merge intelligent** — Detecte les blocs `# >>> USER CUSTOM >>>` dans
+- **Mode merge intelligent** - Detecte les blocs `# >>> USER CUSTOM >>>` dans
   l'ancien .bashrc et les reinjecte dans `~/.bashrc.local` (sourcee section 13).
-- **Prerequis figlet** — Detection + installation `apt install -y figlet` via
+- **Prerequis figlet** - Detection + installation `apt install -y figlet` via
   `execute_as_root` (meme chemin que le module `updates`).
-- **Idempotence** — Pas de backup ni de reecriture si sha256 identique au template.
-- **Securite** — Usernames valides `^[a-z_][a-z0-9_-]*$`, contenu transfere
+- **Idempotence** - Pas de backup ni de reecriture si sha256 identique au template.
+- **Securite** - Usernames valides `^[a-z_][a-z0-9_-]*$`, contenu transfere
   exclusivement en base64 (`printf '%s' '{b64}' | base64 -d > ~/.bashrc`),
   validation syntaxique `bash -n` post-deploiement, backup `.bashrc.bak.YYYYMMDD_HHMMSS`
   avec `chmod 600`.
-- **Frontend** — `www/bashrc/index.php` avec 3 onglets (Deploiement / Historique /
+- **Frontend** - `www/bashrc/index.php` avec 3 onglets (Deploiement / Historique /
   Template). Tableau utilisateurs : UID, home, shell, taille, sha8, status,
   badge custom detecte. Modal de preview avec diff colorise (unified diff).
-- **Migration 031** — Colonne `can_manage_bashrc` dans `permissions`.
-- **i18n FR + EN** — `www/lang/{fr,en}/bashrc.php` + cles nav + perms dans admin.php.
-- **Audit log** — Chaque `install_figlet`, `deploy`, `restore` journalise dans `user_logs`.
-- **Tests E2E** — `tests/e2e/go-bashrc.mjs` : login superadmin, select serveur,
+- **Migration 031** - Colonne `can_manage_bashrc` dans `permissions`.
+- **i18n FR + EN** - `www/lang/{fr,en}/bashrc.php` + cles nav + perms dans admin.php.
+- **Audit log** - Chaque `install_figlet`, `deploy`, `restore` journalise dans `user_logs`.
+- **Tests E2E** - `tests/e2e/go-bashrc.mjs` : login superadmin, select serveur,
   preview dry_run, deploy mode merge, verify backup via SSH (pas docker exec),
   restore, verification `bash -n` post-deploiement.
 
 ---
 
-## [1.13.1] — 2026-04-12
+## [1.13.1] - 2026-04-12
 
 ### Preferences de notifications email par utilisateur
 
-- **Table `notification_preferences`** — Migration 027. Chaque utilisateur peut etre
+- **Table `notification_preferences`** - Migration 027. Chaque utilisateur peut etre
   abonne a 6 types d'evenements : scan CVE, audit SSH, alertes securite, conformite,
   backups, mises a jour. Canaux : email, in-app, ou les deux.
-- **Admin > Acces & Permissions** — Nouvelle section "Notifications email" avec le meme
+- **Admin > Acces & Permissions** - Nouvelle section "Notifications email" avec le meme
   pattern card accordeon que les droits fonctionnels. Grille de checkboxes par user,
   groupees par categorie (Securite / Rapports), toggle htmx, Tout activer/desactiver.
-- **Notifications ciblees** — Les scans CVE et audits SSH envoient maintenant des
+- **Notifications ciblees** - Les scans CVE et audits SSH envoient maintenant des
   notifications in-app uniquement aux users abonnes (via `notify_subscribed()`),
   avec filtrage par `machine_access` pour les users role=1.
-- **Alertes securite automatiques** — CVE CRITICAL et grades SSH D/E/F declenchent
+- **Alertes securite automatiques** - CVE CRITICAL et grades SSH D/E/F declenchent
   une notification `security_alert` en plus de la notification standard.
-- **Helper `get_subscribed_emails()`** — Retourne les emails des users abonnes a un
+- **Helper `get_subscribed_emails()`** - Retourne les emails des users abonnes a un
   type d'evenement, filtre par machine_access. Pret pour l'envoi SMTP cible.
-- **i18n FR + EN** — Fichiers `lang/fr/notif_pref.php` et `lang/en/notif_pref.php`.
+- **i18n FR + EN** - Fichiers `lang/fr/notif_pref.php` et `lang/en/notif_pref.php`.
 
-### Migration stack — PHP 8.4 / Python 3.13 / MySQL 9.2
+### Migration stack - PHP 8.4 / Python 3.13 / MySQL 9.2
 
-- **PHP 8.2.30 → 8.4.20** — Image Docker `php:8.4-apache`. Aucun breaking change
+- **PHP 8.2.30 → 8.4.20** - Image Docker `php:8.4-apache`. Aucun breaking change
   detecte dans le code (signatures nullable deja conformes `?Type`). Extensions
   inchangees : gd, imagick, pdo_mysql, mysqli, curl.
-- **Python 3.12.13 → 3.13.13** — Image Docker `python:3.13-slim` (builder + runtime).
+- **Python 3.12.13 → 3.13.13** - Image Docker `python:3.13-slim` (builder + runtime).
   Toutes les dependances pip installees sans erreur. 169 tests pytest passes.
-- **MySQL 9.1.0 → 9.2.0** — Upgrade in-place automatique du data dictionary
+- **MySQL 9.1.0 → 9.2.0** - Upgrade in-place automatique du data dictionary
   (v90000 → v90200) et du serveur (v90100 → v90200). Volume de donnees compatible.
-- **CI/CD** — `python-version` 3.12 → 3.13, `php-version` 8.2 → 8.4 dans
+- **CI/CD** - `python-version` 3.12 → 3.13, `php-version` 8.2 → 8.4 dans
   `.github/workflows/ci.yml`.
 
 ### Hardening securite post-migration
 
-- **Apache TLS** — Force TLS 1.2+, cipher suite ECDHE+AESGCM/CHACHA20,
+- **Apache TLS** - Force TLS 1.2+, cipher suite ECDHE+AESGCM/CHACHA20,
   `SSLCompression off`, `SSLHonorCipherOrder on`. Negocie TLS 1.3 + AES-256-GCM.
-- **CSP** — `Content-Security-Policy` ajoute sur les 2 templates Apache (SSL + HTTP).
+- **CSP** - `Content-Security-Policy` ajoute sur les 2 templates Apache (SSL + HTTP).
   `default-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`.
-- **Permissions-Policy** — Desactive geolocation, camera, microphone, payment, USB.
-- **ServerTokens Prod + ServerSignature Off** — Version Apache masquee dans les
+- **Permissions-Policy** - Desactive geolocation, camera, microphone, payment, USB.
+- **ServerTokens Prod + ServerSignature Off** - Version Apache masquee dans les
   headers HTTP et les pages d'erreur.
-- **php.ini** — `open_basedir` restreint a `/var/www/html:/var/www/sessions:/tmp`,
+- **php.ini** - `open_basedir` restreint a `/var/www/html:/var/www/sessions:/tmp`,
   `allow_url_include = Off` explicite, `E_STRICT` retire de `error_reporting` (supprime en 8.4).
-- **Python deps pinnees** — flask>=3.0.0, werkzeug>=3.0.0, flask-cors>=4.0.0,
+- **Python deps pinnees** - flask>=3.0.0, werkzeug>=3.0.0, flask-cors>=4.0.0,
   marshmallow>=3.20.0, cryptography>=42.0.0, requests>=2.31.0.
-- **MySQL 9.2 compat** — `ORDER BY` ajoute sur `GROUP BY status` dans cve_remediation
+- **MySQL 9.2 compat** - `ORDER BY` ajoute sur `GROUP BY status` dans cve_remediation
   (ordre non garanti en MySQL 9.2 sans ORDER BY explicite).
-- **Docker** — `composer:latest` remplace par `composer:2` (image pinnee).
+- **Docker** - `composer:latest` remplace par `composer:2` (image pinnee).
 
 ---
 
-## [1.13.0] — 2026-04-12
+## [1.13.0] - 2026-04-12
 
 ### Planification SSH Audit + Tendances + Export PDF
 
-- **Planification scans SSH Audit** — Table `ssh_audit_schedules` avec expressions cron.
+- **Planification scans SSH Audit** - Table `ssh_audit_schedules` avec expressions cron.
   Le scheduler execute automatiquement les scans SSH sur le parc (par tag, env, ou all).
   Routes CRUD : `/ssh-audit/schedules` GET/POST/DELETE/toggle.
-- **Tendances SSH Audit** — Route `/ssh-audit/trends` retourne les scores moyens sur
+- **Tendances SSH Audit** - Route `/ssh-audit/trends` retourne les scores moyens sur
   30 jours (global ou par machine). Pret pour graphiques frontend.
-- **Export PDF compliance** — Bouton "Export PDF" via dompdf, rapport A4 paysage avec
+- **Export PDF compliance** - Bouton "Export PDF" via dompdf, rapport A4 paysage avec
   toutes les sections : resume, CVE, utilisateurs, SSH audit, supervision, hash SHA-256.
-- **Dashboard enrichi** — 6 cards (ajout SSH Audit score A-F + Agents deployes),
+- **Dashboard enrichi** - 6 cards (ajout SSH Audit score A-F + Agents deployes),
   raccourcis Supervision et SSH Audit dans les acces rapides.
-- **Compliance report enrichi** — Sections SSH Audit (scores par serveur) et Supervision
+- **Compliance report enrichi** - Sections SSH Audit (scores par serveur) et Supervision
   (badges multi-agent par serveur) ajoutees. Resume executif 6 cards.
 
 ### Audit securite global (68 failles corrigees)
@@ -569,108 +630,108 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 #### Architecture
 
-- **Backend `routes/supervision.py`** — Routes generiques multi-agent via `/{platform}/deploy`,
+- **Backend `routes/supervision.py`** - Routes generiques multi-agent via `/{platform}/deploy`,
   `/{platform}/version`, `/{platform}/uninstall`, `/{platform}/reconfigure`,
   `/{platform}/config/read`, `/{platform}/config/save`, `/{platform}/backups`,
   `/{platform}/restore`. Registre d'agents (`AGENT_REGISTRY`) avec les specs de chaque
   plateforme (service, config path, commandes install/version/uninstall).
-- **Table `supervision_agents`** — Tracking multi-agent par serveur (machine_id + platform).
+- **Table `supervision_agents`** - Tracking multi-agent par serveur (machine_id + platform).
   Un serveur peut avoir Zabbix ET Prometheus ET Telegraf en meme temps. Badges visuels
   dans le tableau (Z=violet, C=rouge, P=orange, T=bleu).
-- **Table `supervision_config`** — Configuration globale par plateforme (colonne `platform`).
+- **Table `supervision_config`** - Configuration globale par plateforme (colonne `platform`).
   Chaque agent a ses propres parametres : Zabbix (Server, TLS/PSK, metadata),
   Centreon (host gRPC, port 4317), Prometheus (listen address, collectors),
   Telegraf (InfluxDB v2 URL/token/org/bucket, inputs).
-- **Table `supervision_overrides`** — Surcharge par serveur (Hostname, ServerActive, etc.).
-- **Permission `can_manage_supervision`** — Admin + superadmin. Interface dans la page
+- **Table `supervision_overrides`** - Surcharge par serveur (Hostname, ServerActive, etc.).
+- **Permission `can_manage_supervision`** - Admin + superadmin. Interface dans la page
   d'administration des permissions.
 
 #### Frontend
 
-- **Selecteur de plateforme** en haut a droite — switch instantane entre Zabbix/Centreon/
+- **Selecteur de plateforme** en haut a droite - switch instantane entre Zabbix/Centreon/
   Prometheus/Telegraf. Change dynamiquement le formulaire de config, les couleurs des
   boutons, le badge plateforme, le compteur d'agents et le chemin du fichier editeur.
-- **3 onglets** — Configuration globale (formulaire specifique par agent), Deploiement
+- **3 onglets** - Configuration globale (formulaire specifique par agent), Deploiement
   agents (tableau 40+ serveurs avec badges multi-agent, filtre, scroll sticky, actions
   masse), Editeur de configuration distant (load/save/backup/restore).
-- **Badges multi-agent** dans le tableau — Chaque serveur affiche tous ses agents
+- **Badges multi-agent** dans le tableau - Chaque serveur affiche tous ses agents
   installes avec version (ex: "Z 7.0.13 | P 1.8.2 | T 1.33.0").
-- **Bouton "Scanner tous les agents"** — Detection des 4 plateformes en une passe.
-- **Compteur** — "12/41 serveurs avec zabbix" adapte a la plateforme active.
-- **UX 40+ serveurs** — Thead sticky, scroll smooth, filtre de recherche, compteur
+- **Bouton "Scanner tous les agents"** - Detection des 4 plateformes en une passe.
+- **Compteur** - "12/41 serveurs avec zabbix" adapte a la plateforme active.
+- **UX 40+ serveurs** - Thead sticky, scroll smooth, filtre de recherche, compteur
   de selection, detection auto des versions apres deploiement.
 
 #### Deploiement agents
 
-- **Zabbix Agent 2** — Repo officiel, paquet + plugins, config INI, PSK chiffre en DB,
+- **Zabbix Agent 2** - Repo officiel, paquet + plugins, config INI, PSK chiffre en DB,
   streaming SSH temps reel. Supporte Debian 11/12/13 et Ubuntu 20.04/22.04.
-- **Centreon Monitoring Agent** — Repo packages.centreon.com, config YAML, gRPC port 4317.
-- **Prometheus Node Exporter** — Paquet apt standard, config flags systemd, pull-based.
-- **Telegraf** — Repo InfluxData, config TOML, outputs InfluxDB v2 ou Prometheus format.
+- **Centreon Monitoring Agent** - Repo packages.centreon.com, config YAML, gRPC port 4317.
+- **Prometheus Node Exporter** - Paquet apt standard, config flags systemd, pull-based.
+- **Telegraf** - Repo InfluxData, config TOML, outputs InfluxDB v2 ou Prometheus format.
 
 #### Technique
 
-- **Migrations** — `022_supervision.sql` (tables config + overrides + permission),
+- **Migrations** - `022_supervision.sql` (tables config + overrides + permission),
   `023_supervision_multi_agent.sql` (colonne platform + colonnes Centreon/Prometheus/Telegraf),
   `024_supervision_agents.sql` (table supervision_agents + migration donnees Zabbix).
-- **Retrocompat** — L'ancienne route `/update_zabbix` redirige (307) vers `/supervision/zabbix/deploy`.
-- **i18n** — 107+ cles FR + EN dans `lang/fr|en/supervision.php`.
-- **Menu sidebar** — Lien Supervision, raccourci clavier `g v`.
-- **Health check** — 6 routes supervision testees dans le diagnostic.
-- **Health check** — 6 nouvelles routes testees dans le diagnostic.
+- **Retrocompat** - L'ancienne route `/update_zabbix` redirige (307) vers `/supervision/zabbix/deploy`.
+- **i18n** - 107+ cles FR + EN dans `lang/fr|en/supervision.php`.
+- **Menu sidebar** - Lien Supervision, raccourci clavier `g v`.
+- **Health check** - 6 routes supervision testees dans le diagnostic.
+- **Health check** - 6 nouvelles routes testees dans le diagnostic.
 
 ---
 
-## [1.12.0] — 2026-04-11
+## [1.12.0] - 2026-04-11
 
 ### Rework complet authentification et controle d'acces
 
-- **ZERO TRUST SESSION** — `checkAuth()` verifie desormais en DB que l'utilisateur
+- **ZERO TRUST SESSION** - `checkAuth()` verifie desormais en DB que l'utilisateur
   existe, est actif (`active=1`), et synchronise le `role_id` session/DB a chaque requete.
   Un user desactive entre deux requetes est immediatement deconnecte.
-- **`checkPermission()` verifie en DB** — Plus jamais de lecture `$_SESSION['permissions']`
+- **`checkPermission()` verifie en DB** - Plus jamais de lecture `$_SESSION['permissions']`
   pour une decision de securite. Combine permissions permanentes + temporaires non expirees.
   Met a jour le cache session apres chaque check. Log les refus dans `user_logs`.
-- **`api_proxy.php` securise** — Le `role_id` transmis au backend Python est verifie en DB
+- **`api_proxy.php` securise** - Le `role_id` transmis au backend Python est verifie en DB
   (plus lu depuis la session). Nouveau header `X-User-Permissions` avec les permissions JSON.
-- **Backend Python renforce** — Nouveau decorateur `@require_permission('can_xxx')` qui
+- **Backend Python renforce** - Nouveau decorateur `@require_permission('can_xxx')` qui
   parse le header `X-User-Permissions`. Logging des refus d'acces (IP + user_id + route).
-- **Superadmin toujours 13/13** — Les superadmins ont toutes les permissions par bypass.
+- **Superadmin toujours 13/13** - Les superadmins ont toutes les permissions par bypass.
   Leurs permissions sont affichees comme toujours cochees et non-editables dans l'interface.
   L'API rejette toute tentative de modification.
-- **Anti-escalation renforcee** — Ajout de protections self-edit sur tous les endpoints
+- **Anti-escalation renforcee** - Ajout de protections self-edit sur tous les endpoints
   admin : `update_permissions`, `toggle_sudo`, `toggle_user`, `update_user`, `update_user_status`.
   Protection dernier superadmin actif sur `toggle_user` et `delete_user`.
-- **CSRF unifie** — `checkCsrfToken()` centralise supporte POST body, header `X-CSRF-TOKEN`,
+- **CSRF unifie** - `checkCsrfToken()` centralise supporte POST body, header `X-CSRF-TOKEN`,
   et body JSON (`php://input`). Tous les endpoints utilisent la fonction centralisee.
   Corrige une comparaison timing-unsafe (`!==`) dans `update_server_access.php`.
-- **Pattern uniforme** — Toutes les pages utilisent `checkAuth([ROLE_*])` + `checkPermission()`.
+- **Pattern uniforme** - Toutes les pages utilisent `checkAuth([ROLE_*])` + `checkPermission()`.
   Constantes `ROLE_USER`, `ROLE_ADMIN`, `ROLE_SUPERADMIN` partout (plus de `[1,2,3]` ou `['1','2','3']`).
-- **Login durci** — Verification `active=1` avant `password_verify()`. Verification DB
+- **Login durci** - Verification `active=1` avant `password_verify()`. Verification DB
   apres TOTP reussi (user desactive entre login et 2FA = rejete).
-- **Logout propre** — Suppression `active_sessions` en DB, cookie secure SameSite=Strict.
-- **Remember-me durci** — Restauration force re-2FA + verification user actif en DB.
-- **Fix htmx 2.0.4** — `hx-vals="js:{...}"` remplace par `hx-vals` statiques +
+- **Logout propre** - Suppression `active_sessions` en DB, cookie secure SameSite=Strict.
+- **Remember-me durci** - Restauration force re-2FA + verification user actif en DB.
+- **Fix htmx 2.0.4** - `hx-vals="js:{...}"` remplace par `hx-vals` statiques +
   `htmx:configRequest` listener (le prefixe `js:` est casse dans htmx 2.0).
 
 ### Fix SSH mode password (`_su_exec`)
 
-- **Approche temp script** — `_su_exec()` ecrit la commande dans `/tmp/.rw_{uuid}.sh`
+- **Approche temp script** - `_su_exec()` ecrit la commande dans `/tmp/.rw_{uuid}.sh`
   et execute `su root -c 'sh /tmp/script.sh'`. Les pipes et redirections fonctionnent
   car `sh` les interprete, pas le PTY. Stdout propre via markers, vrai exit code.
-- **`execute_as_root_stream()`** — Meme approche temp script pour le streaming
+- **`execute_as_root_stream()`** - Meme approche temp script pour le streaming
   (MAJ APT, MAJ SECU). Detection sudo via `sudo -S -p '' true` avec le vrai mot de
   passe (evite les faux positifs de `sudo -n`).
-- **PATH complet** — `export PATH=/usr/local/sbin:...:/bin` en tete de chaque script
+- **PATH complet** - `export PATH=/usr/local/sbin:...:/bin` en tete de chaque script
   (resout `iptables: not found`, `sshd: not found`).
-- **Backups sshd_config** — `LC_ALL=C` sur `ls -la` pour forcer les dates en anglais
+- **Backups sshd_config** - `LC_ALL=C` sur `ls -la` pour forcer les dates en anglais
   (le parsing regex echouait avec les dates en francais "avril").
 
 ### CGU et Confidentialite
 
-- **terms.php reecrit** — 8 sections professionnelles (objet, auth 2FA, responsabilites,
+- **terms.php reecrit** - 8 sections professionnelles (objet, auth 2FA, responsabilites,
   activites interdites, tracabilite, limites, modifications, contact).
-- **privacy.php reecrit** — 7 sections RGPD (donnees collectees, finalites, stockage/securite,
+- **privacy.php reecrit** - 7 sections RGPD (donnees collectees, finalites, stockage/securite,
   conservation, partage self-hosted, droits, contact DPO) + exercice des droits en ligne.
 - **118 cles i18n ajoutees** en parite FR/EN.
 
@@ -682,128 +743,128 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 ---
 
-## [1.11.0] — 2026-04-10
+## [1.11.0] - 2026-04-10
 
 ### Gestion des services systemd
 
-- **Nouvelle page `/services/services_manager.php`** — Interface complete de gestion
+- **Nouvelle page `/services/services_manager.php`** - Interface complete de gestion
   des services systemd sur les serveurs Linux distants (equivalent services.msc Windows)
-- **Liste des services** — Affiche tous les services systemd avec statut (running/stopped/failed),
+- **Liste des services** - Affiche tous les services systemd avec statut (running/stopped/failed),
   etat au boot (enabled/disabled), description et categorie automatique
-- **Actions** — Demarrer, arreter, redemarrer, activer/desactiver au boot depuis l'interface
-- **Logs** — Consultation journalctl par service (50/100/200 lignes)
-- **Detail service** — Modal avec PID, memoire, uptime, description complete
-- **Categorisation automatique** — Web, Base de donnees, Mail, Securite, Monitoring, SSH,
+- **Actions** - Demarrer, arreter, redemarrer, activer/desactiver au boot depuis l'interface
+- **Logs** - Consultation journalctl par service (50/100/200 lignes)
+- **Detail service** - Modal avec PID, memoire, uptime, description complete
+- **Categorisation automatique** - Web, Base de donnees, Mail, Securite, Monitoring, SSH,
   Systeme, Reseau, Conteneurs, FTP (10 categories)
-- **Services proteges** — sshd, systemd-journald, dbus ne peuvent pas etre arretes (anti-lockout)
-- **Filtres** — Par statut, par categorie, recherche texte
-- **Stats** — Compteurs services actifs/arretes/en echec
-- **8 routes API** — /services/list, /status, /start, /stop, /restart, /enable, /disable, /logs
-- **Migration 020** — Permission can_manage_services
-- **i18n** — 87 cles FR+EN (1148 total)
+- **Services proteges** - sshd, systemd-journald, dbus ne peuvent pas etre arretes (anti-lockout)
+- **Filtres** - Par statut, par categorie, recherche texte
+- **Stats** - Compteurs services actifs/arretes/en echec
+- **8 routes API** - /services/list, /status, /start, /stop, /restart, /enable, /disable, /logs
+- **Migration 020** - Permission can_manage_services
+- **i18n** - 87 cles FR+EN (1148 total)
 
 ---
 
-## [1.10.1] — 2026-04-10
+## [1.10.1] - 2026-04-10
 
 ### Durcissement securite (pentest interne)
 
-- **force_password_change a l'install** — Le superadmin cree par `install.sh` a desormais
+- **force_password_change a l'install** - Le superadmin cree par `install.sh` a desormais
   `force_password_change = 1`. Meme si le mot de passe initial est compromis, l'attaquant
   est bloque sur la page profil et doit le changer (le vrai admin verra la compromission)
-- **Masquage mot de passe Docker logs** — Le mot de passe initial n'est plus affiche en clair
+- **Masquage mot de passe Docker logs** - Le mot de passe initial n'est plus affiche en clair
   dans `docker logs`. Affichage masque (`sup***min`), mot de passe complet dans
   `/var/www/html/.first_run_credentials` (chmod 600, lisible uniquement depuis le conteneur)
-- **start.sh** — Nouveau script de demarrage securise :
+- **start.sh** - Nouveau script de demarrage securise :
   - `chmod 600` automatique sur `srv-docker.env` et certificats
   - Detection des secrets par defaut (SECRET_KEY, API_KEY, DB_PASSWORD, MYSQL_ROOT_PASSWORD)
   - Warning rouge + confirmation avant demarrage si secrets non changes
-- **Privileges MySQL restreints** — L'utilisateur applicatif `rootwarden_user` n'a plus
+- **Privileges MySQL restreints** - L'utilisateur applicatif `rootwarden_user` n'a plus
   `ALL PRIVILEGES`. Remplace par : SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX,
   CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE (principe du moindre privilege)
-- **INIT_SUPERADMIN_PASSWORD vide par defaut** — Plus de mot de passe previsible
+- **INIT_SUPERADMIN_PASSWORD vide par defaut** - Plus de mot de passe previsible
   dans `srv-docker.env`. Si vide, un mot de passe aleatoire 24 chars est genere
 
 ### Amelioration UX admin
 
-- **Page Acces & Droits** — Badges (compteurs serveurs/droits) alignes inline avec le nom
+- **Page Acces & Droits** - Badges (compteurs serveurs/droits) alignes inline avec le nom
   au lieu d'etre pousses a l'extreme droite. Labels clarifies :
   "Voit tout" → "Acces global", "Bypass all" → "Tous les droits",
   "Droits d'acces" → "Droits fonctionnels"
-- **Descriptions sections** — Chaque section de la page admin a desormais une ligne
+- **Descriptions sections** - Chaque section de la page admin a desormais une ligne
   explicative sous le titre (Attribution des serveurs, Droits fonctionnels)
 
 ### Fichiers modifies
 
-- `php/install.sh` — force_password_change + masquage logs + fichier credentials
-- `srv-docker.env` — INIT_SUPERADMIN_PASSWORD vide, INIT_ADMIN_PASSWORD supprime
-- `srv-docker.env.example` — Warning securite en en-tete (6 points)
-- `mysql/init.sql` — GRANT restreints pour rootwarden_user
-- `start.sh` — Nouveau script demarrage securise
-- `www/adm/includes/manage_access.php` — Alignement + descriptions
-- `www/adm/includes/manage_permissions.php` — Alignement + descriptions + labels
+- `php/install.sh` - force_password_change + masquage logs + fichier credentials
+- `srv-docker.env` - INIT_SUPERADMIN_PASSWORD vide, INIT_ADMIN_PASSWORD supprime
+- `srv-docker.env.example` - Warning securite en en-tete (6 points)
+- `mysql/init.sql` - GRANT restreints pour rootwarden_user
+- `start.sh` - Nouveau script demarrage securise
+- `www/adm/includes/manage_access.php` - Alignement + descriptions
+- `www/adm/includes/manage_permissions.php` - Alignement + descriptions + labels
 
 ---
 
-## [1.10.0] — 2026-04-09
+## [1.10.0] - 2026-04-09
 
 ### Gestion Fail2ban
 
-- **Nouvelle page `/fail2ban/fail2ban_manager.php`** — Interface complete de gestion Fail2ban
+- **Nouvelle page `/fail2ban/fail2ban_manager.php`** - Interface complete de gestion Fail2ban
   sur tous les serveurs geres via SSH
-- **Detection automatique des services** — SSH, FTP (vsftpd/proftpd/pure-ftpd), Apache,
+- **Detection automatique des services** - SSH, FTP (vsftpd/proftpd/pure-ftpd), Apache,
   Nginx, Postfix, Dovecot. Affiche les jails disponibles par service detecte
-- **Activation/desactivation de jails** — Modal de configuration (maxretry, bantime, findtime),
+- **Activation/desactivation de jails** - Modal de configuration (maxretry, bantime, findtime),
   ecriture dans `/etc/fail2ban/jail.local` et restart automatique
-- **Monitoring IPs bannies** — Vue en temps reel par jail, nombre actuel et total
-- **Ban/unban manuel** — Bannir ou debannir une IP depuis l'interface avec confirmation
-- **Installation automatique** — Bouton "Installer Fail2ban" si absent sur le serveur
-- **Historique d'audit** — Table `fail2ban_history` : chaque ban/unban logge avec auteur
-- **Viewer jail.local** — Lecture du fichier de config en read-only
-- **Dashboard** — Widget IPs bannies + alerte serveurs sans Fail2ban
-- **Permission** — `can_manage_fail2ban` dans le systeme RBAC (11 fichiers)
-- **11 routes API** — /fail2ban/status, /jail, /install, /ban, /unban, /restart,
+- **Monitoring IPs bannies** - Vue en temps reel par jail, nombre actuel et total
+- **Ban/unban manuel** - Bannir ou debannir une IP depuis l'interface avec confirmation
+- **Installation automatique** - Bouton "Installer Fail2ban" si absent sur le serveur
+- **Historique d'audit** - Table `fail2ban_history` : chaque ban/unban logge avec auteur
+- **Viewer jail.local** - Lecture du fichier de config en read-only
+- **Dashboard** - Widget IPs bannies + alerte serveurs sans Fail2ban
+- **Permission** - `can_manage_fail2ban` dans le systeme RBAC (11 fichiers)
+- **11 routes API** - /fail2ban/status, /jail, /install, /ban, /unban, /restart,
   /config, /history, /services, /enable_jail, /disable_jail
-- **Migration 019** — Permission, tables fail2ban_history et fail2ban_status
+- **Migration 019** - Permission, tables fail2ban_history et fail2ban_status
 
 ### Securite comptes utilisateurs
 
-- **Changement de mot de passe obligatoire** — Flag `force_password_change` sur les users.
+- **Changement de mot de passe obligatoire** - Flag `force_password_change` sur les users.
   Apres creation ou reset admin, l'utilisateur est force de changer son mdp
   a la premiere connexion (bandeau alerte, navigation bloquee)
-- **Magic link d'activation** — Les nouveaux utilisateurs recoivent un email avec un lien
+- **Magic link d'activation** - Les nouveaux utilisateurs recoivent un email avec un lien
   d'activation (token 24h) au lieu d'un mot de passe temporaire en clair.
   L'email affiche les exigences du mot de passe (15+ chars, complexite)
-- **Migration 018** — Colonne `force_password_change` sur la table users
+- **Migration 018** - Colonne `force_password_change` sur la table users
 
 ### Corrections
 
-- **CVE save en BDD** — `executemany` de mysql-connector ne gerait pas les apostrophes
+- **CVE save en BDD** - `executemany` de mysql-connector ne gerait pas les apostrophes
   dans les summaries CVE. Remplace par `execute()` individuel. Ajout logging
   `_save_scan()` succes/echec
-- **CVE datetime serialization** — `scan_date` converti en ISO string avant jsonify
-- **CVE loadLastResults()** — Plus de catch vide : erreurs HTTP et JSON loguees en console
-- **SMTP plain port 25** — Support relay Exchange Online Protection sans TLS/SSL
+- **CVE datetime serialization** - `scan_date` converti en ISO string avant jsonify
+- **CVE loadLastResults()** - Plus de catch vide : erreurs HTTP et JSON loguees en console
+- **SMTP plain port 25** - Support relay Exchange Online Protection sans TLS/SSL
   (MAIL_SMTP_TLS=false + port != 465 → SMTP plain). Ajout `MAIL_DEBUG=true`
   pour diagnostiquer les connexions SMTP. Log config SMTP a chaque envoi
-- **URL emails** — `forgot_password.php` utilise `URL_HTTPS` env au lieu de `HTTP_HOST`
+- **URL emails** - `forgot_password.php` utilise `URL_HTTPS` env au lieu de `HTTP_HOST`
   (qui retournait localhost:8443 dans Docker)
-- **apt force-confold** — Toutes les commandes apt ajoutent
+- **apt force-confold** - Toutes les commandes apt ajoutent
   `-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'`
   pour eviter les prompts interactifs dpkg sur les fichiers de config modifies
-- **Detect apt lock + auto-repair** — Pre-check avant chaque MAJ : detecte si apt/dpkg
+- **Detect apt lock + auto-repair** - Pre-check avant chaque MAJ : detecte si apt/dpkg
   est verrouille, kill les process bloques, supprime les locks, `dpkg --configure -a`
-- **Bouton Repair dpkg** — Nouveau bouton rouge dans l'interface MAJ pour reparation manuelle
-- **SSH keepalive 30s** — Empeche les timeouts sur les scans CVE longs (1900+ paquets)
-- **Proxy timeout 30min** — `api_proxy.php` GET/POST passes de 300s/600s a 1800s
+- **Bouton Repair dpkg** - Nouveau bouton rouge dans l'interface MAJ pour reparation manuelle
+- **SSH keepalive 30s** - Empeche les timeouts sur les scans CVE longs (1900+ paquets)
+- **Proxy timeout 30min** - `api_proxy.php` GET/POST passes de 300s/600s a 1800s
 
 ---
 
-## [1.9.1] — 2026-04-08
+## [1.9.1] - 2026-04-08
 
 ### Corrections service account + compatibilite zero-password
 
-- **Compte service rootwarden** — Corrections du deploiement :
+- **Compte service rootwarden** - Corrections du deploiement :
   - Fix permissions keypair (`chmod 755` dossier, `chown` UID process Hypercorn)
   - Fallback `su -c` : ajout messages francais dans `_SUDO_UNAVAILABLE`
     (`commande introuvable`, `pas dans le fichier sudoers`)
@@ -825,83 +886,83 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
   - `cve.py`, `ssh.py preflight_check` : accepte password vide avec keypair
   - `helpers.py` : `server_decrypt_password` retourne `""` au lieu de `None`
 
-### Scan CVE — progression temps reel + seuil par serveur
+### Scan CVE - progression temps reel + seuil par serveur
 
-- **Progression temps reel** (cve_scanner.py) — Events enrichis avec `machine_id`,
+- **Progression temps reel** (cve_scanner.py) - Events enrichis avec `machine_id`,
   etapes `detect_os`/`packages`/`scan`, `current`/`total`/`percent` par paquet,
   compteur `total_cve_found` en cours de scan
-- **Seuil CVSS par serveur** (cve.py) — Route `/cve_scan` accepte `per_machine_cvss`
+- **Seuil CVSS par serveur** (cve.py) - Route `/cve_scan` accepte `per_machine_cvss`
   (dict `{machine_id: min_cvss}`). Seuil par machine prioritaire sur le global
-- **Frontend** (cveScan.js) — Barre de progression avec nom du paquet et pourcentage,
+- **Frontend** (cveScan.js) - Barre de progression avec nom du paquet et pourcentage,
   affichage des etapes initiales (detection OS, recuperation paquets). Dropdown seuil
   inline par serveur, synchro avec le seuil global, persistance localStorage
-- **Fix findings invisibles** — Les events `finding` incluent maintenant `machine_id`
+- **Fix findings invisibles** - Les events `finding` incluent maintenant `machine_id`
   (le JS les ignorait sinon). Corrige le bug "1421 CVE trouvees, 0 affichees"
 
 ### Corrections UX/UI
 
-- **Freeze navigation** — `session_write_close()` dans `api_proxy.php` avant curl
+- **Freeze navigation** - `session_write_close()` dans `api_proxy.php` avant curl
   (le lock de session PHP bloquait toutes les requetes pendant les operations longues)
-- **Cache JS** — Ajout `?v=filemtime()` sur tous les includes JS externes (cveScan.js,
+- **Cache JS** - Ajout `?v=filemtime()` sur tous les includes JS externes (cveScan.js,
   iptablesManager.js, sshManagement.js, apiCalls.js, domManipulation.js, admin.js)
   pour eviter les versions en cache apres mise a jour
-- **Actualisation apres actions** — `location.reload()` ajoute sur `updateUserStatus`,
+- **Actualisation apres actions** - `location.reload()` ajoute sur `updateUserStatus`,
   `deleteUser` (doublon supprime dans manage_roles.php), `excludeUser`
-- **admin_page.php** — Inclusion de `admin.js` (manquait)
-- **Champ Zabbix RSA** — Rendu facultatif dans le formulaire d'ajout/edition serveur
-- **Health check** — CVE scan en dry (`machine_id=0`) pour eviter le timeout 10s
-- **"SA" renomme "Admin distant"** — Libelle plus clair dans l'UI platform_keys.php
-- **Email bienvenue** — PHPMailer (remplace `mail()` natif) a la creation d'utilisateur
+- **admin_page.php** - Inclusion de `admin.js` (manquait)
+- **Champ Zabbix RSA** - Rendu facultatif dans le formulaire d'ajout/edition serveur
+- **Health check** - CVE scan en dry (`machine_id=0`) pour eviter le timeout 10s
+- **"SA" renomme "Admin distant"** - Libelle plus clair dans l'UI platform_keys.php
+- **Email bienvenue** - PHPMailer (remplace `mail()` natif) a la creation d'utilisateur
 
 ---
 
-## [1.9.0] — 2026-04-07
+## [1.9.0] - 2026-04-07
 
 ### Suppression des mots de passe hardcodes (install.sh)
 
-- **`php/install.sh`** — Nouveau script de premier demarrage. Genere les mots de passe
+- **`php/install.sh`** - Nouveau script de premier demarrage. Genere les mots de passe
   admin/superadmin au premier lancement Docker (aleatoires ou via `INIT_SUPERADMIN_PASSWORD`).
   Hash bcrypt insere en BDD via PHP CLI. Mot de passe affiche dans les logs Docker.
   Flag `/var/www/html/.installed` empeche la re-execution
-- **`mysql/init.sql`** — Les hash bcrypt hardcodes sont remplaces par `$PLACEHOLDER$`
+- **`mysql/init.sql`** - Les hash bcrypt hardcodes sont remplaces par `$PLACEHOLDER$`
   (invalide, aucun login possible sans install.sh). La `SECRET_KEY` peut desormais
-  etre n'importe quelle valeur — plus de dependance a une cle de chiffrement fixe
-- **`php/entrypoint.sh`** — Appel de install.sh apres Composer, avant la config SSL
-- **`php/Dockerfile`** — COPY + chmod de install.sh
-- **`srv-docker.env.example`** — Variables `INIT_SUPERADMIN_PASSWORD` et `INIT_ADMIN_PASSWORD`
+  etre n'importe quelle valeur - plus de dependance a une cle de chiffrement fixe
+- **`php/entrypoint.sh`** - Appel de install.sh apres Composer, avant la config SSL
+- **`php/Dockerfile`** - COPY + chmod de install.sh
+- **`srv-docker.env.example`** - Variables `INIT_SUPERADMIN_PASSWORD` et `INIT_ADMIN_PASSWORD`
 
 ### Reinitialisation de mot de passe par email
 
-- **Migration 016** — Table `password_reset_tokens` (user_id, token_hash bcrypt,
+- **Migration 016** - Table `password_reset_tokens` (user_id, token_hash bcrypt,
   expires_at 1h, used_at, ip_address)
-- **`www/auth/forgot_password.php`** — Page "Mot de passe oublie". Rate limit 3 demandes
+- **`www/auth/forgot_password.php`** - Page "Mot de passe oublie". Rate limit 3 demandes
   par IP par heure. Message identique que l'email existe ou non (anti-enumeration).
   Token 256 bits hache en bcrypt avant stockage
-- **`www/auth/reset_password.php`** — Validation token (password_verify), nouveau mot de
+- **`www/auth/reset_password.php`** - Validation token (password_verify), nouveau mot de
   passe avec confirmation. Invalide tous les tokens du user apres changement
-- **`www/includes/mail_helper.php`** — Wrapper PHPMailer. Lit les env vars SMTP existantes.
+- **`www/includes/mail_helper.php`** - Wrapper PHPMailer. Lit les env vars SMTP existantes.
   Email HTML responsive avec branding RootWarden (header bleu, bouton CTA, footer)
-- **`www/auth/login.php`** — Lien "Mot de passe oublie ?" apres le champ password
-- **`www/composer.json`** — Ajout dependance `phpmailer/phpmailer ^6.9`
-- **`backend/scheduler.py`** — Purge automatique des tokens expires dans `_purge_old_logs()`
+- **`www/auth/login.php`** - Lien "Mot de passe oublie ?" apres le champ password
+- **`www/composer.json`** - Ajout dependance `phpmailer/phpmailer ^6.9`
+- **`backend/scheduler.py`** - Purge automatique des tokens expires dans `_purge_old_logs()`
 
 ### Compte de service rootwarden (NOPASSWD sudo)
 
-- **Migration 017** — Colonnes `service_account_deployed` et `service_account_deployed_at`
+- **Migration 017** - Colonnes `service_account_deployed` et `service_account_deployed_at`
   sur la table `machines`
-- **Route `POST /deploy_service_account`** — Deploie un compte Linux `rootwarden` dedie
+- **Route `POST /deploy_service_account`** - Deploie un compte Linux `rootwarden` dedie
   sur les serveurs selectionnes : `useradd -r -m -s /bin/bash`, deploiement keypair
   Ed25519 dans `/home/rootwarden/.ssh/`, creation `/etc/sudoers.d/rootwarden` avec
   `NOPASSWD: ALL`, validation `visudo -cf`, test connexion + `sudo whoami`
-- **`connect_ssh()`** — Nouveau parametre `service_account`. Si True, tente la connexion
+- **`connect_ssh()`** - Nouveau parametre `service_account`. Si True, tente la connexion
   en tant que `rootwarden` via keypair avant le fallback user/password existant
-- **`execute_as_root()` / `execute_as_root_stream()`** — Detectent `_rootwarden_auth_method
+- **`execute_as_root()` / `execute_as_root_stream()`** - Detectent `_rootwarden_auth_method
   == 'service_account'` et executent `sudo sh -c` sans envoyer de mot de passe
-  (NOPASSWD). Pas de PTY, pas de filtrage password — sortie propre
-- **24 appels `ssh_session()` mis a jour** — Tous les SELECT machines incluent
+  (NOPASSWD). Pas de PTY, pas de filtrage password - sortie propre
+- **24 appels `ssh_session()` mis a jour** - Tous les SELECT machines incluent
   `service_account_deployed`, passe a `ssh_session(service_account=...)`.
   Retrocompatible : le parametre default a `False`
-- **`www/adm/platform_keys.php`** — Nouvelle colonne "Service Acc." avec badge indigo,
+- **`www/adm/platform_keys.php`** - Nouvelle colonne "Service Acc." avec badge indigo,
   stat card compteur, boutons "SA" par serveur et "Deployer SA" en masse
 
 > **Flux de migration complet** : Deployer keypair → Deployer service account →
@@ -910,11 +971,11 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 ---
 
-## [1.8.1] — 2026-04-07
+## [1.8.1] - 2026-04-07
 
-### Correctif critique — erreur 500 sur installation neuve
+### Correctif critique - erreur 500 sur installation neuve
 
-- **`mysql/init.sql`** — Le schema initial pre-enregistrait les migrations 006-015
+- **`mysql/init.sql`** - Le schema initial pre-enregistrait les migrations 006-015
   dans `schema_migrations` sans creer les tables et colonnes correspondantes.
   Sur une installation neuve, `db_migrate.py` considerait ces migrations comme
   deja appliquees et ne les executait pas, provoquant des erreurs 500 sur
@@ -935,82 +996,82 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 ---
 
-## [1.8.0] — 2026-04-04
+## [1.8.0] - 2026-04-04
 
 ### Pipeline CI/CD (GitHub Actions)
 
-- **`.github/workflows/ci.yml`** — Pipeline 4 jobs declenchee sur push/PR vers main :
+- **`.github/workflows/ci.yml`** - Pipeline 4 jobs declenchee sur push/PR vers main :
   lint Python (ruff), lint PHP (`php -l`), tests pytest (139 tests), build Docker images
-- **`backend/ruff.toml`** — Configuration ruff (ignore E501/E402/F401 pour SQL et mocks)
+- **`backend/ruff.toml`** - Configuration ruff (ignore E501/E402/F401 pour SQL et mocks)
 - Job deploy staging commente, pret a activer avec secrets GitHub
 
 ### Suite de tests pytest (139 tests)
 
-- **Infrastructure** — `conftest.py` avec fixtures : app Flask, client HTTP,
+- **Infrastructure** - `conftest.py` avec fixtures : app Flask, client HTTP,
   mock MySQL (`mysql.connector.connect`), headers par role (user/admin/superadmin)
-- **test_permissions.py** (17 tests) — Matrice API key (12 routes), check_machine_access,
+- **test_permissions.py** (17 tests) - Matrice API key (12 routes), check_machine_access,
   require_role, API key invalide/vide
-- **test_monitoring.py** (15 tests) — /test, /list_machines (filtrage role),
+- **test_monitoring.py** (15 tests) - /test, /list_machines (filtrage role),
   /server_status (online/offline), /linux_version, /last_reboot, /filter_servers
-- **test_admin.py** (18 tests) — /admin/backups CRUD, /server_lifecycle (active/retiring/
+- **test_admin.py** (18 tests) - /admin/backups CRUD, /server_lifecycle (active/retiring/
   archived/invalid), /exclude_user, /admin/temp_permissions CRUD (grant/revoke/hours)
-- **test_cve.py** (34 tests) — /cve_scan, /cve_results, /cve_history, /cve_compare,
+- **test_cve.py** (34 tests) - /cve_scan, /cve_results, /cve_history, /cve_compare,
   /cve_test_connection, /cve_schedules CRUD, /cve_whitelist CRUD, /cve_remediation + stats
-- **test_ssh.py** (38 tests) — /platform_key, /regenerate, /deploy (machine access 403),
+- **test_ssh.py** (38 tests) - /platform_key, /regenerate, /deploy (machine access 403),
   /preflight_check, /deploy_platform_key, /test_platform_key, /remove_ssh_password
   (keypair not deployed 400), /reenter_ssh_password, /scan_server_users,
   /remove_user_keys, /delete_remote_user (root protege, user SSH protege)
-- **test_iptables.py** (16 tests) — /iptables, /iptables-validate, /iptables-apply,
+- **test_iptables.py** (16 tests) - /iptables, /iptables-validate, /iptables-apply,
   /iptables-restore, /iptables-history, /iptables-rollback, /iptables-logs
 - Couverture : 6 Blueprints, tous les codes retour (401/400/403/404/200)
 
 ### Integration htmx (zero build, 50 KB)
 
-- **htmx 2.0.4** servi localement (`/js/htmx.min.js`) — CDN externe inaccessible
+- **htmx 2.0.4** servi localement (`/js/htmx.min.js`) - CDN externe inaccessible
   depuis le conteneur Docker (certificat auto-signe)
-- **CSRF auto-inject** — `htmx:configRequest` injecte `csrf_token` dans toutes les
+- **CSRF auto-inject** - `htmx:configRequest` injecte `csrf_token` dans toutes les
   requetes htmx. Event `showToast` pour les toasts via header `HX-Trigger`
-- **toggle_user.php / toggle_sudo.php** — Retournent un fragment HTML `<button>`
+- **toggle_user.php / toggle_sudo.php** - Retournent un fragment HTML `<button>`
   quand `HX-Request` header present, JSON sinon (retrocompatible)
-- **update_permissions.php** — Retourne un fragment HTML `<label>` avec checkbox
+- **update_permissions.php** - Retourne un fragment HTML `<label>` avec checkbox
   htmx quand `HX-Request`, accepte form-urlencoded en plus de JSON
-- **manage_users.php** — `onclick="toggleUserStatus()"` → `hx-post` + `hx-swap="outerHTML"`.
+- **manage_users.php** - `onclick="toggleUserStatus()"` → `hx-post` + `hx-swap="outerHTML"`.
   ~60 lignes JS supprimees (toggleUserStatus, toggleSudo)
-- **manage_permissions.php** — `onchange="updatePermission()"` → `hx-post` +
+- **manage_permissions.php** - `onchange="updatePermission()"` → `hx-post` +
   `hx-trigger="change"` + `hx-target="closest label"`. ~25 lignes JS supprimees.
   `setAllPerms()` utilise `htmx.trigger()` au lieu de `updatePermission()`
 - **Server access** conserve le JS (manipulation className trop complexe pour htmx v1)
 
 ### Corrections UX/UI
 
-- **CGU** — Bouton "J'accepte" passe de `bg-orange-500` a `bg-blue-600` (design system)
-- **Mises a jour Linux** — "MaJ Secu" et "Planifier Securite" passent de `bg-red-500`
+- **CGU** - Bouton "J'accepte" passe de `bg-orange-500` a `bg-blue-600` (design system)
+- **Mises a jour Linux** - "MaJ Secu" et "Planifier Securite" passent de `bg-red-500`
   a `bg-amber-500` (rouge reserve aux actions destructives)
-- **Profile** — 3 boutons bleus → 1 seul primaire ("Enregistrer" email),
+- **Profile** - 3 boutons bleus → 1 seul primaire ("Enregistrer" email),
   2 secondaires (`border border-gray-300`). Card password `rounded-xl shadow-sm`
-- **CVE Export** — Erreurs brutes → reponses JSON (`Content-Type: application/json`)
+- **CVE Export** - Erreurs brutes → reponses JSON (`Content-Type: application/json`)
 
 ---
 
-## [1.7.0] — 2026-04-04
+## [1.7.0] - 2026-04-04
 
 ### Refonte systeme de permissions
 
-- **5 failles AJAX corrigees** — checkAuth([3]) ajoute sur toggle_user, toggle_sudo,
+- **5 failles AJAX corrigees** - checkAuth([3]) ajoute sur toggle_user, toggle_sudo,
   update_user, update_user_status, update_server_access. global_search filtre par role
-- **3 routes SSE securisees** — @require_api_key ajoute sur /logs, /update-logs, /iptables-logs
-- **Proxy securise** — api_proxy.php transmet X-User-ID et X-User-Role au backend Python.
+- **3 routes SSE securisees** - @require_api_key ajoute sur /logs, /update-logs, /iptables-logs
+- **Proxy securise** - api_proxy.php transmet X-User-ID et X-User-Role au backend Python.
   Helpers Python : get_current_user(), require_role(), check_machine_access()
 - **5 nouvelles permissions** (migration 013) : can_manage_remote_users,
   can_manage_platform_key, can_view_compliance, can_manage_backups, can_schedule_cve
-- **Ouverture par permission** — SSH, updates, iptables, conformite accessibles aux users
+- **Ouverture par permission** - SSH, updates, iptables, conformite accessibles aux users
   avec la bonne permission (plus besoin d'etre admin). Sidebar affiche les liens par permission
-- **Filtrage user_machine_access** — SSH management filtre les machines par user pour role=1
+- **Filtrage user_machine_access** - SSH management filtre les machines par user pour role=1
 - **10 permissions** gerees dans l'admin (5 existantes + 5 nouvelles)
 
 ### Permissions temporaires
 
-- **Table temporary_permissions** (migration 014) — Accorder un acces pour 1h a 30 jours
+- **Table temporary_permissions** (migration 014) - Accorder un acces pour 1h a 30 jours
   a un utilisateur (ex: prestataire). Expiration automatique
 - **checkPermission()** verifie les permissions temporaires en fallback si la perm
   permanente est refusee (query BDD)
@@ -1021,7 +1082,7 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 ### Gestion des utilisateurs distants
 
-- **Page /adm/server_users.php** — Nouvelle page d'administration pour gerer les
+- **Page /adm/server_users.php** - Nouvelle page d'administration pour gerer les
   utilisateurs Linux presents sur chaque serveur distant :
   - Scan automatique au chargement (liste users avec shell valide)
   - Indicateurs visuels : cle plateforme (vert), cles presentes (jaune),
@@ -1030,201 +1091,201 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
   - Supprimer TOUTES les cles (`> authorized_keys`)
   - Supprimer l'utilisateur Linux (`userdel`, option `-r` pour le home)
   - Exclure de la synchronisation (table `user_exclusions`)
-- **Routes API** — `POST /remove_user_keys` (mode all/rootwarden_only),
+- **Routes API** - `POST /remove_user_keys` (mode all/rootwarden_only),
   `POST /delete_remote_user` (avec protection users systeme + user SSH)
-- **Protections** — Users systeme (root, daemon, www-data) et user SSH de
+- **Protections** - Users systeme (root, daemon, www-data) et user SSH de
   connexion non supprimables. Double confirmation pour userdel
 
 ### Reorganisation architecture
 
-- **Flask Blueprints** — server.py (2786 lignes, 58 routes) decoupe en 6 modules :
+- **Flask Blueprints** - server.py (2786 lignes, 58 routes) decoupe en 6 modules :
   `routes/monitoring.py` (7 routes), `routes/iptables.py` (7), `routes/admin.py` (4),
   `routes/cve.py` (16), `routes/ssh.py` (10), `routes/updates.py` (12).
   Helpers partages dans `routes/helpers.py`
-- **Fichiers morts supprimes** — 11 fichiers : redirects obsoletes (cve_scan.php, docs.php),
+- **Fichiers morts supprimes** - 11 fichiers : redirects obsoletes (cve_scan.php, docs.php),
   utilitaires dev (test_decrypt.py, utils.py), scripts legacy (update_variables.sh,
   migrate_passwords.php, reset_zabbix_password.php), build Tailwind (frontend/),
   doublon (manage_servers_fonctionnel.php, update_permissions_ajax.php)
-- **Endpoints AJAX reorganises** — www/adm/api/ cree, 9 endpoints deplaces
+- **Endpoints AJAX reorganises** - www/adm/api/ cree, 9 endpoints deplaces
   (toggle_user, toggle_sudo, delete_user, update_user, update_user_status,
   update_server_access, update_permissions, change_password, global_search)
-- **Includes renommes** — manage_ssh_key→manage_users, manage_droit_servers→manage_access,
+- **Includes renommes** - manage_ssh_key→manage_users, manage_droit_servers→manage_access,
   manage_portail_users→manage_roles. health_check deplace de security/ vers adm/
-- **JS extrait** — 1461 lignes JS inline extraites en fichiers externes :
+- **JS extrait** - 1461 lignes JS inline extraites en fichiers externes :
   iptables/js/iptablesManager.js (492L), ssh/js/sshManagement.js (237L),
   security/js/cveScan.js (732L)
 
 ### Refonte UX/UI
 
-- **Sidebar verticale** — Navigation fixe a gauche (desktop) avec icones, sections
+- **Sidebar verticale** - Navigation fixe a gauche (desktop) avec icones, sections
   categorisees (Navigation/Admin/Autre), recherche integree, avatar user en bas.
   Drawer mobile avec overlay. Remplace la barre horizontale surcharegee
-- **Dashboard compact** — Header bienvenue reduit a 1 ligne + badge alertes.
+- **Dashboard compact** - Header bienvenue reduit a 1 ligne + badge alertes.
   4 stat cards au lieu de 5. Raccourcis en grid uniforme. Widget remediation fusionne
-- **Design system** — Boutons harmonises sur toutes les pages : 1 primaire bleu + reste en
+- **Design system** - Boutons harmonises sur toutes les pages : 1 primaire bleu + reste en
   secondaire gris. Zero orange. Templates iptables en dropdown. 7 boutons MaJ Linux
   regroupes (5 consultation + separateur + 2 actions)
-- **Footer compact** — Une ligne : copyright + logos mini + liens
-- **Coherence globale** — Titres h1=text-2xl, h2=text-lg partout. Boutons login/2FA/SSH
+- **Footer compact** - Une ligne : copyright + logos mini + liens
+- **Coherence globale** - Titres h1=text-2xl, h2=text-lg partout. Boutons login/2FA/SSH
   en bleu. Header tableau MaJ Linux en gris. Pubkey truncatee. Profil uniforme
 
 ### Migration SSH password → keypair Ed25519
 
-- **Keypair plateforme Ed25519** — Generee automatiquement au demarrage du backend Python.
+- **Keypair plateforme Ed25519** - Generee automatiquement au demarrage du backend Python.
   Persistee dans un volume Docker nomme `platform_ssh_keys`. Pubkey affichee dans les logs
   et recuperable via `GET /platform_key`
-- **Auth SSH keypair-first** — `connect_ssh()` essaie d'abord la keypair plateforme,
+- **Auth SSH keypair-first** - `connect_ssh()` essaie d'abord la keypair plateforme,
   fallback sur password si echec. Champ `_rootwarden_auth_method` sur le client SSH
-- **Deploiement de la cle plateforme** — Route `POST /deploy_platform_key` : deploie la
+- **Deploiement de la cle plateforme** - Route `POST /deploy_platform_key` : deploie la
   pubkey sur les serveurs selectionnes, teste la connexion, marque en BDD. Bouton
   "Deployer sur tous" dans l'UI admin
-- **Test keypair** — Route `POST /test_platform_key` : verifie la connexion sans password
-- **Suppression du password SSH** — Route `POST /remove_ssh_password` : supprime le password
+- **Test keypair** - Route `POST /test_platform_key` : verifie la connexion sans password
+- **Suppression du password SSH** - Route `POST /remove_ssh_password` : supprime le password
   de la BDD apres validation keypair. Double confirmation dans l'UI
-- **Regeneration de keypair** — Route `POST /regenerate_platform_key` : supprime et regenere
+- **Regeneration de keypair** - Route `POST /regenerate_platform_key` : supprime et regenere
   la keypair. Marque tous les serveurs comme non-deployes. Double confirmation
-- **Page admin "Securite SSH"** — Nouvelle page `/adm/platform_keys.php` avec :
+- **Page admin "Securite SSH"** - Nouvelle page `/adm/platform_keys.php` avec :
   pubkey copiable, progression (deployes/en attente/password supprime), tableau des serveurs
   avec badges auth (keypair/keypair+pwd/password), boutons Tester/Suppr. pwd/Users
-- **Scan des utilisateurs distants** — Route `POST /scan_server_users` : liste les users
+- **Scan des utilisateurs distants** - Route `POST /scan_server_users` : liste les users
   avec shell valide, compte les cles SSH, detecte la cle plateforme. Tableau de resultats
   dans la page admin
-- **Alerte dashboard** — Alerte si des serveurs utilisent encore l'auth par password
+- **Alerte dashboard** - Alerte si des serveurs utilisent encore l'auth par password
   avec lien vers la page de migration
-- **Barre de progression migration** — Barre visuelle tricolore (rouge/jaune/vert) dans la
+- **Barre de progression migration** - Barre visuelle tricolore (rouge/jaune/vert) dans la
   page Cle SSH avec message de statut contextuel
-- **Suppression en masse des passwords** — Bouton orange "Suppr. passwords (N)" avec
+- **Suppression en masse des passwords** - Bouton orange "Suppr. passwords (N)" avec
   triple confirmation. Ne propose que les serveurs deja migres en keypair
-- **Rollback password** — Bouton "Re-saisir pwd" pour restaurer un password SSH apres
+- **Rollback password** - Bouton "Re-saisir pwd" pour restaurer un password SSH apres
   suppression. Route `POST /reenter_ssh_password` avec chiffrement automatique
-- **Filtrage serveurs archives** — Les serveurs en lifecycle "archived" sont exclus des
+- **Filtrage serveurs archives** - Les serveurs en lifecycle "archived" sont exclus des
   pages operationnelles (SSH, CVE, MaJ Linux) et du backend (list_machines, filter_servers)
-- **Webhook keypair** — Notification Slack/Teams/Discord quand un serveur migre en keypair
-- **Migration 012** — Colonnes `platform_key_deployed`, `platform_key_deployed_at`,
+- **Webhook keypair** - Notification Slack/Teams/Discord quand un serveur migre en keypair
+- **Migration 012** - Colonnes `platform_key_deployed`, `platform_key_deployed_at`,
   `ssh_password_required` sur la table `machines`
 
-## [1.6.0] — 2026-04-03
+## [1.6.0] - 2026-04-03
 
 ### Nouvelles fonctionnalites
 
-- **Scans CVE planifies** — Planification automatique via expressions cron (ex: quotidien
+- **Scans CVE planifies** - Planification automatique via expressions cron (ex: quotidien
   a 03h). CRUD complet (`/cve_schedules`), thread daemon, calcul next_run via `croniter`.
   Interface collapsible dans la page CVE pour creer/activer/supprimer des planifications
-- **Dry-run APT** — Bouton "Dry-run" sur la page MaJ Linux. Simule `apt-get upgrade --dry-run`
+- **Dry-run APT** - Bouton "Dry-run" sur la page MaJ Linux. Simule `apt-get upgrade --dry-run`
   sans rien installer. Affiche les paquets qui seraient mis a jour (route `/dry_run_update`)
-- **Pre-flight checks SSH** — Avant chaque deploiement de cles SSH, verification automatique :
+- **Pre-flight checks SSH** - Avant chaque deploiement de cles SSH, verification automatique :
   connectivite reseau, connexion SSH, version OS, espace disque, presence de cles SSH.
   Affichage du rapport dans les logs avant lancement du deploiement (`/preflight_check`)
-- **Tendances CVE (dashboard)** — Graphique en barres sur 30 jours avec indicateur de tendance
+- **Tendances CVE (dashboard)** - Graphique en barres sur 30 jours avec indicateur de tendance
   (hausse/baisse vs semaine precedente). Barres colorees par severite (rouge/orange/jaune)
   Route API `/cve_trends` pour l'agregation par jour
-- **Historique iptables + rollback** — Sauvegarde automatique des regles avant chaque
+- **Historique iptables + rollback** - Sauvegarde automatique des regles avant chaque
   modification. Table `iptables_history` avec auteur et raison. Routes `/iptables-history`
   et `/iptables-rollback` pour consultation et restauration
-- **Whitelist CVE** — Marquer des CVE comme faux positifs acceptes avec justification, auteur
+- **Whitelist CVE** - Marquer des CVE comme faux positifs acceptes avec justification, auteur
   et date d'expiration. Table `cve_whitelist`, routes CRUD `/cve_whitelist`
-- **Import CSV serveurs & utilisateurs** — Upload CSV depuis l'onglet admin pour creer
+- **Import CSV serveurs & utilisateurs** - Upload CSV depuis l'onglet admin pour creer
   des serveurs ou utilisateurs en masse. Validation par ligne, gestion doublons, tags,
   chiffrement automatique des mots de passe, rapport d'import avec erreurs detaillees
-- **Historique de login + sessions actives** — Table `login_history` tracant chaque
+- **Historique de login + sessions actives** - Table `login_history` tracant chaque
   tentative (succes/echec, IP, user-agent). Table `active_sessions` avec revocation
   depuis la page Profil. Conformite ISO 27001 A.9.4.2
-- **Politique d'expiration des mots de passe** — Configurable via `PASSWORD_EXPIRY_DAYS`
+- **Politique d'expiration des mots de passe** - Configurable via `PASSWORD_EXPIRY_DAYS`
   (defaut: desactive). Banniere d'avertissement N jours avant expiration. Redirection
   forcee vers la page Profil quand le mot de passe est expire
-- **Validation iptables (dry-run)** — Bouton "Valider" qui teste la syntaxe des regles
+- **Validation iptables (dry-run)** - Bouton "Valider" qui teste la syntaxe des regles
   via `iptables-restore --test` sans les appliquer. Route `/iptables-validate`
-- **Retention & purge automatique des logs** — Configurable via `LOG_RETENTION_DAYS`.
+- **Retention & purge automatique des logs** - Configurable via `LOG_RETENTION_DAYS`.
   Purge periodique (1x/heure) des tables user_logs, login_history, login_attempts,
   active_sessions. Conservation des N derniers scans CVE par serveur (`CVE_SCAN_RETENTION`)
-- **Suivi de remediation CVE** — Cycle de vie des vulnerabilites : Open → In Progress → Resolved.
+- **Suivi de remediation CVE** - Cycle de vie des vulnerabilites : Open → In Progress → Resolved.
   Assignation a un responsable, deadline, note de resolution. Table `cve_remediation` avec routes
   CRUD (`/cve_remediation`) et stats (`/cve_remediation/stats`). Auto-resolution prevu post-scan
-- **Deploiement SSH par groupe/tag** — Filtres par tag et environnement dans la page de deploiement
+- **Deploiement SSH par groupe/tag** - Filtres par tag et environnement dans la page de deploiement
   SSH. Bouton "Cocher filtres" pour selectionner uniquement les machines visibles
-- **Templates iptables** — 5 presets chargeables en 1 clic : Serveur Web, Base de donnees,
+- **Templates iptables** - 5 presets chargeables en 1 clic : Serveur Web, Base de donnees,
   SSH uniquement, Deny All, Docker Host. Insere le template dans l'editeur IPv4
-- **Backup BDD automatique** — mysqldump compresse planifie via le scheduler. Retention
+- **Backup BDD automatique** - mysqldump compresse planifie via le scheduler. Retention
   configurable (`BACKUP_RETENTION_DAYS`). Routes `/admin/backups` (GET pour lister, POST pour
   creer). Volume Docker `/app/backups` monte sur l'hote
-- **Workflow decommissionnement serveur** — Statut lifecycle : Active → Retiring → Archived.
+- **Workflow decommissionnement serveur** - Statut lifecycle : Active → Retiring → Archived.
   Banniere visuelle dans les cartes serveurs admin. Boutons Retirer/Archiver/Reactiver.
   Route `/server_lifecycle`. Colonne `retire_date` pour la planification
-- **Alertes SSH actionnables** — Les alertes "cles SSH > 90 jours" affichent desormais les
+- **Alertes SSH actionnables** - Les alertes "cles SSH > 90 jours" affichent desormais les
   noms des utilisateurs concernes avec un lien direct vers l'administration
-- **Export CSV** — Bouton d'export sur chaque carte serveur dans le scan CVE
+- **Export CSV** - Bouton d'export sur chaque carte serveur dans le scan CVE
   (`/security/cve_export.php`) + export du journal d'audit (`/adm/audit_log.php?export=csv`)
-- **Journal d'audit complet** — Nouvelle page `/adm/audit_log.php` avec filtres par
+- **Journal d'audit complet** - Nouvelle page `/adm/audit_log.php` avec filtres par
   utilisateur/action, pagination, export CSV. Actions loguees : connexion, toggle
   actif/sudo, creation/suppression utilisateur, modification cle SSH, permissions
-- **Notifications webhook** — Support Slack, Teams, Discord et generic
+- **Notifications webhook** - Support Slack, Teams, Discord et generic
   (`backend/webhook_utils.py`). Evenements : cve_critical, cve_high, deploy_complete,
   server_offline. Configuration via `WEBHOOK_URL`, `WEBHOOK_TYPE`, `WEBHOOK_EVENTS`
-- **Session timeout** — Deconnexion automatique apres inactivite (defaut 30 min),
+- **Session timeout** - Deconnexion automatique apres inactivite (defaut 30 min),
   configurable via `SESSION_TIMEOUT`. Message "session expiree" sur la page login
-- **Alertes securite sur le dashboard** — 6 verifications automatiques : users sans
+- **Alertes securite sur le dashboard** - 6 verifications automatiques : users sans
   2FA, users sans cle SSH, serveurs offline, CVE critiques, serveurs non verifies 30j+,
   cles SSH anciennes 90j+
-- **Suivi d'age des cles SSH** — Colonne `ssh_key_updated_at` (migration 005), badge
+- **Suivi d'age des cles SSH** - Colonne `ssh_key_updated_at` (migration 005), badge
   rouge "Cle SSH (Xj)" quand > 90 jours dans l'admin
-- **OpenCVE v2 on-prem** — Support Bearer token, adaptation format reponse API v2
+- **OpenCVE v2 on-prem** - Support Bearer token, adaptation format reponse API v2
   (cve_id→id, description→summary, metrics nested), fallback search si vendor/product 404
-- **Selection du role a la creation** — Dropdown user/admin/super-admin dans le
+- **Selection du role a la creation** - Dropdown user/admin/super-admin dans le
   formulaire d'ajout utilisateur
-- **Champ email utilisateur** — Migration 004, champ dans le formulaire de creation,
+- **Champ email utilisateur** - Migration 004, champ dans le formulaire de creation,
   envoi mail de bienvenue (si SMTP configure), modifiable dans le profil
-- **Test de connectivite serveur** — Bouton "Tester" dans chaque carte serveur admin
-- **Resume global CVE** — Bandeau en haut de la page scan avec total CRITICAL/HIGH/MEDIUM
+- **Test de connectivite serveur** - Bouton "Tester" dans chaque carte serveur admin
+- **Resume global CVE** - Bandeau en haut de la page scan avec total CRITICAL/HIGH/MEDIUM
 
 ### Finitions UI (features round 3)
 
-- **Widget remediation CVE (dashboard)** — Compteurs Open/En cours/Resolues/Acceptees
+- **Widget remediation CVE (dashboard)** - Compteurs Open/En cours/Resolues/Acceptees
   avec indicateur de deadlines depassees sur la page d'accueil
-- **UI historique iptables** — Section historique avec bouton Restaurer par version dans
+- **UI historique iptables** - Section historique avec bouton Restaurer par version dans
   la page iptables. Chargement automatique apres recuperation des regles
-- **Auto-resolution CVE** — Apres chaque scan, les remediations ouvertes dont la CVE
+- **Auto-resolution CVE** - Apres chaque scan, les remediations ouvertes dont la CVE
   n'est plus detectee passent automatiquement en "resolved" avec note horodatee
-- **Gestion des backups (admin)** — Modal dans l'admin avec liste des sauvegardes,
+- **Gestion des backups (admin)** - Modal dans l'admin avec liste des sauvegardes,
   taille, date. Bouton "Creer un backup maintenant" pour dump manuel
 
 ### Finitions UI (features round 4)
 
-- **Remediation CVE inline** — Dropdown de statut (Open/En cours/Accepte/Won't fix) directement
+- **Remediation CVE inline** - Dropdown de statut (Open/En cours/Accepte/Won't fix) directement
   dans le tableau de resultats CVE par serveur. Colonne "Suivi" ajoutee
-- **Whitelist CVE inline** — Fonction JS `whitelistCve()` accessible depuis la page scan,
+- **Whitelist CVE inline** - Fonction JS `whitelistCve()` accessible depuis la page scan,
   avec saisie de la raison via prompt
-- **Message lockout sur login** — Banniere rouge avec temps restant quand l'IP est bloquee
+- **Message lockout sur login** - Banniere rouge avec temps restant quand l'IP est bloquee
   apres 5 tentatives echouees. Message d'expiration de mot de passe
-- **Expiration mot de passe** — `password_expires_at` mis a jour automatiquement apres chaque
+- **Expiration mot de passe** - `password_expires_at` mis a jour automatiquement apres chaque
   changement de mot de passe si `PASSWORD_EXPIRY_DAYS` est configure. Session flag efface
-- **Rapport de conformite** — Nouvelle page `/security/compliance_report.php` : resume executif,
+- **Rapport de conformite** - Nouvelle page `/security/compliance_report.php` : resume executif,
   CVE par serveur, remediation, authentification/cles SSH, pare-feu. Export CSV + impression PDF.
   Hash SHA-256 pour preuve d'integrite. Bouton raccourci sur le dashboard
 
 ### Finitions UI (features round 5)
 
-- **Paquets en attente** — Bouton "Paquets" dans la page MaJ Linux. Affiche la liste des
+- **Paquets en attente** - Bouton "Paquets" dans la page MaJ Linux. Affiche la liste des
   paquets upgradables (`apt list --upgradable`) sans rien toucher. Route `/pending_packages`
-- **Notes sur les serveurs** — Champ de notes libres dans chaque carte serveur admin.
+- **Notes sur les serveurs** - Champ de notes libres dans chaque carte serveur admin.
   Historique des notes avec auteur et date. Table `server_notes` (migration 011)
-- **Timeline d'activite (profil)** — Section "Mon activite recente" avec icones colorees
+- **Timeline d'activite (profil)** - Section "Mon activite recente" avec icones colorees
   par type d'action (connexion, SSH, mot de passe, suppression, creation)
-- **Recherche globale** — Barre de recherche dans le menu (cross-entites : serveurs, users, CVE).
+- **Recherche globale** - Barre de recherche dans le menu (cross-entites : serveurs, users, CVE).
   Resultats instantanes en dropdown avec debounce 250ms. Page `/adm/global_search.php`
-- **Dashboard auto-refresh** — Les statuts serveurs se rafraichissent automatiquement toutes
+- **Dashboard auto-refresh** - Les statuts serveurs se rafraichissent automatiquement toutes
   les 60 secondes sans recharger la page (appel `/list_machines` en arriere-plan)
 
 ### Finitions UI (features round 6)
 
-- **Comparaison de scans CVE** — Bouton "Diff" par serveur dans la page CVE scan. Modal avec
+- **Comparaison de scans CVE** - Bouton "Diff" par serveur dans la page CVE scan. Modal avec
   compteurs (corrigees / inchangees / nouvelles) et listes colorees. Route `/cve_compare`
-- **Notification email expiration MdP** — Le scheduler verifie chaque heure si des mots de
+- **Notification email expiration MdP** - Le scheduler verifie chaque heure si des mots de
   passe expirent dans les 7 prochains jours et envoie un email de rappel (si MAIL_ENABLED)
-- **Indicateur reboot required** — Badge rouge "REBOOT" anime pulse a cote de la date de
+- **Indicateur reboot required** - Badge rouge "REBOOT" anime pulse a cote de la date de
   dernier boot quand `/var/run/reboot-required` est present sur le serveur
-- **Raccourcis clavier** — `Ctrl+K` ou `/` = recherche, `g+h` = dashboard, `g+s` = SSH,
+- **Raccourcis clavier** - `Ctrl+K` ou `/` = recherche, `g+h` = dashboard, `g+s` = SSH,
   `g+u` = MaJ, `g+c` = CVE, `g+a` = admin, `g+i` = iptables, `g+p` = profil, `?` = aide
-- **Compteur lifecycle admin** — Le header admin affiche les serveurs "en retrait" et "archives"
+- **Compteur lifecycle admin** - Le header admin affiche les serveurs "en retrait" et "archives"
 
 ### Ameliorations d'affichage CVE
 
@@ -1237,58 +1298,58 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 ### Corrections de bugs
 
-- **`execute_as_root_stream`** — Fallback `su -c` quand sudo absent (serveurs Debian
+- **`execute_as_root_stream`** - Fallback `su -c` quand sudo absent (serveurs Debian
   sans sudo), delai 1s pour l'invite "Mot de passe :"
-- **`/linux_version`** et **`/last_reboot`** — Utilisent `client.exec_command` direct
+- **`/linux_version`** et **`/last_reboot`** - Utilisent `client.exec_command` direct
   au lieu de `execute_as_root` (pas besoin de root pour `cat /etc/os-release` et `uptime -s`)
 - **`import re` local** dans `last_reboot()` qui masquait le `re` global → supprime
-- **Status Online/ONLINE** — JS harmonise en "ONLINE" pour correspondre a la BDD
+- **Status Online/ONLINE** - JS harmonise en "ONLINE" pour correspondre a la BDD
 - **Bouton "Reboot"** renomme en **"Dernier boot"** (evite la confusion "reboot le serveur")
-- **`apiCalls.js`** — Apostrophe non echappee dans toast (`l'heure`) cassait tout le JS
-- **CSP** — Ajout `unsafe-eval` pour Tailwind CDN
-- **`configure_servers.py`** — `NoneType.strip()` sur user sans cle SSH (3 occurrences)
-- **CVE doublons** — Deduplication paquets multiarch (dict `seen`)
-- **`createMachineRow()`** — 3 colonnes manquantes (MaJ secu, derniere exec, dernier boot)
-- **Modal `#schedule-modal`** manquant — Ajout du HTML
-- **`checkLinuxVersion()`** — Met a jour le DOM immediatement (plus besoin de recharger)
-- **Bouton "Dernier boot"** — Reference `$m` hors boucle PHP → itere `getSelectedMachineIds()`
-- **`filterFindings()`** — Reconstruit le tableau depuis la memoire (filtres par annee fonctionnels)
-- **`mysql/init.sql`** — Les comptes seedés `admin` et `superadmin` utilisent
+- **`apiCalls.js`** - Apostrophe non echappee dans toast (`l'heure`) cassait tout le JS
+- **CSP** - Ajout `unsafe-eval` pour Tailwind CDN
+- **`configure_servers.py`** - `NoneType.strip()` sur user sans cle SSH (3 occurrences)
+- **CVE doublons** - Deduplication paquets multiarch (dict `seen`)
+- **`createMachineRow()`** - 3 colonnes manquantes (MaJ secu, derniere exec, dernier boot)
+- **Modal `#schedule-modal`** manquant - Ajout du HTML
+- **`checkLinuxVersion()`** - Met a jour le DOM immediatement (plus besoin de recharger)
+- **Bouton "Dernier boot"** - Reference `$m` hors boucle PHP → itere `getSelectedMachineIds()`
+- **`filterFindings()`** - Reconstruit le tableau depuis la memoire (filtres par annee fonctionnels)
+- **`mysql/init.sql`** - Les comptes seedés `admin` et `superadmin` utilisent
   désormais des hashes cohérents avec les identifiants documentés
-- **`php/entrypoint.sh`** — `composer install` automatique au démarrage si
+- **`php/entrypoint.sh`** - `composer install` automatique au démarrage si
   `www/vendor/autoload.php` absent (fix 2FA après `docker-compose up -d`)
 
 ### Documentation
 
-- **`README.md`** — Réécriture complète pour v1.6.0 (features, stack, installation)
-- **`ARCHITECTURE.md`** — Mise à jour avec nouveaux fichiers, tables, colonnes et flux
-- **`documentation.php`** — Ajout sections webhooks, tags, audit, session timeout, export CSV
+- **`README.md`** - Réécriture complète pour v1.6.0 (features, stack, installation)
+- **`ARCHITECTURE.md`** - Mise à jour avec nouveaux fichiers, tables, colonnes et flux
+- **`documentation.php`** - Ajout sections webhooks, tags, audit, session timeout, export CSV
 
-## [1.5.3] — 2026-04-01
+## [1.5.3] - 2026-04-01
 
 ### Refonte interface (design system unifie)
 
-- **`ssh_management.php`** — Layout 2 colonnes (serveurs + terminal logs), bouton
+- **`ssh_management.php`** - Layout 2 colonnes (serveurs + terminal logs), bouton
   deploiement avec spinner/loading state, toast de succes a la fin du deploiement
-- **`iptables_manager.php`** — Card-based layout, selecteur serveur + bouton principal,
+- **`iptables_manager.php`** - Card-based layout, selecteur serveur + bouton principal,
   actions secondaires en hierarchy, panneaux regles en grille 2 colonnes
-- **`linux_updates.php`** — Barre compacte filtres + actions inline, pills colorees
+- **`linux_updates.php`** - Barre compacte filtres + actions inline, pills colorees
   par importance (versions bleu, statuts vert, MaJ orange, secu rouge), Zabbix inline
-- **`admin_page.php`** — Systeme d'onglets (Utilisateurs, Serveurs, Acces & Droits,
+- **`admin_page.php`** - Systeme d'onglets (Utilisateurs, Serveurs, Acces & Droits,
   Exclusions) avec deep-links via URL hash, regroupement logique des sections
-- **`verify_2fa.php` / `enable_2fa.php`** — Gradient bleu, branding white-label,
+- **`verify_2fa.php` / `enable_2fa.php`** - Gradient bleu, branding white-label,
   champ code TOTP monospace 6 digits, bouton orange, QR code centre avec secret
   collapsible (details/summary)
-- **`menu.php`** — Reecrit : icones SVG, lien actif surligne, badge user avec pill
+- **`menu.php`** - Reecrit : icones SVG, lien actif surligne, badge user avec pill
   de role, hamburger mobile fonctionnel, toggle dark/light avec icones soleil/lune
-- **`footer.php`** — Compact : logos technos discrets (40% opacity) + copyright en
+- **`footer.php`** - Compact : logos technos discrets (40% opacity) + copyright en
   une ligne au lieu du gros bloc "A propos"
-- **`index.php`** — Dashboard : 4 cartes statistiques + 6 raccourcis conditionnels
-- **`profile.php`** — Carte identite (role, date creation, statut 2FA, sudo)
+- **`index.php`** - Dashboard : 4 cartes statistiques + 6 raccourcis conditionnels
+- **`profile.php`** - Carte identite (role, date creation, statut 2FA, sudo)
 
 ### Toast notifications
 
-- **`head.php`** — Composant global toast() avec 4 types (success/error/warning/info),
+- **`head.php`** - Composant global toast() avec 4 types (success/error/warning/info),
   animation slide-in depuis la droite, auto-dismiss 4s
 - Remplacement des 33 `alert()` par `toast()` dans 7 fichiers
 - Toasts de succes sur les actions admin (toggle user, acces serveur, deploiement)
@@ -1302,114 +1363,114 @@ qui supporte 4 plateformes de monitoring : Zabbix, Centreon, Prometheus Node Exp
 
 ---
 
-## [1.5.2] — 2026-04-01
+## [1.5.2] - 2026-04-01
 
 ### Corrections de sécurité
 
-- **`ssh_utils.py`** — Le mot de passe root était visible dans les logs de streaming
+- **`ssh_utils.py`** - Le mot de passe root était visible dans les logs de streaming
   SSH (`execute_as_root_stream`). Le PTY renvoyait le mot de passe en écho dans stdout.
   Corrigé : filtrage du mot de passe + nettoyage des séquences ANSI dans le flux.
-- **`privacy.php`** — Action de suppression de compte sans validation CSRF.
+- **`privacy.php`** - Action de suppression de compte sans validation CSRF.
   Ajout de `checkCsrfToken()`, champ hidden CSRF, confirmation JS et protection
   contre la suppression du dernier superadmin.
-- **`delete_user.php`** — Un superadmin pouvait supprimer son propre compte et
+- **`delete_user.php`** - Un superadmin pouvait supprimer son propre compte et
   supprimer le dernier superadmin. Double protection ajoutée (self + count).
 
 ### Corrections de bugs
 
-- **`login.php`** — CSP `script-src 'self'` bloquait le CDN Tailwind sur la page
+- **`login.php`** - CSP `script-src 'self'` bloquait le CDN Tailwind sur la page
   de connexion. Ajouté `https://cdn.tailwindcss.com` dans la directive.
-- **`menu.php`** — Les conditions de navigation (`$role === 'superadmin'`)
+- **`menu.php`** - Les conditions de navigation (`$role === 'superadmin'`)
   comparaient un entier avec une chaîne et ne fonctionnaient jamais. Corrigé
   avec `$roleLabel` mappé depuis `role_id`.
-- **`manage_ssh_key.php`** — `htmlspecialchars(null)` sur la colonne `company`
+- **`manage_ssh_key.php`** - `htmlspecialchars(null)` sur la colonne `company`
   (PHP 8.2 deprecation warning visible). Ajouté `?? ''`.
-- **`configure_servers.py`** — `ensure_sudo_installed()` appelé sans `root_password`
+- **`configure_servers.py`** - `ensure_sudo_installed()` appelé sans `root_password`
   (argument manquant). `ssh_connection()` yield un channel au lieu du client SSH
   (type mismatch). Corrigé avec tuple `(channel, client)`.
-- **`domManipulation.js`** — Smart quotes Unicode (`'` `'`) dans le code exécutable
+- **`domManipulation.js`** - Smart quotes Unicode (`'` `'`) dans le code exécutable
   cassaient le parsing JS. Remplacées par des apostrophes droites.
-- **`profile.php`** — Classes CSS `light:` invalides (prefix inexistant dans Tailwind).
+- **`profile.php`** - Classes CSS `light:` invalides (prefix inexistant dans Tailwind).
 
 ### Architecture (proxy API)
 
-- **`api_proxy.php`** (nouveau) — Proxy PHP générique qui relaie toutes les requêtes
+- **`api_proxy.php`** (nouveau) - Proxy PHP générique qui relaie toutes les requêtes
   JS vers le backend Python en interne Docker. Supporte GET JSON, GET SSE streaming,
   POST JSON et POST streaming. Élimine les problèmes CORS entre le navigateur et
   Hypercorn ASGI, et masque l'API_KEY côté serveur.
-- **`head.php`** — `window.API_URL` pointe désormais vers `/api_proxy.php` au lieu
+- **`head.php`** - `window.API_URL` pointe désormais vers `/api_proxy.php` au lieu
   de l'URL Python directe. Ce changement central corrige toutes les pages d'un coup.
-- **`server.py`** — CORS géré manuellement (`@app.after_request`) au lieu de
+- **`server.py`** - CORS géré manuellement (`@app.after_request`) au lieu de
   `flask_cors` (incompatible avec Hypercorn). Ajout de `handle_preflight()` pour OPTIONS.
-- **`cve_scan.php`** — Test de connexion OpenCVE migré côté PHP (curl server-side)
+- **`cve_scan.php`** - Test de connexion OpenCVE migré côté PHP (curl server-side)
   au lieu de JS → Python directe.
 
 ### Environnement preprod
 
-- **`test-server/Dockerfile`** (nouveau) — Conteneur Debian Bookworm avec SSH, sudo
+- **`test-server/Dockerfile`** (nouveau) - Conteneur Debian Bookworm avec SSH, sudo
   et iptables pour tester les routes en local. Profile Docker `preprod`.
-- **`mock-opencve/app.py`** (nouveau) — Mock API OpenCVE avec 13 CVE réalistes
+- **`mock-opencve/app.py`** (nouveau) - Mock API OpenCVE avec 13 CVE réalistes
   couvrant 10 packages Debian (apt, bash, libc6, sudo, openssh, curl, etc.).
-- **`docker-compose.yml`** — Services `test-server` et `mock-opencve` sous le
+- **`docker-compose.yml`** - Services `test-server` et `mock-opencve` sous le
   profile `preprod`. Port Python exposé pour le dev.
 
 ### Améliorations UX
 
-- **`index.php`** — Dashboard avec 4 cartes statistiques (serveurs, en ligne,
+- **`index.php`** - Dashboard avec 4 cartes statistiques (serveurs, en ligne,
   utilisateurs, CVE) et 6 raccourcis conditionnels selon les permissions.
-- **`profile.php`** — Carte d'identité utilisateur (rôle, date de création,
+- **`profile.php`** - Carte d'identité utilisateur (rôle, date de création,
   statut 2FA, sudo).
-- **`menu.php`** — Affichage du nom de rôle (`superadmin`) au lieu du numéro (`3`).
-- **`index.php`** — Rôle affiché en texte (`Super-administrateur`) au lieu de l'ID.
-- **`health_check.php`** (nouveau) — Page diagnostic testant les 11 routes backend
+- **`menu.php`** - Affichage du nom de rôle (`superadmin`) au lieu du numéro (`3`).
+- **`index.php`** - Rôle affiché en texte (`Super-administrateur`) au lieu de l'ID.
+- **`health_check.php`** (nouveau) - Page diagnostic testant les 11 routes backend
   avec statut, temps de réponse et aperçu JSON. Accessible depuis Administration.
 
 ---
 
-## [1.5.1] — 2026-03-31
+## [1.5.1] - 2026-03-31
 
 ### Corrections de bugs (review d'alignement frontend ↔ backend)
 
-- **`apiCalls.js`** — `apiFetch()` n'envoyait jamais le header `X-API-KEY` → toutes les
+- **`apiCalls.js`** - `apiFetch()` n'envoyait jamais le header `X-API-KEY` → toutes les
   routes appelées via cette fonction retournaient HTTP 401. Header ajouté dans les defaults.
-- **`iptables_manager.php`** — Template literal JavaScript (`` ` `` backtick) utilisé dans
+- **`iptables_manager.php`** - Template literal JavaScript (`` ` `` backtick) utilisé dans
   du code PHP → interprété comme `shell_exec()`. Remplacé par `getenv('API_URL') . '/...'`.
-- **`iptables_manager.php`** — Les 3 appels `fetch()` vers `/iptables`, `/iptables-apply`,
+- **`iptables_manager.php`** - Les 3 appels `fetch()` vers `/iptables`, `/iptables-apply`,
   `/iptables-restore` n'envoyaient pas `X-API-KEY` → HTTP 401 systématique sur la page iptables.
-- **`ssh_management.php`** — Appel `fetch()` vers `/deploy` sans `X-API-KEY` → HTTP 401
+- **`ssh_management.php`** - Appel `fetch()` vers `/deploy` sans `X-API-KEY` → HTTP 401
   lors de tout déploiement de clé SSH.
-- **`apiCalls.js`** — `zabbixUpdateSingle()` utilisait `apiFetch()` (attend du JSON) sur
+- **`apiCalls.js`** - `zabbixUpdateSingle()` utilisait `apiFetch()` (attend du JSON) sur
   `/update_zabbix` qui retourne du streaming `text/plain` → erreur de parsing JSON.
   Réécrit avec `fetch()` + `ReadableStream` reader.
-- **`functions.php`** — `can_scan_cve` absent du tableau de fallback dans
+- **`functions.php`** - `can_scan_cve` absent du tableau de fallback dans
   `initializeUserSession()` → comportement imprévisible pour les users sans ligne en BDD.
-- **`crypto.php`** — Divergence de dérivation de clé AES entre PHP et Python :
+- **`crypto.php`** - Divergence de dérivation de clé AES entre PHP et Python :
   PHP passait la clé hex brute à `openssl_encrypt()`, Python faisait `bytes.fromhex()`.
   Nouveau helper `prepareKeyForAES()` aligné sur le comportement Python.
-- **`config.py`** — `ENCRYPTION_KEY` marquée comme obligatoire (`_require_env`) alors
+- **`config.py`** - `ENCRYPTION_KEY` marquée comme obligatoire (`_require_env`) alors
   qu'elle n'est pas utilisée par le backend Python → crash au démarrage si absente.
   Passée en optionnelle avec `os.getenv('ENCRYPTION_KEY', '')`.
-- **`srv-docker.env.example`** — `DB_PORT` utilisé par `config.py` mais absent du template.
+- **`srv-docker.env.example`** - `DB_PORT` utilisé par `config.py` mais absent du template.
   Ajouté commenté avec valeur par défaut 3306.
 
 ### Documentation (couverture complète du projet)
 
-- **Backend Python** (10 fichiers) — docstrings module-level + toutes les fonctions/classes :
+- **Backend Python** (10 fichiers) - docstrings module-level + toutes les fonctions/classes :
   `server.py`, `config.py`, `encryption.py`, `ssh_utils.py`, `iptables_manager.py`,
   `cve_scanner.py`, `mail_utils.py`, `db_migrate.py`, `configure_servers.py`, `update_server.py`
-- **PHP `www/`** (~35 fichiers) — blocs PHPDoc en-tête + PHPDoc sur toutes les fonctions :
+- **PHP `www/`** (~35 fichiers) - blocs PHPDoc en-tête + PHPDoc sur toutes les fonctions :
   auth/, adm/includes/, adm/ (endpoints AJAX), security/, ssh/, iptables/, update/functions/,
   pages racine (index, head, menu, footer, db, profile, privacy, terms)
-- **PHP `php/`** (8 fichiers) — commentaires sur Dockerfile, entrypoint.sh, templates Apache,
+- **PHP `php/`** (8 fichiers) - commentaires sur Dockerfile, entrypoint.sh, templates Apache,
   php.ini (justification de chaque surcharge), scripts shell
-- **JS** (3 fichiers) — JSDoc complet sur toutes les fonctions :
+- **JS** (3 fichiers) - JSDoc complet sur toutes les fonctions :
   `update/js/apiCalls.js`, `update/js/domManipulation.js`, `js/admin.js`
-- **`ARCHITECTURE.md`** — Carte complète du projet (arbre ASCII, rôle de chaque fichier,
+- **`ARCHITECTURE.md`** - Carte complète du projet (arbre ASCII, rôle de chaque fichier,
   tables MySQL, flux de données, conventions de développement)
 
 ---
 
-## [1.5.0] — 2026-03-31
+## [1.5.0] - 2026-03-31
 
 ### Ajouté
 - **Scan CVE** : intégration OpenCVE (cloud `opencve.io` ou instance on-prem)
@@ -1466,7 +1527,7 @@ docker exec -i rootwarden_db mysql -u rootwarden_user -p rootwarden \
 
 ---
 
-## [1.4.28] — 2025-xx-xx
+## [1.4.28] - 2025-xx-xx
 
 ### Modifié
 - Amélioration de la gestion des mises à jour Linux
@@ -1474,7 +1535,7 @@ docker exec -i rootwarden_db mysql -u rootwarden_user -p rootwarden \
 
 ---
 
-## [1.4.x] — Historique antérieur
+## [1.4.x] - Historique antérieur
 
 > Les versions antérieures à 1.4.28 n'ont pas de changelog détaillé.
 > Consultez le log Git pour l'historique complet : `git log --oneline`

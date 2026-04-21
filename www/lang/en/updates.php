@@ -1,5 +1,5 @@
 <?php
-// lang/en/updates.php — 58 cles
+// lang/en/updates.php - 58 cles
 return [
     'updates.title' => 'Linux Updates',
     'updates.subtitle' => 'APT package management',

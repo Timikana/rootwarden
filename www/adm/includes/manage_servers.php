@@ -429,7 +429,7 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
                             <div class="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg <?= $lifecycleCls ?>">
                                 <span class="text-xs font-medium"><?= $lifecycle === 'retiring' ? '&#9888; ' . t('servers.lifecycle_retiring') : '&#128451; ' . t('servers.lifecycle_archived') ?></span>
                                 <?php if ($server['retire_date'] ?? null): ?>
-                                <span class="text-[10px]">— <?= t('servers.lifecycle_planned_date', ['date' => htmlspecialchars($server['retire_date'])]) ?></span>
+                                <span class="text-[10px]">- <?= t('servers.lifecycle_planned_date', ['date' => htmlspecialchars($server['retire_date'])]) ?></span>
                                 <?php endif; ?>
                             </div>
                             <?php endif; ?>

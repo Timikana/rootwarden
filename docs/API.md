@@ -1,4 +1,4 @@
-# API Reference — RootWarden v1.11.0
+# API Reference - RootWarden v1.11.0
 
 > 77 routes reparties en 8 Blueprints Flask.  
 > Toutes les routes (sauf `/test`) exigent le header `X-API-KEY`.  
@@ -15,9 +15,9 @@
 | `X-User-Role` | Role : 1=user, 2=admin, 3=superadmin |
 
 **Codes communs :**
-- `401` — API key manquante ou invalide
-- `403` — Permission insuffisante ou acces machine refuse
-- `500` — Erreur serveur
+- `401` - API key manquante ou invalide
+- `403` - Permission insuffisante ou acces machine refuse
+- `500` - Erreur serveur
 
 ---
 
@@ -71,8 +71,8 @@ Recupere la version OS via SSH (`/etc/os-release`).
 // Response 200
 { "success": true, "machine_id": 1, "version": "Debian GNU/Linux 12 (bookworm)" }
 ```
-- `400` — machine_id manquant ou invalide
-- `404` — Machine introuvable
+- `400` - machine_id manquant ou invalide
+- `404` - Machine introuvable
 
 ---
 
@@ -133,8 +133,8 @@ Lance `configure_servers.py` en arriere-plan. Verifie l'acces machine pour role 
 // Response 200
 { "success": true, "message": "Deploiement lance avec succes." }
 ```
-- `400` — Aucune machine selectionnee
-- `403` — Acces refuse a une machine
+- `400` - Aucune machine selectionnee
+- `403` - Acces refuse a une machine
 
 ---
 
@@ -145,7 +145,7 @@ Stream SSE temps reel du fichier `deployment.log`.
 Content-Type: text/event-stream
 
 data: [2026-04-04] Deploying keys to srv-web...
-data: [2026-04-04] OK — 3 users deployed
+data: [2026-04-04] OK - 3 users deployed
 data: [Fin du flux de logs]
 ```
 
@@ -229,7 +229,7 @@ Supprime le password SSH d'un serveur (apres validation keypair).
 // Response 200
 { "success": true, "message": "Password SSH supprime pour srv-web" }
 ```
-- `400` — Keypair non deployee
+- `400` - Keypair non deployee
 
 ---
 
@@ -251,7 +251,7 @@ Regenere la keypair Ed25519. Tous les serveurs sont marques comme non-deployes.
 
 ```json
 // Response 200
-{ "success": true, "message": "Keypair regeneree — re-deploiement requis", "public_key": "ssh-ed25519 AAAA..." }
+{ "success": true, "message": "Keypair regeneree - re-deploiement requis", "public_key": "ssh-ed25519 AAAA..." }
 ```
 
 ---
@@ -273,7 +273,7 @@ configure sudoers NOPASSWD:ALL, valide et teste.
   ]
 }
 ```
-- `500` — Keypair plateforme non generee
+- `500` - Keypair plateforme non generee
 
 ---
 
@@ -321,7 +321,7 @@ Supprime un utilisateur Linux (`userdel`). Decorateur `@require_machine_access`.
 // Response 200
 { "success": true, "message": "Utilisateur 'ancien_user' supprime de srv-web" }
 ```
-- `400` — Utilisateur systeme protege ou user SSH de connexion
+- `400` - Utilisateur systeme protege ou user SSH de connexion
 
 ---
 

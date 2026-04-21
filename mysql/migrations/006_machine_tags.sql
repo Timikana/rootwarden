@@ -1,4 +1,4 @@
--- Migration 006 — Tags personnalises sur les serveurs
+-- Migration 006 - Tags personnalises sur les serveurs
 -- Table deja creee dans init.sql, ce fichier est pour la coherence du dossier migrations/
 
 CREATE TABLE IF NOT EXISTS machine_tags (

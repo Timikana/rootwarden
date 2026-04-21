@@ -1,6 +1,6 @@
 <?php
 /**
- * api_proxy.php — Proxy PHP générique vers le backend Python.
+ * api_proxy.php - Proxy PHP générique vers le backend Python.
  *
  * Relaie TOUTES les requêtes du navigateur vers le backend Python en interne Docker.
  * Élimine les problèmes CORS (Hypercorn ASGI) et masque l'API_KEY côté serveur.
@@ -26,7 +26,7 @@ checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 $api_key    = getenv('API_KEY') ?: '';
 $python_url = 'https://python:5000';
 
-// Role et permissions deja synchronises par checkAuth() — utiliser la session
+// Role et permissions deja synchronises par checkAuth() - utiliser la session
 $userId = (int) $_SESSION['user_id'];
 $roleId = (int) $_SESSION['role_id'];
 

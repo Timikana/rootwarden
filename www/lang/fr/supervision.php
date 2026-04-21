@@ -1,5 +1,5 @@
 <?php
-// lang/fr/supervision.php — Module Supervision (deploiement agents Zabbix)
+// lang/fr/supervision.php - Module Supervision (deploiement agents Zabbix)
 return [
     // Page
     'supervision.title' => 'Supervision',
@@ -94,7 +94,7 @@ return [
 
     // Monitoring (placeholder)
     'supervision.monitoring_title' => 'Monitoring',
-    'supervision.monitoring_desc' => 'Integration API Zabbix (statuts, alertes, graphiques) — a venir.',
+    'supervision.monitoring_desc' => 'Integration API Zabbix (statuts, alertes, graphiques) - a venir.',
     'supervision.monitoring_placeholder' => 'Cette section sera disponible dans une prochaine version avec l\'integration de l\'API Zabbix et Centreon.',
 
     // Messages generaux
@@ -132,4 +132,21 @@ return [
     'supervision.telegraf_inputs_hint' => 'Separes par virgule (ex: cpu,mem,disk,diskio,net,system)',
     'supervision.telegraf_interval' => 'Intervalle de collecte',
     'supervision.telegraf_no_influx' => 'Sans URL InfluxDB, Telegraf expose les metriques en Prometheus format sur :9273',
+
+    // Profils de supervision (catalogue metadata)
+    'supervision.tab_profiles' => 'Profils',
+    'supervision.profiles_title' => 'Profils de supervision',
+    'supervision.profiles_desc' => 'Presets reutilisables (HostMetadata, Server, proxy). Evite la saisie libre par machine : l\'admin cree le catalogue une fois, les autres assignent chaque serveur a un profil.',
+    'supervision.profiles_empty' => 'Aucun profil defini. Cliquez sur "Nouveau profil" pour en creer un.',
+    'supervision.profiles_interp_hint' => 'Astuce : les champs peuvent contenir {machine.name} ou {machine.ip} - ils seront substitues au deploiement.',
+    'supervision.profile_new' => 'Nouveau profil',
+    'supervision.profile_name' => 'Nom',
+    'supervision.profile_name_hint' => 'Doit matcher un regex Zabbix auto-registration (ex : LinuxInterne, LinuxExterne).',
+    'supervision.profile_host_metadata' => 'HostMetadata',
+    'supervision.profile_host_metadata_hint' => 'Valeur envoyee a Zabbix pour l\'auto-registration. Laisser vide = utilise la config globale.',
+    'supervision.profile_description' => 'Description',
+    'supervision.profile_server' => 'Server',
+    'supervision.profile_proxy' => 'Proxy',
+    'supervision.profile_machines' => 'Machines',
+    'supervision.profile_notes' => 'Notes (aide pour les autres admins)',
 ];

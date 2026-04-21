@@ -1,6 +1,6 @@
 <?php
 /**
- * audit_verify.php — Verifie l'integrite de la chaine de hash user_logs.
+ * audit_verify.php - Verifie l'integrite de la chaine de hash user_logs.
  *
  * Walks chaque ligne dans l'ordre d'ID, recalcule le hash attendu et le
  * compare a self_hash stocke. Signale la PREMIERE incoherence si presente.
@@ -45,7 +45,7 @@ try {
             // On ne peut pas poursuivre la chaine tant qu'elle n'est pas scellee,
             // donc on arrete le scan coherent ici.
             if ($firstError === null && $unsealed === 1) {
-                // Pas une erreur en soi, juste un signal — continue pour compter
+                // Pas une erreur en soi, juste un signal - continue pour compter
             }
             continue;
         }

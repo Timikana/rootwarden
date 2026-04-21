@@ -1,5 +1,5 @@
 """
-test_iptables.py — Tests des routes iptables (manage, validate, history, rollback).
+test_iptables.py - Tests des routes iptables (manage, validate, history, rollback).
 """
 
 import json
@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 
 class TestManageIptables:
-    """POST /iptables — charger les regles."""
+    """POST /iptables - charger les regles."""
 
     def test_iptables_no_api_key(self, client):
         resp = client.post('/iptables', json={'action': 'get'})
@@ -20,7 +20,7 @@ class TestManageIptables:
 
 
 class TestValidateIptables:
-    """POST /iptables-validate — validation dry-run."""
+    """POST /iptables-validate - validation dry-run."""
 
     def test_validate_no_api_key(self, client):
         resp = client.post('/iptables-validate', json={})
@@ -39,7 +39,7 @@ class TestValidateIptables:
 
 
 class TestIptablesApply:
-    """POST /iptables-apply — application des regles."""
+    """POST /iptables-apply - application des regles."""
 
     def test_apply_no_api_key(self, client):
         resp = client.post('/iptables-apply', json={})
@@ -51,7 +51,7 @@ class TestIptablesApply:
 
 
 class TestIptablesRestore:
-    """POST /iptables-restore — restauration depuis BDD."""
+    """POST /iptables-restore - restauration depuis BDD."""
 
     def test_restore_no_api_key(self, client):
         resp = client.post('/iptables-restore', json={})
@@ -63,7 +63,7 @@ class TestIptablesRestore:
 
 
 class TestIptablesHistory:
-    """GET /iptables-history — historique des modifications."""
+    """GET /iptables-history - historique des modifications."""
 
     def test_history_no_api_key(self, client):
         resp = client.get('/iptables-history?server_id=1')
@@ -83,7 +83,7 @@ class TestIptablesHistory:
 
 
 class TestIptablesRollback:
-    """POST /iptables-rollback — restauration d'une version."""
+    """POST /iptables-rollback - restauration d'une version."""
 
     def test_rollback_no_api_key(self, client):
         resp = client.post('/iptables-rollback', json={'history_id': 1})
@@ -100,7 +100,7 @@ class TestIptablesRollback:
 
 
 class TestIptablesLogs:
-    """GET /iptables-logs — streaming SSE."""
+    """GET /iptables-logs - streaming SSE."""
 
     def test_logs_no_api_key(self, client):
         resp = client.get('/iptables-logs')

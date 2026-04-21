@@ -1,4 +1,4 @@
--- 015_notifications.sql — Systeme de notifications in-app
+-- 015_notifications.sql - Systeme de notifications in-app
 -- Chaque notification cible un utilisateur specifique (ou tous si user_id = 0)
 
 CREATE TABLE IF NOT EXISTS notifications (

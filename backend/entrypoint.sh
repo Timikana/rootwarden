@@ -7,7 +7,7 @@ chmod -R 775 /app/logs 2>/dev/null || true
 
 # Generate self-signed SSL cert if missing (bind mount may override image certs)
 if [ ! -f /app/ssl/srv-docker.pem ] || [ ! -f /app/ssl/srv-docker-key.pem ]; then
-    echo "[RootWarden] Certificat SSL backend absent — generation auto-signee..."
+    echo "[RootWarden] Certificat SSL backend absent - generation auto-signee..."
     mkdir -p /app/ssl
     openssl req -x509 -nodes -days 730 -newkey rsa:2048 \
         -keyout /app/ssl/srv-docker-key.pem \

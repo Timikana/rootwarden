@@ -1,5 +1,5 @@
 """
-notify.py — Module de notifications in-app pour RootWarden.
+notify.py - Module de notifications in-app pour RootWarden.
 
 Cree des enregistrements dans la table `notifications` pour alerter
 les utilisateurs via l'interface web (icone cloche + badge).

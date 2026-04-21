@@ -1,4 +1,4 @@
--- Migration 019 — Fail2ban : permission + tables historique et cache statut
+-- Migration 019 - Fail2ban : permission + tables historique et cache statut
 -- ============================================================================
 
 -- 1. Ajout permission can_manage_fail2ban

@@ -1,5 +1,5 @@
 <?php
-// lang/en/terms.php — 87 cles
+// lang/en/terms.php - 87 cles
 return [
     'terms.page_title' => 'Terms of Service',
     'terms.accept' => 'I accept the terms',

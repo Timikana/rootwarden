@@ -1,5 +1,5 @@
 /**
- * 04-ssh-preflight.test.mjs — E2E : SSH preflight check
+ * 04-ssh-preflight.test.mjs - E2E : SSH preflight check
  *
  * Valide :
  *  - Page Cles SSH accessible
@@ -14,7 +14,7 @@ import { launchBrowser, newPage, login, BASE_URL } from './helpers.mjs';
 
 let browser, page;
 
-describe('04 — SSH Preflight', () => {
+describe('04 - SSH Preflight', () => {
     before(async () => {
         browser = await launchBrowser();
         page = await newPage(browser);

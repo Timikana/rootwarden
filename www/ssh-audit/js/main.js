@@ -1,4 +1,4 @@
-// ssh-audit/js/main.js — Interactions JS pour la page SSH Audit
+// ssh-audit/js/main.js - Interactions JS pour la page SSH Audit
 const API = window.API_URL || '/api_proxy.php';
 let _currentServer = null;
 let _lastFindings = [];

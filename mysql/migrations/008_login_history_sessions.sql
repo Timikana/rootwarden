@@ -1,4 +1,4 @@
--- Migration 008 — Historique de login, sessions actives, politique mot de passe
+-- Migration 008 - Historique de login, sessions actives, politique mot de passe
 -- Conformite ISO 27001 A.9.4.2 (tracabilite des acces)
 
 -- Historique de toutes les tentatives de connexion

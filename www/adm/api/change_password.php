@@ -1,6 +1,6 @@
 <?php
 /**
- * change_password.php — Changement de mot de passe de l'utilisateur connecté
+ * change_password.php - Changement de mot de passe de l'utilisateur connecté
  *
  * Rôle : permet à tout utilisateur authentifié de modifier son propre mot de passe
  *        depuis le portail. L'ancien mot de passe est vérifié avec password_verify()

@@ -1,5 +1,5 @@
 /**
- * go-admin-full.mjs — Test COMPLET des fonctions admin RootWarden v1.13.1
+ * go-admin-full.mjs - Test COMPLET des fonctions admin RootWarden v1.13.1
  * 48 tests : CRUD users/servers, toggle active/sudo, roles, permissions (14 droits),
  * acces serveurs, notification prefs (6 types), notifications in-app, recherche globale,
  * anti-escalade (toggle/delete self), onglets UI, audit log, health check,
@@ -68,7 +68,7 @@ page.on('requestfailed', r=>{const msg=`${r.failure()?.errorText||'unknown'} ${r
 
 console.log('');
 console.log('============================================================');
-console.log('  RootWarden v1.13.1 — Test Admin COMPLET');
+console.log('  RootWarden v1.13.1 - Test Admin COMPLET');
 console.log('============================================================\n');
 
 // Helper: get CSRF token from page
@@ -79,7 +79,7 @@ async function getCsrf(pg) {
   );
 }
 
-// Helper: fetch JSON via page context (keeps cookies) — auto-injects CSRF
+// Helper: fetch JSON via page context (keeps cookies) - auto-injects CSRF
 async function apiPost(pg, url, body) {
   return pg.evaluate(async (u, b) => {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content
@@ -212,7 +212,7 @@ try {
   // Find the add user form and fill it
   const formExists = await page.evaluate(() => !!document.querySelector('input[name="name"][form],form input[name="name"]'));
   if (formExists) {
-    // Fill user creation form — find fields within the add-user section
+    // Fill user creation form - find fields within the add-user section
     await page.evaluate(() => {
       // Find the form that has action=add_user or the one with name field in the details
       const forms = document.querySelectorAll('form');
@@ -368,7 +368,7 @@ if (testUserId) {
     // Change role of test user to admin (2) then back to user (1)
     const csrfR = await getCsrf(page);
 
-    // POST form to change role — this is a form POST, not AJAX
+    // POST form to change role - this is a form POST, not AJAX
     const roleResult = await page.evaluate(async (uid, csrf) => {
       const fd = new URLSearchParams();
       fd.append('csrf_token', csrf);
@@ -941,7 +941,7 @@ try {
 // RAPPORT
 // =====================================================================
 console.log('\n============================================================');
-console.log('  RAPPORT FINAL — Admin Tests');
+console.log('  RAPPORT FINAL - Admin Tests');
 console.log('============================================================\n');
 for (const r of results) console.log(r);
 console.log(`\n  TOTAL: ${ok} OK, ${warn} WARN, ${fail} FAIL / ${ok + warn + fail} tests`);

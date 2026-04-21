@@ -1,6 +1,6 @@
 <?php
 /**
- * auth/migrate_totp.php — Migration one-shot des secrets TOTP plaintext → chiffres.
+ * auth/migrate_totp.php - Migration one-shot des secrets TOTP plaintext → chiffres.
  *
  * Parcourt tous les users avec un totp_secret non-null et sans prefixe "totp:".
  * Chiffre chaque secret et UPDATE en BDD.
@@ -29,9 +29,9 @@ $errors = 0;
 foreach ($users as $u) {
     $secret = $u['totp_secret'];
 
-    // Deja chiffre — skip
+    // Deja chiffre - skip
     if (strpos($secret, 'totp:') === 0) {
-        echo "[SKIP] {$u['name']} (id={$u['id']}) — deja chiffre\n";
+        echo "[SKIP] {$u['name']} (id={$u['id']}) - deja chiffre\n";
         $skipped++;
         continue;
     }
@@ -39,7 +39,7 @@ foreach ($users as $u) {
     // Chiffrer
     $encrypted = encryptTotpSecret($secret);
     if (strpos($encrypted, 'totp:') !== 0) {
-        echo "[ERREUR] {$u['name']} (id={$u['id']}) — chiffrement echoue, secret conserve en clair\n";
+        echo "[ERREUR] {$u['name']} (id={$u['id']}) - chiffrement echoue, secret conserve en clair\n";
         $errors++;
         continue;
     }
@@ -47,7 +47,7 @@ foreach ($users as $u) {
     // Verifier que le dechiffrement fonctionne AVANT d'ecrire
     $decrypted = decryptTotpSecret($encrypted);
     if ($decrypted !== $secret) {
-        echo "[ERREUR] {$u['name']} (id={$u['id']}) — verification echec (decrypt != original), SKIP\n";
+        echo "[ERREUR] {$u['name']} (id={$u['id']}) - verification echec (decrypt != original), SKIP\n";
         $errors++;
         continue;
     }
@@ -55,7 +55,7 @@ foreach ($users as $u) {
     // UPDATE
     $stmtUpdate = $pdo->prepare("UPDATE users SET totp_secret = ? WHERE id = ?");
     $stmtUpdate->execute([$encrypted, $u['id']]);
-    echo "[OK] {$u['name']} (id={$u['id']}) — secret chiffre\n";
+    echo "[OK] {$u['name']} (id={$u['id']}) - secret chiffre\n";
     $migrated++;
 }
 

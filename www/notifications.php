@@ -1,6 +1,6 @@
 <?php
 /**
- * notifications.php — Historique complet des notifications in-app
+ * notifications.php - Historique complet des notifications in-app
  */
 require_once __DIR__ . '/auth/verify.php';
 require_once __DIR__ . '/db.php';
@@ -56,7 +56,7 @@ $typeLabels = [
 <!DOCTYPE html>
 <html lang="fr" class="">
 <head>
-    <title><?= $pageTitle ?> — <?= htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden') ?></title>
+    <title><?= $pageTitle ?> - <?= htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden') ?></title>
     <?php require_once 'head.php'; ?>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen">

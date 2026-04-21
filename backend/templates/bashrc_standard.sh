@@ -1,6 +1,6 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════════════════════════════════
-#  .bashrc standardise — Deploiement infrastructure RootWarden
+#  .bashrc standardise - Deploiement infrastructure RootWarden
 #  Version   : 3.0
 #  Maintenu  : Equipe Admin.Sys
 #  Modifie   : 2026-04-20
@@ -212,7 +212,7 @@ __sysinfo() {
     local a=0
 
     ((EUID==0)) \
-        && echo -e "  ${BRED}⚠  SESSION ROOT — Toute action est journalisee.${RST}" && a=1
+        && echo -e "  ${BRED}⚠  SESSION ROOT - Toute action est journalisee.${RST}" && a=1
 
     local cores=$(nproc 2>/dev/null || echo 1)
     awk -v l="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null)" -v c="$cores" \
@@ -418,7 +418,7 @@ sysinfo() {
     echo -e "${CYN}OS        :${RST} $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")"
     echo -e "${CYN}Kernel    :${RST} $(uname -r)"
     echo -e "${CYN}Uptime    :${RST} $(uptime -p 2>/dev/null || uptime)"
-    echo -e "${CYN}CPU       :${RST} $(nproc) coeurs — $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs)"
+    echo -e "${CYN}CPU       :${RST} $(nproc) coeurs - $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs)"
     echo -e "${CYN}RAM       :${RST} $(free -h | awk '/^Mem:/{printf "%s / %s",$3,$2}')"
     echo -e "${CYN}Disque /  :${RST} $(df -h / | awk 'NR==2{printf "%s / %s (%s)",$3,$2,$5}')"
     echo -e "${CYN}IP privee :${RST} $(ip -4 -o addr show 2>/dev/null | awk '!/127\.0\.0\.1/{print $4;exit}')"

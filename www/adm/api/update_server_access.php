@@ -1,6 +1,6 @@
 <?php
 /**
- * update_server_access.php — Ajout ou suppression d'un accès utilisateur ↔ machine (endpoint AJAX)
+ * update_server_access.php - Ajout ou suppression d'un accès utilisateur ↔ machine (endpoint AJAX)
  *
  * Rôle : gère la table de liaison `user_machine_access` pour accorder ou révoquer
  *        l'accès d'un utilisateur à une machine spécifique. Appelé depuis deux
@@ -28,7 +28,7 @@
  * Table affectée : `user_machine_access` (colonnes : user_id, machine_id).
  *
  * Comportement selon l'action :
- *   - "add"    : INSERT IGNORE (idempotent — pas d'erreur si l'accès existe déjà)
+ *   - "add"    : INSERT IGNORE (idempotent - pas d'erreur si l'accès existe déjà)
  *   - "remove" : DELETE WHERE user_id = ? AND machine_id = ?
  *   - autre    : erreur JSON retournée, aucune modification en base
  */
@@ -44,7 +44,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// --- Validation CSRF (POST, header htmx, ou body JSON — timing-safe) ---
+// --- Validation CSRF (POST, header htmx, ou body JSON - timing-safe) ---
 checkCsrfToken();
 
 // --- Lecture du body JSON ---

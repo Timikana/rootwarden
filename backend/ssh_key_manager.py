@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ssh_key_manager.py — Gestion de la keypair Ed25519 de la plateforme RootWarden.
+ssh_key_manager.py - Gestion de la keypair Ed25519 de la plateforme RootWarden.
 
 La plateforme utilise une paire de cles Ed25519 pour s'authentifier aupres
 des serveurs distants sans stocker de password SSH en BDD.
@@ -125,5 +125,5 @@ def regenerate_platform_key():
         PRIVATE_KEY_PATH.unlink()
     if PUBLIC_KEY_PATH.exists():
         PUBLIC_KEY_PATH.unlink()
-    _log.warning("Ancienne keypair supprimee — regeneration en cours")
+    _log.warning("Ancienne keypair supprimee - regeneration en cours")
     generate_platform_key()

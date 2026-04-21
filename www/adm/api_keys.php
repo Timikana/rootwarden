@@ -1,6 +1,6 @@
 <?php
 /**
- * api_keys.php — Gestion des cles API (segmentation + scope + rotation).
+ * api_keys.php - Gestion des cles API (segmentation + scope + rotation).
  *
  * Acces : superadmin avec permission can_manage_api_keys.
  * Actions :
@@ -95,7 +95,7 @@ $keys = $pdo->query(
 <html lang="<?= getLang() ?>">
 <head>
     <?php require_once __DIR__ . '/../head.php'; ?>
-    <title>API Keys — RootWarden</title>
+    <title>API Keys - RootWarden</title>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
     <?php require_once __DIR__ . '/../menu.php'; ?>
@@ -197,7 +197,7 @@ $keys = $pdo->query(
                                 <button type="submit" class="text-xs text-red-600 hover:text-red-800">Revoquer</button>
                             </form>
                             <?php else: ?>
-                                <span class="text-[10px] text-gray-400">—</span>
+                                <span class="text-[10px] text-gray-400">-</span>
                             <?php endif; ?>
                         </td>
                     </tr>

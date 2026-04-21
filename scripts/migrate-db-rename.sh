@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# migrate-db-rename.sh — Migration de ssh_key_management vers rootwarden
+# migrate-db-rename.sh - Migration de ssh_key_management vers rootwarden
 # =============================================================================
 #
 # Ce script migre une installation existante :
@@ -43,7 +43,7 @@ error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 # ── Verification des prerequis ───────────────────────────────────────────────
 echo ""
 echo "============================================"
-echo "  RootWarden — Migration base de donnees"
+echo "  RootWarden - Migration base de donnees"
 echo "  ssh_key_management → rootwarden"
 echo "  ssh_user → rootwarden_user"
 echo "============================================"
@@ -99,7 +99,7 @@ if [ "$HAS_OLD_DB" -gt 0 ] && [ "$HAS_NEW_DB" -gt 0 ]; then
     error "Les deux bases '${OLD_DB}' et '${NEW_DB}' existent. Resolution manuelle requise."
 fi
 
-info "Base '${OLD_DB}' detectee — migration necessaire."
+info "Base '${OLD_DB}' detectee - migration necessaire."
 
 # ── Confirmation ─────────────────────────────────────────────────────────────
 echo ""
@@ -118,18 +118,18 @@ if [ "$CONFIRM" != "oui" ]; then
 fi
 
 # ── Etape 1 : Backup ────────────────────────────────────────────────────────
-info "Etape 1/5 — Sauvegarde de ${OLD_DB}..."
+info "Etape 1/5 - Sauvegarde de ${OLD_DB}..."
 mkdir -p "$BACKUP_DIR"
 docker exec "$CONTAINER" mysqldump -u root -p"${ROOT_PASS}" --single-transaction --routines --triggers "${OLD_DB}" 2>/dev/null | gzip > "${BACKUP_FILE}"
 BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
 info "Backup cree : ${BACKUP_FILE} (${BACKUP_SIZE})"
 
 # ── Etape 2 : Creer la nouvelle base ────────────────────────────────────────
-info "Etape 2/5 — Creation de la base ${NEW_DB}..."
+info "Etape 2/5 - Creation de la base ${NEW_DB}..."
 mysql_exec "CREATE DATABASE ${NEW_DB} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # ── Etape 3 : Copier les tables ─────────────────────────────────────────────
-info "Etape 3/5 — Copie des tables de ${OLD_DB} vers ${NEW_DB}..."
+info "Etape 3/5 - Copie des tables de ${OLD_DB} vers ${NEW_DB}..."
 docker exec "$CONTAINER" mysqldump -u root -p"${ROOT_PASS}" --single-transaction --routines --triggers "${OLD_DB}" 2>/dev/null \
     | docker exec -i "$CONTAINER" mysql -u root -p"${ROOT_PASS}" "${NEW_DB}" 2>/dev/null
 
@@ -143,7 +143,7 @@ if [ "$OLD_COUNT" != "$NEW_COUNT" ]; then
 fi
 
 # ── Etape 4 : Renommer l'utilisateur MySQL ──────────────────────────────────
-info "Etape 4/5 — Renommage utilisateur ${OLD_USER} → ${NEW_USER}..."
+info "Etape 4/5 - Renommage utilisateur ${OLD_USER} → ${NEW_USER}..."
 
 # Verifier si l'ancien user existe
 HAS_OLD_USER=$(mysql_exec "SELECT User FROM mysql.user WHERE User='${OLD_USER}';" | grep -c "${OLD_USER}" || true)
@@ -155,7 +155,7 @@ if [ "$HAS_OLD_USER" -gt 0 ]; then
     mysql_exec "FLUSH PRIVILEGES;"
     info "Utilisateur renomme et privileges mis a jour."
 else
-    warn "Utilisateur '${OLD_USER}' non trouve — creation de '${NEW_USER}'..."
+    warn "Utilisateur '${OLD_USER}' non trouve - creation de '${NEW_USER}'..."
     # Lire le mot de passe depuis l'env si disponible
     DB_PASS="${DB_PASSWORD:-rootwarden_password}"
     mysql_exec "CREATE USER '${NEW_USER}'@'%' IDENTIFIED BY '${DB_PASS}';"
@@ -165,7 +165,7 @@ else
 fi
 
 # ── Etape 5 : Supprimer l'ancienne base ─────────────────────────────────────
-info "Etape 5/5 — Suppression de l'ancienne base ${OLD_DB}..."
+info "Etape 5/5 - Suppression de l'ancienne base ${OLD_DB}..."
 mysql_exec "DROP DATABASE ${OLD_DB};"
 info "Base '${OLD_DB}' supprimee."
 

@@ -1,5 +1,5 @@
 <?php
-// lang/en/compliance.php — 35 cles
+// lang/en/compliance.php - 35 cles
 return [
     'compliance.title' => 'Compliance Report',
     'compliance.desc' => 'Server fleet compliance report. Generate a printable HTML report or export to CSV with SHA-256 hash.',
@@ -36,8 +36,8 @@ return [
     'compliance.rem_resolved' => 'Resolved',
     'compliance.rem_accepted' => 'Accepted',
     'compliance.rem_wont_fix' => 'Won\'t fix',
-    'compliance.section_ssh_audit' => 'SSH Audit — Security Scores',
-    'compliance.section_supervision' => 'Supervision — Monitoring Agents Deployed',
+    'compliance.section_ssh_audit' => 'SSH Audit - Security Scores',
+    'compliance.section_supervision' => 'Supervision - Monitoring Agents Deployed',
     'compliance.ssh_audit_avg' => 'Avg SSH Score',
     'compliance.supervision_coverage' => 'Monitoring coverage',
     'compliance.th_score' => 'Score',

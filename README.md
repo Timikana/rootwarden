@@ -4,75 +4,75 @@
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
-> services systemd, audit sshd_config et vulnerabilites CVE — depuis une interface unique.
+> services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
 
 ---
 
 ## Fonctionnalités
 
 ### Gestion des serveurs
-- **Clés SSH** — Déploiement en masse, suivi d'âge des clés (alerte > 90 jours)
-- **Mises à jour Linux** — APT update/upgrade en streaming temps réel, fallback `su -c` si sudo absent
-- **Pare-feu iptables** — Consultation, édition, sauvegarde/restauration depuis la BDD
-- **Fail2ban** — Detection services (SSH/FTP/Apache/Nginx/Mail), activation jails, ban/unban IP, installation auto
-- **Services systemd** — Demarrer, arreter, redemarrer les services Linux. Logs journalctl, categorisation automatique, services proteges
-- **Audit SSH** — Scanner sshd_config, scoring securite (A-F), correctifs en 1 clic, editeur config, backups/restore, toggle directives ON/OFF, reload sshd
-- **Supervision multi-agent** — Deploiement et configuration d'agents de monitoring via SSH. Supporte Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter et Telegraf. Config globale par plateforme, overrides par serveur, editeur de config distant, backups/restore, badges multi-agent, scan tous agents en 1 clic
-- **Bashrc standardise** — Deploiement d'un `.bashrc` unifie par utilisateur (banniere figlet, tableau sysinfo, alertes, prompt git-aware, alias). Mode overwrite ou merge (preservation blocs custom via `~/.bashrc.local`). Backup automatique, restore en 1 clic, validation syntaxique post-deploy, idempotence sha256, preview diff colorise.
-- **Graylog Sidecar** — Deploiement du Graylog Sidecar (filebeat/nxlog/winlogbeat) via SSH. Configuration serveur centralisee, collectors (templates YAML/XML) editables en base avec validation YAML, enregistrement automatique aupres du manager Graylog.
-- **Wazuh Agent** — Deploiement + enrolement de l'agent Wazuh aupres du manager. Gestion groupes, options FIM/active response/SCA/rootcheck par serveur, rules/decoders/CDB lists editables (validation xmllint). Integration API manager pour push des rules.
-- **Tags personnalisés** — Étiquetez vos serveurs (web, bdd, production, dmz…) et filtrez par tag
+- **Clés SSH** - Déploiement en masse, suivi d'âge des clés (alerte > 90 jours)
+- **Mises à jour Linux** - APT update/upgrade en streaming temps réel, fallback `su -c` si sudo absent
+- **Pare-feu iptables** - Consultation, édition, sauvegarde/restauration depuis la BDD
+- **Fail2ban** - Detection services (SSH/FTP/Apache/Nginx/Mail), activation jails, ban/unban IP, installation auto
+- **Services systemd** - Demarrer, arreter, redemarrer les services Linux. Logs journalctl, categorisation automatique, services proteges
+- **Audit SSH** - Scanner sshd_config, scoring securite (A-F), correctifs en 1 clic, editeur config, backups/restore, toggle directives ON/OFF, reload sshd
+- **Supervision multi-agent** - Deploiement et configuration d'agents de monitoring via SSH. Supporte Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter et Telegraf. Config globale par plateforme, overrides par serveur, editeur de config distant, backups/restore, badges multi-agent, scan tous agents en 1 clic
+- **Bashrc standardise** - Deploiement d'un `.bashrc` unifie par utilisateur (banniere figlet, tableau sysinfo, alertes, prompt git-aware, alias). Mode overwrite ou merge (preservation blocs custom via `~/.bashrc.local`). Backup automatique, restore en 1 clic, validation syntaxique post-deploy, idempotence sha256, preview diff colorise.
+- **Graylog Sidecar** - Deploiement du Graylog Sidecar (filebeat/nxlog/winlogbeat) via SSH. Configuration serveur centralisee, collectors (templates YAML/XML) editables en base avec validation YAML, enregistrement automatique aupres du manager Graylog.
+- **Wazuh Agent** - Deploiement + enrolement de l'agent Wazuh aupres du manager. Gestion groupes, options FIM/active response/SCA/rootcheck par serveur, rules/decoders/CDB lists editables (validation xmllint). Integration API manager pour push des rules.
+- **Tags personnalisés** - Étiquetez vos serveurs (web, bdd, production, dmz…) et filtrez par tag
 
 ### Scan de vulnérabilités CVE
-- **OpenCVE** — Supporte cloud (app.opencve.io) et on-prem v2 (Bearer token)
-- **Streaming temps réel** — JSON-lines, progression paquet par paquet
-- **Filtres** — Par sévérité (CRITICAL/HIGH/MEDIUM) et par année
-- **Export CSV** — Téléchargement en 1 clic pour chaque serveur
-- **Résumé global** — Vue d'ensemble du parc en haut de page
+- **OpenCVE** - Supporte cloud (app.opencve.io) et on-prem v2 (Bearer token)
+- **Streaming temps réel** - JSON-lines, progression paquet par paquet
+- **Filtres** - Par sévérité (CRITICAL/HIGH/MEDIUM) et par année
+- **Export CSV** - Téléchargement en 1 clic pour chaque serveur
+- **Résumé global** - Vue d'ensemble du parc en haut de page
 
 ### Sécurité & conformité
-- **Keypair plateforme Ed25519** — Auth SSH sans password, migration progressive, suppression des secrets en BDD
-- **Compte de service rootwarden** — User Linux dedie avec sudoers NOPASSWD:ALL, zero password requis
-- **Reset mot de passe par email** — Lien "Mot de passe oublie" sur la page de login, token 1h, PHPMailer
-- **Demarrage securise (start.sh)** — chmod 600 automatique sur .env, detection secrets par defaut, masquage mot de passe dans Docker logs
-- **force_password_change** — Changement de mot de passe obligatoire a la premiere connexion (superadmin et nouveaux users)
-- **Premier demarrage securise** — install.sh genere les mots de passe au lieu de les hardcoder en BDD
-- **Chiffrement dual** — libsodium (sodium:) + AES-256-CBC (aes:), compatible PHP ↔ Python
-- **HKDF key derivation** — Cles derivees distinctes pour mots de passe (rootwarden-aes) et secrets TOTP (rootwarden-totp)
-- **Chiffrement TOTP en BDD** — Secrets 2FA chiffres (Sodium/AES), retrocompatible plaintext
-- **2FA TOTP** — Authentification multi-facteurs obligatoire
-- **RBAC** — 3 rôles (user, admin, superadmin) + 15 permissions granulaires
-- **Auth DB-verified** — checkAuth/checkPermission verifient en base a chaque requete, session = cache UI uniquement
-- **Anti-escalation** — Protection self-edit sur tous les endpoints admin, SA non-modifiable, dernier SA protege
-- **CSRF unifie** — checkCsrfToken() supporte POST body, header X-CSRF-TOKEN, body JSON (timing-safe)
-- **SSH dual auth** — Mode keypair (sudo NOPASSWD) + mode password (su -c via temp script), detection automatique
-- **Expiration mots de passe** — Configurable par utilisateur (Global/Exempt/30-365j)
-- **Session timeout** — Déconnexion automatique après inactivité (configurable)
-- **Journal d'audit** — Toutes les actions admin loguées, export CSV, filtres
-- **Historique de login** — Toutes les tentatives tracées (IP, user-agent, statut)
-- **Rapport de conformité** — HTML imprimable + CSV avec hash SHA-256
-- **CGU et Confidentialite** — Pages professionnelles avec RGPD (acces/rectification/effacement/portabilite)
-- **Backup BDD automatique** — mysqldump compressé, rétention configurable
-- **Tailwind compile localement** — CSP sans unsafe-eval, pas de CDN externe
-- **Reseau Docker isole** — BDD sur reseau interne uniquement, pas d'acces internet
-- **Privileges MySQL restreints** — User applicatif sans ALL PRIVILEGES (SELECT/INSERT/UPDATE/DELETE + migrations)
-- **Brute-force protection 2 couches** — Rate limit par IP (5/10min) + lockout per-user avec **backoff progressif** (3=1min, 4=5min, 5=15min, 6=1h, 7+=4h). Password spraying detection (>= 5 usernames distincts/10min depuis meme IP = alerte superadmin). Bouton "Deverrouiller" admin.
-- **Audit log tamper-evident** — Chaque ligne `user_logs` scellee par chaine de hash SHA2-256 (prev_hash | user_id | action | unix_ts). Endpoint `/adm/api/audit_verify.php` recalcule la chaine et detecte toute alteration (MISMATCH / PREV_BROKEN). Bouton "Verifier integrite" dans l'audit log.
-- **API keys segmentees** — Table `api_keys` avec scope par regex de route (ex: `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stocke en SHA-256. UI CRUD superadmin avec rotation + revocation soft + `last_used_at`/`last_used_ip` tracking. Fallback zero-downtime sur `Config.API_KEY` legacy tant que la table est vide.
-- **CI supply chain security** — gitleaks (secrets commit), bandit (SAST Python), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depend de tous les scans → pas de release sur CVE critique.
-- **Session revocation server-side** — `verify.php` verifie `active_sessions` a chaque requete → un clic "Revoquer" / "Deconnecter les autres" a un effet immediat, invalide les cookies voles.
-- **Password history + HIBP** — Refuse la reutilisation des 5 derniers mots de passe (table `password_history`). Verification opt-in contre HaveIBeenPwned via k-anonymity API (5 premiers hex SHA1 envoyes, seuil configurable).
-- **RGPD self-service** — Route `/profile/export.php` : tout user telecharge ses donnees personnelles au format JSON (profil + logs + sessions + prefs, hashes masques). Endpoint admin `/adm/api/anonymize_user.php` : soft-delete preservant l'audit log (art. 17.3.e).
-- **28+ failles de securite corrigees (3 audits)** — SQLi, CSRF, XSS, timing attack, etc.
+- **Keypair plateforme Ed25519** - Auth SSH sans password, migration progressive, suppression des secrets en BDD
+- **Compte de service rootwarden** - User Linux dedie avec sudoers NOPASSWD:ALL, zero password requis
+- **Reset mot de passe par email** - Lien "Mot de passe oublie" sur la page de login, token 1h, PHPMailer
+- **Demarrage securise (start.sh)** - chmod 600 automatique sur .env, detection secrets par defaut, masquage mot de passe dans Docker logs
+- **force_password_change** - Changement de mot de passe obligatoire a la premiere connexion (superadmin et nouveaux users)
+- **Premier demarrage securise** - install.sh genere les mots de passe au lieu de les hardcoder en BDD
+- **Chiffrement dual** - libsodium (sodium:) + AES-256-CBC (aes:), compatible PHP ↔ Python
+- **HKDF key derivation** - Cles derivees distinctes pour mots de passe (rootwarden-aes) et secrets TOTP (rootwarden-totp)
+- **Chiffrement TOTP en BDD** - Secrets 2FA chiffres (Sodium/AES), retrocompatible plaintext
+- **2FA TOTP** - Authentification multi-facteurs obligatoire
+- **RBAC** - 3 rôles (user, admin, superadmin) + 15 permissions granulaires
+- **Auth DB-verified** - checkAuth/checkPermission verifient en base a chaque requete, session = cache UI uniquement
+- **Anti-escalation** - Protection self-edit sur tous les endpoints admin, SA non-modifiable, dernier SA protege
+- **CSRF unifie** - checkCsrfToken() supporte POST body, header X-CSRF-TOKEN, body JSON (timing-safe)
+- **SSH dual auth** - Mode keypair (sudo NOPASSWD) + mode password (su -c via temp script), detection automatique
+- **Expiration mots de passe** - Configurable par utilisateur (Global/Exempt/30-365j)
+- **Session timeout** - Déconnexion automatique après inactivité (configurable)
+- **Journal d'audit** - Toutes les actions admin loguées, export CSV, filtres
+- **Historique de login** - Toutes les tentatives tracées (IP, user-agent, statut)
+- **Rapport de conformité** - HTML imprimable + CSV avec hash SHA-256
+- **CGU et Confidentialite** - Pages professionnelles avec RGPD (acces/rectification/effacement/portabilite)
+- **Backup BDD automatique** - mysqldump compressé, rétention configurable
+- **Tailwind compile localement** - CSP sans unsafe-eval, pas de CDN externe
+- **Reseau Docker isole** - BDD sur reseau interne uniquement, pas d'acces internet
+- **Privileges MySQL restreints** - User applicatif sans ALL PRIVILEGES (SELECT/INSERT/UPDATE/DELETE + migrations)
+- **Brute-force protection 2 couches** - Rate limit par IP (5/10min) + lockout per-user avec **backoff progressif** (3=1min, 4=5min, 5=15min, 6=1h, 7+=4h). Password spraying detection (>= 5 usernames distincts/10min depuis meme IP = alerte superadmin). Bouton "Deverrouiller" admin.
+- **Audit log tamper-evident** - Chaque ligne `user_logs` scellee par chaine de hash SHA2-256 (prev_hash | user_id | action | unix_ts). Endpoint `/adm/api/audit_verify.php` recalcule la chaine et detecte toute alteration (MISMATCH / PREV_BROKEN). Bouton "Verifier integrite" dans l'audit log.
+- **API keys segmentees** - Table `api_keys` avec scope par regex de route (ex: `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stocke en SHA-256. UI CRUD superadmin avec rotation + revocation soft + `last_used_at`/`last_used_ip` tracking. Fallback zero-downtime sur `Config.API_KEY` legacy tant que la table est vide.
+- **CI supply chain security** - gitleaks (secrets commit), bandit (SAST Python), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depend de tous les scans → pas de release sur CVE critique.
+- **Session revocation server-side** - `verify.php` verifie `active_sessions` a chaque requete → un clic "Revoquer" / "Deconnecter les autres" a un effet immediat, invalide les cookies voles.
+- **Password history + HIBP** - Refuse la reutilisation des 5 derniers mots de passe (table `password_history`). Verification opt-in contre HaveIBeenPwned via k-anonymity API (5 premiers hex SHA1 envoyes, seuil configurable).
+- **RGPD self-service** - Route `/profile/export.php` : tout user telecharge ses donnees personnelles au format JSON (profil + logs + sessions + prefs, hashes masques). Endpoint admin `/adm/api/anonymize_user.php` : soft-delete preservant l'audit log (art. 17.3.e).
+- **28+ failles de securite corrigees (3 audits)** - SQLi, CSRF, XSS, timing attack, etc.
 
 ### Notifications
-- **Webhooks** — Slack, Teams, Discord, generic (CVE critiques, serveurs offline, déploiements)
-- **Email** — Rapports CVE HTML, mail de bienvenue utilisateur (SMTP)
+- **Webhooks** - Slack, Teams, Discord, generic (CVE critiques, serveurs offline, déploiements)
+- **Email** - Rapports CVE HTML, mail de bienvenue utilisateur (SMTP)
 
 ### Dashboard
-- **Alertes sécurité** — Users sans 2FA, clés SSH anciennes, serveurs offline, CVE critiques
-- **État du parc** — Chaque serveur avec version OS, statut, CVE, dernier contrôle
-- **Raccourcis** — Accès rapide aux modules selon les permissions
+- **Alertes sécurité** - Users sans 2FA, clés SSH anciennes, serveurs offline, CVE critiques
+- **État du parc** - Chaque serveur avec version OS, statut, CVE, dernier contrôle
+- **Raccourcis** - Accès rapide aux modules selon les permissions
 
 ---
 
@@ -158,8 +158,8 @@ docker exec rootwarden_python python /app/db_migrate.py
 Documentation technique complète accessible dans l'application : **https://localhost:8443/documentation.php**
 
 Fichiers de référence :
-- `ARCHITECTURE.md` — Carte de tous les fichiers, tables BDD, flux de données
-- `CHANGELOG.md` — Historique des versions (Semantic Versioning)
+- `ARCHITECTURE.md` - Carte de tous les fichiers, tables BDD, flux de données
+- `CHANGELOG.md` - Historique des versions (Semantic Versioning)
 
 ---
 
@@ -167,18 +167,18 @@ Fichiers de référence :
 
 ### Checklist avant deploiement
 
-1. **Secrets uniques** — Generez toutes les cles avec `openssl rand -hex 32`
-2. **start.sh** — Utilisez `./start.sh` au lieu de `docker-compose up` (chmod auto + verification secrets)
-3. **Permissions fichier** — `chmod 600 srv-docker.env` (automatique via start.sh sur Linux)
-4. **Supprimez les credentials initiales** — Apres la premiere connexion :
+1. **Secrets uniques** - Generez toutes les cles avec `openssl rand -hex 32`
+2. **start.sh** - Utilisez `./start.sh` au lieu de `docker-compose up` (chmod auto + verification secrets)
+3. **Permissions fichier** - `chmod 600 srv-docker.env` (automatique via start.sh sur Linux)
+4. **Supprimez les credentials initiales** - Apres la premiere connexion :
    ```bash
    docker exec <php_container> rm /var/www/html/.first_run_credentials
    ```
-5. **Videz INIT_SUPERADMIN_PASSWORD** — Supprimez la valeur dans srv-docker.env apres installation
-6. **SSL** — Utilisez SSL_MODE=custom avec vos propres certificats (Let's Encrypt, certificat entreprise)
-7. **Acces host** — Limitez l'acces SSH au serveur Docker aux seuls administrateurs infrastructure
-8. **Backups** — Activez BACKUP_ENABLED=true avec une retention adaptee
-9. **Monitoring** — Configurez les webhooks (Slack/Teams) pour les alertes CVE et serveurs offline
+5. **Videz INIT_SUPERADMIN_PASSWORD** - Supprimez la valeur dans srv-docker.env apres installation
+6. **SSL** - Utilisez SSL_MODE=custom avec vos propres certificats (Let's Encrypt, certificat entreprise)
+7. **Acces host** - Limitez l'acces SSH au serveur Docker aux seuls administrateurs infrastructure
+8. **Backups** - Activez BACKUP_ENABLED=true avec une retention adaptee
+9. **Monitoring** - Configurez les webhooks (Slack/Teams) pour les alertes CVE et serveurs offline
 
 ---
 
@@ -221,7 +221,7 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
-Un simple `up -d` reutilise l'image en cache — il ne detecte pas les changements
+Un simple `up -d` reutilise l'image en cache - il ne detecte pas les changements
 dans les fichiers copies (`COPY` dans Dockerfile).
 
 ### Les mots de passe par defaut ne fonctionnent pas
@@ -255,7 +255,7 @@ les CVE HIGH et MEDIUM. Baissez a `0+` pour tout voir.
 
 Verifiez aussi que votre navigateur n'utilise pas un JS en cache (Ctrl+Shift+R).
 
-### `docker compose down -v` — que se passe-t-il ?
+### `docker compose down -v` - que se passe-t-il ?
 
 | Flag `-v` | Donnees BDD | Keypair SSH | Sessions | Passwords |
 |-----------|-------------|-------------|----------|-----------|
@@ -281,4 +281,4 @@ MIT
 
 ---
 
-*RootWarden v1.13.1 — 2026-04-16*
+*RootWarden v1.13.1 - 2026-04-16*

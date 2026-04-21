@@ -22,8 +22,8 @@ services:
       - ./www/logs:/var/www/html/logs
       - ./php/php.ini:/usr/local/etc/php/php.ini
       - ./certs:/var/www/certs          # Partagé avec l'entrypoint (certs auto ou custom)
-      # - /etc/localtime:/etc/localtime:ro   # Linux only — désactivé sur Windows
-      # - /etc/timezone:/etc/timezone:ro    # Linux only — désactivé sur Windows
+      # - /etc/localtime:/etc/localtime:ro   # Linux only - désactivé sur Windows
+      # - /etc/timezone:/etc/timezone:ro    # Linux only - désactivé sur Windows
     env_file:
       - srv-docker.env
     depends_on:
@@ -49,7 +49,7 @@ services:
       external:
 
   # ─────────────────────────────────────────────────────────────
-  # Backend Python (Flask) — réseau interne uniquement
+  # Backend Python (Flask) - réseau interne uniquement
   # Le frontend PHP le contacte via http://python:5000 (réseau Docker).
   # Ne pas exposer ce port sur l'hôte en production.
   # Pour déboguer en local, ajoutez : ports: ["5000:5000"]
@@ -102,7 +102,7 @@ services:
       external:
 
   # ─────────────────────────────────────────────────────────────
-  # Base de données MySQL — réseau interne uniquement
+  # Base de données MySQL - réseau interne uniquement
   # Ne pas exposer le port MySQL sur l'hôte en production.
   # Pour accéder depuis un client SQL local, décommentez "ports".
   # ─────────────────────────────────────────────────────────────

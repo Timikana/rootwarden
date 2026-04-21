@@ -273,7 +273,7 @@ function populateMachineTable(machines) {
         tr.appendChild(createTd(m.criticality ?? "NON CRITIQUE", ['criticality', 'text-center']));
         tr.appendChild(createTd(m.network_type ?? "INTERNE", ['network-type', 'text-center']));
 
-        // Actions — IDs sont des entiers validés ci-dessus (pas de données utilisateur brutes)
+        // Actions - IDs sont des entiers validés ci-dessus (pas de données utilisateur brutes)
         // addEventListener est utilisé (pas d'onclick inline) pour éviter les injections CSP
         const tdActions = document.createElement('td');
         tdActions.classList.add('p-2', 'space-y-1', 'text-xs');

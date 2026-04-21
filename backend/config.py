@@ -1,26 +1,26 @@
 # config/config.py
 """
-config.py — Configuration centralisée du projet RootWarden (Gestion_SSH_KEY).
+config.py - Configuration centralisée du projet RootWarden (Gestion_SSH_KEY).
 
 Rôle :
     Charge et valide toutes les variables d'environnement au démarrage.
     Regroupe les paramètres sous la classe ``Config`` pour un accès global unifié.
 
 Variables obligatoires (le backend s'arrête avec sys.exit(1) si elles sont absentes) :
-    SECRET_KEY      — Clé AES-256 principale pour le chiffrement des mots de passe (hex 64 chars).
-    API_KEY         — Clé d'authentification X-API-KEY requise sur toutes les routes sensibles.
+    SECRET_KEY      - Clé AES-256 principale pour le chiffrement des mots de passe (hex 64 chars).
+    API_KEY         - Clé d'authentification X-API-KEY requise sur toutes les routes sensibles.
 
 Variables optionnelles notables :
-    OLD_SECRET_KEY  — Ancienne clé AES pour migration transparente des mots de passe.
-    OPENCVE_*       — Paramètres de connexion à l'instance OpenCVE (vide = fonctionnalité désactivée).
-    MAIL_*          — Configuration SMTP pour l'envoi de rapports CVE par e-mail.
-    DEBUG_MODE      — Active le mode debug Flask (NE JAMAIS utiliser en production).
+    OLD_SECRET_KEY  - Ancienne clé AES pour migration transparente des mots de passe.
+    OPENCVE_*       - Paramètres de connexion à l'instance OpenCVE (vide = fonctionnalité désactivée).
+    MAIL_*          - Configuration SMTP pour l'envoi de rapports CVE par e-mail.
+    DEBUG_MODE      - Active le mode debug Flask (NE JAMAIS utiliser en production).
 
 Sécurité :
     Les clés de chiffrement ne doivent jamais être loguées ni exposées dans les réponses API.
     Utiliser srv-docker.env (exclu du dépôt git) pour les valeurs sensibles.
 
-Dépendances : os, sys (stdlib uniquement — pas de dépendances tierces).
+Dépendances : os, sys (stdlib uniquement - pas de dépendances tierces).
 """
 
 import os
@@ -64,7 +64,7 @@ class Config:
         API_KEY (str)         : Clé HTTP X-API-KEY protégeant les routes sensibles.
         DB_CONFIG (dict)      : Paramètres de connexion MySQL (host, user, password, database, port).
         SSH_TIMEOUT (int)     : Timeout SSH en secondes (défaut : 360).
-        DEBUG (bool)          : Mode debug Flask — false en production.
+        DEBUG (bool)          : Mode debug Flask - false en production.
         LOG_LEVEL (str)       : Niveau de log Python (DEBUG, INFO, WARNING…).
         OPENCVE_URL (str)     : URL de l'instance OpenCVE.
         OPENCVE_USERNAME (str): Identifiant OpenCVE.
@@ -76,7 +76,7 @@ class Config:
         MAIL_TO (str)         : Destinataires (séparés par des virgules).
         MAIL_SMTP_* (str/int) : Paramètres SMTP (host, port, user, password, TLS).
     """
-    # Clés de chiffrement AES-256 — obligatoires, sans valeur par défaut
+    # Clés de chiffrement AES-256 - obligatoires, sans valeur par défaut
     SECRET_KEY     = _require_env('SECRET_KEY')
     OLD_SECRET_KEY = os.getenv('OLD_SECRET_KEY', '')  # Optionnel : ancienne clé pour migration
     ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', '')  # Optionnel : clé secondaire PHP (non utilisée par le backend Python)
@@ -105,7 +105,7 @@ class Config:
     DEBUG         = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
     LOG_LEVEL     = os.getenv('LOG_LEVEL', 'DEBUG' if DEBUG else 'INFO').upper()
 
-    # Clé d'API pour authentifier les requêtes du frontend — obligatoire
+    # Clé d'API pour authentifier les requêtes du frontend - obligatoire
     API_KEY = _require_env('API_KEY')
 
     # ── OpenCVE ─────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 SELECT 1;
 
--- Migration 032 : Table bashrc_templates — template editable via UI
+-- Migration 032 : Table bashrc_templates - template editable via UI
 -- Remplace la lecture figee du fichier backend/templates/bashrc_standard.sh
 
 CREATE TABLE IF NOT EXISTS bashrc_templates (

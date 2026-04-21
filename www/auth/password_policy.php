@@ -1,6 +1,6 @@
 <?php
 /**
- * password_policy.php — Validation centralisee des politiques de mot de passe.
+ * password_policy.php - Validation centralisee des politiques de mot de passe.
  *
  * Responsabilites :
  *   1. Complexite locale (15 chars, 4 classes)
@@ -39,7 +39,7 @@ function passwordPolicyCheckHistory(PDO $pdo, int $userId, string $newPassword):
         $stmt = $pdo->prepare(
             "SELECT password_hash FROM password_history WHERE user_id = ? ORDER BY changed_at DESC LIMIT ?"
         );
-        // LIMIT avec integer via bindValue (PDO emule) — passons par interpolation apres cast int
+        // LIMIT avec integer via bindValue (PDO emule) - passons par interpolation apres cast int
         $limit = (int) PASSWORD_HISTORY_SIZE;
         $stmt = $pdo->prepare(
             "SELECT password_hash FROM password_history WHERE user_id = ? "

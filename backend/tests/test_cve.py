@@ -1,5 +1,5 @@
 """
-test_cve.py — Tests des routes CVE (scan, results, history, whitelist, schedules, remediation).
+test_cve.py - Tests des routes CVE (scan, results, history, whitelist, schedules, remediation).
 """
 
 import json
@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 
 class TestCveTrends:
-    """GET /cve_trends — tendances CVE 30 jours."""
+    """GET /cve_trends - tendances CVE 30 jours."""
 
     def test_cve_trends_success(self, client, admin_headers, mock_cursor):
         mock_cursor._results = []
@@ -24,7 +24,7 @@ class TestCveTrends:
 
 
 class TestCveScan:
-    """POST /cve_scan — scan CVE sur un serveur."""
+    """POST /cve_scan - scan CVE sur un serveur."""
 
     def test_cve_scan_no_api_key(self, client):
         resp = client.post('/cve_scan', json={'machine_id': 1})
@@ -40,7 +40,7 @@ class TestCveScan:
 
 
 class TestCveResults:
-    """GET /cve_results — resultats du dernier scan."""
+    """GET /cve_results - resultats du dernier scan."""
 
     def test_cve_results_no_api_key(self, client):
         resp = client.get('/cve_results?machine_id=1')
@@ -60,7 +60,7 @@ class TestCveResults:
 
 
 class TestCveHistory:
-    """GET /cve_history — historique des scans."""
+    """GET /cve_history - historique des scans."""
 
     def test_cve_history_no_api_key(self, client):
         resp = client.get('/cve_history?machine_id=1')
@@ -80,7 +80,7 @@ class TestCveHistory:
 
 
 class TestCveCompare:
-    """GET /cve_compare — comparaison de 2 scans."""
+    """GET /cve_compare - comparaison de 2 scans."""
 
     def test_cve_compare_no_api_key(self, client):
         resp = client.get('/cve_compare?machine_id=1')
@@ -99,7 +99,7 @@ class TestCveCompare:
 
 
 class TestCveTestConnection:
-    """GET /cve_test_connection — test connectivite OpenCVE."""
+    """GET /cve_test_connection - test connectivite OpenCVE."""
 
     def test_cve_test_connection_no_api_key(self, client):
         resp = client.get('/cve_test_connection')
@@ -117,7 +117,7 @@ class TestCveTestConnection:
 
 
 class TestCveSchedules:
-    """CRUD /cve_schedules — planification des scans CVE."""
+    """CRUD /cve_schedules - planification des scans CVE."""
 
     def test_list_schedules(self, client, admin_headers, mock_cursor):
         mock_cursor._results = []
@@ -161,7 +161,7 @@ class TestCveSchedules:
 
 
 class TestCveWhitelist:
-    """CRUD /cve_whitelist — gestion des faux positifs."""
+    """CRUD /cve_whitelist - gestion des faux positifs."""
 
     def test_list_whitelist(self, client, admin_headers, mock_cursor):
         mock_cursor._results = []
@@ -192,7 +192,7 @@ class TestCveWhitelist:
 
 
 class TestCveRemediation:
-    """CRUD /cve_remediation — plan de remediation."""
+    """CRUD /cve_remediation - plan de remediation."""
 
     def test_list_remediation(self, client, admin_headers, mock_cursor):
         mock_cursor._results = []

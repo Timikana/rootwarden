@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * migrate_crypto.php — Script de migration du chiffrement des mots de passe
+ * migrate_crypto.php - Script de migration du chiffrement des mots de passe
  *
  * Rôle       : Script CLI one-shot à exécuter lors d'une rotation de clé de
  *              chiffrement ou lors d'une migration AES → Sodium. Re-chiffre
@@ -22,16 +22,16 @@
  *   - Extension PHP sodium (détection du format sodium:)
  *
  * Variables d'environnement lues :
- *   OLD_SECRET_KEY — Ancienne clé de chiffrement (hex 32/64 chars ou texte 32 chars)
- *   SECRET_KEY     — Nouvelle clé de chiffrement (même format)
+ *   OLD_SECRET_KEY - Ancienne clé de chiffrement (hex 32/64 chars ou texte 32 chars)
+ *   SECRET_KEY     - Nouvelle clé de chiffrement (même format)
  *
  * Formats de chiffrement gérés :
- *   sodium:…  — Déjà migré, ignoré (retourne null)
- *   aes:…     — AES-256-CBC avec préfixe explicite, déchiffré puis re-chiffré
- *   …         — AES-256-CBC ancien format sans préfixe, déchiffré puis re-chiffré
- *   $2y$…     — bcrypt (exclu de la requête SQL, non traité ici)
+ *   sodium:…  - Déjà migré, ignoré (retourne null)
+ *   aes:…     - AES-256-CBC avec préfixe explicite, déchiffré puis re-chiffré
+ *   …         - AES-256-CBC ancien format sans préfixe, déchiffré puis re-chiffré
+ *   $2y$…     - bcrypt (exclu de la requête SQL, non traité ici)
  *
- * Sécurité   : S'exécute dans une transaction BDD — rollback automatique en cas
+ * Sécurité   : S'exécute dans une transaction BDD - rollback automatique en cas
  *              d'erreur globale. Les erreurs par ligne sont loggées sans rollback
  *              partiel (la ligne est simplement ignorée).
  *
@@ -190,7 +190,7 @@ echo "Clé actuelle (SECRET_KEY): "     . substr($newKey, 0, 6) . "..." . substr
 echo "Ancienne clé (OLD_SECRET_KEY): " . substr($oldKey, 0, 6) . "..." . substr($oldKey, -6) . " (" . strlen($oldKey) . " caractères)\n\n";
 
 try {
-    // Toute la migration s'exécute dans une transaction — rollback si erreur globale
+    // Toute la migration s'exécute dans une transaction - rollback si erreur globale
     $pdo->beginTransaction();
 
     // ── Section machines désactivée ───────────────────────────────────────────
@@ -243,7 +243,7 @@ try {
 
     // ── Migration de la table users ───────────────────────────────────────────
     // Sélectionne uniquement les utilisateurs dont le mot de passe n'est PAS
-    // déjà un hash bcrypt (préfixe '$2y$') — les hash bcrypt n'ont pas besoin
+    // déjà un hash bcrypt (préfixe '$2y$') - les hash bcrypt n'ont pas besoin
     // d'être re-chiffrés (ils ne sont pas chiffrés AES, juste hachés).
     $stmt = $pdo->query("SELECT id, name, password FROM users WHERE password NOT LIKE '\$2y\$%'");
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -282,7 +282,7 @@ try {
         }
     }
 
-    // Validation de la transaction — persiste toutes les mises à jour
+    // Validation de la transaction - persiste toutes les mises à jour
     $pdo->commit();
 
     echo "\n=== Migration terminée avec succès ! ===\n";

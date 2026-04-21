@@ -1,5 +1,5 @@
 <?php
-// lang/fr/wazuh.php — Module Wazuh (Agent + rules)
+// lang/fr/wazuh.php - Module Wazuh (Agent + rules)
 return [
     'wazuh.title' => 'Wazuh',
     'wazuh.subtitle' => 'Deploiement de l\'agent Wazuh, options par serveur, rules/decoders editables.',
@@ -55,7 +55,7 @@ return [
 
     // Options
     'wazuh.server' => 'Serveur',
-    'wazuh.select_server' => '— Choisir un serveur —',
+    'wazuh.select_server' => '- Choisir un serveur -',
     'wazuh.log_format' => 'Format de log',
     'wazuh.syscheck_frequency' => 'Frequence FIM (secondes)',
     'wazuh.fim_paths' => 'Chemins FIM surveilles',

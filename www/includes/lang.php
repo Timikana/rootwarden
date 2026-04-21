@@ -1,6 +1,6 @@
 <?php
 /**
- * lang.php — Systeme d'internationalisation (i18n) RootWarden
+ * lang.php - Systeme d'internationalisation (i18n) RootWarden
  *
  * Detecte la langue active, charge le fichier de traduction correspondant,
  * et fournit les fonctions t() et getLang() a toutes les pages.

@@ -1,6 +1,6 @@
 <?php
 /**
- * anonymize_user.php — Anonymisation RGPD d'un utilisateur (soft-delete).
+ * anonymize_user.php - Anonymisation RGPD d'un utilisateur (soft-delete).
  *
  * A la difference d'un DELETE dur (cascade FK) :
  *   - Preserve l'integrite de l'audit log (user_logs) -> tracabilite legale
@@ -117,7 +117,7 @@ try {
     $pdo->commit();
 
     audit_log_raw($pdo, $actorId, sprintf(
-        "[rgpd] Anonymisation du compte '%s' (id=%d) — PII effacees, audit conserve",
+        "[rgpd] Anonymisation du compte '%s' (id=%d) - PII effacees, audit conserve",
         $originalName, $userId
     ));
 

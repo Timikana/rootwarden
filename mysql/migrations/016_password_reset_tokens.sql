@@ -1,4 +1,4 @@
--- 016_password_reset_tokens.sql — Tokens de reinitialisation de mot de passe
+-- 016_password_reset_tokens.sql - Tokens de reinitialisation de mot de passe
 --
 -- Table utilisee par le flux "Mot de passe oublie" :
 --   1. L'utilisateur saisit son email sur forgot_password.php
