@@ -884,6 +884,22 @@ def scan_server_users():
                     """, (mid, uname, u['uid'], u['home'], u['shell'], u['keys_count'],
                           u['has_platform_key'], auto_status, auto_managed, auto_notes))
 
+            # Nettoyage des "fantomes" : users qui existaient en inventaire
+            # mais qui ne sont plus sur le serveur (userdel manuel depuis une
+            # autre console, compte systeme supprime, etc.). Sans ca, un
+            # compte comme `cleopatre` reste visible a vie dans l'UI.
+            # On identifie les fantomes = rows en DB non-touchees par ce scan.
+            scanned_usernames = {u['name'] for u in scanned_users}
+            ghost_usernames = [u for u in existing.keys() if u not in scanned_usernames]
+            if ghost_usernames:
+                placeholders = ','.join(['%s'] * len(ghost_usernames))
+                cur.execute(
+                    f"DELETE FROM server_user_inventory "
+                    f"WHERE machine_id = %s AND username IN ({placeholders})",
+                    (mid, *ghost_usernames))
+                logger.info("scan_server_users(%s): %d fantome(s) purge(s) : %s",
+                            mid, len(ghost_usernames), ','.join(ghost_usernames))
+
             conn_inv.commit()
 
             # Marquer scanne
@@ -1031,28 +1047,73 @@ def delete_remote_user():
 
     try:
         with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
-            flag = '-r' if remove_home else ''
+            # Flags :
+            #   -r : supprime le home directory + mail spool
+            #   -f : force meme si l'user est connecte, meme si le group primaire
+            #        porte le meme nom. On l'active par defaut : sans lui,
+            #        un processus actif fait echouer userdel alors que dans
+            #        99% des cas l'admin veut vraiment degager l'user.
+            flags = ['-f']
+            if remove_home:
+                flags.append('-r')
+            flag_str = ' '.join(flags)
             # Chemin absolu : su -c n'a pas /usr/sbin dans le PATH
-            cmd = f"/usr/sbin/userdel {flag} {shlex.quote(username)} 2>&1"
+            cmd = f"/usr/sbin/userdel {flag_str} {shlex.quote(username)} 2>&1"
             output, _, exit_code = execute_as_root(client, cmd, root_pass, logger=logger)
             output_str = output if isinstance(output, str) else str(output)
 
             if 'no such user' in output_str.lower():
-                return jsonify({'success': False, 'message': f"'{username}' n'existe pas sur ce serveur"})
+                # Deja absent : on nettoie quand meme la DB et on renvoie success.
+                _cleanup_user_inventory(machine_id, username)
+                return jsonify({'success': True, 'message': f"'{username}' n'existait deja plus - inventaire nettoye"})
 
-            # Verifier le exit code - 0 = succes, sinon echec
-            if exit_code and int(exit_code) != 0:
-                logger.warning("userdel '%s' sur %s: exit=%s output=%s", username, m['name'], exit_code, output_str)
-                return jsonify({'success': False, 'message': f"Echec suppression: {output_str.strip()}"})
-
-            # Verifier que l'utilisateur n'existe plus
+            # Verifier si l'utilisateur existe encore via `id`. C'est la
+            # source de verite : userdel peut retourner exit != 0 avec des
+            # warnings (mail spool, subuid, cron) alors que l'user EST
+            # bien supprime. Sans ce check on renvoyait "Echec" a tort.
             check, _, _ = execute_as_root(client, f"id {shlex.quote(username)} 2>&1", root_pass, timeout=5)
-            if 'no such user' not in (check or '').lower() and username in (check or ''):
-                return jsonify({'success': False, 'message': f"'{username}' existe toujours apres userdel - process actif ?"})
+            check_str = (check or '').lower()
+            user_gone = 'no such user' in check_str or 'does not exist' in check_str
 
-            logger.info("User '%s' supprime sur %s (remove_home=%s)", username, m['name'], remove_home)
-            return jsonify({'success': True, 'message': f"Utilisateur '{username}' supprime de {m['name']}"})
+            if user_gone:
+                if exit_code and int(exit_code) != 0:
+                    # Warnings non-fatals : on logue mais on considere la suppression OK.
+                    logger.info(
+                        "userdel '%s' sur %s : exit=%s warnings mais user absent, OK. output=%s",
+                        username, m['name'], exit_code, output_str.strip()[:200])
+                _cleanup_user_inventory(machine_id, username)
+                logger.info("User '%s' supprime sur %s (remove_home=%s)", username, m['name'], remove_home)
+                return jsonify({
+                    'success': True,
+                    'message': f"Utilisateur '{username}' supprime de {m['name']}",
+                    'warnings': output_str.strip() if exit_code else None,
+                })
+
+            # user_gone == False : userdel n'a vraiment pas fonctionne.
+            logger.warning("userdel '%s' sur %s: user toujours present. exit=%s output=%s",
+                           username, m['name'], exit_code, output_str)
+            return jsonify({
+                'success': False,
+                'message': f"'{username}' toujours present apres userdel. Verifie : processus actif (`ps -u {username}`), quotas, NIS/LDAP. Sortie : {output_str.strip()[:300]}"
+            })
 
     except Exception as e:
         logger.error("[delete_remote_user] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+def _cleanup_user_inventory(machine_id, username):
+    """Nettoie server_user_inventory apres suppression confirmee d'un user."""
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM server_user_inventory WHERE machine_id = %s AND username = %s",
+                (int(machine_id), username))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning("cleanup server_user_inventory (%s/%s) failed: %s",
+                       machine_id, username, e)
