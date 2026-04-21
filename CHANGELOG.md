@@ -5,6 +5,39 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.16.1] - 2026-04-21
+
+### Fix : auto-register de la cle legacy Config.API_KEY
+
+Bug decouvert en prod : des qu'un admin creait sa premiere entree dans
+`api_keys` via l'UI, le proxy PHP (qui envoie toujours `Config.API_KEY`
+depuis `srv-docker.env`) se cassait silencieusement. Le fallback legacy de
+`_validate_api_key_from_db` n'est actif que quand la table est vide (v1.14.4
+design), donc tous les appels backend retournaient 401 "Non autorise" sans
+aucune trace visible cote UI.
+
+Symptomes observes : dashboard SSH audit vide, compliance report a 0
+partout, /cve_trends refuse, etc.
+
+Correctif :
+- Migration `040_api_keys_auto_generated.sql` :
+  * Ajoute colonne `auto_generated TINYINT(1)` sur `api_keys`.
+  * Ajoute `UNIQUE KEY uk_api_keys_name` pour supporter INSERT IGNORE.
+  * Backfill : tagge `proxy-internal-legacy` existante (patch manuel
+    eventuel) en `auto_generated=1`.
+- `www/adm/api_keys.php` (handler create) :
+  * Apres chaque creation de cle utilisateur, `INSERT IGNORE` d'une entree
+    `proxy-internal-legacy` (SHA256 de `Config.API_KEY`, scope=NULL,
+    `auto_generated=1`). Idempotent, zero-downtime.
+- UI `/adm/api_keys.php` :
+  * Banniere jaune tant qu'une cle `auto_generated=1` active existe.
+  * Badge `AUTO` sur la ligne concernee dans le tableau.
+
+Test live : instance Docker locale - proxy PHP -> Python passe a nouveau
+apres ajout de la cle auto-generee, GET /test retourne 200.
+
+---
+
 ## [1.16.0] - 2026-04-21
 
 ### Feat : Profils de supervision (catalogue metadata)
