@@ -64,6 +64,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newKey = $fullKey;
                     $success = "Cle API '$name' creee. Copiez-la maintenant, elle ne sera plus affichee.";
                     audit_log($pdo, "Creation cle API '$name' prefix=$prefix scope=" . ($scope ?: 'ALL'));
+
+                    // Auto-register la cle legacy Config.API_KEY si pas deja presente.
+                    // Cas critique : premiere cle creee par un admin - sans ca le proxy PHP
+                    // (qui envoie toujours getenv('API_KEY')) se casse silencieusement parce
+                    // que le fallback legacy n'est actif que quand la table est vide (v1.14.4).
+                    // On insere une entree `proxy-internal-legacy` scope=NULL taggee
+                    // auto_generated=1 - l'admin la voit dans la liste et peut la revoquer
+                    // apres avoir rotate srv-docker.env:API_KEY avec une vraie cle scopee.
+                    $legacyRaw = getenv('API_KEY') ?: '';
+                    if ($legacyRaw !== '') {
+                        $legacyHash   = hash('sha256', $legacyRaw);
+                        $legacyPrefix = 'legacy_' . substr(hash('sha256', 'proxy-internal-legacy'), 0, 6);
+                        $pdo->prepare(
+                            "INSERT IGNORE INTO api_keys "
+                            . "(name, key_prefix, key_hash, scope_json, created_by, auto_generated) "
+                            . "VALUES ('proxy-internal-legacy', ?, ?, NULL, ?, 1)"
+                        )->execute([$legacyPrefix, $legacyHash, (int)$_SESSION['user_id']]);
+                    }
                 } catch (\PDOException $e) {
                     $error = $e->getCode() === '23000' ? 'Une cle avec ce nom existe deja.' : 'Erreur creation';
                     error_log('api_keys create: ' . $e->getMessage());
@@ -86,10 +104,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Liste des cles (masquees)
+// Note : la colonne auto_generated n'existe qu'a partir de la migration 040.
+// Utilise COALESCE pour retrocompatibilite si la migration n'a pas encore tourne.
 $keys = $pdo->query(
-    "SELECT id, name, key_prefix, scope_json, created_at, revoked_at, last_used_at, last_used_ip "
+    "SELECT id, name, key_prefix, scope_json, created_at, revoked_at, last_used_at, last_used_ip, "
+    . "COALESCE(auto_generated, 0) AS auto_generated "
     . "FROM api_keys ORDER BY revoked_at IS NULL DESC, created_at DESC"
 )->fetchAll(PDO::FETCH_ASSOC);
+
+// Detecte la cle legacy auto-generee encore active (warning banner)
+$hasLegacyActive = false;
+foreach ($keys as $k) {
+    if (!empty($k['auto_generated']) && empty($k['revoked_at'])) {
+        $hasLegacyActive = true;
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= getLang() ?>">
@@ -110,6 +140,28 @@ $keys = $pdo->query(
 
         <?php if ($error): ?>
         <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <?php if ($hasLegacyActive): ?>
+        <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg text-sm">
+            <div class="flex items-start gap-3">
+                <span class="text-2xl">⚠</span>
+                <div class="flex-1">
+                    <div class="font-bold text-yellow-800 dark:text-yellow-300 mb-1">Cle legacy <code class="px-1 bg-yellow-100 dark:bg-yellow-800/40 rounded">proxy-internal-legacy</code> active</div>
+                    <p class="text-yellow-700 dark:text-yellow-300 mb-2">
+                        Cette cle auto-generee autorise <b>toutes les routes</b> (scope=NULL).
+                        Elle existe pour que le proxy PHP (qui envoie <code>srv-docker.env:API_KEY</code>)
+                        continue a fonctionner pendant la transition vers les cles segmentees.
+                    </p>
+                    <p class="text-yellow-700 dark:text-yellow-300">
+                        <b>Action recommandee</b> : creez une vraie cle scopee pour le proxy PHP
+                        (ex. <code>php-proxy</code> avec scope <code>.*</code> ou regex precises),
+                        rotatez <code>srv-docker.env:API_KEY</code> vers cette nouvelle valeur,
+                        puis revoquez <code>proxy-internal-legacy</code>.
+                    </p>
+                </div>
+            </div>
+        </div>
         <?php endif; ?>
 
         <?php if ($newKey): ?>
@@ -162,7 +214,12 @@ $keys = $pdo->query(
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                     <?php foreach ($keys as $k): ?>
                     <tr>
-                        <td class="px-3 py-2 font-medium"><?= htmlspecialchars($k['name']) ?></td>
+                        <td class="px-3 py-2 font-medium">
+                            <?= htmlspecialchars($k['name']) ?>
+                            <?php if (!empty($k['auto_generated'])): ?>
+                                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300" title="Cle auto-generee par la plateforme">AUTO</span>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-3 py-2 font-mono text-xs"><?= htmlspecialchars($k['key_prefix']) ?>…</td>
                         <td class="px-3 py-2 text-xs">
                             <?php if ($k['scope_json']): ?>
