@@ -51,6 +51,8 @@ return [
     'profile.error_password_mismatch' => 'Les mots de passe ne correspondent pas.',
     'profile.password_policy_hint' => 'Le mot de passe doit contenir au minimum 15 caracteres, dont au moins : 1 majuscule, 1 minuscule, 1 chiffre et 1 caractere special.',
     'profile.error_password_policy' => 'Le mot de passe doit contenir au moins 15 caracteres, une majuscule, une minuscule, un chiffre et un caractere special.',
+    'profile.error_password_reuse' => 'Ce mot de passe a deja ete utilise recemment. Choisissez-en un nouveau qui ne figure pas parmi vos 5 derniers.',
+    'profile.error_password_pwned' => 'Ce mot de passe apparait dans une fuite de donnees publique (HaveIBeenPwned). Choisissez-en un autre.',
     'profile.password_updated' => 'Mot de passe modifie avec succes.',
     'profile.error_password_update' => 'Erreur lors de la modification du mot de passe.',
 ];
