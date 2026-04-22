@@ -54,10 +54,14 @@ def _run_scheduled_scan(schedule: dict):
     try:
         cur = conn.cursor(dictionary=True)
 
-        # Determine les machines cibles
+        # Determine les machines cibles. Inclure service_account_deployed
+        # pour supporter les machines en mode keypair (password peut etre
+        # NULL apres avoir suivi l'onboarding "supprime les MDP de la BDD").
+        base_cols = ("id, name, ip, port, user, password, root_password, "
+                     "service_account_deployed")
         if schedule['target_type'] == 'tag' and schedule['target_value']:
             cur.execute(
-                "SELECT m.id, m.name, m.ip, m.port, m.user, m.password, m.root_password "
+                f"SELECT m.{base_cols.replace(', ', ', m.')} "
                 "FROM machines m "
                 "INNER JOIN machine_tags mt ON m.id = mt.machine_id "
                 "WHERE mt.tag = %s",
@@ -72,13 +76,12 @@ def _run_scheduled_scan(schedule: dict):
             if ids:
                 fmt = ','.join(['%s'] * len(ids))
                 cur.execute(
-                    f"SELECT id, name, ip, port, user, password, root_password "
-                    f"FROM machines WHERE id IN ({fmt})", ids
+                    f"SELECT {base_cols} FROM machines WHERE id IN ({fmt})", ids
                 )
             else:
-                cur.execute("SELECT id, name, ip, port, user, password, root_password FROM machines")
+                cur.execute(f"SELECT {base_cols} FROM machines")
         else:
-            cur.execute("SELECT id, name, ip, port, user, password, root_password FROM machines")
+            cur.execute(f"SELECT {base_cols} FROM machines")
 
         machines = cur.fetchall()
     finally:
@@ -87,19 +90,31 @@ def _run_scheduled_scan(schedule: dict):
     min_cvss = float(schedule.get('min_cvss') or 7.0)
     scanned = 0
     total_findings = 0
+    skipped = []
 
     for m in machines:
         try:
-            ssh_pass = encryption.decrypt_password(m['password'])
-            if not ssh_pass:
+            svc = bool(m.get('service_account_deployed'))
+            ssh_pass = encryption.decrypt_password(m['password']) if m.get('password') else ''
+            # Machine sans mot de passe ET sans keypair deployee = inscannable.
+            # Sinon, ssh_session utilisera la keypair plateforme (svc=True).
+            if not ssh_pass and not svc:
+                skipped.append(m['name'])
                 continue
-            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=_log) as client:
+            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass or None,
+                             logger=_log, service_account=svc) as client:
                 for event in scan_server(client, m['id'], m['name'], min_cvss):
                     if event.get('type') == 'done':
                         scanned += 1
                         total_findings += event.get('total_findings', 0)
         except Exception as e:
             _log.warning("Scheduler: erreur scan %s : %s", m['name'], e)
+
+    if skipped:
+        _log.warning(
+            "Scheduler: scan '%s' - %d machine(s) ignoree(s) (ni password "
+            "ni keypair deployee) : %s",
+            schedule['name'], len(skipped), ', '.join(skipped))
 
     _log.info("Scheduler: scan '%s' termine - %d serveurs, %d CVE", schedule['name'], scanned, total_findings)
 
