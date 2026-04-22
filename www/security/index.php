@@ -290,30 +290,83 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
     </details>
 
     <!-- Modal presets cron -->
-    <div id="cron-presets-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 class="font-bold"><?= t('cve.cron_presets_title') ?></h3>
-                <button onclick="document.getElementById('cron-presets-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">&times;</button>
+    <div id="cron-presets-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+         onclick="if(event.target===this) this.classList.add('hidden')">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between z-10">
+                <div>
+                    <h3 class="font-bold text-lg"><?= t('cve.cron_presets_title') ?></h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5"><?= t('cve.cron_presets_desc') ?></p>
+                </div>
+                <button onclick="document.getElementById('cron-presets-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
             </div>
-            <div class="p-4 space-y-2">
+            <div class="p-4 space-y-4">
                 <?php
-                $presets = [
-                    ['label' => t('cve.preset_every_5min'),  'expr' => '*/5 * * * *'],
-                    ['label' => t('cve.preset_every_15min'), 'expr' => '*/15 * * * *'],
-                    ['label' => t('cve.preset_hourly'),      'expr' => '0 * * * *'],
-                    ['label' => t('cve.preset_daily_3am'),   'expr' => '0 3 * * *'],
-                    ['label' => t('cve.preset_daily_midnight'), 'expr' => '0 0 * * *'],
-                    ['label' => t('cve.preset_weekly_mon8'), 'expr' => '0 8 * * 1'],
-                    ['label' => t('cve.preset_weekly_sun2'), 'expr' => '0 2 * * 0'],
-                    ['label' => t('cve.preset_monthly_1st'), 'expr' => '0 3 1 * *'],
+                $presetGroups = [
+                    [
+                        'title' => t('cve.preset_group_frequent'),
+                        'icon'  => '⚡',
+                        'tone'  => 'amber',
+                        'items' => [
+                            ['label' => t('cve.preset_every_5min'),  'expr' => '*/5 * * * *',  'hint' => t('cve.preset_hint_tests')],
+                            ['label' => t('cve.preset_every_15min'), 'expr' => '*/15 * * * *', 'hint' => t('cve.preset_hint_dev')],
+                            ['label' => t('cve.preset_hourly'),      'expr' => '0 * * * *',    'hint' => ''],
+                        ],
+                    ],
+                    [
+                        'title' => t('cve.preset_group_daily'),
+                        'icon'  => '🌙',
+                        'tone'  => 'blue',
+                        'items' => [
+                            ['label' => t('cve.preset_daily_3am'),      'expr' => '0 3 * * *', 'hint' => t('cve.preset_hint_recommended')],
+                            ['label' => t('cve.preset_daily_midnight'), 'expr' => '0 0 * * *', 'hint' => ''],
+                            ['label' => t('cve.preset_daily_6am'),      'expr' => '0 6 * * *', 'hint' => ''],
+                        ],
+                    ],
+                    [
+                        'title' => t('cve.preset_group_weekly'),
+                        'icon'  => '📅',
+                        'tone'  => 'green',
+                        'items' => [
+                            ['label' => t('cve.preset_weekly_mon8'), 'expr' => '0 8 * * 1', 'hint' => t('cve.preset_hint_workweek')],
+                            ['label' => t('cve.preset_weekly_sun2'), 'expr' => '0 2 * * 0', 'hint' => t('cve.preset_hint_weekend')],
+                        ],
+                    ],
+                    [
+                        'title' => t('cve.preset_group_monthly'),
+                        'icon'  => '🗓',
+                        'tone'  => 'purple',
+                        'items' => [
+                            ['label' => t('cve.preset_monthly_1st'), 'expr' => '0 3 1 * *', 'hint' => ''],
+                        ],
+                    ],
                 ];
-                foreach ($presets as $p): ?>
-                <button type="button" onclick="pickCronPreset('<?= htmlspecialchars($p['expr']) ?>')"
-                        class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-left">
-                    <span class="text-sm"><?= htmlspecialchars($p['label']) ?></span>
-                    <code class="text-[10px] text-gray-500 font-mono"><?= htmlspecialchars($p['expr']) ?></code>
-                </button>
+                $toneClasses = [
+                    'amber'  => 'border-amber-200 dark:border-amber-800/50 hover:bg-amber-50 dark:hover:bg-amber-900/20',
+                    'blue'   => 'border-blue-200 dark:border-blue-800/50 hover:bg-blue-50 dark:hover:bg-blue-900/20',
+                    'green'  => 'border-green-200 dark:border-green-800/50 hover:bg-green-50 dark:hover:bg-green-900/20',
+                    'purple' => 'border-purple-200 dark:border-purple-800/50 hover:bg-purple-50 dark:hover:bg-purple-900/20',
+                ];
+                foreach ($presetGroups as $grp): ?>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
+                        <span class="text-base"><?= $grp['icon'] ?></span> <?= htmlspecialchars($grp['title']) ?>
+                    </h4>
+                    <div class="space-y-1.5">
+                        <?php foreach ($grp['items'] as $p): ?>
+                        <button type="button" onclick="pickCronPreset('<?= htmlspecialchars($p['expr']) ?>')"
+                                class="group w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border <?= $toneClasses[$grp['tone']] ?> text-left transition-colors">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium"><?= htmlspecialchars($p['label']) ?></div>
+                                <?php if ($p['hint']): ?>
+                                <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5"><?= htmlspecialchars($p['hint']) ?></div>
+                                <?php endif; ?>
+                            </div>
+                            <code class="flex-shrink-0 text-[10px] text-gray-400 font-mono bg-gray-100 dark:bg-gray-900/50 px-1.5 py-0.5 rounded group-hover:bg-white dark:group-hover:bg-gray-800"><?= htmlspecialchars($p['expr']) ?></code>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>

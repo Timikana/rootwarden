@@ -620,8 +620,8 @@ async function loadSchedules() {
         }
         list.innerHTML = d.schedules.map(s => {
             const enabled = s.enabled == 1;
-            const lastRun = s.last_run ? new Date(s.last_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Jamais';
-            const nextRun = s.next_run ? new Date(s.next_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+            const lastRun = fmtLocalDate(s.last_run, 'Jamais');
+            const nextRun = fmtLocalDate(s.next_run, '-');
             let target = 'Tous';
             if (s.target_type === 'tag') {
                 target = 'Tag: ' + esc(s.target_value);
@@ -693,6 +693,28 @@ async function deleteSchedule(id) {
     loadSchedules();
 }
 
+/**
+ * Formate une date vers la timezone locale du navigateur.
+ * - Accepte ISO 8601 avec Z (UTC) ou format MySQL "YYYY-MM-DD HH:MM:SS"
+ *   qu'on interprete comme UTC (le backend tourne en UTC en Docker par defaut).
+ * - Retourne `fallback` si l'input est vide / invalide.
+ * Fix : avant, "2026-04-22 08:15:00" etait interprete comme LOCAL par
+ * Chrome -> affichait "08:15" a un user en CEST au lieu de "10:15".
+ */
+function fmtLocalDate(v, fallback = '-') {
+    if (!v) return fallback;
+    let iso = String(v);
+    // Format MySQL sans timezone -> on ajoute Z pour le traiter comme UTC
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(iso) && !/[zZ]$|[+-]\d{2}:?\d{2}$/.test(iso)) {
+        iso = iso.replace(' ', 'T') + 'Z';
+    }
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return fallback;
+    return d.toLocaleString(navigator.language || 'fr-FR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    });
+}
+
 // ── Simulateur cron : preview live + presets ─────────────────────────────
 let _cronPreviewTimer = null;
 function cronPreviewDebounced() {
@@ -716,7 +738,7 @@ async function cronPreview() {
             return;
         }
         input.classList.add('border-green-400');
-        const previews = (d.next_runs || []).slice(0, 3).map(esc).join(' · ');
+        const previews = (d.next_runs || []).slice(0, 3).map(iso => esc(fmtLocalDate(iso, '?'))).join(' · ');
         out.innerHTML = `<span class="text-green-600 dark:text-green-400">✓ ${esc(d.human)}</span><br>`
                       + `<span class="text-gray-400">Prochains : ${previews}</span>`;
     } catch (e) {

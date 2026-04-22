@@ -329,14 +329,21 @@ def cron_preview():
         return jsonify({'valid': False, 'error': 'expression requise'})
     try:
         from croniter import croniter
+        from datetime import timezone
         if not croniter.is_valid(expr):
             return jsonify({'valid': False, 'error': 'Expression cron invalide'})
-        base = datetime.now()
+        # On fournit les datetimes en ISO 8601 UTC (suffixe Z) pour que le
+        # frontend les convertisse automatiquement vers la TZ du navigateur
+        # via new Date(iso).toLocaleString(). Evite le bug "il est 10h13
+        # mais l'UI affiche 8h15" quand le container tourne en UTC.
+        base = datetime.now(timezone.utc)
         it = croniter(expr, base)
         runs = []
         for _ in range(5):
             d = it.get_next(datetime)
-            runs.append(d.strftime('%Y-%m-%d %H:%M'))
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=timezone.utc)
+            runs.append(d.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
         # Description humaine basique (meilleure approche : python-crontab
         # descriptor, mais on evite une dep de plus).
         parts = expr.split()
