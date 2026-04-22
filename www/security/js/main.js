@@ -622,7 +622,16 @@ async function loadSchedules() {
             const enabled = s.enabled == 1;
             const lastRun = s.last_run ? new Date(s.last_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Jamais';
             const nextRun = s.next_run ? new Date(s.next_run).toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
-            const target = s.target_type === 'all' ? 'Tous' : (s.target_type === 'tag' ? 'Tag: ' + esc(s.target_value) : 'Selection');
+            let target = 'Tous';
+            if (s.target_type === 'tag') {
+                target = 'Tag: ' + esc(s.target_value);
+            } else if (s.target_type === 'machines') {
+                try {
+                    const ids = JSON.parse(s.target_value || '[]');
+                    const names = ids.map(id => (window._machinesById?.[id]?.name) || `#${id}`);
+                    target = names.length === 1 ? 'Serveur: ' + esc(names[0]) : `${names.length} serveurs`;
+                } catch { target = 'Selection'; }
+            }
             return `<div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${enabled ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700/30 opacity-60'}">
                 <div class="flex-1 min-w-0">
                     <span class="text-sm font-medium">${esc(s.name)}</span>
@@ -649,7 +658,14 @@ async function addSchedule() {
     if (!name) { toast('Nom requis', 'warning'); return; }
 
     let target_type = 'all', target_value = '';
-    if (targetRaw.startsWith('tag:')) { target_type = 'tag'; target_value = targetRaw.substring(4); }
+    if (targetRaw.startsWith('tag:')) {
+        target_type = 'tag';
+        target_value = targetRaw.substring(4);
+    } else if (targetRaw.startsWith('machine:')) {
+        target_type = 'machines';
+        // Le backend attend un JSON array d'IDs (supporte le multi-select futur)
+        target_value = JSON.stringify([parseInt(targetRaw.substring(8), 10)]);
+    }
 
     const r = await fetch(`${window.API_URL}/cve_schedules`, {
         method: 'POST',

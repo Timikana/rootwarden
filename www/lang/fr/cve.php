@@ -7,6 +7,8 @@ return [
     'cve.no_permission' => 'Vous n\'avez pas la permission d\'acceder au scan CVE.',
     'cve.btn_scan' => 'Scanner',
     'cve.btn_scan_all' => 'Scanner tout (:count serveurs)',
+    'cve.sched_by_tag' => 'Par tag',
+    'cve.sched_by_server' => 'Par serveur precis',
     'cve.cvss_threshold' => 'Seuil CVSS',
     'cve.cvss_all' => 'Tout (0+)',
     'cve.cvss_medium' => 'MEDIUM+ (4+)',
