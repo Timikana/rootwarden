@@ -12,7 +12,7 @@ last_reviewed: 2026-04-21
 routes: []
 tables: [permissions, user_machine_access, users]
 imports_detected: []
-last_synced: 2026-04-21
+last_synced: 2026-04-22
 # AUTO-END
 ---
 

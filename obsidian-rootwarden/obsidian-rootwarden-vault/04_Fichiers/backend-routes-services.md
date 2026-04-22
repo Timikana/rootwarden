@@ -14,7 +14,7 @@ last_reviewed: 2026-04-21
 routes: [/services/disable, /services/enable, /services/list, /services/logs, /services/restart, /services/start, /services/status, /services/stop]
 tables: [machines, user_logs]
 imports_detected: [routes, services_manager, ssh_utils]
-last_synced: 2026-04-21
+last_synced: 2026-04-22
 # AUTO-END
 ---
 
