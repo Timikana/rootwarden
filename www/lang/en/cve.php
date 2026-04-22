@@ -9,6 +9,8 @@ return [
     'cve.btn_scan_all' => 'Scan all (:count servers)',
     'cve.sched_by_tag' => 'By tag',
     'cve.sched_by_server' => 'By specific server',
+    'cve.sched_new' => 'New schedule',
+    'cve.sched_name_placeholder' => 'e.g. Daily scan 03h',
     'cve.cron_presets_tip' => 'Pick a preset',
     'cve.cron_presets_title' => 'Schedule presets',
     'cve.preset_every_5min' => 'Every 5 minutes',
