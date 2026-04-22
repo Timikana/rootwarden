@@ -313,6 +313,56 @@ def list_cve_schedules():
         conn.close()
 
 
+@bp.route('/cron_preview', methods=['GET'])
+@require_api_key
+@require_role(2)
+def cron_preview():
+    """Previsualise les N prochains declenchements d'une expression cron.
+
+    Aide l'admin non-expert : on appelle cet endpoint en live pendant qu'il
+    tape, et l'UI affiche "Prochains : 22/04 07:30, 07:35, 07:40...". Les
+    presets UI (toutes les 5 min, quotidien 3h...) utilisent aussi cette
+    route pour valider avant soumission.
+    """
+    expr = (request.args.get('expr') or '').strip()
+    if not expr:
+        return jsonify({'valid': False, 'error': 'expression requise'})
+    try:
+        from croniter import croniter
+        if not croniter.is_valid(expr):
+            return jsonify({'valid': False, 'error': 'Expression cron invalide'})
+        base = datetime.now()
+        it = croniter(expr, base)
+        runs = []
+        for _ in range(5):
+            d = it.get_next(datetime)
+            runs.append(d.strftime('%Y-%m-%d %H:%M'))
+        # Description humaine basique (meilleure approche : python-crontab
+        # descriptor, mais on evite une dep de plus).
+        parts = expr.split()
+        if len(parts) == 5:
+            m, h, dom, mo, dow = parts
+            if m.startswith('*/') or m.startswith('0/'):
+                human = f"Toutes les {m.split('/')[-1]} minutes"
+            elif m == '*' and h == '*':
+                human = "Chaque minute"
+            elif m.isdigit() and h == '*':
+                human = f"A la minute {m} de chaque heure"
+            elif m.isdigit() and h.isdigit() and dom == '*' and mo == '*' and dow == '*':
+                human = f"Tous les jours a {int(h):02d}:{int(m):02d}"
+            elif m.isdigit() and h.isdigit() and dow != '*':
+                dn = {'0': 'dim', '1': 'lun', '2': 'mar', '3': 'mer', '4': 'jeu',
+                      '5': 'ven', '6': 'sam', '7': 'dim'}.get(dow, dow)
+                human = f"Tous les {dn} a {int(h):02d}:{int(m):02d}"
+            else:
+                human = f"Selon l'expression : {expr}"
+        else:
+            human = f"Selon l'expression : {expr}"
+        return jsonify({'valid': True, 'next_runs': runs, 'human': human})
+    except Exception as e:
+        return jsonify({'valid': False, 'error': str(e)[:200]})
+
+
 @bp.route('/cve_schedules', methods=['POST'])
 @require_api_key
 @require_role(2)

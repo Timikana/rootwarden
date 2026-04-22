@@ -231,7 +231,14 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
                 </div>
                 <div>
                     <label class="text-xs text-gray-500"><?= t('cve.sched_cron') ?></label>
-                    <input id="sched-cron" type="text" value="0 3 * * *" placeholder="0 3 * * *" class="block w-32 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
+                    <div class="flex items-center gap-1">
+                        <input id="sched-cron" type="text" value="0 3 * * *" placeholder="0 3 * * *"
+                               oninput="cronPreviewDebounced()"
+                               class="block w-32 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
+                        <button type="button" onclick="openCronPresets()" title="<?= t('cve.cron_presets_tip') ?>"
+                                class="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-700">📅</button>
+                    </div>
+                    <div id="cron-preview" class="mt-1 text-[10px] text-gray-500 dark:text-gray-400 font-mono"></div>
                 </div>
                 <div>
                     <label class="text-xs text-gray-500"><?= t('cve.sched_cvss_min') ?></label>
@@ -281,6 +288,36 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
             </p>
         </div>
     </details>
+
+    <!-- Modal presets cron -->
+    <div id="cron-presets-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="font-bold"><?= t('cve.cron_presets_title') ?></h3>
+                <button onclick="document.getElementById('cron-presets-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-4 space-y-2">
+                <?php
+                $presets = [
+                    ['label' => t('cve.preset_every_5min'),  'expr' => '*/5 * * * *'],
+                    ['label' => t('cve.preset_every_15min'), 'expr' => '*/15 * * * *'],
+                    ['label' => t('cve.preset_hourly'),      'expr' => '0 * * * *'],
+                    ['label' => t('cve.preset_daily_3am'),   'expr' => '0 3 * * *'],
+                    ['label' => t('cve.preset_daily_midnight'), 'expr' => '0 0 * * *'],
+                    ['label' => t('cve.preset_weekly_mon8'), 'expr' => '0 8 * * 1'],
+                    ['label' => t('cve.preset_weekly_sun2'), 'expr' => '0 2 * * 0'],
+                    ['label' => t('cve.preset_monthly_1st'), 'expr' => '0 3 1 * *'],
+                ];
+                foreach ($presets as $p): ?>
+                <button type="button" onclick="pickCronPreset('<?= htmlspecialchars($p['expr']) ?>')"
+                        class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-left">
+                    <span class="text-sm"><?= htmlspecialchars($p['label']) ?></span>
+                    <code class="text-[10px] text-gray-500 font-mono"><?= htmlspecialchars($p['expr']) ?></code>
+                </button>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
     <?php endif; ?>
 
     <!-- ── Cartes serveurs ────────────────────────────────────────────────── -->

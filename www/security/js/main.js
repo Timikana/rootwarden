@@ -693,6 +693,51 @@ async function deleteSchedule(id) {
     loadSchedules();
 }
 
+// ── Simulateur cron : preview live + presets ─────────────────────────────
+let _cronPreviewTimer = null;
+function cronPreviewDebounced() {
+    clearTimeout(_cronPreviewTimer);
+    _cronPreviewTimer = setTimeout(cronPreview, 400);
+}
+
+async function cronPreview() {
+    const input = document.getElementById('sched-cron');
+    const out = document.getElementById('cron-preview');
+    if (!input || !out) return;
+    const expr = input.value.trim();
+    input.classList.remove('border-red-400', 'border-green-400');
+    if (!expr) { out.innerHTML = ''; return; }
+    try {
+        const r = await fetch(`${window.API_URL}/cron_preview?expr=${encodeURIComponent(expr)}`);
+        const d = await r.json();
+        if (!d.valid) {
+            input.classList.add('border-red-400');
+            out.innerHTML = `<span class="text-red-500">✗ ${esc(d.error || 'Expression invalide')}</span>`;
+            return;
+        }
+        input.classList.add('border-green-400');
+        const previews = (d.next_runs || []).slice(0, 3).map(esc).join(' · ');
+        out.innerHTML = `<span class="text-green-600 dark:text-green-400">✓ ${esc(d.human)}</span><br>`
+                      + `<span class="text-gray-400">Prochains : ${previews}</span>`;
+    } catch (e) {
+        out.innerHTML = `<span class="text-gray-400">Impossible de prevoir</span>`;
+    }
+}
+
+function openCronPresets() {
+    document.getElementById('cron-presets-modal')?.classList.remove('hidden');
+}
+
+function pickCronPreset(expr) {
+    const input = document.getElementById('sched-cron');
+    if (input) { input.value = expr; cronPreview(); }
+    document.getElementById('cron-presets-modal')?.classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('sched-cron')) cronPreview();
+});
+
 // ── Comparaison de scans CVE ──────────────────────────────────────────────
 async function compareCveScans(machineId) {
     try {
