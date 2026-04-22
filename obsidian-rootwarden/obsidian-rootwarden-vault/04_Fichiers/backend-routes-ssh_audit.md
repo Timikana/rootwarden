@@ -14,7 +14,7 @@ last_reviewed: 2026-04-21
 routes: [/ssh-audit/backups, /ssh-audit/config, /ssh-audit/fix, /ssh-audit/policies, /ssh-audit/reload, /ssh-audit/restore, /ssh-audit/results, /ssh-audit/save-config, /ssh-audit/scan, /ssh-audit/scan-all, /ssh-audit/schedules, /ssh-audit/schedules/<int:schedule_id>, /ssh-audit/schedules/<int:schedule_id>/toggle, /ssh-audit/toggle, /ssh-audit/trends]
 tables: [machines, ssh_audit_policies, ssh_audit_results, ssh_audit_schedules, user_logs]
 imports_detected: [routes, ssh_audit, ssh_utils]
-last_synced: 2026-04-21
+last_synced: 2026-04-22
 # AUTO-END
 ---
 

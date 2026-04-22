@@ -117,17 +117,19 @@ if ($method === 'GET') {
     exit;
 }
 
-// ── POST ───────────────────────────────────────────────────────────────────
-if ($method === 'POST') {
+// ── POST / PUT / DELETE / PATCH ────────────────────────────────────────────
+// On unifie le chemin pour tous les verbes qui portent (ou pas) un body JSON.
+// Avant : seul POST etait supporte -> /cve_schedules/<id> en PUT retournait 405
+// et l'UI ne pouvait ni toggle ni supprimer les scans planifies.
+if (in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
     $body = file_get_contents('php://input');
 
     header('X-Accel-Buffering: no');
     header('Cache-Control: no-cache');
 
     $ch = curl_init($target);
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $body,
+    $opts = [
+        CURLOPT_CUSTOMREQUEST  => $method,
         CURLOPT_TIMEOUT        => 1800,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_SSL_VERIFYHOST => false,
@@ -139,10 +141,19 @@ if ($method === 'POST') {
                 $contentType = trim(substr($header, 13));
                 header('Content-Type: ' . $contentType);
             }
+            // Relaye le status HTTP du backend (sinon 405 DELETE devient 200).
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $m)) {
+                http_response_code((int)$m[1]);
+            }
             return strlen($header);
         },
         CURLOPT_WRITEFUNCTION  => $writeFn,
-    ]);
+    ];
+    // Body uniquement pour les methodes qui en ont un
+    if ($body !== '' && $body !== false) {
+        $opts[CURLOPT_POSTFIELDS] = $body;
+    }
+    curl_setopt_array($ch, $opts);
     curl_exec($ch);
     $err = curl_error($ch);
     curl_close($ch);

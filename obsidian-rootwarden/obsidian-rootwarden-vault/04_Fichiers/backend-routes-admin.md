@@ -16,7 +16,7 @@ status: stable
 routes: [/admin/backups, /admin/notification_prefs, /admin/temp_permissions, /admin/temp_permissions/<int:perm_id>, /admin/user_inventory/classify, /admin/user_inventory/classify_bulk, /exclude_user, /server_lifecycle]
 tables: [machines, notification_preferences, server_user_inventory, temporary_permissions, user_exclusions, users]
 imports_detected: [routes]
-last_synced: 2026-04-21
+last_synced: 2026-04-22
 # AUTO-END
 ---
 

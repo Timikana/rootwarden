@@ -15,7 +15,7 @@ last_reviewed: 2026-04-21
 routes: [/iptables, /iptables-apply, /iptables-history, /iptables-logs, /iptables-restore, /iptables-rollback, /iptables-validate]
 tables: [iptables_history, iptables_rules, machines]
 imports_detected: [iptables_manager, routes, ssh_utils]
-last_synced: 2026-04-21
+last_synced: 2026-04-22
 # AUTO-END
 ---
 

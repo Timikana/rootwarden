@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [cve_scan_schedules, cve_whitelist, iptables_history]
 imports_detected: []
-last_synced: 2026-04-21
+last_synced: 2026-04-22
 # AUTO-END
 ---
 
