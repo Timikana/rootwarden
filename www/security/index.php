@@ -247,10 +247,29 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
                     <select id="sched-target" class="block text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
                         <option value="all"><?= t('cve.sched_all_servers') ?></option>
                         <?php
-                        $tags = $pdo->query("SELECT DISTINCT tag FROM machine_tags ORDER BY tag")->fetchAll(PDO::FETCH_COLUMN);
-                        foreach ($tags as $tag): ?>
-                        <option value="tag:<?= htmlspecialchars($tag) ?>">Tag: <?= htmlspecialchars($tag) ?></option>
-                        <?php endforeach; ?>
+                        // Tags : tous les serveurs portant un tag donne
+                        $tags = $pdo->query("SELECT DISTINCT tag FROM machine_tags WHERE tag IS NOT NULL AND tag != '' ORDER BY tag")->fetchAll(PDO::FETCH_COLUMN);
+                        if ($tags): ?>
+                            <optgroup label="<?= t('cve.sched_by_tag') ?>">
+                                <?php foreach ($tags as $tag): ?>
+                                <option value="tag:<?= htmlspecialchars($tag) ?>">Tag: <?= htmlspecialchars($tag) ?></option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endif; ?>
+                        <?php
+                        // Serveur precis : 1 entree par machine active
+                        $machinesForTarget = $pdo->query(
+                            "SELECT id, name, ip FROM machines "
+                            . "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
+                            . "ORDER BY name"
+                        )->fetchAll(PDO::FETCH_ASSOC);
+                        if ($machinesForTarget): ?>
+                            <optgroup label="<?= t('cve.sched_by_server') ?>">
+                                <?php foreach ($machinesForTarget as $mm): ?>
+                                <option value="machine:<?= (int)$mm['id'] ?>"><?= htmlspecialchars($mm['name']) ?> (<?= htmlspecialchars($mm['ip']) ?>)</option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <button onclick="addSchedule()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded font-medium">
