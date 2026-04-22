@@ -9,6 +9,8 @@ return [
     'cve.btn_scan_all' => 'Scanner tout (:count serveurs)',
     'cve.sched_by_tag' => 'Par tag',
     'cve.sched_by_server' => 'Par serveur precis',
+    'cve.sched_new' => 'Nouvelle planification',
+    'cve.sched_name_placeholder' => 'Ex: Scan quotidien 03h',
     'cve.cron_presets_tip' => 'Choisir un preset',
     'cve.cron_presets_title' => 'Presets de planification',
     'cve.cron_presets_desc' => 'Clique un preset pour pre-remplir l\'expression cron.',

@@ -224,75 +224,81 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
         </summary>
         <div class="px-5 pb-4">
             <div id="schedules-list" class="space-y-2 mb-3"></div>
-            <div class="flex flex-wrap items-end gap-3 border-t border-gray-100 dark:border-gray-700 pt-3">
-                <div>
-                    <label class="text-xs text-gray-500"><?= t('cve.sched_name') ?></label>
-                    <input id="sched-name" type="text" placeholder="Scan quotidien 03h" class="block w-44 text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500"><?= t('cve.sched_cron') ?></label>
-                    <div class="flex items-center gap-1">
-                        <input id="sched-cron" type="text" value="0 3 * * *" placeholder="0 3 * * *"
-                               oninput="cronPreviewDebounced()"
-                               class="block w-32 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
-                        <button type="button" onclick="openCronPresets()" title="<?= t('cve.cron_presets_tip') ?>"
-                                class="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-700">📅</button>
+            <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3"><?= t('cve.sched_new') ?></h4>
+                <!-- Grid 4 colonnes alignes, preview en dessous, bouton sur toute la largeur au dernier rang -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                        <label for="sched-name" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('cve.sched_name') ?></label>
+                        <input id="sched-name" type="text" placeholder="<?= t('cve.sched_name_placeholder') ?>"
+                               class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div id="cron-preview" class="mt-1 text-[10px] text-gray-500 dark:text-gray-400 font-mono"></div>
+                    <div>
+                        <label for="sched-cron" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('cve.sched_cron') ?></label>
+                        <div class="flex gap-1">
+                            <input id="sched-cron" type="text" value="0 3 * * *" placeholder="0 3 * * *"
+                                   oninput="cronPreviewDebounced()"
+                                   class="flex-1 min-w-0 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500">
+                            <button type="button" onclick="openCronPresets()" title="<?= t('cve.cron_presets_tip') ?>"
+                                    class="flex-shrink-0 px-3 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-gray-700">📅</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="sched-cvss" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('cve.sched_cvss_min') ?></label>
+                        <select id="sched-cvss" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700">
+                            <option value="0"><?= t('cve.cvss_all') ?></option>
+                            <option value="4"><?= t('cve.cvss_medium') ?></option>
+                            <option value="7" selected><?= t('cve.cvss_high') ?></option>
+                            <option value="9"><?= t('cve.cvss_critical') ?></option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sched-target" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('cve.sched_target') ?></label>
+                        <select id="sched-target" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700">
+                            <option value="all"><?= t('cve.sched_all_servers') ?></option>
+                            <?php
+                            $tags = $pdo->query("SELECT DISTINCT tag FROM machine_tags WHERE tag IS NOT NULL AND tag != '' ORDER BY tag")->fetchAll(PDO::FETCH_COLUMN);
+                            if ($tags): ?>
+                                <optgroup label="<?= t('cve.sched_by_tag') ?>">
+                                    <?php foreach ($tags as $tag): ?>
+                                    <option value="tag:<?= htmlspecialchars($tag) ?>">Tag: <?= htmlspecialchars($tag) ?></option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endif; ?>
+                            <?php
+                            $machinesForTarget = $pdo->query(
+                                "SELECT id, name, ip FROM machines "
+                                . "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
+                                . "ORDER BY name"
+                            )->fetchAll(PDO::FETCH_ASSOC);
+                            if ($machinesForTarget): ?>
+                                <optgroup label="<?= t('cve.sched_by_server') ?>">
+                                    <?php foreach ($machinesForTarget as $mm): ?>
+                                    <option value="machine:<?= (int)$mm['id'] ?>"><?= htmlspecialchars($mm['name']) ?> (<?= htmlspecialchars($mm['ip']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endif; ?>
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label class="text-xs text-gray-500"><?= t('cve.sched_cvss_min') ?></label>
-                    <select id="sched-cvss" class="block text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
-                        <option value="0"><?= t('cve.cvss_all') ?></option>
-                        <option value="4"><?= t('cve.cvss_medium') ?></option>
-                        <option value="7" selected><?= t('cve.cvss_high') ?></option>
-                        <option value="9"><?= t('cve.cvss_critical') ?></option>
-                    </select>
+                <!-- Preview cron sur toute la largeur (sous les inputs) -->
+                <div id="cron-preview" class="mt-2 text-xs text-gray-500 dark:text-gray-400 min-h-[1.5rem]"></div>
+                <div class="flex flex-wrap items-center gap-3 mt-3">
+                    <button onclick="addSchedule()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg font-medium">
+                        + <?= t('cve.sched_add') ?>
+                    </button>
+                    <p class="text-[11px] text-gray-400 flex-1">
+                        <?= t('cve.sched_cron_hint') ?>
+                    </p>
                 </div>
-                <div>
-                    <label class="text-xs text-gray-500"><?= t('cve.sched_target') ?></label>
-                    <select id="sched-target" class="block text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700">
-                        <option value="all"><?= t('cve.sched_all_servers') ?></option>
-                        <?php
-                        // Tags : tous les serveurs portant un tag donne
-                        $tags = $pdo->query("SELECT DISTINCT tag FROM machine_tags WHERE tag IS NOT NULL AND tag != '' ORDER BY tag")->fetchAll(PDO::FETCH_COLUMN);
-                        if ($tags): ?>
-                            <optgroup label="<?= t('cve.sched_by_tag') ?>">
-                                <?php foreach ($tags as $tag): ?>
-                                <option value="tag:<?= htmlspecialchars($tag) ?>">Tag: <?= htmlspecialchars($tag) ?></option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
-                        <?php
-                        // Serveur precis : 1 entree par machine active
-                        $machinesForTarget = $pdo->query(
-                            "SELECT id, name, ip FROM machines "
-                            . "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
-                            . "ORDER BY name"
-                        )->fetchAll(PDO::FETCH_ASSOC);
-                        if ($machinesForTarget): ?>
-                            <optgroup label="<?= t('cve.sched_by_server') ?>">
-                                <?php foreach ($machinesForTarget as $mm): ?>
-                                <option value="machine:<?= (int)$mm['id'] ?>"><?= htmlspecialchars($mm['name']) ?> (<?= htmlspecialchars($mm['ip']) ?>)</option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endif; ?>
-                    </select>
-                </div>
-                <button onclick="addSchedule()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded font-medium">
-                    <?= t('cve.sched_add') ?>
-                </button>
             </div>
-            <p class="text-[10px] text-gray-400 mt-2">
-                <?= t('cve.sched_cron_hint') ?>
-            </p>
         </div>
     </details>
 
     <!-- Modal presets cron -->
-    <div id="cron-presets-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    <div id="cron-presets-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4"
          onclick="if(event.target===this) this.classList.add('hidden')">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-y-auto" style="max-height: 90vh">
             <div class="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between z-10">
                 <div>
                     <h3 class="font-bold text-lg"><?= t('cve.cron_presets_title') ?></h3>
