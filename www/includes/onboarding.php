@@ -54,9 +54,11 @@ $steps[] = [
 ];
 
 // 3. 2FA active sur le compte courant
-$stmt = $pdo->prepare("SELECT totp_secret FROM users WHERE id = ?");
+$stmt = $pdo->prepare("SELECT totp_secret, ssh_key FROM users WHERE id = ?");
 $stmt->execute([$uid]);
-$has2fa = !empty($stmt->fetchColumn());
+$u = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$has2fa = !empty($u['totp_secret']);
+$hasSshKey = !empty($u['ssh_key']);
 $steps[] = [
     'key'   => '2fa',
     'done'  => $has2fa,
@@ -64,6 +66,16 @@ $steps[] = [
     'desc'  => t('onboarding.step_2fa_desc'),
     'cta'   => t('onboarding.step_2fa_cta'),
     'url'   => '/auth/enable_2fa.php',
+];
+
+// 3b. Cle SSH publique de l'user dans son profil
+$steps[] = [
+    'key'   => 'ssh_key',
+    'done'  => $hasSshKey,
+    'title' => t('onboarding.step_ssh_key_title'),
+    'desc'  => t('onboarding.step_ssh_key_desc'),
+    'cta'   => t('onboarding.step_ssh_key_cta'),
+    'url'   => '/profile.php',
 ];
 
 // 4. Keypair plateforme deployee

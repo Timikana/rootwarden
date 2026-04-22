@@ -6,7 +6,7 @@ return [
     'cve.cvss_tooltip' => 'CVSS Score: vulnerability severity scale from 0 (low) to 10 (critical)',
     'cve.no_permission' => 'You do not have permission to access CVE scanning.',
     'cve.btn_scan' => 'Scan',
-    'cve.btn_scan_all' => 'Scan all',
+    'cve.btn_scan_all' => 'Scan all (:count servers)',
     'cve.cvss_threshold' => 'CVSS threshold',
     'cve.cvss_all' => 'All',
     'cve.cvss_medium' => 'Medium (4.0+)',
