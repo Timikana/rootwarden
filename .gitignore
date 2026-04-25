@@ -85,3 +85,6 @@ obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/cache
 # (autoreference infinie quand clone depuis un autre OS).
 obsidian-rootwarden/obsidian-rootwarden-vault/Code
 obsidian-rootwarden/Code
+# Canvas Obsidian "Sans titre" / brouillons
+obsidian-rootwarden/**/*.canvas
+obsidian-rootwarden/**/Sans*titre*.md

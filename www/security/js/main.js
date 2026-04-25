@@ -650,6 +650,29 @@ async function loadSchedules() {
     } catch(e) { console.error('loadSchedules:', e); }
 }
 
+function onSchedTargetChange() {
+    const sel = document.getElementById('sched-target');
+    const list = document.getElementById('sched-multi-list');
+    if (!sel || !list) return;
+    list.classList.toggle('hidden', sel.value !== 'multi');
+    if (sel.value === 'multi') updateSchedMultiCount();
+}
+
+function schedMultiAll(checked) {
+    document.querySelectorAll('.sched-multi-cb').forEach(cb => { cb.checked = !!checked; });
+    updateSchedMultiCount();
+}
+
+function updateSchedMultiCount() {
+    const n = document.querySelectorAll('.sched-multi-cb:checked').length;
+    const el = document.getElementById('sched-multi-count');
+    if (el) el.textContent = n;
+}
+
+document.addEventListener('change', e => {
+    if (e.target && e.target.classList && e.target.classList.contains('sched-multi-cb')) updateSchedMultiCount();
+});
+
 async function addSchedule() {
     const name = document.getElementById('sched-name')?.value.trim();
     const cron = document.getElementById('sched-cron')?.value.trim();
@@ -663,8 +686,12 @@ async function addSchedule() {
         target_value = targetRaw.substring(4);
     } else if (targetRaw.startsWith('machine:')) {
         target_type = 'machines';
-        // Le backend attend un JSON array d'IDs (supporte le multi-select futur)
         target_value = JSON.stringify([parseInt(targetRaw.substring(8), 10)]);
+    } else if (targetRaw === 'multi') {
+        const ids = Array.from(document.querySelectorAll('.sched-multi-cb:checked')).map(cb => parseInt(cb.value, 10)).filter(Boolean);
+        if (ids.length === 0) { toast('Selectionne au moins un serveur', 'warning'); return; }
+        target_type = 'machines';
+        target_value = JSON.stringify(ids);
     }
 
     const r = await fetch(`${window.API_URL}/cve_schedules`, {
@@ -673,7 +700,13 @@ async function addSchedule() {
         body: JSON.stringify({name, cron_expression: cron, min_cvss: parseFloat(cvss), target_type, target_value})
     });
     const d = await r.json();
-    if (d.success) { toast('Planification ajoutee', 'success'); loadSchedules(); document.getElementById('sched-name').value = ''; }
+    if (d.success) {
+        toast('Planification ajoutee', 'success');
+        loadSchedules();
+        document.getElementById('sched-name').value = '';
+        schedMultiAll(false);
+        const sel = document.getElementById('sched-target'); if (sel) { sel.value = 'all'; onSchedTargetChange(); }
+    }
     else toast(d.message || 'Erreur', 'error');
 }
 

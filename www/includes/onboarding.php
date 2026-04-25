@@ -162,6 +162,22 @@ $progress = $nbTotal > 0 ? (int) round(($nbDone / $nbTotal) * 100) : 0;
         </button>
     </div>
 
+    <?php if ($nbDone === $nbTotal): ?>
+    <div class="p-5 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-b border-green-200 dark:border-green-800/50">
+        <div class="flex items-start gap-3">
+            <span class="text-3xl flex-shrink-0">🎉</span>
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-green-700 dark:text-green-300 text-base"><?= t('onboarding.complete_title') ?></div>
+                <p class="text-xs text-gray-600 dark:text-gray-300 mt-1"><?= t('onboarding.complete_desc') ?></p>
+                <button type="button" onclick="dismissOnboarding()"
+                        class="mt-3 text-xs px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold">
+                    <?= t('onboarding.complete_cta') ?>
+                </button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <ol class="divide-y divide-gray-100 dark:divide-gray-700">
         <?php foreach ($steps as $i => $s): ?>
         <li class="p-4 flex items-start gap-3 <?= $s['done'] ? 'opacity-60' : '' ?>">
