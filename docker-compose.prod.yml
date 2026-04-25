@@ -1,0 +1,37 @@
+# ================================================================
+# docker-compose.prod.yml - override pour deploiement production
+#
+# Apporte le hardening recommande par l'audit securite v1.17.0 :
+#   - retire les bind-mounts ./backend:/app et ./www:/var/www/html
+#     qui defaisaient le hardening de l'image baked (audit FIND-3)
+#   - le code applicatif reste celui baked dans l'image construite
+#     en CI ; les volumes nommes/persistants pour data/logs/keys sont
+#     conserves
+#
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# En dev local, ne pas inclure ce fichier - le bind-mount facilite
+# le hot-reload du code.
+# ================================================================
+
+services:
+  python:
+    volumes:
+      # Retire ./backend:/app (utilise l'image baked)
+      # Retire ./mysql/migrations:/app/migrations:ro (deja inclus dans l'image)
+      # Conserve uniquement les volumes pour data persistante :
+      - ./backend/logs:/app/logs
+      - ./backend/ssl:/app/ssl
+      - ./backups:/app/backups
+      - platform_ssh_keys:/app/platform_ssh
+      - ./mysql/migrations:/app/migrations:ro
+
+  php:
+    volumes:
+      # Retire ./www:/var/www/html (utilise l'image baked).
+      # Conserve uniquement les volumes runtime/upload :
+      - php_sessions:/var/www/sessions
+      - ./www/logs:/var/www/html/logs
+      - ./www/_ul:/var/www/html/_ul
+      - ./php/php.ini:/usr/local/etc/php/php.ini

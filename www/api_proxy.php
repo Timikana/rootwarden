@@ -23,6 +23,15 @@ require_once __DIR__ . '/auth/verify.php';
 // checkAuth verifie en DB que l'user existe + active=1 + synchronise role_id en session
 checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 
+// CSRF defense-in-depth : SameSite=Strict mitige le cross-site CSRF, mais
+// une XSS sur le meme origin donnerait acces au proxy (l'endpoint le plus
+// puissant : forward toutes les routes Python). Token injecte automatiquement
+// par www/js/utils.js sur les fetch() non-GET vers api_proxy.php.
+$_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if (in_array($_method, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
+    checkCsrfToken();
+}
+
 $api_key    = getenv('API_KEY') ?: '';
 $python_url = 'https://python:5000';
 
