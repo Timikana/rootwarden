@@ -159,6 +159,27 @@ try {
         <!-- Wizard d'onboarding (auto-detecte les etapes, dismissable) -->
         <?php if (($_SESSION['role_id'] ?? 0) >= ROLE_ADMIN) {
             require __DIR__ . '/includes/onboarding.php';
+
+            // Banner rotation cle legacy : visible sur le dashboard quand
+            // une cle scopee existe deja mais que la cle auto-generee n'a
+            // pas encore ete revoquee - rappel persistant.
+            try {
+                $legacyAlert = $pdo->query(
+                    "SELECT "
+                    . "  SUM(CASE WHEN COALESCE(auto_generated,0)=1 AND revoked_at IS NULL THEN 1 ELSE 0 END) AS legacy_active, "
+                    . "  SUM(CASE WHEN COALESCE(auto_generated,0)=0 AND revoked_at IS NULL THEN 1 ELSE 0 END) AS scoped_active "
+                    . "FROM api_keys"
+                )->fetch(PDO::FETCH_ASSOC) ?: ['legacy_active' => 0, 'scoped_active' => 0];
+                if ((int)$legacyAlert['legacy_active'] > 0 && (int)$legacyAlert['scoped_active'] > 0): ?>
+                <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg text-sm flex items-center gap-3">
+                    <span class="text-xl">🛑</span>
+                    <div class="flex-1 text-red-700 dark:text-red-300">
+                        <b>Rotation API recommandee</b> - une cle scopee existe, mais <code class="px-1 bg-red-100 dark:bg-red-800/40 rounded">proxy-internal-legacy</code> est toujours active.
+                    </div>
+                    <a href="/adm/api_keys.php" class="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg whitespace-nowrap">Gerer les cles</a>
+                </div>
+                <?php endif;
+            } catch (\PDOException $e) { /* table api_keys absente : ignore */ }
         } ?>
 
         <!-- ── En-tête + alertes ──────────────────────────────────────── -->

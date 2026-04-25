@@ -14,7 +14,7 @@ last_reviewed: 2026-04-21
 routes: [/supervision/<platform>/backups, /supervision/<platform>/config/read, /supervision/<platform>/config/save, /supervision/<platform>/deploy, /supervision/<platform>/reconfigure, /supervision/<platform>/restore, /supervision/<platform>/uninstall, /supervision/<platform>/version, /supervision/agents, /supervision/agents/<int:machine_id>, /supervision/config, /supervision/config/<platform>, /supervision/machines, /supervision/machines/<int:mid>/profile, /supervision/overrides/<int:machine_id>, /supervision/profiles, /supervision/profiles/<int:pid>, /supervision/zabbix/backups, /supervision/zabbix/config/read, /supervision/zabbix/config/save, /supervision/zabbix/deploy, /supervision/zabbix/reconfigure, /supervision/zabbix/restore, /supervision/zabbix/uninstall, /supervision/zabbix/version]
 tables: [machine_supervision_profile, machines, supervision_agents, supervision_config, supervision_metadata_profiles, supervision_overrides]
 imports_detected: [routes, ssh_utils]
-last_synced: 2026-04-22
+last_synced: 2026-04-25
 # AUTO-END
 ---
 

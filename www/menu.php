@@ -237,6 +237,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
 <!-- Content wrapper : offset pour la sidebar -->
 <div class="lg:ml-56 min-h-screen pt-12 lg:pt-0">
 
+<script src="/js/utils.js?v=<?= file_exists(__DIR__ . '/js/utils.js') ? filemtime(__DIR__ . '/js/utils.js') : 1 ?>"></script>
 <script>
 // Dark mode toggle
 (function() {

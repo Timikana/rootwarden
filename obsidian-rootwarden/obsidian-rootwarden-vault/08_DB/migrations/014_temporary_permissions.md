@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [temporary_permissions]
 imports_detected: []
-last_synced: 2026-04-22
+last_synced: 2026-04-25
 # AUTO-END
 ---
 

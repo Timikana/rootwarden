@@ -161,6 +161,18 @@ Fichiers de référence :
 - `ARCHITECTURE.md` - Carte de tous les fichiers, tables BDD, flux de données
 - `CHANGELOG.md` - Historique des versions (Semantic Versioning)
 
+### Vault Obsidian (architecture concentrique)
+
+Le repo embarque un vault Obsidian complet sous [`obsidian-rootwarden/obsidian-rootwarden-vault/`](obsidian-rootwarden/obsidian-rootwarden-vault/) — 400+ notes organisees en couches concentriques (L0 Vision → L5 Functions, plus 06-12 transverses : modules, blueprints, fichiers, frontend, DB, infra, sécurité, scripts, tests, RGPD).
+
+Pour l'ouvrir :
+1. Installer [Obsidian](https://obsidian.md) (gratuit).
+2. **Open folder as vault** → pointer vers `obsidian-rootwarden/obsidian-rootwarden-vault/`.
+3. Ouvrir la *Graph view* (`Ctrl+G`) — les color groups par couche sont dans `.obsidian/graph.json` et se chargent automatiquement.
+4. Le junction Windows `Code/` est recree apres clone via le script de sync (voir [`scripts/sync-obsidian-vault.py`](scripts/sync-obsidian-vault.py)).
+
+Le sync est hybride : les blocs `<!-- AUTO ... -->` sont regeneres automatiquement depuis le code, le reste est edite manuellement. Le hook `post-commit` rejoue le sync sur les fichiers concernes par le commit.
+
 ---
 
 ## Securisation production
