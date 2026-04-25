@@ -9,6 +9,7 @@ vendor/
 
 # Secrets — NE JAMAIS commiter ces fichiers
 srv-docker.env
+srv-docker.env.bak.*
 *.env
 !srv-docker.env.example
 !*.env.example
