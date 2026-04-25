@@ -11,7 +11,7 @@ version_introduced: 1.15.0
 last_reviewed: 2026-04-21
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
-routes: [/wazuh/config, /wazuh/group, /wazuh/install, /wazuh/options, /wazuh/restart, /wazuh/rules, /wazuh/rules/<name>, /wazuh/servers, /wazuh/uninstall]
+routes: [/wazuh/config, /wazuh/detect, /wazuh/group, /wazuh/install, /wazuh/options, /wazuh/restart, /wazuh/rules, /wazuh/rules/<name>, /wazuh/servers, /wazuh/uninstall]
 tables: [machines, user_logs, wazuh_agents, wazuh_config, wazuh_machine_options, wazuh_rules]
 imports_detected: [encryption, routes, ssh_utils]
 last_synced: 2026-04-25

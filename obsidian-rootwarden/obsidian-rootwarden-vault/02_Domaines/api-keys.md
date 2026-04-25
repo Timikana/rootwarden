@@ -29,6 +29,14 @@ Remplace `Config.API_KEY` unique par multi-key avec scope regex par route.
 - hash SHA-256, check `revoked_at`
 - scope = liste de regex, au moins une doit matcher `request.path`
 
+## Rotation cle legacy `proxy-internal-legacy`
+
+Depuis v1.17.0, le banner sur `/adm/api_keys.php` a 2 niveaux :
+- **Jaune (info)** : seule la cle auto-generee `proxy-internal-legacy` est active. Cas nominal apres premier deploiement.
+- **Rouge (action requise)** : une cle scopee active coexiste avec la legacy. Il est temps de rotater `srv-docker.env:API_KEY` vers la cle scopee et de revoquer la legacy.
+
+Un rappel persistant compact apparait aussi sur le dashboard tant que les deux coexistent ([[04_Fichiers/www-index]]).
+
 ## Voir aussi
 
-- [[04_Fichiers/www-adm-api_keys]] · [[08_DB/migrations/037_api_keys]] · [[08_DB/tables/api_keys]] · [[06_Securite/threat-model]]
+- [[04_Fichiers/www-adm-api_keys]] · [[08_DB/migrations/037_api_keys]] · [[08_DB/migrations/040_api_keys_auto_generated]] · [[08_DB/tables/api_keys]] · [[06_Securite/threat-model]]
