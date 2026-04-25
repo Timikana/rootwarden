@@ -203,6 +203,14 @@ services:
       - no-new-privileges:true
     profiles:
       - preprod
+    # Passwords obligatoires depuis v1.17.0 - le container refuse de demarrer
+    # si TEST_SERVER_ROOT_PASSWORD / TEST_SERVER_USER_PASSWORD ne sont pas
+    # definis dans srv-docker.env. La verification stricte est faite par
+    # l'entrypoint du Dockerfile (set -e + exit 1) plutot que par compose
+    # pour ne pas bloquer la validation des autres profils.
+    environment:
+      ROOT_PASSWORD: ${TEST_SERVER_ROOT_PASSWORD:-}
+      TEST_PASSWORD: ${TEST_SERVER_USER_PASSWORD:-}
     deploy:
       resources:
         limits:

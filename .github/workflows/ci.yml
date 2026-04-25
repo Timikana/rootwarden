@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: test-results.xml
@@ -147,7 +147,7 @@ jobs:
         with:
           fetch-depth: 0  # full history pour scanner tous les commits
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2 (pinned 2026-04-25)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Si le repo n'a pas de config, gitleaks utilise sa baseline par defaut
@@ -171,11 +171,9 @@ jobs:
         working-directory: backend
         # -ll = low severity minimum, -ii = medium confidence minimum
         # Exclut les repertoires de tests (faux-positifs frequents)
-        run: |
-          bandit -r . -ll -ii -c bandit.yml --exclude ./tests,./__pycache__ --format txt || EXIT=$?
-          # Non-bloquant en PR, bloquant sur main
-          if [ "${{ github.event_name }}" = "pull_request" ]; then exit 0; fi
-          exit ${EXIT:-0}
+        # Bloquant sur PR ET main depuis v1.17.0 (review securite). Allowlist
+        # via bandit.yml si bruit, plutot que de laisser passer silencieusement.
+        run: bandit -r . -ll -ii -c bandit.yml --exclude ./tests,./__pycache__ --format txt
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
@@ -194,13 +192,8 @@ jobs:
       - name: Run pip-audit on requirements
         working-directory: backend
         # Scan du requirements.txt fige. --strict = fail si CVE detectee.
-        # On reste en mode warning sur PR pour ne pas bloquer la velocite.
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pip-audit -r requirements.txt --desc || true
-          else
-            pip-audit -r requirements.txt --desc --strict
-          fi
+        # Bloquant sur PR ET main depuis v1.17.0 (review securite).
+        run: pip-audit -r requirements.txt --desc --strict
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.4 : SCA PHP (composer audit - CVE sur dependances Composer)
@@ -239,7 +232,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Trivy fs (requirements + composer + misconfig IaC)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -285,7 +278,7 @@ jobs:
           cache-from: type=gha
 
       - name: Scan PHP image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: rootwarden-php:scan
           format: table
@@ -294,7 +287,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Scan Python image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: rootwarden-python:scan
           format: table
