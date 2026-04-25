@@ -15,7 +15,7 @@ status: stable
 
 ## Intention
 
-Scan de vulnérabilités OpenCVE (cloud ou v2 on-prem Bearer). Streaming JSON-lines paquet par paquet. Whitelist, schedules cron, remediation status, historique et comparaison.
+Scan de vulnérabilités OpenCVE (cloud ou v2 on-prem Bearer). Streaming JSON-lines paquet par paquet. Whitelist, schedules cron (multi-select serveurs depuis v1.17.0), remediation status, historique et comparaison.
 
 ## Modules
 

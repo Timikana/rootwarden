@@ -5,6 +5,90 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.17.0] - 2026-04-25
+
+### Multi-select serveurs sur les planifications de scans
+
+Les schedules CVE et SSH audit acceptent desormais une selection libre de
+serveurs (plus seulement "tous", "par tag" ou "un seul serveur"). UI :
+nouvelle option "Plusieurs serveurs" qui deplie une grille de checkboxes
+avec boutons Tout/Aucun + compteur live. Backend : `target_type='machines'`
++ `target_value` JSON array d'IDs. Parite stricte CVE/SSH audit.
+
+- Migration `043_ssh_audit_schedules_machines_target.sql` :
+  * `target_type` ENUM elargi a 'machines'.
+  * `target_value` passe en TEXT (JSON array d'IDs au lieu de VARCHAR(100)).
+- `backend/scheduler.py` : SSH audit gere `target_type='machines'`
+  (parite avec CVE qui le supportait depuis v1.14.x).
+- `www/security/index.php` + `www/ssh-audit/index.php` : section
+  "Scans planifies" admin+ avec multi-select.
+- E2E `tests/e2e/go-ssh-audit-schedules.mjs` : create all + create multi
+  (2 IDs) + toggle + render UI + delete. CVE schedule existant inchange.
+
+### Onboarding wizard : message felicitations 8/8
+
+Quand toutes les etapes sont validees, le bandeau affiche un encart vert/bleu
+"Felicitations, RootWarden est pret !" avec CTA "Masquer definitivement"
+(au lieu de simplement disparaitre). 3 cles i18n.
+
+### Banner de rotation cle API legacy
+
+Sur `/adm/api_keys.php` : 2 niveaux de banner.
+- Jaune (info) tant que seule la cle `proxy-internal-legacy` existe.
+- Rouge (action requise) des qu'une cle scopee active coexiste avec la
+  legacy : "Rotation requise, revoquer proxy-internal-legacy".
+
+Sur le dashboard `/index.php`, rappel persistant compact tant que les
+deux cles coexistent. Plus de risque d'oublier la rotation post-deploiement.
+
+### Wazuh : detection d'agent existant
+
+Nouveau bouton "Scanner" cyan dans l'onglet Deploiement. Endpoint
+`POST /wazuh/detect` qui SSH le serveur, lit `/var/ossec/bin/wazuh-control
+info`, `client.keys` et `systemctl is-active wazuh-agent` pour alimenter
+la table `wazuh_agents` sans reinstaller. Cas d'usage : agent deja deploye
+hors RootWarden et qu'on veut superviser depuis l'UI.
+
+### Auto-classification serveurs : comptes `nologin`
+
+`POST /scan_server_users` inclut desormais TOUS les comptes /etc/passwd
+(le filtre awk excluait `nologin|false|sync|halt|shutdown`). Les comptes
+sans login sont auto-classifies `excluded` avec note explicite. Ils restent
+auditables sans polluer la liste des comptes geres.
+
+### Bug `Tester` cle plateforme
+
+`POST /test_platform_key` verifie `platform_key_deployed` AVANT de tenter
+la connexion SSH. Sur un nouveau serveur : message clair *"Cle non deployee
+sur X - clique Deployer d'abord"* au lieu de l'erreur paramiko brute.
+`AuthenticationException` capturee separement (message friendlier).
+
+### Centralisation `fmtLocalDate()` en JS global
+
+Le helper de formatage de date locale (UTC -> timezone navigateur) etait
+duplique dans `security/js/main.js` ; il vit maintenant dans `www/js/utils.js`
+charge depuis `menu.php` (toutes pages). `ssh-audit/js/main.js` l'utilise via
+`window.fmtLocalDate`.
+
+### Vault Obsidian : graph.json restaure depuis template
+
+Obsidian reecrit `.obsidian/graph.json` en permanence (scale, close, zoom),
+donc on versionnait des changements parasites. Le fichier est maintenant
+gitignore ; on versionne `graph.json.template` (avec les colorGroups par
+couche) que `scripts/sync-obsidian-vault.py` recopie au premier checkout.
+
+### Renommages mineurs
+
+- `admin.btn_ssh_key` : "Cle SSH" -> "Cle SSH Keypair" (FR), "SSH Key" -> "SSH Keypair" (EN).
+
+### CI
+
+- Fix `import json` (F821) + suppression des `import json` locaux qui
+  shadowent le global (F823) dans `backend/scheduler.py`.
+- Pipeline GitHub Actions a 11 jobs reste vert.
+
+---
+
 ## [1.16.1] - 2026-04-21
 
 ### Fix : auto-register de la cle legacy Config.API_KEY

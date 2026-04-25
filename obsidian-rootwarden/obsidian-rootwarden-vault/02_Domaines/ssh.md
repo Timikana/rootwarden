@@ -35,6 +35,8 @@ Gestion des accès SSH sur un parc distant : keypair plateforme Ed25519 (auth sa
 - Mot de passe SSH jamais en argument shell.
 - Sur `test-server` Docker, vérifier via SSH pas `docker exec` (namespaces différents).
 - Keypair persistée dans volume Docker `platform_ssh_keys`.
+- `POST /test_platform_key` doit checker `platform_key_deployed` AVANT la connexion SSH (sinon erreur paramiko brute pour un nouveau serveur). Fix v1.17.0.
+- `POST /scan_server_users` inclut tous les `/etc/passwd` ; les comptes `nologin/false/sync/halt/shutdown` sont auto-classifies `excluded` (auditable sans polluer la liste). Fix v1.17.0.
 
 ## Voir aussi
 

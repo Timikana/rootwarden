@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.16.1
+# 🔐 RootWarden v1.17.0
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -293,4 +293,4 @@ MIT
 
 ---
 
-*RootWarden v1.16.1 - 2026-04-21*
+*RootWarden v1.17.0 - 2026-04-25*
