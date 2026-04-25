@@ -45,6 +45,16 @@ if [ ! -f "${ENV_FILE}" ]; then
     exit 1
 fi
 
+# ── Merge automatique des cles manquantes (sans toucher aux secrets) ─────────
+# Compare srv-docker.env.example avec srv-docker.env et AJOUTE les cles
+# manquantes a la fin (avec leur commentaire). Ne modifie JAMAIS les valeurs
+# deja presentes. Utile apres `git pull` qui ajoute des nouvelles vars.
+if [ -x "${SCRIPT_DIR}/scripts/env-merge.sh" ]; then
+    "${SCRIPT_DIR}/scripts/env-merge.sh" || {
+        echo -e "${YELLOW}[RootWarden]${NC} env-merge a echoue, on continue avec l'env existant."
+    }
+fi
+
 # ── Securisation des permissions fichier ─────────────────────────────────────
 # chmod 600 = lisible/ecrivable uniquement par le proprietaire
 echo -e "${GREEN}[RootWarden]${NC} Securisation des fichiers sensibles..."

@@ -117,6 +117,11 @@ if ($method === 'GET') {
                 $isStreaming = (stripos($ct, 'text/event-stream') !== false);
                 header('Content-Type: ' . $ct);
             }
+            // Propage le status HTTP du backend (404 quand un blueprint disable
+            // par feature flag retourne 404 sur GET).
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $m)) {
+                http_response_code((int)$m[1]);
+            }
             return strlen($header);
         },
         CURLOPT_WRITEFUNCTION  => $writeFn,

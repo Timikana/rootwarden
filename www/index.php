@@ -28,6 +28,7 @@ require_once __DIR__ . '/auth/verify.php';
 require_once __DIR__ . '/auth/functions.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/lang.php';
+require_once __DIR__ . '/includes/feature_flags.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -372,7 +373,7 @@ try {
                 $shortcuts[] = ['url' => '/bashrc/', 'label' => t('dashboard.sc_bashrc'), 'desc' => t('dashboard.sc_bashrc_desc')];
             if (($permissions['can_manage_graylog'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/graylog/', 'label' => t('dashboard.sc_graylog'), 'desc' => t('dashboard.sc_graylog_desc')];
-            if (($permissions['can_manage_wazuh'] ?? false) || $isSA)
+            if (feature_enabled('wazuh') && (($permissions['can_manage_wazuh'] ?? false) || $isSA))
                 $shortcuts[] = ['url' => '/wazuh/', 'label' => t('dashboard.sc_wazuh'), 'desc' => t('dashboard.sc_wazuh_desc')];
             if (($permissions['can_audit_ssh'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/ssh-audit/', 'label' => t('dashboard.sc_ssh_audit'), 'desc' => t('dashboard.sc_ssh_audit_desc')];
