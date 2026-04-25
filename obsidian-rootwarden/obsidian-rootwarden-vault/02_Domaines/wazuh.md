@@ -17,6 +17,10 @@ status: stable
 
 Déploiement + enrôlement agent Wazuh via agent-auth. Gestion groupes, options FIM/AR/SCA/rootcheck par serveur, rules/decoders/CDB éditables (validation `xmllint --noout`). API manager pour push des rules.
 
+Depuis v1.17.0 : route `POST /wazuh/detect` pour decouvrir un agent installe hors RootWarden et le peupler dans `wazuh_agents` sans reinstaller.
+
+Depuis v1.18.0 : module activable/desactivable via `WAZUH_ENABLED` dans `srv-docker.env` (voir [[02_Domaines/feature-flags]]). Quand OFF, le blueprint backend n'est pas enregistre, le menu cache l'entree, `/wazuh/index.php` retourne 404.
+
 ## Flow
 
 [[01_Architecture/flow-wazuh-deploy]]

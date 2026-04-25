@@ -5,6 +5,83 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.18.0] - 2026-04-25
+
+### Feature flags : modules ON/OFF via srv-docker.env
+
+Les modules peuvent etre desactives entierement via une variable d'environnement
+sans toucher au code. Premier toggle : `WAZUH_ENABLED=true|false`. Quand OFF :
+- backend : blueprint Wazuh non enregistre, toutes les routes /wazuh/* retournent 404
+- PHP : helper `feature_enabled('wazuh')` retourne false, sidebar/dashboard cachent
+  l'entree, /wazuh/index.php abort en 404 (defense-in-depth)
+- helper generique reutilisable : `feature_enabled('xxx')` lit `XXX_ENABLED`,
+  default true (compatibilite ascendante)
+- `www/api_proxy.php` : propage le HTTP status du backend sur GET (sinon 404
+  Flask devenait 200 cote PHP)
+
+### Hardening securite (suite audit complet)
+
+**CI/CD** :
+- Nouveau job `sast-semgrep` (bloquant PR + main) : config `p/owasp-top-ten`
+  cross-langue PHP+JS+Python avec 6 rules FP-confirmees exclues.
+- `actions/upload-artifact@v4` (was `@main`, mutable supply-chain).
+- `gitleaks-action` + `trivy-action` pin SHA.
+- `bandit` + `pip-audit` bloquants sur PR (etait `\|\| true`).
+
+**Frontend** :
+- `api_proxy.php` : `checkCsrfToken()` sur POST/PUT/DELETE/PATCH (defense-in-depth
+  contre XSS same-origin sur l'endpoint le plus puissant).
+- `www/js/utils.js` : wrapper fetch() qui auto-injecte `X-CSRF-TOKEN` sur les
+  non-GET vers `/api_proxy.php` - aucun caller existant a modifier.
+
+**Infra** :
+- `docker-compose.prod.yml` : override qui retire les bind-mounts
+  `./backend:/app` + `./www:/var/www/html` (defaisaient le hardening de l'image
+  baked). Usage : `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`.
+- `test-server/Dockerfile` : refuse de demarrer (`set -e + exit 1`) sans
+  `TEST_SERVER_ROOT_PASSWORD` / `TEST_SERVER_USER_PASSWORD`. Fallbacks
+  `RootPass-Preprod` / `TestPass-Preprod` supprimes.
+
+### E2E securite (tests/e2e/go-security.mjs)
+
+Codifie les invariants pour qu'ils ne regressent jamais :
+- POST `/api_proxy.php/*` sans X-CSRF-TOKEN -> 403
+- POST avec CSRF -> 200
+- GET non authentifie -> redirect login / 4xx
+- XSS payload dans nom de schedule -> echappe dans le DOM, JS non execute
+- audit_verify hash chain -> integrity OK
+
+### Scripts d'orchestration : start.sh + stop.sh + maj.sh + env-merge.sh
+
+- `scripts/env-merge.sh` : compare `srv-docker.env` vs `srv-docker.env.example`,
+  ajoute les cles manquantes a la fin avec leur commentaire de preface.
+  **Ne touche JAMAIS aux valeurs existantes** (secrets preserves). Backup auto
+  `srv-docker.env.bak.YYYYMMDD_HHMMSS`. `--dry-run` pour lister sans ecrire.
+- `start.sh` : appelle automatiquement `env-merge.sh` avant chmod / verif
+  secrets / lancement docker compose. Plus besoin d'y penser apres `git pull`.
+- `stop.sh` : wrapper docker compose down avec confirmation interactive sur
+  `-v` (suppression volumes BDD destructive), auto-detection profile preprod.
+- `maj.sh` : pipeline 5 etapes (git pull -> env-merge -> docker build ->
+  migrations -> up -d). Migrations DB lancees in-place via docker exec si
+  python tourne deja. `--no-pull / --no-build / --check`.
+
+### Memoire + checklist
+
+- Nouvelle memoire `feedback_security_checklist.md` : auth+role+CSRF+placeholders
+  +escHtml a verifier sur chaque endpoint, lancer `go-security.mjs` apres modif.
+- `feedback_ruff_f823_imports.md` : piege F823 quand un import global + local
+  coexistent dans le meme module.
+- `feedback_migration_sql_comments.md` : pas de commentaires `--` entre les
+  statements (db_migrate.py concatene apres split sur `;`).
+
+### Migration
+
+- 043 (`ssh_audit_schedules_machines_target.sql`) : etend ENUM `target_type`
+  pour 'machines' + `target_value` -> TEXT (multi-select v1.17 portait sur le
+  scheduler mais le schema bloquait).
+
+---
+
 ## [1.17.0] - 2026-04-25
 
 ### Multi-select serveurs sur les planifications de scans
