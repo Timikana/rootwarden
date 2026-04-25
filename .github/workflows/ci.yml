@@ -176,6 +176,29 @@ jobs:
         run: bandit -r . -ll -ii -c bandit.yml --exclude ./tests,./__pycache__ --format txt
 
   # ─────────────────────────────────────────────────────────────
+  # Job 4.2.1 : Semgrep - SAST cross-langue (PHP + JS + Python + Docker)
+  # Couvre ce que bandit rate : XSS PHP, prototype pollution JS, OWASP Top 10
+  # generique. Ruleset auto = config OWASP + CWE par defaut.
+  # ─────────────────────────────────────────────────────────────
+  sast-semgrep:
+    name: SAST cross-langue (semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install semgrep
+        run: pip install semgrep
+      - name: Run semgrep
+        # --config=auto recupere les regles OWASP/CWE pour les langages detectes.
+        # --error fail si findings >= ERROR severity (bloquant). WARNING/INFO
+        # restent visibles mais non bloquants.
+        # --metrics=off pour ne pas envoyer de telemetrie a Semgrep Inc.
+        # Allowlist : .semgrepignore (cree si bruit, pattern .gitignore-like).
+        run: semgrep --config=auto --error --metrics=off --severity=ERROR .
+
+  # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
   # ─────────────────────────────────────────────────────────────
   sca-python:
@@ -301,7 +324,7 @@ jobs:
   auto-tag:
     name: Auto tag version
     runs-on: ubuntu-latest
-    needs: [build-docker, security-scan, secrets-scan, sast-python, sca-python, sca-php, trivy-fs]
+    needs: [build-docker, security-scan, secrets-scan, sast-python, sast-semgrep, sca-python, sca-php, trivy-fs]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write
