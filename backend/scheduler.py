@@ -69,7 +69,6 @@ def _run_scheduled_scan(schedule: dict):
                 (schedule['target_value'],)
             )
         elif schedule['target_type'] == 'machines' and schedule['target_value']:
-            import json
             try:
                 ids = json.loads(schedule['target_value'])
             except (json.JSONDecodeError, TypeError):
@@ -184,7 +183,6 @@ def _run_scheduled_ssh_audit(schedule: dict):
                     ssh_ver = get_ssh_version(client, root_pass)
                     result = audit_sshd_config(config)
                     # Save result
-                    import json
                     cur.execute(
                         "INSERT INTO ssh_audit_results (machine_id, score, grade, critical_count, high_count, "
                         "medium_count, low_count, findings_json, config_raw, ssh_version, audited_by) "
