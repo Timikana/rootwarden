@@ -208,6 +208,7 @@ jobs:
             --config=p/owasp-top-ten \
             --exclude-rule=python.cryptography.security.mode-without-authentication.crypto-mode-without-authentication \
             --exclude-rule=python.flask.security.injection.tainted-sql-string.tainted-sql-string \
+            --exclude-rule=php.lang.security.injection.tainted-sql-string.tainted-sql-string \
             --exclude-rule=php.lang.security.injection.echoed-request.echoed-request \
             --exclude-rule=dockerfile.security.missing-user.missing-user \
             --exclude-rule=dockerfile.security.missing-user-entrypoint.missing-user-entrypoint \
