@@ -5,6 +5,7 @@
  */
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/includes/lang.php';
+require_once __DIR__ . '/includes/feature_flags.php';
 
 if (!isset($_SESSION['permissions'])) {
     $_SESSION['permissions'] = defined('DEFAULT_PERMISSIONS') ? DEFAULT_PERMISSIONS : [
@@ -104,7 +105,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
         <?= $sideLink('/graylog/', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10M4 18h10"/></svg>', t('nav.graylog'), t('nav.tip_graylog')) ?>
         <?php endif; ?>
 
-        <?php if (($perms['can_manage_wazuh'] ?? false) || $isSA): ?>
+        <?php if (feature_enabled('wazuh') && (($perms['can_manage_wazuh'] ?? false) || $isSA)): ?>
         <?= $sideLink('/wazuh/', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2L3 7v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V7l-9-5z"/></svg>', t('nav.wazuh'), t('nav.tip_wazuh')) ?>
         <?php endif; ?>
 
@@ -213,7 +214,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
             <?php if (($perms['can_manage_supervision'] ?? false) || $isSA): ?><a href="/supervision/" title="<?= t('nav.tip_supervision') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.supervision') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_bashrc'] ?? false) || $isSA): ?><a href="/bashrc/" title="<?= t('nav.tip_bashrc') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.bashrc') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_graylog'] ?? false) || $isSA): ?><a href="/graylog/" title="<?= t('nav.tip_graylog') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.graylog') ?></a><?php endif; ?>
-            <?php if (($perms['can_manage_wazuh'] ?? false) || $isSA): ?><a href="/wazuh/" title="<?= t('nav.tip_wazuh') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.wazuh') ?></a><?php endif; ?>
+            <?php if (feature_enabled('wazuh') && (($perms['can_manage_wazuh'] ?? false) || $isSA)): ?><a href="/wazuh/" title="<?= t('nav.tip_wazuh') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.wazuh') ?></a><?php endif; ?>
             <?php if (($perms['can_scan_cve'] ?? false) || $isSA): ?><a href="/security/" title="<?= t('nav.tip_cve_scan') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.cve_scan') ?></a><?php endif; ?>
             <?php if ($hasAdminSection): ?>
             <hr class="border-gray-800 my-2">

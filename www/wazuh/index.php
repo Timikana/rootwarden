@@ -11,7 +11,16 @@
  */
 require_once __DIR__ . '/../auth/verify.php';
 require_once __DIR__ . '/../includes/lang.php';
+require_once __DIR__ . '/../includes/feature_flags.php';
 require_once __DIR__ . '/../db.php';
+
+// Module Wazuh ON/OFF via WAZUH_ENABLED dans srv-docker.env. Si OFF :
+// 404 immediat - le menu cache deja l'entree mais defense-in-depth.
+if (!feature_enabled('wazuh')) {
+    http_response_code(404);
+    echo '<!DOCTYPE html><html><body><h1>404 Not Found</h1><p>Module Wazuh desactive (WAZUH_ENABLED=false).</p></body></html>';
+    exit;
+}
 
 checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_manage_wazuh');

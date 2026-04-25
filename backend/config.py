@@ -105,6 +105,15 @@ class Config:
     DEBUG         = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
     LOG_LEVEL     = os.getenv('LOG_LEVEL', 'DEBUG' if DEBUG else 'INFO').upper()
 
+    # ── Feature flags (toggles ON/OFF de modules entiers) ───────────────────
+    # Quand un flag est OFF :
+    #   - Backend : le blueprint correspondant n'est pas enregistre (404 sur
+    #     /<module>/* automatiquement)
+    #   - PHP : helper feature_enabled('xxx') retourne false -> menu cache,
+    #     pages /xxx/* abortent en 404
+    # Defaults a true pour ne pas casser les deploiements existants.
+    WAZUH_ENABLED = os.getenv('WAZUH_ENABLED', 'true').lower() == 'true'
+
     # Clé d'API pour authentifier les requêtes du frontend - obligatoire
     API_KEY = _require_env('API_KEY')
 
