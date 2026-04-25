@@ -83,7 +83,13 @@ app.register_blueprint(ssh_audit_bp)
 app.register_blueprint(supervision_bp)
 app.register_blueprint(bashrc_bp)
 app.register_blueprint(graylog_bp)
-app.register_blueprint(wazuh_bp)
+
+# Feature flag : blueprint Wazuh enregistre uniquement si WAZUH_ENABLED=true.
+# Quand OFF, toutes les routes /wazuh/* retournent 404 nativement (Flask).
+if Config.WAZUH_ENABLED:
+    app.register_blueprint(wazuh_bp)
+else:
+    print("[INFO] WAZUH_ENABLED=false - blueprint Wazuh non enregistre", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS manuel (compatible Hypercorn ASGI)

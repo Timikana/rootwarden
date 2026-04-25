@@ -1,6 +1,6 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.17.0
+# 🔐 RootWarden v1.18.0
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
@@ -110,6 +110,29 @@ chmod 600 srv-docker.env
 ```
 
 > Le script `start.sh` securise automatiquement les permissions et verifie les secrets par defaut.
+
+### Scripts d'orchestration
+
+Le repo embarque 3 scripts pour gerer le cycle de vie du deploiement, complementaires :
+
+| Script | Quand l'utiliser | Ce qu'il fait |
+|--------|------------------|---------------|
+| `./start.sh [-d]` | Demarrage / redemarrage | env-merge auto + chmod 600 + verif secrets + `docker compose up` |
+| `./stop.sh [-v]` | Arret | `docker compose down` (avec confirmation interactive sur `-v` qui supprime les volumes) |
+| `./maj.sh` | Apres `git pull` ou release | Pipeline 5 etapes : `git pull` -> `env-merge` -> `docker build` -> migrations DB -> `up -d` |
+
+**Le merge automatique de l'env** (`scripts/env-merge.sh`, appele par start.sh + maj.sh) compare ton `srv-docker.env` local avec `srv-docker.env.example` et **ajoute les cles manquantes** a la fin avec leur commentaire de preface. **Tes valeurs existantes (cles/secrets) ne sont JAMAIS modifiees**. Backup auto avant ecriture.
+
+### Feature flags (modules ON/OFF)
+
+Certains modules peuvent etre desactives entierement via `srv-docker.env` sans toucher au code :
+
+```bash
+# Dans srv-docker.env
+WAZUH_ENABLED=false
+```
+
+Quand un flag est sur `false`, le backend n'enregistre pas le blueprint correspondant (404 sur les routes), le frontend cache l'entree de menu et bloque la page concernee. Helper PHP : `feature_enabled('module')`. Voir [feature_flags.php](www/includes/feature_flags.php).
 
 ### Accès
 - Interface : **https://localhost:8443**
@@ -293,4 +316,4 @@ MIT
 
 ---
 
-*RootWarden v1.17.0 - 2026-04-25*
+*RootWarden v1.18.0 - 2026-04-25*
