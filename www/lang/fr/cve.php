@@ -50,4 +50,9 @@ return [
     'cve.sched_cron' => 'Expression cron',
     'cve.sched_cron_hint' => 'Syntaxe cron : minute heure jour mois jour_semaine. Ex: 0 3 * * * = tous les jours a 3h',
     'cve.sched_cvss_min' => 'CVSS min',
+    'cve.sched_multi_servers' => 'Plusieurs serveurs (selection)',
+    'cve.sched_multi_pick' => 'Cocher les serveurs a scanner',
+    'cve.sched_multi_all' => 'Tout selectionner',
+    'cve.sched_multi_none' => 'Aucun',
+    'cve.sched_multi_selected' => 'serveur(s) selectionne(s)',
 ];

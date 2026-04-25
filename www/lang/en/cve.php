@@ -50,4 +50,9 @@ return [
     'cve.sched_cron' => 'Cron expression',
     'cve.sched_cron_hint' => 'e.g. 0 2 * * 1 (every Monday at 2:00)',
     'cve.sched_cvss_min' => 'Minimum CVSS',
+    'cve.sched_multi_servers' => 'Multiple servers (pick)',
+    'cve.sched_multi_pick' => 'Pick servers to scan',
+    'cve.sched_multi_all' => 'Select all',
+    'cve.sched_multi_none' => 'None',
+    'cve.sched_multi_selected' => 'server(s) selected',
 ];

@@ -254,7 +254,7 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
                     </div>
                     <div>
                         <label for="sched-target" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('cve.sched_target') ?></label>
-                        <select id="sched-target" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700">
+                        <select id="sched-target" onchange="onSchedTargetChange()" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700">
                             <option value="all"><?= t('cve.sched_all_servers') ?></option>
                             <?php
                             $tags = $pdo->query("SELECT DISTINCT tag FROM machine_tags WHERE tag IS NOT NULL AND tag != '' ORDER BY tag")->fetchAll(PDO::FETCH_COLUMN);
@@ -277,9 +277,30 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
                                     <option value="machine:<?= (int)$mm['id'] ?>"><?= htmlspecialchars($mm['name']) ?> (<?= htmlspecialchars($mm['ip']) ?>)</option>
                                     <?php endforeach; ?>
                                 </optgroup>
+                                <option value="multi"><?= t('cve.sched_multi_servers') ?></option>
                             <?php endif; ?>
                         </select>
                     </div>
+                </div>
+                <!-- Selection multi-serveurs (visible uniquement si target=multi) -->
+                <div id="sched-multi-list" class="hidden mt-2 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900/30">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-gray-600 dark:text-gray-300"><?= t('cve.sched_multi_pick') ?></span>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="schedMultiAll(true)" class="text-[11px] text-blue-600 hover:underline"><?= t('cve.sched_multi_all') ?></button>
+                            <button type="button" onclick="schedMultiAll(false)" class="text-[11px] text-gray-500 hover:underline"><?= t('cve.sched_multi_none') ?></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
+                        <?php foreach ($machinesForTarget as $mm): ?>
+                        <label class="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-white dark:hover:bg-gray-800 cursor-pointer">
+                            <input type="checkbox" class="sched-multi-cb" value="<?= (int)$mm['id'] ?>" data-name="<?= htmlspecialchars($mm['name'], ENT_QUOTES) ?>">
+                            <span><?= htmlspecialchars($mm['name']) ?></span>
+                            <span class="text-xs text-gray-400"><?= htmlspecialchars($mm['ip']) ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2"><span id="sched-multi-count">0</span> <?= t('cve.sched_multi_selected') ?></p>
                 </div>
                 <!-- Preview cron sur toute la largeur (sous les inputs) -->
                 <div id="cron-preview" class="mt-2 text-xs text-gray-500 dark:text-gray-400 min-h-[1.5rem]"></div>
@@ -495,6 +516,7 @@ window._cveConfig = {
     machineIds: <?= json_encode(array_column($machines, 'id')) ?>,
     username: '<?= htmlspecialchars($_SESSION['username'] ?? 'admin') ?>'
 };
+window._machinesById = <?= json_encode(array_column($machinesForTarget ?? [], null, 'id'), JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="/security/js/main.js?v=<?= filemtime(__DIR__ . '/js/main.js') ?>"></script>
 
