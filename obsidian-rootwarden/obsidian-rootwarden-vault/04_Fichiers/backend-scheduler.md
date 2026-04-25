@@ -14,7 +14,7 @@ status: stable
 routes: []
 tables: [active_sessions, cve_scan_schedules, cve_scans, machine_tags, machines, notifications, password_reset_tokens, ssh_audit_results, ssh_audit_schedules, temporary_permissions, users]
 imports_detected: [config, ssh_utils, threading]
-last_synced: 2026-04-22
+last_synced: 2026-04-25
 # AUTO-END
 ---
 

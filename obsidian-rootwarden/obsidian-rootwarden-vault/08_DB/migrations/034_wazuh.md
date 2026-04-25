@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [permissions, wazuh_agents, wazuh_config, wazuh_machine_options, wazuh_rules]
 imports_detected: []
-last_synced: 2026-04-22
+last_synced: 2026-04-25
 # AUTO-END
 ---
 

@@ -150,6 +150,21 @@ def _run_scheduled_ssh_audit(schedule: dict):
                 "SELECT id, name, ip, port, user, password, root_password, service_account_deployed "
                 "FROM machines WHERE environment = %s AND (lifecycle_status IS NULL OR lifecycle_status != 'archived')",
                 (schedule['target_value'],))
+        elif schedule['target_type'] == 'machines' and schedule.get('target_value'):
+            try:
+                ids = json.loads(schedule['target_value'])
+                ids = [int(x) for x in ids if str(x).isdigit() or isinstance(x, int)]
+            except Exception:
+                ids = []
+            if ids:
+                fmt = ','.join(['%s'] * len(ids))
+                cur.execute(
+                    "SELECT id, name, ip, port, user, password, root_password, service_account_deployed "
+                    f"FROM machines WHERE id IN ({fmt}) "
+                    "AND (lifecycle_status IS NULL OR lifecycle_status != 'archived')",
+                    ids)
+            else:
+                cur.execute("SELECT id, name, ip, port, user, password, root_password, service_account_deployed FROM machines WHERE 1=0")
         else:
             cur.execute(
                 "SELECT id, name, ip, port, user, password, root_password, service_account_deployed "

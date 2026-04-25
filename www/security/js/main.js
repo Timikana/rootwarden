@@ -726,27 +726,7 @@ async function deleteSchedule(id) {
     loadSchedules();
 }
 
-/**
- * Formate une date vers la timezone locale du navigateur.
- * - Accepte ISO 8601 avec Z (UTC) ou format MySQL "YYYY-MM-DD HH:MM:SS"
- *   qu'on interprete comme UTC (le backend tourne en UTC en Docker par defaut).
- * - Retourne `fallback` si l'input est vide / invalide.
- * Fix : avant, "2026-04-22 08:15:00" etait interprete comme LOCAL par
- * Chrome -> affichait "08:15" a un user en CEST au lieu de "10:15".
- */
-function fmtLocalDate(v, fallback = '-') {
-    if (!v) return fallback;
-    let iso = String(v);
-    // Format MySQL sans timezone -> on ajoute Z pour le traiter comme UTC
-    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(iso) && !/[zZ]$|[+-]\d{2}:?\d{2}$/.test(iso)) {
-        iso = iso.replace(' ', 'T') + 'Z';
-    }
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return fallback;
-    return d.toLocaleString(navigator.language || 'fr-FR', {
-        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-    });
-}
+// fmtLocalDate() est defini dans /js/utils.js (charge depuis menu.php)
 
 // ── Simulateur cron : preview live + presets ─────────────────────────────
 let _cronPreviewTimer = null;

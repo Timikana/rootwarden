@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [machine_supervision_profile, supervision_metadata_profiles]
 imports_detected: []
-last_synced: 2026-04-22
+last_synced: 2026-04-25
 # AUTO-END
 ---
 

@@ -15,7 +15,7 @@ last_reviewed: 2026-04-21
 routes: [/cve_trends, /filter_servers, /last_reboot, /linux_version, /list_machines, /server_status, /test]
 tables: [cve_scans, machine_tags, machines, user_machine_access]
 imports_detected: [routes, server_checks, ssh_utils]
-last_synced: 2026-04-22
+last_synced: 2026-04-25
 # AUTO-END
 ---
 

@@ -81,6 +81,10 @@ obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/app.json
 obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/appearance.json
 obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/hotkeys.json
 obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/cache
+# graph.json est regenere en permanence par Obsidian (scale/close/zoom).
+# On versionne uniquement graph.json.template ; un script restaure le fichier
+# au premier checkout. Les colorGroups par couche restent partages.
+obsidian-rootwarden/obsidian-rootwarden-vault/.obsidian/graph.json
 # Le junction Windows Code/ -> racine repo ne doit JAMAIS etre committee
 # (autoreference infinie quand clone depuis un autre OS).
 obsidian-rootwarden/obsidian-rootwarden-vault/Code

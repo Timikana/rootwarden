@@ -586,3 +586,147 @@ async function reloadSshd() {
         }
     } catch (e) { toast(__('exception_with_msg', { msg: e }), 'error'); }
 }
+
+// ── Scans planifies (admin+) ────────────────────────────────────────────────
+
+function onSshSchedTargetChange() {
+    const sel = document.getElementById('ssh-sched-target');
+    const list = document.getElementById('ssh-sched-multi-list');
+    if (!sel || !list) return;
+    list.classList.toggle('hidden', sel.value !== 'multi');
+    if (sel.value === 'multi') updateSshSchedMultiCount();
+}
+
+function sshSchedMultiAll(checked) {
+    document.querySelectorAll('.ssh-sched-multi-cb').forEach(cb => { cb.checked = !!checked; });
+    updateSshSchedMultiCount();
+}
+
+function updateSshSchedMultiCount() {
+    const n = document.querySelectorAll('.ssh-sched-multi-cb:checked').length;
+    const el = document.getElementById('ssh-sched-multi-count');
+    if (el) el.textContent = n;
+}
+
+document.addEventListener('change', e => {
+    if (e.target && e.target.classList && e.target.classList.contains('ssh-sched-multi-cb')) updateSshSchedMultiCount();
+});
+
+let _sshCronTimer = null;
+function sshCronPreviewDebounced() { clearTimeout(_sshCronTimer); _sshCronTimer = setTimeout(sshCronPreview, 400); }
+async function sshCronPreview() {
+    const input = document.getElementById('ssh-sched-cron');
+    const out = document.getElementById('ssh-cron-preview');
+    if (!input || !out) return;
+    const expr = input.value.trim();
+    input.classList.remove('border-red-400', 'border-green-400');
+    if (!expr) { out.innerHTML = ''; return; }
+    try {
+        const r = await fetch(`${API}/cron_preview?expr=${encodeURIComponent(expr)}`);
+        const d = await r.json();
+        if (!d.valid) {
+            input.classList.add('border-red-400');
+            out.innerHTML = `<span class="text-red-500">&#10007; ${escHtmlSched(d.error || 'Expression invalide')}</span>`;
+            return;
+        }
+        input.classList.add('border-green-400');
+        const previews = (d.next_runs || []).slice(0, 3).map(iso => escHtmlSched(window.fmtLocalDate ? window.fmtLocalDate(iso, '?') : iso)).join(' &middot; ');
+        out.innerHTML = `<span class="text-green-600 dark:text-green-400">&#10003; ${escHtmlSched(d.human)}</span><br><span class="text-gray-400">Prochains : ${previews}</span>`;
+    } catch (e) { out.innerHTML = '<span class="text-gray-400">Impossible de prevoir</span>'; }
+}
+
+function escHtmlSched(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function loadSshSchedules() {
+    try {
+        const d = await apiGet('/ssh-audit/schedules');
+        if (!d.success) return;
+        const list = document.getElementById('ssh-schedules-list');
+        const count = document.getElementById('ssh-schedule-count');
+        if (!list) return;
+        const active = (d.schedules || []).filter(s => s.enabled);
+        if (count) count.textContent = active.length > 0 ? `${active.length} actif${active.length > 1 ? 's' : ''}` : '';
+        if (!d.schedules || d.schedules.length === 0) {
+            list.innerHTML = '<p class="text-xs text-gray-400">Aucun scan planifie.</p>';
+            return;
+        }
+        list.innerHTML = d.schedules.map(s => {
+            const enabled = s.enabled == 1 || s.enabled === true;
+            const lastRun = window.fmtLocalDate ? window.fmtLocalDate(s.last_run, 'Jamais') : (s.last_run || 'Jamais');
+            const nextRun = window.fmtLocalDate ? window.fmtLocalDate(s.next_run, '-') : (s.next_run || '-');
+            let target = 'Tous';
+            if (s.target_type === 'tag') target = 'Tag: ' + escHtmlSched(s.target_value);
+            else if (s.target_type === 'environment') target = 'Env: ' + escHtmlSched(s.target_value);
+            else if (s.target_type === 'machines') {
+                try {
+                    const ids = JSON.parse(s.target_value || '[]');
+                    const names = ids.map(id => (window._sshSchedMachines?.[id]?.name) || `#${id}`);
+                    target = names.length === 1 ? 'Serveur: ' + escHtmlSched(names[0]) : `${names.length} serveurs`;
+                } catch { target = 'Selection'; }
+            }
+            return `<div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${enabled ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700/30 opacity-60'}">
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm font-medium">${escHtmlSched(s.name)}</span>
+                    <span class="text-xs text-gray-400 ml-2 font-mono">${escHtmlSched(s.cron_expression)}</span>
+                    <span class="text-xs text-gray-400 ml-2">${target}</span>
+                </div>
+                <div class="flex items-center gap-3 flex-shrink-0 text-xs text-gray-500">
+                    <span>Dernier: ${lastRun}</span>
+                    <span>Prochain: ${nextRun}</span>
+                    <button onclick="toggleSshSchedule(${s.id})" class="px-2 py-0.5 rounded text-xs font-medium ${enabled ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-200 text-gray-500'}">${enabled ? 'ON' : 'OFF'}</button>
+                    <button onclick="deleteSshSchedule(${s.id})" class="text-red-400 hover:text-red-600">&times;</button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) { console.error('loadSshSchedules:', e); }
+}
+
+async function addSshSchedule() {
+    const name = document.getElementById('ssh-sched-name')?.value.trim();
+    const cron = document.getElementById('ssh-sched-cron')?.value.trim();
+    const targetRaw = document.getElementById('ssh-sched-target')?.value || 'all';
+    if (!name) { toast('Nom requis', 'warning'); return; }
+    if (!cron) { toast('Cron requis', 'warning'); return; }
+
+    let target_type = 'all', target_value = null;
+    if (targetRaw.startsWith('tag:')) {
+        target_type = 'tag'; target_value = targetRaw.substring(4);
+    } else if (targetRaw.startsWith('machine:')) {
+        target_type = 'machines';
+        target_value = JSON.stringify([parseInt(targetRaw.substring(8), 10)]);
+    } else if (targetRaw === 'multi') {
+        const ids = Array.from(document.querySelectorAll('.ssh-sched-multi-cb:checked')).map(cb => parseInt(cb.value, 10)).filter(Boolean);
+        if (ids.length === 0) { toast('Selectionne au moins un serveur', 'warning'); return; }
+        target_type = 'machines'; target_value = JSON.stringify(ids);
+    }
+
+    try {
+        const d = await apiPost('/ssh-audit/schedules', { name, cron_expression: cron, target_type, target_value });
+        if (d.success) {
+            toast('Planification creee', 'success');
+            document.getElementById('ssh-sched-name').value = '';
+            sshSchedMultiAll(false);
+            const sel = document.getElementById('ssh-sched-target'); if (sel) { sel.value = 'all'; onSshSchedTargetChange(); }
+            loadSshSchedules();
+        } else { toast(d.message || 'Erreur', 'error'); }
+    } catch (e) { toast('Erreur reseau', 'error'); }
+}
+
+async function toggleSshSchedule(id) {
+    try {
+        const r = await fetch(`${API}/ssh-audit/schedules/${id}/toggle`, { method: 'POST' });
+        if (r.ok) loadSshSchedules();
+    } catch (e) { console.error(e); }
+}
+
+async function deleteSshSchedule(id) {
+    if (!confirm('Supprimer cette planification ?')) return;
+    try {
+        const r = await fetch(`${API}/ssh-audit/schedules/${id}`, { method: 'DELETE' });
+        if (r.ok) { toast('Planification supprimee', 'success'); loadSshSchedules(); }
+    } catch (e) { console.error(e); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('ssh-schedules-list')) { loadSshSchedules(); sshCronPreview(); }
+});

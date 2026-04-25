@@ -12,9 +12,19 @@ require_once __DIR__ . '/../includes/lang.php';
 checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_audit_ssh');
 
+$role = (int) ($_SESSION['role_id'] ?? 0);
+
 // Chargement des serveurs
 $stmt = $pdo->query("SELECT id, name, ip, port FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' ORDER BY name");
 $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Tags pour le selecteur de planification (admin+)
+$schedTags = [];
+if ($role >= ROLE_ADMIN) {
+    try {
+        $schedTags = $pdo->query("SELECT DISTINCT tag FROM machine_tags WHERE tag IS NOT NULL AND tag != '' ORDER BY tag")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\PDOException $e) { $schedTags = []; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= getLang() ?>">
@@ -178,6 +188,88 @@ $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div id="history-list" class="space-y-2"></div>
             <p id="no-history-msg" class="hidden text-sm text-gray-400 dark:text-gray-500 py-4 text-center"><?= t('ssh_audit.no_history') ?></p>
         </div>
+
+        <?php if ($role >= ROLE_ADMIN): ?>
+        <!-- Scans SSH planifies (admin+) -->
+        <details class="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6">
+            <summary class="px-5 py-3 cursor-pointer flex items-center justify-between text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <?= t('ssh_audit.scheduled_scans') ?>
+                </span>
+                <span id="ssh-schedule-count" class="text-xs text-gray-400"></span>
+            </summary>
+            <div class="px-5 pb-4">
+                <div id="ssh-schedules-list" class="space-y-2 mb-3"></div>
+                <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
+                    <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3"><?= t('ssh_audit.sched_new') ?></h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                            <label for="ssh-sched-name" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('ssh_audit.sched_name') ?></label>
+                            <input id="ssh-sched-name" type="text" placeholder="<?= t('ssh_audit.sched_name_placeholder') ?>"
+                                   class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="ssh-sched-cron" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('ssh_audit.sched_cron') ?></label>
+                            <input id="ssh-sched-cron" type="text" value="0 4 * * *" placeholder="0 4 * * *"
+                                   oninput="sshCronPreviewDebounced()"
+                                   class="w-full text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="ssh-sched-target" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('ssh_audit.sched_target') ?></label>
+                            <select id="ssh-sched-target" onchange="onSshSchedTargetChange()" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700">
+                                <option value="all"><?= t('ssh_audit.sched_all_servers') ?></option>
+                                <?php if ($schedTags): ?>
+                                    <optgroup label="<?= t('ssh_audit.sched_by_tag') ?>">
+                                        <?php foreach ($schedTags as $tag): ?>
+                                        <option value="tag:<?= htmlspecialchars($tag) ?>">Tag: <?= htmlspecialchars($tag) ?></option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php endif; ?>
+                                <?php if ($servers): ?>
+                                    <optgroup label="<?= t('ssh_audit.sched_by_server') ?>">
+                                        <?php foreach ($servers as $mm): ?>
+                                        <option value="machine:<?= (int)$mm['id'] ?>"><?= htmlspecialchars($mm['name']) ?> (<?= htmlspecialchars($mm['ip']) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                    <option value="multi"><?= t('ssh_audit.sched_multi_servers') ?></option>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Selection multi-serveurs -->
+                    <div id="ssh-sched-multi-list" class="hidden mt-2 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900/30">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300"><?= t('ssh_audit.sched_multi_pick') ?></span>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="sshSchedMultiAll(true)" class="text-[11px] text-blue-600 hover:underline"><?= t('ssh_audit.sched_multi_all') ?></button>
+                                <button type="button" onclick="sshSchedMultiAll(false)" class="text-[11px] text-gray-500 hover:underline"><?= t('ssh_audit.sched_multi_none') ?></button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
+                            <?php foreach ($servers as $mm): ?>
+                            <label class="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-white dark:hover:bg-gray-800 cursor-pointer">
+                                <input type="checkbox" class="ssh-sched-multi-cb" value="<?= (int)$mm['id'] ?>">
+                                <span><?= htmlspecialchars($mm['name']) ?></span>
+                                <span class="text-xs text-gray-400"><?= htmlspecialchars($mm['ip']) ?></span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-2"><span id="ssh-sched-multi-count">0</span> <?= t('ssh_audit.sched_multi_selected') ?></p>
+                    </div>
+                    <div id="ssh-cron-preview" class="mt-2 text-xs text-gray-500 dark:text-gray-400 min-h-[1.5rem]"></div>
+                    <div class="mt-3">
+                        <button onclick="addSshSchedule()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg font-medium">
+                            + <?= t('ssh_audit.sched_add') ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </details>
+        <script>
+        window._sshSchedMachines = <?= json_encode(array_column($servers, null, 'id'), JSON_UNESCAPED_UNICODE) ?>;
+        </script>
+        <?php endif; ?>
 
         <!-- Activity log -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5">

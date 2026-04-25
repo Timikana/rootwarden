@@ -112,12 +112,14 @@ $keys = $pdo->query(
     . "FROM api_keys ORDER BY revoked_at IS NULL DESC, created_at DESC"
 )->fetchAll(PDO::FETCH_ASSOC);
 
-// Detecte la cle legacy auto-generee encore active (warning banner)
+// Detecte la cle legacy auto-generee encore active + presence d'une cle scopee
+// pour adapter le ton du banner (CTA "creer une cle" vs "rotation maintenant").
 $hasLegacyActive = false;
+$hasScopedKey = false;
 foreach ($keys as $k) {
-    if (!empty($k['auto_generated']) && empty($k['revoked_at'])) {
-        $hasLegacyActive = true;
-        break;
+    if (empty($k['revoked_at'])) {
+        if (!empty($k['auto_generated'])) $hasLegacyActive = true;
+        else $hasScopedKey = true;
     }
 }
 ?>
@@ -142,7 +144,24 @@ foreach ($keys as $k) {
         <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <?php if ($hasLegacyActive): ?>
+        <?php if ($hasLegacyActive && $hasScopedKey): ?>
+        <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700 rounded-lg text-sm">
+            <div class="flex items-start gap-3">
+                <span class="text-2xl">🛑</span>
+                <div class="flex-1">
+                    <div class="font-bold text-red-800 dark:text-red-300 mb-1">Rotation requise : <code class="px-1 bg-red-100 dark:bg-red-800/40 rounded">proxy-internal-legacy</code> doit etre revoquee</div>
+                    <p class="text-red-700 dark:text-red-300 mb-2">
+                        Tu as deja une cle API scopee active. La cle legacy auto-generee (scope=NULL, toutes routes)
+                        n'est plus necessaire et represente un risque inutile.
+                    </p>
+                    <p class="text-red-700 dark:text-red-300">
+                        <b>A faire</b> : verifie que <code>srv-docker.env:API_KEY</code> pointe vers ta cle scopee,
+                        puis revoque <code>proxy-internal-legacy</code> ci-dessous.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <?php elseif ($hasLegacyActive): ?>
         <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg text-sm">
             <div class="flex items-start gap-3">
                 <span class="text-2xl">⚠</span>

@@ -305,6 +305,16 @@ def main():
         print(f"[sync-obsidian] vault absent ({VAULT}) - skip.")
         return 0
 
+    # Restaure graph.json depuis le template si absent. Obsidian reecrit le
+    # fichier en permanence (scale/close/zoom), donc on versionne uniquement
+    # le template (avec colorGroups partages) et on copie au premier checkout.
+    graph_real = VAULT / '.obsidian' / 'graph.json'
+    graph_tpl = VAULT / '.obsidian' / 'graph.json.template'
+    if graph_tpl.exists() and not graph_real.exists():
+        if not args.dry_run:
+            graph_real.write_bytes(graph_tpl.read_bytes())
+        print(f"[sync-obsidian] graph.json restaure depuis template")
+
     actions = []
     for src_path in sorted((REPO / 'backend').rglob('*.py')):
         if '__pycache__' in src_path.parts or 'tests' in src_path.parts:
