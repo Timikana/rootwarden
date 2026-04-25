@@ -7,90 +7,36 @@
   "showOrphans": true,
   "collapse-color-groups": false,
   "colorGroups": [
-    {
-      "query": "tag:#auth",
-      "color": {
-        "a": 1,
-        "rgb": 14701131
-      }
-    },
-    {
-      "query": "tag:#security",
-      "color": {
-        "a": 1,
-        "rgb": 14518041
-      }
-    },
-    {
-      "query": "tag:#ci",
-      "color": {
-        "a": 1,
-        "rgb": 2201331
-      }
-    },
-    {
-      "query": "tag:#db",
-      "color": {
-        "a": 1,
-        "rgb": 9922482
-      }
-    },
-    {
-      "query": "tag:#frontend",
-      "color": {
-        "a": 1,
-        "rgb": 15780932
-      }
-    },
-    {
-      "query": "tag:#backend",
-      "color": {
-        "a": 1,
-        "rgb": 3050327
-      }
-    },
-    {
-      "query": "tag:#module/graylog",
-      "color": {
-        "a": 1,
-        "rgb": 5301420
-      }
-    },
-    {
-      "query": "tag:#module/wazuh",
-      "color": {
-        "a": 1,
-        "rgb": 4113254
-      }
-    },
-    {
-      "query": "tag:#rgpd",
-      "color": {
-        "a": 1,
-        "rgb": 15895499
-      }
-    },
-    {
-      "query": "tag:#audit",
-      "color": {
-        "a": 1,
-        "rgb": 9127187
-      }
-    },
-    {
-      "query": "tag:#concept",
-      "color": {
-        "a": 1,
-        "rgb": 10395294
-      }
-    },
-    {
-      "query": "tag:#test",
-      "color": {
-        "a": 1,
-        "rgb": 7385154
-      }
-    }
+    { "query": "tag:#vision",            "color": { "a": 1, "rgb": 16766720 } },
+    { "query": "tag:#architecture",      "color": { "a": 1, "rgb": 10040268 } },
+    { "query": "tag:#moc",               "color": { "a": 1, "rgb": 11579568 } },
+    { "query": "tag:#auth",              "color": { "a": 1, "rgb": 14701131 } },
+    { "query": "tag:#security",          "color": { "a": 1, "rgb": 14518041 } },
+    { "query": "tag:#audit",             "color": { "a": 1, "rgb": 9127187 } },
+    { "query": "tag:#rgpd",              "color": { "a": 1, "rgb": 15895499 } },
+    { "query": "tag:#ci",                "color": { "a": 1, "rgb": 2201331 } },
+    { "query": "tag:#ci-cd",             "color": { "a": 1, "rgb": 2201331 } },
+    { "query": "tag:#db",                "color": { "a": 1, "rgb": 9922482 } },
+    { "query": "tag:#frontend",          "color": { "a": 1, "rgb": 15780932 } },
+    { "query": "tag:#backend",           "color": { "a": 1, "rgb": 3050327 } },
+    { "query": "tag:#ssh",               "color": { "a": 1, "rgb": 4915330 } },
+    { "query": "tag:#infra",             "color": { "a": 1, "rgb": 6724095 } },
+    { "query": "tag:#ops",               "color": { "a": 1, "rgb": 9127187 } },
+    { "query": "tag:#scripts",           "color": { "a": 1, "rgb": 8421376 } },
+    { "query": "tag:#feature-flags",     "color": { "a": 1, "rgb": 16711935 } },
+    { "query": "tag:#onboarding",        "color": { "a": 1, "rgb": 16753920 } },
+    { "query": "tag:#module/cve",        "color": { "a": 1, "rgb": 16724787 } },
+    { "query": "tag:#module/supervision","color": { "a": 1, "rgb": 52945 } },
+    { "query": "tag:#module/wazuh",      "color": { "a": 1, "rgb": 4113254 } },
+    { "query": "tag:#module/graylog",    "color": { "a": 1, "rgb": 5301420 } },
+    { "query": "tag:#module/api-keys",   "color": { "a": 1, "rgb": 16737792 } },
+    { "query": "tag:#module/ssh-audit",  "color": { "a": 1, "rgb": 35723 } },
+    { "query": "tag:#module/bashrc",     "color": { "a": 1, "rgb": 8388352 } },
+    { "query": "tag:#concept",           "color": { "a": 1, "rgb": 10395294 } },
+    { "query": "tag:#test",              "color": { "a": 1, "rgb": 7385154 } },
+    { "query": "tag:#journal",           "color": { "a": 1, "rgb": 11393254 } },
+    { "query": "tag:#stack",             "color": { "a": 1, "rgb": 13631488 } },
+    { "query": "tag:#roadmap",           "color": { "a": 1, "rgb": 16763955 } }
   ],
   "collapse-display": false,
   "showArrow": true,
