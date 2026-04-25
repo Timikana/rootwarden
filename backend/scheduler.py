@@ -14,6 +14,7 @@ Demarrage :
     Appeler start_scheduler() au demarrage de Flask (dans server.py).
 """
 
+import json
 import time
 import logging
 import threading
