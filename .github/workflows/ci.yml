@@ -191,12 +191,16 @@ jobs:
       - name: Install semgrep
         run: pip install semgrep
       - name: Run semgrep
-        # --config=auto recupere les regles OWASP/CWE pour les langages detectes.
+        # Configs specifiques (--config=auto exige metrics on, on prefere off).
+        # p/security-audit + p/owasp-top-ten : couvrent OWASP Top 10 cross-langue.
         # --error fail si findings >= ERROR severity (bloquant). WARNING/INFO
         # restent visibles mais non bloquants.
-        # --metrics=off pour ne pas envoyer de telemetrie a Semgrep Inc.
         # Allowlist : .semgrepignore (cree si bruit, pattern .gitignore-like).
-        run: semgrep --config=auto --error --metrics=off --severity=ERROR .
+        run: |
+          semgrep \
+            --config=p/security-audit \
+            --config=p/owasp-top-ten \
+            --error --metrics=off --severity=ERROR .
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
