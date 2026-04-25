@@ -9,7 +9,7 @@ return [
     'admin.btn_journal' => 'Journal',
     'admin.btn_diagnostic' => 'Diagnostic',
     'admin.btn_remote_users' => 'Utilisateurs distants',
-    'admin.btn_ssh_key' => 'Cle SSH',
+    'admin.btn_ssh_key' => 'Cle SSH Keypair',
     'admin.btn_backups' => 'Backups',
     'admin.tip_journal' => 'Consulter l\'historique de toutes les actions effectuees',
     'admin.tip_diagnostic' => 'Verifier la sante de toutes les routes API backend',
