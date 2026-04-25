@@ -347,6 +347,71 @@ def install():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@bp.route('/wazuh/detect', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_wazuh')
+@require_machine_access
+@threaded_route
+def detect():
+    """Detecte un agent Wazuh deja installe sur le serveur sans le reinstaller.
+
+    Utile quand l'agent a ete deploye en dehors de RootWarden : on remplit la
+    table `wazuh_agents` a partir de /var/ossec/* pour le voir dans l'UI.
+    """
+    data = request.get_json(silent=True) or {}
+    row, err = _resolve_machine(data.get('machine_id'))
+    if err:
+        return err
+
+    user_id, _ = get_current_user()
+    ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
+
+    try:
+        with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
+            # /var/ossec/bin/wazuh-control n'existe que si l'agent est installe
+            v_out, _, code = execute_as_root(
+                client,
+                "test -x /var/ossec/bin/wazuh-control && "
+                "/var/ossec/bin/wazuh-control info 2>&1 | grep WAZUH_VERSION | cut -d= -f2 | tr -d '\"' "
+                "|| echo NOT_INSTALLED",
+                root_pwd, logger=logger, timeout=10)
+            v_out = (v_out or '').strip()
+            if not v_out or v_out == 'NOT_INSTALLED':
+                return jsonify({'success': False, 'detected': False,
+                                'message': f"Aucun agent Wazuh detecte sur {row['name']}."})
+
+            version = v_out[:20] or 'unknown'
+
+            id_out, _, _ = execute_as_root(client,
+                "grep -E '^ID:' /var/ossec/etc/client.keys 2>/dev/null | head -1 | awk '{print $2}' || "
+                "cat /var/ossec/etc/client.keys 2>/dev/null | head -1 | awk '{print $1}'",
+                root_pwd, logger=logger, timeout=10)
+            agent_id = (id_out or '').strip()[:10] or None
+
+            grp_out, _, _ = execute_as_root(client,
+                "grep -oP '(?<=<groups>).*?(?=</groups>)' /var/ossec/etc/ossec.conf 2>/dev/null | head -1",
+                root_pwd, logger=logger, timeout=10)
+            grp = (grp_out or '').strip()[:80] or None
+
+            status_out, _, _ = execute_as_root(client,
+                "systemctl is-active wazuh-agent 2>/dev/null || echo unknown",
+                root_pwd, logger=logger, timeout=10)
+            sys_status = (status_out or '').strip()
+            agent_status = 'active' if sys_status == 'active' else (
+                'disconnected' if sys_status in ('inactive', 'failed') else 'unknown')
+
+        _upsert_agent(row['id'], agent_id=agent_id, version=version,
+                      group_name=grp, status=agent_status)
+        _audit(user_id, 'detect', f"machine_id={row['id']} agent_id={agent_id} version={version}")
+        return jsonify({'success': True, 'detected': True, 'agent_id': agent_id,
+                        'version': version, 'group': grp, 'status': agent_status,
+                        'message': f"Agent detecte sur {row['name']} (v{version})"})
+    except Exception as e:
+        logger.exception("Erreur detect wazuh : %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @bp.route('/wazuh/uninstall', methods=['POST'])
 @require_api_key
 @require_role(2)

@@ -666,13 +666,25 @@ def test_platform_key():
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT ip, port, user FROM machines WHERE id = %s", (int(machine_id),))
+        cur.execute(
+            "SELECT ip, port, user, name, platform_key_deployed FROM machines WHERE id = %s",
+            (int(machine_id),)
+        )
         m = cur.fetchone()
     finally:
         conn.close()
 
     if not m:
         return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+
+    # Si la keypair n'a jamais ete deployee, message clair plutot qu'erreur
+    # paramiko illisible. Le bouton "Tester" est visible meme avant deploiement.
+    if not m.get('platform_key_deployed'):
+        return jsonify({
+            'success': False,
+            'auth_method': 'none',
+            'message': f"Cle non deployee sur {m['name']} - clique 'Deployer' d'abord."
+        })
 
     try:
         from ssh_key_manager import get_platform_private_key
@@ -684,9 +696,15 @@ def test_platform_key():
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(hostname=m['ip'], port=m['port'], username=m['user'], pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10)
         client.close()
-        return jsonify({'success': True, 'auth_method': 'keypair', 'message': 'Connexion keypair OK'})
+        return jsonify({'success': True, 'auth_method': 'keypair', 'message': f"Connexion keypair OK sur {m['name']}"})
+    except paramiko.AuthenticationException:
+        return jsonify({
+            'success': False,
+            'auth_method': 'password',
+            'message': f"Authentification keypair refusee sur {m['name']} - re-deploie la cle."
+        })
     except Exception as e:
-        return jsonify({'success': False, 'auth_method': 'password', 'message': f'Keypair echouee: {e}'})
+        return jsonify({'success': False, 'auth_method': 'password', 'message': f"Keypair echouee sur {m['name']} : {e}"})
 
 
 @bp.route('/remove_ssh_password', methods=['POST'])
@@ -792,8 +810,11 @@ def scan_server_users():
 
     try:
         with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
-            # Lister les users avec shell valide + UID
-            cmd = "awk -F: '$7 !~ /(nologin|false|sync|halt|shutdown)/ {print $1\":\"$3\":\"$6\":\"$7}' /etc/passwd"
+            # Lister TOUS les users de /etc/passwd. Les comptes systeme
+            # (shell=nologin/false/sync/halt/shutdown) seront auto-classifies
+            # 'excluded' plus bas pour qu'ils restent auditables sans polluer
+            # la liste des comptes geres.
+            cmd = "awk -F: '{print $1\":\"$3\":\"$6\":\"$7}' /etc/passwd"
             stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
             passwd_output = stdout.read().decode('utf-8', errors='replace')
 
@@ -863,10 +884,16 @@ def scan_server_users():
                           u['has_platform_key'], mid, uname))
                 else:
                     # Nouveau user - classifier automatiquement
+                    shell_basename = (u.get('shell') or '').rsplit('/', 1)[-1].lower()
+                    is_nologin_shell = shell_basename in ('nologin', 'false', 'sync', 'halt', 'shutdown')
                     if uname in sys_users or uname.lower() in sys_users:
                         auto_status = 'excluded'
                         auto_managed = 'manual'
                         auto_notes = 'Compte systeme (auto-classifie)'
+                    elif is_nologin_shell:
+                        auto_status = 'excluded'
+                        auto_managed = 'manual'
+                        auto_notes = f'Compte sans login (shell={u["shell"]}) - auto-classifie'
                     elif uname in rw_authorized:
                         auto_status = 'managed'
                         auto_managed = 'rootwarden'

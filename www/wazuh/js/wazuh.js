@@ -97,6 +97,7 @@ async function wzLoadServers() {
             <td class="px-3 py-2 mono text-xs">${escHtml(s.group_name || '-')}</td>
             <td class="px-3 py-2 whitespace-nowrap">
                 <button onclick="wzInstall(${s.id})" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('wazuh.btn_install'))}</button>
+                <button onclick="wzDetect(${s.id})" class="text-xs text-cyan-600 hover:text-cyan-800 ml-2" title="${escHtml(__('wazuh.btn_detect_tip'))}">${escHtml(__('wazuh.btn_detect'))}</button>
                 <button onclick="wzRestart(${s.id})" class="text-xs text-green-500 hover:text-green-700 ml-2">${escHtml(__('wazuh.btn_restart'))}</button>
                 <button onclick="wzSetGroup(${s.id})" class="text-xs text-purple-500 hover:text-purple-700 ml-2">${escHtml(__('wazuh.btn_setgroup'))}</button>
                 <button onclick="wzUninstall(${s.id})" class="text-xs text-red-500 hover:text-red-700 ml-2">${escHtml(__('wazuh.btn_uninstall'))}</button>
@@ -111,6 +112,12 @@ async function wzInstall(mid) {
     if (!confirm(__('wazuh.confirm_install'))) return;
     const r = await apiFetch('/wazuh/install', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
     alert((r.message || (r.success ? 'OK' : 'Echec')) + (r.agent_id ? ` (agent_id=${r.agent_id})` : ''));
+    wzLoadServers();
+}
+
+async function wzDetect(mid) {
+    const r = await apiFetch('/wazuh/detect', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
+    alert(r.message || (r.success ? 'Agent detecte' : 'Aucun agent'));
     wzLoadServers();
 }
 

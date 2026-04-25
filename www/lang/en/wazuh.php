@@ -44,6 +44,8 @@ return [
     'wazuh.status_unknown' => 'Unknown',
 
     'wazuh.btn_install' => 'Install',
+    'wazuh.btn_detect' => 'Scan',
+    'wazuh.btn_detect_tip' => 'Detect an existing Wazuh agent without reinstalling',
     'wazuh.btn_uninstall' => 'Uninstall',
     'wazuh.btn_restart' => 'Restart',
     'wazuh.btn_setgroup' => 'Change group',
