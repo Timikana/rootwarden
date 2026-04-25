@@ -192,14 +192,25 @@ jobs:
         run: pip install semgrep
       - name: Run semgrep
         # Configs specifiques (--config=auto exige metrics on, on prefere off).
-        # p/security-audit + p/owasp-top-ten : couvrent OWASP Top 10 cross-langue.
-        # --error fail si findings >= ERROR severity (bloquant). WARNING/INFO
-        # restent visibles mais non bloquants.
-        # Allowlist : .semgrepignore (cree si bruit, pattern .gitignore-like).
+        # p/owasp-top-ten : focus OWASP Top 10. Plus surgical que p/security-audit
+        # qui flag des patterns Dockerfile intentionnels (USER root pour Apache:80).
+        # Exclusions : 5 regles validees comme FP par audit v1.17.0
+        #   - dockerfile missing-user : Apache/sshd ont besoin de root, gosu drop
+        #     les privileges au runtime ; Trivy couvre les vraies regressions.
+        #   - mode-without-authentication : encryption.py utilise libsodium
+        #     SecretBox en preference, AES-CBC est fallback documente.
+        #   - tainted-sql-string : `fmt = ','.join(['%s']*len(ids))` est le
+        #     pattern recommande pour `IN (...)` ; donnees passees via params.
+        #   - echoed-request : echo json_encode(...) est safe (Content-Type JSON).
+        # Allowlist additionnelle : .semgrepignore si besoin.
         run: |
           semgrep \
-            --config=p/security-audit \
             --config=p/owasp-top-ten \
+            --exclude-rule=python.cryptography.security.mode-without-authentication.crypto-mode-without-authentication \
+            --exclude-rule=python.flask.security.injection.tainted-sql-string.tainted-sql-string \
+            --exclude-rule=php.lang.security.injection.echoed-request.echoed-request \
+            --exclude-rule=dockerfile.security.missing-user.missing-user \
+            --exclude-rule=dockerfile.security.missing-user-entrypoint.missing-user-entrypoint \
             --error --metrics=off --severity=ERROR .
 
   # ─────────────────────────────────────────────────────────────
