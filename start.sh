@@ -49,8 +49,9 @@ fi
 # Compare srv-docker.env.example avec srv-docker.env et AJOUTE les cles
 # manquantes a la fin (avec leur commentaire). Ne modifie JAMAIS les valeurs
 # deja presentes. Utile apres `git pull` qui ajoute des nouvelles vars.
-if [ -x "${SCRIPT_DIR}/scripts/env-merge.sh" ]; then
-    "${SCRIPT_DIR}/scripts/env-merge.sh" || {
+if [ -f "${SCRIPT_DIR}/scripts/env-merge.sh" ]; then
+    chmod +x "${SCRIPT_DIR}/scripts/env-merge.sh" 2>/dev/null || true
+    bash "${SCRIPT_DIR}/scripts/env-merge.sh" || {
         echo -e "${YELLOW}[RootWarden]${NC} env-merge a echoue, on continue avec l'env existant."
     }
 fi

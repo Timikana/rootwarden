@@ -304,20 +304,69 @@ def install():
     user_id, _ = get_current_user()
     ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
 
-    # Install + registration
+    # Install multi-OS : detecte la famille via /etc/os-release puis branche
+    # apt (Debian/Ubuntu) / yum-dnf (RHEL/Rocky/Alma/Fedora/Amazon/Oracle) /
+    # zypper (SUSE/openSUSE). Avant v1.18.x c'etait apt-only -> fail silencieux
+    # sur RHEL family. Le manager + group + registration_password sont passes
+    # en env vars, communs aux 3 branches.
     env_vars = f"WAZUH_MANAGER='{manager}' WAZUH_AGENT_GROUP='{group}'"
     if reg_pwd:
         env_vars += f" WAZUH_REGISTRATION_PASSWORD='{reg_pwd}'"
 
-    install_cmd = (
-        "export DEBIAN_FRONTEND=noninteractive && "
-        "curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && "
-        "chmod 644 /usr/share/keyrings/wazuh.gpg && "
-        "echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' > /etc/apt/sources.list.d/wazuh.list && "
-        "apt-get update -qq && "
-        f"{env_vars} apt-get install -y wazuh-agent && "
-        "systemctl daemon-reload && systemctl enable --now wazuh-agent"
-    )
+    install_cmd = f"""
+set -e
+. /etc/os-release 2>/dev/null || (echo "no /etc/os-release" >&2; exit 1)
+ID_LC=$(echo "${{ID:-unknown}}" | tr 'A-Z' 'a-z')
+LIKE_LC=$(echo "${{ID_LIKE:-}}" | tr 'A-Z' 'a-z')
+
+is_deb() {{ case " $ID_LC $LIKE_LC " in *" debian "*|*" ubuntu "*) return 0;; esac; return 1; }}
+is_rhel() {{ case " $ID_LC $LIKE_LC " in *" rhel "*|*" fedora "*|*" centos "*) return 0;; esac; return 1; }}
+is_suse() {{ case " $ID_LC $LIKE_LC " in *" suse "*|*" opensuse "*|*" sles "*) return 0;; esac; return 1; }}
+
+if is_deb; then
+    export DEBIAN_FRONTEND=noninteractive
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import
+    chmod 644 /usr/share/keyrings/wazuh.gpg
+    echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' > /etc/apt/sources.list.d/wazuh.list
+    apt-get update -qq
+    {env_vars} apt-get install -y wazuh-agent
+elif is_rhel; then
+    rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
+    cat > /etc/yum.repos.d/wazuh.repo <<'REPOEOF'
+[wazuh]
+gpgcheck=1
+gpgkey=https://packages.wazuh.com/key/GPG-KEY-WAZUH
+enabled=1
+name=EL-$releasever - Wazuh
+baseurl=https://packages.wazuh.com/4.x/yum/
+protect=1
+REPOEOF
+    if command -v dnf >/dev/null 2>&1; then
+        {env_vars} dnf install -y wazuh-agent
+    else
+        {env_vars} yum install -y wazuh-agent
+    fi
+elif is_suse; then
+    rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
+    cat > /etc/zypp/repos.d/wazuh.repo <<'REPOEOF'
+[wazuh]
+gpgcheck=1
+gpgkey=https://packages.wazuh.com/key/GPG-KEY-WAZUH
+enabled=1
+name=Wazuh repository
+baseurl=https://packages.wazuh.com/4.x/yum/
+type=rpm-md
+REPOEOF
+    {env_vars} zypper -n install wazuh-agent
+else
+    echo "OS non supporte par l'installeur Wazuh : ID=$ID_LC ID_LIKE=$LIKE_LC" >&2
+    echo "Familles supportees : debian, ubuntu, rhel/centos/rocky/alma/fedora, suse/opensuse" >&2
+    exit 2
+fi
+
+systemctl daemon-reload
+systemctl enable --now wazuh-agent
+""".strip()
 
     try:
         with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
