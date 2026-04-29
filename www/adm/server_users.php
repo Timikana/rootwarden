@@ -260,7 +260,10 @@ async function deleteUser(username) {
     } catch(e) { toast(__('toast_network_error'), 'error'); }
 }
 
+let _CURRENT_KEYS_USER = '';  // user actuellement affiche dans le modal
+
 async function showUserKeys(username) {
+    _CURRENT_KEYS_USER = username;
     const modal = document.getElementById('keys-modal');
     const body = document.getElementById('keys-modal-body');
     const title = document.getElementById('keys-modal-title');
@@ -281,17 +284,26 @@ async function showUserKeys(username) {
         }
         let html = '<div class="space-y-3">';
         for (const k of d.keys) {
+            const fpAttr = (typeof escAttr === 'function' ? escAttr(k.fingerprint) : escHtml(k.fingerprint));
             const platformBadge = k.is_platform
                 ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 ml-2">${__('server_users_key_platform')}</span>`
                 : '';
             const ownerBadge = k.owner_name
                 ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ml-2">${escHtml(k.owner_name)}</span>`
                 : (k.is_platform ? '' : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 ml-2">${__('server_users_key_unknown_owner')}</span>`);
+            // Bouton supprimer : disabled si cle plateforme (anti-self-lock)
+            const labelAttr = (typeof escAttr === 'function' ? escAttr(k.comment || k.fingerprint) : escHtml(k.comment || k.fingerprint));
+            const removeBtn = k.is_platform
+                ? `<button disabled class="text-[10px] px-2 py-1 rounded border border-gray-200 text-gray-400 cursor-not-allowed" title="${(typeof escAttr === 'function' ? escAttr(__('server_users_key_remove_blocked_platform')) : __('server_users_key_remove_blocked_platform'))}">&#10006;</button>`
+                : `<button data-fp="${fpAttr}" data-comment="${labelAttr}" onclick="removeUserKey(this.dataset.fp, this.dataset.comment)" class="text-[10px] px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="${(typeof escAttr === 'function' ? escAttr(__('server_users_key_remove_tip')) : __('server_users_key_remove_tip'))}">&#10006; ${__('server_users_key_remove')}</button>`;
             html += `
                 <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-xs font-mono font-bold text-gray-600 dark:text-gray-300">${escHtml(k.type)}</span>
-                        ${platformBadge}${ownerBadge}
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs font-mono font-bold text-gray-600 dark:text-gray-300">${escHtml(k.type)}</span>
+                            ${platformBadge}${ownerBadge}
+                        </div>
+                        ${removeBtn}
                     </div>
                     <div class="text-[11px] font-mono text-gray-500 break-all mb-1">${escHtml(k.fingerprint)}</div>
                     ${k.comment ? `<div class="text-xs text-gray-600 dark:text-gray-400 italic">${escHtml(k.comment)}</div>` : ''}
@@ -305,6 +317,34 @@ async function showUserKeys(username) {
         body.innerHTML = html;
     } catch(e) {
         body.innerHTML = `<div class="text-sm text-red-500 py-4">${escHtml(__('toast_network_error'))}</div>`;
+    }
+}
+
+async function removeUserKey(fingerprint, label) {
+    const username = _CURRENT_KEYS_USER;
+    if (!username) return;
+    const confirmMsg = __('server_users_key_remove_confirm')
+        .replace('%key', label || fingerprint)
+        .replace('%user', username);
+    if (!confirm(confirmMsg)) return;
+    try {
+        const r = await fetch(`${window.API_URL}/server_user_remove_key`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                machine_id: MACHINE_ID,
+                username: username,
+                fingerprint_sha256: fingerprint,
+            }),
+        });
+        const d = await r.json();
+        toast(d.message || (d.success ? __('toast_success') : __('toast_error')), d.success ? 'success' : 'error');
+        if (d.success) {
+            await showUserKeys(username);  // refresh modal
+            scanUsers();                    // refresh table compteurs
+        }
+    } catch(e) {
+        toast(__('toast_network_error'), 'error');
     }
 }
 

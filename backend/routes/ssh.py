@@ -29,7 +29,7 @@ import time
 import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
 from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
 
 bp = Blueprint('ssh', __name__)
@@ -1193,6 +1193,158 @@ def server_user_keys():
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
     finally:
         conn.close()
+
+
+@bp.route('/server_user_remove_key', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_machine_access
+@threaded_route
+def server_user_remove_key():
+    """Supprime UNE cle SSH precise du authorized_keys d'un user distant.
+
+    Body JSON :
+        machine_id (int)              : id du serveur (required)
+        username   (str)              : compte distant (required)
+        fingerprint_sha256 (str)      : fingerprint de la cle a virer (required)
+        force (bool)                  : si true, autorise la suppression de la
+                                        cle plateforme (par defaut bloquee)
+
+    Side effects :
+        - SSH (en root) -> reecrit ~/.ssh/authorized_keys sans la ligne ciblee
+        - DELETE de la row dans server_user_ssh_keys
+        - Audit log via user_logs
+    """
+    data = request.get_json(silent=True) or {}
+    machine_id = data.get('machine_id')
+    username = (data.get('username') or '').strip()
+    fingerprint = (data.get('fingerprint_sha256') or '').strip()
+    # Strip eventuel prefixe "SHA256:" envoye par le frontend
+    if fingerprint.startswith('SHA256:'):
+        fingerprint = fingerprint[len('SHA256:'):]
+    force = bool(data.get('force', False))
+
+    if not machine_id or not username or not fingerprint:
+        return jsonify({'success': False, 'message': 'machine_id, username et fingerprint_sha256 requis'}), 400
+    if not _validate_username(username):
+        return jsonify({'success': False, 'message': 'username invalide'}), 400
+    if not re.match(r'^[A-Za-z0-9+/]{40,64}$', fingerprint):
+        return jsonify({'success': False, 'message': 'fingerprint invalide'}), 400
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT id, name, ip, port, user, password, root_password, "
+            "service_account_deployed FROM machines WHERE id = %s",
+            (int(machine_id),))
+        m = cur.fetchone()
+        if not m:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+
+        # Verifie que la cle existe en BDD pour ce user/machine
+        cur.execute(
+            "SELECT key_type, comment, is_platform_key FROM server_user_ssh_keys "
+            "WHERE machine_id = %s AND username = %s AND fingerprint_sha256 = %s",
+            (int(machine_id), username, fingerprint))
+        key_row = cur.fetchone()
+        if not key_row:
+            return jsonify({
+                'success': False,
+                'message': 'Cle non trouvee en inventaire - relance un scan'
+            }), 404
+
+        # Garde-fou : ne pas se locker hors du serveur en supprimant la cle
+        # plateforme RootWarden, sauf si force=True explicite.
+        if key_row.get('is_platform_key') and not force:
+            return jsonify({
+                'success': False,
+                'message': "Suppression bloquee : c'est la cle plateforme RootWarden. "
+                           "Utilise --force si tu veux vraiment te locker hors du serveur."
+            }), 400
+    finally:
+        conn.close()
+
+    ssh_pass = server_decrypt_password(m['password'])
+    root_pass = server_decrypt_password(m.get('root_password') or '')
+    fp_q = shlex.quote(fingerprint)
+    user_q = shlex.quote(username)
+
+    # Script bash root-side : pour CHAQUE ligne du authorized_keys, recalculer
+    # le fingerprint via ssh-keygen -lf, comparer, garder la ligne si != cible.
+    # ssh-keygen est universel sur tout systeme avec OpenSSH installe.
+    remove_script = f"""
+set -e
+home=$(getent passwd {user_q} | cut -d: -f6)
+ak="$home/.ssh/authorized_keys"
+if [ ! -f "$ak" ]; then
+    echo "no authorized_keys for {username}" >&2
+    exit 1
+fi
+tmp=$(mktemp)
+cp "$ak" "${{tmp}}.bak"
+removed=0
+while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$line" ] && continue
+    case "$line" in \\#*) echo "$line" >> "$tmp"; continue;; esac
+    fp=$(printf '%s\\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{{print $2}}' | sed 's/^SHA256://')
+    if [ "$fp" = {fp_q} ]; then
+        removed=$((removed + 1))
+    else
+        echo "$line" >> "$tmp"
+    fi
+done < "$ak"
+if [ "$removed" -eq 0 ]; then
+    rm -f "$tmp" "${{tmp}}.bak"
+    echo "fingerprint not found" >&2
+    exit 2
+fi
+mv "$tmp" "$ak"
+chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true
+chmod 600 "$ak"
+echo "removed=$removed"
+"""
+
+    user_id, _ = get_current_user()
+    try:
+        with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                         service_account=m.get('service_account_deployed', False)) as client:
+            out, err_out, code = execute_as_root(client, remove_script, root_pass,
+                                                  logger=logger, timeout=30)
+            if code != 0:
+                logger.warning("server_user_remove_key(%s,%s): exit=%s err=%s",
+                               machine_id, username, code, (err_out or '')[:300])
+                return jsonify({
+                    'success': False,
+                    'message': f"Suppression echouee : {(err_out or out or 'erreur inconnue').strip()[:200]}"
+                }), 500
+
+        # Cleanup BDD
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM server_user_ssh_keys WHERE machine_id = %s "
+                "AND username = %s AND fingerprint_sha256 = %s",
+                (int(machine_id), username, fingerprint))
+            # Audit log RGPD-friendly (action utilisateur trace)
+            cur.execute(
+                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
+                (user_id,
+                 f"[ssh-keys] retire fingerprint {fingerprint[:16]}... "
+                 f"de {username}@{m['name']} (type={key_row['key_type']})"))
+            conn.commit()
+        finally:
+            conn.close()
+
+        return jsonify({
+            'success': True,
+            'message': f"Cle SSH supprimee de {username}@{m['name']}",
+            'fingerprint': fingerprint,
+        })
+    except Exception as e:
+        logger.error("server_user_remove_key(%s, %s, %s): %s", machine_id, username, fingerprint, e)
+        return jsonify({'success': False, 'message': f'Erreur SSH : {str(e)[:200]}'}), 500
 
 
 @bp.route('/remove_user_keys', methods=['POST'])
