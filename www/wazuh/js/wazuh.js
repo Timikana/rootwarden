@@ -71,8 +71,22 @@ async function wzLoadServers() {
     const r = await apiFetch('/wazuh/servers');
     if (!r.success) { c.innerHTML = `<div class="text-sm text-red-500 py-6">${escHtml(r.message || 'Erreur')}</div>`; return; }
     if (!r.servers.length) { c.innerHTML = `<div class="text-sm text-gray-500 py-6">${escHtml(__('wazuh.no_servers'))}</div>`; return; }
-    let html = '<table class="w-full text-sm"><thead class="bg-gray-50 dark:bg-gray-700/50"><tr>' +
+
+    // Compteur serveurs sans agent (pour le bouton Installer tout)
+    const noAgent = r.servers.filter(s => !s.agent_id).length;
+    const installAllBtn = noAgent > 0
+        ? `<div class="mb-3 flex items-center justify-end">
+             <button onclick="wzInstallAll()" class="text-xs px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
+               ${escHtml(__('wazuh.btn_install_all'))} (${noAgent})
+             </button>
+           </div>`
+        : '';
+
+    let html = installAllBtn + '<table class="w-full text-sm"><thead class="bg-gray-50 dark:bg-gray-700/50"><tr>' +
         '<th class="text-left px-3 py-2">Name</th><th class="text-left px-3 py-2">IP</th>' +
+        `<th class="text-left px-3 py-2">${escHtml(__('wazuh.col_network'))}</th>` +
+        `<th class="text-left px-3 py-2">${escHtml(__('wazuh.col_criticality'))}</th>` +
+        `<th class="text-left px-3 py-2">${escHtml(__('wazuh.col_environment'))}</th>` +
         `<th class="text-left px-3 py-2">${escHtml(__('wazuh.col_agent_id'))}</th>` +
         `<th class="text-left px-3 py-2">${escHtml(__('wazuh.col_status'))}</th>` +
         `<th class="text-left px-3 py-2">${escHtml(__('wazuh.col_version'))}</th>` +
@@ -88,9 +102,22 @@ async function wzLoadServers() {
     for (const s of r.servers) {
         const b = badges[s.status] || ['gray', 'status_unknown'];
         const badge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-${b[0]}-100 text-${b[0]}-700 dark:bg-${b[0]}-900/40">${escHtml(__('wazuh.' + b[1]))}</span>`;
+        // Badges réseau, criticité, environment
+        const netBadge = s.network_type === 'EXTERNE'
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40">${escHtml(s.network_type)}</span>`
+            : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">${escHtml(s.network_type || '-')}</span>`;
+        const critBadge = s.criticality === 'CRITIQUE'
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 font-bold">${escHtml(s.criticality)}</span>`
+            : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">${escHtml(s.criticality || '-')}</span>`;
+        const envBadge = s.environment
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40">${escHtml(s.environment)}</span>`
+            : '<span class="text-[10px] text-gray-400">-</span>';
         html += `<tr>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.name)}</td>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.ip)}</td>
+            <td class="px-3 py-2">${netBadge}</td>
+            <td class="px-3 py-2">${critBadge}</td>
+            <td class="px-3 py-2">${envBadge}</td>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.agent_id || '-')}</td>
             <td class="px-3 py-2">${badge}</td>
             <td class="px-3 py-2 mono text-xs">${escHtml(s.version || '-')}</td>
@@ -112,6 +139,29 @@ async function wzInstall(mid) {
     if (!confirm(__('wazuh.confirm_install'))) return;
     const r = await apiFetch('/wazuh/install', { method: 'POST', body: JSON.stringify({ machine_id: mid }) });
     alert((r.message || (r.success ? 'OK' : 'Echec')) + (r.agent_id ? ` (agent_id=${r.agent_id})` : ''));
+    wzLoadServers();
+}
+
+async function wzInstallAll() {
+    if (!confirm(__('wazuh.confirm_install_all'))) return;
+    // Indicateur visuel pendant le run (peut etre long sur N serveurs)
+    const c = document.getElementById('wz-servers-container');
+    const loadingHtml = `<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 rounded-lg p-4 my-3 text-sm flex items-center gap-2">
+        <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="3" stroke-dasharray="60" stroke-dashoffset="20"/></svg>
+        ${escHtml(__('wazuh.installing_all'))}
+    </div>` + c.innerHTML;
+    c.innerHTML = loadingHtml;
+
+    const r = await apiFetch('/wazuh/install_all', { method: 'POST', body: JSON.stringify({}) });
+    let summary = r.message || (r.success ? 'OK' : 'Echec');
+    if (r.details && r.details.length) {
+        const fails = r.details.filter(d => !d.success);
+        if (fails.length) {
+            summary += '\n\n' + __('wazuh.install_all_failures') + ':\n' +
+                fails.map(f => `- ${f.name}: ${(f.message || '').slice(0, 100)}`).join('\n');
+        }
+    }
+    alert(summary);
     wzLoadServers();
 }
 
