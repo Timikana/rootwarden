@@ -5,6 +5,70 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.19.0] - 2026-04-29
+
+### Inventaire detaille des cles SSH par utilisateur distant
+
+`/adm/server_users.php` : le compteur de cles SSH d'un user devient cliquable
+et ouvre un modal listant CHAQUE cle avec :
+- type (`ssh-rsa`, `ssh-ed25519`, `ecdsa-*`, `sk-*`)
+- fingerprint SHA256 (format identique a `ssh-keygen -lf`)
+- comment (`user@hostname`)
+- badge "plateforme" / nom proprietaire RootWarden / "proprietaire inconnu"
+- date 1re vue (utile pour drift detection)
+
+Backend :
+- Migration 044 : nouvelle table `server_user_ssh_keys` (machine_id,
+  username, key_type, fingerprint_sha256, comment, is_platform_key,
+  first_seen_at, last_seen_at) avec UNIQUE et FK CASCADE.
+- `scan_server_users` refactore : 1 seul `execute_as_root` qui dump tous
+  les `authorized_keys` du serveur (root inclus) avec marqueurs
+  `###USER:xxx###`. Avant : N appels SSH en simple user, silent fail sur
+  `/root/*` et users a home protege.
+- Nouvelle route `GET /server_user_keys?machine_id=X&username=Y` avec
+  cross-reference sur `users.ssh_key` (ownership detection).
+- Drift detection : cles disparues entre 2 scans -> DELETE auto.
+
+### Suppression chirurgicale d'une cle SSH precise
+
+Bouton ✗ par cle dans le modal. Confirmation utilisateur requise. SSH en
+root sur le serveur, recalcule chaque fingerprint via `ssh-keygen -lf` et
+filtre la ligne ciblee, conserve le reste, chmod 600.
+
+- Nouvelle route `POST /server_user_remove_key` (role admin requis).
+- Garde-fou : suppression de la cle plateforme RootWarden BLOQUEE par
+  defaut (sinon RootWarden se locke hors du serveur). Override via flag
+  `force=true` dans le payload.
+- Audit log entry par suppression (fingerprint tronque + user + machine).
+
+### Fixes prod (suite v1.18 deployment)
+
+- `maj.sh` + `start.sh` : `chmod +x scripts/env-merge.sh` AVANT l'appel +
+  invocation `bash <script>` (ne depend plus du bit exec apres `git pull`).
+- `test_platform_key` : fallback `ip:port` quand `machines.name` est
+  NULL/vide -> evite le toast "Connexion keypair OK sur " (nom vide).
+- `Wazuh install` multi-OS : detection `/etc/os-release` + branche apt
+  (Debian/Ubuntu) / yum-dnf (RHEL/Rocky/Alma/Fedora/Amazon/Oracle) /
+  zypper (SUSE/openSUSE). Avant : apt-only -> fail silencieux sur
+  RHEL family.
+- Bit `+x` persistant (mode 100755) en git pour `maj.sh`, `start.sh`,
+  `stop.sh`, `scripts/*.sh`, `scripts/sync-obsidian-vault.py`. Plus besoin
+  de `chmod +x` apres `git clone` ou `git pull`.
+
+### Migration
+
+- 044 (`server_user_ssh_keys.sql`) : table + UNIQUE (machine_id, username,
+  fingerprint_sha256) + FK CASCADE.
+
+### Tests
+
+- `tests/e2e/go-ssh-keys-inventory.mjs` : valide scan + endpoint
+  `server_user_keys` + format reponse (fingerprint SHA256:..., owner_name,
+  is_platform).
+- `go-security.mjs` : regression OK.
+
+---
+
 ## [1.18.0] - 2026-04-25
 
 ### Feature flags : modules ON/OFF via srv-docker.env

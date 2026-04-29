@@ -37,6 +37,9 @@ Gestion des accès SSH sur un parc distant : keypair plateforme Ed25519 (auth sa
 - Keypair persistée dans volume Docker `platform_ssh_keys`.
 - `POST /test_platform_key` doit checker `platform_key_deployed` AVANT la connexion SSH (sinon erreur paramiko brute pour un nouveau serveur). Fix v1.17.0.
 - `POST /scan_server_users` inclut tous les `/etc/passwd` ; les comptes `nologin/false/sync/halt/shutdown` sont auto-classifies `excluded` (auditable sans polluer la liste). Fix v1.17.0.
+- **`scan_server_users` lit les `authorized_keys` via `execute_as_root`** (pas `cat` simple user) - sinon silent fail sur `/root/*` et users a home 700. Fix v1.19.0.
+- **Inventaire detaille des cles SSH** dans `server_user_ssh_keys` (depuis v1.19.0). Drift detection auto via `last_seen_at`.
+- **Suppression chirurgicale `POST /server_user_remove_key`** : bloque suppression de la cle plateforme RootWarden par defaut (anti-self-lock, override `force=true`).
 
 ## Voir aussi
 
