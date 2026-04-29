@@ -271,7 +271,9 @@ window._i18n = Object.assign(window._i18n || {}, {
 $jsKeys = ['wazuh.loading', 'wazuh.no_servers', 'wazuh.confirm_install', 'wazuh.confirm_uninstall',
     'wazuh.confirm_restart', 'wazuh.confirm_delete_rule', 'wazuh.saving', 'wazuh.saved',
     'wazuh.col_agent_id', 'wazuh.col_status', 'wazuh.col_version', 'wazuh.col_group', 'wazuh.col_actions',
-    'wazuh.btn_install', 'wazuh.btn_detect', 'wazuh.btn_detect_tip', 'wazuh.btn_uninstall', 'wazuh.btn_restart', 'wazuh.btn_setgroup',
+    'wazuh.col_network', 'wazuh.col_criticality', 'wazuh.col_environment',
+    'wazuh.btn_install', 'wazuh.btn_install_all', 'wazuh.btn_detect', 'wazuh.btn_detect_tip', 'wazuh.btn_uninstall', 'wazuh.btn_restart', 'wazuh.btn_setgroup',
+    'wazuh.confirm_install_all', 'wazuh.installing_all', 'wazuh.install_all_failures',
     'wazuh.status_active', 'wazuh.status_disconnected', 'wazuh.status_never', 'wazuh.status_pending', 'wazuh.status_unknown',
     'wazuh.pwd_set', 'wazuh.pwd_not_set', 'wazuh.prompt_group'];
 foreach ($jsKeys as $k) echo "  " . json_encode($k) . ": " . json_encode(t($k)) . ",\n";

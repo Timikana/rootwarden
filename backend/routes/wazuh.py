@@ -267,12 +267,15 @@ def list_servers():
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
         cur.execute("""
-            SELECT m.id, m.name, m.ip, m.port, m.environment, m.online_status,
+            SELECT m.id, m.name, m.ip, m.port,
+                   m.environment, m.criticality, m.network_type, m.online_status,
                    a.agent_id, a.agent_name, a.version, a.group_name, a.status, a.last_keep_alive
             FROM machines m
             LEFT JOIN wazuh_agents a ON a.machine_id = m.id
             WHERE m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived'
-            ORDER BY m.name
+            ORDER BY
+                CASE WHEN m.criticality = 'CRITIQUE' THEN 0 ELSE 1 END,
+                m.name
         """)
         servers = cur.fetchall()
     return jsonify({'success': True, 'servers': servers})
@@ -394,6 +397,173 @@ systemctl enable --now wazuh-agent
     except Exception as e:
         logger.exception("Erreur install wazuh : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@bp.route('/wazuh/install_all', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_wazuh')
+@threaded_route
+def install_all():
+    """Installe Wazuh agent sur TOUS les serveurs sans agent.
+
+    Boucle sequentielle (pas en parallele : chaque install fait apt-get update
+    et tire des paquets, parallele ferait surcharge reseau + manager Wazuh).
+    Renvoie un resume {ok, fail, skipped} avec details par machine.
+
+    Body JSON :
+        group (str, optional) : groupe Wazuh applique a tous (sinon default)
+    """
+    data = request.get_json(silent=True) or {}
+    requested_group = (data.get('group') or '').strip()
+
+    cfg = _get_config()
+    if not cfg:
+        return jsonify({'success': False, 'message': 'Config Wazuh absente (onglet Configuration)'}), 400
+
+    # Liste des serveurs sans agent (LEFT JOIN wazuh_agents puis filter NULL)
+    with get_db_connection() as conn:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT m.id, m.name
+            FROM machines m
+            LEFT JOIN wazuh_agents a ON a.machine_id = m.id
+            WHERE (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')
+              AND a.id IS NULL
+            ORDER BY
+                CASE WHEN m.criticality = 'CRITIQUE' THEN 0 ELSE 1 END,
+                m.name
+        """)
+        targets = cur.fetchall()
+
+    if not targets:
+        return jsonify({'success': True, 'ok': 0, 'fail': 0, 'skipped': 0,
+                        'message': 'Aucun serveur sans agent', 'details': []})
+
+    results = {'ok': 0, 'fail': 0, 'details': []}
+    for t in targets:
+        # Reutilise la logique de /wazuh/install via appel HTTP-like : on
+        # appelle directement la fonction install() ne marche pas (decorateurs
+        # require_api_key etc.). On reimplemente la logique core ici en mode
+        # silencieux. Ceci evite de retraiter tout dans chaque endpoint.
+        try:
+            from flask import g
+            row = {'id': t['id']}
+            row_full, err = _resolve_machine(t['id'])
+            if err:
+                results['fail'] += 1
+                results['details'].append({'id': t['id'], 'name': t['name'],
+                                           'success': False, 'message': 'machine resolution failed'})
+                continue
+
+            manager = cfg['manager_ip']
+            reg_pwd = _dec(cfg.get('registration_password'))
+            group = requested_group or cfg['default_group']
+            if not _GROUP_RE.match(group):
+                results['fail'] += 1
+                results['details'].append({'id': t['id'], 'name': t['name'],
+                                           'success': False, 'message': f'group invalide : {group}'})
+                continue
+
+            ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row_full)
+            env_vars = f"WAZUH_MANAGER='{manager}' WAZUH_AGENT_GROUP='{group}'"
+            if reg_pwd:
+                env_vars += f" WAZUH_REGISTRATION_PASSWORD='{reg_pwd}'"
+
+            install_cmd = f"""
+set -e
+. /etc/os-release 2>/dev/null || (echo "no /etc/os-release" >&2; exit 1)
+ID_LC=$(echo "${{ID:-unknown}}" | tr 'A-Z' 'a-z')
+LIKE_LC=$(echo "${{ID_LIKE:-}}" | tr 'A-Z' 'a-z')
+is_deb() {{ case " $ID_LC $LIKE_LC " in *" debian "*|*" ubuntu "*) return 0;; esac; return 1; }}
+is_rhel() {{ case " $ID_LC $LIKE_LC " in *" rhel "*|*" fedora "*|*" centos "*) return 0;; esac; return 1; }}
+is_suse() {{ case " $ID_LC $LIKE_LC " in *" suse "*|*" opensuse "*|*" sles "*) return 0;; esac; return 1; }}
+if is_deb; then
+    export DEBIAN_FRONTEND=noninteractive
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import
+    chmod 644 /usr/share/keyrings/wazuh.gpg
+    echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' > /etc/apt/sources.list.d/wazuh.list
+    apt-get update -qq
+    {env_vars} apt-get install -y wazuh-agent
+elif is_rhel; then
+    rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
+    cat > /etc/yum.repos.d/wazuh.repo <<'REPOEOF'
+[wazuh]
+gpgcheck=1
+gpgkey=https://packages.wazuh.com/key/GPG-KEY-WAZUH
+enabled=1
+name=EL-$releasever - Wazuh
+baseurl=https://packages.wazuh.com/4.x/yum/
+protect=1
+REPOEOF
+    if command -v dnf >/dev/null 2>&1; then
+        {env_vars} dnf install -y wazuh-agent
+    else
+        {env_vars} yum install -y wazuh-agent
+    fi
+elif is_suse; then
+    rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
+    cat > /etc/zypp/repos.d/wazuh.repo <<'REPOEOF'
+[wazuh]
+gpgcheck=1
+gpgkey=https://packages.wazuh.com/key/GPG-KEY-WAZUH
+enabled=1
+name=Wazuh repository
+baseurl=https://packages.wazuh.com/4.x/yum/
+type=rpm-md
+REPOEOF
+    {env_vars} zypper -n install wazuh-agent
+else
+    echo "OS non supporte" >&2; exit 2
+fi
+systemctl daemon-reload
+systemctl enable --now wazuh-agent
+""".strip()
+
+            with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
+                out, err_out, code = execute_as_root(client, install_cmd, root_pwd, logger=logger, timeout=600)
+                if code != 0:
+                    results['fail'] += 1
+                    results['details'].append({'id': t['id'], 'name': t['name'],
+                                               'success': False,
+                                               'message': (err_out or '')[-300:].strip() or f'exit={code}'})
+                    continue
+
+                v_out, _, _ = execute_as_root(client,
+                    "/var/ossec/bin/wazuh-control info 2>&1 | grep WAZUH_VERSION | cut -d= -f2 | tr -d '\"'",
+                    root_pwd, logger=logger, timeout=10)
+                version = (v_out or '').strip()[:20] or 'unknown'
+
+                id_out, _, _ = execute_as_root(client,
+                    "grep -E '^ID:' /var/ossec/etc/client.keys 2>/dev/null | head -1 | awk '{print $2}' || "
+                    "cat /var/ossec/etc/client.keys 2>/dev/null | head -1 | awk '{print $1}'",
+                    root_pwd, logger=logger, timeout=10)
+                agent_id = (id_out or '').strip()[:10]
+
+            _upsert_agent(t['id'], agent_id=agent_id or None, version=version,
+                          group_name=group, status='pending',
+                          installed_at=datetime.datetime.now())
+            results['ok'] += 1
+            results['details'].append({'id': t['id'], 'name': t['name'],
+                                       'success': True, 'agent_id': agent_id, 'version': version})
+        except Exception as e:
+            logger.exception("install_all : erreur sur %s : %s", t['name'], e)
+            results['fail'] += 1
+            results['details'].append({'id': t['id'], 'name': t['name'],
+                                       'success': False, 'message': str(e)[:200]})
+
+    user_id, _ = get_current_user()
+    _audit(user_id, 'install_all',
+           f"ok={results['ok']} fail={results['fail']} total={len(targets)}")
+    return jsonify({
+        'success': results['fail'] == 0,
+        'ok': results['ok'],
+        'fail': results['fail'],
+        'skipped': 0,
+        'total': len(targets),
+        'message': f"{results['ok']}/{len(targets)} agent(s) installe(s)",
+        'details': results['details'],
+    })
 
 
 @bp.route('/wazuh/detect', methods=['POST'])

@@ -21,6 +21,11 @@ Depuis v1.17.0 : route `POST /wazuh/detect` pour decouvrir un agent installe hor
 
 Depuis v1.18.0 : module activable/desactivable via `WAZUH_ENABLED` dans `srv-docker.env` (voir [[02_Domaines/feature-flags]]). Quand OFF, le blueprint backend n'est pas enregistre, le menu cache l'entree, `/wazuh/index.php` retourne 404.
 
+Depuis v1.19.x :
+- **Install multi-OS** dans `/wazuh/install` : detection `/etc/os-release` puis branche apt (Debian/Ubuntu) / yum-dnf (RHEL/Rocky/Alma/Fedora/Amazon/Oracle) / zypper (SUSE/openSUSE). Avant : apt-only -> fail silencieux sur RHEL family.
+- **Bouton "Installer sur tous"** + endpoint `POST /wazuh/install_all` : boucle sequentielle sur tous les serveurs sans agent (LEFT JOIN `wazuh_agents` filter NULL). Renvoie `{ok, fail, total, details}`. Tri par criticité descendante (CRITIQUE en premier) puis nom.
+- **Colonnes Reseau / Criticite / Environnement** dans la liste serveurs (`network_type`, `criticality`, `environment` de la table `machines`). Tri par criticité descendante puis nom dans `/wazuh/servers`.
+
 ## Flow
 
 [[01_Architecture/flow-wazuh-deploy]]
