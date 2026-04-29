@@ -81,10 +81,13 @@ if [ ! -f "${ENV_FILE}" ]; then
     echo -e "${RED}[maj]${NC} ${ENV_FILE} absent. Copier d'abord : cp srv-docker.env.example srv-docker.env" >&2
     exit 1
 fi
+# Apres git pull, le bit executable n'est pas toujours conserve (umask, FS
+# Windows-mounted). On le re-applique avant l'appel pour eviter le crash.
+chmod +x "${SCRIPT_DIR}/scripts/env-merge.sh" 2>/dev/null || true
 if [ "$DRY_RUN" -eq 1 ]; then
-    run "${SCRIPT_DIR}/scripts/env-merge.sh" --dry-run
+    run bash "${SCRIPT_DIR}/scripts/env-merge.sh" --dry-run
 else
-    "${SCRIPT_DIR}/scripts/env-merge.sh"
+    bash "${SCRIPT_DIR}/scripts/env-merge.sh"
 fi
 
 # ── Etape 3 : rebuild Docker ─────────────────────────────────────────────────

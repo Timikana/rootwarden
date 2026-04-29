@@ -677,13 +677,18 @@ def test_platform_key():
     if not m:
         return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
 
+    # Label defensif : certaines machines ont name=NULL ou vide en BDD (import
+    # historique ou edit ulterieur). Sans ce fallback, le toast affiche
+    # "Connexion keypair OK sur " (nom vide) - bug remonte v1.18.0.
+    label = (m.get('name') or '').strip() or f"{m['ip']}:{m['port']}"
+
     # Si la keypair n'a jamais ete deployee, message clair plutot qu'erreur
     # paramiko illisible. Le bouton "Tester" est visible meme avant deploiement.
     if not m.get('platform_key_deployed'):
         return jsonify({
             'success': False,
             'auth_method': 'none',
-            'message': f"Cle non deployee sur {m['name']} - clique 'Deployer' d'abord."
+            'message': f"Cle non deployee sur {label} - clique 'Deployer' d'abord."
         })
 
     try:
@@ -696,15 +701,15 @@ def test_platform_key():
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(hostname=m['ip'], port=m['port'], username=m['user'], pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10)
         client.close()
-        return jsonify({'success': True, 'auth_method': 'keypair', 'message': f"Connexion keypair OK sur {m['name']}"})
+        return jsonify({'success': True, 'auth_method': 'keypair', 'message': f"Connexion keypair OK sur {label}"})
     except paramiko.AuthenticationException:
         return jsonify({
             'success': False,
             'auth_method': 'password',
-            'message': f"Authentification keypair refusee sur {m['name']} - re-deploie la cle."
+            'message': f"Authentification keypair refusee sur {label} - re-deploie la cle."
         })
     except Exception as e:
-        return jsonify({'success': False, 'auth_method': 'password', 'message': f"Keypair echouee sur {m['name']} : {e}"})
+        return jsonify({'success': False, 'auth_method': 'password', 'message': f"Keypair echouee sur {label} : {e}"})
 
 
 @bp.route('/remove_ssh_password', methods=['POST'])
