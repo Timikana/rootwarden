@@ -1535,9 +1535,23 @@ def delete_remote_user():
             # source de verite : userdel peut retourner exit != 0 avec des
             # warnings (mail spool, subuid, cron) alors que l'user EST
             # bien supprime. Sans ce check on renvoyait "Echec" a tort.
-            check, _, _ = execute_as_root(client, f"id {shlex.quote(username)} 2>&1", root_pass, timeout=5)
+            #
+            # IMPORTANT : on regarde l'EXIT CODE de `id` (universal), pas le
+            # message qui depend de la locale. En FR : "utilisateur
+            # inexistant", en EN : "no such user", en ES : "no existe el
+            # usuario"... Le exit code lui est toujours 1 si user absent.
+            # Bug v1.19.x : message FR ne matchait pas -> "echec" alors que
+            # delete OK. Fix : exit_code est l'autorite, message en fallback.
+            check, check_err, check_exit = execute_as_root(
+                client, f"id {shlex.quote(username)} 2>&1", root_pass, timeout=5)
             check_str = (check or '').lower()
-            user_gone = 'no such user' in check_str or 'does not exist' in check_str
+            user_gone = (
+                (check_exit is not None and int(check_exit) != 0)
+                or 'no such user' in check_str
+                or 'does not exist' in check_str
+                or 'utilisateur inexistant' in check_str
+                or 'no existe el usuario' in check_str
+            )
 
             if user_gone:
                 if exit_code and int(exit_code) != 0:
