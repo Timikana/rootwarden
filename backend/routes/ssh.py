@@ -97,26 +97,43 @@ def _parse_authorized_keys_dump(dump: str):
 
     Format attendu : sequences ``###USER:xxx###`` ... ``###ENDUSER###``.
     Retourne ``{username: [parsed_keys]}``.
+
+    Tolere les cas degrades :
+    - authorized_keys sans newline finale -> ###ENDUSER### colle a la
+      derniere cle ("ssh-ed25519 AAAA...comment###ENDUSER###")
+    - ###USER:xxx### colle a un suffixe (theoriquement impossible mais safe)
     """
     result = {}
     if not dump:
         return result
     current_user = None
     buf = []
-    for line in dump.splitlines():
-        if line.startswith('###USER:') and line.endswith('###'):
-            current_user = line[len('###USER:'):-len('###')].strip()
-            buf = []
-            continue
-        if line.startswith('###ENDUSER###'):
+    for raw_line in dump.splitlines():
+        # Si la ligne CONTIENT ###ENDUSER### (potentiellement collee a une cle)
+        idx_end = raw_line.find('###ENDUSER###')
+        if idx_end >= 0:
+            # Capture le prefixe (potentielle derniere cle) avant le marqueur
+            prefix = raw_line[:idx_end]
+            if prefix.strip():
+                buf.append(prefix)
             if current_user:
                 parsed = [_parse_ssh_key_line(ln) for ln in buf]
                 result[current_user] = [k for k in parsed if k]
             current_user = None
             buf = []
+            # Le suffixe apres ###ENDUSER### pourrait theoriquement contenir
+            # un nouveau ###USER:xxx### sur la meme ligne, on le retraite
+            suffix = raw_line[idx_end + len('###ENDUSER###'):]
+            if '###USER:' in suffix:
+                raw_line = suffix
+            else:
+                continue
+        if raw_line.startswith('###USER:') and raw_line.rstrip().endswith('###'):
+            current_user = raw_line[len('###USER:'):raw_line.rstrip().rfind('###')].strip()
+            buf = []
             continue
         if current_user is not None:
-            buf.append(line)
+            buf.append(raw_line)
     return result
 
 
@@ -913,6 +930,12 @@ def scan_server_users():
             #      cles a lui dans ~/ qu'il peut lire sans sudo). Ainsi si
             #      root_password absent ou sudo refuse, on a quand meme le user.
             # Resultat : on merge les 2 dumps -- root prioritaire si il a vu.
+            # IMPORTANT : `printf '\\n'` apres `cat` car les authorized_keys
+            # ecrits par RootWarden via `printf '%s'` n'ont PAS de newline
+            # finale -> le marqueur ###ENDUSER### colle sur la derniere cle,
+            # le parser ne le voit pas -> les cles de l'user ne sont jamais
+            # enregistrees. Bug observe sur 4 users (rootwarden, gbroussier,
+            # kduplouy, cleopatre) v1.19.0.
             dump_script = (
                 "awk -F: '{print $6\":\"$1}' /etc/passwd | "
                 "while IFS=: read home user; do "
@@ -920,6 +943,7 @@ def scan_server_users():
                 "  [ -r \"$ak\" ] || continue; "
                 "  echo \"###USER:$user###\"; "
                 "  cat \"$ak\"; "
+                "  printf '\\n'; "
                 "  echo \"###ENDUSER###\"; "
                 "done"
             )
@@ -943,6 +967,7 @@ def scan_server_users():
                     "if [ -r \"$ak\" ]; then "
                     "  echo \"###USER:$(whoami)###\"; "
                     "  cat \"$ak\"; "
+                    "  printf '\\n'; "
                     "  echo \"###ENDUSER###\"; "
                     "fi"
                 )
