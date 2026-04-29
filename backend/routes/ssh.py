@@ -905,11 +905,14 @@ def scan_server_users():
             stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
             passwd_output = stdout.read().decode('utf-8', errors='replace')
 
-            # 2. Dump des authorized_keys via root (lisible sur /root/* et
-            # /home/*/.ssh/authorized_keys protege chmod 600). Avant v1.18.x
-            # on faisait `cat` en simple user -> permission denied silencieux
-            # sur root et users privilegies. Output marque ###USER:xxx### pour
-            # parsing en 1 seul roundtrip SSH.
+            # 2. Dump des authorized_keys.
+            # Strategie en 2 etages :
+            #   a) Tente execute_as_root -> dump TOUS les users (root + home prot).
+            #   b) En parallele : `cat ~/.ssh/authorized_keys` en simple user
+            #      pour AU MOINS recuperer les cles du user connecte (ex: ses
+            #      cles a lui dans ~/ qu'il peut lire sans sudo). Ainsi si
+            #      root_password absent ou sudo refuse, on a quand meme le user.
+            # Resultat : on merge les 2 dumps -- root prioritaire si il a vu.
             dump_script = (
                 "awk -F: '{print $6\":\"$1}' /etc/passwd | "
                 "while IFS=: read home user; do "
@@ -920,15 +923,42 @@ def scan_server_users():
                 "  echo \"###ENDUSER###\"; "
                 "done"
             )
+            ak_dump_root = ''
             try:
-                ak_dump, _, _ = execute_as_root(client, dump_script, root_pass,
-                                                logger=logger, timeout=30)
+                ak_dump_root, _err, _code = execute_as_root(client, dump_script, root_pass,
+                                                            logger=logger, timeout=30)
+                if not ak_dump_root.strip():
+                    logger.info("scan_server_users(%s): dump root vide (probable absence de fichiers ou silent fail). Fallback simple-user.", mid)
             except Exception as _e:
-                logger.warning("scan_server_users: dump root authorized_keys echoue (%s) -- fallback no-root", _e)
-                ak_dump = ''
+                logger.warning("scan_server_users(%s): dump root authorized_keys echoue (%s) -- fallback simple-user", mid, _e)
 
-            # Parse le dump en {username: [parsed_keys]}
-            keys_by_user = _parse_authorized_keys_dump(ak_dump)
+            # Fallback simple-user : recupere AU MOINS authorized_keys du user
+            # connecte (et tout home world-readable, rare). Pas de filtre awk
+            # de tous les users car cat /home/X/.ssh/* en simple user echoue
+            # pour les autres -> on cible le user de connexion uniquement.
+            ak_dump_user = ''
+            try:
+                user_script = (
+                    "ak=\"$HOME/.ssh/authorized_keys\"; "
+                    "if [ -r \"$ak\" ]; then "
+                    "  echo \"###USER:$(whoami)###\"; "
+                    "  cat \"$ak\"; "
+                    "  echo \"###ENDUSER###\"; "
+                    "fi"
+                )
+                _stdin, _stdout, _stderr = client.exec_command(user_script, timeout=10)
+                ak_dump_user = _stdout.read().decode('utf-8', errors='replace')
+            except Exception as _e:
+                logger.warning("scan_server_users(%s): dump simple-user echoue (%s)", mid, _e)
+
+            # Parse les 2 dumps. Root gagne en cas de doublon (dump_root est
+            # autoritatif). Le simple-user comble les trous.
+            keys_root = _parse_authorized_keys_dump(ak_dump_root)
+            keys_user = _parse_authorized_keys_dump(ak_dump_user)
+            keys_by_user = dict(keys_user)  # base = user
+            keys_by_user.update(keys_root)  # root ecrase si present
+            logger.info("scan_server_users(%s): %d user(s) avec cles (root=%d, fallback=%d)",
+                        mid, len(keys_by_user), len(keys_root), len(keys_user))
 
             from ssh_key_manager import get_platform_public_key
             platform_pubkey = get_platform_public_key() or ''
