@@ -15,7 +15,7 @@ status: stable
 routes: []
 tables: [cve_findings, cve_remediation, cve_scans]
 imports_detected: [config]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

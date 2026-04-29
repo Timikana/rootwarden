@@ -15,7 +15,7 @@ status: stable
 routes: []
 tables: [schema_migrations]
 imports_detected: [argparse, config, pathlib]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 
