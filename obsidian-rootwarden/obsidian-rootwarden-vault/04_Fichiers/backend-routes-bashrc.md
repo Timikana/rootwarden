@@ -16,7 +16,7 @@ status: stable
 routes: [/bashrc/backups, /bashrc/deploy, /bashrc/prerequisites, /bashrc/preview, /bashrc/restore, /bashrc/template, /bashrc/users]
 tables: [bashrc_templates, machines, user_logs]
 imports_detected: [difflib, pathlib, routes, ssh_utils]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

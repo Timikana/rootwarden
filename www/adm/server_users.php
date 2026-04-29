@@ -180,7 +180,7 @@ function renderUsers(users, pendingCount) {
             </td>
             <td class="px-4 py-3 text-xs text-gray-400 font-mono">${safeHome}</td>
             <td class="px-4 py-3 text-center">
-                <span class="${u.keys_count > 0 ? 'font-bold text-blue-500' : 'text-gray-400'}">${u.keys_count || 0}</span>
+                ${u.keys_count > 0 ? `<button data-user="${safeName}" onclick="showUserKeys(this.dataset.user)" class="font-bold text-blue-500 hover:text-blue-700 hover:underline cursor-pointer" title="${__('server_users_view_keys_tip')}">${u.keys_count}</button>` : '<span class="text-gray-400">0</span>'}
             </td>
             <td class="px-4 py-3 text-center">${u.has_platform_key ? '<span class="text-green-500">&#10003;</span>' : '<span class="text-gray-400">&#10007;</span>'}</td>
             <td class="px-4 py-3 text-center">
@@ -260,10 +260,74 @@ async function deleteUser(username) {
     } catch(e) { toast(__('toast_network_error'), 'error'); }
 }
 
+async function showUserKeys(username) {
+    const modal = document.getElementById('keys-modal');
+    const body = document.getElementById('keys-modal-body');
+    const title = document.getElementById('keys-modal-title');
+    title.textContent = __('server_users_keys_for').replace('%user', username);
+    body.innerHTML = `<div class="text-sm text-gray-400 py-6 text-center">${__('common_loading')}</div>`;
+    modal.classList.remove('hidden');
+
+    try {
+        const r = await fetch(`${window.API_URL}/server_user_keys?machine_id=${MACHINE_ID}&username=${encodeURIComponent(username)}`);
+        const d = await r.json();
+        if (!d.success) {
+            body.innerHTML = `<div class="text-sm text-red-500 py-4">${escHtml(d.message || __('toast_error'))}</div>`;
+            return;
+        }
+        if (!d.keys || d.keys.length === 0) {
+            body.innerHTML = `<div class="text-sm text-gray-400 py-4 text-center">${__('server_users_no_keys')}</div>`;
+            return;
+        }
+        let html = '<div class="space-y-3">';
+        for (const k of d.keys) {
+            const platformBadge = k.is_platform
+                ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 ml-2">${__('server_users_key_platform')}</span>`
+                : '';
+            const ownerBadge = k.owner_name
+                ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ml-2">${escHtml(k.owner_name)}</span>`
+                : (k.is_platform ? '' : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 ml-2">${__('server_users_key_unknown_owner')}</span>`);
+            html += `
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs font-mono font-bold text-gray-600 dark:text-gray-300">${escHtml(k.type)}</span>
+                        ${platformBadge}${ownerBadge}
+                    </div>
+                    <div class="text-[11px] font-mono text-gray-500 break-all mb-1">${escHtml(k.fingerprint)}</div>
+                    ${k.comment ? `<div class="text-xs text-gray-600 dark:text-gray-400 italic">${escHtml(k.comment)}</div>` : ''}
+                    <div class="text-[10px] text-gray-400 mt-1">
+                        ${__('server_users_key_first_seen')} ${escHtml(k.first_seen_at || '?')}
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        body.innerHTML = html;
+    } catch(e) {
+        body.innerHTML = `<div class="text-sm text-red-500 py-4">${escHtml(__('toast_network_error'))}</div>`;
+    }
+}
+
+function closeKeysModal() {
+    document.getElementById('keys-modal').classList.add('hidden');
+}
+
 if (MACHINE_ID > 0) {
     document.addEventListener('DOMContentLoaded', scanUsers);
 }
 </script>
+
+<!-- Modal liste des cles SSH d'un user -->
+<div id="keys-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+     onclick="if(event.target===this) closeKeysModal()">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col" style="max-height: 80vh">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+            <h3 id="keys-modal-title" class="text-lg font-bold text-gray-800 dark:text-gray-200">SSH keys</h3>
+            <button onclick="closeKeysModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="keys-modal-body" class="p-6 overflow-y-auto"></div>
+    </div>
+</div>
 
 <?php require_once __DIR__ . '/../footer.php'; ?>
 </body>

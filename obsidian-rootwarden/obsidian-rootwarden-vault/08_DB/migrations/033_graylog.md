@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [ci, graylog_collectors, graylog_config, graylog_rsyslog, graylog_sidecars, graylog_templates, permissions]
 imports_detected: []
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

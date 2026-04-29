@@ -14,7 +14,7 @@ last_reviewed: 2026-04-21
 routes: [/wazuh/config, /wazuh/detect, /wazuh/group, /wazuh/install, /wazuh/options, /wazuh/restart, /wazuh/rules, /wazuh/rules/<name>, /wazuh/servers, /wazuh/uninstall]
 tables: [machines, user_logs, wazuh_agents, wazuh_config, wazuh_machine_options, wazuh_rules]
 imports_detected: [encryption, routes, ssh_utils]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 
