@@ -20,6 +20,8 @@ import re
 import json
 import shlex
 import socket
+import base64
+import hashlib
 import logging
 import subprocess
 import threading
@@ -36,6 +38,87 @@ bp = Blueprint('ssh', __name__)
 # Securite : validation des noms d'utilisateur (anti-injection OS command)
 # ─────────────────────────────────────────────────────────────────────────────
 _USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
+
+# ── Helpers SSH keys parsing (v1.18.x) ──────────────────────────────────
+_SSH_KEY_TYPE_RE = re.compile(r'^(ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-[a-z0-9-]+|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)$')
+
+
+def _parse_ssh_key_line(line: str):
+    """Parse une ligne authorized_keys -> dict ou None.
+
+    Retourne {type, fingerprint_sha256, comment, data} ou None si invalide.
+    Format attendu : ``<type> <base64_data> [comment]``. Les options
+    (`from=`, `command=`, etc.) en prefixe sont ignorees. Lignes de
+    commentaire (`#`) et vides ignorees.
+
+    Le fingerprint SHA256 est calcule comme `ssh-keygen -lf` :
+    base64(sha256(base64_decode(key_data))) sans padding.
+    """
+    line = (line or '').strip()
+    if not line or line.startswith('#'):
+        return None
+    # Si options ssh (from=,command=,etc.) en prefixe, on saute jusqu'au type
+    rest = line
+    if not _SSH_KEY_TYPE_RE.match(rest.split(None, 1)[0]):
+        # Cherche le prochain token qui ressemble a un type de cle
+        tokens = rest.split()
+        for i, tok in enumerate(tokens):
+            if _SSH_KEY_TYPE_RE.match(tok):
+                rest = ' '.join(tokens[i:])
+                break
+        else:
+            return None
+    parts = rest.split(None, 2)
+    if len(parts) < 2:
+        return None
+    key_type = parts[0]
+    key_data = parts[1]
+    comment = parts[2].strip() if len(parts) > 2 else None
+    if not _SSH_KEY_TYPE_RE.match(key_type):
+        return None
+    try:
+        raw = base64.b64decode(key_data, validate=False)
+    except Exception:
+        return None
+    if len(raw) < 8:
+        return None
+    digest = hashlib.sha256(raw).digest()
+    fp = base64.b64encode(digest).decode('ascii').rstrip('=')
+    return {
+        'type': key_type[:32],
+        'fingerprint': fp[:64],
+        'comment': comment[:255] if comment else None,
+        'data': key_data,
+    }
+
+
+def _parse_authorized_keys_dump(dump: str):
+    """Parse le dump multi-user produit par scan_server_users.
+
+    Format attendu : sequences ``###USER:xxx###`` ... ``###ENDUSER###``.
+    Retourne ``{username: [parsed_keys]}``.
+    """
+    result = {}
+    if not dump:
+        return result
+    current_user = None
+    buf = []
+    for line in dump.splitlines():
+        if line.startswith('###USER:') and line.endswith('###'):
+            current_user = line[len('###USER:'):-len('###')].strip()
+            buf = []
+            continue
+        if line.startswith('###ENDUSER###'):
+            if current_user:
+                parsed = [_parse_ssh_key_line(ln) for ln in buf]
+                result[current_user] = [k for k in parsed if k]
+            current_user = None
+            buf = []
+            continue
+        if current_user is not None:
+            buf.append(line)
+    return result
+
 
 def _validate_username(username: str) -> bool:
     """Valide qu'un nom d'utilisateur ne contient que des caracteres surs."""
@@ -813,15 +896,39 @@ def scan_server_users():
     mid = int(machine_id)
     ssh_pass = server_decrypt_password(m['password'])
 
+    root_pass = server_decrypt_password(m.get('root_password') or '')
+
     try:
         with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
-            # Lister TOUS les users de /etc/passwd. Les comptes systeme
-            # (shell=nologin/false/sync/halt/shutdown) seront auto-classifies
-            # 'excluded' plus bas pour qu'ils restent auditables sans polluer
-            # la liste des comptes geres.
+            # 1. Lister TOUS les users de /etc/passwd (no privilege requis).
             cmd = "awk -F: '{print $1\":\"$3\":\"$6\":\"$7}' /etc/passwd"
             stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
             passwd_output = stdout.read().decode('utf-8', errors='replace')
+
+            # 2. Dump des authorized_keys via root (lisible sur /root/* et
+            # /home/*/.ssh/authorized_keys protege chmod 600). Avant v1.18.x
+            # on faisait `cat` en simple user -> permission denied silencieux
+            # sur root et users privilegies. Output marque ###USER:xxx### pour
+            # parsing en 1 seul roundtrip SSH.
+            dump_script = (
+                "awk -F: '{print $6\":\"$1}' /etc/passwd | "
+                "while IFS=: read home user; do "
+                "  ak=\"$home/.ssh/authorized_keys\"; "
+                "  [ -r \"$ak\" ] || continue; "
+                "  echo \"###USER:$user###\"; "
+                "  cat \"$ak\"; "
+                "  echo \"###ENDUSER###\"; "
+                "done"
+            )
+            try:
+                ak_dump, _, _ = execute_as_root(client, dump_script, root_pass,
+                                                logger=logger, timeout=30)
+            except Exception as _e:
+                logger.warning("scan_server_users: dump root authorized_keys echoue (%s) -- fallback no-root", _e)
+                ak_dump = ''
+
+            # Parse le dump en {username: [parsed_keys]}
+            keys_by_user = _parse_authorized_keys_dump(ak_dump)
 
             from ssh_key_manager import get_platform_public_key
             platform_pubkey = get_platform_public_key() or ''
@@ -840,20 +947,20 @@ def scan_server_users():
                 if not re.match(r'^/[a-zA-Z0-9/_.-]+$', home):
                     continue
 
-                ak_cmd = f"cat {home}/.ssh/authorized_keys 2>/dev/null || echo ''"
-                stdin2, stdout2, stderr2 = client.exec_command(ak_cmd, timeout=10)
-                ak_content = stdout2.read().decode('utf-8', errors='replace').strip()
-
-                keys = [k.strip() for k in ak_content.split('\n') if k.strip() and k.strip().startswith('ssh-')]
-                has_platform = any(platform_fragment in k for k in keys) if platform_fragment else False
+                user_keys = keys_by_user.get(uname, [])
+                # Marque has_platform_key si le fragment de cle plateforme y est
+                for k in user_keys:
+                    k['is_platform'] = bool(platform_fragment and platform_fragment in k.get('data', ''))
+                has_platform = any(k['is_platform'] for k in user_keys)
 
                 scanned_users.append({
                     'name': uname,
                     'uid': uid,
                     'home': home,
                     'shell': shell,
-                    'keys_count': len(keys),
+                    'keys_count': len(user_keys),
                     'has_platform_key': has_platform,
+                    'keys': user_keys,
                 })
 
         # Peupler server_user_inventory
@@ -934,6 +1041,49 @@ def scan_server_users():
 
             conn_inv.commit()
 
+            # Inventaire detaille des cles SSH (table server_user_ssh_keys
+            # depuis migration 044). On upsert chaque cle vue ; les cles
+            # disparues entre 2 scans sont supprimees -> drift detection
+            # gratuite via ALTER de last_seen_at.
+            try:
+                seen_keys = set()  # {(username, fingerprint)}
+                for u in scanned_users:
+                    for k in u.get('keys', []):
+                        seen_keys.add((u['name'], k['fingerprint']))
+                        cur.execute("""
+                            INSERT INTO server_user_ssh_keys
+                                (machine_id, username, key_type, fingerprint_sha256,
+                                 comment, is_platform_key)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            ON DUPLICATE KEY UPDATE
+                                key_type = VALUES(key_type),
+                                comment = VALUES(comment),
+                                is_platform_key = VALUES(is_platform_key),
+                                last_seen_at = CURRENT_TIMESTAMP
+                        """, (mid, u['name'], k['type'], k['fingerprint'],
+                              k.get('comment'), 1 if k.get('is_platform') else 0))
+
+                # Supprimer les cles qui n'ont pas ete revues sur ce scan
+                cur.execute(
+                    "SELECT username, fingerprint_sha256 FROM server_user_ssh_keys "
+                    "WHERE machine_id = %s", (mid,))
+                existing_keys = {(r['username'], r['fingerprint_sha256'])
+                                 for r in cur.fetchall()}
+                stale = existing_keys - seen_keys
+                if stale:
+                    for uname, fp in stale:
+                        cur.execute(
+                            "DELETE FROM server_user_ssh_keys "
+                            "WHERE machine_id = %s AND username = %s "
+                            "AND fingerprint_sha256 = %s",
+                            (mid, uname, fp))
+                    logger.info("scan_server_users(%s): %d cle(s) SSH retiree(s)",
+                                mid, len(stale))
+                conn_inv.commit()
+            except Exception as _e:
+                logger.warning("scan_server_users: maj server_user_ssh_keys echoue (%s)", _e)
+                conn_inv.rollback()
+
             # Marquer scanne
             cur.execute("UPDATE machines SET users_scanned_at = NOW() WHERE id = %s", (mid,))
             conn_inv.commit()
@@ -968,6 +1118,81 @@ def scan_server_users():
     except Exception as e:
         logger.error("scan_server_users(%s): %s", machine_id, e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/server_user_keys', methods=['GET'])
+@require_api_key
+@require_machine_access
+@threaded_route
+def server_user_keys():
+    """Liste les cles SSH inventoriees pour un user d'un serveur.
+
+    Query params :
+        machine_id (int)  : id du serveur (required)
+        username   (str)  : username dont on veut les cles (required)
+
+    Response :
+        {success, keys: [{type, fingerprint, comment, is_platform,
+                          owner_name, owner_id, first_seen_at, last_seen_at}]}
+
+    Le cross-reference cherche dans `users.ssh_key` (cle publique stockee
+    par chaque user RootWarden) un fingerprint match -> permet d'identifier
+    "qui a depose cette cle".
+    """
+    machine_id = request.args.get('machine_id', type=int)
+    username = (request.args.get('username') or '').strip()
+    if not machine_id or not username:
+        return jsonify({'success': False, 'message': 'machine_id et username requis'}), 400
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$', username):
+        return jsonify({'success': False, 'message': 'username invalide'}), 400
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+
+        # 1. Cles inventoriees pour cette machine + user
+        cur.execute("""
+            SELECT key_type, fingerprint_sha256, comment, is_platform_key,
+                   first_seen_at, last_seen_at
+            FROM server_user_ssh_keys
+            WHERE machine_id = %s AND username = %s
+            ORDER BY is_platform_key DESC, first_seen_at ASC
+        """, (machine_id, username))
+        rows = cur.fetchall()
+
+        # 2. Cross-reference avec users.ssh_key pour ownership
+        # Calcule le fingerprint des cles users RootWarden et match.
+        cur.execute("SELECT id, name, ssh_key FROM users WHERE active = 1 AND ssh_key IS NOT NULL AND ssh_key != ''")
+        rw_users = cur.fetchall()
+        rw_fp_map = {}  # {fingerprint: (id, name)}
+        for u in rw_users:
+            parsed = _parse_ssh_key_line(u['ssh_key'])
+            if parsed:
+                rw_fp_map[parsed['fingerprint']] = (u['id'], u['name'])
+
+        keys = []
+        for r in rows:
+            fp = r['fingerprint_sha256']
+            owner_id, owner_name = (None, None)
+            if fp in rw_fp_map:
+                owner_id, owner_name = rw_fp_map[fp]
+            keys.append({
+                'type': r['key_type'],
+                'fingerprint': f"SHA256:{fp}",
+                'comment': r['comment'],
+                'is_platform': bool(r['is_platform_key']),
+                'owner_id': owner_id,
+                'owner_name': owner_name,
+                'first_seen_at': str(r['first_seen_at']) if r['first_seen_at'] else None,
+                'last_seen_at': str(r['last_seen_at']) if r['last_seen_at'] else None,
+            })
+
+        return jsonify({'success': True, 'keys': keys, 'count': len(keys)})
+    except Exception as e:
+        logger.error("server_user_keys(%s, %s): %s", machine_id, username, e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+    finally:
+        conn.close()
 
 
 @bp.route('/remove_user_keys', methods=['POST'])

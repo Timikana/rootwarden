@@ -12,10 +12,10 @@ version_introduced: 1.0
 last_reviewed: 2026-04-21
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
-routes: [/delete_remote_user, /deploy, /deploy_platform_key, /deploy_service_account, /logs, /platform_key, /preflight_check, /reenter_ssh_password, /regenerate_platform_key, /remove_ssh_password, /remove_user_keys, /scan_server_users, /test_platform_key]
-tables: [machines, server_user_inventory, user_machine_access, users]
+routes: [/delete_remote_user, /deploy, /deploy_platform_key, /deploy_service_account, /logs, /platform_key, /preflight_check, /reenter_ssh_password, /regenerate_platform_key, /remove_ssh_password, /remove_user_keys, /scan_server_users, /server_user_keys, /test_platform_key]
+tables: [machines, server_user_inventory, server_user_ssh_keys, user_machine_access, users]
 imports_detected: [routes, ssh_utils, threading, traceback]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

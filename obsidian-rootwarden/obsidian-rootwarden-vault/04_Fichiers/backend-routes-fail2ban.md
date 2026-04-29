@@ -15,7 +15,7 @@ last_reviewed: 2026-04-21
 routes: [/fail2ban/ban, /fail2ban/ban_all_servers, /fail2ban/config, /fail2ban/disable_jail, /fail2ban/enable_jail, /fail2ban/geoip, /fail2ban/history, /fail2ban/install, /fail2ban/install_all, /fail2ban/jail, /fail2ban/logs, /fail2ban/restart, /fail2ban/services, /fail2ban/stats, /fail2ban/status, /fail2ban/templates, /fail2ban/unban, /fail2ban/unban_all, /fail2ban/whitelist]
 tables: [fail2ban_history, fail2ban_status, machines]
 imports_detected: [fail2ban_manager, routes, ssh_utils]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

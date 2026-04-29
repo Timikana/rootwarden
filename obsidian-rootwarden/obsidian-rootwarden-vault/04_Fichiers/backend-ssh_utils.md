@@ -16,7 +16,7 @@ status: stable
 routes: []
 tables: [machines, user_machine_access, users]
 imports_detected: [config, contextlib, encryption, select]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

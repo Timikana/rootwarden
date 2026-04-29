@@ -14,7 +14,7 @@ last_reviewed: 2026-04-21
 routes: [/apt_check_lock, /apt_update, /custom_update, /dpkg_repair, /dry_run_update, /pending_packages, /schedule_advanced_security_update, /schedule_advanced_update, /schedule_update, /security_updates, /update, /update-logs, /update_security_exec, /update_zabbix]
 tables: [machines]
 imports_detected: [routes, ssh_utils]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

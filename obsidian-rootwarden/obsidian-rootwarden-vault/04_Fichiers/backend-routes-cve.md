@@ -16,7 +16,7 @@ status: stable
 routes: [/cron_preview, /cve_compare, /cve_history, /cve_remediation, /cve_remediation/stats, /cve_results, /cve_scan, /cve_scan_all, /cve_schedules, /cve_schedules/<int:schedule_id>, /cve_test_connection, /cve_whitelist, /cve_whitelist/<int:whitelist_id>]
 tables: [cve_findings, cve_remediation, cve_scan_schedules, cve_scans, cve_whitelist, machines, users]
 imports_detected: [config, cve_scanner, mail_utils, routes, ssh_utils, threading]
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 
