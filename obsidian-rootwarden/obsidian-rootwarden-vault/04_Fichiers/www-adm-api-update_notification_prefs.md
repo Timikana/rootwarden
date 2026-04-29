@@ -12,7 +12,7 @@ last_reviewed: 2026-04-21
 routes: []
 tables: [notification_preferences]
 imports_detected: []
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 

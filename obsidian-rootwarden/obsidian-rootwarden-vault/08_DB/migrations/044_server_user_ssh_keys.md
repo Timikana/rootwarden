@@ -3,20 +3,20 @@ type: migration
 layer: transverse
 tags: [db]
 language: sql
-path: mysql/migrations/041_ssh_audit_results_counts.sql
+path: mysql/migrations/044_server_user_ssh_keys.sql
 version_introduced:
-last_reviewed: 2026-04-21
+last_reviewed: 2026-04-29
 status: applied
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
-tables: [ssh_audit_results]
+tables: [server_user_ssh_keys]
 imports_detected: []
 last_synced: 2026-04-29
 # AUTO-END
 ---
 
-# 041_ssh_audit_results_counts - [[Code/mysql/migrations/041_ssh_audit_results_counts.sql]]
+# 044_server_user_ssh_keys - [[Code/mysql/migrations/044_server_user_ssh_keys.sql]]
 
 _Migration auto-detectee. Decris l'intention metier en quelques lignes._
 

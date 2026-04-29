@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [server_notes]
 imports_detected: []
-last_synced: 2026-04-25
+last_synced: 2026-04-29
 # AUTO-END
 ---
 
