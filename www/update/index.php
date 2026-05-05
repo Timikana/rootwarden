@@ -79,30 +79,70 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title><?= t('updates.title') ?></title>
     <style>
         .logs-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            /*max-height: 500px; /* Limite la hauteur globale */
-            /*overflow-y: auto; /* Active le scroll si nécessaire */
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 0.75rem;
+            padding: 0.75rem;
         }
 
         .server-log-window {
             border: 1px solid #444;
             background-color: #1e1e1e;
             color: #d4d4d4;
-            width: 45%; /* Ajuste la taille */
-            min-height: 200px; /* Taille minimum */
-            max-height: 400px; /* Évite les fenêtres trop grandes */
-            padding: 0.5rem;
-            overflow-y: auto; /* Active le scroll dans chaque fenêtre */
-            border-radius: 5px;
+            height: 420px;
+            padding: 0;
+            overflow: hidden;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
         }
 
-        .server-log-window h3 {
-            margin: 0 0 0.5rem 0;
+        .server-log-window > .log-header {
+            margin: 0;
+            padding: 0.5rem 0.75rem;
             font-family: sans-serif;
-            font-size: 1.1rem;
+            font-size: 0.95rem;
+            font-weight: 600;
             color: #90caf9;
+            background: #0f1722;
+            border-bottom: 1px solid #1f2a3a;
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+
+        .server-log-window .log-header .server-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .server-log-window .log-follow-toggle {
+            font-size: 0.7rem;
+            font-weight: normal;
+            color: #c8d3e0;
+            cursor: pointer;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            flex: 0 0 auto;
+        }
+
+        .server-log-window .log-follow-toggle input {
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .log-window {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0.5rem 0.75rem;
+            scroll-behavior: smooth;
         }
 
         .log-line {
@@ -110,8 +150,7 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
             padding: 2px 0;
             font-family: monospace;
             white-space: pre-wrap;
-            max-height: 300px; /* Évite que les logs débordent */
-            overflow-y: auto;
+            word-break: break-word;
         }
     </style>
 </head>
