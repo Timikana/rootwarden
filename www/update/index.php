@@ -183,6 +183,8 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button onclick="updateLinux()" class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors font-medium"><?= t('updates.btn_apt_update') ?></button>
                     <button onclick="applySecurityUpdates()" class="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium"><?= t('updates.btn_secu_update') ?></button>
                     <button onclick="dpkgRepair()" class="text-xs px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors font-medium" title="<?= t('updates.tip_dpkg_repair') ?>"><?= t('updates.btn_dpkg_repair') ?></button>
+                    <span class="w-px h-6 bg-gray-300 dark:bg-gray-600 self-center"></span>
+                    <button onclick="rebootSelected()" class="text-xs px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white transition-colors font-medium" title="<?= t('updates.tip_reboot') ?>"><?= t('updates.btn_reboot') ?></button>
                 </div>
             </div>
         </div>
