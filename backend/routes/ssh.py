@@ -1175,6 +1175,83 @@ def scan_server_users():
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
+@bp.route('/sshd_allow_user', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_machine_access
+@threaded_route
+def sshd_allow_user():
+    """Patche sshd_config pour ajouter un username a AllowUsers.
+
+    Endpoint manuel utilise depuis /adm/server_users.php quand un user a
+    une cle SSH deposee mais ne peut pas se connecter (sshd refuse car
+    AllowUsers ne le liste pas).
+
+    Body JSON :
+        machine_id (int)  : id du serveur
+        username   (str)  : user a ajouter dans AllowUsers
+
+    Garde-fous (helper _ensure_sshd_allows_user) :
+    - Idempotent : skip si username deja dans AllowUsers
+    - Skip si AllowUsers absent du sshd_config (rien a patcher)
+    - Backup .bak.rw avant modification
+    - Validation `sshd -t` apres patch
+    - Rollback complet (restore backup + reload) si une etape rate
+
+    Audit log entry par appel.
+    """
+    data = request.get_json(silent=True) or {}
+    machine_id = data.get('machine_id')
+    username = (data.get('username') or '').strip()
+    if not machine_id or not username:
+        return jsonify({'success': False, 'message': 'machine_id et username requis'}), 400
+    if not _validate_username(username):
+        return jsonify({'success': False, 'message': 'username invalide'}), 400
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT id, name, ip, port, user, password, root_password, "
+            "service_account_deployed FROM machines WHERE id = %s",
+            (int(machine_id),))
+        m = cur.fetchone()
+    finally:
+        conn.close()
+
+    if not m:
+        return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+
+    ssh_pass = server_decrypt_password(m['password'])
+    root_pass = server_decrypt_password(m.get('root_password') or '')
+    user_id, _ = get_current_user()
+
+    try:
+        with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                         service_account=m.get('service_account_deployed', False)) as client:
+            modified, msg = _ensure_sshd_allows_user(client, root_pass, username, logger)
+
+        try:
+            conn_a = get_db_connection()
+            cur_a = conn_a.cursor()
+            cur_a.execute(
+                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
+                (user_id, f"[ssh] sshd_allow_user '{username}' sur {m['name']} : {msg[:200]}"))
+            conn_a.commit()
+            conn_a.close()
+        except Exception:
+            pass
+
+        return jsonify({
+            'success': True,
+            'modified': modified,
+            'message': f"{m['name']}: {msg}",
+        })
+    except Exception as e:
+        logger.error("sshd_allow_user(%s, %s): %s", machine_id, username, e)
+        return jsonify({'success': False, 'message': f'Erreur SSH : {str(e)[:200]}'}), 500
+
+
 @bp.route('/server_user_keys', methods=['GET'])
 @require_api_key
 @require_machine_access
