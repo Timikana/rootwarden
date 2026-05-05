@@ -5,6 +5,58 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.20.0] - 2026-05-05
+
+### Bouton Redemarrer serveur (`/update/`)
+
+Action manquante depuis la v1.0 alors que toutes les autres actions (apt update,
+fail2ban restart, services systemd) etaient possibles. Maintenant :
+- `POST /reboot_server` (role admin requis + `require_machine_access` + audit log)
+- Bouton rouge **"Redemarrer"** dans la toolbar de `/update/index.php`
+- Double confirmation utilisateur (action critique)
+- Support `delay_minutes` (cap 24h) : `shutdown -r +N` programme avec broadcast aux users connectes
+- Sans delay : `systemctl reboot` immediat (fallback `/sbin/shutdown -r now` si systemd absent)
+- Webhook notification sur `server_reboot`
+- i18n FR/EN parite : 7 cles
+
+### Auto-fix sshd AllowUsers (suite v1.19)
+
+`POST /sshd_allow_user` - endpoint manuel + bouton "Autoriser sshd" sur chaque
+ligne user dans `/adm/server_users.php`. Patche `sshd_config` pour ajouter le
+user a AllowUsers si absent. Idempotent (skip si AllowUsers absent ou user
+deja autorise) + rollback complet (backup `.bak.rw` + `sshd -t` + restore si fail).
+
+Et auto-fix dans `deploy_service_account` : si `paramiko.AuthenticationException`
+sur le test SSH du compte rootwarden, trigger automatique de
+`_ensure_sshd_allows_user(rootwarden)` puis retry. Resout les serveurs hardenes
+type SRV-WEB qui bloquaient silencieusement.
+
+### Documentation API enrichie
+
+`/api/docs.php` (Swagger UI) etait coince en **v1.13.0**. Mis a jour vers
+**v1.19.0** dans `info.version` du `openapi.yaml`. Nouvelles routes documentees :
+- `/reboot_server` (Monitoring)
+- `/server_user_keys` (SSH) - inventaire cles detaillees v1.19.0
+- `/server_user_remove_key` (SSH) - suppression chirurgicale v1.19.0
+- `/sshd_allow_user` (SSH) - patch AllowUsers v1.19.x
+- `/wazuh/install_all` (Wazuh) - install batch v1.19.0
+- `/wazuh/detect` (Wazuh) - detection agent existant v1.19.0
+
+**Total** : 130 -> 136 paths documentes.
+
+### Health check enrichi
+
+`/adm/health_check.php` test maintenant 5 routes en plus :
+`/reboot_server`, `/server_user_keys`, `/server_user_remove_key`,
+`/sshd_allow_user`, `/wazuh/detect`, `/wazuh/install_all`.
+
+### Memoire
+
+- Nouvelle memoire `feedback_sshd_allowusers.md` documentant le piege AllowUsers
+  sur serveurs hardenes (port custom + AllowUsers en place).
+
+---
+
 ## [1.19.0] - 2026-04-29
 
 ### Inventaire detaille des cles SSH par utilisateur distant

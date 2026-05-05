@@ -898,3 +898,40 @@ function dpkgRepair() {
         });
     });
 }
+
+// ── Reboot serveurs selectionnes ──────────────────────────────────────────
+// Action critique : double confirmation utilisateur avant POST.
+function rebootSelected() {
+    const machineIds = getSelectedMachineIds();
+    if (machineIds.length === 0) {
+        toast(__('updates.no_machine_selected') || 'Aucune machine selectionnee', 'warning');
+        return;
+    }
+    if (!confirm(__('updates.reboot_confirm1').replace('%count', machineIds.length))) return;
+    if (!confirm(__('updates.reboot_confirm2'))) return;
+
+    machineIds.forEach(id => {
+        const card = document.getElementById(`server-${id}`);
+        const serverName = card ? card.querySelector('.server-name')?.textContent || `#${id}` : `#${id}`;
+        appendLog(__('updates.rebooting', {server: serverName}), 'warning', serverName);
+
+        fetch(`${window.API_URL}/reboot_server`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({machine_id: id, delay_minutes: 0}),
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    appendLog(d.message, 'success', serverName);
+                    toast(d.message, 'success');
+                } else {
+                    appendLog(d.message || __('toast_error'), 'error', serverName);
+                    toast(d.message || __('toast_error'), 'error');
+                }
+            })
+            .catch(err => {
+                appendLog(__('exception_with_msg', {msg: err}), 'error', serverName);
+            });
+    });
+}
