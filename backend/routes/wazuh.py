@@ -144,6 +144,22 @@ def _upsert_agent(machine_id, **fields):
         conn.commit()
 
 
+def _wazuh_pkg_specs(version: str):
+    """Retourne (pkg_deb, pkg_rpm) selon la version Wazuh demandee.
+
+    Format paquets Wazuh : <version>-1 (build number toujours -1).
+    Si 'latest' ou format invalide -> pas de pinning, dernier paquet du repo.
+    """
+    version = (version or '').strip()
+    if not version or version.lower() == 'latest':
+        return ('wazuh-agent', 'wazuh-agent')
+    # Accepte 4.14.5 ou 4.14.5-1 ; refuse tout caractere shell
+    if not re.match(r'^[0-9]+(\.[0-9]+){1,3}(-[0-9]+)?$', version):
+        return ('wazuh-agent', 'wazuh-agent')
+    ver_with_build = version if '-' in version else f'{version}-1'
+    return (f'wazuh-agent={ver_with_build}', f'wazuh-agent-{ver_with_build}')
+
+
 def _validate_xml(content: str):
     """Valide un XML via xmllint. Retourne (ok, error_msg)."""
     if not content.strip():
@@ -316,6 +332,11 @@ def install():
     if reg_pwd:
         env_vars += f" WAZUH_REGISTRATION_PASSWORD='{reg_pwd}'"
 
+    # Version pinning depuis v1.20.x : si cfg['agent_version'] != 'latest',
+    # on cible une version specifique pour aligner sur le manager (ex 4.14.5).
+    # Format Wazuh : <version>-1 (build number toujours -1 pour les paquets).
+    pkg_deb, pkg_rpm = _wazuh_pkg_specs(cfg.get('agent_version') or 'latest')
+
     install_cmd = f"""
 set -e
 . /etc/os-release 2>/dev/null || (echo "no /etc/os-release" >&2; exit 1)
@@ -332,7 +353,7 @@ if is_deb; then
     chmod 644 /usr/share/keyrings/wazuh.gpg
     echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' > /etc/apt/sources.list.d/wazuh.list
     apt-get update -qq
-    {env_vars} apt-get install -y wazuh-agent
+    {env_vars} apt-get install -y {pkg_deb}
 elif is_rhel; then
     rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
     cat > /etc/yum.repos.d/wazuh.repo <<'REPOEOF'
@@ -345,9 +366,9 @@ baseurl=https://packages.wazuh.com/4.x/yum/
 protect=1
 REPOEOF
     if command -v dnf >/dev/null 2>&1; then
-        {env_vars} dnf install -y wazuh-agent
+        {env_vars} dnf install -y {pkg_rpm}
     else
-        {env_vars} yum install -y wazuh-agent
+        {env_vars} yum install -y {pkg_rpm}
     fi
 elif is_suse; then
     rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
@@ -360,7 +381,7 @@ name=Wazuh repository
 baseurl=https://packages.wazuh.com/4.x/yum/
 type=rpm-md
 REPOEOF
-    {env_vars} zypper -n install wazuh-agent
+    {env_vars} zypper -n install {pkg_rpm}
 else
     echo "OS non supporte par l'installeur Wazuh : ID=$ID_LC ID_LIKE=$LIKE_LC" >&2
     echo "Familles supportees : debian, ubuntu, rhel/centos/rocky/alma/fedora, suse/opensuse" >&2
@@ -470,6 +491,9 @@ def install_all():
             if reg_pwd:
                 env_vars += f" WAZUH_REGISTRATION_PASSWORD='{reg_pwd}'"
 
+            # Version pinning (cf. install()) : aligne sur cfg.agent_version
+            pkg_deb, pkg_rpm = _wazuh_pkg_specs(cfg.get('agent_version') or 'latest')
+
             install_cmd = f"""
 set -e
 . /etc/os-release 2>/dev/null || (echo "no /etc/os-release" >&2; exit 1)
@@ -484,7 +508,7 @@ if is_deb; then
     chmod 644 /usr/share/keyrings/wazuh.gpg
     echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' > /etc/apt/sources.list.d/wazuh.list
     apt-get update -qq
-    {env_vars} apt-get install -y wazuh-agent
+    {env_vars} apt-get install -y {pkg_deb}
 elif is_rhel; then
     rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
     cat > /etc/yum.repos.d/wazuh.repo <<'REPOEOF'
@@ -497,9 +521,9 @@ baseurl=https://packages.wazuh.com/4.x/yum/
 protect=1
 REPOEOF
     if command -v dnf >/dev/null 2>&1; then
-        {env_vars} dnf install -y wazuh-agent
+        {env_vars} dnf install -y {pkg_rpm}
     else
-        {env_vars} yum install -y wazuh-agent
+        {env_vars} yum install -y {pkg_rpm}
     fi
 elif is_suse; then
     rpm --import https://packages.wazuh.com/key/GPG-KEY-WAZUH
@@ -512,7 +536,7 @@ name=Wazuh repository
 baseurl=https://packages.wazuh.com/4.x/yum/
 type=rpm-md
 REPOEOF
-    {env_vars} zypper -n install wazuh-agent
+    {env_vars} zypper -n install {pkg_rpm}
 else
     echo "OS non supporte" >&2; exit 2
 fi
