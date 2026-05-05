@@ -193,11 +193,12 @@ function renderUsers(users, pendingCount) {
                 </select>
             </td>
             <td class="px-4 py-3">
-                <div class="flex gap-1">
+                <div class="flex gap-1 flex-wrap">
                     ${u.keys_count > 0 && !isSys ? `
                         <button data-user="${safeName}" onclick="removeKeys(this.dataset.user, 'all')" class="text-[10px] px-2 py-1 rounded border border-orange-300 text-orange-600 hover:bg-orange-50">${__('server_users_btn_remove_all_keys')}</button>
                     ` : ''}
                     ${!isSys ? `
+                        <button data-user="${safeName}" onclick="sshdAllowUser(this.dataset.user)" title="${__('server_users_btn_sshd_allow_tip')}" class="text-[10px] px-2 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50">${__('server_users_btn_sshd_allow')}</button>
                         <button data-user="${safeName}" onclick="deleteUser(this.dataset.user)" class="text-[10px] px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200">${__('server_users_btn_delete_user')}</button>
                     ` : ''}
                 </div>
@@ -243,6 +244,18 @@ async function removeKeys(username, mode) {
         const d = await r.json();
         toast(d.message, d.success ? 'success' : 'error');
         if (d.success) setTimeout(() => scanUsers(), 500);
+    } catch(e) { toast(__('toast_network_error'), 'error'); }
+}
+
+async function sshdAllowUser(username) {
+    if (!confirm(__('server_users_sshd_allow_confirm').replace('%user', username).replace('%server', MACHINE_NAME))) return;
+    try {
+        const r = await fetch(`${window.API_URL}/sshd_allow_user`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({machine_id: MACHINE_ID, username})
+        });
+        const d = await r.json();
+        toast(d.message || (d.success ? __('toast_success') : __('toast_error')), d.success ? 'success' : 'error');
     } catch(e) { toast(__('toast_network_error'), 'error'); }
 }
 
