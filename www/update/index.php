@@ -184,8 +184,8 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button onclick="applySecurityUpdates()" class="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium"><?= t('updates.btn_secu_update') ?></button>
                     <button onclick="dpkgRepair()" class="text-xs px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors font-medium" title="<?= t('updates.tip_dpkg_repair') ?>"><?= t('updates.btn_dpkg_repair') ?></button>
                     <span class="w-px h-6 bg-gray-300 dark:bg-gray-600 self-center"></span>
-                    <button onclick="rebootSelected()" class="text-xs px-3 py-1.5 rounded-lg bg-red-800 hover:bg-red-900 text-white font-bold flex items-center gap-1.5 ring-2 ring-yellow-300 shadow-md" title="<?= t('updates.tip_reboot') ?>" style="min-height: 28px;">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9"/></svg>
+                    <button onclick="rebootSelected()" class="text-xs flex items-center gap-1.5 font-bold rounded-lg" title="<?= t('updates.tip_reboot') ?>" style="background: #991b1b; color: #fff; padding: 6px 14px; border: 2px solid #fde047; box-shadow: 0 2px 6px rgba(0,0,0,0.2); min-height: 30px; cursor: pointer;" onmouseover="this.style.background='#7f1d1d'" onmouseout="this.style.background='#991b1b'">
+                        <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9"/></svg>
                         <?= t('updates.btn_reboot') ?>
                     </button>
                 </div>
