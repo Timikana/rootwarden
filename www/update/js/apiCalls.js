@@ -908,7 +908,7 @@ function rebootSelected() {
         return;
     }
     if (!confirm(__('updates.reboot_confirm1').replace('%count', machineIds.length))) return;
-    if (!confirm(__('updates.reboot_confirm2'))) return;
+    if (!confirm(__('updates.reboot_confirm2').replace('%count', machineIds.length))) return;
 
     machineIds.forEach(id => {
         const card = document.getElementById(`server-${id}`);
