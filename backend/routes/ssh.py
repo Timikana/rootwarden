@@ -137,6 +137,79 @@ def _parse_authorized_keys_dump(dump: str):
     return result
 
 
+def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
+    """Patche sshd_config pour ajouter sa_name a AllowUsers si necessaire.
+
+    Sur serveurs hardenes (port custom, AllowUsers en place), creer un
+    nouveau user `rootwarden` ne suffit pas : sshd refuse l'auth tant que
+    l'user n'est pas explicitement liste. Ce helper :
+      1. grep AllowUsers dans sshd_config + sshd_config.d/*.conf
+      2. Si present et sa_name absent : backup + sed-append + sshd -t + reload
+      3. Rollback si une etape echoue (restaure backup et reload)
+
+    Returns (modified: bool, message: str). modified=True si patch applique.
+    Idempotent : si sa_name deja dans AllowUsers, retourne (False, msg).
+    """
+    grep_cmd = (
+        "grep -rEH '^[[:space:]]*AllowUsers[[:space:]]' "
+        "/etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true"
+    )
+    out, _, _ = execute_as_root(client, grep_cmd, root_pass, logger=logger)
+    if not out or not out.strip():
+        return False, "AllowUsers absent - pas de patch necessaire"
+
+    # Format : /path/to/file:AllowUsers user1 user2 ...
+    first_line = out.strip().split('\n')[0]
+    if ':' not in first_line:
+        return False, "Parse grep AllowUsers ambigu, skip"
+    file_path, raw = first_line.split(':', 1)
+    tokens = raw.strip().split()
+    if not tokens or tokens[0].lower() != 'allowusers' or len(tokens) < 2:
+        return False, "Format AllowUsers inattendu, skip"
+    users_listed = tokens[1:]
+    if sa_name in users_listed:
+        return False, f"{sa_name} deja dans AllowUsers"
+
+    fp_q = shlex.quote(file_path)
+    bak_q = shlex.quote(file_path + '.bak.rw')
+    sa_q = shlex.quote(sa_name)
+
+    # 1. Backup
+    _, err_b, code_b = execute_as_root(client, f"cp -a {fp_q} {bak_q}", root_pass, logger=logger)
+    if code_b != 0:
+        return False, f"Backup echoue : {(err_b or '')[:200]}"
+
+    # 2. Patch via awk : ajoute sa_name a la fin de la 1re ligne AllowUsers
+    patch_cmd = (
+        f"awk -v u={sa_q} 'BEGIN{{f=0}} "
+        f"/^[[:space:]]*AllowUsers[[:space:]]/ && !f {{print $0\" \"u; f=1; next}} "
+        f"{{print}}' {fp_q} > /tmp/sshd_rw_patch.tmp && "
+        f"mv /tmp/sshd_rw_patch.tmp {fp_q}"
+    )
+    _, err_p, code_p = execute_as_root(client, patch_cmd, root_pass, logger=logger)
+    if code_p != 0:
+        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
+        return False, f"Patch awk echoue : {(err_p or '')[:200]}"
+
+    # 3. Validation sshd -t
+    _, err_t, code_t = execute_as_root(client, "sshd -t 2>&1", root_pass, logger=logger)
+    if code_t != 0:
+        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
+        return False, f"sshd -t a refuse le patch : {(err_t or '')[:200]}"
+
+    # 4. Reload sshd (different selon distrib : sshd vs ssh)
+    reload_cmd = "systemctl reload sshd 2>&1 || systemctl reload ssh 2>&1 || true"
+    _, err_r, code_r = execute_as_root(client, reload_cmd, root_pass, logger=logger)
+    if code_r != 0:
+        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
+        execute_as_root(client, reload_cmd, root_pass, logger=logger)
+        return False, f"reload sshd echoue, rollback effectue : {(err_r or '')[:200]}"
+
+    logger.info("sshd AllowUsers patche : ajoute '%s' dans %s (backup %s.bak.rw)",
+                sa_name, file_path, file_path)
+    return True, f"AllowUsers patche : {sa_name} ajoute dans {file_path}"
+
+
 def _validate_username(username: str) -> bool:
     """Valide qu'un nom d'utilisateur ne contient que des caracteres surs."""
     return bool(_USERNAME_RE.match(username))
@@ -564,16 +637,35 @@ def deploy_platform_key():
                             client, f"/usr/sbin/visudo -cf /etc/sudoers.d/{sa_name}", root_pass, logger=logger
                         )
                         if code_sudo == 0:
-                            # Test connexion SA + sudo
-                            sa_test = paramiko.SSHClient()
-                            sa_test.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                            sa_test.connect(
-                                hostname=m['ip'], port=m['port'], username=sa_name,
-                                pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10
-                            )
-                            stdin_t, stdout_t, _ = sa_test.exec_command("sudo whoami", timeout=10)
-                            whoami = stdout_t.read().decode().strip()
-                            sa_test.close()
+                            # Test connexion SA + sudo (avec retry automatique
+                            # si sshd_config a AllowUsers qui bloque rootwarden,
+                            # cas observe en prod sur serveurs hardenes).
+                            def _try_sa_login():
+                                sa_test = paramiko.SSHClient()
+                                sa_test.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                                sa_test.connect(
+                                    hostname=m['ip'], port=m['port'], username=sa_name,
+                                    pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10
+                                )
+                                stdin_t, stdout_t, _ = sa_test.exec_command("sudo whoami", timeout=10)
+                                whoami = stdout_t.read().decode().strip()
+                                sa_test.close()
+                                return whoami
+
+                            whoami = ''
+                            try:
+                                whoami = _try_sa_login()
+                            except paramiko.AuthenticationException:
+                                # Auto-fix : sshd refuse peut-etre rootwarden via
+                                # AllowUsers. On tente de patcher + retry.
+                                modified, patch_msg = _ensure_sshd_allows_user(
+                                    client, root_pass, sa_name, logger)
+                                logger.info("Service account auth fail, patch sshd : %s", patch_msg)
+                                if modified:
+                                    try:
+                                        whoami = _try_sa_login()
+                                    except paramiko.AuthenticationException:
+                                        logger.warning("Service account auth toujours refusee apres patch sshd")
                             if whoami == 'root':
                                 sa_ok = True
                                 conn3 = get_db_connection()
