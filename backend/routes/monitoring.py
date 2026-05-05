@@ -7,6 +7,7 @@ Routes :
     POST /server_status     - Statut online/offline
     POST /linux_version     - Version OS via SSH
     POST /last_reboot       - Dernier boot + reboot required
+    POST /reboot_server     - Redemarrer le serveur distant (admin only)
     GET  /filter_servers    - Filtrage par env/criticality/tag
     GET  /cve_trends        - Tendances CVE 30 jours
 """
@@ -161,6 +162,101 @@ def last_reboot():
             conn.commit()
         return jsonify({'success': True, 'last_reboot': last_reboot_time, 'reboot_required': reboot_required}), 200
     except Exception as e:
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/reboot_server', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_machine_access
+@threaded_route
+def reboot_server():
+    """Redemarre le serveur distant.
+
+    Action critique : double confirmation cote UI (le frontend demande deux
+    confirms). Backend exige role admin (2+) + acces machine + audit log.
+
+    Body JSON :
+        machine_id (int)        : id du serveur (required)
+        delay_minutes (int)     : differer le reboot via `shutdown -r +N`.
+                                  Si 0 ou absent : `systemctl reboot` immediat.
+
+    Returns :
+        {success, message} - la connexion SSH est coupee par le serveur des
+        l'execution donc on ne peut pas attendre un retour shell. On considere
+        success si la commande a ete envoyee sans erreur paramiko.
+    """
+    from ssh_utils import execute_as_root
+    data = request.json or {}
+    machine_id = data.get('machine_id')
+    delay_minutes = max(0, min(int(data.get('delay_minutes') or 0), 1440))  # cap 24h
+
+    if not machine_id:
+        return jsonify({'success': False, 'message': 'machine_id manquant'}), 400
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT id, name, ip, port, user, password, root_password, "
+                "service_account_deployed FROM machines WHERE id = %s",
+                (machine_id,))
+            row = cursor.fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+
+        ssh_password = server_decrypt_password(row['password'], logger=logger)
+        root_password = server_decrypt_password(row.get('root_password') or '', logger=logger)
+        user_id, _ = get_current_user()
+
+        if delay_minutes == 0:
+            cmd = "systemctl reboot 2>&1 || /sbin/shutdown -r now 2>&1"
+            msg_action = "Redemarrage immediat envoye"
+        else:
+            # `shutdown -r +N` differe ; broadcast un message aux users connectes
+            cmd = f"/sbin/shutdown -r +{delay_minutes} 'Reboot programme par RootWarden dans {delay_minutes} min'"
+            msg_action = f"Redemarrage programme dans {delay_minutes} min"
+
+        with ssh_session(row['ip'], row['port'], row['user'], ssh_password, logger=logger,
+                         service_account=row.get('service_account_deployed', False)) as client:
+            try:
+                # Le reboot tue la session SSH ; on ignore les exceptions de fin
+                # de connexion. Si on a pu envoyer la commande sans paramiko
+                # error, c'est OK.
+                execute_as_root(client, cmd, root_password, logger=logger, timeout=15)
+            except Exception as exec_err:
+                # Connection drop / timeout = normal sur reboot immediat
+                logger.info("reboot_server : connexion coupee (attendu) : %s", str(exec_err)[:120])
+
+        # Audit log entry
+        try:
+            with get_db_connection() as conn_a:
+                cur_a = conn_a.cursor()
+                cur_a.execute(
+                    "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
+                    (user_id,
+                     f"[reboot] serveur '{row['name']}' (id={machine_id}) - {msg_action}"))
+                conn_a.commit()
+        except Exception:
+            pass
+
+        # Webhook notification
+        try:
+            from webhooks import send_webhook
+            send_webhook('server_reboot', {
+                'title': f"Reboot : {row['name']}",
+                'message': f"{msg_action} sur {row['name']} ({row['ip']})",
+            })
+        except Exception:
+            pass
+
+        return jsonify({
+            'success': True,
+            'message': f"{msg_action} sur {row['name']}",
+            'delay_minutes': delay_minutes,
+        }), 200
+    except Exception as e:
+        logger.error("reboot_server(%s): %s", machine_id, e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 

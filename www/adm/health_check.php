@@ -61,6 +61,7 @@ $routes = [
     ['Server Status',          'POST', '/server_status', ['machine_id' => $machineId], t('health.route_server_status')],
     ['Linux Version',          'POST', '/linux_version', ['machine_id' => $machineId], t('health.route_linux_version')],
     ['Last Reboot',            'POST', '/last_reboot', ['machine_id' => $machineId], t('health.route_last_reboot')],
+    ['Reboot Server (dry)',    'POST', '/reboot_server', ['machine_id' => 0, 'delay_minutes' => 0], 'Redemarre le serveur (machine_id=0 -> 404)'],
 
     // ── SSH / Deploiement ───────────────────────────────────────────────
     ['Deploy (dry)',            'POST', '/deploy', ['machines' => []], t('health.route_deploy')],
@@ -70,6 +71,9 @@ $routes = [
     ['Test Platform Key',      'POST', '/test_platform_key', ['machine_id' => $machineId], t('health.route_test_platform_key')],
     ['Deploy Service Account', 'POST', '/deploy_service_account', ['machine_id' => $machineId], t('health.route_deploy_service_account')],
     ['Scan Server Users',      'POST', '/scan_server_users', ['machine_id' => $machineId], t('health.route_scan_server_users')],
+    ['Server User Keys',       'GET',  "/server_user_keys?machine_id=$machineId&username=root", null, 'Liste cles SSH detaillees (v1.19.0)'],
+    ['Server User Remove Key', 'POST', '/server_user_remove_key', ['machine_id' => $machineId, 'username' => 'nope', 'fingerprint_sha256' => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'], 'Supprime UNE cle precise (v1.19.0)'],
+    ['Sshd Allow User',        'POST', '/sshd_allow_user', ['machine_id' => $machineId, 'username' => 'rootwarden'], 'Patche AllowUsers idempotent (v1.19.x)'],
     ['Logs SSE',               'GET',  '/logs', null, t('health.route_logs_sse'), true],
 
     // ── Mises a jour ────────────────────────────────────────────────────
@@ -134,6 +138,8 @@ $routes = [
     // ── Wazuh ────────────────────────────────────────────────────────────
     ['Wazuh Config',           'GET',  '/wazuh/config', null, 'Config Wazuh manager'],
     ['Wazuh Servers',          'GET',  '/wazuh/servers', null, 'Liste agents'],
+    ['Wazuh Detect',           'POST', '/wazuh/detect', ['machine_id' => $machineId], 'Detecte agent existant (v1.19.0)'],
+    ['Wazuh Install All (dry)', 'POST', '/wazuh/install_all', [], 'Install Wazuh sur tous (v1.19.0) - dry, vide la liste'],
     ['Wazuh Rules',            'GET',  '/wazuh/rules', null, 'Rules/decoders/CDB'],
 
     // ── SSH Audit ────────────────────────────────────────────────────────

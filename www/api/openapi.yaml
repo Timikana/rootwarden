@@ -7,7 +7,7 @@ info:
 
     **Authentification** : header `X-API-KEY` obligatoire sur toutes les routes (sauf /test).
     Le frontend PHP utilise `/api_proxy.php` qui injecte la cle automatiquement.
-  version: 1.13.0
+  version: 1.19.0
   contact:
     name: RootWarden
     url: https://github.com/Timikana/rootwarden
@@ -253,6 +253,34 @@ paths:
       responses:
         '200': { description: Date et statut reboot }
 
+  /reboot_server:
+    post:
+      tags: [Monitoring]
+      summary: Redemarre le serveur distant (admin only - role 2+)
+      description: |
+        Action critique. Le frontend doit demander double confirmation utilisateur.
+        Backend exige role admin + acces machine + audit log entry.
+        La connexion SSH est coupee par le serveur des l'execution donc on ne
+        peut pas attendre un retour shell - succes = commande envoyee sans
+        erreur paramiko.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
+                delay_minutes:
+                  type: integer
+                  default: 0
+                  description: Differer le reboot via shutdown -r +N. 0 ou absent = systemctl reboot immediat. Cap a 1440 (24h).
+      responses:
+        '200': { description: Reboot envoye }
+        '400': { description: machine_id manquant }
+        '403': { description: Pas admin ou pas d'acces machine }
+        '404': { description: Machine introuvable }
+
   /cve_trends:
     get:
       tags: [Monitoring]
@@ -364,6 +392,10 @@ paths:
     post:
       tags: [SSH]
       summary: Liste les utilisateurs SSH sur un serveur distant
+      description: |
+        Scanne /etc/passwd + dump authorized_keys de chaque user (via execute_as_root
+        en priorite + fallback simple-user). Stocke chaque cle dans
+        server_user_ssh_keys avec fingerprint SHA256 + drift detection.
       requestBody:
         content:
           application/json:
@@ -374,6 +406,73 @@ paths:
                 machine_id: { type: integer }
       responses:
         '200': { description: Liste des users avec cles SSH }
+
+  /server_user_keys:
+    get:
+      tags: [SSH]
+      summary: Detail des cles SSH d'un user distant (v1.19.0)
+      description: |
+        Renvoie chaque cle avec type, fingerprint SHA256 (format ssh-keygen -lf),
+        comment, badge platform, owner_name (cross-ref users.ssh_key RootWarden),
+        first_seen_at + last_seen_at.
+      parameters:
+        - { name: machine_id, in: query, required: true, schema: { type: integer } }
+        - { name: username, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Liste des cles avec metadonnees }
+        '400': { description: Parametres manquants ou invalides }
+
+  /server_user_remove_key:
+    post:
+      tags: [SSH]
+      summary: Supprime UNE cle SSH precise du authorized_keys d'un user (v1.19.0)
+      description: |
+        SSH root-side, recalcule fingerprint via ssh-keygen -lf, filtre la
+        ligne ciblee, conserve le reste, chmod 600. Garde-fou : suppression
+        de la cle plateforme RootWarden bloquee par defaut (anti-self-lock).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, username, fingerprint_sha256]
+              properties:
+                machine_id: { type: integer }
+                username: { type: string }
+                fingerprint_sha256:
+                  type: string
+                  description: Fingerprint SHA256 (avec ou sans prefixe 'SHA256:')
+                force:
+                  type: boolean
+                  default: false
+                  description: Autorise la suppression de la cle plateforme RootWarden
+      responses:
+        '200': { description: Cle supprimee }
+        '400': { description: Garde-fou anti-self-lock ou parametres invalides }
+        '404': { description: Machine ou cle introuvable }
+
+  /sshd_allow_user:
+    post:
+      tags: [SSH]
+      summary: Patche sshd_config AllowUsers pour un username (v1.19.x)
+      description: |
+        Endpoint manuel utilise depuis /adm/server_users.php quand un user
+        a une cle SSH deposee mais ne peut pas se connecter parce que sshd
+        refuse via AllowUsers. Idempotent (skip si AllowUsers absent ou
+        username deja autorise) + rollback complet si une etape rate
+        (restore backup .bak.rw + reload sshd).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, username]
+              properties:
+                machine_id: { type: integer }
+                username: { type: string }
+      responses:
+        '200': { description: Patch applique ou skip (idempotent) }
+        '400': { description: machine_id ou username invalide }
 
   /remove_user_keys:
     post:
@@ -2500,7 +2599,11 @@ paths:
   /wazuh/install:
     post:
       tags: [Wazuh]
-      summary: Installe + enrole l'agent Wazuh
+      summary: Installe + enrole l'agent Wazuh (multi-OS depuis v1.19.0)
+      description: |
+        Detection automatique de l'OS via /etc/os-release puis branche apt
+        (Debian/Ubuntu) / yum-dnf (RHEL/Rocky/Alma/Fedora/Amazon/Oracle) /
+        zypper (SUSE/openSUSE).
       requestBody:
         content:
           application/json:
@@ -2510,6 +2613,43 @@ paths:
               properties:
                 machine_id: { type: integer }
                 group: { type: string }
+
+  /wazuh/install_all:
+    post:
+      tags: [Wazuh]
+      summary: Install Wazuh agent sur tous les serveurs sans agent (v1.19.0)
+      description: |
+        Boucle sequentielle (LEFT JOIN wazuh_agents filter NULL). Tri
+        criticality DESC (CRITIQUE en premier) puis name. Renvoie un
+        resume {ok, fail, total, details}.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                group:
+                  type: string
+                  description: Groupe Wazuh applique a tous (sinon default_group)
+      responses:
+        '200': { description: Resume install + details par serveur }
+
+  /wazuh/detect:
+    post:
+      tags: [Wazuh]
+      summary: Detecte un agent Wazuh deja installe sans reinstaller (v1.19.0)
+      description: |
+        SSH check /var/ossec/bin/wazuh-control + client.keys + systemctl
+        is-active. Alimente wazuh_agents si trouve. Cas d'usage : agent
+        deploye hors RootWarden, on veut le superviser depuis l'UI.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id]
+              properties:
+                machine_id: { type: integer }
 
   /wazuh/uninstall:
     post:
