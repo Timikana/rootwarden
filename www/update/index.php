@@ -184,7 +184,10 @@ $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <button onclick="applySecurityUpdates()" class="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium"><?= t('updates.btn_secu_update') ?></button>
                     <button onclick="dpkgRepair()" class="text-xs px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors font-medium" title="<?= t('updates.tip_dpkg_repair') ?>"><?= t('updates.btn_dpkg_repair') ?></button>
                     <span class="w-px h-6 bg-gray-300 dark:bg-gray-600 self-center"></span>
-                    <button onclick="rebootSelected()" class="text-xs px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white transition-colors font-medium" title="<?= t('updates.tip_reboot') ?>"><?= t('updates.btn_reboot') ?></button>
+                    <button onclick="rebootSelected()" class="text-xs px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white transition-colors font-bold flex items-center gap-1.5 ring-2 ring-rose-300 dark:ring-rose-500/60 shadow-sm" title="<?= t('updates.tip_reboot') ?>">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5.636 5.636a9 9 0 1012.728 0M12 3v9"/></svg>
+                        <?= t('updates.btn_reboot') ?>
+                    </button>
                 </div>
             </div>
         </div>
