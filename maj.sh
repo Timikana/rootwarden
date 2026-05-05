@@ -124,6 +124,19 @@ if [ "${DEBUG_MODE}" = "true" ]; then
 fi
 run ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up -d
 
+# ── Etape 5b : restart PHP pour vider l'OPcache ─────────────────────────────
+# Le bind-mount ./www:/var/www/html synchronise les fichiers source en temps
+# reel mais PHP-FPM/Apache utilisent OPcache qui garde les versions compilees
+# en memoire. `up -d` ne recreate le container PHP que si l'image a change ;
+# une simple modif PHP (ajout bouton, fix UI, etc.) ne declenche pas le
+# recreate. Sans restart, on sert l'ancienne version pendant des heures.
+# Cout : ~2s. Benefice : zero piege OPcache, le code PHP commit = code servi.
+if [ "$DRY_RUN" -eq 0 ]; then
+    echo -e "${GREEN}[maj]${NC} Vider OPcache PHP (restart container)..."
+    ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} restart php >/dev/null 2>&1 || \
+        echo -e "  ${YELLOW}!${NC} Restart php a echoue (container deja a jour ?)"
+fi
+
 if [ "$DRY_RUN" -eq 0 ]; then
     echo ""
     echo -e "${GREEN}[maj] OK${NC}. Verifier l'etat : ${YELLOW}docker ps${NC} ou ${YELLOW}./start.sh logs${NC}"
