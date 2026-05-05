@@ -642,26 +642,33 @@ function appendLog(message, type = "info", serverName = null) {
     if (serverName) {
         targetContainer = getServerLogWindow(serverName);
     } else {
-        // En fallback, si aucun nom n'est fourni, on affiche dans un conteneur général
         targetContainer = document.getElementById("logs-container");
     }
-    
-    // Pour les messages de progression, on peut mettre à jour la dernière ligne
+    if (!targetContainer) return;
+
+    // Smart auto-follow : si le toggle "Suivre" est ON (ou absent = ON par defaut)
+    // ET si l'utilisateur est deja proche du bas, on scrolle. Sinon on respecte
+    // sa position pour qu'il puisse lire des logs passes sans etre yank.
+    const wrap = targetContainer.closest('.server-log-window');
+    const followInput = wrap ? wrap.querySelector('.log-follow-toggle input') : null;
+    const followOn = followInput ? followInput.checked : true;
+    const nearBottom = (targetContainer.scrollHeight - targetContainer.scrollTop - targetContainer.clientHeight) < 40;
+
     if (type === "progress") {
         const lastLine = targetContainer.lastElementChild;
         if (lastLine && lastLine.classList.contains("progress")) {
             lastLine.textContent = message;
+            if (followOn && nearBottom) targetContainer.scrollTop = targetContainer.scrollHeight;
             return;
         }
     }
-    
+
     const p = document.createElement("p");
     p.textContent = message;
     p.classList.add("log-line", type);
     targetContainer.appendChild(p);
-    
-    // Défilement automatique
-    targetContainer.scrollTop = targetContainer.scrollHeight;
+
+    if (followOn && nearBottom) targetContainer.scrollTop = targetContainer.scrollHeight;
 }
 
 /**
@@ -697,13 +704,39 @@ function getServerLogWindow(serverName) {
         serverLogDiv.classList.add('server-log-window');
         serverLogDiv.setAttribute('data-server-name', serverName);
 
-        const title = document.createElement('h3');
-        title.textContent = serverName; // textContent pour éviter XSS
-        serverLogDiv.appendChild(title);
+        // Header fixe (hors zone scrollable) : nom du serveur + toggle "Suivre"
+        const header = document.createElement('div');
+        header.classList.add('log-header');
 
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('server-name');
+        nameSpan.textContent = serverName;
+        header.appendChild(nameSpan);
+
+        const toggleLabel = document.createElement('label');
+        toggleLabel.classList.add('log-follow-toggle');
+        toggleLabel.title = 'Suivre automatiquement les nouvelles lignes';
+        const toggleInput = document.createElement('input');
+        toggleInput.type = 'checkbox';
+        toggleInput.checked = true;
+        toggleLabel.appendChild(toggleInput);
+        toggleLabel.appendChild(document.createTextNode('Suivre'));
+        header.appendChild(toggleLabel);
+
+        serverLogDiv.appendChild(header);
+
+        // Zone scrollable independante : c'est elle qui scroll, le header reste fixe
         const logWindow = document.createElement('div');
         logWindow.classList.add('log-window');
         serverLogDiv.appendChild(logWindow);
+
+        // Quand l'utilisateur scrolle vers le haut manuellement, on decoche
+        // "Suivre" pour ne pas le yank au prochain log. S'il revient en bas,
+        // on recoche automatiquement.
+        logWindow.addEventListener('scroll', () => {
+            const nearBottom = (logWindow.scrollHeight - logWindow.scrollTop - logWindow.clientHeight) < 40;
+            toggleInput.checked = nearBottom;
+        }, { passive: true });
 
         logsContainer.appendChild(serverLogDiv);
     }
