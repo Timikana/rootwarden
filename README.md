@@ -1,10 +1,31 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.20.0
+# 🔐 RootWarden v1.21.0
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
 > services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
+
+## 🛡️ Nouveau dans la v1.21.0 — Security Hardening OWASP Top 10
+
+Audit OWASP Top 10 complet + 30 findings patches en 3 vagues. Aucune regression detectee via Puppeteer. Voir [OPERATIONS.md](OPERATIONS.md) pour le deploiement et [CONTRIBUTING-SECURITY.md](CONTRIBUTING-SECURITY.md) pour les conventions.
+
+**Highlights** :
+- Backend Python re-verifie role+permissions en DB a chaque requete (plus de confiance aux headers HTTP)
+- Chiffrement AES-256-GCM (AEAD) au lieu de CBC non authentifie (anti bit-flipping)
+- Hash chain audit log : HMAC-SHA256 avec cle dediee `AUDIT_HMAC_KEY` (auto-generee par `env-merge.sh`)
+- Step-up auth (re-2FA) sur actions destructrices (delete_user, update_permissions) + modal UI automatique
+- Kill-switch `/revoke_service_account` (superadmin) : userdel + sudoers purge en masse
+- Rate-limits : 2FA par IP, CVE scan par user (60s), cron schedule min 10 min
+- SSRF guard sur URLs externes (OpenCVE, NVD, webhooks) + blocklist IP machine (loopback, 169.254.x, etc.)
+- `api_proxy.php` whitelist explicite des routes (anti-IDOR sur nouveaux blueprints)
+- `shlex.quote` sur tous les arguments shell (anti-RCE dans Wazuh, Graylog, bashrc)
+- bcrypt cost 12, scrubber logs centralise (passwords/tokens/secrets jamais en clair)
+- CSP nonces (CSP3 ignore unsafe-inline si nonce present)
+- `docker-compose.prod.yml` durci : `cap_drop ALL`, `read_only`, `tmpfs`, user 1000 (non-root)
+- `maj.sh` verifie signature GPG des commits (mode strict opt-in via `MAJ_REQUIRE_SIGNED=1`)
+- 10 regles Semgrep custom (`.semgrep/rules-rootwarden.yml`) bloquantes en CI anti-regression
+- Documentation operationnelle complete (`OPERATIONS.md`)
 
 ---
 
