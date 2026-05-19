@@ -139,14 +139,43 @@ _log_format = (
     if Config.DEBUG else
     '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 )
-logging.basicConfig(
-    level=_log_level,
-    format=_log_format,
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(server_log_file),
-    ]
-)
+
+
+# Patch A09-04 (OWASP A09 Logging & Monitoring Failures) : filtre qui
+# scrubbe les secrets connus avant ecriture sur disque/stdout. Sans ca,
+# DEBUG_MODE=true ou un f-string mal place exposait passwords SSH/root,
+# tokens API, secrets TOTP, mdp Wazuh registration dans server.log.
+import re as _re_log
+_SECRET_PATTERNS = [
+    (_re_log.compile(r"(password['\"]?\s*[:=]\s*['\"]?)([^'\"\s,}]+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
+    (_re_log.compile(r"(token['\"]?\s*[:=]\s*['\"]?)([^'\"\s,}]+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
+    (_re_log.compile(r"(WAZUH_REGISTRATION_PASSWORD=)(\S+)"), r"\1***SCRUBBED***"),
+    (_re_log.compile(r"(api[_-]?key['\"]?\s*[:=]\s*['\"]?)([^'\"\s,}]+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
+    (_re_log.compile(r"(authorization:\s*bearer\s+)(\S+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
+    (_re_log.compile(r"(opc_org\.[A-Za-z0-9_.-]+)"), "***OPENCVE-TOKEN-SCRUBBED***"),
+]
+
+
+class _SecretScrubFilter(logging.Filter):
+    """Rewrite log records to scrub credentials/tokens before write."""
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+            for pat, repl in _SECRET_PATTERNS:
+                msg = pat.sub(repl, msg)
+            record.msg = msg
+            record.args = ()
+        except Exception:
+            pass
+        return True
+
+
+_handlers = [logging.StreamHandler(), logging.FileHandler(server_log_file)]
+_scrub = _SecretScrubFilter()
+for _h in _handlers:
+    _h.addFilter(_scrub)
+
+logging.basicConfig(level=_log_level, format=_log_format, handlers=_handlers)
 logger = logging.getLogger(__name__)
 
 if Config.DEBUG:
