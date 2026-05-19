@@ -37,6 +37,7 @@ import re
 import json
 import base64
 import hashlib
+import shlex
 import datetime
 import difflib
 import subprocess
@@ -589,9 +590,13 @@ def restore():
                 return jsonify({'success': False, 'message': 'Utilisateur introuvable'}), 404
             home = u['home']
 
+            # Patch CMD-INJ-02 : shlex.quote sur home/backup_path/uname pour
+            # eviter injection si /etc/passwd contient un home avec ' ou $().
+            home_q = shlex.quote(home)
+            uname_q = shlex.quote(uname)
             if not backup:
                 # Recherche du backup le plus recent
-                cmd = f"ls -1t '{home}'/.bashrc.bak.* 2>/dev/null | head -1"
+                cmd = f"ls -1t {home_q}/.bashrc.bak.* 2>/dev/null | head -1"
                 out, _, _ = _ssh_exec(client, cmd, root_pwd, as_root=True, timeout=10)
                 latest = out.strip()
                 if not latest:
@@ -602,12 +607,14 @@ def restore():
                     return jsonify({'success': False, 'message': 'Nom de backup inattendu'}), 400
             else:
                 backup_path = f"{home}/{backup}"
+            backup_q = shlex.quote(backup_path)
+            target_q = shlex.quote(f"{home}/.bashrc")
 
             restore_cmd = (
-                f"[ -f '{backup_path}' ] && "
-                f"cp -a '{backup_path}' '{home}/.bashrc' && "
-                f"chmod 644 '{home}/.bashrc' && "
-                f"chown {uname}:{uname} '{home}/.bashrc'"
+                f"[ -f {backup_q} ] && "
+                f"cp -a {backup_q} {target_q} && "
+                f"chmod 644 {target_q} && "
+                f"chown {uname_q}:{uname_q} {target_q}"
             )
             _, err_out, code = _ssh_exec(client, restore_cmd, root_pwd, as_root=True, timeout=15)
             ok = (code == 0)

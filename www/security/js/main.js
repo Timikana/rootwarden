@@ -367,7 +367,7 @@ function renderResults(machineId, findings, meta) {
                 <td class="px-4 py-2 text-xs font-medium">${esc(f.package||f.package_name||'')}</td>
                 <td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version||f.package_version||'')}</td>
                 <td class="px-4 py-2 whitespace-nowrap">
-                    <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${f.cvss||f.cvss_score||''}</span>
+                    <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span>
                 </td>
                 <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-xs truncate" title="${esc(f.summary||'')}">${esc((f.summary||'').slice(0,120))}</td>
                 <td class="px-3 py-2 whitespace-nowrap">
@@ -477,7 +477,7 @@ function loadMoreFindings(machineId) {
         tr.className = `finding-row ${st.row}`;
         tr.dataset.severity = sev;
         tr.dataset.year = year;
-        tr.innerHTML = `<td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td><td class="px-4 py-2 text-xs font-medium">${esc(f.package||f.package_name||'')}</td><td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version||f.package_version||'')}</td><td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${f.cvss||f.cvss_score||''}</span></td><td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate">${esc((f.summary||'').slice(0,150))}</td>`;
+        tr.innerHTML = `<td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td><td class="px-4 py-2 text-xs font-medium">${esc(f.package||f.package_name||'')}</td><td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version||f.package_version||'')}</td><td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span></td><td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate">${esc((f.summary||'').slice(0,150))}</td>`;
         tbody.appendChild(tr);
     });
 
@@ -511,7 +511,7 @@ function searchFindings(machineId, query) {
             <td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td>
             <td class="px-4 py-2 text-xs font-medium">${esc(f.package || f.package_name || '')}</td>
             <td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version || f.package_version || '')}</td>
-            <td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${f.cvss || f.cvss_score || ''}</span></td>
+            <td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span></td>
             <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate">${esc((f.summary || '').slice(0, 150))}</td>
         </tr>`;
     }).join('');
@@ -546,7 +546,7 @@ function filterFindings(machineId, filter) {
             <td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td>
             <td class="px-4 py-2 text-xs font-medium">${esc(f.package || f.package_name || '')}</td>
             <td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version || f.package_version || '')}</td>
-            <td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${f.cvss || f.cvss_score || ''}</span></td>
+            <td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span></td>
             <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate" title="${esc(f.summary || '')}">${esc((f.summary || '').slice(0, 150))}</td>
         </tr>`;
     }).join('');

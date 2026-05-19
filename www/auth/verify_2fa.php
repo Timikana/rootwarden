@@ -51,19 +51,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
     checkCsrfToken();
     $code = $_POST['2fa_code'];
 
-    // Rate limiting 2FA : max 5 tentatives par minute.
-    // Patch A07-01 (OWASP A07) : avant, le rate limit ne faisait que setter
-    // $error sans interrompre l'execution -> le elseif($totp->verify(...))
-    // s'executait quand meme et permettait un brute-force du TOTP. Maintenant
-    // on enregistre la tentative d'abord et on chaine if/elseif/else
-    // exclusivement pour fail-close sur rate limit.
+    // Rate limiting 2FA : max 5 tentatives / minute par SESSION + max 10 / 10 min par IP.
+    // Patch A07-01 (chaine if/elseif/else) + A07-NEW-01 (compteur IP en DB).
+    // Avant A07-NEW-01 : le rate-limit etait uniquement par session ; un attaquant
+    // pouvait reset le compteur en rejetant son cookie de session et en se
+    // re-logguant a chaque cycle. Maintenant on a un compteur IP-based en DB qui
+    // resiste a la rotation de session.
     if (!isset($_SESSION['2fa_attempts'])) $_SESSION['2fa_attempts'] = [];
     $_SESSION['2fa_attempts'] = array_filter($_SESSION['2fa_attempts'], fn($t) => $t > time() - 60);
     $_SESSION['2fa_attempts'][] = time();
 
     $codeHash = hash('sha256', $code . floor(time() / 30));
 
-    if (count($_SESSION['2fa_attempts']) > 5) {
+    // Compteur IP-based via login_attempts (etape = '2fa')
+    $clientIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $ipBlocked = false;
+    try {
+        $stmtIp = $pdo->prepare(
+            "SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? "
+            . "AND attempted_at > (NOW() - INTERVAL 10 MINUTE) AND step = '2fa' AND success = 0"
+        );
+        $stmtIp->execute([$clientIp]);
+        $ipBlocked = ((int)$stmtIp->fetchColumn()) >= 10;
+        // On enregistre la tentative en cours (success=0, on update si OK plus bas)
+        $pdo->prepare(
+            "INSERT INTO login_attempts (ip_address, username, success, step, attempted_at) "
+            . "VALUES (?, ?, 0, '2fa', NOW())"
+        )->execute([$clientIp, $_SESSION['temp_user']['name'] ?? 'unknown']);
+    } catch (\Throwable $_e) {
+        // Si la colonne 'step' n'existe pas dans la table (migration pas faite),
+        // on continue avec le rate-limit session uniquement. Pas blocker.
+    }
+
+    if ($ipBlocked) {
+        $error = t('2fa.error_rate_limit');
+    } elseif (count($_SESSION['2fa_attempts']) > 5) {
         $error = t('2fa.error_rate_limit');
     } elseif (isset($_SESSION['last_totp_hash']) && $_SESSION['last_totp_hash'] === $codeHash) {
         // Anti-replay : rejeter un code deja utilise dans cette fenetre de temps

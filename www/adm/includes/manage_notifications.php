@@ -83,7 +83,7 @@ while ($user = $nUsersStmt->fetch(PDO::FETCH_ASSOC)):
     <div class="px-4 pb-4 pt-2 border-t border-gray-100 dark:border-gray-700">
         <?php foreach ($notifGroups as $groupName => $events): ?>
         <div class="mb-3">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5"><?= $groupName ?></div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5"><?= htmlspecialchars($groupName, ENT_QUOTES, 'UTF-8') ?></div>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                 <?php foreach ($events as $evKey => $evInfo):
                     $checked = $notifPrefs[$user['id']][$evKey] ?? false;
@@ -100,8 +100,8 @@ while ($user = $nUsersStmt->fetch(PDO::FETCH_ASSOC)):
                     <span class="w-3.5 h-3.5 flex-shrink-0 <?= $checked ? 'text-green-500' : 'text-gray-400' ?>"><?= $checked ? '&#10003;' : '&#10007;' ?></span>
                     <?php endif; ?>
                     <div class="min-w-0">
-                        <div class="text-xs font-medium text-gray-700 dark:text-gray-300"><?= $evInfo['label'] ?></div>
-                        <div class="text-[10px] text-gray-400 truncate"><?= $evInfo['desc'] ?></div>
+                        <div class="text-xs font-medium text-gray-700 dark:text-gray-300"><?= htmlspecialchars($evInfo['label'], ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="text-[10px] text-gray-400 truncate"><?= htmlspecialchars($evInfo['desc'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                 </label>
                 <?php endforeach; ?>
