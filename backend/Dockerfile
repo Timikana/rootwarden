@@ -9,6 +9,12 @@
 ################################################
 
 # ── Stage 1 : Builder ────────────────────────────────────────
+# Patch A06-NEW-02 : pin par digest pour reproductibilite + protection
+# contre re-push registry. Regenerer via scripts/pin-docker-digests.sh
+# tous les 1-3 mois (apres test de regression sur les nouveaux patches
+# upstream).
+# TODO : remplacer la ligne FROM ci-dessous par la version pinned du
+# fichier .docker-digests une fois generee.
 FROM python:3.13-slim AS builder
 
 LABEL maintainer="Timikana" \

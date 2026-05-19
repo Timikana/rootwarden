@@ -1,0 +1,32 @@
+# requirements.in - source pour pip-compile (Patch A06-NEW-01 OWASP A06).
+#
+# Generer requirements.txt verrouille avec hashes :
+#   docker run --rm -v $(pwd)/backend:/io -w /io python:3.13-slim sh -c \
+#     'pip install pip-tools && pip-compile --generate-hashes --output-file=requirements.txt requirements.in'
+#
+# Puis dans backend/Dockerfile :
+#   RUN pip install --require-hashes -r requirements.txt
+#
+# Sans --require-hashes, un attaquant compromettant PyPI peut publier une
+# version pinned modifiee et l'installation tirera silencieusement la
+# nouvelle. Avec hashes, la pip refuse tout artefact dont le hash ne
+# matche pas celui ecrit dans requirements.txt.
+
+flask>=3.1,<4
+flask-cors>=6,<7
+werkzeug>=3.1,<4
+mysql-connector-python>=9,<10
+paramiko>=4,<5
+pycryptodome>=3.23,<4
+cryptography>=47,<48
+marshmallow>=4,<5
+hypercorn>=0.18,<0.20
+paramiko-expect>=0.3,<0.4
+pynacl>=1.6,<2
+requests>=2.33,<3
+croniter>=6,<7
+pytest>=9,<10
+pytest-cov>=7,<8
+quart>=0.20,<0.21
+quart-cors>=0.8,<0.9
+graypy>=2.1,<3  # A09-NEW-03 - GELF handler (optionnel runtime)
