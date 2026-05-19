@@ -15,7 +15,8 @@ _scan_lock = threading.Lock()
 
 
 def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
-                      per_machine_cvss: dict = None):
+                      per_machine_cvss: dict = None,
+                      scan_source: str = 'hybrid'):
     """
     Générateur commun pour les routes /cve_scan et /cve_scan_all.
     Chaque événement est une ligne JSON terminée par \\n.
@@ -62,7 +63,7 @@ def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
 
             with ssh_session(m['ip'], m['port'], ssh_user, ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
                 all_findings = []
-                for event in scan_server(client, m['id'], m['name'], machine_cvss):
+                for event in scan_server(client, m['id'], m['name'], machine_cvss, scan_source=scan_source):
                     yield json.dumps(event, default=str) + '\n'
                     if event['type'] == 'finding':
                         all_findings.append(event)
@@ -120,7 +121,10 @@ def cve_scan():
     raw_id = data.get('machine_id')
     min_cvss = float(data.get('min_cvss', Config.CVE_MIN_CVSS))
     min_cvss = max(0.0, min(10.0, min_cvss))
-    logger.info("CVE scan request: machine_id=%s, min_cvss=%s, raw_data=%s", raw_id, min_cvss, {k: data[k] for k in ('machine_id', 'min_cvss', 'per_machine_cvss') if k in data})
+    scan_source = str(data.get('scan_source', 'hybrid')).lower()
+    if scan_source not in ('fast', 'hybrid', 'precise'):
+        scan_source = 'hybrid'
+    logger.info("CVE scan request: machine_id=%s, min_cvss=%s, scan_source=%s, raw_data=%s", raw_id, min_cvss, scan_source, {k: data[k] for k in ('machine_id', 'min_cvss', 'per_machine_cvss', 'scan_source') if k in data})
 
     # Seuils par serveur : {"per_machine_cvss": {"1": 4.0, "2": 9.0}}
     per_machine_cvss = data.get('per_machine_cvss', None)
@@ -144,7 +148,7 @@ def cve_scan():
 
     def locked_stream():
         try:
-            yield from _stream_cve_scan(ids, min_cvss, per_machine_cvss)
+            yield from _stream_cve_scan(ids, min_cvss, per_machine_cvss, scan_source=scan_source)
         finally:
             _scan_lock.release()
 
@@ -165,13 +169,16 @@ def cve_scan_all():
     min_cvss = float(data.get('min_cvss', Config.CVE_MIN_CVSS))
     min_cvss = max(0.0, min(10.0, min_cvss))
     per_machine_cvss = data.get('per_machine_cvss', None)
+    scan_source = str(data.get('scan_source', 'hybrid')).lower()
+    if scan_source not in ('fast', 'hybrid', 'precise'):
+        scan_source = 'hybrid'
 
     if not _scan_lock.acquire(blocking=False):
         return jsonify({'success': False, 'message': 'Un scan CVE est deja en cours. Reessayez plus tard.'}), 429
 
     def locked_stream():
         try:
-            yield from _stream_cve_scan([], min_cvss, per_machine_cvss)
+            yield from _stream_cve_scan([], min_cvss, per_machine_cvss, scan_source=scan_source)
         finally:
             _scan_lock.release()
 

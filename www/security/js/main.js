@@ -82,7 +82,23 @@ function scanServer(id) {
     const perSelect = document.getElementById(`cvss-${id}`);
     const globalSelect = document.getElementById('global-min-cvss');
     const minCvss = parseFloat(perSelect ? perSelect.value : globalSelect.value);
-    runScan('scan', { machine_id: id, min_cvss: minCvss }, [id]);
+    const scanSource = _getScanSource();
+    runScan('scan', { machine_id: id, min_cvss: minCvss, scan_source: scanSource }, [id]);
+}
+
+// Lit la source CVE choisie (select #scan-source) avec persistance localStorage.
+// Defaut: 'hybrid' (compromis vitesse/precision).
+function _getScanSource() {
+    const sel = document.getElementById('scan-source');
+    if (!sel) return 'hybrid';
+    // Restaure depuis localStorage au premier appel
+    if (!sel.dataset.restored) {
+        const saved = localStorage.getItem('rw_scan_source');
+        if (saved && ['fast', 'hybrid', 'precise'].includes(saved)) sel.value = saved;
+        sel.addEventListener('change', () => localStorage.setItem('rw_scan_source', sel.value));
+        sel.dataset.restored = '1';
+    }
+    return sel.value;
 }
 
 // ── Scan global ───────────────────────────────────────────────────────────
@@ -104,7 +120,7 @@ async function scanAll() {
         // Seuil par serveur si disponible, sinon global
         const perSelect = document.getElementById(`cvss-${id}`);
         const minCvss = parseFloat(perSelect ? perSelect.value : globalCvss);
-        await runScan('scan', { machine_id: id, min_cvss: minCvss }, [id]);
+        await runScan('scan', { machine_id: id, min_cvss: minCvss, scan_source: _getScanSource() }, [id]);
         done++;
         const pct = Math.round((done / allIds.length) * 100);
         const name = document.querySelector(`#server-card-${id} .font-semibold`)?.textContent || `#${id}`;
