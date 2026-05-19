@@ -654,6 +654,11 @@ async function loadSchedules() {
                     <span class="text-xs text-gray-400 ml-2 font-mono">${esc(s.cron_expression)}</span>
                     <span class="text-xs text-gray-400 ml-2">${target}</span>
                     <span class="text-xs text-gray-400 ml-2">CVSS &ge; ${s.min_cvss}</span>
+                    <span class="text-[10px] uppercase tracking-wide ml-2 px-1.5 py-0.5 rounded ${
+                        s.scan_source === 'fast'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                        s.scan_source === 'precise' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                                                       'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                    }">${esc(s.scan_source || 'hybrid')}</span>
                 </div>
                 <div class="flex items-center gap-3 flex-shrink-0 text-xs text-gray-500">
                     <span>Dernier: ${lastRun}</span>
@@ -693,6 +698,8 @@ async function addSchedule() {
     const name = document.getElementById('sched-name')?.value.trim();
     const cron = document.getElementById('sched-cron')?.value.trim();
     const cvss = document.getElementById('sched-cvss')?.value || '7';
+    const sourceRaw = document.getElementById('sched-source')?.value || 'hybrid';
+    const scan_source = ['fast','hybrid','precise'].includes(sourceRaw) ? sourceRaw : 'hybrid';
     const targetRaw = document.getElementById('sched-target')?.value || 'all';
     if (!name) { toast('Nom requis', 'warning'); return; }
 
@@ -713,7 +720,7 @@ async function addSchedule() {
     const r = await fetch(`${window.API_URL}/cve_schedules`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name, cron_expression: cron, min_cvss: parseFloat(cvss), target_type, target_value})
+        body: JSON.stringify({name, cron_expression: cron, min_cvss: parseFloat(cvss), scan_source, target_type, target_value})
     });
     const d = await r.json();
     if (d.success) {
