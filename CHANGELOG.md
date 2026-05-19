@@ -5,9 +5,9 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-## [Unreleased - security hardening] - 2026-05-19
+## [1.21.0] - 2026-05-19 — Security hardening OWASP Top 10
 
-Branche `security/owasp-audit-2026-05` (à merger). Audit OWASP Top 10 complet + 30 findings patchés sur 3 vagues. Voir [OPERATIONS.md](OPERATIONS.md) pour le déploiement.
+Audit OWASP Top 10 complet + 30 findings patchés sur 3 vagues. Merge `security/owasp-audit-2026-05` -> main. Voir [OPERATIONS.md](OPERATIONS.md) pour le déploiement.
 
 ### Critiques (vague 1)
 - **A01-01 / A04-01** Backend Python re-vérifie role+permissions en DB (helpers.py). `X-User-Role` / `X-User-Permissions` headers désormais ignorés.
