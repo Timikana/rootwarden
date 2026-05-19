@@ -112,12 +112,28 @@ def require_api_key(func):
             )
             return jsonify({'success': False, 'message': 'Non autorise'}), 401
 
-        # Priorite 2 (fallback) : Config.API_KEY legacy
-        # Actif uniquement si la table api_keys est vide (premier boot).
-        if db_ok is None and hmac.compare_digest(key, Config.API_KEY):
+        # Patch A07-02 (OWASP A07) : fallback Config.API_KEY uniquement en
+        # mode bootstrap explicite (flag env API_KEY_BOOTSTRAP=1). Avant :
+        # le fallback s'activait des que la table api_keys etait vide OU
+        # que la DB etait down -> compromise une migration DB foiree ou un
+        # outage MySQL en escalation de droits silencieuse. Apres : le
+        # fallback exige une variable d'env explicite, sinon fail-closed.
+        bootstrap = os.getenv('API_KEY_BOOTSTRAP', '').lower() in ('1', 'true', 'yes')
+        if db_ok is None and bootstrap and hmac.compare_digest(key, Config.API_KEY):
+            logger.warning(
+                "API key fallback bootstrap utilise (table vide / DB down) depuis %s. "
+                "A desactiver des qu'une cle est creee en BDD (unset API_KEY_BOOTSTRAP).",
+                request.remote_addr
+            )
             return func(*args, **kwargs)
 
-        logger.warning("Requete refusee : X-API-KEY invalide depuis %s", request.remote_addr)
+        if db_ok is None and not bootstrap:
+            logger.warning(
+                "API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP "
+                "non active (fail-closed) depuis %s", request.remote_addr
+            )
+        else:
+            logger.warning("Requete refusee : X-API-KEY invalide depuis %s", request.remote_addr)
         return jsonify({'success': False, 'message': 'Non autorise'}), 401
     return decorated
 
