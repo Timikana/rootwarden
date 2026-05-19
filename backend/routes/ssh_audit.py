@@ -687,7 +687,15 @@ def create_ssh_schedule():
     try:
         from croniter import croniter
         from datetime import datetime
-        next_run = croniter(cron_expr).get_next(datetime)
+        it = croniter(cron_expr)
+        next_run = it.get_next(datetime)
+        # Patch A04-INSEC-N1 : intervalle minimum 10 minutes
+        following = it.get_next(datetime)
+        if (following - next_run).total_seconds() < 600:
+            return jsonify({
+                'success': False,
+                'message': 'Frequence cron trop elevee (intervalle minimum 10 minutes)'
+            }), 400
     except Exception:
         return jsonify({'success': False, 'message': 'Expression cron invalide'}), 400
 
