@@ -12,10 +12,10 @@ version_introduced: 1.0
 last_reviewed: 2026-04-21
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
-routes: [/cve_trends, /filter_servers, /last_reboot, /linux_version, /list_machines, /server_status, /test]
-tables: [cve_scans, machine_tags, machines, user_machine_access]
+routes: [/cve_trends, /filter_servers, /last_reboot, /linux_version, /list_machines, /reboot_server, /server_status, /test]
+tables: [cve_scans, machine_tags, machines, user_logs, user_machine_access]
 imports_detected: [routes, server_checks, ssh_utils]
-last_synced: 2026-04-29
+last_synced: 2026-05-19
 # AUTO-END
 ---
 

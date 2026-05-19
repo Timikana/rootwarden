@@ -14,8 +14,8 @@ status: stable
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
 tables: [cve_findings, cve_remediation, cve_scans]
-imports_detected: [config]
-last_synced: 2026-04-29
+imports_detected: [config, urllib]
+last_synced: 2026-05-19
 # AUTO-END
 ---
 

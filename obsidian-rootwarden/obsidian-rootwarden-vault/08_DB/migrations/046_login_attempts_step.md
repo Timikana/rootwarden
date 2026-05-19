@@ -3,20 +3,20 @@ type: migration
 layer: transverse
 tags: [db]
 language: sql
-path: mysql/migrations/042_user_onboarding.sql
+path: mysql/migrations/046_login_attempts_step.sql
 version_introduced:
-last_reviewed: 2026-04-21
+last_reviewed: 2026-05-19
 status: applied
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
-tables: [users]
+tables: [login_attempts]
 imports_detected: []
 last_synced: 2026-05-19
 # AUTO-END
 ---
 
-# 042_user_onboarding - [[Code/mysql/migrations/042_user_onboarding.sql]]
+# 046_login_attempts_step - [[Code/mysql/migrations/046_login_attempts_step.sql]]
 
 _Migration auto-detectee. Decris l'intention metier en quelques lignes._
 

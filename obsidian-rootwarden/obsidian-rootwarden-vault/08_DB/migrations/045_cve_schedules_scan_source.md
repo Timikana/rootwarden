@@ -3,20 +3,20 @@ type: migration
 layer: transverse
 tags: [db]
 language: sql
-path: mysql/migrations/042_user_onboarding.sql
+path: mysql/migrations/045_cve_schedules_scan_source.sql
 version_introduced:
-last_reviewed: 2026-04-21
+last_reviewed: 2026-05-19
 status: applied
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
-tables: [users]
+tables: [cve_scan_schedules]
 imports_detected: []
 last_synced: 2026-05-19
 # AUTO-END
 ---
 
-# 042_user_onboarding - [[Code/mysql/migrations/042_user_onboarding.sql]]
+# 045_cve_schedules_scan_source - [[Code/mysql/migrations/045_cve_schedules_scan_source.sql]]
 
 _Migration auto-detectee. Decris l'intention metier en quelques lignes._
 
