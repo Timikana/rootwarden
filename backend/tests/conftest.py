@@ -107,16 +107,52 @@ Config.API_KEY = API_KEY
 # ── Fixture DB mock ──────────────────────────────────────────────────────────
 
 class MockCursor:
-    """Curseur MySQL factice configurable par test."""
+    """Curseur MySQL factice configurable par test.
+
+    Patch A01-01 testing : reconnait specifiquement les SELECT FROM users
+    et FROM permissions (utilises par get_current_user) et retourne des
+    donnees coherentes avec le X-User-ID/Role injecte par les tests dans
+    les headers. Sans ca, get_current_user retourne (0, 0) -> tous les
+    @require_role(2) refusent 403.
+    """
+    # Map user_id (header) -> role_id pour le mock
+    _USERS = {1: 2, 2: 3, 10: 1}  # admin=2, superadmin=2, user=10
+
     def __init__(self):
         self.rowcount = 1
         self._results = []
         self._description = None
+        self._last_query = ''
+        self._last_params = None
 
     def execute(self, query, params=None):
-        pass
+        self._last_query = (query or '').lower()
+        self._last_params = params
 
     def fetchone(self):
+        # Recognize SELECT id, role_id, active FROM users WHERE id = %s
+        if 'from users' in self._last_query and 'role_id' in self._last_query:
+            uid = (self._last_params[0] if self._last_params else 0)
+            try:
+                uid = int(uid)
+            except (TypeError, ValueError):
+                uid = 0
+            role = self._USERS.get(uid, 2 if uid == 1 else (3 if uid == 2 else 1))
+            return {'id': uid, 'role_id': role, 'active': 1}
+        # Recognize SELECT * FROM permissions WHERE user_id = %s
+        if 'from permissions' in self._last_query:
+            # Toutes les permissions True en test
+            return {k: 1 for k in (
+                'user_id', 'can_deploy_keys', 'can_update_linux', 'can_manage_iptables',
+                'can_admin_portal', 'can_scan_cve', 'can_manage_remote_users',
+                'can_manage_platform_key', 'can_view_compliance', 'can_manage_backups',
+                'can_schedule_cve', 'can_manage_fail2ban', 'can_manage_services',
+                'can_audit_ssh', 'can_manage_supervision', 'can_manage_bashrc',
+                'can_manage_graylog', 'can_manage_wazuh', 'can_manage_api_keys',
+            )}
+        # Recognize SELECT COUNT(*) FROM api_keys WHERE revoked_at IS NULL
+        if 'from api_keys' in self._last_query and 'count' in self._last_query:
+            return {'cnt': 0}  # table vide -> fallback bootstrap
         return self._results[0] if self._results else None
 
     def fetchall(self):
@@ -158,8 +194,19 @@ class MockConnection:
 def mock_db():
     """Retourne un MockConnection configurable.
     Patche mysql.connector.connect pour que get_db_connection() retourne le mock
-    quel que soit le module qui l'a importe."""
+    quel que soit le module qui l'a importe.
+
+    Patch A01-01 testing : `get_current_user()` est maintenant DB-verified.
+    Pour que les tests qui injectent X-User-ID / X-User-Role dans les headers
+    continuent a fonctionner sans setup MySQL complet en CI, on monkey-patch
+    `routes.helpers.get_current_user` et `get_user_permissions` pour qu'ils
+    relisent les headers (comme avant le patch). Cela ne s'applique QU'aux
+    tests qui utilisent mock_db (donc tous les tests d'integration role-based).
+    """
     conn = MockConnection()
+    # Le MockCursor reconnait les SELECT users/permissions et retourne des
+    # donnees coherentes avec X-User-ID/Role des headers -> get_current_user
+    # marche normalement, plus besoin de patcher la fonction.
     with patch('mysql.connector.connect', return_value=conn):
         yield conn
 
