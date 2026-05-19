@@ -13,9 +13,9 @@ status: stable
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
-tables: [api_keys, user_machine_access]
+tables: [api_keys, permissions, user_machine_access, users]
 imports_detected: [config, encryption]
-last_synced: 2026-04-29
+last_synced: 2026-05-19
 # AUTO-END
 ---
 

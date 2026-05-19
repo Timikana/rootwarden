@@ -14,7 +14,7 @@ status: stable
 routes: []
 tables: [notification_preferences, notifications, user_machine_access, users]
 imports_detected: [routes]
-last_synced: 2026-04-29
+last_synced: 2026-05-19
 # AUTO-END
 ---
 

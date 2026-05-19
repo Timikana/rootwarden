@@ -16,8 +16,8 @@ status: stable
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
 tables: []
-imports_detected: [config, routes]
-last_synced: 2026-04-29
+imports_detected: [config, log_scrub, routes]
+last_synced: 2026-05-19
 # AUTO-END
 ---
 

@@ -10,9 +10,9 @@ last_reviewed: 2026-04-21
 
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
-tables: [users]
+tables: [active_sessions, remember_tokens, users]
 imports_detected: []
-last_synced: 2026-04-29
+last_synced: 2026-05-19
 # AUTO-END
 ---
 

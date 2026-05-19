@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [permissions, ssh_audit_policies, ssh_audit_results]
 imports_detected: []
-last_synced: 2026-04-29
+last_synced: 2026-05-19
 # AUTO-END
 ---
 
