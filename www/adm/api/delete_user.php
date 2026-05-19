@@ -48,8 +48,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // --- Validation du jeton CSRF ---
-// Empêche les attaques Cross-Site Request Forgery sur cette action destructive.
+// Empeche les attaques Cross-Site Request Forgery sur cette action destructive.
 checkCsrfToken();
+
+// Patch A04-INSEC-N4 : step-up auth (re-2FA) obligatoire sur cette action.
+// Si l'attaquant a vole une session valide, il devra quand meme reproduire
+// le code TOTP pour delete un user. Le frontend doit ouvrir un modal et
+// appeler /auth/step_up_verify.php si la reponse contient step_up_required.
+require_once __DIR__ . '/../../auth/step_up.php';
+stepUpRequire('delete_user');
 
 // --- Validation de l'identifiant utilisateur ---
 // intval() garantit un entier ; un ID ≤ 0 est rejeté immédiatement.
@@ -66,13 +73,20 @@ if ($user_id === (int)$_SESSION['user_id']) {
     exit;
 }
 
-// --- Protection hierarchique : un admin ne peut pas supprimer un superadmin ---
+// --- Protection hierarchique stricte ---
+// Patch A01-03 (OWASP A01) : un admin ne peut supprimer que des roles
+// INFERIEURS au sien (un admin ne peut pas delete un autre admin ni un
+// superadmin). Avant ce patch, deux admins compromis pouvaient se purger
+// mutuellement, ou un admin malveillant pouvait eliminer ses pairs.
 $stmtCheck = $pdo->prepare("SELECT role_id FROM users WHERE id = ?");
 $stmtCheck->execute([$user_id]);
 $targetRole = (int)$stmtCheck->fetchColumn();
 $currentRoleId = getUserRole((int) $_SESSION['user_id']);
-if ($currentRoleId === 2 && $targetRole === 3) {
-    echo json_encode(['success' => false, 'message' => 'Un admin ne peut pas supprimer un superadmin.']);
+if ($targetRole >= $currentRoleId) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Suppression interdite : impossible de supprimer un compte de role egal ou superieur au votre.'
+    ]);
     exit;
 }
 // --- Protection : on ne supprime pas le dernier superadmin ---

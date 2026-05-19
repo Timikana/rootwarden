@@ -290,7 +290,10 @@ function validatePassword($inputPassword, $storedPassword, $isEncrypted = false)
  * @return string            Hash calculé.
  */
 function hash_password($password) {
-    return password_hash($password, PASSWORD_DEFAULT);
+    // Patch A02-NEW-01 : bcrypt cost 12 (OWASP 2024 recommandation).
+    // BCRYPT_COST vient de auth/password_policy.php ; fallback 12 sinon.
+    $cost = defined('BCRYPT_COST') ? BCRYPT_COST : 12;
+    return password_hash($password, PASSWORD_BCRYPT, ['cost' => $cost]);
 }
 
 /**

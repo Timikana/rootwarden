@@ -18,7 +18,8 @@ header("X-Content-Type-Options: nosniff");
 header("X-Frame-Options: DENY");
 header("X-XSS-Protection: 1; mode=block");
 header("Referrer-Policy: strict-origin-when-cross-origin");
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+require_once __DIR__ . '/../includes/csp_nonce.php';
+header("Content-Security-Policy: " . csp_header_value());
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -121,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
                     if ($oldHash) passwordPolicyRecordOld($pdo, (int)$uid, (string)$oldHash);
 
                     // Mettre a jour le mot de passe et effacer le flag force_password_change
-                    $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+                    $hash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]); // A02-NEW-01
                     $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE, password_updated_at = NOW() WHERE id = ?");
                     $stmt->execute([$hash, $uid]);
 

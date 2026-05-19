@@ -29,6 +29,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Connexion PDO et vérification de l'authentification de session
 require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/../../auth/verify.php';
+require_once __DIR__ . '/../../auth/password_policy.php';
 
 // --- Contrôle d'accès ---
 // Si aucun utilisateur n'est connecté, on redirige vers la page de connexion.
@@ -61,21 +62,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$_SESSION['user_id']]);
         $user = $stmt->fetch();
 
-        // password_verify() compare l'entrée en clair avec le hash bcrypt stocké
+        // password_verify() compare l'entree en clair avec le hash bcrypt stocke
         if (!$user || !password_verify($current_password, $user['password'])) {
             $error = "Le mot de passe actuel est incorrect.";
         } else {
-            // --- Mise à jour du mot de passe ---
-            // Hachage du nouveau mot de passe avec l'algorithme bcrypt (cost par défaut : 10)
-            $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
+            // Patch A02-NEW-02 : applique la password policy (15c/4 classes,
+            // historique, HIBP) comme reset_password.php et profile.php le font
+            // deja. Sans cette validation, cet endpoint etait un bypass de la
+            // policy.
+            $policyErr = passwordPolicyValidateAll($pdo, (int)$_SESSION['user_id'], $new_password);
+            if ($policyErr) {
+                $error = t($policyErr);
+            } else {
+                // Patch A02-NEW-01 : bcrypt cost 12 (recommandation OWASP 2024).
+                $hashed_password = password_hash($new_password, PASSWORD_BCRYPT, ['cost' => 12]);
 
-            // Mise à jour en base : seul le compte de l'utilisateur connecté est affecté
-            $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE, password_updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$hashed_password, $_SESSION['user_id']]);
-            unset($_SESSION['force_password_change']);
-            require_once __DIR__ . '/../includes/audit_log.php';
-            audit_log($pdo, "Changement mot de passe");
-            $success = "Votre mot de passe a été mis à jour avec succès.";
+                // Archiver l'ancien hash en historique (anti-reuse)
+                if (function_exists('passwordPolicyRecordOld')) {
+                    passwordPolicyRecordOld($pdo, (int)$_SESSION['user_id'], $user['password']);
+                }
+
+                $stmt = $pdo->prepare("UPDATE users SET password = ?, force_password_change = FALSE, password_updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$hashed_password, $_SESSION['user_id']]);
+                unset($_SESSION['force_password_change']);
+
+                // Patch A01-NEW-02 : rotation session + purge des autres sessions/
+                // tokens de l'utilisateur. Empeche un attaquant qui a vole une
+                // session/cookie remember_me de garder l'acces apres que la
+                // victime change son mdp suite a alerte.
+                $currentSessionId = session_id();
+                session_regenerate_id(true);
+                try {
+                    $pdo->prepare("DELETE FROM remember_tokens WHERE user_id = ?")
+                        ->execute([(int)$_SESSION['user_id']]);
+                } catch (\Throwable $_e) { /* table optionnelle, on ignore */ }
+                try {
+                    $pdo->prepare("DELETE FROM active_sessions WHERE user_id = ? AND session_id != ?")
+                        ->execute([(int)$_SESSION['user_id'], $currentSessionId]);
+                } catch (\Throwable $_e) { /* table optionnelle */ }
+
+                require_once __DIR__ . '/../includes/audit_log.php';
+                audit_log($pdo, "Changement mot de passe");
+                $success = "Votre mot de passe a ete mis a jour avec succes.";
+            }
         }
     }
 }
