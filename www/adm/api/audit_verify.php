@@ -66,13 +66,21 @@ try {
         }
 
         // Check self_hash recomputation
+        // Patch A08-02 : accepte hash HMAC (nouveau) ou SHA2 (legacy)
         $expectedSelf = audit_log_compute_hash(
             (string)$r['prev_hash'],
             (int)$r['user_id'],
             (string)$r['action'],
             (int)$r['ts']
         );
-        if ($expectedSelf !== $r['self_hash']) {
+        $selfValid = audit_log_verify_hash(
+            (string)$r['self_hash'],
+            (string)$r['prev_hash'],
+            (int)$r['user_id'],
+            (string)$r['action'],
+            (int)$r['ts']
+        );
+        if (!$selfValid) {
             if ($firstError === null) {
                 $firstError = [
                     'id' => (int)$r['id'],
