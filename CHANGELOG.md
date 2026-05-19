@@ -5,6 +5,68 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [Unreleased - security hardening] - 2026-05-19
+
+Branche `security/owasp-audit-2026-05` (à merger). Audit OWASP Top 10 complet + 30 findings patchés sur 3 vagues. Voir [OPERATIONS.md](OPERATIONS.md) pour le déploiement.
+
+### Critiques (vague 1)
+- **A01-01 / A04-01** Backend Python re-vérifie role+permissions en DB (helpers.py). `X-User-Role` / `X-User-Permissions` headers désormais ignorés.
+- **A02-01** Chiffrement passe à AES-256-GCM (AEAD). Préfixe `gcm:` pour les nouvelles écritures, lecture `aes:` legacy conservée.
+- **A08-01** `audit_seal.php` ne réécrit plus les lignes scellées (anti-tamper même par superadmin compromis).
+- **A04-03** `shlex.quote` sur les arguments shell (Wazuh registration_password + Graylog logger) → corrige RCE root distante.
+
+### Hautes (vague 1 + 2)
+- **A01-02/03/04** : `monitoring.py server_status` + machine_access ; `delete_user` strict `targetRole < currentRole` ; anti self-grant `update_server_access`.
+- **A02-02/04** : decrypt strict (plus de `errors='ignore'`, plus de fallback null-byte). TOTP fail-closed si SECRET_KEY absente.
+- **A04-02** : `api_proxy.php` whitelist explicite ~46 préfixes + rejet path traversal.
+- **A06-01** : `requirements.txt` pinné en `==`.
+- **A07-01/02** : rate-limit 2FA chainé `if/elseif/else`. Fallback `Config.API_KEY` désormais opt-in via `API_KEY_BOOTSTRAP=1`.
+- **A08-02** : audit hash chain passe en HMAC-SHA256 avec `AUDIT_HMAC_KEY` dédiée (auto-générée par `env-merge.sh`). Rétrocompat SHA2 legacy pour vérif.
+- **A09-04** : `_SecretScrubFilter` sur tous les handlers logging (server.log + deployment.log + iptables.log + update_servers.log).
+- **A10-01/02** : blocklist IP (loopback, link-local, AWS metadata) sur création machine + URL externes via `_url_is_safe_external()`.
+
+### Vague 2 — re-audit findings
+- **A01-NEW-01/03/04** : `@require_role(2)` sur `/update_security_exec`, `/fail2ban/geoip`, SSE log streams.
+- **A01-NEW-02** : `change_password.php` → `session_regenerate_id(true)` + purge `remember_tokens` + `active_sessions`.
+- **A02-NEW-01** : bcrypt cost **12** (constante `BCRYPT_COST` configurable via env).
+- **A02-NEW-02** : `change_password.php` applique la `passwordPolicyValidateAll()` (bypass corrigé).
+- **A02-NEW-03** : `AUDIT_HMAC_KEY` dans `srv-docker.env.example` + warning runtime + **auto-gen `openssl rand -hex 32`** dans `env-merge.sh`.
+- **A04-INSEC-N1** : refus cron schedule `< 10 min` (anti-DoS OpenCVE/SSH).
+- **A04-INSEC-N2** : rate-limit CVE scan **60s par user**.
+- **A07-NEW-01** : rate-limit 2FA **par IP** (login_attempts.step='2fa', max 10/10min). Migration 046.
+- **A08-NEW-01** : `maj.sh` vérifie signature GPG `git verify-commit HEAD` (mode permissif par défaut, strict via `MAJ_REQUIRE_SIGNED=1`).
+- **A09-NEW-01** : factorisation `backend/log_scrub.py` + `attach_scrub` + `install_scrub_on_root`.
+- **A10-SSRF-N1** : NVDClient passe par `_url_is_safe_external` (oversight du patch A10-02).
+- **A10-SSRF-N2** : webhook URL validé + `resp.text` plus loggé.
+- **A10-SSRF-N4** : `connect_ssh()` Python a aussi un blocklist host.
+- **CMD-INJ-02** : `shlex.quote` sur `home`/`uname`/`backup_path` dans `bashrc.py restore`.
+- **XSS-02/03** : `htmlspecialchars` sur labels notif + `Number(cvss).toFixed(1)` en JS.
+
+### Vague 3 — automation + UX
+- **A04-INSEC-N4** : step-up 2FA implémenté côté backend (`/auth/step_up_verify.php`, helpers `step_up.php`) + **modal frontend automatique** via wrapper `window.fetch` qui catch les 403 `step_up_required` (utils.js).
+- **A04-INSEC-N5** : kill-switch `/revoke_service_account` (superadmin) → `userdel rootwarden` + sudoers purge sur N machines.
+- **A05-NEW-01/02/03** : hardening `docker-compose.prod.yml` (user non-root, `cap_drop ALL`, `read_only`, tmpfs).
+- **A05-NEW-04** : CSP nonces (helper `csp_nonce.php`) + maintien `unsafe-inline` pour rétrocompat — CSP3 ignore `unsafe-inline` si nonce présent.
+- **A05-NEW-05** : corrige commentaire Tailwind CDN (en fait local depuis longtemps).
+- **A06-NEW-01** : `requirements.in` source pip-compile + doc.
+- **A06-NEW-02** : `scripts/pin-docker-digests.sh` helper.
+- **A09-NEW-03** : GELF handler optionnel via `GRAYLOG_HOST/PORT`.
+
+### Conventions sécurité
+- **`CONTRIBUTING-SECURITY.md`** : 11 sections + checklist code-review + workflow patch sécu.
+- **`.semgrep/rules-rootwarden.yml`** : 10 règles custom CI (anti-régression).
+- **Mémoires Claude Code** : conventions et règles persistées pour application automatique en future session.
+
+### Migrations DB
+- **045** : `cve_scan_schedules.scan_source` (`fast`/`hybrid`/`precise`).
+- **046** : `login_attempts.step` (rate-limit 2FA par IP).
+
+### Documentation
+- **`OPERATIONS.md`** : guide d'exploitation complet (déploiement, maj, hardening, kill-switch, rate-limits, etc.).
+- **`CONTRIBUTING-SECURITY.md`** : règles à respecter pour éviter régressions.
+
+---
+
 ## [1.20.0] - 2026-05-05
 
 ### Bouton Redemarrer serveur (`/update/`)
