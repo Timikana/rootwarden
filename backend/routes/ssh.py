@@ -711,6 +711,101 @@ def deploy_platform_key():
     return jsonify({'success': all_ok, 'results': results})
 
 
+@bp.route('/revoke_service_account', methods=['POST'])
+@require_api_key
+@require_role(3)  # superadmin only - kill-switch
+@threaded_route
+def revoke_service_account():
+    """
+    Patch A04-INSEC-N5 (OWASP A04 Insecure Design) - kill-switch.
+
+    Revoque le compte de service 'rootwarden' sur une ou plusieurs machines :
+    - Supprime l'utilisateur Linux distant (userdel -r -f)
+    - Retire le fichier /etc/sudoers.d/rootwarden
+    - Marque service_account_deployed=0 en BDD
+    - Audit log immutable
+
+    Cas d'usage : compromission suspectee de la clé Ed25519 plateforme,
+    rotation forcee, audit sortant. Superadmin only.
+
+    Body JSON : {machine_ids: [int], reason: str}
+    """
+    data = request.get_json(silent=True) or {}
+    machine_ids = data.get('machine_ids', [])
+    reason = (data.get('reason') or 'panic_revoke').strip()[:200]
+    if not machine_ids:
+        return jsonify({'success': False, 'message': 'machine_ids requis'}), 400
+
+    user_id, _ = get_current_user()
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        fmt = ','.join(['%s'] * len(machine_ids))
+        cur.execute(
+            f"SELECT id, name, ip, port, user, password, root_password "
+            f"FROM machines WHERE id IN ({fmt})", machine_ids
+        )
+        machines = cur.fetchall()
+    finally:
+        conn.close()
+
+    import shlex as _shlex
+    results = []
+    for m in machines:
+        r = {'machine_id': m['id'], 'name': m['name'], 'success': False, 'message': ''}
+        try:
+            ssh_pass = server_decrypt_password(m['password'])
+            root_pass = server_decrypt_password(m['root_password'])
+            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger) as client:
+                # Suppression user + sudoers (idempotent : si deja supprime, OK)
+                cmd = (
+                    "set -e; "
+                    "rm -f /etc/sudoers.d/rootwarden; "
+                    "userdel -r -f rootwarden 2>/dev/null || true; "
+                    "rm -rf /home/rootwarden /var/spool/mail/rootwarden 2>/dev/null || true; "
+                    "id rootwarden 2>/dev/null && exit 1 || exit 0"
+                )
+                from ssh_utils import execute_as_root
+                _, err_out, code = execute_as_root(client, cmd, root_pass, logger=logger, timeout=30)
+                if code == 0:
+                    # Update BDD
+                    with get_db_connection() as conn2:
+                        cur2 = conn2.cursor()
+                        cur2.execute(
+                            "UPDATE machines SET service_account_deployed = 0 WHERE id = %s",
+                            (m['id'],)
+                        )
+                        conn2.commit()
+                    r['success'] = True
+                    r['message'] = 'Service account revoque'
+                else:
+                    r['message'] = (err_out or '')[-300:].strip() or f'exit={code}'
+        except Exception as e:
+            logger.exception("revoke_service_account %s : %s", m['name'], e)
+            r['message'] = str(e)[:200]
+
+        # Audit log immutable (HMAC chain cote PHP, ici juste user_logs INSERT)
+        try:
+            with get_db_connection() as conn3:
+                cur3 = conn3.cursor()
+                cur3.execute(
+                    "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
+                    (user_id, f"[panic] revoke_service_account machine={_shlex.quote(m['name'])} "
+                              f"reason={_shlex.quote(reason)} ok={r['success']}")
+                )
+                conn3.commit()
+        except Exception:
+            pass
+
+        results.append(r)
+
+    return jsonify({
+        'success': all(r['success'] for r in results),
+        'count': len(results),
+        'results': results,
+    })
+
+
 @bp.route('/deploy_service_account', methods=['POST'])
 @require_api_key
 @require_machine_access

@@ -48,8 +48,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // --- Validation du jeton CSRF ---
-// Empêche les attaques Cross-Site Request Forgery sur cette action destructive.
+// Empeche les attaques Cross-Site Request Forgery sur cette action destructive.
 checkCsrfToken();
+
+// Patch A04-INSEC-N4 : step-up auth (re-2FA) obligatoire sur cette action.
+// Si l'attaquant a vole une session valide, il devra quand meme reproduire
+// le code TOTP pour delete un user. Le frontend doit ouvrir un modal et
+// appeler /auth/step_up_verify.php si la reponse contient step_up_required.
+require_once __DIR__ . '/../../auth/step_up.php';
+stepUpRequire('delete_user');
 
 // --- Validation de l'identifiant utilisateur ---
 // intval() garantit un entier ; un ID ≤ 0 est rejeté immédiatement.

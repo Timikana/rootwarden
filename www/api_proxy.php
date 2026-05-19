@@ -86,7 +86,7 @@ $ALLOWED_PROXY_PREFIXES = [
     '/cve_', '/cron_preview',
     '/deploy', '/preflight_check',
     '/platform_key', '/deploy_platform_key', '/test_platform_key',
-    '/deploy_service_account', '/regenerate_platform_key',
+    '/deploy_service_account', '/revoke_service_account', '/regenerate_platform_key',
     '/remove_ssh_password', '/reenter_ssh_password',
     '/scan_server_users', '/sshd_allow_user',
     '/server_user_keys', '/server_user_remove_key',

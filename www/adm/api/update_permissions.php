@@ -55,6 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // --- Validation CSRF (POST, header htmx, ou body JSON) ---
 checkCsrfToken();
 
+// Patch A04-INSEC-N4 : step-up auth (re-2FA) sur modif de permissions.
+require_once __DIR__ . '/../../auth/step_up.php';
+stepUpRequire('update_permissions');
+
 // --- Lecture du body (JSON ou form-urlencoded pour htmx) ---
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 if (str_contains($contentType, 'application/json')) {

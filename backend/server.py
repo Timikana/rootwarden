@@ -147,6 +147,33 @@ _log_format = (
 from log_scrub import attach_scrub, install_scrub_on_root
 
 _handlers = [logging.StreamHandler(), logging.FileHandler(server_log_file)]
+
+# Patch A09-NEW-03 (OWASP A09) : forwarding GELF optionnel vers Graylog
+# pour centraliser les logs applicatifs hors du container (en cas de
+# compromission, les logs locaux peuvent etre effaces). Active si
+# GRAYLOG_HOST defini en env. Compat lib graypy (pas de fallback : si la
+# lib n'est pas dispo, on log juste un warning).
+_graylog_host = os.getenv('GRAYLOG_HOST', '').strip()
+if _graylog_host:
+    try:
+        import graypy
+        _graylog_port = int(os.getenv('GRAYLOG_PORT', '12201'))
+        _gh = graypy.GELFTCPHandler(_graylog_host, _graylog_port,
+                                     facility='rootwarden-backend')
+        _handlers.append(_gh)
+        logging.getLogger(__name__).info(
+            "GELF forwarding active vers %s:%d", _graylog_host, _graylog_port
+        )
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "GRAYLOG_HOST defini mais graypy non installe : "
+            "pip install graypy -- forwarding GELF desactive"
+        )
+    except Exception as _gelf_err:
+        logging.getLogger(__name__).warning(
+            "GELF handler init echoue : %s", _gelf_err
+        )
+
 for _h in _handlers:
     attach_scrub(_h)
 
