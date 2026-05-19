@@ -126,6 +126,17 @@ class Config:
     OPENCVE_TOKEN    = os.getenv('OPENCVE_TOKEN', '')  # Bearer token pour OpenCVE v2 on-prem
     CVE_CACHE_TTL    = int(os.getenv('CVE_CACHE_TTL', '3600'))   # secondes
     CVE_MIN_CVSS     = float(os.getenv('CVE_MIN_CVSS', '7.0'))   # seuil par défaut
+    # Pagination OpenCVE : limit=100 / 20 pages = jusqu'a 2000 CVE par composant
+    # (necessaire pour kernel/openssl qui ont des milliers de CVE indexees).
+    CVE_PAGE_LIMIT   = int(os.getenv('CVE_PAGE_LIMIT', '100'))
+    CVE_MAX_PAGES    = int(os.getenv('CVE_MAX_PAGES', '20'))
+    # Enrichissement via NVD 2.0 API pour filtrer par version installee.
+    # Sans ca, OpenCVE renvoie toutes les CVE d'un produit sans tenir compte
+    # de la version courante -> bcp de faux positifs.
+    NVD_ENRICHMENT_ENABLED = os.getenv('NVD_ENRICHMENT_ENABLED', 'true').lower() == 'true'
+    NVD_API_URL      = os.getenv('NVD_API_URL', 'https://services.nvd.nist.gov/rest/json/cves/2.0')
+    NVD_API_KEY      = os.getenv('NVD_API_KEY', '')  # optionnel : 50 req/30s avec, 5 sans
+    NVD_CACHE_TTL    = int(os.getenv('NVD_CACHE_TTL', '604800'))  # 7 jours par defaut
 
     # ── Notifications email ──────────────────────────────────────────────────
     MAIL_ENABLED       = os.getenv('MAIL_ENABLED', 'false').lower() == 'true'
