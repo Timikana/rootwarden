@@ -66,13 +66,20 @@ if ($user_id === (int)$_SESSION['user_id']) {
     exit;
 }
 
-// --- Protection hierarchique : un admin ne peut pas supprimer un superadmin ---
+// --- Protection hierarchique stricte ---
+// Patch A01-03 (OWASP A01) : un admin ne peut supprimer que des roles
+// INFERIEURS au sien (un admin ne peut pas delete un autre admin ni un
+// superadmin). Avant ce patch, deux admins compromis pouvaient se purger
+// mutuellement, ou un admin malveillant pouvait eliminer ses pairs.
 $stmtCheck = $pdo->prepare("SELECT role_id FROM users WHERE id = ?");
 $stmtCheck->execute([$user_id]);
 $targetRole = (int)$stmtCheck->fetchColumn();
 $currentRoleId = getUserRole((int) $_SESSION['user_id']);
-if ($currentRoleId === 2 && $targetRole === 3) {
-    echo json_encode(['success' => false, 'message' => 'Un admin ne peut pas supprimer un superadmin.']);
+if ($targetRole >= $currentRoleId) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Suppression interdite : impossible de supprimer un compte de role egal ou superieur au votre.'
+    ]);
     exit;
 }
 // --- Protection : on ne supprime pas le dernier superadmin ---
