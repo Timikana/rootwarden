@@ -112,12 +112,28 @@ def require_api_key(func):
             )
             return jsonify({'success': False, 'message': 'Non autorise'}), 401
 
-        # Priorite 2 (fallback) : Config.API_KEY legacy
-        # Actif uniquement si la table api_keys est vide (premier boot).
-        if db_ok is None and hmac.compare_digest(key, Config.API_KEY):
+        # Patch A07-02 (OWASP A07) : fallback Config.API_KEY uniquement en
+        # mode bootstrap explicite (flag env API_KEY_BOOTSTRAP=1). Avant :
+        # le fallback s'activait des que la table api_keys etait vide OU
+        # que la DB etait down -> compromise une migration DB foiree ou un
+        # outage MySQL en escalation de droits silencieuse. Apres : le
+        # fallback exige une variable d'env explicite, sinon fail-closed.
+        bootstrap = os.getenv('API_KEY_BOOTSTRAP', '').lower() in ('1', 'true', 'yes')
+        if db_ok is None and bootstrap and hmac.compare_digest(key, Config.API_KEY):
+            logger.warning(
+                "API key fallback bootstrap utilise (table vide / DB down) depuis %s. "
+                "A desactiver des qu'une cle est creee en BDD (unset API_KEY_BOOTSTRAP).",
+                request.remote_addr
+            )
             return func(*args, **kwargs)
 
-        logger.warning("Requete refusee : X-API-KEY invalide depuis %s", request.remote_addr)
+        if db_ok is None and not bootstrap:
+            logger.warning(
+                "API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP "
+                "non active (fail-closed) depuis %s", request.remote_addr
+            )
+        else:
+            logger.warning("Requete refusee : X-API-KEY invalide depuis %s", request.remote_addr)
         return jsonify({'success': False, 'message': 'Non autorise'}), 401
     return decorated
 
@@ -141,10 +157,67 @@ def get_db_connection():
 
 
 def get_current_user():
-    """Retourne (user_id, role_id) depuis les headers X-User-ID et X-User-Role."""
-    user_id = int(request.headers.get('X-User-ID', 0))
-    role_id = int(request.headers.get('X-User-Role', 0))
-    return user_id, role_id
+    """Retourne (user_id, role_id) avec verification DB obligatoire.
+
+    Defense in depth contre A01-01 / A04-01 : auparavant le backend lisait
+    X-User-Role depuis les headers, ce qui permettait a tout client en
+    possession d'X-API-KEY de forger role=3. Maintenant on lit uniquement
+    X-User-ID puis on re-charge role_id + active depuis la table users.
+    Permissions chargees depuis la table permissions au meme moment.
+
+    Cache par requete via flask.g pour eviter de marteler la DB.
+    Failsafe : retourne (0, 0) si user inactif/introuvable ou DB down ->
+    tous les require_role/require_permission fail-close.
+    """
+    from flask import g
+    if hasattr(g, '_rw_user_cache'):
+        return g._rw_user_cache
+
+    try:
+        user_id = int(request.headers.get('X-User-ID', 0))
+    except (ValueError, TypeError):
+        user_id = 0
+
+    if user_id <= 0:
+        g._rw_user_cache = (0, 0)
+        g._rw_user_perms = {}
+        return g._rw_user_cache
+
+    try:
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, role_id, active FROM users WHERE id = %s",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            if not row or not row.get('active'):
+                logger.warning(
+                    "get_current_user: user_id=%d introuvable ou inactif (header ignore)",
+                    user_id
+                )
+                g._rw_user_cache = (0, 0)
+                g._rw_user_perms = {}
+                return g._rw_user_cache
+            role_id = int(row.get('role_id') or 0)
+
+            # Charge les permissions granulaires en meme temps (1 requete DB
+            # plutot que 2 sur des routes qui appellent les deux helpers)
+            cur.execute("SELECT * FROM permissions WHERE user_id = %s", (user_id,))
+            prow = cur.fetchone() or {}
+            perms = {k: bool(v) for k, v in prow.items() if k != 'user_id'}
+
+            g._rw_user_cache = (user_id, role_id)
+            g._rw_user_perms = perms
+            return g._rw_user_cache
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error("get_current_user: erreur DB pour user_id=%d : %s", user_id, e)
+        g._rw_user_cache = (0, 0)
+        g._rw_user_perms = {}
+        return g._rw_user_cache
 
 
 def require_role(min_role):
@@ -165,14 +238,16 @@ def require_role(min_role):
 
 
 def get_user_permissions():
-    """Parse les permissions utilisateur depuis le header X-User-Permissions (JSON).
-    Retourne un dict vide si le header est absent ou invalide."""
-    raw = request.headers.get('X-User-Permissions', '{}')
-    try:
-        perms = json.loads(raw)
-        return perms if isinstance(perms, dict) else {}
-    except (json.JSONDecodeError, TypeError):
-        return {}
+    """Retourne les permissions granulaires depuis la table permissions.
+
+    Defense in depth contre A01-01 : auparavant on lisait X-User-Permissions
+    JSON depuis les headers, ce qui permettait de forger n'importe quel
+    droit. Desormais on s'appuie uniquement sur la valeur en DB (chargee
+    par get_current_user() et cachee dans flask.g)."""
+    from flask import g
+    if not hasattr(g, '_rw_user_perms'):
+        get_current_user()  # populate cache
+    return getattr(g, '_rw_user_perms', {}) or {}
 
 
 def require_permission(permission):

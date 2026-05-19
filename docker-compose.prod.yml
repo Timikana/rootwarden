@@ -1,18 +1,28 @@
 # ================================================================
 # docker-compose.prod.yml - override pour deploiement production
 #
-# Apporte le hardening recommande par l'audit securite v1.17.0 :
+# Apporte le hardening recommande par les audits securite :
+#
+# Audit v1.17.0 - FIND-3 :
 #   - retire les bind-mounts ./backend:/app et ./www:/var/www/html
-#     qui defaisaient le hardening de l'image baked (audit FIND-3)
+#     qui defaisaient le hardening de l'image baked
 #   - le code applicatif reste celui baked dans l'image construite
 #     en CI ; les volumes nommes/persistants pour data/logs/keys sont
 #     conserves
+#
+# Audit OWASP 2026-05-19 - A05-NEW-01/02/03 :
+#   - cap_drop ALL + cap_add minimaux (no kernel privileges hors ce qui
+#     est strictement necessaire au binding ports 80/443 et au lifecycle
+#     gosu/su d'Apache)
+#   - read_only: true filesystem + tmpfs sur /tmp et /var/run
+#   - security_opt: no-new-privileges deja present, conserve
+#   - ports MySQL non exposes (deja le cas en dev)
 #
 # Usage :
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # En dev local, ne pas inclure ce fichier - le bind-mount facilite
-# le hot-reload du code.
+# le hot-reload du code et certains hardenings cassent les tests.
 # ================================================================
 
 services:
@@ -26,6 +36,17 @@ services:
       - ./backups:/app/backups
       - platform_ssh_keys:/app/platform_ssh
       - ./mysql/migrations:/app/migrations:ro
+    # Patch A05-NEW-01/02/03 hardening
+    user: "1000:1000"  # uid rootwarden cree dans le Dockerfile (apres gosu)
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+      - /var/run:size=8M
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Python n'a pas besoin de capabilities pour ses binds (Hypercorn 5000 = >1024)
 
   php:
     volumes:
@@ -34,4 +55,38 @@ services:
       - php_sessions:/var/www/sessions
       - ./www/logs:/var/www/html/logs
       - ./www/_ul:/var/www/html/_ul
-      - ./php/php.ini:/usr/local/etc/php/php.ini
+      - ./php/php.ini:/usr/local/etc/php/php.ini:ro
+      - ./certs:/var/www/certs:ro
+    # Patch A05-NEW-01/02/03 hardening
+    # PHP/Apache reste root pour bind 80/443 mais drop toutes les caps
+    # autres que NET_BIND_SERVICE + CHOWN/SETUID/SETGID (Apache fork).
+    read_only: true
+    tmpfs:
+      - /tmp:size=128M,mode=1777
+      - /var/run:size=8M
+      - /var/lock:size=8M
+      - /var/log/apache2:size=64M
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE  # Apache lit /etc/apache2/* en user www-data
+
+  db:
+    # Patch A05-NEW-01/02/03 hardening minimal MySQL
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    # MySQL ecrit dans /var/lib/mysql, /var/run/mysqld : pas de read_only here.

@@ -69,6 +69,58 @@ if (!$path || $path === '/') {
     exit;
 }
 
+// Patch A04-02 (OWASP A04 Insecure Design) : whitelist explicite des
+// prefixes de routes autorises. Avant : tout PATH_INFO etait forwarde au
+// backend, ce qui rendait automatiquement publique toute nouvelle route
+// debug/internal ajoutee cote Python. Maintenant : fail-closed sur tout
+// path non liste, et rejet immediat de path traversal.
+if (strpos($path, '..') !== false || strpos($path, '//') !== false || strpos($path, '\\') !== false) {
+    http_response_code(400);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Path invalide']);
+    exit;
+}
+$ALLOWED_PROXY_PREFIXES = [
+    '/test', '/list_machines', '/filter_servers',
+    '/server_status', '/linux_version', '/last_reboot', '/reboot_server',
+    '/cve_', '/cron_preview',
+    '/deploy', '/preflight_check',
+    '/platform_key', '/deploy_platform_key', '/test_platform_key',
+    '/deploy_service_account', '/revoke_service_account', '/regenerate_platform_key',
+    '/remove_ssh_password', '/reenter_ssh_password',
+    '/scan_server_users', '/sshd_allow_user',
+    '/server_user_keys', '/server_user_remove_key',
+    '/remove_user_keys', '/delete_remote_user',
+    '/logs', '/update', '/update-logs', '/update_zabbix', '/update_security_exec',
+    '/apt_check_lock', '/apt_update', '/security_updates',
+    '/dpkg_repair', '/custom_update', '/dry_run_update', '/pending_packages',
+    '/schedule_update', '/schedule_advanced_update', '/schedule_advanced_security_update',
+    '/iptables', '/iptables-',
+    '/fail2ban/',
+    '/ssh-audit/',
+    '/supervision/',
+    '/graylog/',
+    '/wazuh/',
+    '/services/',
+    '/admin/',
+    '/bashrc/',
+    '/exclude_user', '/server_lifecycle',
+];
+$pathAllowed = false;
+foreach ($ALLOWED_PROXY_PREFIXES as $prefix) {
+    if ($path === $prefix || strpos($path, $prefix) === 0) {
+        $pathAllowed = true;
+        break;
+    }
+}
+if (!$pathAllowed) {
+    error_log("[api_proxy] Route refusee (whitelist) : $path depuis user_id=$userId");
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Route non autorisee']);
+    exit;
+}
+
 $query  = $_SERVER['QUERY_STRING'] ?? '';
 $target = $python_url . $path . ($query ? "?$query" : '');
 $method = $_SERVER['REQUEST_METHOD'];

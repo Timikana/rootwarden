@@ -57,24 +57,47 @@ def list_machines():
 @bp.route('/server_status', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_machine_access
 @threaded_route
 def server_status():
+    """Verifie la disponibilite TCP d'une machine du parc.
+
+    Patch A01-02 : auparavant le endpoint acceptait n'importe quelle 'ip'
+    brute (admin -> LAN scan). Desormais on resout machine_id puis on
+    utilise l'IP enregistree en BDD. Defense en profondeur cote SSRF/LAN
+    pivot meme si l'attaquant n'a pas pu inserer une machine arbitraire.
+    """
     data = request.json or {}
-    ip = data.get('ip')
-    port = data.get('port', 22)
-    if not ip:
-        return jsonify({'success': False, 'message': 'IP manquante'}), 400
+    machine_id = data.get('machine_id')
+    if machine_id is None:
+        return jsonify({'success': False, 'message': 'machine_id requis'}), 400
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5)
-        result = sock.connect_ex((ip, int(port)))
-        sock.close()
-        status = 'online' if result == 0 else 'offline'
+        machine_id = int(machine_id)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'machine_id invalide'}), 400
+
+    try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT online_status, name FROM machines WHERE ip = %s", (ip,))
-            prev = cursor.fetchone()
-            cursor.execute("UPDATE machines SET online_status = %s WHERE ip = %s", (status.upper(), ip))
+            cursor.execute(
+                "SELECT id, ip, port, name, online_status FROM machines WHERE id = %s",
+                (machine_id,)
+            )
+            machine = cursor.fetchone()
+        if not machine:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+        ip = machine['ip']
+        port = int(machine.get('port') or 22)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex((ip, port))
+        sock.close()
+        status = 'online' if result == 0 else 'offline'
+        prev = machine
+        with get_db_connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("UPDATE machines SET online_status = %s WHERE id = %s",
+                           (status.upper(), machine_id))
             conn.commit()
         # Notification si le serveur passe offline
         if status == 'offline' and prev and prev.get('online_status') == 'ONLINE':

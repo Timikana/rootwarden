@@ -17,8 +17,8 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from routes.helpers import (
-    require_api_key, require_role, require_machine_access, threaded_route, get_db_connection,
-    server_decrypt_password, logger,
+    require_api_key, require_role, require_permission, require_machine_access, threaded_route,
+    get_db_connection, server_decrypt_password, logger,
 )
 from ssh_utils import ssh_session
 from fail2ban_manager import (
@@ -635,6 +635,8 @@ def fail2ban_install_all():
 
 @bp.route('/fail2ban/geoip', methods=['POST'])
 @require_api_key
+@require_role(2)
+@require_permission('can_manage_fail2ban')
 @threaded_route
 def fail2ban_geoip():
     """Lookup GeoIP pour une IP."""

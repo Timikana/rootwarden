@@ -71,6 +71,25 @@ if [ "$DO_PULL" -eq 1 ]; then
         echo -e "  ${YELLOW}!${NC} Sur la branche ${branch} (pas main) - pull respecte."
     fi
     run git pull --ff-only origin "${branch}"
+
+    # Patch A08-NEW-01 (OWASP A08 Data Integrity) : verification signature GPG
+    # du commit HEAD apres git pull. Empeche le deploiement de code non signe
+    # (compromission remote, MITM sur git, push malicieux).
+    #
+    # MODE PAR DEFAUT : warning si non signe (ne bloque pas - retrocompat
+    # avec les setups dev sans GPG). Pour activer la verification STRICTE
+    # (recommandee en prod), set MAJ_REQUIRE_SIGNED=1.
+    if git verify-commit HEAD >/dev/null 2>&1; then
+        echo -e "  ${GREEN}OK${NC} signature GPG du HEAD valide"
+    else
+        if [ "${MAJ_REQUIRE_SIGNED:-0}" = "1" ]; then
+            echo -e "${RED}[maj]${NC} HEAD non signe GPG ou signature invalide (mode strict MAJ_REQUIRE_SIGNED=1)." >&2
+            echo -e "  Configurer git config commit.gpgsign true + cle GPG du committer." >&2
+            echo -e "  Pour bypass temporaire : unset MAJ_REQUIRE_SIGNED puis relancer." >&2
+            exit 1
+        fi
+        echo -e "  ${YELLOW}!${NC} HEAD non signe GPG (mode permissif - set MAJ_REQUIRE_SIGNED=1 pour exiger)."
+    fi
 else
     echo -e "${GREEN}[maj 1/5]${NC} git pull SKIP (--no-pull)"
 fi

@@ -68,12 +68,25 @@ def send_webhook(title: str, message: str, event: str = '', severity: str = 'inf
         else:
             payload = _build_generic(title, message, severity, fields)
 
+        # Patch A10-SSRF-N2 (OWASP A10) : valide la cible avant l'envoi.
+        # Avant : un admin pouvait pointer WEBHOOK_URL vers 169.254.169.254 ou
+        # un service interne et exfiltrer la reponse via le log resp.text[:200].
+        try:
+            from cve_scanner import _url_is_safe_external
+            if not _url_is_safe_external(WEBHOOK_URL):
+                _log.warning("Webhook URL refusee (SSRF guard) : %s", WEBHOOK_URL)
+                return False
+        except Exception:
+            pass  # si l'import echoue, on garde le comportement legacy
+
         resp = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code < 300:
             _log.info("Webhook sent: %s [%s]", event, title[:50])
             return True
         else:
-            _log.warning("Webhook failed: HTTP %d - %s", resp.status_code, resp.text[:200])
+            # Patch A10-SSRF-N2 : NE PAS logger resp.text (canal exfiltration
+            # si la cible est un service interne renvoyant des secrets dans le body).
+            _log.warning("Webhook failed: HTTP %d (body suppressed for SSRF safety)", resp.status_code)
             return False
 
     except Exception as e:

@@ -531,6 +531,23 @@ def decrypt_password(encrypted_password: str, logger=None) -> str:
 # ===================================================
 # Gestion SSH (connexion, root)
 # ===================================================
+def _is_safe_ssh_host(host: str) -> bool:
+    """Blocklist SSH host (A10-SSRF-N4). True si autorise.
+
+    Refuse explicitement loopback (127/8), link-local (169.254/16), 0/8,
+    IPv6 loopback/link-local. Les IPs privees RFC1918 et FQDN sont OK
+    (cas legitime : LAN d'entreprise).
+    """
+    if not host:
+        return False
+    s = host.strip()
+    if (s.startswith('127.') or s.startswith('169.254.') or s.startswith('0.')
+            or s == '::1' or s.lower().startswith('fe80:')
+            or s.lower() in ('localhost', '0:0:0:0:0:0:0:0', '::')):
+        return False
+    return True
+
+
 def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 logger=None, force_password: bool = False,
                 service_account: bool = False) -> paramiko.SSHClient:
@@ -559,6 +576,14 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
         paramiko.SSHClient: Client SSH connecte.
     """
     _logger = logger or logging.getLogger(__name__)
+
+    # Patch A10-SSRF-N4 (OWASP A10) : defense-in-depth - refuse les hosts
+    # loopback/link-local meme si la validation cote PHP a ete contournee
+    # (script interne, futur blueprint, etc). Les IPs privees RFC1918
+    # restent autorisees pour les LAN d'entreprise.
+    if not _is_safe_ssh_host(host):
+        raise ValueError(f"Host SSH refuse (loopback/link-local) : {host}")
+
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

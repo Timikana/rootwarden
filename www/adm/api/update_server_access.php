@@ -52,10 +52,24 @@ $data = json_decode(file_get_contents('php://input'), true) ?: [];
 
 // --- Validation de la présence des champs obligatoires ---
 if (isset($data['user_id'], $data['machine_id'], $data['action'])) {
-    // Typage strict pour éviter les injections de type sur les entiers
+    // Typage strict pour eviter les injections de type sur les entiers
     $user_id    = (int)$data['user_id'];
     $machine_id = (int)$data['machine_id'];
-    $action     = $data['action']; // Valeur contrôlée par le if/elseif ci-dessous
+    $action     = $data['action']; // Valeur controlee par le if/elseif ci-dessous
+
+    // Patch A01-04 (OWASP A01) : un admin ne peut pas se self-grant un acces
+    // machine. Le pouvoir d'accorder est reserve au superadmin OU a un admin
+    // sur un OTHER user. Avant ce patch, un admin compromis se donnait
+    // l'acces a toutes les machines en un appel.
+    $currentUserId = (int)($_SESSION['user_id'] ?? 0);
+    $currentRoleId = (int)($_SESSION['role_id'] ?? 0);
+    if ($action === 'add' && $user_id === $currentUserId && $currentRoleId < 3) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Un admin ne peut pas s\'attribuer l\'acces a une machine. Demandez au superadmin.'
+        ]);
+        exit;
+    }
 
     try {
         if ($action === 'add') {

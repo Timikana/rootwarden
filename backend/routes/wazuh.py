@@ -39,6 +39,7 @@ import os
 import json
 import base64
 import hashlib
+import shlex
 import tempfile
 import subprocess
 import datetime
@@ -328,9 +329,15 @@ def install():
     # zypper (SUSE/openSUSE). Avant v1.18.x c'etait apt-only -> fail silencieux
     # sur RHEL family. Le manager + group + registration_password sont passes
     # en env vars, communs aux 3 branches.
-    env_vars = f"WAZUH_MANAGER='{manager}' WAZUH_AGENT_GROUP='{group}'"
+    # Patch A04-03 : quote toutes les valeurs interpolees dans le shell.
+    # Sans shlex.quote, un mot de passe contenant ' ou $() permettait une
+    # injection de commande root distante via 'WAZUH_REGISTRATION_PASSWORD'.
+    env_vars = (
+        f"WAZUH_MANAGER={shlex.quote(manager)} "
+        f"WAZUH_AGENT_GROUP={shlex.quote(group)}"
+    )
     if reg_pwd:
-        env_vars += f" WAZUH_REGISTRATION_PASSWORD='{reg_pwd}'"
+        env_vars += f" WAZUH_REGISTRATION_PASSWORD={shlex.quote(reg_pwd)}"
 
     # Version pinning depuis v1.20.x : si cfg['agent_version'] != 'latest',
     # on cible une version specifique pour aligner sur le manager (ex 4.14.5).
@@ -487,9 +494,13 @@ def install_all():
                 continue
 
             ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row_full)
-            env_vars = f"WAZUH_MANAGER='{manager}' WAZUH_AGENT_GROUP='{group}'"
+            # Patch A04-03 (cf install()) : quote shell pour eviter RCE root.
+            env_vars = (
+                f"WAZUH_MANAGER={shlex.quote(manager)} "
+                f"WAZUH_AGENT_GROUP={shlex.quote(group)}"
+            )
             if reg_pwd:
-                env_vars += f" WAZUH_REGISTRATION_PASSWORD='{reg_pwd}'"
+                env_vars += f" WAZUH_REGISTRATION_PASSWORD={shlex.quote(reg_pwd)}"
 
             # Version pinning (cf. install()) : aligne sur cfg.agent_version
             pkg_deb, pkg_rpm = _wazuh_pkg_specs(cfg.get('agent_version') or 'latest')

@@ -132,3 +132,30 @@ done
 added=${#missing_keys[@]}
 echo -e "${GREEN}[env-merge]${NC} ${added} cle(s) ajoutee(s) a la fin de ${ENV_FILE}."
 echo -e "  ${YELLOW}Action :${NC} verifier les valeurs (CHANGEZ_MOI_*, ${YELLOW}*_ENABLED${NC}, etc.) puis relancer."
+
+# ── Auto-generation des cles crypto vides ────────────────────────────────────
+# Patch OWASP : certaines cles doivent imperativement etre non-vides en prod
+# (sinon fail-closed cote app). On les genere automatiquement quand elles
+# viennent d'etre ajoutees vides par env-merge -> pas d'oubli operateur.
+#
+# Liste : AUDIT_HMAC_KEY (A08-02, sinon fallback SECRET_KEY = separation nulle).
+generate_if_empty() {
+    local key="$1"
+    local current_value=$(grep -E "^${key}=" "${ENV_FILE}" | tail -1 | cut -d= -f2-)
+    if [ -z "${current_value}" ] || [ "${current_value}" = "" ]; then
+        if command -v openssl >/dev/null 2>&1; then
+            local generated=$(openssl rand -hex 32)
+            # Replace in file (in-place portable)
+            sed -i.tmp "s|^${key}=.*|${key}=${generated}|" "${ENV_FILE}" && rm -f "${ENV_FILE}.tmp"
+            echo -e "  ${GREEN}auto-gen${NC} ${key} = (hex 64 chars genere)"
+        else
+            echo -e "  ${YELLOW}!${NC} ${key} vide et openssl indispo -> a remplir manuellement"
+        fi
+    fi
+}
+
+for crypto_key in AUDIT_HMAC_KEY; do
+    if echo "${missing_keys[@]}" | grep -qw "${crypto_key}"; then
+        generate_if_empty "${crypto_key}"
+    fi
+done

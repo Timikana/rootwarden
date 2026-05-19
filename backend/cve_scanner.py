@@ -33,13 +33,52 @@ Note de sécurité :
 import re
 import time
 import json
+import ipaddress
+import socket
 import logging
+from urllib.parse import urlparse
+
 import mysql.connector
 import requests
 from datetime import datetime
 from config import Config
 
 _log = logging.getLogger(__name__)
+
+
+# Patch A10-02 (OWASP A10 SSRF) : verifie qu'une URL externe ne pointe pas
+# vers une IP loopback / link-local / multicast (metadata cloud). Les IPs
+# privees RFC1918 restent autorisees (OpenCVE/Wazuh/Zabbix on-prem sur LAN
+# = cas legitime). Si DNS echoue : fail-open temporaire pour ne pas casser
+# les flows legitimes (FQDN public mal resolu) - le caller verra l'erreur.
+def _url_is_safe_external(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        host = parsed.hostname or ''
+        if not host:
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+            return not (ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified)
+        except ValueError:
+            pass
+        try:
+            addrs = socket.getaddrinfo(host, None)
+            for fam, _, _, _, sockaddr in addrs:
+                ip_str = sockaddr[0]
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                    if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified:
+                        return False
+                except ValueError:
+                    continue
+            return True
+        except socket.gaierror:
+            return True
+    except Exception:
+        return False
 
 # ────────────────────────────────────────────────────────────────────────────
 # Utilitaires CVSS
@@ -158,6 +197,9 @@ class OpenCVEClient:
                 return data
 
         url = f"{self.base_url}{path}"
+        # Patch A10-02 : refuse les targets loopback/link-local/multicast
+        if not _url_is_safe_external(url):
+            raise ValueError(f"URL OpenCVE refusee (SSRF guard) : {self.base_url}")
         kwargs = {'params': params, 'timeout': 15}
         if self.token:
             kwargs['headers'] = {'Authorization': f'Bearer {self.token}'}
@@ -424,6 +466,13 @@ class NVDClient:
             time.sleep(wait)
 
         try:
+            # Patch A10-SSRF-N1 : NVDClient doit aussi passer par le guard SSRF.
+            # Sans ca, un admin modifiant NVD_API_URL en .env vers
+            # http://169.254.169.254/... exfiltrait les creds cloud via les logs
+            # de scan. Pareil pour le second appel paginate plus bas.
+            if not _url_is_safe_external(self.url):
+                _log.warning("NVD URL refusee (SSRF guard) : %s", self.url)
+                return None
             headers = {}
             if self.api_key:
                 headers['apiKey'] = self.api_key
@@ -501,6 +550,11 @@ def scan_component_via_nvd(component_name: str, version: str,
     start_index = 0
     per_page = 2000
     max_pages = 10  # 20000 CVE max -> couvre meme kernel (5000-6000)
+
+    # Patch A10-SSRF-N1 : check URL avant pagination
+    if not _url_is_safe_external(nvd.url):
+        _log.warning("NVD URL refusee (SSRF guard) : %s", nvd.url)
+        return []
 
     for page in range(max_pages):
         # Rate limiting via le client

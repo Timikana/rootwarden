@@ -384,9 +384,14 @@ def test_forward():
     ip, port, ssh_user, pwd, root_pwd, svc = _get_ssh_creds(row)
     tag = f"rootwarden-test-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
     try:
+        # Patch A04-03/A03-CMD-01 : shlex.quote sur row['name'] (input user
+        # potentiellement non valide si machine creee/importee sans regex).
+        import shlex
+        msg = shlex.quote(f"ping depuis RootWarden {row['name']}")
+        tag_q = shlex.quote(tag)
         with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
             _, err_out, code = execute_as_root(client,
-                f"logger -t '{tag}' 'ping depuis RootWarden {row['name']}'",
+                f"logger -t {tag_q} {msg}",
                 root_pwd, logger=logger, timeout=5)
         _audit(user_id, 'test_forward', f"machine_id={row['id']} tag={tag}")
         return jsonify({'success': code == 0, 'tag': tag,
