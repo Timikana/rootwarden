@@ -139,6 +139,21 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
                 </select>
             </div>
 
+            <!-- Source CVE -->
+            <div class="flex items-center gap-2">
+                <label for="scan-source" class="text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap"
+                       title="Fast = OpenCVE seul, rapide mais bcp de faux positifs. Hybride = NVD pour kernel/ssl/ssh + OpenCVE pour le reste + filtre version. Precis = NVD partout, lent mais sans faux positifs.">
+                    Source CVE
+                </label>
+                <select id="scan-source"
+                        class="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5
+                               bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500">
+                    <option value="fast">Rapide (OpenCVE seul)</option>
+                    <option value="hybrid" selected>Hybride (recommande)</option>
+                    <option value="precise">Precis (NVD partout)</option>
+                </select>
+            </div>
+
             <?php if ($role >= 2 || count($machines) > 1): ?>
             <!-- Bouton scan global (visible si admin ou plusieurs serveurs autorisés) -->
             <button id="btn-scan-all"
