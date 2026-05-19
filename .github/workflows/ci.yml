@@ -93,6 +93,10 @@ jobs:
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
           API_KEY: test-api-key-for-ci
+          # Patch A07-02 : le fallback Config.API_KEY n'est actif qu'en mode
+          # bootstrap explicite. En CI, pas de DB -> table api_keys vide ->
+          # sans ce flag tous les require_api_key retournent 401.
+          API_KEY_BOOTSTRAP: "1"
         run: |
           python -m pytest tests/ -v --tb=short --junitxml=../test-results.xml
 
