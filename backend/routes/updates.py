@@ -9,7 +9,7 @@ import re
 import time
 import logging
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
 bp = Blueprint('updates', __name__)
@@ -671,11 +671,17 @@ def schedule_advanced_security_update():
 
 @bp.route('/update_security_exec', methods=['POST'])
 @require_api_key
+@require_role(2)
+@require_machine_access
 @threaded_route
 def update_security_exec():
     """
     Endpoint appelé par le cron job sur la machine distante après l'exécution de la mise à jour de sécurité.
     Met à jour la colonne maj_secu_last_exec_date dans la BDD pour la machine concernée.
+
+    Patch A01-NEW-01 : ajout de @require_role(2) + @require_machine_access.
+    Avant, tout user role=1 pouvait POST {machine_id: N} et marquer arbitrairement
+    une machine comme "a jour" pour masquer une CVE critique.
     """
     data = request.json
     machine_id = data.get('machine_id')
@@ -701,6 +707,7 @@ update_log_file = "/app/logs/update_servers.log"
 
 @bp.route('/update-logs')
 @require_api_key
+@require_role(2)  # Patch A01-NEW-04 : SSE logs reservees admin (info disclosure)
 @threaded_route
 def stream_update_logs():
     """
