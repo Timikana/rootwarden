@@ -37,7 +37,28 @@ function validateInput($data, $type) {
         case 'name':
             return validateServerName($data) ? $data : false;
         case 'ip':
-            return filter_var($data, FILTER_VALIDATE_IP) ? $data : false;
+            // Patch A10-01 (OWASP A10 SSRF) : refuse loopback (127/8),
+            // link-local (169.254/16 = AWS/Azure metadata), 0.0.0.0/8,
+            // multicast (224/4) et IPv6 ::1/loopback. Les IPs privees
+            // RFC1918 (10/8, 192.168/16, 172.16/12) restent autorisees
+            // car les LAN d'entreprise sont des cibles normales de
+            // RootWarden. Cible : empecher un admin compromis d'inserer
+            // 169.254.169.254 pour exfiltrer les credentials cloud.
+            if (!filter_var($data, FILTER_VALIDATE_IP)) return false;
+            $isLoopbackOrReserved = (
+                // 127.0.0.0/8
+                strpos($data, '127.') === 0 ||
+                // link-local 169.254.0.0/16
+                strpos($data, '169.254.') === 0 ||
+                // 0.0.0.0/8
+                strpos($data, '0.') === 0 ||
+                // IPv6 loopback / link-local
+                $data === '::1' || stripos($data, 'fe80:') === 0 ||
+                // unspecified
+                $data === '::' || $data === '0:0:0:0:0:0:0:0'
+            );
+            if ($isLoopbackOrReserved) return false;
+            return $data;
         case 'port':
             return filter_var($data, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]) ? $data : false;
         case 'string':
