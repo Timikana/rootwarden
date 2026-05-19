@@ -16,6 +16,19 @@ if (!defined('PASSWORD_HISTORY_SIZE')) {
 }
 
 /**
+ * Patch A02-NEW-01 (OWASP A02) : bcrypt cost factor centralise.
+ * Recommandation OWASP 2024 : cost >= 12 sur CPU moderne (~250ms / hash).
+ * Le defaut PHP est 10 (~60ms) - insuffisant face au bruteforce GPU.
+ * Utilisation :
+ *     password_hash($pwd, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]);
+ * Au login : password_needs_rehash() detecte les vieux hash cost=10 et
+ * re-hash transparent (cf. login.php).
+ */
+if (!defined('BCRYPT_COST')) {
+    define('BCRYPT_COST', (int)(getenv('BCRYPT_COST') ?: 12));
+}
+
+/**
  * Verifie la complexite locale. Retourne null si OK.
  * Cle i18n : 'profile.error_password_policy'.
  */

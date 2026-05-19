@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Sauvegarde l'ANCIEN hash dans password_history (pour la non-reutilisation future)
                 passwordPolicyRecordOld($pdo, $userId, $storedPassword);
                 // Hachage bcrypt du nouveau mot de passe (PASSWORD_DEFAULT = bcrypt)
-                $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+                $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]); // A02-NEW-01
                 // Calcul de la date d'expiration (per-user override > global)
                 $overrideStmt = $pdo->prepare("SELECT password_expiry_override FROM users WHERE id = ?");
                 $overrideStmt->execute([$userId]);
