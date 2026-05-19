@@ -246,7 +246,17 @@ jobs:
         working-directory: backend
         # Scan du requirements.txt fige. --strict = fail si CVE detectee.
         # Bloquant sur PR ET main depuis v1.17.0 (review securite).
-        run: pip-audit -r requirements.txt --desc --strict
+        #
+        # Exceptions documentees (--ignore-vuln) :
+        #
+        # CVE-2026-44405 (paramiko <= 4.0.0) - SHA-1 dans rsakey.py.
+        #   - Pas de fix upstream disponible (a la date du 2026-05-19)
+        #   - Impact RootWarden : NUL. On utilise Ed25519 partout (keypair
+        #     plateforme generee dans backend/platform_ssh) et password
+        #     fallback. Aucune utilisation de RSA keys via paramiko.
+        #   - A retirer des qu'un fix upstream est publie. Tracking :
+        #     https://github.com/paramiko/paramiko/issues/
+        run: pip-audit -r requirements.txt --desc --strict --ignore-vuln CVE-2026-44405
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.4 : SCA PHP (composer audit - CVE sur dependances Composer)
