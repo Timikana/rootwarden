@@ -201,36 +201,24 @@ class Encryption:
                 _log.warning("Erreur lors du chiffrement avec Sodium: %s", e)
                 # Continuer avec AES comme méthode de secours
         
-        # Méthode de secours: AES
+        # Methode de secours : AES-256-GCM (AEAD)
+        # Patch A02-01 : on n'ecrit PLUS d'AES-CBC. CBC sans MAC = malleable
+        # (bit-flipping detectable via padding oracle ou DBA compromis). GCM
+        # est AEAD, l'integrite est verifiee a chaque dechiffrement.
+        # Le lecteur sait toujours lire l'ancien format "aes:" (CBC) pour la
+        # retrocompatibilite des donnees existantes -> migration progressive.
         try:
-            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
             from base64 import b64encode
             import os
-            
-            # Générer un IV aléatoire
-            iv = os.urandom(16)  # 16 octets pour AES
-            
-            # Appliquer le padding PKCS7
-            password_bytes = password.encode('utf-8')
-            padding_length = 16 - (len(password_bytes) % 16)
-            padded_password = password_bytes + bytes([padding_length] * padding_length)
-            
-            # Créer le chiffreur AES
-            cipher = Cipher(
-                algorithms.AES(self.secret_key),
-                modes.CBC(iv),
-                backend=default_backend()
-            )
-            encryptor = cipher.encryptor()
-            
-            # Chiffrer
-            encrypted = encryptor.update(padded_password) + encryptor.finalize()
-            
-            # Combiner IV et données chiffrées, puis encoder en base64
-            return f"aes:{b64encode(iv + encrypted).decode('ascii')}"
+
+            nonce = os.urandom(12)  # 96 bits recommandes pour GCM
+            aesgcm = AESGCM(self.secret_key)
+            ct = aesgcm.encrypt(nonce, password.encode('utf-8'), associated_data=None)
+            # Format : gcm:<base64(nonce[12] + ciphertext+tag)>
+            return f"gcm:{b64encode(nonce + ct).decode('ascii')}"
         except Exception as e:
-            _log.error("Erreur lors du chiffrement AES: %s", e)
+            _log.error("Erreur lors du chiffrement AES-GCM: %s", e)
             raise
 
     def decrypt_password(self, encrypted_password: str) -> str:
@@ -256,7 +244,28 @@ class Encryption:
         if not encrypted_password:
             return ""
         
-        # Détecter la méthode de chiffrement utilisée
+        # Detecter la methode de chiffrement utilisee
+        # Nouveau format AES-GCM (AEAD, integrite verifiee) - patch A02-01
+        if encrypted_password.startswith("gcm:"):
+            try:
+                from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                from base64 import b64decode
+                blob = b64decode(encrypted_password[4:])
+                if len(blob) < 13:
+                    raise ValueError("Ciphertext GCM trop court")
+                nonce, ct = blob[:12], blob[12:]
+                # Essai cle principale puis ancienne (rotation)
+                for key in (self.secret_key, self.secret_key_raw):
+                    try:
+                        pt = AESGCM(key).decrypt(nonce, ct, associated_data=None)
+                        return pt.decode('utf-8')
+                    except Exception:
+                        continue
+                raise ValueError("Echec dechiffrement GCM (tag invalide)")
+            except Exception as e:
+                _log.debug("GCM decrypt failed: %s", e)
+                raise
+
         if encrypted_password.startswith("sodium:") and self.is_sodium_available:
             # Déchiffrement avec Sodium - essaie cle HKDF puis cle brute (fallback legacy)
             import nacl.secret
