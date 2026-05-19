@@ -401,7 +401,18 @@ def create_cve_schedule():
         from croniter import croniter
         if not croniter.is_valid(cron_expr):
             raise ValueError("Expression cron invalide")
-        next_run = croniter(cron_expr).get_next(datetime)
+        it = croniter(cron_expr)
+        next_run = it.get_next(datetime)
+        # Patch A04-INSEC-N1 (OWASP A04 Insecure Design) : refuse les schedules
+        # plus frequents que 10 minutes. Sans ce clamp, '* * * * *' lancait un
+        # scan par minute -> ban OpenCVE upstream + DoS interne + abus admin
+        # malveillant. 600s = compromise raisonnable (cron quotidien typique).
+        following = it.get_next(datetime)
+        if (following - next_run).total_seconds() < 600:
+            return jsonify({
+                'success': False,
+                'message': "Frequence cron trop elevee (intervalle minimum 10 minutes)"
+            }), 400
     except Exception as e:
         return jsonify({'success': False, 'message': f'Expression cron invalide: {e}'}), 400
 
