@@ -51,16 +51,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
     checkCsrfToken();
     $code = $_POST['2fa_code'];
 
-    // Rate limiting 2FA : max 5 tentatives par minute
+    // Rate limiting 2FA : max 5 tentatives par minute.
+    // Patch A07-01 (OWASP A07) : avant, le rate limit ne faisait que setter
+    // $error sans interrompre l'execution -> le elseif($totp->verify(...))
+    // s'executait quand meme et permettait un brute-force du TOTP. Maintenant
+    // on enregistre la tentative d'abord et on chaine if/elseif/else
+    // exclusivement pour fail-close sur rate limit.
     if (!isset($_SESSION['2fa_attempts'])) $_SESSION['2fa_attempts'] = [];
     $_SESSION['2fa_attempts'] = array_filter($_SESSION['2fa_attempts'], fn($t) => $t > time() - 60);
-    if (count($_SESSION['2fa_attempts']) >= 5) {
-        $error = t('2fa.error_rate_limit');
-    }
+    $_SESSION['2fa_attempts'][] = time();
 
-    // Anti-replay : rejeter un code deja utilise dans cette fenetre de temps
     $codeHash = hash('sha256', $code . floor(time() / 30));
-    if (isset($_SESSION['last_totp_hash']) && $_SESSION['last_totp_hash'] === $codeHash) {
+
+    if (count($_SESSION['2fa_attempts']) > 5) {
+        $error = t('2fa.error_rate_limit');
+    } elseif (isset($_SESSION['last_totp_hash']) && $_SESSION['last_totp_hash'] === $codeHash) {
+        // Anti-replay : rejeter un code deja utilise dans cette fenetre de temps
         $error = t('2fa.error_reused');
     } elseif ($totp->verify($code, null, 1)) { // null = heure actuelle, 1 = tolerance d'une periode
         $_SESSION['last_totp_hash'] = $codeHash;
