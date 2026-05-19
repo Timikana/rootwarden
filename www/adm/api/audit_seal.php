@@ -67,12 +67,20 @@ try {
         );
         $prevSelf = $r['current_self'];
 
+        // Patch A08-02 : accepte aussi le hash legacy SHA2-256 simple
+        // pendant la migration. audit_log_verify_hash retourne true si le
+        // stored matche soit le HMAC (nouveau), soit le SHA2 (ancien).
+        $valid = $prevSelf !== null && audit_log_verify_hash(
+            (string)$prevSelf, $lastHash, (int)$r['user_id'],
+            (string)$r['action'], (int)$r['ts']
+        );
+
         if ($prevSelf === null) {
             // Ligne orpheline : on la scelle en continuant la chaine valide
             $orphanCount++;
             $pending[] = [(int)$r['id'], $lastHash, $computed];
             $lastHash = $computed;
-        } elseif ($prevSelf !== $computed) {
+        } elseif (!$valid) {
             // Ligne deja scellee mais ne matche pas. NE PAS REECRIRE.
             // Log hors-bande pour investigation + arrete le sealing.
             $tamperedDetected[] = (int)$r['id'];

@@ -19,11 +19,45 @@ if (!defined('AUDIT_LOG_GENESIS')) {
 }
 
 /**
- * Calcule le self_hash SHA2-256 d'une ligne user_logs.
- * IMPORTANT : la formule doit matcher /adm/api/audit_verify.php.
+ * Calcule le self_hash HMAC-SHA256 d'une ligne user_logs.
+ * IMPORTANT : la formule doit matcher /adm/api/audit_verify.php et audit_seal.php.
+ *
+ * Patch A08-02 (OWASP A08) : passage de SHA2-256 simple a HMAC-SHA256 avec
+ * cle secrete dediee (AUDIT_HMAC_KEY) distincte de SECRET_KEY. Avant : un
+ * attaquant connaissant le format (lisible dans le code) pouvait recalculer
+ * la chaine apres modification d'une ligne via UPDATE direct (SQLi, vol
+ * de credentials DBA). Maintenant : sans la cle dediee, impossible de
+ * forger un hash valide -> tamper-evidence renforcee.
+ *
+ * La cle vient de AUDIT_HMAC_KEY (env var) ou tombe sur SECRET_KEY (fallback
+ * pour la migration progressive). Idealement la cle est stockee hors BDD
+ * (variable d'env Docker, secret manager) pour qu'un attaquant qui dump la
+ * DB n'ait pas la cle qui signe les lignes.
  */
 function audit_log_compute_hash(string $prevHash, int $userId, string $action, int $unixTs): string {
-    return hash('sha256', implode('|', [$prevHash, (string)$userId, $action, (string)$unixTs]));
+    static $hmacKey = null;
+    if ($hmacKey === null) {
+        $hmacKey = (string)(getenv('AUDIT_HMAC_KEY') ?: getenv('SECRET_KEY') ?: 'rootwarden-audit-default');
+    }
+    return hash_hmac('sha256', implode('|', [$prevHash, (string)$userId, $action, (string)$unixTs]), $hmacKey);
+}
+
+/**
+ * Verifie un self_hash existant en acceptant le format legacy (SHA2-256 simple)
+ * ou le nouveau format HMAC-SHA256. Necessaire pour la retrocompatibilite des
+ * lignes scellees AVANT le patch A08-02 : sans ce double-check, audit_verify
+ * marquerait toutes les anciennes lignes comme "tampered" alors qu'elles sont
+ * juste signees avec l'ancien algorithme.
+ *
+ * Apres migration des donnees historiques (re-seal), ce fallback pourra etre
+ * supprime.
+ */
+function audit_log_verify_hash(string $stored, string $prevHash, int $userId, string $action, int $unixTs): bool {
+    $hmac = audit_log_compute_hash($prevHash, $userId, $action, $unixTs);
+    if (hash_equals($stored, $hmac)) return true;
+    // Fallback legacy : SHA2-256 sans HMAC (pre-A08-02)
+    $legacy = hash('sha256', implode('|', [$prevHash, (string)$userId, $action, (string)$unixTs]));
+    return hash_equals($stored, $legacy);
 }
 
 /**
