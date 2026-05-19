@@ -389,6 +389,9 @@ def create_cve_schedule():
     min_cvss = float(data.get('min_cvss', 7.0))
     target_type = data.get('target_type', 'all')
     target_value = data.get('target_value', '')
+    scan_source = str(data.get('scan_source', 'hybrid')).lower()
+    if scan_source not in ('fast', 'hybrid', 'precise'):
+        scan_source = 'hybrid'
 
     if not name:
         return jsonify({'success': False, 'message': 'Nom requis'}), 400
@@ -406,9 +409,9 @@ def create_cve_schedule():
     try:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO cve_scan_schedules (name, cron_expression, min_cvss, target_type, target_value, next_run) "
-            "VALUES (%s, %s, %s, %s, %s, %s)",
-            (name, cron_expr, min_cvss, target_type, target_value, next_run)
+            "INSERT INTO cve_scan_schedules (name, cron_expression, min_cvss, scan_source, target_type, target_value, next_run) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (name, cron_expr, min_cvss, scan_source, target_type, target_value, next_run)
         )
         conn.commit()
         return jsonify({'success': True, 'id': cur.lastrowid})
@@ -432,10 +435,15 @@ def update_cve_schedule(schedule_id):
 
         updates = []
         params = []
-        for field in ('name', 'cron_expression', 'min_cvss', 'target_type', 'target_value', 'enabled'):
+        for field in ('name', 'cron_expression', 'min_cvss', 'scan_source', 'target_type', 'target_value', 'enabled'):
             if field in data:
+                val = data[field]
+                if field == 'scan_source':
+                    val = str(val).lower()
+                    if val not in ('fast', 'hybrid', 'precise'):
+                        val = 'hybrid'
                 updates.append(f"{field} = %s")
-                params.append(data[field])
+                params.append(val)
 
         if 'cron_expression' in data:
             try:

@@ -241,8 +241,8 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
             <div id="schedules-list" class="space-y-2 mb-3"></div>
             <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
                 <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3"><?= t('cve.sched_new') ?></h4>
-                <!-- Grid 4 colonnes alignes, preview en dessous, bouton sur toute la largeur au dernier rang -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <!-- Grid 5 colonnes alignes, preview en dessous, bouton sur toute la largeur au dernier rang -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div>
                         <label for="sched-name" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"><?= t('cve.sched_name') ?></label>
                         <input id="sched-name" type="text" placeholder="<?= t('cve.sched_name_placeholder') ?>"
@@ -265,6 +265,14 @@ $tipId = 'cve-scan'; $tipTitle = t('tip.cve_title'); $tipSteps = [
                             <option value="4"><?= t('cve.cvss_medium') ?></option>
                             <option value="7" selected><?= t('cve.cvss_high') ?></option>
                             <option value="9"><?= t('cve.cvss_critical') ?></option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sched-source" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1" title="Fast: OpenCVE seul (rapide, faux+). Hybride: NVD pour kernel/ssl/ssh + OpenCVE + filtre version (recommande). Precis: NVD partout (lent, fiable).">Source CVE</label>
+                        <select id="sched-source" class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700">
+                            <option value="fast">Rapide</option>
+                            <option value="hybrid" selected>Hybride</option>
+                            <option value="precise">Precis</option>
                         </select>
                     </div>
                     <div>
