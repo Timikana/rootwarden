@@ -203,18 +203,22 @@ class OpenCVEClient:
         Supporte deux modes :
           - OpenCVE v1 / cloud / mock : ?vendor=X&product=Y
           - OpenCVE v2 on-prem : ?search=package (vendor/product = 404)
-        Pagine automatiquement (max 3 pages).
+        Pagine avec limit=CVE_PAGE_LIMIT (default 100) sur CVE_MAX_PAGES pages
+        (default 20) -> jusqu'a 2000 CVE par composant. Necessaire pour kernel/
+        openssl/glibc qui ont des milliers de CVE indexees.
         """
         results = []
         page = 1
         use_search = False  # On essaie d'abord vendor/product, fallback search
+        limit = Config.CVE_PAGE_LIMIT
+        max_pages = Config.CVE_MAX_PAGES
 
-        while page <= 3:
+        while page <= max_pages:
             try:
                 if use_search:
-                    params = {'search': package, 'page': page}
+                    params = {'search': package, 'page': page, 'limit': limit}
                 else:
-                    params = {'vendor': vendor, 'product': package, 'page': page}
+                    params = {'vendor': vendor, 'product': package, 'page': page, 'limit': limit}
 
                 data = self._get('/api/cve', params)
                 batch = data.get('results', [])
@@ -268,6 +272,345 @@ def get_opencve_client() -> OpenCVEClient:
     if _opencve is None:
         _opencve = OpenCVEClient()
     return _opencve
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Enrichissement NVD : filtrage par version installee
+# ────────────────────────────────────────────────────────────────────────────
+#
+# OpenCVE on-prem v2 n'expose pas les configurations CPE / version ranges via
+# son API REST. Resultat : on recoit *toutes* les CVE d'un produit sans pouvoir
+# filtrer par version installee -> faux positifs massifs (ex: kernel = 17797 CVE).
+#
+# Solution : on fetch chaque CVE retournee par OpenCVE depuis l'API NVD 2.0
+# (gratuite, 5 req/30s sans cle / 50 req/30s avec cle) pour recuperer les
+# configurations.nodes.cpeMatch puis on filtre par la version installee.
+#
+# Cache TTL 7 jours par defaut : les CPE d'une CVE bougent peu, on evite de
+# bombarder NVD a chaque scan.
+
+class _VersionTuple:
+    """
+    Parser de version "tolerant" pour comparaisons CPE.
+
+    Linux/Debian/upstream produisent des versions tres heterogenes :
+        '6.1.0-18-amd64', '3.0.11-1~deb12u2', '1:9.2p1', '2.31', '4.32.1f'.
+
+    On extrait la sequence numerique principale (entiers + suffixes alpha) et
+    on compare lexicographiquement par tuples. Approximatif mais robuste : si
+    on peut pas parser, on retombe sur la comparaison string.
+    """
+    _SPLIT_RE = re.compile(r'(\d+|[A-Za-z]+)')
+
+    def __init__(self, raw: str):
+        self.raw = raw or ''
+        # Strip epoch Debian (1:9.2p1 -> 9.2p1) et suffixe distro (-deb12u3)
+        cleaned = _EPOCH_RE.sub('', self.raw)
+        cleaned = _DISTRO_RE.sub('', cleaned)
+        parts = []
+        for tok in self._SPLIT_RE.findall(cleaned):
+            if tok.isdigit():
+                parts.append((0, int(tok)))
+            else:
+                # alpha < digit dans CPE (ex: rc1 < 1) : on prefixe 1 pour mettre apres
+                parts.append((1, tok.lower()))
+        self.parts = tuple(parts) if parts else ((1, cleaned.lower()),)
+
+    def __lt__(self, other): return self.parts < other.parts
+    def __le__(self, other): return self.parts <= other.parts
+    def __gt__(self, other): return self.parts > other.parts
+    def __ge__(self, other): return self.parts >= other.parts
+    def __eq__(self, other): return self.parts == other.parts
+
+
+def _version_matches_cpe_range(installed: str, cpe_match: dict) -> bool:
+    """
+    True si la version installee tombe dans la range vulnerable d'un cpeMatch NVD.
+
+    cpeMatch peut avoir :
+      - criteria : 'cpe:2.3:o:linux:linux_kernel:6.1.0:...'  (version exacte si != '*' et '-')
+      - versionStartIncluding / versionStartExcluding
+      - versionEndIncluding / versionEndExcluding
+
+    Si le cpeMatch a 'vulnerable: false', on ignore (CPE non-vulnerable).
+    """
+    if not cpe_match.get('vulnerable', True):
+        return False
+
+    try:
+        inst = _VersionTuple(installed)
+    except Exception:
+        return True  # En cas de doute, on garde la CVE (false-positive safe)
+
+    # 1) Version exacte dans le CPE criteria
+    criteria = cpe_match.get('criteria', '') or ''
+    parts = criteria.split(':')
+    # cpe:2.3:o:vendor:product:version:...
+    if len(parts) >= 6:
+        cpe_version = parts[5]
+        if cpe_version not in ('*', '-', '', 'ANY'):
+            return _VersionTuple(cpe_version) == inst
+
+    # 2) Range check
+    has_range = False
+    if 'versionStartIncluding' in cpe_match:
+        has_range = True
+        if inst < _VersionTuple(cpe_match['versionStartIncluding']):
+            return False
+    if 'versionStartExcluding' in cpe_match:
+        has_range = True
+        if inst <= _VersionTuple(cpe_match['versionStartExcluding']):
+            return False
+    if 'versionEndIncluding' in cpe_match:
+        has_range = True
+        if inst > _VersionTuple(cpe_match['versionEndIncluding']):
+            return False
+    if 'versionEndExcluding' in cpe_match:
+        has_range = True
+        if inst >= _VersionTuple(cpe_match['versionEndExcluding']):
+            return False
+
+    # Si CPE generique sans range et sans version exacte -> tout est vulnerable
+    # (ex: cpe:2.3:o:linux:linux_kernel:*:* couvre toutes les versions)
+    return has_range or True
+
+
+class NVDClient:
+    """
+    Client REST pour l'API NVD 2.0 (https://services.nvd.nist.gov/rest/json/cves/2.0).
+
+    But : recuperer les `configurations[].nodes[].cpeMatch[]` d'une CVE pour
+    permettre le filtrage par version installee (info absente d'OpenCVE on-prem).
+
+    Limites de l'API NVD (sans cle / avec cle) :
+        - 5 req / 30s   sans cle
+        - 50 req / 30s  avec NVD_API_KEY (gratuit sur https://nvd.nist.gov/developers)
+
+    Cache memoire TTL (NVD_CACHE_TTL, default 7 jours) :
+        Les CPE d'une CVE bougent peu, on evite les appels repetes.
+        Le cache persiste tant que le worker Python tourne.
+    """
+
+    def __init__(self):
+        self.url = Config.NVD_API_URL
+        self.api_key = Config.NVD_API_KEY
+        self.cache_ttl = Config.NVD_CACHE_TTL
+        self._cache: dict[str, tuple[float, list[dict]]] = {}
+        self._last_call = 0.0
+        # Rate-limit : on espace au minimum 6s (sans cle) ou 0.6s (avec cle)
+        self._min_interval = 0.6 if self.api_key else 6.0
+
+    def get_configurations(self, cve_id: str) -> list[dict] | None:
+        """
+        Retourne la liste des configurations CPE pour une CVE.
+
+        Returns:
+            list[dict] : liste des `configurations` brutes (chaque entree contient
+                des nodes -> cpeMatch). Vide si la CVE n'a pas de CPE.
+            None : si l'API NVD est inaccessible ou la CVE introuvable.
+                Dans ce cas l'appelant doit considerer la CVE comme "applicable"
+                par defaut (failsafe : on prefere un faux positif a un faux negatif).
+        """
+        if not cve_id:
+            return None
+        now = time.time()
+        cached = self._cache.get(cve_id)
+        if cached and (now - cached[0] < self.cache_ttl):
+            return cached[1]
+
+        # Rate limiting simple
+        wait = self._min_interval - (now - self._last_call)
+        if wait > 0:
+            time.sleep(wait)
+
+        try:
+            headers = {}
+            if self.api_key:
+                headers['apiKey'] = self.api_key
+            resp = requests.get(self.url, params={'cveId': cve_id},
+                                headers=headers, timeout=15)
+            self._last_call = time.time()
+            if resp.status_code == 404:
+                self._cache[cve_id] = (now, [])
+                return []
+            resp.raise_for_status()
+            data = resp.json()
+            vulns = data.get('vulnerabilities') or []
+            if not vulns:
+                self._cache[cve_id] = (now, [])
+                return []
+            configs = vulns[0].get('cve', {}).get('configurations') or []
+            self._cache[cve_id] = (now, configs)
+            return configs
+        except Exception as e:
+            _log.debug("NVD fetch failed for %s : %s", cve_id, e)
+            return None
+
+
+_nvd: NVDClient | None = None
+
+
+def get_nvd_client() -> NVDClient:
+    global _nvd
+    if _nvd is None:
+        _nvd = NVDClient()
+    return _nvd
+
+
+# Mapping CPE pour les composants systeme : (part, vendor, product)
+# part : 'o' = OS / 'a' = application / 'h' = hardware
+# vendor/product : noms officiels CPE (souvent != nom paquet Debian)
+_CPE_BY_COMPONENT = {
+    'linux_kernel':       ('o', 'linux',     'linux_kernel'),
+    'debian_linux':       ('o', 'debian',    'debian_linux'),
+    'ubuntu_linux':       ('o', 'canonical', 'ubuntu_linux'),
+    'openssh':            ('a', 'openbsd',   'openssh'),
+    'openssl':            ('a', 'openssl',   'openssl'),
+    'apache_http_server': ('a', 'apache',    'http_server'),
+    'nginx':              ('a', 'f5',        'nginx'),
+    'docker':             ('a', 'docker',    'docker'),
+}
+
+
+def scan_component_via_nvd(component_name: str, version: str,
+                            nvd: NVDClient | None = None) -> list[dict]:
+    """
+    Scan d'un composant systeme directement via l'API NVD 2.0 avec cpeName.
+
+    Pour les composants a fort volume CVE (kernel = 17000+ CVE), la pagination
+    OpenCVE n'est pas pratique (10/page) ET ne retourne pas toujours les CVE
+    attendues. NVD avec cpeName filtre cote serveur par version exacte.
+
+    Args:
+        component_name : nom logique (ex 'linux_kernel', 'openssh')
+        version        : version installee nettoyee (ex '6.6.87')
+        nvd            : NVDClient (singleton)
+
+    Returns:
+        Liste de CVE au format OpenCVE-compatible (id, summary, cvss dict).
+        Liste vide si NVD indispo ou pas de mapping CPE pour ce composant.
+    """
+    cpe_tuple = _CPE_BY_COMPONENT.get(component_name)
+    if not cpe_tuple:
+        return []
+    part, vendor, product = cpe_tuple
+    cpe_name = f"cpe:2.3:{part}:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
+
+    nvd = nvd or get_nvd_client()
+    out: list[dict] = []
+    start_index = 0
+    per_page = 2000
+    max_pages = 10  # 20000 CVE max -> couvre meme kernel (5000-6000)
+
+    for page in range(max_pages):
+        # Rate limiting via le client
+        now = time.time()
+        wait = nvd._min_interval - (now - nvd._last_call)
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            headers = {}
+            if nvd.api_key:
+                headers['apiKey'] = nvd.api_key
+            resp = requests.get(nvd.url, params={
+                'cpeName': cpe_name,
+                'resultsPerPage': per_page,
+                'startIndex': start_index,
+            }, headers=headers, timeout=30)
+            nvd._last_call = time.time()
+            if resp.status_code == 404:
+                break
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            _log.debug("NVD cpeName scan failed page=%d for %s %s : %s",
+                       page, component_name, version, e)
+            break
+
+        vulns = data.get('vulnerabilities', [])
+        if not vulns:
+            break
+
+        for item in vulns:
+            cve = item.get('cve', {})
+            cve_id = cve.get('id', '')
+            if not cve_id:
+                continue
+            # Description en anglais (NVD propose plusieurs langues)
+            desc = ''
+            for d in cve.get('descriptions', []):
+                if d.get('lang') == 'en':
+                    desc = d.get('value', '')
+                    break
+            # CVSS : prefere v3.1, fallback v3.0, v2.0
+            metrics = cve.get('metrics', {})
+            cvss_score = 0.0
+            for key in ('cvssMetricV31', 'cvssMetricV30', 'cvssMetricV2'):
+                items = metrics.get(key) or []
+                if items:
+                    cvss_score = items[0].get('cvssData', {}).get('baseScore', 0.0)
+                    break
+            out.append({
+                'id': cve_id,
+                'summary': desc,
+                'cvss': {'v3': cvss_score},
+            })
+            # On peuple aussi le cache des configurations pour cette CVE
+            configs = cve.get('configurations') or []
+            nvd._cache[cve_id] = (time.time(), configs)
+
+        total = data.get('totalResults', len(out))
+        start_index += per_page
+        if start_index >= total:
+            break
+
+    return out
+
+
+def cve_applies_to_version(cve_id: str, product: str, installed_version: str,
+                           nvd: NVDClient | None = None) -> bool:
+    """
+    Determine si une CVE concerne reellement la version installee, via NVD.
+
+    Args:
+        cve_id            : ex 'CVE-2026-31431'
+        product           : nom CPE du produit (ex 'linux_kernel', 'openssl', 'curl')
+        installed_version : version installee nettoyee (ex '6.1.0', '3.0.11')
+
+    Returns:
+        True si au moins un cpeMatch vulnerable du produit matche la version.
+        True aussi si NVD est inaccessible ou la CVE n'a pas de configurations
+        (failsafe : on prefere garder une CVE douteuse que la perdre).
+        False uniquement si NVD nous dit explicitement que la version est hors range.
+    """
+    nvd = nvd or get_nvd_client()
+    configs = nvd.get_configurations(cve_id)
+    if configs is None:
+        return True  # NVD indispo -> failsafe
+    if not configs:
+        return True  # Pas de CPE chez NVD -> on garde par defaut
+
+    product_lc = (product or '').lower()
+    found_product_match = False
+    for cfg in configs:
+        for node in cfg.get('nodes', []):
+            for m in node.get('cpeMatch', []):
+                criteria = (m.get('criteria') or '').lower()
+                # cpe:2.3:<part>:<vendor>:<product>:...
+                parts = criteria.split(':')
+                if len(parts) < 5:
+                    continue
+                cpe_product = parts[4]
+                if cpe_product != product_lc:
+                    continue
+                found_product_match = True
+                if _version_matches_cpe_range(installed_version, m):
+                    return True
+    # Si le produit est mentionne dans NVD mais aucun range ne matche -> hors version
+    if found_product_match:
+        return False
+    # Le produit n'apparait pas dans les CPE NVD -> on garde par defaut
+    return True
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -468,6 +811,7 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
       {'type': 'error',    'message': '...'}
     """
     opencve = get_opencve_client()
+    nvd = get_nvd_client() if Config.NVD_ENRICHMENT_ENABLED else None
     try:
         # Etape 1 : detection OS
         yield {'type': 'progress', 'machine_id': machine_id,
@@ -528,22 +872,48 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
             # Vendor : specifique pour composants systeme, sinon vendor OS
             pkg_vendor = _SYSTEM_VENDORS.get(pkg['name'], vendor)
 
+            # Routing : pour les composants systeme (kernel, openssl, ssh...),
+            # OpenCVE pagine mal (10/page, sort par updated_at, parfois rate des
+            # CVE) sur des volumes >1000. On bascule sur NVD direct avec cpeName
+            # qui filtre par version exacte cote serveur.
+            use_nvd_direct = (nvd is not None and comp_type != 'package'
+                              and pkg['name'] in _CPE_BY_COMPONENT)
             try:
-                cves = opencve.get_cves_for_package(pkg['name'], pkg_vendor)
+                if use_nvd_direct:
+                    cves = scan_component_via_nvd(pkg['name'],
+                                                   pkg.get('clean_version', pkg['version']),
+                                                   nvd=nvd)
+                else:
+                    cves = opencve.get_cves_for_package(pkg['name'], pkg_vendor)
                 queried += 1
             except Exception as pkg_err:
                 _log.debug("Skipped %s: %s", pkg['name'], pkg_err)
                 skipped += 1
                 continue
             pkg_cve_count = 0
+            filtered_by_version = 0
             for cve in cves:
                 score = best_cvss(cve.get('cvss') or cve.get('metrics') or {})
                 if score < min_cvss:
                     continue
+
+                cve_id = cve.get('id', '')
+
+                # Filtrage par version installee via NVD (si active).
+                # Sans ca, OpenCVE renvoie TOUTES les CVE du produit, peu importe
+                # la version : faux positifs massifs. Le filtre garde la CVE en
+                # cas de doute (NVD indispo, CPE absent) -> failsafe.
+                if nvd is not None and cve_id:
+                    if not cve_applies_to_version(cve_id, pkg['name'],
+                                                  pkg.get('clean_version', pkg['version']),
+                                                  nvd=nvd):
+                        filtered_by_version += 1
+                        continue
+
                 finding = {
                     'package':  pkg['name'],
                     'version':  pkg['version'],
-                    'cve_id':   cve.get('id', ''),
+                    'cve_id':   cve_id,
                     'cvss':     round(score, 1),
                     'severity': cvss_to_severity(score),
                     'summary':  (cve.get('summary') or '')[:300],
@@ -553,6 +923,9 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
                 pkg_cve_count += 1
                 total_cve_found += 1
                 yield {'type': 'finding', 'machine_id': machine_id, **finding}
+            if filtered_by_version:
+                _log.debug("NVD filter: %d CVE ecartees pour %s (version=%s)",
+                           filtered_by_version, pkg['name'], pkg.get('clean_version'))
             # Emit cve_count for this package (even if 0) for UI tracking
             if pkg_cve_count == 0 and i % 10 == 0:
                 # Only emit every 10 packages to avoid flooding for zero-CVE packages
