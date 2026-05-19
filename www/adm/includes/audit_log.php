@@ -36,8 +36,24 @@ if (!defined('AUDIT_LOG_GENESIS')) {
  */
 function audit_log_compute_hash(string $prevHash, int $userId, string $action, int $unixTs): string {
     static $hmacKey = null;
+    static $warned  = false;
     if ($hmacKey === null) {
-        $hmacKey = (string)(getenv('AUDIT_HMAC_KEY') ?: getenv('SECRET_KEY') ?: 'rootwarden-audit-default');
+        $dedicated = (string)(getenv('AUDIT_HMAC_KEY') ?: '');
+        if ($dedicated !== '') {
+            $hmacKey = $dedicated;
+        } else {
+            // Fallback : SECRET_KEY puis default. Emet un warning une fois par
+            // process pour signaler que la separation de cle n'est PAS active.
+            if (!$warned) {
+                error_log(
+                    "[RootWarden] AUDIT_HMAC_KEY non configure - fallback sur SECRET_KEY. "
+                    . "La tamper-evidence est affaiblie : configurez AUDIT_HMAC_KEY (openssl rand -hex 32) "
+                    . "dans srv-docker.env pour separer la cle de signature de la cle de chiffrement."
+                );
+                $warned = true;
+            }
+            $hmacKey = (string)(getenv('SECRET_KEY') ?: 'rootwarden-audit-default');
+        }
     }
     return hash_hmac('sha256', implode('|', [$prevHash, (string)$userId, $action, (string)$unixTs]), $hmacKey);
 }

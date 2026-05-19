@@ -164,6 +164,13 @@ def setup_logging(log_file: str):
     handler = RotatingFileHandler(log_file, maxBytes=10**6, backupCount=5)
     formatter = CustomFormatter('%(asctime)s - %(machine)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
+    # Patch A09-NEW-01 : applique le scrubber aussi sur les FileHandler
+    # supplementaires (deployment.log, iptables.log, update_servers.log).
+    try:
+        from log_scrub import attach_scrub
+        attach_scrub(handler)
+    except Exception:
+        pass
     
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
