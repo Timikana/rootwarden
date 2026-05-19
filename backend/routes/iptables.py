@@ -16,7 +16,7 @@ import base64
 import mysql.connector
 from flask import Blueprint, jsonify, request, Response
 
-from routes.helpers import require_api_key, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
 from ssh_utils import db_config, ssh_session, execute_as_root, execute_as_root_stream
 from iptables_manager import get_iptables_rules, apply_iptables_rules
 
@@ -249,6 +249,7 @@ def iptables_rollback():
 
 @bp.route('/iptables-logs')
 @require_api_key
+@require_role(2)  # Patch A01-NEW-04 : SSE logs reservees admin
 def iptables_logs():
     """Stream SSE des logs iptables."""
     log_file = '/app/logs/iptables.log'

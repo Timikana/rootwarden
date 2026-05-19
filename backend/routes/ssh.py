@@ -289,6 +289,7 @@ def deploy():
 
 @bp.route('/logs')
 @require_api_key
+@require_role(2)  # Patch A01-NEW-04 : SSE logs reservees admin (info disclosure)
 @threaded_route
 def stream_logs():
     """
