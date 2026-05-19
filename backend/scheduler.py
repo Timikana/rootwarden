@@ -88,6 +88,9 @@ def _run_scheduled_scan(schedule: dict):
         conn.close()
 
     min_cvss = float(schedule.get('min_cvss') or 7.0)
+    scan_source = (schedule.get('scan_source') or 'hybrid').lower()
+    if scan_source not in ('fast', 'hybrid', 'precise'):
+        scan_source = 'hybrid'
     scanned = 0
     total_findings = 0
     skipped = []
@@ -96,14 +99,12 @@ def _run_scheduled_scan(schedule: dict):
         try:
             svc = bool(m.get('service_account_deployed'))
             ssh_pass = encryption.decrypt_password(m['password']) if m.get('password') else ''
-            # Machine sans mot de passe ET sans keypair deployee = inscannable.
-            # Sinon, ssh_session utilisera la keypair plateforme (svc=True).
             if not ssh_pass and not svc:
                 skipped.append(m['name'])
                 continue
             with ssh_session(m['ip'], m['port'], m['user'], ssh_pass or None,
                              logger=_log, service_account=svc) as client:
-                for event in scan_server(client, m['id'], m['name'], min_cvss):
+                for event in scan_server(client, m['id'], m['name'], min_cvss, scan_source=scan_source):
                     if event.get('type') == 'done':
                         scanned += 1
                         total_findings += event.get('total_findings', 0)
