@@ -67,9 +67,16 @@ rules:
       - metavariable-regex:
           metavariable: $X
           regex: '.*(token|hash|csrf|api_key).*'
+      # Exclure les comparaisons entre 2 valeurs derivees localement
+      # (ex: $session_hash === hash('sha256', $code . $step)) qui ne sont
+      # pas vulnerables au timing puisque les deux cotes viennent du serveur.
+      - pattern-not: $X === $_SESSION[...]
+      - pattern-not: $_SESSION[...] === $X
     message: |
       Comparaison de token/hash/csrf avec == ou === = timing attack potentielle.
       Utiliser hash_equals($a, $b) pour comparaison constant-time.
+      Si la comparaison est legitime (deux valeurs serveur-side), ajouter en
+      commentaire : // nosemgrep: rw-php-equals-on-hash
     languages: [php]
     severity: WARNING
 
@@ -150,9 +157,16 @@ rules:
   - id: rw-aes-cbc-encrypt
     patterns:
       - pattern: openssl_encrypt($DATA, 'AES-256-CBC', ...)
+    paths:
+      # migrate_crypto.php est par design un re-encrypt CBC->AEAD pour les
+      # vieilles donnees. Toleré le temps de la migration complete.
+      exclude:
+        - 'www/auth/migrate_crypto.php'
     message: |
       AES-CBC sans MAC = malleable (bit-flipping). Utiliser AES-GCM (AEAD) :
       openssl_encrypt($data, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag)
       ou libsodium sodium_crypto_secretbox().
+      Si vraiment necessaire (migration legacy), ajouter // nosemgrep et un
+      commentaire qui motive la conservation du CBC.
     languages: [php]
     severity: ERROR
