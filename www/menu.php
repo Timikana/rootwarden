@@ -353,8 +353,13 @@ function loadNotifList() {
                 const readBtn = unread
                     ? `<button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read","id":${n.id}}' hx-swap="none" class="text-[10px] text-blue-500 hover:text-blue-700 flex-shrink-0">Lire</button>`
                     : '';
-                const link = n.link ? `onclick="window.location='${n.link}'"` : '';
-                return `<div class="flex items-start gap-2 px-3 py-2 ${bg} hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-xs" ${link}>
+                // Patch A03-XSS-01 (OWASP A03 XSS) : avant on inserait
+                // `onclick="window.location='${n.link}'"` brut -> stored XSS
+                // si n.link = "javascript:alert(1)//" ou contenait '. Maintenant
+                // on n'utilise plus d'attribut inline et on attache un listener
+                // qui ne deroule QUE des paths internes (commencent par /).
+                const safeLink = (typeof n.link === 'string' && /^\/[A-Za-z0-9_\-./?=&#%]*$/.test(n.link)) ? n.link : '';
+                return `<div class="flex items-start gap-2 px-3 py-2 ${bg} hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-xs"${safeLink ? ` data-rw-link="${escHtml(safeLink)}"` : ''}>
                     <span class="text-sm mt-0.5">${icon}</span>
                     <div class="flex-1 min-w-0">
                         <div class="font-medium text-gray-800 dark:text-gray-200 ${unread ? 'font-bold' : ''}">${escHtml(n.title)}</div>
@@ -364,6 +369,14 @@ function loadNotifList() {
                     ${readBtn}
                 </div>`;
             }).join('');
+            // Listener delegue : ne navigue que si data-rw-link contient un
+            // path interne valide. Aucun javascript: ni URL externe ne passe.
+            list.querySelectorAll('[data-rw-link]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const dest = el.getAttribute('data-rw-link') || '';
+                    if (dest.startsWith('/')) window.location.assign(dest);
+                });
+            });
             if (typeof htmx !== 'undefined') htmx.process(list);
         })
         .catch(() => {});

@@ -6,6 +6,14 @@
 
 if (!isset($pdo) || !isset($_SESSION['csrf_token'])) return;
 
+// Patch A03-CMD-01 : assure que validateServerName() est dispo (definie
+// dans manage_servers.php). Si le fichier n'a pas ete inclus, on inline.
+if (!function_exists('validateServerName')) {
+    function validateServerName($name) {
+        return is_string($name) && preg_match('/^[a-zA-Z0-9._-]{1,255}$/', $name) === 1;
+    }
+}
+
 $importResult = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_type'])) {
@@ -45,6 +53,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_type'])) {
                         }
                         if (!filter_var($ip, FILTER_VALIDATE_IP)) {
                             $results['errors'][] = "Ligne $lineNum ($name) : IP invalide '$ip'";
+                            continue;
+                        }
+                        // Patch A03-CMD-01 (OWASP A03) : valider le nom de machine
+                        // contre la regex stricte (alphanum + - + _, 1-255 chars).
+                        // Avant : un nom CSV "foo'; reboot; echo '" finissait dans
+                        // les commandes shell (logger -t '...' 'ping ... \$name')
+                        // via /graylog/test, RCE root distante.
+                        if (!validateServerName($name)) {
+                            $results['errors'][] = "Ligne $lineNum : nom de machine invalide (caracteres non autorises)";
+                            continue;
+                        }
+                        // Refuse aussi IPs loopback/link-local (cf A10-01)
+                        $ipReserved = (
+                            strpos($ip, '127.') === 0 || strpos($ip, '169.254.') === 0 ||
+                            strpos($ip, '0.') === 0 || $ip === '::1' || stripos($ip, 'fe80:') === 0
+                        );
+                        if ($ipReserved) {
+                            $results['errors'][] = "Ligne $lineNum ($name) : IP reservee refusee ($ip)";
                             continue;
                         }
                         // Verifier doublon
