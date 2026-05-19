@@ -355,8 +355,12 @@ class Encryption:
         if self.old_secret_key:
             keys_to_try.append((self.old_key_bytes, "OLD_SECRET_KEY"))
 
+        # Patch A02-02 (OWASP A02) : un seul chemin de dechiffrement strict
+        # par cle (PKCS7 valide), JAMAIS errors='ignore', JAMAIS fallback
+        # null-byte truncation. Sinon : padding oracle exploitable + retour
+        # silencieux de plaintext arbitraire en cas d'alteration ciphertext.
+        # Si toutes les cles echouent -> ValueError -> caller doit notifier.
         for key, key_name in keys_to_try:
-            # 1. Essayer avec la bibliothèque cryptography
             try:
                 cipher = Cipher(
                     algorithms.AES(key),
@@ -365,41 +369,16 @@ class Encryption:
                 )
                 decryptor = cipher.decryptor()
                 raw_data = decryptor.update(encrypted_data) + decryptor.finalize()
-                
-                # Essayer plusieurs techniques de dépadding 
-                # PKCS7 padding où le dernier octet indique le nombre d'octets à retirer
-                try:
-                    padding_length = raw_data[-1]
-                    if 1 <= padding_length <= 16:
-                        # Vérification simplifiée du padding sans validation stricte
-                        unpadded = raw_data[:-padding_length]
-                        try:
-                            return unpadded.decode('utf-8')
-                        except UnicodeDecodeError:
-                            # Si ça ne marche pas, essayer différemment
-                            pass
-                except (IndexError, ValueError):
-                    pass
-                
-                # PHP pourrait avoir des caractères nuls à la fin
-                try:
-                    null_pos = raw_data.find(b'\x00')
-                    if null_pos > 0:
-                        return raw_data[:null_pos].decode('utf-8')
-                except Exception:
-                    pass
-                    
-                # Dernier recours: essayer de décoder tel quel
-                try:
-                    return raw_data.decode('utf-8', errors='ignore').rstrip('\x00')
-                except Exception:
-                    pass
-                    
+                # PKCS7 strict (leve si invalide)
+                unpadded = self.unpad(raw_data)
+                # Decodage UTF-8 strict (leve si non-UTF8)
+                return unpadded.decode('utf-8')
             except Exception as e:
-                _log.debug("Exception avec %s: %s", key_name, e)
+                _log.debug("Echec dechiffrement CBC avec %s: %s", key_name, e)
+                continue
 
-        # Si aucune des méthodes n'a fonctionné, lever une exception
-        raise ValueError("Échec de déchiffrement avec la méthode PHP compatible")
+        # Toutes les cles ont echoue -> ne PAS retourner de garbage
+        raise ValueError("Echec de dechiffrement (toutes les cles essayees)")
 
     def decrypt_simple(self, encrypted_password: str) -> str:
         """
@@ -442,133 +421,32 @@ class Encryption:
         iv = decoded_data[:16]
         encrypted_data = decoded_data[16:]
         
-        # Mode sans vérification de padding pour compatibilité PHP
-        def simple_unpad(data):
-            if not data:
-                return b''
-            padding_length = data[-1]
-            # Si le padding est valide, l'appliquer sinon retourner les données telles quelles
-            if 1 <= padding_length <= 16:
-                return data[:-padding_length]
-            return data
-        
-        # Essayer avec la clé actuelle (HKDF derivee puis brute si echec)
-        try:
-            try:
-                from Crypto.Cipher import AES as CryptoAES
-                cipher = CryptoAES.new(self.secret_key, CryptoAES.MODE_CBC, iv)
-                decrypted = cipher.decrypt(encrypted_data)
-                
-                # Essayer de décoder avec diverses stratégies de unpad
-                try:
-                    # 1. Essayer le unpad standard
-                    unpadded = simple_unpad(decrypted)
-                    result = unpadded.decode('utf-8', errors='ignore')
-                    if result:
-                        return result
-                except Exception:
-                    pass
-                
-                # 2. Essayer sans unpad
-                try:
-                    result = decrypted.decode('utf-8', errors='ignore')
-                    if result:
-                        return result
-                except Exception:
-                    pass
-                
-                # 3. Essayer jusqu'au premier null byte
-                try:
-                    null_pos = decrypted.find(b'\0')
-                    if null_pos > 0:
-                        return decrypted[:null_pos].decode('utf-8', errors='ignore')
-                except Exception:
-                    pass
-            except ImportError:
-                pass
-            
-            # Si PyCrypto n'est pas disponible ou échoue, utiliser cryptography
+        # Patch A02-02 : strict PKCS7 + strict UTF-8, plus de errors='ignore',
+        # plus de null-byte truncation. Si toutes les cles echouent on leve
+        # ValueError au lieu de retourner "" ou du garbage.
+        keys_to_try = [
+            (self.secret_key, "SECRET_KEY_HKDF"),
+            (self.secret_key_raw, "SECRET_KEY_RAW"),
+        ]
+        if self.old_secret_key:
+            keys_to_try.append((self.old_key_bytes, "OLD_SECRET_KEY"))
+
+        for key, key_name in keys_to_try:
             try:
                 cipher = Cipher(
-                    algorithms.AES(self.secret_key),
+                    algorithms.AES(key),
                     modes.CBC(iv),
                     backend=default_backend()
                 )
                 decryptor = cipher.decryptor()
                 decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
-                
-                # Mêmes stratégies de unpad
-                try:
-                    unpadded = simple_unpad(decrypted)
-                    result = unpadded.decode('utf-8', errors='ignore')
-                    if result:
-                        return result
-                except Exception:
-                    pass
-            except Exception:
-                pass
-        except Exception:
-            pass
-        
-        # Essayer avec l'ancienne clé (non-hexadécimale)
-        if self.old_secret_key:
-            try:
-                # Utiliser PyCrypto si disponible
-                try:
-                    from Crypto.Cipher import AES as CryptoAES
-                    cipher = CryptoAES.new(self.old_key_bytes, CryptoAES.MODE_CBC, iv)
-                    decrypted = cipher.decrypt(encrypted_data)
-                    
-                    # Mêmes stratégies de unpad
-                    try:
-                        unpadded = simple_unpad(decrypted)
-                        result = unpadded.decode('utf-8', errors='ignore')
-                        if result:
-                            return result
-                    except Exception:
-                        pass
-                    
-                    try:
-                        result = decrypted.decode('utf-8', errors='ignore')
-                        if result:
-                            return result
-                    except Exception:
-                        pass
-                    
-                    try:
-                        null_pos = decrypted.find(b'\0')
-                        if null_pos > 0:
-                            return decrypted[:null_pos].decode('utf-8', errors='ignore')
-                    except Exception:
-                        pass
-                except ImportError:
-                    pass
-                
-                # Si PyCrypto n'est pas disponible ou échoue, utiliser cryptography
-                try:
-                    cipher = Cipher(
-                        algorithms.AES(self.old_key_bytes),
-                        modes.CBC(iv),
-                        backend=default_backend()
-                    )
-                    decryptor = cipher.decryptor()
-                    decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
-                    
-                    # Mêmes stratégies de unpad
-                    try:
-                        unpadded = simple_unpad(decrypted)
-                        result = unpadded.decode('utf-8', errors='ignore')
-                        if result:
-                            return result
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-            except Exception:
-                pass
-        
-        # Si aucune méthode n'a fonctionné
-        return ""
+                unpadded = self.unpad(decrypted)  # PKCS7 strict
+                return unpadded.decode('utf-8')   # UTF-8 strict
+            except Exception as e:
+                _log.debug("decrypt_simple : echec %s : %s", key_name, e)
+                continue
+
+        raise ValueError("Echec dechiffrement (decrypt_simple, toutes cles)")
 
     def test_decryption(self, encrypted_password):
         """

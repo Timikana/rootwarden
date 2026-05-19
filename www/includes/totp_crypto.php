@@ -21,8 +21,17 @@ function encryptTotpSecret(string $secret): string
 
     $secretKey = getenv('SECRET_KEY');
     if (empty($secretKey)) {
-        error_log("[RootWarden] SECRET_KEY absente - TOTP secret non chiffre");
-        return $secret; // Fallback plaintext si pas de cle
+        // Patch A02-04 (OWASP A02) : FAIL-CLOSED. Avant ce patch, si la
+        // SECRET_KEY etait absente / vide, on retournait le secret TOTP en
+        // CLAIR -> stockage silencieux d'un secret 2FA en clair en BDD,
+        // utilisable directement par n'importe quel acces lecture DB.
+        // Desormais on leve une exception : aucun secret TOTP ne peut
+        // etre ecrit sans cle de chiffrement.
+        error_log("[RootWarden] CRITIQUE: SECRET_KEY absente - encryptTotpSecret refuse fail-closed");
+        throw new \RuntimeException(
+            'SECRET_KEY indisponible : chiffrement TOTP impossible. '
+            . 'Configurez SECRET_KEY dans srv-docker.env avant tout enrollment 2FA.'
+        );
     }
 
     // Sodium (prioritaire) - cle HKDF derivee avec info label "rootwarden-totp"
@@ -48,8 +57,12 @@ function encryptTotpSecret(string $secret): string
     $iv = random_bytes(16);
     $encrypted = openssl_encrypt($secret, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
     if ($encrypted === false) {
-        error_log("[RootWarden] TOTP AES encrypt failed");
-        return $secret; // Fallback plaintext
+        // Patch A02-04 : FAIL-CLOSED, plus de fallback plaintext.
+        error_log("[RootWarden] CRITIQUE: TOTP AES encrypt failed - refus fail-closed");
+        throw new \RuntimeException(
+            'Chiffrement TOTP echoue (openssl_encrypt). '
+            . 'Verifiez la configuration cryptographique.'
+        );
     }
     return 'totp:aes:' . base64_encode($iv . $encrypted);
 }
