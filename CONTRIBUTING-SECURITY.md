@@ -61,6 +61,39 @@ Ce document liste les règles à respecter pour **éviter les régressions** dé
 - **Audit, pentest, patch sécu** = branche dédiée (`security/...`) + commits atomiques + **JAMAIS de merge** sans validation explicite user.
 - **CI gates bloquants** : bandit, semgrep (owasp-top-ten + custom rules), pip-audit, gitleaks, trivy.
 
+## 9. Checklist code-review sécurité
+
+Avant de merger une PR qui touche à du code sensible (auth, BDD, SSH, crypto), vérifier :
+
+- [ ] Toute requête SQL utilise `prepare()`/`%s` (jamais d'interpolation)
+- [ ] Toute commande shell `execute_as_root` quote les variables (`shlex.quote`) ou pousse via `base64 -d`
+- [ ] Tout `<?= $var ?>` dans un template a un `htmlspecialchars()`
+- [ ] Toute nouvelle route Flask a `@require_api_key` + `@require_role(N)` ou `@require_permission(...)`
+- [ ] Tout endpoint avec `machine_id` a `@require_machine_access`
+- [ ] Toute nouvelle URL externe (fetch/requests) passe par `_url_is_safe_external()`
+- [ ] Si le patch ajoute un nouveau blueprint, le préfixe est ajouté à `$ALLOWED_PROXY_PREFIXES`
+- [ ] Si le patch touche au logging, vérifier qu'aucun secret n'est interpolé directement
+- [ ] Pas de `errors='ignore'` sur un `decode`/`unpad` lié à de la crypto
+- [ ] CI verte (bandit/semgrep/pip-audit/gitleaks/trivy)
+
+## 10. Exceptions Semgrep (`nosemgrep`)
+
+Si une règle déclenche un faux positif sur du code légitime :
+
+```python
+result = cur.execute(f"SELECT * FROM {table_whitelist}")  # nosemgrep: rw-sql-fstring-execute
+# table_whitelist vient de notre code, pas de l'input user
+```
+
+**Convention** : toujours commenter la raison à côté du `nosemgrep`. Une exception sans justification = refus en code-review.
+
+## 11. Signaler une faille
+
+Pas de bug bounty public, mais en interne :
+1. **Ne PAS** ouvrir une issue GitHub publique pour une vuln active.
+2. Envoyer à `gauderic.broussier@magiline.fr` avec sujet `[RW-SECU]`.
+3. Si exploit confirmé : créer une branche `security/...`, patch, review, merge avec validation explicite.
+
 ---
 
 **En cas de doute** : refuser (fail-closed), logger, demander revue. Une régression sécu coûte plus cher qu'un feature en retard.
