@@ -466,6 +466,13 @@ class NVDClient:
             time.sleep(wait)
 
         try:
+            # Patch A10-SSRF-N1 : NVDClient doit aussi passer par le guard SSRF.
+            # Sans ca, un admin modifiant NVD_API_URL en .env vers
+            # http://169.254.169.254/... exfiltrait les creds cloud via les logs
+            # de scan. Pareil pour le second appel paginate plus bas.
+            if not _url_is_safe_external(self.url):
+                _log.warning("NVD URL refusee (SSRF guard) : %s", self.url)
+                return None
             headers = {}
             if self.api_key:
                 headers['apiKey'] = self.api_key
@@ -543,6 +550,11 @@ def scan_component_via_nvd(component_name: str, version: str,
     start_index = 0
     per_page = 2000
     max_pages = 10  # 20000 CVE max -> couvre meme kernel (5000-6000)
+
+    # Patch A10-SSRF-N1 : check URL avant pagination
+    if not _url_is_safe_external(nvd.url):
+        _log.warning("NVD URL refusee (SSRF guard) : %s", nvd.url)
+        return []
 
     for page in range(max_pages):
         # Rate limiting via le client

@@ -141,41 +141,17 @@ _log_format = (
 )
 
 
-# Patch A09-04 (OWASP A09 Logging & Monitoring Failures) : filtre qui
-# scrubbe les secrets connus avant ecriture sur disque/stdout. Sans ca,
-# DEBUG_MODE=true ou un f-string mal place exposait passwords SSH/root,
-# tokens API, secrets TOTP, mdp Wazuh registration dans server.log.
-import re as _re_log
-_SECRET_PATTERNS = [
-    (_re_log.compile(r"(password['\"]?\s*[:=]\s*['\"]?)([^'\"\s,}]+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
-    (_re_log.compile(r"(token['\"]?\s*[:=]\s*['\"]?)([^'\"\s,}]+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
-    (_re_log.compile(r"(WAZUH_REGISTRATION_PASSWORD=)(\S+)"), r"\1***SCRUBBED***"),
-    (_re_log.compile(r"(api[_-]?key['\"]?\s*[:=]\s*['\"]?)([^'\"\s,}]+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
-    (_re_log.compile(r"(authorization:\s*bearer\s+)(\S+)", _re_log.IGNORECASE), r"\1***SCRUBBED***"),
-    (_re_log.compile(r"(opc_org\.[A-Za-z0-9_.-]+)"), "***OPENCVE-TOKEN-SCRUBBED***"),
-]
-
-
-class _SecretScrubFilter(logging.Filter):
-    """Rewrite log records to scrub credentials/tokens before write."""
-    def filter(self, record):
-        try:
-            msg = record.getMessage()
-            for pat, repl in _SECRET_PATTERNS:
-                msg = pat.sub(repl, msg)
-            record.msg = msg
-            record.args = ()
-        except Exception:
-            pass
-        return True
-
+# Patch A09-04 + A09-NEW-01 : scrubber centralise via log_scrub.py applique
+# au root logger (et donc a TOUS les handlers ajoutes ensuite, dont
+# deployment.log / iptables.log / update_servers.log via configure_servers.py).
+from log_scrub import attach_scrub, install_scrub_on_root
 
 _handlers = [logging.StreamHandler(), logging.FileHandler(server_log_file)]
-_scrub = _SecretScrubFilter()
 for _h in _handlers:
-    _h.addFilter(_scrub)
+    attach_scrub(_h)
 
 logging.basicConfig(level=_log_level, format=_log_format, handlers=_handlers)
+install_scrub_on_root()  # auto-scrub sur les futurs handlers (modules tiers)
 logger = logging.getLogger(__name__)
 
 if Config.DEBUG:
