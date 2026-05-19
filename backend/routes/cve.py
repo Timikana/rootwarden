@@ -1,8 +1,9 @@
 import json
+import time
 import threading
 from datetime import datetime
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
 from ssh_utils import ssh_session, validate_machine_id
 from config import Config
 from cve_scanner import scan_server, get_last_scan_results, get_scan_history, get_opencve_client
@@ -12,6 +13,10 @@ bp = Blueprint('cve', __name__)
 
 # Verrou global : un seul scan CVE a la fois (evite l'epuisement du thread pool)
 _scan_lock = threading.Lock()
+
+# Patch A04-INSEC-N2 : rate-limit par user (dict en memoire, OK car worker
+# unique Hypercorn). Pour multi-worker, deplacer en table SQL.
+_user_scan_throttle: dict[int, float] = {}
 
 
 def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
@@ -142,6 +147,20 @@ def cve_scan():
             ids = [validate_machine_id(raw_id)]
         except ValueError as e:
             return jsonify({'success': False, 'message': str(e)}), 400
+
+    # Patch A04-INSEC-N2 (OWASP A04) : rate-limit par utilisateur (60s entre scans).
+    # _scan_lock est global mais non-bloquant ; un user role=1 pouvait spammer
+    # /cve_scan, chaque tentative consommait un thread+DB.
+    user_id, _role = get_current_user()
+    now_ts = time.time()
+    last = _user_scan_throttle.get(user_id, 0)
+    if user_id and (now_ts - last) < 60:
+        return jsonify({
+            'success': False,
+            'message': f"Patientez {int(60 - (now_ts - last))}s avant un nouveau scan CVE."
+        }), 429
+    if user_id:
+        _user_scan_throttle[user_id] = now_ts
 
     if not _scan_lock.acquire(blocking=False):
         return jsonify({'success': False, 'message': 'Un scan CVE est deja en cours. Reessayez plus tard.'}), 429
