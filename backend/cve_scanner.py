@@ -800,18 +800,26 @@ def get_system_components(ssh_client) -> list[dict]:
 # Scan complet (générateur → streaming)
 # ────────────────────────────────────────────────────────────────────────────
 
+SCAN_SOURCES = ('fast', 'hybrid', 'precise')
+
+
 def scan_server(ssh_client, machine_id: int, machine_name: str,
-                min_cvss: float = 0.0):
+                min_cvss: float = 0.0, scan_source: str = 'hybrid'):
     """
-    Générateur qui scanne un serveur et yield des dicts d'événements :
-      {'type': 'start',    'total': N, 'vendor': '...'}
-      {'type': 'progress', 'current': i, 'total': N, 'package': '...'}
-      {'type': 'finding',  ... données CVE ...}
-      {'type': 'done',     'total_findings': N, 'packages_scanned': N}
-      {'type': 'error',    'message': '...'}
+    Générateur qui scanne un serveur et yield des dicts d'événements.
+
+    scan_source :
+      - 'fast'    : OpenCVE seul, pas de filtre version (legacy, rapide, faux+).
+      - 'hybrid'  : composants systeme via NVD direct, paquets dpkg via OpenCVE,
+                    filtre version NVD applique partout. Defaut. Bon compromis.
+      - 'precise' : NVD direct partout (tres lent sans cle, max precision).
     """
+    if scan_source not in SCAN_SOURCES:
+        scan_source = 'hybrid'
     opencve = get_opencve_client()
-    nvd = get_nvd_client() if Config.NVD_ENRICHMENT_ENABLED else None
+    # NVD utile pour hybrid+precise. En fast on bypasse.
+    nvd = get_nvd_client() if (Config.NVD_ENRICHMENT_ENABLED
+                                and scan_source != 'fast') else None
     try:
         # Etape 1 : detection OS
         yield {'type': 'progress', 'machine_id': machine_id,
@@ -872,12 +880,17 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
             # Vendor : specifique pour composants systeme, sinon vendor OS
             pkg_vendor = _SYSTEM_VENDORS.get(pkg['name'], vendor)
 
-            # Routing : pour les composants systeme (kernel, openssl, ssh...),
-            # OpenCVE pagine mal (10/page, sort par updated_at, parfois rate des
-            # CVE) sur des volumes >1000. On bascule sur NVD direct avec cpeName
-            # qui filtre par version exacte cote serveur.
-            use_nvd_direct = (nvd is not None and comp_type != 'package'
-                              and pkg['name'] in _CPE_BY_COMPONENT)
+            # Routing selon scan_source :
+            # - fast    : OpenCVE pour tout
+            # - hybrid  : NVD direct pour system_components, OpenCVE pour dpkg
+            # - precise : NVD direct pour tout ce qui a un mapping CPE
+            if scan_source == 'fast':
+                use_nvd_direct = False
+            elif scan_source == 'precise':
+                use_nvd_direct = (nvd is not None and pkg['name'] in _CPE_BY_COMPONENT)
+            else:  # hybrid
+                use_nvd_direct = (nvd is not None and comp_type != 'package'
+                                  and pkg['name'] in _CPE_BY_COMPONENT)
             try:
                 if use_nvd_direct:
                     cves = scan_component_via_nvd(pkg['name'],
