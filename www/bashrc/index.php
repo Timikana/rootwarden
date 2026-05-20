@@ -20,12 +20,19 @@ require_once __DIR__ . '/../db.php';
 checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
 checkPermission('can_manage_bashrc');
 
-// Liste des serveurs (non archives)
+// Liste des serveurs (non archives) avec la date du dernier deploy bashrc.
+// Le dernier deploy est extrait de user_logs : action LIKE '[bashrc] deploy%machine_id=X%'.
+// LEFT JOIN garde les machines jamais deployees (last_deploy = NULL).
 $stmt = $pdo->query("
-    SELECT id, name, ip, port, environment, online_status
-    FROM machines
-    WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'
-    ORDER BY name
+    SELECT m.id, m.name, m.ip, m.port, m.environment, m.online_status,
+           MAX(ul.created_at) AS last_deploy_at
+    FROM machines m
+    LEFT JOIN user_logs ul
+      ON ul.action LIKE CONCAT('[bashrc] deploy%machine_id=', m.id, '%')
+     AND ul.action NOT LIKE '%dry_run=True%'
+    WHERE m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived'
+    GROUP BY m.id, m.name, m.ip, m.port, m.environment, m.online_status
+    ORDER BY m.name
 ");
 $machines = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -108,17 +115,63 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                     </button>
                 </div>
 
-                <!-- Checklist serveurs multi-select (Patch bashrc multi-deploy) -->
-                <div id="machine-list" class="border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-900/30">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+                <!-- Liste serveurs multi-select en vertical avec date dernier deploy
+                     (Patch bashrc multi-deploy). Classes Tailwind safe PurgeCSS. -->
+                <div id="machine-list" class="border border-gray-200 dark:border-gray-700 rounded-lg mb-4 max-h-72 overflow-y-auto bg-gray-50 dark:bg-gray-800/50">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 dark:bg-gray-700/50 sticky top-0">
+                            <tr class="text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                <th class="px-3 py-2 w-10"></th>
+                                <th class="text-left px-3 py-2"><?= t('bashrc.col_name') ?></th>
+                                <th class="text-left px-3 py-2"><?= t('bashrc.col_ip') ?></th>
+                                <th class="text-left px-3 py-2 hidden md:table-cell"><?= t('bashrc.col_env') ?></th>
+                                <th class="text-left px-3 py-2"><?= t('bashrc.col_last_deploy') ?></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                         <?php foreach ($machines as $m): ?>
-                        <label class="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-white dark:hover:bg-gray-800 cursor-pointer">
-                            <input type="checkbox" class="machine-chk" value="<?= (int)$m['id'] ?>" data-name="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" onchange="bashrcMachineChange()">
-                            <span class="truncate"><?= htmlspecialchars($m['name']) ?></span>
-                            <span class="text-xs text-gray-400 truncate"><?= htmlspecialchars($m['ip']) ?></span>
-                        </label>
+                            <?php
+                            $envBadge = match($m['environment']) {
+                                'PROD'  => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                                'DEV'   => 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+                                'TEST'  => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+                                default => 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+                            };
+                            $lastDeploy = $m['last_deploy_at'];
+                            $lastStr = $lastDeploy ?: '';
+                            // Color : vert si < 30j, ambre si 30-90j, gris si > 90j ou jamais
+                            $lastClass = 'text-gray-400 dark:text-gray-500';
+                            if ($lastDeploy) {
+                                $ageDays = (time() - strtotime($lastDeploy)) / 86400;
+                                if ($ageDays < 30) $lastClass = 'text-green-600 dark:text-green-400';
+                                elseif ($ageDays < 90) $lastClass = 'text-yellow-600 dark:text-yellow-400';
+                                else $lastClass = 'text-red-500 dark:text-red-400';
+                            }
+                            ?>
+                            <tr class="hover:bg-white dark:hover:bg-gray-700/50">
+                                <td class="px-3 py-2 text-center">
+                                    <input type="checkbox" class="machine-chk" value="<?= (int)$m['id'] ?>"
+                                           data-name="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>"
+                                           onchange="bashrcMachineChange()">
+                                </td>
+                                <td class="px-3 py-2 font-medium"><?= htmlspecialchars($m['name']) ?></td>
+                                <td class="px-3 py-2 mono text-xs text-gray-500 dark:text-gray-400"><?= htmlspecialchars($m['ip']) ?></td>
+                                <td class="px-3 py-2 hidden md:table-cell">
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full <?= $envBadge ?>">
+                                        <?= htmlspecialchars($m['environment']) ?>
+                                    </span>
+                                </td>
+                                <td class="px-3 py-2 text-xs <?= $lastClass ?>" data-utc="<?= htmlspecialchars($lastStr) ?>">
+                                    <?php if ($lastDeploy): ?>
+                                        <span class="last-deploy-display"><?= htmlspecialchars($lastDeploy) ?></span>
+                                    <?php else: ?>
+                                        <span class="italic"><?= t('bashrc.never_deployed') ?></span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
                         <?php endforeach; ?>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
 
                 <!-- Bandeau info multi-deploy (visible si >1 serveur coche) -->
@@ -142,14 +195,22 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                     <button id="btn-dryrun" onclick="bashrcDeploy(true)" disabled
                             class="px-4 py-2 text-sm bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded-lg"><?= t('bashrc.btn_dry_run') ?></button>
 
-                    <!-- Multi-deploy : actif quand >1 serveur coche -->
+                    <!-- Multi-deploy : actif quand >1 serveur coche.
+                         Inline styles pour les variants purple-700/300/400 absents
+                         du build PurgeCSS (cf. feedback-tailwind-purged-classes). -->
                     <span class="hidden md:inline mx-2 w-px h-6 bg-gray-300 dark:bg-gray-600"></span>
                     <button id="btn-multi-deploy" onclick="bashrcMultiDeploy(false)" disabled
-                            class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium">
+                            class="px-4 py-2 text-sm disabled:bg-gray-400 text-white rounded-lg font-medium"
+                            style="background:#7c3aed;"
+                            onmouseover="if(!this.disabled)this.style.background='#6d28d9'"
+                            onmouseout="if(!this.disabled)this.style.background='#7c3aed'">
                         <?= t('bashrc.btn_multi_deploy') ?>
                     </button>
                     <button id="btn-multi-dryrun" onclick="bashrcMultiDeploy(true)" disabled
-                            class="px-4 py-2 text-sm bg-purple-300 hover:bg-purple-400 disabled:bg-gray-300 text-purple-900 rounded-lg">
+                            class="px-4 py-2 text-sm disabled:bg-gray-300 rounded-lg"
+                            style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;"
+                            onmouseover="if(!this.disabled){this.style.background='#ddd6fe';}"
+                            onmouseout="if(!this.disabled){this.style.background='#ede9fe';}">
                         <?= t('bashrc.btn_multi_dryrun') ?>
                     </button>
                 </div>
@@ -265,6 +326,17 @@ foreach ($jsKeys as $k) {
 });
 </script>
 <script src="/bashrc/js/bashrc.js?v=<?= htmlspecialchars($jsVersion) ?>"></script>
+<script>
+// Formate les dates "dernier deploiement" en local (UTC -> tz navigateur).
+// Le PHP rend "YYYY-MM-DD HH:MM:SS" UTC ; on remplace via fmtLocalDate (utils.js).
+document.querySelectorAll('#machine-list td[data-utc]').forEach(td => {
+    const utc = td.getAttribute('data-utc');
+    if (utc && window.fmtLocalDate) {
+        const span = td.querySelector('.last-deploy-display');
+        if (span) span.textContent = window.fmtLocalDate(utc, utc);
+    }
+});
+</script>
 <script>
 // Tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
