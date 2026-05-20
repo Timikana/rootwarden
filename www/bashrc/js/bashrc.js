@@ -46,9 +46,80 @@ function fmtTime(ts) {
     return d.toLocaleString();
 }
 
+// ── Multi-server checklist (patch bashrc multi-deploy) ──────────────────────
+//
+// Comportement :
+//   - 0 serveur coche  -> tous les boutons disabled, message "Choisir au moins un serveur"
+//   - 1 serveur coche  -> charge les users de ce serveur (comportement legacy)
+//                         -> Preview / Deploy / Dry-run actifs sur ce serveur
+//   - N>1 serveurs     -> masque le tableau users (deploy global par serveur)
+//                         -> active "Deployer sur N serveurs" + "Dry-run multi"
+function _bashrcSelectedMachines() {
+    return Array.from(document.querySelectorAll('.machine-chk:checked'))
+        .map(c => ({id: parseInt(c.value, 10), name: c.getAttribute('data-name') || c.value}));
+}
+
+function bashrcMachineAll(checked) {
+    document.querySelectorAll('.machine-chk').forEach(c => { c.checked = !!checked; });
+    bashrcMachineChange();
+}
+
+function bashrcMachineChange() {
+    const machines = _bashrcSelectedMachines();
+    const count = machines.length;
+    const counter = document.getElementById('machine-count');
+    if (counter) counter.textContent = String(count);
+
+    const info = document.getElementById('multi-info');
+    const infoText = document.getElementById('multi-info-text');
+    const container = document.getElementById('users-table-container');
+    const btnMulti = document.getElementById('btn-multi-deploy');
+    const btnMultiDry = document.getElementById('btn-multi-dryrun');
+    const btnPreview = document.getElementById('btn-preview');
+    const btnDeploy = document.getElementById('btn-deploy');
+    const btnDryRun = document.getElementById('btn-dryrun');
+
+    if (count === 0) {
+        info.classList.add('hidden');
+        container.innerHTML = `<div class="text-sm text-gray-500 text-center py-6">${escHtml(__('bashrc.pick_server_first'))}</div>`;
+        [btnPreview, btnDeploy, btnDryRun, btnMulti, btnMultiDry].forEach(b => { if (b) b.disabled = true; });
+        _currentMachineId = null;
+        return;
+    }
+
+    if (count === 1) {
+        // Mode mono-serveur : comportement legacy
+        info.classList.add('hidden');
+        const m = machines[0];
+        const sel = document.getElementById('machine-select');
+        if (sel) sel.value = String(m.id);  // sync ancien select si encore present
+        _currentMachineId = m.id;
+        // Charge les users pour ce serveur
+        bashrcLoadUsers();
+        if (btnMulti) btnMulti.disabled = true;
+        if (btnMultiDry) btnMultiDry.disabled = true;
+        return;
+    }
+
+    // Mode multi-serveur : on cache les users individuels
+    info.classList.remove('hidden');
+    infoText.textContent = __('bashrc.multi_deploy_info', {count: count});
+    container.innerHTML = `<div class="text-sm text-gray-500 text-center py-6">${escHtml(__('bashrc.multi_users_auto'))}</div>`;
+    [btnPreview, btnDeploy, btnDryRun].forEach(b => { if (b) b.disabled = true; });
+    if (btnMulti) btnMulti.disabled = false;
+    if (btnMultiDry) btnMultiDry.disabled = false;
+    _currentMachineId = null;
+}
+
+// Sync au chargement de la page si checkboxes deja cochees (back-button)
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('machine-list')) bashrcMachineChange();
+});
+
+
 async function bashrcLoadUsers() {
-    const sel = document.getElementById('machine-select');
-    const mid = parseInt(sel.value || '0', 10);
+    // _currentMachineId est setter par bashrcMachineChange() (1 seul serveur coche)
+    const mid = _currentMachineId;
     const container = document.getElementById('users-table-container');
     const btnInstall = document.getElementById('btn-install-figlet');
     const banner = document.getElementById('prereq-banner');
@@ -386,6 +457,124 @@ document.addEventListener('click', (e) => {
 });
 
 // Bridge i18n : __('bashrc.foo') → window._i18n['bashrc.foo']
-function __(key) {
-    return (window._i18n && window._i18n[key]) || key;
+// Supporte les placeholders : __('bashrc.foo', {count: 3}) → "3 serveurs"
+function __(key, vars) {
+    let s = (window._i18n && window._i18n[key]) || key;
+    if (vars) {
+        for (const [k, v] of Object.entries(vars)) {
+            s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), String(v));
+        }
+    }
+    return s;
+}
+
+
+// ── Multi-deploy bashrc sur N serveurs (patch bashrc multi) ─────────────────
+//
+// Pour chaque serveur coche : recupere la liste des users (call /bashrc/users),
+// filtre les non-system (excluded geres en BDD via deploy logic backend), et
+// appelle /bashrc/deploy avec le set complet. Aggrege les resultats dans une
+// table par serveur.
+async function bashrcMultiDeploy(dryRun) {
+    const machines = _bashrcSelectedMachines();
+    if (machines.length < 2) {
+        alert(__('bashrc.multi_pick_2_min'));
+        return;
+    }
+    const mode = document.getElementById('deploy-mode').value;
+    const label = dryRun ? __('bashrc.confirm_multi_dry') : __('bashrc.confirm_multi_deploy');
+    const names = machines.map(m => m.name).join('\n  • ');
+    if (!confirm(`${label}\n\n${__('bashrc.servers')} (${machines.length}) :\n  • ${names}\n\n${__('bashrc.mode')} : ${mode}`)) return;
+
+    const panel = document.getElementById('deploy-result');
+    const content = document.getElementById('deploy-result-content');
+    panel.classList.remove('hidden');
+    content.innerHTML = `<div class="text-gray-500">${escHtml(__('bashrc.multi_in_progress'))}</div>`;
+
+    const results = [];
+    let totalOk = 0, totalFailed = 0, totalSkipped = 0;
+
+    for (const m of machines) {
+        // 1. Charge la liste des users du serveur
+        let userList;
+        try {
+            const ur = await apiFetch(`/bashrc/users?machine_id=${m.id}`);
+            if (!ur.success) {
+                results.push({machine: m, error: ur.message || 'Erreur load users'});
+                continue;
+            }
+            // Filtre : tous les users non-system listed par le backend.
+            // Le backend renvoie deja la liste filtree (uid >= 1000 + root).
+            userList = (ur.users || []).map(u => u.name);
+        } catch (e) {
+            results.push({machine: m, error: String(e).slice(0, 200)});
+            continue;
+        }
+        if (!userList.length) {
+            results.push({machine: m, summary: {ok: 0, failed: 0, skipped: 0}, results: [], note: __('bashrc.no_users')});
+            continue;
+        }
+
+        // 2. Deploy
+        try {
+            const dr = await apiFetch('/bashrc/deploy', {
+                method: 'POST',
+                body: JSON.stringify({machine_id: m.id, users: userList, mode, dry_run: dryRun}),
+            });
+            if (!dr.success) {
+                results.push({machine: m, error: dr.message || 'Erreur deploy'});
+                continue;
+            }
+            results.push({machine: m, summary: dr.summary || {}, results: dr.results || [], dry_run: !!dr.dry_run});
+            totalOk += (dr.summary?.ok || 0);
+            totalFailed += (dr.summary?.failed || 0);
+            totalSkipped += (dr.summary?.skipped || 0);
+        } catch (e) {
+            results.push({machine: m, error: String(e).slice(0, 200)});
+        }
+    }
+
+    // 3. Render aggregated results
+    let html = `<div class="mb-3 flex gap-3 text-sm flex-wrap">
+        <span class="px-2 py-1 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 font-medium">${machines.length} ${__('bashrc.servers').toLowerCase()}</span>
+        <span class="px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">${escHtml(__('bashrc.ok'))}: ${totalOk}</span>
+        <span class="px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">${escHtml(__('bashrc.failed'))}: ${totalFailed}</span>
+        <span class="px-2 py-1 rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">${escHtml(__('bashrc.skipped'))}: ${totalSkipped}</span>
+        ${dryRun ? `<span class="px-2 py-1 rounded bg-yellow-100 text-yellow-700">DRY RUN</span>` : ''}
+    </div>`;
+
+    for (const r of results) {
+        html += `<details class="mb-2 border border-gray-200 dark:border-gray-700 rounded-lg"><summary class="px-3 py-2 cursor-pointer text-sm font-medium flex items-center justify-between">
+            <span>${escHtml(r.machine.name)}</span>`;
+        if (r.error) {
+            html += `<span class="text-xs text-red-500">${escHtml(r.error)}</span>`;
+        } else if (r.note) {
+            html += `<span class="text-xs text-gray-500">${escHtml(r.note)}</span>`;
+        } else {
+            const s = r.summary || {};
+            html += `<span class="text-xs">
+                <span class="text-green-600">✓ ${s.ok || 0}</span> /
+                <span class="text-red-600">✗ ${s.failed || 0}</span> /
+                <span class="text-gray-500">skip ${s.skipped || 0}</span>
+            </span>`;
+        }
+        html += '</summary>';
+        if (r.results && r.results.length) {
+            html += '<table class="w-full text-xs p-2"><thead><tr class="bg-gray-50 dark:bg-gray-700/50">'
+                + `<th class="px-2 py-1 text-left">User</th><th class="px-2 py-1">OK</th><th class="px-2 py-1 text-left">Backup</th><th class="px-2 py-1 text-left">Detail</th>`
+                + '</tr></thead><tbody>';
+            for (const u of r.results) {
+                const detail = u.error || u.reason || (u.dry_run ? __('bashrc.dry_would_run') : '');
+                html += `<tr>
+                    <td class="px-2 py-1 mono">${escHtml(u.user)}</td>
+                    <td class="px-2 py-1 text-center">${u.ok ? '✓' : '✗'}</td>
+                    <td class="px-2 py-1 mono text-[10px]">${escHtml(u.backup || '')}</td>
+                    <td class="px-2 py-1 text-gray-500">${escHtml(detail)}</td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+        }
+        html += '</details>';
+    }
+    content.innerHTML = html;
 }

@@ -34,15 +34,23 @@ if (!function_exists('csp_nonce')) {
     }
 
     /**
-     * Retourne la chaine CSP complete (a passer dans le header) avec le
-     * nonce courant. Inclut 'unsafe-inline' en parallele pour la
-     * retrocompat (CSP3 navigateurs : ignore unsafe-inline si nonce present).
+     * Retourne la chaine CSP complete (a passer dans le header).
+     *
+     * IMPORTANT : la version actuelle utilise 'unsafe-inline' sans nonce.
+     * En CSP3 (Chrome moderne), si on declare un nonce dans script-src,
+     * 'unsafe-inline' est AUTOMATIQUEMENT IGNORE pour les scripts inline
+     * sans nonce -> tous les <script>inline</script> du repo sont casses
+     * silencieusement (bridge i18n, tabs, htmx, etc.).
+     *
+     * Migration progressive : ajouter `nonce="<?= csp_nonce() ?>"` sur CHAQUE
+     * <script> inline du repo, PUIS reactiver le nonce ici en retirant
+     * 'unsafe-inline'. Tant que tous les inline ne sont pas migres, on
+     * reste sur 'unsafe-inline' pure (comme avant le patch A05-NEW-04).
      */
     function csp_header_value(): string {
-        $n = csp_nonce();
         return "default-src 'self'; "
-             . "script-src 'self' 'nonce-{$n}' 'unsafe-inline'; "
-             . "style-src 'self' 'nonce-{$n}' 'unsafe-inline'; "
+             . "script-src 'self' 'unsafe-inline'; "
+             . "style-src 'self' 'unsafe-inline'; "
              . "img-src 'self' data:; "
              . "font-src 'self'; "
              . "connect-src 'self'; "

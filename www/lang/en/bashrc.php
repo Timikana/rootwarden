@@ -12,7 +12,18 @@ return [
 
     // Selection / config
     'bashrc.server' => 'Target server',
+    'bashrc.servers' => 'Target servers',
     'bashrc.select_server' => '- Choose a server -',
+    'bashrc.all' => 'All',
+    'bashrc.none' => 'None',
+    'bashrc.btn_multi_deploy' => 'Deploy multi',
+    'bashrc.btn_multi_dryrun' => 'Dry-run multi',
+    'bashrc.multi_deploy_info' => 'Multi-deploy mode active on {count} server(s). All non-system users will be targeted.',
+    'bashrc.multi_users_auto' => 'In multi mode, users are auto-selected (all non-system on each server).',
+    'bashrc.multi_pick_2_min' => 'Select at least 2 servers for multi-deploy.',
+    'bashrc.multi_in_progress' => 'Multi-deploy in progress...',
+    'bashrc.confirm_multi_deploy' => 'Deploy bashrc to all servers below?',
+    'bashrc.confirm_multi_dry' => 'Run a multi-server dry-run (no changes)?',
     'bashrc.mode' => 'Mode',
     'bashrc.mode_overwrite' => 'Overwrite',
     'bashrc.mode_merge' => 'Merge (keep custom blocks)',
