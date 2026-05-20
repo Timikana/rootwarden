@@ -5,6 +5,15 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.4] - 2026-05-20 — Hotfix bootstrap legacy API key
+
+### Fix critique : 401 sur toutes les routes apres upgrade prod
+- Symptome : sur prod fraichement migree de pre-v1.21 vers v1.21.x, **toutes** les routes backend (deploy_platform_key, list_machines, etc.) retournent 401. Cause : la table `api_keys` est vide tant qu'un admin n'a pas cree sa 1ere cle via `/adm/api_keys.php` (qui auto-insere `proxy-internal-legacy`). Sans cette entree, le proxy PHP envoie `getenv('API_KEY')` que personne ne reconnait, et le fallback `Config.API_KEY` est opt-in (`API_KEY_BOOTSTRAP=1`).
+- Fix : nouvelle etape `5c` dans `maj.sh` qui detecte `api_keys` vide + `API_KEY` env set et insere automatiquement `proxy-internal-legacy` (hash SHA256 de l'env, scope=NULL, auto_generated=1). Identique au comportement PHP `api_keys.php` mais sans dependre du clic UI. Idempotent (`INSERT IGNORE`).
+- L'admin voit toujours la cle dans l'UI avec badge AUTO et peut la revoquer apres avoir rotate vers une cle scopee.
+
+---
+
 ## [1.21.3] - 2026-05-20 — Hotfix onglets admin + dedup CSP
 
 ### Fix critique : onglets admin_page casses
