@@ -38,6 +38,22 @@ except Exception as _migrate_err:
     )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Bootstrap auto de la legacy api_key (v1.21.6)
+# ─────────────────────────────────────────────────────────────────────────────
+# Si la table api_keys ne contient aucune ligne active dont le hash matche
+# Config.API_KEY, on insere automatiquement la legacy 'proxy-internal-legacy-
+# bootstrap-YYYYMMDD'. Evite que toutes les routes retournent 401 apres une
+# maj.sh qui aurait skip l'etape 5c (script obsolete, container db down, etc.).
+# Idempotent : ne fait rien si une cle active matche deja.
+try:
+    from bootstrap_api_key import bootstrap_legacy_api_key
+    bootstrap_legacy_api_key()
+except Exception as _boot_err:
+    logging.getLogger(__name__).warning(
+        "Impossible de bootstrap la legacy api_key : %s", _boot_err
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Generation de la keypair plateforme (auth SSH sans password)
 # ─────────────────────────────────────────────────────────────────────────────
 try:
