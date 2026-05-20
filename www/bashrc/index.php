@@ -90,16 +90,11 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
              ═══════════════════════════════════════════════════════════════ -->
         <div class="tab-panel active" data-panel="deploy">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-4">
-                <div class="flex items-center gap-3 mb-4 flex-wrap">
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300"><?= t('bashrc.server') ?></label>
-                    <select id="machine-select" onchange="bashrcLoadUsers()" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 min-w-[280px]">
-                        <option value=""><?= t('bashrc.select_server') ?></option>
-                        <?php foreach ($machines as $m): ?>
-                        <option value="<?= (int)$m['id'] ?>">
-                            <?= htmlspecialchars($m['name']) ?> (<?= htmlspecialchars($m['ip']) ?>)
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="flex items-center gap-3 mb-3 flex-wrap">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300"><?= t('bashrc.servers') ?></label>
+                    <span id="machine-count" class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">0</span>
+                    <button type="button" onclick="bashrcMachineAll(true)" class="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"><?= t('bashrc.all') ?></button>
+                    <button type="button" onclick="bashrcMachineAll(false)" class="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"><?= t('bashrc.none') ?></button>
 
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300 ml-4"><?= t('bashrc.mode') ?></label>
                     <select id="deploy-mode" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
@@ -113,6 +108,24 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                     </button>
                 </div>
 
+                <!-- Checklist serveurs multi-select (Patch bashrc multi-deploy) -->
+                <div id="machine-list" class="border border-gray-200 dark:border-gray-700 rounded-lg p-2 mb-4 max-h-48 overflow-y-auto bg-gray-50 dark:bg-gray-900/30">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1">
+                        <?php foreach ($machines as $m): ?>
+                        <label class="flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-white dark:hover:bg-gray-800 cursor-pointer">
+                            <input type="checkbox" class="machine-chk" value="<?= (int)$m['id'] ?>" data-name="<?= htmlspecialchars($m['name'], ENT_QUOTES) ?>" onchange="bashrcMachineChange()">
+                            <span class="truncate"><?= htmlspecialchars($m['name']) ?></span>
+                            <span class="text-xs text-gray-400 truncate"><?= htmlspecialchars($m['ip']) ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Bandeau info multi-deploy (visible si >1 serveur coche) -->
+                <div id="multi-info" class="hidden mb-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200">
+                    <span id="multi-info-text"></span>
+                </div>
+
                 <div id="prereq-banner" class="hidden mb-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-sm text-yellow-800 dark:text-yellow-200">
                     <?= t('bashrc.figlet_missing') ?>
                 </div>
@@ -121,13 +134,24 @@ $jsVersion = file_exists($jsPath) ? substr(hash('sha256', (string)filemtime($jsP
                     <div class="text-sm text-gray-500 dark:text-gray-400 text-center py-6"><?= t('bashrc.pick_server_first') ?></div>
                 </div>
 
-                <div class="flex items-center gap-2 mt-4">
+                <div class="flex items-center gap-2 mt-4 flex-wrap">
                     <button id="btn-preview" onclick="bashrcPreview()" disabled
                             class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-lg"><?= t('bashrc.btn_preview') ?></button>
                     <button id="btn-deploy" onclick="bashrcDeploy(false)" disabled
                             class="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg"><?= t('bashrc.btn_deploy') ?></button>
                     <button id="btn-dryrun" onclick="bashrcDeploy(true)" disabled
                             class="px-4 py-2 text-sm bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded-lg"><?= t('bashrc.btn_dry_run') ?></button>
+
+                    <!-- Multi-deploy : actif quand >1 serveur coche -->
+                    <span class="hidden md:inline mx-2 w-px h-6 bg-gray-300 dark:bg-gray-600"></span>
+                    <button id="btn-multi-deploy" onclick="bashrcMultiDeploy(false)" disabled
+                            class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium">
+                        <?= t('bashrc.btn_multi_deploy') ?>
+                    </button>
+                    <button id="btn-multi-dryrun" onclick="bashrcMultiDeploy(true)" disabled
+                            class="px-4 py-2 text-sm bg-purple-300 hover:bg-purple-400 disabled:bg-gray-300 text-purple-900 rounded-lg">
+                        <?= t('bashrc.btn_multi_dryrun') ?>
+                    </button>
                 </div>
             </div>
 
@@ -229,6 +253,10 @@ $jsKeys = [
     'bashrc.saving', 'bashrc.template_dirty', 'bashrc.template_saved',
     'bashrc.confirm_save_template', 'bashrc.confirm_reset_template',
     'bashrc.template_danger', 'bashrc.template_danger_confirm',
+    // Multi-deploy (patch bashrc multi)
+    'bashrc.servers', 'bashrc.mode', 'bashrc.multi_deploy_info', 'bashrc.multi_users_auto',
+    'bashrc.multi_pick_2_min', 'bashrc.multi_in_progress',
+    'bashrc.confirm_multi_deploy', 'bashrc.confirm_multi_dry',
 ];
 foreach ($jsKeys as $k) {
     echo "  " . json_encode($k) . ": " . json_encode(t($k)) . ",\n";
