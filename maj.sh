@@ -156,6 +156,41 @@ if [ "$DRY_RUN" -eq 0 ]; then
         echo -e "  ${YELLOW}!${NC} Restart php a echoue (container deja a jour ?)"
 fi
 
+# ── Etape 6 : check anciennete des cles API (rappel rotation) ───────────────
+# Pas une etape de mise a jour : juste un warning en fin de pipeline si des
+# cles API non-auto-generees datent depuis longtemps. Seuils : 90j (warning),
+# 180j (alerte). Base sur created_at, pas last_used_at - une cle compromise
+# reste compromise meme si elle est utilisee tous les jours.
+if [ "$DRY_RUN" -eq 0 ] && docker ps --format '{{.Names}}' | grep -q '^rootwarden_db$'; then
+    DB_NAME=$(grep "^MYSQL_DATABASE=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    DB_PASS=$(grep "^MYSQL_ROOT_PASSWORD=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    if [ -n "$DB_NAME" ] && [ -n "$DB_PASS" ]; then
+        # silent on errors : si la table/colonne n'existe pas (boot initial), skip
+        AGE_REPORT=$(docker exec -i rootwarden_db sh -c "MYSQL_PWD='${DB_PASS}' mysql -uroot -N -B '${DB_NAME}' 2>/dev/null" <<'SQL' || true
+SELECT
+  SUM(CASE WHEN DATEDIFF(NOW(), created_at) >= 180 THEN 1 ELSE 0 END) AS critical,
+  SUM(CASE WHEN DATEDIFF(NOW(), created_at) BETWEEN 90 AND 179 THEN 1 ELSE 0 END) AS warning
+FROM api_keys
+WHERE revoked_at IS NULL
+  AND COALESCE(auto_generated, 0) = 0;
+SQL
+        )
+        if [ -n "$AGE_REPORT" ]; then
+            CRIT=$(echo "$AGE_REPORT" | awk '{print $1}')
+            WARN=$(echo "$AGE_REPORT" | awk '{print $2}')
+            if [ "${CRIT:-0}" != "0" ] && [ "${CRIT:-NULL}" != "NULL" ]; then
+                echo ""
+                echo -e "${RED}[maj]${NC} ${CRIT} cle(s) API actives > 180 jours - rotation recommandee."
+                echo -e "  Aller dans /adm/api_keys.php > Revoquer puis ${CYAN}↻ Renouveler${NC}."
+            elif [ "${WARN:-0}" != "0" ] && [ "${WARN:-NULL}" != "NULL" ]; then
+                echo ""
+                echo -e "${YELLOW}[maj]${NC} ${WARN} cle(s) API actives entre 90 et 180 jours - pense a les rotater."
+                echo -e "  Voir /adm/api_keys.php."
+            fi
+        fi
+    fi
+fi
+
 if [ "$DRY_RUN" -eq 0 ]; then
     echo ""
     echo -e "${GREEN}[maj] OK${NC}. Verifier l'etat : ${YELLOW}docker ps${NC} ou ${YELLOW}./start.sh logs${NC}"

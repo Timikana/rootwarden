@@ -15,7 +15,7 @@ last_reviewed: 2026-04-21
 routes: [/delete_remote_user, /deploy, /deploy_platform_key, /deploy_service_account, /logs, /platform_key, /preflight_check, /reenter_ssh_password, /regenerate_platform_key, /remove_ssh_password, /remove_user_keys, /revoke_service_account, /scan_server_users, /server_user_keys, /server_user_remove_key, /sshd_allow_user, /test_platform_key]
 tables: [machines, server_user_inventory, server_user_ssh_keys, user_logs, user_machine_access, users]
 imports_detected: [routes, ssh_utils, threading, traceback]
-last_synced: 2026-05-19
+last_synced: 2026-05-20
 # AUTO-END
 ---
 

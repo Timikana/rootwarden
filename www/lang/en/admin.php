@@ -10,6 +10,8 @@ return [
     'admin.btn_diagnostic' => 'Health Check',
     'admin.btn_remote_users' => 'Remote Users',
     'admin.btn_ssh_key' => 'SSH Keypair',
+    'admin.btn_api_keys' => 'API Keys',
+    'admin.tip_api_keys' => 'Manage segmented API keys with per-route regex scope',
     'admin.btn_backups' => 'Backups',
     'admin.tip_journal' => 'View history of all actions performed',
     'admin.tip_diagnostic' => 'Check health of all backend API routes',

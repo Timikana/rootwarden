@@ -5,6 +5,41 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.2] - 2026-05-20 — Patch UX cles API + rotation
+
+### Cles API - refonte formulaire de creation
+- **Modeles rapides** : 8 chips pre-remplissent nom + scope en 1 clic (Tout / Lecture seule / Scan CVE / Deploiement SSH / Maj APT / Audit SSH / Monitoring / Vider).
+- **Checklist de 15 modules** (monitoring, cve, ssh, updates, iptables, fail2ban, services, ssh_audit, supervision, bashrc, graylog, wazuh, admin, reboot, logs) : cocher genere automatiquement les regex de scope.
+- **Textarea avance** collapse sous `<details>` pour edition manuelle des regex (mode pro).
+- Auto-suggestion du nom : `{preset}-YYYY-MM-DD` quand le champ est vide.
+
+### Bouton "Cles API" dans la toolbar admin
+- Visible entre "SSH Keypair" et "Backups" dans `/adm/admin_page.php` - acces direct au menu (auparavant orphelin).
+- i18n FR/EN : `admin.btn_api_keys`, `admin.tip_api_keys`.
+
+### Bouton "↻ Renouveler" sur les cles revoquees
+- Recree une cle avec **meme scope + meme consumer_hint** sous un nouveau nom `{base}-rYYYYMMDD-HHMMSS` (strip d'un suffixe `-rXXX` precedent pour eviter les noms a rallonge).
+- Garde-fous : refuse si la cle est encore active (anti-doublon), refuse les cles `auto_generated` (proxy-internal-legacy).
+- Audit log : `Renouvellement cle API 'old' -> 'new'`.
+
+### Champ `consumer_hint` (memo "ou est utilisee cette cle")
+- Migration `047_api_keys_consumer_hint.sql` : colonne VARCHAR(200) nullable, idempotente.
+- Champ texte libre a la creation : `srv-docker.env:API_KEY`, `GitLab CI variable PROD_API_KEY`, `ansible-vault secrets.yml`, etc. Pas de credential stocke, juste un memo.
+- Recopie automatique au renouvellement.
+- Bandeau vert post-creation affiche un rappel personnalise si hint fourni, sinon une checklist generique (srv-docker.env, jobs CI/CD, k8s secrets, ansible-vault).
+- Colonne "Consommateur" dans la table (tronquee a 32 chars + title=full au hover).
+
+### Banner anciennete (rotation guidee)
+- **UI** : banner en haut de `/adm/api_keys.php` si des cles actives non-auto-generees datent de plus de 90j (jaune) ou 180j (rouge). Liste : age, nom, consumer_hint.
+- **CLI** : etape 6 de `maj.sh` interroge la DB en silence et affiche un warning en fin de pipeline. Failsafe : skip silencieux si table/colonne absente (boot initial).
+- Bonne pratique : rotater les credentials a long terme (90j warning, 180j alerte) limite l'impact d'une compromission.
+- Source : `created_at` (pas `last_used_at`) - une cle compromise reste a risque meme utilisee tous les jours.
+
+### Note importante
+- **Pas de deploiement automatique** : la plateforme ne touche jamais aux secrets de deploiement (srv-docker.env, secrets k8s, vault). Le renouvellement cree juste une nouvelle valeur en DB. Le bandeau vert et le champ `consumer_hint` aident l'admin a savoir ou recoller manuellement.
+
+---
+
 ## [1.21.1] - 2026-05-19 — Patch UX bashrc
 
 ### Bashrc - deploiement multi-serveurs
