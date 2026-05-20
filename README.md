@@ -1,12 +1,20 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.21.0
+# 🔐 RootWarden v1.21.1
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
 > services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
 
-## 🛡️ Nouveau dans la v1.21.0 — Security Hardening OWASP Top 10
+## 🚀 Nouveau dans la v1.21.1 (patch UX bashrc)
+
+- Module Bashrc : **deploiement multi-serveurs en 1 clic** via checklist (au lieu du dropdown mono-serveur).
+- Liste verticale + colonne **"Dernier deploiement"** color-codee (vert <30j, jaune 30-90j, rouge >90j, italique gris si jamais).
+- Date du dernier deploy extraite de `user_logs` (exclut les dry-run), formatee en fuseau navigateur.
+- Boutons "Deployer multi" / "Dry-run multi" violets, actifs des qu'on coche >1 serveur. Iteration N serveurs, deploiement sur tous les non-system users, resultat aggrege avec details par serveur.
+- Fix collateral CSP : rollback du nonce dans `csp_header_value()` (CSP3 ignorait `unsafe-inline` -> tous les inline scripts du repo etaient casses silencieusement). Doc procedure de re-activation apres migration complete dans `www/includes/csp_nonce.php`.
+
+## 🛡️ v1.21.0 — Security Hardening OWASP Top 10
 
 Audit OWASP Top 10 complet + 30 findings patches en 3 vagues. Aucune regression detectee via Puppeteer. Voir [OPERATIONS.md](OPERATIONS.md) pour le deploiement et [CONTRIBUTING-SECURITY.md](CONTRIBUTING-SECURITY.md) pour les conventions.
 

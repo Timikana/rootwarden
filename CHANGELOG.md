@@ -5,6 +5,29 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.1] - 2026-05-19 — Patch UX bashrc
+
+### Bashrc - deploiement multi-serveurs
+- **Checklist multi-select** des serveurs (remplace le dropdown mono-serveur).
+- **Layout vertical** : tableau 1 ligne / serveur (nom, IP, env, dernier deploy).
+- **Colonne "Dernier deploiement"** color-codee : vert <30j, jaune 30-90j, rouge >90j, italique gris si jamais. Donnees extraites de `user_logs` (action LIKE `[bashrc] deploy%machine_id=X%`, exclut dry_run=True). Dates formatees en fuseau navigateur via `fmtLocalDate()`.
+- **Boutons "Deployer multi" / "Dry-run multi"** violets - actifs des qu'on coche >=2 serveurs. Iteration N serveurs, deploiement sur tous les non-system users, resultat aggrege avec `<details>` collapsibles par serveur.
+- Header `<thead>` sticky au scroll pour les gros parcs.
+- Modes 0 / 1 / N serveurs cibles geres : 0 = boutons disabled + message, 1 = comportement legacy (selection users fine), N = mode multi (deploy auto sur tous les non-system).
+
+### Fix collateral CSP (regression de la v1.21.0)
+- Rollback du nonce dans `csp_header_value()` : CSP3 ignore automatiquement `'unsafe-inline'` si un nonce est declare dans `script-src` -> tous les `<script>inline</script>` du repo etaient bloques silencieusement (bridge i18n, tabs, htmx, etc.). Retour a `'unsafe-inline'` pure en attendant la migration progressive des inline scripts.
+- Doc procedure de reactivation dans `www/includes/csp_nonce.php`.
+
+### Convention Tailwind purged respectee (cf [[feedback-tailwind-purged-classes]])
+- `dark:bg-gray-900/30` (non compile) -> `dark:bg-gray-800/50` (compile)
+- `bg-purple-700/300/400` (non compiles) -> inline styles hex avec `onmouseover/out`
+
+### i18n
+- 12 nouvelles cles FR/EN (`bashrc.servers`, `bashrc.all`, `bashrc.none`, `bashrc.btn_multi_deploy`, `bashrc.btn_multi_dryrun`, `bashrc.multi_deploy_info`, `bashrc.col_name`, `bashrc.col_ip`, `bashrc.col_env`, `bashrc.col_last_deploy`, `bashrc.never_deployed`, `bashrc.multi_in_progress`, etc.).
+
+---
+
 ## [1.21.0] - 2026-05-19 — Security hardening OWASP Top 10
 
 Audit OWASP Top 10 complet + 30 findings patchés sur 3 vagues. Merge `security/owasp-audit-2026-05` -> main. Voir [OPERATIONS.md](OPERATIONS.md) pour le déploiement.
