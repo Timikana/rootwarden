@@ -156,7 +156,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
         echo -e "  ${YELLOW}!${NC} Restart php a echoue (container deja a jour ?)"
 fi
 
-# ── Etape 5c : bootstrap proxy-internal-legacy si table api_keys vide ───────
+# ── Etape 5c : bootstrap proxy-internal-legacy si env API_KEY orpheline ─────
 # Cas d'upgrade pre-v1.21 -> v1.21+ : avant, le proxy PHP authentifiait via
 # Config.API_KEY (env var). Depuis v1.21, le backend Python verifie la cle
 # contre la table api_keys. Le fallback legacy est opt-in via API_KEY_BOOTSTRAP=1.
@@ -167,31 +167,41 @@ fi
 # ne reconnait -> 401 systematique sur toutes les routes (deploy_platform_key,
 # list_machines, etc.). Plus rien ne marche dans l'UI apres maj.
 #
-# Fix : a la fin de chaque maj.sh, si la table api_keys est vide ET l'env
-# API_KEY est set, on insere automatiquement la legacy entry (scope=NULL,
-# auto_generated=1). L'admin la voit dans l'UI et peut la revoquer apres
-# avoir rotate vers une cle scopee. Comportement identique au PHP api_keys.php
+# Bug v1.21.4 (decouvert v1.21.5) : la condition initiale "table vide" loupe
+# le cas ou la table contient des cles scopees ou une legacy revoquee dont
+# AUCUNE ne matche le hash de l'env API_KEY. Resultat : 401 persistant apres
+# maj alors que les conditions sont presentes.
+#
+# Fix v1.21.5 : on bootstrap si aucune ligne active (revoked_at IS NULL) ne
+# matche le SHA-256 de l'env API_KEY. Pour eviter la collision UNIQUE sur
+# 'proxy-internal-legacy' (ex: ancienne legacy revoquee laissee pour audit),
+# on suffixe le nom avec la date du bootstrap : 'proxy-internal-legacy-bootstrap-YYYYMMDD'.
 # (cf. CONTRIBUTING-SECURITY.md A07).
 if [ "$DRY_RUN" -eq 0 ] && docker ps --format '{{.Names}}' | grep -q '^rootwarden_db$'; then
     DB_NAME=$(grep "^MYSQL_DATABASE=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d'=' -f2-)
     DB_PASS=$(grep "^MYSQL_ROOT_PASSWORD=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d'=' -f2-)
     API_KEY_ENV=$(grep "^API_KEY=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d'=' -f2-)
     if [ -n "$DB_NAME" ] && [ -n "$DB_PASS" ] && [ -n "$API_KEY_ENV" ]; then
-        # COUNT(*) : retourne 0 si table existe et vide, vide si table absente
-        AK_COUNT=$(docker exec -i rootwarden_db sh -c "MYSQL_PWD='${DB_PASS}' mysql -uroot -N -B '${DB_NAME}' -e 'SELECT COUNT(*) FROM api_keys;' 2>/dev/null" || true)
-        if [ "${AK_COUNT:-NULL}" = "0" ]; then
-            # SHA256 de la cle env + prefix legacy_<6chars sha256("proxy-internal-legacy")>
-            LEGACY_HASH=$(printf '%s' "$API_KEY_ENV" | sha256sum | awk '{print $1}')
+        # SHA256 de la cle env : sert au test ET a l'insertion
+        LEGACY_HASH=$(printf '%s' "$API_KEY_ENV" | sha256sum | awk '{print $1}')
+        # Verifie si une cle ACTIVE matche deja le hash de l'env API_KEY
+        AK_MATCH=$(docker exec -i rootwarden_db sh -c "MYSQL_PWD='${DB_PASS}' mysql -uroot -N -B '${DB_NAME}' -e \"SELECT COUNT(*) FROM api_keys WHERE key_hash='${LEGACY_HASH}' AND revoked_at IS NULL;\" 2>/dev/null" || true)
+        if [ "${AK_MATCH:-NULL}" = "0" ]; then
             PREFIX_SEED=$(printf '%s' 'proxy-internal-legacy' | sha256sum | awk '{print substr($1,1,6)}')
             LEGACY_PREFIX="legacy_${PREFIX_SEED}"
-            echo -e "${GREEN}[maj 5c]${NC} Table api_keys vide + API_KEY env detecte -> bootstrap proxy-internal-legacy..."
+            BOOTSTRAP_DATE=$(date -u +%Y%m%d)
+            LEGACY_NAME="proxy-internal-legacy-bootstrap-${BOOTSTRAP_DATE}"
+            # Compte les lignes existantes pour info (rappel rotation)
+            AK_TOTAL=$(docker exec -i rootwarden_db sh -c "MYSQL_PWD='${DB_PASS}' mysql -uroot -N -B '${DB_NAME}' -e 'SELECT COUNT(*) FROM api_keys;' 2>/dev/null" || true)
+            echo -e "${GREEN}[maj 5c]${NC} Aucune cle active ne matche l'env API_KEY (${AK_TOTAL:-?} ligne(s) en base) -> bootstrap ${LEGACY_NAME}..."
+            # INSERT IGNORE protege contre le cas (rare) ou le meme bootstrap a deja tourne aujourd'hui
             docker exec -i rootwarden_db sh -c "MYSQL_PWD='${DB_PASS}' mysql -uroot -B '${DB_NAME}'" <<SQL
 INSERT IGNORE INTO api_keys (name, key_prefix, key_hash, scope_json, created_by, auto_generated)
-VALUES ('proxy-internal-legacy', '${LEGACY_PREFIX}', '${LEGACY_HASH}', NULL, NULL, 1);
+VALUES ('${LEGACY_NAME}', '${LEGACY_PREFIX}', '${LEGACY_HASH}', NULL, NULL, 1);
 SQL
             echo -e "  ${GREEN}OK${NC} cle legacy inseree (scope=NULL, auto_generated=1)."
             echo -e "  ${YELLOW}Action recommandee${NC} : creer une cle scopee dans /adm/api_keys.php,"
-            echo -e "  rotater srv-docker.env:API_KEY puis revoquer la legacy."
+            echo -e "  rotater srv-docker.env:API_KEY puis revoquer ${LEGACY_NAME}."
         fi
     fi
 fi
