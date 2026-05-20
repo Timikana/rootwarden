@@ -14,7 +14,7 @@ last_reviewed: 2026-04-21
 routes: [/graylog/config, /graylog/deploy, /graylog/servers, /graylog/templates, /graylog/templates/<name>, /graylog/test, /graylog/uninstall]
 tables: [graylog_config, graylog_rsyslog, graylog_templates, machines, user_logs]
 imports_detected: [routes, ssh_utils]
-last_synced: 2026-05-19
+last_synced: 2026-05-20
 # AUTO-END
 ---
 

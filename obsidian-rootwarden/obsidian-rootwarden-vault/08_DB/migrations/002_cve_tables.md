@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [cve_findings, cve_scans]
 imports_detected: []
-last_synced: 2026-05-19
+last_synced: 2026-05-20
 # AUTO-END
 ---
 

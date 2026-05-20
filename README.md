@@ -1,12 +1,21 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.21.1
+# 🔐 RootWarden v1.21.2
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
 > services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
 
-## 🚀 Nouveau dans la v1.21.1 (patch UX bashrc)
+## 🚀 Nouveau dans la v1.21.2 (patch UX cles API)
+
+- **Formulaire de creation refondu** : 8 modeles rapides + checklist de 15 modules qui generent automatiquement les regex de scope. Textarea avance pour les pros.
+- **Bouton "Cles API"** visible dans la toolbar admin (avant orphelin).
+- **Bouton "↻ Renouveler"** sur chaque cle revoquee : recree avec meme scope + meme consumer_hint, suffixe `-rYYYYMMDD-HHMMSS`. Garde-fous anti-doublon.
+- **Champ `consumer_hint`** : memo libre "ou est utilisee cette cle" (`srv-docker.env:API_KEY`, `GitLab CI`, `ansible-vault`). Pas de credential stocke, juste un rappel affiche au renouvellement.
+- **Rotation guidee** : banner UI + warning `maj.sh` si des cles actives non-auto-generees datent de plus de 90 jours (jaune) ou 180 jours (rouge). Source `created_at`.
+- Migration `047_api_keys_consumer_hint.sql` idempotente.
+
+## 🛠️ v1.21.1 (patch UX bashrc)
 
 - Module Bashrc : **deploiement multi-serveurs en 1 clic** via checklist (au lieu du dropdown mono-serveur).
 - Liste verticale + colonne **"Dernier deploiement"** color-codee (vert <30j, jaune 30-90j, rouge >90j, italique gris si jamais).

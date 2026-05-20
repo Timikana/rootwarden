@@ -1,10 +1,19 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.21.1
+# RootWarden v1.21.2
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
 > systemd services, sshd_config audit and CVE vulnerabilities - from a single interface.
+
+## What's new in v1.21.2 (API keys UX patch)
+
+- **Redesigned creation form**: 8 quick presets + checklist of 15 modules that auto-generate the scope regexes. Advanced textarea for power users.
+- **"API Keys" button** visible in the admin toolbar (previously orphaned).
+- **"↻ Renew" button** on each revoked key: re-creates with same scope + same consumer_hint, suffix `-rYYYYMMDD-HHMMSS`. Anti-duplicate guards.
+- **`consumer_hint` field**: free-text memo "where is this key used" (`srv-docker.env:API_KEY`, `GitLab CI`, `ansible-vault`). No credential stored, just a reminder shown at renewal.
+- **Guided rotation**: UI banner + `maj.sh` warning if active non-auto-generated keys are older than 90 days (yellow) or 180 days (red). Source `created_at`.
+- Migration `047_api_keys_consumer_hint.sql` is idempotent.
 
 ## What's new in v1.21.1 (bashrc UX patch)
 
