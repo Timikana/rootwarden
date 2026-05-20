@@ -246,7 +246,16 @@ jobs:
         working-directory: backend
         # Scan du requirements.txt fige. --strict = fail si CVE detectee.
         # Bloquant sur PR ET main depuis v1.17.0 (review securite).
-        run: pip-audit -r requirements.txt --desc --strict
+        #
+        # Exceptions documentees (a re-evaluer a chaque bump dependance) :
+        #
+        # PYSEC-2024-271 (flask-cors <=6.0.2)
+        #   Log injection via CRLF dans le path d'une requete GET.
+        #   Trigger : log level = DEBUG sur l'app Flask.
+        #   Impact RootWarden : nul - prod tourne en INFO/WARN, debug uniquement
+        #   sur preprod local. Pas de fix upstream (6.0.2 est la derniere version).
+        #   A retirer quand flask-cors 6.0.3+ sort avec un patch.
+        run: pip-audit -r requirements.txt --desc --strict --ignore-vuln PYSEC-2024-271
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.4 : SCA PHP (composer audit - CVE sur dependances Composer)
