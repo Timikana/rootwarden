@@ -1,10 +1,18 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.21.0
+# RootWarden v1.21.1
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
 > systemd services, sshd_config audit and CVE vulnerabilities - from a single interface.
+
+## What's new in v1.21.1 (bashrc UX patch)
+
+- Bashrc module: **one-click multi-server deploy** via checklist (was a single-server dropdown).
+- Vertical list with **"Last deployment"** column, color-coded (green <30d, yellow 30-90d, red >90d, italic gray if never).
+- Last deploy date pulled from `user_logs` (excludes dry-runs), rendered in browser timezone.
+- "Deploy multi" / "Dry-run multi" purple buttons activate as soon as >1 server is selected. Iterates N servers, deploys to all non-system users, aggregated results with per-server details.
+- Collateral CSP fix: rolled back the nonce in `csp_header_value()` (CSP3 was ignoring `unsafe-inline` -> all inline scripts in the repo were silently broken). Re-activation procedure documented in `www/includes/csp_nonce.php` for after the full inline-scripts migration.
 
 ## What's new in v1.21.0 — OWASP Top 10 Security Hardening
 
