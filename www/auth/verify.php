@@ -183,10 +183,13 @@ if (!headers_sent()) {
     header("X-Frame-Options: DENY");
     header("X-XSS-Protection: 1; mode=block");
     header("Referrer-Policy: strict-origin-when-cross-origin");
-    // Patch A05-NEW-04 : CSP avec nonce + 'unsafe-inline' (defense in depth).
-    // Les navigateurs CSP3 ignorent 'unsafe-inline' si un nonce est present.
-    require_once __DIR__ . '/../includes/csp_nonce.php';
-    header("Content-Security-Policy: " . csp_header_value());
+    // CSP : emise UNIQUEMENT par Apache (apache-{ssl,http}.conf.tmpl). Si on la
+    // re-emet ici, le navigateur reçoit DEUX headers Content-Security-Policy et
+    // applique l'intersection des deux policies (la plus restrictive). Quand les
+    // deux divergent legerement (ex: object-src 'none' cote Apache vs connect-src
+    // 'self' cote PHP), des features cassent silencieusement (regression
+    // v1.21.x : tabs admin_page bloques). csp_nonce.php reste dispo pour usage
+    // futur (migration progressive vers nonce).
 }
 
 // ── Permissions par defaut si absentes (session partielle) ───────────────────
