@@ -23,8 +23,7 @@ header("X-Content-Type-Options: nosniff");
 header("X-Frame-Options: DENY");
 header("X-XSS-Protection: 1; mode=block");
 header("Referrer-Policy: strict-origin-when-cross-origin");
-require_once __DIR__ . '/../includes/csp_nonce.php';
-header("Content-Security-Policy: " . csp_header_value());
+// CSP : voir commentaire dans verify.php - emise uniquement par Apache.
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

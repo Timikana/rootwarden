@@ -5,6 +5,18 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.3] - 2026-05-20 — Hotfix onglets admin + dedup CSP
+
+### Fix critique : onglets admin_page casses
+- `validateServerName()` etait declaree dans deux fichiers (`manage_servers.php:22` sans guard et `import_csv.php:12` avec guard `function_exists`). Selon l'ordre d'inclusion, un fatal `Cannot redeclare function` cassait le render de `/adm/admin_page.php` apres l'onglet Utilisateurs -> les onglets Serveurs / Acces & Permissions etaient invisibles, tout le JS apres le point d'erreur (dont `switchTab()`) n'etait pas emis.
+- Fix : ajout du guard `function_exists` aussi dans `manage_servers.php`. L'ordre d'inclusion n'a plus d'importance.
+
+### Fix : double emission CSP (Apache + PHP)
+- Apache (`apache-{ssl,http}.conf.tmpl`) et `verify.php` / `login.php` / `forgot_password.php` / `reset_password.php` emettaient **chacun** un header `Content-Security-Policy`. Quand les deux policies divergeaient (Apache : `object-src 'none'` ; PHP : `connect-src 'self'`), le navigateur appliquait l'intersection -> risque de regressions silencieuses sur features web modernes.
+- Fix : la CSP n'est plus emise que par Apache (canonical). Le helper `csp_nonce.php` reste dispo pour usage futur (migration vers nonce explicites).
+
+---
+
 ## [1.21.2] - 2026-05-20 — Patch UX cles API + rotation
 
 ### Cles API - refonte formulaire de creation

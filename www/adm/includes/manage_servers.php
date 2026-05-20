@@ -16,11 +16,18 @@ if (session_status() === PHP_SESSION_NONE) {
 /**
  * Valide un nom de serveur : uniquement lettres, chiffres, tirets et underscores (1–255 caractères).
  *
+ * Guard function_exists : ce fichier ET import_csv.php declarent la meme fonction.
+ * Si l'ordre d'inclusion fait charger import_csv.php en premier, on prend ici le
+ * fallback - sinon manage_servers.php gagne avec la version locale. Sans le guard,
+ * "Cannot redeclare function validateServerName()" fatal en plein render.
+ *
  * @param  string $name  Nom à valider.
  * @return bool
  */
-function validateServerName($name) {
-    return preg_match('/^[a-zA-Z0-9-_]{1,255}$/', $name);
+if (!function_exists('validateServerName')) {
+    function validateServerName($name) {
+        return preg_match('/^[a-zA-Z0-9-_]{1,255}$/', $name);
+    }
 }
 
 /**
