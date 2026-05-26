@@ -36,11 +36,13 @@ ENV TZ=Europe/Paris
 # cron / ntpdate : synchronisation horaire planifiée
 # libcurl / libpng / libfreetype / libjpeg : dépendances de l’extension GD
 RUN apt-get update && apt-get install -y \
-    openssl nano curl unzip git cron ntpsec-ntpdate gettext-base \
+    openssl nano curl wget unzip git cron ntpsec-ntpdate gettext-base \
     libcurl4-openssl-dev libfreetype6-dev libjpeg62-turbo-dev libpng-dev \
     imagemagick libmagickwand-dev \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
+# wget : requis par pecl install imagick >= 3.8.1 qui telecharge PHP-Parser
+# au build (curl fallback ne suit pas les redirects -> tarball 9 bytes -> KO).
 
 # Installation de l’extension imagick via PECL
 # (non disponible dans docker-php-ext-install)
