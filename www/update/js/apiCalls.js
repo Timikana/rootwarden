@@ -654,11 +654,24 @@ function appendLog(message, type = "info", serverName = null) {
     const followOn = followInput ? followInput.checked : true;
     const nearBottom = (targetContainer.scrollHeight - targetContainer.scrollTop - targetContainer.clientHeight) < 40;
 
+    // Helper : scroll programmatique marque pour que le scroll-listener
+    // ignore l'event genere (sinon flicker du toggle "Suivre").
+    const programmaticScroll = () => {
+        targetContainer._isProgrammaticScroll = true;
+        targetContainer.scrollTop = targetContainer.scrollHeight;
+        // Reset apres la prochaine frame ou le scroll event sera dispatche
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                targetContainer._isProgrammaticScroll = false;
+            });
+        });
+    };
+
     if (type === "progress") {
         const lastLine = targetContainer.lastElementChild;
         if (lastLine && lastLine.classList.contains("progress")) {
             lastLine.textContent = message;
-            if (followOn && nearBottom) targetContainer.scrollTop = targetContainer.scrollHeight;
+            if (followOn && nearBottom) programmaticScroll();
             return;
         }
     }
@@ -668,7 +681,7 @@ function appendLog(message, type = "info", serverName = null) {
     p.classList.add("log-line", type);
     targetContainer.appendChild(p);
 
-    if (followOn && nearBottom) targetContainer.scrollTop = targetContainer.scrollHeight;
+    if (followOn && nearBottom) programmaticScroll();
 }
 
 /**
@@ -732,8 +745,10 @@ function getServerLogWindow(serverName) {
 
         // Quand l'utilisateur scrolle vers le haut manuellement, on decoche
         // "Suivre" pour ne pas le yank au prochain log. S'il revient en bas,
-        // on recoche automatiquement.
+        // on recoche automatiquement. On ignore les scrolls programmatiques
+        // (declenches par l'auto-follow) qui sinon faisaient flicker le toggle.
         logWindow.addEventListener('scroll', () => {
+            if (logWindow._isProgrammaticScroll) return;
             const nearBottom = (logWindow.scrollHeight - logWindow.scrollTop - logWindow.clientHeight) < 40;
             toggleInput.checked = nearBottom;
         }, { passive: true });
