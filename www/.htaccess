@@ -1,7 +1,27 @@
-# Bloquer l'accès aux fichiers de test/debug/config
+# Desactive directory listing global (pentest 2026-05-20 : /lang/, /includes/,
+# /logs/, /security/, /services/, /ssh/, /update/, /vendor/, /adm/, /api/
+# enumeres en GET)
+Options -Indexes
+
+# Bloquer l'acces aux fichiers de test/debug/config
 <FilesMatch "(test_|\.env|\.log|\.sql|\.gz|\.bak|\.yaml|\.yml|seed_|\.gitignore|composer\.(json|lock))">
     Require all denied
 </FilesMatch>
 
-# Bloquer l'accès au dossier .git (si présent par erreur)
+# Bloquer l'acces direct aux fichiers d'include partiels (pas censes etre
+# servis en HTTP - utilises via require_once cote serveur uniquement).
+# La pentest 2026-05-20 a enumere menu.php, head.php, footer.php, db.php,
+# auth/functions.php : meme si executes par Apache et donc pas en leak de
+# source, ils peuvent emettre des warnings/HTML hors contexte qui leakent
+# des paths ou affichent du menu admin (info disclosure).
+<FilesMatch "^(db|menu|head|footer)\.php$">
+    Require all denied
+</FilesMatch>
+
+# Bloquer l'acces a version.txt (info disclosure - pentest 2026-05-20)
+<Files "version.txt">
+    Require all denied
+</Files>
+
+# Bloquer l'acces au dossier .git (si present par erreur)
 RedirectMatch 404 /\.git

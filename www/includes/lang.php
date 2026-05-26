@@ -9,8 +9,14 @@
  * Stockage : $_SESSION['lang'] + cookie 'lang' (365 jours)
  */
 
+// Whitelist stricte des langues supportees - utilisee partout pour eviter LFI
+// via $_GET, $_COOKIE ou $_SESSION (cf. pentest 2026-05-20 : vecteur cookie
+// 'lang' permettait require '/lang/<arbitraire>.php' si non valide).
+const ALLOWED_LANGS = ['fr', 'en'];
+const DEFAULT_LANG = 'fr';
+
 // Changement de langue via GET ?lang=xx
-if (isset($_GET['lang']) && in_array($_GET['lang'], ['fr', 'en'], true)) {
+if (isset($_GET['lang']) && in_array($_GET['lang'], ALLOWED_LANGS, true)) {
     if (session_status() === PHP_SESSION_ACTIVE) {
         $_SESSION['lang'] = $_GET['lang'];
     }
@@ -20,12 +26,19 @@ if (isset($_GET['lang']) && in_array($_GET['lang'], ['fr', 'en'], true)) {
 /**
  * Retourne la langue active (fr ou en).
  * Priorite : session > cookie > defaut (fr)
+ * Toute valeur hors whitelist (cookie forge, session corrompue) -> defaut.
  */
 function getLang(): string {
-    if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['lang'])) {
+    if (session_status() === PHP_SESSION_ACTIVE
+        && isset($_SESSION['lang'])
+        && in_array($_SESSION['lang'], ALLOWED_LANGS, true)) {
         return $_SESSION['lang'];
     }
-    return $_COOKIE['lang'] ?? 'fr';
+    $cookieLang = $_COOKIE['lang'] ?? '';
+    if (in_array($cookieLang, ALLOWED_LANGS, true)) {
+        return $cookieLang;
+    }
+    return DEFAULT_LANG;
 }
 
 // Charge le fichier de traduction
