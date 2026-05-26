@@ -563,10 +563,13 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
             const statusEl = document.getElementById('server-status-' + id);
             if (statusEl) statusEl.textContent = __('servers.test_in_progress');
             try {
+                // Patch A01-02 (backend) : /server_status n'accepte plus d'IP
+                // brute (anti LAN-scan). On envoie uniquement machine_id, l'IP
+                // est resolue cote Python depuis la BDD.
                 const r = await fetch(window.API_URL + '/server_status', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ip: ip, port: parseInt(port)})
+                    body: JSON.stringify({machine_id: parseInt(id, 10)})
                 });
                 const d = await r.json();
                 if (d.success && d.status === 'online') {

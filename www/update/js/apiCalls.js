@@ -132,10 +132,10 @@ function checkServerStatus() {
             return;
         }
 
-        const ip = row.getAttribute('data-ip');
-        const port = row.getAttribute('data-port') || 22;
-
-        apiFetch(`${window.API_URL}/server_status`, { ip, port: parseInt(port, 10) })
+        // Patch A01-02 (backend) : le endpoint /server_status n'accepte plus
+        // d'IP brute (anti LAN-scan). On envoie uniquement machine_id, l'IP
+        // est resolue en BDD cote Python.
+        apiFetch(`${window.API_URL}/server_status`, { machine_id: parseInt(id, 10) })
         .then(data => {
             if (data.success) {
                 const status = data.status === 'online' ? 'ONLINE' : 'OFFLINE';
