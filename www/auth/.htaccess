@@ -1,0 +1,7 @@
+# Fichiers utilitaires de www/auth/ - includes serveur uniquement, jamais
+# appeles en HTTP direct. Les pages d'auth (login.php, verify.php, logout.php,
+# etc.) restent accessibles : on ne bloque QUE les helpers.
+# Pentest 2026-05-20 : auth/functions.php enumere via menu.php/head.php.
+<FilesMatch "^(functions|password_policy|migrate_crypto|migrate_totp)\.php$">
+    Require all denied
+</FilesMatch>

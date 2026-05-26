@@ -1,0 +1,4 @@
+# Tous les fichiers de www/includes/ sont des includes serveur uniquement
+# (require_once depuis les pages PHP). Aucun acces HTTP direct legitime.
+# Pentest 2026-05-20 : /includes/ etait enumere - cf. www/.htaccess Options -Indexes.
+Require all denied
