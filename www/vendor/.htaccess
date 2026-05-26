@@ -1,0 +1,5 @@
+# Composer vendor/ : aucune raison legitime d'acceder aux libs PHP via HTTP
+# direct. Composer autoload.php est inclus serveur via require_once depuis les
+# pages PHP, pas appele en HTTP.
+# Pentest 2026-05-20 : /vendor/ enumere via directory listing.
+Require all denied

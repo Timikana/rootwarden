@@ -1,0 +1,4 @@
+# www/lang/ : fichiers de traduction (fr.php, en.php + sous-dossiers fr/, en/)
+# servis via require_once depuis www/includes/lang.php. Aucun acces HTTP direct.
+# Pentest 2026-05-20 : /lang/ enumere via directory listing.
+Require all denied

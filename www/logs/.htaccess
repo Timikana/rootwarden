@@ -1,0 +1,5 @@
+# www/logs/ : ne devrait pas exister en webroot, mais existe parfois en runtime
+# (montage volume Docker, generation au demarrage). Aucun log applicatif n'a
+# vocation a etre servi en HTTP - ils contiennent des secrets, IPs, sessions.
+# Pentest 2026-05-20 : /logs/ enumere via directory listing.
+Require all denied

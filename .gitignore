@@ -6,6 +6,7 @@ node_modules/
 package-lock.json
 vendor/
 !vendor/composer/
+!www/vendor/.htaccess
 
 # Secrets — NE JAMAIS commiter ces fichiers
 srv-docker.env
@@ -27,6 +28,7 @@ backend/ssl/
 *.log
 backend/logs/
 www/logs/
+!www/logs/.htaccess
 
 # Backups — generes automatiquement
 backend/backups/
