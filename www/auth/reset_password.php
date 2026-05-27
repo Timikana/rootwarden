@@ -205,30 +205,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
 
             <?php elseif ($tokenValid): ?>
                 <!-- Formulaire nouveau mot de passe -->
-                <form method="POST" action="reset_password.php?uid=<?= (int)$uid ?>&token=<?= htmlspecialchars($token) ?>">
+                <form method="POST" id="reset-form" action="reset_password.php?uid=<?= (int)$uid ?>&token=<?= htmlspecialchars($token) ?>">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
 
                     <div class="mb-4">
                         <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
                             <?= t('reset.new_password') ?>
                         </label>
-                        <input type="password" id="password" name="password"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg
-                                      focus:outline-none focus:ring-2 focus:ring-blue-500
-                                      focus:border-transparent transition-colors"
-                               autocomplete="new-password" required minlength="15">
+                        <div class="relative">
+                            <input type="password" id="password" name="password"
+                                   class="reset-pw-input w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg
+                                          focus:outline-none focus:ring-2 focus:ring-blue-500
+                                          focus:border-transparent transition-colors"
+                                   autocomplete="new-password" required minlength="15">
+                            <button type="button" class="reset-pw-toggle absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    data-target="password" aria-label="<?= t('reset.toggle_visibility') ?>" title="<?= t('reset.toggle_visibility') ?>">&#128065;</button>
+                        </div>
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         <label for="password_confirm" class="block text-sm font-medium text-gray-700 mb-1">
                             <?= t('reset.confirm_password') ?>
                         </label>
-                        <input type="password" id="password_confirm" name="password_confirm"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg
-                                      focus:outline-none focus:ring-2 focus:ring-blue-500
-                                      focus:border-transparent transition-colors"
-                               autocomplete="new-password" required minlength="15">
+                        <div class="relative">
+                            <input type="password" id="password_confirm" name="password_confirm"
+                                   class="reset-pw-input w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg
+                                          focus:outline-none focus:ring-2 focus:ring-blue-500
+                                          focus:border-transparent transition-colors"
+                                   autocomplete="new-password" required minlength="15">
+                            <button type="button" class="reset-pw-toggle absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    data-target="password_confirm" aria-label="<?= t('reset.toggle_visibility') ?>" title="<?= t('reset.toggle_visibility') ?>">&#128065;</button>
+                        </div>
                     </div>
+
+                    <!-- Indicateur match/mismatch en temps reel -->
+                    <p id="reset-match-indicator" class="text-xs mb-3 h-4" aria-live="polite"></p>
 
                     <p class="text-xs text-gray-500 mb-4">
                         <?= t('profile.password_policy_hint') ?>
@@ -241,6 +252,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
                         <?= t('reset.submit') ?>
                     </button>
                 </form>
+
+                <script>
+                    (function () {
+                        const pw = document.getElementById('password');
+                        const pwc = document.getElementById('password_confirm');
+                        const indicator = document.getElementById('reset-match-indicator');
+                        const form = document.getElementById('reset-form');
+                        const T = {
+                            match: <?= json_encode(t('reset.match_ok')) ?>,
+                            mismatch: <?= json_encode(t('reset.match_ko')) ?>,
+                            trimWarning: <?= json_encode(t('reset.trim_warning')) ?>
+                        };
+
+                        // Toggle visibilite par champ
+                        document.querySelectorAll('.reset-pw-toggle').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const input = document.getElementById(btn.dataset.target);
+                                if (!input) return;
+                                input.type = input.type === 'password' ? 'text' : 'password';
+                            });
+                        });
+
+                        // Trim auto avant submit + indicateur si trim a eu lieu
+                        let hadTrim = false;
+                        function trimIfNeeded(input) {
+                            const v = input.value;
+                            const trimmed = v.replace(/^\s+|\s+$/g, '');
+                            if (v !== trimmed) {
+                                input.value = trimmed;
+                                hadTrim = true;
+                            }
+                        }
+
+                        // Indicateur temps reel + bordure
+                        function updateMatchIndicator() {
+                            const v1 = pw.value;
+                            const v2 = pwc.value;
+                            if (!v1 || !v2) {
+                                indicator.textContent = '';
+                                pwc.classList.remove('border-green-500', 'border-red-500');
+                                return;
+                            }
+                            if (v1 === v2) {
+                                indicator.textContent = T.match;
+                                indicator.className = 'text-xs mb-3 h-4 text-green-600';
+                                pwc.classList.remove('border-red-500');
+                                pwc.classList.add('border-green-500');
+                            } else {
+                                indicator.textContent = T.mismatch;
+                                indicator.className = 'text-xs mb-3 h-4 text-red-600';
+                                pwc.classList.remove('border-green-500');
+                                pwc.classList.add('border-red-500');
+                            }
+                        }
+                        pw.addEventListener('input', updateMatchIndicator);
+                        pwc.addEventListener('input', updateMatchIndicator);
+
+                        // Trim au paste (gere le cas Bitwarden/KeePass qui ajoute parfois \n)
+                        [pw, pwc].forEach(inp => {
+                            inp.addEventListener('paste', () => {
+                                setTimeout(() => { trimIfNeeded(inp); updateMatchIndicator(); }, 0);
+                            });
+                        });
+
+                        // Submit : trim final + warning si on a du nettoyer
+                        form.addEventListener('submit', (e) => {
+                            trimIfNeeded(pw);
+                            trimIfNeeded(pwc);
+                            updateMatchIndicator();
+                            if (pw.value !== pwc.value) {
+                                e.preventDefault();
+                                indicator.textContent = T.mismatch;
+                                indicator.className = 'text-xs mb-3 h-4 text-red-600';
+                            } else if (hadTrim) {
+                                // Pas bloquant, juste informatif au prochain affichage
+                                console.info(T.trimWarning);
+                            }
+                        });
+                    })();
+                </script>
 
             <?php else: ?>
                 <!-- Token invalide / expire -->
