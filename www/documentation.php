@@ -888,6 +888,29 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             <!-- ────────────────────────────────────────── -->
             <!-- 9e. Session & timeout                     -->
             <!-- ────────────────────────────────────────── -->
+            <!-- Reverse-proxy : URL publique pour les emails -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="reverse-proxy" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Reverse-proxy &amp; URL publique</h2>
+                <p class="text-sm mb-3">
+                    Quand RootWarden est expose derriere un reverse-proxy (HAProxy, nginx, Cloudflare, etc.), le hostname et le port
+                    vus par les utilisateurs finaux differet de l'URL interne du container. Les liens generes dans les <strong>emails sortants</strong>
+                    (reset password, notifications) doivent referencer l'URL <em>publique</em>, sinon les destinataires tombent sur des URLs inaccessibles.
+                </p>
+                <h3 class="font-semibold mb-2">Configuration</h3>
+                <div class="code-block mb-3"># srv-docker.env
+URL_HTTPS=https://lagoon.dom-magiline.local:8443     # URL interne (frontend JS)
+URL_PUBLIC_HTTPS=https://cleopatre-ssh.magiline.fr   # URL publique (emails)</div>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>URL_HTTPS</strong> : utilise par le frontend JS pour les appels XHR. Doit correspondre a l'URL que les users tapent dans leur navigateur.</li>
+                    <li><strong>URL_PUBLIC_HTTPS</strong> <em>(optionnel)</em> : si defini, sert pour construire les liens dans les emails. Sinon fallback sur <code>URL_HTTPS</code> (retrocompat).</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Quand le definir</h3>
+                <p class="text-sm">Uniquement si l'URL publique vue par les destinataires d'emails differe de <code>URL_HTTPS</code> (hostname et/ou port). Cas typique : HAProxy expose en :443 standard alors que le container PHP ecoute en :8443 interne.</p>
+                <p class="text-xs text-gray-500 mt-2">Code : <code>www/auth/forgot_password.php</code></p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <section id="session" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
                 <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Session & timeout</h2>
                 <p class="text-sm mb-3">

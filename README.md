@@ -197,6 +197,8 @@ docker-compose --profile preprod up -d
 | `SESSION_TIMEOUT` | Timeout session en minutes (défaut 30) |
 | `SSL_MODE` | auto / custom / disabled |
 | `INIT_SUPERADMIN_PASSWORD` | Mot de passe initial superadmin (vide = auto-genere, recommande) |
+| `URL_HTTPS` | URL interne (frontend JS) - ex `https://lagoon:8443` |
+| `URL_PUBLIC_HTTPS` | URL publique pour les emails (optionnel, si reverse-proxy) - ex `https://cleopatre-ssh.magiline.fr` |
 
 Voir `srv-docker.env.example` pour la liste complète.
 

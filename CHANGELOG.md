@@ -5,6 +5,55 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.7] - 2026-05-27 — Hotfixes pentest + reverse-proxy + UX
+
+### Fix : reset password via reverse-proxy (HAProxy)
+- Symptome (LAGOON) : email de reset mdp contient `https://cleopatre-ssh.magiline.fr:8443/auth/reset_password.php?...` mais l'HAProxy public ecoute sur **443**, pas 8443. L'utilisateur tombe sur `Could not connect to server` au TCP.
+- Cause : `URL_HTTPS` servait pour le frontend JS (URL interne `lagoon:8443`) ET pour les emails (qui doivent referencer l'URL publique). Ces deux usages divergent des qu'il y a un reverse-proxy.
+- Fix : nouvelle variable d'env optionnelle `URL_PUBLIC_HTTPS`. Si definie, `forgot_password.php` l'utilise pour construire le lien email. Fallback sur `URL_HTTPS` si absente (retrocompat).
+- Deploiement : editer `srv-docker.env` -> `URL_PUBLIC_HTTPS=https://cleopatre-ssh.magiline.fr` (sans port si HAProxy ecoute en 443), puis `docker compose restart php`.
+
+### Fix : unlock_user laissait le rate-limit IP actif
+- Symptome : superadmin clique "Deverrouiller" sur un compte lock 120 min -> l'user retombe sur "Trop de tentatives, ressayer dans 10 minutes" sans pouvoir se logger.
+- Cause : `unlock_user.php` resetait `users.failed_attempts` + `users.locked_until` mais ne touchait pas `login_attempts` (table separee qui sert au rate-limit IP-based 5 echecs / 10 min ajoute par patch A07-NEW-01).
+- Fix : purge des tentatives echouees du username concerne (`DELETE FROM login_attempts WHERE username = ? AND success = 0`). On garde les attempts d'autres users sur la meme IP (NAT partage) intactes.
+
+### Fix : toggle "Suivre" flicker sur /update/
+- Symptome : checkbox 'Suivre' se decochait/recochait rapidement quand des logs arrivaient en continu.
+- Cause : auto-scroll programmatique declenche un event `scroll` qui fait recalculer `nearBottom`. Pendant la frame de stabilisation du layout, le ratio scrollHeight/scrollTop/clientHeight peut momentanement ne plus correspondre -> toggle.checked = false -> frame suivante = true -> flicker.
+- Fix : flag `_isProgrammaticScroll` set juste avant l'auto-scroll, reset apres 2 raf. Le scroll-listener bail out si flag actif. Scrolls user (wheel, touch, scrollbar drag) non affectes.
+
+### Fix : /server_status retournait 400 apres patch A01-02
+- Symptome : clic sur "Tester" un serveur dans l'admin -> 400 `machine_id requis`.
+- Cause : 2 sites d'appel JS (`www/update/js/apiCalls.js`, `www/adm/includes/manage_servers.php`) envoyaient encore `{ip, port}` alors que le patch securite A01-02 a modifie `/server_status` pour exiger `machine_id` (anti LAN-scan).
+- Fix : harmonisation JS sur `{machine_id}`. Audit des autres endpoints `@require_machine_access` : RAS.
+
+### Fix : CI build PHP/Apache
+- Symptome : `pecl install imagick` echoue `wget: not found` puis `Failed to extract PHP-Parser tarball`.
+- Cause : imagick 3.8.1 (publie 2026-05-26) telecharge PHP-Parser via wget au build. L'image `php:8.4-apache` n'embarque pas wget.
+- Fix : ajout `wget` aux deps apt-get install du Dockerfile.
+
+---
+
+## [1.21.6] - 2026-05-26 — Backend auto-bootstrap api_key
+
+### Fix critique : 401 persistant apres maj.sh
+- Symptome : sur LAGOON, malgre le hotfix v1.21.4/v1.21.5 dans `maj.sh`, le backend Python continuait a logger `API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP non active (fail-closed)`. Cause possible : `maj.sh` execute mais avec une version anterieure du script (etape 5c absente), ou container `rootwarden_db` down au moment du check.
+- Fix : deplacement du bootstrap legacy api_key de `maj.sh` (etape shell) VERS le backend Python lui-meme (`backend/bootstrap_api_key.py`). A chaque demarrage du container `rootwarden_python`, on verifie qu'une cle active matche le SHA-256 de `Config.API_KEY` ; sinon on INSERT `proxy-internal-legacy-bootstrap-YYYYMMDD`.
+- Avantages : plus de dependance shell, plus besoin du flag `API_KEY_BOOTSTRAP=1`, idempotent, best-effort (ne bloque pas le boot).
+- L'etape 5c de `maj.sh` reste en ceinture-bretelle.
+
+---
+
+## [1.21.5] - 2026-05-26 — Hotfix bootstrap legacy (suite v1.21.4)
+
+### Fix : bootstrap saute si la table contient deja des cles
+- Symptome : sur certains serveurs, `maj.sh` etape 5c ne bootstrappait pas car la table `api_keys` contenait deja des cles (scopees, ou une legacy revoquee) -> 401 persistant.
+- Cause : la condition `COUNT(*) = 0` (table vide) loupait le cas ou aucune cle ACTIVE ne matche le hash de l'env API_KEY.
+- Fix : passage a `COUNT(*) WHERE key_hash = sha256(env) AND revoked_at IS NULL`. Insertion sous nom date `proxy-internal-legacy-bootstrap-YYYYMMDD` pour eviter collision UNIQUE avec une eventuelle ancienne legacy revoquee laissee en base pour audit.
+
+---
+
 ## [1.21.4] - 2026-05-20 — Hotfix bootstrap legacy API key
 
 ### Fix critique : 401 sur toutes les routes apres upgrade prod
