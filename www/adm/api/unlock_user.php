@@ -58,10 +58,19 @@ try {
     $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
         ->execute([$user_id]);
 
+    // Bug 2026-05-26 : sans purge de login_attempts, l'user restait bloque
+    // par le rate-limit IP-based (5 echecs / 10 min) meme apres unlock du
+    // compte. On purge les tentatives echouees lui appartenant.
+    $purgeStmt = $pdo->prepare(
+        "DELETE FROM login_attempts WHERE username = ? AND success = 0"
+    );
+    $purgeStmt->execute([$u['name']]);
+    $purged = $purgeStmt->rowCount();
+
     $actor_id = (int)($_SESSION['user_id'] ?? 0);
     audit_log_raw($pdo, $actor_id, sprintf(
-        "[security] Deverrouillage manuel du compte %s (id=%d, %d echecs effaces)",
-        $u['name'], $user_id, (int)$u['failed_attempts']
+        "[security] Deverrouillage manuel du compte %s (id=%d, %d echecs effaces, %d login_attempts purgees)",
+        $u['name'], $user_id, (int)$u['failed_attempts'], $purged
     ));
 
     echo json_encode([
@@ -70,6 +79,7 @@ try {
         'user_name' => $u['name'],
         'was_locked' => !empty($u['locked_until']),
         'cleared_attempts' => (int)$u['failed_attempts'],
+        'purged_login_attempts' => $purged,
     ]);
 } catch (\Exception $e) {
     error_log('unlock_user.php: ' . $e->getMessage());
