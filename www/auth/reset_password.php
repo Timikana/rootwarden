@@ -216,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg
                                       focus:outline-none focus:ring-2 focus:ring-blue-500
                                       focus:border-transparent transition-colors"
-                               autocomplete="new-password" required minlength="8">
+                               autocomplete="new-password" required minlength="15">
                     </div>
 
                     <div class="mb-4">
@@ -227,11 +227,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg
                                       focus:outline-none focus:ring-2 focus:ring-blue-500
                                       focus:border-transparent transition-colors"
-                               autocomplete="new-password" required minlength="8">
+                               autocomplete="new-password" required minlength="15">
                     </div>
 
                     <p class="text-xs text-gray-500 mb-4">
-                        <?= t('reset.min_chars') ?>
+                        <?= t('profile.password_policy_hint') ?>
                     </p>
 
                     <button type="submit"
