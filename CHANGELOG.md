@@ -5,6 +5,24 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.8] - 2026-05-27 — UX reset password : indicateur match + toggle visibilite
+
+### Feat : form reset password tolerant aux paste foireux
+- Contexte : un user a rapporte qu'une passphrase de 38 chars (toutes les classes OK) etait rejetee a tort. Investigation : `passwordPolicyValidateAll` retournait `null` (aucune raison de rejeter) pour ce password sur l'user_id concerne. Le message affiche etait en realite `reset.error_mismatch` -> le copier-coller depuis Bitwarden/KeePass ajoute parfois un `\n` ou un espace en fin d'un des 2 champs, rendant les saisies differentes cote serveur.
+- Fix UX (cf. `www/auth/reset_password.php`) :
+  - Indicateur temps reel sous les 2 champs (vert "correspondent" / rouge "differents") avec bordure coloree
+  - Toggle 👁 par champ pour reveler le mot de passe et le verifier visuellement
+  - Trim auto au paste et au submit (`^\s+|\s+$`) pour gerer les newlines/spaces invisibles
+  - Submit bloque cote client si mismatch apres trim -> evite un roundtrip serveur inutile
+- Nouvelles cles i18n FR + EN : `reset.match_ok` / `match_ko` / `toggle_visibility` / `trim_warning`
+
+### Fix : alignement hint UX sur la vraie policy serveur
+- HTML `minlength="8"` -> `15` (sur password et password_confirm)
+- Hint affiche `profile.password_policy_hint` (detaille les 4 classes) au lieu de `reset.min_chars` (qui disait "Minimum 8 caracteres")
+- Update i18n `reset.min_chars` et `reset.error_short` FR/EN avec la vraie regle
+
+---
+
 ## [1.21.7] - 2026-05-27 — Hotfixes pentest + reverse-proxy + UX
 
 ### Fix : reset password via reverse-proxy (HAProxy)

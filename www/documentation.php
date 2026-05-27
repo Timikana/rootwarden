@@ -886,6 +886,32 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Reset password : UX tolerante aux paste -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="reset-password-ux" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Form reset password : UX</h2>
+                <p class="text-sm mb-3">
+                    Depuis v1.21.8, le formulaire <code>auth/reset_password.php</code> integre une logique JS pour eviter les
+                    rejets opaques cote serveur quand l'utilisateur colle un mot de passe depuis un gestionnaire (Bitwarden,
+                    KeePass, 1Password) qui ajoute parfois un <code>\n</code> ou un espace en fin de selection.
+                </p>
+                <h3 class="font-semibold mb-2">Comportements client</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Indicateur match temps reel</strong> : message vert (correspondent) ou rouge (differents) sous le 2eme champ + bordure coloree, mis a jour a chaque keystroke.</li>
+                    <li><strong>Toggle visibilite</strong> : bouton 👁 par champ pour revealer le mdp et le verifier visuellement (utile en cas de doute sur le paste).</li>
+                    <li><strong>Trim auto</strong> : au paste et au submit, regex <code>^\s+|\s+$</code> nettoie les whitespaces invisibles (newline, tab, espace).</li>
+                    <li><strong>Submit bloque cote client</strong> : si les 2 champs different apres trim, le form ne part pas -> pas de roundtrip serveur ni de message d'erreur generique.</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Securite</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Toutes les chaines i18n inserees dans le JS inline passent par <code>json_encode()</code> -&gt; pas de XSS.</li>
+                    <li>Le toggle visibilite cote client n'affecte pas le hash bcrypt cote serveur (cost 12, BCRYPT_COST).</li>
+                    <li>Validation serveur reste autoritative : <code>passwordPolicyValidateAll()</code> (complexite 15 chars + 4 classes, history non-reuse, HIBP optionnel).</li>
+                </ul>
+                <p class="text-xs text-gray-500 mt-2">Code : <code>www/auth/reset_password.php</code>, <code>www/auth/password_policy.php</code>. i18n : <code>reset.match_ok/match_ko/toggle_visibility/trim_warning</code></p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- 9e. Session & timeout                     -->
             <!-- ────────────────────────────────────────── -->
             <!-- Reverse-proxy : URL publique pour les emails -->
