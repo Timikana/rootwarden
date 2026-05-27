@@ -94,8 +94,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $stmt->execute([$user['id'], $tokenHash, $expiresAt, $ip]);
 
-                // Construire l'URL de reset (URL_HTTPS = URL publique du serveur)
-                $baseUrl = rtrim(getenv('URL_HTTPS') ?: 'https://localhost:8443', '/');
+                // Construire l'URL de reset. Priorite : URL_PUBLIC_HTTPS (defini
+                // quand un reverse-proxy/HAProxy expose l'app sur un hostname/port
+                // different de URL_HTTPS interne) > URL_HTTPS > fallback localhost.
+                // Cf. bug 2026-05-27 : LAGOON envoyait des liens https://...:8443
+                // alors que l'HAProxy public ecoute sur 443 -> 'Could not connect'.
+                $baseUrl = rtrim(
+                    getenv('URL_PUBLIC_HTTPS')
+                        ?: (getenv('URL_HTTPS') ?: 'https://localhost:8443'),
+                    '/'
+                );
                 $resetUrl = "{$baseUrl}/auth/reset_password.php?uid={$user['id']}&token={$token}";
 
                 // Envoyer l'email
