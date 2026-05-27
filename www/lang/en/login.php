@@ -35,6 +35,7 @@ return [
     'reset.match_ko' => 'Passwords differ.',
     'reset.toggle_visibility' => 'Show / hide password',
     'reset.trim_warning' => 'Leading/trailing whitespace stripped automatically.',
+    'reset.revealed_autohide' => 'Password revealed temporarily, hidden in 8 seconds or when window loses focus.',
     'reset.error_short' => 'Password must be at least 15 characters.',
     'reset.sign_in' => 'Sign in',
     'reset.error_csrf' => 'Invalid session. Please reload the page.',

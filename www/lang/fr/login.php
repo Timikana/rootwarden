@@ -35,6 +35,7 @@ return [
     'reset.match_ko' => 'Les mots de passe sont differents.',
     'reset.toggle_visibility' => 'Afficher / masquer le mot de passe',
     'reset.trim_warning' => 'Espaces en debut/fin de saisie supprimes automatiquement.',
+    'reset.revealed_autohide' => 'Mot de passe affiche temporairement, masque dans 8 secondes ou si vous changez de fenetre.',
     'reset.error_short' => 'Le mot de passe doit contenir au moins 15 caracteres.',
     'reset.sign_in' => 'Se connecter',
     'reset.error_csrf' => 'Session invalide. Veuillez recharger la page.',
