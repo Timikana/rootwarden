@@ -907,6 +907,13 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                     <li>Toutes les chaines i18n inserees dans le JS inline passent par <code>json_encode()</code> -&gt; pas de XSS.</li>
                     <li>Le toggle visibilite cote client n'affecte pas le hash bcrypt cote serveur (cost 12, BCRYPT_COST).</li>
                     <li>Validation serveur reste autoritative : <code>passwordPolicyValidateAll()</code> (complexite 15 chars + 4 classes, history non-reuse, HIBP optionnel).</li>
+                    <li><strong>Durcissement v1.21.9</strong> (anti shoulder-surfing) : le mdp revelé via 👁 se re-masque automatiquement
+                        <ul class="list-disc list-inside ml-5 mt-1 space-y-0.5">
+                            <li>apres <strong>8 secondes</strong> (timeout reinitialise si reclic)</li>
+                            <li>immediatement si l'onglet n'est plus visible (<code>visibilitychange</code>)</li>
+                            <li>immediatement si la fenetre perd le focus (<code>window.blur</code>)</li>
+                        </ul>
+                    </li>
                 </ul>
                 <p class="text-xs text-gray-500 mt-2">Code : <code>www/auth/reset_password.php</code>, <code>www/auth/password_policy.php</code>. i18n : <code>reset.match_ok/match_ko/toggle_visibility/trim_warning</code></p>
             </section>

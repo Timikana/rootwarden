@@ -5,6 +5,26 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.21.9] - 2026-05-27 — Durcissement toggle visibilite mdp (anti shoulder-surfing)
+
+### Fix securite (defense en profondeur) : auto-hide du toggle 👁
+- Contexte : le toggle 👁 ajoute en v1.21.8 exposait le mot de passe en DOM (`type=text`) jusqu'a ce que l'utilisateur reclique. Risque shoulder-surfing si l'user laisse la page ouverte ou alt-tab vers une autre app en oubliant de re-masquer.
+- Fix : 3 mecanismes complementaires d'auto-masquage cote client :
+  - **Timeout 8s** : apres clic sur 👁, le mdp se re-masque automatiquement apres 8 secondes (replace tout timer existant si reclic)
+  - **visibilitychange** : mask immediat si l'onglet n'est plus visible (Tab change, minimisation)
+  - **window.blur** : mask immediat si la fenetre perd le focus (alt-tab, autre app)
+- Aucun impact serveur, le hash bcrypt reste inchange. Pas de regression OWASP.
+- Nouvelle cle i18n : `reset.revealed_autohide` (annonce accessibility aria-label).
+
+### Audit OWASP Top 10 du patch
+- A01 Access Control : aucun changement de logique d'authn/authz
+- A02 Crypto : bcrypt cost BCRYPT_COST (12) preserve
+- A03 Injection : i18n via `json_encode()` (XSS-safe)
+- A05 Misconfig : compatible CSP existante (`script-src 'self' 'unsafe-inline'`)
+- A07 Auth : pas de regression sur le token TTL ni la policy serveur
+
+---
+
 ## [1.21.8] - 2026-05-27 — UX reset password : indicateur match + toggle visibilite
 
 ### Feat : form reset password tolerant aux paste foireux

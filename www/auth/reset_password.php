@@ -262,17 +262,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
                         const T = {
                             match: <?= json_encode(t('reset.match_ok')) ?>,
                             mismatch: <?= json_encode(t('reset.match_ko')) ?>,
-                            trimWarning: <?= json_encode(t('reset.trim_warning')) ?>
+                            trimWarning: <?= json_encode(t('reset.trim_warning')) ?>,
+                            revealedHint: <?= json_encode(t('reset.revealed_autohide')) ?>
                         };
 
-                        // Toggle visibilite par champ
+                        // ── Toggle visibilite avec durcissement anti shoulder-surfing ──
+                        // Auto-hide apres REVEAL_TIMEOUT_MS (8s) + mask sur perte de focus
+                        // (document.visibilitychange + window.blur). Le but : limiter la
+                        // fenetre temporelle d'exposition du mdp en clair en DOM.
+                        const REVEAL_TIMEOUT_MS = 8000;
+                        const revealTimers = new Map(); // input -> setTimeout id
+
+                        function maskInput(input) {
+                            input.type = 'password';
+                            input.setAttribute('aria-live', 'polite');
+                            const tid = revealTimers.get(input);
+                            if (tid) { clearTimeout(tid); revealTimers.delete(input); }
+                        }
+
+                        function maskAllRevealed() {
+                            [pw, pwc].forEach(inp => {
+                                if (inp.type === 'text') maskInput(inp);
+                            });
+                        }
+
                         document.querySelectorAll('.reset-pw-toggle').forEach(btn => {
                             btn.addEventListener('click', () => {
                                 const input = document.getElementById(btn.dataset.target);
                                 if (!input) return;
-                                input.type = input.type === 'password' ? 'text' : 'password';
+                                if (input.type === 'password') {
+                                    input.type = 'text';
+                                    input.setAttribute('aria-label', T.revealedHint);
+                                    // Auto-hide apres timeout, en remplacant tout timer existant
+                                    const prev = revealTimers.get(input);
+                                    if (prev) clearTimeout(prev);
+                                    const tid = setTimeout(() => maskInput(input), REVEAL_TIMEOUT_MS);
+                                    revealTimers.set(input, tid);
+                                } else {
+                                    maskInput(input);
+                                }
                             });
                         });
+
+                        // Mask immediat si on quitte l'onglet (Tab change / minimisation)
+                        document.addEventListener('visibilitychange', () => {
+                            if (document.hidden) maskAllRevealed();
+                        });
+
+                        // Mask immediat si la fenetre perd le focus (alt-tab, autre app)
+                        window.addEventListener('blur', maskAllRevealed);
 
                         // Trim auto avant submit + indicateur si trim a eu lieu
                         let hadTrim = false;
