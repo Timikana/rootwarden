@@ -174,6 +174,8 @@ docker-compose --profile preprod up -d
 | `SESSION_TIMEOUT` | Session timeout in minutes (default 30) |
 | `SSL_MODE` | auto / custom / disabled |
 | `INIT_SUPERADMIN_PASSWORD` | Initial superadmin password (empty = auto-generated, recommended) |
+| `URL_HTTPS` | Internal URL (frontend JS) - e.g. `https://prod:8443` |
+| `URL_PUBLIC_HTTPS` | Public URL for outgoing emails (optional, behind reverse-proxy) - e.g. `https://portail.example.com` |
 
 See `srv-docker.env.example` for the full list.
 
