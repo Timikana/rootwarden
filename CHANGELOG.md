@@ -5,6 +5,52 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.22.2] - 2026-05-31 — Pattern desired/actual state + UI grossie
+
+### Architecture : resolution de la double source de verite
+
+Feedback user 2026-05-31 apres v1.22.1 : "maintenant dit moi si c'est logique pour toi?".
+Audit honnete : la v1.22.1 introduisait une double source de verite entre
+`user_machine_access.sudo_preset` (configure depuis admin) et `server_user_sudo_policies`
+(ecrit par la page server_user_policies.php) **sans pont entre les deux**.
+
+**Resolution : pattern desired/actual state (infra-as-code classique)**
+
+| Table | Role | Qui ecrit |
+|---|---|---|
+| `user_machine_access.sudo_preset` | **Desired state** (intention admin) | Dropdown onglet Acces |
+| `server_user_sudo_policies` | **Actual state** (etat reel deploye) | configure_servers.py au deploy |
+| `policy_deployments` | **Audit trail** | configure_servers.py au deploy |
+
+#### Implementation
+- `backend/ssh_utils.py::load_data_from_db()` : enrichi pour charger
+  `sudo_preset/nopasswd/runas/custom_rules` depuis `user_machine_access`. Le dict
+  user retourne maintenant `sudo_policies = { machine_id: {preset, nopasswd, runas, custom_rules} }`.
+- `backend/configure_servers.py::add_to_sudoers()` : refactor pour accepter un
+  `policy` dict. Rendu via `sudo_manager.render_policy()` + visudo -cf avant mv
+  atomique (compatible canal SSH root via `execute_command_as_root`). Fallback
+  historique NOPASSWD ALL si pas de policy fournie (retrocompat bool `users.sudo`).
+- `configure_users()` : lit `user.sudo_policies.get(machine_id)` pour la machine
+  en cours. Priorite : preset configure > bool legacy `users.sudo` > rien.
+
+#### Comportement effectif
+- Configurer dropdown 'apt_only' dans onglet Acces -> au prochain deploy SSH,
+  le sudoers cible contient les bonnes lignes (visudo valide).
+- Configurer 'none' -> le fichier sudoers est supprime au prochain deploy.
+- Aucun preset configure + `users.sudo=1` (legacy) -> NOPASSWD ALL comme v1.21.x.
+
+### Fix UX : interface grossie
+Feedback user "je trouve ca petit pour info..." apres review v1.22.1 :
+- Layout serveurs : `flex-wrap` horizontal -> `flex-col` vertical (1 serveur par ligne)
+- Texte general : `text-[10px]` -> `text-xs` / `text-sm`
+- Bloc sudo dropdown : conteneur avec bg + border + padding + icone cadenas
+- Select sudo : `min-w-[220px]` au lieu de tres etroit
+- Checkbox NOPASSWD : `h-4 w-4` + label gras (au lieu de h-3 w-3)
+- Lien 'Avance' : avec icone fleche + push a droite (`ml-auto`)
+- Badge sudo sur toggle serveur : `rounded-full` + `font-semibold`
+
+---
+
 ## [1.22.1] - 2026-05-31 — Sudo par (user x serveur) integre dans onglet Acces
 
 ### Feat : choix du preset sudo lors de l'attribution serveur
