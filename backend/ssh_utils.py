@@ -1184,15 +1184,19 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
         cursor.execute("SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, service_account_deployed FROM machines")
         machines = cursor.fetchall()
 
-        # Jointure users -> user_machine_access
+        # Jointure users -> user_machine_access (avec preset sudo par machine v1.22.0+)
         cursor.execute("""
-            SELECT 
-                u.id AS user_id, 
+            SELECT
+                u.id AS user_id,
                 u.name AS user_name,
                 u.active,
                 u.sudo,
                 u.ssh_key,
-                uma.machine_id
+                uma.machine_id,
+                uma.sudo_preset,
+                uma.sudo_nopasswd,
+                uma.sudo_runas,
+                uma.sudo_custom_rules
             FROM users u
             LEFT JOIN user_machine_access uma ON u.id = uma.user_id
         """)
@@ -1201,7 +1205,7 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
         cursor.close()
         db.close()
 
-        # Regrouper par user_id
+        # Regrouper par user_id - on stocke aussi le preset sudo par machine (desired state)
         users_dict = {}
         for record in user_machines:
             uid = record['user_id']
@@ -1211,10 +1215,18 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
                     "active": record['active'],
                     "sudo": record['sudo'],
                     "ssh_key": record['ssh_key'],
-                    "allowed_servers": []
+                    "allowed_servers": [],
+                    "sudo_policies": {},  # v1.22.2 : machine_id -> {preset, nopasswd, runas, custom_rules}
                 }
-            if record['machine_id']:
-                users_dict[uid]['allowed_servers'].append(record['machine_id'])
+            mid = record.get('machine_id')
+            if mid:
+                users_dict[uid]['allowed_servers'].append(mid)
+                users_dict[uid]['sudo_policies'][mid] = {
+                    'preset': record.get('sudo_preset') or 'none',
+                    'nopasswd': bool(record.get('sudo_nopasswd')),
+                    'runas': record.get('sudo_runas') or 'root',
+                    'custom_rules': record.get('sudo_custom_rules') or '',
+                }
 
         users = list(users_dict.values())
 
