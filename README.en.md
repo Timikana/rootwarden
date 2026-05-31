@@ -1,10 +1,19 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.21.2
+# RootWarden v1.22.2
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
 > systemd services, sshd_config audit and CVE vulnerabilities - from a single interface.
+
+## 🆕 v1.22.x — Per-user sudo + SFTP policies
+
+- **Fine-grained sudo per (user × server)**: dropdown of 7 presets (apt_only, restart_services, read_logs, systemctl_specific, all_nopasswd, custom, none) directly in `Administration → Access & Permissions`. NOPASSWD inline. "Advanced →" link to full UI.
+- **Per-user SFTP policies** (`/adm/server_user_policies.php`): ChrootDirectory, ForceCommand internal-sftp, AllowTcpForwarding, AllowAgentForwarding, X11Forwarding per Linux account.
+- **Systematic validation**: `visudo -cf` (sudoers) + `sshd -t` (sshd_config) BEFORE atomic `mv`. `.rwbak` backup with auto-restore on reload failure.
+- **Audit + 1-click rollback**: `policy_deployments` table with policy_snapshot JSON + before/after content. "Restore this version" button from history.
+- **Desired/actual state pattern** (v1.22.2): `user_machine_access.sudo_preset` = admin intent, applied on next SSH deploy via `configure_servers.py::add_to_sudoers()` rendered by `sudo_manager.render_policy()`.
+- **Step-up 2FA** on deploy/remove/rollback (action `policy_action`, 15 min freshness). HMAC audit_log chain with auto-scrub if content > 200 chars.
 
 ## What's new in v1.21.2 (API keys UX patch)
 

@@ -98,6 +98,40 @@ Addition a `.github/workflows/ci.yml` des scans manquants.
 - **trivy-fs** : scan repo (requirements, composer.lock, Dockerfiles, secrets, misconfig).
 - `auto-tag` depend de tous ces jobs → une CVE critique empeche le tag de release.
 
+### Politiques sudo + SFTP par utilisateur (v1.22.0+)
+
+Administration fine des droits sudo et acces SFTP/SSH par compte Linux distant.
+
+- 3 nouvelles tables (mig 048-050) : `server_user_sudo_policies`, `server_user_sftp_policies`, `policy_deployments`
+- Module backend `backend/sudo_manager.py` : 5 presets metier (apt_only, restart_services, read_logs, systemctl_specific, all_nopasswd) + custom. Validation `visudo -cf` avant `mv` atomique.
+- Module backend `backend/sftp_manager.py` : Match User block dans `/etc/ssh/sshd_config.d/`. Validation `sshd -t` + backup .rwbak + restoration auto si reload echoue.
+- Blueprint `backend/routes/policies.py` : 9 routes superadmin (deploy/audit/remove/rollback/list/history) avec @require_role(3).
+- UI dediee `www/adm/server_user_policies.php` : 3 onglets (Sudo / SFTP / Historique), rollback 1-clic depuis l'audit trail.
+- Hardening : step-up 2FA via `api_proxy.php` sur deploy/remove/rollback (action `policy_action`, 15 min).
+
+#### Pattern desired/actual state (v1.22.2+)
+
+Resolution de la double source de verite entre desired (`user_machine_access`) et actual (`server_user_sudo_policies`) :
+
+```
+admin --[dropdown Acces]--> user_machine_access.sudo_preset      [DESIRED]
+                                            |
+                                            v
+                            configure_servers.py au deploy
+                            ssh_utils.load_data_from_db() lit le desired
+                            sudo_manager.render_policy() + visudo -cf
+                                            |
+                                            v
+                          /etc/sudoers.d/<user> sur le serveur     [ACTUAL]
+                          server_user_sudo_policies (a brancher)
+```
+
+- `backend/ssh_utils.py::load_data_from_db()` charge `sudo_policies = { machine_id: {preset, nopasswd, runas, custom_rules} }` par user.
+- `backend/configure_servers.py::add_to_sudoers(channel, username, policy=...)` rend via sudo_manager + visudo -cf + mv atomique. Fallback NOPASSWD ALL si pas de policy fournie (retrocompat bool `users.sudo`).
+- Override avance via la page dediee `/adm/server_user_policies.php` pour custom_rules, SFTP, rollback historique.
+
+---
+
 ### API keys segmentees (v1.14.4, commit 5c04d2e)
 
 Remplace `Config.API_KEY` unique par table multi-key avec scope.
@@ -567,7 +601,10 @@ Gestion_SSH_KEY/
 | `roles` | 3 rôles : user(1), admin(2), superadmin(3) |
 | `machines` | Serveurs gérés : name, ip, port, user, password (chiffré), root_password (chiffré), environment, criticality, network_type, online_status, zabbix_agent_version |
 | `permissions` | 1 ligne/user : can_deploy_keys, can_update_linux, can_manage_iptables, can_admin_portal, can_scan_cve, can_manage_remote_users, can_manage_platform_key, can_view_compliance, can_manage_backups, can_schedule_cve, can_manage_fail2ban, can_manage_services, can_audit_ssh, can_manage_supervision |
-| `user_machine_access` | Many-to-many : quel user accède à quel serveur |
+| `user_machine_access` | Many-to-many user ↔ serveur + **desired state sudo** (v1.22.1+) : `sudo_preset` (7 valeurs), `sudo_nopasswd`, `sudo_runas`, `sudo_custom_rules` |
+| `server_user_sudo_policies` (v1.22.0+) | **Actual state sudo** par (machine, server_user_inventory) : preset deploye, custom_rules, last_deployed_at, last_deployed_path |
+| `server_user_sftp_policies` (v1.22.0+) | Politique SFTP/SSH par user : sftp_only, chroot_dir, working_dir, forwardings, x11 |
+| `policy_deployments` (v1.22.0+) | Audit trail des deploys : policy_snapshot JSON, contenu avant/apres, status (applied/rolled_back/failed/superseded), deployed_by, rollback_reason |
 | `user_exclusions` | Exclusions explicites user ↔ machine |
 | `remember_tokens` | Tokens "Se souvenir de moi" (hash bcrypt + expiry) |
 | `login_attempts` | Rate limiting : IP + timestamp + compteur |
