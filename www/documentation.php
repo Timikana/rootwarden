@@ -939,6 +939,40 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                     <li><strong>A09</strong> : <code>policy_deployments</code> = trail audit complet avec actor, snapshot JSON, contenu avant/apres, status</li>
                 </ul>
                 <p class="text-xs text-gray-500 mt-2">Code : <code>backend/sudo_manager.py</code>, <code>backend/sftp_manager.py</code>, <code>backend/routes/policies.py</code>, <code>www/adm/server_user_policies.php</code></p>
+
+                <h3 class="font-semibold mt-4 mb-2">Integration onglet Acces &amp; Permissions (v1.22.1+)</h3>
+                <p class="text-sm mb-2">
+                    Pour eviter de naviguer entre 2 pages, le dropdown preset sudo est aussi disponible directement dans
+                    <code>Administration &rarr; Acces &amp; Permissions</code>, sous chaque toggle serveur attribue.
+                    Visible superadmin uniquement, pour les utilisateurs role=1 avec acces explicite a au moins 1 serveur.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Dropdown 7 valeurs (none / apt_only / restart_services / read_logs / systemctl_specific / all_nopasswd / custom)</li>
+                    <li>Checkbox <code>NOPASSWD</code> inline</li>
+                    <li>Badge couleur sur le toggle quand preset != none (rouge=all_nopasswd, ambre=custom, violet=autre)</li>
+                    <li>Lien <em>Avance &rarr;</em> qui ouvre la page dediee pour custom_rules + SFTP + rollback</li>
+                </ul>
+
+                <h3 class="font-semibold mt-4 mb-2">Pattern desired / actual state (v1.22.2+)</h3>
+                <p class="text-sm mb-3">
+                    Architecture infra-as-code pour eviter la double source de verite entre les 2 tables :
+                </p>
+                <table class="text-sm w-full border-collapse mb-3">
+                    <thead class="bg-gray-100 dark:bg-gray-700"><tr>
+                        <th class="p-2 text-left">Table</th><th class="p-2 text-left">Role</th><th class="p-2 text-left">Qui ecrit</th>
+                    </tr></thead>
+                    <tbody class="text-xs">
+                        <tr><td class="p-2 font-mono">user_machine_access.sudo_preset</td><td class="p-2"><strong>Desired</strong> (intention admin)</td><td class="p-2">Dropdown onglet Acces</td></tr>
+                        <tr><td class="p-2 font-mono">server_user_sudo_policies</td><td class="p-2"><strong>Actual</strong> (etat reel deploye)</td><td class="p-2">configure_servers.py au deploy</td></tr>
+                        <tr><td class="p-2 font-mono">policy_deployments</td><td class="p-2"><strong>Audit trail</strong></td><td class="p-2">configure_servers.py au deploy</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-sm">
+                    Pont implemente dans <code>backend/configure_servers.py::add_to_sudoers()</code> : au deploy SSH,
+                    on lit <code>user.sudo_policies[machine_id]</code> charge par <code>load_data_from_db()</code>, on rend
+                    via <code>sudo_manager.render_policy()</code>, on valide par <code>visudo -cf</code>, puis <code>mv</code>
+                    atomique. Fallback historique sur le bool <code>users.sudo</code> si pas de preset configure.
+                </p>
             </section>
 
             <!-- ────────────────────────────────────────── -->
