@@ -97,6 +97,27 @@ def _actor_id() -> int:
         return 0
 
 
+def _audit_log(user_id: int, action: str, details: str):
+    """Journalise une action dans user_logs (audit chain HMAC via trigger BDD).
+    Scrub les contenus sensibles (sudoers custom_rules peut contenir des commandes
+    revelant l'inventaire systeme - on hash le contenu pour ne logger que un fingerprint)."""
+    import hashlib
+    # Scrub : si details contient un payload long (> 200 chars), on le hash
+    if len(details) > 200:
+        sha = hashlib.sha256(details.encode('utf-8')).hexdigest()[:16]
+        details = f"{details[:180]}... [scrubbed-sha256:{sha}]"
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
+                (user_id or None, f"[policy] {action} - {details}")
+            )
+            conn.commit()
+    except Exception as e:
+        logger.warning("Audit log policy echec : %s", e)
+
+
 def _record_deployment(machine_id: int, server_user_id: int, policy_type: str,
                        policy_snapshot: dict, result: dict, actor_id: int,
                        status: str = 'applied') -> int:
@@ -245,6 +266,10 @@ def sudo_deploy():
     deployment_id = _record_deployment(
         mid, server_user_id, 'sudo', policy, result, _actor_id(), status)
 
+    _audit_log(_actor_id(),
+        f"sudo_deploy machine_id={mid} server_user_id={server_user_id} preset={policy['preset']} status={status}",
+        f"target={result.get('target_path', '?')} nopasswd={policy['nopasswd']} runas={policy['runas']}")
+
     response = {**result, 'deployment_id': deployment_id}
     return jsonify(response), (200 if result.get('success') else 400)
 
@@ -315,6 +340,9 @@ def sudo_remove():
         'server_user_sudo_policies', mid, server_user_id, _actor_id(),
         enabled=False, last_deployed_path=result.get('target_path', '')
     )
+    _audit_log(_actor_id(),
+        f"sudo_remove machine_id={mid} server_user_id={server_user_id} username={username}",
+        f"target={result.get('target_path', '?')}")
     return jsonify({**result, 'deployment_id': deployment_id})
 
 
@@ -389,6 +417,10 @@ def sftp_deploy():
     deployment_id = _record_deployment(
         mid, server_user_id, 'sftp', policy, result, _actor_id(), status)
 
+    _audit_log(_actor_id(),
+        f"sftp_deploy machine_id={mid} server_user_id={server_user_id} sftp_only={policy['sftp_only']} status={status}",
+        f"target={result.get('target_path', '?')} chroot={policy.get('chroot_dir') or '-'}")
+
     return jsonify({**result, 'deployment_id': deployment_id}), (200 if result.get('success') else 400)
 
 
@@ -457,6 +489,9 @@ def sftp_remove():
         'server_user_sftp_policies', mid, server_user_id, _actor_id(),
         enabled=False, last_deployed_path=result.get('target_path', '')
     )
+    _audit_log(_actor_id(),
+        f"sftp_remove machine_id={mid} server_user_id={server_user_id} username={username}",
+        f"target={result.get('target_path', '?')}")
     return jsonify({**result, 'deployment_id': deployment_id})
 
 
@@ -537,6 +572,10 @@ def rollback():
         {'rollback_of': int(deployment_id), 'reason': reason},
         result, _actor_id(), 'applied' if result.get('success') else 'failed'
     )
+
+    _audit_log(_actor_id(),
+        f"rollback type={policy_type} machine_id={mid} server_user_id={dep['server_user_id']} from_deployment={deployment_id}",
+        f"reason={reason or '-'} success={result.get('success')}")
 
     return jsonify({
         **result,

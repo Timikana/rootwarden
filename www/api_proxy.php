@@ -32,6 +32,33 @@ if (in_array($_method, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
     checkCsrfToken();
 }
 
+// Patch A04-INSEC-N4 (v1.22.0) : step-up 2FA obligatoire sur les routes de
+// politique sudo/SFTP (deploy/remove/rollback). Changer une politique sudoers
+// ou un Match User block donne de facto root sur le serveur cible - meme
+// niveau de criticite que delete_user / regen platform key.
+$_path = $_SERVER['PATH_INFO'] ?? $_SERVER['REQUEST_URI'] ?? '';
+$_stepupPatterns = [
+    '#^/policy/(sudo|sftp)/(deploy|remove)$#',
+    '#^/policy/rollback$#',
+];
+foreach ($_stepupPatterns as $_pat) {
+    if (preg_match($_pat, parse_url($_path, PHP_URL_PATH) ?: '')) {
+        require_once __DIR__ . '/auth/step_up.php';
+        if (!stepUpVerify('policy_action')) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Re-authentification 2FA requise pour cette action',
+                'step_up_required' => true,
+                'action' => 'policy_action',
+            ]);
+            exit;
+        }
+        break;
+    }
+}
+
 $api_key    = getenv('API_KEY') ?: '';
 $python_url = 'https://python:5000';
 

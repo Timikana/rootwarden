@@ -76,6 +76,10 @@ $routes = [
     ['Sshd Allow User',        'POST', '/sshd_allow_user', ['machine_id' => $machineId, 'username' => 'rootwarden'], 'Patche AllowUsers idempotent (v1.19.x)'],
     ['Logs SSE',               'GET',  '/logs', null, t('health.route_logs_sse'), true],
 
+    // ── Politiques sudo + SFTP par utilisateur (v1.22.0) ───────────────
+    ['Policy List',            'GET',  '/policy/list', null, 'Liste les politiques sudo/SFTP configurees'],
+    ['Policy Deployments',     'GET',  "/policy/deployments?machine_id=$machineId&server_user_id=0", null, 'Historique pour rollback (v1.22.0)'],
+
     // ── Mises a jour ────────────────────────────────────────────────────
     ['Update (dry)',            'POST', '/update', ['machine_id' => $machineId], t('health.route_update')],
     ['Security Updates',       'POST', '/security_updates', ['machine_id' => $machineId], t('health.route_security_updates')],
