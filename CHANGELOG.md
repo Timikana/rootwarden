@@ -5,50 +5,6 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-## [1.22.0] - 2026-05-31 — Politiques sudo + SFTP par utilisateur distant
-
-### Feat majeure : administration fine des droits sudo et acces SFTP/SSH
-
-Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de configurer, pour chaque (machine, server_user_inventory.id), une politique sudo et/ou une politique SFTP/SSH, deployees via SSH puis enregistrees dans un historique pour rollback 1-clic.
-
-#### Couche BDD (migrations 048-050)
-- `server_user_sudo_policies` : 5 presets metier + custom, nopasswd, runas, enabled
-- `server_user_sftp_policies` : sftp_only/chroot/working/forwardings/x11
-- `policy_deployments` : historique avec policy_snapshot JSON + previous_file_content pour rollback
-
-#### Couche backend Python
-- `backend/sudo_manager.py` : 5 renderers de preset + custom (visudo -cf au deploy)
-- `backend/sftp_manager.py` : rendu du Match User block + sshd -t + reload sshd
-- `backend/routes/policies.py` : Blueprint Flask avec 9 routes :
-  - `POST /policy/sudo/deploy` `audit` `remove`
-  - `POST /policy/sftp/deploy` `audit` `remove`
-  - `POST /policy/rollback` (avec verification machine_id == deployment.machine_id)
-  - `GET  /policy/deployments` (historique pagine, limit 50)
-  - `GET  /policy/list` (toutes les politiques configurees, filtre par machine_id)
-
-#### Couche UI
-- `www/adm/server_user_policies.php` : 3 onglets (Sudo / SFTP / Historique)
-- Sudo : dropdown 6 presets + textarea custom + liste services + nopasswd + runas
-- SFTP : sftp_only, chroot_dir, working_dir, 4 toggles forwardings/x11
-- Historique : liste deploiements avec status badge + bouton "Restaurer cette version"
-- Audit cote serveur : bouton "Auditer" lit le fichier reel sur la machine
-- Confirmation systematique avant remove ou rollback
-- Lien sidebar (visible superadmin uniquement)
-
-#### Defense en profondeur (audit OWASP Top 10)
-- **A01** Broken Access Control : `@require_role(3)` (superadmin) sur les 9 routes backend ET `checkAuth([ROLE_SUPERADMIN])` sur la page PHP. Verification machine_id sur le rollback (un rollback cross-machine est refuse).
-- **A02** Crypto : aucun nouveau hash/secret, pas de regression.
-- **A03** Injection : managers valident username `[a-z_][a-z0-9_-]{0,31}`, path absolu sans `..`, services regex `[A-Za-z0-9@._-]+`. Heredoc avec marker aleatoire pour eviter collision avec contenu. SQL via prepared statements.
-- **A04** Insecure Design : validation `visudo -cf` (sudoers) et `sshd -t` (sshd_config) SYSTEMATIQUE avant `mv` atomique. Backup en place `.rwbak` avant `systemctl reload sshd`. Si reload echoue, le backup est restaure automatiquement - evite de couper SSH du serveur cible.
-- **A05** Misconfig : chemins cibles figes (`/etc/sudoers.d/rootwarden-*`, `/etc/ssh/sshd_config.d/rootwarden-*.conf`). chmod 0440 (sudoers) / 0644 (sshd) + chown root:root. Conforme conventions OpenSSH/visudo.
-- **A09** Logging : table `policy_deployments` = trail audit complet (policy_snapshot JSON, contenu avant/apres, validation_output, actor user_id, timestamps). 4 statuts : applied / rolled_back / failed / superseded.
-
-#### Internationalisation
-- Parite FR + EN : `www/lang/fr/policies.php` + `www/lang/en/policies.php` (50+ cles)
-- Tous les hints presets, warnings securite, status badges, confirmations en 2 langues
-
----
-
 ## [1.21.9] - 2026-05-27 — Durcissement toggle visibilite mdp (anti shoulder-surfing)
 
 ### Fix securite (defense en profondeur) : auto-hide du toggle 👁
