@@ -132,6 +132,7 @@ $ALLOWED_PROXY_PREFIXES = [
     '/admin/',
     '/bashrc/',
     '/exclude_user', '/server_lifecycle',
+    '/policy/',
 ];
 $pathAllowed = false;
 foreach ($ALLOWED_PROXY_PREFIXES as $prefix) {
