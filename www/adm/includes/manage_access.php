@@ -16,11 +16,26 @@ $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
 $stmt_servers = $pdo->query("SELECT id, name, ip, environment FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' ORDER BY name");
 $servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt_attr = $pdo->query("SELECT user_id, machine_id FROM user_machine_access");
+$stmt_attr = $pdo->query("SELECT user_id, machine_id, sudo_preset, sudo_nopasswd, sudo_runas FROM user_machine_access");
 $access_matrix = [];
 foreach ($stmt_attr->fetchAll(PDO::FETCH_ASSOC) as $a) {
-    $access_matrix[$a['user_id']][$a['machine_id']] = true;
+    $access_matrix[$a['user_id']][$a['machine_id']] = [
+        'sudo_preset' => $a['sudo_preset'] ?? 'none',
+        'sudo_nopasswd' => (bool)$a['sudo_nopasswd'],
+        'sudo_runas' => $a['sudo_runas'] ?? 'root',
+    ];
 }
+// v1.22.0 : presets sudo disponibles pour le dropdown inline
+$SUDO_PRESETS = [
+    'none' => t('access.sudo_preset_none'),
+    'apt_only' => t('access.sudo_preset_apt_only'),
+    'restart_services' => t('access.sudo_preset_restart_services'),
+    'read_logs' => t('access.sudo_preset_read_logs'),
+    'systemctl_specific' => t('access.sudo_preset_systemctl_specific'),
+    'all_nopasswd' => t('access.sudo_preset_all_nopasswd'),
+    'custom' => t('access.sudo_preset_custom'),
+];
+$isSuperAdmin = (int)($_SESSION['role_id'] ?? 0) === 3;
 ?>
 
 <div class="flex items-center justify-between mb-2">
@@ -68,6 +83,8 @@ foreach ($stmt_attr->fetchAll(PDO::FETCH_ASSOC) as $a) {
         <div class="flex flex-wrap gap-2" id="servers-<?= $user['id'] ?>">
             <?php foreach ($servers as $srv):
                 $hasAccess = isset($userAccess[$srv['id']]);
+                $sudoPresetCur = $hasAccess ? ($userAccess[$srv['id']]['sudo_preset'] ?? 'none') : 'none';
+                $sudoNopasswdCur = $hasAccess ? ($userAccess[$srv['id']]['sudo_nopasswd'] ?? false) : false;
                 $envCls = match($srv['environment'] ?? '') {
                     'PROD' => 'border-red-300 dark:border-red-700',
                     'DEV' => 'border-green-300 dark:border-green-700',
@@ -77,14 +94,52 @@ foreach ($stmt_attr->fetchAll(PDO::FETCH_ASSOC) as $a) {
                 $activeCls = $hasAccess
                     ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
                     : "bg-gray-50 dark:bg-gray-700/30 $envCls text-gray-500 dark:text-gray-400";
+                // Badge sudo : couleur selon criticite
+                $sudoBadgeCls = match($sudoPresetCur) {
+                    'all_nopasswd' => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                    'custom' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                    'none' => 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+                    default => 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+                };
             ?>
-            <button class="access-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors <?= $activeCls ?>"
-                    data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>" data-active="<?= $hasAccess ? '1' : '0' ?>"
-                    onclick="toggleAccess(this)">
-                <span class="w-2 h-2 rounded-full <?= $hasAccess ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-500' ?> flex-shrink-0"></span>
-                <span class="font-medium"><?= htmlspecialchars($srv['name']) ?></span>
-                <span class="text-[9px] opacity-60"><?= htmlspecialchars($srv['ip']) ?></span>
-            </button>
+            <div class="flex flex-col gap-1 server-card" data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>">
+                <button class="access-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors <?= $activeCls ?>"
+                        data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>" data-active="<?= $hasAccess ? '1' : '0' ?>"
+                        onclick="toggleAccess(this)">
+                    <span class="w-2 h-2 rounded-full <?= $hasAccess ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-500' ?> flex-shrink-0"></span>
+                    <span class="font-medium"><?= htmlspecialchars($srv['name']) ?></span>
+                    <span class="text-[9px] opacity-60"><?= htmlspecialchars($srv['ip']) ?></span>
+                    <?php if ($hasAccess && $sudoPresetCur !== 'none'): ?>
+                    <span class="text-[9px] px-1 py-0.5 rounded <?= $sudoBadgeCls ?>" title="<?= t('access.sudo_active') ?>">
+                        sudo:<?= $sudoPresetCur ?><?= $sudoNopasswdCur ? '!' : '' ?>
+                    </span>
+                    <?php endif; ?>
+                </button>
+                <?php if ($hasAccess && $isSuperAdmin): ?>
+                <!-- v1.22.0 : dropdown inline preset sudo + lien vers UI avance -->
+                <div class="flex items-center gap-1 pl-3 sudo-row">
+                    <label class="text-[10px] text-gray-400"><?= t('access.sudo_label') ?>:</label>
+                    <select class="sudo-preset text-[10px] px-1 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                            data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>"
+                            onchange="updateSudoPreset(this)">
+                        <?php foreach ($SUDO_PRESETS as $val => $label): ?>
+                        <option value="<?= $val ?>" <?= $val === $sudoPresetCur ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label class="text-[10px] text-gray-400 flex items-center gap-0.5">
+                        <input type="checkbox" class="sudo-nopasswd form-checkbox h-3 w-3"
+                               <?= $sudoNopasswdCur ? 'checked' : '' ?>
+                               data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>"
+                               onchange="updateSudoPreset(this)">
+                        NOPASSWD
+                    </label>
+                    <a href="/adm/server_user_policies.php?server=<?= $srv['id'] ?>" target="_blank"
+                       class="text-[10px] text-blue-500 hover:underline ml-1" title="<?= t('access.advanced_tip') ?>">
+                        <?= t('access.advanced') ?> &rarr;
+                    </a>
+                </div>
+                <?php endif; ?>
+            </div>
             <?php endforeach; ?>
         </div>
         <?php if ((int)$user['role_id'] >= 2): ?>
@@ -96,6 +151,48 @@ foreach ($stmt_attr->fetchAll(PDO::FETCH_ASSOC) as $a) {
 </div>
 
 <script>
+async function updateSudoPreset(el) {
+    const userId = el.dataset.user;
+    const machineId = el.dataset.machine;
+    const card = el.closest('.server-card');
+    if (!card) return;
+    const preset = card.querySelector('.sudo-preset')?.value || 'none';
+    const nopasswd = card.querySelector('.sudo-nopasswd')?.checked ? 1 : 0;
+    try {
+        const r = await fetch('api/update_server_access.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: userId, machine_id: machineId, action: 'update_sudo',
+                sudo_preset: preset, sudo_nopasswd: nopasswd, sudo_runas: 'root',
+                csrf_token: '<?= htmlspecialchars($_SESSION['csrf_token']) ?>'
+            })
+        });
+        const d = await r.json();
+        if (typeof toast === 'function') {
+            toast(d.message || (d.success ? 'OK' : 'Erreur'), d.success ? 'success' : 'error', d.success ? 2500 : 5000);
+        }
+        if (d.success) {
+            // Refresh badge sur le bouton parent
+            const btn = card.querySelector('.access-btn');
+            const existing = btn?.querySelector('span.rounded');
+            if (existing) existing.remove();
+            if (preset !== 'none') {
+                const badge = document.createElement('span');
+                badge.className = 'text-[9px] px-1 py-0.5 rounded ' + (
+                    preset === 'all_nopasswd' ? 'bg-red-100 text-red-700' :
+                    preset === 'custom' ? 'bg-amber-100 text-amber-700' :
+                    'bg-purple-100 text-purple-700'
+                );
+                badge.textContent = 'sudo:' + preset + (nopasswd ? '!' : '');
+                btn?.appendChild(badge);
+            }
+        }
+    } catch (e) {
+        if (typeof toast === 'function') toast('Erreur reseau : ' + e, 'error');
+    }
+}
+
 async function toggleAccess(btn) {
     const userId = btn.dataset.user;
     const machineId = btn.dataset.machine;

@@ -5,6 +5,37 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.22.1] - 2026-05-31 — Sudo par (user x serveur) integre dans onglet Acces
+
+### Feat : choix du preset sudo lors de l'attribution serveur
+
+Suite a la review v1.22.0 : la page `/adm/server_user_policies.php` etait separee du flow d'ajout. Demande user : "c'est la que j'attend les modif sudo" (= a cote du toggle d'attribution serveur).
+
+#### Couche BDD (migration 051)
+- `user_machine_access` enrichie : `sudo_preset`, `sudo_nopasswd`, `sudo_runas`, `sudo_custom_rules`
+- Migration de compat auto : `users.sudo=1` -> `sudo_preset='all_nopasswd' + nopasswd=TRUE` sur toutes les attributions des users concernes (preserve le comportement existant)
+- Le bool `users.sudo` reste pour retrocompat (deprecie mais non drop)
+
+#### UI (admin_page.php -> onglet Acces & Permissions)
+- Sous chaque toggle serveur attribue, dropdown inline preset sudo (7 valeurs : none / apt_only / restart_services / read_logs / systemctl_specific / all_nopasswd / custom) + checkbox NOPASSWD
+- Badge couleur sur le toggle (rouge si all_nopasswd, ambre si custom, violet si autre)
+- Lien "Avance →" qui ouvre `server_user_policies.php?server=X` pre-rempli pour les cas custom_rules, SFTP, audit, historique
+- Visible uniquement pour superadmin (role_id=3)
+- Toast feedback sur changement de preset
+
+#### Endpoint backend
+- `www/adm/api/update_server_access.php` : nouvelle action `update_sudo` qui accepte `{user_id, machine_id, sudo_preset, sudo_nopasswd, sudo_runas}`. Whitelist preset cote serveur + regex runas. UPDATE conditionnel sur ligne existante (refuse si l'access n'a pas ete cree d'abord). Audit_log trace.
+
+#### TODO (commit separe)
+- `backend/configure_servers.py` doit lire `user_machine_access.sudo_preset` au moment du deploy SSH et invoquer `sudo_manager.deploy_policy()` au lieu de l'actuel `echo '<user> ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/...`. Pour l'instant les modifications du preset sont stockees mais pas encore propagees au prochain deploy.
+
+#### Audit OWASP
+- A01 : `@checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` + dropdown visible superadmin only ; anti self-grant deja en place (patch A01-04)
+- A03 : whitelist preset + regex runas `[a-z_][a-z0-9_-]{0,31}`
+- A09 : audit_log via helper existant
+
+---
+
 ## [1.22.0] - 2026-05-31 — Politiques sudo + SFTP par utilisateur distant
 
 ### Hardening complementaire (audit OWASP renforce)
