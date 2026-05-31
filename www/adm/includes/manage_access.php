@@ -80,7 +80,7 @@ $isSuperAdmin = (int)($_SESSION['role_id'] ?? 0) === 3;
                 <button onclick="toggleAllAccess(<?= $user['id'] ?>, false)" class="text-[10px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-500 hover:bg-red-50 hover:text-red-700"><?= t('access.select_none') ?></button>
             </div>
         </div>
-        <div class="flex flex-wrap gap-2" id="servers-<?= $user['id'] ?>">
+        <div class="flex flex-col gap-2" id="servers-<?= $user['id'] ?>">
             <?php foreach ($servers as $srv):
                 $hasAccess = isset($userAccess[$srv['id']]);
                 $sudoPresetCur = $hasAccess ? ($userAccess[$srv['id']]['sudo_preset'] ?? 'none') : 'none';
@@ -102,40 +102,45 @@ $isSuperAdmin = (int)($_SESSION['role_id'] ?? 0) === 3;
                     default => 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
                 };
             ?>
-            <div class="flex flex-col gap-1 server-card" data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>">
-                <button class="access-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors <?= $activeCls ?>"
+            <div class="flex flex-col gap-1.5 server-card w-full" data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>">
+                <button class="access-btn flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors <?= $activeCls ?>"
                         data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>" data-active="<?= $hasAccess ? '1' : '0' ?>"
                         onclick="toggleAccess(this)">
-                    <span class="w-2 h-2 rounded-full <?= $hasAccess ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-500' ?> flex-shrink-0"></span>
+                    <span class="w-2.5 h-2.5 rounded-full <?= $hasAccess ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-500' ?> flex-shrink-0"></span>
                     <span class="font-medium"><?= htmlspecialchars($srv['name']) ?></span>
-                    <span class="text-[9px] opacity-60"><?= htmlspecialchars($srv['ip']) ?></span>
+                    <span class="text-xs opacity-70"><?= htmlspecialchars($srv['ip']) ?></span>
                     <?php if ($hasAccess && $sudoPresetCur !== 'none'): ?>
-                    <span class="text-[9px] px-1 py-0.5 rounded <?= $sudoBadgeCls ?>" title="<?= t('access.sudo_active') ?>">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-semibold ml-1 <?= $sudoBadgeCls ?>" title="<?= t('access.sudo_active') ?>">
                         sudo:<?= $sudoPresetCur ?><?= $sudoNopasswdCur ? '!' : '' ?>
                     </span>
                     <?php endif; ?>
                 </button>
                 <?php if ($hasAccess && $isSuperAdmin): ?>
-                <!-- v1.22.0 : dropdown inline preset sudo + lien vers UI avance -->
-                <div class="flex items-center gap-1 pl-3 sudo-row">
-                    <label class="text-[10px] text-gray-400"><?= t('access.sudo_label') ?>:</label>
-                    <select class="sudo-preset text-[10px] px-1 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                <!-- v1.22.1 : dropdown inline preset sudo + lien vers UI avance -->
+                <div class="flex flex-wrap items-center gap-2 pl-3 pr-2 py-1.5 bg-gray-50 dark:bg-gray-900/40 rounded-lg border border-gray-200 dark:border-gray-700 sudo-row">
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        <?= t('access.sudo_label') ?>
+                    </label>
+                    <select class="sudo-preset text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 min-w-[220px]"
                             data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>"
                             onchange="updateSudoPreset(this)">
                         <?php foreach ($SUDO_PRESETS as $val => $label): ?>
                         <option value="<?= $val ?>" <?= $val === $sudoPresetCur ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <label class="text-[10px] text-gray-400 flex items-center gap-0.5">
-                        <input type="checkbox" class="sudo-nopasswd form-checkbox h-3 w-3"
+                    <label class="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" class="sudo-nopasswd form-checkbox h-4 w-4 text-purple-600 rounded"
                                <?= $sudoNopasswdCur ? 'checked' : '' ?>
                                data-user="<?= $user['id'] ?>" data-machine="<?= $srv['id'] ?>"
                                onchange="updateSudoPreset(this)">
-                        NOPASSWD
+                        <span class="font-medium">NOPASSWD</span>
                     </label>
                     <a href="/adm/server_user_policies.php?server=<?= $srv['id'] ?>" target="_blank"
-                       class="text-[10px] text-blue-500 hover:underline ml-1" title="<?= t('access.advanced_tip') ?>">
-                        <?= t('access.advanced') ?> &rarr;
+                       class="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-auto flex items-center gap-1"
+                       title="<?= t('access.advanced_tip') ?>">
+                        <?= t('access.advanced') ?>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </a>
                 </div>
                 <?php endif; ?>
