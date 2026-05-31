@@ -7,6 +7,14 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [1.22.0] - 2026-05-31 — Politiques sudo + SFTP par utilisateur distant
 
+### Hardening complementaire (audit OWASP renforce)
+- **Step-up 2FA** (A07) sur `/policy/(sudo|sftp)/(deploy|remove)` et `/policy/rollback` via `api_proxy.php`. Reuse du modal global `rwOpenStepUpModal()` deja en place (utils.js). Action `policy_action` valide 15 min.
+- **Audit log chain HMAC** (A09) : helper `_audit_log()` dans `routes/policies.py` integre dans 5 actions critiques. Scrub auto si details > 200 chars (SHA-256 fingerprint sans leak des sudoers custom).
+- **Whitelist proxy** corrigee : ajout `/policy/` dans `$ALLOWED_PROXY_PREFIXES` de `api_proxy.php` (etait oubliee - aurait bloque toutes les routes en prod).
+- **Documentation API** : 9 routes ajoutees dans `openapi.yaml` (schemas, responses 200/400/403/404, tag Policies).
+- **Diagnostic backend** : 2 entrees dans `/adm/health_check.php` (policy/list + policy/deployments).
+- **Tests E2E Puppeteer** : `tests/e2e/go-policies.mjs` couvre 17 assertions : login + 2FA + CGU, acces page, 3 onglets, 6 presets, lecture backend, step-up 2FA effectif, historique, lien sidebar superadmin only.
+
 ### Feat majeure : administration fine des droits sudo et acces SFTP/SSH
 
 Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de configurer, pour chaque (machine, server_user_inventory.id), une politique sudo et/ou une politique SFTP/SSH, deployees via SSH puis enregistrees dans un historique pour rollback 1-clic.
