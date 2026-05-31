@@ -886,6 +886,62 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Politiques sudo + SFTP par utilisateur -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="per-user-policies" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Politiques sudo / SFTP par utilisateur</h2>
+                <p class="text-sm mb-3">
+                    Depuis v1.22.0, RootWarden permet de configurer finement les droits sudo et les acces SFTP/SSH de chaque
+                    compte Linux sur chaque serveur gere. Acces : <code>/adm/server_user_policies.php</code> - <strong>superadmin uniquement</strong>.
+                </p>
+                <h3 class="font-semibold mb-2">Architecture</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>3 tables BDD</strong> (migrations 048-050) : <code>server_user_sudo_policies</code>, <code>server_user_sftp_policies</code>, <code>policy_deployments</code> (historique pour rollback).</li>
+                    <li><strong>2 modules backend</strong> : <code>backend/sudo_manager.py</code> et <code>backend/sftp_manager.py</code>. Pattern identique aux managers existants (fail2ban, iptables, services).</li>
+                    <li><strong>1 Blueprint Flask</strong> : <code>backend/routes/policies.py</code> avec 9 routes (deploy/audit/remove pour chaque type + rollback + listing).</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Presets sudo (5 + custom)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>all_nopasswd</code> : ALL=(ALL) NOPASSWD:ALL - reserve aux comptes de service automatises</li>
+                    <li><code>restart_services</code> : systemctl restart/reload/status * (tous services)</li>
+                    <li><code>apt_only</code> : apt update/upgrade/install (apt et apt-get)</li>
+                    <li><code>read_logs</code> : tail /var/log/*, less /var/log/*, journalctl</li>
+                    <li><code>systemctl_specific</code> : liste blanche de services autorises (saisie par admin)</li>
+                    <li><code>custom</code> : lignes sudoers brutes, validee par visudo -cf cote serveur</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Politique SFTP / SSH (Match User block)</h3>
+                <p class="text-sm mb-2">Genere un fichier <code>/etc/ssh/sshd_config.d/rootwarden-&lt;user&gt;.conf</code> avec :</p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>ForceCommand internal-sftp -d &lt;dir&gt;</code> si sftp_only actif</li>
+                    <li><code>ChrootDirectory</code> (admin renseigne, dossier doit exister et etre owned par root)</li>
+                    <li><code>PasswordAuthentication</code>, <code>AllowTcpForwarding</code>, <code>AllowAgentForwarding</code>, <code>X11Forwarding</code> par user</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Defense en profondeur</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>visudo -cf</strong> systematique avant <code>mv</code> sur sudoers - politique invalide refusee, sudo reste intact</li>
+                    <li><strong>sshd -t</strong> systematique avant <code>systemctl reload sshd</code> - sshd cassé = SSH coupé au reboot, c\'est critique</li>
+                    <li><strong>Backup en place</strong> (<code>.rwbak</code>) avant modification : si reload echoue, restauration automatique</li>
+                    <li><strong>Username regex strict</strong> <code>[a-z_][a-z0-9_-]{0,31}</code> bloque injection cote managers</li>
+                    <li><strong>Path validation</strong> sur chroot/working_dir : chemin absolu, pas de <code>..</code> dans les segments</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Rollback 1-clic</h3>
+                <p class="text-sm mb-3">
+                    Chaque deploiement sauvegarde le contenu precedent dans <code>policy_deployments.previous_file_content</code>.
+                    Depuis l\'onglet <em>Historique</em>, un bouton <em>Restaurer cette version</em> rejoue le contenu d\'origine
+                    (avec re-validation visudo/sshd -t). Le rollback est trace : <code>rolled_back_by</code>, <code>rolled_back_at</code>,
+                    <code>rollback_reason</code> sont remplis.
+                </p>
+                <h3 class="font-semibold mb-2">Securite (audit OWASP)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>A01</strong> : <code>@require_role(3)</code> sur les 9 routes - admin classique n\'a pas acces</li>
+                    <li><strong>A03</strong> : tous les inputs valides cote manager (username regex, path regex, services regex), aucun input direct dans la commande shell</li>
+                    <li><strong>A04</strong> : sequence de deploy = validation AVANT mv, rollback auto si echec - protege contre la chaine "deploy puis casse"</li>
+                    <li><strong>A09</strong> : <code>policy_deployments</code> = trail audit complet avec actor, snapshot JSON, contenu avant/apres, status</li>
+                </ul>
+                <p class="text-xs text-gray-500 mt-2">Code : <code>backend/sudo_manager.py</code>, <code>backend/sftp_manager.py</code>, <code>backend/routes/policies.py</code>, <code>www/adm/server_user_policies.php</code></p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Reset password : UX tolerante aux paste -->
             <!-- ────────────────────────────────────────── -->
             <section id="reset-password-ux" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
