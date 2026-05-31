@@ -68,4 +68,7 @@ return [
     'policies.deploy_success' => 'Deploiement reussi.',
     'policies.deploy_fail' => 'Echec du deploiement',
     'policies.net_error' => 'Erreur reseau',
+    'policies.audit_found' => 'Fichier de politique trouve sur le serveur.',
+    'policies.audit_not_found' => 'Aucun fichier de politique sur le serveur.',
+    'policies.remove_success' => 'Politique supprimee du serveur.',
 ];

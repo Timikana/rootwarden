@@ -251,6 +251,9 @@ const T = {
     deploySuccess: <?= json_encode(t('policies.deploy_success')) ?>,
     deployFail: <?= json_encode(t('policies.deploy_fail')) ?>,
     netError: <?= json_encode(t('policies.net_error')) ?>,
+    auditFound: <?= json_encode(t('policies.audit_found')) ?>,
+    auditNotFound: <?= json_encode(t('policies.audit_not_found')) ?>,
+    removeSuccess: <?= json_encode(t('policies.remove_success')) ?>,
 };
 const presetHints = {
     all_nopasswd: <?= json_encode(t('policies.preset_hint_all_nopasswd')) ?>,
@@ -294,6 +297,12 @@ function show(id, content, ok) {
     el.classList.toggle('text-red-600', !ok);
 }
 
+function notifyToast(success, message) {
+    if (typeof toast === 'function') {
+        toast(message || (success ? T.deploySuccess : T.deployFail), success ? 'success' : 'error', success ? 3000 : 6000);
+    }
+}
+
 async function deployPolicy(type) {
     const body = { machine_id: MACHINE_ID, server_user_id: SERVER_USER_ID };
     if (type === 'sudo') {
@@ -316,8 +325,12 @@ async function deployPolicy(type) {
     try {
         const data = await callApi('/policy/' + type + '/deploy', 'POST', body);
         show(type + '-output', data, data.success);
+        notifyToast(data.success, data.success ? T.deploySuccess : (T.deployFail + ' : ' + (data.message || data.error || '?')));
         if (data.success) setTimeout(() => location.reload(), 1500);
-    } catch (e) { show(type + '-output', T.netError + ' : ' + e, false); }
+    } catch (e) {
+        show(type + '-output', T.netError + ' : ' + e, false);
+        notifyToast(false, T.netError + ' : ' + e);
+    }
 }
 
 async function auditPolicy(type) {
@@ -326,7 +339,11 @@ async function auditPolicy(type) {
         const data = await callApi('/policy/' + type + '/audit', 'POST', body);
         const content = data.exists ? data.content : '(' + (T.deployFail ? 'aucun fichier' : 'no file') + ' a ' + (data.target_path || '?') + ')';
         show(type + '-output', content, data.success);
-    } catch (e) { show(type + '-output', T.netError + ' : ' + e, false); }
+        notifyToast(data.success, data.exists ? T.auditFound : T.auditNotFound);
+    } catch (e) {
+        show(type + '-output', T.netError + ' : ' + e, false);
+        notifyToast(false, T.netError + ' : ' + e);
+    }
 }
 
 async function removePolicy(type) {
@@ -335,8 +352,12 @@ async function removePolicy(type) {
     try {
         const data = await callApi('/policy/' + type + '/remove', 'POST', body);
         show(type + '-output', data, data.success);
+        notifyToast(data.success, data.success ? T.removeSuccess : (T.deployFail + ' : ' + (data.message || data.error || '?')));
         if (data.success) setTimeout(() => location.reload(), 1500);
-    } catch (e) { show(type + '-output', T.netError + ' : ' + e, false); }
+    } catch (e) {
+        show(type + '-output', T.netError + ' : ' + e, false);
+        notifyToast(false, T.netError + ' : ' + e);
+    }
 }
 
 async function loadHistory() {
@@ -372,9 +393,11 @@ async function rollbackTo(deploymentId) {
     if (!confirm(T.confirmRollback)) return;
     try {
         const data = await callApi('/policy/rollback', 'POST', { machine_id: MACHINE_ID, deployment_id: deploymentId, reason });
-        alert(data.success ? T.deploySuccess : (T.deployFail + ' : ' + (data.message || data.error || '?')));
-        if (data.success) location.reload();
-    } catch (e) { alert(T.netError + ' : ' + e); }
+        notifyToast(data.success, data.success ? T.deploySuccess : (T.deployFail + ' : ' + (data.message || data.error || '?')));
+        if (data.success) setTimeout(() => location.reload(), 1500);
+    } catch (e) {
+        notifyToast(false, T.netError + ' : ' + e);
+    }
 }
 </script>
 
