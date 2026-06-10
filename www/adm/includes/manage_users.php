@@ -88,8 +88,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     // creait un superadmin, recevait le magic-link sur son email et prenait le
     // controle. Le superadmin reste libre de creer n'importe quel role.
     $myRole = (int)($_SESSION['role_id'] ?? 1);
+    $roleDowngraded = false;
     if ($myRole < 3 && $role_id >= $myRole) {
         $role_id = 1;
+        $roleDowngraded = true; // feedback utilisateur (toast) au lieu d'un clamp silencieux
     }
 
     // Placeholder password - impossible de se connecter avec (pas de mdp en clair)
@@ -194,6 +196,9 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
     <?php if (isset($error)): ?>
         <script>document.addEventListener('DOMContentLoaded', () => toast(<?= json_encode($error) ?>, 'error'));</script>
+    <?php endif; ?>
+    <?php if (!empty($roleDowngraded)): ?>
+        <script>document.addEventListener('DOMContentLoaded', () => toast(<?= json_encode(t('users.role_downgraded')) ?>, 'warning', 6000));</script>
     <?php endif; ?>
 
     <!-- Barre de recherche -->

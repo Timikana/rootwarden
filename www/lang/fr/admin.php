@@ -98,6 +98,7 @@ return [
     'users.count' => ':count utilisateur(s)',
     'users.error_invalid_name' => 'Nom invalide.',
     'users.created_success' => 'Utilisateur cree avec succes.',
+    'users.role_downgraded' => 'Role ramene a "Utilisateur" : vous ne pouvez creer qu\'un role inferieur au votre.',
     'users.error_sql' => 'Erreur SQL :',
     'users.generated_password' => 'Mot de passe genere :',
     'users.password_warning' => 'Notez ce mot de passe - il ne sera plus affiche.',
