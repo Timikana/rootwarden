@@ -50,21 +50,27 @@ function encryptTotpSecret(string $secret): string
         }
     }
 
-    // AES-256-CBC (fallback) - cle HKDF derivee
+    // AES-256-GCM (fallback AEAD) - cle HKDF derivee.
+    // Patch A02 : avant, le fallback etait AES-256-CBC SANS authentification
+    // (pas d'HMAC/AEAD) -> aucune integrite sur le secret TOTP stocke,
+    // incoherent avec l'AES-GCM utilise pour les mots de passe machines. GCM
+    // fournit le tag d'authentification. (Le dechiffrement reste retrocompatible
+    // avec les anciens blobs `totp:aes:` CBC, cf. decryptTotpSecret.)
     $rawKey = substr(hex2bin($secretKey), 0, 32);
     if (strlen($rawKey) < 32) $rawKey = str_pad($rawKey, 32, "\0");
     $key = hash_hkdf('sha256', $rawKey, 32, 'rootwarden-totp');
-    $iv = random_bytes(16);
-    $encrypted = openssl_encrypt($secret, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
-    if ($encrypted === false) {
+    $iv = random_bytes(12);
+    $tag = '';
+    $encrypted = openssl_encrypt($secret, 'AES-256-GCM', $key, OPENSSL_RAW_DATA, $iv, $tag, '', 16);
+    if ($encrypted === false || strlen($tag) !== 16) {
         // Patch A02-04 : FAIL-CLOSED, plus de fallback plaintext.
-        error_log("[RootWarden] CRITIQUE: TOTP AES encrypt failed - refus fail-closed");
+        error_log("[RootWarden] CRITIQUE: TOTP AES-GCM encrypt failed - refus fail-closed");
         throw new \RuntimeException(
-            'Chiffrement TOTP echoue (openssl_encrypt). '
+            'Chiffrement TOTP echoue (openssl_encrypt AES-256-GCM). '
             . 'Verifiez la configuration cryptographique.'
         );
     }
-    return 'totp:aes:' . base64_encode($iv . $encrypted);
+    return 'totp:gcm:' . base64_encode($iv . $tag . $encrypted);
 }
 
 /**
@@ -111,7 +117,28 @@ function decryptTotpSecret(string $value): string
         return '';
     }
 
-    // totp:aes:base64(iv + ciphertext)
+    // totp:gcm:base64(iv[12] + tag[16] + ciphertext) - format AEAD courant
+    if (strpos($value, 'totp:gcm:') === 0) {
+        $data = base64_decode(substr($value, strlen('totp:gcm:')));
+        if ($data === false || strlen($data) <= 28) {
+            error_log("[RootWarden] TOTP GCM decode failed");
+            return '';
+        }
+        $iv  = substr($data, 0, 12);
+        $tag = substr($data, 12, 16);
+        $ciphertext = substr($data, 28);
+        $rawKey = substr(hex2bin($secretKey), 0, 32);
+        if (strlen($rawKey) < 32) $rawKey = str_pad($rawKey, 32, "\0");
+        $hkdfKey = hash_hkdf('sha256', $rawKey, 32, 'rootwarden-totp');
+        $decrypted = openssl_decrypt($ciphertext, 'AES-256-GCM', $hkdfKey, OPENSSL_RAW_DATA, $iv, $tag);
+        if ($decrypted === false) {
+            error_log("[RootWarden] TOTP GCM decrypt failed (tag invalide)");
+            return '';
+        }
+        return $decrypted;
+    }
+
+    // totp:aes:base64(iv + ciphertext) - LEGACY CBC non authentifie (lecture seule)
     if (strpos($value, 'totp:aes:') === 0) {
         $data = base64_decode(substr($value, strlen('totp:aes:')));
         if ($data === false || strlen($data) <= 16) {

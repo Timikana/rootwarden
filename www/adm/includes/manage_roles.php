@@ -144,10 +144,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_role'])) {
         }
 
         // Vérifier les permissions - empecher l'escalade de privileges
-        if ($_SESSION['role_id'] === 2 && $user['role_id'] === 3) {
+        $myRole = (int)$_SESSION['role_id'];
+        if ($myRole === 2 && (int)$user['role_id'] === 3) {
             throw new Exception(t('roles.error_cannot_edit_superadmin_role'));
         }
-        if ($new_role_id > $_SESSION['role_id']) {
+        // Patch A01 : un non-superadmin ne peut assigner qu'un role STRICTEMENT
+        // inferieur au sien (avant : `>` autorisait l'egalite -> un admin
+        // pouvait promouvoir un user en admin). Le superadmin reste libre.
+        if ($myRole < 3 && $new_role_id >= $myRole) {
             throw new Exception(t('roles.error_cannot_assign_higher_role'));
         }
         if ($user_id === (int)$_SESSION['user_id']) {

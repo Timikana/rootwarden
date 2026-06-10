@@ -206,6 +206,21 @@ checkboxes active_response / SCA / rootcheck.
 - audit_log prefix `[graylog]` / `[wazuh]` sur toute action (install, uninstall,
   save_config, save_rule/collector, set_group, save_options)
 
+#### Controle d'acces (durci v1.23.0)
+
+- `require_machine_access` valide **chaque** id machine du body/args, qu'il soit
+  passe en singulier (`machine_id`/`server_id`) ou en liste (`machine_ids`/
+  `server_ids`), et **fail-closed** si un id n'est pas autorise. Avant v1.23.0,
+  les routes a parametre pluriel echappaient au controle (no-op).
+- Toute route mutant l'etat d'un serveur (deploiement compte service root,
+  suppression de comptes/cles, octroi de preset sudo) porte explicitement
+  `@require_role(2|3)` — ne jamais s'appuyer sur `require_machine_access` seul.
+- Defense en profondeur : `api_proxy.php` refuse cote PHP les prefixes admin
+  pour un role utilisateur, en plus de l'enforcement backend.
+- Dechiffrement : `server_decrypt_password` s'appuie exclusivement sur
+  `encryption.decrypt_password` (AES-GCM AEAD, integrite verifiee) — plus aucun
+  fallback heuristique. Fail-closed sur echec.
+
 ---
 
 # Architecture & Carte des fichiers - RootWarden v1.14.0

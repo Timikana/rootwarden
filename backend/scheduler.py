@@ -203,69 +203,6 @@ def _run_scheduled_ssh_audit(schedule: dict):
         conn.close()
 
 
-def _scheduler_loop():
-    """Boucle principale du scheduler - tourne en daemon thread."""
-    _log.info("Scheduler demarre (CVE + SSH Audit, intervalle: %ds)", _CHECK_INTERVAL)
-    while True:
-        try:
-            conn = _get_db()
-            cur = conn.cursor(dictionary=True)
-            now = datetime.now()
-
-            # CVE scans planifies
-            cur.execute(
-                "SELECT * FROM cve_scan_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
-                (now,)
-            )
-            schedules = cur.fetchall()
-
-            for sched in schedules:
-                try:
-                    _run_scheduled_scan(sched)
-                except Exception as e:
-                    _log.error("Scheduler: erreur execution %s : %s", sched['name'], e)
-
-                try:
-                    next_run = _compute_next_run(sched['cron_expression'], now)
-                    cur.execute(
-                        "UPDATE cve_scan_schedules SET last_run = %s, next_run = %s WHERE id = %s",
-                        (now, next_run, sched['id'])
-                    )
-                    conn.commit()
-                except Exception as e:
-                    _log.error("Scheduler: erreur mise a jour next_run pour %s : %s", sched['name'], e)
-
-            # SSH Audit scans planifies
-            try:
-                cur.execute(
-                    "SELECT * FROM ssh_audit_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
-                    (now,)
-                )
-                ssh_schedules = cur.fetchall()
-                for sched in ssh_schedules:
-                    try:
-                        _run_scheduled_ssh_audit(sched)
-                    except Exception as e:
-                        _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
-                    try:
-                        next_run = _compute_next_run(sched['cron_expression'], now)
-                        cur.execute(
-                            "UPDATE ssh_audit_schedules SET last_run = %s, next_run = %s WHERE id = %s",
-                            (now, next_run, sched['id'])
-                        )
-                        conn.commit()
-                    except Exception as e:
-                        _log.error("Scheduler SSH: erreur next_run %s : %s", sched['name'], e)
-            except Exception as e:
-                _log.debug("Scheduler SSH Audit: table pas encore creee: %s", e)
-
-            conn.close()
-        except Exception as e:
-            _log.error("Scheduler: erreur boucle principale : %s", e)
-
-        time.sleep(_CHECK_INTERVAL)
-
-
 def _purge_old_logs():
     """Purge les logs et historiques anciens selon LOG_RETENTION_DAYS."""
     retention_days = int(os.environ.get('LOG_RETENTION_DAYS', '0'))
@@ -465,9 +402,13 @@ def _check_password_expiry_notifications():
 def _scheduler_loop_with_purge():
     """Boucle principale combinant scans CVE planifies et purge des logs."""
     global _purge_counter
-    _log.info("Scheduler demarre (CVE + purge, intervalle: %ds)", _CHECK_INTERVAL)
+    _log.info("Scheduler demarre (CVE + SSH Audit + purge, intervalle: %ds)", _CHECK_INTERVAL)
     while True:
-        # Scans CVE planifies
+        # Scans CVE + audits SSH planifies
+        # Patch (bug) : la connexion est fermee dans un finally (avant, conn.close()
+        # etait dans le try -> toute exception fuyait la connexion MySQL a chaque
+        # iteration en erreur => epuisement du pool).
+        conn = None
         try:
             conn = _get_db()
             cur = conn.cursor(dictionary=True)
@@ -491,9 +432,41 @@ def _scheduler_loop_with_purge():
                     conn.commit()
                 except Exception as e:
                     _log.error("Scheduler: erreur mise a jour next_run pour %s : %s", sched['name'], e)
-            conn.close()
+
+            # Audits SSH planifies
+            # Patch (bug) : ce bloc vivait dans _scheduler_loop() qui n'etait
+            # JAMAIS appelee (start_scheduler ne lance que cette boucle-ci) ->
+            # les audits SSH planifies ne s'executaient jamais, silencieusement.
+            try:
+                cur.execute(
+                    "SELECT * FROM ssh_audit_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
+                    (now,)
+                )
+                ssh_schedules = cur.fetchall()
+                for sched in ssh_schedules:
+                    try:
+                        _run_scheduled_ssh_audit(sched)
+                    except Exception as e:
+                        _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
+                    try:
+                        next_run = _compute_next_run(sched['cron_expression'], now)
+                        cur.execute(
+                            "UPDATE ssh_audit_schedules SET last_run = %s, next_run = %s WHERE id = %s",
+                            (now, next_run, sched['id'])
+                        )
+                        conn.commit()
+                    except Exception as e:
+                        _log.error("Scheduler SSH: erreur next_run %s : %s", sched['name'], e)
+            except Exception as e:
+                _log.debug("Scheduler SSH Audit: table pas encore creee: %s", e)
         except Exception as e:
             _log.error("Scheduler: erreur boucle principale : %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         # Purge periodique + backup (1x par heure)
         _purge_counter += 1

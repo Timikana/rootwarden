@@ -38,6 +38,8 @@ from contextlib import contextmanager
 from config import Config
 from encryption import Encryption
 
+import re
+
 from ssh_utils import (
     connect_ssh,
     switch_to_root,
@@ -46,6 +48,17 @@ from ssh_utils import (
     load_data_from_db,
     ensure_sudo_installed
 )
+
+# Patch A03 (command injection, defense en profondeur) : configure_servers.py
+# etait le SEUL module a interpoler username brut dans des commandes shell root
+# (useradd/chown/mkdir/sudoers...) sans la validation pourtant presente dans
+# sudo_manager, sftp_manager et routes/ssh.py. Meme regex stricte ici.
+_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
+
+
+def _valid_username(username) -> bool:
+    """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32)."""
+    return bool(username) and bool(_USERNAME_RE.match(str(username)))
 
 # ===================================================
 # Classe CustomFormatter pour Gérer l'Absence du Champ 'machine'
@@ -198,6 +211,10 @@ def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
     Le fichier deploye est /etc/sudoers.d/<username> avec mode 0440 root:root
     (standard sudoers - sinon visudo le refuse).
     """
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"add_to_sudoers : username invalide refuse : {username!r}")
+        return
     # Cas preset='none' : ne rien deployer, et supprimer si existait
     if policy and policy.get('preset') == 'none':
         remove_from_sudoers(channel, username, logger=logger)
@@ -266,6 +283,10 @@ def remove_from_sudoers(channel, username: str, logger=None):
         username : Nom de l'utilisateur Linux à retirer des sudoers.
         logger   : Logger optionnel pour tracer l'opération.
     """
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"remove_from_sudoers : username invalide refuse : {username!r}")
+        return
     try:
         sudoers_file = f"/etc/sudoers.d/{username}"
         execute_command_as_root(channel, f"rm -f {sudoers_file}", logger=logger)
@@ -293,6 +314,10 @@ def user_exists(channel, username: str, logger=None) -> bool:
     Returns:
         True si l'utilisateur existe, False sinon (ou en cas d'erreur).
     """
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"user_exists : username invalide refuse : {username!r}")
+        return False
     try:
         output = execute_command_as_root(channel, f"id -u {username}", logger=logger)
         exists = output.strip().isdigit()
@@ -343,6 +368,10 @@ def manage_ssh_keys(channel, user: dict, logger=None):
         if logger:
             logger.error("Nom d'utilisateur manquant dans la definition de l'utilisateur.")
         return
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"manage_ssh_keys : username invalide refuse : {username!r}")
+        return
 
     authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
 
@@ -388,6 +417,10 @@ def deploy_user_config(channel, user: dict, logger=None):
     if not username:
         if logger:
             logger.error("Nom d'utilisateur manquant dans la définition de l'utilisateur.")
+        return
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"deploy_user_config : username invalide refuse : {username!r}")
         return
 
     # --- Gestion de la cle SSH ---
@@ -678,6 +711,9 @@ class ServerConfigurator:
         username = user.get('name')
         if not username:
             self.logger.error("Nom d'utilisateur manquant dans la définition de l'utilisateur.")
+            return
+        if not _valid_username(username):
+            self.logger.error(f"configure_user : username invalide refuse : {username!r}")
             return
 
         active = user.get('active', False)

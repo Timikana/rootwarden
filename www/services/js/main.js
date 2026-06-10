@@ -198,7 +198,7 @@ function categoryBadge(category) {
 }
 
 function actionButtons(svc) {
-    const name = escAttr(svc.name);
+    const name = escJsAttr(svc.name); // injecte dans des handlers onclick (chaine JS)
     const disabled = svc.protected ? 'disabled title="' + escAttr(__('svc_protected')) + '"' : '';
     const disabledCls = svc.protected ? 'opacity-50 cursor-not-allowed' : '';
 
@@ -344,7 +344,7 @@ async function viewDetail(name) {
         const isProtected = PROTECTED_SERVICES && PROTECTED_SERVICES.includes(name);
         const disabled = isProtected ? 'disabled' : '';
         const disabledCls = isProtected ? 'opacity-50 cursor-not-allowed' : '';
-        const eName = escAttr(name);
+        const eName = escJsAttr(name); // injecte dans des handlers onclick (chaine JS)
 
         let actHtml = '';
         if (activeState === 'active') {
@@ -415,4 +415,18 @@ function escAttr(s) {
     return String(s).replace(/&/g, '&amp;').replace(/'/g, '&#39;')
                      .replace(/"/g, '&quot;').replace(/</g, '&lt;')
                      .replace(/>/g, '&gt;').replace(/\\/g, '\\\\');
+}
+
+// Patch A03 (DOM-XSS) : echappement pour une valeur placee dans une chaine JS
+// single-quote a l'interieur d'un attribut onclick double-quote. escAttr (entites
+// HTML) est DANGEREUX ici : le parseur HTML decode &#39; en ' AVANT que le JS ne
+// compile le handler -> breakout de chaine. On hex-echappe tout caractere non
+// alphanumerique : la sortie ne contient ni quote/&/</> litteral (attribut HTML
+// intact) et les \xNN sont decodes en data inerte par le moteur JS au clic.
+function escJsAttr(s) {
+    return String(s == null ? '' : s).replace(/[^a-zA-Z0-9_.\-]/g, function (c) {
+        var n = c.charCodeAt(0);
+        return n < 256 ? '\\x' + n.toString(16).padStart(2, '0')
+                       : '\\u' + n.toString(16).padStart(4, '0');
+    });
 }

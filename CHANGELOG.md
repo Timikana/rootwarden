@@ -5,6 +5,129 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.23.0] - 2026-06-10 — Audit sécurité de bout en bout + remédiations OWASP Top 10
+
+Audit complet du code (backend Flask, frontend PHP, JS, infra Docker/CI) suivi
+de la remédiation de l'ensemble des findings. Les escalades de privilège
+identifiées étaient exploitables de bout en bout (proxy → backend) ; les autres
+relèvent du durcissement défense-en-profondeur, de la robustesse et de bugs
+fonctionnels. Tous les correctifs portent un commentaire `Patch <Axx>` au point
+de modification.
+
+### A01 — Broken Access Control (escalades corrigées)
+- `routes/helpers.py::require_machine_access` : lisait uniquement `machine_id`
+  /`server_id` (singulier) → **no-op** sur les routes à paramètre `machine_ids`
+  (pluriel). Désormais collecte aussi `machine_ids`/`server_ids` (listes) et
+  **fail-closed** si un id n'est pas autorisé.
+- `routes/ssh.py` : ajout de `@require_role(2)` sur `deploy_platform_key`,
+  `deploy_service_account` (déploiement compte root `NOPASSWD:ALL`),
+  `remove_ssh_password`, `reenter_ssh_password`, `scan_server_users`,
+  `remove_user_keys`, `delete_remote_user` — qui n'avaient aucun contrôle de rôle.
+- `adm/includes/manage_users.php` + `import_csv.php` : un admin (role 2) pouvait
+  créer un compte **superadmin** (role_id=3 accepté sans contrôle hiérarchique)
+  puis prendre le contrôle via le magic-link. Désormais un créateur non-superadmin
+  ne peut créer/assigner qu'un rôle **strictement inférieur** au sien.
+- `adm/includes/manage_roles.php::change_role` : autorisait l'égalité de rôle
+  (admin → admin) ; passé à strictement inférieur (superadmin excepté).
+- `adm/api/update_server_access.php` (`update_sudo`) : aucune garde de rôle/anti-self
+  → un admin posait `all_nopasswd` (root distant) sur tout user ; désormais
+  **superadmin-only** (cohérent avec l'UI).
+- `api_proxy.php` : gate de rôle défense-en-profondeur sur les préfixes admin
+  (`/deploy_service_account`, `/policy/`, `/admin/`, …) en plus du backend.
+- `routes/cve.py::cve_compare` : IDOR — les `scan1`/`scan2` fournis n'étaient pas
+  liés au `machine_id` autorisé ; vérification d'appartenance ajoutée.
+- `routes/helpers.py::_validate_api_key_from_db` : **fail-open** sur scope d'API
+  key corrompu/non-liste (le commentaire promettait "denied", le code accordait) ;
+  désormais fail-closed.
+
+### A02 — Cryptographic Failures
+- `routes/helpers.py` + `server_checks.py` : **retrait** du fallback déchiffreur
+  legacy `ssh_utils.decrypt_password` (heuristique best-effort qui annulait la
+  garantie d'intégrité AES-GCM/anti-padding-oracle) ; fail-closed sur échec.
+- `encryption.py` : la boucle de déchiffrement GCM essaie désormais aussi la clé
+  dérivée de `OLD_SECRET_KEY` (rotation) — évitait de retomber sur le fallback.
+- `mail_utils.py` : STARTTLS/SMTPS avec contexte TLS vérifiant (chaîne+hostname) ;
+  sans contexte, un MITM capturait les credentials SMTP.
+- `includes/totp_crypto.php` : fallback non-sodium passé d'AES-256-**CBC** (non
+  authentifié) à AES-256-**GCM** (AEAD) ; lecture rétrocompatible des anciens
+  blobs `totp:aes:`.
+- `adm/server_user_policies.php` : suppression de la clé API backend exposée en
+  clair dans le DOM (`const API_KEY`).
+
+### A03 — Injection / XSS
+- DOM-XSS : helper `escJsAttr()` (hex-échappement) introduit dans 7 modules JS
+  (`services`, `fail2ban`, `ssh-audit`, `bashrc`, `graylog`, `wazuh`,
+  `supervision/profiles`). `escAttr` (entités HTML) dans un `onclick` était
+  contournable : le parseur décode `&#39;` en `'` avant compilation JS → breakout.
+- `json_encode` en contexte `<script>` : ajout des flags
+  `JSON_HEX_TAG|APOS|QUOT|AMP` (`head.php`, `ssh/index.php`, `ssh-audit/index.php`).
+- `notifications.php` : href de notification restreint aux chemins internes
+  (bloque `javascript:`), aligné sur `menu.php`.
+- `mail_utils.py` : `html.escape()` sur toutes les valeurs interpolées dans le
+  rapport CVE + neutralisation d'injection d'en-tête SMTP (CR/LF dans le sujet).
+- `configure_servers.py` : validation `_USERNAME_RE` (regex stricte) ajoutée sur
+  `configure_user`/`deploy_user_config`/`manage_ssh_keys`/`add_to_sudoers`/
+  `remove_from_sudoers`/`user_exists` — seul module sans cette défense.
+
+### A04 — Insecure Design
+- `api_proxy.php` : le check step-up 2FA utilisait une résolution de chemin
+  divergente du forwarding (préfixe `api_proxy.php` non retiré) → step-up
+  contournable si `PATH_INFO` absent. Chemin canonique calculé une seule fois.
+
+### A07 — Authentication Failures
+- `auth/reset_password.php` + `profile.php` : invalidation des `active_sessions`
+  et `remember_tokens` après changement/reset de mot de passe (un attaquant gardait
+  sa session après reset).
+- `auth/login.php` : anti-énumération par timing (coût bcrypt équivalent brûlé
+  pour les comptes inexistants) + re-hash bcrypt transparent si coût obsolète.
+- `auth/step_up_verify.php` : anti-rejeu TOTP (le step-up n'en avait aucun).
+- `auth/verify_2fa.php` : une 2FA réussie était comptée comme échec dans le
+  rate-limit IP (DoS de comptes légitimes) ; double incrément du compteur session
+  corrigé.
+
+### A08 / A09 / A10
+- A10 SSRF : `cve_scanner.py` et `webhooks.py` suivaient les redirections sans
+  re-valider la cible → helper `_safe_get` (redirections désactivées + re-validation
+  de chaque saut) ; webhooks `generic` signés HMAC-SHA256 (`WEBHOOK_SECRET`).
+- A08 CI : bloc `permissions: contents: read` global (least-privilege GITHUB_TOKEN).
+- A09 : messages d'erreur SQL génériques côté client (`policies.py`), détail en log.
+
+### Bugs fonctionnels
+- `scheduler.py` : les **audits SSH planifiés ne s'exécutaient jamais** (bloc dans
+  une fonction `_scheduler_loop` jamais appelée) ; fusionné dans la boucle active
+  + fuite de connexion MySQL corrigée (close en `finally`). Fonction morte supprimée.
+- `adm/health_check.php` : la page diagnostic déclenchait des **actions
+  destructives sur un serveur de prod** au chargement (stop cron, réécriture
+  sshd_config, dpkg_repair…) ; routes mutantes basculées sur `machine_id=0` (no-op).
+- `index.php` : carte « remédiations » lisait `$remStats` avant sa définition
+  (toujours 0) + précédence d'opérateur `?? 0 > 0` corrigée.
+- `db_backup.py` : écriture atomique (`.tmp`→rename) + sidecar `.sha256` (un dump
+  tronqué par exception n'est plus pris pour un backup valide).
+
+### Infra / déploiement
+- `docker-compose.prod.yml` : retrait de `user:"1000:1000"` (incompatible avec
+  `useradd -r` + `gosu` → crashloop backend en prod).
+- `php/install.sh` : flag `.installed` et credentials écrits dans un volume
+  persistant writable (`/var/www/sessions`) au lieu de `/var/www/html` (read_only)
+  → évitait un crashloop et la régénération du mot de passe superadmin à chaque boot.
+  Compat du flag legacy conservée.
+- `backend/entrypoint.sh` : hypercorn lancé via `-c hypercorn_config.py`
+  (`workers=4` était ignoré, 1 seul worker en prod).
+- `.gitignore` : exclusion des scripts e2e `*-pentest.mjs` (credentials de test en dur).
+
+### Limitations connues (non corrigées dans cette release)
+- **CSP** : la politique réelle conserve `script-src 'unsafe-inline'` sans nonce.
+  La migration (nonce sur chaque `<script>` inline + retrait de `'unsafe-inline'`)
+  nécessite un test navigateur complet pour ne pas casser l'UI → à planifier.
+  Commentaire trompeur de `csp_nonce.php` corrigé pour refléter l'état réel.
+- **Vérification de clé d'hôte SSH** (`AutoAddPolicy`) : laissée en l'état
+  (changer pour `RejectPolicy` sans flux d'enrôlement TOFU casserait tout SSH) —
+  décision de design à trancher.
+- **CI/images** : SHA-pinning des actions GitHub et digest-pinning des images de
+  base recommandés (nécessitent une résolution réseau, non faite ici).
+
+---
+
 ## [1.22.2] - 2026-05-31 — Pattern desired/actual state + UI grossie
 
 ### Architecture : resolution de la double source de verite

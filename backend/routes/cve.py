@@ -275,6 +275,22 @@ def cve_compare():
             scan2_id = scans[0]['id']  # plus recent
             scan1_id = scans[1]['id']  # precedent
 
+        # Patch A01 (IDOR) : verifier que les DEUX scans appartiennent bien a la
+        # machine autorisee. Avant, scan1/scan2 fournis en query etaient requetes
+        # directement -> un user pouvait lire les findings de scans d'une autre
+        # machine en devinant des ids sequentiels.
+        try:
+            s1, s2 = int(scan1_id), int(scan2_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'message': 'scan invalide'}), 400
+        cur.execute(
+            "SELECT id FROM cve_scans WHERE id IN (%s, %s) AND machine_id = %s",
+            (s1, s2, machine_id)
+        )
+        owned = {r['id'] for r in cur.fetchall()}
+        if s1 not in owned or s2 not in owned:
+            return jsonify({'success': False, 'message': 'Scan introuvable pour cette machine'}), 403
+
         # CVE du scan 1 (ancien)
         cur.execute("SELECT cve_id, package_name, cvss_score, severity FROM cve_findings WHERE scan_id = %s", (int(scan1_id),))
         cves1 = {r['cve_id']: r for r in cur.fetchall()}

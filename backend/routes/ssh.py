@@ -516,6 +516,7 @@ def get_platform_key():
 
 @bp.route('/deploy_platform_key', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : deploiement de cle plateforme reserve admin
 @require_machine_access
 @threaded_route
 def deploy_platform_key():
@@ -808,6 +809,7 @@ def revoke_service_account():
 
 @bp.route('/deploy_service_account', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : deploiement compte service NOPASSWD:ALL reserve admin
 @require_machine_access
 @threaded_route
 def deploy_service_account():
@@ -1002,6 +1004,7 @@ def test_platform_key():
 
 @bp.route('/remove_ssh_password', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : effacement des credentials SSH reserve admin
 @require_machine_access
 @threaded_route
 def remove_ssh_password():
@@ -1034,6 +1037,7 @@ def remove_ssh_password():
 
 @bp.route('/reenter_ssh_password', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : reecriture des credentials SSH reserve admin
 @require_machine_access
 @threaded_route
 def reenter_ssh_password():
@@ -1078,6 +1082,7 @@ def regenerate_platform_key_route():
 
 @bp.route('/scan_server_users', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : enumeration des comptes distants reservee admin
 @require_machine_access
 @threaded_route
 def scan_server_users():
@@ -1669,6 +1674,7 @@ echo "removed=$removed"
 
 @bp.route('/remove_user_keys', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : suppression de toutes les cles d'un user reservee admin
 @require_machine_access
 @threaded_route
 def remove_user_keys():
@@ -1733,6 +1739,7 @@ def remove_user_keys():
 
 @bp.route('/delete_remote_user', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : userdel distant irreversible reserve admin
 @require_machine_access
 @threaded_route
 def delete_remote_user():
