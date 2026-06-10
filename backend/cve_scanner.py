@@ -80,6 +80,29 @@ def _url_is_safe_external(url: str) -> bool:
     except Exception:
         return False
 
+
+def _safe_get(url: str, max_redirects: int = 5, **kwargs):
+    """GET externe avec re-validation SSRF a CHAQUE saut de redirection.
+
+    Patch A10 : avant, les appels utilisaient allow_redirects=True (defaut) ->
+    le guard ne validait que l'URL initiale, et une reponse 302 Location
+    pointant vers 169.254.169.254 (metadata cloud) ou un service interne etait
+    suivie sans controle. Ici on desactive les redirections automatiques et on
+    revalide manuellement chaque Location via _url_is_safe_external."""
+    kwargs['allow_redirects'] = False
+    current = url
+    for _ in range(max_redirects + 1):
+        if not _url_is_safe_external(current):
+            raise ValueError(f"URL refusee (SSRF guard) : {urlparse(current).hostname}")
+        resp = requests.get(current, **kwargs)
+        if resp.status_code in (301, 302, 303, 307, 308) and 'Location' in resp.headers:
+            current = requests.compat.urljoin(current, resp.headers['Location'])
+            # params ne doivent pas etre re-appliques sur la cible de redirection
+            kwargs.pop('params', None)
+            continue
+        return resp
+    raise ValueError("Trop de redirections (SSRF guard)")
+
 # ────────────────────────────────────────────────────────────────────────────
 # Utilitaires CVSS
 # ────────────────────────────────────────────────────────────────────────────
@@ -197,15 +220,14 @@ class OpenCVEClient:
                 return data
 
         url = f"{self.base_url}{path}"
-        # Patch A10-02 : refuse les targets loopback/link-local/multicast
-        if not _url_is_safe_external(url):
-            raise ValueError(f"URL OpenCVE refusee (SSRF guard) : {self.base_url}")
+        # Patch A10-02/A10 : refuse loopback/link-local/multicast + revalide
+        # chaque redirection (cf. _safe_get).
         kwargs = {'params': params, 'timeout': 15}
         if self.token:
             kwargs['headers'] = {'Authorization': f'Bearer {self.token}'}
         else:
             kwargs['auth'] = self.auth
-        resp = requests.get(url, **kwargs)
+        resp = _safe_get(url, **kwargs)
         resp.raise_for_status()
         data = resp.json()
         self._cache[cache_key] = (now, data)
@@ -470,14 +492,11 @@ class NVDClient:
             # Sans ca, un admin modifiant NVD_API_URL en .env vers
             # http://169.254.169.254/... exfiltrait les creds cloud via les logs
             # de scan. Pareil pour le second appel paginate plus bas.
-            if not _url_is_safe_external(self.url):
-                _log.warning("NVD URL refusee (SSRF guard) : %s", self.url)
-                return None
             headers = {}
             if self.api_key:
                 headers['apiKey'] = self.api_key
-            resp = requests.get(self.url, params={'cveId': cve_id},
-                                headers=headers, timeout=15)
+            resp = _safe_get(self.url, params={'cveId': cve_id},
+                             headers=headers, timeout=15)
             self._last_call = time.time()
             if resp.status_code == 404:
                 self._cache[cve_id] = (now, [])
@@ -566,7 +585,7 @@ def scan_component_via_nvd(component_name: str, version: str,
             headers = {}
             if nvd.api_key:
                 headers['apiKey'] = nvd.api_key
-            resp = requests.get(nvd.url, params={
+            resp = _safe_get(nvd.url, params={
                 'cpeName': cpe_name,
                 'resultsPerPage': per_page,
                 'startIndex': start_index,

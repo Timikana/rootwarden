@@ -61,6 +61,16 @@ if (!$row || empty($row['totp_secret'])) {
     exit;
 }
 
+// Patch A07 (anti-rejeu) : avant, le step-up n'avait AUCUN anti-rejeu -> un
+// code TOTP intercepte restait utilisable pour valider une action sensible
+// pendant toute sa fenetre. On lie le code a sa fenetre de temps et on rejette
+// la reutilisation (meme principe que verify_2fa.php).
+$codeHash = hash('sha256', $code . floor(time() / 30));
+if (($_SESSION['_step_up_last_totp'] ?? '') === $codeHash) {
+    echo json_encode(['success' => false, 'message' => 'Code 2FA deja utilise']);
+    exit;
+}
+
 $secret = decryptTotpSecret($row['totp_secret']);
 $totp = TOTP::create($secret);
 if (!$totp->verify($code, null, 1)) {
@@ -68,6 +78,7 @@ if (!$totp->verify($code, null, 1)) {
     exit;
 }
 
+$_SESSION['_step_up_last_totp'] = $codeHash;
 stepUpMark($action);
 echo json_encode([
     'success' => true,

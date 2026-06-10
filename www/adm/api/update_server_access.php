@@ -95,6 +95,17 @@ if (isset($data['user_id'], $data['machine_id'], $data['action'])) {
         } elseif ($action === 'update_sudo') {
             // --- v1.22.0 : mise a jour du preset sudo par couple (user, machine) ---
             // Necessite que l'access existe deja. Whitelist preset cote serveur.
+            //
+            // Patch A01 : l'octroi d'un preset sudo equivaut a accorder root
+            // distant -> action superadmin-only, comme l'UI le restreint deja
+            // (manage_access.php n'affiche le dropdown que si $isSuperAdmin).
+            // Avant ce patch la branche n'avait AUCUN controle de role ni
+            // anti-self : un admin (role 2) pouvait poser all_nopasswd sur
+            // n'importe quel user disposant deja d'un acces machine.
+            if ($currentRoleId < 3) {
+                echo json_encode(['success' => false, 'message' => 'Action reservee au superadmin.']);
+                exit;
+            }
             $ALLOWED_PRESETS = ['none', 'all_nopasswd', 'restart_services', 'apt_only', 'read_logs', 'systemctl_specific', 'custom'];
             $preset = $data['sudo_preset'] ?? 'none';
             if (!in_array($preset, $ALLOWED_PRESETS, true)) {

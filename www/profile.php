@@ -186,6 +186,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $expiresAt = $effectiveDays > 0 ? date('Y-m-d', strtotime("+{$effectiveDays} days")) : null;
                 $stmt = $pdo->prepare("UPDATE users SET password = ?, password_expires_at = ? WHERE id = ?");
                 $stmt->execute([$hashedPassword, $expiresAt, $userId]);
+
+                // Patch A07 : revoquer les AUTRES sessions actives (on garde la
+                // session courante) et tous les cookies "remember-me" apres un
+                // changement de mot de passe. Best-effort.
+                try {
+                    $pdo->prepare("DELETE FROM active_sessions WHERE user_id = ? AND session_id != ?")
+                        ->execute([$userId, session_id()]);
+                } catch (\Throwable $_e) { error_log("[profile] purge active_sessions: " . $_e->getMessage()); }
+                try {
+                    $pdo->prepare("DELETE FROM remember_tokens WHERE user_id = ?")->execute([$userId]);
+                } catch (\Throwable $_e) { error_log("[profile] purge remember_tokens: " . $_e->getMessage()); }
+
                 // Effacer le flag d'expiration en session
                 unset($_SESSION['password_expired'], $_SESSION['password_warn_days']);
 

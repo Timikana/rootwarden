@@ -46,17 +46,20 @@ def _resolve_ssh_creds(data):
     if not machine_id:
         return None, None, None, None, None, False, None, "machine_id requis."
 
+    # Patch (bug) : with-context -> la connexion est fermee meme si execute leve
+    # (avant, conn.close() dans le try fuyait la connexion sur erreur).
+    # Patch A09 : message generique au client, detail en log (pas de f"...{e}").
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            "SELECT id, ip, port, user, password, root_password, "
-            "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-            (int(machine_id),))
-        row = cur.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, ip, port, user, password, root_password, "
+                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
+                (int(machine_id),))
+            row = cur.fetchone()
     except Exception as e:
-        return None, None, None, None, None, False, None, f"Erreur BDD: {e}"
+        logger.error("Erreur BDD _resolve_ssh_creds: %s", e)
+        return None, None, None, None, None, False, None, "Erreur BDD"
 
     if not row:
         return None, None, None, None, None, False, None, "Machine introuvable."
@@ -78,12 +81,11 @@ def _resolve_ssh_creds(data):
 def _get_username_from_server_user_id(server_user_id: int) -> str:
     """Lookup username via server_user_inventory.id. Retourne '' si introuvable."""
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT username FROM server_user_inventory WHERE id = %s",
-                    (int(server_user_id),))
-        row = cur.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT username FROM server_user_inventory WHERE id = %s",
+                        (int(server_user_id),))
+            row = cur.fetchone()
     except Exception:
         return ''
     return row['username'] if row else ''
@@ -519,16 +521,17 @@ def rollback():
 
     # Lookup le deployment cible
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            "SELECT id, machine_id, server_user_id, policy_type, "
-            "previous_file_content, target_path, status FROM policy_deployments WHERE id = %s",
-            (int(deployment_id),))
-        dep = cur.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, machine_id, server_user_id, policy_type, "
+                "previous_file_content, target_path, status FROM policy_deployments WHERE id = %s",
+                (int(deployment_id),))
+            dep = cur.fetchone()
     except Exception as e:
-        return jsonify({'success': False, 'message': f'Erreur BDD: {e}'}), 500
+        # Patch A09 : pas de detail SQL au client.
+        logger.error("Erreur BDD rollback lookup: %s", e)
+        return jsonify({'success': False, 'message': 'Erreur BDD'}), 500
 
     if not dep:
         return jsonify({'success': False, 'message': 'deployment introuvable'}), 404

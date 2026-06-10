@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 node_modules/
+
+# Scripts e2e pentest/scratch : contiennent des credentials de test (mots de
+# passe localhost + secret TOTP) en dur. Ne JAMAIS committer.
+tests/e2e/go-test-pentest.mjs
+tests/e2e/*-pentest.mjs
 package-lock.json
 vendor/
 !vendor/composer/

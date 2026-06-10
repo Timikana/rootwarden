@@ -17,10 +17,17 @@
 set -e
 
 APP_DIR="/var/www/html"
-FLAG_FILE="${APP_DIR}/.installed"
+# Patch A05 : en prod /var/www/html est monte read_only -> le flag .installed et
+# le fichier de credentials ne peuvent pas y etre ecrits (install.sh planterait
+# en boucle, ou re-genererait le mot de passe superadmin a chaque boot). On les
+# place dans un volume PERSISTANT et writable (php_sessions -> /var/www/sessions).
+STATE_DIR="/var/www/sessions"
+mkdir -p "${STATE_DIR}" 2>/dev/null || true
+FLAG_FILE="${STATE_DIR}/.installed"
+LEGACY_FLAG="${APP_DIR}/.installed"   # compat installs anterieures
 
-# ── Idempotence : ne pas re-executer si deja installe ───────────────────────
-if [ -f "${FLAG_FILE}" ]; then
+# ── Idempotence : ne pas re-executer si deja installe (nouveau flag OU legacy) ─
+if [ -f "${FLAG_FILE}" ] || [ -f "${LEGACY_FLAG}" ]; then
     echo "[RootWarden] Installation deja effectuee - install.sh ignore"
     exit 0
 fi
@@ -101,7 +108,7 @@ php -r "
 # ── Ecriture securisee des identifiants ──────────────────────────────────────
 # Le mot de passe est ecrit dans un fichier temporaire lisible uniquement par root.
 # Il est aussi affiche une seule fois dans les logs Docker (premier demarrage).
-CREDS_FILE="${APP_DIR}/.first_run_credentials"
+CREDS_FILE="${STATE_DIR}/.first_run_credentials"
 cat > "${CREDS_FILE}" <<CREDS_EOF
 ========================================
  ROOTWARDEN - Identifiants initiaux

@@ -36,34 +36,29 @@ def decrypt_password(encrypted_password, logger=None):
     """
     Déchiffre un mot de passe chiffré stocké en base de données.
 
-    Tente d'abord de déchiffrer via l'instance globale ``encryptor`` (Encryption).
-    En cas d'échec, effectue un second essai via la fonction ``decrypt_password``
-    de ``ssh_utils`` (importée dynamiquement pour éviter les imports circulaires).
+    Déchiffre via l'instance globale ``encryptor`` (Encryption) qui gère tous
+    les formats (AES-GCM AEAD, sodium, CBC legacy + rotation OLD_SECRET_KEY).
+
+    Patch A02 : le fallback vers ``ssh_utils.decrypt_password`` (dechiffreur
+    "best-effort" qui devine un plaintext par heuristique) a ete RETIRE car il
+    annulait la garantie d'integrite du patch A02-02. Fail-closed en cas d'echec.
 
     Args:
         encrypted_password: Mot de passe chiffré (chaîne ou None).
         logger            : Logger optionnel pour enregistrer les erreurs.
 
     Returns:
-        Le mot de passe en clair (str), une chaîne vide si ``encrypted_password``
-        est falsy, ou None si les deux tentatives de déchiffrement échouent.
+        Le mot de passe en clair (str), ou une chaîne vide si ``encrypted_password``
+        est falsy ou si le déchiffrement échoue.
     """
     if not encrypted_password:
         return ""
     try:
-        # Utiliser la méthode decrypt_password de la classe Encryption qui gère tous les formats
         return encryptor.decrypt_password(encrypted_password)
     except Exception as e:
         if logger:
-            logger.error(f"Erreur de déchiffrement dans update_server: {e}")
-        # Si on a une erreur avec l'encrypteur, tenter avec la méthode du ssh_utils
-        try:
-            from ssh_utils import decrypt_password as ssh_decrypt
-            return ssh_decrypt(encrypted_password, logger)
-        except Exception as e2:
-            if logger:
-                logger.error(f"Seconde tentative de déchiffrement échouée dans update_server: {e2}")
-            return None
+            logger.error(f"Erreur de déchiffrement dans update_server (fail-closed): {e}")
+        return ""
 
 def get_linux_version(channel):
     """

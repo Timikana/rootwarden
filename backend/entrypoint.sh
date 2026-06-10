@@ -18,6 +18,8 @@ if [ ! -f /app/ssl/srv-docker.pem ] || [ ! -f /app/ssl/srv-docker-key.pem ]; the
     echo "[RootWarden] Certificat SSL genere."
 fi
 
-# Drop privileges and exec hypercorn as non-root user
-exec gosu rootwarden hypercorn -b 0.0.0.0:5000 \
-    --certfile=ssl/srv-docker.pem --keyfile=ssl/srv-docker-key.pem server:app
+# Drop privileges and exec hypercorn as non-root user.
+# Patch (bug) : on charge hypercorn_config.py via -c. Avant, les flags etaient
+# passes en CLI et le fichier de config (workers=4, bind, cert) etait IGNORE ->
+# le backend tournait avec 1 seul worker (defaut) malgre la config.
+exec gosu rootwarden hypercorn -c hypercorn_config.py server:app

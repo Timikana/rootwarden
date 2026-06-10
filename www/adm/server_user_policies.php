@@ -243,7 +243,8 @@ if ($selectedId && $selectedUserId) {
 <script>
 const MACHINE_ID = <?= (int)$selectedId ?>;
 const SERVER_USER_ID = <?= (int)$selectedUserId ?>;
-const API_KEY = <?= json_encode(getenv('API_KEY') ?: '') ?>;
+// Patch A02 : la cle API backend ne doit JAMAIS etre exposee dans le DOM.
+// Tous les appels passent par /api_proxy.php qui injecte la cle cote serveur.
 const USER_ID = <?= (int)($_SESSION['user_id'] ?? 0) ?>;
 const T = {
     confirmRemove: <?= json_encode(t('policies.confirm_remove')) ?>,

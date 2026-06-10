@@ -18,6 +18,7 @@ Variables d'environnement :
 
 import os
 import gzip
+import hashlib
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -30,23 +31,32 @@ BACKUP_DIR = Path('/app/backups')
 
 
 def create_backup() -> str:
-    """Cree un backup mysqldump compresse. Retourne le chemin du fichier."""
+    """Cree un backup mysqldump compresse. Retourne le chemin du fichier.
+
+    Patch (bug/A08) : ecriture atomique via un fichier .tmp renomme seulement
+    apres succes complet (avant, un dump tronque par une exception restait sur
+    disque et etait considere comme un backup valide). Un sidecar .sha256 est
+    ecrit pour permettre de verifier l'integrite avant restauration.
+    Note A02 : le volume /app/backups doit etre chiffre au repos (le dump
+    contient hashes/secrets chiffres) - cf. OPERATIONS.md."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f"rootwarden_backup_{timestamp}.sql.gz"
     filepath = BACKUP_DIR / filename
+    tmppath = BACKUP_DIR / (filename + '.tmp')
 
     db = Config.DB_CONFIG
 
     _log.info("Backup MySQL en cours -> %s", filepath)
 
+    conn = None
     try:
         import mysql.connector
         conn = mysql.connector.connect(**db)
         cur = conn.cursor()
 
-        with gzip.open(filepath, 'wt', encoding='utf-8') as f:
+        with gzip.open(tmppath, 'wt', encoding='utf-8') as f:
             f.write(f"-- RootWarden backup {timestamp}\n")
             f.write(f"-- Database: {db['database']}\n\n")
 
@@ -84,13 +94,37 @@ def create_backup() -> str:
             f.write(f"\n-- End of backup {timestamp}\n")
 
         conn.close()
+        conn = None
+
+        # Rename atomique : le backup n'existe sous son nom final que s'il est
+        # complet. Puis sidecar .sha256 pour verification d'integrite.
+        os.replace(tmppath, filepath)
+        sha = hashlib.sha256()
+        with open(filepath, 'rb') as fh:
+            for chunk in iter(lambda: fh.read(65536), b''):
+                sha.update(chunk)
+        with open(str(filepath) + '.sha256', 'w', encoding='utf-8') as sf:
+            sf.write(f"{sha.hexdigest()}  {filename}\n")
+
         size_mb = filepath.stat().st_size / (1024 * 1024)
-        _log.info("Backup cree: %s (%.1f MB)", filename, size_mb)
+        _log.info("Backup cree: %s (%.1f MB, sha256 %s...)", filename, size_mb, sha.hexdigest()[:12])
         return str(filepath)
 
     except Exception as e:
         _log.error("Backup echoue: %s", e)
+        # Nettoyer le .tmp partiel pour ne pas laisser de fichier corrompu.
+        try:
+            if tmppath.exists():
+                tmppath.unlink()
+        except Exception:
+            pass
         raise
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def cleanup_old_backups():
@@ -107,10 +141,21 @@ def cleanup_old_backups():
             mtime = datetime.fromtimestamp(f.stat().st_mtime)
             if mtime < cutoff:
                 f.unlink()
+                # Supprimer le sidecar .sha256 associe s'il existe.
+                sidecar = Path(str(f) + '.sha256')
+                if sidecar.exists():
+                    sidecar.unlink()
                 deleted += 1
                 _log.debug("Backup supprime: %s", f.name)
         except Exception as e:
             _log.warning("Erreur suppression %s: %s", f.name, e)
+
+    # Purger aussi les .tmp orphelins (backups interrompus).
+    for tmp in BACKUP_DIR.glob('rootwarden_backup_*.sql.gz.tmp'):
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
 
     if deleted > 0:
         _log.info("Purge backups: %d fichier(s) supprime(s) (retention %d jours)", deleted, retention)

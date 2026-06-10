@@ -169,7 +169,7 @@ async function loadJailDetail(jail) {
                     <td class="py-2 px-3 font-mono text-sm">${escHtml(ip)}</td>
                     <td class="py-2 px-3 text-xs" id="geo-${escAttr(ip)}"><span class="text-gray-400">...</span></td>
                     <td class="py-2 px-3 text-right">
-                        <button onclick="unbanIp('${escAttr(jail)}', '${escAttr(ip)}')"
+                        <button onclick="unbanIp('${escJsAttr(jail)}', '${escJsAttr(ip)}')"
                                 class="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors">
                             Unban
                         </button>
@@ -342,11 +342,11 @@ async function loadServices() {
                         jailsHtml += `
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
                                 ${escHtml(j.name)}
-                                <button onclick="disableJail('${escAttr(j.name)}')" class="ml-1 text-red-500 hover:text-red-700" title="${__('f2b_disable')}">&times;</button>
+                                <button onclick="disableJail('${escJsAttr(j.name)}')" class="ml-1 text-red-500 hover:text-red-700" title="${__('f2b_disable')}">&times;</button>
                             </span>`;
                     } else {
                         jailsHtml += `
-                            <button onclick="openJailModal('${escAttr(j.name)}')"
+                            <button onclick="openJailModal('${escJsAttr(j.name)}')"
                                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:bg-green-100 hover:text-green-700 transition-colors"
                                     title="${__('f2b_click_to_enable')}">
                                 ${escHtml(j.name)} +
@@ -613,4 +613,15 @@ function escAttr(s) {
     return String(s).replace(/&/g, '&amp;').replace(/'/g, '&#39;')
                      .replace(/"/g, '&quot;').replace(/</g, '&lt;')
                      .replace(/>/g, '&gt;').replace(/\\/g, '\\\\');
+}
+
+// Patch A03 (DOM-XSS) : echappement sur pour une valeur dans une chaine JS
+// single-quote a l'interieur d'un onclick (cf. services/js/main.js). Hex-echappe
+// tout sauf alphanumerique -> pas de breakout possible via ' ou entites HTML.
+function escJsAttr(s) {
+    return String(s == null ? '' : s).replace(/[^a-zA-Z0-9_.\-]/g, function (c) {
+        var n = c.charCodeAt(0);
+        return n < 256 ? '\\x' + n.toString(16).padStart(2, '0')
+                       : '\\u' + n.toString(16).padStart(4, '0');
+    });
 }

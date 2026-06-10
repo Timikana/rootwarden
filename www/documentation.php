@@ -973,6 +973,32 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                     via <code>sudo_manager.render_policy()</code>, on valide par <code>visudo -cf</code>, puis <code>mv</code>
                     atomique. Fallback historique sur le bool <code>users.sudo</code> si pas de preset configure.
                 </p>
+
+                <h3 class="font-semibold mt-4 mb-2">Durcissement securite OWASP Top 10 (v1.23.0+)</h3>
+                <p class="text-sm mb-3">
+                    Audit de bout en bout suivi de la remediation de l'ensemble des findings. Points
+                    visibles pour l'exploitant (le detail complet est dans le <code>CHANGELOG.md</code>) :
+                </p>
+                <ul class="list-disc ml-6 text-sm space-y-1">
+                    <li><strong>Controle d'acces (A01)</strong> : le deploiement du compte de service root,
+                        la suppression de comptes/cles distants et l'octroi de presets sudo sont desormais
+                        reserves aux roles admin/superadmin (cote backend ET proxy). Un admin ne peut plus
+                        creer ni promouvoir un compte d'un role superieur ou egal au sien.</li>
+                    <li><strong>2FA (A07)</strong> : un changement/reset de mot de passe deconnecte toutes
+                        les autres sessions et revoque les cookies "se souvenir de moi". Anti-rejeu du code
+                        TOTP ajoute sur la re-authentification (step-up). Une 2FA reussie ne compte plus
+                        comme un echec dans le rate-limit.</li>
+                    <li><strong>Diagnostic</strong> : la page <code>Health check</code> n'execute plus
+                        aucune action modifiant un serveur reel (les routes mutantes sont testees a vide).</li>
+                    <li><strong>Audits SSH planifies</strong> : corrige — ils ne s'executaient jamais
+                        auparavant (bug du scheduler).</li>
+                    <li><strong>Webhooks</strong> : les webhooks de type <code>generic</code> peuvent etre
+                        signes en HMAC-SHA256 via la variable <code>WEBHOOK_SECRET</code> (en-tete
+                        <code>X-RootWarden-Signature</code>).</li>
+                    <li><strong>Limitation connue</strong> : la CSP conserve <code>'unsafe-inline'</code>
+                        (migration nonce a planifier avec test navigateur). Ne pas considerer la CSP comme
+                        une barriere XSS active pour l'instant.</li>
+                </ul>
             </section>
 
             <!-- ────────────────────────────────────────── -->

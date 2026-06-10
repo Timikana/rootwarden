@@ -267,7 +267,7 @@ if ($role >= ROLE_ADMIN) {
             </div>
         </details>
         <script>
-        window._sshSchedMachines = <?= json_encode(array_column($servers, null, 'id'), JSON_UNESCAPED_UNICODE) ?>;
+        window._sshSchedMachines = <?= json_encode(array_column($servers, null, 'id'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
         </script>
         <?php endif; ?>
 

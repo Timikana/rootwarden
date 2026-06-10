@@ -17,6 +17,8 @@ Configuration via variables d'environnement :
 
 import os
 import json
+import hmac
+import hashlib
 import logging
 import requests
 
@@ -26,6 +28,8 @@ WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED', 'false').lower() == 'true'
 WEBHOOK_URL     = os.getenv('WEBHOOK_URL', '')
 WEBHOOK_TYPE    = os.getenv('WEBHOOK_TYPE', 'generic').lower()
 WEBHOOK_EVENTS  = [e.strip() for e in os.getenv('WEBHOOK_EVENTS', '').split(',') if e.strip()]
+# Secret optionnel pour signer les webhooks 'generic' (HMAC-SHA256).
+WEBHOOK_SECRET  = os.getenv('WEBHOOK_SECRET', '')
 
 
 def is_enabled(event: str = '') -> bool:
@@ -79,7 +83,20 @@ def send_webhook(title: str, message: str, event: str = '', severity: str = 'inf
         except Exception:
             pass  # si l'import echoue, on garde le comportement legacy
 
-        resp = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        # Patch A08 : signer le corps pour les webhooks 'generic' afin que le
+        # recepteur puisse verifier l'authenticite/integrite du message
+        # (HMAC-SHA256 sur le body brut). Slack/Teams/Discord ont leur propre
+        # mecanisme (URL secrete), on ne touche pas a leur payload.
+        headers = {'Content-Type': 'application/json'}
+        body = json.dumps(payload).encode('utf-8')
+        if WEBHOOK_TYPE == 'generic' and WEBHOOK_SECRET:
+            sig = hmac.new(WEBHOOK_SECRET.encode('utf-8'), body, hashlib.sha256).hexdigest()
+            headers['X-RootWarden-Signature'] = f'sha256={sig}'
+
+        # Patch A10 : allow_redirects=False -> une redirection ne peut pas
+        # rediriger l'envoi (et son eventuelle signature) vers une cible interne.
+        resp = requests.post(WEBHOOK_URL, data=body, headers=headers,
+                             timeout=10, allow_redirects=False)
         if resp.status_code < 300:
             _log.info("Webhook sent: %s [%s]", event, title[:50])
             return True

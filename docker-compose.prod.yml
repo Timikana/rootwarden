@@ -37,7 +37,11 @@ services:
       - platform_ssh_keys:/app/platform_ssh
       - ./mysql/migrations:/app/migrations:ro
     # Patch A05-NEW-01/02/03 hardening
-    user: "1000:1000"  # uid rootwarden cree dans le Dockerfile (apres gosu)
+    # NOTE : pas de `user:` ici. Le conteneur demarre root (entrypoint.sh fait
+    # chown des volumes + gen cert), puis DROP les privileges via `gosu
+    # rootwarden`. L'uid de rootwarden vient de `useradd -r` (plage systeme, PAS
+    # 1000) -> forcer user:"1000:1000" cassait gosu (setuid impossible depuis un
+    # uid non-root different) et provoquait un crashloop du backend en prod.
     read_only: true
     tmpfs:
       - /tmp:size=64M,mode=1777
