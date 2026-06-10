@@ -1026,6 +1026,23 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Score de posture de conformite (v1.26.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="compliance-posture" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Score de posture de conformité (v1.26.0+)</h2>
+                <p class="text-sm mb-3">
+                    Le rapport de conformité (<code>/security/compliance_report.php</code>, permission
+                    <code>can_view_compliance</code>) affiche un <strong>score de posture par serveur</strong>
+                    (0-100 + note A-F) qui agrège l'audit sshd, les CVE critiques/hautes, la présence de
+                    fail2ban et la dérive de configuration. Une moyenne de flotte est affichée.
+                </p>
+                <p class="text-sm">
+                    Inclus dans les exports <strong>CSV</strong> et <strong>PDF</strong> du rapport.
+                    Barème : A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, sinon F.
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Centre de taches (v1.25.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="task-center" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
