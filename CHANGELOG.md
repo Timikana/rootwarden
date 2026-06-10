@@ -26,7 +26,9 @@ de modification.
 - `adm/includes/manage_users.php` + `import_csv.php` : un admin (role 2) pouvait
   créer un compte **superadmin** (role_id=3 accepté sans contrôle hiérarchique)
   puis prendre le contrôle via le magic-link. Désormais un créateur non-superadmin
-  ne peut créer/assigner qu'un rôle **strictement inférieur** au sien.
+  ne peut créer/assigner qu'un rôle **strictement inférieur** au sien. Un toast
+  d'avertissement informe l'admin quand le rôle est ramené à « Utilisateur »
+  (plus de clamp silencieux ; clés i18n `users.role_downgraded` fr+en).
 - `adm/includes/manage_roles.php::change_role` : autorisait l'égalité de rôle
   (admin → admin) ; passé à strictement inférieur (superadmin excepté).
 - `adm/api/update_server_access.php` (`update_sudo`) : aucune garde de rôle/anti-self

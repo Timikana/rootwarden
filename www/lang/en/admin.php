@@ -59,6 +59,7 @@ return [
     'users.count' => ':count user(s)',
     'users.error_invalid_name' => 'Invalid name.',
     'users.created_success' => 'User created successfully.',
+    'users.role_downgraded' => 'Role reset to "User": you can only create a role lower than your own.',
     'users.error_sql' => 'SQL Error:',
     'users.generated_password' => 'Generated password:',
     'users.password_warning' => 'Write down this password - it will not be shown again.',
