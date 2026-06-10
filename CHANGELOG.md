@@ -5,6 +5,34 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.26.0] - 2026-06-10 — Feature : score de posture de conformité consolidé (CIS-like)
+
+Troisième feature de la roadmap. Le rapport de conformité (`/security/compliance_report.php`)
+exportait déjà CSV + PDF (dompdf) ; cette version ajoute un **score de posture
+unique par serveur** agrégeant plusieurs signaux en une note A-F.
+
+### Score de posture (0-100 + lettre, par serveur)
+Calculé PHP-side à partir des données déjà en base :
+- base = score du dernier audit sshd (`ssh_audit_results`), ou 50 si jamais audité ;
+- −30 si CVE critique(s), −15 si CVE haute(s) (dernier scan) ;
+- −15 si fail2ban absent (`fail2ban_status`) ;
+- −10 par catégorie en dérive (`config_drift`, plafonné à −30).
+Note : A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, sinon F. Moyenne de flotte affichée.
+
+### Implémentation
+- Nouvelle section « Posture de conformité par serveur » (tableau trié par score
+  croissant + carte de moyenne) dans le rapport HTML.
+- Posture intégrée aux exports **CSV** et **PDF** existants.
+- Durcissement du PDF : purge des buffers de sortie avant `stream()` — un notice
+  PHP (mode debug) pouvait corrompre le binaire en le préfixant de `<br />…`.
+- i18n fr+en (`compliance.section_posture`, `posture_avg`, `th_score`, etc.).
+
+### Vérifié
+Page 200 + 0 erreur PHP/JS, section posture + moyenne affichées, export CSV
+(section POSTURE présente), export PDF binaire valide (`%PDF-`, stable sur 3 appels).
+
+---
+
 ## [1.25.0] - 2026-06-10 — Feature : centre de tâches (suivi de l'activité de fond)
 
 Deuxième feature de la roadmap. Donne une visibilité opérationnelle sur les

@@ -42,6 +42,14 @@ return [
     'compliance.supervision_coverage' => 'Monitoring coverage',
     'compliance.th_score' => 'Score',
     'compliance.th_grade' => 'Grade',
+    // Consolidated posture (v1.26.0)
+    'compliance.section_posture' => 'Compliance posture per server',
+    'compliance.posture_desc'    => 'Consolidated score (0-100) aggregating sshd audit, critical/high CVEs, fail2ban presence and config drift.',
+    'compliance.posture_avg'     => 'Fleet average posture',
+    'compliance.posture_empty'   => 'No server to evaluate.',
+    'compliance.th_server'       => 'Server',
+    'compliance.th_score'        => 'Score',
+    'compliance.th_gaps'         => 'Gaps',
     'compliance.th_date' => 'Date',
     'compliance.btn_pdf' => 'Export PDF',
 ];
