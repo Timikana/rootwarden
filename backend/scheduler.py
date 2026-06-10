@@ -16,6 +16,7 @@ Demarrage :
 
 import json
 import time
+import shlex
 import logging
 import threading
 import mysql.connector
@@ -333,7 +334,9 @@ def _weekly_user_scan():
                         if len(parts) < 2:
                             continue
                         uname, home = parts[0], parts[1]
-                        ak_cmd = f"cat {home}/.ssh/authorized_keys 2>/dev/null | wc -l"
+                        # Patch A03 : home vient du /etc/passwd distant -> shlex.quote
+                        # pour eviter une injection si le champ contient ; $() etc.
+                        ak_cmd = f"cat {shlex.quote(home)}/.ssh/authorized_keys 2>/dev/null | wc -l"
                         stdin2, stdout2, _ = client.exec_command(ak_cmd, timeout=5)
                         count = int(stdout2.read().decode().strip() or '0')
                         if count > 0 and uname not in ('root',):

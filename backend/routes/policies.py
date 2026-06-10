@@ -78,13 +78,23 @@ def _resolve_ssh_creds(data):
     return ip, port, ssh_user, ssh_password, root_password, svc, machine_id, None
 
 
-def _get_username_from_server_user_id(server_user_id: int) -> str:
-    """Lookup username via server_user_inventory.id. Retourne '' si introuvable."""
+def _get_username_from_server_user_id(server_user_id: int, machine_id=None) -> str:
+    """Lookup username via server_user_inventory.id. Retourne '' si introuvable.
+
+    Patch A01 : si machine_id est fourni, on exige que la ligne appartienne bien
+    a cette machine (WHERE id=%s AND machine_id=%s). Avant, un server_user_id
+    d'une autre machine etait resolu sans controle -> on pouvait deployer/auditer
+    un sudoers pour un username appartenant a une machine differente."""
     try:
         with get_db_connection() as conn:
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT username FROM server_user_inventory WHERE id = %s",
-                        (int(server_user_id),))
+            if machine_id is not None:
+                cur.execute(
+                    "SELECT username FROM server_user_inventory WHERE id = %s AND machine_id = %s",
+                    (int(server_user_id), int(machine_id)))
+            else:
+                cur.execute("SELECT username FROM server_user_inventory WHERE id = %s",
+                            (int(server_user_id),))
             row = cur.fetchone()
     except Exception:
         return ''
@@ -217,7 +227,7 @@ def sudo_deploy():
     if not server_user_id:
         return jsonify({'success': False, 'message': 'server_user_id requis'}), 400
 
-    username = _get_username_from_server_user_id(server_user_id)
+    username = _get_username_from_server_user_id(server_user_id, mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
@@ -291,7 +301,7 @@ def sudo_audit():
     server_user_id = data.get('server_user_id')
     if not server_user_id:
         return jsonify({'success': False, 'message': 'server_user_id requis'}), 400
-    username = _get_username_from_server_user_id(server_user_id)
+    username = _get_username_from_server_user_id(server_user_id, mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
@@ -320,7 +330,7 @@ def sudo_remove():
     server_user_id = data.get('server_user_id')
     if not server_user_id:
         return jsonify({'success': False, 'message': 'server_user_id requis'}), 400
-    username = _get_username_from_server_user_id(server_user_id)
+    username = _get_username_from_server_user_id(server_user_id, mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
@@ -365,7 +375,7 @@ def sftp_deploy():
     server_user_id = data.get('server_user_id')
     if not server_user_id:
         return jsonify({'success': False, 'message': 'server_user_id requis'}), 400
-    username = _get_username_from_server_user_id(server_user_id)
+    username = _get_username_from_server_user_id(server_user_id, mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
@@ -441,7 +451,7 @@ def sftp_audit():
     server_user_id = data.get('server_user_id')
     if not server_user_id:
         return jsonify({'success': False, 'message': 'server_user_id requis'}), 400
-    username = _get_username_from_server_user_id(server_user_id)
+    username = _get_username_from_server_user_id(server_user_id, mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
@@ -470,7 +480,7 @@ def sftp_remove():
     server_user_id = data.get('server_user_id')
     if not server_user_id:
         return jsonify({'success': False, 'message': 'server_user_id requis'}), 400
-    username = _get_username_from_server_user_id(server_user_id)
+    username = _get_username_from_server_user_id(server_user_id, mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
@@ -538,7 +548,7 @@ def rollback():
     if int(dep['machine_id']) != int(mid):
         return jsonify({'success': False, 'message': 'deployment_id ne correspond pas a machine_id'}), 400
 
-    username = _get_username_from_server_user_id(dep['server_user_id'])
+    username = _get_username_from_server_user_id(dep['server_user_id'], mid)
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
