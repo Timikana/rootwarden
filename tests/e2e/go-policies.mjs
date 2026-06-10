@@ -20,9 +20,9 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 
 const BASE = 'https://localhost:8443';
-const USER = 'superadmin';
-const PASS = 'RootWarden@2026-Sec!';
-const SECRET = 'M7YDC3WY2AHAOC6UE2ZLF3SYH336SZTUC37WASUGH7Z6T5CZBVB5A2VK3SPETIIDMQIUAYH5QNRHR6ONO5V2ORR733MMIFFPE4LEJ7A';
+const USER = process.env.E2E_USER || 'superadmin';
+const PASS = process.env.E2E_PASS || 'RootWarden@2026-Sec!';
+const SECRET = process.env.E2E_TOTP_SECRET || ''; // audit v1.23 : secret 2FA via env, plus de secret en dur
 
 function b32(s){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let b='';for(const c of s.toUpperCase().replace(/=+$/,'')){const v=a.indexOf(c);if(v===-1)continue;b+=v.toString(2).padStart(5,'0')}const r=[];for(let i=0;i+8<=b.length;i+=8)r.push(parseInt(b.slice(i,i+8),2));return Buffer.from(r)}
 function totp(s){const k=b32(s);const c=Math.floor(Date.now()/1000/30);const buf=Buffer.alloc(8);buf.writeBigUInt64BE(BigInt(c));const h=createHmac('sha1',k).update(buf).digest();const o=h[h.length-1]&0x0f;return((h.readUInt32BE(o)&0x7fffffff)%1000000).toString().padStart(6,'0')}

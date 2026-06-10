@@ -215,8 +215,15 @@ def get_config():
 def save_config():
     data = request.get_json(silent=True) or {}
     manager_ip = (data.get('manager_ip') or '').strip()
-    manager_port = int(data.get('manager_port') or 1514)
-    registration_port = int(data.get('registration_port') or 1515)
+    # Robustesse : ports valides 1-65535, sinon valeur par defaut (pas de 500).
+    def _safe_port(v, default):
+        try:
+            p = int(v)
+            return p if 1 <= p <= 65535 else default
+        except (ValueError, TypeError):
+            return default
+    manager_port = _safe_port(data.get('manager_port'), 1514)
+    registration_port = _safe_port(data.get('registration_port'), 1515)
     reg_pwd = data.get('registration_password', '')
     default_group = (data.get('default_group') or 'default').strip()
     agent_version = (data.get('agent_version') or 'latest').strip()
