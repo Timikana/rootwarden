@@ -5,6 +5,39 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.24.0] - 2026-06-10 — Feature : détection de dérive de configuration (drift)
+
+Première feature de la roadmap produit post-audit. Détecte les écarts entre
+l'**état désiré** (géré par RootWarden) et l'**état réel** des serveurs, à partir
+des données déjà en base — **aucun nouvel appel SSH** (rapide, sans impact réseau).
+
+### Catégories évaluées (par machine)
+- **sudo** : nb de politiques désirées (`user_machine_access.sudo_preset` ≠ 'none')
+  vs nb réellement déployées et actives (`server_user_sudo_policies.enabled`).
+  Écart → « redéploiement requis ».
+- **sshd** : grade du dernier audit SSH (`ssh_audit_results`). C/D/F → dérive.
+- **fail2ban** : protection brute-force installée + active (`fail2ban_status`).
+
+### Implémentation
+- Migration `052_config_drift.sql` : table `config_drift` (upsert par
+  (machine_id, category), FK cascade, statut ok/drift/unknown + détail + horodatage).
+- Blueprint `backend/routes/drift.py` : `/drift/scan` (par machine), `/drift/scan_all`,
+  `/drift/results`. Gardé par `@require_role(2)` + `@require_permission('can_view_compliance')`,
+  requêtes 100 % paramétrées.
+- Scheduler : scan de dérive de toute la flotte une fois par heure (cycle de purge),
+  log si dérive détectée.
+- Frontend `www/drift/` : tableau par serveur (badges sudo/sshd/fail2ban), cartes de
+  résumé, boutons « Scanner tout » / « Re-scanner ». Rendu sans `onclick` interpolé
+  (addEventListener + textContent → pas de DOM-XSS).
+- Menu : entrée « Dérive de config » dans la section Conformité (`can_view_compliance`).
+- i18n fr+en (`lang/{fr,en}/drift.php`), whitelist + gate admin dans `api_proxy.php`.
+
+### Vérifié
+Migration appliquée, backend redémarre clean, page 200 + 0 erreur PHP/JS, scan_all
+fonctionnel (srv-zabbix : sudo OK, sshd non audité, fail2ban absent → dérive détectée).
+
+---
+
 ## [1.23.3] - 2026-06-10 — Lot B : résiduel bas/moyen (fin de l'audit)
 
 Derniers findings (bas/moyens) + bugs fonctionnels. Vérifié : 18/18 pages, 8/8

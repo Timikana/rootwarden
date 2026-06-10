@@ -139,6 +139,7 @@ $ALLOWED_PROXY_PREFIXES = [
     '/bashrc/',
     '/exclude_user', '/server_lifecycle',
     '/policy/',
+    '/drift/',
 ];
 $pathAllowed = false;
 foreach ($ALLOWED_PROXY_PREFIXES as $prefix) {
@@ -165,7 +166,7 @@ $ADMIN_ONLY_PREFIXES = [
     '/deploy_platform_key', '/remove_ssh_password', '/reenter_ssh_password',
     '/scan_server_users', '/sshd_allow_user', '/remove_user_keys', '/delete_remote_user',
     '/server_user_remove_key', '/admin/', '/policy/', '/exclude_user',
-    '/server_lifecycle', '/update_security_exec',
+    '/server_lifecycle', '/update_security_exec', '/drift/',
 ];
 if ($roleId < ROLE_ADMIN) {
     foreach ($ADMIN_ONLY_PREFIXES as $prefix) {
