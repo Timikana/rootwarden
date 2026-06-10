@@ -43,6 +43,7 @@ return [
     'profile.all_others_revoked' => ':count autre(s) session(s) revoquee(s).',
     'profile.error_revoke' => 'Erreur lors de la revocation de la session.',
     'profile.error_email_format' => 'Veuillez saisir une adresse email valide.',
+    'profile.must_change_password_first' => 'Vous devez d\'abord changer votre mot de passe avant toute autre modification.',
     'profile.email_updated' => 'Email mis a jour avec succes.',
     'profile.error_ssh_format' => 'Format de cle SSH invalide. Formats acceptes : ssh-rsa, ssh-ed25519, ecdsa.',
     'profile.ssh_updated' => 'Cle SSH mise a jour avec succes.',

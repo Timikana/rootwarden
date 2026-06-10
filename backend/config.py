@@ -105,6 +105,15 @@ class Config:
     DEBUG         = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
     LOG_LEVEL     = os.getenv('LOG_LEVEL', 'DEBUG' if DEBUG else 'INFO').upper()
 
+    # Patch A05 : refuser le mot de passe DB par defaut hors mode debug. Avant,
+    # un deploiement qui oubliait DB_PASSWORD demarrait silencieusement avec un
+    # mot de passe trivial et publiquement connu (present dans le depot).
+    if not DEBUG and DB_CONFIG['password'] == 'rootwarden_password':
+        raise RuntimeError(
+            "DB_PASSWORD non defini (valeur par defaut detectee) en mode non-debug. "
+            "Configurez DB_PASSWORD dans srv-docker.env avant de demarrer."
+        )
+
     # ── Feature flags (toggles ON/OFF de modules entiers) ───────────────────
     # Quand un flag est OFF :
     #   - Backend : le blueprint correspondant n'est pas enregistre (404 sur

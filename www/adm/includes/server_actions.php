@@ -72,6 +72,9 @@ function validateInput($data, $type) {
             return filter_var($data, FILTER_VALIDATE_IP) ? $data : false;
         case 'port':
             return filter_var($data, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]) ? $data : false;
+        case 'id': // Patch : identifiant entier positif SANS borne haute (un id de
+            // serveur > 65535 etait rejete a tort par le type 'port' -> serveur non editable).
+            return filter_var($data, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ? $data : false;
         case 'string':
             return htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
         case 'rsa_key': // Validation simple pour une clé RSA
@@ -186,14 +189,15 @@ if (isset($_POST['action']) && $_POST['action'] === 'add_server') {
             if ($e->getCode() == 23000) { // Violation de contrainte (par exemple, nom ou IP unique)
                 $response['message'] = "Un serveur avec ce nom ou cette IP existe déjà.";
             } else {
-                $response['message'] = "Erreur SQL : " . $e->getMessage();
+                error_log('[server_actions add] ' . $e->getMessage()); // A09 : detail en log
+                $response['message'] = "Erreur lors de l'enregistrement du serveur.";
             }
         }
     }
 } 
 // Mettre à jour un serveur
 elseif (isset($_POST['action']) && $_POST['action'] === 'update_server') {
-    $server_id = validateInput($_POST['server_id'], 'port');
+    $server_id = validateInput($_POST['server_id'], 'id');
     $name = validateInput($_POST['name'], 'name');
     $ip = validateInput($_POST['ip'], 'ip');
     $user = validateInput($_POST['user'], 'string');
@@ -234,7 +238,8 @@ elseif (isset($_POST['action']) && $_POST['action'] === 'update_server') {
                 if ($e->getCode() == 23000) {
                     $response['message'] = "Un serveur avec ce nom ou cette IP existe déjà.";
                 } else {
-                    $response['message'] = "Erreur SQL : " . $e->getMessage();
+                    error_log('[server_actions update] ' . $e->getMessage()); // A09 : detail en log
+                    $response['message'] = "Erreur lors de la mise a jour du serveur.";
                 }
             }
         }
@@ -242,7 +247,7 @@ elseif (isset($_POST['action']) && $_POST['action'] === 'update_server') {
 } 
 // Supprimer un serveur
 elseif (isset($_POST['action']) && $_POST['action'] === 'delete_server') {
-    $server_id = validateInput($_POST['server_id'], 'port');
+    $server_id = validateInput($_POST['server_id'], 'id');
     if (!$server_id) {
         $response['message'] = "ID de serveur invalide.";
     } else {
@@ -252,7 +257,8 @@ elseif (isset($_POST['action']) && $_POST['action'] === 'delete_server') {
             $response['success'] = true;
             $response['message'] = "Serveur supprimé avec succès.";
         } catch (PDOException $e) {
-            $response['message'] = "Erreur SQL : " . $e->getMessage();
+            error_log('[server_actions delete] ' . $e->getMessage()); // A09 : detail en log
+            $response['message'] = "Erreur lors de la suppression du serveur.";
         }
     }
 }

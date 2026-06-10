@@ -5,6 +5,55 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.23.3] - 2026-06-10 — Lot B : résiduel bas/moyen (fin de l'audit)
+
+Derniers findings (bas/moyens) + bugs fonctionnels. Vérifié : 18/18 pages, 8/8
+handlers, backend redémarre clean, login/profile OK.
+
+### A05 — Misconfiguration
+- **Mot de passe DB par défaut refusé hors debug** : `config.py` (backend) et
+  `db.php` (PHP) lèvent/refusent si `DB_PASSWORD` vaut `rootwarden_password`
+  (valeur triviale du dépôt) en mode non-debug.
+- **db.php** : charset `utf8` → `utf8mb4` ; le `$hint` (suggestion `down -v`) et
+  le message d'erreur SQL ne sont plus exposés qu'en `DEBUG_MODE`.
+- **Cookie `lang`** : ajout de `SameSite=Lax` (forme tableau de `setcookie`).
+- **`www/_ul`** : artefact (snapshot statique de la page login avec token CSRF en
+  dur, non référencé) supprimé + mount retiré de `docker-compose.prod.yml`.
+
+### A07 / A04 — Auth & Design
+- **`profile.php`** : sous `force_password_change`, les modifications d'email et de
+  clé SSH sont bloquées (seul le formulaire de mot de passe est traité) — avant,
+  un compte en changement forcé pouvait changer ces vecteurs de prise de contrôle
+  avant le mot de passe. (clé i18n `profile.must_change_password_first` fr+en)
+- **`forgot_password.php`** : le message de succès était placé DANS `if ($user)` →
+  un email inexistant n'affichait aucun message (énumération). Déplacé hors du if
+  + travail bcrypt factice pour égaliser le timing.
+- **`anonymize_user`** : step-up 2FA ajouté (action irréversible, comme `delete_user`).
+
+### A09 — Logging / fuite d'info
+- **Erreurs SQL génériques** côté client (détail en `error_log`) :
+  `toggle_sudo`, `toggle_user`, `delete_user`, `server_actions` (add/update/delete).
+- **PTY** : `execute_as_root_stream` ne se repose plus sur `replace(root_password)`
+  (échouait si l'écho était scindé sur une frontière de chunk → fuite partielle) ;
+  bufferisation jusqu'au premier `\n` pour jeter la ligne d'écho entière.
+
+### A01 — Access Control
+- **Notifications broadcast** (`user_id=0`) : un simple utilisateur ne peut plus
+  les supprimer (réservé aux admins) — avant, le `OR user_id = 0` le permettait.
+- **`openapi.php`** : aligné sur `docs.php` (superadmin uniquement ; la spec révèle
+  toutes les routes).
+
+### Bug fonctionnel
+- **`server_id` validé comme port (1-65535)** : un serveur d'id > 65535 ne pouvait
+  plus être édité/supprimé. Ajout d'un type de validation `id` (entier positif sans
+  borne haute) dans `server_actions.php` et `manage_servers.php`.
+
+### Note
+- GeoIP (`fail2ban_manager`) reste en HTTP : ip-api.com en tier gratuit n'autorise
+  que HTTP (HTTPS = payant) ; l'IP envoyée est déjà publique. Documenté.
+
+---
+
 ## [1.23.2] - 2026-06-10 — Lot #2 : IDOR + cohérence d'accès (suite audit)
 
 Findings de contrôle d'accès restants. Vérifié : 18/18 pages, 8/8 handlers,

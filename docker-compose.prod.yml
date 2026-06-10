@@ -58,7 +58,8 @@ services:
       # Conserve uniquement les volumes runtime/upload :
       - php_sessions:/var/www/sessions
       - ./www/logs:/var/www/html/logs
-      - ./www/_ul:/var/www/html/_ul
+      # Patch : mount ./www/_ul retire (artefact : snapshot statique de la page
+      # login avec token CSRF en dur, non reference par le code).
       - ./php/php.ini:/usr/local/etc/php/php.ini:ro
       - ./certs:/var/www/certs:ro
     # Patch A05-NEW-01/02/03 hardening
