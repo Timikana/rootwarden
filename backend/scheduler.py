@@ -291,6 +291,30 @@ _purge_counter = 0
 _PURGE_INTERVAL = 60  # toutes les 60 iterations = 1h
 
 
+def _drift_scan_all():
+    """Detection de derive de configuration sur toutes les machines non archivees.
+    Calcul a partir des donnees deja en base (pas d'appel SSH) -> peu couteux.
+    Notifie les superadmins si de nouvelles derives apparaissent."""
+    from routes.drift import scan_machine
+    conn = _get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id FROM machines WHERE lifecycle_status IS NULL "
+                    "OR lifecycle_status <> 'archived'")
+        ids = [r['id'] for r in cur.fetchall()]
+    finally:
+        conn.close()
+    total_drift = 0
+    for mid in ids:
+        try:
+            _, dc = scan_machine(mid)
+            total_drift += dc
+        except Exception as e:
+            _log.debug("Drift scan machine %s: %s", mid, e)
+    if total_drift:
+        _log.info("Drift scan: %d derive(s) detectee(s) sur %d machine(s)", total_drift, len(ids))
+
+
 def _weekly_user_scan():
     """Scan hebdomadaire des utilisateurs distants - detecte les cles orphelines."""
     import os
@@ -513,6 +537,12 @@ def _scheduler_loop_with_purge():
                 _weekly_user_scan()
             except Exception as scan_err:
                 _log.debug("Weekly user scan skip: %s", scan_err)
+
+            # Detection de derive de configuration (toutes les machines)
+            try:
+                _drift_scan_all()
+            except Exception as drift_err:
+                _log.debug("Drift scan skip: %s", drift_err)
 
         time.sleep(_CHECK_INTERVAL)
 

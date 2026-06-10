@@ -1002,6 +1002,30 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Detection de derive de configuration (v1.24.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="drift-detection" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Détection de dérive (v1.24.0+)</h2>
+                <p class="text-sm mb-3">
+                    Page <code>/drift/</code> (section Conformité, permission
+                    <code>can_view_compliance</code>). Détecte les écarts entre l'état
+                    <strong>désiré</strong> (géré par RootWarden) et l'état <strong>réel</strong>
+                    des serveurs, à partir des données déjà en base — aucun nouvel appel SSH.
+                </p>
+                <ul class="list-disc ml-6 text-sm space-y-1 mb-3">
+                    <li><strong>sudo</strong> : politiques désirées (onglet Accès) vs réellement
+                        déployées → signale un redéploiement requis.</li>
+                    <li><strong>sshd</strong> : grade du dernier audit SSH (C/D/F = dérive).</li>
+                    <li><strong>fail2ban</strong> : protection brute-force installée et active.</li>
+                </ul>
+                <p class="text-sm">
+                    Scan manuel (« Scanner tout » / « Re-scanner ») ou automatique (toutes les
+                    heures via le scheduler). Endpoints backend : <code>/drift/scan</code>,
+                    <code>/drift/scan_all</code>, <code>/drift/results</code> (admin + can_view_compliance).
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Reset password : UX tolerante aux paste -->
             <!-- ────────────────────────────────────────── -->
             <section id="reset-password-ux" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
