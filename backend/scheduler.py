@@ -296,6 +296,12 @@ def _drift_scan_all():
     Calcul a partir des donnees deja en base (pas d'appel SSH) -> peu couteux.
     Notifie les superadmins si de nouvelles derives apparaissent."""
     from routes.drift import scan_machine
+    from task_tracker import track
+    with track('drift_scan', 'Scan de derive (toutes machines)'):
+        _drift_scan_all_impl(scan_machine)
+
+
+def _drift_scan_all_impl(scan_machine):
     conn = _get_db()
     try:
         cur = conn.cursor(dictionary=True)
@@ -447,7 +453,9 @@ def _scheduler_loop_with_purge():
             schedules = cur.fetchall()
             for sched in schedules:
                 try:
-                    _run_scheduled_scan(sched)
+                    from task_tracker import track
+                    with track('cve_scan', f"Scan CVE planifie : {sched.get('name', '?')}"):
+                        _run_scheduled_scan(sched)
                 except Exception as e:
                     _log.error("Scheduler: erreur execution %s : %s", sched['name'], e)
                 try:
@@ -472,7 +480,9 @@ def _scheduler_loop_with_purge():
                 ssh_schedules = cur.fetchall()
                 for sched in ssh_schedules:
                     try:
-                        _run_scheduled_ssh_audit(sched)
+                        from task_tracker import track
+                        with track('ssh_audit', f"Audit SSH planifie : {sched.get('name', '?')}"):
+                            _run_scheduled_ssh_audit(sched)
                     except Exception as e:
                         _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
                     try:
@@ -500,10 +510,24 @@ def _scheduler_loop_with_purge():
         if _purge_counter >= _PURGE_INTERVAL:
             _purge_counter = 0
             _purge_old_logs()
-            # Backup quotidien
+            # Purge des taches terminees anciennes (meme retention que les logs)
+            try:
+                from task_tracker import purge_old_tasks
+                _retention = int(os.environ.get('LOG_RETENTION_DAYS', '0'))
+                if _retention > 0:
+                    purge_old_tasks(_retention)
+            except Exception:
+                pass
+            # Backup quotidien (suivi comme tache seulement si BACKUP_ENABLED,
+            # sinon run_backup() est un no-op et creerait une tache vide chaque heure)
             try:
                 from db_backup import run_backup
-                run_backup()
+                if os.environ.get('BACKUP_ENABLED', '').lower() == 'true':
+                    from task_tracker import track
+                    with track('db_backup', 'Backup BDD'):
+                        run_backup()
+                else:
+                    run_backup()
             except Exception as bk_err:
                 _log.debug("Backup skip: %s", bk_err)
 

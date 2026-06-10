@@ -5,6 +5,40 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.25.0] - 2026-06-10 — Feature : centre de tâches (suivi de l'activité de fond)
+
+Deuxième feature de la roadmap. Donne une visibilité opérationnelle sur les
+tâches de fond de la plateforme (scans CVE/SSH/drift, backups) avec
+statut/durée/historique — la base du « passage à l'échelle ».
+
+### Implémentation
+- Migration `053_tasks.sql` : table `tasks` (type, label, status
+  pending/running/success/error, machine_id, progress, detail, horodatages).
+- `backend/task_tracker.py` : helper autonome réutilisable — context manager
+  `with track(type, label, machine_id):` (success/error auto) + `create_task`/
+  `update_task`/`purge_old_tasks`. Best-effort (n'impacte jamais le job suivi),
+  SQL paramétré, noms de colonnes whitelistés.
+- Instrumentation du scheduler : scans CVE planifiés, audits SSH planifiés, scan
+  de dérive, backup (si activé) sont désormais tracés. Purge des tâches terminées
+  selon `LOG_RETENTION_DAYS`.
+- Blueprint `backend/routes/tasks.py` : `/tasks/list` (filtrable status/type,
+  paginé), `/tasks/stats` (compteurs 24h + en cours). `@require_role(2)`.
+- Frontend `www/tasks/` : tableau live (badges de statut, type, durée, détail),
+  cartes de résumé, filtre par statut, rafraîchissement auto (5s). Rendu sans
+  `onclick` interpolé (textContent → pas de DOM-XSS).
+- Menu (section Admin), i18n fr+en, whitelist + gate admin `api_proxy.php`.
+
+### Note
+Lecture seule pour l'instant (historique + statut live). Le **retry** et
+l'instrumentation des déploiements interactifs viendront dans une itération
+ultérieure (le helper `task_tracker` est prêt à être branché partout).
+
+### Vérifié
+Migration appliquée, backend clean, page 200 + 0 erreur PHP/JS, rendu des tâches
+(drift_scan réussie + tâche en échec avec détail), cartes de résumé, filtre.
+
+---
+
 ## [1.24.0] - 2026-06-10 — Feature : détection de dérive de configuration (drift)
 
 Première feature de la roadmap produit post-audit. Détecte les écarts entre

@@ -1026,6 +1026,29 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Centre de taches (v1.25.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="task-center" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Centre de tâches (v1.25.0+)</h2>
+                <p class="text-sm mb-3">
+                    Page <code>/tasks/</code> (section Admin). Historique et statut des tâches
+                    de fond de la plateforme : scans CVE/SSH/dérive planifiés et backups sont
+                    tracés (statut, durée, détail). Rafraîchissement auto, filtre par statut.
+                </p>
+                <p class="text-sm mb-3">
+                    Côté code, n'importe quel job peut se tracer via le helper
+                    <code>task_tracker</code> :
+                    <code>with track('cve_scan', 'Scan CVE srv-01', machine_id=3): ...</code>
+                    (passage automatique à <em>success</em> en sortie, <em>error</em> sur exception).
+                </p>
+                <p class="text-sm">
+                    Endpoints : <code>/tasks/list</code> (filtrable status/type), <code>/tasks/stats</code>
+                    (admin). Purge des tâches terminées selon <code>LOG_RETENTION_DAYS</code>. Lecture
+                    seule pour l'instant (retry et suivi des déploiements interactifs à venir).
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Reset password : UX tolerante aux paste -->
             <!-- ────────────────────────────────────────── -->
             <section id="reset-password-ux" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
