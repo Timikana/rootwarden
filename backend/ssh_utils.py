@@ -666,8 +666,25 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
 
         yield "Début de l'exécution...\n"
 
-        # Ignore les premiers octets (écho du mot de passe renvoyé par le PTY)
+        # Patch A09 : l'echo PTY du mot de passe (root_password + '\n') est la
+        # PREMIERE ligne renvoyee. L'ancien `text.replace(root_password, '')`
+        # echouait si l'echo etait scinde sur une frontiere recv(4096) -> fuite
+        # partielle du mot de passe dans le flux. On bufferise desormais jusqu'au
+        # premier '\n' et on jette tout ce qui precede (la ligne d'echo entiere),
+        # quel que soit le decoupage en chunks.
         _skip_password = True
+        _skip_buf = ''
+
+        def _strip_pw_echo(text):
+            """Retourne (texte_a_emettre, skip_encore_actif)."""
+            nonlocal _skip_buf
+            _skip_buf += text
+            nl = _skip_buf.find('\n')
+            if nl == -1:
+                return '', True       # encore dans la ligne d'echo, ne rien emettre
+            remainder = _skip_buf[nl + 1:]
+            _skip_buf = ''
+            return remainder, False   # ligne d'echo jetee, suite normale
 
         while True:
             r, _, _ = select.select([stdout.channel], [], [], 0.5)
@@ -676,13 +693,10 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
                 if not chunk:
                     break
                 text = chunk.decode('utf-8', errors='replace')
-                # Filtre l'écho du mot de passe dans les premiers chunks
                 if _skip_password:
-                    text = text.replace(root_password, '')
-                    text = text.replace('\r', '')
-                    if text.strip():
-                        _skip_password = False
-                # Nettoie les séquences ANSI du terminal
+                    text, _skip_password = _strip_pw_echo(text)
+                    if _skip_password:
+                        continue
                 text = _ansi_re.sub('', text)
                 if text.strip():
                     yield text
@@ -690,8 +704,12 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
                 while stdout.channel.recv_ready():
                     chunk = stdout.channel.recv(4096)
                     if chunk:
-                        text = _ansi_re.sub('', chunk.decode('utf-8', errors='replace'))
-                        text = text.replace(root_password, '')
+                        text = chunk.decode('utf-8', errors='replace')
+                        if _skip_password:
+                            text, _skip_password = _strip_pw_echo(text)
+                            if _skip_password:
+                                continue
+                        text = _ansi_re.sub('', text)
                         if text.strip():
                             yield text
                 break

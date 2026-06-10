@@ -108,9 +108,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Envoyer l'email
                 sendPasswordResetEmail($user['email'], $resetUrl, $user['name']);
+            } else {
+                // Patch A07 (anti-enumeration timing) : email inexistant -> on
+                // brule un cout bcrypt equivalent a la generation de token, sinon
+                // la reponse est nettement plus rapide = oracle "l'email existe".
+                password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
             }
 
-            // Message identique dans tous les cas (anti-enumeration)
+            // Message identique dans TOUS les cas (HORS du if). Avant, il etait
+            // place DANS le if ($user) -> un email inexistant n'affichait aucun
+            // message = enumeration par presence/absence du message de succes.
             $message = t('forgot.success');
             $messageType = 'success';
         }

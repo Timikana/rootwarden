@@ -75,9 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
             'new_sudo' => $new_sudo
         ]);
     } catch (Exception $e) {
+        // Patch A09 : detail en log, message generique au client.
+        error_log('[toggle_sudo] ' . $e->getMessage());
         echo json_encode([
             'success' => false,
-            'message' => 'Erreur : ' . $e->getMessage()
+            'message' => 'Erreur lors de la mise a jour.'
         ]);
     }
 }

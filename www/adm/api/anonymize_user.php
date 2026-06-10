@@ -34,6 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 checkCsrfToken();
 
+// Patch A04 : step-up 2FA obligatoire (action destructive irreversible, au meme
+// titre que delete_user qui l'exigeait deja). Coherence des actions sensibles.
+require_once __DIR__ . '/../../auth/step_up.php';
+stepUpRequire('anonymize_user');
+
 $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 $userId = (int)($data['user_id'] ?? 0);
 
