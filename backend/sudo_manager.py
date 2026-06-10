@@ -77,6 +77,11 @@ def render_preset_restart_services(username: str, runas: str = 'root', nopasswd:
 
 
 def render_preset_apt_only(username: str, runas: str = 'root', nopasswd: bool = True) -> str:
+    """AVERTISSEMENT : ce preset est EQUIVALENT ROOT. `apt install/upgrade`
+    execute des scripts de mainteneur (.deb postinst) en root -> un utilisateur
+    avec ce preset peut obtenir un shell root via un paquet construit. Il n'existe
+    pas de moyen sur de "limiter a apt" sans donner root. A n'accorder qu'a des
+    operateurs deja de confiance. (cf. CONTRIBUTING-SECURITY.md / presets sudo)"""
     return (
         f"{username} ALL={_runas_spec(runas)} {_tag(nopasswd)}"
         "/usr/bin/apt update, /usr/bin/apt upgrade -y, /usr/bin/apt install *, "
@@ -85,10 +90,15 @@ def render_preset_apt_only(username: str, runas: str = 'root', nopasswd: bool = 
 
 
 def render_preset_read_logs(username: str, runas: str = 'root', nopasswd: bool = True) -> str:
+    """Lecture seule des logs. Durci : retrait de `less` (permettait `!sh` =
+    shell root) ; `cat`/`tail` ne peuvent pas spawn de shell ; `journalctl` force
+    `--no-pager` (sinon ouvre un pager -> evasion shell). Le matching sudoers est
+    par prefixe : `journalctl --no-pager *` impose le flag, et sudo execute la
+    commande directement (pas via un shell) donc pas d'injection de metacaracteres."""
     return (
         f"{username} ALL={_runas_spec(runas)} {_tag(nopasswd)}"
-        "/usr/bin/tail /var/log/*, /usr/bin/less /var/log/*, "
-        "/bin/journalctl, /bin/journalctl *"
+        "/usr/bin/tail /var/log/*, /usr/bin/cat /var/log/*, "
+        "/bin/journalctl --no-pager, /bin/journalctl --no-pager *"
     )
 
 

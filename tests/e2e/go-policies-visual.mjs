@@ -7,9 +7,9 @@ import { createHmac } from 'crypto';
 import { mkdirSync } from 'fs';
 
 const BASE = 'https://localhost:8443';
-const USER = 'superadmin';
-const PASS = 'RootWarden@2026-Sec!';
-const SECRET = 'M7YDC3WY2AHAOC6UE2ZLF3SYH336SZTUC37WASUGH7Z6T5CZBVB5A2VK3SPETIIDMQIUAYH5QNRHR6ONO5V2ORR733MMIFFPE4LEJ7A';
+const USER = process.env.E2E_USER || 'superadmin';
+const PASS = process.env.E2E_PASS || 'RootWarden@2026-Sec!';
+const SECRET = process.env.E2E_TOTP_SECRET || ''; // audit v1.23 : secret 2FA via env, plus de secret en dur
 const SHOTS = './screenshots/policies';
 mkdirSync(SHOTS, { recursive: true });
 

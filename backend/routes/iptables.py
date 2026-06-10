@@ -32,17 +32,18 @@ def _resolve_ssh_creds(data):
     if not machine_id:
         return None, None, None, None, None, False, "machine_id requis."
 
+    # Patch (bug/A09) : with-context + message generique (detail en log).
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            "SELECT id, ip, port, user, password, root_password, "
-            "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-            (int(machine_id),))
-        row = cur.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, ip, port, user, password, root_password, "
+                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
+                (int(machine_id),))
+            row = cur.fetchone()
     except Exception as e:
-        return None, None, None, None, None, False, f"Erreur BDD: {e}"
+        logger.error("Erreur BDD _resolve_ssh_creds (iptables): %s", e)
+        return None, None, None, None, None, False, "Erreur BDD"
 
     if not row:
         return None, None, None, None, None, False, "Machine introuvable."
@@ -67,7 +68,7 @@ def _resolve_ssh_creds(data):
 @threaded_route
 def manage_iptables():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         action = data.get('action')
         server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
         if err:
@@ -98,7 +99,7 @@ def manage_iptables():
 @threaded_route
 def validate_iptables():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         rules_v4 = data.get('rules_v4', '')
         server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
         if err:
@@ -126,7 +127,7 @@ def validate_iptables():
 @threaded_route
 def manage_iptables_apply():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         action = data.get('action')
         server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
         if err:
@@ -171,7 +172,7 @@ def manage_iptables_apply():
 @threaded_route
 def manage_iptables_restore():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
         if err:
             return jsonify({"success": False, "message": err}), 400
@@ -255,18 +256,33 @@ def iptables_logs():
     log_file = '/app/logs/iptables.log'
 
     def generate():
+        # Patch (A04/robustesse) : flux borne dans le temps + heartbeat. Avant,
+        # `while True` sans borne mobilisait un thread/contexte indefiniment par
+        # connexion -> saturation possible du pool. On arrete apres MAX_STREAM_S
+        # et on emet un heartbeat (`: ping`) qui leve une exception si le client
+        # est deconnecte, ce qui termine proprement le generateur.
+        MAX_STREAM_S = 600  # 10 min max par connexion
+        IDLE_TICK = 0.5
+        start = time.monotonic()
+        idle = 0
         try:
             with open(log_file, 'r') as f:
                 f.seek(0, 2)
-                while True:
+                while time.monotonic() - start < MAX_STREAM_S:
                     line = f.readline()
                     if line:
                         yield f"data: {line}\n\n"
+                        idle = 0
                     else:
-                        import time
-                        time.sleep(0.5)
+                        time.sleep(IDLE_TICK)
+                        idle += 1
+                        if idle % 20 == 0:  # heartbeat ~10s
+                            yield ": ping\n\n"
+                yield "data: [Flux ferme apres 10 min - rechargez pour continuer]\n\n"
         except FileNotFoundError:
             yield "data: [Fichier de log introuvable]\n\n"
+        except (GeneratorExit, BrokenPipeError):
+            return
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})

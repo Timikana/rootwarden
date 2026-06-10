@@ -124,7 +124,10 @@ def grant_temp_permission():
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     permission = (data.get('permission') or '').strip()
-    hours = int(data.get('hours', 24))
+    try:
+        hours = int(data.get('hours', 24))  # robustesse : 500 evite sur valeur non-numerique
+    except (ValueError, TypeError):
+        hours = 24
     machine_id = data.get('machine_id')
     reason = (data.get('reason') or '').strip()
     granted_by = int(request.headers.get('X-User-ID', 0))
@@ -237,7 +240,7 @@ def toggle_notification_pref():
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     event_type = (data.get('event_type') or '').strip()
-    enabled = int(data.get('value', 0))
+    enabled = 1 if str(data.get('value', 0)) in ('1', 'true', 'True', 'on') else 0
 
     if not user_id or event_type not in VALID_EVENT_TYPES:
         return jsonify({'success': False, 'message': 'user_id et event_type valides requis'}), 400

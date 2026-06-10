@@ -10,7 +10,7 @@ import { createHmac } from 'crypto';
 export const BASE_URL = process.env.E2E_URL || 'https://localhost:8443';
 export const SUPERADMIN_USER = process.env.E2E_USER || 'superadmin';
 export const SUPERADMIN_PASS = process.env.E2E_PASS || 'superadmin';
-export const TOTP_SECRET = process.env.E2E_TOTP_SECRET || 'QMLH2AFHTN6LVD6QTGFXYCX6RONTQS23CDTHE4YMBYY2XBLRGO3GLMW72CPGTQR7A6XOLWZ4YNDM5D2CER47EQSFWSMIUKWQHLLGCQQ';
+export const TOTP_SECRET = process.env.E2E_TOTP_SECRET || ''; // audit v1.23 : secret 2FA via env uniquement
 
 const TIMEOUT = 15_000;
 

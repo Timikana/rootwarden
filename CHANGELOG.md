@@ -5,6 +5,50 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.23.1] - 2026-06-10 — Durcissement défense-en-profondeur (suite audit)
+
+Traitement des findings restants (moyens/bas) de l'audit v1.23.0, plus hygiène.
+Aucune escalade ; robustesse + défense en profondeur. Vérifié : 18/18 pages,
+8/8 handlers, backend redémarre clean, bandit clean.
+
+### Robustesse / fiabilité
+- **Fuites de connexions MySQL** : `_resolve_ssh_creds` de `fail2ban.py`,
+  `iptables.py`, `services.py`, `ssh_audit.py` passées en `with get_db_connection()`
+  (la connexion fuyait sur exception → épuisement progressif du pool).
+- **Flux SSE bornés** : `iptables_logs` et `stream_update_logs` avaient un
+  `while True` sans fin → un thread/contexte mobilisé indéfiniment par connexion.
+  Ajout d'une borne (10 min) + heartbeat (`: ping`) qui détecte la déconnexion client.
+- **Robustesse des entrées** : `get_json(silent=True)` (iptables, pas de 500 sur
+  body non-JSON), casts de ports bornés (wazuh), `int(hours)`/`value` gardés (admin).
+
+### Sécurité (défense en profondeur)
+- **`configure_servers` (déjà v1.23.0) + `bashrc.py`** : `home` (lu dans le
+  `/etc/passwd` distant) validé par regex `^/[A-Za-z0-9._/-]+$` avant toute
+  interpolation shell dans `_inspect_bashrc`/`_read_remote_bashrc`/`deploy`/backups
+  (le seul `restore()` était déjà `shlex.quote`).
+- **Presets sudo durcis** : `read_logs` retire `less` (permettait `!sh` = shell
+  root) au profit de `cat`/`tail` (pas d'évasion) et force `journalctl --no-pager` ;
+  `apt_only` documenté explicitement comme **équivalent root** (apt exécute des
+  scripts mainteneur — pas de moyen sûr de « limiter à apt »).
+- **Déchiffreur legacy supprimé** : `ssh_utils.decrypt_password` (~360 lignes
+  d'heuristique best-effort) retirée définitivement ; tout passe par
+  `encryption.decrypt_password` (AES-GCM AEAD).
+
+### Bug fonctionnel
+- **`update_security_exec`** : le callback cron renvoyait toujours 401 (ni clé
+  API ni session role possible depuis un cron) → le suivi « dernière MAJ sécu »
+  restait faux. Authentification machine-to-machine par **token HMAC** signé avec
+  `SECRET_KEY` et borné au `machine_id` (header `X-Update-Token`, comparé en
+  constant-time). Conserve la protection A01-NEW-01 (un user role=1 ne peut pas
+  forger le token).
+
+### Hygiène
+- Secret TOTP dev retiré des fichiers e2e trackés (`go-policies.mjs`,
+  `go-policies-visual.mjs`, `go-access-sudo-visual.mjs`, `helpers.mjs`) → lu via
+  `E2E_TOTP_SECRET` uniquement (le base32 n'était pas détecté par gitleaks).
+
+---
+
 ## [1.23.0] - 2026-06-10 — Audit sécurité de bout en bout + remédiations OWASP Top 10
 
 Audit complet du code (backend Flask, frontend PHP, JS, infra Docker/CI) suivi
