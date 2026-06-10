@@ -212,7 +212,10 @@
                         action: "save_to_db",
                         server_id: server.id,
                         rules_v4: rulesV4,
-                        rules_v6: rulesV6
+                        rules_v6: rulesV6,
+                        // Patch : index.php exige checkCsrfToken() ; le wrapper utils.js
+                        // n'injecte le token que vers api_proxy.php, pas vers "index.php".
+                        csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || ''
                     }),
                 });
 
@@ -248,6 +251,7 @@
                     body: new URLSearchParams({
                         action: "load_from_db",
                         server_id: server.id,
+                        csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || ''
                     }),
                 });
 

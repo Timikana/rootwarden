@@ -5,6 +5,47 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.23.2] - 2026-06-10 — Lot #2 : IDOR + cohérence d'accès (suite audit)
+
+Findings de contrôle d'accès restants. Vérifié : 18/18 pages, 8/8 handlers,
+fix CSRF iptables confirmé (load_from_db → 200 au lieu de 403), backend clean.
+
+### A01 — Broken Access Control
+- **IDOR iptables** : [iptables/index.php](www/iptables/index.php) — les handlers
+  `load_from_db`/`save_to_db`/`restore` prenaient `$_POST['server_id']` sans
+  revérifier l'accès (le dropdown était filtré, pas les handlers) → un role-1 avec
+  `can_manage_iptables` pouvait lire/écrire/restaurer les règles de **n'importe
+  quelle machine**. Revalidation `user_machine_access` ajoutée (admins exemptés).
+- **IDOR supervision** : `require_role(2)` ajouté sur `machine_profile`,
+  `zabbix/version` et `<platform>/version` (les autres routes supervision
+  l'avaient déjà ; `require_machine_access` est un no-op sur le `mid` d'URL).
+- **Exposition de colonnes** : `update/functions/filter.php` ne sélectionne plus
+  `SELECT *` (qui renvoyait `password`/`root_password` chiffrés au navigateur) mais
+  des colonnes explicites ; `checkPermission('can_update_linux')` ajouté sur
+  `filter_servers.php` et `list_machines.php`.
+- **Policy ↔ machine** : `_get_username_from_server_user_id` exige désormais que
+  le `server_user_id` appartienne au `machine_id` ciblé (avant : résolution sans
+  contrôle → déploiement possible d'un sudoers pour un user d'une autre machine).
+
+### A03 — Injection
+- `scheduler.py` : `shlex.quote` sur `home` (lu dans `/etc/passwd` distant) dans
+  le scan hebdomadaire des clés (`cat {home}/.ssh/...`) — dernier site oublié.
+
+### Bug fonctionnel
+- **iptables « Sauvegarder/Charger BDD »** : les boutons `fetch("index.php")`
+  n'envoyaient pas le token CSRF (le wrapper utils.js ne l'injecte que vers
+  api_proxy.php) → 403 systématique. Token `csrf_token` ajouté au body.
+
+### Note de conception (non modifié)
+- Les routes mutantes *par-machine* (fail2ban ban/restart, services start/stop,
+  iptables apply) restent gardées par `@require_machine_access` seul : un role=1
+  inscrit dans `user_machine_access` est considéré **opérateur de ses machines**.
+  Les actions *flotte entière* (`ban_all_servers`, `install_all`) exigent role 2.
+  Modèle cohérent conservé ; à durcir en `require_role(2)` si role=1 doit être
+  lecteur seul (décision de gouvernance).
+
+---
+
 ## [1.23.1] - 2026-06-10 — Durcissement défense-en-profondeur (suite audit)
 
 Traitement des findings restants (moyens/bas) de l'audit v1.23.0, plus hygiène.
