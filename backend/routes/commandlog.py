@@ -41,7 +41,8 @@ def list_command_log():
     params = []
     if machine_id:
         try:
-            params.append(int(machine_id)); q += "AND c.machine_id = %s "
+            params.append(int(machine_id))
+            q += "AND c.machine_id = %s "
         except (ValueError, TypeError):
             return jsonify({'success': False, 'message': 'machine_id invalide'}), 400
     if context:
