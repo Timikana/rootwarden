@@ -1038,6 +1038,23 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Recherche globale + audit (v1.34.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="search" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Recherche globale + audit log (v1.34.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/search/</code> (admin) interroge en un seul endroit les <strong>serveurs</strong>,
+                    <strong>utilisateurs</strong>, <strong>CVE</strong>, <strong>tickets</strong> et le
+                    <strong>journal d'audit</strong> (<code>GET /search?q=</code>, résultats catégorisés).
+                </p>
+                <p class="text-sm">
+                    Le <strong>visualiseur d'audit log</strong> (<code>/adm/audit_log.php</code>) — filtres user/action/date,
+                    pagination, export CSV et <strong>vérification de la chaîne HMAC</strong> — est accessible depuis le menu.
+                    Recherche : <code>@require_role(2)</code> + <code>can_admin_portal</code>, LIKE 100&nbsp;% paramétré.
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Ticketing ITSM (v1.33.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="tickets" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
