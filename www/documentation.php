@@ -1038,6 +1038,26 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Restauration de backup (v1.35.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="backups" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Sauvegardes & restauration (v1.35.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/backups/</code> (admin) gère les sauvegardes de la base : création,
+                    <strong>test de restauration</strong> (vérification sha256 + lisibilité, non destructif) et
+                    <strong>restauration</strong>.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>La restauration (<code>POST /admin/backups/restore</code>) est <strong>réservée au
+                        superadmin</strong> (DROP TABLE → recréation) : nom validé (anti path-traversal),
+                        sha256 vérifié avant application, <strong>backup de sécurité créé automatiquement</strong>.</li>
+                    <li>Confirmation forte côté UI (re-saisie du nom du fichier). Opération journalisée
+                        (command log, contexte <code>db_restore</code>).</li>
+                    <li>Le test de restauration (<code>verify</code>) compte tables/statements sans rien appliquer.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Recherche globale + audit (v1.34.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="search" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">

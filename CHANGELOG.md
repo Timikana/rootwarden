@@ -5,6 +5,44 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.35.0] - 2026-06-14 — Feature : restauration de backup depuis l'UI
+
+Douzième et dernière feature de la roadmap. Les backups (création + sha256)
+existaient déjà ; la **restauration** et le **test de restauration** étaient manuels.
+
+### Backend (`db_backup.py`)
+- `verify_backup(filename)` — **test de restauration non destructif** : vérifie
+  l'empreinte sha256, la lisibilité du gzip, compte tables/statements. N'applique rien.
+- `restore_backup(filename)` — **restauration** (DROP TABLE → recréation) :
+  - nom validé par regex (anti **path-traversal**), sha256 vérifié **avant** application ;
+  - **backup de sécurité automatique** avant écrasement ;
+  - `FOREIGN_KEY_CHECKS=0` pendant l'application ;
+  - splitter SQL robuste (`_split_sql`) respectant chaînes quotées + échappement
+    (un `;` dans une donnée ne casse pas le découpage).
+
+### Routes (`routes/admin.py`)
+- `POST /admin/backups/verify` (admin, role 2) ;
+- `POST /admin/backups/restore` (**superadmin uniquement, role 3** — opération la
+  plus destructive) ; journalisée dans le command log (context `db_restore`).
+
+### Frontend (`/backups/`)
+- Page : liste (fichier, taille, date), **Créer**, **Vérifier**, **Restaurer**
+  (réservé superadmin, **double confirmation** par re-saisie du nom de fichier).
+  Bannière d'avertissement. Rendu sans `onclick` interpolé.
+- Menu (Admin) + tooltips, i18n fr+en. (`/admin/` déjà whitelisté + admin-only.)
+
+### OWASP / sécurité
+A01 restore = role 3 (superadmin), A03 nom validé + requêtes contrôlées,
+A08 intégrité sha256 vérifiée avant restauration + backup de sécurité, A09 trail.
+
+### Vérifié
+Cycle complet : create (62 tables) → verify (valide, sha256 OK, 451 statements) →
+restore (451 appliqués, backup de sécurité créé) → BDD intacte (superadmin role 3
+préservé, 2 users, 62 tables). UI Puppeteer : liste + bouton restore (SA) + verify
+API valide, 0 erreur JS.
+
+---
+
 ## [1.34.0] - 2026-06-14 — Feature : recherche globale + audit log dans le menu
 
 Onzième feature de la roadmap.
