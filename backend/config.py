@@ -175,6 +175,18 @@ class Config:
     CHATOPS_SLACK_SIGNING_SECRET  = os.getenv('CHATOPS_SLACK_SIGNING_SECRET', '')
     CHATOPS_TOKEN                 = os.getenv('CHATOPS_TOKEN', '')
 
+    # ── Ticketing ITSM (GLPI / Jira / ServiceNow / generique) ───────────────
+    # Transforme un finding (ex CVE) en ticket. Si desactive, les tickets crees
+    # restent 'local' (traces en base sans reference externe).
+    TICKETING_ENABLED   = os.getenv('TICKETING_ENABLED', 'false').lower() == 'true'
+    TICKETING_PROVIDER  = os.getenv('TICKETING_PROVIDER', 'generic').lower()  # jira|servicenow|glpi|generic
+    TICKETING_URL       = os.getenv('TICKETING_URL', '')
+    TICKETING_USER      = os.getenv('TICKETING_USER', '')
+    TICKETING_TOKEN     = os.getenv('TICKETING_TOKEN', '')
+    TICKETING_PROJECT   = os.getenv('TICKETING_PROJECT', '')      # cle projet Jira
+    TICKETING_APP_TOKEN = os.getenv('TICKETING_APP_TOKEN', '')    # App-Token GLPI
+    TICKETING_AUTO_KEV  = os.getenv('TICKETING_AUTO_KEV', 'false').lower() == 'true'
+
     # ── Notifications email ──────────────────────────────────────────────────
     MAIL_ENABLED       = os.getenv('MAIL_ENABLED', 'false').lower() == 'true'
     MAIL_FROM          = os.getenv('MAIL_FROM', '')

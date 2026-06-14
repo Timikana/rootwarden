@@ -1038,6 +1038,21 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
             except Exception as enr_err:
                 _log.debug("CVE enrichment skipped: %s", enr_err)
 
+            # Auto-ticket pour les CVE activement exploitees (CISA KEV), opt-in.
+            # Dedup par (cve_id, machine) -> pas de spam sur scans repetes.
+            if Config.TICKETING_AUTO_KEV:
+                try:
+                    from routes.tickets import create_or_get_ticket
+                    for f in findings:
+                        if f.get('kev'):
+                            summ = f"[CVE/KEV] {f['cve_id']} sur {machine_name} ({f['package']})"
+                            desc = (f"CVE {f['cve_id']} activement exploitee (CISA KEV). "
+                                    f"Paquet {f['package']} {f.get('version')}, CVSS {f.get('cvss')}, "
+                                    f"EPSS {f.get('epss_score')}.")
+                            create_or_get_ticket('cve', f['cve_id'], machine_id, summ, desc, None)
+                except Exception as tk_err:
+                    _log.debug("auto-ticket KEV skipped: %s", tk_err)
+
         # Tri final : KEV d'abord, puis priorite decroissante, puis severite/CVSS
         findings.sort(key=lambda x: (
             0 if x.get('kev') else 1,
