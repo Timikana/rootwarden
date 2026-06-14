@@ -5,6 +5,44 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.32.0] - 2026-06-14 — Feature : ChatOps bidirectionnel (Slack / Teams)
+
+Neuvième feature de la roadmap. Les webhooks **sortants** existaient déjà ; cette
+version ajoute le sens **entrant** : piloter RootWarden depuis le chat.
+
+### Réception de commandes (migration 059 + `backend/chatops.py`)
+- Endpoint `POST /chatops/command` (backend) exposé publiquement via le
+  passthrough `www/chatops/webhook.php` (sans session — Slack/Teams ne peuvent
+  pas s'authentifier par session).
+- **Authentification** : signature Slack `v0` (HMAC-SHA256 sur `v0:{ts}:{body}`
+  + anti-rejeu 5 min) **ou** jeton partagé constant-time (`X-ChatOps-Token`,
+  pour Teams/générique). Aucune commande sans auth valide.
+- **Mapping** `chatops_users` (chat_user_id → utilisateur RootWarden) : l'acteur
+  est résolu via ce mapping ; sans mapping, les commandes mutantes sont refusées.
+- Commandes (liste blanche) : `help`, `status` (résumé flotte), `approvals`
+  (demandes en attente), `approve <id>` / `reject <id>` — **respecte la règle
+  4-eyes** (refus d'approuver sa propre demande).
+
+### Frontend (`/chatops/`) + config
+- Page admin : gestion des mappings chat↔utilisateur + instructions de setup
+  (URL du webhook, signing secret Slack, jeton Teams). Rendu sans `onclick` interpolé.
+- Routes `/chatops/users` (GET/POST/DELETE, admin) via le proxy authentifié.
+- Opt-in : `CHATOPS_ENABLED`, `CHATOPS_SLACK_SIGNING_SECRET`, `CHATOPS_TOKEN`.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/chatops/users` admin-only),
+  i18n fr+en.
+
+### OWASP / sécurité
+A01/A07 : endpoint entrant authentifié par signature/jeton (jamais par session) ;
+mapping CRUD réservé admin ; backend Python non exposé (atteint via le passthrough).
+A03 commandes en liste blanche + requêtes paramétrées.
+
+### Vérifié (curl live, token activé temporairement)
+`status` → résumé flotte ; `approvals` → 2 demandes ; `approve 6` (demandeur tiers)
+→ approuvée ; `approve 7` (sa propre demande) → refus 4-eyes ; mauvais jeton → 401 ;
+commande sans mapping → refus d'identité ; `help` → liste des commandes.
+
+---
+
 ## [1.31.1] - 2026-06-14 — Fix : le superadmin contourne l'approbation 4-eyes
 
 Sur un déploiement avec un **seul administrateur**, la règle 4-eyes (approbation

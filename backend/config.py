@@ -168,6 +168,13 @@ class Config:
     ).split(',') if a.strip()}
     APPROVAL_TTL_HOURS = int(os.getenv('APPROVAL_TTL_HOURS', '24'))
 
+    # ── ChatOps bidirectionnel (reception de commandes) ─────────────────────
+    # Les webhooks sortants restent geres par webhooks.py. Ici : le sens entrant.
+    # Auth : signing secret Slack (HMAC) et/ou jeton partage (Teams/generique).
+    CHATOPS_ENABLED               = os.getenv('CHATOPS_ENABLED', 'false').lower() == 'true'
+    CHATOPS_SLACK_SIGNING_SECRET  = os.getenv('CHATOPS_SLACK_SIGNING_SECRET', '')
+    CHATOPS_TOKEN                 = os.getenv('CHATOPS_TOKEN', '')
+
     # ── Notifications email ──────────────────────────────────────────────────
     MAIL_ENABLED       = os.getenv('MAIL_ENABLED', 'false').lower() == 'true'
     MAIL_FROM          = os.getenv('MAIL_FROM', '')
