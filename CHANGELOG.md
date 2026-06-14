@@ -5,6 +5,43 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.31.0] - 2026-06-14 — Feature : journal des commandes (trail type bastion)
+
+Huitième feature de la roadmap. Trace **ce que RootWarden exécute réellement**
+sur les serveurs distants : un journal d'audit type bastion (qui, quoi, où,
+quand, résultat).
+
+### Modèle (migration 058 + `backend/command_logger.py`)
+- Table `command_log` (machine_id, user_id, context, command, success, detail,
+  created_at). Helper `log_command(...)` best-effort (connexion propre, jamais
+  d'exception remontée — la journalisation ne casse jamais l'action suivie).
+
+### Instrumentation des routes privilégiées
+- `reboot_server` (context `reboot`), `delete_remote_user` (`delete_user`,
+  succès réel d'après le check `id`), `update_server` (`full_update`),
+  `apply_security_updates` (`security_update`), `custom_update` (`custom_update`).
+  Chaque entrée capture la commande exacte + l'acteur + la machine.
+
+### Consultation (`routes/commandlog.py` + `/commandlog/`)
+- `GET /command_log` (filtres machine/context, limite ≤ 500) + `/command_log/contexts`.
+- Page lecture seule : tableau filtrable (machine, contexte), pastille de
+  résultat OK/échec. Rendu sans `onclick` interpolé → pas de DOM-XSS.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/command_log`, admin-only),
+  i18n fr+en.
+
+### OWASP / sécurité
+A01 `@require_role(2)` + `can_admin_portal` (consultation d'un journal d'audit),
+A03 requêtes paramétrées + filtres validés, A09 journal en lecture seule (pas
+de suppression via l'API).
+
+### Vérifié
+`log_command` insère correctement (smoke-test). Viewer Puppeteer : 3 entrées
+rendues (userdel / upgrade / reboot), filtre par contexte (delete_user → 1), 0
+erreur JS. (Les actions mutantes ne sont pas déclenchées en live contre le
+serveur de prod — instrumentation vérifiée par code + test du logger.)
+
+---
+
 ## [1.30.0] - 2026-06-14 — Feature : workflow d'approbation 4-eyes
 
 Septième feature de la roadmap. Au-delà du step-up 2FA (qui protège contre le

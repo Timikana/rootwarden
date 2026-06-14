@@ -279,6 +279,14 @@ def reboot_server():
                 # Connection drop / timeout = normal sur reboot immediat
                 logger.info("reboot_server : connexion coupee (attendu) : %s", str(exec_err)[:120])
 
+        # Journal des commandes (trail bastion)
+        try:
+            from command_logger import log_command
+            log_command(machine_id, user_id, cmd, context='reboot', success=True,
+                        detail=msg_action)
+        except Exception:
+            pass
+
         # Audit log entry
         try:
             with get_db_connection() as conn_a:

@@ -1841,6 +1841,16 @@ def delete_remote_user():
                 or 'no existe el usuario' in check_str
             )
 
+            # Journal des commandes (trail bastion)
+            try:
+                from command_logger import log_command
+                _luid, _ = get_current_user()
+                log_command(machine_id, _luid, cmd, context='delete_user',
+                            success=bool(user_gone),
+                            detail=f"remove_home={remove_home}")
+            except Exception:
+                pass
+
             if user_gone:
                 if exit_code and int(exit_code) != 0:
                     # Warnings non-fatals : on logue mais on considere la suppression OK.

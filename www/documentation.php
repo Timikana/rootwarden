@@ -1038,6 +1038,25 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Journal des commandes / bastion (v1.31.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="commandlog" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Journal des commandes / bastion (v1.31.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/commandlog/</code> (admin + <code>can_admin_portal</code>) trace les commandes
+                    privilégiées réellement exécutées par RootWarden sur les serveurs distants : <em>qui, quoi,
+                    où, quand, résultat</em> — un trail d'audit type bastion.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Contextes instrumentés : <code>reboot</code>, <code>delete_user</code>,
+                        <code>full_update</code>, <code>security_update</code>, <code>custom_update</code>.</li>
+                    <li>Lecture seule (pas de suppression via l'API). Filtres machine + contexte. Migration 058.</li>
+                    <li>Helper <code>command_logger.log_command()</code> best-effort : la journalisation ne casse
+                        jamais l'action suivie.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Approbation 4-eyes (v1.30.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="approvals" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
