@@ -5,6 +5,45 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.37.0] - 2026-06-14 — Feature : inventaire & veille des conteneurs Docker
+
+Sur demande : monitorer les conteneurs Docker des serveurs, détecter les mises à
+jour disponibles côté **image** et côté **git**, avec le changelog.
+
+### Détection (migration 061 + `backend/docker_monitor.py`)
+- Via SSH (root) : `docker ps` + `docker inspect` (labels compose) +
+  `docker image inspect` (digest local `RepoDigests`). Auto-détecte compose / run.
+- **Git** : si une stack vient d'un dépôt cloné (working_dir compose = repo git),
+  `git fetch` (best-effort, sans prompt, timeout) + nombre de commits en retard
+  (`HEAD..origin`) + **changelog** (liste des commits). `safe.directory='*'` pour
+  éviter l'erreur « dubious ownership » en root.
+
+### Veille des images (`backend/docker_registry.py`)
+- Compare le **digest local** au **digest distant** du même tag via la Registry
+  HTTP API v2 : **Docker Hub**, **GHCR**, registres **génériques/internes**.
+  Auth anonyme par défaut ; token Bearer optionnel par hôte
+  (`DOCKER_REGISTRY_TOKENS`). Flux de challenge `WWW-Authenticate` géré.
+- SSRF : guard `_url_is_safe_external` (autorise RFC1918 pour un registre interne,
+  bloque loopback/link-local/metadata). Best-effort : digest distant inconnu →
+  pas de mise à jour signalée (zéro faux positif).
+
+### Routes & UI
+- `routes/docker.py` : `POST /docker/scan` (machine, `require_machine_access`),
+  `POST /docker/scan_all` (admin, streaming), `GET /docker/results`.
+- Page `/docker/` (admin) : cartes de résumé + table (serveur, conteneur, image,
+  état, **MAJ image** À jour/Dispo/Inconnu, **git N commits en retard** + changelog
+  repliable). Scan par serveur ou global. Rendu sans `onclick` interpolé.
+- Menu (opérationnel, admin) + tooltips, whitelist `api_proxy.php` (`/docker/`),
+  i18n fr+en.
+
+### Vérifié (live, vrai serveur srv-zabbix)
+**19 conteneurs réels détectés**, digests résolus, **6 mises à jour d'image
+réelles** signalées (ex glances, homepage), projets compose identifiés, détection
+git correcte (0 stack git ici). Module registre testé contre Docker Hub (token +
+digest réels). UI Puppeteer : 19 lignes, 4 cartes, badges MAJ/à jour, 0 erreur JS.
+
+---
+
 ## [1.36.0] - 2026-06-14 — UX : séparation Sudo / SFTP + explications en clair
 
 Suite à un retour utilisateur (« je sépare sudo et sftp, et dis ce que chaque
