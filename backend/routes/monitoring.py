@@ -230,6 +230,21 @@ def reboot_server():
     except Exception as e:
         logger.debug("maintenance check (reboot) skipped: %s", e)
 
+    # Approbation 4-eyes : un reboot est une action destructive (coupure de service).
+    try:
+        from approvals import gate
+        _uid, _ = get_current_user()
+        _ap = gate('reboot_server', int(machine_id), 'reboot',
+                   {'delay_minutes': delay_minutes}, _uid)
+        if _ap is not None:
+            msg = ("Demande d'approbation creee : un 2e administrateur doit valider avant le reboot."
+                   if _ap['status'] == 'created'
+                   else "Reboot deja en attente d'approbation par un 2e administrateur.")
+            return jsonify({'success': False, 'pending_approval': True,
+                            'request_id': _ap['id'], 'message': msg}), 202
+    except Exception as e:
+        logger.debug("approval gate (reboot) skipped: %s", e)
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
