@@ -71,4 +71,47 @@ return [
     'policies.audit_found' => 'Policy file found on server.',
     'policies.audit_not_found' => 'No policy file on server.',
     'policies.remove_success' => 'Policy removed from server.',
+
+    // Separate Sudo / SFTP pages (v1.36.0) + plain-language help
+    'nav.sudo_policies' => 'Sudo rights',
+    'nav.tip_sudo_policies' => 'Grant precise admin rights to a user on a server (superadmin)',
+    'nav.sftp_policies' => 'SFTP/SSH access',
+    'nav.tip_sftp_policies' => 'Restrict how a user connects to a server (superadmin)',
+
+    'sudopol.title' => 'Per-user sudo rights',
+    'sudopol.intro_title' => 'What is this page for?',
+    'sudopol.intro' => '"sudo" lets a normal user run certain commands as administrator (root). Here you choose, for ONE user on ONE server, WHAT they are allowed to do as admin — without giving them full power. Pick a ready-made template, then click "Deploy".',
+    'sudopol.choose' => '1. Choose what the user can do',
+
+    'sftppol.title' => 'Per-user SFTP / SSH access',
+    'sftppol.intro_title' => 'What is this page for?',
+    'sftppol.intro' => 'Here you control HOW a user connects to ONE server: limit them to file transfer only, lock them inside a single folder, force key-based login instead of password, etc. Tick the options you want, then click "Deploy".',
+    'sftppol.options' => '1. Choose the connection restrictions',
+
+    'policies.preset_help_all_nopasswd' => 'The user becomes a FULL administrator (root) and can do EVERYTHING, without even typing a password. Reserve for automated accounts (bots), never a person.',
+    'policies.preset_help_restart_services' => 'The user can start / stop / restart any service (e.g. the web server, the database). They cannot do anything else as admin.',
+    'policies.preset_help_apt_only' => 'The user can install and update software (the "apt" command). They cannot touch the rest of the system.',
+    'policies.preset_help_read_logs' => 'The user can only READ the server logs (/var/log). They cannot change anything. Ideal for support / monitoring.',
+    'policies.preset_help_systemctl_specific' => 'Like "restart services", but only for the list of services YOU choose (e.g. only "nginx"). More precise and safer.',
+    'policies.preset_help_custom' => 'For experts: you write the rules yourself. The server validates them (visudo) before applying; if invalid, nothing changes.',
+
+    'sftppol.f_sftp_only' => 'File transfer only (no terminal)',
+    'sftppol.h_sftp_only' => 'If ticked: the user can ONLY upload and download files (SFTP). They CANNOT open a terminal to run commands. Perfect for an account that only drops/fetches files.',
+    'sftppol.f_chroot' => 'Lock into a folder ("chroot" jail)',
+    'sftppol.h_chroot' => 'A "jail": the user sees ONLY this folder (and its content), as if alone on the server. They cannot look elsewhere (system files, other users\' folders...). Example: /srv/sftp/john. Leave empty = no jail. Technical note: the folder must already exist, be owned by root and have mode 0755, otherwise SSH refuses (security rule).',
+    'sftppol.f_working' => 'Landing folder',
+    'sftppol.h_working' => 'The folder the user lands in right after connecting (e.g. /upload). Convenience, not a security control.',
+    'sftppol.f_password' => 'Allow password login',
+    'sftppol.h_password' => 'Ticked: the user can log in with a password. Unticked: they MUST use an SSH key (much safer, recommended).',
+    'sftppol.f_tcp' => 'Allow network tunnels (port forwarding)',
+    'sftppol.h_tcp' => 'Lets the user route other network connections through SSH (e.g. reach an internal database). If not needed, untick: it is safer.',
+    'sftppol.f_agent' => 'Allow key bouncing (agent forwarding)',
+    'sftppol.h_agent' => 'Lets the user reuse their SSH key to bounce to another server from this one. If not needed, untick.',
+    'sftppol.f_x11' => 'Allow graphical apps (X11)',
+    'sftppol.h_x11' => 'Lets a graphical application window from the server show on the user\'s machine. Very rarely useful: leave unticked.',
+
+    'policies.help_deploy' => 'Applies the configuration on the server (after automatic validation).',
+    'policies.help_audit' => 'Reads the file actually present on the server, to check the current state.',
+    'policies.help_remove' => 'Removes this configuration from the server (back to default behavior).',
+    'policies.history_toggle' => 'History & rollback',
 ];

@@ -5,6 +5,38 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.36.0] - 2026-06-14 — UX : séparation Sudo / SFTP + explications en clair
+
+Suite à un retour utilisateur (« je sépare sudo et sftp, et dis ce que chaque
+truc fait — je n'ai jamais vu chroot »), la gestion des droits par utilisateur
+distant est rendue **compréhensible par un non-expert Linux**.
+
+### Séparation en deux pages
+- L'ancienne page unique à 3 onglets (`/adm/server_user_policies.php`) est scindée :
+  - **`/adm/server_user_sudo.php`** — droits sudo (« ce que l'utilisateur peut faire en admin ») ;
+  - **`/adm/server_user_sftp.php`** — accès SFTP/SSH (« comment l'utilisateur se connecte »).
+- L'ancienne URL **redirige** vers la page sudo (compat liens/bookmarks). Menu : deux
+  entrées distinctes (Droits sudo / Accès SFTP/SSH).
+- JS factorisé dans `www/adm/js/server_user_policy.js` (config par page via `window.POL`).
+
+### Explications en clair (le cœur du retour)
+- Chaque page a un **encadré « À quoi sert cette page ? »**.
+- Chaque **preset sudo** affiche une phrase concrète (ex : *read_logs* → « l'utilisateur
+  peut seulement LIRE les journaux, il ne peut RIEN modifier »).
+- Chaque **option SFTP** a un libellé humain + une explication sous le champ, sans jargon :
+  - chroot → « Enfermer dans un dossier (« cage ») : l'utilisateur ne voit QUE ce dossier… » ;
+  - sftp_only → « Transfert de fichiers uniquement (pas de terminal) » ;
+  - password/tcp/agent/x11 forwarding → expliqués avec leur impact sécurité.
+- Boutons Déployer/Auditer/Supprimer accompagnés de leur rôle.
+
+### Vérifié (Puppeteer)
+Page sudo : encadré intro + aide qui change selon le preset (apt_only → read_logs).
+Page SFTP : intro + champ chroot + explication « cage » + « terminal » + libellés humains.
+Ancienne URL → redirige vers sudo. 0 erreur JS. (Backend inchangé : routes `/policy/*`
+et managers identiques.)
+
+---
+
 ## [1.35.0] - 2026-06-14 — Feature : restauration de backup depuis l'UI
 
 Douzième et dernière feature de la roadmap. Les backups (création + sha256)
