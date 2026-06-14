@@ -89,6 +89,7 @@ from routes.wazuh import bp as wazuh_bp
 from routes.policies import bp as policies_bp
 from routes.drift import bp as drift_bp
 from routes.tasks import bp as tasks_bp
+from routes.groups import bp as groups_bp
 
 app.register_blueprint(monitoring_bp)
 app.register_blueprint(iptables_bp)
@@ -105,6 +106,7 @@ app.register_blueprint(graylog_bp)
 app.register_blueprint(policies_bp)
 app.register_blueprint(drift_bp)
 app.register_blueprint(tasks_bp)
+app.register_blueprint(groups_bp)
 
 # Feature flag : blueprint Wazuh enregistre uniquement si WAZUH_ENABLED=true.
 # Quand OFF, toutes les routes /wazuh/* retournent 404 nativement (Flask).

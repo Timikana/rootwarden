@@ -1038,6 +1038,28 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Groupes & actions de masse (v1.28.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="groups" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Groupes & actions de masse (v1.28.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/groups/</code> (admin + <code>can_admin_portal</code>) regroupe les serveurs
+                    pour agir sur tout un groupe d'un coup :
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Groupes dynamiques</strong> : règle de filtre sur <code>environment</code>,
+                        <code>criticality</code>, <code>network_type</code>, <code>lifecycle_status</code> et
+                        <code>tags</code>. Résolution live (un serveur qui matche entre automatiquement).</li>
+                    <li><strong>Groupes statiques</strong> : liste de membres explicite.</li>
+                    <li><strong>Actions de masse</strong> (<code>POST /groups/&lt;id&gt;/run</code>) : <code>drift_scan</code>
+                        (rapide, sans SSH) et <code>cve_scan</code> (pipeline CVE complet), lancées en arrière-plan,
+                        chaque machine tracée dans le <strong>centre de tâches</strong>.</li>
+                </ul>
+                <p class="text-sm">Filtres construits depuis une whitelist de colonnes/valeurs (requêtes 100 % paramétrées).
+                    Migration 055 : <code>machine_groups</code> + <code>machine_group_members</code>.</p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Score de posture de conformite (v1.26.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="compliance-posture" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">

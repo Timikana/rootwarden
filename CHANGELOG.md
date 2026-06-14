@@ -5,6 +5,46 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.28.0] - 2026-06-14 — Feature : groupes de machines + actions de masse
+
+Cinquième feature de la roadmap. Permet de regrouper les serveurs et d'agir
+sur tout un groupe d'un coup, plutôt que machine par machine.
+
+### Groupes (backend `routes/groups.py` + migration 055)
+- **Groupes dynamiques** : règle de filtre sur les attributs de `machines`
+  (`environment`, `criticality`, `network_type`, `lifecycle_status`) + `tags`
+  (`machine_tags`). Résolution **live** — un serveur qui matche la règle entre
+  automatiquement dans le groupe (OR dans une catégorie, AND entre catégories).
+- **Groupes statiques** : liste de membres explicite (`machine_group_members`).
+- CRUD complet : `GET/POST /groups`, `PUT/DELETE /groups/<id>`,
+  `GET /groups/<id>/members` (résolution + détail).
+- Sécurité : filtres construits depuis une **whitelist** de colonnes + valeurs
+  enum validées (A03), 100 % paramétré ; `@require_role(2)` + `can_admin_portal`.
+
+### Actions de masse (`POST /groups/<id>/run`)
+- Lance une opération sur tous les membres résolus, **en arrière-plan**, chaque
+  machine étant tracée dans le **centre de tâches** (v1.25.0) :
+  - `drift_scan` — scan de dérive (rapide, sans SSH) ;
+  - `cve_scan` — scan CVE complet (réutilise tout le pipeline : SSH +
+    enrichissement EPSS/KEV + persistance, via le générateur de streaming drainé).
+- Réponse immédiate (`queued: N`) ; suivi dans `/tasks/`.
+
+### Frontend (`/groups/`)
+- Page de gestion : formulaire de création (dynamique avec cases à cocher par
+  catégorie / statique avec checklist de serveurs), cartes de groupes avec
+  compteur de membres, résumé de filtres, boutons « Voir membres / Scan dérive /
+  Scan CVE / Supprimer ». Rendu sans `onclick` interpolé (addEventListener +
+  `textContent`) → pas de DOM-XSS.
+- Entrée menu (section Admin) + whitelist `api_proxy.php` (`/groups`, admin-only).
+- i18n fr+en (`groups.*` + `js.groups.*` + `nav.groups`).
+
+### Vérifié (Puppeteer live)
+Groupe dynamique `environment=PROD` créé → 1 membre résolu (srv-zabbix) →
+« Voir membres » OK → « Scan dérive » → tâche `drift_scan` créée dans le centre
+de tâches. 0 erreur JS.
+
+---
+
 ## [1.27.0] - 2026-06-14 — Feature : priorisation EPSS + CISA KEV des CVE
 
 Quatrième feature de la roadmap. Le CVSS mesure la *sévérité théorique* d'une
