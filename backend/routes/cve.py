@@ -224,6 +224,71 @@ def cve_results():
     return jsonify({'success': True, **results})
 
 
+@bp.route('/cve_reprioritize', methods=['POST'])
+@require_api_key
+@require_machine_access
+@threaded_route
+def cve_reprioritize():
+    """
+    Re-enrichit (EPSS + CISA KEV) les findings du dernier scan d'une machine,
+    SANS reconnexion SSH. Coeur de la boucle de priorisation : permet de
+    rafraichir quotidiennement la probabilite d'exploitation et de remonter
+    les CVE devenues "activement exploitees" (entrees au catalogue KEV) sans
+    relancer un scan complet (lent).
+
+    Body JSON : {machine_id: int}
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        machine_id = validate_machine_id(data.get('machine_id'))
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'machine_id invalide'}), 400
+
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        # Dernier scan complete de la machine
+        cur.execute(
+            "SELECT id FROM cve_scans WHERE machine_id = %s AND status = 'completed' "
+            "ORDER BY scan_date DESC LIMIT 1",
+            (machine_id,)
+        )
+        scan = cur.fetchone()
+        if not scan:
+            return jsonify({'success': False, 'message': 'Aucun scan a re-prioriser'}), 404
+
+        cur.execute(
+            "SELECT id, cve_id, cvss_score FROM cve_findings WHERE scan_id = %s",
+            (scan['id'],)
+        )
+        rows = cur.fetchall()
+        if not rows:
+            return jsonify({'success': True, 'enriched': 0, 'kev': 0, 'epss': 0})
+
+        findings = [{'cve_id': r['cve_id'], 'cvss': r['cvss_score'] or 0.0} for r in rows]
+        try:
+            from cve_enrich import enrich_findings
+            stats = enrich_findings(findings)
+        except Exception as e:
+            logger.error("cve_reprioritize enrich failed: %s", e)
+            return jsonify({'success': False, 'message': 'Enrichissement indisponible'}), 503
+
+        upd = conn.cursor()
+        for r, f in zip(rows, findings):
+            upd.execute(
+                "UPDATE cve_findings SET epss_score=%s, epss_percentile=%s, kev=%s, "
+                "kev_date_added=%s, priority_score=%s, priority_label=%s WHERE id=%s",
+                (f.get('epss_score'), f.get('epss_percentile'),
+                 1 if f.get('kev') else 0, f.get('kev_date_added'),
+                 f.get('priority_score'), f.get('priority_label'), r['id'])
+            )
+        conn.commit()
+        return jsonify({'success': True, 'enriched': len(rows),
+                        'kev': stats.get('kev', 0), 'epss': stats.get('epss', 0)})
+    finally:
+        conn.close()
+
+
 @bp.route('/cve_history', methods=['GET'])
 @require_api_key
 @require_machine_access

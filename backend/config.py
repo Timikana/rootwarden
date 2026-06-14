@@ -147,6 +147,16 @@ class Config:
     NVD_API_KEY      = os.getenv('NVD_API_KEY', '')  # optionnel : 50 req/30s avec, 5 sans
     NVD_CACHE_TTL    = int(os.getenv('NVD_CACHE_TTL', '604800'))  # 7 jours par defaut
 
+    # Enrichissement EPSS (FIRST.org) + CISA KEV pour la priorisation des CVE.
+    # EPSS = probabilite d'exploitation (0..1), KEV = exploitation in-the-wild
+    # averee. Gratuit, sans cle. Best-effort : si l'API est injoignable, le scan
+    # CVE continue (les findings restent priorises sur le CVSS seul).
+    CVE_ENRICH_ENABLED    = os.getenv('CVE_ENRICH_ENABLED', 'true').lower() == 'true'
+    EPSS_API_URL          = os.getenv('EPSS_API_URL', 'https://api.first.org/data/v1/epss')
+    KEV_CATALOG_URL       = os.getenv('KEV_CATALOG_URL', 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json')
+    CVE_ENRICH_CACHE_TTL  = int(os.getenv('CVE_ENRICH_CACHE_TTL', '86400'))   # EPSS par CVE : 24h
+    KEV_CACHE_TTL         = int(os.getenv('KEV_CACHE_TTL', '86400'))          # catalogue KEV : 24h
+
     # ── Notifications email ──────────────────────────────────────────────────
     MAIL_ENABLED       = os.getenv('MAIL_ENABLED', 'false').lower() == 'true'
     MAIL_FROM          = os.getenv('MAIL_FROM', '')

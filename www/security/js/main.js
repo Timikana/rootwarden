@@ -42,6 +42,39 @@ const SEV_STYLES = {
     NONE:     { badge: 'bg-gray-400 text-white',    row: 'bg-gray-50 dark:bg-gray-800' },
 };
 
+// Construit la cellule "Severite / Priorite" d'un finding : badge CVSS, +
+// pastille KEV (rouge, exploitation in-the-wild averee), + EPSS (probabilite
+// d'exploitation). Centralise pour rester coherent entre buildRows et la
+// pagination (loadMoreFindings).
+function sevCell(f) {
+    const sev = f.severity || 'NONE';
+    const st  = SEV_STYLES[sev] || SEV_STYLES.NONE;
+    let html = `<span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span>`;
+    if (f.kev) {
+        const d = f.kev_date_added ? ` (${esc(String(f.kev_date_added))})` : '';
+        html += ` <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-600 text-white" title="${tt('js.cve_kev_title')}${d}">KEV</span>`;
+    }
+    if (f.epss_score != null) {
+        const pct = Math.round(Number(f.epss_score) * 100);
+        const hot = Number(f.epss_score) >= 0.5 ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-gray-500 dark:text-gray-400';
+        html += ` <span class="text-[10px] ${hot}" title="${tt('js.cve_epss_title')}">EPSS ${pct}%</span>`;
+    }
+    return html;
+}
+
+// Helper i18n cote JS avec repli : window._i18n (getJsTranslations) sinon defaut.
+function tt(key) {
+    const fallback = {
+        'js.cve_kev_title': 'Activement exploitee (catalogue CISA KEV)',
+        'js.cve_epss_title': 'EPSS : probabilite d\'exploitation a 30 jours',
+        'js.cve_reprio_ok': 'Re-priorisation terminee',
+        'js.cve_reprio_running': 'Re-priorisation EPSS / KEV...',
+        'js.cve_reprio_err': 'Re-priorisation indisponible',
+        'js.cve_kev_filter': 'KEV',
+    };
+    return (window._i18n && window._i18n[key]) || fallback[key] || key;
+}
+
 // ── Test connexion OpenCVE ────────────────────────────────────────────────
 // Le test est désormais fait côté PHP (server-side) pour éviter les problèmes
 // CORS entre le navigateur et le backend Python via Hypercorn.
@@ -68,6 +101,36 @@ async function loadLastResults(id) {
         else if (!d.success) console.warn(`[CVE] loadLastResults machine ${id}:`, d.message);
     } catch (e) {
         console.error(`[CVE] loadLastResults machine ${id}:`, e);
+    }
+}
+
+/**
+ * Re-priorise les findings du dernier scan via EPSS (FIRST.org) + CISA KEV,
+ * sans reconnexion SSH (rapide). Met a jour les scores d'exploitabilite puis
+ * recharge l'affichage avec le nouveau tri (KEV/priorite en tete).
+ * @param {number} id - Identifiant de la machine
+ */
+async function reprioritizeCve(id) {
+    const btn = document.getElementById(`reprio-btn-${id}`);
+    const old = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+        const r = await fetch(`${API_URL}/cve_reprioritize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ machine_id: id }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success) {
+            if (window.toast) window.toast(`${tt('js.cve_reprio_ok')} — KEV: ${d.kev||0}, EPSS: ${d.epss||0}`, 'success');
+            await loadLastResults(id);
+        } else if (window.toast) {
+            window.toast(d.message || tt('js.cve_reprio_err'), 'error');
+        }
+    } catch (e) {
+        if (window.toast) window.toast(tt('js.cve_reprio_err'), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = old; }
     }
 }
 
@@ -191,7 +254,13 @@ async function runScan(endpoint, body, machineIds) {
     // Rétablit les boutons et affiche les résultats finaux
     for (const id of machineIds) {
         setScanning(id, false);
-        if (findingsMap[id] !== undefined) renderResults(id, findingsMap[id], metaMap[id]);
+        if (findingsMap[id] !== undefined) {
+            renderResults(id, findingsMap[id], metaMap[id]);
+            // Les findings streames individuellement n'ont pas encore l'EPSS/KEV
+            // (enrichi en bloc apres le scan, cote backend). On recharge la
+            // version persistee enrichie pour afficher KEV/EPSS et le bon tri.
+            if (metaMap[id]) loadLastResults(id);
+        }
     }
 }
 
@@ -322,11 +391,26 @@ function renderResults(machineId, findings, meta) {
                             class="sev-btn text-xs font-bold px-2.5 py-1 rounded-full ${SEV_STYLES[s]?.badge || ''}">
                         ${safeSev} (${cnt})
                     </button>`;
-        })
+        }),
+        // Bouton KEV (seulement si des CVE activement exploitees sont presentes)
+        (() => {
+            const kevCnt = findings.filter(f => f.kev).length;
+            return kevCnt ? `<button onclick="filterFindings(${_mid},'KEV')" data-sev="KEV"
+                            class="sev-btn text-xs font-bold px-2.5 py-1 rounded-full bg-rose-600 text-white"
+                            title="${tt('js.cve_kev_title')}">
+                        ${tt('js.cve_kev_filter')} (${kevCnt})
+                    </button>` : '';
+        })()
     ].join('');
 
-    // Trier par année (plus récent d'abord) puis par CVSS
+    // Tri : KEV (exploitees) d'abord, puis score de priorite (EPSS+CVSS)
+    // decroissant, puis annee (recent d'abord), puis CVSS. La priorisation
+    // EPSS/KEV remonte les CVE reellement dangereuses avant les CVSS eleves
+    // jamais exploites.
     findings.sort((a, b) => {
+        if ((b.kev?1:0) !== (a.kev?1:0)) return (b.kev?1:0) - (a.kev?1:0);
+        const pa = a.priority_score ?? -1, pb = b.priority_score ?? -1;
+        if (pb !== pa) return pb - pa;
         const ya = parseInt((a.cve_id||'').replace('CVE-','')) || 0;
         const yb = parseInt((b.cve_id||'').replace('CVE-','')) || 0;
         if (yb !== ya) return yb - ya;
@@ -366,9 +450,7 @@ function renderResults(machineId, findings, meta) {
                 </td>
                 <td class="px-4 py-2 text-xs font-medium">${esc(f.package||f.package_name||'')}</td>
                 <td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version||f.package_version||'')}</td>
-                <td class="px-4 py-2 whitespace-nowrap">
-                    <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span>
-                </td>
+                <td class="px-4 py-2 whitespace-nowrap">${sevCell(f)}</td>
                 <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-xs truncate" title="${esc(f.summary||'')}">${esc((f.summary||'').slice(0,120))}</td>
                 <td class="px-3 py-2 whitespace-nowrap">
                     <select onchange="setCveRemediation('${esc(f.cve_id)}', ${machineId}, this.value)" class="text-[10px] border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700">
@@ -413,9 +495,12 @@ function renderResults(machineId, findings, meta) {
                 <button onclick="filterFindings(${machineId},'ALL')" class="sev-btn text-[10px] px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">Toutes</button>
                 ${yearBtns}
             </div>
-            <div>
+            <div class="flex flex-wrap items-center gap-2">
                 <input type="text" placeholder="Rechercher un CVE ou paquet..." class="w-full sm:w-64 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500"
                        oninput="searchFindings(${machineId}, this.value)">
+                <button id="reprio-btn-${_mid}" onclick="reprioritizeCve(${_mid})"
+                        class="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors whitespace-nowrap"
+                        title="${tt('js.cve_epss_title')}">↻ EPSS / KEV</button>
             </div>
         </div>
         <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -477,7 +562,7 @@ function loadMoreFindings(machineId) {
         tr.className = `finding-row ${st.row}`;
         tr.dataset.severity = sev;
         tr.dataset.year = year;
-        tr.innerHTML = `<td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td><td class="px-4 py-2 text-xs font-medium">${esc(f.package||f.package_name||'')}</td><td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version||f.package_version||'')}</td><td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span></td><td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate">${esc((f.summary||'').slice(0,150))}</td>`;
+        tr.innerHTML = `<td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td><td class="px-4 py-2 text-xs font-medium">${esc(f.package||f.package_name||'')}</td><td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version||f.package_version||'')}</td><td class="px-4 py-2 whitespace-nowrap">${sevCell(f)}</td><td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate">${esc((f.summary||'').slice(0,150))}</td>`;
         tbody.appendChild(tr);
     });
 
@@ -511,7 +596,7 @@ function searchFindings(machineId, query) {
             <td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td>
             <td class="px-4 py-2 text-xs font-medium">${esc(f.package || f.package_name || '')}</td>
             <td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version || f.package_version || '')}</td>
-            <td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span></td>
+            <td class="px-4 py-2 whitespace-nowrap">${sevCell(f)}</td>
             <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate">${esc((f.summary || '').slice(0, 150))}</td>
         </tr>`;
     }).join('');
@@ -527,6 +612,8 @@ function filterFindings(machineId, filter) {
     let filtered;
     if (filter === 'ALL') {
         filtered = all;
+    } else if (filter === 'KEV') {
+        filtered = all.filter(f => f.kev);
     } else if (filter.startsWith('YEAR-')) {
         const year = filter.replace('YEAR-', '');
         filtered = all.filter(f => (f.cve_id || '').includes('CVE-' + year));
@@ -546,7 +633,7 @@ function filterFindings(machineId, filter) {
             <td class="px-4 py-2 font-mono text-xs whitespace-nowrap"><a href="https://www.cve.org/CVERecord?id=${esc(f.cve_id)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${esc(f.cve_id)}</a></td>
             <td class="px-4 py-2 text-xs font-medium">${esc(f.package || f.package_name || '')}</td>
             <td class="px-4 py-2 font-mono text-xs text-gray-500">${esc(f.version || f.package_version || '')}</td>
-            <td class="px-4 py-2 whitespace-nowrap"><span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}">${sev} ${Number(f.cvss||f.cvss_score||0).toFixed(1)}</span></td>
+            <td class="px-4 py-2 whitespace-nowrap">${sevCell(f)}</td>
             <td class="px-4 py-2 text-[11px] text-gray-600 dark:text-gray-300 max-w-md truncate" title="${esc(f.summary || '')}">${esc((f.summary || '').slice(0, 150))}</td>
         </tr>`;
     }).join('');

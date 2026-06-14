@@ -393,4 +393,11 @@ return [
     'js.servers.lifecycle_confirm_reactivate' => 'Reactiver',
     'js.servers.lifecycle_updated' => 'Statut du serveur mis a jour.',
     'js.servers.lifecycle_confirm' => 'Confirmer le changement de cycle de vie ?',
+    // CVE - priorisation EPSS / CISA KEV
+    'js.cve_kev_title' => 'Activement exploitee (catalogue CISA KEV)',
+    'js.cve_epss_title' => 'EPSS : probabilite d\'exploitation a 30 jours',
+    'js.cve_reprio_ok' => 'Re-priorisation terminee',
+    'js.cve_reprio_running' => 'Re-priorisation EPSS / KEV...',
+    'js.cve_reprio_err' => 'Re-priorisation indisponible',
+    'js.cve_kev_filter' => 'KEV',
 ];

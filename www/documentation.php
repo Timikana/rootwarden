@@ -680,6 +680,18 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                     <li><strong>Déduplication</strong> - Les paquets multiarch (ex: libc6:amd64 + libc6:i386) ne sont scannés qu'une fois</li>
                 </ul>
 
+                <h3 class="font-semibold mt-3 mb-2">Priorisation EPSS + CISA KEV (v1.27.0)</h3>
+                <p class="text-sm mb-2">Le CVSS mesure la sévérité théorique, pas la probabilité réelle d'exploitation.
+                Chaque finding est enrichi (best-effort, gratuit, sans clé) avec :</p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>EPSS</strong> (<a href="https://www.first.org/epss/" target="_blank" class="text-blue-500 hover:underline">FIRST.org</a>) - probabilité d'exploitation à 30 jours (0-100 %, badge rouge si ≥ 50 %)</li>
+                    <li><strong>CISA KEV</strong> - pastille rouge <code>KEV</code> si la CVE est <em>activement exploitée in-the-wild</em></li>
+                    <li><strong>Score de priorité</strong> (0-100) : KEV ⇒ 100/URGENT ; sinon 50 % CVSS + 50 % EPSS. Le tri remonte les CVE réellement dangereuses avant les CVSS élevés jamais exploités.</li>
+                    <li><strong>Filtre KEV</strong> + bouton <code>↻ EPSS / KEV</code> (<code>POST /cve_reprioritize</code>) : ré-enrichit le dernier scan <em>sans reconnexion SSH</em>, à rejouer quotidiennement.</li>
+                </ul>
+                <p class="text-sm mb-3">Config : <code>CVE_ENRICH_ENABLED</code>, <code>EPSS_API_URL</code>, <code>KEV_CATALOG_URL</code>,
+                <code>CVE_ENRICH_CACHE_TTL</code>, <code>KEV_CACHE_TTL</code>.</p>
+
                 <h3 class="font-semibold mt-3 mb-2">Accès</h3>
                 <p class="text-sm">Page : <code>/security/</code> · Permission : <code>can_scan_cve</code> (ou superadmin)<br>
                 Les utilisateurs de rôle <em>user</em> ne voient que leurs serveurs assignés dans <code>user_machine_access</code>.</p>
