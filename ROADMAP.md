@@ -35,6 +35,15 @@ HA / multi-nœud** (exclu).
 | 1.24.0 | **Détection de dérive (drift)** | `/drift/` + table `config_drift` (mig 052) + scan scheduler 1x/h. Compare désiré/réel (sudo, sshd, fail2ban) depuis la BDD, sans SSH. |
 | 1.25.0 | **Centre de tâches async** | `/tasks/` + table `tasks` (mig 053) + helper `task_tracker.py` (context manager). Scheduler instrumenté (CVE/SSH/drift/backup). Lecture seule (retry à venir). |
 | 1.26.0 | **Score de posture conformité (CIS-like)** | Note A-F par serveur dans le rapport conformité (sshd+CVE+fail2ban+drift), incluse aux exports CSV/PDF. Durcissement PDF (purge buffers). |
+| 1.27.0 | **Priorisation EPSS + CISA KEV** | `cve_enrich.py` (EPSS FIRST.org + KEV CISA), score de priorité, `/cve_reprioritize`, badges KEV/EPSS + tri (mig 054). |
+| 1.28.0 | **Groupes dynamiques + actions de masse** | `/groups/` + `machine_groups`/`machine_group_members` (mig 055), filtres env/criticité/réseau/cycle/tags, bulk drift/CVE → centre de tâches. |
+| 1.29.0 | **Fenêtres de maintenance** | `/maintenance/` + `maintenance_windows` (mig 056), enforcement HTTP 423 sur update/reboot, bypass superadmin. |
+| 1.30.0 / 1.31.1 | **Workflow d'approbation 4-eyes** | `/approvals/` + `approval_requests` (mig 057), store-and-replay, règle 4-eyes, **bypass superadmin** (mono-admin). |
+| 1.31.0 | **Journal des commandes (bastion)** | `/commandlog/` + `command_log` (mig 058), instrumentation reboot/delete_user/updates. |
+| 1.32.0 | **ChatOps bidirectionnel** | `/chatops/` + `chatops_users` (mig 059), endpoint entrant (signature Slack / jeton), commandes status/approvals/approve/reject. |
+| 1.33.0 | **Ticketing ITSM** | `/tickets/` + `tickets` (mig 060), adaptateurs Jira/ServiceNow/GLPI/generic, CVE→ticket (bouton + auto-KEV), SSRF guard. |
+| 1.34.0 | **Recherche globale + audit log** | `/search/` (serveurs/users/CVE/tickets/audit), visualiseur audit HMAC exposé au menu. |
+| 1.35.0 | **Restauration de backup** | `/backups/` : verify (test non destructif) + restore (superadmin, sha256 + backup de sécurité auto). |
 
 ---
 
@@ -42,24 +51,11 @@ HA / multi-nœud** (exclu).
 
 1. **Rotation automatique des secrets** — rotation planifiée des mots de passe
    root/SSH des machines, avec audit. Table de planning + job scheduler + UI.
-   *Self-contained, haute valeur DevSecOps.*
-2. **Priorisation des vulnérabilités EPSS + CISA KEV** + boucle de remédiation
-   patch (scan → planifier patch → re-scan de vérif). Enrichir le scan CVE.
-3. **Groupes dynamiques + actions de masse** — groupes par tag/env/criticité,
-   opérations groupées (déploiement, scan, patch) sur un groupe.
-4. **Fenêtres de maintenance / calendrier de changements** — bornes horaires
-   autorisées pour les actions mutantes + calendrier.
-5. **Workflow d'approbation 4-eyes** — validation par un 2e admin avant les
-   actions les plus destructives (au-delà du step-up 2FA).
-6. **Enregistrement de session SSH / log des commandes** — traçabilité type
-   bastion de ce qui est réellement exécuté via la plateforme.
-7. **ChatOps bidirectionnel** (Slack/Teams) — déclencher/approuver depuis le chat
-   (aujourd'hui webhooks sortants uniquement).
-8. **Ticketing** (GLPI / Jira / ServiceNow) — finding CVE → ticket auto.
-9. **Recherche globale + visualiseur d'audit log** — recherche serveurs/users/CVE/
-   logs + UI de consultation de l'audit log (HMAC chain) avec filtres et export.
-10. **Restauration de backup depuis l'UI** — les backups existent (création +
-    sha256), restauration encore manuelle ; + test de restauration.
+   *Self-contained, haute valeur DevSecOps. (Seule feature roadmap non démarrée.)*
+
+> Les features 2 à 10 de la roadmap initiale sont **livrées** (v1.27.0 → v1.35.0,
+> voir tableau ci-dessus et CHANGELOG). Chacune : migration idempotente + blueprint
+> backend + page PHP/JS + i18n fr/en + menu + whitelist proxy + doc + test Puppeteer live.
 
 ### Exclu (décision)
 - ❌ SSO / OIDC / LDAP
@@ -69,14 +65,19 @@ HA / multi-nœud** (exclu).
 
 ## 🔧 Opérationnel en attente
 
-- **Push** de la branche `feat/per-user-sudo-sftp` (11 commits locaux non poussés).
+- **Push** de la branche `feat/per-user-sudo-sftp` (~20 commits locaux non poussés,
+  dont features v1.27 → v1.35).
 - **Merge vers `main`** : nécessite validation verbale explicite (convention
   patches sécu).
 - **Test boot préprod** avec l'override prod : `docker compose -f docker-compose.yml
   -f docker-compose.prod.yml up -d` après rebuild `--no-cache` (valider les fixes
   `user:`/`read_only`/`install.sh`).
 - **Appliquer les migrations** en préprod/prod : `docker exec <php|python> python
-  db_migrate.py` (migrations 052 config_drift, 053 tasks).
+  db_migrate.py` (migrations **052 → 060** : config_drift, tasks, cve_epss_kev,
+  machine_groups, maintenance_windows, approval_requests, command_log,
+  chatops_users, tickets).
+- **Features opt-in à activer** côté `.env` si souhaité : `APPROVAL_ENABLED`,
+  `CHATOPS_ENABLED` (+ secret/jeton), `TICKETING_ENABLED` (+ provider).
 
 ---
 
