@@ -5,6 +5,36 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.34.0] - 2026-06-14 — Feature : recherche globale + audit log dans le menu
+
+Onzième feature de la roadmap.
+
+### Recherche globale (`routes/search.py` + `/search/`)
+- Un seul endpoint `GET /search?q=` interroge **serveurs** (nom/IP),
+  **utilisateurs** (nom/email), **CVE** (cve_id/paquet), **tickets** (résumé/réf)
+  et **journal d'audit** (action). Résultats catégorisés + lien de navigation,
+  plafonnés à 10 par catégorie.
+- Page `/search/` : champ unique avec recherche **debouncée** (300 ms), rendu en
+  cartes par catégorie. Rendu sans `onclick` interpolé → pas de DOM-XSS.
+- Sécurité : `@require_role(2)` + `can_admin_portal` (traverse users + audit),
+  LIKE 100 % paramétré, terme ≥ 2 caractères.
+
+### Visualiseur d'audit log
+- Le visualiseur existant (`/adm/audit_log.php` : filtres user/action/date,
+  pagination, **export CSV**, **vérification de la chaîne HMAC** via
+  `/adm/api/audit_verify.php`) est désormais **accessible depuis le menu** (section
+  Admin) — il n'était atteignable que via la page d'administration.
+
+### Divers
+- Menu (Admin) : entrées « Recherche » + « Journal d'audit » + tooltips.
+- Whitelist `api_proxy.php` (`/search`, admin-only), i18n fr+en.
+
+### Vérifié
+UI Puppeteer + API : `srv` → 1 serveur, `super` → 1 utilisateur, rendu en cartes
+(srv-zabbix présent), 0 erreur JS.
+
+---
+
 ## [1.33.0] - 2026-06-14 — Feature : ticketing ITSM (CVE → ticket)
 
 Dixième feature de la roadmap. Transforme un finding (notamment CVE) en ticket
