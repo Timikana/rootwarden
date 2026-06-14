@@ -1020,8 +1020,31 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
                        'package': pkg['name'], 'cve_count': 0, 'step': 'scan',
                        'total_cve_found': total_cve_found}
 
-        # Tri final : CRITICAL → LOW, puis score décroissant
-        findings.sort(key=lambda x: (SEVERITY_ORDER.get(x['severity'], 5), -x['cvss']))
+        # Enrichissement EPSS (FIRST.org) + CISA KEV : annote chaque finding
+        # avec une probabilite d'exploitation et un score de priorite consolide.
+        # Best-effort : si les API sont injoignables, on garde les findings tels
+        # quels (priority_score base sur le CVSS seul via compute_priority).
+        if Config.CVE_ENRICH_ENABLED and findings:
+            try:
+                yield {'type': 'progress', 'machine_id': machine_id,
+                       'step': 'enrich',
+                       'message': 'Enrichissement EPSS / CISA KEV...'}
+                from cve_enrich import enrich_findings
+                stats = enrich_findings(findings)
+                if stats.get('kev'):
+                    yield {'type': 'progress', 'machine_id': machine_id,
+                           'step': 'enrich',
+                           'message': f"{stats['kev']} CVE activement exploitee(s) (CISA KEV)"}
+            except Exception as enr_err:
+                _log.debug("CVE enrichment skipped: %s", enr_err)
+
+        # Tri final : KEV d'abord, puis priorite decroissante, puis severite/CVSS
+        findings.sort(key=lambda x: (
+            0 if x.get('kev') else 1,
+            -(x.get('priority_score') or 0.0),
+            SEVERITY_ORDER.get(x['severity'], 5),
+            -x['cvss'],
+        ))
 
         # Persistance en base
         scan_id = _save_scan(machine_id, findings, total, min_cvss)
@@ -1130,14 +1153,19 @@ def _save_scan(machine_id: int, findings: list[dict],
             insert_sql = """
                 INSERT INTO cve_findings
                     (scan_id, machine_id, package_name, package_version,
-                     cve_id, cvss_score, severity, summary)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                     cve_id, cvss_score, severity, summary,
+                     epss_score, epss_percentile, kev, kev_date_added,
+                     priority_score, priority_label)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """
             for f in findings:
                 cur.execute(insert_sql, (
                     scan_id, machine_id, f['package'], f['version'],
                     f['cve_id'], f['cvss'], f['severity'],
                     (f.get('summary') or '')[:300],
+                    f.get('epss_score'), f.get('epss_percentile'),
+                    1 if f.get('kev') else 0, f.get('kev_date_added'),
+                    f.get('priority_score'), f.get('priority_label'),
                 ))
         conn.commit()
         _log.info("Scan saved: scan_id=%s, machine_id=%s, findings=%d",
@@ -1186,14 +1214,21 @@ def get_last_scan_results(machine_id: int) -> dict | None:
 
         cur.execute("""
             SELECT package_name, package_version, cve_id,
-                   cvss_score, severity, summary
+                   cvss_score, severity, summary,
+                   epss_score, epss_percentile, kev, kev_date_added,
+                   priority_score, priority_label
             FROM cve_findings
             WHERE scan_id = %s
             ORDER BY
+                kev DESC,
+                priority_score DESC,
                 FIELD(severity,'CRITICAL','HIGH','MEDIUM','LOW','NONE'),
                 cvss_score DESC
         """, (scan['id'],))
         findings = cur.fetchall()
+        for f in findings:
+            if f.get('kev_date_added') and hasattr(f['kev_date_added'], 'isoformat'):
+                f['kev_date_added'] = f['kev_date_added'].isoformat()
 
         return {
             'scan':     scan,

@@ -5,6 +5,52 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.27.0] - 2026-06-14 — Feature : priorisation EPSS + CISA KEV des CVE
+
+Quatrième feature de la roadmap. Le CVSS mesure la *sévérité théorique* d'une
+CVE, pas la probabilité qu'elle soit réellement exploitée. Cette version enrichit
+chaque finding avec deux signaux d'exploitabilité gratuits et complémentaires
+pour **prioriser ce qu'il faut patcher en premier**.
+
+### Enrichissement (backend)
+- **EPSS** (FIRST.org) : probabilité d'exploitation à 30 jours (0..1), récupérée
+  par batch de 80 CVE, cache mémoire 24h.
+- **CISA KEV** : flag « activement exploitée in-the-wild », catalogue complet
+  chargé puis caché 24h.
+- Nouveau module `backend/cve_enrich.py` (`EPSSClient`, `KEVCatalog`,
+  `compute_priority`, `enrich_findings`) réutilisant le guard SSRF (`_safe_get`)
+  du scanner. **Best-effort** : API injoignable ⇒ le scan continue (priorisation
+  sur le CVSS seul), jamais d'échec de scan.
+- **Score de priorité consolidé** (0-100 + label `URGENT`/`HIGH`/`MEDIUM`/`LOW`) :
+  KEV ⇒ 100/URGENT ; sinon moyenne pondérée 50 % CVSS + 50 % EPSS. Une CVSS 9.8
+  jamais exploitée (EPSS 0.01) tombe sous une CVSS 6.5 activement exploitée.
+- Enrichissement intégré à `scan_server` (avant persistance) + tri par KEV puis
+  priorité. `_save_scan` + `get_last_scan_results` étendus aux 6 nouvelles colonnes.
+- Nouvelle route **`POST /cve_reprioritize`** : ré-enrichit les findings du dernier
+  scan **sans reconnexion SSH** (rapide) — cœur de la boucle de priorisation, à
+  rejouer quotidiennement pour capter les nouvelles entrées KEV/EPSS.
+
+### Boucle de remédiation patch
+La vérification post-patch est assurée par l'auto-résolution déjà en place : à
+chaque scan, les CVE non re-détectées passent en `resolved`. Le cycle complet =
+scan → priorisation EPSS/KEV → remédiation → re-scan de vérification.
+
+### Frontend (`/security/`)
+- Pastille rouge **KEV** + **EPSS %** (rouge si ≥ 50 %) dans la colonne sévérité,
+  centralisées via `sevCell(f)` (cohérent sur rendu/pagination/recherche/filtre).
+- Tri par défaut : KEV en tête, puis score de priorité décroissant.
+- Bouton de filtre **KEV** (si CVE exploitées) + bouton **↻ EPSS / KEV** (re-priorisation).
+- Rechargement auto des données enrichies après un scan live.
+
+### Migration / config / i18n
+- Migration **054** (idempotente) : `epss_score`, `epss_percentile`, `kev`,
+  `kev_date_added`, `priority_score`, `priority_label` + index `idx_cve_findings_kev`.
+- Config : `CVE_ENRICH_ENABLED`, `EPSS_API_URL`, `KEV_CATALOG_URL`,
+  `CVE_ENRICH_CACHE_TTL`, `KEV_CACHE_TTL` (+ `srv-docker.env.example`).
+- i18n fr+en (`js.cve_kev_*`, `js.cve_epss_*`, `js.cve_reprio_*`, `cve.epss_legend`).
+
+---
+
 ## [1.26.0] - 2026-06-10 — Feature : score de posture de conformité consolidé (CIS-like)
 
 Troisième feature de la roadmap. Le rapport de conformité (`/security/compliance_report.php`)
