@@ -5,6 +5,48 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.29.0] - 2026-06-14 — Feature : fenêtres de maintenance / calendrier de changements
+
+Sixième feature de la roadmap. Encadre **quand** les actions mutantes peuvent
+s'exécuter, pour éviter les patchs/reboots en pleine production.
+
+### Modèle (migration 056 + `backend/maintenance.py`)
+- Table `maintenance_windows` : plages horaires hebdomadaires (scope `global` ou
+  `machine`, jours 0-6, `start_time`/`end_time`, `enabled`). Gère les fenêtres à
+  cheval sur minuit (start > end).
+- Helper `is_allowed(machine_id, role)` :
+  - **superadmin (role 3) → bypass** (urgence patch), journalisé ;
+  - aucune fenêtre active applicable → autorisé (défaut permissif) ;
+  - sinon → autorisé seulement dans une fenêtre. **Fail-open** sur erreur BDD.
+
+### Enforcement (actions mutantes gatées)
+Vérification insérée dans : `update_server` (full upgrade), `apply_security_updates`,
+`custom_update` (routes updates) et `reboot_server` (monitoring). Hors fenêtre →
+HTTP **423** + message clair. Les endpoints lecture seule (`dry_run_update`) et le
+callback cron (`update_security_exec`) ne sont **pas** gatés.
+
+### Routes & frontend
+- `routes/maintenance.py` : CRUD `/maintenance/windows` + `GET /maintenance/check`
+  (utilisé par le frontend pour prévenir avant une action).
+- Page `/maintenance/` : formulaire (scope, jours, horaires), liste avec badges de
+  jours et indicateur **Ouverte / Fermée / Désactivée** calculé client-side.
+  Rendu sans `onclick` interpolé → pas de DOM-XSS.
+- Menu (Admin) + tooltips (`nav.maintenance` / `nav.tip_maintenance`).
+- Whitelist `api_proxy.php` : `/maintenance/` autorisé, `/maintenance/windows`
+  admin-only (le `/check` reste accessible aux opérateurs).
+
+### OWASP / sécurité
+A01 `@require_role(2)` + `can_admin_portal` (CRUD), A03 jours/heures validés
+(regex HH:MM, jours 0-6) + requêtes paramétrées, A04 l'enforcement lui-même est
+un contrôle d'autorisation temporel.
+
+### Vérifié
+Logique : fenêtre fermée (admin) → bloqué `outside-window` ; ouverte → `in-window` ;
+superadmin → `superadmin-bypass` ; sans fenêtre → `no-window`. UI Puppeteer :
+création + listing + `/maintenance/check`, 0 erreur JS.
+
+---
+
 ## [1.28.0] - 2026-06-14 — Feature : groupes de machines + actions de masse
 
 Cinquième feature de la roadmap. Permet de regrouper les serveurs et d'agir

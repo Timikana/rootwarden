@@ -217,6 +217,19 @@ def reboot_server():
     if not machine_id:
         return jsonify({'success': False, 'message': 'machine_id manquant'}), 400
 
+    # Fenetre de maintenance : un reboot est une action mutante critique.
+    try:
+        from maintenance import is_allowed
+        _uid, _role = get_current_user()
+        allowed, reason = is_allowed(machine_id, role=_role)
+        if not allowed:
+            logger.info("Reboot bloque (hors fenetre de maintenance) machine_id=%s", machine_id)
+            return jsonify({'success': False,
+                            'message': "Reboot bloque : hors fenetre de maintenance autorisee.",
+                            'reason': reason}), 423
+    except Exception as e:
+        logger.debug("maintenance check (reboot) skipped: %s", e)
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)

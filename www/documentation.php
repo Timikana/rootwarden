@@ -1038,6 +1038,26 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Fenetres de maintenance (v1.29.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="maintenance" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Fenêtres de maintenance (v1.29.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/maintenance/</code> (admin + <code>can_admin_portal</code>) définit les plages
+                    horaires hebdomadaires pendant lesquelles les <strong>actions mutantes</strong> sont autorisées.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Scope <strong>global</strong> (toute la flotte) ou <strong>machine</strong> précise ;
+                        jours + plage horaire (gère les fenêtres à cheval sur minuit).</li>
+                    <li>Hors fenêtre, ces actions renvoient <strong>HTTP 423</strong> : <code>update_server</code>,
+                        <code>apply_security_updates</code>, <code>custom_update</code>, <code>reboot_server</code>.</li>
+                    <li><strong>Superadmin</strong> contourne les fenêtres (urgence patch, journalisé). Aucune fenêtre
+                        définie = aucune restriction. Fail-open en cas d'erreur BDD.</li>
+                    <li>Endpoint <code>GET /maintenance/check?machine_id=</code> pour prévenir l'opérateur avant d'agir.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Groupes & actions de masse (v1.28.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="groups" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
