@@ -1038,6 +1038,29 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- ChatOps bidirectionnel (v1.32.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="chatops" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">ChatOps bidirectionnel (v1.32.0+)</h2>
+                <p class="text-sm mb-3">
+                    Les webhooks <strong>sortants</strong> (notifications) restent gérés par <code>WEBHOOK_*</code>.
+                    La page <code>/chatops/</code> (admin) ajoute le sens <strong>entrant</strong> : piloter
+                    RootWarden depuis Slack ou Teams.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Point d'entrée public <code>/chatops/webhook.php</code> → backend <code>/chatops/command</code>.
+                        Auth par <strong>signature Slack</strong> (v0 HMAC + anti-rejeu) ou <strong>jeton partagé</strong>
+                        (<code>X-ChatOps-Token</code>, Teams/générique).</li>
+                    <li>Mapping <code>chatops_users</code> (identité chat → utilisateur RootWarden) ; sans mapping,
+                        les commandes mutantes sont refusées.</li>
+                    <li>Commandes : <code>status</code>, <code>approvals</code>, <code>approve &lt;id&gt;</code>,
+                        <code>reject &lt;id&gt;</code>, <code>help</code> — l'approbation respecte la règle 4-eyes.</li>
+                    <li>Opt-in : <code>CHATOPS_ENABLED</code>, <code>CHATOPS_SLACK_SIGNING_SECRET</code>,
+                        <code>CHATOPS_TOKEN</code>. Migration 059.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Journal des commandes / bastion (v1.31.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="commandlog" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
