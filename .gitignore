@@ -38,6 +38,9 @@ www/logs/
 # Backups — generes automatiquement
 backend/backups/
 backups/
+# Exception : www/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage
+!www/backups/
+!www/backups/**
 
 # Base de donnees locale
 mysql/data/
