@@ -1778,6 +1778,22 @@ def delete_remote_user():
     if username == m['user']:
         return jsonify({'success': False, 'message': f"'{username}' est l'utilisateur SSH de connexion - suppression interdite"}), 400
 
+    # Approbation 4-eyes : suppression d'utilisateur distant = action destructive.
+    # Si activee, exige l'aval d'un 2e admin avant execution (store-and-replay).
+    try:
+        from approvals import gate
+        _uid, _ = get_current_user()
+        _ap = gate('delete_remote_user', int(machine_id), username,
+                   {'username': username, 'remove_home': bool(remove_home)}, _uid)
+        if _ap is not None:
+            msg = ("Demande d'approbation creee : un 2e administrateur doit valider avant suppression."
+                   if _ap['status'] == 'created'
+                   else "Action deja en attente d'approbation par un 2e administrateur.")
+            return jsonify({'success': False, 'pending_approval': True,
+                            'request_id': _ap['id'], 'message': msg}), 202
+    except Exception as _e:
+        logger.debug("approval gate (delete_remote_user) skipped: %s", _e)
+
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m['root_password'])
 

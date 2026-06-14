@@ -157,6 +157,17 @@ class Config:
     CVE_ENRICH_CACHE_TTL  = int(os.getenv('CVE_ENRICH_CACHE_TTL', '86400'))   # EPSS par CVE : 24h
     KEV_CACHE_TTL         = int(os.getenv('KEV_CACHE_TTL', '86400'))          # catalogue KEV : 24h
 
+    # ── Workflow d'approbation 4-eyes ───────────────────────────────────────
+    # Opt-in (defaut false) : si active, les actions listees exigent l'aval d'un
+    # SECOND admin avant execution. Desactive par defaut pour ne pas bloquer les
+    # deploiements mono-admin.
+    APPROVAL_ENABLED   = os.getenv('APPROVAL_ENABLED', 'false').lower() == 'true'
+    APPROVAL_ACTIONS   = {a.strip() for a in os.getenv(
+        'APPROVAL_ACTIONS',
+        'delete_remote_user,reboot_server,revoke_service_account,regenerate_platform_key'
+    ).split(',') if a.strip()}
+    APPROVAL_TTL_HOURS = int(os.getenv('APPROVAL_TTL_HOURS', '24'))
+
     # ── Notifications email ──────────────────────────────────────────────────
     MAIL_ENABLED       = os.getenv('MAIL_ENABLED', 'false').lower() == 'true'
     MAIL_FROM          = os.getenv('MAIL_FROM', '')

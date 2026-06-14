@@ -1038,6 +1038,27 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Approbation 4-eyes (v1.30.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="approvals" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Approbation 4-eyes (v1.30.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/approvals/</code> (admin + <code>can_admin_portal</code>) impose une double
+                    validation sur les actions destructives. Modèle <em>store-and-replay</em> :
+                </p>
+                <ol class="list-decimal list-inside text-sm space-y-1 mb-3">
+                    <li>L'admin déclenche l'action → une demande <code>pending</code> est créée (HTTP 202),
+                        l'action n'est <strong>pas</strong> exécutée ;</li>
+                    <li>un <strong>second</strong> admin approuve (il ne peut pas approuver sa propre demande — règle 4-eyes) ;</li>
+                    <li>le demandeur rejoue l'action → l'approbation est consommée → exécution.</li>
+                </ol>
+                <p class="text-sm">Opt-in via <code>APPROVAL_ENABLED=true</code> (désactivé par défaut pour les
+                    déploiements mono-admin). Actions concernées : <code>APPROVAL_ACTIONS</code>
+                    (par défaut <code>delete_remote_user</code>, <code>reboot_server</code>,
+                    <code>revoke_service_account</code>, <code>regenerate_platform_key</code>). Migration 057.</p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Fenetres de maintenance (v1.29.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="maintenance" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">

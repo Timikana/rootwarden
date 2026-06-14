@@ -5,6 +5,49 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.30.0] - 2026-06-14 — Feature : workflow d'approbation 4-eyes
+
+Septième feature de la roadmap. Au-delà du step-up 2FA (qui protège contre le
+vol de session), impose une **double validation humaine** sur les actions les
+plus destructives : un second administrateur doit approuver avant exécution.
+
+### Modèle store-and-replay (migration 057 + `backend/approvals.py`)
+- Table `approval_requests` (action_type, machine_id, target, payload, status,
+  requested_by, approved_by, decision_reason, expires_at).
+- `gate(action, machine_id, target, payload, user)` :
+  1. 1re tentative → crée une demande `pending`, **n'exécute pas** (retour 202) ;
+  2. un 2e admin approuve ;
+  3. le demandeur rejoue → `gate` consomme l'approbation → l'action s'exécute.
+  Pas de doublon (retentative = même demande). TTL d'expiration des `pending`.
+- **Opt-in** (`APPROVAL_ENABLED=false` par défaut) pour ne pas bloquer un
+  déploiement mono-admin. Liste d'actions configurable (`APPROVAL_ACTIONS`).
+  **Fail-open** sur erreur BDD.
+
+### Règle 4-eyes (`routes/approvals.py`)
+- `GET /approvals`, `POST /approvals/<id>/approve|reject`, `/approvals/stats`.
+- **Un admin ne peut pas approuver sa propre demande** (`approved_by != requested_by`),
+  imposé côté backend (403) **et** UI (bouton désactivé sur ses propres demandes).
+- Décisions horodatées + tracées (A09).
+
+### Actions gatées
+`delete_remote_user` (ssh) et `reboot_server` (monitoring) appellent `gate()`
+après leurs validations ; hors approbation → HTTP **202** + `pending_approval`.
+D'autres actions peuvent opter via `APPROVAL_ACTIONS`.
+
+### Frontend (`/approvals/`) + divers
+- Page de revue : onglets (en attente / approuvées / rejetées / toutes), boutons
+  approuver/rejeter (motif), badge d'état. Rendu sans `onclick` interpolé.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/approvals`, admin-only),
+  i18n fr+en, notification best-effort aux admins à la création d'une demande.
+
+### Vérifié
+gate() : created → pending (sans doublon) → approuvée → consommée → `executed`.
+4-eyes : auto-approbation refusée (403 backend + bouton désactivé UI),
+approbation d'un autre admin OK (200). Route : `reboot_server` → 202
+`pending_approval` (aucun reboot réel). 0 erreur JS (hors 403 attendu du test négatif).
+
+---
+
 ## [1.29.0] - 2026-06-14 — Feature : fenêtres de maintenance / calendrier de changements
 
 Sixième feature de la roadmap. Encadre **quand** les actions mutantes peuvent
