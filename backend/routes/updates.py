@@ -35,6 +35,17 @@ def _maintenance_block(machine_id):
         logger.debug("maintenance check skipped: %s", e)
     return None
 
+
+def _log_cmd(machine_id, command, context):
+    """Journalise une commande privilegiee (trail bastion). Best-effort.
+    success=None car les updates streament (resultat connu cote client)."""
+    try:
+        from command_logger import log_command
+        uid, _ = get_current_user()
+        log_command(machine_id, uid, command, context=context, success=None)
+    except Exception:
+        pass
+
 bp = Blueprint('updates', __name__)
 
 
@@ -225,6 +236,7 @@ def update_server():
             "apt update && apt full-upgrade -y "
             "-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'"
         )
+        _log_cmd(machine_id, command, 'full_update')
 
         def generate():
             with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
@@ -292,6 +304,7 @@ def apply_security_updates():
             "apt-get update && apt-get upgrade --with-new-pkgs --only-upgrade -y "
             "-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'"
         )
+        _log_cmd(machine_id, command, 'security_update')
 
         def generate():
             with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
@@ -445,6 +458,7 @@ def apt_update():
         else:  # specific
             pkg_str = ' '.join(packages)
             command = f"{env_prefix} && apt-get update && apt-get install -y {dpkg_opts} {pkg_str}"
+        _log_cmd(machine_id, command, 'custom_update')
 
         # Bloquer les paquets exclus le temps de la mise à jour, puis les débloquer
         hold_cmd    = f"apt-mark hold {' '.join(exclusions)}" if exclusions else ""
