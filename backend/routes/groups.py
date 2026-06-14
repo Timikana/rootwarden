@@ -184,11 +184,14 @@ def update_group(group_id):
 
         sets, vals = [], []
         if 'name' in data and (data['name'] or '').strip():
-            sets.append('name = %s'); vals.append(data['name'].strip()[:100])
+            sets.append('name = %s')
+            vals.append(data['name'].strip()[:100])
         if 'description' in data:
-            sets.append('description = %s'); vals.append((data['description'] or '')[:255])
+            sets.append('description = %s')
+            vals.append((data['description'] or '')[:255])
         if 'filters' in data and g['group_type'] == 'dynamic':
-            sets.append('filters = %s'); vals.append(json.dumps(_sanitize_filters(data['filters'] or {})))
+            sets.append('filters = %s')
+            vals.append(json.dumps(_sanitize_filters(data['filters'] or {})))
         if sets:
             vals.append(group_id)
             cur2 = conn.cursor()

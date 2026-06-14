@@ -109,19 +109,23 @@ def update_window(window_id):
     data = request.get_json(silent=True) or {}
     sets, vals = [], []
     if 'name' in data and (data['name'] or '').strip():
-        sets.append('name = %s'); vals.append(data['name'].strip()[:100])
+        sets.append('name = %s')
+        vals.append(data['name'].strip()[:100])
     if 'days' in data:
         d = _clean_days(data['days'] or [])
         if d:
-            sets.append('days = %s'); vals.append(d)
+            sets.append('days = %s')
+            vals.append(d)
     for col in ('start_time', 'end_time'):
         if col in data:
             v = (data[col] or '').strip()
             if not _TIME_RE.match(v):
                 return jsonify({'success': False, 'message': f'{col} invalide (HH:MM)'}), 400
-            sets.append(f'{col} = %s'); vals.append(v + ':00')
+            sets.append(f'{col} = %s')
+            vals.append(v + ':00')
     if 'enabled' in data:
-        sets.append('enabled = %s'); vals.append(1 if data['enabled'] else 0)
+        sets.append('enabled = %s')
+        vals.append(1 if data['enabled'] else 0)
     if not sets:
         return jsonify({'success': True})
     with get_db_connection() as conn:
