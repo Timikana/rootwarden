@@ -5,7 +5,7 @@ return [
     'nav.tip_approvals' => 'Validation 4-eyes des actions destructives (2e admin)',
 
     'appr.title' => 'Approbations (4-eyes)',
-    'appr.desc' => 'Les actions destructives (suppression d\'utilisateur, reboot...) peuvent exiger l\'aval d\'un second administrateur. Vous ne pouvez pas approuver vos propres demandes.',
+    'appr.desc' => 'Les actions destructives (suppression d\'utilisateur, reboot...) peuvent exiger l\'aval d\'un second administrateur. Vous ne pouvez pas approuver vos propres demandes. Le superadmin n\'est pas soumis a l\'approbation (utile en mono-admin).',
     'appr.tab_pending' => 'En attente',
     'appr.tab_approved' => 'Approuvees',
     'appr.tab_rejected' => 'Rejetees',

@@ -1071,6 +1071,9 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                     <li>un <strong>second</strong> admin approuve (il ne peut pas approuver sa propre demande — règle 4-eyes) ;</li>
                     <li>le demandeur rejoue l'action → l'approbation est consommée → exécution.</li>
                 </ol>
+                <p class="text-sm mb-2"><strong>Le superadmin (rôle 3) n'est pas soumis à l'approbation</strong> :
+                    sur un déploiement avec un seul administrateur, la règle 4-eyes ne pourrait jamais être
+                    satisfaite (pas de 2e admin pour approuver) et bloquerait toute action. Le contournement est journalisé.</p>
                 <p class="text-sm">Opt-in via <code>APPROVAL_ENABLED=true</code> (désactivé par défaut pour les
                     déploiements mono-admin). Actions concernées : <code>APPROVAL_ACTIONS</code>
                     (par défaut <code>delete_remote_user</code>, <code>reboot_server</code>,

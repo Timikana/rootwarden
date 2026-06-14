@@ -27,6 +27,8 @@ from config import Config
 
 _log = logging.getLogger(__name__)
 
+ROLE_SUPERADMIN = 3
+
 
 def _conn():
     return mysql.connector.connect(**Config.DB_CONFIG)
@@ -49,19 +51,29 @@ def find_request(cur, action_type, machine_id, target, requested_by, status):
     return cur.fetchone()
 
 
-def gate(action_type, machine_id, target, payload, requested_by):
+def gate(action_type, machine_id, target, payload, requested_by, role=None):
     """
     Verrou d'approbation. Retourne :
       - None                          -> l'action peut s'executer (pas requise,
-                                         ou une approbation valide a ete consommee).
+                                         superadmin, ou approbation consommee).
       - {'status': 'pending', 'id'}   -> demande deja en attente (re-tentative).
       - {'status': 'created', 'id'}   -> demande creee a l'instant (1re tentative).
 
     target : chaine identifiant la cible exacte (username, 'reboot'...). Le
     rapprochement demande<->retentative se fait sur (action, machine, target,
     requested_by).
+
+    Le SUPERADMIN (role 3) contourne l'approbation : sur un deploiement avec un
+    seul administrateur, la regle 4-eyes (approbation par un 2e admin) ne pourrait
+    jamais etre satisfaite et bloquerait toute action. Le contournement est
+    journalise.
     """
     if not is_required(action_type):
+        return None
+
+    if role is not None and int(role) >= ROLE_SUPERADMIN:
+        _log.info("Approbation 4-eyes contournee (superadmin) action=%s cible=%s",
+                  action_type, target)
         return None
 
     target = (target or '')[:255]
