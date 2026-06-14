@@ -5,6 +5,18 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.31.1] - 2026-06-14 — Fix : le superadmin contourne l'approbation 4-eyes
+
+Sur un déploiement avec un **seul administrateur**, la règle 4-eyes (approbation
+par un 2e admin) ne pouvait jamais être satisfaite : le superadmin se serait
+bloqué lui-même (impossible d'approuver sa propre demande, pas d'autre admin).
+- `approvals.gate()` prend désormais le `role` et **contourne l'approbation pour
+  le superadmin (rôle 3)** — contournement journalisé.
+- Appelants mis à jour (`delete_remote_user`, `reboot_server`) pour transmettre
+  le rôle. Doc + i18n (fr/en) précisent l'exemption superadmin.
+
+---
+
 ## [1.31.0] - 2026-06-14 — Feature : journal des commandes (trail type bastion)
 
 Huitième feature de la roadmap. Trace **ce que RootWarden exécute réellement**

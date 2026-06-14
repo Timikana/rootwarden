@@ -233,9 +233,9 @@ def reboot_server():
     # Approbation 4-eyes : un reboot est une action destructive (coupure de service).
     try:
         from approvals import gate
-        _uid, _ = get_current_user()
+        _uid, _role = get_current_user()
         _ap = gate('reboot_server', int(machine_id), 'reboot',
-                   {'delay_minutes': delay_minutes}, _uid)
+                   {'delay_minutes': delay_minutes}, _uid, role=_role)
         if _ap is not None:
             msg = ("Demande d'approbation creee : un 2e administrateur doit valider avant le reboot."
                    if _ap['status'] == 'created'

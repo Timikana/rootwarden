@@ -5,7 +5,7 @@ return [
     'nav.tip_approvals' => '4-eyes validation of destructive actions (2nd admin)',
 
     'appr.title' => 'Approvals (4-eyes)',
-    'appr.desc' => 'Destructive actions (user deletion, reboot...) may require a second administrator\'s approval. You cannot approve your own requests.',
+    'appr.desc' => 'Destructive actions (user deletion, reboot...) may require a second administrator\'s approval. You cannot approve your own requests. Superadmins are exempt from approval (useful for single-admin setups).',
     'appr.tab_pending' => 'Pending',
     'appr.tab_approved' => 'Approved',
     'appr.tab_rejected' => 'Rejected',
