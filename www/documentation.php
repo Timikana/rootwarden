@@ -904,7 +904,13 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                 <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Politiques sudo / SFTP par utilisateur</h2>
                 <p class="text-sm mb-3">
                     Depuis v1.22.0, RootWarden permet de configurer finement les droits sudo et les acces SFTP/SSH de chaque
-                    compte Linux sur chaque serveur gere. Acces : <code>/adm/server_user_policies.php</code> - <strong>superadmin uniquement</strong>.
+                    compte Linux sur chaque serveur gere. <strong>Superadmin uniquement</strong>.
+                </p>
+                <p class="text-sm mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <strong>v1.36.0</strong> : la gestion a ete <strong>separee en deux pages distinctes</strong>, avec une
+                    explication en clair de chaque option (pour les non-experts) :
+                    <code>/adm/server_user_sudo.php</code> (droits sudo) et <code>/adm/server_user_sftp.php</code> (acces SFTP/SSH).
+                    L'ancienne URL <code>/adm/server_user_policies.php</code> redirige vers la page sudo.
                 </p>
                 <h3 class="font-semibold mb-2">Architecture</h3>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
@@ -950,7 +956,7 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                     <li><strong>A04</strong> : sequence de deploy = validation AVANT mv, rollback auto si echec - protege contre la chaine "deploy puis casse"</li>
                     <li><strong>A09</strong> : <code>policy_deployments</code> = trail audit complet avec actor, snapshot JSON, contenu avant/apres, status</li>
                 </ul>
-                <p class="text-xs text-gray-500 mt-2">Code : <code>backend/sudo_manager.py</code>, <code>backend/sftp_manager.py</code>, <code>backend/routes/policies.py</code>, <code>www/adm/server_user_policies.php</code></p>
+                <p class="text-xs text-gray-500 mt-2">Code : <code>backend/sudo_manager.py</code>, <code>backend/sftp_manager.py</code>, <code>backend/routes/policies.py</code>, <code>www/adm/server_user_sudo.php</code> + <code>server_user_sftp.php</code> (JS partage <code>www/adm/js/server_user_policy.js</code>)</p>
 
                 <h3 class="font-semibold mt-4 mb-2">Integration onglet Acces &amp; Permissions (v1.22.1+)</h3>
                 <p class="text-sm mb-2">

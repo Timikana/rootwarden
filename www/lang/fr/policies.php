@@ -71,4 +71,52 @@ return [
     'policies.audit_found' => 'Fichier de politique trouve sur le serveur.',
     'policies.audit_not_found' => 'Aucun fichier de politique sur le serveur.',
     'policies.remove_success' => 'Politique supprimee du serveur.',
+
+    // ───────────────────────────────────────────────────────────────────
+    // Pages separees Sudo / SFTP (v1.36.0) + explications en clair
+    // ───────────────────────────────────────────────────────────────────
+    'nav.sudo_policies' => 'Droits sudo',
+    'nav.tip_sudo_policies' => 'Donner des droits admin precis a un utilisateur sur un serveur (superadmin)',
+    'nav.sftp_policies' => 'Acces SFTP/SSH',
+    'nav.tip_sftp_policies' => 'Limiter comment un utilisateur se connecte a un serveur (superadmin)',
+
+    'sudopol.title' => 'Droits sudo par utilisateur',
+    'sudopol.intro_title' => 'A quoi sert cette page ?',
+    'sudopol.intro' => 'Le « sudo » permet a un utilisateur normal d\'executer certaines commandes en tant qu\'administrateur (root). Ici tu choisis, pour UN utilisateur sur UN serveur, CE QU\'IL a le droit de faire en admin — sans lui donner tous les pouvoirs. Choisis un modele pret a l\'emploi, puis clique « Deployer ».',
+    'sudopol.choose' => '1. Choisis ce que l\'utilisateur peut faire',
+
+    'sftppol.title' => 'Acces SFTP / SSH par utilisateur',
+    'sftppol.intro_title' => 'A quoi sert cette page ?',
+    'sftppol.intro' => 'Ici tu controles COMMENT un utilisateur se connecte a UN serveur : le limiter au simple transfert de fichiers, l\'enfermer dans un seul dossier, l\'obliger a utiliser une cle plutot qu\'un mot de passe, etc. Coche les options voulues, puis clique « Deployer ».',
+    'sftppol.options' => '1. Choisis les restrictions de connexion',
+
+    // Explications detaillees des presets sudo (phrase concrete + consequence)
+    'policies.preset_help_all_nopasswd' => 'L\'utilisateur devient administrateur TOTAL (root) et peut TOUT faire, sans meme taper de mot de passe. A reserver aux comptes automatiques (robots), jamais a une personne.',
+    'policies.preset_help_restart_services' => 'L\'utilisateur peut demarrer / arreter / redemarrer n\'importe quel service (ex : le serveur web, la base de donnees). Il ne peut rien faire d\'autre en admin.',
+    'policies.preset_help_apt_only' => 'L\'utilisateur peut installer et mettre a jour des logiciels (commande « apt »). Il ne peut pas toucher au reste du systeme.',
+    'policies.preset_help_read_logs' => 'L\'utilisateur peut seulement LIRE les journaux du serveur (dossier /var/log). Il ne peut RIEN modifier. Ideal pour du support / supervision.',
+    'policies.preset_help_systemctl_specific' => 'Comme « redemarrer des services », mais uniquement pour la liste de services que TU choisis (ex : seulement « nginx »). Plus precis et plus sur.',
+    'policies.preset_help_custom' => 'Pour experts : tu ecris toi-meme les regles. Le serveur les verifie (visudo) avant de les appliquer ; si elles sont invalides, rien n\'est change.',
+
+    // SFTP : libelles humains + explications
+    'sftppol.f_sftp_only' => 'Transfert de fichiers uniquement (pas de terminal)',
+    'sftppol.h_sftp_only' => 'Si coche : l\'utilisateur peut SEULEMENT envoyer et telecharger des fichiers (SFTP). Il ne peut PAS ouvrir un terminal pour taper des commandes. Parfait pour un compte qui ne sert qu\'a deposer/recuperer des fichiers.',
+    'sftppol.f_chroot' => 'Enfermer dans un dossier (« cage » chroot)',
+    'sftppol.h_chroot' => 'Une « cage » : l\'utilisateur ne voit QUE ce dossier (et ce qu\'il contient), comme s\'il etait seul sur le serveur. Impossible pour lui d\'aller voir ailleurs (les fichiers systeme, les dossiers des autres...). Exemple : /srv/sftp/jean. Laisser vide = pas de cage. Note technique : le dossier doit deja exister, appartenir a root et avoir les droits 0755, sinon SSH refuse (regle de securite).',
+    'sftppol.f_working' => 'Dossier d\'arrivee',
+    'sftppol.h_working' => 'Le dossier dans lequel l\'utilisateur arrive directement quand il se connecte (ex : /upload). Confort, pas une securite.',
+    'sftppol.f_password' => 'Autoriser la connexion par mot de passe',
+    'sftppol.h_password' => 'Coche : l\'utilisateur peut se connecter avec un mot de passe. Decoche : il DOIT utiliser une cle SSH (nettement plus sur, recommande).',
+    'sftppol.f_tcp' => 'Autoriser les tunnels reseau (port forwarding)',
+    'sftppol.h_tcp' => 'Permet a l\'utilisateur de faire passer d\'autres connexions reseau a travers SSH (ex : atteindre une base de donnees interne). Si ce n\'est pas necessaire, decoche : c\'est plus sur.',
+    'sftppol.f_agent' => 'Autoriser le rebond de cle (agent forwarding)',
+    'sftppol.h_agent' => 'Permet a l\'utilisateur de reutiliser sa cle SSH pour rebondir vers un autre serveur depuis celui-ci. Si ce n\'est pas necessaire, decoche.',
+    'sftppol.f_x11' => 'Autoriser les applications graphiques (X11)',
+    'sftppol.h_x11' => 'Permet d\'afficher une fenetre d\'application graphique du serveur sur le poste de l\'utilisateur. Tres rarement utile : laisse decoche.',
+
+    // Aide commune (boutons)
+    'policies.help_deploy' => 'Applique la configuration sur le serveur (apres verification automatique).',
+    'policies.help_audit' => 'Lit le fichier reellement present sur le serveur, pour verifier l\'etat actuel.',
+    'policies.help_remove' => 'Supprime cette configuration du serveur (retour au comportement par defaut).',
+    'policies.history_toggle' => 'Historique & restauration',
 ];
