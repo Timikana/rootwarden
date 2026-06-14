@@ -12,8 +12,28 @@ import hashlib
 import logging
 from flask import Blueprint, jsonify, request, Response
 from config import Config
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
+
+
+def _maintenance_block(machine_id):
+    """Retourne une reponse (json, 423) si une fenetre de maintenance interdit
+    l'action mutante maintenant, sinon None. Best-effort (fail-open en cas
+    d'erreur via maintenance.is_allowed)."""
+    try:
+        from maintenance import is_allowed
+        _uid, role = get_current_user()
+        allowed, reason = is_allowed(machine_id, role=role)
+        if not allowed:
+            logger.info("Action mutante bloquee (hors fenetre de maintenance) machine_id=%s", machine_id)
+            return jsonify({
+                'success': False,
+                'message': "Action bloquee : hors fenetre de maintenance autorisee.",
+                'reason': reason,
+            }), 423
+    except Exception as e:
+        logger.debug("maintenance check skipped: %s", e)
+    return None
 
 bp = Blueprint('updates', __name__)
 
@@ -180,6 +200,10 @@ def update_server():
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+    blocked = _maintenance_block(machine_id)
+    if blocked:
+        return blocked
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -242,6 +266,10 @@ def apply_security_updates():
         machine_id = validate_machine_id(data.get('machine_id'))
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
+
+    blocked = _maintenance_block(machine_id)
+    if blocked:
+        return blocked
 
     try:
         with get_db_connection() as conn:
@@ -458,6 +486,10 @@ def custom_update():
         machine_id = validate_machine_id(data.get('machine_id'))
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
+
+    blocked = _maintenance_block(machine_id)
+    if blocked:
+        return blocked
 
     selected_packages = _validate_package_list(data.get('selected_packages', []))
     excluded_packages = _validate_package_list(data.get('excluded_packages', []))
