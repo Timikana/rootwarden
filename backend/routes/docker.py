@@ -18,7 +18,7 @@ import json
 
 from routes.helpers import (
     require_api_key, require_role, require_machine_access, threaded_route,
-    get_db_connection, server_decrypt_password, logger,
+    get_db_connection, server_decrypt_password, get_current_user, logger,
 )
 from ssh_utils import ssh_session, validate_machine_id
 
@@ -166,6 +166,15 @@ def docker_results():
         except (ValueError, TypeError):
             return jsonify({'success': False, 'message': 'machine_id invalide'}), 400
         q += "AND d.machine_id = %s "
+    else:
+        # A01/IDOR : sans machine_id, require_machine_access ne filtre rien.
+        # Un operateur (role < 2) ne doit voir QUE ses machines accessibles ;
+        # un admin (role >= 2) voit toute la flotte.
+        uid, role = get_current_user()
+        if (role or 0) < 2:
+            q += ("AND d.machine_id IN (SELECT machine_id FROM user_machine_access "
+                  "WHERE user_id = %s) ")
+            params.append(uid)
     q += "ORDER BY m.name, d.container_name"
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)

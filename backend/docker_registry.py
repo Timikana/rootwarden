@@ -24,10 +24,14 @@ import os
 import re
 import logging
 
-import requests
-from cve_scanner import _url_is_safe_external
+from cve_scanner import _url_is_safe_external, _safe_get
 
 _log = logging.getLogger(__name__)
+
+# Hote de registre valide : lettres/chiffres/.-_ + port optionnel. Bloque les
+# confusions d'userinfo (ex 'legit.io@169.254.169.254') et autres injections
+# d'hote provenant de la sortie 'docker ps' du serveur surveille.
+_HOST_RE = re.compile(r'^[A-Za-z0-9._-]+(:\d+)?$')
 
 _DOCKER_HUB = 'registry-1.docker.io'
 _MANIFEST_ACCEPT = ', '.join([
@@ -93,7 +97,9 @@ def _bearer_from_challenge(www_auth, host, repo):
     if not _url_is_safe_external(realm):
         return None
     try:
-        r = requests.get(realm, params=params, timeout=10)
+        # A10 : _safe_get re-valide CHAQUE saut de redirection (un realm
+        # malveillant pourrait sinon 302 vers 169.254.169.254 / un service interne).
+        r = _safe_get(realm, params=params, timeout=10)
         r.raise_for_status()
         return r.json().get('token') or r.json().get('access_token')
     except Exception as e:
@@ -108,6 +114,9 @@ def get_remote_digest(image_ref):
     except Exception:
         return None
 
+    if not _HOST_RE.match(host or ''):
+        _log.warning("Hote de registre invalide, ignore : %r", host)
+        return None
     base = f"https://{host}"
     url = f"{base}/v2/{repo}/manifests/{tag}"
     if not _url_is_safe_external(url):
@@ -120,14 +129,16 @@ def get_remote_digest(image_ref):
         headers['Authorization'] = f'Bearer {token}'
 
     try:
-        # 1er essai : direct (registres anonymes ou token deja fourni)
-        resp = requests.get(url, headers=headers, timeout=12, allow_redirects=True)
+        # 1er essai : direct (registres anonymes ou token deja fourni).
+        # A10 : via _safe_get -> redirections revalidees a chaque saut (un
+        # registre malveillant pourrait sinon rediriger vers la metadata cloud).
+        resp = _safe_get(url, headers=headers, timeout=12)
         # Defi d'auth -> on resout un token Bearer et on retente
         if resp.status_code == 401 and 'Authorization' not in headers:
             bearer = _bearer_from_challenge(resp.headers.get('WWW-Authenticate'), host, repo)
             if bearer:
                 headers['Authorization'] = f'Bearer {bearer}'
-                resp = requests.get(url, headers=headers, timeout=12, allow_redirects=True)
+                resp = _safe_get(url, headers=headers, timeout=12)
         if resp.status_code != 200:
             _log.debug("manifest %s:%s -> HTTP %s", repo, tag, resp.status_code)
             return None

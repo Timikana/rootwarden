@@ -186,6 +186,11 @@ def dispatch(text, chat_user_id, platform='slack'):
     if cmd in ('approvals', 'pending'):
         return _list_pending()
     if cmd in ('approve', 'reject'):
+        # A01 : aligner l'ACL chat sur l'UI web (approve/reject = admin role >= 2).
+        # Sans ce controle, un compte mappe en role 1 pouvait debloquer des
+        # actions destructives 4-eyes depuis le chat.
+        if (role_id or 0) < 2:
+            return ":no_entry: Action reservee aux administrateurs (role insuffisant)."
         if len(parts) < 2:
             return f"Usage : `{cmd} <id> [motif]`"
         decision = 'approved' if cmd == 'approve' else 'rejected'

@@ -5,6 +5,37 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.37.1] - 2026-06-14 — Hardening : audit OWASP Top 10 des features v1.27→v1.37
+
+Audit OWASP Top 10 ciblé sur les 11 features de la session (4 revues
+adversariales en parallèle + vérification manuelle de chaque finding). **Aucune
+faille critique ni bypass d'auth/injection** sur le socle (signatures ChatOps,
+SSRF guards, requêtes paramétrées, 4-eyes serveur, path-traversal backup : OK).
+6 corrections appliquées :
+
+- **A01 — ChatOps approve/reject sans contrôle de rôle** (HIGH) : un compte mappé
+  en rôle 1 pouvait débloquer des actions 4-eyes depuis le chat. Ajout du gate
+  `role >= 2` dans `chatops.dispatch` (aligné sur l'UI web).
+- **A10 — SSRF par redirection** (MEDIUM, x2) : `docker_registry` suivait les
+  redirections du manifeste et du `realm` d'auth sans revalidation → passage par
+  `_safe_get` (revalidation de chaque saut, comme le scanner CVE).
+- **A01/IDOR — `docker/results` sans `machine_id`** (MEDIUM) : un opérateur (rôle 1)
+  recevait l'inventaire Docker de TOUTE la flotte → filtrage sur
+  `user_machine_access` pour les rôles < 2.
+- **A03 — XSS d'attribut `href`** (MEDIUM) : `tickets.js` injectait `external_url`
+  (réponse ITSM) dans un `href` via un échappeur qui n'échappe pas les `"` →
+  `escAttr` + allowlist de schéma `http(s)`. Idem défensif sur `search.js`.
+- **A10 — validation de l'hôte registre** (LOW) : regex stricte sur le host
+  (bloque la confusion d'userinfo type `legit.io@169.254.169.254`).
+- **Bug** : précédence du tuple de retour Jira (`ticketing._create_jira`) corrigée.
+
+Findings résiduels acceptés/documentés : guard SSRF permissif sur le LAN RFC1918
+(registre/OpenCVE interne — choix design), fail-open des fenêtres de maintenance
+et de l'approbation sur erreur BDD (disponibilité), prefix-matching du proxy
+(non exploitable, défense en profondeur).
+
+---
+
 ## [1.37.0] - 2026-06-14 — Feature : inventaire & veille des conteneurs Docker
 
 Sur demande : monitorer les conteneurs Docker des serveurs, détecter les mises à

@@ -6,6 +6,9 @@
     const API = window.API_URL || '/api_proxy.php';
     function __(k) { return (window._i18n && (window._i18n['js.' + k] || window._i18n[k])) || k; }
     function escHtml(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    // escHtml (variante textContent) n'echappe PAS les guillemets -> dangereux en
+    // contexte d'attribut. escAttr ajoute l'echappement des " pour les href, etc.
+    function escAttr(s) { return escHtml(s).replace(/"/g, '&quot;'); }
     function notify(m, t) { if (window.toast) window.toast(m, t || 'info'); }
 
     async function api(path, opts) {
@@ -22,7 +25,12 @@
     }
 
     function refCell(t) {
-        if (t.external_url) return `<a href="${escHtml(t.external_url)}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">${escHtml(t.external_id || t.ref || '↗')}</a>`;
+        // external_url vient de la reponse de l'ITSM (donnee externe) : on
+        // n'autorise que http(s) (pas de javascript:) et on echappe les " (attribut).
+        const url = String(t.external_url || '');
+        if (/^https?:\/\//i.test(url)) {
+            return `<a href="${escAttr(url)}" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">${escHtml(t.external_id || t.ref || '↗')}</a>`;
+        }
         return escHtml(t.external_id || t.ref || '—');
     }
 
