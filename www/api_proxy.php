@@ -146,6 +146,7 @@ $ALLOWED_PROXY_PREFIXES = [
     '/approvals',
     '/command_log',
     '/chatops/users',
+    '/tickets',
 ];
 $pathAllowed = false;
 foreach ($ALLOWED_PROXY_PREFIXES as $prefix) {
@@ -173,7 +174,7 @@ $ADMIN_ONLY_PREFIXES = [
     '/scan_server_users', '/sshd_allow_user', '/remove_user_keys', '/delete_remote_user',
     '/server_user_remove_key', '/admin/', '/policy/', '/exclude_user',
     '/server_lifecycle', '/update_security_exec', '/drift/', '/tasks/',
-    '/groups', '/maintenance/windows', '/approvals', '/command_log', '/chatops/users',
+    '/groups', '/maintenance/windows', '/approvals', '/command_log', '/chatops/users', '/tickets',
 ];
 if ($roleId < ROLE_ADMIN) {
     foreach ($ADMIN_ONLY_PREFIXES as $prefix) {

@@ -71,8 +71,37 @@ function tt(key) {
         'js.cve_reprio_running': 'Re-priorisation EPSS / KEV...',
         'js.cve_reprio_err': 'Re-priorisation indisponible',
         'js.cve_kev_filter': 'KEV',
+        'js.cve_ticket_title': 'Creer un ticket pour cette CVE',
+        'js.cve_ticket_ok': 'Ticket cree',
+        'js.cve_ticket_dup': 'Ticket deja existant',
+        'js.cve_ticket_err': 'Echec de creation du ticket (droits admin requis ?)',
     };
     return (window._i18n && window._i18n[key]) || fallback[key] || key;
+}
+
+/**
+ * Cree un ticket ITSM (Jira/GLPI/ServiceNow/local) a partir d'un finding CVE.
+ * Reserve aux admins (endpoint /tickets) ; erreur geree proprement sinon.
+ */
+async function createCveTicket(cveId, machineId, btn) {
+    if (btn) { btn.disabled = true; }
+    try {
+        const r = await fetch(`${API_URL}/tickets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: 'cve', ref: cveId, machine_id: machineId }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success) {
+            if (window.toast) window.toast(d.deduped ? tt('js.cve_ticket_dup') : `${tt('js.cve_ticket_ok')} (${d.provider})`, 'success');
+        } else if (window.toast) {
+            window.toast(d.message || tt('js.cve_ticket_err'), 'error');
+        }
+    } catch (e) {
+        if (window.toast) window.toast(tt('js.cve_ticket_err'), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; }
+    }
 }
 
 // ── Test connexion OpenCVE ────────────────────────────────────────────────
@@ -460,6 +489,9 @@ function renderResults(machineId, findings, meta) {
                         <option value="accepted">Accepte</option>
                         <option value="wont_fix">Won't fix</option>
                     </select>
+                    <button onclick="createCveTicket('${esc(f.cve_id)}', ${machineId}, this)"
+                            class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                            title="${tt('js.cve_ticket_title')}">🎟</button>
                 </td>
             </tr>`;
         }).join('');

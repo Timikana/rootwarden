@@ -400,4 +400,8 @@ return [
     'js.cve_reprio_running' => 'Re-priorisation EPSS / KEV...',
     'js.cve_reprio_err' => 'Re-priorisation indisponible',
     'js.cve_kev_filter' => 'KEV',
+    'js.cve_ticket_title' => 'Creer un ticket pour cette CVE',
+    'js.cve_ticket_ok' => 'Ticket cree',
+    'js.cve_ticket_dup' => 'Ticket deja existant',
+    'js.cve_ticket_err' => 'Echec de creation du ticket (droits admin requis ?)',
 ];

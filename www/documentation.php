@@ -1038,6 +1038,26 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Ticketing ITSM (v1.33.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="tickets" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Ticketing ITSM — CVE → ticket (v1.33.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/tickets/</code> (admin) crée des tickets dans votre outil ITSM à partir des
+                    findings. Fournisseurs : <code>jira</code>, <code>servicenow</code>, <code>glpi</code>,
+                    <code>generic</code> (webhook JSON).
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Bouton 🎟 sur chaque finding CVE (page <code>/security/</code>) + création manuelle.</li>
+                    <li><strong>Auto-KEV</strong> (<code>TICKETING_AUTO_KEV</code>) : ticket auto pour chaque CVE
+                        activement exploitée détectée au scan, dédupliqué.</li>
+                    <li>Si aucun fournisseur configuré → ticket <code>local</code> (tracé sans cible externe).
+                        Dédup par (source, ref, machine). SSRF guard sur l'URL. Migration 060.</li>
+                    <li>Config : <code>TICKETING_ENABLED/PROVIDER/URL/USER/TOKEN/PROJECT/APP_TOKEN</code>.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- ChatOps bidirectionnel (v1.32.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="chatops" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">

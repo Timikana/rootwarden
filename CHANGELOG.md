@@ -5,6 +5,44 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.33.0] - 2026-06-14 — Feature : ticketing ITSM (CVE → ticket)
+
+Dixième feature de la roadmap. Transforme un finding (notamment CVE) en ticket
+dans l'outil ITSM de l'équipe.
+
+### Adaptateurs (migration 060 + `backend/ticketing.py`)
+- Fournisseurs : **Jira** (REST v2), **ServiceNow** (table incident),
+  **GLPI** (apirest.php), **generic** (webhook JSON). Sélection par config.
+- SSRF : toute création distante passe par le guard (`_url_is_safe_external`)
+  avant POST. Aucun secret journalisé.
+- Si désactivé/échec → ticket **`local`** (tracé en base sans référence externe),
+  rien n'est perdu. Table `tickets` avec **dédup** par (source, ref, machine_id).
+
+### Routes & intégrations (`routes/tickets.py`)
+- `POST /tickets` (manuel ou `source=cve`), `GET /tickets` (liste).
+- `create_or_get_ticket()` réutilisable : dédup + fallback local.
+- **CVE → ticket** : bouton 🎟 sur chaque finding de la page CVE (`/security/`).
+- **Auto-KEV** (opt-in `TICKETING_AUTO_KEV`) : à chaque scan, un ticket est créé
+  automatiquement pour les CVE activement exploitées (CISA KEV), dédupliqué.
+
+### Frontend (`/tickets/`) + config
+- Page admin : liste (source, fournisseur, référence cliquable) + création
+  manuelle + indicateur de fournisseur. Rendu sans `onclick` interpolé.
+- Config : `TICKETING_ENABLED`, `TICKETING_PROVIDER`, `TICKETING_URL`,
+  `TICKETING_USER/TOKEN`, `TICKETING_PROJECT` (Jira), `TICKETING_APP_TOKEN` (GLPI),
+  `TICKETING_AUTO_KEV`.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/tickets` admin-only), i18n fr+en.
+
+### OWASP / sécurité
+A01 `@require_role(2)` + `can_admin_portal`, A03 requêtes paramétrées + dédup
+unique, A10 (SSRF) guard sur l'URL du fournisseur.
+
+### Vérifié
+create + dédup (même id) ; UI Puppeteer : création manuelle listée, CVE→ticket
+(200, provider local) listé, indicateur « aucun fournisseur configuré », 0 erreur JS.
+
+---
+
 ## [1.32.0] - 2026-06-14 — Feature : ChatOps bidirectionnel (Slack / Teams)
 
 Neuvième feature de la roadmap. Les webhooks **sortants** existaient déjà ; cette
