@@ -53,7 +53,7 @@ def _create_jira(summary, description):
     r = _post(url, headers, payload)
     data = r.json()
     key = data.get('key', '')
-    return key, f"{base}/browse/{key}" if key else (key, base)
+    return (key, f"{base}/browse/{key}") if key else (key, base)
 
 
 def _create_servicenow(summary, description):

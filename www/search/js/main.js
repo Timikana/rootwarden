@@ -22,8 +22,11 @@
     }
 
     function card(cat, items) {
+        // it.link est un chemin interne fixe cote serveur ; on n'autorise QUE les
+        // chemins relatifs ('/...') et on echappe les " (contexte d'attribut).
+        const safeLink = (l) => (/^\/[A-Za-z0-9._\/-]*$/.test(String(l || '')) ? String(l) : '#').replace(/"/g, '&quot;');
         const rows = items.map(it =>
-            `<a href="${escHtml(it.link || '#')}" class="block px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40">
+            `<a href="${safeLink(it.link)}" class="block px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40">
                 <div class="text-sm font-medium">${escHtml(it.label)}</div>
                 <div class="text-xs text-gray-400">${escHtml(it.sub || '')}</div>
              </a>`).join('');
