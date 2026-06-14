@@ -112,6 +112,9 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
         <?php if (($perms['can_scan_cve'] ?? false) || $isSA): ?>
         <?= $sideLink('/security/', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>', t('nav.cve_scan'), t('nav.tip_cve_scan')) ?>
         <?php endif; ?>
+        <?php if ($isAdmin || $isSA): ?>
+        <?= $sideLink('/docker/index.php', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13h4v4H5zM10 13h4v4h-4zM15 13h4v4h-4zM10 8h4v4h-4zM3 17h18v3H3z"/></svg>', t('nav.docker'), t('nav.tip_docker')) ?>
+        <?php endif; ?>
 
         <?php
         $hasAdminSection = ($perms['can_admin_portal'] ?? false) || ($perms['can_manage_remote_users'] ?? false) || ($perms['can_manage_platform_key'] ?? false) || ($perms['can_view_compliance'] ?? false) || $isSA;

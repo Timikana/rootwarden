@@ -148,6 +148,7 @@ $ALLOWED_PROXY_PREFIXES = [
     '/chatops/users',
     '/tickets',
     '/search',
+    '/docker/',
 ];
 $pathAllowed = false;
 foreach ($ALLOWED_PROXY_PREFIXES as $prefix) {

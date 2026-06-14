@@ -1044,6 +1044,28 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
             </section>
 
             <!-- ────────────────────────────────────────── -->
+            <!-- Conteneurs Docker (v1.37.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="docker" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Conteneurs Docker — inventaire & veille (v1.37.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/docker/</code> (admin) inventorie les conteneurs Docker de chaque serveur et
+                    signale les mises à jour disponibles :
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Détection</strong> (SSH, root) : <code>docker ps</code> + <code>docker inspect</code>
+                        (labels compose) + <code>docker image inspect</code> (digest local). Auto : compose / run.</li>
+                    <li><strong>MAJ image</strong> : compare le digest local au digest distant du même tag via la
+                        Registry API v2 (Docker Hub, GHCR, registre interne). Token privé optionnel via
+                        <code>DOCKER_REGISTRY_TOKENS</code>. SSRF-guard (autorise le LAN, bloque metadata).</li>
+                    <li><strong>MAJ git</strong> : si la stack vient d'un dépôt cloné, nombre de commits en retard
+                        (<code>HEAD..origin</code>) + <strong>changelog</strong> des commits.</li>
+                    <li>Endpoints : <code>POST /docker/scan</code> (machine), <code>/docker/scan_all</code> (admin),
+                        <code>GET /docker/results</code>. Migration 061 : <code>docker_inventory</code>.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
             <!-- Restauration de backup (v1.35.0) -->
             <!-- ────────────────────────────────────────── -->
             <section id="backups" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
