@@ -11,10 +11,18 @@
 #   5. docker compose up -d (recree les containers avec nouveau code/env)
 #
 # Usage :
-#   ./maj.sh             # MAJ standard
+#   ./maj.sh             # MAJ standard (propose le canal beta/release si interactif)
+#   ./maj.sh --beta      # force le canal BETA   (branche 'beta')
+#   ./maj.sh --release   # force le canal RELEASE (branche 'main')
 #   ./maj.sh --no-pull   # skip git pull (deja fait)
 #   ./maj.sh --no-build  # skip docker build
 #   ./maj.sh --check     # dry-run : verifie sans rien executer
+#
+# Canal de mise a jour :
+#   - release (main) : version stable.
+#   - beta           : nouveautes en avant-premiere (branche 'beta').
+#   Choix memorise dans .update_channel ; forcable via --beta / --release ou
+#   la variable d'env MAJ_CHANNEL=beta|release.
 #
 # Idempotent : peut etre rejoue sans casse.
 # =============================================================================
@@ -33,16 +41,58 @@ NC='\033[0m'
 DO_PULL=1
 DO_BUILD=1
 DRY_RUN=0
+CHANNEL_ARG=""        # vide = a determiner (env / fichier / prompt)
+CHANNEL_FILE="${SCRIPT_DIR}/.update_channel"
 for arg in "$@"; do
     case "$arg" in
         --no-pull) DO_PULL=0 ;;
         --no-build) DO_BUILD=0 ;;
         --check|--dry-run) DRY_RUN=1 ;;
+        --beta) CHANNEL_ARG="beta" ;;
+        --release|--main|--stable) CHANNEL_ARG="release" ;;
+        --channel=*) CHANNEL_ARG="${arg#*=}" ;;
         *) echo -e "${YELLOW}[maj]${NC} Option inconnue : ${arg}" ;;
     esac
 done
 
 cd "${SCRIPT_DIR}"
+
+# ── Selection du canal de mise a jour (beta / release) ───────────────────────
+# Priorite : flag (--beta/--release) > MAJ_CHANNEL env > .update_channel >
+# prompt interactif > defaut 'release'. Le choix retenu est memorise.
+CHANNEL="${CHANNEL_ARG:-${MAJ_CHANNEL:-}}"
+if [ -z "$CHANNEL" ] && [ -f "$CHANNEL_FILE" ]; then
+    CHANNEL="$(tr -d '[:space:]' < "$CHANNEL_FILE" 2>/dev/null)"
+fi
+if [ -z "$CHANNEL" ]; then
+    if [ -t 0 ]; then
+        echo -e "${GREEN}[maj]${NC} Quel canal de mise a jour ?"
+        echo -e "    ${CYAN}1${NC}) release  (branche main)  - stable"
+        echo -e "    ${CYAN}2${NC}) beta     (branche beta)  - nouveautes en avant-premiere"
+        printf "  Choix [1/2] (defaut 1) : "
+        read -r _ch
+        case "$_ch" in
+            2|beta|b) CHANNEL="beta" ;;
+            *) CHANNEL="release" ;;
+        esac
+    else
+        CHANNEL="release"   # non-interactif (cron/CI) : stable par defaut
+    fi
+fi
+# Normalisation + mapping canal -> branche git
+case "$CHANNEL" in
+    beta)            TARGET_BRANCH="beta" ;;
+    release|main|"") CHANNEL="release"; TARGET_BRANCH="main" ;;
+    *)
+        echo -e "${RED}[maj]${NC} Canal inconnu : '${CHANNEL}' (attendu : beta | release)." >&2
+        exit 1
+        ;;
+esac
+# Memorise le choix pour les prochaines MAJ (sauf dry-run)
+if [ "$DRY_RUN" -eq 0 ]; then
+    printf '%s\n' "$CHANNEL" > "$CHANNEL_FILE" 2>/dev/null || true
+fi
+echo -e "${GREEN}[maj]${NC} Canal : ${CYAN}${CHANNEL}${NC} -> branche ${CYAN}${TARGET_BRANCH}${NC}"
 
 # ── Detection Docker Compose ─────────────────────────────────────────────────
 if docker compose version >/dev/null 2>&1; then
@@ -65,12 +115,27 @@ run() {
 
 # ── Etape 1 : git pull ───────────────────────────────────────────────────────
 if [ "$DO_PULL" -eq 1 ]; then
-    echo -e "${GREEN}[maj 1/5]${NC} git pull..."
-    branch=$(git rev-parse --abbrev-ref HEAD)
-    if [ "$branch" != "main" ]; then
-        echo -e "  ${YELLOW}!${NC} Sur la branche ${branch} (pas main) - pull respecte."
+    echo -e "${GREEN}[maj 1/5]${NC} git pull (canal ${CHANNEL} -> ${TARGET_BRANCH})..."
+    current=$(git rev-parse --abbrev-ref HEAD)
+    run git fetch origin "${TARGET_BRANCH}"
+    # Bascule sur la branche du canal choisi si on n'y est pas deja.
+    if [ "$current" != "$TARGET_BRANCH" ]; then
+        echo -e "  ${YELLOW}!${NC} Bascule ${current} -> ${TARGET_BRANCH}"
+        if [ "$DRY_RUN" -eq 0 ]; then
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+                echo -e "${RED}[maj]${NC} Modifications locales non commitees : impossible de changer de canal proprement." >&2
+                echo -e "  Committez/stash vos changements puis relancez (ou restez sur ${current} avec --no-pull)." >&2
+                exit 1
+            fi
+            # Cree la branche locale suivant origin/<branche> si absente, sinon checkout simple.
+            if git show-ref --verify --quiet "refs/heads/${TARGET_BRANCH}"; then
+                run git checkout "${TARGET_BRANCH}"
+            else
+                run git checkout -b "${TARGET_BRANCH}" --track "origin/${TARGET_BRANCH}"
+            fi
+        fi
     fi
-    run git pull --ff-only origin "${branch}"
+    run git pull --ff-only origin "${TARGET_BRANCH}"
 
     # Patch A08-NEW-01 (OWASP A08 Data Integrity) : verification signature GPG
     # du commit HEAD apres git pull. Empeche le deploiement de code non signe

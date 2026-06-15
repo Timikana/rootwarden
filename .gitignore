@@ -106,3 +106,6 @@ obsidian-rootwarden/**/Sans*titre*.md
 
 
 ONBOARDING.md
+
+# Canal de mise a jour memorise par maj.sh (runtime)
+.update_channel
