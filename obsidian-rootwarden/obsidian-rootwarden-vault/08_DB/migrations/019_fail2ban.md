@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [fail2ban_history, fail2ban_status, permissions]
 imports_detected: []
-last_synced: 2026-05-20
+last_synced: 2026-06-16
 # AUTO-END
 ---
 
