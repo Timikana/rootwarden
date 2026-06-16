@@ -119,7 +119,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1 (node24, pinned 2026-06-16)
         with:
           name: test-results
           path: test-results.xml
@@ -168,7 +168,7 @@ jobs:
         with:
           fetch-depth: 0  # full history pour scanner tous les commits
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2 (pinned 2026-04-25)
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0 (node24, pinned 2026-06-16 ; gratuit pour repo perso, licence requise seulement pour les organisations)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Si le repo n'a pas de config, gitleaks utilise sa baseline par defaut
@@ -234,6 +234,28 @@ jobs:
             --exclude-rule=dockerfile.security.missing-user.missing-user \
             --exclude-rule=dockerfile.security.missing-user-entrypoint.missing-user-entrypoint \
             --error --metrics=off --severity=ERROR .
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 4.2b : regles custom RootWarden (.semgrep/) - ADVISORY (non bloquant)
+  # Introduites en non bloquant car jamais executees en CI auparavant : plusieurs
+  # regles ERROR matchent des patterns LEGITIMES (f-string SQL + placeholders,
+  # execute_as_root + shlex.quote, /chatops/command authentifie par signature sans
+  # api_key) et necessitent un tri (# nosemgrep) avant de pouvoir bloquer.
+  # Ce job surface les findings sans casser le pipeline ; a passer bloquant une
+  # fois les faux positifs annotes.
+  sast-semgrep-custom:
+    name: SAST regles custom RootWarden (semgrep, advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install semgrep
+        run: pip install semgrep
+      - name: Run custom rules (.semgrep/rules-rootwarden.yml)
+        run: semgrep --config=.semgrep/rules-rootwarden.yml --error --metrics=off --severity=ERROR .
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
