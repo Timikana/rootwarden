@@ -12,7 +12,7 @@ last_reviewed: 2026-04-21
 routes: []
 tables: [cve_findings, machines, roles, users]
 imports_detected: []
-last_synced: 2026-05-20
+last_synced: 2026-06-16
 # AUTO-END
 ---
 

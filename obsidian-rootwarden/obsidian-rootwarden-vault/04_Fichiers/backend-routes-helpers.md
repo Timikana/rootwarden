@@ -15,7 +15,7 @@ status: stable
 routes: []
 tables: [api_keys, permissions, user_machine_access, users]
 imports_detected: [config, encryption]
-last_synced: 2026-05-20
+last_synced: 2026-06-16
 # AUTO-END
 ---
 
