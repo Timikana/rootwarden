@@ -92,6 +92,47 @@ try {
 $nbWithAgent = count(array_unique(array_column($supervisionAgents, 'machine_id')));
 $sshAuditAvg = count($sshAuditResults) > 0 ? (int)(array_sum(array_column($sshAuditResults, 'score')) / count($sshAuditResults)) : 0;
 
+// ── Posture de conformite consolidee par serveur (CIS-like) ─────────────────
+// Agrege en une note unique (0-100 + lettre) : audit sshd + CVE crit/haute +
+// fail2ban + derive de config (table config_drift, v1.24.0).
+$sshByMachine = [];
+foreach ($sshAuditResults as $saM) { $sshByMachine[$saM['machine_id']] = $saM; }
+$f2bByMachine = [];
+try {
+    foreach ($pdo->query("SELECT server_id, installed, running FROM fail2ban_status")->fetchAll(PDO::FETCH_ASSOC) as $f) {
+        $f2bByMachine[$f['server_id']] = $f;
+    }
+} catch (\Exception $e) {}
+$driftByMachine = [];
+try {
+    foreach ($pdo->query("SELECT machine_id, SUM(status = 'drift') AS dc FROM config_drift GROUP BY machine_id")->fetchAll(PDO::FETCH_ASSOC) as $d) {
+        $driftByMachine[$d['machine_id']] = (int)$d['dc'];
+    }
+} catch (\Exception $e) {}
+
+$posture = [];
+foreach ($servers as $s) {
+    $mid = $s['id'];
+    $score = isset($sshByMachine[$mid]) ? (int)$sshByMachine[$mid]['score'] : 50;
+    $reasons = [];
+    if (!isset($sshByMachine[$mid])) { $reasons[] = 'sshd non audite'; }
+    $crit = (int)($s['critical_count'] ?? 0);
+    $high = (int)($s['high_count'] ?? 0);
+    if ($crit > 0)      { $score -= 30; $reasons[] = "$crit CVE critique(s)"; }
+    elseif ($high > 0)  { $score -= 15; $reasons[] = "$high CVE haute(s)"; }
+    $f2b = $f2bByMachine[$mid] ?? null;
+    if (!$f2b || empty($f2b['installed'])) { $score -= 15; $reasons[] = 'fail2ban absent'; }
+    $dc = $driftByMachine[$mid] ?? 0;
+    if ($dc > 0) { $score -= min(30, 10 * $dc); $reasons[] = "$dc derive(s) config"; }
+    $score = max(0, min(100, $score));
+    $grade = $score >= 90 ? 'A' : ($score >= 75 ? 'B' : ($score >= 60 ? 'C' : ($score >= 40 ? 'D' : 'F')));
+    $posture[] = ['name' => $s['name'], 'ip' => $s['ip'], 'score' => $score, 'grade' => $grade,
+                  'reasons' => $reasons ? implode(', ', $reasons) : 'conforme'];
+}
+usort($posture, fn($a, $b) => $a['score'] <=> $b['score']);
+$postureAvg = count($posture) ? (int)(array_sum(array_column($posture, 'score')) / count($posture)) : 0;
+$postureGradeAvg = $postureAvg >= 90 ? 'A' : ($postureAvg >= 75 ? 'B' : ($postureAvg >= 60 ? 'C' : ($postureAvg >= 40 ? 'D' : 'F')));
+
 // Hash du rapport pour preuve d'integrite
 $reportData = json_encode(compact('servers', 'users', 'remStats', 'date'));
 $reportHash = hash('sha256', $reportData);
@@ -108,6 +149,13 @@ if (isset($_GET['format']) && $_GET['format'] === 'csv') {
     fputcsv($out, ['Serveurs', $nbServers, 'En ligne', $nbOnline]);
     fputcsv($out, ['Utilisateurs actifs', $nbActiveUsers, '2FA actif', $nbActive2FA]);
     fputcsv($out, ['Cles SSH > 90j', $nbOldKeys]);
+    fputcsv($out, ['Score de posture moyen', $postureAvg . '/100', 'Note', $postureGradeAvg]);
+    fputcsv($out, []);
+    fputcsv($out, ['=== POSTURE PAR SERVEUR (sshd + CVE + fail2ban + derive) ===']);
+    fputcsv($out, ['Nom', 'IP', 'Score', 'Note', 'Ecarts']);
+    foreach ($posture as $p) {
+        fputcsv($out, [$p['name'], $p['ip'], $p['score'] . '/100', $p['grade'], $p['reasons']]);
+    }
     fputcsv($out, []);
     fputcsv($out, ['=== SERVEURS ===']);
     fputcsv($out, ['Nom', 'IP', 'Statut', 'Environnement', 'CVE Total', 'CVE Critical', 'CVE High', 'Dernier scan', 'Derniere MaJ']);
@@ -162,6 +210,19 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
     $pdfHtml .= "<div class='stat-box'><div class='stat-num'>{$nbActive2FA}/{$nbActiveUsers}</div><div>2FA actif</div></div>";
     $pdfHtml .= "<div class='stat-box'><div class='stat-num'>{$nbOldKeys}</div><div>Cles SSH &gt; 90j</div></div>";
     $pdfHtml .= "<div class='stat-box'><div class='stat-num'>" . $remStats['overdue'] . "</div><div>Deadlines depassees</div></div>";
+    $_postureCls = $postureAvg >= 75 ? 'green' : ($postureAvg >= 60 ? 'blue' : 'critical');
+    $pdfHtml .= "<div class='stat-box'><div class='stat-num {$_postureCls}'>{$postureAvg}/100 ({$postureGradeAvg})</div><div>Posture moyenne</div></div>";
+
+    // Posture de conformite consolidee
+    $pdfHtml .= '<h2>Posture de conformite par serveur (sshd + CVE + fail2ban + derive)</h2>';
+    $pdfHtml .= '<table><tr><th>Serveur</th><th>IP</th><th>Score</th><th>Note</th><th>Ecarts</th></tr>';
+    foreach ($posture as $p) {
+        $gCls = $p['grade'] === 'A' ? 'green' : (in_array($p['grade'], ['B', 'C']) ? 'blue' : 'critical');
+        $pdfHtml .= '<tr><td>' . htmlspecialchars($p['name']) . '</td><td>' . htmlspecialchars($p['ip']) . '</td>';
+        $pdfHtml .= '<td>' . $p['score'] . '/100</td><td' . " class=\"$gCls\"" . '><strong>' . $p['grade'] . '</strong></td>';
+        $pdfHtml .= '<td>' . htmlspecialchars($p['reasons']) . '</td></tr>';
+    }
+    $pdfHtml .= '</table>';
 
     // Serveurs
     $pdfHtml .= '<h2>Vulnerabilites CVE par serveur</h2><table><tr><th>Serveur</th><th>IP</th><th>Statut</th><th>Env</th><th>CVE</th><th>Crit</th><th>High</th><th>Dernier scan</th></tr>';
@@ -213,6 +274,10 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
     $dompdf->loadHtml($pdfHtml);
     $dompdf->setPaper('A4', 'landscape');
     $dompdf->render();
+    // Patch : purger tout output parasite (notices PHP captures par ob_start en
+    // mode debug) avant d'emettre le binaire PDF -> evite un PDF corrompu prefixe
+    // de "<br />..." selon les donnees.
+    while (ob_get_level() > 0) { ob_end_clean(); }
     $dompdf->stream('rapport_conformite_' . date('Y-m-d') . '.pdf', ['Attachment' => true]);
     exit;
 }
@@ -278,6 +343,49 @@ if (isset($_GET['format']) && $_GET['format'] === 'pdf') {
                 <div class="text-2xl font-bold text-indigo-600"><?= $nbWithAgent ?>/<?= $nbServers ?></div>
                 <div class="text-xs text-gray-500"><?= t('compliance.supervision_coverage') ?></div>
             </div>
+        </div>
+    </div>
+
+    <!-- 1bis. Posture de conformite consolidee (CIS-like) -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6 print-break">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200"><?= t('compliance.section_posture') ?></h2>
+            <?php $pAvgColor = $postureAvg >= 75 ? 'text-green-600 dark:text-green-400' : ($postureAvg >= 60 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'); ?>
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                <?= t('compliance.posture_avg') ?> :
+                <span class="font-bold <?= $pAvgColor ?>"><?= $postureAvg ?>/100 (<?= $postureGradeAvg ?>)</span>
+            </div>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3"><?= t('compliance.posture_desc') ?></p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                        <th class="px-3 py-2 text-left"><?= t('compliance.th_server') ?? 'Serveur' ?></th>
+                        <th class="px-3 py-2 text-left">IP</th>
+                        <th class="px-3 py-2 text-center"><?= t('compliance.th_score') ?></th>
+                        <th class="px-3 py-2 text-center"><?= t('compliance.th_grade') ?></th>
+                        <th class="px-3 py-2 text-left"><?= t('compliance.th_gaps') ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($posture as $p):
+                        $gc = $p['grade'] === 'A' ? 'text-green-600 dark:text-green-400'
+                            : (in_array($p['grade'], ['B', 'C']) ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-red-600 dark:text-red-400'); ?>
+                    <tr class="border-b border-gray-100 dark:border-gray-700/50">
+                        <td class="px-3 py-2 font-medium"><?= htmlspecialchars($p['name']) ?></td>
+                        <td class="px-3 py-2 font-mono text-xs text-gray-500"><?= htmlspecialchars($p['ip']) ?></td>
+                        <td class="px-3 py-2 text-center"><?= $p['score'] ?>/100</td>
+                        <td class="px-3 py-2 text-center font-extrabold text-lg <?= $gc ?>"><?= $p['grade'] ?></td>
+                        <td class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400"><?= htmlspecialchars($p['reasons']) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($posture)): ?>
+                    <tr><td colspan="5" class="px-3 py-4 text-center text-gray-400"><?= t('compliance.posture_empty') ?></td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 

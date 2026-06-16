@@ -516,6 +516,7 @@ def get_platform_key():
 
 @bp.route('/deploy_platform_key', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : deploiement de cle plateforme reserve admin
 @require_machine_access
 @threaded_route
 def deploy_platform_key():
@@ -808,6 +809,7 @@ def revoke_service_account():
 
 @bp.route('/deploy_service_account', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : deploiement compte service NOPASSWD:ALL reserve admin
 @require_machine_access
 @threaded_route
 def deploy_service_account():
@@ -1002,6 +1004,7 @@ def test_platform_key():
 
 @bp.route('/remove_ssh_password', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : effacement des credentials SSH reserve admin
 @require_machine_access
 @threaded_route
 def remove_ssh_password():
@@ -1034,6 +1037,7 @@ def remove_ssh_password():
 
 @bp.route('/reenter_ssh_password', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : reecriture des credentials SSH reserve admin
 @require_machine_access
 @threaded_route
 def reenter_ssh_password():
@@ -1078,6 +1082,7 @@ def regenerate_platform_key_route():
 
 @bp.route('/scan_server_users', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : enumeration des comptes distants reservee admin
 @require_machine_access
 @threaded_route
 def scan_server_users():
@@ -1669,6 +1674,7 @@ echo "removed=$removed"
 
 @bp.route('/remove_user_keys', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : suppression de toutes les cles d'un user reservee admin
 @require_machine_access
 @threaded_route
 def remove_user_keys():
@@ -1733,6 +1739,7 @@ def remove_user_keys():
 
 @bp.route('/delete_remote_user', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : userdel distant irreversible reserve admin
 @require_machine_access
 @threaded_route
 def delete_remote_user():
@@ -1770,6 +1777,22 @@ def delete_remote_user():
     # Protection : ne pas supprimer l'utilisateur SSH de connexion
     if username == m['user']:
         return jsonify({'success': False, 'message': f"'{username}' est l'utilisateur SSH de connexion - suppression interdite"}), 400
+
+    # Approbation 4-eyes : suppression d'utilisateur distant = action destructive.
+    # Si activee, exige l'aval d'un 2e admin avant execution (store-and-replay).
+    try:
+        from approvals import gate
+        _uid, _role = get_current_user()
+        _ap = gate('delete_remote_user', int(machine_id), username,
+                   {'username': username, 'remove_home': bool(remove_home)}, _uid, role=_role)
+        if _ap is not None:
+            msg = ("Demande d'approbation creee : un 2e administrateur doit valider avant suppression."
+                   if _ap['status'] == 'created'
+                   else "Action deja en attente d'approbation par un 2e administrateur.")
+            return jsonify({'success': False, 'pending_approval': True,
+                            'request_id': _ap['id'], 'message': msg}), 202
+    except Exception as _e:
+        logger.debug("approval gate (delete_remote_user) skipped: %s", _e)
 
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m['root_password'])
@@ -1817,6 +1840,16 @@ def delete_remote_user():
                 or 'utilisateur inexistant' in check_str
                 or 'no existe el usuario' in check_str
             )
+
+            # Journal des commandes (trail bastion)
+            try:
+                from command_logger import log_command
+                _luid, _ = get_current_user()
+                log_command(machine_id, _luid, cmd, context='delete_user',
+                            success=bool(user_gone),
+                            detail=f"remove_home={remove_home}")
+            except Exception:
+                pass
 
             if user_gone:
                 if exit_code and int(exit_code) != 0:

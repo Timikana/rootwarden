@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 node_modules/
+
+# Scripts e2e pentest/scratch : contiennent des credentials de test (mots de
+# passe localhost + secret TOTP) en dur. Ne JAMAIS committer.
+tests/e2e/go-test-pentest.mjs
+tests/e2e/*-pentest.mjs
 package-lock.json
 vendor/
 !vendor/composer/
@@ -33,6 +38,9 @@ www/logs/
 # Backups — generes automatiquement
 backend/backups/
 backups/
+# Exception : www/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage
+!www/backups/
+!www/backups/**
 
 # Base de donnees locale
 mysql/data/
@@ -98,3 +106,6 @@ obsidian-rootwarden/**/Sans*titre*.md
 
 
 ONBOARDING.md
+
+# Canal de mise a jour memorise par maj.sh (runtime)
+.update_channel

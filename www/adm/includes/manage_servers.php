@@ -68,6 +68,8 @@ function validateInput($data, $type) {
             return $data;
         case 'port':
             return filter_var($data, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]) ? $data : false;
+        case 'id': // entier positif sans borne haute (id serveur > 65535 etait rejete par 'port')
+            return filter_var($data, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ? $data : false;
         case 'string':
             return htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
         case 'rsa_key': // Validation simple pour une clé RSA
@@ -140,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['update_server'])) {
         checkCsrfToken();
     
-        $server_id = validateInput($_POST['server_id'], 'port');
+        $server_id = validateInput($_POST['server_id'], 'id');
         $name = validateInput($_POST['name'], 'name');
         $ip = validateInput($_POST['ip'], 'ip');
         $user = validateInput($_POST['user'], 'string');
@@ -191,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['delete_server'])) {
         checkCsrfToken();
     
-        $server_id = validateInput($_POST['server_id'], 'port');
+        $server_id = validateInput($_POST['server_id'], 'id');
         if (!$server_id) {
             $error = t('servers.error_invalid_id');
         } else {

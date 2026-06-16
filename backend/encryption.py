@@ -75,8 +75,12 @@ class Encryption:
 
         if self.old_secret_key:
             self.old_key_bytes = self._prepare_key(self.old_secret_key, is_old_key=True)
+            # Cle ancienne derivee HKDF (meme label que la cle principale) pour
+            # dechiffrer les blobs GCM ecrits AVANT une rotation OLD_SECRET_KEY.
+            self.old_key_derived = self._derive_key(self.old_key_bytes, b'rootwarden-aes')
         else:
             self.old_key_bytes = None
+            self.old_key_derived = None
 
     def _check_sodium_available(self):
         """
@@ -254,8 +258,16 @@ class Encryption:
                 if len(blob) < 13:
                     raise ValueError("Ciphertext GCM trop court")
                 nonce, ct = blob[:12], blob[12:]
-                # Essai cle principale puis ancienne (rotation)
-                for key in (self.secret_key, self.secret_key_raw):
+                # Essai cle principale puis ancienne (rotation OLD_SECRET_KEY).
+                # Patch A02 : on inclut desormais old_key_derived/old_key_bytes,
+                # sinon un blob GCM chiffre avant rotation devenait indechiffrable
+                # et retombait sur le fallback legacy "best-effort".
+                gcm_keys = [self.secret_key, self.secret_key_raw]
+                if self.old_key_derived:
+                    gcm_keys.append(self.old_key_derived)
+                if self.old_key_bytes:
+                    gcm_keys.append(self.old_key_bytes)
+                for key in gcm_keys:
                     try:
                         pt = AESGCM(key).decrypt(nonce, ct, associated_data=None)
                         return pt.decode('utf-8')

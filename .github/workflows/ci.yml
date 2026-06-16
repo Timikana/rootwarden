@@ -13,6 +13,13 @@ on:
   pull_request:
     branches: [main]
 
+# Patch A08 : least-privilege par defaut pour GITHUB_TOKEN. Sans bloc global,
+# le token herite des permissions par defaut du repo (potentiellement write) ->
+# surface d'abus si une action est compromise. Les jobs qui ont besoin de plus
+# (auto-tag : contents: write) le declarent explicitement.
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/rootwarden

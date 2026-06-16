@@ -15,6 +15,15 @@ function escAttr(s) {
         .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
         .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\/g, '&#92;');
 }
+// Patch A03 (DOM-XSS) : echappement pour une chaine JS dans un onclick (cf.
+// services/js/main.js) - hex-echappe tout sauf alphanumerique.
+function escJsAttr(s) {
+    return String(s == null ? '' : s).replace(/[^a-zA-Z0-9_.\-]/g, function (c) {
+        var n = c.charCodeAt(0);
+        return n < 256 ? '\\x' + n.toString(16).padStart(2, '0')
+                       : '\\u' + n.toString(16).padStart(4, '0');
+    });
+}
 
 function getCsrfToken() {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -196,7 +205,7 @@ async function bashrcLoadUsers() {
                 <td class="px-3 py-2 mono text-xs">${escHtml(u.sha8 || '')}</td>
                 <td class="px-3 py-2">${statusBadge}${customBadge}</td>
                 <td class="px-3 py-2">
-                    <button onclick="bashrcRestore('${escAttr(u.name)}')" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('bashrc.btn_restore'))}</button>
+                    <button onclick="bashrcRestore('${escJsAttr(u.name)}')" class="text-xs text-blue-500 hover:text-blue-700">${escHtml(__('bashrc.btn_restore'))}</button>
                 </td>
             </tr>
         `;

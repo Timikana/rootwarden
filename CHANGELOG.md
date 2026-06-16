@@ -5,6 +5,971 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+> ## ⚠️ AVERTISSEMENT — Build `main` (v1.37.1-beta), NON TESTÉ EN PRODUCTION
+>
+> Cette branche `main` intègre désormais (merge depuis `beta`) toutes les
+> fonctionnalités **v1.24 → v1.37** : drift, centre de tâches, posture conformité,
+> priorisation EPSS/KEV, groupes & actions de masse, fenêtres de maintenance,
+> approbation 4-eyes, journal de commandes (bastion), ChatOps, ticketing,
+> recherche globale, restauration de backup, veille conteneurs Docker.
+>
+> **Ces fonctionnalités n'ont été validées qu'en développement (tests Puppeteer),
+> PAS en production.** À considérer comme **bêta** : tester en pré-production et
+> valider chaque feature critique avant tout usage réel. Les features sensibles
+> (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`) sont **OFF par
+> défaut**. Penser à appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.1] - 2026-06-14 — Hardening : audit OWASP Top 10 des features v1.27→v1.37
+
+Audit OWASP Top 10 ciblé sur les 11 features de la session (4 revues
+adversariales en parallèle + vérification manuelle de chaque finding). **Aucune
+faille critique ni bypass d'auth/injection** sur le socle (signatures ChatOps,
+SSRF guards, requêtes paramétrées, 4-eyes serveur, path-traversal backup : OK).
+6 corrections appliquées :
+
+- **A01 — ChatOps approve/reject sans contrôle de rôle** (HIGH) : un compte mappé
+  en rôle 1 pouvait débloquer des actions 4-eyes depuis le chat. Ajout du gate
+  `role >= 2` dans `chatops.dispatch` (aligné sur l'UI web).
+- **A10 — SSRF par redirection** (MEDIUM, x2) : `docker_registry` suivait les
+  redirections du manifeste et du `realm` d'auth sans revalidation → passage par
+  `_safe_get` (revalidation de chaque saut, comme le scanner CVE).
+- **A01/IDOR — `docker/results` sans `machine_id`** (MEDIUM) : un opérateur (rôle 1)
+  recevait l'inventaire Docker de TOUTE la flotte → filtrage sur
+  `user_machine_access` pour les rôles < 2.
+- **A03 — XSS d'attribut `href`** (MEDIUM) : `tickets.js` injectait `external_url`
+  (réponse ITSM) dans un `href` via un échappeur qui n'échappe pas les `"` →
+  `escAttr` + allowlist de schéma `http(s)`. Idem défensif sur `search.js`.
+- **A10 — validation de l'hôte registre** (LOW) : regex stricte sur le host
+  (bloque la confusion d'userinfo type `legit.io@169.254.169.254`).
+- **Bug** : précédence du tuple de retour Jira (`ticketing._create_jira`) corrigée.
+
+Findings résiduels acceptés/documentés : guard SSRF permissif sur le LAN RFC1918
+(registre/OpenCVE interne — choix design), fail-open des fenêtres de maintenance
+et de l'approbation sur erreur BDD (disponibilité), prefix-matching du proxy
+(non exploitable, défense en profondeur).
+
+---
+
+## [1.37.0] - 2026-06-14 — Feature : inventaire & veille des conteneurs Docker
+
+Sur demande : monitorer les conteneurs Docker des serveurs, détecter les mises à
+jour disponibles côté **image** et côté **git**, avec le changelog.
+
+### Détection (migration 061 + `backend/docker_monitor.py`)
+- Via SSH (root) : `docker ps` + `docker inspect` (labels compose) +
+  `docker image inspect` (digest local `RepoDigests`). Auto-détecte compose / run.
+- **Git** : si une stack vient d'un dépôt cloné (working_dir compose = repo git),
+  `git fetch` (best-effort, sans prompt, timeout) + nombre de commits en retard
+  (`HEAD..origin`) + **changelog** (liste des commits). `safe.directory='*'` pour
+  éviter l'erreur « dubious ownership » en root.
+
+### Veille des images (`backend/docker_registry.py`)
+- Compare le **digest local** au **digest distant** du même tag via la Registry
+  HTTP API v2 : **Docker Hub**, **GHCR**, registres **génériques/internes**.
+  Auth anonyme par défaut ; token Bearer optionnel par hôte
+  (`DOCKER_REGISTRY_TOKENS`). Flux de challenge `WWW-Authenticate` géré.
+- SSRF : guard `_url_is_safe_external` (autorise RFC1918 pour un registre interne,
+  bloque loopback/link-local/metadata). Best-effort : digest distant inconnu →
+  pas de mise à jour signalée (zéro faux positif).
+
+### Routes & UI
+- `routes/docker.py` : `POST /docker/scan` (machine, `require_machine_access`),
+  `POST /docker/scan_all` (admin, streaming), `GET /docker/results`.
+- Page `/docker/` (admin) : cartes de résumé + table (serveur, conteneur, image,
+  état, **MAJ image** À jour/Dispo/Inconnu, **git N commits en retard** + changelog
+  repliable). Scan par serveur ou global. Rendu sans `onclick` interpolé.
+- Menu (opérationnel, admin) + tooltips, whitelist `api_proxy.php` (`/docker/`),
+  i18n fr+en.
+
+### Vérifié (live, vrai serveur srv-zabbix)
+**19 conteneurs réels détectés**, digests résolus, **6 mises à jour d'image
+réelles** signalées (ex glances, homepage), projets compose identifiés, détection
+git correcte (0 stack git ici). Module registre testé contre Docker Hub (token +
+digest réels). UI Puppeteer : 19 lignes, 4 cartes, badges MAJ/à jour, 0 erreur JS.
+
+---
+
+## [1.36.0] - 2026-06-14 — UX : séparation Sudo / SFTP + explications en clair
+
+Suite à un retour utilisateur (« je sépare sudo et sftp, et dis ce que chaque
+truc fait — je n'ai jamais vu chroot »), la gestion des droits par utilisateur
+distant est rendue **compréhensible par un non-expert Linux**.
+
+### Séparation en deux pages
+- L'ancienne page unique à 3 onglets (`/adm/server_user_policies.php`) est scindée :
+  - **`/adm/server_user_sudo.php`** — droits sudo (« ce que l'utilisateur peut faire en admin ») ;
+  - **`/adm/server_user_sftp.php`** — accès SFTP/SSH (« comment l'utilisateur se connecte »).
+- L'ancienne URL **redirige** vers la page sudo (compat liens/bookmarks). Menu : deux
+  entrées distinctes (Droits sudo / Accès SFTP/SSH).
+- JS factorisé dans `www/adm/js/server_user_policy.js` (config par page via `window.POL`).
+
+### Explications en clair (le cœur du retour)
+- Chaque page a un **encadré « À quoi sert cette page ? »**.
+- Chaque **preset sudo** affiche une phrase concrète (ex : *read_logs* → « l'utilisateur
+  peut seulement LIRE les journaux, il ne peut RIEN modifier »).
+- Chaque **option SFTP** a un libellé humain + une explication sous le champ, sans jargon :
+  - chroot → « Enfermer dans un dossier (« cage ») : l'utilisateur ne voit QUE ce dossier… » ;
+  - sftp_only → « Transfert de fichiers uniquement (pas de terminal) » ;
+  - password/tcp/agent/x11 forwarding → expliqués avec leur impact sécurité.
+- Boutons Déployer/Auditer/Supprimer accompagnés de leur rôle.
+
+### Vérifié (Puppeteer)
+Page sudo : encadré intro + aide qui change selon le preset (apt_only → read_logs).
+Page SFTP : intro + champ chroot + explication « cage » + « terminal » + libellés humains.
+Ancienne URL → redirige vers sudo. 0 erreur JS. (Backend inchangé : routes `/policy/*`
+et managers identiques.)
+
+---
+
+## [1.35.0] - 2026-06-14 — Feature : restauration de backup depuis l'UI
+
+Douzième et dernière feature de la roadmap. Les backups (création + sha256)
+existaient déjà ; la **restauration** et le **test de restauration** étaient manuels.
+
+### Backend (`db_backup.py`)
+- `verify_backup(filename)` — **test de restauration non destructif** : vérifie
+  l'empreinte sha256, la lisibilité du gzip, compte tables/statements. N'applique rien.
+- `restore_backup(filename)` — **restauration** (DROP TABLE → recréation) :
+  - nom validé par regex (anti **path-traversal**), sha256 vérifié **avant** application ;
+  - **backup de sécurité automatique** avant écrasement ;
+  - `FOREIGN_KEY_CHECKS=0` pendant l'application ;
+  - splitter SQL robuste (`_split_sql`) respectant chaînes quotées + échappement
+    (un `;` dans une donnée ne casse pas le découpage).
+
+### Routes (`routes/admin.py`)
+- `POST /admin/backups/verify` (admin, role 2) ;
+- `POST /admin/backups/restore` (**superadmin uniquement, role 3** — opération la
+  plus destructive) ; journalisée dans le command log (context `db_restore`).
+
+### Frontend (`/backups/`)
+- Page : liste (fichier, taille, date), **Créer**, **Vérifier**, **Restaurer**
+  (réservé superadmin, **double confirmation** par re-saisie du nom de fichier).
+  Bannière d'avertissement. Rendu sans `onclick` interpolé.
+- Menu (Admin) + tooltips, i18n fr+en. (`/admin/` déjà whitelisté + admin-only.)
+
+### OWASP / sécurité
+A01 restore = role 3 (superadmin), A03 nom validé + requêtes contrôlées,
+A08 intégrité sha256 vérifiée avant restauration + backup de sécurité, A09 trail.
+
+### Vérifié
+Cycle complet : create (62 tables) → verify (valide, sha256 OK, 451 statements) →
+restore (451 appliqués, backup de sécurité créé) → BDD intacte (superadmin role 3
+préservé, 2 users, 62 tables). UI Puppeteer : liste + bouton restore (SA) + verify
+API valide, 0 erreur JS.
+
+---
+
+## [1.34.0] - 2026-06-14 — Feature : recherche globale + audit log dans le menu
+
+Onzième feature de la roadmap.
+
+### Recherche globale (`routes/search.py` + `/search/`)
+- Un seul endpoint `GET /search?q=` interroge **serveurs** (nom/IP),
+  **utilisateurs** (nom/email), **CVE** (cve_id/paquet), **tickets** (résumé/réf)
+  et **journal d'audit** (action). Résultats catégorisés + lien de navigation,
+  plafonnés à 10 par catégorie.
+- Page `/search/` : champ unique avec recherche **debouncée** (300 ms), rendu en
+  cartes par catégorie. Rendu sans `onclick` interpolé → pas de DOM-XSS.
+- Sécurité : `@require_role(2)` + `can_admin_portal` (traverse users + audit),
+  LIKE 100 % paramétré, terme ≥ 2 caractères.
+
+### Visualiseur d'audit log
+- Le visualiseur existant (`/adm/audit_log.php` : filtres user/action/date,
+  pagination, **export CSV**, **vérification de la chaîne HMAC** via
+  `/adm/api/audit_verify.php`) est désormais **accessible depuis le menu** (section
+  Admin) — il n'était atteignable que via la page d'administration.
+
+### Divers
+- Menu (Admin) : entrées « Recherche » + « Journal d'audit » + tooltips.
+- Whitelist `api_proxy.php` (`/search`, admin-only), i18n fr+en.
+
+### Vérifié
+UI Puppeteer + API : `srv` → 1 serveur, `super` → 1 utilisateur, rendu en cartes
+(srv-zabbix présent), 0 erreur JS.
+
+---
+
+## [1.33.0] - 2026-06-14 — Feature : ticketing ITSM (CVE → ticket)
+
+Dixième feature de la roadmap. Transforme un finding (notamment CVE) en ticket
+dans l'outil ITSM de l'équipe.
+
+### Adaptateurs (migration 060 + `backend/ticketing.py`)
+- Fournisseurs : **Jira** (REST v2), **ServiceNow** (table incident),
+  **GLPI** (apirest.php), **generic** (webhook JSON). Sélection par config.
+- SSRF : toute création distante passe par le guard (`_url_is_safe_external`)
+  avant POST. Aucun secret journalisé.
+- Si désactivé/échec → ticket **`local`** (tracé en base sans référence externe),
+  rien n'est perdu. Table `tickets` avec **dédup** par (source, ref, machine_id).
+
+### Routes & intégrations (`routes/tickets.py`)
+- `POST /tickets` (manuel ou `source=cve`), `GET /tickets` (liste).
+- `create_or_get_ticket()` réutilisable : dédup + fallback local.
+- **CVE → ticket** : bouton 🎟 sur chaque finding de la page CVE (`/security/`).
+- **Auto-KEV** (opt-in `TICKETING_AUTO_KEV`) : à chaque scan, un ticket est créé
+  automatiquement pour les CVE activement exploitées (CISA KEV), dédupliqué.
+
+### Frontend (`/tickets/`) + config
+- Page admin : liste (source, fournisseur, référence cliquable) + création
+  manuelle + indicateur de fournisseur. Rendu sans `onclick` interpolé.
+- Config : `TICKETING_ENABLED`, `TICKETING_PROVIDER`, `TICKETING_URL`,
+  `TICKETING_USER/TOKEN`, `TICKETING_PROJECT` (Jira), `TICKETING_APP_TOKEN` (GLPI),
+  `TICKETING_AUTO_KEV`.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/tickets` admin-only), i18n fr+en.
+
+### OWASP / sécurité
+A01 `@require_role(2)` + `can_admin_portal`, A03 requêtes paramétrées + dédup
+unique, A10 (SSRF) guard sur l'URL du fournisseur.
+
+### Vérifié
+create + dédup (même id) ; UI Puppeteer : création manuelle listée, CVE→ticket
+(200, provider local) listé, indicateur « aucun fournisseur configuré », 0 erreur JS.
+
+---
+
+## [1.32.0] - 2026-06-14 — Feature : ChatOps bidirectionnel (Slack / Teams)
+
+Neuvième feature de la roadmap. Les webhooks **sortants** existaient déjà ; cette
+version ajoute le sens **entrant** : piloter RootWarden depuis le chat.
+
+### Réception de commandes (migration 059 + `backend/chatops.py`)
+- Endpoint `POST /chatops/command` (backend) exposé publiquement via le
+  passthrough `www/chatops/webhook.php` (sans session — Slack/Teams ne peuvent
+  pas s'authentifier par session).
+- **Authentification** : signature Slack `v0` (HMAC-SHA256 sur `v0:{ts}:{body}`
+  + anti-rejeu 5 min) **ou** jeton partagé constant-time (`X-ChatOps-Token`,
+  pour Teams/générique). Aucune commande sans auth valide.
+- **Mapping** `chatops_users` (chat_user_id → utilisateur RootWarden) : l'acteur
+  est résolu via ce mapping ; sans mapping, les commandes mutantes sont refusées.
+- Commandes (liste blanche) : `help`, `status` (résumé flotte), `approvals`
+  (demandes en attente), `approve <id>` / `reject <id>` — **respecte la règle
+  4-eyes** (refus d'approuver sa propre demande).
+
+### Frontend (`/chatops/`) + config
+- Page admin : gestion des mappings chat↔utilisateur + instructions de setup
+  (URL du webhook, signing secret Slack, jeton Teams). Rendu sans `onclick` interpolé.
+- Routes `/chatops/users` (GET/POST/DELETE, admin) via le proxy authentifié.
+- Opt-in : `CHATOPS_ENABLED`, `CHATOPS_SLACK_SIGNING_SECRET`, `CHATOPS_TOKEN`.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/chatops/users` admin-only),
+  i18n fr+en.
+
+### OWASP / sécurité
+A01/A07 : endpoint entrant authentifié par signature/jeton (jamais par session) ;
+mapping CRUD réservé admin ; backend Python non exposé (atteint via le passthrough).
+A03 commandes en liste blanche + requêtes paramétrées.
+
+### Vérifié (curl live, token activé temporairement)
+`status` → résumé flotte ; `approvals` → 2 demandes ; `approve 6` (demandeur tiers)
+→ approuvée ; `approve 7` (sa propre demande) → refus 4-eyes ; mauvais jeton → 401 ;
+commande sans mapping → refus d'identité ; `help` → liste des commandes.
+
+---
+
+## [1.31.1] - 2026-06-14 — Fix : le superadmin contourne l'approbation 4-eyes
+
+Sur un déploiement avec un **seul administrateur**, la règle 4-eyes (approbation
+par un 2e admin) ne pouvait jamais être satisfaite : le superadmin se serait
+bloqué lui-même (impossible d'approuver sa propre demande, pas d'autre admin).
+- `approvals.gate()` prend désormais le `role` et **contourne l'approbation pour
+  le superadmin (rôle 3)** — contournement journalisé.
+- Appelants mis à jour (`delete_remote_user`, `reboot_server`) pour transmettre
+  le rôle. Doc + i18n (fr/en) précisent l'exemption superadmin.
+
+---
+
+## [1.31.0] - 2026-06-14 — Feature : journal des commandes (trail type bastion)
+
+Huitième feature de la roadmap. Trace **ce que RootWarden exécute réellement**
+sur les serveurs distants : un journal d'audit type bastion (qui, quoi, où,
+quand, résultat).
+
+### Modèle (migration 058 + `backend/command_logger.py`)
+- Table `command_log` (machine_id, user_id, context, command, success, detail,
+  created_at). Helper `log_command(...)` best-effort (connexion propre, jamais
+  d'exception remontée — la journalisation ne casse jamais l'action suivie).
+
+### Instrumentation des routes privilégiées
+- `reboot_server` (context `reboot`), `delete_remote_user` (`delete_user`,
+  succès réel d'après le check `id`), `update_server` (`full_update`),
+  `apply_security_updates` (`security_update`), `custom_update` (`custom_update`).
+  Chaque entrée capture la commande exacte + l'acteur + la machine.
+
+### Consultation (`routes/commandlog.py` + `/commandlog/`)
+- `GET /command_log` (filtres machine/context, limite ≤ 500) + `/command_log/contexts`.
+- Page lecture seule : tableau filtrable (machine, contexte), pastille de
+  résultat OK/échec. Rendu sans `onclick` interpolé → pas de DOM-XSS.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/command_log`, admin-only),
+  i18n fr+en.
+
+### OWASP / sécurité
+A01 `@require_role(2)` + `can_admin_portal` (consultation d'un journal d'audit),
+A03 requêtes paramétrées + filtres validés, A09 journal en lecture seule (pas
+de suppression via l'API).
+
+### Vérifié
+`log_command` insère correctement (smoke-test). Viewer Puppeteer : 3 entrées
+rendues (userdel / upgrade / reboot), filtre par contexte (delete_user → 1), 0
+erreur JS. (Les actions mutantes ne sont pas déclenchées en live contre le
+serveur de prod — instrumentation vérifiée par code + test du logger.)
+
+---
+
+## [1.30.0] - 2026-06-14 — Feature : workflow d'approbation 4-eyes
+
+Septième feature de la roadmap. Au-delà du step-up 2FA (qui protège contre le
+vol de session), impose une **double validation humaine** sur les actions les
+plus destructives : un second administrateur doit approuver avant exécution.
+
+### Modèle store-and-replay (migration 057 + `backend/approvals.py`)
+- Table `approval_requests` (action_type, machine_id, target, payload, status,
+  requested_by, approved_by, decision_reason, expires_at).
+- `gate(action, machine_id, target, payload, user)` :
+  1. 1re tentative → crée une demande `pending`, **n'exécute pas** (retour 202) ;
+  2. un 2e admin approuve ;
+  3. le demandeur rejoue → `gate` consomme l'approbation → l'action s'exécute.
+  Pas de doublon (retentative = même demande). TTL d'expiration des `pending`.
+- **Opt-in** (`APPROVAL_ENABLED=false` par défaut) pour ne pas bloquer un
+  déploiement mono-admin. Liste d'actions configurable (`APPROVAL_ACTIONS`).
+  **Fail-open** sur erreur BDD.
+
+### Règle 4-eyes (`routes/approvals.py`)
+- `GET /approvals`, `POST /approvals/<id>/approve|reject`, `/approvals/stats`.
+- **Un admin ne peut pas approuver sa propre demande** (`approved_by != requested_by`),
+  imposé côté backend (403) **et** UI (bouton désactivé sur ses propres demandes).
+- Décisions horodatées + tracées (A09).
+
+### Actions gatées
+`delete_remote_user` (ssh) et `reboot_server` (monitoring) appellent `gate()`
+après leurs validations ; hors approbation → HTTP **202** + `pending_approval`.
+D'autres actions peuvent opter via `APPROVAL_ACTIONS`.
+
+### Frontend (`/approvals/`) + divers
+- Page de revue : onglets (en attente / approuvées / rejetées / toutes), boutons
+  approuver/rejeter (motif), badge d'état. Rendu sans `onclick` interpolé.
+- Menu (Admin) + tooltips, whitelist `api_proxy.php` (`/approvals`, admin-only),
+  i18n fr+en, notification best-effort aux admins à la création d'une demande.
+
+### Vérifié
+gate() : created → pending (sans doublon) → approuvée → consommée → `executed`.
+4-eyes : auto-approbation refusée (403 backend + bouton désactivé UI),
+approbation d'un autre admin OK (200). Route : `reboot_server` → 202
+`pending_approval` (aucun reboot réel). 0 erreur JS (hors 403 attendu du test négatif).
+
+---
+
+## [1.29.0] - 2026-06-14 — Feature : fenêtres de maintenance / calendrier de changements
+
+Sixième feature de la roadmap. Encadre **quand** les actions mutantes peuvent
+s'exécuter, pour éviter les patchs/reboots en pleine production.
+
+### Modèle (migration 056 + `backend/maintenance.py`)
+- Table `maintenance_windows` : plages horaires hebdomadaires (scope `global` ou
+  `machine`, jours 0-6, `start_time`/`end_time`, `enabled`). Gère les fenêtres à
+  cheval sur minuit (start > end).
+- Helper `is_allowed(machine_id, role)` :
+  - **superadmin (role 3) → bypass** (urgence patch), journalisé ;
+  - aucune fenêtre active applicable → autorisé (défaut permissif) ;
+  - sinon → autorisé seulement dans une fenêtre. **Fail-open** sur erreur BDD.
+
+### Enforcement (actions mutantes gatées)
+Vérification insérée dans : `update_server` (full upgrade), `apply_security_updates`,
+`custom_update` (routes updates) et `reboot_server` (monitoring). Hors fenêtre →
+HTTP **423** + message clair. Les endpoints lecture seule (`dry_run_update`) et le
+callback cron (`update_security_exec`) ne sont **pas** gatés.
+
+### Routes & frontend
+- `routes/maintenance.py` : CRUD `/maintenance/windows` + `GET /maintenance/check`
+  (utilisé par le frontend pour prévenir avant une action).
+- Page `/maintenance/` : formulaire (scope, jours, horaires), liste avec badges de
+  jours et indicateur **Ouverte / Fermée / Désactivée** calculé client-side.
+  Rendu sans `onclick` interpolé → pas de DOM-XSS.
+- Menu (Admin) + tooltips (`nav.maintenance` / `nav.tip_maintenance`).
+- Whitelist `api_proxy.php` : `/maintenance/` autorisé, `/maintenance/windows`
+  admin-only (le `/check` reste accessible aux opérateurs).
+
+### OWASP / sécurité
+A01 `@require_role(2)` + `can_admin_portal` (CRUD), A03 jours/heures validés
+(regex HH:MM, jours 0-6) + requêtes paramétrées, A04 l'enforcement lui-même est
+un contrôle d'autorisation temporel.
+
+### Vérifié
+Logique : fenêtre fermée (admin) → bloqué `outside-window` ; ouverte → `in-window` ;
+superadmin → `superadmin-bypass` ; sans fenêtre → `no-window`. UI Puppeteer :
+création + listing + `/maintenance/check`, 0 erreur JS.
+
+---
+
+## [1.28.0] - 2026-06-14 — Feature : groupes de machines + actions de masse
+
+Cinquième feature de la roadmap. Permet de regrouper les serveurs et d'agir
+sur tout un groupe d'un coup, plutôt que machine par machine.
+
+### Groupes (backend `routes/groups.py` + migration 055)
+- **Groupes dynamiques** : règle de filtre sur les attributs de `machines`
+  (`environment`, `criticality`, `network_type`, `lifecycle_status`) + `tags`
+  (`machine_tags`). Résolution **live** — un serveur qui matche la règle entre
+  automatiquement dans le groupe (OR dans une catégorie, AND entre catégories).
+- **Groupes statiques** : liste de membres explicite (`machine_group_members`).
+- CRUD complet : `GET/POST /groups`, `PUT/DELETE /groups/<id>`,
+  `GET /groups/<id>/members` (résolution + détail).
+- Sécurité : filtres construits depuis une **whitelist** de colonnes + valeurs
+  enum validées (A03), 100 % paramétré ; `@require_role(2)` + `can_admin_portal`.
+
+### Actions de masse (`POST /groups/<id>/run`)
+- Lance une opération sur tous les membres résolus, **en arrière-plan**, chaque
+  machine étant tracée dans le **centre de tâches** (v1.25.0) :
+  - `drift_scan` — scan de dérive (rapide, sans SSH) ;
+  - `cve_scan` — scan CVE complet (réutilise tout le pipeline : SSH +
+    enrichissement EPSS/KEV + persistance, via le générateur de streaming drainé).
+- Réponse immédiate (`queued: N`) ; suivi dans `/tasks/`.
+
+### Frontend (`/groups/`)
+- Page de gestion : formulaire de création (dynamique avec cases à cocher par
+  catégorie / statique avec checklist de serveurs), cartes de groupes avec
+  compteur de membres, résumé de filtres, boutons « Voir membres / Scan dérive /
+  Scan CVE / Supprimer ». Rendu sans `onclick` interpolé (addEventListener +
+  `textContent`) → pas de DOM-XSS.
+- Entrée menu (section Admin) + whitelist `api_proxy.php` (`/groups`, admin-only).
+- i18n fr+en (`groups.*` + `js.groups.*` + `nav.groups`).
+
+### Vérifié (Puppeteer live)
+Groupe dynamique `environment=PROD` créé → 1 membre résolu (srv-zabbix) →
+« Voir membres » OK → « Scan dérive » → tâche `drift_scan` créée dans le centre
+de tâches. 0 erreur JS.
+
+---
+
+## [1.27.0] - 2026-06-14 — Feature : priorisation EPSS + CISA KEV des CVE
+
+Quatrième feature de la roadmap. Le CVSS mesure la *sévérité théorique* d'une
+CVE, pas la probabilité qu'elle soit réellement exploitée. Cette version enrichit
+chaque finding avec deux signaux d'exploitabilité gratuits et complémentaires
+pour **prioriser ce qu'il faut patcher en premier**.
+
+### Enrichissement (backend)
+- **EPSS** (FIRST.org) : probabilité d'exploitation à 30 jours (0..1), récupérée
+  par batch de 80 CVE, cache mémoire 24h.
+- **CISA KEV** : flag « activement exploitée in-the-wild », catalogue complet
+  chargé puis caché 24h.
+- Nouveau module `backend/cve_enrich.py` (`EPSSClient`, `KEVCatalog`,
+  `compute_priority`, `enrich_findings`) réutilisant le guard SSRF (`_safe_get`)
+  du scanner. **Best-effort** : API injoignable ⇒ le scan continue (priorisation
+  sur le CVSS seul), jamais d'échec de scan.
+- **Score de priorité consolidé** (0-100 + label `URGENT`/`HIGH`/`MEDIUM`/`LOW`) :
+  KEV ⇒ 100/URGENT ; sinon moyenne pondérée 50 % CVSS + 50 % EPSS. Une CVSS 9.8
+  jamais exploitée (EPSS 0.01) tombe sous une CVSS 6.5 activement exploitée.
+- Enrichissement intégré à `scan_server` (avant persistance) + tri par KEV puis
+  priorité. `_save_scan` + `get_last_scan_results` étendus aux 6 nouvelles colonnes.
+- Nouvelle route **`POST /cve_reprioritize`** : ré-enrichit les findings du dernier
+  scan **sans reconnexion SSH** (rapide) — cœur de la boucle de priorisation, à
+  rejouer quotidiennement pour capter les nouvelles entrées KEV/EPSS.
+
+### Boucle de remédiation patch
+La vérification post-patch est assurée par l'auto-résolution déjà en place : à
+chaque scan, les CVE non re-détectées passent en `resolved`. Le cycle complet =
+scan → priorisation EPSS/KEV → remédiation → re-scan de vérification.
+
+### Frontend (`/security/`)
+- Pastille rouge **KEV** + **EPSS %** (rouge si ≥ 50 %) dans la colonne sévérité,
+  centralisées via `sevCell(f)` (cohérent sur rendu/pagination/recherche/filtre).
+- Tri par défaut : KEV en tête, puis score de priorité décroissant.
+- Bouton de filtre **KEV** (si CVE exploitées) + bouton **↻ EPSS / KEV** (re-priorisation).
+- Rechargement auto des données enrichies après un scan live.
+
+### Migration / config / i18n
+- Migration **054** (idempotente) : `epss_score`, `epss_percentile`, `kev`,
+  `kev_date_added`, `priority_score`, `priority_label` + index `idx_cve_findings_kev`.
+- Config : `CVE_ENRICH_ENABLED`, `EPSS_API_URL`, `KEV_CATALOG_URL`,
+  `CVE_ENRICH_CACHE_TTL`, `KEV_CACHE_TTL` (+ `srv-docker.env.example`).
+- i18n fr+en (`js.cve_kev_*`, `js.cve_epss_*`, `js.cve_reprio_*`, `cve.epss_legend`).
+
+---
+
+## [1.26.0] - 2026-06-10 — Feature : score de posture de conformité consolidé (CIS-like)
+
+Troisième feature de la roadmap. Le rapport de conformité (`/security/compliance_report.php`)
+exportait déjà CSV + PDF (dompdf) ; cette version ajoute un **score de posture
+unique par serveur** agrégeant plusieurs signaux en une note A-F.
+
+### Score de posture (0-100 + lettre, par serveur)
+Calculé PHP-side à partir des données déjà en base :
+- base = score du dernier audit sshd (`ssh_audit_results`), ou 50 si jamais audité ;
+- −30 si CVE critique(s), −15 si CVE haute(s) (dernier scan) ;
+- −15 si fail2ban absent (`fail2ban_status`) ;
+- −10 par catégorie en dérive (`config_drift`, plafonné à −30).
+Note : A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, sinon F. Moyenne de flotte affichée.
+
+### Implémentation
+- Nouvelle section « Posture de conformité par serveur » (tableau trié par score
+  croissant + carte de moyenne) dans le rapport HTML.
+- Posture intégrée aux exports **CSV** et **PDF** existants.
+- Durcissement du PDF : purge des buffers de sortie avant `stream()` — un notice
+  PHP (mode debug) pouvait corrompre le binaire en le préfixant de `<br />…`.
+- i18n fr+en (`compliance.section_posture`, `posture_avg`, `th_score`, etc.).
+
+### Vérifié
+Page 200 + 0 erreur PHP/JS, section posture + moyenne affichées, export CSV
+(section POSTURE présente), export PDF binaire valide (`%PDF-`, stable sur 3 appels).
+
+---
+
+## [1.25.0] - 2026-06-10 — Feature : centre de tâches (suivi de l'activité de fond)
+
+Deuxième feature de la roadmap. Donne une visibilité opérationnelle sur les
+tâches de fond de la plateforme (scans CVE/SSH/drift, backups) avec
+statut/durée/historique — la base du « passage à l'échelle ».
+
+### Implémentation
+- Migration `053_tasks.sql` : table `tasks` (type, label, status
+  pending/running/success/error, machine_id, progress, detail, horodatages).
+- `backend/task_tracker.py` : helper autonome réutilisable — context manager
+  `with track(type, label, machine_id):` (success/error auto) + `create_task`/
+  `update_task`/`purge_old_tasks`. Best-effort (n'impacte jamais le job suivi),
+  SQL paramétré, noms de colonnes whitelistés.
+- Instrumentation du scheduler : scans CVE planifiés, audits SSH planifiés, scan
+  de dérive, backup (si activé) sont désormais tracés. Purge des tâches terminées
+  selon `LOG_RETENTION_DAYS`.
+- Blueprint `backend/routes/tasks.py` : `/tasks/list` (filtrable status/type,
+  paginé), `/tasks/stats` (compteurs 24h + en cours). `@require_role(2)`.
+- Frontend `www/tasks/` : tableau live (badges de statut, type, durée, détail),
+  cartes de résumé, filtre par statut, rafraîchissement auto (5s). Rendu sans
+  `onclick` interpolé (textContent → pas de DOM-XSS).
+- Menu (section Admin), i18n fr+en, whitelist + gate admin `api_proxy.php`.
+
+### Note
+Lecture seule pour l'instant (historique + statut live). Le **retry** et
+l'instrumentation des déploiements interactifs viendront dans une itération
+ultérieure (le helper `task_tracker` est prêt à être branché partout).
+
+### Vérifié
+Migration appliquée, backend clean, page 200 + 0 erreur PHP/JS, rendu des tâches
+(drift_scan réussie + tâche en échec avec détail), cartes de résumé, filtre.
+
+---
+
+## [1.24.0] - 2026-06-10 — Feature : détection de dérive de configuration (drift)
+
+Première feature de la roadmap produit post-audit. Détecte les écarts entre
+l'**état désiré** (géré par RootWarden) et l'**état réel** des serveurs, à partir
+des données déjà en base — **aucun nouvel appel SSH** (rapide, sans impact réseau).
+
+### Catégories évaluées (par machine)
+- **sudo** : nb de politiques désirées (`user_machine_access.sudo_preset` ≠ 'none')
+  vs nb réellement déployées et actives (`server_user_sudo_policies.enabled`).
+  Écart → « redéploiement requis ».
+- **sshd** : grade du dernier audit SSH (`ssh_audit_results`). C/D/F → dérive.
+- **fail2ban** : protection brute-force installée + active (`fail2ban_status`).
+
+### Implémentation
+- Migration `052_config_drift.sql` : table `config_drift` (upsert par
+  (machine_id, category), FK cascade, statut ok/drift/unknown + détail + horodatage).
+- Blueprint `backend/routes/drift.py` : `/drift/scan` (par machine), `/drift/scan_all`,
+  `/drift/results`. Gardé par `@require_role(2)` + `@require_permission('can_view_compliance')`,
+  requêtes 100 % paramétrées.
+- Scheduler : scan de dérive de toute la flotte une fois par heure (cycle de purge),
+  log si dérive détectée.
+- Frontend `www/drift/` : tableau par serveur (badges sudo/sshd/fail2ban), cartes de
+  résumé, boutons « Scanner tout » / « Re-scanner ». Rendu sans `onclick` interpolé
+  (addEventListener + textContent → pas de DOM-XSS).
+- Menu : entrée « Dérive de config » dans la section Conformité (`can_view_compliance`).
+- i18n fr+en (`lang/{fr,en}/drift.php`), whitelist + gate admin dans `api_proxy.php`.
+
+### Vérifié
+Migration appliquée, backend redémarre clean, page 200 + 0 erreur PHP/JS, scan_all
+fonctionnel (srv-zabbix : sudo OK, sshd non audité, fail2ban absent → dérive détectée).
+
+---
+
+## [1.23.3] - 2026-06-10 — Lot B : résiduel bas/moyen (fin de l'audit)
+
+Derniers findings (bas/moyens) + bugs fonctionnels. Vérifié : 18/18 pages, 8/8
+handlers, backend redémarre clean, login/profile OK.
+
+### A05 — Misconfiguration
+- **Mot de passe DB par défaut refusé hors debug** : `config.py` (backend) et
+  `db.php` (PHP) lèvent/refusent si `DB_PASSWORD` vaut `rootwarden_password`
+  (valeur triviale du dépôt) en mode non-debug.
+- **db.php** : charset `utf8` → `utf8mb4` ; le `$hint` (suggestion `down -v`) et
+  le message d'erreur SQL ne sont plus exposés qu'en `DEBUG_MODE`.
+- **Cookie `lang`** : ajout de `SameSite=Lax` (forme tableau de `setcookie`).
+- **`www/_ul`** : artefact (snapshot statique de la page login avec token CSRF en
+  dur, non référencé) supprimé + mount retiré de `docker-compose.prod.yml`.
+
+### A07 / A04 — Auth & Design
+- **`profile.php`** : sous `force_password_change`, les modifications d'email et de
+  clé SSH sont bloquées (seul le formulaire de mot de passe est traité) — avant,
+  un compte en changement forcé pouvait changer ces vecteurs de prise de contrôle
+  avant le mot de passe. (clé i18n `profile.must_change_password_first` fr+en)
+- **`forgot_password.php`** : le message de succès était placé DANS `if ($user)` →
+  un email inexistant n'affichait aucun message (énumération). Déplacé hors du if
+  + travail bcrypt factice pour égaliser le timing.
+- **`anonymize_user`** : step-up 2FA ajouté (action irréversible, comme `delete_user`).
+
+### A09 — Logging / fuite d'info
+- **Erreurs SQL génériques** côté client (détail en `error_log`) :
+  `toggle_sudo`, `toggle_user`, `delete_user`, `server_actions` (add/update/delete).
+- **PTY** : `execute_as_root_stream` ne se repose plus sur `replace(root_password)`
+  (échouait si l'écho était scindé sur une frontière de chunk → fuite partielle) ;
+  bufferisation jusqu'au premier `\n` pour jeter la ligne d'écho entière.
+
+### A01 — Access Control
+- **Notifications broadcast** (`user_id=0`) : un simple utilisateur ne peut plus
+  les supprimer (réservé aux admins) — avant, le `OR user_id = 0` le permettait.
+- **`openapi.php`** : aligné sur `docs.php` (superadmin uniquement ; la spec révèle
+  toutes les routes).
+
+### Bug fonctionnel
+- **`server_id` validé comme port (1-65535)** : un serveur d'id > 65535 ne pouvait
+  plus être édité/supprimé. Ajout d'un type de validation `id` (entier positif sans
+  borne haute) dans `server_actions.php` et `manage_servers.php`.
+
+### Note
+- GeoIP (`fail2ban_manager`) reste en HTTP : ip-api.com en tier gratuit n'autorise
+  que HTTP (HTTPS = payant) ; l'IP envoyée est déjà publique. Documenté.
+
+---
+
+## [1.23.2] - 2026-06-10 — Lot #2 : IDOR + cohérence d'accès (suite audit)
+
+Findings de contrôle d'accès restants. Vérifié : 18/18 pages, 8/8 handlers,
+fix CSRF iptables confirmé (load_from_db → 200 au lieu de 403), backend clean.
+
+### A01 — Broken Access Control
+- **IDOR iptables** : [iptables/index.php](www/iptables/index.php) — les handlers
+  `load_from_db`/`save_to_db`/`restore` prenaient `$_POST['server_id']` sans
+  revérifier l'accès (le dropdown était filtré, pas les handlers) → un role-1 avec
+  `can_manage_iptables` pouvait lire/écrire/restaurer les règles de **n'importe
+  quelle machine**. Revalidation `user_machine_access` ajoutée (admins exemptés).
+- **IDOR supervision** : `require_role(2)` ajouté sur `machine_profile`,
+  `zabbix/version` et `<platform>/version` (les autres routes supervision
+  l'avaient déjà ; `require_machine_access` est un no-op sur le `mid` d'URL).
+- **Exposition de colonnes** : `update/functions/filter.php` ne sélectionne plus
+  `SELECT *` (qui renvoyait `password`/`root_password` chiffrés au navigateur) mais
+  des colonnes explicites ; `checkPermission('can_update_linux')` ajouté sur
+  `filter_servers.php` et `list_machines.php`.
+- **Policy ↔ machine** : `_get_username_from_server_user_id` exige désormais que
+  le `server_user_id` appartienne au `machine_id` ciblé (avant : résolution sans
+  contrôle → déploiement possible d'un sudoers pour un user d'une autre machine).
+
+### A03 — Injection
+- `scheduler.py` : `shlex.quote` sur `home` (lu dans `/etc/passwd` distant) dans
+  le scan hebdomadaire des clés (`cat {home}/.ssh/...`) — dernier site oublié.
+
+### Bug fonctionnel
+- **iptables « Sauvegarder/Charger BDD »** : les boutons `fetch("index.php")`
+  n'envoyaient pas le token CSRF (le wrapper utils.js ne l'injecte que vers
+  api_proxy.php) → 403 systématique. Token `csrf_token` ajouté au body.
+
+### Note de conception (non modifié)
+- Les routes mutantes *par-machine* (fail2ban ban/restart, services start/stop,
+  iptables apply) restent gardées par `@require_machine_access` seul : un role=1
+  inscrit dans `user_machine_access` est considéré **opérateur de ses machines**.
+  Les actions *flotte entière* (`ban_all_servers`, `install_all`) exigent role 2.
+  Modèle cohérent conservé ; à durcir en `require_role(2)` si role=1 doit être
+  lecteur seul (décision de gouvernance).
+
+---
+
+## [1.23.1] - 2026-06-10 — Durcissement défense-en-profondeur (suite audit)
+
+Traitement des findings restants (moyens/bas) de l'audit v1.23.0, plus hygiène.
+Aucune escalade ; robustesse + défense en profondeur. Vérifié : 18/18 pages,
+8/8 handlers, backend redémarre clean, bandit clean.
+
+### Robustesse / fiabilité
+- **Fuites de connexions MySQL** : `_resolve_ssh_creds` de `fail2ban.py`,
+  `iptables.py`, `services.py`, `ssh_audit.py` passées en `with get_db_connection()`
+  (la connexion fuyait sur exception → épuisement progressif du pool).
+- **Flux SSE bornés** : `iptables_logs` et `stream_update_logs` avaient un
+  `while True` sans fin → un thread/contexte mobilisé indéfiniment par connexion.
+  Ajout d'une borne (10 min) + heartbeat (`: ping`) qui détecte la déconnexion client.
+- **Robustesse des entrées** : `get_json(silent=True)` (iptables, pas de 500 sur
+  body non-JSON), casts de ports bornés (wazuh), `int(hours)`/`value` gardés (admin).
+
+### Sécurité (défense en profondeur)
+- **`configure_servers` (déjà v1.23.0) + `bashrc.py`** : `home` (lu dans le
+  `/etc/passwd` distant) validé par regex `^/[A-Za-z0-9._/-]+$` avant toute
+  interpolation shell dans `_inspect_bashrc`/`_read_remote_bashrc`/`deploy`/backups
+  (le seul `restore()` était déjà `shlex.quote`).
+- **Presets sudo durcis** : `read_logs` retire `less` (permettait `!sh` = shell
+  root) au profit de `cat`/`tail` (pas d'évasion) et force `journalctl --no-pager` ;
+  `apt_only` documenté explicitement comme **équivalent root** (apt exécute des
+  scripts mainteneur — pas de moyen sûr de « limiter à apt »).
+- **Déchiffreur legacy supprimé** : `ssh_utils.decrypt_password` (~360 lignes
+  d'heuristique best-effort) retirée définitivement ; tout passe par
+  `encryption.decrypt_password` (AES-GCM AEAD).
+
+### Bug fonctionnel
+- **`update_security_exec`** : le callback cron renvoyait toujours 401 (ni clé
+  API ni session role possible depuis un cron) → le suivi « dernière MAJ sécu »
+  restait faux. Authentification machine-to-machine par **token HMAC** signé avec
+  `SECRET_KEY` et borné au `machine_id` (header `X-Update-Token`, comparé en
+  constant-time). Conserve la protection A01-NEW-01 (un user role=1 ne peut pas
+  forger le token).
+
+### Hygiène
+- Secret TOTP dev retiré des fichiers e2e trackés (`go-policies.mjs`,
+  `go-policies-visual.mjs`, `go-access-sudo-visual.mjs`, `helpers.mjs`) → lu via
+  `E2E_TOTP_SECRET` uniquement (le base32 n'était pas détecté par gitleaks).
+
+---
+
+## [1.23.0] - 2026-06-10 — Audit sécurité de bout en bout + remédiations OWASP Top 10
+
+Audit complet du code (backend Flask, frontend PHP, JS, infra Docker/CI) suivi
+de la remédiation de l'ensemble des findings. Les escalades de privilège
+identifiées étaient exploitables de bout en bout (proxy → backend) ; les autres
+relèvent du durcissement défense-en-profondeur, de la robustesse et de bugs
+fonctionnels. Tous les correctifs portent un commentaire `Patch <Axx>` au point
+de modification.
+
+### A01 — Broken Access Control (escalades corrigées)
+- `routes/helpers.py::require_machine_access` : lisait uniquement `machine_id`
+  /`server_id` (singulier) → **no-op** sur les routes à paramètre `machine_ids`
+  (pluriel). Désormais collecte aussi `machine_ids`/`server_ids` (listes) et
+  **fail-closed** si un id n'est pas autorisé.
+- `routes/ssh.py` : ajout de `@require_role(2)` sur `deploy_platform_key`,
+  `deploy_service_account` (déploiement compte root `NOPASSWD:ALL`),
+  `remove_ssh_password`, `reenter_ssh_password`, `scan_server_users`,
+  `remove_user_keys`, `delete_remote_user` — qui n'avaient aucun contrôle de rôle.
+- `adm/includes/manage_users.php` + `import_csv.php` : un admin (role 2) pouvait
+  créer un compte **superadmin** (role_id=3 accepté sans contrôle hiérarchique)
+  puis prendre le contrôle via le magic-link. Désormais un créateur non-superadmin
+  ne peut créer/assigner qu'un rôle **strictement inférieur** au sien. Un toast
+  d'avertissement informe l'admin quand le rôle est ramené à « Utilisateur »
+  (plus de clamp silencieux ; clés i18n `users.role_downgraded` fr+en).
+- `adm/includes/manage_roles.php::change_role` : autorisait l'égalité de rôle
+  (admin → admin) ; passé à strictement inférieur (superadmin excepté).
+- `adm/api/update_server_access.php` (`update_sudo`) : aucune garde de rôle/anti-self
+  → un admin posait `all_nopasswd` (root distant) sur tout user ; désormais
+  **superadmin-only** (cohérent avec l'UI).
+- `api_proxy.php` : gate de rôle défense-en-profondeur sur les préfixes admin
+  (`/deploy_service_account`, `/policy/`, `/admin/`, …) en plus du backend.
+- `routes/cve.py::cve_compare` : IDOR — les `scan1`/`scan2` fournis n'étaient pas
+  liés au `machine_id` autorisé ; vérification d'appartenance ajoutée.
+- `routes/helpers.py::_validate_api_key_from_db` : **fail-open** sur scope d'API
+  key corrompu/non-liste (le commentaire promettait "denied", le code accordait) ;
+  désormais fail-closed.
+
+### A02 — Cryptographic Failures
+- `routes/helpers.py` + `server_checks.py` : **retrait** du fallback déchiffreur
+  legacy `ssh_utils.decrypt_password` (heuristique best-effort qui annulait la
+  garantie d'intégrité AES-GCM/anti-padding-oracle) ; fail-closed sur échec.
+- `encryption.py` : la boucle de déchiffrement GCM essaie désormais aussi la clé
+  dérivée de `OLD_SECRET_KEY` (rotation) — évitait de retomber sur le fallback.
+- `mail_utils.py` : STARTTLS/SMTPS avec contexte TLS vérifiant (chaîne+hostname) ;
+  sans contexte, un MITM capturait les credentials SMTP.
+- `includes/totp_crypto.php` : fallback non-sodium passé d'AES-256-**CBC** (non
+  authentifié) à AES-256-**GCM** (AEAD) ; lecture rétrocompatible des anciens
+  blobs `totp:aes:`.
+- `adm/server_user_policies.php` : suppression de la clé API backend exposée en
+  clair dans le DOM (`const API_KEY`).
+
+### A03 — Injection / XSS
+- DOM-XSS : helper `escJsAttr()` (hex-échappement) introduit dans 7 modules JS
+  (`services`, `fail2ban`, `ssh-audit`, `bashrc`, `graylog`, `wazuh`,
+  `supervision/profiles`). `escAttr` (entités HTML) dans un `onclick` était
+  contournable : le parseur décode `&#39;` en `'` avant compilation JS → breakout.
+- `json_encode` en contexte `<script>` : ajout des flags
+  `JSON_HEX_TAG|APOS|QUOT|AMP` (`head.php`, `ssh/index.php`, `ssh-audit/index.php`).
+- `notifications.php` : href de notification restreint aux chemins internes
+  (bloque `javascript:`), aligné sur `menu.php`.
+- `mail_utils.py` : `html.escape()` sur toutes les valeurs interpolées dans le
+  rapport CVE + neutralisation d'injection d'en-tête SMTP (CR/LF dans le sujet).
+- `configure_servers.py` : validation `_USERNAME_RE` (regex stricte) ajoutée sur
+  `configure_user`/`deploy_user_config`/`manage_ssh_keys`/`add_to_sudoers`/
+  `remove_from_sudoers`/`user_exists` — seul module sans cette défense.
+
+### A04 — Insecure Design
+- `api_proxy.php` : le check step-up 2FA utilisait une résolution de chemin
+  divergente du forwarding (préfixe `api_proxy.php` non retiré) → step-up
+  contournable si `PATH_INFO` absent. Chemin canonique calculé une seule fois.
+
+### A07 — Authentication Failures
+- `auth/reset_password.php` + `profile.php` : invalidation des `active_sessions`
+  et `remember_tokens` après changement/reset de mot de passe (un attaquant gardait
+  sa session après reset).
+- `auth/login.php` : anti-énumération par timing (coût bcrypt équivalent brûlé
+  pour les comptes inexistants) + re-hash bcrypt transparent si coût obsolète.
+- `auth/step_up_verify.php` : anti-rejeu TOTP (le step-up n'en avait aucun).
+- `auth/verify_2fa.php` : une 2FA réussie était comptée comme échec dans le
+  rate-limit IP (DoS de comptes légitimes) ; double incrément du compteur session
+  corrigé.
+
+### A08 / A09 / A10
+- A10 SSRF : `cve_scanner.py` et `webhooks.py` suivaient les redirections sans
+  re-valider la cible → helper `_safe_get` (redirections désactivées + re-validation
+  de chaque saut) ; webhooks `generic` signés HMAC-SHA256 (`WEBHOOK_SECRET`).
+- A08 CI : bloc `permissions: contents: read` global (least-privilege GITHUB_TOKEN).
+- A09 : messages d'erreur SQL génériques côté client (`policies.py`), détail en log.
+
+### Bugs fonctionnels
+- `scheduler.py` : les **audits SSH planifiés ne s'exécutaient jamais** (bloc dans
+  une fonction `_scheduler_loop` jamais appelée) ; fusionné dans la boucle active
+  + fuite de connexion MySQL corrigée (close en `finally`). Fonction morte supprimée.
+- `adm/health_check.php` : la page diagnostic déclenchait des **actions
+  destructives sur un serveur de prod** au chargement (stop cron, réécriture
+  sshd_config, dpkg_repair…) ; routes mutantes basculées sur `machine_id=0` (no-op).
+- `index.php` : carte « remédiations » lisait `$remStats` avant sa définition
+  (toujours 0) + précédence d'opérateur `?? 0 > 0` corrigée.
+- `db_backup.py` : écriture atomique (`.tmp`→rename) + sidecar `.sha256` (un dump
+  tronqué par exception n'est plus pris pour un backup valide).
+
+### Infra / déploiement
+- `docker-compose.prod.yml` : retrait de `user:"1000:1000"` (incompatible avec
+  `useradd -r` + `gosu` → crashloop backend en prod).
+- `php/install.sh` : flag `.installed` et credentials écrits dans un volume
+  persistant writable (`/var/www/sessions`) au lieu de `/var/www/html` (read_only)
+  → évitait un crashloop et la régénération du mot de passe superadmin à chaque boot.
+  Compat du flag legacy conservée.
+- `backend/entrypoint.sh` : hypercorn lancé via `-c hypercorn_config.py`
+  (`workers=4` était ignoré, 1 seul worker en prod).
+- `.gitignore` : exclusion des scripts e2e `*-pentest.mjs` (credentials de test en dur).
+
+### Limitations connues (non corrigées dans cette release)
+- **CSP** : la politique réelle conserve `script-src 'unsafe-inline'` sans nonce.
+  La migration (nonce sur chaque `<script>` inline + retrait de `'unsafe-inline'`)
+  nécessite un test navigateur complet pour ne pas casser l'UI → à planifier.
+  Commentaire trompeur de `csp_nonce.php` corrigé pour refléter l'état réel.
+- **Vérification de clé d'hôte SSH** (`AutoAddPolicy`) : laissée en l'état
+  (changer pour `RejectPolicy` sans flux d'enrôlement TOFU casserait tout SSH) —
+  décision de design à trancher.
+- **CI/images** : SHA-pinning des actions GitHub et digest-pinning des images de
+  base recommandés (nécessitent une résolution réseau, non faite ici).
+
+---
+
+## [1.22.2] - 2026-05-31 — Pattern desired/actual state + UI grossie
+
+### Architecture : resolution de la double source de verite
+
+Feedback user 2026-05-31 apres v1.22.1 : "maintenant dit moi si c'est logique pour toi?".
+Audit honnete : la v1.22.1 introduisait une double source de verite entre
+`user_machine_access.sudo_preset` (configure depuis admin) et `server_user_sudo_policies`
+(ecrit par la page server_user_policies.php) **sans pont entre les deux**.
+
+**Resolution : pattern desired/actual state (infra-as-code classique)**
+
+| Table | Role | Qui ecrit |
+|---|---|---|
+| `user_machine_access.sudo_preset` | **Desired state** (intention admin) | Dropdown onglet Acces |
+| `server_user_sudo_policies` | **Actual state** (etat reel deploye) | configure_servers.py au deploy |
+| `policy_deployments` | **Audit trail** | configure_servers.py au deploy |
+
+#### Implementation
+- `backend/ssh_utils.py::load_data_from_db()` : enrichi pour charger
+  `sudo_preset/nopasswd/runas/custom_rules` depuis `user_machine_access`. Le dict
+  user retourne maintenant `sudo_policies = { machine_id: {preset, nopasswd, runas, custom_rules} }`.
+- `backend/configure_servers.py::add_to_sudoers()` : refactor pour accepter un
+  `policy` dict. Rendu via `sudo_manager.render_policy()` + visudo -cf avant mv
+  atomique (compatible canal SSH root via `execute_command_as_root`). Fallback
+  historique NOPASSWD ALL si pas de policy fournie (retrocompat bool `users.sudo`).
+- `configure_users()` : lit `user.sudo_policies.get(machine_id)` pour la machine
+  en cours. Priorite : preset configure > bool legacy `users.sudo` > rien.
+
+#### Comportement effectif
+- Configurer dropdown 'apt_only' dans onglet Acces -> au prochain deploy SSH,
+  le sudoers cible contient les bonnes lignes (visudo valide).
+- Configurer 'none' -> le fichier sudoers est supprime au prochain deploy.
+- Aucun preset configure + `users.sudo=1` (legacy) -> NOPASSWD ALL comme v1.21.x.
+
+### Fix UX : interface grossie
+Feedback user "je trouve ca petit pour info..." apres review v1.22.1 :
+- Layout serveurs : `flex-wrap` horizontal -> `flex-col` vertical (1 serveur par ligne)
+- Texte general : `text-[10px]` -> `text-xs` / `text-sm`
+- Bloc sudo dropdown : conteneur avec bg + border + padding + icone cadenas
+- Select sudo : `min-w-[220px]` au lieu de tres etroit
+- Checkbox NOPASSWD : `h-4 w-4` + label gras (au lieu de h-3 w-3)
+- Lien 'Avance' : avec icone fleche + push a droite (`ml-auto`)
+- Badge sudo sur toggle serveur : `rounded-full` + `font-semibold`
+
+---
+
+## [1.22.1] - 2026-05-31 — Sudo par (user x serveur) integre dans onglet Acces
+
+### Feat : choix du preset sudo lors de l'attribution serveur
+
+Suite a la review v1.22.0 : la page `/adm/server_user_policies.php` etait separee du flow d'ajout. Demande user : "c'est la que j'attend les modif sudo" (= a cote du toggle d'attribution serveur).
+
+#### Couche BDD (migration 051)
+- `user_machine_access` enrichie : `sudo_preset`, `sudo_nopasswd`, `sudo_runas`, `sudo_custom_rules`
+- Migration de compat auto : `users.sudo=1` -> `sudo_preset='all_nopasswd' + nopasswd=TRUE` sur toutes les attributions des users concernes (preserve le comportement existant)
+- Le bool `users.sudo` reste pour retrocompat (deprecie mais non drop)
+
+#### UI (admin_page.php -> onglet Acces & Permissions)
+- Sous chaque toggle serveur attribue, dropdown inline preset sudo (7 valeurs : none / apt_only / restart_services / read_logs / systemctl_specific / all_nopasswd / custom) + checkbox NOPASSWD
+- Badge couleur sur le toggle (rouge si all_nopasswd, ambre si custom, violet si autre)
+- Lien "Avance →" qui ouvre `server_user_policies.php?server=X` pre-rempli pour les cas custom_rules, SFTP, audit, historique
+- Visible uniquement pour superadmin (role_id=3)
+- Toast feedback sur changement de preset
+
+#### Endpoint backend
+- `www/adm/api/update_server_access.php` : nouvelle action `update_sudo` qui accepte `{user_id, machine_id, sudo_preset, sudo_nopasswd, sudo_runas}`. Whitelist preset cote serveur + regex runas. UPDATE conditionnel sur ligne existante (refuse si l'access n'a pas ete cree d'abord). Audit_log trace.
+
+#### TODO (commit separe)
+- `backend/configure_servers.py` doit lire `user_machine_access.sudo_preset` au moment du deploy SSH et invoquer `sudo_manager.deploy_policy()` au lieu de l'actuel `echo '<user> ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/...`. Pour l'instant les modifications du preset sont stockees mais pas encore propagees au prochain deploy.
+
+#### Audit OWASP
+- A01 : `@checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` + dropdown visible superadmin only ; anti self-grant deja en place (patch A01-04)
+- A03 : whitelist preset + regex runas `[a-z_][a-z0-9_-]{0,31}`
+- A09 : audit_log via helper existant
+
+---
+
+## [1.22.0] - 2026-05-31 — Politiques sudo + SFTP par utilisateur distant
+
+### Hardening complementaire (audit OWASP renforce)
+- **Step-up 2FA** (A07) sur `/policy/(sudo|sftp)/(deploy|remove)` et `/policy/rollback` via `api_proxy.php`. Reuse du modal global `rwOpenStepUpModal()` deja en place (utils.js). Action `policy_action` valide 15 min.
+- **Audit log chain HMAC** (A09) : helper `_audit_log()` dans `routes/policies.py` integre dans 5 actions critiques. Scrub auto si details > 200 chars (SHA-256 fingerprint sans leak des sudoers custom).
+- **Whitelist proxy** corrigee : ajout `/policy/` dans `$ALLOWED_PROXY_PREFIXES` de `api_proxy.php` (etait oubliee - aurait bloque toutes les routes en prod).
+- **Documentation API** : 9 routes ajoutees dans `openapi.yaml` (schemas, responses 200/400/403/404, tag Policies).
+- **Diagnostic backend** : 2 entrees dans `/adm/health_check.php` (policy/list + policy/deployments).
+- **Tests E2E Puppeteer** : `tests/e2e/go-policies.mjs` couvre 17 assertions : login + 2FA + CGU, acces page, 3 onglets, 6 presets, lecture backend, step-up 2FA effectif, historique, lien sidebar superadmin only.
+
+### Feat majeure : administration fine des droits sudo et acces SFTP/SSH
+
+Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de configurer, pour chaque (machine, server_user_inventory.id), une politique sudo et/ou une politique SFTP/SSH, deployees via SSH puis enregistrees dans un historique pour rollback 1-clic.
+
+#### Couche BDD (migrations 048-050)
+- `server_user_sudo_policies` : 5 presets metier + custom, nopasswd, runas, enabled
+- `server_user_sftp_policies` : sftp_only/chroot/working/forwardings/x11
+- `policy_deployments` : historique avec policy_snapshot JSON + previous_file_content pour rollback
+
+#### Couche backend Python
+- `backend/sudo_manager.py` : 5 renderers de preset + custom (visudo -cf au deploy)
+- `backend/sftp_manager.py` : rendu du Match User block + sshd -t + reload sshd
+- `backend/routes/policies.py` : Blueprint Flask avec 9 routes :
+  - `POST /policy/sudo/deploy` `audit` `remove`
+  - `POST /policy/sftp/deploy` `audit` `remove`
+  - `POST /policy/rollback` (avec verification machine_id == deployment.machine_id)
+  - `GET  /policy/deployments` (historique pagine, limit 50)
+  - `GET  /policy/list` (toutes les politiques configurees, filtre par machine_id)
+
+#### Couche UI
+- `www/adm/server_user_policies.php` : 3 onglets (Sudo / SFTP / Historique)
+- Sudo : dropdown 6 presets + textarea custom + liste services + nopasswd + runas
+- SFTP : sftp_only, chroot_dir, working_dir, 4 toggles forwardings/x11
+- Historique : liste deploiements avec status badge + bouton "Restaurer cette version"
+- Audit cote serveur : bouton "Auditer" lit le fichier reel sur la machine
+- Confirmation systematique avant remove ou rollback
+- Lien sidebar (visible superadmin uniquement)
+
+#### Defense en profondeur (audit OWASP Top 10)
+- **A01** Broken Access Control : `@require_role(3)` (superadmin) sur les 9 routes backend ET `checkAuth([ROLE_SUPERADMIN])` sur la page PHP. Verification machine_id sur le rollback (un rollback cross-machine est refuse).
+- **A02** Crypto : aucun nouveau hash/secret, pas de regression.
+- **A03** Injection : managers valident username `[a-z_][a-z0-9_-]{0,31}`, path absolu sans `..`, services regex `[A-Za-z0-9@._-]+`. Heredoc avec marker aleatoire pour eviter collision avec contenu. SQL via prepared statements.
+- **A04** Insecure Design : validation `visudo -cf` (sudoers) et `sshd -t` (sshd_config) SYSTEMATIQUE avant `mv` atomique. Backup en place `.rwbak` avant `systemctl reload sshd`. Si reload echoue, le backup est restaure automatiquement - evite de couper SSH du serveur cible.
+- **A05** Misconfig : chemins cibles figes (`/etc/sudoers.d/rootwarden-*`, `/etc/ssh/sshd_config.d/rootwarden-*.conf`). chmod 0440 (sudoers) / 0644 (sshd) + chown root:root. Conforme conventions OpenSSH/visudo.
+- **A09** Logging : table `policy_deployments` = trail audit complet (policy_snapshot JSON, contenu avant/apres, validation_output, actor user_id, timestamps). 4 statuts : applied / rolled_back / failed / superseded.
+
+#### Internationalisation
+- Parite FR + EN : `www/lang/fr/policies.php` + `www/lang/en/policies.php` (50+ cles)
+- Tous les hints presets, warnings securite, status badges, confirmations en 2 langues
+
+---
+
 ## [1.21.9] - 2026-05-27 — Durcissement toggle visibilite mdp (anti shoulder-surfing)
 
 ### Fix securite (defense en profondeur) : auto-hide du toggle 👁

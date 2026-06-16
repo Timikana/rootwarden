@@ -37,6 +37,7 @@ return [
     'profile.confirm_revoke_all_others' => 'Sign out all other sessions (computers, mobile, other browsers)? Current session will be kept.',
     'profile.all_others_revoked' => ':count other session(s) revoked.',
     'profile.error_email_format' => 'Invalid email format.',
+    'profile.must_change_password_first' => 'You must change your password before making any other change.',
     'profile.error_ssh_format' => 'Invalid SSH key format.',
     'profile.error_ssh_update' => 'Error updating SSH key.',
     'profile.error_wrong_password' => 'Current password is incorrect.',

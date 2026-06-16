@@ -139,7 +139,18 @@ function escapeHtml(s) {
     }[c]));
 }
 
-function escapeAttr(s) { return String(s || '').replace(/'/g, "\\'"); }
+// Patch A03 (DOM-XSS) : avant, escapeAttr n'echappait QUE la simple quote
+// (pas les guillemets doubles, ni < > &) alors que l'attribut onclick est
+// delimite par des guillemets doubles -> un nom de profil contenant " injectait
+// un attribut (ex. onmouseover). On hex-echappe desormais tout caractere non
+// alphanumerique : sortie sans quote/&/</> litteral, decodee en data inerte par JS.
+function escapeAttr(s) {
+    return String(s == null ? '' : s).replace(/[^a-zA-Z0-9_.\-]/g, function (c) {
+        var n = c.charCodeAt(0);
+        return n < 256 ? '\\x' + n.toString(16).padStart(2, '0')
+                       : '\\u' + n.toString(16).padStart(4, '0');
+    });
+}
 
 // Hook onglet profiles : charge a l'activation
 document.addEventListener('DOMContentLoaded', () => {

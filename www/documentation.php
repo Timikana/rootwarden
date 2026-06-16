@@ -680,6 +680,18 @@ APRES :  RootWarden --[keypair Ed25519]--> Serveur (zero password en transit)
                     <li><strong>Déduplication</strong> - Les paquets multiarch (ex: libc6:amd64 + libc6:i386) ne sont scannés qu'une fois</li>
                 </ul>
 
+                <h3 class="font-semibold mt-3 mb-2">Priorisation EPSS + CISA KEV (v1.27.0)</h3>
+                <p class="text-sm mb-2">Le CVSS mesure la sévérité théorique, pas la probabilité réelle d'exploitation.
+                Chaque finding est enrichi (best-effort, gratuit, sans clé) avec :</p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>EPSS</strong> (<a href="https://www.first.org/epss/" target="_blank" class="text-blue-500 hover:underline">FIRST.org</a>) - probabilité d'exploitation à 30 jours (0-100 %, badge rouge si ≥ 50 %)</li>
+                    <li><strong>CISA KEV</strong> - pastille rouge <code>KEV</code> si la CVE est <em>activement exploitée in-the-wild</em></li>
+                    <li><strong>Score de priorité</strong> (0-100) : KEV ⇒ 100/URGENT ; sinon 50 % CVSS + 50 % EPSS. Le tri remonte les CVE réellement dangereuses avant les CVSS élevés jamais exploités.</li>
+                    <li><strong>Filtre KEV</strong> + bouton <code>↻ EPSS / KEV</code> (<code>POST /cve_reprioritize</code>) : ré-enrichit le dernier scan <em>sans reconnexion SSH</em>, à rejouer quotidiennement.</li>
+                </ul>
+                <p class="text-sm mb-3">Config : <code>CVE_ENRICH_ENABLED</code>, <code>EPSS_API_URL</code>, <code>KEV_CATALOG_URL</code>,
+                <code>CVE_ENRICH_CACHE_TTL</code>, <code>KEV_CACHE_TTL</code>.</p>
+
                 <h3 class="font-semibold mt-3 mb-2">Accès</h3>
                 <p class="text-sm">Page : <code>/security/</code> · Permission : <code>can_scan_cve</code> (ou superadmin)<br>
                 Les utilisateurs de rôle <em>user</em> ne voient que leurs serveurs assignés dans <code>user_machine_access</code>.</p>
@@ -883,6 +895,379 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                         </ul>
                     </li>
                 </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Politiques sudo + SFTP par utilisateur -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="per-user-policies" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Politiques sudo / SFTP par utilisateur</h2>
+                <p class="text-sm mb-3">
+                    Depuis v1.22.0, RootWarden permet de configurer finement les droits sudo et les acces SFTP/SSH de chaque
+                    compte Linux sur chaque serveur gere. <strong>Superadmin uniquement</strong>.
+                </p>
+                <p class="text-sm mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <strong>v1.36.0</strong> : la gestion a ete <strong>separee en deux pages distinctes</strong>, avec une
+                    explication en clair de chaque option (pour les non-experts) :
+                    <code>/adm/server_user_sudo.php</code> (droits sudo) et <code>/adm/server_user_sftp.php</code> (acces SFTP/SSH).
+                    L'ancienne URL <code>/adm/server_user_policies.php</code> redirige vers la page sudo.
+                </p>
+                <h3 class="font-semibold mb-2">Architecture</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>3 tables BDD</strong> (migrations 048-050) : <code>server_user_sudo_policies</code>, <code>server_user_sftp_policies</code>, <code>policy_deployments</code> (historique pour rollback).</li>
+                    <li><strong>2 modules backend</strong> : <code>backend/sudo_manager.py</code> et <code>backend/sftp_manager.py</code>. Pattern identique aux managers existants (fail2ban, iptables, services).</li>
+                    <li><strong>1 Blueprint Flask</strong> : <code>backend/routes/policies.py</code> avec 9 routes (deploy/audit/remove pour chaque type + rollback + listing).</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Presets sudo (5 + custom)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>all_nopasswd</code> : ALL=(ALL) NOPASSWD:ALL - reserve aux comptes de service automatises</li>
+                    <li><code>restart_services</code> : systemctl restart/reload/status * (tous services)</li>
+                    <li><code>apt_only</code> : apt update/upgrade/install (apt et apt-get)</li>
+                    <li><code>read_logs</code> : tail /var/log/*, less /var/log/*, journalctl</li>
+                    <li><code>systemctl_specific</code> : liste blanche de services autorises (saisie par admin)</li>
+                    <li><code>custom</code> : lignes sudoers brutes, validee par visudo -cf cote serveur</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Politique SFTP / SSH (Match User block)</h3>
+                <p class="text-sm mb-2">Genere un fichier <code>/etc/ssh/sshd_config.d/rootwarden-&lt;user&gt;.conf</code> avec :</p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><code>ForceCommand internal-sftp -d &lt;dir&gt;</code> si sftp_only actif</li>
+                    <li><code>ChrootDirectory</code> (admin renseigne, dossier doit exister et etre owned par root)</li>
+                    <li><code>PasswordAuthentication</code>, <code>AllowTcpForwarding</code>, <code>AllowAgentForwarding</code>, <code>X11Forwarding</code> par user</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Defense en profondeur</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>visudo -cf</strong> systematique avant <code>mv</code> sur sudoers - politique invalide refusee, sudo reste intact</li>
+                    <li><strong>sshd -t</strong> systematique avant <code>systemctl reload sshd</code> - sshd cassé = SSH coupé au reboot, c\'est critique</li>
+                    <li><strong>Backup en place</strong> (<code>.rwbak</code>) avant modification : si reload echoue, restauration automatique</li>
+                    <li><strong>Username regex strict</strong> <code>[a-z_][a-z0-9_-]{0,31}</code> bloque injection cote managers</li>
+                    <li><strong>Path validation</strong> sur chroot/working_dir : chemin absolu, pas de <code>..</code> dans les segments</li>
+                </ul>
+                <h3 class="font-semibold mb-2">Rollback 1-clic</h3>
+                <p class="text-sm mb-3">
+                    Chaque deploiement sauvegarde le contenu precedent dans <code>policy_deployments.previous_file_content</code>.
+                    Depuis l\'onglet <em>Historique</em>, un bouton <em>Restaurer cette version</em> rejoue le contenu d\'origine
+                    (avec re-validation visudo/sshd -t). Le rollback est trace : <code>rolled_back_by</code>, <code>rolled_back_at</code>,
+                    <code>rollback_reason</code> sont remplis.
+                </p>
+                <h3 class="font-semibold mb-2">Securite (audit OWASP)</h3>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>A01</strong> : <code>@require_role(3)</code> sur les 9 routes - admin classique n\'a pas acces</li>
+                    <li><strong>A03</strong> : tous les inputs valides cote manager (username regex, path regex, services regex), aucun input direct dans la commande shell</li>
+                    <li><strong>A04</strong> : sequence de deploy = validation AVANT mv, rollback auto si echec - protege contre la chaine "deploy puis casse"</li>
+                    <li><strong>A09</strong> : <code>policy_deployments</code> = trail audit complet avec actor, snapshot JSON, contenu avant/apres, status</li>
+                </ul>
+                <p class="text-xs text-gray-500 mt-2">Code : <code>backend/sudo_manager.py</code>, <code>backend/sftp_manager.py</code>, <code>backend/routes/policies.py</code>, <code>www/adm/server_user_sudo.php</code> + <code>server_user_sftp.php</code> (JS partage <code>www/adm/js/server_user_policy.js</code>)</p>
+
+                <h3 class="font-semibold mt-4 mb-2">Integration onglet Acces &amp; Permissions (v1.22.1+)</h3>
+                <p class="text-sm mb-2">
+                    Pour eviter de naviguer entre 2 pages, le dropdown preset sudo est aussi disponible directement dans
+                    <code>Administration &rarr; Acces &amp; Permissions</code>, sous chaque toggle serveur attribue.
+                    Visible superadmin uniquement, pour les utilisateurs role=1 avec acces explicite a au moins 1 serveur.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Dropdown 7 valeurs (none / apt_only / restart_services / read_logs / systemctl_specific / all_nopasswd / custom)</li>
+                    <li>Checkbox <code>NOPASSWD</code> inline</li>
+                    <li>Badge couleur sur le toggle quand preset != none (rouge=all_nopasswd, ambre=custom, violet=autre)</li>
+                    <li>Lien <em>Avance &rarr;</em> qui ouvre la page dediee pour custom_rules + SFTP + rollback</li>
+                </ul>
+
+                <h3 class="font-semibold mt-4 mb-2">Pattern desired / actual state (v1.22.2+)</h3>
+                <p class="text-sm mb-3">
+                    Architecture infra-as-code pour eviter la double source de verite entre les 2 tables :
+                </p>
+                <table class="text-sm w-full border-collapse mb-3">
+                    <thead class="bg-gray-100 dark:bg-gray-700"><tr>
+                        <th class="p-2 text-left">Table</th><th class="p-2 text-left">Role</th><th class="p-2 text-left">Qui ecrit</th>
+                    </tr></thead>
+                    <tbody class="text-xs">
+                        <tr><td class="p-2 font-mono">user_machine_access.sudo_preset</td><td class="p-2"><strong>Desired</strong> (intention admin)</td><td class="p-2">Dropdown onglet Acces</td></tr>
+                        <tr><td class="p-2 font-mono">server_user_sudo_policies</td><td class="p-2"><strong>Actual</strong> (etat reel deploye)</td><td class="p-2">configure_servers.py au deploy</td></tr>
+                        <tr><td class="p-2 font-mono">policy_deployments</td><td class="p-2"><strong>Audit trail</strong></td><td class="p-2">configure_servers.py au deploy</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-sm">
+                    Pont implemente dans <code>backend/configure_servers.py::add_to_sudoers()</code> : au deploy SSH,
+                    on lit <code>user.sudo_policies[machine_id]</code> charge par <code>load_data_from_db()</code>, on rend
+                    via <code>sudo_manager.render_policy()</code>, on valide par <code>visudo -cf</code>, puis <code>mv</code>
+                    atomique. Fallback historique sur le bool <code>users.sudo</code> si pas de preset configure.
+                </p>
+
+                <h3 class="font-semibold mt-4 mb-2">Durcissement securite OWASP Top 10 (v1.23.0+)</h3>
+                <p class="text-sm mb-3">
+                    Audit de bout en bout suivi de la remediation de l'ensemble des findings. Points
+                    visibles pour l'exploitant (le detail complet est dans le <code>CHANGELOG.md</code>) :
+                </p>
+                <ul class="list-disc ml-6 text-sm space-y-1">
+                    <li><strong>Controle d'acces (A01)</strong> : le deploiement du compte de service root,
+                        la suppression de comptes/cles distants et l'octroi de presets sudo sont desormais
+                        reserves aux roles admin/superadmin (cote backend ET proxy). Un admin ne peut plus
+                        creer ni promouvoir un compte d'un role superieur ou egal au sien.</li>
+                    <li><strong>2FA (A07)</strong> : un changement/reset de mot de passe deconnecte toutes
+                        les autres sessions et revoque les cookies "se souvenir de moi". Anti-rejeu du code
+                        TOTP ajoute sur la re-authentification (step-up). Une 2FA reussie ne compte plus
+                        comme un echec dans le rate-limit.</li>
+                    <li><strong>Diagnostic</strong> : la page <code>Health check</code> n'execute plus
+                        aucune action modifiant un serveur reel (les routes mutantes sont testees a vide).</li>
+                    <li><strong>Audits SSH planifies</strong> : corrige — ils ne s'executaient jamais
+                        auparavant (bug du scheduler).</li>
+                    <li><strong>Webhooks</strong> : les webhooks de type <code>generic</code> peuvent etre
+                        signes en HMAC-SHA256 via la variable <code>WEBHOOK_SECRET</code> (en-tete
+                        <code>X-RootWarden-Signature</code>).</li>
+                    <li><strong>Limitation connue</strong> : la CSP conserve <code>'unsafe-inline'</code>
+                        (migration nonce a planifier avec test navigateur). Ne pas considerer la CSP comme
+                        une barriere XSS active pour l'instant.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Detection de derive de configuration (v1.24.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="drift-detection" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Détection de dérive (v1.24.0+)</h2>
+                <p class="text-sm mb-3">
+                    Page <code>/drift/</code> (section Conformité, permission
+                    <code>can_view_compliance</code>). Détecte les écarts entre l'état
+                    <strong>désiré</strong> (géré par RootWarden) et l'état <strong>réel</strong>
+                    des serveurs, à partir des données déjà en base — aucun nouvel appel SSH.
+                </p>
+                <ul class="list-disc ml-6 text-sm space-y-1 mb-3">
+                    <li><strong>sudo</strong> : politiques désirées (onglet Accès) vs réellement
+                        déployées → signale un redéploiement requis.</li>
+                    <li><strong>sshd</strong> : grade du dernier audit SSH (C/D/F = dérive).</li>
+                    <li><strong>fail2ban</strong> : protection brute-force installée et active.</li>
+                </ul>
+                <p class="text-sm">
+                    Scan manuel (« Scanner tout » / « Re-scanner ») ou automatique (toutes les
+                    heures via le scheduler). Endpoints backend : <code>/drift/scan</code>,
+                    <code>/drift/scan_all</code>, <code>/drift/results</code> (admin + can_view_compliance).
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Conteneurs Docker (v1.37.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="docker" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Conteneurs Docker — inventaire & veille (v1.37.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/docker/</code> (admin) inventorie les conteneurs Docker de chaque serveur et
+                    signale les mises à jour disponibles :
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Détection</strong> (SSH, root) : <code>docker ps</code> + <code>docker inspect</code>
+                        (labels compose) + <code>docker image inspect</code> (digest local). Auto : compose / run.</li>
+                    <li><strong>MAJ image</strong> : compare le digest local au digest distant du même tag via la
+                        Registry API v2 (Docker Hub, GHCR, registre interne). Token privé optionnel via
+                        <code>DOCKER_REGISTRY_TOKENS</code>. SSRF-guard (autorise le LAN, bloque metadata).</li>
+                    <li><strong>MAJ git</strong> : si la stack vient d'un dépôt cloné, nombre de commits en retard
+                        (<code>HEAD..origin</code>) + <strong>changelog</strong> des commits.</li>
+                    <li>Endpoints : <code>POST /docker/scan</code> (machine), <code>/docker/scan_all</code> (admin),
+                        <code>GET /docker/results</code>. Migration 061 : <code>docker_inventory</code>.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Restauration de backup (v1.35.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="backups" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Sauvegardes & restauration (v1.35.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/backups/</code> (admin) gère les sauvegardes de la base : création,
+                    <strong>test de restauration</strong> (vérification sha256 + lisibilité, non destructif) et
+                    <strong>restauration</strong>.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>La restauration (<code>POST /admin/backups/restore</code>) est <strong>réservée au
+                        superadmin</strong> (DROP TABLE → recréation) : nom validé (anti path-traversal),
+                        sha256 vérifié avant application, <strong>backup de sécurité créé automatiquement</strong>.</li>
+                    <li>Confirmation forte côté UI (re-saisie du nom du fichier). Opération journalisée
+                        (command log, contexte <code>db_restore</code>).</li>
+                    <li>Le test de restauration (<code>verify</code>) compte tables/statements sans rien appliquer.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Recherche globale + audit (v1.34.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="search" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Recherche globale + audit log (v1.34.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/search/</code> (admin) interroge en un seul endroit les <strong>serveurs</strong>,
+                    <strong>utilisateurs</strong>, <strong>CVE</strong>, <strong>tickets</strong> et le
+                    <strong>journal d'audit</strong> (<code>GET /search?q=</code>, résultats catégorisés).
+                </p>
+                <p class="text-sm">
+                    Le <strong>visualiseur d'audit log</strong> (<code>/adm/audit_log.php</code>) — filtres user/action/date,
+                    pagination, export CSV et <strong>vérification de la chaîne HMAC</strong> — est accessible depuis le menu.
+                    Recherche : <code>@require_role(2)</code> + <code>can_admin_portal</code>, LIKE 100&nbsp;% paramétré.
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Ticketing ITSM (v1.33.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="tickets" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Ticketing ITSM — CVE → ticket (v1.33.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/tickets/</code> (admin) crée des tickets dans votre outil ITSM à partir des
+                    findings. Fournisseurs : <code>jira</code>, <code>servicenow</code>, <code>glpi</code>,
+                    <code>generic</code> (webhook JSON).
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Bouton 🎟 sur chaque finding CVE (page <code>/security/</code>) + création manuelle.</li>
+                    <li><strong>Auto-KEV</strong> (<code>TICKETING_AUTO_KEV</code>) : ticket auto pour chaque CVE
+                        activement exploitée détectée au scan, dédupliqué.</li>
+                    <li>Si aucun fournisseur configuré → ticket <code>local</code> (tracé sans cible externe).
+                        Dédup par (source, ref, machine). SSRF guard sur l'URL. Migration 060.</li>
+                    <li>Config : <code>TICKETING_ENABLED/PROVIDER/URL/USER/TOKEN/PROJECT/APP_TOKEN</code>.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- ChatOps bidirectionnel (v1.32.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="chatops" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">ChatOps bidirectionnel (v1.32.0+)</h2>
+                <p class="text-sm mb-3">
+                    Les webhooks <strong>sortants</strong> (notifications) restent gérés par <code>WEBHOOK_*</code>.
+                    La page <code>/chatops/</code> (admin) ajoute le sens <strong>entrant</strong> : piloter
+                    RootWarden depuis Slack ou Teams.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Point d'entrée public <code>/chatops/webhook.php</code> → backend <code>/chatops/command</code>.
+                        Auth par <strong>signature Slack</strong> (v0 HMAC + anti-rejeu) ou <strong>jeton partagé</strong>
+                        (<code>X-ChatOps-Token</code>, Teams/générique).</li>
+                    <li>Mapping <code>chatops_users</code> (identité chat → utilisateur RootWarden) ; sans mapping,
+                        les commandes mutantes sont refusées.</li>
+                    <li>Commandes : <code>status</code>, <code>approvals</code>, <code>approve &lt;id&gt;</code>,
+                        <code>reject &lt;id&gt;</code>, <code>help</code> — l'approbation respecte la règle 4-eyes.</li>
+                    <li>Opt-in : <code>CHATOPS_ENABLED</code>, <code>CHATOPS_SLACK_SIGNING_SECRET</code>,
+                        <code>CHATOPS_TOKEN</code>. Migration 059.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Journal des commandes / bastion (v1.31.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="commandlog" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Journal des commandes / bastion (v1.31.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/commandlog/</code> (admin + <code>can_admin_portal</code>) trace les commandes
+                    privilégiées réellement exécutées par RootWarden sur les serveurs distants : <em>qui, quoi,
+                    où, quand, résultat</em> — un trail d'audit type bastion.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Contextes instrumentés : <code>reboot</code>, <code>delete_user</code>,
+                        <code>full_update</code>, <code>security_update</code>, <code>custom_update</code>.</li>
+                    <li>Lecture seule (pas de suppression via l'API). Filtres machine + contexte. Migration 058.</li>
+                    <li>Helper <code>command_logger.log_command()</code> best-effort : la journalisation ne casse
+                        jamais l'action suivie.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Approbation 4-eyes (v1.30.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="approvals" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Approbation 4-eyes (v1.30.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/approvals/</code> (admin + <code>can_admin_portal</code>) impose une double
+                    validation sur les actions destructives. Modèle <em>store-and-replay</em> :
+                </p>
+                <ol class="list-decimal list-inside text-sm space-y-1 mb-3">
+                    <li>L'admin déclenche l'action → une demande <code>pending</code> est créée (HTTP 202),
+                        l'action n'est <strong>pas</strong> exécutée ;</li>
+                    <li>un <strong>second</strong> admin approuve (il ne peut pas approuver sa propre demande — règle 4-eyes) ;</li>
+                    <li>le demandeur rejoue l'action → l'approbation est consommée → exécution.</li>
+                </ol>
+                <p class="text-sm mb-2"><strong>Le superadmin (rôle 3) n'est pas soumis à l'approbation</strong> :
+                    sur un déploiement avec un seul administrateur, la règle 4-eyes ne pourrait jamais être
+                    satisfaite (pas de 2e admin pour approuver) et bloquerait toute action. Le contournement est journalisé.</p>
+                <p class="text-sm">Opt-in via <code>APPROVAL_ENABLED=true</code> (désactivé par défaut pour les
+                    déploiements mono-admin). Actions concernées : <code>APPROVAL_ACTIONS</code>
+                    (par défaut <code>delete_remote_user</code>, <code>reboot_server</code>,
+                    <code>revoke_service_account</code>, <code>regenerate_platform_key</code>). Migration 057.</p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Fenetres de maintenance (v1.29.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="maintenance" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Fenêtres de maintenance (v1.29.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/maintenance/</code> (admin + <code>can_admin_portal</code>) définit les plages
+                    horaires hebdomadaires pendant lesquelles les <strong>actions mutantes</strong> sont autorisées.
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li>Scope <strong>global</strong> (toute la flotte) ou <strong>machine</strong> précise ;
+                        jours + plage horaire (gère les fenêtres à cheval sur minuit).</li>
+                    <li>Hors fenêtre, ces actions renvoient <strong>HTTP 423</strong> : <code>update_server</code>,
+                        <code>apply_security_updates</code>, <code>custom_update</code>, <code>reboot_server</code>.</li>
+                    <li><strong>Superadmin</strong> contourne les fenêtres (urgence patch, journalisé). Aucune fenêtre
+                        définie = aucune restriction. Fail-open en cas d'erreur BDD.</li>
+                    <li>Endpoint <code>GET /maintenance/check?machine_id=</code> pour prévenir l'opérateur avant d'agir.</li>
+                </ul>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Groupes & actions de masse (v1.28.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="groups" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Groupes & actions de masse (v1.28.0+)</h2>
+                <p class="text-sm mb-3">
+                    La page <code>/groups/</code> (admin + <code>can_admin_portal</code>) regroupe les serveurs
+                    pour agir sur tout un groupe d'un coup :
+                </p>
+                <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+                    <li><strong>Groupes dynamiques</strong> : règle de filtre sur <code>environment</code>,
+                        <code>criticality</code>, <code>network_type</code>, <code>lifecycle_status</code> et
+                        <code>tags</code>. Résolution live (un serveur qui matche entre automatiquement).</li>
+                    <li><strong>Groupes statiques</strong> : liste de membres explicite.</li>
+                    <li><strong>Actions de masse</strong> (<code>POST /groups/&lt;id&gt;/run</code>) : <code>drift_scan</code>
+                        (rapide, sans SSH) et <code>cve_scan</code> (pipeline CVE complet), lancées en arrière-plan,
+                        chaque machine tracée dans le <strong>centre de tâches</strong>.</li>
+                </ul>
+                <p class="text-sm">Filtres construits depuis une whitelist de colonnes/valeurs (requêtes 100 % paramétrées).
+                    Migration 055 : <code>machine_groups</code> + <code>machine_group_members</code>.</p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Score de posture de conformite (v1.26.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="compliance-posture" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Score de posture de conformité (v1.26.0+)</h2>
+                <p class="text-sm mb-3">
+                    Le rapport de conformité (<code>/security/compliance_report.php</code>, permission
+                    <code>can_view_compliance</code>) affiche un <strong>score de posture par serveur</strong>
+                    (0-100 + note A-F) qui agrège l'audit sshd, les CVE critiques/hautes, la présence de
+                    fail2ban et la dérive de configuration. Une moyenne de flotte est affichée.
+                </p>
+                <p class="text-sm">
+                    Inclus dans les exports <strong>CSV</strong> et <strong>PDF</strong> du rapport.
+                    Barème : A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, sinon F.
+                </p>
+            </section>
+
+            <!-- ────────────────────────────────────────── -->
+            <!-- Centre de taches (v1.25.0) -->
+            <!-- ────────────────────────────────────────── -->
+            <section id="task-center" class="doc-anchor bg-white dark:bg-gray-800 shadow rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">Centre de tâches (v1.25.0+)</h2>
+                <p class="text-sm mb-3">
+                    Page <code>/tasks/</code> (section Admin). Historique et statut des tâches
+                    de fond de la plateforme : scans CVE/SSH/dérive planifiés et backups sont
+                    tracés (statut, durée, détail). Rafraîchissement auto, filtre par statut.
+                </p>
+                <p class="text-sm mb-3">
+                    Côté code, n'importe quel job peut se tracer via le helper
+                    <code>task_tracker</code> :
+                    <code>with track('cve_scan', 'Scan CVE srv-01', machine_id=3): ...</code>
+                    (passage automatique à <em>success</em> en sortie, <em>error</em> sur exception).
+                </p>
+                <p class="text-sm">
+                    Endpoints : <code>/tasks/list</code> (filtrable status/type), <code>/tasks/stats</code>
+                    (admin). Purge des tâches terminées selon <code>LOG_RETENTION_DAYS</code>. Lecture
+                    seule pour l'instant (retry et suivi des déploiements interactifs à venir).
+                </p>
             </section>
 
             <!-- ────────────────────────────────────────── -->

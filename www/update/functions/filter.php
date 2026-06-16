@@ -30,8 +30,13 @@ function getFilteredServers(?string $environment, ?string $criticality, ?string 
 {
     global $pdo;
 
-    // Construire la requête dynamiquement
-    $sql = "SELECT * FROM machines WHERE 1=1";
+    // Patch A01/A02 : colonnes EXPLICITES (jamais SELECT *). Avant, le SELECT *
+    // renvoyait aussi password/root_password (chiffres) au navigateur -> surface
+    // inutile. On ne selectionne que les colonnes d'affichage/filtrage.
+    $sql = "SELECT id, name, ip, port, user, linux_version, last_checked, status, "
+         . "lifecycle_status, online_status, environment, criticality, network_type, "
+         . "maj_secu_date, maj_secu_last_exec_date, last_reboot, created_at "
+         . "FROM machines WHERE 1=1";
     $params = [];
 
     if (!empty($environment)) {

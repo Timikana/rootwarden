@@ -98,9 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
             'new_status' => $new_status
         ]);
     } catch (Exception $e) {
+        // Patch A09 : detail en log, message generique au client.
+        error_log('[toggle_user] ' . $e->getMessage());
         echo json_encode([
             'success' => false,
-            'message' => 'Erreur : ' . $e->getMessage()
+            'message' => 'Erreur lors de la mise a jour.'
         ]);
     }
 }

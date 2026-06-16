@@ -147,6 +147,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_type'])) {
                             $hash = password_hash($password, PASSWORD_DEFAULT);
                             $roleMap = ['user' => 1, 'admin' => 2, 'superadmin' => 3];
                             $roleId = $roleMap[strtolower($data['role'] ?? 'user')] ?? 1;
+                            // Patch A01/A07 : meme regle hierarchique que add_user.
+                            // Un import par un non-superadmin ne peut creer un role
+                            // superieur ou egal au sien.
+                            $myRole = (int)($_SESSION['role_id'] ?? 1);
+                            if ($myRole < 3 && $roleId >= $myRole) {
+                                $roleId = 1;
+                            }
                             $email = trim($data['email'] ?? '');
                             $sshKey = trim($data['ssh_key'] ?? '');
                             $active = (int)($data['active'] ?? 1);

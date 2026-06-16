@@ -20,7 +20,15 @@ if (isset($_GET['lang']) && in_array($_GET['lang'], ALLOWED_LANGS, true)) {
     if (session_status() === PHP_SESSION_ACTIVE) {
         $_SESSION['lang'] = $_GET['lang'];
     }
-    setcookie('lang', $_GET['lang'], time() + 86400 * 365, '/', '', true, true);
+    // Patch A05 : forme tableau pour ajouter SameSite (absent de la forme
+    // positionnelle). Lax suffit pour un cookie de preference non sensible.
+    setcookie('lang', $_GET['lang'], [
+        'expires'  => time() + 86400 * 365,
+        'path'     => '/',
+        'secure'   => true,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
 }
 
 /**

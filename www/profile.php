@@ -60,6 +60,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Vérification du jeton CSRF - stoppe l'exécution si invalide
     checkCsrfToken();
 
+    // Patch A04 : sous force_password_change, seul le formulaire de mot de passe
+    // est autorise. Avant, un compte en changement force pouvait modifier son
+    // email ou sa cle SSH (vecteurs de prise de controle) AVANT de changer le
+    // mot de passe. On bloque toute action non-mot-de-passe dans cet etat.
+    $forcedChange = !empty($_SESSION['force_password_change']);
+    $isPasswordForm = isset($_POST['current_password'], $_POST['new_password'], $_POST['confirm_password']);
+    $blockNonPassword = $forcedChange && !$isPasswordForm;
+    if ($blockNonPassword) {
+        $error = t('profile.must_change_password_first');
+    }
+
     // ── Revocation de session ──────────────────────────────────────────
     if (isset($_POST['revoke_session'])) {
         $revokeId = $_POST['revoke_session'];
@@ -98,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ── Formulaire 0 : mise à jour de l'email ──────────────────────────
-    if (isset($_POST['new_email'])) {
+    if (!$blockNonPassword && isset($_POST['new_email'])) {
         $newEmail = filter_var(trim($_POST['new_email']), FILTER_VALIDATE_EMAIL) ?: null;
         if ($_POST['new_email'] && !$newEmail) {
             $error = t('profile.error_email_format');
@@ -113,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ── Formulaire 1 : mise à jour de la clé SSH ──────────────────────────
-    if (isset($_POST['new_ssh_key'])) {
+    if (!$blockNonPassword && isset($_POST['new_ssh_key'])) {
         $newSshKey = trim($_POST['new_ssh_key']);
 
         // Validation du format de clé SSH publique (supporte rsa, ed25519, ecdsa)
@@ -186,6 +197,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $expiresAt = $effectiveDays > 0 ? date('Y-m-d', strtotime("+{$effectiveDays} days")) : null;
                 $stmt = $pdo->prepare("UPDATE users SET password = ?, password_expires_at = ? WHERE id = ?");
                 $stmt->execute([$hashedPassword, $expiresAt, $userId]);
+
+                // Patch A07 : revoquer les AUTRES sessions actives (on garde la
+                // session courante) et tous les cookies "remember-me" apres un
+                // changement de mot de passe. Best-effort.
+                try {
+                    $pdo->prepare("DELETE FROM active_sessions WHERE user_id = ? AND session_id != ?")
+                        ->execute([$userId, session_id()]);
+                } catch (\Throwable $_e) { error_log("[profile] purge active_sessions: " . $_e->getMessage()); }
+                try {
+                    $pdo->prepare("DELETE FROM remember_tokens WHERE user_id = ?")->execute([$userId]);
+                } catch (\Throwable $_e) { error_log("[profile] purge remember_tokens: " . $_e->getMessage()); }
+
                 // Effacer le flag d'expiration en session
                 unset($_SESSION['password_expired'], $_SESSION['password_warn_days']);
 

@@ -80,6 +80,29 @@ def _url_is_safe_external(url: str) -> bool:
     except Exception:
         return False
 
+
+def _safe_get(url: str, max_redirects: int = 5, **kwargs):
+    """GET externe avec re-validation SSRF a CHAQUE saut de redirection.
+
+    Patch A10 : avant, les appels utilisaient allow_redirects=True (defaut) ->
+    le guard ne validait que l'URL initiale, et une reponse 302 Location
+    pointant vers 169.254.169.254 (metadata cloud) ou un service interne etait
+    suivie sans controle. Ici on desactive les redirections automatiques et on
+    revalide manuellement chaque Location via _url_is_safe_external."""
+    kwargs['allow_redirects'] = False
+    current = url
+    for _ in range(max_redirects + 1):
+        if not _url_is_safe_external(current):
+            raise ValueError(f"URL refusee (SSRF guard) : {urlparse(current).hostname}")
+        resp = requests.get(current, **kwargs)
+        if resp.status_code in (301, 302, 303, 307, 308) and 'Location' in resp.headers:
+            current = requests.compat.urljoin(current, resp.headers['Location'])
+            # params ne doivent pas etre re-appliques sur la cible de redirection
+            kwargs.pop('params', None)
+            continue
+        return resp
+    raise ValueError("Trop de redirections (SSRF guard)")
+
 # ────────────────────────────────────────────────────────────────────────────
 # Utilitaires CVSS
 # ────────────────────────────────────────────────────────────────────────────
@@ -197,15 +220,14 @@ class OpenCVEClient:
                 return data
 
         url = f"{self.base_url}{path}"
-        # Patch A10-02 : refuse les targets loopback/link-local/multicast
-        if not _url_is_safe_external(url):
-            raise ValueError(f"URL OpenCVE refusee (SSRF guard) : {self.base_url}")
+        # Patch A10-02/A10 : refuse loopback/link-local/multicast + revalide
+        # chaque redirection (cf. _safe_get).
         kwargs = {'params': params, 'timeout': 15}
         if self.token:
             kwargs['headers'] = {'Authorization': f'Bearer {self.token}'}
         else:
             kwargs['auth'] = self.auth
-        resp = requests.get(url, **kwargs)
+        resp = _safe_get(url, **kwargs)
         resp.raise_for_status()
         data = resp.json()
         self._cache[cache_key] = (now, data)
@@ -470,14 +492,11 @@ class NVDClient:
             # Sans ca, un admin modifiant NVD_API_URL en .env vers
             # http://169.254.169.254/... exfiltrait les creds cloud via les logs
             # de scan. Pareil pour le second appel paginate plus bas.
-            if not _url_is_safe_external(self.url):
-                _log.warning("NVD URL refusee (SSRF guard) : %s", self.url)
-                return None
             headers = {}
             if self.api_key:
                 headers['apiKey'] = self.api_key
-            resp = requests.get(self.url, params={'cveId': cve_id},
-                                headers=headers, timeout=15)
+            resp = _safe_get(self.url, params={'cveId': cve_id},
+                             headers=headers, timeout=15)
             self._last_call = time.time()
             if resp.status_code == 404:
                 self._cache[cve_id] = (now, [])
@@ -566,7 +585,7 @@ def scan_component_via_nvd(component_name: str, version: str,
             headers = {}
             if nvd.api_key:
                 headers['apiKey'] = nvd.api_key
-            resp = requests.get(nvd.url, params={
+            resp = _safe_get(nvd.url, params={
                 'cpeName': cpe_name,
                 'resultsPerPage': per_page,
                 'startIndex': start_index,
@@ -1001,8 +1020,46 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
                        'package': pkg['name'], 'cve_count': 0, 'step': 'scan',
                        'total_cve_found': total_cve_found}
 
-        # Tri final : CRITICAL → LOW, puis score décroissant
-        findings.sort(key=lambda x: (SEVERITY_ORDER.get(x['severity'], 5), -x['cvss']))
+        # Enrichissement EPSS (FIRST.org) + CISA KEV : annote chaque finding
+        # avec une probabilite d'exploitation et un score de priorite consolide.
+        # Best-effort : si les API sont injoignables, on garde les findings tels
+        # quels (priority_score base sur le CVSS seul via compute_priority).
+        if Config.CVE_ENRICH_ENABLED and findings:
+            try:
+                yield {'type': 'progress', 'machine_id': machine_id,
+                       'step': 'enrich',
+                       'message': 'Enrichissement EPSS / CISA KEV...'}
+                from cve_enrich import enrich_findings
+                stats = enrich_findings(findings)
+                if stats.get('kev'):
+                    yield {'type': 'progress', 'machine_id': machine_id,
+                           'step': 'enrich',
+                           'message': f"{stats['kev']} CVE activement exploitee(s) (CISA KEV)"}
+            except Exception as enr_err:
+                _log.debug("CVE enrichment skipped: %s", enr_err)
+
+            # Auto-ticket pour les CVE activement exploitees (CISA KEV), opt-in.
+            # Dedup par (cve_id, machine) -> pas de spam sur scans repetes.
+            if Config.TICKETING_AUTO_KEV:
+                try:
+                    from routes.tickets import create_or_get_ticket
+                    for f in findings:
+                        if f.get('kev'):
+                            summ = f"[CVE/KEV] {f['cve_id']} sur {machine_name} ({f['package']})"
+                            desc = (f"CVE {f['cve_id']} activement exploitee (CISA KEV). "
+                                    f"Paquet {f['package']} {f.get('version')}, CVSS {f.get('cvss')}, "
+                                    f"EPSS {f.get('epss_score')}.")
+                            create_or_get_ticket('cve', f['cve_id'], machine_id, summ, desc, None)
+                except Exception as tk_err:
+                    _log.debug("auto-ticket KEV skipped: %s", tk_err)
+
+        # Tri final : KEV d'abord, puis priorite decroissante, puis severite/CVSS
+        findings.sort(key=lambda x: (
+            0 if x.get('kev') else 1,
+            -(x.get('priority_score') or 0.0),
+            SEVERITY_ORDER.get(x['severity'], 5),
+            -x['cvss'],
+        ))
 
         # Persistance en base
         scan_id = _save_scan(machine_id, findings, total, min_cvss)
@@ -1111,14 +1168,19 @@ def _save_scan(machine_id: int, findings: list[dict],
             insert_sql = """
                 INSERT INTO cve_findings
                     (scan_id, machine_id, package_name, package_version,
-                     cve_id, cvss_score, severity, summary)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                     cve_id, cvss_score, severity, summary,
+                     epss_score, epss_percentile, kev, kev_date_added,
+                     priority_score, priority_label)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """
             for f in findings:
                 cur.execute(insert_sql, (
                     scan_id, machine_id, f['package'], f['version'],
                     f['cve_id'], f['cvss'], f['severity'],
                     (f.get('summary') or '')[:300],
+                    f.get('epss_score'), f.get('epss_percentile'),
+                    1 if f.get('kev') else 0, f.get('kev_date_added'),
+                    f.get('priority_score'), f.get('priority_label'),
                 ))
         conn.commit()
         _log.info("Scan saved: scan_id=%s, machine_id=%s, findings=%d",
@@ -1167,14 +1229,21 @@ def get_last_scan_results(machine_id: int) -> dict | None:
 
         cur.execute("""
             SELECT package_name, package_version, cve_id,
-                   cvss_score, severity, summary
+                   cvss_score, severity, summary,
+                   epss_score, epss_percentile, kev, kev_date_added,
+                   priority_score, priority_label
             FROM cve_findings
             WHERE scan_id = %s
             ORDER BY
+                kev DESC,
+                priority_score DESC,
                 FIELD(severity,'CRITICAL','HIGH','MEDIUM','LOW','NONE'),
                 cvss_score DESC
         """, (scan['id'],))
         findings = cur.fetchall()
+        for f in findings:
+            if f.get('kev_date_added') and hasattr(f['kev_date_added'], 'isoformat'):
+                f['kev_date_added'] = f['kev_date_added'].isoformat()
 
         return {
             'scan':     scan,

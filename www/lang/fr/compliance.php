@@ -42,6 +42,14 @@ return [
     'compliance.supervision_coverage' => 'Couverture monitoring',
     'compliance.th_score' => 'Score',
     'compliance.th_grade' => 'Note',
+    // Posture consolidee (v1.26.0)
+    'compliance.section_posture' => 'Posture de conformite par serveur',
+    'compliance.posture_desc'    => 'Note consolidee (0-100) agregeant l\'audit sshd, les CVE critiques/hautes, la presence de fail2ban et la derive de configuration.',
+    'compliance.posture_avg'     => 'Posture moyenne de la flotte',
+    'compliance.posture_empty'   => 'Aucun serveur a evaluer.',
+    'compliance.th_server'       => 'Serveur',
+    'compliance.th_score'        => 'Score',
+    'compliance.th_gaps'         => 'Ecarts',
     'compliance.th_date' => 'Date',
     'compliance.btn_pdf' => 'Export PDF',
 ];

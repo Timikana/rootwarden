@@ -105,6 +105,15 @@ class Config:
     DEBUG         = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
     LOG_LEVEL     = os.getenv('LOG_LEVEL', 'DEBUG' if DEBUG else 'INFO').upper()
 
+    # Patch A05 : refuser le mot de passe DB par defaut hors mode debug. Avant,
+    # un deploiement qui oubliait DB_PASSWORD demarrait silencieusement avec un
+    # mot de passe trivial et publiquement connu (present dans le depot).
+    if not DEBUG and DB_CONFIG['password'] == 'rootwarden_password':
+        raise RuntimeError(
+            "DB_PASSWORD non defini (valeur par defaut detectee) en mode non-debug. "
+            "Configurez DB_PASSWORD dans srv-docker.env avant de demarrer."
+        )
+
     # ── Feature flags (toggles ON/OFF de modules entiers) ───────────────────
     # Quand un flag est OFF :
     #   - Backend : le blueprint correspondant n'est pas enregistre (404 sur
@@ -137,6 +146,46 @@ class Config:
     NVD_API_URL      = os.getenv('NVD_API_URL', 'https://services.nvd.nist.gov/rest/json/cves/2.0')
     NVD_API_KEY      = os.getenv('NVD_API_KEY', '')  # optionnel : 50 req/30s avec, 5 sans
     NVD_CACHE_TTL    = int(os.getenv('NVD_CACHE_TTL', '604800'))  # 7 jours par defaut
+
+    # Enrichissement EPSS (FIRST.org) + CISA KEV pour la priorisation des CVE.
+    # EPSS = probabilite d'exploitation (0..1), KEV = exploitation in-the-wild
+    # averee. Gratuit, sans cle. Best-effort : si l'API est injoignable, le scan
+    # CVE continue (les findings restent priorises sur le CVSS seul).
+    CVE_ENRICH_ENABLED    = os.getenv('CVE_ENRICH_ENABLED', 'true').lower() == 'true'
+    EPSS_API_URL          = os.getenv('EPSS_API_URL', 'https://api.first.org/data/v1/epss')
+    KEV_CATALOG_URL       = os.getenv('KEV_CATALOG_URL', 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json')
+    CVE_ENRICH_CACHE_TTL  = int(os.getenv('CVE_ENRICH_CACHE_TTL', '86400'))   # EPSS par CVE : 24h
+    KEV_CACHE_TTL         = int(os.getenv('KEV_CACHE_TTL', '86400'))          # catalogue KEV : 24h
+
+    # ── Workflow d'approbation 4-eyes ───────────────────────────────────────
+    # Opt-in (defaut false) : si active, les actions listees exigent l'aval d'un
+    # SECOND admin avant execution. Desactive par defaut pour ne pas bloquer les
+    # deploiements mono-admin.
+    APPROVAL_ENABLED   = os.getenv('APPROVAL_ENABLED', 'false').lower() == 'true'
+    APPROVAL_ACTIONS   = {a.strip() for a in os.getenv(
+        'APPROVAL_ACTIONS',
+        'delete_remote_user,reboot_server,revoke_service_account,regenerate_platform_key'
+    ).split(',') if a.strip()}
+    APPROVAL_TTL_HOURS = int(os.getenv('APPROVAL_TTL_HOURS', '24'))
+
+    # ── ChatOps bidirectionnel (reception de commandes) ─────────────────────
+    # Les webhooks sortants restent geres par webhooks.py. Ici : le sens entrant.
+    # Auth : signing secret Slack (HMAC) et/ou jeton partage (Teams/generique).
+    CHATOPS_ENABLED               = os.getenv('CHATOPS_ENABLED', 'false').lower() == 'true'
+    CHATOPS_SLACK_SIGNING_SECRET  = os.getenv('CHATOPS_SLACK_SIGNING_SECRET', '')
+    CHATOPS_TOKEN                 = os.getenv('CHATOPS_TOKEN', '')
+
+    # ── Ticketing ITSM (GLPI / Jira / ServiceNow / generique) ───────────────
+    # Transforme un finding (ex CVE) en ticket. Si desactive, les tickets crees
+    # restent 'local' (traces en base sans reference externe).
+    TICKETING_ENABLED   = os.getenv('TICKETING_ENABLED', 'false').lower() == 'true'
+    TICKETING_PROVIDER  = os.getenv('TICKETING_PROVIDER', 'generic').lower()  # jira|servicenow|glpi|generic
+    TICKETING_URL       = os.getenv('TICKETING_URL', '')
+    TICKETING_USER      = os.getenv('TICKETING_USER', '')
+    TICKETING_TOKEN     = os.getenv('TICKETING_TOKEN', '')
+    TICKETING_PROJECT   = os.getenv('TICKETING_PROJECT', '')      # cle projet Jira
+    TICKETING_APP_TOKEN = os.getenv('TICKETING_APP_TOKEN', '')    # App-Token GLPI
+    TICKETING_AUTO_KEV  = os.getenv('TICKETING_AUTO_KEV', 'false').lower() == 'true'
 
     # ── Notifications email ──────────────────────────────────────────────────
     MAIL_ENABLED       = os.getenv('MAIL_ENABLED', 'false').lower() == 'true'

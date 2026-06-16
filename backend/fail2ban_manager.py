@@ -292,6 +292,9 @@ def geoip_lookup(ip: str) -> dict:
             return data
 
     try:
+        # Note A10 : ip-api.com en tier gratuit n'autorise que HTTP (HTTPS = offre
+        # payante). L'IP envoyee est deja publique (IP bannie) -> fuite negligeable
+        # via MITM. A migrer vers un service GeoIP HTTPS si besoin de confidentialite.
         resp = _requests.get(
             f'http://ip-api.com/json/{ip}',
             params={'fields': 'country,countryCode,status'},

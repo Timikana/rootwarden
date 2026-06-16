@@ -61,13 +61,21 @@ def _validate_api_key_from_db(raw_key: str, route_path: str):
             # Scope check
             scope = row.get('scope_json')
             if scope:
+                # Patch A01 : fail-closed sur scope corrompu/inexploitable.
+                # Avant : un json.loads en echec (except: pass) ou un scope
+                # qui n'est pas une liste non-vide tombait sur "return True"
+                # -> une cle censee restreinte devenait pleine portee. Le
+                # commentaire promettait "denied" mais le code accordait.
                 try:
                     patterns = json.loads(scope)
-                    if isinstance(patterns, list) and patterns:
-                        if not any(re.search(p, route_path or '') for p in patterns):
-                            return False, row['id']
                 except Exception:
-                    pass  # scope corrompu = denied
+                    logger.warning("API key scope_json malforme (key_id=%s) -> refus", row['id'])
+                    return False, row['id']
+                if not isinstance(patterns, list) or not patterns:
+                    logger.warning("API key scope vide/non-liste (key_id=%s) -> refus", row['id'])
+                    return False, row['id']
+                if not any(re.search(p, route_path or '') for p in patterns):
+                    return False, row['id']
             # Update last_used (best-effort, ne bloque pas si erreur)
             try:
                 ip = request.remote_addr if request else None
@@ -282,29 +290,48 @@ def check_machine_access(machine_id):
         return True
     if not user_id or not machine_id:
         return False
+    # Patch A01/A03 : cast int defensif. Un machine_id non numerique (ex.
+    # "--foo" passe via JSON) leve un ValueError -> on refuse au lieu de 500.
+    try:
+        mid = int(machine_id)
+    except (ValueError, TypeError):
+        return False
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         cur.execute("SELECT 1 FROM user_machine_access WHERE user_id = %s AND machine_id = %s",
-                    (user_id, int(machine_id)))
+                    (user_id, mid))
         return cur.fetchone() is not None
     finally:
         conn.close()
 
 
 def require_machine_access(func):
-    """Decorateur : verifie que l'utilisateur a acces a la machine_id du request body/args.
-    Accepte aussi server_id comme alias (utilise par fail2ban, iptables history)."""
+    """Decorateur : verifie que l'utilisateur a acces a la/les machine(s) du request.
+    Accepte machine_id/server_id (singulier) ET machine_ids/server_ids (pluriel,
+    listes). Fail-closed : si un id present n'est pas autorise, l'acces est refuse.
+
+    Patch A01 : avant, seul machine_id/server_id (singulier) etait lu. Les routes
+    a parametre pluriel (deploy_platform_key, deploy_service_account, ...) voyaient
+    donc machine_id=None -> le decorateur etait un no-op et n'imposait aucun controle."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         data = request.get_json(silent=True) or {}
-        machine_id = (data.get('machine_id') or request.args.get('machine_id')
-                       or data.get('server_id') or request.args.get('server_id'))
-        if machine_id and not check_machine_access(machine_id):
+        ids = []
+        single = (data.get('machine_id') or request.args.get('machine_id')
+                  or data.get('server_id') or request.args.get('server_id'))
+        if single:
+            ids.append(single)
+        for key in ('machine_ids', 'server_ids'):
+            val = data.get(key)
+            if isinstance(val, list):
+                ids.extend(val)
+        denied = [mid for mid in ids if not check_machine_access(mid)]
+        if denied:
             user_id, role_id = get_current_user()
             logger.warning(
-                "Acces machine refuse (machine_id=%s) pour user_id=%d role=%d sur %s depuis %s",
-                machine_id, user_id, role_id, request.path, request.remote_addr
+                "Acces machine refuse (ids=%s) pour user_id=%s role=%s sur %s depuis %s",
+                denied, user_id, role_id, request.path, request.remote_addr
             )
             return jsonify({'success': False, 'message': 'Acces refuse a cette machine'}), 403
         return func(*args, **kwargs)
@@ -312,18 +339,20 @@ def require_machine_access(func):
 
 
 def server_decrypt_password(encrypted_password, logger=None):
-    """Dechiffre un mot de passe stocke en BDD. Retourne toujours une string (jamais None)."""
+    """Dechiffre un mot de passe stocke en BDD. Retourne toujours une string (jamais None).
+
+    Patch A02 : on s'appuie EXCLUSIVEMENT sur encryption.decrypt_password (AES-GCM
+    AEAD, sodium, CBC legacy + rotation OLD_SECRET_KEY, integrite verifiee). Le
+    fallback vers ssh_utils.decrypt_password a ete RETIRE : ce dechiffreur
+    "best-effort" devinait un plaintext par heuristique (decode errors=ignore,
+    troncature au null byte, extraction des octets imprimables, padding PKCS7
+    arbitraire) -> il annulait la garantie d'integrite/anti-padding-oracle du
+    patch A02-02 sur TOUTES les routes. En cas d'echec : fail-closed (string vide)."""
     if not encrypted_password:
         return ""
     try:
         return encryption.decrypt_password(encrypted_password)
     except Exception as e:
         if logger:
-            logger.error("Erreur de dechiffrement: %s", e)
-        try:
-            from ssh_utils import decrypt_password as ssh_decrypt
-            return ssh_decrypt(encrypted_password, logger)
-        except Exception as e2:
-            if logger:
-                logger.error("Seconde tentative echouee: %s", e2)
-            return ""
+            logger.error("Erreur de dechiffrement (fail-closed): %s", e)
+        return ""

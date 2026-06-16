@@ -43,17 +43,19 @@ def _resolve_ssh_creds(data):
     if not machine_id:
         return None, None, None, None, None, False, None, "machine_id requis."
 
+    # Patch (bug/A09) : with-context (ferme la connexion meme sur exception,
+    # evite l'epuisement du pool) + message generique au client (detail en log).
     try:
-        conn = get_db_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            "SELECT id, ip, port, user, password, root_password, "
-            "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-            (int(machine_id),))
-        row = cur.fetchone()
-        conn.close()
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, ip, port, user, password, root_password, "
+                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
+                (int(machine_id),))
+            row = cur.fetchone()
     except Exception as e:
-        return None, None, None, None, None, False, None, f"Erreur BDD: {e}"
+        logger.error("Erreur BDD _resolve_ssh_creds (fail2ban): %s", e)
+        return None, None, None, None, None, False, None, "Erreur BDD"
 
     if not row:
         return None, None, None, None, None, False, None, "Machine introuvable."

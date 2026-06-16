@@ -2,7 +2,9 @@
 // lang/fr/cve.php - 24 cles
 return [
     'cve.title' => 'Scan CVE',
-    'cve.desc' => 'Scanner les vulnerabilites connues (CVE) sur vos serveurs via OpenCVE. Filtrez par severite CVSS et exportez les resultats en CSV.',
+    'cve.desc' => 'Scanner les vulnerabilites connues (CVE) sur vos serveurs via OpenCVE. Priorisation EPSS (probabilite d\'exploitation) + CISA KEV (vulnerabilites activement exploitees). Filtrez par severite CVSS et exportez les resultats en CSV.',
+    'cve.epss_legend' => 'EPSS = probabilite d\'exploitation a 30 jours (FIRST.org). KEV = vulnerabilite activement exploitee (catalogue CISA).',
+    'cve.btn_reprioritize' => 'Re-prioriser (EPSS / KEV)',
     'cve.cvss_tooltip' => 'Score CVSS : echelle de severite des vulnerabilites de 0 (faible) a 10 (critique)',
     'cve.no_permission' => 'Vous n\'avez pas la permission d\'acceder au scan CVE.',
     'cve.btn_scan' => 'Scanner',

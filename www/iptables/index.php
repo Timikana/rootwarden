@@ -67,6 +67,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
+    // Patch A01 (IDOR) : le dropdown est filtre par user_machine_access, mais
+    // les handlers prenaient $_POST['server_id'] sans le revérifier -> un role-1
+    // pouvait lire/ecrire/restaurer les regles iptables de N'IMPORTE quelle
+    // machine via un server_id forge. On revalide l'acces ici (les admins
+    // role>=2 ont acces a tout).
+    if ($role < 2) {
+        $acc = $pdo->prepare("SELECT 1 FROM user_machine_access WHERE user_id = ? AND machine_id = ?");
+        $acc->execute([$_SESSION['user_id'], (int) $serverId]);
+        if (!$acc->fetch()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Accès refusé à ce serveur.']);
+            exit;
+        }
+    }
+
     switch ($action) {
         case 'load_from_db':
             loadRulesFromDB($pdo, $serverId);

@@ -1,0 +1,38 @@
+<?php
+// lang/fr/docker.php - Inventaire & veille des conteneurs Docker
+return [
+    'nav.docker' => 'Conteneurs Docker',
+    'nav.tip_docker' => 'Inventaire Docker des serveurs + veille mises a jour (image & git)',
+
+    'docker.title' => 'Conteneurs Docker',
+    'docker.desc' => 'Detecte les conteneurs Docker de chaque serveur et signale les mises a jour disponibles : cote image (une version plus recente existe sur le registre) et cote git (la stack vient d\'un depot en retard - avec le changelog des commits).',
+    'docker.btn_scan_one' => 'Scanner ce serveur',
+    'docker.btn_scan_all' => 'Scanner tout',
+    'docker.col_machine' => 'Serveur',
+    'docker.col_container' => 'Conteneur',
+    'docker.col_image' => 'Image',
+    'docker.col_state' => 'Etat',
+    'docker.col_image_update' => 'MAJ image',
+    'docker.col_git' => 'Git (stack)',
+    'docker.col_checked' => 'Verifie le',
+    'docker.loading' => 'Chargement...',
+
+    // JS
+    'js.docker.empty' => 'Aucun conteneur connu. Lance un scan.',
+    'js.docker.up_to_date' => 'A jour',
+    'js.docker.update_available' => 'MAJ dispo',
+    'js.docker.update_hint' => 'Une version plus recente de cette image existe sur le registre (digest different).',
+    'js.docker.unknown' => 'Inconnu',
+    'js.docker.commits_behind' => ':n commit(s) en retard',
+    'js.docker.sum_containers' => 'Conteneurs',
+    'js.docker.sum_machines' => 'Serveurs',
+    'js.docker.sum_img_updates' => 'MAJ image dispo',
+    'js.docker.sum_git_updates' => 'Stacks git en retard',
+    'js.docker.scanning' => 'Scan Docker en cours...',
+    'js.docker.scanning_all' => 'Scan Docker de tous les serveurs...',
+    'js.docker.scan_done' => 'Scan Docker termine.',
+    'js.docker.scan_all_done' => 'Scan termine (:n serveur(s)).',
+    'js.docker.no_docker' => 'Docker non detecte sur ce serveur.',
+    'js.docker.err_load' => 'Erreur de chargement.',
+    'js.docker.err_scan' => 'Echec du scan Docker.',
+];

@@ -217,6 +217,34 @@ def reboot_server():
     if not machine_id:
         return jsonify({'success': False, 'message': 'machine_id manquant'}), 400
 
+    # Fenetre de maintenance : un reboot est une action mutante critique.
+    try:
+        from maintenance import is_allowed
+        _uid, _role = get_current_user()
+        allowed, reason = is_allowed(machine_id, role=_role)
+        if not allowed:
+            logger.info("Reboot bloque (hors fenetre de maintenance) machine_id=%s", machine_id)
+            return jsonify({'success': False,
+                            'message': "Reboot bloque : hors fenetre de maintenance autorisee.",
+                            'reason': reason}), 423
+    except Exception as e:
+        logger.debug("maintenance check (reboot) skipped: %s", e)
+
+    # Approbation 4-eyes : un reboot est une action destructive (coupure de service).
+    try:
+        from approvals import gate
+        _uid, _role = get_current_user()
+        _ap = gate('reboot_server', int(machine_id), 'reboot',
+                   {'delay_minutes': delay_minutes}, _uid, role=_role)
+        if _ap is not None:
+            msg = ("Demande d'approbation creee : un 2e administrateur doit valider avant le reboot."
+                   if _ap['status'] == 'created'
+                   else "Reboot deja en attente d'approbation par un 2e administrateur.")
+            return jsonify({'success': False, 'pending_approval': True,
+                            'request_id': _ap['id'], 'message': msg}), 202
+    except Exception as e:
+        logger.debug("approval gate (reboot) skipped: %s", e)
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -250,6 +278,14 @@ def reboot_server():
             except Exception as exec_err:
                 # Connection drop / timeout = normal sur reboot immediat
                 logger.info("reboot_server : connexion coupee (attendu) : %s", str(exec_err)[:120])
+
+        # Journal des commandes (trail bastion)
+        try:
+            from command_logger import log_command
+            log_command(machine_id, user_id, cmd, context='reboot', success=True,
+                        detail=msg_action)
+        except Exception:
+            pass
 
         # Audit log entry
         try:

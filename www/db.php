@@ -35,9 +35,20 @@ $dbname   = getenv('DB_NAME')     ?: 'rootwarden';          // Base de données 
 $username = getenv('DB_USER')     ?: 'rootwarden_user';     // Utilisateur MySQL applicatif
 $password = getenv('DB_PASSWORD') ?: 'rootwarden_password'; // Mot de passe MySQL applicatif
 
+$debugMode = getenv('DEBUG_MODE') === 'true';
+
+// Patch A05 : refuser le mot de passe DB par defaut hors mode debug (valeur
+// triviale connue, presente dans le depot). Coherent avec config.py backend.
+if (!$debugMode && $password === 'rootwarden_password') {
+    error_log('[db.php] DB_PASSWORD non defini (valeur par defaut) en mode non-debug');
+    http_response_code(500);
+    die("Configuration invalide. Contactez l'administrateur.");
+}
+
 try {
-    // Création de la connexion PDO avec charset UTF-8 pour les échanges client/serveur
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
+    // Connexion PDO avec charset utf8mb4 (Unicode complet, evite les troncatures
+    // et certaines attaques d'encodage sur l'ancien utf8 3 octets).
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
 
     // Active le mode exception : toute erreur SQL lèvera une PDOException
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -46,17 +57,18 @@ try {
     $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 } catch (PDOException $e) {
     error_log("DB connection failed: " . $e->getMessage());
-    $debugMode = getenv('DEBUG_MODE') === 'true';
-    $hint = '';
-    if (strpos($e->getMessage(), 'Access denied') !== false) {
-        $hint = '<br><small style="color:#999">Verifiez que DB_PASSWORD dans srv-docker.env correspond au mot de passe MySQL.<br>'
-              . 'Si vous avez change le mot de passe apres la premiere initialisation, supprimez le volume :<br>'
-              . '<code>docker-compose down -v && docker-compose up -d</code> (attention : efface les donnees)</small>';
-    }
     if ($debugMode) {
+        // Le hint (suggestion down -v) ne doit apparaitre qu'en debug : il revele
+        // l'infra et une procedure destructive a un utilisateur non authentifie.
+        $hint = '';
+        if (strpos($e->getMessage(), 'Access denied') !== false) {
+            $hint = '<br><small style="color:#999">Verifiez que DB_PASSWORD dans srv-docker.env correspond au mot de passe MySQL.<br>'
+                  . 'Si vous avez change le mot de passe apres la premiere initialisation, supprimez le volume :<br>'
+                  . '<code>docker-compose down -v && docker-compose up -d</code> (attention : efface les donnees)</small>';
+        }
         die("Erreur DB : " . htmlspecialchars($e->getMessage()) . $hint);
     } else {
-        die("Erreur de connexion a la base de donnees. Contactez l'administrateur." . $hint);
+        die("Erreur de connexion a la base de donnees. Contactez l'administrateur.");
     }
 }
 
