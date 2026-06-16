@@ -44,6 +44,10 @@ HA / multi-nœud** (exclu).
 | 1.33.0 | **Ticketing ITSM** | `/tickets/` + `tickets` (mig 060), adaptateurs Jira/ServiceNow/GLPI/generic, CVE→ticket (bouton + auto-KEV), SSRF guard. |
 | 1.34.0 | **Recherche globale + audit log** | `/search/` (serveurs/users/CVE/tickets/audit), visualiseur audit HMAC exposé au menu. |
 | 1.35.0 | **Restauration de backup** | `/backups/` : verify (test non destructif) + restore (superadmin, sha256 + backup de sécurité auto). |
+| 1.36.0 | **Split Sudo/SFTP + aide en clair** | Pages séparées `/adm/server_user_sudo.php` + `_sftp.php`, chaque option expliquée pour non-experts. |
+| 1.37.0 | **Veille conteneurs Docker** | `/docker/` : inventaire + MAJ image (digest registre) & git (commits + changelog), mig 061. |
+| 1.37.1 | **Audit OWASP des features** | 6 correctifs (A01/A03/A10). |
+| 1.37.2/.3 | **Docs + CI** | README FR/EN, `bandit.yml` recréé, fix `cryptography` 48.0.1 (pip-audit). |
 
 ---
 

@@ -35,14 +35,36 @@ Tout est automatisé en 5 étapes :
 | 4 | `db_migrate.py` joue les migrations en attente | migration runner |
 | 5 | `docker compose up -d --force-recreate` + clear OPcache | UX |
 
-### Modes
+### Canal beta / release (v1.37+)
+
+`maj.sh` propose le canal de mise à jour : **release** (branche `main`, stable) ou
+**beta** (branche `beta`, nouveautés en avant-première). Choix mémorisé dans
+`.update_channel`.
 
 ```bash
-./maj.sh                                # mode normal
+./maj.sh                                # mode normal (propose le canal si interactif)
+./maj.sh --beta                         # force le canal beta (branche beta)
+./maj.sh --release                      # force le canal release (branche main)
 ./maj.sh --no-pull                      # skip git pull (deploy local)
 ./maj.sh --dry-run                      # affiche sans exécuter
 MAJ_REQUIRE_SIGNED=1 ./maj.sh           # strict : refuse les commits non-signés GPG
 ```
+
+> ⚠️ La branche `main` est actuellement en **bêta** (features v1.24→v1.37 validées
+> en dev seulement). Tester en pré-production avant usage critique.
+
+### Migrations & features récentes (v1.24 → v1.37)
+
+- **Migrations 052 → 061** appliquées automatiquement par l'étape 4 (`db_migrate.py`) :
+  `config_drift`, `tasks`, `cve_findings`(EPSS/KEV), `machine_groups(_members)`,
+  `maintenance_windows`, `approval_requests`, `command_log`, `chatops_users`,
+  `tickets`, `docker_inventory`.
+- **Features opt-in** (OFF par défaut, à activer dans `srv-docker.env` si besoin,
+  récupérées via `env-merge.sh`) :
+  `APPROVAL_ENABLED` (4-eyes), `CHATOPS_ENABLED` + `CHATOPS_SLACK_SIGNING_SECRET`/`CHATOPS_TOKEN`,
+  `TICKETING_ENABLED` + `TICKETING_PROVIDER/URL/...`, `DOCKER_REGISTRY_TOKENS` (registres privés).
+- Si `git pull` échoue avec **« dubious ownership »** (dépôt possédé par un autre user) :
+  `git config --global --add safe.directory /srv/rootwarden` (ou `--system` pour tous les users).
 
 ### Si verify-commit GPG échoue avec `MAJ_REQUIRE_SIGNED=1`
 

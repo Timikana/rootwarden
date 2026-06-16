@@ -1,3 +1,38 @@
+# Architecture & Carte des fichiers - RootWarden v1.37.x
+
+> ⚠️ Branche `main` = **bêta** (features v1.24→v1.37 validées en dev seulement).
+
+## Vague DevSecOps v1.24 → v1.37 (modules ajoutés)
+
+Chaque module suit le même slice : migration idempotente + blueprint backend
+(enregistré dans `backend/server.py`) + page PHP/JS (rendu sans `onclick`
+interpolé) + i18n FR/EN + entrée `menu.php` + whitelist `api_proxy.php` + doc.
+
+| Version | Module | Backend | Frontend | Migration |
+|---|---|---|---|---|
+| 1.24 | Dérive config | `routes/drift.py` | `/drift/` | 052 `config_drift` |
+| 1.25 | Centre de tâches | `routes/tasks.py`, `task_tracker.py` | `/tasks/` | 053 `tasks` |
+| 1.26 | Posture conformité | (compliance_report.php) | `/security/compliance_report.php` | — |
+| 1.27 | EPSS + CISA KEV | `cve_enrich.py`, `routes/cve.py::cve_reprioritize` | `/security/` (badges) | 054 (cols `cve_findings`) |
+| 1.28 | Groupes & masse | `routes/groups.py` | `/groups/` | 055 `machine_groups(_members)` |
+| 1.29 | Fenêtres maintenance | `maintenance.py`, `routes/maintenance.py` | `/maintenance/` | 056 `maintenance_windows` |
+| 1.30 | Approbation 4-eyes | `approvals.py`, `routes/approvals.py` | `/approvals/` | 057 `approval_requests` |
+| 1.31 | Journal commandes | `command_logger.py`, `routes/commandlog.py` | `/commandlog/` | 058 `command_log` |
+| 1.32 | ChatOps entrant | `chatops.py`, `routes/chatops.py` | `/chatops/` + `webhook.php` | 059 `chatops_users` |
+| 1.33 | Ticketing ITSM | `ticketing.py`, `routes/tickets.py` | `/tickets/` | 060 `tickets` |
+| 1.34 | Recherche globale | `routes/search.py` | `/search/` (+ audit log au menu) | — |
+| 1.35 | Restauration backup | `db_backup.py`, `routes/admin.py` | `/backups/` | — |
+| 1.36 | Split Sudo/SFTP + aide | (pages séparées) | `/adm/server_user_sudo.php` + `_sftp.php` | — |
+| 1.37 | Veille conteneurs Docker | `docker_monitor.py`, `docker_registry.py`, `routes/docker.py` | `/docker/` | 061 `docker_inventory` |
+
+Sécurité transverse : SSRF via `cve_scanner._safe_get` (EPSS/KEV, registre Docker,
+ticketing), 4-eyes serveur (`approved_by != requested_by`, bypass superadmin),
+enforcement fenêtres de maintenance (HTTP 423), audit OWASP v1.37.1 (6 correctifs
+A01/A03/A10). Features opt-in OFF par défaut : `APPROVAL_ENABLED`, `CHATOPS_ENABLED`,
+`TICKETING_ENABLED`.
+
+---
+
 # Architecture & Carte des fichiers - RootWarden v1.15.1
 
 ## CI/CD - SAST bandit fix (v1.15.1)

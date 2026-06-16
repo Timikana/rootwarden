@@ -1,8 +1,29 @@
-# API Reference - RootWarden v1.11.0
+# API Reference - RootWarden v1.37.x
 
-> 77 routes reparties en 8 Blueprints Flask.  
-> Toutes les routes (sauf `/test`) exigent le header `X-API-KEY`.  
+> Toutes les routes (sauf `/test` et `/chatops/command`) exigent le header `X-API-KEY`.  
 > Le frontend PHP appelle l'API via le proxy `/api_proxy.php` qui injecte la cle automatiquement.
+
+---
+
+## Routes ajoutées v1.24 → v1.37
+
+Blueprints récents (auth : `@require_api_key` + `@require_role`/`@require_permission`/`@require_machine_access`).
+
+| Méthode & route | Rôle min | Description |
+|---|---|---|
+| `POST /drift/scan` · `/drift/scan_all` · `GET /drift/results` | 2 | Détection de dérive de config (sudo/sshd/fail2ban) |
+| `GET /tasks/list` · `/tasks/stats` | 2 | Centre de tâches de fond |
+| `POST /cve_reprioritize` | machine | Ré-enrichit EPSS/KEV du dernier scan (sans SSH) |
+| `GET/POST /groups` · `PUT/DELETE /groups/<id>` · `GET /groups/<id>/members` · `POST /groups/<id>/run` | 2 | Groupes dynamiques/statiques + actions de masse |
+| `GET/POST /maintenance/windows` · `PUT/DELETE …/<id>` · `GET /maintenance/check` | 2 (check: machine) | Fenêtres de maintenance |
+| `GET /approvals` · `POST /approvals/<id>/approve|reject` · `GET /approvals/stats` | 2 | Workflow 4-eyes (approve ≠ demandeur) |
+| `GET /command_log` · `/command_log/contexts` | 2 | Journal des commandes (bastion) |
+| `POST /chatops/command` | signature/jeton | Endpoint ChatOps entrant (public via `webhook.php`) |
+| `GET/POST/DELETE /chatops/users` | 2 | Mapping chat ↔ utilisateur |
+| `GET/POST /tickets` | 2 | Ticketing ITSM (CVE → ticket) |
+| `GET /search?q=` | 2 | Recherche globale (serveurs/users/CVE/tickets/audit) |
+| `POST /docker/scan` · `/docker/scan_all` · `GET /docker/results` | machine / 2 | Inventaire & veille conteneurs Docker |
+| `POST /admin/backups/verify` · `/admin/backups/restore` | 2 / **3** | Test d'intégrité + restauration de backup (restore = superadmin) |
 
 ---
 
