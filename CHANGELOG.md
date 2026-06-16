@@ -5,19 +5,34 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — Build `main` (v1.37.1-beta), NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — Build `main` (v1.37.2-beta), NON TESTÉ EN PRODUCTION
 >
-> Cette branche `main` intègre désormais (merge depuis `beta`) toutes les
-> fonctionnalités **v1.24 → v1.37** : drift, centre de tâches, posture conformité,
-> priorisation EPSS/KEV, groupes & actions de masse, fenêtres de maintenance,
-> approbation 4-eyes, journal de commandes (bastion), ChatOps, ticketing,
-> recherche globale, restauration de backup, veille conteneurs Docker.
+> La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
+> **v1.24 → v1.37** : drift, centre de tâches, posture conformité, priorisation
+> EPSS/KEV, groupes & actions de masse, fenêtres de maintenance, approbation
+> 4-eyes, journal de commandes (bastion), ChatOps, ticketing, recherche globale,
+> restauration de backup, veille conteneurs Docker.
 >
-> **Ces fonctionnalités n'ont été validées qu'en développement (tests Puppeteer),
-> PAS en production.** À considérer comme **bêta** : tester en pré-production et
-> valider chaque feature critique avant tout usage réel. Les features sensibles
-> (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`) sont **OFF par
-> défaut**. Penser à appliquer les **migrations 052 → 061** avant usage.
+> **Validées en développement uniquement (tests Puppeteer), PAS en production.**
+> À considérer comme **bêta** : tester en pré-production avant tout usage réel.
+> Features sensibles OFF par défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`,
+> `TICKETING_ENABLED`). Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.2] - 2026-06-15 — Docs (README FR/EN) + correctifs CI
+
+- **README.md / README.en.md** : titre porté à v1.37.1, section « 🆕 v1.24 → v1.37 »
+  récapitulant les 12 features (avec mention **bêta / non testé en prod**), entrées
+  ajoutées dans Fonctionnalités (EPSS/KEV, Docker, groupes, fenêtres de maintenance).
+  Parité FR/EN respectée. Description du dépôt GitHub mise à jour.
+- **CI — ruff** : 3 erreurs résiduelles corrigées (`mock-opencve/app.py` F401,
+  `scripts/sync-obsidian-vault.py` F401/F541) → `ruff check .` repasse au vert.
+- **CI — bandit** : recréation du fichier de config **`bandit.yml`** (référencé par
+  `bandit -c bandit.yml` mais absent du repo → le job échouait au chargement). Skips
+  documentés des faux positifs/décisions design : B608 (SQL paramétré), B110
+  (best-effort), B601 (paramiko + shlex.quote), B507 (AutoAddPolicy — décision design),
+  B108 (/tmp transitoire). `bandit -r . -ll -ii -c bandit.yml` → 0 finding au seuil.
 
 ---
 
