@@ -4,6 +4,27 @@
 
 ---
 
+## Audit 5 - Features DevSecOps v1.27 → v1.37 (2026-06-14)
+
+Revue OWASP Top 10 des 11 features ajoutees post-audit (4 revues adversariales
+paralleles + verification manuelle). **Aucune faille critique ni bypass
+d'auth/injection** sur le socle. 6 correctifs appliques (v1.37.1) :
+
+| # | Sev. | OWASP | Finding | Correctif |
+|---|---|---|---|---|
+| 1 | HIGH | A01 | ChatOps approve/reject sans controle de role (un role 1 mappe pouvait debloquer du 4-eyes) | gate `role >= 2` dans `chatops.dispatch` |
+| 2 | MED | A10 | `docker_registry` suivait redirections manifeste + realm sans revalidation | passage par `_safe_get` (revalide chaque saut) |
+| 3 | MED | A01 | `docker/results` sans `machine_id` -> fuite inventaire de toute la flotte (role 1) | filtrage `user_machine_access` pour role < 2 |
+| 4 | MED | A03 | XSS d'attribut `href` (ticket `external_url` via echappeur sans `"`) | `escAttr` + allowlist schema http(s) |
+| 5 | LOW | A10 | hote registre non valide (confusion userinfo) | regex stricte sur le host |
+| 6 | — | bug | precedence du tuple de retour Jira | corrige |
+
+Residuels acceptes/documentes : guard SSRF permissif RFC1918 (registre/OpenCVE
+interne = design), fail-open fenetres de maintenance / approbation sur erreur BDD
+(disponibilite), prefix-matching du proxy (non exploitable). cf CHANGELOG v1.37.1.
+
+---
+
 ## Audit 4 - Pentest interne (2026-04-10)
 
 ### Chaine d'attaque testee
