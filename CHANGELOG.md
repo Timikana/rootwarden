@@ -5,18 +5,31 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — Build `main` (v1.37.2-beta), NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — Build `main` (v1.37.3-beta), NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
-> **v1.24 → v1.37** : drift, centre de tâches, posture conformité, priorisation
-> EPSS/KEV, groupes & actions de masse, fenêtres de maintenance, approbation
-> 4-eyes, journal de commandes (bastion), ChatOps, ticketing, recherche globale,
-> restauration de backup, veille conteneurs Docker.
->
-> **Validées en développement uniquement (tests Puppeteer), PAS en production.**
-> À considérer comme **bêta** : tester en pré-production avant tout usage réel.
-> Features sensibles OFF par défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`,
-> `TICKETING_ENABLED`). Appliquer les **migrations 052 → 061** avant usage.
+> **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
+> de maintenance, 4-eyes, journal de commandes, ChatOps, ticketing, recherche
+> globale, restauration backup, veille Docker). **Validées en développement
+> uniquement (Puppeteer), PAS en production.** À considérer comme **bêta** :
+> tester en pré-production avant tout usage réel. Features sensibles OFF par
+> défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
+> Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.3] - 2026-06-16 — Fix CI : CVE dépendance cryptography (pip-audit)
+
+Le job CI **SCA Python (pip-audit)** était rouge (mode `--strict`) :
+- **cryptography 47.0.0** → **GHSA-537c-gmf6-5ccf** : les wheels PyPI < 48.0.1
+  embarquent une copie statique d'OpenSSL vulnérable (advisory OpenSSL 2026-06-09).
+- **Correctif** : `backend/requirements.txt` `cryptography==47.0.0` → **`==48.0.1`**.
+  Compatibilité vérifiée (import + AES-GCM + paramiko OK) ;
+  `pip-audit -r requirements.txt --strict` → **« No known vulnerabilities found »**.
+
+> Les jobs `ruff`, `bandit`, `semgrep`, `gitleaks`, `php -l`, `trivy`,
+> `composer audit`, `build Docker` étaient déjà verts ; seul `pip-audit`
+> bloquait (CVE upstream apparue après le pin).
 
 ---
 
