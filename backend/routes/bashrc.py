@@ -58,6 +58,16 @@ bp = Blueprint('bashrc', __name__)
 _USERNAME_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
 _BACKUP_NAME_RE = re.compile(r'^\.bashrc\.bak\.\d{8}_\d{6}$')
 _VALID_MODES = {'overwrite', 'merge'}
+# Patch A03 (defense en profondeur) : home vient du /etc/passwd distant. Les
+# commandes l'interpolent entre quotes simples ('{home}') -> un home contenant
+# une quote simple permettrait un breakout. On valide que c'est un chemin
+# absolu sain avant toute interpolation. _inspect_bashrc/_read_remote_bashrc/
+# deploy refusent un home non conforme.
+_HOME_RE = re.compile(r'^/[A-Za-z0-9._/-]{1,128}$')
+
+
+def _safe_home(home) -> bool:
+    return bool(home) and bool(_HOME_RE.match(str(home)))
 
 # ── Template standard ────────────────────────────────────────────────────────
 # Source DB prioritaire (editable via UI /bashrc/ onglet Template).
@@ -203,6 +213,9 @@ def _list_users(client, root_password: str):
 
 def _inspect_bashrc(client, root_password: str, home: str, user: str):
     """Inspecte l'etat du .bashrc d'un user : existe, taille, mtime, sha256, custom blocks."""
+    if not _safe_home(home):
+        logger.warning("bashrc _inspect_bashrc : home non conforme refuse : %r", home)
+        return {'exists': False, 'size': 0, 'mtime': 0, 'sha8': '--------', 'has_custom': False}
     bashrc = f"{home}/.bashrc"
     # stat + sha256 + detection blocs custom (entre marqueurs) + content length
     cmd = (
@@ -232,6 +245,9 @@ def _inspect_bashrc(client, root_password: str, home: str, user: str):
 
 def _read_remote_bashrc(client, root_password: str, home: str) -> str:
     """Lit le contenu du .bashrc distant (base64 pour eviter tout encoding issue)."""
+    if not _safe_home(home):
+        logger.warning("bashrc _read_remote_bashrc : home non conforme refuse : %r", home)
+        return ""
     cmd = f"if [ -f '{home}/.bashrc' ]; then base64 -w0 '{home}/.bashrc'; fi"
     out, _, code = _ssh_exec(client, cmd, root_password, as_root=True, timeout=15)
     if code != 0 or not out.strip():
@@ -461,6 +477,10 @@ def deploy():
                     continue
 
                 home = u['home']
+                if not _safe_home(home):
+                    logger.warning("bashrc deploy : home non conforme refuse : %r", home)
+                    results.append({'user': uname, 'ok': False, 'error': 'home non conforme'})
+                    continue
                 bashrc = f"{home}/.bashrc"
                 current = _read_remote_bashrc(client, root_pwd, home)
                 current_sha = hashlib.sha256(current.encode('utf-8')).hexdigest() if current else ''
@@ -751,6 +771,9 @@ def list_backups():
             if not u:
                 return jsonify({'success': False, 'message': 'Utilisateur introuvable'}), 404
             home = u['home']
+            if not _safe_home(home):
+                logger.warning("bashrc backups : home non conforme refuse : %r", home)
+                return jsonify({'success': False, 'message': 'home non conforme'}), 400
 
             cmd = (
                 f"LC_ALL=C ls -la --time-style=+%s '{home}'/.bashrc.bak.* 2>/dev/null "

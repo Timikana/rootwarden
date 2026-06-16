@@ -143,6 +143,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
 
                     $pdo->commit();
 
+                    // Patch A07/A01 : un reset de mot de passe doit deconnecter
+                    // TOUTES les sessions actives et revoquer les cookies
+                    // "remember-me" de l'utilisateur. Avant, un attaquant ayant
+                    // vole une session/cookie conservait son acces malgre le
+                    // reset. Best-effort apres commit (ne pas annuler le reset
+                    // si une table est absente).
+                    try {
+                        $pdo->prepare("DELETE FROM active_sessions WHERE user_id = ?")->execute([$uid]);
+                    } catch (\Throwable $_e) { error_log("[reset] purge active_sessions: " . $_e->getMessage()); }
+                    try {
+                        $pdo->prepare("DELETE FROM remember_tokens WHERE user_id = ?")->execute([$uid]);
+                    } catch (\Throwable $_e) { error_log("[reset] purge remember_tokens: " . $_e->getMessage()); }
+
                     $resetDone = true;
                     $tokenValid = false;
                     $message = t('reset.success');

@@ -65,12 +65,15 @@ $_headVars = [
 ];
 // Injection sécurisée : json_encode() échappe les guillemets, balises et
 // caractères Unicode - aucune valeur d'env ne peut injecter du JS arbitraire.
+// Patch A03 : flags HEX pour neutraliser </script>, ', ", & meme si une valeur
+// d'env/traduction venait a contenir ces caracteres (defense en profondeur).
+$_jsonScriptFlags = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE;
 echo '<script>';
 foreach ($_headVars as $k => $v) {
-    echo "window.{$k} = " . json_encode((string) $v) . ";\n";
+    echo "window.{$k} = " . json_encode((string) $v, $_jsonScriptFlags) . ";\n";
 }
-echo "window.LANG = " . json_encode(getLang()) . ";\n";
-echo "window._i18n = " . json_encode(getJsTranslations('js.'), JSON_UNESCAPED_UNICODE) . ";\n";
+echo "window.LANG = " . json_encode(getLang(), $_jsonScriptFlags) . ";\n";
+echo "window._i18n = " . json_encode(getJsTranslations('js.'), $_jsonScriptFlags) . ";\n";
 echo "function __(key, params) {\n";
 echo "    let s = window._i18n['js.' + key] || window._i18n[key] || key;\n";
 echo "    if (params) Object.keys(params).forEach(k => { s = s.replace(':' + k, params[k]); });\n";

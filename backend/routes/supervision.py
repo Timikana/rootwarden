@@ -731,6 +731,7 @@ def zabbix_deploy():
 
 @bp.route('/supervision/zabbix/version', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : aligne sur les autres routes supervision (admin)
 @require_permission('can_manage_supervision')
 @require_machine_access
 @threaded_route
@@ -1291,6 +1292,7 @@ def generic_deploy(platform):
 
 @bp.route('/supervision/<platform>/version', methods=['POST'])
 @require_api_key
+@require_role(2)  # Patch A01 : aligne sur les autres routes supervision (admin)
 @require_permission('can_manage_supervision')
 @require_machine_access
 @threaded_route
@@ -1814,6 +1816,7 @@ def delete_profile(pid):
 
 @bp.route('/supervision/machines/<int:mid>/profile', methods=['GET', 'POST', 'DELETE'])
 @require_api_key
+@require_role(2)  # Patch A01 : require_machine_access est un no-op sur le mid d'URL -> require_role indispensable
 @require_permission('can_manage_supervision')
 @require_machine_access
 def machine_profile(mid):

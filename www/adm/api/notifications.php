@@ -118,8 +118,17 @@ switch ($action) {
     case 'delete':
         $id = (int)($_POST['id'] ?? $data['id'] ?? 0);
         if (!$id) { echo json_encode(['success' => false, 'message' => 'id requis']); break; }
-        $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ? AND (user_id = ? OR user_id = 0)");
-        $stmt->execute([$id, $userId]);
+        // Patch A01 : un simple utilisateur ne peut supprimer QUE ses propres
+        // notifications. Avant, le `OR user_id = 0` lui permettait de supprimer
+        // une notification broadcast (partagee par tous) -> impact sur les autres.
+        // Seuls les admins (role>=2) peuvent supprimer un broadcast.
+        if ($roleId >= 2) {
+            $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ? AND (user_id = ? OR user_id = 0)");
+            $stmt->execute([$id, $userId]);
+        } else {
+            $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?");
+            $stmt->execute([$id, $userId]);
+        }
         echo json_encode(['success' => true, 'deleted' => $stmt->rowCount() > 0]);
         break;
 

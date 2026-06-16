@@ -127,8 +127,14 @@ $typeLabels = [
                     </div>
                     <!-- Actions -->
                     <div class="flex items-center gap-1 flex-shrink-0">
-                        <?php if ($n['link']): ?>
-                        <a href="<?= htmlspecialchars($n['link']) ?>" class="text-[10px] px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors">Voir</a>
+                        <?php
+                        // Patch A03 : n'autoriser que des chemins internes (memes
+                        // contraintes que menu.php). htmlspecialchars seul
+                        // n'empeche pas un schema javascript: -> XSS au clic.
+                        $safeLink = (!empty($n['link']) && preg_match('#^/[A-Za-z0-9_\-./?=&#%]*$#', $n['link'])) ? $n['link'] : '';
+                        ?>
+                        <?php if ($safeLink): ?>
+                        <a href="<?= htmlspecialchars($safeLink) ?>" class="text-[10px] px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors">Voir</a>
                         <?php endif; ?>
                         <?php if ($unread): ?>
                         <button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read","id":<?= $n['id'] ?>}' hx-swap="none"

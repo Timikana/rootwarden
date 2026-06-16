@@ -26,7 +26,8 @@ require_once __DIR__ . '/filter.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-checkAuth(['2','3']); // Autorise rôles admin, superadmin etc.
+checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
+checkPermission('can_update_linux'); // Patch A01 : cohérent avec la page update/index.php
 
 // Récupère les paramètres GET
 $environment = $_GET['environment'] ?? '';

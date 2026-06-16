@@ -115,7 +115,9 @@ try {
 
     echo json_encode(['success' => true, 'message' => 'Utilisateur supprimé avec succès.']);
 } catch (PDOException $e) {
-    // Retourne le message d'erreur SQL (échappé) sans exposer de données sensibles
-    echo json_encode(['success' => false, 'message' => 'Erreur SQL : ' . htmlspecialchars($e->getMessage())]);
+    // Patch A09 : detail en log, message generique au client (le message SQL
+    // peut reveler le schema/les contraintes).
+    error_log('[delete_user] ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Erreur lors de la suppression.']);
 }
 ?>

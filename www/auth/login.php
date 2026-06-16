@@ -14,6 +14,7 @@
  */
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/password_policy.php'; // BCRYPT_COST (re-hash + anti-enumeration au login)
 require_once __DIR__ . '/../adm/includes/crypto.php';
 require_once __DIR__ . '/../adm/includes/audit_log.php';
 require_once __DIR__ . '/../includes/lang.php';
@@ -154,6 +155,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
                     ->execute([$user['id']]);
             } catch (\Exception $e) {}
+
+            // Patch A02 : re-hash si le cout bcrypt stocke est inferieur au cout
+            // courant (ex. ancien compte cost=10). Mise a niveau transparente au
+            // login. Avant, le commentaire l'annoncait mais ce n'etait pas fait.
+            if (password_needs_rehash($user['password'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST])) {
+                try {
+                    $rehash = password_hash($password, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]);
+                    $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$rehash, $user['id']]);
+                } catch (\Exception $e) {}
+            }
+
             recordLoginAttempt($pdo, $username, true);
 
             // NE PAS initialiser la session complete avant le 2FA !
@@ -216,6 +228,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
 
         } else {
+            // Patch A07 (anti-enumeration timing) : si l'utilisateur n'existe
+            // pas, password_verify n'a jamais tourne -> reponse nettement plus
+            // rapide = oracle "le compte existe". On brule un cout bcrypt
+            // equivalent pour egaliser le temps de reponse.
+            if (!$user) {
+                @password_hash($password, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]);
+            }
+
             recordLoginAttempt($pdo, $username, false);
 
             // Incrementer failed_attempts + calculer lockout per-user

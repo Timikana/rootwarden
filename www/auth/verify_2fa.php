@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
     // Compteur IP-based via login_attempts (etape = '2fa')
     $clientIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
     $ipBlocked = false;
+    $attemptId = null; // id de la ligne login_attempts, pour la repasser a success=1 si OK
     try {
         $stmtIp = $pdo->prepare(
             "SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? "
@@ -78,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
             "INSERT INTO login_attempts (ip_address, username, success, step, attempted_at) "
             . "VALUES (?, ?, 0, '2fa', NOW())"
         )->execute([$clientIp, $_SESSION['temp_user']['name'] ?? 'unknown']);
+        $attemptId = (int)$pdo->lastInsertId();
     } catch (\Throwable $_e) {
         // Si la colonne 'step' n'existe pas dans la table (migration pas faite),
         // on continue avec le rate-limit session uniquement. Pas blocker.
@@ -92,6 +94,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
         $error = t('2fa.error_reused');
     } elseif ($totp->verify($code, null, 1)) { // null = heure actuelle, 1 = tolerance d'une periode
         $_SESSION['last_totp_hash'] = $codeHash;
+
+        // Patch (bug) : repasser la tentative a success=1. Avant, la ligne
+        // restait a success=0 -> une 2FA REUSSIE comptait comme un echec dans
+        // le compteur IP ">=10 echecs/10min" et bloquait des users legitimes
+        // (notamment plusieurs comptes derriere une meme IP/NAT).
+        if ($attemptId) {
+            try {
+                $pdo->prepare("UPDATE login_attempts SET success = 1 WHERE id = ?")->execute([$attemptId]);
+            } catch (\Throwable $_e) {}
+        }
 
         // Verifier que l'utilisateur existe et est actif en DB (ZERO TRUST)
         $stmtUser = $pdo->prepare("SELECT id, name, role_id, active, force_password_change FROM users WHERE id = ? AND active = 1");
@@ -123,7 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
         header("Location: ../terms.php");
         exit();
     } else {
-        $_SESSION['2fa_attempts'][] = time();
+        // Patch (bug) : la tentative est deja enregistree ligne ~62
+        // ($_SESSION['2fa_attempts'][] = time()). Un second push ici la comptait
+        // double -> lockout 2FA au bout de ~3 essais reels au lieu de 5.
         $error = t('2fa.error_invalid');
     }
 }

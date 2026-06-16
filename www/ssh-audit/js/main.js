@@ -303,7 +303,7 @@ async function loadPolicies(machineId) {
                         <span class="px-2 py-0.5 rounded-full text-xs font-bold ${badgeCls}">${escHtml(statusLabel)}</span>
                         ${p.reason ? `<span class="text-xs text-gray-400 dark:text-gray-500 italic">${escHtml(p.reason)}</span>` : ''}
                     </div>
-                    <button onclick="togglePolicy('${escAttr(p.directive)}', '${escAttr(toggleTarget)}')" class="text-xs px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                    <button onclick="togglePolicy('${escJsAttr(p.directive)}', '${escJsAttr(toggleTarget)}')" class="text-xs px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
                         ${escHtml(toggleLabel)}
                     </button>
                 </div>`;
@@ -390,7 +390,7 @@ function renderFindings(findings) {
 
         let actionHtml = '';
         if (true && f.fixable) {
-            actionHtml = `<button onclick="fixDirective('${escAttr(f.directive)}', '${escAttr(f.recommended)}')" class="text-xs px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium">${escHtml(__('audit_btn_fix'))}</button>`;
+            actionHtml = `<button onclick="fixDirective('${escJsAttr(f.directive)}', '${escJsAttr(f.recommended)}')" class="text-xs px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium">${escHtml(__('audit_btn_fix'))}</button>`;
         }
 
         return `
@@ -402,7 +402,7 @@ function renderFindings(findings) {
                 <td class="py-2 px-3 text-xs text-gray-500 dark:text-gray-400 max-w-xs">${escHtml(f.description || '')}</td>
                 <td class="py-2 px-3">
                     ${true
-                        ? `<button onclick="toggleDirective('${escAttr(f.directive)}', ${f.current !== '(absent)'})"
+                        ? `<button onclick="toggleDirective('${escJsAttr(f.directive)}', ${f.current !== '(absent)'})"
                              class="text-xs px-2 py-1 rounded ${f.current !== '(absent)' ? 'bg-green-100 dark:bg-green-900/30 text-green-700' : 'bg-gray-100 dark:bg-gray-600 text-gray-500'} transition-colors"
                              title="${f.current !== '(absent)' ? escAttr(__('audit_toggle_disable', {key: f.directive})) : escAttr(__('audit_toggle_enable', {key: f.directive}))}"
                             >${f.current !== '(absent)' ? escHtml(__('audit_directive_enabled')) : escHtml(__('audit_directive_disabled'))}</button>`
@@ -468,6 +468,16 @@ function escAttr(s) {
     return String(s).replace(/&/g, '&amp;').replace(/'/g, '&#39;')
                      .replace(/"/g, '&quot;').replace(/</g, '&lt;')
                      .replace(/>/g, '&gt;').replace(/\\/g, '\\\\');
+}
+
+// Patch A03 (DOM-XSS) : echappement pour une valeur dans une chaine JS
+// single-quote a l'interieur d'un onclick (cf. services/js/main.js).
+function escJsAttr(s) {
+    return String(s == null ? '' : s).replace(/[^a-zA-Z0-9_.\-]/g, function (c) {
+        var n = c.charCodeAt(0);
+        return n < 256 ? '\\x' + n.toString(16).padStart(2, '0')
+                       : '\\u' + n.toString(16).padStart(4, '0');
+    });
 }
 
 // ── Editor ──────────────────────────────────────────────────────────────────
@@ -547,7 +557,7 @@ async function loadBackups() {
                     <span class="text-xs text-gray-400 ml-2">${escHtml(b.date)}</span>
                     <span class="text-xs text-gray-400 ml-2">${Math.round(b.size / 1024)} KB</span>
                 </div>
-                <button onclick="restoreBackup('${escAttr(b.filename)}')" class="text-xs px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white">${escHtml(__('audit_btn_restore'))}</button>
+                <button onclick="restoreBackup('${escJsAttr(b.filename)}')" class="text-xs px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white">${escHtml(__('audit_btn_restore'))}</button>
             </div>
         `).join('');
     } catch (e) { list.innerHTML = `<p class="text-sm text-red-400">Error</p>`; }

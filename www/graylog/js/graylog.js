@@ -6,6 +6,8 @@ const API = window.API_URL || '/api_proxy.php';
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 function escAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\\/g, '&#92;'); }
+// Patch A03 (DOM-XSS) : echappement pour une chaine JS dans un onclick - hex-echappe tout sauf alphanumerique.
+function escJsAttr(s) { return String(s == null ? '' : s).replace(/[^a-zA-Z0-9_.\-]/g, function (c) { var n = c.charCodeAt(0); return n < 256 ? '\\x' + n.toString(16).padStart(2, '0') : '\\u' + n.toString(16).padStart(4, '0'); }); }
 function __(k) { return (window._i18n && window._i18n[k]) || k; }
 
 function getCsrfToken() { const m = document.querySelector('meta[name="csrf-token"]'); return m ? m.getAttribute('content') : ''; }
@@ -117,7 +119,7 @@ async function glLoadTemplates() {
     if (!r.templates.length) { list.innerHTML = `<div class="text-xs text-gray-400 text-center py-3">-</div>`; return; }
     list.innerHTML = r.templates.map(t => `
         <div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/40 cursor-pointer text-xs"
-             onclick="glSelectTemplate('${escAttr(t.name)}')">
+             onclick="glSelectTemplate('${escJsAttr(t.name)}')">
             <div class="flex items-center gap-2 min-w-0">
                 <span class="font-medium truncate">${escHtml(t.name)}</span>
                 ${t.enabled

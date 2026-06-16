@@ -16,6 +16,7 @@ Demarrage :
 
 import json
 import time
+import shlex
 import logging
 import threading
 import mysql.connector
@@ -203,69 +204,6 @@ def _run_scheduled_ssh_audit(schedule: dict):
         conn.close()
 
 
-def _scheduler_loop():
-    """Boucle principale du scheduler - tourne en daemon thread."""
-    _log.info("Scheduler demarre (CVE + SSH Audit, intervalle: %ds)", _CHECK_INTERVAL)
-    while True:
-        try:
-            conn = _get_db()
-            cur = conn.cursor(dictionary=True)
-            now = datetime.now()
-
-            # CVE scans planifies
-            cur.execute(
-                "SELECT * FROM cve_scan_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
-                (now,)
-            )
-            schedules = cur.fetchall()
-
-            for sched in schedules:
-                try:
-                    _run_scheduled_scan(sched)
-                except Exception as e:
-                    _log.error("Scheduler: erreur execution %s : %s", sched['name'], e)
-
-                try:
-                    next_run = _compute_next_run(sched['cron_expression'], now)
-                    cur.execute(
-                        "UPDATE cve_scan_schedules SET last_run = %s, next_run = %s WHERE id = %s",
-                        (now, next_run, sched['id'])
-                    )
-                    conn.commit()
-                except Exception as e:
-                    _log.error("Scheduler: erreur mise a jour next_run pour %s : %s", sched['name'], e)
-
-            # SSH Audit scans planifies
-            try:
-                cur.execute(
-                    "SELECT * FROM ssh_audit_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
-                    (now,)
-                )
-                ssh_schedules = cur.fetchall()
-                for sched in ssh_schedules:
-                    try:
-                        _run_scheduled_ssh_audit(sched)
-                    except Exception as e:
-                        _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
-                    try:
-                        next_run = _compute_next_run(sched['cron_expression'], now)
-                        cur.execute(
-                            "UPDATE ssh_audit_schedules SET last_run = %s, next_run = %s WHERE id = %s",
-                            (now, next_run, sched['id'])
-                        )
-                        conn.commit()
-                    except Exception as e:
-                        _log.error("Scheduler SSH: erreur next_run %s : %s", sched['name'], e)
-            except Exception as e:
-                _log.debug("Scheduler SSH Audit: table pas encore creee: %s", e)
-
-            conn.close()
-        except Exception as e:
-            _log.error("Scheduler: erreur boucle principale : %s", e)
-
-        time.sleep(_CHECK_INTERVAL)
-
-
 def _purge_old_logs():
     """Purge les logs et historiques anciens selon LOG_RETENTION_DAYS."""
     retention_days = int(os.environ.get('LOG_RETENTION_DAYS', '0'))
@@ -353,6 +291,36 @@ _purge_counter = 0
 _PURGE_INTERVAL = 60  # toutes les 60 iterations = 1h
 
 
+def _drift_scan_all():
+    """Detection de derive de configuration sur toutes les machines non archivees.
+    Calcul a partir des donnees deja en base (pas d'appel SSH) -> peu couteux.
+    Notifie les superadmins si de nouvelles derives apparaissent."""
+    from routes.drift import scan_machine
+    from task_tracker import track
+    with track('drift_scan', 'Scan de derive (toutes machines)'):
+        _drift_scan_all_impl(scan_machine)
+
+
+def _drift_scan_all_impl(scan_machine):
+    conn = _get_db()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id FROM machines WHERE lifecycle_status IS NULL "
+                    "OR lifecycle_status <> 'archived'")
+        ids = [r['id'] for r in cur.fetchall()]
+    finally:
+        conn.close()
+    total_drift = 0
+    for mid in ids:
+        try:
+            _, dc = scan_machine(mid)
+            total_drift += dc
+        except Exception as e:
+            _log.debug("Drift scan machine %s: %s", mid, e)
+    if total_drift:
+        _log.info("Drift scan: %d derive(s) detectee(s) sur %d machine(s)", total_drift, len(ids))
+
+
 def _weekly_user_scan():
     """Scan hebdomadaire des utilisateurs distants - detecte les cles orphelines."""
     import os
@@ -396,7 +364,9 @@ def _weekly_user_scan():
                         if len(parts) < 2:
                             continue
                         uname, home = parts[0], parts[1]
-                        ak_cmd = f"cat {home}/.ssh/authorized_keys 2>/dev/null | wc -l"
+                        # Patch A03 : home vient du /etc/passwd distant -> shlex.quote
+                        # pour eviter une injection si le champ contient ; $() etc.
+                        ak_cmd = f"cat {shlex.quote(home)}/.ssh/authorized_keys 2>/dev/null | wc -l"
                         stdin2, stdout2, _ = client.exec_command(ak_cmd, timeout=5)
                         count = int(stdout2.read().decode().strip() or '0')
                         if count > 0 and uname not in ('root',):
@@ -465,9 +435,13 @@ def _check_password_expiry_notifications():
 def _scheduler_loop_with_purge():
     """Boucle principale combinant scans CVE planifies et purge des logs."""
     global _purge_counter
-    _log.info("Scheduler demarre (CVE + purge, intervalle: %ds)", _CHECK_INTERVAL)
+    _log.info("Scheduler demarre (CVE + SSH Audit + purge, intervalle: %ds)", _CHECK_INTERVAL)
     while True:
-        # Scans CVE planifies
+        # Scans CVE + audits SSH planifies
+        # Patch (bug) : la connexion est fermee dans un finally (avant, conn.close()
+        # etait dans le try -> toute exception fuyait la connexion MySQL a chaque
+        # iteration en erreur => epuisement du pool).
+        conn = None
         try:
             conn = _get_db()
             cur = conn.cursor(dictionary=True)
@@ -479,7 +453,9 @@ def _scheduler_loop_with_purge():
             schedules = cur.fetchall()
             for sched in schedules:
                 try:
-                    _run_scheduled_scan(sched)
+                    from task_tracker import track
+                    with track('cve_scan', f"Scan CVE planifie : {sched.get('name', '?')}"):
+                        _run_scheduled_scan(sched)
                 except Exception as e:
                     _log.error("Scheduler: erreur execution %s : %s", sched['name'], e)
                 try:
@@ -491,19 +467,67 @@ def _scheduler_loop_with_purge():
                     conn.commit()
                 except Exception as e:
                     _log.error("Scheduler: erreur mise a jour next_run pour %s : %s", sched['name'], e)
-            conn.close()
+
+            # Audits SSH planifies
+            # Patch (bug) : ce bloc vivait dans _scheduler_loop() qui n'etait
+            # JAMAIS appelee (start_scheduler ne lance que cette boucle-ci) ->
+            # les audits SSH planifies ne s'executaient jamais, silencieusement.
+            try:
+                cur.execute(
+                    "SELECT * FROM ssh_audit_schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= %s)",
+                    (now,)
+                )
+                ssh_schedules = cur.fetchall()
+                for sched in ssh_schedules:
+                    try:
+                        from task_tracker import track
+                        with track('ssh_audit', f"Audit SSH planifie : {sched.get('name', '?')}"):
+                            _run_scheduled_ssh_audit(sched)
+                    except Exception as e:
+                        _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
+                    try:
+                        next_run = _compute_next_run(sched['cron_expression'], now)
+                        cur.execute(
+                            "UPDATE ssh_audit_schedules SET last_run = %s, next_run = %s WHERE id = %s",
+                            (now, next_run, sched['id'])
+                        )
+                        conn.commit()
+                    except Exception as e:
+                        _log.error("Scheduler SSH: erreur next_run %s : %s", sched['name'], e)
+            except Exception as e:
+                _log.debug("Scheduler SSH Audit: table pas encore creee: %s", e)
         except Exception as e:
             _log.error("Scheduler: erreur boucle principale : %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         # Purge periodique + backup (1x par heure)
         _purge_counter += 1
         if _purge_counter >= _PURGE_INTERVAL:
             _purge_counter = 0
             _purge_old_logs()
-            # Backup quotidien
+            # Purge des taches terminees anciennes (meme retention que les logs)
+            try:
+                from task_tracker import purge_old_tasks
+                _retention = int(os.environ.get('LOG_RETENTION_DAYS', '0'))
+                if _retention > 0:
+                    purge_old_tasks(_retention)
+            except Exception:
+                pass
+            # Backup quotidien (suivi comme tache seulement si BACKUP_ENABLED,
+            # sinon run_backup() est un no-op et creerait une tache vide chaque heure)
             try:
                 from db_backup import run_backup
-                run_backup()
+                if os.environ.get('BACKUP_ENABLED', '').lower() == 'true':
+                    from task_tracker import track
+                    with track('db_backup', 'Backup BDD'):
+                        run_backup()
+                else:
+                    run_backup()
             except Exception as bk_err:
                 _log.debug("Backup skip: %s", bk_err)
 
@@ -537,6 +561,12 @@ def _scheduler_loop_with_purge():
                 _weekly_user_scan()
             except Exception as scan_err:
                 _log.debug("Weekly user scan skip: %s", scan_err)
+
+            # Detection de derive de configuration (toutes les machines)
+            try:
+                _drift_scan_all()
+            except Exception as drift_err:
+                _log.debug("Drift scan skip: %s", drift_err)
 
         time.sleep(_CHECK_INTERVAL)
 

@@ -32,6 +32,49 @@ if (in_array($_method, ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
     checkCsrfToken();
 }
 
+// ── Extraction canonique du path (ex: /api_proxy.php/deploy → /deploy) ──────
+// Patch A04 : un SEUL calcul du path, utilise a la fois pour le step-up et le
+// forwarding. Avant, le step-up lisait `PATH_INFO ?? REQUEST_URI` SANS retirer
+// le prefixe `api_proxy.php`, alors que le forwarding le retirait -> si
+// PATH_INFO n'etait pas peuple, le regex ancre ^/policy/... ne matchait pas
+// et le step-up 2FA etait saute, tandis que la route root-granting etait quand
+// meme forwardee. Les deux resolutions doivent etre identiques.
+$path = $_SERVER['PATH_INFO'] ?? '';
+if (!$path) {
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $pos = strpos($uri, 'api_proxy.php');
+    if ($pos !== false) {
+        $path = substr($uri, $pos + strlen('api_proxy.php'));
+        $path = strtok($path, '?');
+    }
+}
+
+// Patch A04-INSEC-N4 (v1.22.0) : step-up 2FA obligatoire sur les routes de
+// politique sudo/SFTP (deploy/remove/rollback). Changer une politique sudoers
+// ou un Match User block donne de facto root sur le serveur cible - meme
+// niveau de criticite que delete_user / regen platform key.
+$_stepupPatterns = [
+    '#^/policy/(sudo|sftp)/(deploy|remove)$#',
+    '#^/policy/rollback$#',
+];
+foreach ($_stepupPatterns as $_pat) {
+    if (preg_match($_pat, parse_url($path, PHP_URL_PATH) ?: '')) {
+        require_once __DIR__ . '/auth/step_up.php';
+        if (!stepUpVerify('policy_action')) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Re-authentification 2FA requise pour cette action',
+                'step_up_required' => true,
+                'action' => 'policy_action',
+            ]);
+            exit;
+        }
+        break;
+    }
+}
+
 $api_key    = getenv('API_KEY') ?: '';
 $python_url = 'https://python:5000';
 
@@ -51,17 +94,7 @@ $userHeaders = [
 // la navigation car PHP garde un verrou exclusif sur le fichier de session.
 session_write_close();
 
-// ── Extraction du path (ex: /api_proxy.php/deploy → /deploy) ───────────────
-$path = $_SERVER['PATH_INFO'] ?? '';
-if (!$path) {
-    $uri = $_SERVER['REQUEST_URI'] ?? '';
-    $pos = strpos($uri, 'api_proxy.php');
-    if ($pos !== false) {
-        $path = substr($uri, $pos + strlen('api_proxy.php'));
-        $path = strtok($path, '?');
-    }
-}
-
+// ── Validation du path ($path deja calcule en tete, avant le step-up) ───────
 if (!$path || $path === '/') {
     http_response_code(400);
     header('Content-Type: application/json');
@@ -105,6 +138,17 @@ $ALLOWED_PROXY_PREFIXES = [
     '/admin/',
     '/bashrc/',
     '/exclude_user', '/server_lifecycle',
+    '/policy/',
+    '/drift/',
+    '/tasks/',
+    '/groups',
+    '/maintenance/',
+    '/approvals',
+    '/command_log',
+    '/chatops/users',
+    '/tickets',
+    '/search',
+    '/docker/',
 ];
 $pathAllowed = false;
 foreach ($ALLOWED_PROXY_PREFIXES as $prefix) {
@@ -119,6 +163,31 @@ if (!$pathAllowed) {
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'Route non autorisee']);
     exit;
+}
+
+// Patch A01 (defense en profondeur) : ces prefixes pilotent des actions
+// d'administration de la flotte (deploiement compte root, suppression de
+// comptes/cles, politiques sudo/SFTP, admin). Le backend Flask les protege
+// deja par @require_role, mais on ne depend jamais d'un seul rempart : un
+// ROLE_USER (role 1) ne doit pas les atteindre via le proxy.
+$ADMIN_ONLY_PREFIXES = [
+    '/deploy_service_account', '/revoke_service_account', '/regenerate_platform_key',
+    '/deploy_platform_key', '/remove_ssh_password', '/reenter_ssh_password',
+    '/scan_server_users', '/sshd_allow_user', '/remove_user_keys', '/delete_remote_user',
+    '/server_user_remove_key', '/admin/', '/policy/', '/exclude_user',
+    '/server_lifecycle', '/update_security_exec', '/drift/', '/tasks/',
+    '/groups', '/maintenance/windows', '/approvals', '/command_log', '/chatops/users', '/tickets', '/search',
+];
+if ($roleId < ROLE_ADMIN) {
+    foreach ($ADMIN_ONLY_PREFIXES as $prefix) {
+        if ($path === $prefix || strpos($path, $prefix) === 0) {
+            error_log("[api_proxy] Route admin refusee pour role=$roleId : $path (user_id=$userId)");
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Privileges insuffisants']);
+            exit;
+        }
+    }
 }
 
 $query  = $_SERVER['QUERY_STRING'] ?? '';

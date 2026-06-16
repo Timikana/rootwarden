@@ -27,6 +27,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
+checkPermission('can_update_linux'); // Patch A01 : cohérent avec la page update/index.php
 
 try {
   $stmt = $pdo->query("

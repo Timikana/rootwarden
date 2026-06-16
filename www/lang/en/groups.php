@@ -1,0 +1,48 @@
+<?php
+// lang/en/groups.php - Machine groups + bulk actions
+return [
+    // Navigation
+    'nav.groups' => 'Groups & bulk',
+    'nav.tip_groups' => 'Dynamic/static machine groups and bulk operations',
+
+    // Page (PHP)
+    'groups.title' => 'Groups & bulk actions',
+    'groups.desc' => 'Group your servers by a dynamic rule (environment, criticality, network, lifecycle, tags) or a static list, then run bulk operations tracked in the task center.',
+    'groups.btn_new' => 'New group',
+    'groups.f_name' => 'Name',
+    'groups.f_desc' => 'Description',
+    'groups.type_dynamic' => 'Dynamic (rule)',
+    'groups.type_static' => 'Static (list)',
+    'groups.dynamic_hint' => 'Servers matching ALL checked categories are included automatically (OR within a category, AND between categories).',
+    'groups.f_environment' => 'Environment',
+    'groups.f_criticality' => 'Criticality',
+    'groups.f_network' => 'Network',
+    'groups.f_lifecycle' => 'Lifecycle',
+    'groups.f_tags' => 'Tags',
+    'groups.tags_placeholder' => 'web, db, frontend (comma-separated)',
+    'groups.tags_known' => 'Known tags',
+    'groups.f_members' => 'Members',
+    'groups.btn_save' => 'Save',
+    'groups.btn_cancel' => 'Cancel',
+    'groups.loading' => 'Loading...',
+
+    // JS (js. prefix -> loaded via getJsTranslations)
+    'js.groups.empty' => 'No group yet. Create your first group.',
+    'js.groups.members' => 'Members',
+    'js.groups.type_static' => 'Static',
+    'js.groups.type_dynamic' => 'Dynamic',
+    'js.groups.act_members' => 'View members',
+    'js.groups.act_drift' => 'Drift scan',
+    'js.groups.act_cve' => 'CVE scan',
+    'js.groups.act_delete' => 'Delete',
+    'js.groups.err_load' => 'Failed to load.',
+    'js.groups.empty_members' => 'No matching server.',
+    'js.groups.confirm_run' => 'Run ":action" on all group members?',
+    'js.groups.queued' => ':n server(s) queued - tracked in the task center.',
+    'js.groups.err_run' => 'Failed to start the action.',
+    'js.groups.confirm_delete' => 'Delete group ":name"?',
+    'js.groups.deleted' => 'Group deleted.',
+    'js.groups.err_name' => 'Name is required.',
+    'js.groups.saved' => 'Group saved.',
+    'js.groups.err_save' => 'Failed to save.',
+];

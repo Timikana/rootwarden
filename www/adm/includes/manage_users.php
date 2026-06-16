@@ -81,7 +81,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $ssh_key = validateInputSSH($_POST['ssh_key'] ?? '', 'ssh_key');
     $active = validateInputSSH(isset($_POST['active']), 'bool');
     $sudo = validateInputSSH(isset($_POST['sudo']), 'bool');
-    $role_id = in_array((int)($_POST['role_id'] ?? 1), [1, 2, 3]) ? (int)$_POST['role_id'] : 1;
+    $role_id = in_array((int)($_POST['role_id'] ?? 1), [1, 2, 3], true) ? (int)$_POST['role_id'] : 1;
+    // Patch A01/A07 : un createur non-superadmin ne peut creer qu'un role
+    // STRICTEMENT inferieur au sien. Avant, la whitelist [1,2,3] acceptait 3
+    // sans comparer au role du createur -> un admin (role 2 + can_admin_portal)
+    // creait un superadmin, recevait le magic-link sur son email et prenait le
+    // controle. Le superadmin reste libre de creer n'importe quel role.
+    $myRole = (int)($_SESSION['role_id'] ?? 1);
+    $roleDowngraded = false;
+    if ($myRole < 3 && $role_id >= $myRole) {
+        $role_id = 1;
+        $roleDowngraded = true; // feedback utilisateur (toast) au lieu d'un clamp silencieux
+    }
 
     // Placeholder password - impossible de se connecter avec (pas de mdp en clair)
     $password = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
@@ -185,6 +196,9 @@ $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
     <?php if (isset($error)): ?>
         <script>document.addEventListener('DOMContentLoaded', () => toast(<?= json_encode($error) ?>, 'error'));</script>
+    <?php endif; ?>
+    <?php if (!empty($roleDowngraded)): ?>
+        <script>document.addEventListener('DOMContentLoaded', () => toast(<?= json_encode(t('users.role_downgraded')) ?>, 'warning', 6000));</script>
     <?php endif; ?>
 
     <!-- Barre de recherche -->

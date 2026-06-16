@@ -38,6 +38,8 @@ from contextlib import contextmanager
 from config import Config
 from encryption import Encryption
 
+import re
+
 from ssh_utils import (
     connect_ssh,
     switch_to_root,
@@ -46,6 +48,17 @@ from ssh_utils import (
     load_data_from_db,
     ensure_sudo_installed
 )
+
+# Patch A03 (command injection, defense en profondeur) : configure_servers.py
+# etait le SEUL module a interpoler username brut dans des commandes shell root
+# (useradd/chown/mkdir/sudoers...) sans la validation pourtant presente dans
+# sudo_manager, sftp_manager et routes/ssh.py. Meme regex stricte ici.
+_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
+
+
+def _valid_username(username) -> bool:
+    """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32)."""
+    return bool(username) and bool(_USERNAME_RE.match(str(username)))
 
 # ===================================================
 # Classe CustomFormatter pour Gérer l'Absence du Champ 'machine'
@@ -185,25 +198,75 @@ def setup_logging(log_file: str):
 # ===================================================
 # Gestion des Sudoers avec sudoers.d
 # ===================================================
-def add_to_sudoers(channel, username: str, logger=None):
+def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
     """
-    Ajoute un utilisateur aux sudoers en créant un fichier dans /etc/sudoers.d/.
+    Ajoute un utilisateur aux sudoers en creant un fichier dans /etc/sudoers.d/.
 
-    Le fichier créé (/etc/sudoers.d/<username>) accorde les droits NOPASSWD: ALL
-    à l'utilisateur et est protégé avec les permissions 440 (lecture root uniquement).
+    v1.22.2 - Lecture du desired state user_machine_access.sudo_preset :
+        Si policy={'preset':..., 'nopasswd':..., 'runas':..., 'custom_rules':...}
+        fourni, on rend le contenu via sudo_manager.render_policy() puis on valide
+        par visudo -cf avant mv atomique. Si preset='none', on supprime le fichier.
+        Si policy=None ou preset absent, fallback historique : NOPASSWD: ALL.
 
-    Args:
-        channel  : Channel SSH root (retourné par switch_to_root).
-        username : Nom de l'utilisateur Linux à ajouter aux sudoers.
-        logger   : Logger optionnel pour tracer l'opération.
+    Le fichier deploye est /etc/sudoers.d/<username> avec mode 0440 root:root
+    (standard sudoers - sinon visudo le refuse).
     """
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"add_to_sudoers : username invalide refuse : {username!r}")
+        return
+    # Cas preset='none' : ne rien deployer, et supprimer si existait
+    if policy and policy.get('preset') == 'none':
+        remove_from_sudoers(channel, username, logger=logger)
+        return
+
+    # Cas preset configure -> rendre via sudo_manager + visudo -cf
+    if policy and policy.get('preset'):
+        try:
+            import sudo_manager
+            policy_full = {
+                'username': username,
+                'preset': policy.get('preset', 'all_nopasswd'),
+                'nopasswd': bool(policy.get('nopasswd', True)),
+                'runas': policy.get('runas') or 'root',
+                'custom_rules': policy.get('custom_rules') or '',
+                'services': policy.get('services') or [],
+            }
+            content = sudo_manager.render_policy(policy_full)
+        except (ValueError, ImportError) as e:
+            if logger:
+                logger.error(f"[{username}] Render sudo policy invalide ({e}), fallback NOPASSWD ALL")
+            policy = None  # Force fallback ci-dessous
+
+    # Fallback historique (preset absent ou render KO) : NOPASSWD ALL
+    if not policy or not policy.get('preset'):
+        content = f"{username} ALL=(ALL:ALL) NOPASSWD: ALL\n"
+
     try:
         sudoers_file = f"/etc/sudoers.d/{username}"
-        sudoers_entry = f"{username} ALL=(ALL:ALL) NOPASSWD: ALL\n"
-        execute_command_as_root(channel, f"echo '{sudoers_entry}' > {sudoers_file}", logger=logger)
-        execute_command_as_root(channel, f"chmod 440 {sudoers_file}", logger=logger)
+        import base64 as _b64
+        import secrets as _secrets
+        b64 = _b64.b64encode(content.encode('utf-8')).decode()
+        tmp = f"/tmp/rootwarden-sudo-{_secrets.token_hex(6)}.tmp"
+        # 1. ecrire dans tmp + chmod
+        execute_command_as_root(
+            channel,
+            f"printf '%s' '{b64}' | base64 -d > {tmp} && chown root:root {tmp} && chmod 0440 {tmp}",
+            logger=logger)
+        # 2. visudo -cf : si KO, supprimer tmp et lever
+        out = execute_command_as_root(
+            channel,
+            f"visudo -cf {tmp} 2>&1 || (rm -f {tmp}; echo __VISUDO_KO__)",
+            logger=logger)
+        if isinstance(out, str) and '__VISUDO_KO__' in out:
+            if logger:
+                logger.error(f"[{username}] visudo -cf refuse la politique - deploy annule")
+            return
+        # 3. mv atomique
+        execute_command_as_root(channel, f"mv {tmp} {sudoers_file}", logger=logger)
         if logger:
-            logger.info(f"[{username}] Ajouté aux sudoers avec configuration NOPASSWD.")
+            preset_label = (policy or {}).get('preset', 'legacy_all_nopasswd')
+            logger.info(f"[{username}] Sudoers deploye (preset={preset_label})")
     except Exception as e:
         if logger:
             logger.error(f"[{username}] Erreur lors de l'ajout aux sudoers : {e}")
@@ -220,6 +283,10 @@ def remove_from_sudoers(channel, username: str, logger=None):
         username : Nom de l'utilisateur Linux à retirer des sudoers.
         logger   : Logger optionnel pour tracer l'opération.
     """
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"remove_from_sudoers : username invalide refuse : {username!r}")
+        return
     try:
         sudoers_file = f"/etc/sudoers.d/{username}"
         execute_command_as_root(channel, f"rm -f {sudoers_file}", logger=logger)
@@ -247,6 +314,10 @@ def user_exists(channel, username: str, logger=None) -> bool:
     Returns:
         True si l'utilisateur existe, False sinon (ou en cas d'erreur).
     """
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"user_exists : username invalide refuse : {username!r}")
+        return False
     try:
         output = execute_command_as_root(channel, f"id -u {username}", logger=logger)
         exists = output.strip().isdigit()
@@ -297,6 +368,10 @@ def manage_ssh_keys(channel, user: dict, logger=None):
         if logger:
             logger.error("Nom d'utilisateur manquant dans la definition de l'utilisateur.")
         return
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"manage_ssh_keys : username invalide refuse : {username!r}")
+        return
 
     authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
 
@@ -342,6 +417,10 @@ def deploy_user_config(channel, user: dict, logger=None):
     if not username:
         if logger:
             logger.error("Nom d'utilisateur manquant dans la définition de l'utilisateur.")
+        return
+    if not _valid_username(username):
+        if logger:
+            logger.error(f"deploy_user_config : username invalide refuse : {username!r}")
         return
 
     # --- Gestion de la cle SSH ---
@@ -633,6 +712,9 @@ class ServerConfigurator:
         if not username:
             self.logger.error("Nom d'utilisateur manquant dans la définition de l'utilisateur.")
             return
+        if not _valid_username(username):
+            self.logger.error(f"configure_user : username invalide refuse : {username!r}")
+            return
 
         active = user.get('active', False)
         sudo = user.get('sudo', False)
@@ -650,9 +732,25 @@ class ServerConfigurator:
             # Deploiement de la cle SSH uniquement (le .bashrc est gere par /bashrc/)
             deploy_user_config(channel, user, logger=self.logger)
 
-            # Gestion des droits sudo
+            # Gestion des droits sudo (v1.22.2 : desired state user_machine_access)
+            #
+            # Pattern desired/actual state :
+            #   - desired = user_machine_access.sudo_preset (configure depuis admin)
+            #   - actual  = /etc/sudoers.d/<user> sur le serveur cible (effet apres deploy)
+            # Si l'user a un preset pour CETTE machine, on l'applique (visudo -cf).
+            # Sinon fallback historique sur le bool users.sudo (compat retrocompat).
             if active:
-                if sudo:
+                machine_id = self.machine.get('id')
+                sudo_policies = user.get('sudo_policies') or {}
+                policy_for_machine = sudo_policies.get(machine_id)
+                # preset != 'none' -> deploy avec policy ; preset=='none' -> remove ;
+                # policy=None -> fallback bool users.sudo
+                if policy_for_machine and policy_for_machine.get('preset') and policy_for_machine.get('preset') != 'none':
+                    add_to_sudoers(channel, username, logger=self.logger, policy=policy_for_machine)
+                elif policy_for_machine and policy_for_machine.get('preset') == 'none':
+                    remove_from_sudoers(channel, username, logger=self.logger)
+                elif sudo:
+                    # Legacy : bool users.sudo=1 -> NOPASSWD ALL (comportement v1.21.x)
                     add_to_sudoers(channel, username, logger=self.logger)
                 else:
                     remove_from_sudoers(channel, username, logger=self.logger)

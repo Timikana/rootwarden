@@ -1,0 +1,38 @@
+<?php
+// lang/en/docker.php - Docker container inventory & update watch
+return [
+    'nav.docker' => 'Docker containers',
+    'nav.tip_docker' => 'Docker inventory of servers + update watch (image & git)',
+
+    'docker.title' => 'Docker containers',
+    'docker.desc' => 'Detects Docker containers on each server and flags available updates: image side (a newer version exists on the registry) and git side (the stack comes from a repo that is behind - with the commit changelog).',
+    'docker.btn_scan_one' => 'Scan this server',
+    'docker.btn_scan_all' => 'Scan all',
+    'docker.col_machine' => 'Server',
+    'docker.col_container' => 'Container',
+    'docker.col_image' => 'Image',
+    'docker.col_state' => 'State',
+    'docker.col_image_update' => 'Image update',
+    'docker.col_git' => 'Git (stack)',
+    'docker.col_checked' => 'Checked',
+    'docker.loading' => 'Loading...',
+
+    // JS
+    'js.docker.empty' => 'No known container. Run a scan.',
+    'js.docker.up_to_date' => 'Up to date',
+    'js.docker.update_available' => 'Update',
+    'js.docker.update_hint' => 'A newer version of this image exists on the registry (different digest).',
+    'js.docker.unknown' => 'Unknown',
+    'js.docker.commits_behind' => ':n commit(s) behind',
+    'js.docker.sum_containers' => 'Containers',
+    'js.docker.sum_machines' => 'Servers',
+    'js.docker.sum_img_updates' => 'Image updates',
+    'js.docker.sum_git_updates' => 'Git stacks behind',
+    'js.docker.scanning' => 'Docker scan in progress...',
+    'js.docker.scanning_all' => 'Docker scan of all servers...',
+    'js.docker.scan_done' => 'Docker scan complete.',
+    'js.docker.scan_all_done' => 'Scan complete (:n server(s)).',
+    'js.docker.no_docker' => 'Docker not detected on this server.',
+    'js.docker.err_load' => 'Failed to load.',
+    'js.docker.err_scan' => 'Docker scan failed.',
+];

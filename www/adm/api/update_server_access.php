@@ -92,6 +92,46 @@ if (isset($data['user_id'], $data['machine_id'], $data['action'])) {
             audit_log($pdo, "Retrait acces machine #$machine_id pour user #$user_id");
             echo json_encode(['success' => true, 'message' => 'Serveur retiré avec succès.']);
 
+        } elseif ($action === 'update_sudo') {
+            // --- v1.22.0 : mise a jour du preset sudo par couple (user, machine) ---
+            // Necessite que l'access existe deja. Whitelist preset cote serveur.
+            //
+            // Patch A01 : l'octroi d'un preset sudo equivaut a accorder root
+            // distant -> action superadmin-only, comme l'UI le restreint deja
+            // (manage_access.php n'affiche le dropdown que si $isSuperAdmin).
+            // Avant ce patch la branche n'avait AUCUN controle de role ni
+            // anti-self : un admin (role 2) pouvait poser all_nopasswd sur
+            // n'importe quel user disposant deja d'un acces machine.
+            if ($currentRoleId < 3) {
+                echo json_encode(['success' => false, 'message' => 'Action reservee au superadmin.']);
+                exit;
+            }
+            $ALLOWED_PRESETS = ['none', 'all_nopasswd', 'restart_services', 'apt_only', 'read_logs', 'systemctl_specific', 'custom'];
+            $preset = $data['sudo_preset'] ?? 'none';
+            if (!in_array($preset, $ALLOWED_PRESETS, true)) {
+                echo json_encode(['success' => false, 'message' => 'Preset sudo invalide.']);
+                exit;
+            }
+            $nopasswd = !empty($data['sudo_nopasswd']) ? 1 : 0;
+            $runas = (string)($data['sudo_runas'] ?? 'root');
+            if (!preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $runas)) {
+                echo json_encode(['success' => false, 'message' => 'Runas invalide.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare(
+                "UPDATE user_machine_access SET sudo_preset = ?, sudo_nopasswd = ?, sudo_runas = ? "
+                . "WHERE user_id = ? AND machine_id = ?"
+            );
+            $stmt->execute([$preset, $nopasswd, $runas, $user_id, $machine_id]);
+            if ($stmt->rowCount() === 0) {
+                echo json_encode(['success' => false, 'message' => 'Aucun acces a mettre a jour (ajoute l\'acces d\'abord).']);
+                exit;
+            }
+            require_once __DIR__ . '/../includes/audit_log.php';
+            audit_log($pdo, "Update sudo preset=$preset nopasswd=$nopasswd machine #$machine_id pour user #$user_id");
+            echo json_encode(['success' => true, 'message' => 'Preset sudo mis a jour.', 'preset' => $preset]);
+
         } else {
             // Action inconnue : rejeté sans modification en base
             echo json_encode(['success' => false, 'message' => 'Action non reconnue.']);

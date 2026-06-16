@@ -34,6 +34,8 @@ Sujet de l'email :
 #   MAIL_SMTP_TLS     true (STARTTLS) / false (SSL direct)
 
 import smtplib
+import ssl
+import html as _html
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -75,6 +77,13 @@ def _build_html(machine_name: str, ip: str, findings: list[dict],
     Returns:
         Chaîne HTML complète (str) prête à être attachée en MIMEText('html').
     """
+    # Patch A03/A09 : toutes les valeurs issues de la BDD (nom de machine, IP,
+    # package, version, cve_id, resume) sont saisies par un utilisateur a la
+    # creation du serveur -> non sures. On les echappe pour eviter une
+    # injection HTML/XSS stockee dans le client mail.
+    safe_name = _html.escape(str(machine_name))
+    safe_ip   = _html.escape(str(ip))
+
     counts = {s: 0 for s in ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')}
     for f in findings:
         sev = f.get('severity', 'NONE')
@@ -83,22 +92,27 @@ def _build_html(machine_name: str, ip: str, findings: list[dict],
 
     rows = ''
     for f in findings:
-        sev   = f.get('severity', 'NONE')
-        color = _SEV_COLORS.get(sev, '#6b7280')
+        sev    = f.get('severity', 'NONE')
+        color  = _SEV_COLORS.get(sev, '#6b7280')
+        cve_id = _html.escape(str(f.get('cve_id', '')))
+        pkg    = _html.escape(str(f.get('package', '')))
+        ver    = _html.escape(str(f.get('version', '')))
+        cvss   = _html.escape(str(f.get('cvss', '')))
+        summ   = _html.escape(str(f.get('summary', ''))[:200])
         rows += f"""
         <tr>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace">
-            <a href="https://www.cve.org/CVERecord?id={f['cve_id']}"
-               style="color:#1d4ed8">{f['cve_id']}</a>
+            <a href="https://www.cve.org/CVERecord?id={cve_id}"
+               style="color:#1d4ed8">{cve_id}</a>
           </td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">{f['package']}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace">{f['version']}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">{pkg}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace">{ver}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;
                      color:{color};font-weight:700;white-space:nowrap">
-            {sev} ({f['cvss']})
+            {sev} ({cvss})
           </td>
           <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;
-                     font-size:12px;color:#4b5563">{f.get('summary','')[:200]}</td>
+                     font-size:12px;color:#4b5563">{summ}</td>
         </tr>"""
 
     badge = lambda sev, c: (
@@ -129,11 +143,11 @@ def _build_html(machine_name: str, ip: str, findings: list[dict],
         <tr>
           <td style="padding-right:32px">
             <div style="font-size:13px;color:#6b7280">Serveur</div>
-            <div style="font-size:16px;font-weight:700">{machine_name}</div>
+            <div style="font-size:16px;font-weight:700">{safe_name}</div>
           </td>
           <td style="padding-right:32px">
             <div style="font-size:13px;color:#6b7280">Adresse IP</div>
-            <div style="font-size:16px;font-weight:700">{ip}</div>
+            <div style="font-size:16px;font-weight:700">{safe_ip}</div>
           </td>
           <td>
             <div style="font-size:13px;color:#6b7280">Seuil CVSS</div>
@@ -217,7 +231,11 @@ def send_cve_report(machine_name: str, ip: str, findings: list[dict],
     critical = sum(1 for f in findings if f.get('severity') == 'CRITICAL')
     high     = sum(1 for f in findings if f.get('severity') == 'HIGH')
 
-    subject = f"[RootWarden] CVE - {machine_name} ({ip}) - {len(findings)} finding(s)"
+    # Patch A03 : neutraliser toute injection d'en-tete SMTP via machine_name/ip
+    # (un nom contenant \r\n permettrait d'ajouter un Bcc:, etc.).
+    subj_name = str(machine_name).replace('\r', ' ').replace('\n', ' ')
+    subj_ip   = str(ip).replace('\r', ' ').replace('\n', ' ')
+    subject = f"[RootWarden] CVE - {subj_name} ({subj_ip}) - {len(findings)} finding(s)"
     if critical:
         subject = f"[CRITICAL] {subject}"
     elif high:
@@ -235,15 +253,19 @@ def send_cve_report(machine_name: str, ip: str, findings: list[dict],
 
     try:
         port = Config.MAIL_SMTP_PORT
+        # Patch A02/A07 : contexte TLS verifiant (chaine + hostname). Sans
+        # contexte explicite, smtplib utilise un contexte non verifiant -> un
+        # MITM sur le lien SMTP pouvait capturer MAIL_SMTP_USER/PASSWORD.
+        tls_ctx = ssl.create_default_context()
         if Config.MAIL_SMTP_TLS:
             # STARTTLS (port 587)
             smtp = smtplib.SMTP(Config.MAIL_SMTP_HOST, port, timeout=15)
             smtp.ehlo()
-            smtp.starttls()
+            smtp.starttls(context=tls_ctx)
             smtp.ehlo()
         elif port == 465:
             # SMTPS (port 465)
-            smtp = smtplib.SMTP_SSL(Config.MAIL_SMTP_HOST, port, timeout=15)
+            smtp = smtplib.SMTP_SSL(Config.MAIL_SMTP_HOST, port, timeout=15, context=tls_ctx)
         else:
             # Plain SMTP sans chiffrement (port 25, relay IP-whitelisté)
             smtp = smtplib.SMTP(Config.MAIL_SMTP_HOST, port, timeout=15)

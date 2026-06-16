@@ -219,6 +219,21 @@ try {
         </div>
         <?php endif; ?>
 
+        <?php
+        // Stats de remediation (utilisees dans la stat card ci-dessous).
+        // Patch (bug) : ce bloc etait place APRES les cartes -> $remStats etait
+        // lu (carte "remediations") avant d'etre defini, la carte affichait
+        // donc toujours 0. Il doit etre calcule AVANT le rendu des cartes.
+        $remStats = ['open' => 0, 'in_progress' => 0, 'resolved' => 0, 'overdue' => 0];
+        if ($roleId >= 2) {
+            try {
+                $rs = $pdo->query("SELECT status, COUNT(*) as cnt FROM cve_remediation GROUP BY status");
+                foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) $remStats[$r['status']] = $r['cnt'];
+                $remStats['overdue'] = (int)$pdo->query("SELECT COUNT(*) FROM cve_remediation WHERE deadline < CURDATE() AND status IN ('open','in_progress')")->fetchColumn();
+            } catch (\Exception $e) {}
+        }
+        ?>
+
         <!-- ── Cartes statistiques ────────────────────────────────────── -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center" title="<?= t('dashboard.tip_servers') ?>">
@@ -241,7 +256,7 @@ try {
                 ?>
                 <div class="text-2xl font-bold <?= $remTotal > 0 ? 'text-orange-500' : 'text-green-600 dark:text-green-400' ?>"><?= $remTotal ?></div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1"><?= t('dashboard.remediations') ?></div>
-                <?php if ($remStats['overdue'] ?? 0 > 0): ?><div class="text-[10px] text-red-500 mt-0.5"><?= $remStats['overdue'] ?> <?= t('dashboard.overdue') ?></div><?php endif; ?>
+                <?php if (($remStats['overdue'] ?? 0) > 0): ?><div class="text-[10px] text-red-500 mt-0.5"><?= $remStats['overdue'] ?> <?= t('dashboard.overdue') ?></div><?php endif; ?>
             </div>
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center" title="<?= t('dashboard.tip_ssh_audit') ?>">
                 <?php
@@ -267,18 +282,6 @@ try {
             $f2bBanned = (int) $pdo->query("SELECT COALESCE(SUM(total_banned), 0) FROM fail2ban_status WHERE running = 1")->fetchColumn();
             $f2bMissing = (int) $pdo->query("SELECT COUNT(*) FROM machines m LEFT JOIN fail2ban_status f ON m.id = f.server_id WHERE (f.installed IS NULL OR f.installed = 0) AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')")->fetchColumn();
         } catch (\Exception $e) {}
-        ?>
-
-        <?php
-        // Stats de remediation (utilisees dans la stat card)
-        $remStats = ['open' => 0, 'in_progress' => 0, 'resolved' => 0, 'overdue' => 0];
-        if ($roleId >= 2) {
-            try {
-                $rs = $pdo->query("SELECT status, COUNT(*) as cnt FROM cve_remediation GROUP BY status");
-                foreach ($rs->fetchAll(PDO::FETCH_ASSOC) as $r) $remStats[$r['status']] = $r['cnt'];
-                $remStats['overdue'] = (int)$pdo->query("SELECT COUNT(*) FROM cve_remediation WHERE deadline < CURDATE() AND status IN ('open','in_progress')")->fetchColumn();
-            } catch (\Exception $e) {}
-        }
         ?>
 
         <!-- ── Tendances CVE (30 derniers jours) ─────────────────────── -->

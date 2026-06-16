@@ -1,10 +1,19 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.21.2
+# 🔐 RootWarden v1.22.2
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
 > services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
+
+## 🆕 v1.22.x — Politiques sudo + SFTP par utilisateur
+
+- **Sudo fin par (user × serveur)** : dropdown 7 presets (apt_only, restart_services, read_logs, systemctl_specific, all_nopasswd, custom, none) directement dans `Administration → Acces & Permissions`. NOPASSWD inline. Lien "Avance →" vers UI complete.
+- **Politiques SFTP par utilisateur** (`/adm/server_user_policies.php`) : ChrootDirectory, ForceCommand internal-sftp, AllowTcpForwarding, AllowAgentForwarding, X11Forwarding par compte Linux.
+- **Validation systematique** : `visudo -cf` (sudoers) + `sshd -t` (sshd_config) AVANT `mv` atomique. Backup `.rwbak` avec restoration auto si reload echoue.
+- **Audit + rollback 1-clic** : table `policy_deployments` avec policy_snapshot JSON + contenu avant/apres. Bouton "Restaurer cette version" depuis l'historique.
+- **Pattern desired/actual state** (v1.22.2) : `user_machine_access.sudo_preset` = intention admin, applique au prochain deploy SSH via `configure_servers.py::add_to_sudoers()` avec rendu par `sudo_manager.render_policy()`.
+- **Step-up 2FA** sur deploy/remove/rollback (action `policy_action`, 15 min de fraicheur). Audit_log chain HMAC avec scrub auto si contenu > 200 chars.
 
 ## 🚀 Nouveau dans la v1.21.2 (patch UX cles API)
 

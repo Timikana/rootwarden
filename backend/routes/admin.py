@@ -43,6 +43,53 @@ def create_backup():
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
+@bp.route('/admin/backups/verify', methods=['POST'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def verify_backup_route():
+    """Test de restauration non destructif : verifie integrite + lisibilite."""
+    from flask import request
+    from db_backup import verify_backup as _verify
+    data = request.get_json(silent=True) or {}
+    try:
+        res = _verify(data.get('filename', ''))
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    return jsonify({'success': True, **res})
+
+
+@bp.route('/admin/backups/restore', methods=['POST'])
+@require_api_key
+@require_role(3)
+@threaded_route
+def restore_backup_route():
+    """Restaure la base depuis un backup. DESTRUCTIF -> superadmin uniquement.
+    Un backup de securite est cree automatiquement avant ecrasement."""
+    from flask import request
+    from routes.helpers import get_current_user, logger as _logger
+    from db_backup import restore_backup as _restore
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename', '')
+    try:
+        res = _restore(filename)
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    # Journal des commandes (trail bastion) : la restauration est une operation majeure
+    try:
+        from command_logger import log_command
+        uid, _ = get_current_user()
+        log_command(None, uid, f"DB restore from {filename}", context='db_restore',
+                    success=res.get('success'),
+                    detail=f"{res.get('statements', 0)} statements, safety={res.get('safety_backup')}")
+    except Exception:
+        pass
+    if not res.get('success'):
+        return jsonify({'success': False, 'message': res.get('error') or 'Restauration echouee',
+                        'safety_backup': res.get('safety_backup')}), 500
+    return jsonify({'success': True, **res})
+
+
 @bp.route('/server_lifecycle', methods=['POST'])
 @require_api_key
 @require_role(2)
@@ -124,7 +171,10 @@ def grant_temp_permission():
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     permission = (data.get('permission') or '').strip()
-    hours = int(data.get('hours', 24))
+    try:
+        hours = int(data.get('hours', 24))  # robustesse : 500 evite sur valeur non-numerique
+    except (ValueError, TypeError):
+        hours = 24
     machine_id = data.get('machine_id')
     reason = (data.get('reason') or '').strip()
     granted_by = int(request.headers.get('X-User-ID', 0))
@@ -237,7 +287,7 @@ def toggle_notification_pref():
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     event_type = (data.get('event_type') or '').strip()
-    enabled = int(data.get('value', 0))
+    enabled = 1 if str(data.get('value', 0)) in ('1', 'true', 'True', 'on') else 0
 
     if not user_id or event_type not in VALID_EVENT_TYPES:
         return jsonify({'success': False, 'message': 'user_id et event_type valides requis'}), 400

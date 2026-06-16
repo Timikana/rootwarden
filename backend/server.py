@@ -86,6 +86,17 @@ from routes.supervision import bp as supervision_bp
 from routes.bashrc import bp as bashrc_bp
 from routes.graylog import bp as graylog_bp
 from routes.wazuh import bp as wazuh_bp
+from routes.policies import bp as policies_bp
+from routes.drift import bp as drift_bp
+from routes.tasks import bp as tasks_bp
+from routes.groups import bp as groups_bp
+from routes.maintenance import bp as maintenance_bp
+from routes.approvals import bp as approvals_bp
+from routes.commandlog import bp as commandlog_bp
+from routes.chatops import bp as chatops_bp
+from routes.tickets import bp as tickets_bp
+from routes.search import bp as search_bp
+from routes.docker import bp as docker_bp
 
 app.register_blueprint(monitoring_bp)
 app.register_blueprint(iptables_bp)
@@ -99,6 +110,17 @@ app.register_blueprint(ssh_audit_bp)
 app.register_blueprint(supervision_bp)
 app.register_blueprint(bashrc_bp)
 app.register_blueprint(graylog_bp)
+app.register_blueprint(policies_bp)
+app.register_blueprint(drift_bp)
+app.register_blueprint(tasks_bp)
+app.register_blueprint(groups_bp)
+app.register_blueprint(maintenance_bp)
+app.register_blueprint(approvals_bp)
+app.register_blueprint(commandlog_bp)
+app.register_blueprint(chatops_bp)
+app.register_blueprint(tickets_bp)
+app.register_blueprint(search_bp)
+app.register_blueprint(docker_bp)
 
 # Feature flag : blueprint Wazuh enregistre uniquement si WAZUH_ENABLED=true.
 # Quand OFF, toutes les routes /wazuh/* retournent 404 nativement (Flask).

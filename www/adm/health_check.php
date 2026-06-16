@@ -45,9 +45,17 @@ function testRoute(string $url, string $method, string $api_key, ?array $body = 
     return [$code >= 200 && $code < 500, $code, $ms, $preview];
 }
 
-// Machine ID for tests that need one
+// Machine ID for tests that need one (routes en LECTURE seule)
 $stmt = $pdo->query("SELECT id FROM machines LIMIT 1");
 $machineId = $stmt->fetchColumn() ?: 0;
+
+// Patch (operationnel) : les routes qui MODIFIENT l'etat d'un serveur
+// (services start/stop, ssh-audit fix/save/toggle/reload, dpkg_repair, update,
+// security_updates, schedule_update, server_lifecycle) ne doivent JAMAIS
+// s'executer sur un vrai serveur au simple chargement de la page diagnostic.
+// On les pointe sur machine_id=0 -> le backend repond "machine introuvable"
+// (<500 = test vert), sans arreter cron ni reecrire sshd_config en prod.
+$mutId = 0;
 
 // ── Liste des routes à tester ──────────────────────────────────────────────
 $sshDry = ['server_ip' => '0.0.0.0', 'ssh_user' => 'test'];
@@ -76,15 +84,19 @@ $routes = [
     ['Sshd Allow User',        'POST', '/sshd_allow_user', ['machine_id' => $machineId, 'username' => 'rootwarden'], 'Patche AllowUsers idempotent (v1.19.x)'],
     ['Logs SSE',               'GET',  '/logs', null, t('health.route_logs_sse'), true],
 
+    // ── Politiques sudo + SFTP par utilisateur (v1.22.0) ───────────────
+    ['Policy List',            'GET',  '/policy/list', null, 'Liste les politiques sudo/SFTP configurees'],
+    ['Policy Deployments',     'GET',  "/policy/deployments?machine_id=$machineId&server_user_id=0", null, 'Historique pour rollback (v1.22.0)'],
+
     // ── Mises a jour ────────────────────────────────────────────────────
-    ['Update (dry)',            'POST', '/update', ['machine_id' => $machineId], t('health.route_update')],
-    ['Security Updates',       'POST', '/security_updates', ['machine_id' => $machineId], t('health.route_security_updates')],
+    ['Update (dry)',            'POST', '/update', ['machine_id' => $mutId], t('health.route_update')],
+    ['Security Updates',       'POST', '/security_updates', ['machine_id' => $mutId], t('health.route_security_updates')],
     ['Dry Run Update',         'POST', '/dry_run_update', ['machine_id' => $machineId], t('health.route_dry_run')],
     ['Pending Packages',       'POST', '/pending_packages', ['machine_id' => $machineId], t('health.route_pending_packages')],
     ['Apt Check Lock',         'POST', '/apt_check_lock', ['machine_id' => $machineId], t('health.route_apt_check_lock')],
-    ['Dpkg Repair',            'POST', '/dpkg_repair', ['machine_id' => $machineId], t('health.route_dpkg_repair')],
+    ['Dpkg Repair',            'POST', '/dpkg_repair', ['machine_id' => $mutId], t('health.route_dpkg_repair')],
     ['Update Zabbix (redirect)','POST', '/update_zabbix', ['machine_ids' => []], 'Redirect vers /supervision/zabbix/deploy'],
-    ['Schedule Update',        'POST', '/schedule_update', ['machine_id' => $machineId, 'interval_minutes' => 0], t('health.route_schedule_update')],
+    ['Schedule Update',        'POST', '/schedule_update', ['machine_id' => $mutId, 'interval_minutes' => 0], t('health.route_schedule_update')],
     ['Update Logs SSE',        'GET',  '/update-logs', null, t('health.route_update_logs_sse'), true],
 
     // ── Iptables ────────────────────────────────────────────────────────
@@ -145,25 +157,25 @@ $routes = [
     // ── SSH Audit ────────────────────────────────────────────────────────
     ['SSH Audit Scan',         'POST', '/ssh_audit/scan', ['machine_id' => $machineId], t('ssh_audit.scan')],
     ['SSH Audit Scan All',     'POST', '/ssh_audit/scan_all', [], t('ssh_audit.scan_all')],
-    ['SSH Audit Fix',          'POST', '/ssh_audit/fix', ['machine_id' => $machineId, 'key' => 'PermitRootLogin', 'value' => 'no'], t('ssh_audit.fix')],
+    ['SSH Audit Fix',          'POST', '/ssh_audit/fix', ['machine_id' => $mutId, 'key' => 'PermitRootLogin', 'value' => 'no'], t('ssh_audit.fix')],
     ['SSH Audit Config',       'POST', '/ssh_audit/config', ['machine_id' => $machineId], t('ssh_audit.view_config')],
     ['SSH Audit History',      'GET',  "/ssh_audit/history?machine_id=$machineId", null, t('ssh_audit.history')],
     ['SSH Audit Fleet',        'GET',  '/ssh_audit/fleet', null, t('ssh_audit.fleet_view')],
     ['SSH Audit Policies',     'GET',  '/ssh_audit/policies', null, t('ssh_audit.policies_title')],
-    ['SSH Audit Save Config',  'POST', '/ssh-audit/save-config', ['machine_id' => $machineId, 'config' => 'test'], 'Sauvegarder sshd_config'],
-    ['SSH Audit Toggle',       'POST', '/ssh-audit/toggle', ['machine_id' => $machineId, 'directive' => 'X11Forwarding', 'enable' => false], 'Toggle directive ON/OFF'],
+    ['SSH Audit Save Config',  'POST', '/ssh-audit/save-config', ['machine_id' => $mutId, 'config' => 'test'], 'Sauvegarder sshd_config'],
+    ['SSH Audit Toggle',       'POST', '/ssh-audit/toggle', ['machine_id' => $mutId, 'directive' => 'X11Forwarding', 'enable' => false], 'Toggle directive ON/OFF'],
     ['SSH Audit Backups',      'POST', '/ssh-audit/backups', ['machine_id' => $machineId], 'Lister backups sshd_config'],
-    ['SSH Audit Restore',      'POST', '/ssh-audit/restore', ['machine_id' => $machineId, 'backup_name' => 'test'], 'Restaurer un backup'],
-    ['SSH Audit Reload',       'POST', '/ssh-audit/reload', ['machine_id' => $machineId], 'Recharger sshd'],
+    ['SSH Audit Restore',      'POST', '/ssh-audit/restore', ['machine_id' => $mutId, 'backup_name' => 'test'], 'Restaurer un backup'],
+    ['SSH Audit Reload',       'POST', '/ssh-audit/reload', ['machine_id' => $mutId], 'Recharger sshd'],
 
     // ── Services systemd ─────────────────────────────────────────────────
     ['Services List',          'POST', '/services/list', ['machine_id' => $machineId], 'Liste services systemd'],
     ['Service Status',         'POST', '/services/status', ['machine_id' => $machineId, 'service' => 'cron'], 'Detail service (PID, memoire)'],
-    ['Service Start',          'POST', '/services/start', ['machine_id' => $machineId, 'service' => 'cron'], 'Demarrer un service'],
-    ['Service Stop',           'POST', '/services/stop', ['machine_id' => $machineId, 'service' => 'cron'], 'Arreter un service'],
-    ['Service Restart',        'POST', '/services/restart', ['machine_id' => $machineId, 'service' => 'cron'], 'Redemarrer un service'],
-    ['Service Enable',         'POST', '/services/enable', ['machine_id' => $machineId, 'service' => 'cron'], 'Activer au boot'],
-    ['Service Disable',        'POST', '/services/disable', ['machine_id' => $machineId, 'service' => 'cron'], 'Desactiver au boot'],
+    ['Service Start',          'POST', '/services/start', ['machine_id' => $mutId, 'service' => 'cron'], 'Demarrer un service'],
+    ['Service Stop',           'POST', '/services/stop', ['machine_id' => $mutId, 'service' => 'cron'], 'Arreter un service'],
+    ['Service Restart',        'POST', '/services/restart', ['machine_id' => $mutId, 'service' => 'cron'], 'Redemarrer un service'],
+    ['Service Enable',         'POST', '/services/enable', ['machine_id' => $mutId, 'service' => 'cron'], 'Activer au boot'],
+    ['Service Disable',        'POST', '/services/disable', ['machine_id' => $mutId, 'service' => 'cron'], 'Desactiver au boot'],
     ['Service Logs',           'POST', '/services/logs', ['machine_id' => $machineId, 'service' => 'cron', 'lines' => 10], 'Logs journalctl'],
 
     // ── CVE ─────────────────────────────────────────────────────────────
@@ -181,7 +193,7 @@ $routes = [
     // ── Admin ───────────────────────────────────────────────────────────
     ['Backups List',           'GET',  '/admin/backups', null, t('health.route_backups')],
     ['Temp Permissions',       'GET',  '/admin/temp_permissions', null, t('health.route_temp_permissions')],
-    ['Server Lifecycle',       'POST', '/server_lifecycle', ['machine_id' => $machineId, 'lifecycle_status' => 'active'], t('health.route_server_lifecycle')],
+    ['Server Lifecycle',       'POST', '/server_lifecycle', ['machine_id' => $mutId, 'lifecycle_status' => 'active'], t('health.route_server_lifecycle')],
 ];
 
 $results = [];

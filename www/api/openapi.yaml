@@ -2715,3 +2715,130 @@ paths:
     delete:
       tags: [Wazuh]
       summary: Supprime un rule
+
+  # ─── Per-user policies (v1.22.0) ────────────────────────────────────────
+  /policy/sudo/deploy:
+    post:
+      tags: [Policies]
+      summary: Deploie une politique sudo (superadmin only, step-up 2FA requis)
+      description: |
+        Genere un fichier /etc/sudoers.d/rootwarden-<user> avec un preset metier
+        ou des regles custom. Valide par visudo -cf avant mv atomique.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, server_user_id, preset]
+              properties:
+                machine_id: { type: integer }
+                server_user_id: { type: integer, description: "FK server_user_inventory.id" }
+                preset: { type: string, enum: [all_nopasswd, restart_services, apt_only, read_logs, systemctl_specific, custom] }
+                nopasswd: { type: boolean, default: false }
+                runas: { type: string, default: root }
+                custom_rules: { type: string, description: "Si preset=custom" }
+                services: { type: array, items: { type: string }, description: "Si preset=systemctl_specific" }
+      responses:
+        '200': { description: Deploy reussi (avec deployment_id pour rollback) }
+        '400': { description: Validation visudo echec ou parametres invalides }
+        '403': { description: step_up_required ou role insuffisant }
+
+  /policy/sudo/audit:
+    post:
+      tags: [Policies]
+      summary: Lit le fichier sudoers.d actuel sur le serveur
+      responses:
+        '200': { description: "{exists, content, target_path}" }
+
+  /policy/sudo/remove:
+    post:
+      tags: [Policies]
+      summary: Supprime le fichier sudoers.d (step-up 2FA requis)
+      responses:
+        '200': { description: Suppression OK }
+        '403': { description: step_up_required }
+
+  /policy/sftp/deploy:
+    post:
+      tags: [Policies]
+      summary: Deploie un bloc Match User dans sshd_config.d (superadmin only, step-up 2FA)
+      description: |
+        Genere /etc/ssh/sshd_config.d/rootwarden-<user>.conf. Valide par sshd -t
+        avant reload sshd. Backup .rwbak avec restoration auto si reload echoue.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, server_user_id]
+              properties:
+                machine_id: { type: integer }
+                server_user_id: { type: integer }
+                sftp_only: { type: boolean }
+                chroot_dir: { type: string }
+                working_dir: { type: string }
+                allow_password_auth: { type: boolean, default: true }
+                allow_tcp_forwarding: { type: boolean, default: true }
+                allow_agent_forwarding: { type: boolean, default: true }
+                x11_forwarding: { type: boolean, default: false }
+      responses:
+        '200': { description: Deploy reussi }
+        '400': { description: sshd -t echec, contenu restaure }
+        '403': { description: step_up_required }
+
+  /policy/sftp/audit:
+    post:
+      tags: [Policies]
+      summary: Lit le fichier sshd_config.d/rootwarden-<user>.conf actuel
+      responses:
+        '200': { description: "{exists, content, target_path}" }
+
+  /policy/sftp/remove:
+    post:
+      tags: [Policies]
+      summary: Supprime le bloc Match User et reload sshd (step-up 2FA)
+      responses:
+        '200': { description: Suppression OK }
+
+  /policy/rollback:
+    post:
+      tags: [Policies]
+      summary: Restaure un deploiement passe depuis policy_deployments (step-up 2FA)
+      description: |
+        Re-applique le previous_file_content du deployment cible. machine_id du
+        deployment doit matcher machine_id du caller (anti rollback cross-machine).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [machine_id, deployment_id]
+              properties:
+                machine_id: { type: integer }
+                deployment_id: { type: integer }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: Rollback applique }
+        '400': { description: deployment_id ne correspond pas a machine_id }
+        '404': { description: deployment_id introuvable }
+
+  /policy/deployments:
+    get:
+      tags: [Policies]
+      summary: Historique des deploiements pour (machine_id, server_user_id)
+      parameters:
+        - { name: machine_id, in: query, schema: { type: integer }, required: true }
+        - { name: server_user_id, in: query, schema: { type: integer }, required: true }
+        - { name: policy_type, in: query, schema: { type: string, enum: [sudo, sftp] } }
+      responses:
+        '200': { description: Liste pagine (limit 50, ordre desc) }
+
+  /policy/list:
+    get:
+      tags: [Policies]
+      summary: Liste toutes les politiques configurees en BDD
+      parameters:
+        - { name: machine_id, in: query, schema: { type: integer }, required: false }
+      responses:
+        '200': { description: "{sudo_policies, sftp_policies}" }

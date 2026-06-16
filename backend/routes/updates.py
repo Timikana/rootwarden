@@ -7,12 +7,58 @@ L'ancienne route /update_zabbix redirige vers /supervision/zabbix/deploy.
 import os
 import re
 import time
+import hmac
+import hashlib
 import logging
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger
+from config import Config
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
+
+def _maintenance_block(machine_id):
+    """Retourne une reponse (json, 423) si une fenetre de maintenance interdit
+    l'action mutante maintenant, sinon None. Best-effort (fail-open en cas
+    d'erreur via maintenance.is_allowed)."""
+    try:
+        from maintenance import is_allowed
+        _uid, role = get_current_user()
+        allowed, reason = is_allowed(machine_id, role=role)
+        if not allowed:
+            logger.info("Action mutante bloquee (hors fenetre de maintenance) machine_id=%s", machine_id)
+            return jsonify({
+                'success': False,
+                'message': "Action bloquee : hors fenetre de maintenance autorisee.",
+                'reason': reason,
+            }), 423
+    except Exception as e:
+        logger.debug("maintenance check skipped: %s", e)
+    return None
+
+
+def _log_cmd(machine_id, command, context):
+    """Journalise une commande privilegiee (trail bastion). Best-effort.
+    success=None car les updates streament (resultat connu cote client)."""
+    try:
+        from command_logger import log_command
+        uid, _ = get_current_user()
+        log_command(machine_id, uid, command, context=context, success=None)
+    except Exception:
+        pass
+
 bp = Blueprint('updates', __name__)
+
+
+def _security_exec_token(machine_id) -> str:
+    """Token HMAC deterministe lie au machine_id, signe avec SECRET_KEY.
+
+    Patch (bug/A07) : le callback cron /update_security_exec ne pouvait fournir
+    ni cle API ni session role(2) -> 401 systematique, le suivi "derniere MAJ
+    secu" restait faux. Ce token machine-to-machine, non forgeable sans
+    SECRET_KEY et borne au machine_id, restaure la fonction sans rouvrir la
+    faille A01-NEW-01 (un user role=1 ne peut pas marquer une machine arbitraire)."""
+    msg = f"update_security_exec:{int(machine_id)}".encode('utf-8')
+    return hmac.new(Config.SECRET_KEY.encode('utf-8'), msg, hashlib.sha256).hexdigest()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +211,10 @@ def update_server():
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+    blocked = _maintenance_block(machine_id)
+    if blocked:
+        return blocked
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -186,6 +236,7 @@ def update_server():
             "apt update && apt full-upgrade -y "
             "-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'"
         )
+        _log_cmd(machine_id, command, 'full_update')
 
         def generate():
             with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
@@ -228,6 +279,10 @@ def apply_security_updates():
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+    blocked = _maintenance_block(machine_id)
+    if blocked:
+        return blocked
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -249,6 +304,7 @@ def apply_security_updates():
             "apt-get update && apt-get upgrade --with-new-pkgs --only-upgrade -y "
             "-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef'"
         )
+        _log_cmd(machine_id, command, 'security_update')
 
         def generate():
             with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
@@ -402,6 +458,7 @@ def apt_update():
         else:  # specific
             pkg_str = ' '.join(packages)
             command = f"{env_prefix} && apt-get update && apt-get install -y {dpkg_opts} {pkg_str}"
+        _log_cmd(machine_id, command, 'custom_update')
 
         # Bloquer les paquets exclus le temps de la mise à jour, puis les débloquer
         hold_cmd    = f"apt-mark hold {' '.join(exclusions)}" if exclusions else ""
@@ -443,6 +500,10 @@ def custom_update():
         machine_id = validate_machine_id(data.get('machine_id'))
     except ValueError as e:
         return jsonify({'success': False, 'message': str(e)}), 400
+
+    blocked = _maintenance_block(machine_id)
+    if blocked:
+        return blocked
 
     selected_packages = _validate_package_list(data.get('selected_packages', []))
     excluded_packages = _validate_package_list(data.get('excluded_packages', []))
@@ -638,8 +699,12 @@ def schedule_advanced_security_update():
         )
         # Appel curl pour notifier le backend après exécution
         backend_url = os.environ.get("API_URL", "https://srv-docker:5000")
+        # Token HMAC machine-to-machine (cf. _security_exec_token) - le cron
+        # n'a pas de session, on l'authentifie via ce token borne au machine_id.
+        exec_token = _security_exec_token(machine_id)
         callback_command = (
             "curl -s -X POST -H 'Content-Type: application/json' "
+            f"-H 'X-Update-Token: {exec_token}' "
             f"-d '{{\"machine_id\": {machine_id}}}' {backend_url}/update_security_exec"
         )
         cron_job = f"{cron_time} root {security_command} && {callback_command}\n"
@@ -670,23 +735,33 @@ def schedule_advanced_security_update():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @bp.route('/update_security_exec', methods=['POST'])
-@require_api_key
-@require_role(2)
-@require_machine_access
 @threaded_route
 def update_security_exec():
     """
     Endpoint appelé par le cron job sur la machine distante après l'exécution de la mise à jour de sécurité.
     Met à jour la colonne maj_secu_last_exec_date dans la BDD pour la machine concernée.
 
-    Patch A01-NEW-01 : ajout de @require_role(2) + @require_machine_access.
-    Avant, tout user role=1 pouvait POST {machine_id: N} et marquer arbitrairement
-    une machine comme "a jour" pour masquer une CVE critique.
+    Auth : token HMAC machine-to-machine (header X-Update-Token), borne au
+    machine_id et signe avec SECRET_KEY (cf. _security_exec_token). Remplace les
+    decorateurs session (@require_role/@require_machine_access) qu'un cron ne peut
+    pas satisfaire. Conserve la protection A01-NEW-01 : un user role=1 ne peut pas
+    forger le token (pas de SECRET_KEY) donc ne peut pas marquer une machine
+    arbitraire comme "a jour" pour masquer une CVE.
     """
-    data = request.json
+    data = request.get_json(silent=True) or {}
     machine_id = data.get('machine_id')
     if not machine_id:
         return jsonify({'success': False, 'message': 'machine_id manquant'}), 400
+    # Validation du token (constant-time)
+    provided = request.headers.get('X-Update-Token', '')
+    try:
+        expected = _security_exec_token(machine_id)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'machine_id invalide'}), 400
+    if not provided or not hmac.compare_digest(provided, expected):
+        logger.warning("update_security_exec : token invalide pour machine_id=%s depuis %s",
+                       machine_id, request.remote_addr)
+        return jsonify({'success': False, 'message': 'Non autorise'}), 401
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -714,18 +789,31 @@ def stream_update_logs():
     Stream en temps réel du fichier de log update_servers.log via SSE.
     """
     def generate_logs():
+        # Patch (A04/robustesse) : flux borne dans le temps + heartbeat (cf.
+        # iptables_logs). Evite un thread/contexte mobilise indefiniment par
+        # connexion SSE.
+        MAX_STREAM_S = 600
+        start = time.monotonic()
+        idle = 0
         try:
             with open(update_log_file, "r") as f:
                 f.seek(0, os.SEEK_END)
-                while True:
+                while time.monotonic() - start < MAX_STREAM_S:
                     line = f.readline()
                     if line:
                         yield f"data: {line.strip()}\n\n"
+                        idle = 0
                     else:
                         time.sleep(0.5)
+                        idle += 1
+                        if idle % 20 == 0:
+                            yield ": ping\n\n"
+                yield "data: [Flux ferme apres 10 min - rechargez pour continuer]\n\n"
+        except (GeneratorExit, BrokenPipeError):
+            return
         except Exception as e:
             logging.error(f"Erreur lors du streaming des logs : {e}")
-            yield f"data: [Erreur] {e}\n\n"
+            yield "data: [Erreur de streaming]\n\n"
     return Response(generate_logs(), content_type='text/event-stream', headers={"Cache-Control": "no-cache"})
 
 

@@ -14,9 +14,13 @@
  *   3. Sur chaque <script>inline</script>, ajouter nonce="<?= csp_nonce() ?>".
  *   4. Une fois tous les inline scripts marques, retirer 'unsafe-inline'.
  *
- * Etat actuel : 'unsafe-inline' conserve pour retrocompat. Le nonce est
- * inclus dans la CSP en parallele -> CSP3 navigateurs modernes ignorent
- * 'unsafe-inline' si nonce present (defense in depth deja active).
+ * Etat actuel (corrige) : la CSP reellement emise (csp_header_value() ET le
+ * template Apache php/apache-*.conf.tmpl) utilise 'unsafe-inline' SANS nonce.
+ * Le nonce N'EST PAS encore inclus dans la CSP : ce helper est pret mais pas
+ * cable. La CSP n'apporte donc PAS de barriere XSS sur script-src tant que la
+ * migration (nonce sur chaque <script> inline + retrait de 'unsafe-inline')
+ * n'est pas terminee et testee en conditions reelles. NE PAS supposer que la
+ * CSP protege contre une injection de script -> cf. backlog securite.
  */
 
 if (!function_exists('csp_nonce')) {
