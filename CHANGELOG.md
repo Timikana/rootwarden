@@ -5,6 +5,21 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.37.3] - 2026-06-16 — Fix CI : CVE dépendance cryptography (pip-audit)
+
+Le job CI **SCA Python (pip-audit)** était rouge (mode `--strict`) :
+- **cryptography 47.0.0** → **GHSA-537c-gmf6-5ccf** : les wheels PyPI < 48.0.1
+  embarquent une copie statique d'OpenSSL vulnérable (advisory OpenSSL 2026-06-09).
+- **Correctif** : `backend/requirements.txt` `cryptography==47.0.0` → **`==48.0.1`**.
+  Compatibilité vérifiée (import + AES-GCM + paramiko OK) ;
+  `pip-audit -r requirements.txt --strict` → **« No known vulnerabilities found »**.
+
+> Les jobs `ruff`, `bandit`, `semgrep`, `gitleaks`, `php -l`, `trivy`,
+> `composer audit`, `build Docker` étaient déjà verts ; seul `pip-audit`
+> bloquait (CVE upstream apparue après le pin).
+
+---
+
 ## [1.37.2] - 2026-06-15 — Docs (README FR/EN) + correctifs CI
 
 - **README.md / README.en.md** : titre porté à v1.37.1, section « 🆕 v1.24 → v1.37 »
