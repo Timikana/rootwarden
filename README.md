@@ -1,10 +1,37 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.22.2
+# 🔐 RootWarden v1.37.1
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
 > services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
+
+## 🆕 v1.24 → v1.37 — DevSecOps avancé (⚠️ bêta, validé en dev uniquement)
+
+Vague de fonctionnalités post-audit. Chaque feature = slice complet (migration idempotente + backend + UI + i18n FR/EN + doc + test Puppeteer). **Validées en développement seulement, pas encore en production** — cf. l'avertissement en tête du [CHANGELOG](CHANGELOG.md). Features sensibles **OFF par défaut** (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`). Migrations **052 → 061** à appliquer.
+
+**Sécurité / vulnérabilités**
+- **Priorisation EPSS + CISA KEV** (v1.27) — chaque CVE enrichie d'une probabilité d'exploitation (EPSS, FIRST.org) et d'un flag « activement exploitée » (CISA KEV) ; tri par priorité, re-priorisation sans re-scan.
+- **Score de posture conformité (CIS-like)** (v1.26) — note A-F par serveur (sshd + CVE + fail2ban + dérive), incluse aux exports CSV/PDF.
+- **Détection de dérive de configuration** (v1.24) — compare l'état désiré/réel (sudo, sshd, fail2ban) sans SSH.
+
+**Gouvernance & exploitation**
+- **Groupes de machines + actions de masse** (v1.28) — groupes dynamiques (env / criticité / réseau / tags) ou statiques, scan drift/CVE groupé suivi dans le centre de tâches.
+- **Fenêtres de maintenance** (v1.29) — bornes horaires autorisées pour les actions mutantes (update/reboot bloqués hors fenêtre, HTTP 423 ; bypass superadmin).
+- **Approbation 4-eyes** (v1.30) — double validation par un 2e admin avant les actions destructives (au-delà du step-up 2FA).
+- **Journal des commandes / bastion** (v1.31) — trace des commandes privilégiées réellement exécutées (qui / quoi / où / quand / résultat).
+- **Centre de tâches** (v1.25) — visibilité sur les tâches de fond (scans CVE/SSH/drift, backups).
+
+**Intégrations**
+- **ChatOps bidirectionnel** (v1.32) — statut de la flotte + approbations depuis Slack/Teams (signature Slack ou jeton partagé, mapping utilisateur, règle 4-eyes respectée).
+- **Ticketing ITSM** (v1.33) — finding CVE → ticket Jira / ServiceNow / GLPI / webhook générique (+ auto-création pour les CVE KEV).
+- **Veille des conteneurs Docker** (v1.37) — inventaire par serveur + mises à jour disponibles : côté **image** (digest local vs registre) et côté **git** (commits en retard + changelog).
+
+**Exploitation & UX**
+- **Recherche globale** (v1.34) — serveurs / utilisateurs / CVE / tickets / audit en un point, + visualiseur du journal d'audit (chaîne HMAC) accessible au menu.
+- **Restauration de backup depuis l'UI** (v1.35) — test d'intégrité (sha256), restauration superadmin avec backup de sécurité automatique.
+- **Pages Sudo / SFTP séparées + explications en clair** (v1.36) — chaque option (chroot, ForceCommand, forwarding…) documentée pour les non-experts.
+- **Audit OWASP Top 10 des nouvelles features** (v1.37.1) — 6 correctifs (A01 contrôle d'accès, A03 XSS, A10 SSRF).
 
 ## 🆕 v1.22.x — Politiques sudo + SFTP par utilisateur
 
@@ -68,10 +95,15 @@ Audit OWASP Top 10 complet + 30 findings patches en 3 vagues. Aucune regression 
 - **Bashrc standardise** - Deploiement d'un `.bashrc` unifie par utilisateur (banniere figlet, tableau sysinfo, alertes, prompt git-aware, alias). Mode overwrite ou merge (preservation blocs custom via `~/.bashrc.local`). Backup automatique, restore en 1 clic, validation syntaxique post-deploy, idempotence sha256, preview diff colorise.
 - **Graylog Sidecar** - Deploiement du Graylog Sidecar (filebeat/nxlog/winlogbeat) via SSH. Configuration serveur centralisee, collectors (templates YAML/XML) editables en base avec validation YAML, enregistrement automatique aupres du manager Graylog.
 - **Wazuh Agent** - Deploiement + enrolement de l'agent Wazuh aupres du manager. Gestion groupes, options FIM/active response/SCA/rootcheck par serveur, rules/decoders/CDB lists editables (validation xmllint). Integration API manager pour push des rules.
+- **Conteneurs Docker** (v1.37) - Inventaire des conteneurs par serveur (`docker ps`/`inspect`) + veille de mise a jour : digest image vs registre (Docker Hub/GHCR/interne) et commits git en retard avec changelog
+- **Groupes & actions de masse** (v1.28) - Groupes dynamiques (env/criticité/réseau/tags) ou statiques, scan drift/CVE sur tout un groupe
+- **Fenêtres de maintenance** (v1.29) - Plages horaires autorisées pour les actions mutantes (update/reboot)
 - **Tags personnalisés** - Étiquetez vos serveurs (web, bdd, production, dmz…) et filtrez par tag
 
 ### Scan de vulnérabilités CVE
 - **OpenCVE** - Supporte cloud (app.opencve.io) et on-prem v2 (Bearer token)
+- **Priorisation EPSS + CISA KEV** (v1.27) - probabilité d'exploitation (EPSS) + flag « activement exploitée » (KEV), score de priorité, tri et badges dédiés
+- **Finding → ticket ITSM** (v1.33) - Jira / ServiceNow / GLPI / webhook, + auto-création pour les CVE KEV
 - **Streaming temps réel** - JSON-lines, progression paquet par paquet
 - **Filtres** - Par sévérité (CRITICAL/HIGH/MEDIUM) et par année
 - **Export CSV** - Téléchargement en 1 clic pour chaque serveur

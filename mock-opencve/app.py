@@ -13,7 +13,6 @@ et couvrent les packages courants de Debian Bookworm.
 
 from flask import Flask, request, jsonify
 from functools import wraps
-import base64
 
 app = Flask(__name__)
 
