@@ -5,6 +5,22 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.37.2] - 2026-06-15 — Docs (README FR/EN) + correctifs CI
+
+- **README.md / README.en.md** : titre porté à v1.37.1, section « 🆕 v1.24 → v1.37 »
+  récapitulant les 12 features (avec mention **bêta / non testé en prod**), entrées
+  ajoutées dans Fonctionnalités (EPSS/KEV, Docker, groupes, fenêtres de maintenance).
+  Parité FR/EN respectée. Description du dépôt GitHub mise à jour.
+- **CI — ruff** : 3 erreurs résiduelles corrigées (`mock-opencve/app.py` F401,
+  `scripts/sync-obsidian-vault.py` F401/F541) → `ruff check .` repasse au vert.
+- **CI — bandit** : recréation du fichier de config **`bandit.yml`** (référencé par
+  `bandit -c bandit.yml` mais absent du repo → le job échouait au chargement). Skips
+  documentés des faux positifs/décisions design : B608 (SQL paramétré), B110
+  (best-effort), B601 (paramiko + shlex.quote), B507 (AutoAddPolicy — décision design),
+  B108 (/tmp transitoire). `bandit -r . -ll -ii -c bandit.yml` → 0 finding au seuil.
+
+---
+
 ## [1.37.1] - 2026-06-14 — Hardening : audit OWASP Top 10 des features v1.27→v1.37
 
 Audit OWASP Top 10 ciblé sur les 11 features de la session (4 revues
