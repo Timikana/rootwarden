@@ -25,7 +25,6 @@ n'existe pas).
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
 from datetime import date
@@ -313,7 +312,7 @@ def main():
     if graph_tpl.exists() and not graph_real.exists():
         if not args.dry_run:
             graph_real.write_bytes(graph_tpl.read_bytes())
-        print(f"[sync-obsidian] graph.json restaure depuis template")
+        print("[sync-obsidian] graph.json restaure depuis template")
 
     actions = []
     for src_path in sorted((REPO / 'backend').rglob('*.py')):

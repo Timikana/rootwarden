@@ -12,7 +12,7 @@ status: applied
 routes: []
 tables: [supervision_config]
 imports_detected: []
-last_synced: 2026-05-20
+last_synced: 2026-06-16
 # AUTO-END
 ---
 

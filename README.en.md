@@ -1,10 +1,37 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.22.2
+# RootWarden v1.37.1
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
 > systemd services, sshd_config audit and CVE vulnerabilities - from a single interface.
+
+## 🆕 v1.24 → v1.37 — Advanced DevSecOps (⚠️ beta, dev-tested only)
+
+Post-audit wave of features. Each feature is a full vertical slice (idempotent migration + backend + UI + FR/EN i18n + docs + Puppeteer test). **Validated in development only, not yet in production** — see the warning at the top of the [CHANGELOG](CHANGELOG.md). Sensitive features are **OFF by default** (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`). Apply migrations **052 → 061**.
+
+**Security / vulnerabilities**
+- **EPSS + CISA KEV prioritization** (v1.27) — each CVE enriched with an exploitation probability (EPSS, FIRST.org) and an "actively exploited" flag (CISA KEV); priority sorting, re-prioritize without re-scan.
+- **Compliance posture score (CIS-like)** (v1.26) — A-F grade per server (sshd + CVE + fail2ban + drift), included in CSV/PDF exports.
+- **Configuration drift detection** (v1.24) — compares desired/actual state (sudo, sshd, fail2ban) without SSH.
+
+**Governance & operations**
+- **Machine groups + bulk actions** (v1.28) — dynamic groups (env / criticality / network / tags) or static, group-wide drift/CVE scan tracked in the task center.
+- **Maintenance windows** (v1.29) — allowed time windows for mutating actions (update/reboot blocked outside the window, HTTP 423; superadmin bypass).
+- **4-eyes approval** (v1.30) — second-admin validation before destructive actions (beyond step-up 2FA).
+- **Command log / bastion** (v1.31) — trail of privileged commands actually executed (who / what / where / when / result).
+- **Task center** (v1.25) — visibility on background tasks (CVE/SSH/drift scans, backups).
+
+**Integrations**
+- **Bidirectional ChatOps** (v1.32) — fleet status + approvals from Slack/Teams (Slack signature or shared token, user mapping, 4-eyes enforced).
+- **ITSM ticketing** (v1.33) — CVE finding → Jira / ServiceNow / GLPI / generic webhook ticket (+ auto-create for KEV CVEs).
+- **Docker container watch** (v1.37) — per-server inventory + available updates: **image** side (local digest vs registry) and **git** side (commits behind + changelog).
+
+**Operations & UX**
+- **Global search** (v1.34) — servers / users / CVEs / tickets / audit in one place, + audit-log viewer (HMAC chain) reachable from the menu.
+- **Backup restore from the UI** (v1.35) — integrity test (sha256), superadmin restore with automatic safety backup.
+- **Separate Sudo / SFTP pages + plain-language help** (v1.36) — every option (chroot, ForceCommand, forwarding…) explained for non-experts.
+- **OWASP Top 10 audit of the new features** (v1.37.1) — 6 fixes (A01 access control, A03 XSS, A10 SSRF).
 
 ## 🆕 v1.22.x — Per-user sudo + SFTP policies
 
@@ -68,10 +95,15 @@ Full OWASP Top 10 audit + 30 findings patched across 3 waves. Zero regression de
 - **Standardized Bashrc** - Deploy a unified `.bashrc` per Linux user (figlet banner, sysinfo table, alerts, git-aware prompt, aliases). Overwrite or merge mode (custom blocks preserved via `~/.bashrc.local`). Automatic backup, one-click restore, post-deploy syntax check, sha256 idempotence, colorized diff preview.
 - **Graylog Sidecar** - Deploy the Graylog Sidecar (filebeat/nxlog/winlogbeat) over SSH. Central server configuration, editable YAML/XML collector templates with YAML validation, auto-registration with the Graylog manager.
 - **Wazuh Agent** - Deploy + enroll the Wazuh agent with the manager. Group management, per-server FIM / active response / SCA / rootcheck options, editable rules / decoders / CDB lists (xmllint validation). Manager API integration to push rules.
+- **Docker containers** (v1.37) - Per-server container inventory (`docker ps`/`inspect`) + update watch: image digest vs registry (Docker Hub/GHCR/internal) and git commits behind with changelog
+- **Groups & bulk actions** (v1.28) - Dynamic groups (env/criticality/network/tags) or static, group-wide drift/CVE scan
+- **Maintenance windows** (v1.29) - Allowed time windows for mutating actions (update/reboot)
 - **Custom Tags** - Label your servers (web, db, production, dmz...) and filter by tag
 
 ### CVE Vulnerability Scanning
 - **OpenCVE** - Supports cloud (app.opencve.io) and on-prem v2 (Bearer token)
+- **EPSS + CISA KEV prioritization** (v1.27) - exploitation probability (EPSS) + "actively exploited" flag (KEV), priority score, dedicated sorting and badges
+- **Finding → ITSM ticket** (v1.33) - Jira / ServiceNow / GLPI / webhook, + auto-create for KEV CVEs
 - **Real-time Streaming** - JSON-lines, per-package progress
 - **Filters** - By severity (CRITICAL/HIGH/MEDIUM) and year
 - **CSV Export** - One-click download per server

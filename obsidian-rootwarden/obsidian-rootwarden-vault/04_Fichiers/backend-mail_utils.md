@@ -13,8 +13,8 @@ status: stable
 # AUTO-BEGIN (sync-obsidian-vault.py)
 routes: []
 tables: []
-imports_detected: [config, email, smtplib]
-last_synced: 2026-05-20
+imports_detected: [config, email, html, smtplib, ssl]
+last_synced: 2026-06-16
 # AUTO-END
 ---
 
