@@ -1,6 +1,6 @@
 # Conventions sécurité — RootWarden
 
-Ce document liste les règles à respecter pour **éviter les régressions** détectées lors de l'audit OWASP Top 10 du 2026-05-19. Les findings correspondants sont entre parenthèses (ex `A01-01`). La plupart des règles sont enforced en CI via `.semgrep/rules-rootwarden.yml`.
+Ce document liste les règles à respecter pour **éviter les régressions** détectées lors des audits OWASP Top 10 (2026-05-19, puis audit des features v1.27→v1.37 le 2026-06-14, cf [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) « Audit 5 »). Les findings correspondants sont entre parenthèses (ex `A01-01`). Les règles `.semgrep/rules-rootwarden.yml` tournent en CI en **job advisory non bloquant** (à passer bloquant après tri des faux positifs).
 
 ## 1. Authentification & accès (A01, A04, A07)
 
@@ -11,6 +11,8 @@ Ce document liste les règles à respecter pour **éviter les régressions** dé
 - **Toute attribution d'accès** (machine, permission) doit refuser le self-grant pour un non-superadmin (A01-04).
 - **2FA** : utiliser `if/elseif/else` exclusifs sur les conditions de rate-limit + verify (A07-01). Le rate-limit doit `exit;` ou continuer dans une branche `elseif`, jamais juste setter `$error`.
 - **API_KEY fallback** : `Config.API_KEY` ne doit s'activer QUE si `API_KEY_BOOTSTRAP=1` est positionné explicitement (A07-02).
+- **Approbation 4-eyes** (v1.30, `approvals.py`) : une demande ne peut être approuvée que par un admin **différent du demandeur** (`approved_by != requested_by`) — contrôle côté serveur, jamais seulement en UI. Le superadmin contourne (mono-admin).
+- **Exception d'auth assumée** : `POST /chatops/command` (v1.32) n'utilise **pas** `@require_api_key` — il est authentifié par **signature Slack (HMAC v0, anti-rejeu)** ou jeton partagé (constant-time). C'est volontaire (Slack/Teams ne peuvent pas envoyer la clé). La règle semgrep `rw-flask-route-without-api-key` y fait donc un faux positif → annoter `# nosemgrep` si on la passe bloquante.
 
 ## 2. Cryptographie (A02)
 
@@ -44,12 +46,14 @@ Ce document liste les règles à respecter pour **éviter les régressions** dé
   ```
 - **Logs** : passer par `logger.info/warning/error/debug`. Le `_SecretScrubFilter` enlève automatiquement passwords/tokens/api_keys, mais c'est une dernière ligne de défense — **ne logge jamais sciemment** un secret (A09-04).
 - **Pas de `print()` direct dans le code backend**. Toujours `logger`.
+- **Journal des commandes / bastion** (v1.31, `command_logger.py`) : les actions privilégiées (reboot, delete_remote_user, updates) doivent être tracées via `log_command(machine_id, user_id, cmd, context, success)` — qui/quoi/où/quand. Best-effort (ne casse jamais l'action).
 
 ## 6. SSRF (A10)
 
 - **IP machine** : refuser loopback (`127.*`), link-local (`169.254.*`), unspecified (`0.*`), IPv6 loopback (`::1`), link-local (`fe80::`) (A10-01).
-- **URLs externes** (OpenCVE, NVD, Graylog, Wazuh, Zabbix, webhooks) : passer par `_url_is_safe_external()` avant tout fetch (A10-02).
-- **Pas de fetch avec input user direct** dans l'URL. Toujours valider scheme + host.
+- **URLs externes** (OpenCVE, NVD, Graylog, Wazuh, Zabbix, webhooks, **EPSS/CISA KEV** `cve_enrich.py`, **registres Docker** `docker_registry.py`, **ITSM** `ticketing.py`) : passer par `_url_is_safe_external()` avant tout fetch (A10-02).
+- **Redirections** : ne jamais suivre une redirection sans la revalider. Utiliser `_safe_get()` (désactive `allow_redirects` + re-checke chaque saut) — sinon un service distant (registre/realm/ITSM) peut rediriger vers la metadata cloud (`169.254.169.254`). Cf audit v1.37.1 (docker_registry).
+- **Pas de fetch avec input user direct** dans l'URL. Toujours valider scheme + host (regex hôte pour les registres : pas d'userinfo `legit@interne`).
 
 ## 7. Proxy & API surface (A04)
 
@@ -58,8 +62,9 @@ Ce document liste les règles à respecter pour **éviter les régressions** dé
 
 ## 8. Workflow
 
-- **Audit, pentest, patch sécu** = branche dédiée (`security/...`) + commits atomiques + **JAMAIS de merge** sans validation explicite user.
-- **CI gates bloquants** : bandit, semgrep (owasp-top-ten + custom rules), pip-audit, gitleaks, trivy.
+- **Canaux** : développement sur **`beta`**, release = merge **`beta` → `main`** avec validation explicite. `maj.sh` propose le canal beta/release.
+- **Audit, pentest, patch sécu** : commits atomiques + **JAMAIS de merge `beta`→`main` sans validation explicite user**.
+- **CI gates bloquants** : ruff, php -l, bandit (`-c bandit.yml`), semgrep (owasp-top-ten), pip-audit (`--strict`), composer audit, gitleaks (v3, Node24), trivy (fs + image). `auto-tag` crée `vX.Y.Z` depuis `www/version.txt` (→ doit rester un nom de tag valide, pas d'espaces/parenthèses). Les **règles custom** `.semgrep/rules-rootwarden.yml` tournent en **advisory** (non bloquant) pour l'instant.
 
 ## 9. Checklist code-review sécurité
 
