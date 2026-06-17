@@ -45,7 +45,7 @@ try {
             <select id="f-context" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
                 <option value=""><?= t('cmdlog.all_contexts') ?></option>
             </select>
-            <button id="refresh-btn" class="text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><?= t('cmdlog.refresh') ?></button>
+            <button id="refresh-btn" title="<?= t('cmdlog.tip_refresh') ?>" class="text-sm px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><?= t('cmdlog.refresh') ?></button>
         </div>
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">

@@ -9,6 +9,7 @@ return [
     'search.title' => 'Recherche globale',
     'search.desc' => 'Recherchez en un seul endroit parmi les serveurs, utilisateurs, CVE, tickets et le journal d\'audit.',
     'search.placeholder' => 'Rechercher un serveur, un utilisateur, une CVE, un ticket...',
+    'search.tip_input' => 'Recherche transverse (min. 2 caracteres) : serveurs, utilisateurs, CVE, tickets et journal d\'audit.',
 
     // JS
     'js.search.cat_machines' => 'Serveurs',

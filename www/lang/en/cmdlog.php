@@ -9,6 +9,7 @@ return [
     'cmdlog.all_machines' => 'All machines',
     'cmdlog.all_contexts' => 'All contexts',
     'cmdlog.refresh' => 'Refresh',
+    'cmdlog.tip_refresh' => 'Reload the log using the selected machine/context filters.',
     'cmdlog.col_when' => 'Date',
     'cmdlog.col_machine' => 'Machine',
     'cmdlog.col_user' => 'User',

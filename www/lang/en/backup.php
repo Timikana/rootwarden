@@ -7,6 +7,7 @@ return [
     'backup.title' => 'Database backups',
     'backup.desc' => 'Create, verify (non-destructive restore test) and restore database backups. Each backup has a sha256 checksum.',
     'backup.btn_create' => 'Create backup',
+    'backup.tip_create' => 'Immediately generate a full database backup (with sha256 checksum).',
     'backup.restore_warning' => 'Restore overwrites the current database (DROP TABLE). A safety backup is created automatically first. Superadmin only.',
     'backup.col_file' => 'File',
     'backup.col_size' => 'Size',
@@ -16,7 +17,9 @@ return [
     // JS
     'js.backup.empty' => 'No backup.',
     'js.backup.verify' => 'Verify',
+    'js.backup.tip_verify' => 'Non-destructive restore test: reloads the backup into a temporary database to confirm it is usable.',
     'js.backup.restore' => 'Restore',
+    'js.backup.tip_restore' => 'DESTRUCTIVE: overwrites the current database with this backup. A safety backup is taken first. Superadmin only.',
     'js.backup.creating' => 'Backup in progress...',
     'js.backup.created' => 'Backup created.',
     'js.backup.err_load' => 'Failed to load.',

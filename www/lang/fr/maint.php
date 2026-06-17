@@ -27,6 +27,7 @@ return [
     'maint.loading' => 'Chargement...',
     'maint.mon' => 'Lun', 'maint.tue' => 'Mar', 'maint.wed' => 'Mer', 'maint.thu' => 'Jeu',
     'maint.fri' => 'Ven', 'maint.sat' => 'Sam', 'maint.sun' => 'Dim',
+    'maint.tip_new' => 'Definir une nouvelle plage horaire pendant laquelle les mises a jour/reboots sont autorises. Hors de ces plages, le backend bloque ces actions (sauf superadmin).',
 
     // JS
     'js.maint.empty' => 'Aucune fenetre definie (aucune restriction active).',

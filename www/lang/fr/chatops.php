@@ -17,6 +17,7 @@ return [
     'chatops.f_user' => 'Utilisateur',
     'chatops.f_label' => 'Libelle',
     'chatops.btn_add' => 'Ajouter',
+    'chatops.tip_add' => 'Associer un identifiant de chat (Slack/Teams) a un utilisateur RootWarden, pour que ses commandes soient authentifiees.',
     'chatops.col_platform' => 'Plateforme',
     'chatops.col_chat_id' => 'Identifiant chat',
     'chatops.col_user' => 'Utilisateur',

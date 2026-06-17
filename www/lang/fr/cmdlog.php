@@ -9,6 +9,7 @@ return [
     'cmdlog.all_machines' => 'Toutes les machines',
     'cmdlog.all_contexts' => 'Tous les contextes',
     'cmdlog.refresh' => 'Rafraichir',
+    'cmdlog.tip_refresh' => 'Recharger le journal avec les filtres machine/contexte selectionnes.',
     'cmdlog.col_when' => 'Date',
     'cmdlog.col_machine' => 'Machine',
     'cmdlog.col_user' => 'Utilisateur',

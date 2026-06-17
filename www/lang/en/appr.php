@@ -20,7 +20,9 @@ return [
     // JS
     'js.appr.empty' => 'No request.',
     'js.appr.approve' => 'Approve',
+    'js.appr.tip_approve' => 'Validate this request (4-eyes rule: a different admin than the requester).',
     'js.appr.reject' => 'Reject',
+    'js.appr.tip_reject' => 'Decline this request; an optional reason can be entered.',
     'js.appr.by' => 'by',
     'js.appr.own_hint' => 'You cannot approve your own request (4-eyes rule).',
     'js.appr.confirm' => 'Confirm: :action this request?',
