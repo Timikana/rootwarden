@@ -42,6 +42,8 @@ try {
             </button>
         </div>
 
+        <?php $tipId = 'tickets'; $tipTitle = t('tip.tickets_title'); $tipSteps = [t('tip.tickets_step1'), t('tip.tickets_step2'), t('tip.tickets_step3'), t('tip.tickets_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
+
         <div id="tickets-status" class="mb-4 text-sm"></div>
 
         <!-- Formulaire creation manuelle -->

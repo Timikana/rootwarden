@@ -49,6 +49,8 @@ try {
             </button>
         </div>
 
+        <?php $tipId = 'groups'; $tipTitle = t('tip.groups_title'); $tipSteps = [t('tip.groups_step1'), t('tip.groups_step2'), t('tip.groups_step3'), t('tip.groups_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
+
         <!-- Formulaire de creation (masque par defaut) -->
         <div id="group-form" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-6 space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -37,6 +37,8 @@ $isSuperadmin = ((int)($_SESSION['role_id'] ?? 0)) >= ROLE_SUPERADMIN;
             </button>
         </div>
 
+        <?php $tipId = 'backup'; $tipTitle = t('tip.backup_title'); $tipSteps = [t('tip.backup_step1'), t('tip.backup_step2'), t('tip.backup_step3')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
+
         <?php if ($isSuperadmin): ?>
         <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-sm">
             ⚠️ <?= t('backup.restore_warning') ?>

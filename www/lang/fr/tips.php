@@ -141,4 +141,65 @@ return [
     'tip.profile_step1' => 'Ajoutez votre <strong>email</strong> pour recevoir les notifications (scan CVE, alertes securite).',
     'tip.profile_step2' => 'Collez votre <strong>cle SSH publique</strong> (ed25519 ou RSA) - elle sera deployee sur vos serveurs assignes.',
     'tip.profile_step3' => 'Changez votre <strong>mot de passe</strong> regulierement (politique d\'expiration configurable par l\'admin).',
+
+    // Page Docker (surveillance conteneurs)
+    'tip.docker_title' => 'Comment surveiller les conteneurs Docker ?',
+    'tip.docker_step1' => '<strong>RootWarden detecte</strong> automatiquement les conteneurs Docker qui tournent sur chaque serveur (via SSH).',
+    'tip.docker_step2' => '<strong>Scanner</strong> un serveur (ou "Tout scanner") compare l\'image locale de chaque conteneur a celle du registre : la colonne <em>MaJ image</em> indique si une version plus recente existe.',
+    'tip.docker_step3' => 'La colonne <em>Git</em> signale, pour les conteneurs builds depuis un depot, si des commits sont disponibles en amont (avec le changelog associe).',
+    'tip.docker_step4' => 'Aucune mise a jour n\'est appliquee automatiquement : la page est en lecture seule, elle vous indique seulement quoi mettre a jour.',
+
+    // Page Groupes de serveurs
+    'tip.groups_title' => 'A quoi servent les groupes de serveurs ?',
+    'tip.groups_step1' => '<strong>Creez un groupe</strong> pour rassembler des serveurs qui se ressemblent (meme role, meme environnement, meme client).',
+    'tip.groups_step2' => 'Depuis un groupe, lancez des actions <strong>en masse</strong> : verifier la derive de configuration (drift) ou scanner les CVE sur tous les membres d\'un coup.',
+    'tip.groups_step3' => 'Le bouton <strong>Membres</strong> permet d\'ajouter ou retirer des serveurs du groupe.',
+    'tip.groups_step4' => '<strong>Supprimer</strong> un groupe n\'efface jamais les serveurs : seul le regroupement disparait.',
+
+    // Page Fenetres de maintenance
+    'tip.maint_title' => 'A quoi servent les fenetres de maintenance ?',
+    'tip.maint_step1' => 'Une <strong>fenetre de maintenance</strong> est une plage horaire (jours + heures) pendant laquelle les actions sensibles (mises a jour, reboot) sont autorisees.',
+    'tip.maint_step2' => '<strong>En dehors</strong> de ces plages, le backend bloque ces actions pour eviter une intervention en pleine journee de production.',
+    'tip.maint_step3' => 'Une fenetre peut etre <strong>globale</strong> (tout le parc) ou ciblee sur une <strong>machine</strong> precise.',
+    'tip.maint_step4' => 'Le <strong>superadmin</strong> garde la priorite et peut agir hors fenetre en cas d\'urgence.',
+
+    // Page Approbations (4-eyes)
+    'tip.appr_title' => 'Comment fonctionne la validation a 4 yeux ?',
+    'tip.appr_step1' => 'Certaines actions destructives (suppression de compte, reboot...) creent une <strong>demande d\'approbation</strong> au lieu de s\'executer immediatement.',
+    'tip.appr_step2' => 'Un <strong>second administrateur</strong> doit approuver la demande. On ne peut pas approuver sa propre demande (regle des 4 yeux).',
+    'tip.appr_step3' => '<strong>Approuver</strong> declenche l\'action ; <strong>Rejeter</strong> l\'annule (un motif peut etre saisi).',
+    'tip.appr_step4' => 'Les <strong>superadmins</strong> sont exemptes d\'approbation (utile si un seul admin gere la plateforme).',
+
+    // Page Journal des commandes
+    'tip.cmdlog_title' => 'A quoi sert le journal des commandes ?',
+    'tip.cmdlog_step1' => 'Ce journal trace, facon <strong>bastion</strong>, chaque commande privilegiee reellement executee par RootWarden sur vos serveurs.',
+    'tip.cmdlog_step2' => 'Pour chaque entree vous voyez <strong>qui, quoi, ou, quand</strong> et le resultat (succes / echec).',
+    'tip.cmdlog_step3' => 'Filtrez par <strong>machine</strong> ou par <strong>contexte</strong> pour retrouver une action precise.',
+    'tip.cmdlog_step4' => 'La page est en <strong>lecture seule</strong> : c\'est une preuve d\'audit, on ne peut rien y modifier.',
+
+    // Page ChatOps
+    'tip.chatops_title' => 'Comment piloter RootWarden depuis le chat ?',
+    'tip.chatops_step1' => 'Le <strong>ChatOps</strong> permet de consulter l\'etat du parc et d\'approuver/rejeter des demandes depuis Slack ou Teams.',
+    'tip.chatops_step2' => 'Renseignez l\'<strong>URL du webhook</strong> entrant dans votre Slack/Teams et le secret/jeton correspondant (affiches plus haut).',
+    'tip.chatops_step3' => 'Associez chaque <strong>identifiant de chat</strong> a un utilisateur RootWarden pour que ses commandes soient authentifiees.',
+    'tip.chatops_step4' => 'Commandes disponibles : <code>status</code>, <code>approvals</code>, <code>approve &lt;id&gt;</code>, <code>reject &lt;id&gt;</code>, <code>help</code>.',
+
+    // Page Tickets (ITSM)
+    'tip.tickets_title' => 'Comment fonctionne le ticketing ITSM ?',
+    'tip.tickets_step1' => 'RootWarden peut creer des <strong>tickets</strong> dans votre outil ITSM (GLPI, Jira, ServiceNow ou un webhook generique) a partir des findings, notamment les CVE.',
+    'tip.tickets_step2' => 'Si aucun fournisseur n\'est configure, les tickets restent <strong>locaux</strong> (simple suivi dans RootWarden).',
+    'tip.tickets_step3' => 'Le bouton <strong>Nouveau ticket</strong> ouvre un formulaire de creation manuelle (resume, machine, description).',
+    'tip.tickets_step4' => 'Les doublons sont <strong>dedoublonnes</strong> automatiquement pour ne pas creer plusieurs tickets pour la meme alerte.',
+
+    // Page Recherche globale
+    'tip.search_title' => 'Comment utiliser la recherche globale ?',
+    'tip.search_step1' => 'Tapez au moins <strong>2 caracteres</strong> pour lancer une recherche transverse.',
+    'tip.search_step2' => 'La recherche couvre en un seul endroit : <strong>serveurs, utilisateurs, CVE, tickets</strong> et le <strong>journal d\'audit</strong>.',
+    'tip.search_step3' => 'Les resultats sont regroupes par categorie ; cliquez sur un resultat pour ouvrir la page correspondante.',
+
+    // Page Sauvegardes BDD
+    'tip.backup_title' => 'Comment gerer les sauvegardes de la base ?',
+    'tip.backup_step1' => '<strong>Creer une sauvegarde</strong> genere immediatement un export complet de la base, avec une empreinte sha256 pour garantir son integrite.',
+    'tip.backup_step2' => '<strong>Verifier</strong> recharge la sauvegarde dans une base temporaire (test non destructif) pour confirmer qu\'elle est exploitable.',
+    'tip.backup_step3' => '<strong>Restaurer</strong> est <span class="text-rose-600 font-medium">destructif</span> : cela ecrase la base actuelle. Une sauvegarde de securite est creee automatiquement avant, et l\'action est reservee au superadmin.',
 ];

@@ -29,6 +29,7 @@ checkPermission('can_admin_portal');
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('appr.title') ?></h1>
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('appr.desc') ?></p>
+            <?php $tipId = 'appr'; $tipTitle = t('tip.appr_title'); $tipSteps = [t('tip.appr_step1'), t('tip.appr_step2'), t('tip.appr_step3'), t('tip.appr_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
 
         <div class="mb-4 flex gap-2 text-sm">
