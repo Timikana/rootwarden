@@ -34,6 +34,7 @@ $webhookUrl = (isset($_SERVER['HTTP_HOST']) ? ('https://' . $_SERVER['HTTP_HOST'
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('chatops.title') ?></h1>
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('chatops.desc') ?></p>
+            <?php $tipId = 'chatops'; $tipTitle = t('tip.chatops_title'); $tipSteps = [t('tip.chatops_step1'), t('tip.chatops_step2'), t('tip.chatops_step3'), t('tip.chatops_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
 
         <div id="chatops-status" class="mb-4 text-sm"></div>

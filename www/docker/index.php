@@ -45,6 +45,8 @@ try {
             </div>
         </div>
 
+        <?php $tipId = 'docker'; $tipTitle = t('tip.docker_title'); $tipSteps = [t('tip.docker_step1'), t('tip.docker_step2'), t('tip.docker_step3'), t('tip.docker_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
+
         <div id="docker-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">

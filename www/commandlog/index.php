@@ -33,6 +33,7 @@ try {
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('cmdlog.title') ?></h1>
             <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('cmdlog.desc') ?></p>
+            <?php $tipId = 'cmdlog'; $tipTitle = t('tip.cmdlog_title'); $tipSteps = [t('tip.cmdlog_step1'), t('tip.cmdlog_step2'), t('tip.cmdlog_step3'), t('tip.cmdlog_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
         </div>
 
         <div class="mb-4 flex flex-wrap items-center gap-3">

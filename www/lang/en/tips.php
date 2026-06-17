@@ -126,4 +126,65 @@ return [
     'tip.profile_step1' => 'Add your <strong>email</strong> to receive notifications (CVE scan, security alerts).',
     'tip.profile_step2' => 'Paste your <strong>SSH public key</strong> (ed25519 or RSA) - it will be deployed on your assigned servers.',
     'tip.profile_step3' => 'Change your <strong>password</strong> regularly (expiration policy configurable by admin).',
+
+    // Docker (container monitoring)
+    'tip.docker_title' => 'How to monitor Docker containers?',
+    'tip.docker_step1' => '<strong>RootWarden auto-detects</strong> the Docker containers running on each server (over SSH).',
+    'tip.docker_step2' => '<strong>Scanning</strong> a server (or "Scan all") compares each container\'s local image with the registry: the <em>Image update</em> column shows whether a newer version exists.',
+    'tip.docker_step3' => 'The <em>Git</em> column flags, for containers built from a repository, whether upstream commits are available (with the related changelog).',
+    'tip.docker_step4' => 'No update is applied automatically: the page is read-only, it only tells you what to update.',
+
+    // Server groups
+    'tip.groups_title' => 'What are server groups for?',
+    'tip.groups_step1' => '<strong>Create a group</strong> to gather servers that are alike (same role, environment or customer).',
+    'tip.groups_step2' => 'From a group, run <strong>bulk</strong> actions: check configuration drift or scan CVEs across all members at once.',
+    'tip.groups_step3' => 'The <strong>Members</strong> button lets you add or remove servers from the group.',
+    'tip.groups_step4' => '<strong>Deleting</strong> a group never removes the servers: only the grouping disappears.',
+
+    // Maintenance windows
+    'tip.maint_title' => 'What are maintenance windows for?',
+    'tip.maint_step1' => 'A <strong>maintenance window</strong> is a time range (days + hours) during which sensitive actions (updates, reboot) are allowed.',
+    'tip.maint_step2' => '<strong>Outside</strong> these ranges, the backend blocks those actions to avoid intervening during production hours.',
+    'tip.maint_step3' => 'A window can be <strong>global</strong> (whole fleet) or targeted at a specific <strong>machine</strong>.',
+    'tip.maint_step4' => 'The <strong>superadmin</strong> keeps priority and can act outside windows in an emergency.',
+
+    // Approvals (4-eyes)
+    'tip.appr_title' => 'How does 4-eyes approval work?',
+    'tip.appr_step1' => 'Some destructive actions (account deletion, reboot...) create an <strong>approval request</strong> instead of running immediately.',
+    'tip.appr_step2' => 'A <strong>second administrator</strong> must approve the request. You cannot approve your own (4-eyes rule).',
+    'tip.appr_step3' => '<strong>Approve</strong> triggers the action; <strong>Reject</strong> cancels it (a reason can be entered).',
+    'tip.appr_step4' => '<strong>Superadmins</strong> are exempt from approval (useful when a single admin runs the platform).',
+
+    // Command log
+    'tip.cmdlog_title' => 'What is the command log for?',
+    'tip.cmdlog_step1' => 'This log records, <strong>bastion</strong>-style, every privileged command actually run by RootWarden on your servers.',
+    'tip.cmdlog_step2' => 'For each entry you see <strong>who, what, where, when</strong> and the result (success / failure).',
+    'tip.cmdlog_step3' => 'Filter by <strong>machine</strong> or <strong>context</strong> to find a specific action.',
+    'tip.cmdlog_step4' => 'The page is <strong>read-only</strong>: it is audit evidence, nothing can be edited.',
+
+    // ChatOps
+    'tip.chatops_title' => 'How to drive RootWarden from chat?',
+    'tip.chatops_step1' => '<strong>ChatOps</strong> lets you check fleet status and approve/reject requests from Slack or Teams.',
+    'tip.chatops_step2' => 'Set the inbound <strong>webhook URL</strong> in your Slack/Teams and the matching secret/token (shown above).',
+    'tip.chatops_step3' => 'Map each <strong>chat ID</strong> to a RootWarden user so their commands are authenticated.',
+    'tip.chatops_step4' => 'Available commands: <code>status</code>, <code>approvals</code>, <code>approve &lt;id&gt;</code>, <code>reject &lt;id&gt;</code>, <code>help</code>.',
+
+    // Tickets (ITSM)
+    'tip.tickets_title' => 'How does ITSM ticketing work?',
+    'tip.tickets_step1' => 'RootWarden can create <strong>tickets</strong> in your ITSM tool (GLPI, Jira, ServiceNow or a generic webhook) from findings, notably CVEs.',
+    'tip.tickets_step2' => 'If no provider is configured, tickets stay <strong>local</strong> (simple tracking inside RootWarden).',
+    'tip.tickets_step3' => 'The <strong>New ticket</strong> button opens a manual creation form (summary, machine, description).',
+    'tip.tickets_step4' => 'Duplicates are <strong>deduplicated</strong> automatically so you don\'t get several tickets for the same alert.',
+
+    // Global search
+    'tip.search_title' => 'How to use global search?',
+    'tip.search_step1' => 'Type at least <strong>2 characters</strong> to run a cross-cutting search.',
+    'tip.search_step2' => 'The search covers, in one place: <strong>servers, users, CVEs, tickets</strong> and the <strong>audit log</strong>.',
+    'tip.search_step3' => 'Results are grouped by category; click a result to open the matching page.',
+
+    // Database backups
+    'tip.backup_title' => 'How to manage database backups?',
+    'tip.backup_step1' => '<strong>Create a backup</strong> immediately generates a full database export, with a sha256 checksum to guarantee its integrity.',
+    'tip.backup_step2' => '<strong>Verify</strong> reloads the backup into a temporary database (non-destructive test) to confirm it is usable.',
+    'tip.backup_step3' => '<strong>Restore</strong> is <span class="text-rose-600 font-medium">destructive</span>: it overwrites the current database. A safety backup is taken first, and the action is superadmin-only.',
 ];

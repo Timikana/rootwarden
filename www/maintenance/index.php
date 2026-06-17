@@ -44,6 +44,8 @@ $dayLabels = [t('maint.mon'), t('maint.tue'), t('maint.wed'), t('maint.thu'), t(
             </button>
         </div>
 
+        <?php $tipId = 'maint'; $tipTitle = t('tip.maint_title'); $tipSteps = [t('tip.maint_step1'), t('tip.maint_step2'), t('tip.maint_step3'), t('tip.maint_step4')]; require __DIR__ . '/../includes/howto_tip.php'; ?>
+
         <!-- Formulaire -->
         <div id="win-form" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-6 space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
