@@ -18,6 +18,22 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.37.4] - 2026-06-17 — Hotfix prod : entrypoint hypercorn (config Python)
+
+Le conteneur `python` crashait en boucle au démarrage (`Restarting (1)`) après
+un build neuf (prod), avec :
+`tomllib.TOMLDecodeError: Invalid value` dans `hypercorn ... Config.from_toml`.
+
+- **Cause** : `backend/entrypoint.sh` lançait `hypercorn -c hypercorn_config.py`.
+  Depuis **hypercorn ≥ 0.15**, un chemin de config **sans préfixe est parsé en
+  TOML** ; il tentait donc de lire le fichier **Python** comme du TOML → crash.
+  (Invisible en dev : l'image n'avait pas été rebuildée avec ce nouvel entrypoint.)
+- **Fix** : préfixe **`file:`** → `hypercorn -c file:hypercorn_config.py server:app`
+  (force `Config.from_pyfile`). Validé : `from_pyfile` charge bien `bind=0.0.0.0:5000`.
+- **Déploiement** : `./maj.sh` (rebuild de l'image → nouvel entrypoint).
+
+---
+
 ## [1.37.3] - 2026-06-16 — Fix CI : CVE dépendance cryptography (pip-audit)
 
 Le job CI **SCA Python (pip-audit)** était rouge (mode `--strict`) :
