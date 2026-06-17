@@ -20,7 +20,9 @@ return [
     // JS
     'js.appr.empty' => 'Aucune demande.',
     'js.appr.approve' => 'Approuver',
+    'js.appr.tip_approve' => 'Valider cette demande (regle 4-eyes : un autre admin que le demandeur).',
     'js.appr.reject' => 'Rejeter',
+    'js.appr.tip_reject' => 'Refuser cette demande ; un motif optionnel peut etre saisi.',
     'js.appr.by' => 'par',
     'js.appr.own_hint' => 'Vous ne pouvez pas approuver votre propre demande (regle 4-eyes).',
     'js.appr.confirm' => 'Confirmer : :action cette demande ?',

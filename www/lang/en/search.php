@@ -9,6 +9,7 @@ return [
     'search.title' => 'Global search',
     'search.desc' => 'Search in one place across servers, users, CVEs, tickets and the audit log.',
     'search.placeholder' => 'Search a server, user, CVE, ticket...',
+    'search.tip_input' => 'Cross-cutting search (min. 2 characters): servers, users, CVEs, tickets and audit log.',
 
     // JS
     'js.search.cat_machines' => 'Servers',

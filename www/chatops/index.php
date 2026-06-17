@@ -78,7 +78,7 @@ $webhookUrl = (isset($_SERVER['HTTP_HOST']) ? ('https://' . $_SERVER['HTTP_HOST'
                     <label class="block text-xs text-gray-500 mb-1"><?= t('chatops.f_label') ?></label>
                     <input id="m-label" type="text" class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
                 </div>
-                <button id="m-add" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg"><?= t('chatops.btn_add') ?></button>
+                <button id="m-add" title="<?= t('chatops.tip_add') ?>" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg"><?= t('chatops.btn_add') ?></button>
             </div>
 
             <table class="w-full text-sm">

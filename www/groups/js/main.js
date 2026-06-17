@@ -51,12 +51,12 @@
 
             const actions = document.createElement('div');
             actions.className = 'flex flex-wrap gap-2 mt-1';
-            const mk = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'text-xs px-2.5 py-1 rounded-lg ' + cls; b.textContent = label; b.addEventListener('click', () => fn(b)); return b; };
+            const mk = (label, cls, fn, tip) => { const b = document.createElement('button'); b.className = 'text-xs px-2.5 py-1 rounded-lg ' + cls; b.textContent = label; if (tip) b.title = tip; b.addEventListener('click', () => fn(b)); return b; };
 
-            actions.appendChild(mk(__('groups.act_members'), 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200', () => showMembers(g.id, g.name)));
-            actions.appendChild(mk(__('groups.act_drift'), 'bg-indigo-600 text-white hover:bg-indigo-700', (b) => runAction(g.id, 'drift_scan', b)));
-            actions.appendChild(mk(__('groups.act_cve'), 'bg-amber-600 text-white hover:bg-amber-700', (b) => runAction(g.id, 'cve_scan', b)));
-            actions.appendChild(mk(__('groups.act_delete'), 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 hover:bg-rose-200', (b) => removeGroup(g.id, g.name)));
+            actions.appendChild(mk(__('groups.act_members'), 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200', () => showMembers(g.id, g.name), __('groups.tip_members')));
+            actions.appendChild(mk(__('groups.act_drift'), 'bg-indigo-600 text-white hover:bg-indigo-700', (b) => runAction(g.id, 'drift_scan', b), __('groups.tip_drift')));
+            actions.appendChild(mk(__('groups.act_cve'), 'bg-amber-600 text-white hover:bg-amber-700', (b) => runAction(g.id, 'cve_scan', b), __('groups.tip_cve')));
+            actions.appendChild(mk(__('groups.act_delete'), 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 hover:bg-rose-200', (b) => removeGroup(g.id, g.name), __('groups.tip_delete')));
             card.appendChild(actions);
 
             const membersBox = document.createElement('div');

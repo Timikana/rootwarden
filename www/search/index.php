@@ -31,6 +31,7 @@ $q = trim((string)($_GET['q'] ?? ''));
         <div class="mb-6">
             <input id="search-input" type="search" autofocus
                    value="<?= htmlspecialchars($q) ?>"
+                   title="<?= t('search.tip_input') ?>"
                    placeholder="<?= t('search.placeholder') ?>"
                    class="w-full md:w-2/3 px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500">
             <div id="search-meta" class="text-xs text-gray-400 mt-2"></div>

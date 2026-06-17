@@ -36,7 +36,7 @@ try {
                 <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100"><?= t('tickets.title') ?></h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400"><?= t('tickets.desc') ?></p>
             </div>
-            <button id="new-ticket-btn" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">
+            <button id="new-ticket-btn" title="<?= t('tickets.tip_new') ?>" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 <span><?= t('tickets.btn_new') ?></span>
             </button>
@@ -66,7 +66,7 @@ try {
                 <textarea id="t-desc" rows="3" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"></textarea>
             </div>
             <div class="flex gap-2">
-                <button id="t-save" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg"><?= t('tickets.btn_create') ?></button>
+                <button id="t-save" title="<?= t('tickets.tip_create') ?>" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg"><?= t('tickets.btn_create') ?></button>
                 <button id="t-cancel" class="bg-gray-200 dark:bg-gray-700 text-sm px-4 py-2 rounded-lg"><?= t('tickets.btn_cancel') ?></button>
             </div>
         </div>

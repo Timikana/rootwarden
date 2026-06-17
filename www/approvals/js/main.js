@@ -50,10 +50,11 @@
                 ap.className = 'text-xs px-2.5 py-1 rounded-lg bg-green-600 text-white mr-2 disabled:opacity-40 disabled:cursor-not-allowed';
                 ap.textContent = __('appr.approve');
                 if (a.is_own) { ap.disabled = true; ap.title = __('appr.own_hint'); }
-                else ap.addEventListener('click', () => decide(a.id, 'approve'));
+                else { ap.title = __('appr.tip_approve'); ap.addEventListener('click', () => decide(a.id, 'approve')); }
                 const rj = document.createElement('button');
                 rj.className = 'text-xs px-2.5 py-1 rounded-lg bg-rose-600 text-white';
                 rj.textContent = __('appr.reject');
+                rj.title = __('appr.tip_reject');
                 rj.addEventListener('click', () => decide(a.id, 'reject'));
                 cell.appendChild(ap); cell.appendChild(rj);
             } else if (a.approver) {

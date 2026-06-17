@@ -40,8 +40,8 @@ try {
                     <option value="<?= (int)$m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <button id="scan-one-btn" class="text-sm px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><?= t('docker.btn_scan_one') ?></button>
-                <button id="scan-all-btn" class="text-sm px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg"><?= t('docker.btn_scan_all') ?></button>
+                <button id="scan-one-btn" title="<?= t('docker.tip_scan_one') ?>" class="text-sm px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><?= t('docker.btn_scan_one') ?></button>
+                <button id="scan-all-btn" title="<?= t('docker.tip_scan_all') ?>" class="text-sm px-3 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg"><?= t('docker.btn_scan_all') ?></button>
             </div>
         </div>
 
@@ -55,8 +55,8 @@ try {
                         <th class="text-left px-4 py-3"><?= t('docker.col_container') ?></th>
                         <th class="text-left px-4 py-3"><?= t('docker.col_image') ?></th>
                         <th class="text-left px-4 py-3"><?= t('docker.col_state') ?></th>
-                        <th class="text-left px-4 py-3"><?= t('docker.col_image_update') ?></th>
-                        <th class="text-left px-4 py-3"><?= t('docker.col_git') ?></th>
+                        <th class="text-left px-4 py-3" title="<?= t('docker.tip_col_image_update') ?>"><?= t('docker.col_image_update') ?></th>
+                        <th class="text-left px-4 py-3" title="<?= t('docker.tip_col_git') ?>"><?= t('docker.col_git') ?></th>
                         <th class="text-left px-4 py-3"><?= t('docker.col_checked') ?></th>
                     </tr>
                 </thead>

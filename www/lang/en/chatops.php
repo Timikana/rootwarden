@@ -17,6 +17,7 @@ return [
     'chatops.f_user' => 'User',
     'chatops.f_label' => 'Label',
     'chatops.btn_add' => 'Add',
+    'chatops.tip_add' => 'Link a chat ID (Slack/Teams) to a RootWarden user so their commands are authenticated.',
     'chatops.col_platform' => 'Platform',
     'chatops.col_chat_id' => 'Chat ID',
     'chatops.col_user' => 'User',

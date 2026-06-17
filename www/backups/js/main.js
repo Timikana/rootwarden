@@ -36,12 +36,14 @@
             const vbtn = document.createElement('button');
             vbtn.className = 'text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 mr-2';
             vbtn.textContent = __('backup.verify');
+            vbtn.title = __('backup.tip_verify');
             vbtn.addEventListener('click', () => verify(b.filename, vbtn));
             cell.appendChild(vbtn);
             if (isSA) {
                 const rbtn = document.createElement('button');
                 rbtn.className = 'text-xs px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-700';
                 rbtn.textContent = __('backup.restore');
+                rbtn.title = __('backup.tip_restore');
                 rbtn.addEventListener('click', () => restore(b.filename, rbtn));
                 cell.appendChild(rbtn);
             }

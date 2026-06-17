@@ -27,6 +27,7 @@ return [
     'maint.loading' => 'Loading...',
     'maint.mon' => 'Mon', 'maint.tue' => 'Tue', 'maint.wed' => 'Wed', 'maint.thu' => 'Thu',
     'maint.fri' => 'Fri', 'maint.sat' => 'Sat', 'maint.sun' => 'Sun',
+    'maint.tip_new' => 'Define a new time window during which updates/reboots are allowed. Outside these windows the backend blocks those actions (except superadmin).',
 
     // JS
     'js.maint.empty' => 'No window defined (no active restriction).',
