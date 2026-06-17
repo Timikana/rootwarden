@@ -22,4 +22,7 @@ fi
 # Patch (bug) : on charge hypercorn_config.py via -c. Avant, les flags etaient
 # passes en CLI et le fichier de config (workers=4, bind, cert) etait IGNORE ->
 # le backend tournait avec 1 seul worker (defaut) malgre la config.
-exec gosu rootwarden hypercorn -c hypercorn_config.py server:app
+# IMPORTANT (hypercorn >= 0.15) : un chemin de config SANS prefixe est parse en
+# TOML. Pour un fichier Python il FAUT le prefixe `file:` (sinon
+# TOMLDecodeError au boot). Cf hypercorn __main__._load_config.
+exec gosu rootwarden hypercorn -c file:hypercorn_config.py server:app
