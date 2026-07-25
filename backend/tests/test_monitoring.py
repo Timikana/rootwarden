@@ -62,24 +62,27 @@ class TestServerStatus:
         assert data['success'] is False
 
     @patch('socket.socket')
-    def test_server_status_online(self, mock_socket_cls, client, admin_headers, mock_db):
+    def test_server_status_online(self, mock_socket_cls, client, admin_headers, mock_cursor):
         mock_sock = MagicMock()
         mock_sock.connect_ex.return_value = 0
         mock_socket_cls.return_value = mock_sock
 
-        resp = client.post('/server_status', headers=admin_headers, json={'ip': '10.0.0.1', 'port': 22})
+        # Patch A01-02 : /server_status resout machine_id -> ip en BDD (plus d'ip brute).
+        mock_cursor._results = [{'id': 1, 'ip': '10.0.0.1', 'port': 22, 'name': 'srv1', 'online_status': 'OFFLINE'}]
+        resp = client.post('/server_status', headers=admin_headers, json={'machine_id': 1})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['success'] is True
         assert data['status'] == 'online'
 
     @patch('socket.socket')
-    def test_server_status_offline(self, mock_socket_cls, client, admin_headers, mock_db):
+    def test_server_status_offline(self, mock_socket_cls, client, admin_headers, mock_cursor):
         mock_sock = MagicMock()
         mock_sock.connect_ex.return_value = 1
         mock_socket_cls.return_value = mock_sock
 
-        resp = client.post('/server_status', headers=admin_headers, json={'ip': '10.0.0.1'})
+        mock_cursor._results = [{'id': 1, 'ip': '10.0.0.1', 'port': 22, 'name': 'srv1', 'online_status': 'ONLINE'}]
+        resp = client.post('/server_status', headers=admin_headers, json={'machine_id': 1})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['status'] == 'offline'

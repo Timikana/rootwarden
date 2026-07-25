@@ -84,7 +84,9 @@ class TestMachineAccessControl:
 class TestCheckMachineAccess:
     """Tests unitaires de la fonction check_machine_access."""
 
-    def test_admin_always_has_access(self, app):
+    def test_admin_always_has_access(self, app, mock_cursor):
+        # check_machine_access -> get_current_user (DB-verified). mock_cursor patche
+        # mysql.connector.connect et reconnait le SELECT FROM users (role via X-User-ID).
         from routes.helpers import check_machine_access
         with app.test_request_context(headers={'X-User-ID': '1', 'X-User-Role': '2'}):
             assert check_machine_access(1) is True
@@ -99,15 +101,14 @@ class TestCheckMachineAccess:
             with patch('mysql.connector.connect', return_value=mock_conn):
                 assert check_machine_access(1) is False
 
-    def test_user_with_access(self, app):
+    def test_user_with_access(self, app, mock_cursor):
+        # user role=1 (X-User-ID=10) : get_current_user reconnait le SELECT users,
+        # puis check_machine_access interroge user_machine_access -> _results[0] present
+        # (curseur simple, fetchone() is not None => True).
         from routes.helpers import check_machine_access
+        mock_cursor._results = [(1,)]
         with app.test_request_context(headers={'X-User-ID': '10', 'X-User-Role': '1'}):
-            mock_conn = MagicMock()
-            mock_cur = MagicMock()
-            mock_cur.fetchone.return_value = (1,)
-            mock_conn.cursor.return_value = mock_cur
-            with patch('mysql.connector.connect', return_value=mock_conn):
-                assert check_machine_access(1) is True
+            assert check_machine_access(1) is True
 
 
 class TestRequireRole:

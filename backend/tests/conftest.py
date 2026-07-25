@@ -20,6 +20,11 @@ API_KEY = 'test-api-key-for-pytest'
 # ── Variables d'environnement AVANT tout import du backend ───────────────────
 os.environ['SECRET_KEY'] = 'a' * 64
 os.environ['API_KEY'] = API_KEY
+# Depuis v1.14.4, la cle API est validee contre la table `api_keys` (DB). En test
+# la DB est mockee (table vide) : sans ce flag, la validation fail-closed -> 401.
+# API_KEY_BOOTSTRAP=1 autorise le fallback sur Config.API_KEY quand la table est vide
+# (identique a ce que fait le job CI test-python). Doit etre defini AVANT import Config.
+os.environ['API_KEY_BOOTSTRAP'] = '1'
 os.environ.setdefault('DB_HOST', 'localhost')
 os.environ.setdefault('DB_USER', 'test')
 os.environ.setdefault('DB_PASSWORD', 'test')
