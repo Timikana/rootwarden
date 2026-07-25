@@ -76,25 +76,18 @@ jobs:
           [ $errors -eq 0 ] || exit 1
 
   # ─────────────────────────────────────────────────────────────
-  # Job 3 : Tests pytest (routes API backend) - NON BLOQUANT v1.21.0
+  # Job 3 : Tests pytest (routes API backend) - BLOQUANT
   #
-  # TODO #pytest-rewrite-v1.22 : les tests d'integration ont ete ecrits
-  # pour l'ancien modele d'auth (headers-based). Le patch securite A01-01
-  # de la v1.21.0 a transforme get_current_user en lecture DB stricte, ce
-  # qui invalide ~50 tests qui injectaient X-User-Role en header. La
-  # reecriture necessite soit (a) un setup MySQL complet en CI avec seed
-  # de users + permissions, soit (b) un refactoring profond des tests
-  # pour utiliser flask.g directement.
-  #
-  # Job marque continue-on-error : la CI reste verte (bandit/semgrep/
-  # pip-audit/gitleaks restent bloquants). A reactiver bloquant en v1.22
-  # apres la reecriture.
+  # Historique : le patch securite A01-01 (v1.21.0) a rendu get_current_user
+  # DB-verified, invalidant les tests qui injectaient X-User-Role en header.
+  # Repare : conftest.py mocke la DB (MockCursor reconnait les SELECT users/
+  # permissions/api_keys) et definit API_KEY_BOOTSTRAP=1. Suite 169/169 verte,
+  # sans setup MySQL reel -> job repasse BLOQUANT (#pytest-rewrite-v1.22 clos).
   # ─────────────────────────────────────────────────────────────
   test-python:
     name: Tests pytest
     runs-on: ubuntu-latest
     needs: lint-python
-    continue-on-error: true  # TODO #pytest-rewrite-v1.22
     steps:
       - uses: actions/checkout@v5
 
@@ -115,7 +108,7 @@ jobs:
           API_KEY: test-api-key-for-ci
           API_KEY_BOOTSTRAP: "1"
         run: |
-          python -m pytest tests/ -v --tb=short --junitxml=../test-results.xml || true
+          python -m pytest tests/ -v --tb=short --junitxml=../test-results.xml
 
       - name: Upload test results
         if: always()
