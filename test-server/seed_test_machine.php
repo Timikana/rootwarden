@@ -15,12 +15,16 @@ $_SESSION = ['user_id' => 2, 'username' => 'superadmin', 'role_id' => 3,
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../adm/includes/crypto.php';
 
+// IP du conteneur test-server sur le reseau Docker interne (docker-compose.yml).
+// Les mots de passe proviennent de l'environnement (TEST_SERVER_*_PASSWORD de
+// srv-docker.env) pour rester synchronises avec le conteneur ; fallback sur les
+// anciennes valeurs par defaut si non fournis.
 $name          = 'Test-Server-Debian';
-$ip            = '192.169.50.6';
+$ip            = getenv('TEST_SERVER_IP') ?: '10.10.10.10';
 $port          = 22;
 $user          = 'testuser';
-$password      = 'testpass';
-$rootPassword  = 'rootpass';
+$password      = getenv('TEST_SERVER_USER_PASSWORD') ?: 'testpass';
+$rootPassword  = getenv('TEST_SERVER_ROOT_PASSWORD') ?: 'rootpass';
 $environment   = 'DEV';
 $criticality   = 'NON CRITIQUE';
 $networkType   = 'INTERNE';
