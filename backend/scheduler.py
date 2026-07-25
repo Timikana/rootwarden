@@ -34,6 +34,57 @@ def _get_db():
     return mysql.connector.connect(**Config.DB_CONFIG)
 
 
+# ── Verrou de leader (multi-workers Hypercorn) ──────────────────────────────
+# Hypercorn demarre `workers` processus (4 en prod, cf hypercorn_config.py) qui
+# importent chacun server.py et lancent donc chacun ce scheduler. Sans garde-fou,
+# chaque job planifie (scan CVE, audit SSH, backup, purges, notifications) est
+# execute une fois PAR worker : next_run n'est mis a jour qu'APRES l'execution,
+# la fenetre de course entre workers est donc de plusieurs minutes.
+# (Probleme reel depuis v1.37.4 : avant le fix `file:` de l'entrypoint, la config
+# etait ignoree et un seul worker tournait, ce qui masquait le defaut.)
+#
+# Solution : verrou nomme MySQL GET_LOCK porte par une connexion DEDIEE gardee
+# ouverte. Un seul worker (le "leader") execute les jobs ; les autres candidatent
+# a chaque iteration et reprennent la main si le leader meurt (cote MySQL, la
+# fermeture/perte de la session libere automatiquement le verrou).
+_LEADER_LOCK_NAME = 'rootwarden_scheduler'
+_leader_conn = None
+
+
+def _ensure_leader() -> bool:
+    """Retourne True si CE processus detient le verrou de leader du scheduler."""
+    global _leader_conn
+    if _leader_conn is not None:
+        try:
+            # reconnect=False obligatoire : une reconnexion transparente creerait
+            # une NOUVELLE session MySQL qui ne detient plus le verrou.
+            _leader_conn.ping(reconnect=False, attempts=1, delay=0)
+            return True
+        except Exception:
+            try:
+                _leader_conn.close()
+            except Exception:
+                pass
+            _leader_conn = None
+            _log.warning("Scheduler: connexion du verrou leader perdue, "
+                         "candidature a la reprise")
+    try:
+        conn = _get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT GET_LOCK(%s, 0)", (_LEADER_LOCK_NAME,))
+        row = cur.fetchone()
+        cur.close()
+        if row and row[0] == 1:
+            _leader_conn = conn
+            _log.info("Scheduler: verrou leader acquis, ce worker execute "
+                      "les jobs planifies")
+            return True
+        conn.close()
+    except Exception as e:
+        _log.debug("Scheduler: acquisition du verrou leader impossible : %s", e)
+    return False
+
+
 def _compute_next_run(cron_expr: str, from_dt: datetime = None) -> datetime:
     """Calcule le prochain run a partir d'une expression cron."""
     from croniter import croniter
@@ -437,6 +488,13 @@ def _scheduler_loop_with_purge():
     global _purge_counter
     _log.info("Scheduler demarre (CVE + SSH Audit + purge, intervalle: %ds)", _CHECK_INTERVAL)
     while True:
+        # Un seul worker execute les jobs (verrou leader MySQL) ; les autres
+        # restent en veille et candidatent a chaque iteration (reprise
+        # automatique si le processus leader meurt).
+        if not _ensure_leader():
+            time.sleep(_CHECK_INTERVAL)
+            continue
+
         # Scans CVE + audits SSH planifies
         # Patch (bug) : la connexion est fermee dans un finally (avant, conn.close()
         # etait dans le try -> toute exception fuyait la connexion MySQL a chaque
