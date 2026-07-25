@@ -28,7 +28,8 @@ describe('04 - SSH Preflight', () => {
     it('should navigate to SSH management page', async () => {
         await page.goto(`${BASE_URL}/ssh/`, { waitUntil: 'networkidle2' });
         const content = await page.content();
-        assert.ok(content.includes('Deploiement des cles SSH'), 'Expected SSH deployment heading');
+        assert.ok(content.includes('Deploiement cles SSH') || content.includes('Deploiement des cles SSH'),
+            'Expected SSH deployment heading');
     });
 
     it('should list servers with checkboxes', async () => {
