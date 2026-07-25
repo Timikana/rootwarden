@@ -7,7 +7,7 @@
  *   - Formulaire configuration globale affiche
  *   - Tableau deploiement affiche
  *   - Editeur de configuration affiche
- *   - Onglet monitoring placeholder affiche
+ *   - Onglet profils (catalogue de profils reutilisables) affiche
  */
 import puppeteer from 'puppeteer';
 import { login, BASE_URL, assertTextPresent, assertSelector, sleep, generateTOTP } from './helpers.mjs';
@@ -83,13 +83,15 @@ async function run() {
     await assertSelector(page, '#editor-server');
     console.log('    OK - editeur de config');
 
-    // Onglet 4 : Monitoring
-    console.log('[5] Onglet Monitoring...');
-    await page.click('.tab-btn[data-tab="monitoring"]');
+    // Onglet 4 : Profils de supervision (l'ancien onglet "monitoring" placeholder
+    // a ete remplace par le catalogue de profils reutilisables).
+    console.log('[5] Onglet Profils...');
+    await page.click('.tab-btn[data-tab="profiles"]');
     await sleep(500);
-    await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-04-monitoring.png`, fullPage: true });
-    console.log('    Screenshot: supervision-04-monitoring.png');
-    console.log('    OK - placeholder monitoring');
+    await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-04-profiles.png`, fullPage: true });
+    console.log('    Screenshot: supervision-04-profiles.png');
+    await assertSelector(page, '#profiles-tbody');
+    console.log('    OK - catalogue de profils');
 
     // Retour onglet config et verif page updates
     console.log('[6] Verification page Updates (pas de Zabbix)...');

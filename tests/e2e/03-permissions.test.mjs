@@ -12,7 +12,10 @@ import assert from 'node:assert';
 import { launchBrowser, newPage, login, sleep, BASE_URL } from './helpers.mjs';
 
 let browser, page;
-const TARGET_USER_ID = '1'; // admin
+// Cible decouverte dynamiquement : le 1er user AVEC des permissions editables.
+// (Le superadmin a toutes ses permissions par bypass -> cases non editables,
+// rendues en <span> sans input[data-permission]. On cible donc un role < 3.)
+let TARGET_USER_ID = null;
 
 describe('03 - Permissions htmx toggle', () => {
     before(async () => {
@@ -28,12 +31,11 @@ describe('03 - Permissions htmx toggle', () => {
     it('should navigate to Acces & Droits tab', async () => {
         await page.goto(`${BASE_URL}/adm/admin_page.php`, { waitUntil: 'networkidle2' });
 
-        // Cliquer sur l'onglet "Acces & Droits"
+        // Activer l'onglet "Acces & Droits" via le mecanisme natif de la page
+        // (switchTab('access')). L'ancienne approche (clic sur le 1er element
+        // contenant "Droits") pouvait cliquer un lien de menu et changer de page.
         await page.evaluate(() => {
-            const tabs = document.querySelectorAll('[role="tab"], button, a');
-            for (const t of tabs) {
-                if (t.textContent.trim().includes('Droits')) { t.click(); break; }
-            }
+            if (typeof switchTab === 'function') switchTab('access');
         });
         await sleep(500);
 
@@ -41,28 +43,35 @@ describe('03 - Permissions htmx toggle', () => {
         assert.ok(content.includes("Droits d'acces") || content.includes('Droits'), 'Expected permissions section');
     });
 
-    it('should open admin permissions card', async () => {
-        await page.evaluate((userId) => {
-            const details = document.querySelectorAll('details');
-            for (const d of details) {
-                const summary = d.querySelector('summary');
-                if (summary && summary.textContent.includes('admin') && summary.textContent.includes('/10')) {
+    it('should open an editable permissions card', async () => {
+        // Les checkboxes de permission portent data-permission ET hx-post vers
+        // update_permissions.php (a distinguer des prefs de notification qui
+        // partagent data-user-id/hx-post). Le badge du resume est "X/Y droits"
+        // (Y = nombre reel de permissions, pas un "/10" fige). On decouvre le 1er
+        // user editable (role < 3) plutot que de coder un id en dur.
+        TARGET_USER_ID = await page.evaluate(() => {
+            const cards = document.querySelectorAll('.perm-card');
+            for (const d of cards) {
+                const cb = d.querySelector('input[data-permission][hx-post]');
+                if (cb) {
                     d.setAttribute('open', '');
                     d.scrollIntoView();
-                    break;
+                    return cb.dataset.userId;
                 }
             }
-        }, TARGET_USER_ID);
+            return null;
+        });
+        assert.ok(TARGET_USER_ID, 'Expected at least one editable permissions card (role < 3)');
 
         await sleep(300);
-        const checkbox = await page.$(`input[data-user-id="${TARGET_USER_ID}"][hx-post]`);
-        assert.ok(checkbox, 'Expected htmx permission checkbox for admin');
+        const checkbox = await page.$(`input[data-user-id="${TARGET_USER_ID}"][data-permission][hx-post]`);
+        assert.ok(checkbox, 'Expected htmx permission checkbox for the editable user');
     });
 
     it('should toggle a permission via htmx', async () => {
         // Trouver une permission non cochee pour la cocher
         const permKey = await page.evaluate((userId) => {
-            const cbs = document.querySelectorAll(`input[data-user-id="${userId}"][hx-post]`);
+            const cbs = document.querySelectorAll(`input[data-user-id="${userId}"][data-permission][hx-post]`);
             for (const cb of cbs) {
                 if (!cb.checked) return cb.dataset.permission;
             }
@@ -72,7 +81,7 @@ describe('03 - Permissions htmx toggle', () => {
         if (!permKey) {
             // Toutes cochees - decocher la premiere
             const firstPerm = await page.evaluate((userId) => {
-                const cb = document.querySelector(`input[data-user-id="${userId}"][hx-post]:checked`);
+                const cb = document.querySelector(`input[data-user-id="${userId}"][data-permission][hx-post]:checked`);
                 return cb?.dataset.permission;
             }, TARGET_USER_ID);
             assert.ok(firstPerm, 'No permission checkbox found');
