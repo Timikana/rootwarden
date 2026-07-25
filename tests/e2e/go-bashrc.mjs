@@ -66,15 +66,31 @@ async function main() {
         }
 
         // 3. Liste des serveurs dispo
-        const machines = await page.$$eval('#machine-select option', opts =>
-            opts.filter(o => o.value).map(o => ({ id: o.value, label: o.textContent.trim() }))
+        // La page bashrc utilise une liste multi-serveurs (checkboxes .machine-chk
+        // dans #machine-list, feature v1.21.1), plus l'ancien dropdown #machine-select.
+        // On lit id + nom + environnement (badge de la 4e colonne de la ligne).
+        const machines = await page.$$eval('#machine-list input.machine-chk', chks =>
+            chks.map(c => {
+                const row = c.closest('tr');
+                const envCell = row?.querySelector('td:nth-child(4) span');
+                return {
+                    id: c.value,
+                    label: c.dataset.name || row?.querySelector('td:nth-child(2)')?.textContent.trim() || c.value,
+                    env: (envCell?.textContent || '').trim().toUpperCase(),
+                };
+            })
         );
         if (!machines.length) {
             console.warn('   aucun serveur disponible, skip');
             await browser.close(); return;
         }
         const target = machines[0];
-        console.log(`   serveur cible : ${target.label} (id=${target.id})`);
+        // Garde-fou : ne JAMAIS ecrire sur une machine de PROD depuis les tests E2E.
+        // On garde les operations non-mutantes (users, preview, dry_run) et on saute
+        // le deploy reel + restore si la cible est en environnement PROD.
+        const isProd = target.env === 'PROD';
+        console.log(`   serveur cible : ${target.label} (id=${target.id}, env=${target.env || '?'})`
+            + (isProd ? ' — PROD : deploy reel desactive (safe mode)' : ''));
 
         // 4. Liste users via API proxy
         console.log('→ GET /bashrc/users');
@@ -110,8 +126,11 @@ async function main() {
             console.log(`   diff bytes : current=${r.current_bytes} new=${r.new_bytes} custom=${r.custom_detected}`);
         }
 
-        // 6. Select dans le UI pour screenshot
-        await page.select('#machine-select', target.id);
+        // 6. Cocher la machine dans le UI pour screenshot
+        await page.evaluate((id) => {
+            const cb = document.querySelector(`#machine-list input.machine-chk[value="${id}"]`);
+            if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+        }, target.id);
         await sleep(1500);
         await shot(page, 'users-loaded');
 
@@ -128,31 +147,36 @@ async function main() {
         });
         console.log(`   status=${dry.status} ok=${dry.json?.summary?.ok}/${dry.json?.summary?.total}`);
 
-        // 8. Deploy reel (merge)
-        console.log('→ POST /bashrc/deploy (real, merge)');
-        const deploy = await apiCall(page, '/api_proxy.php/bashrc/deploy', {
-            method: 'POST',
-            body: JSON.stringify({
-                machine_id: parseInt(target.id, 10),
-                users: [testUser.name],
-                mode: 'merge',
-                dry_run: false,
-            }),
-        });
-        console.log(`   status=${deploy.status} summary=${JSON.stringify(deploy.json?.summary)}`);
-        if (!deploy.json?.success) {
-            throw new Error(`deploy failed : ${deploy.json?.message}`);
+        // 8. Deploy reel (merge) — SAUF sur PROD (garde-fou de securite)
+        let depRes = null;
+        if (isProd) {
+            console.log('→ POST /bashrc/deploy (real) : SKIP (machine PROD, safe mode)');
+        } else {
+            console.log('→ POST /bashrc/deploy (real, merge)');
+            const deploy = await apiCall(page, '/api_proxy.php/bashrc/deploy', {
+                method: 'POST',
+                body: JSON.stringify({
+                    machine_id: parseInt(target.id, 10),
+                    users: [testUser.name],
+                    mode: 'merge',
+                    dry_run: false,
+                }),
+            });
+            console.log(`   status=${deploy.status} summary=${JSON.stringify(deploy.json?.summary)}`);
+            if (!deploy.json?.success) {
+                throw new Error(`deploy failed : ${deploy.json?.message}`);
+            }
+            depRes = deploy.json.results[0];
+            console.log(`   deploy result : ok=${depRes.ok} backup=${depRes.backup} syntax_ok=${depRes.syntax_ok} skipped=${depRes.skipped}`);
         }
-        const depRes = deploy.json.results[0];
-        console.log(`   deploy result : ok=${depRes.ok} backup=${depRes.backup} syntax_ok=${depRes.syntax_ok} skipped=${depRes.skipped}`);
 
-        // 9. Liste backups
+        // 9. Liste backups (lecture seule, sans danger)
         console.log('→ GET /bashrc/backups');
         const backups = await apiCall(page, `/api_proxy.php/bashrc/backups?machine_id=${target.id}&user=${testUser.name}`);
         console.log(`   backups count=${(backups.json?.backups || []).length}`);
 
         // 10. Restore (si on a fait un deploy reel avec backup)
-        if (depRes.backup) {
+        if (depRes?.backup) {
             console.log('→ POST /bashrc/restore');
             const restore = await apiCall(page, '/api_proxy.php/bashrc/restore', {
                 method: 'POST',
