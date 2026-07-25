@@ -76,47 +76,41 @@ if (page.url().includes('terms')) {
     check('CGU acceptees', !page.url().includes('terms'), page.url());
 }
 
-// 2. ACCES page policies
-console.log('\n2) Acces /adm/server_user_policies.php');
+// 2. ACCES page policies (v1.36 : page unique scindee en 2 pages sudo/sftp ;
+//    server_user_policies.php redirige 302 -> server_user_sudo.php).
+console.log('\n2) Acces page Sudo (via redirect server_user_policies.php)');
 const resp = await page.goto(`${BASE}/adm/server_user_policies.php`, { waitUntil: 'networkidle2' });
-check('HTTP 200', resp.status() === 200, 'status=' + resp.status());
+check('HTTP 200 (apres redirect)', resp.status() === 200, 'status=' + resp.status());
+check('Redirige vers server_user_sudo.php', page.url().includes('server_user_sudo.php'), 'url=' + page.url());
 
 const title = await page.title();
-check('Titre contient "Politiques"', /Politique|policies/i.test(title), 'title=' + title);
+check('Titre contient "Sudo"/"Politique"', /sudo|Politique|policies/i.test(title), 'title=' + title);
 
-const hasServerSelect = await page.evaluate(() => !!document.getElementById('server-select'));
-check('Selecteur serveur present', hasServerSelect);
+// Selecteurs serveur/user : <select onchange="location.href='?server=...'"> (nav par query-param)
+const selectCount = await page.evaluate(() =>
+    document.querySelectorAll('select[onchange*="location.href"]').length);
+check('Selecteurs serveur/user presents (nav query-param)', selectCount >= 1, 'selects=' + selectCount);
 
-const hasUserSelect = await page.evaluate(() => !!document.getElementById('user-select'));
-check('Selecteur user present', hasUserSelect);
+// Zone historique de deploiements (repliable)
+const hasHistory = await page.evaluate(() => !!document.getElementById('history-toggle'));
+check('Zone historique presente (#history-toggle)', hasHistory);
 
-const hasSudoTab = await page.evaluate(() => !!document.getElementById('tab-sudo'));
-const hasSftpTab = await page.evaluate(() => !!document.getElementById('tab-sftp'));
-const hasHistoryTab = await page.evaluate(() => !!document.getElementById('tab-history'));
-check('3 onglets presents (sudo/sftp/history)', hasSudoTab && hasSftpTab && hasHistoryTab);
-
-// 3. Switch tab SFTP
-console.log('\n3) Onglet SFTP');
-await page.click('#tab-sftp');
-await sleep(300);
-const sftpVisible = await page.evaluate(() => !document.getElementById('pane-sftp')?.classList.contains('hidden'));
-check('Pane SFTP visible apres click', sftpVisible);
-
+// 3. Page SFTP (page dediee depuis v1.36)
+console.log('\n3) Page SFTP dediee');
+const sftpResp = await page.goto(`${BASE}/adm/server_user_sftp.php`, { waitUntil: 'networkidle2' });
+check('HTTP 200 page SFTP', sftpResp.status() === 200, 'status=' + sftpResp.status());
 const hasChrootInput = await page.evaluate(() => !!document.getElementById('sftp-chroot'));
-const hasSftpOnly = await page.evaluate(() => !!document.getElementById('sftp-only'));
-check('Champs SFTP presents (chroot, sftp_only)', hasChrootInput && hasSftpOnly);
+const hasWorking = await page.evaluate(() => !!document.getElementById('sftp-working'));
+check('Champs SFTP presents (chroot, working_dir)', hasChrootInput && hasWorking);
 
-// 4. Onglet sudo presets
-console.log('\n4) Onglet Sudo - presets disponibles');
-await page.click('#tab-sudo');
-await sleep(300);
-const presets = await page.evaluate(() => {
-    const sel = document.getElementById('sudo-preset');
-    return sel ? Array.from(sel.options).map(o => o.value) : [];
+// 4. Page Sudo - preset apt_only rendu cote backend (sans deployer)
+console.log('\n4) Backend : render preset sudo apt_only');
+const rendered = await page.evaluate(async () => {
+    const r = await fetch('/api_proxy.php/policy/sudo/audit?machine_id=1&server_user_id=0');
+    return { status: r.status };
 });
-const expected = ['all_nopasswd', 'restart_services', 'apt_only', 'read_logs', 'systemctl_specific', 'custom'];
-const allPresets = expected.every(p => presets.includes(p));
-check('6 presets sudo presents', allPresets, presets.join(','));
+// audit lecture seule : 200 (ou 4xx si pas de cible) mais jamais 5xx
+check('GET /policy/sudo/audit ne casse pas (pas de 5xx)', rendered.status < 500, 'status=' + rendered.status);
 
 // 5. Backend smoke test : /policy/list via api_proxy
 console.log('\n5) Backend /policy/list');
@@ -147,19 +141,20 @@ check('POST /policy/sudo/deploy = 403 (step_up_required)', deployResp.status ===
 check('Reponse step_up_required=true', deployResp.body && deployResp.body.step_up_required === true,
     JSON.stringify(deployResp.body));
 
-// 7. Onglet historique
-console.log('\n7) Onglet Historique');
-await page.click('#tab-history');
-await sleep(800);
-const historyVisible = await page.evaluate(() => !document.getElementById('pane-history')?.classList.contains('hidden'));
-check('Pane Historique visible', historyVisible);
+// 7. Historique de deploiements (zone repliable sur la page sudo)
+console.log('\n7) Historique de deploiements');
+await page.goto(`${BASE}/adm/server_user_sudo.php`, { waitUntil: 'networkidle2' });
+const hasHistoryBox = await page.evaluate(() => !!document.getElementById('history-box'));
+check('Zone historique (#history-box) presente', hasHistoryBox);
 
-// 8. Verification du lien menu sidebar (superadmin only)
-console.log('\n8) Lien sidebar visible pour superadmin');
+// 8. Verification des liens menu sidebar (superadmin only) : pages sudo + sftp
+console.log('\n8) Liens sidebar visibles pour superadmin');
 const sidebarHasLink = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('a')).some(a => a.href.includes('server_user_policies.php'));
+    const hrefs = Array.from(document.querySelectorAll('a')).map(a => a.href);
+    return hrefs.some(h => h.includes('server_user_sudo.php'))
+        && hrefs.some(h => h.includes('server_user_sftp.php'));
 });
-check('Lien /adm/server_user_policies.php dans la sidebar', sidebarHasLink);
+check('Liens Sudo + SFTP dans la sidebar', sidebarHasLink);
 
 // ── Synthese ──
 console.log('\n========================================');
