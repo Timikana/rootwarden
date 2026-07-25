@@ -216,9 +216,10 @@ class TestCveRemediation:
         assert resp.status_code == 400
 
     def test_remediation_stats(self, client, admin_headers, mock_cursor):
-        # fetchall retourne les stats par status, fetchone retourne overdue count
-        mock_cursor.fetchall = lambda: [{'status': 'open', 'cnt': 3}]
-        mock_cursor.fetchone = lambda: {'cnt': 0}
+        # Ne PAS clobber fetchone : get_current_user (DB-verified depuis v1.21) fait
+        # d'abord un SELECT ... FROM users que le MockCursor reconnait. On passe les
+        # stats via _results (fetchall = by-status ; fetchone overdue = _results[0]).
+        mock_cursor._results = [{'status': 'open', 'cnt': 3}]
         resp = client.get('/cve_remediation/stats', headers=admin_headers)
         assert resp.status_code == 200
 
