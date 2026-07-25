@@ -235,17 +235,25 @@ def app():
     from routes.iptables import bp as iptables_bp
     from routes.updates import bp as updates_bp
     from routes.supervision import bp as supervision_bp
+    # Blueprints des features v1.24+ (gouvernance/observabilite) : les enregistrer
+    # permet de tester leurs routes (roles, validations) au niveau HTTP.
+    from routes.tickets import bp as tickets_bp
+    from routes.search import bp as search_bp
+    from routes.approvals import bp as approvals_bp
+    from routes.maintenance import bp as maintenance_bp
+    from routes.groups import bp as groups_bp
+    from routes.tasks import bp as tasks_bp
+    from routes.commandlog import bp as commandlog_bp
+    from routes.docker import bp as docker_bp
+    from routes.drift import bp as drift_bp
 
     test_app = Flask(__name__)
     test_app.config['TESTING'] = True
 
-    test_app.register_blueprint(monitoring_bp)
-    test_app.register_blueprint(admin_bp)
-    test_app.register_blueprint(ssh_bp)
-    test_app.register_blueprint(cve_bp)
-    test_app.register_blueprint(iptables_bp)
-    test_app.register_blueprint(updates_bp)
-    test_app.register_blueprint(supervision_bp)
+    for _bp in (monitoring_bp, admin_bp, ssh_bp, cve_bp, iptables_bp, updates_bp,
+                supervision_bp, tickets_bp, search_bp, approvals_bp, maintenance_bp,
+                groups_bp, tasks_bp, commandlog_bp, docker_bp, drift_bp):
+        test_app.register_blueprint(_bp)
 
     return test_app
 
