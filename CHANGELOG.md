@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.5, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.6, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,42 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.6] - 2026-07-25 — Sécurité : MAJ dépendances PHP (8 advisories dompdf + otphp)
+
+Audit de dépendances complet (pip-audit + composer audit, 2026-07-25) :
+- **Python : aucune vulnérabilité connue** (cryptography 48.0.1, paramiko 5.0.0,
+  flask 3.1.3... déjà à jour).
+- **PHP : 8 advisories sur 2 paquets**, corrigées par cette release.
+
+### Fix
+- **dompdf/dompdf `v2.0.8` → `v3.1.6`** (contrainte `^2.0` → `^3.1` dans
+  `www/composer.json`) — corrige 6 CVE : CVE-2026-56722 (lecture de fichiers
+  locaux via SVG), CVE-2026-59943 (fuite d'existence de fichiers via SVG),
+  CVE-2026-59942 et CVE-2026-59941 (DoS par épuisement de ressources via images),
+  CVE-2026-55555 (oracle d'existence de fichiers via font-face), CVE-2026-55554
+  (bypass de validation chroot). Exposition réelle limitée (HTML du rapport
+  généré côté serveur, `isRemoteEnabled=false` déjà en place), mais le job CI
+  `sca-php` (strict sur main) serait rouge sans le bump.
+- **spomky-labs/otphp `11.3.0` → `11.5.0`** — corrige GHSA-g7m4-839x-ch6v (HIGH :
+  DivisionByZeroError via paramètre `digits` d'une URI de provisioning) et
+  GHSA-2jx3-65f3-xr8r (MEDIUM : mass-assignment via `loadFromProvisioningUri`).
+  Exposition réelle nulle : `loadFromProvisioningUri` n'est appelé nulle part
+  dans `www/` (les TOTP sont créés via `createFromSecret` avec nos paramètres).
+
+### OWASP / sécurité
+- A06 (Vulnerable and Outdated Components) : `composer audit --locked` repasse à
+  **0 advisory** ; API dompdf utilisée (`loadHtml`/`setPaper`/`render`/`stream`,
+  constructeur options tableau) inchangée entre v2 et v3.
+
+### Vérifié
+- Smoke tests dans le conteneur php : génération + vérification TOTP OK
+  (otphp 11.5.0), rendu PDF OK (`%PDF`, mêmes options que `compliance_report.php`).
+- E2E Puppeteer `01-login.test.mjs` : **6/6 pass** (login + 2FA TOTP → dashboard)
+  après restart du conteneur php.
+- `composer audit --locked` : « No security vulnerability advisories found ».
 
 ---
 
