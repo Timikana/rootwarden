@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.6, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.7, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,36 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.7] - 2026-07-25 — Fix : contraintes requirements.in désynchronisées (risque de régression CVE)
+
+Chasse active aux incohérences de configuration : `backend/requirements.in`
+contraignait deux paquets **en-dessous** de la version verrouillée dans
+`requirements.txt`, ce qui aurait fait **régresser une CVE** au prochain
+`pip-compile` (le lock aurait été recalculé sur la borne haute du `.in`).
+
+### Fix
+- **paramiko** : `.in` `>=4,<5` → `>=5,<6` (le lock est `==5.0.0`, corrigeant
+  **CVE-2026-44405**). Sans ce fix, un `pip-compile` serait redescendu en 4.x.
+- **cryptography** : `.in` `>=47,<48` → `>=48,<49` (le lock est `==48.0.1`,
+  corrigeant **GHSA-537c-gmf6-5ccf**, cf v1.37.3). Idem : `<48` aurait rétrogradé
+  en 47.x.
+- Détection systématique : les autres contraintes `>=x,<y` du `.in` sont
+  cohérentes avec le lock (hypercorn 0.18 < 0.20, flask, werkzeug, etc.).
+
+### Docs
+- README : titre `v1.37.1` → `v1.37.7`, pied de page `v1.20.0 - 2026-05-05`
+  → `v1.37.7 - 2026-07-25` (dérive de version corrigée).
+
+### OWASP / sécurité
+- A06 (Vulnerable and Outdated Components) : élimine un risque latent de
+  réintroduction de deux CVE déjà corrigées lors d'une régénération du lock.
+
+### Vérifié
+- `pip-audit` reste vert (le lock installé est inchangé : paramiko 5.0.0,
+  cryptography 48.0.1) ; seules les bornes du `.in` sont réalignées.
 
 ---
 
