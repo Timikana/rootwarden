@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.3, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.5, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,41 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.5] - 2026-07-25 — Fix : jobs planifiés exécutés une fois PAR worker Hypercorn
+
+Depuis le hotfix v1.37.4 (`hypercorn -c file:...`), la configuration est réellement
+chargée et le backend tourne avec **4 workers**. Or `server.py` démarre le scheduler
+à l'**import du module** : chaque worker lançait donc son propre thread scheduler,
+sans aucun verrou. Conséquence : scans CVE / audits SSH planifiés, backups quotidiens,
+purges et notifications pouvaient être exécutés **jusqu'à 4 fois en parallèle**
+(`next_run` n'est mis à jour qu'APRÈS l'exécution → fenêtre de course de plusieurs
+minutes). Avant v1.37.4, la config était ignorée (1 seul worker effectif) : le défaut
+existait mais était masqué.
+
+### Fix
+- `backend/scheduler.py` : **verrou de leader MySQL** (`GET_LOCK('rootwarden_scheduler')`)
+  porté par une **connexion dédiée gardée ouverte**. Un seul worker (le leader) exécute
+  les jobs ; les autres candidatent à chaque itération (60 s) et reprennent
+  automatiquement la main si le leader meurt (perte de session MySQL = libération
+  automatique du verrou côté serveur).
+- `ping(reconnect=False)` sur la connexion du verrou : une reconnexion transparente
+  créerait une NOUVELLE session MySQL qui ne détiendrait plus le verrou (le leader
+  doit re-candidater explicitement).
+
+### OWASP / sécurité
+- Pas de nouvelle surface d'attaque : verrou interne à la BDD, aucun input utilisateur,
+  requête paramétrée. Améliore l'intégrité opérationnelle (A04/A08 : plus de doubles
+  backups, doubles scans ni notifications dupliquées concurrentes).
+
+### Vérifié
+- Dev Docker, image rebuildée (4 workers effectifs) : 4 threads scheduler démarrés,
+  **1 seul** « verrou leader acquis » dans les logs.
+- Failover : `KILL` de la session MySQL du leader → `WARNING connexion du verrou
+  leader perdue` puis ré-acquisition au cycle suivant (≤ 60 s), verrou re-détenu
+  (`IS_USED_LOCK` non NULL).
 
 ---
 

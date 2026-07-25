@@ -424,7 +424,9 @@ Gestion_SSH_KEY/
 │   │                              get_platform_private_key(), regenerate_platform_key().
 │   │                              Cle dans /app/platform_ssh/ (volume Docker nomme)
 │   ├── 📄 scheduler.py            Thread daemon : scans CVE planifies, purge logs,
-│   │                              backups BDD, notifications expiration MdP, scan users hebdo
+│   │                              backups BDD, notifications expiration MdP, scan users hebdo.
+│   │                              Verrou leader MySQL GET_LOCK (v1.37.5) : un seul worker
+│   │                              Hypercorn execute les jobs, reprise auto si le leader meurt
 │   ├── 📄 db_backup.py            Backup MySQL pure Python (gzip). create_backup(),
 │   │                              cleanup_old_backups(), list_backups()
 │   ├── 📄 webhooks.py        Notifications Slack/Teams/Discord/generic.
