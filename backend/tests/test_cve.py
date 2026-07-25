@@ -38,6 +38,29 @@ class TestCveScan:
         resp = client.post('/cve_scan_all', json={})
         assert resp.status_code == 401
 
+    def test_cve_scan_rate_limit_60s(self, client, admin_headers, mock_cursor):
+        """Patch A04-INSEC-N2 : 60s min entre 2 scans par utilisateur -> 429."""
+        import time as _t
+        import routes.cve as cve
+        try:
+            cve._user_scan_throttle[1] = _t.time()  # user 1 (admin_headers) vient de scanner
+            resp = client.post('/cve_scan', headers=admin_headers, json={'machine_id': 1})
+            assert resp.status_code == 429
+            assert 'patientez' in (resp.get_json() or {}).get('message', '').lower()
+        finally:
+            cve._user_scan_throttle.pop(1, None)
+
+    def test_cve_scan_throttle_expire(self, client, admin_headers, mock_cursor):
+        """Un dernier scan il y a > 60s ne doit PAS declencher le throttle (pas de 429)."""
+        import time as _t
+        import routes.cve as cve
+        try:
+            cve._user_scan_throttle[1] = _t.time() - 120  # il y a 2 min
+            resp = client.post('/cve_scan', headers=admin_headers, json={'machine_id': 1})
+            assert resp.status_code != 429, "un scan vieux de 2 min ne doit pas etre throttle"
+        finally:
+            cve._user_scan_throttle.pop(1, None)
+
 
 class TestCveResults:
     """GET /cve_results - resultats du dernier scan."""
