@@ -46,19 +46,21 @@ try {
     const cfg = await call(page, '/api_proxy.php/graylog/config');
     a(cfg.success === true, 'config load OK');
 
-    console.log('2. POST /graylog/config (invalid url)');
+    // Modele actuel : forwarding rsyslog (server_host + server_port + protocol),
+    // et "templates" (plus "collectors"). L'ancien modele sidecar (server_url/
+    // api_token/collectors) a ete remplace.
+    console.log('2. POST /graylog/config (host invalide)');
     const bad = await call(page, '/api_proxy.php/graylog/config', {
-        method: 'POST', body: JSON.stringify({ server_url: 'not-a-url' })
+        method: 'POST', body: JSON.stringify({ server_host: 'a b c', server_port: 514, protocol: 'udp' })
     });
-    a(bad.success === false, 'URL invalide rejetee');
+    a(bad.success === false, 'host invalide rejete');
 
     console.log('3. POST /graylog/config (valid)');
     const ok = await call(page, '/api_proxy.php/graylog/config', {
         method: 'POST',
         body: JSON.stringify({
-            server_url: 'https://graylog.test:9000',
-            api_token: 'test-token-1234567890',
-            tls_verify: false, sidecar_version: 'latest'
+            server_host: 'graylog.test', server_port: 1514, protocol: 'tcp',
+            ratelimit_burst: 0, ratelimit_interval: 0
         })
     });
     a(ok.success === true, 'config saved');
@@ -67,32 +69,32 @@ try {
     const srv = await call(page, '/api_proxy.php/graylog/servers');
     a(srv.success === true, `servers loaded (${(srv.servers || []).length})`);
 
-    console.log('5. POST /graylog/collectors (invalid name)');
-    const bi = await call(page, '/api_proxy.php/graylog/collectors', {
+    console.log('5. POST /graylog/templates (name invalide)');
+    const bi = await call(page, '/api_proxy.php/graylog/templates', {
         method: 'POST', body: JSON.stringify({ name: 'bad name!', content: '' })
     });
-    a(bi.success === false, 'name invalide rejetee');
+    a(bi.success === false, 'name invalide rejete');
 
-    console.log('6. POST /graylog/collectors (valid + YAML)');
-    const ci = await call(page, '/api_proxy.php/graylog/collectors', {
+    console.log('6. POST /graylog/templates (valide)');
+    const ci = await call(page, '/api_proxy.php/graylog/templates', {
         method: 'POST', body: JSON.stringify({
-            name: 'e2e-test', collector_type: 'filebeat',
-            content: "filebeat.inputs:\n  - type: log\n    paths: ['/var/log/syslog']\n",
-            tags: 'test,e2e'
+            name: 'e2e-test', description: 'template e2e',
+            content: "*.* @@graylog.test:1514;RSYSLOG_SyslogProtocol23Format\n",
+            enabled: true
         })
     });
-    a(ci.success === true, `collector cree (sha=${ci.sha8})`);
+    a(ci.success === true, `template cree (sha=${ci.sha8})`);
 
-    console.log('7. GET /graylog/collectors');
-    const cl = await call(page, '/api_proxy.php/graylog/collectors');
-    a((cl.collectors || []).some(c => c.name === 'e2e-test'), 'collector dans la liste');
+    console.log('7. GET /graylog/templates');
+    const cl = await call(page, '/api_proxy.php/graylog/templates');
+    a((cl.templates || []).some(c => c.name === 'e2e-test'), 'template dans la liste');
 
-    console.log('8. DELETE collector');
-    const d = await call(page, '/api_proxy.php/graylog/collectors/e2e-test', { method: 'DELETE' });
-    a(d.success === true, 'collector supprime');
+    console.log('8. DELETE template');
+    const d = await call(page, '/api_proxy.php/graylog/templates/e2e-test', { method: 'DELETE' });
+    a(d.success === true, 'template supprime');
 
     // Switch UI tabs pour screenshots
-    for (const t of ['deploy', 'collectors', 'history']) {
+    for (const t of ['deploy', 'templates', 'history']) {
         await page.evaluate((tn) => {
             const b = Array.from(document.querySelectorAll('.tab-btn')).find(x => x.dataset.tab === tn);
             if (b) b.click();
