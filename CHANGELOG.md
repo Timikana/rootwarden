@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.9, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.10, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,32 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.10] - 2026-08-05 — Sécurité : bump `cryptography` 48.0.1 → 50.0.0 (3 CVE, CI pip-audit rouge)
+
+**Contexte** : le job CI **SCA Python (pip-audit)** est passé au rouge (bloquant
+l'auto-tag) après la publication de 3 avis de sécurité sur `cryptography 48.0.1`,
+version épinglée dans `requirements.txt`. Aucune modification de code applicatif
+n'était en cause — advisories publiées après le dernier run vert.
+
+### CVE corrigées
+| ID | Impact | Corrigé en |
+|----|--------|-----------|
+| PYSEC-2026-3552 | Oracle de Bleichenbacher sur `pkcs7_decrypt_*` (timing + longueur de clé divulguée) | 50.0.0 |
+| PYSEC-2026-3553 | DoS : blowup exponentiel sur chaînes de certificats auto-signés dupliqués | 49.0.0 |
+| PYSEC-2026-3554 | Contournement de `NameConstraints` : SAN wildcard trop large accepté | 49.0.0 |
+
+### Fix
+- `backend/requirements.in` : `cryptography>=48,<49` → `cryptography>=50,<51`.
+- `backend/requirements.txt` (lock) : `cryptography==48.0.1` → `cryptography==50.0.0`.
+- Vérifié localement : `pip-audit -r requirements.txt --strict` → *No known
+  vulnerabilities found*. Compatible `paramiko==5.0.0` (exige `cryptography>=3.3`).
+
+> **Note CI** : le job *SAST règles custom RootWarden (semgrep, advisory)* reste
+> rouge mais est `continue-on-error: true` — dette connue (findings pré-existants
+> `ssh_utils.py`, `crypto.php`, `machines.py`), non bloquant pour l'auto-tag.
 
 ---
 
