@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.7, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.8, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,50 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.8] - 2026-08-05 — Fix : NOPASSWD ignoré après déploiement de clé SSH (fichiers sudoers dupliqués)
+
+**Symptôme (prod)** : même avec le preset sudo en NOPASSWD, l'utilisateur devait
+toujours saisir son mot de passe après un déploiement de clé SSH.
+
+### Cause (régression de nommage, depuis v1.22.0)
+Deux chemins de code écrivaient le sudoers d'un même utilisateur dans **deux
+fichiers différents** :
+- `configure_servers.add_to_sudoers` (déploiement de clé SSH) → `/etc/sudoers.d/<user>`
+- `sudo_manager.deploy_policy` (page `/adm/server_user_policies.php`) → `/etc/sudoers.d/rootwarden-<user>`
+
+`/etc/sudoers.d` est lu en **ordre lexical** et la **dernière** règle qui matche
+gagne. Les deux fichiers pouvaient être désynchronisés (l'un NOPASSWD, l'autre non)
+et le fichier lu en dernier (`<user>` vient après `rootwarden-<user>`) écrasait la
+règle NOPASSWD → invite mot de passe. `remove_from_sudoers` n'effaçait par ailleurs
+que `/etc/sudoers.d/<user>`, laissant `rootwarden-<user>` orphelin.
+
+### Fix (`backend/configure_servers.py`)
+- Nommage **unifié** : `add_to_sudoers` écrit désormais `/etc/sudoers.d/rootwarden-<user>`,
+  **identique** à `sudo_manager` (`_target_path`). Un redéploiement depuis n'importe
+  quel chemin ÉCRASE le même fichier au lieu d'accumuler des règles contradictoires.
+- **Purge** de l'ancien fichier à nom nu `/etc/sudoers.d/<user>` (helper
+  `_purge_legacy_sudoers`) à chaque add/remove.
+- **Garde-fou** : le fichier du compte de service `/etc/sudoers.d/rootwarden`
+  (géré par `routes/ssh.py`) n'est **jamais** touché (`username == 'rootwarden'` exclu).
+- `remove_from_sudoers` supprime maintenant le fichier unifié **ET** le legacy.
+
+### OWASP / sécurité
+- A05/A08 (intégrité de configuration) : une seule source de vérité par utilisateur
+  dans sudoers.d, plus de règle résiduelle contradictoire.
+- Note de suivi : deux *stores* de desired-state cohabitent encore
+  (`user_machine_access.sudo_preset` côté onglet Accès et `server_user_sudo_policies`
+  côté page policies) — à unifier ultérieurement ; ce correctif règle le conflit de
+  fichiers qui causait le symptôme.
+
+### Vérifié
+- pytest `test_sudoers_naming.py` (7/7) : chemin unifié = `sudo_manager._target_path`,
+  purge legacy, compte de service protégé, contenu rendu contient `NOPASSWD`.
+- Démonstration live sur le test-server (DEV) : fichier legacy sans NOPASSWD →
+  `sudo -l` = `(ALL) ALL` (mdp requis) ; après fix (fichier unifié + purge) →
+  `sudo -l` = `(root) NOPASSWD: ALL`. Suite complète 249/249.
 
 ---
 

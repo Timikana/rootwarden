@@ -198,6 +198,38 @@ def setup_logging(log_file: str):
 # ===================================================
 # Gestion des Sudoers avec sudoers.d
 # ===================================================
+#
+# Convention de nommage UNIFIEE (fix regression) : le fichier sudoers d'un
+# utilisateur gere est /etc/sudoers.d/rootwarden-<user>, IDENTIQUE a celui ecrit
+# par sudo_manager.deploy_policy (page /adm/server_user_policies.php). Avant, ce
+# chemin (deploiement de cle SSH) ecrivait /etc/sudoers.d/<user> tandis que la
+# page policies ecrivait /etc/sudoers.d/rootwarden-<user> : DEUX fichiers pour le
+# meme user. Comme /etc/sudoers.d est lu en ordre lexical et que la DERNIERE regle
+# qui matche gagne, 'rootwarden-<user>' (lu apres '<user>') l'emportait -> une
+# regle sans NOPASSWD pouvait ecraser un deploiement NOPASSWD (et inversement),
+# d'ou "j'ai mis NOPASSWD mais sudo redemande le mot de passe".
+# On ecrit donc le meme fichier des deux cotes (un redeploiement ECRASE au lieu
+# d'accumuler) et on purge l'ancien fichier a nom nu. Le compte de service
+# (/etc/sudoers.d/rootwarden, gere par routes/ssh.py) n'est JAMAIS touche.
+_SUDOERS_PREFIX = 'rootwarden-'
+_RESERVED_SA_USER = 'rootwarden'  # compte de service : son fichier /etc/sudoers.d/rootwarden est intouchable
+
+
+def _sudoers_target(username: str) -> str:
+    """Chemin unifie du fichier sudoers.d d'un utilisateur gere."""
+    return f"/etc/sudoers.d/{_SUDOERS_PREFIX}{username}"
+
+
+def _purge_legacy_sudoers(channel, username: str, logger=None) -> None:
+    """Supprime l'ancien fichier a nom nu /etc/sudoers.d/<user> (naming pre-fix),
+    sauf s'il s'agit du compte de service rootwarden (fichier reserve)."""
+    if username == _RESERVED_SA_USER:
+        return  # ne jamais toucher /etc/sudoers.d/rootwarden (compte de service)
+    try:
+        execute_command_as_root(channel, f"rm -f /etc/sudoers.d/{username}", logger=logger)
+    except Exception as e:
+        if logger:
+            logger.warning(f"[{username}] purge legacy sudoers echouee (non bloquant) : {e}")
 def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
     """
     Ajoute un utilisateur aux sudoers en creant un fichier dans /etc/sudoers.d/.
@@ -243,7 +275,7 @@ def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
         content = f"{username} ALL=(ALL:ALL) NOPASSWD: ALL\n"
 
     try:
-        sudoers_file = f"/etc/sudoers.d/{username}"
+        sudoers_file = _sudoers_target(username)  # /etc/sudoers.d/rootwarden-<user> (unifie)
         import base64 as _b64
         import secrets as _secrets
         b64 = _b64.b64encode(content.encode('utf-8')).decode()
@@ -264,9 +296,13 @@ def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
             return
         # 3. mv atomique
         execute_command_as_root(channel, f"mv {tmp} {sudoers_file}", logger=logger)
+        # 4. purge de l'ancien fichier a nom nu (evite un doublon qui, lu apres
+        #    rootwarden-<user> ? non : lu AVANT, mais il pourrait subsister avec une
+        #    regle contradictoire). On garde une seule source de verite par user.
+        _purge_legacy_sudoers(channel, username, logger=logger)
         if logger:
             preset_label = (policy or {}).get('preset', 'legacy_all_nopasswd')
-            logger.info(f"[{username}] Sudoers deploye (preset={preset_label})")
+            logger.info(f"[{username}] Sudoers deploye ({sudoers_file}, preset={preset_label})")
     except Exception as e:
         if logger:
             logger.error(f"[{username}] Erreur lors de l'ajout aux sudoers : {e}")
@@ -288,10 +324,13 @@ def remove_from_sudoers(channel, username: str, logger=None):
             logger.error(f"remove_from_sudoers : username invalide refuse : {username!r}")
         return
     try:
-        sudoers_file = f"/etc/sudoers.d/{username}"
-        execute_command_as_root(channel, f"rm -f {sudoers_file}", logger=logger)
+        # Supprime le fichier unifie ET l'ancien fichier a nom nu (naming pre-fix),
+        # pour ne laisser AUCUNE regle residuelle. Le compte de service rootwarden
+        # (/etc/sudoers.d/rootwarden) est protege par _purge_legacy_sudoers.
+        execute_command_as_root(channel, f"rm -f {_sudoers_target(username)}", logger=logger)
+        _purge_legacy_sudoers(channel, username, logger=logger)
         if logger:
-            logger.info(f"[{username}] Retiré des sudoers.")
+            logger.info(f"[{username}] Retiré des sudoers (fichier unifie + legacy).")
     except Exception as e:
         if logger:
             logger.error(f"[{username}] Erreur lors du retrait des sudoers : {e}")
