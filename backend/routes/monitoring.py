@@ -372,16 +372,29 @@ def cve_trends():
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
+        # On ne retient que le DERNIER scan de chaque machine pour chaque jour
+        # (rn = 1) avant de sommer entre machines : sinon plusieurs scans d'une
+        # meme machine le meme jour (planification horaire, re-scans manuels)
+        # gonfleraient le total journalier d'autant de fois qu'il y a eu de scans.
         cur.execute("""
-            SELECT DATE(scan_date) as day,
+            SELECT day,
                    SUM(cve_count) as total,
                    SUM(critical_count) as critical,
                    SUM(high_count) as high,
                    SUM(medium_count) as medium
-            FROM cve_scans
-            WHERE status = 'completed'
-              AND scan_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY DATE(scan_date)
+            FROM (
+                SELECT DATE(scan_date) as day, cve_count, critical_count,
+                       high_count, medium_count,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY machine_id, DATE(scan_date)
+                           ORDER BY scan_date DESC
+                       ) as rn
+                FROM cve_scans
+                WHERE status = 'completed'
+                  AND scan_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            ) latest_per_day
+            WHERE rn = 1
+            GROUP BY day
             ORDER BY day
         """)
         trends = cur.fetchall()
