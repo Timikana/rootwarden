@@ -255,6 +255,40 @@ def _run_scheduled_ssh_audit(schedule: dict):
         conn.close()
 
 
+def _purge_cve_scans(cur) -> int:
+    """Purge les vieux scans CVE et retourne le nombre de lignes supprimees.
+
+    Retention basee sur la DUREE (CVE_SCAN_RETENTION_DAYS, defaut 90 j) et non
+    sur un nombre de scans. Le diagramme "Tendances CVE (30 jours)" groupe par
+    JOUR : une retention en nombre (CVE_SCAN_RETENTION=10 scans/machine)
+    effondrait tout l'historique sur une seule date des que plusieurs scans
+    tombaient le meme jour (planification horaire ou re-scans manuels en rafale),
+    d'ou le symptome "un seul point affiche". On conserve en plus AU MOINS
+    CVE_SCAN_RETENTION scans recents par machine (machine scannee rarement +
+    comparaison des 2 derniers scans). Une ligne n'est supprimee que si elle est
+    A LA FOIS hors des N plus recents de sa machine ET plus vieille que la
+    fenetre de retention -> la fenetre du diagramme (>= 30 j) est toujours
+    preservee tant que CVE_SCAN_RETENTION_DAYS >= 30.
+    """
+    cve_min_keep = int(os.environ.get('CVE_SCAN_RETENTION', '10'))
+    cve_retention_days = int(os.environ.get('CVE_SCAN_RETENTION_DAYS', '90'))
+    cur.execute(
+        """
+        DELETE s FROM cve_scans s
+        LEFT JOIN (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (PARTITION BY machine_id ORDER BY scan_date DESC) as rn
+                FROM cve_scans
+            ) ranked WHERE rn <= %s
+        ) keep ON s.id = keep.id
+        WHERE keep.id IS NULL
+          AND s.scan_date < DATE_SUB(NOW(), INTERVAL %s DAY)
+        """,
+        (cve_min_keep, cve_retention_days),
+    )
+    return cur.rowcount
+
+
 def _purge_old_logs():
     """Purge les logs et historiques anciens selon LOG_RETENTION_DAYS."""
     retention_days = int(os.environ.get('LOG_RETENTION_DAYS', '0'))
@@ -311,20 +345,9 @@ def _purge_old_logs():
         except Exception:
             pass
 
-        # Purge des vieux scans CVE (garder les N derniers par machine)
-        cve_retention = int(os.environ.get('CVE_SCAN_RETENTION', '10'))
+        # Purge des vieux scans CVE (retention en DUREE + plancher par machine)
         try:
-            cur.execute("""
-                DELETE s FROM cve_scans s
-                LEFT JOIN (
-                    SELECT id FROM (
-                        SELECT id, ROW_NUMBER() OVER (PARTITION BY machine_id ORDER BY scan_date DESC) as rn
-                        FROM cve_scans
-                    ) ranked WHERE rn <= %s
-                ) keep ON s.id = keep.id
-                WHERE keep.id IS NULL
-            """, (cve_retention,))
-            total_deleted += cur.rowcount
+            total_deleted += _purge_cve_scans(cur)
         except Exception as e:
             _log.debug("CVE scan purge skipped: %s", e)
 

@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.8, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.9, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,59 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.9] - 2026-08-05 — Fix : diagramme « Tendances CVE (30 jours) » réduit à un seul point
+
+**Symptôme (prod)** : sur le dashboard, le diagramme « Tendances CVE (30 jours) »
+n'affichait qu'une seule barre (le dernier jour), sans historique.
+
+### Cause 1 — rétention des scans CVE en NOMBRE au lieu d'une DURÉE
+La purge périodique (`scheduler._purge_old_logs`, active quand
+`LOG_RETENTION_DAYS > 0`) ne gardait que les **N derniers scans par machine**
+(`CVE_SCAN_RETENTION`, défaut **10**), en comptant des **scans**. Or le diagramme
+groupe par **jour** sur 30 jours. Dès que plusieurs scans tombaient le même jour
+(planification horaire ou re-scans manuels en rafale), les 10 scans conservés
+retombaient tous sur la même date → tout l'historique journalier était purgé →
+un seul point affiché.
+
+### Cause 2 — double-comptage intra-journée dans la requête de tendance
+`GET /cve_trends` faisait `SUM(cve_count) … GROUP BY DATE(scan_date)` **sur la
+table brute** : si une machine était scannée plusieurs fois le même jour, son
+compte de CVE était additionné autant de fois qu'il y avait de scans → total
+journalier gonflé (visible une fois l'historique rétabli par le fix ci-dessus).
+
+### Fix
+- **`backend/scheduler.py`** : purge CVE désormais **basée sur la durée**. Nouvelle
+  variable `CVE_SCAN_RETENTION_DAYS` (défaut **90**, ≥ la fenêtre de 30 j du
+  diagramme). Un scan n'est supprimé que s'il est **à la fois** hors des N plus
+  récents de sa machine (`CVE_SCAN_RETENTION`, conservé comme **plancher** pour
+  les machines scannées rarement + la comparaison des 2 derniers scans) **ET**
+  plus vieux que `CVE_SCAN_RETENTION_DAYS`. Logique extraite dans
+  `_purge_cve_scans()` (testable).
+- **`backend/routes/monitoring.py`** (`/cve_trends`) : ne retient plus que le
+  **dernier scan par (machine, jour)** (`ROW_NUMBER() … PARTITION BY machine_id,
+  DATE(scan_date)`, `rn = 1`) avant de sommer entre machines → plus de
+  double-comptage des scans multiples d'une même machine le même jour.
+
+### Configuration
+- Nouvelle variable **`CVE_SCAN_RETENTION_DAYS`** documentée dans
+  `srv-docker.env.example` (récupérée automatiquement via `./maj.sh`). **Doit
+  rester ≥ 30** sous peine de tronquer le diagramme.
+
+### Tests
+- `backend/tests/test_scheduler.py` : 4 tests SPEC (rétention par défaut en
+  durée `(10, 90)`, fenêtre ≥ 30 j, suppression conditionnée aux **deux**
+  critères, override par variables d'env).
+- `backend/tests/test_cve_trends.py` (nouveau) : 4 tests SPEC (fenêtre 30 j
+  préservée, déduplication `(machine, jour)`, SUM appliqué à la sous-requête
+  dédupliquée et non à la table brute).
+- Suite complète : **257 tests OK**.
+
+### Frontend
+Aucun changement : `www/index.php` construisait déjà correctement 30 barres
+(jours manquants remplis à 0) ; le bug était entièrement côté données backend.
 
 ---
 
