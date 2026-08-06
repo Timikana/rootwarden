@@ -20,8 +20,18 @@ from encryption import Encryption
 # Singleton chiffrement
 encryption = Encryption()
 
-# Pool de threads pour les routes longues
-executor = ThreadPoolExecutor(max_workers=10)
+# Pool de threads partage par TOUTES les routes @threaded_route (par worker
+# Hypercorn). Fix v1.37.13 : 10 slots saturaient des que /update/ tirait
+# plusieurs requetes SSH par machine en parallele pendant qu'un scan de parc
+# tournait -> future.result() s'empilait sans timeout -> 504/500 en cascade
+# sur toute l'UI. 32 par defaut (surchargeable via API_THREADPOOL_WORKERS) ;
+# les operations longues de parc (ex. /ssh-audit/scan-all) doivent elles
+# passer en tache de fond (centre de taches), jamais monopoliser ce pool.
+try:
+    _tp_workers = int(os.getenv('API_THREADPOOL_WORKERS', '32'))
+except (TypeError, ValueError):
+    _tp_workers = 32
+executor = ThreadPoolExecutor(max_workers=max(4, _tp_workers))
 
 # Logger global
 logger = logging.getLogger('rootwarden')

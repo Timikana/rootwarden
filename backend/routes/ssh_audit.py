@@ -14,6 +14,7 @@ Routes :
 import json
 import logging
 import datetime
+import threading
 from flask import Blueprint, jsonify, request
 
 from routes.helpers import (
@@ -217,12 +218,71 @@ def ssh_audit_scan():
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
+def _run_scan_all_background(machines, audited_by, task_id):
+    """Audite tout le parc en ARRIERE-PLAN (thread daemon), progression dans
+    le centre de taches. Ne touche jamais au contexte de requete Flask."""
+    from task_tracker import update_task
+    results, errors = 0, []
+    total = len(machines)
+    for idx, machine in enumerate(machines, start=1):
+        mid = machine['id']
+        try:
+            ip, port, user, ssh_pass, root_pass, svc, _, err = _resolve_ssh_creds({'machine_id': mid})
+            if err:
+                errors.append({'machine_id': mid, 'error': err})
+                continue
+            with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+                config_text = get_sshd_config(client, root_pass)
+                if not config_text:
+                    errors.append({'machine_id': mid, 'error': 'Impossible de lire sshd_config'})
+                    continue
+                ssh_version = get_ssh_version(client, root_pass)
+                policies = _load_policies(mid)
+                result = audit_sshd_config(config_text, policies)
+                _save_audit_result(mid, result, config_text, ssh_version, audited_by)
+                results += 1
+        except Exception as e:
+            logger.error("[ssh-audit/scan-all] machine #%s: %s", mid, e)
+            errors.append({'machine_id': mid, 'error': str(e)})
+        finally:
+            update_task(task_id, progress=int(idx * 100 / max(1, total)),
+                        detail=f"{idx}/{total} - {machine.get('name') or mid} "
+                               f"({results} OK, {len(errors)} erreur(s))")
+
+    final_detail = f"{results} OK, {len(errors)} erreur(s) sur {total}"
+    update_task(task_id,
+                status='success' if results or not total else 'error',
+                progress=100, detail=final_detail, finished=True)
+    _log_audit_action(0, 'scan_all', f'Audit SSH global ({results} OK, {len(errors)} erreurs)', audited_by)
+    logger.info("[ssh-audit/scan-all] termine : %s", final_detail)
+
+
+def _spawn_scan_all_thread(machines, audited_by, task_id):
+    """Cree et demarre le thread daemon du scan de parc.
+
+    Isole dans un helper pour rester patchable en test SANS stubber
+    threading.Thread globalement (le ThreadPoolExecutor de @threaded_route en
+    depend pour creer ses workers : le stubber global = deadlock du pool)."""
+    t = threading.Thread(target=_run_scan_all_background,
+                         args=(machines, audited_by, task_id), daemon=True)
+    t.start()
+    return t
+
+
 @bp.route('/ssh-audit/scan-all', methods=['POST'])
 @require_api_key
 @require_role(2)
 @threaded_route
 def ssh_audit_scan_all():
-    """Audit SSH de toutes les machines."""
+    """Lance l'audit SSH de TOUT le parc en arriere-plan (centre de taches).
+
+    Fix v1.37.13 : avant, la route bouclait en SSH sur toutes les machines DANS
+    la requete HTTP -> connexion ouverte plusieurs minutes -> 504 des proxys
+    intermediaires, saturation du ThreadPoolExecutor partage et 500/504 en
+    cascade sur les autres pages (/update/). Pattern aligne sur groups.run :
+    reponse immediate {queued, task_id}, progression via /tasks/list, resultats
+    via GET /ssh-audit/fleet.
+    """
     try:
         conn = get_db_connection()
         cur = conn.cursor(dictionary=True)
@@ -233,62 +293,58 @@ def ssh_audit_scan_all():
         logger.error("[ssh-audit/scan-all] BDD: %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
-    results = []
-    errors = []
+    if not machines:
+        return jsonify({'success': True, 'queued': 0, 'background': True,
+                        'task_id': None, 'message': 'Aucune machine a auditer'})
+
     audited_by = request.headers.get('X-User-ID', 'admin')
+    from task_tracker import create_task
+    try:
+        created_by = int(audited_by)
+    except (TypeError, ValueError):
+        created_by = None
+    task_id = create_task('ssh_audit', f'Audit SSH global ({len(machines)} serveurs)',
+                          created_by=created_by)
 
-    for machine in machines:
-        mid = machine['id']
-        data_m = {'machine_id': mid}
-        ip, port, user, ssh_pass, root_pass, svc, _, err = _resolve_ssh_creds(data_m)
-        if err:
-            errors.append({'machine_id': mid, 'error': err})
-            continue
+    _spawn_scan_all_thread(machines, audited_by, task_id)
 
-        try:
-            with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
-                config_text = get_sshd_config(client, root_pass)
-                if not config_text:
-                    errors.append({'machine_id': mid, 'error': 'Impossible de lire sshd_config'})
-                    continue
+    return jsonify({'success': True, 'queued': len(machines),
+                    'background': True, 'task_id': task_id})
 
-                ssh_version = get_ssh_version(client, root_pass)
-                policies = _load_policies(mid)
-                result = audit_sshd_config(config_text, policies)
-                persisted, persist_err = _save_audit_result(
-                    mid, result, config_text, ssh_version, audited_by)
 
-                row = {
-                    'machine_id': mid,
-                    'name': machine.get('name'),
-                    'server': machine.get('name'),  # alias pour le rendu front
-                    'ip': machine.get('ip'),
-                    'score': result['score'],
-                    'grade': result['grade'],
-                    'counts': result['counts'],
-                    'critical_count': result['counts'].get('critical', 0),
-                    'high_count': result['counts'].get('high', 0),
-                    'ssh_version': ssh_version,
-                    'scanned_at': datetime.datetime.utcnow().isoformat() + 'Z',
-                    'last_scan': datetime.datetime.utcnow().isoformat() + 'Z',
-                    'persisted': persisted,
-                }
-                if persist_err:
-                    row['persistence_error'] = persist_err
-                results.append(row)
-        except Exception as e:
-            logger.error("[ssh-audit/scan-all] machine #%s: %s", mid, e)
-            errors.append({'machine_id': mid, 'error': str(e)})
+@bp.route('/ssh-audit/fleet', methods=['GET'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def ssh_audit_fleet():
+    """Dernier resultat d'audit par machine (DB uniquement, aucun SSH).
 
-    _log_audit_action(0, 'scan_all', f'Audit SSH global ({len(results)} OK, {len(errors)} erreurs)', audited_by)
-
-    return jsonify({
-        'success': True,
-        'results': results,
-        'errors': errors,
-        'total_scanned': len(results),
-        'total_errors': len(errors),
-    })
+    Alimente la vue "parc" de la page SSH Audit : appele au chargement et en
+    polling pendant un scan-all (les resultats arrivent au fil de l'eau)."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT r.machine_id, m.name AS server, m.name, m.ip,
+                   r.score, r.grade, r.critical_count, r.high_count,
+                   r.ssh_version, r.audited_at AS last_scan
+            FROM ssh_audit_results r
+            JOIN (SELECT machine_id, MAX(id) AS max_id
+                  FROM ssh_audit_results GROUP BY machine_id) latest
+              ON r.id = latest.max_id
+            JOIN machines m ON m.id = r.machine_id
+            WHERE m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived'
+            ORDER BY m.name
+        """)
+        rows = cur.fetchall()
+        conn.close()
+        for r in rows:
+            if r.get('last_scan') and hasattr(r['last_scan'], 'isoformat'):
+                r['last_scan'] = r['last_scan'].isoformat()
+        return jsonify({'success': True, 'results': rows, 'total': len(rows)})
+    except Exception as e:
+        logger.error("[ssh-audit/fleet] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/ssh-audit/results', methods=['GET'])

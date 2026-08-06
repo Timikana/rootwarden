@@ -151,12 +151,13 @@ async function scanServer() {
 // ── Scan all servers (admin) ────────────────────────────────────────────────
 
 async function scanAll() {
-    
-
     clearLogs();
     appendLog(__('audit_scanning_all'));
 
     try {
+        // v1.37.13 : le scan du parc tourne desormais en ARRIERE-PLAN (centre
+        // de taches). Avant, la requete restait ouverte pendant tout le scan
+        // SSH du parc -> 504 des proxys + saturation backend sur les gros parcs.
         const d = await apiPost('/ssh-audit/scan-all', {});
         if (!d.success) {
             appendLog(__('error_with_msg', { msg: d.message }));
@@ -164,20 +165,59 @@ async function scanAll() {
             return;
         }
 
-        const results = d.results || [];
+        appendLog(__('audit_scan_all_queued', { count: d.queued ?? 0 }));
+        toast(__('audit_scan_all_queued', { count: d.queued ?? 0 }), 'info');
+
         const fleetContainer = document.getElementById('fleet-container');
-        if (fleetContainer) {
-            fleetContainer.classList.remove('hidden');
-            renderFleetView(results);
-        }
-
-        appendLog(__('audit_scan_all_complete', { count: results.length }));
-        toast(__('audit_scan_all_complete', { count: results.length }), 'success');
-
+        if (fleetContainer) fleetContainer.classList.remove('hidden');
+        await refreshFleet();               // etat courant (derniers audits connus)
+        if (d.queued > 0) pollScanAll(d.task_id);
     } catch (e) {
         appendLog(__('exception_with_msg', { msg: e }));
         toast(__('exception_with_msg', { msg: e }), 'error');
     }
+}
+
+/** Recharge la vue "parc" depuis la BDD (dernier audit par machine, aucun SSH). */
+async function refreshFleet() {
+    try {
+        const d = await apiGet('/ssh-audit/fleet');
+        if (d.success) renderFleetView(d.results || []);
+    } catch (e) { /* silencieux : simple rafraichissement */ }
+}
+
+/** Suit la tache de scan-all : rafraichit le parc toutes les 5s jusqu'a la fin. */
+function pollScanAll(taskId) {
+    let ticks = 0;
+    let lastDetail = '';
+    const iv = setInterval(async () => {
+        ticks++;
+        await refreshFleet();
+
+        let done = false;
+        let detail = '';
+        if (taskId) {
+            try {
+                const t = await apiGet('/tasks/list?type=ssh_audit&limit=10');
+                const task = (t.tasks || []).find(x => x.id === taskId);
+                if (task) {
+                    detail = task.detail || `${task.progress ?? 0}%`;
+                    if (detail !== lastDetail) {
+                        appendLog(__('audit_scan_all_progress', { detail }));
+                        lastDetail = detail;
+                    }
+                    done = (task.status === 'success' || task.status === 'error');
+                }
+            } catch (e) { /* le prochain tick reessaiera */ }
+        }
+
+        if (done || ticks > 240) { // garde-fou ~20 min
+            clearInterval(iv);
+            await refreshFleet();
+            appendLog(__('audit_scan_all_complete_bg', { detail: detail || lastDetail }));
+            toast(__('audit_scan_all_complete_bg', { detail: detail || lastDetail }), 'success');
+        }
+    }, 5000);
 }
 
 // ── View raw config ─────────────────────────────────────────────────────────

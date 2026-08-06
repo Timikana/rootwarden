@@ -2287,6 +2287,13 @@ paths:
       responses:
         '200': { description: Mise a jour }
 
+  /ssh-audit/fleet:
+    get:
+      tags: [SSH Audit]
+      summary: Dernier resultat d'audit par machine (vue parc, BDD uniquement)
+      responses:
+        '200': { description: Liste des derniers audits par machine }
+
   /ssh-audit/trends:
     get:
       tags: [SSH Audit]
