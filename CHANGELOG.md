@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.12, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.13, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,62 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.13] - 2026-08-06 — Fix : 504/500 en cascade (scan SSH du parc synchrone + pool backend saturé)
+
+**Symptômes (prod)** : en lançant l'audit SSH sur **tout le parc**, erreur 500
+sur le scan lui-même, puis erreurs **504/500 en série sur les autres pages**
+(/update/…) pendant toute la durée du scan.
+
+### Causes
+1. **`POST /ssh-audit/scan-all` était synchrone** : la route bouclait en SSH
+   sur toutes les machines DANS la requête HTTP. Sur un parc réel (machines
+   lentes/injoignables → timeouts SSH successifs), la connexion restait ouverte
+   plusieurs minutes → n'importe quel proxy intermédiaire coupe (504) et la
+   requête interrompue finit en erreur.
+2. **Pool backend figé à 10 threads** : toutes les routes `@threaded_route`
+   partagent un `ThreadPoolExecutor(max_workers=10)` et `future.result()` est
+   **bloquant sans timeout**. La page /update/ tire plusieurs requêtes SSH par
+   machine en parallèle : pendant un scan de parc, le pool saturait et toutes
+   les requêtes s'empilaient → 504/500 en cascade sur toute l'UI.
+
+### Fix
+- **`/ssh-audit/scan-all` passe en tâche de fond** (pattern `groups.run`) :
+  réponse immédiate `{queued, task_id, background: true}`, thread daemon
+  `_run_scan_all_background` isolé du contexte de requête, **progression par
+  machine dans le Centre de tâches** (`x/N — n OK, m erreur(s)`), statut final
+  success/error. Helper `_spawn_scan_all_thread` isolé (patchable en test sans
+  stubber `threading.Thread` global, dont dépendent les workers du pool).
+- **Nouvel endpoint `GET /ssh-audit/fleet`** : dernier audit par machine (BDD
+  uniquement, aucun SSH) — alimente la vue « parc » au chargement et pendant le
+  polling. Documenté dans `openapi.yaml`.
+- **UI SSH Audit** : « Tout scanner » affiche immédiatement « lancé en
+  arrière-plan (N serveurs) », montre l'état courant du parc, puis rafraîchit
+  la vue toutes les 5 s en suivant la tâche jusqu'au message de fin. 3 clés
+  i18n ajoutées (FR/EN).
+- **Pool backend dimensionné** : défaut **32 threads** (au lieu de 10),
+  surchargeable via **`API_THREADPOOL_WORKERS`** (documenté dans
+  `srv-docker.env.example`).
+
+### Tests
+- `backend/tests/test_ssh_audit_scan_all.py` (nouveau, 8 tests SPEC) : réponse
+  immédiate + délégation au thread (helper patché — stubber `threading.Thread`
+  global deadlockait le pool), 0 machine ⇒ pas de thread, RBAC role 1 refusé,
+  `/fleet` DB-only, runner : progression + statut final success/error, thread
+  daemon, pool ≥ 16.
+- Blueprint `ssh_audit` enregistré dans le conftest (il n'était pas testable).
+- Suite complète : **275 tests OK**.
+- E2E Puppeteer `tests/e2e/go-ssh-audit-scanall.mjs` (nouveau) : **5/5 PASS** —
+  réponse en **0,6 s** (avant : durée du scan complet), vue parc immédiate,
+  fin de tâche reçue via Centre de tâches, résultats affichés, 0 erreur JS.
+
+### Notes exploitation
+- Le suivi du scan de parc se fait désormais dans le **Centre de tâches**
+  (`/tasks/`) ; la page SSH Audit se met à jour toute seule.
+- Les 504 résiduels sur /update/ pendant de futurs pics de charge peuvent se
+  régler en augmentant `API_THREADPOOL_WORKERS`.
 
 ---
 
