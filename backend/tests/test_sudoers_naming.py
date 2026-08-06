@@ -19,12 +19,21 @@ import configure_servers as cs
 
 @pytest.fixture
 def capture(monkeypatch):
-    """Capture les commandes SSH root emises (execute_command_as_root mocke)."""
+    """Capture les commandes SSH root emises (execute_command_as_root mocke).
+
+    Simule le mode legacy (PTY) de facon realiste : la sortie contient l'ECHO
+    de la commande envoyee (comme un vrai shell interactif), suivi pour visudo
+    du marqueur OK reellement execute. Les tests valident donc aussi, au
+    passage, l'immunite du parsing a l'echo du terminal.
+    """
     calls = []
 
     def fake_exec(channel, command, logger=None, **kw):
         calls.append(command)
-        return ''  # visudo -cf : '' => pas de __VISUDO_KO__ => deploy continue
+        if 'visudo -cf' in command:
+            # echo PTY de la commande + sortie visudo + marqueur OK execute
+            return f"{command}\r\n/tmp/x: parsed OK\r\n__VISUDO_OK__\r\n"
+        return command  # echo PTY seul pour les autres commandes
 
     monkeypatch.setattr(cs, 'execute_command_as_root', fake_exec)
     return calls

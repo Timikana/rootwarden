@@ -285,14 +285,37 @@ def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
             channel,
             f"printf '%s' '{b64}' | base64 -d > {tmp} && chown root:root {tmp} && chmod 0440 {tmp}",
             logger=logger)
-        # 2. visudo -cf : si KO, supprimer tmp et lever
+        # 2. visudo -cf : valider AVANT d'installer.
+        #
+        # PIEGE mode legacy (shell interactif PTY, machines bootstrap su/sudo) :
+        # le terminal ECHOTE la commande envoyee, echo inclus dans la sortie lue.
+        # L'ancien test `'__VISUDO_KO__' in out` matchait donc l'echo de la
+        # commande elle-meme (qui contenait le marqueur en clair) et annulait
+        # TOUS les deploiements sudoers en mode legacy, meme quand visudo
+        # validait -> "visudo -cf refuse la politique" systematique, aucun
+        # fichier NOPASSWD installe (bug prod). Parade :
+        #   - marqueurs assembles par concatenation shell ("__VISUDO_""OK__") :
+        #     la ligne echotee ne contient jamais le marqueur contigu, seul
+        #     l'echo REELLEMENT execute le produit ;
+        #   - verification d'un marqueur POSITIF emis seulement si visudo
+        #     reussit. Fail-closed : sortie tronquee/illisible => on n'installe
+        #     rien (un sudoers invalide peut casser sudo sur toute la machine).
         out = execute_command_as_root(
             channel,
-            f"visudo -cf {tmp} 2>&1 || (rm -f {tmp}; echo __VISUDO_KO__)",
+            f'if visudo -cf {tmp} 2>&1; then echo "__VISUDO_""OK__"; '
+            f'else echo "__VISUDO_""KO__"; fi',
             logger=logger)
-        if isinstance(out, str) and '__VISUDO_KO__' in out:
+        out_s = out if isinstance(out, str) else ''
+        if '__VISUDO_KO__' in out_s or '__VISUDO_OK__' not in out_s:
+            # Nettoyage du tmp dans les deux cas d'abandon (plus de rm dans la
+            # commande distante : il contiendrait le chemin 2 fois et allonge
+            # l'echo ; un rm dedie est idempotent).
+            execute_command_as_root(channel, f"rm -f {tmp}", logger=logger)
             if logger:
-                logger.error(f"[{username}] visudo -cf refuse la politique - deploy annule")
+                if '__VISUDO_KO__' in out_s:
+                    logger.error(f"[{username}] visudo -cf refuse la politique - deploy annule : {out_s[-300:]}")
+                else:
+                    logger.error(f"[{username}] visudo -cf : resultat illisible (fail-closed) - deploy annule")
             return
         # 3. mv atomique
         execute_command_as_root(channel, f"mv {tmp} {sudoers_file}", logger=logger)
@@ -359,7 +382,14 @@ def user_exists(channel, username: str, logger=None) -> bool:
         return False
     try:
         output = execute_command_as_root(channel, f"id -u {username}", logger=logger)
-        exists = output.strip().isdigit()
+        # PIEGE mode legacy (PTY) : la sortie contient l'echo de la commande et
+        # le prompt -> `output.strip().isdigit()` etait TOUJOURS False et les
+        # utilisateurs existants etaient revus comme "a creer" (useradd
+        # echouait ensuite en silence). On cherche donc une LIGNE entierement
+        # numerique (l'UID), robuste en mode exec (sortie propre) comme en
+        # mode legacy (echo + prompt : jamais purement numeriques).
+        out_s = output if isinstance(output, str) else ''
+        exists = any(ln.strip().isdigit() for ln in out_s.splitlines())
         if logger:
             logger.info(f"[{username}] Existence de l'utilisateur vérifiée : {exists}")
         return exists
