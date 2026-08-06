@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.10, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.11, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,78 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.11] - 2026-08-06 — Fix : deploy sudoers TOUJOURS annulé en mode legacy (« visudo -cf refuse la politique ») + ligne droits sudo absente sans refresh
+
+**Symptômes (prod, EAU-ACTU)** :
+1. Chaque déploiement de clé SSH loggait `[user] visudo -cf refuse la politique -
+   deploy annulé` pour TOUS les utilisateurs → **aucun fichier sudoers installé**
+   → « j'ai mis NOPASSWD mais sudo demande toujours le mot de passe ». (Le fix
+   v1.37.8 corrigeait le conflit de nommage ; ce bug-ci l'empêchait carrément
+   d'écrire le fichier sur les machines en mode legacy.)
+2. Dans l'onglet Accès & Permissions, activer un accès n'affichait pas la ligne
+   « droits sudo » (preset + NOPASSWD) : il fallait recharger la page.
+
+### Cause 1 — écho du PTY interprété comme un échec visudo (backend, bloquant)
+Sur les machines en bootstrap `su`/`sudo` (pas de compte de service), les
+commandes root passent par le **mode legacy** de `execute_command_as_root` :
+un shell interactif avec PTY, qui **échote la commande envoyée** dans la sortie
+lue. Or la validation embarquait le marqueur d'échec **en clair** dans la
+commande (`visudo -cf {tmp} 2>&1 || (rm -f {tmp}; echo __VISUDO_KO__)`) : le
+test `'__VISUDO_KO__' in out` matchait l'écho de la commande elle-même →
+**faux refus systématique**, même quand visudo validait la politique. Les
+machines avec compte de service (`exec_command`, sans écho) n'étaient pas
+touchées — d'où un bug visible uniquement sur une partie du parc.
+
+Même famille : `user_exists()` testait `output.strip().isdigit()` — toujours
+False avec écho+prompt → les utilisateurs déjà présents étaient revus comme
+« à créer » à chaque déploiement (le `useradd` échouait ensuite en silence).
+
+### Fix backend (`backend/configure_servers.py`)
+- **Marqueurs assemblés par concaténation shell** (`echo "__VISUDO_""OK__"`) :
+  la ligne échotée ne contient jamais le marqueur contigu ; seul l'écho
+  réellement exécuté le produit.
+- **Vérification positive fail-closed** : le déploiement n'a lieu que si le
+  marqueur OK est vu ; sortie illisible/tronquée ⇒ abandon (un sudoers invalide
+  peut casser sudo sur toute la machine) + **nettoyage du tmp** dans tous les
+  cas d'abandon + sortie visudo incluse dans le log d'erreur.
+- `user_exists()` : détection de l'UID par **ligne entièrement numérique**,
+  robuste en mode exec comme en mode legacy.
+- Périmètre audité : les autres marqueurs `|| echo XXX` du backend passent tous
+  par des helpers `exec_command` (sans écho) — non concernés ; le check dpkg de
+  `ensure_sudo_installed` utilise un marqueur positif — sain.
+
+### Fix UI (`www/adm/includes/manage_access.php`)
+- `toggleAccess()` **injecte dynamiquement la ligne « droits sudo »** (dropdown
+  preset + NOPASSWD + lien avancé, identique au rendu PHP) dès l'activation de
+  l'accès, et la retire (ligne + badge) à la révocation — plus besoin de
+  recharger la page. Labels injectés via `textContent`/`json_encode` (pas de
+  HTML dynamique non échappé).
+- Fix badge dupliqué : l'ancien sélecteur `span.rounded` ne matchait pas le
+  badge PHP (`rounded-full`) → doublons à chaque changement de preset. Classe
+  dédiée `.sudo-badge` des deux côtés + parité dark mode.
+
+### Tests
+- `backend/tests/test_visudo_legacy_echo.py` (nouveau, 10 tests SPEC) :
+  commande sans marqueur contigu, écho PTY sans faux refus, vrai refus ⇒
+  abandon + nettoyage tmp, sortie illisible ⇒ fail-closed, user_exists
+  paramétré exec/legacy.
+- `backend/tests/test_sudoers_naming.py` : fixture réaliste (écho PTY + marqueur
+  OK) — les 7 tests valident désormais aussi l'immunité à l'écho.
+- Suite complète : **267 tests OK**.
+- E2E Puppeteer `tests/e2e/go-access-toggle-refresh.mjs` (nouveau, auto-validant,
+  restaure l'état) : **14/14 PASS** — activation ⇒ ligne sudo visible sans
+  rechargement (marqueur JS intact), 7 presets, révocation ⇒ ligne + badge
+  retirés, 0 erreur JS.
+
+### Notes exploitation
+- Après mise à jour des conteneurs, **relancer le déploiement de la clé SSH**
+  sur les machines concernées : les fichiers `/etc/sudoers.d/rootwarden-<user>`
+  seront cette fois réellement installés.
+- Les tentatives échouées ont pu laisser des `/tmp/rootwarden-sudo-*.tmp`
+  orphelins sur les serveurs cibles (inoffensifs, purgés au reboot).
 
 ---
 

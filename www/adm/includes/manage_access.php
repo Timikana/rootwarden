@@ -110,7 +110,7 @@ $isSuperAdmin = (int)($_SESSION['role_id'] ?? 0) === 3;
                     <span class="font-medium"><?= htmlspecialchars($srv['name']) ?></span>
                     <span class="text-xs opacity-70"><?= htmlspecialchars($srv['ip']) ?></span>
                     <?php if ($hasAccess && $sudoPresetCur !== 'none'): ?>
-                    <span class="text-xs px-2 py-0.5 rounded-full font-semibold ml-1 <?= $sudoBadgeCls ?>" title="<?= t('access.sudo_active') ?>">
+                    <span class="sudo-badge text-xs px-2 py-0.5 rounded-full font-semibold ml-1 <?= $sudoBadgeCls ?>" title="<?= t('access.sudo_active') ?>">
                         sudo:<?= $sudoPresetCur ?><?= $sudoNopasswdCur ? '!' : '' ?>
                     </span>
                     <?php endif; ?>
@@ -156,6 +156,71 @@ $isSuperAdmin = (int)($_SESSION['role_id'] ?? 0) === 3;
 </div>
 
 <script>
+// v1.37.11 : constantes partagees pour construire la sudo-row en JS (fix :
+// activer l'acces n'affichait pas les droits avances sans recharger la page).
+const SUDO_PRESETS   = <?= json_encode($SUDO_PRESETS, JSON_UNESCAPED_UNICODE) ?>;
+const IS_SUPERADMIN  = <?= $isSuperAdmin ? 'true' : 'false' ?>;
+const SUDO_LABEL     = <?= json_encode(t('access.sudo_label'), JSON_UNESCAPED_UNICODE) ?>;
+const ADVANCED_LABEL = <?= json_encode(t('access.advanced'), JSON_UNESCAPED_UNICODE) ?>;
+const ADVANCED_TIP   = <?= json_encode(t('access.advanced_tip'), JSON_UNESCAPED_UNICODE) ?>;
+
+/**
+ * Construit la ligne "droits sudo" (dropdown preset + NOPASSWD + lien avance),
+ * identique au rendu PHP, pour l'injecter sans rechargement quand un acces
+ * vient d'etre active. Labels injectes via textContent (pas d'innerHTML avec
+ * des donnees dynamiques).
+ */
+function buildSudoRow(userId, machineId) {
+    const row = document.createElement('div');
+    row.className = 'flex flex-wrap items-center gap-2 pl-3 pr-2 py-1.5 bg-gray-50 dark:bg-gray-900/40 rounded-lg border border-gray-200 dark:border-gray-700 sudo-row';
+
+    const label = document.createElement('label');
+    label.className = 'text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-1';
+    label.innerHTML = '<svg class="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>';
+    label.appendChild(document.createTextNode(SUDO_LABEL));
+
+    const sel = document.createElement('select');
+    sel.className = 'sudo-preset text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 min-w-[220px]';
+    sel.dataset.user = userId;
+    sel.dataset.machine = machineId;
+    sel.addEventListener('change', () => updateSudoPreset(sel));
+    for (const [val, lbl] of Object.entries(SUDO_PRESETS)) {
+        const o = document.createElement('option');
+        o.value = val;
+        o.textContent = lbl;
+        if (val === 'none') o.selected = true;
+        sel.appendChild(o);
+    }
+
+    const npLabel = document.createElement('label');
+    npLabel.className = 'text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5 cursor-pointer';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'sudo-nopasswd form-checkbox h-4 w-4 text-purple-600 rounded';
+    cb.dataset.user = userId;
+    cb.dataset.machine = machineId;
+    cb.addEventListener('change', () => updateSudoPreset(cb));
+    const npTxt = document.createElement('span');
+    npTxt.className = 'font-medium';
+    npTxt.textContent = 'NOPASSWD';
+    npLabel.appendChild(cb);
+    npLabel.appendChild(npTxt);
+
+    const adv = document.createElement('a');
+    adv.href = '/adm/server_user_policies.php?server=' + encodeURIComponent(machineId);
+    adv.target = '_blank';
+    adv.className = 'text-xs text-blue-600 dark:text-blue-400 hover:underline ml-auto flex items-center gap-1';
+    adv.title = ADVANCED_TIP;
+    adv.textContent = ADVANCED_LABEL;
+    adv.insertAdjacentHTML('beforeend', ' <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>');
+
+    row.appendChild(label);
+    row.appendChild(sel);
+    row.appendChild(npLabel);
+    row.appendChild(adv);
+    return row;
+}
+
 async function updateSudoPreset(el) {
     const userId = el.dataset.user;
     const machineId = el.dataset.machine;
@@ -178,16 +243,19 @@ async function updateSudoPreset(el) {
             toast(d.message || (d.success ? 'OK' : 'Erreur'), d.success ? 'success' : 'error', d.success ? 2500 : 5000);
         }
         if (d.success) {
-            // Refresh badge sur le bouton parent
+            // Refresh badge sur le bouton parent.
+            // Fix v1.37.11 : l'ancien selecteur 'span.rounded' ne matchait pas
+            // le badge rendu par PHP (classe 'rounded-full') -> badges dupliques
+            // a chaque changement de preset. Classe dediee .sudo-badge des deux
+            // cotes, et memes classes visuelles que le rendu PHP (dark inclus).
             const btn = card.querySelector('.access-btn');
-            const existing = btn?.querySelector('span.rounded');
-            if (existing) existing.remove();
+            btn?.querySelector('.sudo-badge')?.remove();
             if (preset !== 'none') {
                 const badge = document.createElement('span');
-                badge.className = 'text-[9px] px-1 py-0.5 rounded ' + (
-                    preset === 'all_nopasswd' ? 'bg-red-100 text-red-700' :
-                    preset === 'custom' ? 'bg-amber-100 text-amber-700' :
-                    'bg-purple-100 text-purple-700'
+                badge.className = 'sudo-badge text-xs px-2 py-0.5 rounded-full font-semibold ml-1 ' + (
+                    preset === 'all_nopasswd' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
+                    preset === 'custom' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                    'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
                 );
                 badge.textContent = 'sudo:' + preset + (nopasswd ? '!' : '');
                 btn?.appendChild(badge);
@@ -230,6 +298,24 @@ async function toggleAccess(btn) {
                 dot.classList.remove('bg-blue-500');
                 dot.classList.add('bg-gray-300','dark:bg-gray-500');
             }
+            // Fix v1.37.11 : afficher/retirer la ligne "droits sudo" SANS
+            // rechargement. Avant, la sudo-row n'etait rendue que cote PHP
+            // ($hasAccess) : apres activation d'un acces il fallait recharger
+            // la page pour voir les droits avances.
+            const serverCard = btn.closest('.server-card');
+            if (serverCard) {
+                if (newState) {
+                    if (IS_SUPERADMIN && !serverCard.querySelector('.sudo-row')) {
+                        serverCard.appendChild(buildSudoRow(userId, machineId));
+                    }
+                } else {
+                    // Acces revoque : la ligne user_machine_access est supprimee
+                    // en base -> le preset sudo disparait avec elle.
+                    serverCard.querySelector('.sudo-row')?.remove();
+                    btn.querySelector('.sudo-badge')?.remove();
+                }
+            }
+
             // Update counter in summary
             const card = btn.closest('.access-card');
             const count = card.querySelectorAll('.access-btn[data-active="1"]').length;
