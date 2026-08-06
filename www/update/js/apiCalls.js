@@ -598,8 +598,13 @@ function filterServers() {
                 appendToLogs(__('upd_filter_error', {msg: data.message}));
                 return;
             }
-            populateMachineTable(data.servers);
-            appendToLogs(__('upd_filter_applied', {count: data.servers.length}));
+            // Fix v1.37.12 : l'API Python /filter_servers renvoie la cle
+            // "machines" (comme refreshMachineList) ; "data.servers" datait de
+            // l'ancien endpoint PHP update/functions/filter_servers.php et
+            // valait undefined -> TypeError "reading 'forEach'" a chaque filtre.
+            const machines = data.machines || [];
+            populateMachineTable(machines);
+            appendToLogs(__('upd_filter_applied', {count: machines.length}));
         })
         .catch(err => {
             console.error("filterServers error:", err);
