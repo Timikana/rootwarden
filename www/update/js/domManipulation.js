@@ -232,6 +232,14 @@ function populateMachineTable(machines) {
     const serverTableBody = document.getElementById("server-table-body");
     if (!serverTableBody) return;
 
+    // Garde defensive (fix v1.37.12) : un appelant passant undefined/null
+    // (ex. cle JSON inattendue) ne doit pas crasher en TypeError sur forEach
+    // ni vider le tableau pour rien - on loggue et on n'affiche rien de neuf.
+    if (!Array.isArray(machines)) {
+        console.warn("populateMachineTable: liste machines invalide", machines);
+        return;
+    }
+
     // Vide le tableau existant avant de le reconstruire
     serverTableBody.innerHTML = "";
 

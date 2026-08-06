@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.11, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.12, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,40 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.12] - 2026-08-06 — Fix : filtres de /update/ cassés (« Exception filtre : TypeError … reading 'forEach' »)
+
+**Symptôme (prod)** : sur la page Mises à jour, cliquer « Filtrer » loggait
+`Exception filtre : TypeError: Cannot read properties of undefined (reading
+'forEach')` et le tableau n'était jamais filtré.
+
+### Cause — clé JSON héritée de l'ancien endpoint PHP
+`filterServers()` (`www/update/js/apiCalls.js`) lisait `data.servers`, la clé
+renvoyée par l'ancien endpoint **PHP** `update/functions/filter_servers.php`
+(`{"servers": [...]}`). Or l'appel a été migré vers l'API **Python**
+`GET /filter_servers`, qui renvoie `{"machines": [...]}` (comme
+`refreshMachineList`). `data.servers` valait donc `undefined` →
+`populateMachineTable(undefined)` → `machines.forEach` → TypeError. Cassé
+depuis la migration vers l'API Python (pas une régression récente).
+
+### Fix
+- `www/update/js/apiCalls.js` : lecture de `data.machines` (+ défaut `[]`),
+  compteur du log « Filtre appliqué » aligné.
+- `www/update/js/domManipulation.js` : garde défensive dans
+  `populateMachineTable` — une liste non-Array est logguée en console et
+  ignorée au lieu de crasher (et de vider le tableau).
+- Vérifié : le SELECT du backend renvoie tous les champs consommés par le
+  tableau (linux_version, last_checked, online_status, maj_secu_*,
+  last_reboot, environment, criticality, network_type) — aucun changement
+  backend nécessaire.
+
+### Tests
+- E2E Puppeteer `tests/e2e/go-update-filter.mjs` (nouveau, lecture seule,
+  auto-validant) : **7/7 PASS** — filtre « tous » repeuple le tableau (2/2
+  lignes, message « Filtre appliqué »), filtre `environment=PROD` restreint
+  à 1 ligne, aucune « Exception filtre », aucune erreur JS.
 
 ---
 
