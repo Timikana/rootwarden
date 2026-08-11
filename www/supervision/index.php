@@ -486,6 +486,7 @@ try {
                                 <th class="p-2"><?= t('supervision.th_ip') ?></th>
                                 <th class="p-2"><?= t('supervision.th_env') ?></th>
                                 <th class="p-2">Agents</th>
+                                <th class="p-2"><?= t('supervision.th_profile') ?></th>
                                 <th class="p-2"><?= t('supervision.th_status') ?></th>
                                 <th class="p-2"><?= t('supervision.th_actions') ?></th>
                             </tr>
@@ -522,6 +523,12 @@ try {
                                         <?php endforeach; ?>
                                         </div>
                                     <?php endif; ?>
+                                </td>
+                                <!-- v1.37.14 : dropdown d'assignation du profil de supervision.
+                                     Peuple par profiles.js (loadDeployProfileSelectors) selon la
+                                     plateforme active ; la config deployee suit le profil choisi. -->
+                                <td class="p-2 text-center profile-cell" data-machine="<?= $mid ?>">
+                                    <span class="text-xs text-gray-400">&hellip;</span>
                                 </td>
                                 <td class="p-2 text-center deploy-online-status text-xs">
                                     <?= htmlspecialchars($m['online_status'] ?? '-') ?>

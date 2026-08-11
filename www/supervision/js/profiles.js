@@ -121,16 +121,72 @@ async function assignProfileToMachine(machineId, profileId) {
     const platform = document.getElementById('agent-platform')?.value || 'zabbix';
     const url = `${API}/supervision/machines/${machineId}/profile?platform=${platform}`;
     try {
+        let r;
         if (!profileId) {
-            await fetch(url, { method: 'DELETE' });
+            r = await fetch(url, { method: 'DELETE' });
         } else {
-            await fetch(url, {
+            r = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ profile_id: parseInt(profileId, 10) }),
             });
         }
-    } catch (e) { console.error(e); }
+        const d = await r.json();
+        return !!d.success;
+    } catch (e) {
+        console.error(e);
+        return false;
+    }
+}
+
+/**
+ * v1.37.14 : peuple les dropdowns "Profil" du tableau de deploiement.
+ * Fix : les profils existaient (CRUD) mais assignProfileToMachine() n'etait
+ * appele NULLE PART - impossible de lier un profil a une machine depuis l'UI,
+ * la config deployee retombait toujours sur la globale.
+ */
+async function loadDeployProfileSelectors() {
+    const cells = document.querySelectorAll('#deploy-table-body .profile-cell');
+    if (!cells.length) return;
+    const platform = document.getElementById('agent-platform')?.value || 'zabbix';
+    const q = `platform=${encodeURIComponent(platform)}`;
+    try {
+        const [pr, ar] = await Promise.all([
+            fetch(`${API}/supervision/profiles?${q}`).then(r => r.json()),
+            fetch(`${API}/supervision/profiles/assignments?${q}`).then(r => r.json()),
+        ]);
+        const profiles = (pr && pr.profiles) || [];
+        const assigned = (ar && ar.assignments) || {};
+        cells.forEach(cell => {
+            const mid = cell.dataset.machine;
+            const sel = document.createElement('select');
+            sel.className = 'profile-select text-xs px-1.5 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 max-w-[150px]';
+            sel.title = __('sup_profile_tip');
+            const none = document.createElement('option');
+            none.value = '';
+            none.textContent = __('sup_profile_none');
+            sel.appendChild(none);
+            profiles.forEach(p => {
+                const o = document.createElement('option');
+                o.value = p.id;
+                o.textContent = p.name;
+                if (String(assigned[mid] ?? '') === String(p.id)) o.selected = true;
+                sel.appendChild(o);
+            });
+            sel.addEventListener('change', async () => {
+                const ok = await assignProfileToMachine(mid, sel.value);
+                if (!ok) {
+                    if (window.toast) toast(__('toast_error'), 'error');
+                    return;
+                }
+                if (window.toast) {
+                    toast(sel.value ? __('sup_profile_assigned') : __('sup_profile_cleared'), 'success');
+                }
+            });
+            cell.innerHTML = '';
+            cell.appendChild(sel);
+        });
+    } catch (e) { console.error('loadDeployProfileSelectors', e); }
 }
 
 function escapeHtml(s) {
@@ -157,6 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-tab="profiles"]').forEach(btn => {
         btn.addEventListener('click', () => setTimeout(loadProfiles, 50));
     });
+    // v1.37.14 : dropdowns d'assignation du tableau de deploiement - charges
+    // au demarrage puis a chaque ouverture de l'onglet Deploiement.
+    loadDeployProfileSelectors();
+    document.querySelectorAll('[data-tab="deploy"]').forEach(btn => {
+        btn.addEventListener('click', () => setTimeout(loadDeployProfileSelectors, 50));
+    });
     // Rafraichit sur changement de plateforme
     const sel = document.getElementById('agent-platform');
     if (sel) {
@@ -164,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (document.getElementById('tab-profiles')?.classList.contains('active')) {
                 loadProfiles();
             }
+            loadDeployProfileSelectors();
         });
     }
 });

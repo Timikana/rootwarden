@@ -46,6 +46,7 @@ return [
     'supervision.deploy_title' => 'Deploiement des agents',
     'supervision.deploy_desc' => 'Installez, reconfigurez ou desinstallez l\'agent Zabbix sur vos serveurs.',
     'supervision.th_name' => 'Nom',
+    'supervision.th_profile' => 'Profil',
     'supervision.th_ip' => 'IP:Port',
     'supervision.th_env' => 'Env',
     'supervision.th_os' => 'OS',
