@@ -128,3 +128,93 @@ class TestPurgeCveScans:
         sched._purge_cve_scans(cur)
         _, params = cur.executed
         assert params == (3, 45)
+
+
+class TestAdvanceSchedule:
+    """Regression v1.37.14 (boucle infinie prod) : next_run doit etre persiste
+    AVANT d'executer la planification. Avant, il n'etait mis a jour qu'apres un
+    scan de 30-45 min : worker mort en plein scan (ou leadership repris par un
+    autre worker) => next_run restait dans le passe => re-declenchement en
+    boucle + 10 000 taches zombies 'En cours' au centre de taches.
+    """
+
+    def _sched(self):
+        from datetime import datetime
+        return ({'id': 5, 'name': 'quotidien', 'cron_expression': '0 3 * * *'},
+                datetime(2026, 8, 11, 3, 0, 30))
+
+    def test_persiste_un_next_run_futur_et_autorise_l_execution(self, sched):
+        s, now = self._sched()
+        cur = _CaptureCursor()
+        conn = MagicMock()
+        ok = sched._advance_schedule(cur, conn, s, now, 'cve_scan_schedules')
+        assert ok is True
+        sql, params = cur.executed
+        assert 'UPDATE cve_scan_schedules SET last_run' in sql
+        assert params[0] == now
+        assert params[1] > now, 'next_run doit etre strictement dans le futur'
+        assert params[2] == 5
+        conn.commit.assert_called_once()
+
+    def test_cron_invalide_reporte_a_24h_au_lieu_de_boucler(self, sched):
+        from datetime import timedelta
+        s, now = self._sched()
+        s['cron_expression'] = 'pas-un-cron'
+        cur = _CaptureCursor()
+        ok = sched._advance_schedule(cur, MagicMock(), s, now, 'cve_scan_schedules')
+        assert ok is True
+        _, params = cur.executed
+        assert params[1] == now + timedelta(days=1)
+
+    def test_echec_de_persistance_saute_l_execution(self, sched):
+        # Fail-closed anti-boucle : si next_run ne peut pas etre avance,
+        # on N'EXECUTE PAS (sinon la planification repart a chaque cycle).
+        s, now = self._sched()
+        cur = MagicMock()
+        cur.execute.side_effect = Exception('MySQL server has gone away')
+        ok = sched._advance_schedule(cur, MagicMock(), s, now, 'cve_scan_schedules')
+        assert ok is False
+
+    def test_table_inconnue_refusee(self, sched):
+        s, now = self._sched()
+        with pytest.raises(ValueError):
+            sched._advance_schedule(_CaptureCursor(), MagicMock(), s, now, 'users')
+
+
+class TestExpireStaleTasks:
+    """Watchdog v1.37.14 : les taches 'running' orphelines (worker mort) doivent
+    expirer en erreur au lieu de rester 'En cours' pour toujours."""
+
+    def _run(self, sched, monkeypatch, rowcount=3):
+        cur = MagicMock()
+        cur.rowcount = rowcount
+        conn = MagicMock()
+        conn.cursor.return_value = cur
+        monkeypatch.setattr(sched, '_get_db', lambda: conn)
+        n = sched._expire_stale_tasks()
+        return n, cur, conn
+
+    def test_marque_les_taches_running_anciennes_en_erreur(self, sched, monkeypatch):
+        monkeypatch.delenv('TASK_STALE_HOURS', raising=False)
+        n, cur, conn = self._run(sched, monkeypatch)
+        assert n == 3
+        sql, params = cur.execute.call_args[0]
+        s = ' '.join(sql.split()).lower()
+        assert "update tasks set status = 'error'" in s
+        assert "where status = 'running'" in s
+        assert 'date_sub(now(), interval %s hour)' in s
+        assert params == (12, 12)  # defaut 12h
+        conn.commit.assert_called_once()
+
+    def test_delai_configurable(self, sched, monkeypatch):
+        monkeypatch.setenv('TASK_STALE_HOURS', '48')
+        _, cur, _ = self._run(sched, monkeypatch)
+        _, params = cur.execute.call_args[0]
+        assert params == (48, 48)
+
+    def test_desactivable_a_zero(self, sched, monkeypatch):
+        monkeypatch.setenv('TASK_STALE_HOURS', '0')
+        called = []
+        monkeypatch.setattr(sched, '_get_db', lambda: called.append(1))
+        assert sched._expire_stale_tasks() == 0
+        assert not called, 'watchdog desactive : aucun acces DB'

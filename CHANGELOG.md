@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.13, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.14, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,66 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.14] - 2026-08-11 — Fix : scans planifiés en boucle infinie + 10 000 tâches zombies « En cours » + noms de serveurs trop restrictifs
+
+**Symptômes (prod)** :
+1. Le Centre de tâches affichait **10 050 tâches « En cours »** : le scan CVE
+   planifié (« Scan quotidien 3h ») se relançait en boucle **toutes les
+   30-45 minutes** (= la durée d'un scan de parc), jour et nuit, sans jamais
+   se terminer (0 réussite en 24 h).
+2. L'ajout d'un serveur dans l'admin refusait les espaces et les caractères
+   `+`, `.`, `()` dans le nom.
+
+### Cause 1 — `next_run` persisté APRÈS l'exécution (boucle infinie)
+Le scheduler ne mettait à jour `next_run` **qu'après** le scan. Un scan de
+parc dure 30-45 min : si le worker meurt pendant (OOM, redémarrage,
+déploiement, perte MySQL) ou si un autre worker reprend le verrou leader
+entre-temps (fenêtre de course documentée dans le code), `next_run` restait
+dans le passé → le scan **repartait immédiatement**, en boucle. Chaque tâche
+interrompue restait « running » pour toujours (personne n'écrira jamais son
+statut final) et `purge_old_tasks` ne supprime que les tâches **terminées** →
+accumulation sans limite.
+
+### Fix 1 (`backend/scheduler.py`)
+- **`_advance_schedule()`** : `last_run`/`next_run` sont persistés **AVANT**
+  d'exécuter la planification (CVE **et** audits SSH). Si la persistance
+  échoue, l'exécution est **sautée** (fail-closed anti-boucle : au pire un
+  cycle perdu, jamais dupliqué). Une expression cron invalide reporte à +24 h
+  au lieu de re-boucler.
+- **Watchdog `_expire_stale_tasks()`** : toute tâche encore « running » après
+  `TASK_STALE_HOURS` (défaut **12 h**, 0 = désactivé) est marquée en erreur
+  avec un détail explicite `[interrompue - watchdog >12h]`. Exécuté **dès la
+  prise de leadership** (nettoie même en cas de crash-loop, où le bloc horaire
+  ne tournait jamais) puis toutes les heures. **Les 10 050 zombies existants
+  seront assainis automatiquement au premier démarrage après mise à jour.**
+
+### Cause 2 — regex de nom de serveur trop stricte
+`validateServerName` n'acceptait que `[a-zA-Z0-9-_]` (3 copies divergentes :
+`manage_servers.php`, `server_actions.php`, `import_csv.php`).
+
+### Fix 2
+Règle unifiée sur les 3 copies : `^[a-zA-Z0-9][a-zA-Z0-9 ._+()-]{0,254}$` —
+espaces, points, `+`, parenthèses autorisés (noms lisibles type « EAU ACTU
+(backup) »). Les métacaractères shell/HTML (`;|&$\`"'<>/\`) restent interdits
+(défense en profondeur : le nom circule dans des configs distantes et des
+messages, déjà quoté/échappé en aval — `shlex.quote`, base64, `escHtml`).
+L'import CSV **utilisateurs** reste strict (les noms deviennent des comptes
+Linux). Champ mot de passe vérifié au passage : aucun caractère refusé
+(trim + chiffrement uniquement).
+
+### Configuration
+- Nouvelle variable **`TASK_STALE_HOURS`** (défaut 12) documentée dans
+  `srv-docker.env.example`.
+
+### Tests
+- `test_scheduler.py` : **+7 tests SPEC** — `_advance_schedule` (next_run futur
+  persisté avant exécution, cron invalide → +24 h, échec de persistance →
+  exécution sautée, table inconnue refusée) et `_expire_stale_tasks` (cible
+  `running` + INTERVAL, délai configurable, désactivable à 0).
+- Suite complète : **282 tests OK**. PHP lint OK sur les 3 fichiers.
 
 ---
 

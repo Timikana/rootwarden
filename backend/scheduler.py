@@ -20,7 +20,7 @@ import shlex
 import logging
 import threading
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from config import Config
 from ssh_utils import ssh_session
@@ -91,6 +91,81 @@ def _compute_next_run(cron_expr: str, from_dt: datetime = None) -> datetime:
     base = from_dt or datetime.now()
     cron = croniter(cron_expr, base)
     return cron.get_next(datetime)
+
+
+_SCHEDULE_TABLES = ('cve_scan_schedules', 'ssh_audit_schedules')
+
+
+def _advance_schedule(cur, conn, sched: dict, now: datetime, table: str) -> bool:
+    """Persiste last_run/next_run AVANT d'executer la planification.
+
+    Fix v1.37.14 (boucle infinie constatee en prod) : next_run n'etait mis a
+    jour qu'APRES l'execution. Un scan CVE de parc dure 30-45 min ; si le
+    worker meurt pendant (OOM, redemarrage, perte MySQL) ou si un autre worker
+    reprend le verrou leader entre-temps, next_run restait dans le passe -> le
+    scan repartait immediatement, en boucle, et chaque tache interrompue
+    restait 'En cours' pour toujours (10 000+ zombies au centre de taches).
+
+    En persistant next_run d'abord — et en SAUTANT l'execution si cette mise a
+    jour echoue — une planification ne peut plus se re-declencher en rafale :
+    au pire un cycle est perdu, jamais duplique.
+
+    Retourne True si la planification peut etre executee.
+    """
+    if table not in _SCHEDULE_TABLES:  # garde-fou : jamais d'entree dynamique
+        raise ValueError(f"table de planification inconnue : {table!r}")
+    try:
+        next_run = _compute_next_run(sched['cron_expression'], now)
+    except Exception as e:
+        # Cron invalide : differer d'un jour plutot que re-boucler sans fin.
+        _log.error("Scheduler: cron invalide pour '%s' (%r) : %s - reporte a +24h",
+                   sched.get('name'), sched.get('cron_expression'), e)
+        next_run = now + timedelta(days=1)
+    try:
+        cur.execute(
+            f"UPDATE {table} SET last_run = %s, next_run = %s WHERE id = %s",
+            (now, next_run, sched['id']))
+        conn.commit()
+        return True
+    except Exception as e:
+        _log.error("Scheduler: next_run non persiste pour '%s' : %s - "
+                   "execution SAUTEE (anti-boucle)", sched.get('name'), e)
+        return False
+
+
+def _expire_stale_tasks():
+    """Watchdog : marque en erreur les taches 'running' trop anciennes.
+
+    Une tache dont le worker est mort en plein travail (OOM, redemarrage
+    conteneur, deploiement) reste 'running' pour toujours : personne n'ecrira
+    jamais son statut final, et purge_old_tasks ne supprime que les taches
+    TERMINEES. Sans ce watchdog elles s'accumulent sans limite dans le centre
+    de taches. Delai configurable via TASK_STALE_HOURS (defaut 12 h, 0 =
+    desactive) - largement au-dessus du plus long job legitime.
+    """
+    try:
+        stale_hours = int(os.environ.get('TASK_STALE_HOURS', '12'))
+    except (TypeError, ValueError):
+        stale_hours = 12
+    if stale_hours <= 0:
+        return 0
+    try:
+        conn = _get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE tasks SET status = 'error', finished_at = NOW(), "
+            "detail = CONCAT(COALESCE(detail, ''), ' [interrompue - watchdog >', %s, 'h]') "
+            "WHERE status = 'running' AND started_at < DATE_SUB(NOW(), INTERVAL %s HOUR)",
+            (stale_hours, stale_hours))
+        n = cur.rowcount
+        conn.commit()
+        conn.close()
+        if n:
+            _log.info("Watchdog taches : %d tache(s) zombie(s) marquee(s) en erreur", n)
+        return n
+    except Exception as e:
+        _log.debug("Watchdog taches : %s", e)
+        return 0
 
 
 def _run_scheduled_scan(schedule: dict):
@@ -510,6 +585,7 @@ def _scheduler_loop_with_purge():
     """Boucle principale combinant scans CVE planifies et purge des logs."""
     global _purge_counter
     _log.info("Scheduler demarre (CVE + SSH Audit + purge, intervalle: %ds)", _CHECK_INTERVAL)
+    stale_swept = False
     while True:
         # Un seul worker execute les jobs (verrou leader MySQL) ; les autres
         # restent en veille et candidatent a chaque iteration (reprise
@@ -517,6 +593,13 @@ def _scheduler_loop_with_purge():
         if not _ensure_leader():
             time.sleep(_CHECK_INTERVAL)
             continue
+
+        # Sweep zombies DES la prise de leadership : si le processus redemarre
+        # plus souvent que l'heure du bloc de purge (ex. crash-loop), les
+        # taches orphelines ne seraient sinon jamais expirees.
+        if not stale_swept:
+            _expire_stale_tasks()
+            stale_swept = True
 
         # Scans CVE + audits SSH planifies
         # Patch (bug) : la connexion est fermee dans un finally (avant, conn.close()
@@ -533,21 +616,17 @@ def _scheduler_loop_with_purge():
             )
             schedules = cur.fetchall()
             for sched in schedules:
+                # next_run est persiste AVANT le scan (voir _advance_schedule) :
+                # un crash en plein scan ne re-declenche plus la planification
+                # en boucle, et un echec de persistance SAUTE l'execution.
+                if not _advance_schedule(cur, conn, sched, now, 'cve_scan_schedules'):
+                    continue
                 try:
                     from task_tracker import track
                     with track('cve_scan', f"Scan CVE planifie : {sched.get('name', '?')}"):
                         _run_scheduled_scan(sched)
                 except Exception as e:
                     _log.error("Scheduler: erreur execution %s : %s", sched['name'], e)
-                try:
-                    next_run = _compute_next_run(sched['cron_expression'], now)
-                    cur.execute(
-                        "UPDATE cve_scan_schedules SET last_run = %s, next_run = %s WHERE id = %s",
-                        (now, next_run, sched['id'])
-                    )
-                    conn.commit()
-                except Exception as e:
-                    _log.error("Scheduler: erreur mise a jour next_run pour %s : %s", sched['name'], e)
 
             # Audits SSH planifies
             # Patch (bug) : ce bloc vivait dans _scheduler_loop() qui n'etait
@@ -560,21 +639,15 @@ def _scheduler_loop_with_purge():
                 )
                 ssh_schedules = cur.fetchall()
                 for sched in ssh_schedules:
+                    # Meme protection anti-boucle que les scans CVE.
+                    if not _advance_schedule(cur, conn, sched, now, 'ssh_audit_schedules'):
+                        continue
                     try:
                         from task_tracker import track
                         with track('ssh_audit', f"Audit SSH planifie : {sched.get('name', '?')}"):
                             _run_scheduled_ssh_audit(sched)
                     except Exception as e:
                         _log.error("Scheduler SSH: erreur %s : %s", sched['name'], e)
-                    try:
-                        next_run = _compute_next_run(sched['cron_expression'], now)
-                        cur.execute(
-                            "UPDATE ssh_audit_schedules SET last_run = %s, next_run = %s WHERE id = %s",
-                            (now, next_run, sched['id'])
-                        )
-                        conn.commit()
-                    except Exception as e:
-                        _log.error("Scheduler SSH: erreur next_run %s : %s", sched['name'], e)
             except Exception as e:
                 _log.debug("Scheduler SSH Audit: table pas encore creee: %s", e)
         except Exception as e:
@@ -590,6 +663,9 @@ def _scheduler_loop_with_purge():
         _purge_counter += 1
         if _purge_counter >= _PURGE_INTERVAL:
             _purge_counter = 0
+            # Watchdog zombies : independant de LOG_RETENTION_DAYS (les taches
+            # 'running' orphelines doivent expirer meme sans retention active).
+            _expire_stale_tasks()
             _purge_old_logs()
             # Purge des taches terminees anciennes (meme retention que les logs)
             try:
