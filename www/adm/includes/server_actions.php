@@ -36,14 +36,15 @@ header('Content-Type: application/json');
 $response = ['success' => false, 'message' => 'Action non reconnue'];
 
 /**
- * Vérifie que le nom d'un serveur est composé uniquement de caractères alphanumériques,
- * tirets et underscores, avec une longueur comprise entre 1 et 255 caractères.
+ * Vérifie qu'un nom de serveur est valide (v1.37.14 : espaces, points, +,
+ * parenthèses autorisés ; métacaractères shell/HTML toujours interdits).
+ * Doit rester IDENTIQUE à manage_servers.php::validateServerName.
  *
  * @param string $name Nom à valider.
  * @return int 1 si valide, 0 sinon.
  */
 function validateServerName($name) {
-    return preg_match('/^[a-zA-Z0-9-_]{1,255}$/', $name);
+    return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9 ._+()-]{0,254}$/', $name);
 }
 
 /**

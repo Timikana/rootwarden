@@ -8,9 +8,11 @@ if (!isset($pdo) || !isset($_SESSION['csrf_token'])) return;
 
 // Patch A03-CMD-01 : assure que validateServerName() est dispo (definie
 // dans manage_servers.php). Si le fichier n'a pas ete inclus, on inline.
+// v1.37.14 : regle IDENTIQUE a manage_servers.php (espaces, points, +,
+// parentheses autorises ; metacaracteres shell/HTML interdits).
 if (!function_exists('validateServerName')) {
     function validateServerName($name) {
-        return is_string($name) && preg_match('/^[a-zA-Z0-9._-]{1,255}$/', $name) === 1;
+        return is_string($name) && preg_match('/^[a-zA-Z0-9][a-zA-Z0-9 ._+()-]{0,254}$/', $name) === 1;
     }
 }
 

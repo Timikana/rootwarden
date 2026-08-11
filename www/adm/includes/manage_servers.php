@@ -14,7 +14,13 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Valide un nom de serveur : uniquement lettres, chiffres, tirets et underscores (1–255 caractères).
+ * Valide un nom de serveur (v1.37.14) : lettres, chiffres, espaces, points,
+ * tirets, underscores, plus et parenthèses (1–255 caractères, commence par un
+ * alphanumérique). Élargi depuis ^[a-zA-Z0-9-_]$ qui refusait les noms
+ * lisibles type "EAU ACTU (backup)" ou "srv+web". Les métacaractères shell et
+ * HTML (; | & $ ` " ' < > / \) restent interdits : le nom circule dans des
+ * configs distantes et des messages — il est toujours quoté/échappé en aval
+ * (shlex.quote, base64, escHtml), mais on garde la défense en profondeur.
  *
  * Guard function_exists : ce fichier ET import_csv.php declarent la meme fonction.
  * Si l'ordre d'inclusion fait charger import_csv.php en premier, on prend ici le
@@ -26,7 +32,7 @@ if (session_status() === PHP_SESSION_NONE) {
  */
 if (!function_exists('validateServerName')) {
     function validateServerName($name) {
-        return preg_match('/^[a-zA-Z0-9-_]{1,255}$/', $name);
+        return preg_match('/^[a-zA-Z0-9][a-zA-Z0-9 ._+()-]{0,254}$/', $name);
     }
 }
 
