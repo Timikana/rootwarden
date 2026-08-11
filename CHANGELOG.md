@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.14, NON TESTÉ EN PRODUCTION
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.15, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres
@@ -15,6 +15,51 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 > tester en pré-production avant tout usage réel. Features sensibles OFF par
 > défaut (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`).
 > Appliquer les **migrations 052 → 061** avant usage.
+
+---
+
+## [1.37.15] - 2026-08-11 — Fix : profils de supervision inassignables (feature à moitié branchée)
+
+**Symptôme (prod)** : les profils Zabbix créés dans l'onglet Profils « ne
+servaient à rien » — aucun moyen de les lier aux machines, et le déploiement
+de l'agent appliquait toujours la configuration globale par défaut.
+
+### Cause — le dropdown d'assignation n'a jamais été câblé
+Toute la plomberie existait : table de liaison `machine_supervision_profile`,
+route `POST /supervision/machines/<id>/profile`, fonction JS
+`assignProfileToMachine()`, et le déploiement consulte bien le profil assigné
+(`_get_machine_profile` → priorité overrides > profil > config globale). Mais
+**`assignProfileToMachine()` n'était appelé nulle part** : aucune UI ne
+permettait de faire l'assignation → table de liaison toujours vide → config
+globale systématique. Le compteur « Machines » de l'onglet Profils restait à 0.
+
+### Fix
+- **Colonne « Profil » dans le tableau de déploiement** : un dropdown par
+  machine (peuplé selon la plateforme active), présélectionné sur le profil
+  assigné, `— aucun —` pour revenir à la config globale. Changement →
+  assignation immédiate + toast « Cliquez "Reconfigurer" pour appliquer ».
+  Chargé au démarrage, à l'ouverture de l'onglet Déploiement et au changement
+  de plateforme.
+- **Nouvel endpoint `GET /supervision/profiles/assignments?platform=…`** :
+  map complète `machine_id → profile_id` en une requête (évite N appels).
+- `assignProfileToMachine()` retourne désormais le succès réel (toast d'erreur
+  sinon).
+- 5 clés i18n ajoutées (FR/EN) : `supervision.th_profile`, `js.sup_profile_*`.
+
+### Utilisation
+1. Onglet **Profils** : créer le profil (HostMetadata, Server, proxy, TLS…).
+2. Onglet **Déploiement** : choisir le profil dans la colonne « Profil » de
+   chaque serveur.
+3. Cliquer **Reconfigurer** (ou Déployer) : la conf générée applique le profil
+   (priorité : overrides machine > profil > config globale).
+
+### Tests
+- `test_supervision.py` : +3 tests (map d'assignations, plateforme invalide
+  refusée, défaut zabbix). Suite complète : **285 tests OK**.
+- E2E Puppeteer `tests/e2e/go-supervision-profile-assign.mjs` (nouveau,
+  auto-nettoyant) : **8/8 PASS** — un dropdown par machine, profil proposé,
+  assignation via l'UI persistée en base, re-sélectionné après rechargement,
+  0 erreur JS.
 
 ---
 

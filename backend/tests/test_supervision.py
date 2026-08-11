@@ -361,3 +361,33 @@ class TestSupervisionSecurity:
         mock_db._cursor._results = [None]
         resp = client.get('/supervision/config', headers=superadmin_headers)
         assert resp.status_code == 200
+
+
+class TestProfileAssignments:
+    """Regression v1.37.14 : les profils de supervision etaient inassignables
+    depuis l'UI (assignProfileToMachine jamais appele, table de liaison vide,
+    deploy toujours en config globale). Nouvel endpoint : la map complete
+    machine_id -> profile_id en UNE requete pour peupler les dropdowns."""
+
+    def test_retourne_la_map_machine_vers_profil(self, client, admin_headers, mock_db):
+        mock_db._cursor._results = [
+            {'machine_id': 2, 'profile_id': 7},
+            {'machine_id': 5, 'profile_id': 3},
+        ]
+        r = client.get('/supervision/profiles/assignments?platform=zabbix',
+                       headers=admin_headers)
+        assert r.status_code == 200
+        d = r.get_json()
+        assert d['success'] is True
+        assert d['assignments'] == {'2': 7, '5': 3}
+
+    def test_plateforme_invalide_refusee(self, client, admin_headers, mock_db):
+        r = client.get('/supervision/profiles/assignments?platform=nagios',
+                       headers=admin_headers)
+        assert r.status_code == 400
+
+    def test_defaut_zabbix(self, client, admin_headers, mock_db):
+        mock_db._cursor._results = []
+        r = client.get('/supervision/profiles/assignments', headers=admin_headers)
+        assert r.status_code == 200
+        assert r.get_json()['assignments'] == {}

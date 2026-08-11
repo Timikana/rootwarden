@@ -1814,6 +1814,35 @@ def delete_profile(pid):
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
+@bp.route('/supervision/profiles/assignments', methods=['GET'])
+@require_api_key
+@require_permission('can_manage_supervision')
+def profile_assignments():
+    """Map machine_id -> profile_id pour une plateforme (une seule requete).
+
+    Alimente les dropdowns "Profil" du tableau de deploiement (fix v1.37.14 :
+    les profils existaient mais AUCUNE UI ne permettait de les lier aux
+    machines - assignProfileToMachine() n'etait appele nulle part, la table
+    machine_supervision_profile restait vide et le deploy retombait toujours
+    sur la config globale)."""
+    platform = (request.args.get('platform') or 'zabbix')
+    if platform not in _VALID_PLATFORMS:
+        return jsonify({'success': False, 'message': 'Plateforme invalide'}), 400
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT machine_id, profile_id FROM machine_supervision_profile "
+                "WHERE platform = %s",
+                (platform,))
+            rows = cur.fetchall()
+        return jsonify({'success': True,
+                        'assignments': {str(r['machine_id']): r['profile_id'] for r in rows}})
+    except Exception as e:
+        logger.error("[supervision/profiles/assignments] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
 @bp.route('/supervision/machines/<int:mid>/profile', methods=['GET', 'POST', 'DELETE'])
 @require_api_key
 @require_role(2)  # Patch A01 : require_machine_access est un no-op sur le mid d'URL -> require_role indispensable
