@@ -56,8 +56,12 @@ backend/tests/__pycache__/
 *.swp
 *.swo
 
-# Claude Code
-.claude/
+# Claude Code : tout est ignore (settings locaux, dumps de skills tiers) SAUF
+# les skills projet rw-* (conventions RootWarden partagees avec le repo).
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/rw-*/
 .mcp.json
 
 # Flag premier demarrage (genere par install.sh)
