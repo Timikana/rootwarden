@@ -10,6 +10,9 @@ require_once __DIR__ . '/db.php';
 checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accept_terms'])) {
+    // Le formulaire porte deja un csrf_token : sans cette verification, un site
+    // tiers pouvait faire accepter les CGU a la place de l'utilisateur.
+    checkCsrfToken();
     $_SESSION['terms_accepted'] = true;
     header("Location: index.php");
     exit();

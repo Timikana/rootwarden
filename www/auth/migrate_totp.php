@@ -4,18 +4,40 @@
  *
  * Parcourt tous les users avec un totp_secret non-null et sans prefixe "totp:".
  * Chiffre chaque secret et UPDATE en BDD.
- * Acces : superadmin uniquement.
- *
- * Usage : https://localhost:8443/auth/migrate_totp.php
  * Idempotent : ne re-chiffre pas les secrets deja chiffres.
+ *
+ * Acces : CLI STRICTEMENT. Toute requete HTTP est refusee (403).
+ *         Pourquoi le refus pur plutot qu'un checkAuth + POST/CSRF :
+ *           1. La version precedente declenchait une ecriture en masse sur la
+ *              table users sur un simple GET. Aucun jeton CSRF n'etait verifie :
+ *              une image ou un lien sur une page tierce suffisait a lancer la
+ *              migration dans la session d'un superadmin connecte.
+ *           2. Le script n'a aucune UI (sortie texte brut) : lui ajouter un
+ *              ecran de confirmation POST + CSRF reviendrait a construire un
+ *              formulaire pour une operation lancee une seule fois, a
+ *              l'installation d'une version.
+ *           3. auth/.htaccess refuse deja ce fichier en HTTP - le mode web
+ *              documente ne fonctionnait donc plus. On aligne le code sur la
+ *              realite operationnelle au lieu de maintenir un chemin mort.
+ *         Cette garde PHP double le blocage Apache et tient meme si la conf
+ *         Apache change ou si AllowOverride est retire.
+ *
+ * Usage : docker exec rootwarden_php php /var/www/html/auth/migrate_totp.php
  */
-require_once __DIR__ . '/../auth/verify.php';
+
+// ── Garde CLI ────────────────────────────────────────────────────────────────
+// Placee AVANT tout require : une requete HTTP ne doit ouvrir ni connexion BDD
+// ni charger les cles de chiffrement.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit;
+}
+
+// En CLI il n'y a ni session ni utilisateur : le controle d'acces est celui du
+// shell sur le conteneur. On ne charge donc pas auth/verify.php (checkAuth y
+// redirigerait vers /auth/login.php et tuerait le script).
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../includes/totp_crypto.php';
-
-checkAuth([ROLE_SUPERADMIN]); // Superadmin uniquement
-
-header('Content-Type: text/plain; charset=utf-8');
 
 echo "=== Migration TOTP secrets (plaintext → chiffre) ===\n\n";
 

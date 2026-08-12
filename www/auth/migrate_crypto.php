@@ -35,9 +35,36 @@
  *              d'erreur globale. Les erreurs par ligne sont loggées sans rollback
  *              partiel (la ligne est simplement ignorée).
  *
+ * Accès      : CLI STRICTEMENT. Toute requête HTTP est refusée (403).
+ *              Pourquoi le refus pur et simple plutôt qu'un checkAuth() :
+ *                1. Le script n'a aucune interface web (il écrit sur stdout) et
+ *                   la doc opérationnelle ne le lance que via docker exec.
+ *                2. Il N'EST PAS idempotent : une seconde exécution après une
+ *                   rotation de clé déchiffrerait avec OLD_SECRET_KEY des données
+ *                   déjà re-chiffrées avec SECRET_KEY. En AES-CBC + OPENSSL_RAW_DATA
+ *                   le déchiffrement ne lève pas d'erreur sur une mauvaise clé :
+ *                   il rend du binaire aléatoire, qui serait alors re-chiffré et
+ *                   écrit en base. Perte irréversible des mots de passe.
+ *                3. Il lit OLD_SECRET_KEY / SECRET_KEY et en affiche des extraits
+ *                   sur la sortie standard.
+ *              Un déclenchement web accidentel (préchargement de lien, scan,
+ *              CSRF sur un superadmin) coûterait donc la base. Aucun garde-fou
+ *              applicatif ne vaut ici l'absence totale de surface HTTP.
+ *              Le blocage Apache (auth/.htaccess) reste en place : cette garde
+ *              PHP en est le doublon, actif même si la conf Apache change.
+ *
  * Note       : La migration des machines/serveurs est désactivée (commentée).
  *              Seule la table `users` est traitée.
  */
+
+// ── Garde CLI ────────────────────────────────────────────────────────────────
+// Placée AVANT tout require : une requête HTTP ne doit même pas ouvrir la
+// connexion BDD ni charger les clés de chiffrement.
+// Lancement : docker exec rootwarden_php php /var/www/html/auth/migrate_crypto.php
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit;
+}
 
 // Charge la connexion PDO depuis les variables d'environnement DB_*
 require_once __DIR__ . '/../db.php';

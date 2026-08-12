@@ -14,8 +14,24 @@ checkPermission('can_audit_ssh');
 
 $role = (int) ($_SESSION['role_id'] ?? 0);
 
-// Chargement des serveurs
-$stmt = $pdo->query("SELECT id, name, ip, port FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' ORDER BY name");
+// Chargement des serveurs accessibles a l'utilisateur courant.
+// Correctif IDOR : un lecteur (role 1) ne doit voir que les machines qui lui
+// sont explicitement attribuees. Avant, le selecteur listait TOUT le parc
+// (noms + IP) quel que soit le role. Meme cloisonnement que security/index.php :
+// admin/superadmin voient tout, le lecteur passe par user_machine_access.
+if ($role >= ROLE_ADMIN) {
+    $stmt = $pdo->query("SELECT id, name, ip, port FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' ORDER BY name");
+} else {
+    $stmt = $pdo->prepare(
+        "SELECT m.id, m.name, m.ip, m.port
+         FROM machines m
+         INNER JOIN user_machine_access uma ON uma.machine_id = m.id
+         WHERE uma.user_id = ?
+           AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')
+         ORDER BY m.name"
+    );
+    $stmt->execute([$_SESSION['user_id']]);
+}
 $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Tags pour le selecteur de planification (admin+)
