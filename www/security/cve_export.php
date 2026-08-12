@@ -36,6 +36,24 @@ if (!$scan) {
     die(json_encode(['error' => 'Aucun scan trouve']));
 }
 
+// Correctif IDOR : machine_id / scan_id viennent de l'URL. Sans ce controle, un
+// lecteur (role 1) pouvait exporter les CVE de N'IMPORTE quelle machine, y
+// compris celles qui ne lui sont pas attribuees. Meme cloisonnement que
+// security/index.php : admin/superadmin voient tout, le lecteur est limite a
+// user_machine_access. Reponse 404 (et non 403) pour ne pas divulguer
+// l'existence de la machine.
+if ((int) ($_SESSION['role_id'] ?? 0) < ROLE_ADMIN) {
+    $chk = $pdo->prepare(
+        "SELECT 1 FROM user_machine_access WHERE user_id = ? AND machine_id = ?"
+    );
+    $chk->execute([$_SESSION['user_id'], (int) $scan['machine_id']]);
+    if (!$chk->fetchColumn()) {
+        http_response_code(404);
+        header('Content-Type: application/json');
+        die(json_encode(['error' => 'Aucun scan trouve']));
+    }
+}
+
 // Récupère les findings
 $stmt = $pdo->prepare("SELECT cve_id, package_name, package_version, cvss_score, severity, summary FROM cve_findings WHERE scan_id = ? ORDER BY FIELD(severity,'CRITICAL','HIGH','MEDIUM','LOW','NONE'), cvss_score DESC");
 $stmt->execute([$scan['id']]);

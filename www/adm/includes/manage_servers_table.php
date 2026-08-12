@@ -55,8 +55,10 @@ if (!in_array($sortColumn, $allowedColumns)) {
 }
 
 // Construction de la requête SQL avec filtres
+// Colonnes EXPLICITES (jamais SELECT *) : le tableau n'affiche jamais les mots de passe
+// (champs vides "laisser vide pour ne pas modifier"), inutile de charger password/root_password chiffres.
 $countSql = "SELECT COUNT(*) FROM machines";
-$sql = "SELECT * FROM machines";
+$sql = "SELECT id, name, ip, port, user, environment, criticality, network_type, online_status FROM machines";
 
 $whereConditions = [];
 $params = [];

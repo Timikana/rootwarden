@@ -26,7 +26,11 @@ $date = date('d/m/Y H:i');
 // ── Collecte des donnees ──────────────────────────────────────────────────
 
 // 1. Serveurs
-$servers = $pdo->query("SELECT m.*,
+// Colonnes EXPLICITES (jamais SELECT m.*) : password/root_password chiffres n'ont rien a faire
+// dans un rapport exporte (HTML/CSV/PDF) ni dans le hash SHA-256 d'integrite du rapport.
+$servers = $pdo->query("SELECT m.id, m.name, m.ip, m.port, m.user, m.linux_version, m.status,
+    m.lifecycle_status, m.online_status, m.environment, m.criticality, m.network_type,
+    m.last_checked, m.last_reboot, m.maj_secu_date, m.maj_secu_last_exec_date, m.created_at,
     (SELECT scan_date FROM cve_scans WHERE machine_id = m.id AND status='completed' ORDER BY scan_date DESC LIMIT 1) as last_scan,
     (SELECT cve_count FROM cve_scans WHERE machine_id = m.id AND status='completed' ORDER BY scan_date DESC LIMIT 1) as cve_count,
     (SELECT critical_count FROM cve_scans WHERE machine_id = m.id AND status='completed' ORDER BY scan_date DESC LIMIT 1) as critical_count,

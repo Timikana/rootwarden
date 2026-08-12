@@ -5,7 +5,67 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-> ## ⚠️ AVERTISSEMENT — `main` v1.37.15, NON TESTÉ EN PRODUCTION
+## [1.37.16] - 2026-08-12 — Sécurité : correctifs issus de l'audit de migration
+
+Défauts relevés lors de l'inventaire préalable à la migration v2.0 (branche `laravel`).
+Ils sont **antérieurs à ce chantier** et sont corrigés ici sur `main`, indépendamment de la
+migration.
+
+### Cloisonnement des données (IDOR)
+- **`ssh-audit/index.php`** : le sélecteur de serveurs listait **tout le parc** (noms + IP) quel
+  que soit le rôle. Un lecteur (rôle 1) voyait donc des machines qui ne lui sont pas attribuées.
+  Cloisonnement aligné sur `security/index.php` : admin/superadmin voient tout, le lecteur passe
+  par `user_machine_access`.
+- **`security/cve_export.php`** : `machine_id` / `scan_id` viennent de l'URL et n'étaient pas
+  contrôlés. Un lecteur pouvait exporter les CVE de **n'importe quelle** machine. Ajout d'un
+  contrôle d'appartenance pour les rôles < admin, avec une réponse **404** (et non 403) pour ne
+  pas divulguer l'existence de la machine.
+
+### Authentification
+- **`terms.php`** : le formulaire portait un `csrf_token` qui n'était **jamais vérifié** —
+  l'acceptation des CGU était CSRF-able. Ajout de `checkCsrfToken()`.
+- **`auth/confirm_2fa.php`** : la vérification TOTP n'avait **ni rate-limit, ni anti-rejeu, ni
+  tolérance explicite**, offrant un chemin de brute-force (10⁶ combinaisons) contournant les
+  protections de `verify_2fa.php`. Alignement sur le mécanisme de référence : rate-limit session
+  (5/min) **et** IP (10/10 min via `login_attempts`, `step='2fa'`), anti-rejeu du dernier code,
+  `verify($code, null, 1)`.
+- **`php/php.ini`** : ajout de `session.use_strict_mode = 1`. Sans cette directive, PHP acceptait
+  un identifiant de session non généré par lui (session fixation) ; les `session_regenerate_id(true)`
+  du code limitaient le risque sans l'éliminer.
+
+### Défense en profondeur
+- **`auth/migrate_crypto.php`** et **`auth/migrate_totp.php`** : ces outils de migration sont
+  désormais **strictement CLI** (403 sur toute requête HTTP, garde placée avant tout `require`
+  pour n'ouvrir ni connexion BDD ni clé de chiffrement). `migrate_totp` déclenchait une écriture
+  en masse sur `users` via un **simple GET sans CSRF**. Note : `www/auth/.htaccess` les refusait
+  déjà en HTTP — la garde PHP double ce blocage et tient même si la configuration Apache change.
+  Usage inchangé : `docker exec rootwarden_php php /var/www/html/auth/migrate_*.php`.
+- **4 × `SELECT *` sur `machines`** remplacés par des listes de colonnes explicites
+  (`adm/includes/manage_servers.php` ×2, `adm/includes/manage_servers_table.php`,
+  `security/compliance_report.php`) : les credentials SSH chiffrés (`password`, `root_password`)
+  ne sont plus chargés en mémoire ni transmis aux vues. Effet de bord positif : ils sortent du
+  hash SHA-256 d'intégrité du rapport de conformité.
+
+### Bug préexistant corrigé au passage
+- `auth/confirm_2fa.php` utilisait `t()` sans jamais charger `includes/lang.php` (ni directement,
+  ni transitivement) : le **premier message d'erreur produisait un fatal** « undefined function ».
+
+### Tests
+- E2E `tests/e2e/go-security-fixes.mjs` (nouveau) : **17/17** — login complet, acceptation des CGU
+  toujours fonctionnelle, pages à requêtes modifiées rendues sans erreur PHP avec leurs données
+  (`adm/admin_page`, `compliance_report`, `ssh-audit`), export CVE toujours autorisé au superadmin,
+  scripts de migration en 403.
+- Suites existantes rejouées : `01-login` (6/6), `02-admin-users` (4/4), `03-permissions` (3/3),
+  `05-cve-scan` (6/6), `09-docker-idor` (4/4). Backend **pytest 285/285**. PHP lint OK sur les
+  9 fichiers modifiés.
+
+> Note de méthode : le rapport d'inventaire signalait aussi `update/functions/list_machines.php`
+> comme IDOR. **Faux positif** : cette page exige déjà `ROLE_ADMIN`, et « un admin voit tout le
+> parc » est le comportement voulu et documenté. Elle n'a pas été modifiée.
+
+---
+
+> ## ⚠️ AVERTISSEMENT — `main` v1.37.16, NON TESTÉ EN PRODUCTION
 >
 > La branche `main` intègre (merge depuis `beta`) toutes les fonctionnalités
 > **v1.24 → v1.37** (drift, tâches, posture, EPSS/KEV, groupes & masse, fenêtres

@@ -227,8 +227,13 @@ $sortColumn = isset($_GET['sort']) ? $_GET['sort'] : 'name';
 $sortDirection = isset($_GET['dir']) && $_GET['dir'] === 'desc' ? 'DESC' : 'ASC';
 
 // Requête pour obtenir les données initiales
+// Colonnes EXPLICITES (jamais SELECT *) : password/root_password sont des credentials
+// chiffres, aucune raison de les charger en memoire PHP ni de les faire transiter jusqu'a la vue.
 $countSql = "SELECT COUNT(*) FROM machines";
-$sql = "SELECT * FROM machines";
+$sql = "SELECT id, name, ip, port, user, linux_version, status, lifecycle_status, retire_date, "
+     . "online_status, environment, criticality, network_type, platform_key_deployed, "
+     . "ssh_password_required, service_account_deployed, deploy_bashrc, cleanup_users, "
+     . "last_checked, created_at FROM machines";
 
 $whereConditions = [];
 $params = [];
@@ -281,7 +286,14 @@ $stmt->execute($params);
 $all_servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Récupération des serveurs
-$stmt_servers = $pdo->query("SELECT * FROM machines");
+// Colonnes EXPLICITES (jamais SELECT *) : on exclut password/root_password pour ne pas
+// charger les credentials chiffres dans la vue (cartes serveurs ci-dessous).
+$stmt_servers = $pdo->query(
+    "SELECT id, name, ip, port, user, linux_version, status, lifecycle_status, retire_date, "
+    . "online_status, environment, criticality, network_type, platform_key_deployed, "
+    . "ssh_password_required, service_account_deployed, deploy_bashrc, cleanup_users, "
+    . "last_checked, created_at FROM machines"
+);
 $all_servers = $stmt_servers->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
