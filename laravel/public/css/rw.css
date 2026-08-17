@@ -1,0 +1,181 @@
+/*
+ * Feuille de style RootWarden v2.0 — ecrite a la main, AUCUNE etape de
+ * construction. Ce qui est ecrit ici est ce qui est servi.
+ *
+ * Jetons d'abord, classes ensuite. Le theme sombre suit la preference du
+ * systeme ; il redefinit UNIQUEMENT des jetons, jamais des regles.
+ */
+
+:root {
+    --rw-fond: #f4f6f9;
+    --rw-surface: #ffffff;
+    --rw-bordure: #d7dee8;
+    --rw-texte: #16202e;
+    --rw-texte-doux: #5b6b80;
+    --rw-accent: #1d4ed8;
+    --rw-accent-texte: #ffffff;
+    --rw-danger: #b91c1c;
+    --rw-danger-fond: #fef2f2;
+    --rw-rayon: 10px;
+    --rw-espace: 16px;
+    --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --rw-fond: #0f1722;
+        --rw-surface: #17202e;
+        --rw-bordure: #2a3746;
+        --rw-texte: #e8eef6;
+        --rw-texte-doux: #9fb0c4;
+        --rw-accent: #5b8cff;
+        --rw-accent-texte: #0b1220;
+        --rw-danger: #fca5a5;
+        --rw-danger-fond: #2a1618;
+        --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+    }
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--rw-fond);
+    color: var(--rw-texte);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ── Ecrans d'authentification ─────────────────────────────────────────── */
+
+.rw-centre {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--rw-espace);
+}
+
+.rw-carte {
+    width: 100%;
+    max-width: 400px;
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    box-shadow: var(--rw-ombre);
+    padding: 28px;
+}
+
+.rw-carte--large { max-width: 720px; }
+
+.rw-titre {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+}
+
+.rw-sous-titre {
+    margin: 0 0 20px;
+    color: var(--rw-texte-doux);
+    font-size: 14px;
+}
+
+/* ── Formulaires ───────────────────────────────────────────────────────── */
+
+.rw-champ { margin-bottom: 14px; }
+
+.rw-etiquette {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--rw-texte-doux);
+}
+
+.rw-saisie {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    background: var(--rw-fond);
+    color: var(--rw-texte);
+    font: inherit;
+}
+
+.rw-saisie:focus {
+    outline: 2px solid var(--rw-accent);
+    outline-offset: 1px;
+    border-color: var(--rw-accent);
+}
+
+/* Le code TOTP se lit chiffre par chiffre : chasse fixe et lettres espacees. */
+.rw-saisie--code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 22px;
+    letter-spacing: .35em;
+    text-align: center;
+}
+
+.rw-bouton {
+    width: 100%;
+    padding: 11px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.rw-bouton:hover { filter: brightness(1.07); }
+.rw-bouton:focus-visible { outline: 2px solid var(--rw-texte); outline-offset: 2px; }
+
+.rw-bouton--discret {
+    width: auto;
+    background: transparent;
+    color: var(--rw-texte-doux);
+    border: 1px solid var(--rw-bordure);
+}
+
+/* ── Messages ──────────────────────────────────────────────────────────── */
+
+.rw-erreur {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--rw-danger);
+    border-radius: 8px;
+    background: var(--rw-danger-fond);
+    color: var(--rw-danger);
+    font-size: 14px;
+}
+
+.rw-note {
+    margin: 20px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--rw-bordure);
+    color: var(--rw-texte-doux);
+    font-size: 13px;
+}
+
+.rw-lien { color: var(--rw-accent); }
+
+/* ── Barre du portail ──────────────────────────────────────────────────── */
+
+.rw-barre {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rw-espace);
+    padding: 12px 20px;
+    background: var(--rw-surface);
+    border-bottom: 1px solid var(--rw-bordure);
+}
+
+.rw-barre__marque { font-weight: 650; }
+.rw-barre__droite { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--rw-texte-doux); }
+
+.rw-contenu { padding: 24px 20px; max-width: 960px; margin: 0 auto; }
+
+.rw-inline { display: inline; }

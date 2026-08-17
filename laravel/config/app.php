@@ -55,6 +55,13 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+     * URL du frontend legacy, encore en service pendant la migration. Les
+     * pages non portees y renvoient explicitement : un renvoi vaut mieux
+     * qu'un ecran vide qui laisse croire que la fonction a disparu.
+     */
+    'url_legacy' => env('LEGACY_URL', 'https://localhost:8443'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

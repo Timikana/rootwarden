@@ -12,7 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            // Session COMPLETEMENT authentifiee : mot de passe ET second
+            // facteur. Entre les deux, la session ne porte qu'un compte
+            // temporaire et ne franchit pas ce garde.
+            'session.authentifiee' => \App\Http\Middleware\SessionAuthentifiee::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

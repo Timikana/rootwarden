@@ -116,6 +116,47 @@ avec une attente **par cible** : écart connu côté legacy, exigence côté Lar
 Le défaut est présent sur `main`, donc en production. Il n'est pas corrigé côté legacy à ce
 jour — la décision appartient à l'exploitant.
 
+### Socle — portage de l'authentification (le même test passe sur les deux cibles)
+
+Chaîne d'authentification portée sur Laravel : mot de passe, second facteur TOTP, conditions
+d'utilisation, déconnexion, garde de session. **`cible=laravel : 14 PASS / 0 FAIL / 0 écart`**,
+avec le même `go-socle-auth.mjs` qui donnait `13 PASS / 1 écart connu` sur le legacy.
+
+**E-01 est corrigé.** `App\Services\Totp` détermine *à quelle fenêtre* appartient le code
+présenté — un booléen de validité ne suffisait pas, la garde a besoin du numéro de fenêtre —
+puis retient la dernière fenêtre consommée **par compte** et refuse toute fenêtre déjà
+consommée. Stockage : cache applicatif (pilote fichier), et non une colonne en base, pour ne
+pas engager un schéma qui appartient au backend Python. Contrepartie assumée et écrite dans
+`PARITE.md`.
+
+Autres points du portage :
+- La décision d'accès vit dans **un seul** middleware (`session.authentifiee`). Entre le mot
+  de passe et le second facteur, la session ne porte qu'un `compte_temporaire` et ne franchit
+  pas ce garde — vérifié sur les trois rôles.
+- Rotation de l'identifiant de session **deux fois** : après le mot de passe et après le
+  second facteur.
+- Le secret TOTP est relu **en base** au moment de la vérification ; il ne transite jamais par
+  la session. Le rôle et l'état actif sont eux aussi revérifiés à cet instant.
+- `App\Support\TotpCrypto` porte fidèlement le déchiffrement du legacy (sodium, AES-GCM, CBC
+  historique, clair) : le même secret doit rester lisible par les deux frontends.
+- Compteurs partagés avec le legacy : verrouillage par compte après 5 échecs, table
+  `login_attempts` par IP, une 2FA réussie enregistrée en `success=1`.
+- Message d'erreur **identique** que le compte existe ou non, pour ne pas révéler quels
+  identifiants existent.
+- Les chemins du legacy (`/index.php`, `/profile.php`, `/auth/login.php`…) redirigent vers les
+  routes portées, ce qui permet au **même** test de viser les deux cibles sans être réécrit.
+- CSS écrit à la main (`public/css/rw.css`), jetons + classes `.rw-*`, thème sombre par
+  préférence système, aucune étape de construction.
+- i18n : `lang/{fr,en}/auth.php`, **24 clés = 24 clés**, zéro clé morte à l'écran.
+
+Volontairement **non porté** à ce stade, et signalé à l'écran plutôt que silencieusement
+absent : l'enrôlement d'un second facteur, la re-authentification ponctuelle (step-up), la
+politique de mot de passe et la réinitialisation. Un compte sans secret TOTP arrive sur une
+impasse explicite qui renvoie vers l'ancien portail — jamais sur un accès accordé.
+
+`legacy/auth/` **n'est pas archivé** : l'ancien portail sert encore toutes les pages métier et
+a besoin de sa propre authentification.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
