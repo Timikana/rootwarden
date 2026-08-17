@@ -1,7 +1,7 @@
 ################################################
 # Dockerfile — Image PHP/Apache pour RootWarden
 #
-# Image unique PHP 8.4 + Apache avec les sources www/.
+# Image unique PHP 8.4 + Apache avec les sources legacy/.
 # Tailwind CSS est charge via CDN en runtime.
 #
 # Variables d’environnement attendues au runtime (via docker-compose / .env) :
@@ -113,8 +113,8 @@ RUN mkdir -p /var/www/sessions && \
 WORKDIR /var/www/html
 
 # Copie du code source PHP depuis le contexte Docker.
-# Le dossier www/ contient toute l’application RootWarden.
-COPY www/ /var/www/html/
+# Le dossier legacy/ contient toute l’application RootWarden.
+COPY legacy/ /var/www/html/
 
 # (Optionnel) Copier d’autres ressources si besoin
 # COPY some_other_stuff /var/www/html/whatever

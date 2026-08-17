@@ -18,8 +18,8 @@ services:
       - "${HTTPS_PORT:-8443}:443"
     volumes:
       - php_sessions:/var/www/sessions
-      - ./www:/var/www/html
-      - ./www/logs:/var/www/html/logs
+      - ./legacy:/var/www/html
+      - ./legacy/logs:/var/www/html/logs
       - ./php/php.ini:/usr/local/etc/php/php.ini
       - ./certs:/var/www/certs          # Partagé avec l'entrypoint (certs auto ou custom)
       # - /etc/localtime:/etc/localtime:ro   # Linux only - désactivé sur Windows
@@ -146,7 +146,7 @@ services:
     container_name: rootwarden_composer
     working_dir: /app
     volumes:
-      - ./www:/app
+      - ./legacy:/app
     command: ["composer", "install", "--no-dev", "--optimize-autoloader"]
     profiles:
       - tools
@@ -158,7 +158,7 @@ services:
     container_name: rootwarden_composer_update
     working_dir: /app
     volumes:
-      - ./www:/app
+      - ./legacy:/app
     command: ["composer", "update", "--no-dev", "--optimize-autoloader"]
     profiles:
       - tools

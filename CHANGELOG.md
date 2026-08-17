@@ -5,6 +5,50 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
+
+### Vague 0 — `www/` devient `legacy/`
+
+Le frontend legacy est renommé `www/` → `legacy/` (227 fichiers). **Aucun changement de
+comportement** : le dossier reste la racine documentaire du conteneur `rootwarden_php`.
+Le déplacement est fait *avant* tout portage — le faire à la fin, avec trente modules déjà
+modifiés, aurait produit un commit géant et conflictuel.
+
+Points d'ancrage repris hors du dossier : `docker-compose.yml` (4 montages côté hôte),
+`docker-compose.prod.yml`, `php/Dockerfile`, `php/entrypoint.sh`, `.github/workflows/ci.yml`
+(l'auto-tag lit désormais `legacy/version.txt`), `.gitignore`, `.gitleaks.toml`,
+`.semgrep/rules-rootwarden.yml`, `scripts/sync-obsidian-vault.py`, `maj.sh`,
+`backend/routes/chatops.py`, les quatre documents racine et les quatre skills du projet.
+
+Laissés intacts délibérément : les chemins `/var/www/html` et `/var/www/sessions` (internes au
+conteneur) et les références de `CHANGELOG.md` (traces historiques — les réécrire falsifierait
+l'historique).
+
+Supprimé : `www/C:/Program Files/Git/var/www/html/test-server`, arborescence vide non suivie par
+git, née d'un chemin POSIX traduit en chemin Windows par Git Bash.
+
+**Vérification** : nouveau test de caractérisation `tests/e2e/go-vague0-legacy.mjs`, joué avant
+puis après. Il suit les liens du menu et compte les sous-ressources en échec page par page.
+37 pages, toutes en 200, toutes garnies, mêmes actifs, une seule sous-ressource en échec avant
+comme après (favicon absent sur `/api/docs.php`, préexistant).
+
+### ⚠ Note d'exploitation
+
+Le montage change de chemin côté hôte. Après récupération, les conteneurs doivent être
+**recréés**, pas seulement redémarrés :
+
+```bash
+docker compose --env-file srv-docker.env up -d php
+```
+
+### Documents de migration
+
+- `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
+- `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
+- `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
+
+---
+
 ## [1.37.16] - 2026-08-12 — Sécurité : correctifs issus de l'audit de migration
 
 Défauts relevés lors de l'inventaire préalable à la migration v2.0 (branche `laravel`).

@@ -13,7 +13,9 @@ Objectif (hybride option B/C) :
 Scope couvert :
   - backend/*.py              -> 04_Fichiers/backend-*.md
   - backend/routes/*.py       -> 04_Fichiers/backend-routes-*.md
-  - www/adm/api/*.php         -> 04_Fichiers/www-adm-api-*.md
+  - legacy/adm/api/*.php      -> 04_Fichiers/www-adm-api-*.md
+    (le prefixe des fiches reste "www-" apres le deplacement de www/ vers
+     legacy/ : le renommer orphelinerait les fiches deja publiees)
   - mysql/migrations/NNN_x.sql -> 08_DB/migrations/NNN_x.md
 
 Usage :
@@ -257,7 +259,7 @@ tags: [frontend, auth]
 version_introduced:
 last_reviewed: {TODAY}
 status: stable"""
-    stub_body = f"""# www/adm/api/{src_path.name} - [[Code/{rel}]]
+    stub_body = f"""# legacy/adm/api/{src_path.name} - [[Code/{rel}]]
 
 _Note auto-generee. Complete la description quand tu as le contexte._
 """
@@ -324,7 +326,7 @@ def main():
         if r:
             actions.append(r)
 
-    api_dir = REPO / 'www' / 'adm' / 'api'
+    api_dir = REPO / 'legacy' / 'adm' / 'api'
     if api_dir.exists():
         for src_path in sorted(api_dir.glob('*.php')):
             r = sync_www_adm_api(src_path, args.dry_run)

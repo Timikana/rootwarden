@@ -57,7 +57,7 @@ Post-audit wave of features. Each feature is a full vertical slice (idempotent m
 - Vertical list with **"Last deployment"** column, color-coded (green <30d, yellow 30-90d, red >90d, italic gray if never).
 - Last deploy date pulled from `user_logs` (excludes dry-runs), rendered in browser timezone.
 - "Deploy multi" / "Dry-run multi" purple buttons activate as soon as >1 server is selected. Iterates N servers, deploys to all non-system users, aggregated results with per-server details.
-- Collateral CSP fix: rolled back the nonce in `csp_header_value()` (CSP3 was ignoring `unsafe-inline` -> all inline scripts in the repo were silently broken). Re-activation procedure documented in `www/includes/csp_nonce.php` for after the full inline-scripts migration.
+- Collateral CSP fix: rolled back the nonce in `csp_header_value()` (CSP3 was ignoring `unsafe-inline` -> all inline scripts in the repo were silently broken). Re-activation procedure documented in `legacy/includes/csp_nonce.php` for after the full inline-scripts migration.
 
 ## What's new in v1.21.0 — OWASP Top 10 Security Hardening
 
@@ -269,10 +269,10 @@ Reference files:
 
 A `down -v` deletes volumes (database). On restart, `init.sql` creates accounts
 with invalid placeholders. `install.sh` must run to generate real passwords.
-If the `www/.installed` flag still exists (bind mount), remove it:
+If the `legacy/.installed` flag still exists (bind mount), remove it:
 
 ```bash
-rm -f www/.installed
+rm -f legacy/.installed
 ./start.sh -d
 docker exec <php_container> cat /var/www/html/.first_run_credentials
 ```
