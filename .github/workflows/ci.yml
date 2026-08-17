@@ -71,7 +71,7 @@ jobs:
               php -l "$file"
               errors=$((errors + 1))
             fi
-          done < <(find www/ -name "*.php" -type f)
+          done < <(find legacy/ -name "*.php" -type f)
           echo "=== $errors erreur(s) de syntaxe ==="
           [ $errors -eq 0 ] || exit 1
 
@@ -293,10 +293,10 @@ jobs:
           php-version: "8.4"
           tools: composer
       - name: Composer install (sans scripts pour eviter hooks arbitraires)
-        working-directory: www
+        working-directory: legacy
         run: composer install --no-scripts --no-interaction --no-progress
       - name: Composer audit
-        working-directory: www
+        working-directory: legacy
         # --locked force le scan des versions exactes pinnees dans composer.lock
         # --format=plain pour output GitHub-friendly
         run: |
@@ -397,7 +397,7 @@ jobs:
       - name: Read version
         id: version
         run: |
-          VERSION=$(cat www/version.txt 2>/dev/null || echo "0.0.0")
+          VERSION=$(cat legacy/version.txt 2>/dev/null || echo "0.0.0")
           echo "version=v${VERSION}" >> $GITHUB_OUTPUT
           echo "Version detected: v${VERSION}"
 

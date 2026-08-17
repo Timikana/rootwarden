@@ -64,7 +64,7 @@ Ce document liste les règles à respecter pour **éviter les régressions** dé
 
 - **Canaux** : développement sur **`beta`**, release = merge **`beta` → `main`** avec validation explicite. `maj.sh` propose le canal beta/release.
 - **Audit, pentest, patch sécu** : commits atomiques + **JAMAIS de merge `beta`→`main` sans validation explicite user**.
-- **CI gates bloquants** : ruff, php -l, bandit (`-c bandit.yml`), semgrep (owasp-top-ten), pip-audit (`--strict`), composer audit, gitleaks (v3, Node24), trivy (fs + image). `auto-tag` crée `vX.Y.Z` depuis `www/version.txt` (→ doit rester un nom de tag valide, pas d'espaces/parenthèses). Les **règles custom** `.semgrep/rules-rootwarden.yml` tournent en **advisory** (non bloquant) pour l'instant.
+- **CI gates bloquants** : ruff, php -l, bandit (`-c bandit.yml`), semgrep (owasp-top-ten), pip-audit (`--strict`), composer audit, gitleaks (v3, Node24), trivy (fs + image). `auto-tag` crée `vX.Y.Z` depuis `legacy/version.txt` (→ doit rester un nom de tag valide, pas d'espaces/parenthèses). Les **règles custom** `.semgrep/rules-rootwarden.yml` tournent en **advisory** (non bloquant) pour l'instant.
 
 ## 9. Checklist code-review sécurité
 

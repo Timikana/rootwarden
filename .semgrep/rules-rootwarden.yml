@@ -161,7 +161,7 @@ rules:
       # migrate_crypto.php est par design un re-encrypt CBC->AEAD pour les
       # vieilles donnees. Toleré le temps de la migration complete.
       exclude:
-        - 'www/auth/migrate_crypto.php'
+        - 'legacy/auth/migrate_crypto.php'
     message: |
       AES-CBC sans MAC = malleable (bit-flipping). Utiliser AES-GCM (AEAD) :
       openssl_encrypt($data, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag)

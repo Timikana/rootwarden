@@ -11,7 +11,7 @@ tests/e2e/*-pentest.mjs
 package-lock.json
 vendor/
 !vendor/composer/
-!www/vendor/.htaccess
+!legacy/vendor/.htaccess
 
 # Secrets — NE JAMAIS commiter ces fichiers
 srv-docker.env
@@ -20,7 +20,7 @@ srv-docker.env.bak.*
 !srv-docker.env.example
 !*.env.example
 .first_run_credentials
-www/.first_run_credentials
+legacy/.first_run_credentials
 
 # Certificats SSL generes localement
 certs/*.pem
@@ -32,15 +32,15 @@ backend/ssl/
 # Logs — generes au runtime
 *.log
 backend/logs/
-www/logs/
-!www/logs/.htaccess
+legacy/logs/
+!legacy/logs/.htaccess
 
 # Backups — generes automatiquement
 backend/backups/
 backups/
-# Exception : www/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage
-!www/backups/
-!www/backups/**
+# Exception : legacy/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage
+!legacy/backups/
+!legacy/backups/**
 
 # Base de donnees locale
 mysql/data/
@@ -65,7 +65,7 @@ backend/tests/__pycache__/
 .mcp.json
 
 # Flag premier demarrage (genere par install.sh)
-www/.installed
+legacy/.installed
 
 # OS
 .DS_Store
@@ -75,7 +75,7 @@ Thumbs.db
 tests/e2e/screenshots/
 
 # Artefacts temporaires
-www/_ul
+legacy/_ul
 
 # Frontend build
 frontend/node_modules/

@@ -57,7 +57,7 @@ Vague de fonctionnalités post-audit. Chaque feature = slice complet (migration 
 - Liste verticale + colonne **"Dernier deploiement"** color-codee (vert <30j, jaune 30-90j, rouge >90j, italique gris si jamais).
 - Date du dernier deploy extraite de `user_logs` (exclut les dry-run), formatee en fuseau navigateur.
 - Boutons "Deployer multi" / "Dry-run multi" violets, actifs des qu'on coche >1 serveur. Iteration N serveurs, deploiement sur tous les non-system users, resultat aggrege avec details par serveur.
-- Fix collateral CSP : rollback du nonce dans `csp_header_value()` (CSP3 ignorait `unsafe-inline` -> tous les inline scripts du repo etaient casses silencieusement). Doc procedure de re-activation apres migration complete dans `www/includes/csp_nonce.php`.
+- Fix collateral CSP : rollback du nonce dans `csp_header_value()` (CSP3 ignorait `unsafe-inline` -> tous les inline scripts du repo etaient casses silencieusement). Doc procedure de re-activation apres migration complete dans `legacy/includes/csp_nonce.php`.
 
 ## 🛡️ v1.21.0 — Security Hardening OWASP Top 10
 
@@ -211,7 +211,7 @@ Certains modules peuvent etre desactives entierement via `srv-docker.env` sans t
 WAZUH_ENABLED=false
 ```
 
-Quand un flag est sur `false`, le backend n'enregistre pas le blueprint correspondant (404 sur les routes), le frontend cache l'entree de menu et bloque la page concernee. Helper PHP : `feature_enabled('module')`. Voir [feature_flags.php](www/includes/feature_flags.php).
+Quand un flag est sur `false`, le backend n'enregistre pas le blueprint correspondant (404 sur les routes), le frontend cache l'entree de menu et bloque la page concernee. Helper PHP : `feature_enabled('module')`. Voir [feature_flags.php](legacy/includes/feature_flags.php).
 
 ### Accès
 - Interface : **https://localhost:8443**
@@ -304,10 +304,10 @@ Le sync est hybride : les blocs `<!-- AUTO ... -->` sont regeneres automatiqueme
 
 Un `down -v` supprime les volumes (BDD). Au redemarrage, `init.sql` cree les comptes
 avec des placeholders invalides. `install.sh` doit tourner pour generer les vrais
-mots de passe. Si le flag `www/.installed` existe encore (bind mount), supprimez-le :
+mots de passe. Si le flag `legacy/.installed` existe encore (bind mount), supprimez-le :
 
 ```bash
-rm -f www/.installed
+rm -f legacy/.installed
 ./start.sh -d
 docker exec <php_container> cat /var/www/html/.first_run_credentials
 ```
@@ -354,7 +354,7 @@ Si le fichier n'existe pas, `install.sh` n'a pas tourne (flag `.installed` exist
 ou erreur de connexion BDD). Supprimez le flag et redemarrez :
 
 ```bash
-rm -f www/.installed
+rm -f legacy/.installed
 docker compose restart php
 ```
 

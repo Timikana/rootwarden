@@ -185,7 +185,7 @@ Les actions sensibles exigent une re-vérification TOTP fraîche (15 min) :
 - `delete_user`
 - `update_permissions`
 
-**Côté UI** : automatique. Un modal demande le code 2FA quand l'utilisateur clique sur l'action. Voir [www/js/utils.js](www/js/utils.js) (`window.rwOpenStepUpModal`).
+**Côté UI** : automatique. Un modal demande le code 2FA quand l'utilisateur clique sur l'action. Voir [legacy/js/utils.js](legacy/js/utils.js) (`window.rwOpenStepUpModal`).
 
 **Côté API** : si tu appelles `/adm/api/delete_user.php` sans step-up, tu reçois :
 ```json
@@ -204,7 +204,7 @@ Tu dois alors POST `/auth/step_up_verify.php` avec le code TOTP puis retry.
 | Déploiements SSH | `backend/logs/deployment.log` | ✅ (via configure_servers.py) |
 | Iptables | `backend/logs/iptables.log` | ✅ |
 | APT updates | `backend/logs/update_servers.log` | ✅ |
-| PHP | `www/logs/*.log` | (Apache standard) |
+| PHP | `legacy/logs/*.log` | (Apache standard) |
 | Audit (DB) | table `user_logs` | HMAC-SHA256 chained |
 
 ### Forwarding GELF (optionnel)

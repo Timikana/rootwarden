@@ -64,8 +64,9 @@ toucher à la zone concernée.
 
 ## Frontend
 - **Tailwind compilé localement avec purge** : une classe jamais utilisée
-  (ex. `rose-*`, `lime-*`) est absente du CSS prod → `grep -r "bg-X" www/`
-  avant d'employer une classe, sinon recompiler.
+  (ex. `rose-*`, `lime-*`) est absente du CSS prod → `grep -r "bg-X" legacy/`
+  avant d'employer une classe, sinon recompiler. (Ne concerne que le legacy :
+  le portage Laravel n'a pas d'etape de construction, cf `ARCHITECTURE-UI.md`.)
 - Après une action AJAX, mettre à jour le DOM complet (badges, lignes
   conditionnelles rendues par PHP) — pas seulement le style du bouton, sinon
   « il faut F5 » (cf sudo-row v1.37.11, profils supervision v1.37.15).

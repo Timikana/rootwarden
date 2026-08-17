@@ -7,15 +7,19 @@ description: Checklist OBLIGATOIRE avant chaque commit feature/fix RootWarden - 
 
 A derouler AVANT chaque commit de feature ou de fix. Aucune etape n'est optionnelle.
 
+> **Migration en cours** : le frontend legacy vit dans `legacy/` (anciennement
+> `www/`) et se deprecie partie par partie — voir `docs/migration/DEPRECIATION.md`.
+> Une partie deja portee est sous `legacy/_deprecated/` : ne plus la modifier.
+
 ## 1. Versioning
-- Bump `www/version.txt` (SemVer `MAJEUR.MINEUR.PATCH`). L'auto-tag CI lit ce fichier.
+- Bump `legacy/version.txt` (SemVer `MAJEUR.MINEUR.PATCH`). L'auto-tag CI lit ce fichier.
 - Entree `CHANGELOG.md` complete : symptome, cause racine, fix, tests, notes exploitation.
 - Mettre a jour la ligne d'avertissement en tete du CHANGELOG (`main vX.Y.Z`).
 - Exception : les chores (tooling, docs internes) ne bumpent pas la version.
 
 ## 2. i18n — parite FR/EN stricte
-- Toute nouvelle cle va dans `www/lang/fr/<module>.php` **ET** `www/lang/en/<module>.php`, dans le meme commit.
-- Cles JS : `www/lang/fr/js.php` + `en/js.php`, prefixe `js.` ; consommees via `__('cle_sans_prefixe')` (defini par `head.php`).
+- Toute nouvelle cle va dans `legacy/lang/fr/<module>.php` **ET** `legacy/lang/en/<module>.php`, dans le meme commit.
+- Cles JS : `legacy/lang/fr/js.php` + `en/js.php`, prefixe `js.` ; consommees via `__('cle_sans_prefixe')` (defini par `head.php`). Le PHP, lui, appelle `t('module.cle')`.
 - Jamais de chaine UI en dur dans le PHP/JS des modules.
 
 ## 3. Securite (OWASP, cf CONTRIBUTING-SECURITY.md)
