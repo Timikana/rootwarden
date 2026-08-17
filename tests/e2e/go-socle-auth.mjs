@@ -34,7 +34,19 @@ const COMPTES = [
 ];
 
 // Pages protegees : une par famille de garde (role 1, admin, superadmin).
+// Les chemins du legacy sont conserves : la cible Laravel les redirige vers ses
+// propres routes, ce qui permet au MEME test de viser les deux sans reecriture.
 const PAGES_PROTEGEES = ['/index.php', '/profile.php', '/adm/admin_page.php'];
+
+/*
+ * Les deux cibles NOMMENT differemment les memes ecrans. L'objet de chaque
+ * assertion est « sur quel ecran suis-je », jamais « quel est le nom du
+ * fichier » : une assertion adossee a une forme propre a une cible ne compare
+ * plus rien des qu'on change de cible.
+ */
+const ECRAN_CONNEXION      = /login\.php|\/connexion/i;
+const ECRAN_SECOND_FACTEUR = /verify_2fa|enable_2fa|second-facteur/i;
+const ECRAN_CGU            = /terms\.php|\/cgu/i;
 
 function b32(s){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let b='';for(const c of s.toUpperCase().replace(/=+$/,'')){const v=a.indexOf(c);if(v===-1)continue;b+=v.toString(2).padStart(5,'0')}const r=[];for(let i=0;i+8<=b.length;i+=8)r.push(parseInt(b.slice(i,i+8),2));return Buffer.from(r)}
 function totp(s){const k=b32(s);const c=Math.floor(Date.now()/1000/30);const buf=Buffer.alloc(8);buf.writeBigUInt64BE(BigInt(c));const h=createHmac('sha1',k).update(buf).digest();const o=h[h.length-1]&0x0f;return((h.readUInt32BE(o)&0x7fffffff)%1000000).toString().padStart(6,'0')}
@@ -125,7 +137,7 @@ try {
         for (const chemin of PAGES_PROTEGEES) {
             const rep = await page.goto(`${BASE}${chemin}`, { waitUntil: 'networkidle2' });
             const url = page.url();
-            const renvoyee = /login|auth/i.test(url);
+            const renvoyee = ECRAN_CONNEXION.test(url);
             verifie(`A. sans session, ${chemin} renvoie vers la connexion`,
                     renvoyee, `statut=${rep ? rep.status() : '?'} url=${url.replace(BASE, '')}`);
         }
@@ -136,7 +148,7 @@ try {
     for (const c of COMPTES) {
         const { ctx, page } = await nouvelOnglet();
         const apres = await etapeMotDePasse(page, c.nom, MDP);
-        const surSecondFacteur = /verify_2fa|enable_2fa|2fa|two-factor/i.test(apres);
+        const surSecondFacteur = ECRAN_SECOND_FACTEUR.test(apres);
         verifie(`B. ${c.nom} : mot de passe seul -> second facteur exige`,
                 surSecondFacteur, apres.replace(BASE, ''));
 
@@ -145,7 +157,7 @@ try {
         await page.goto(`${BASE}/index.php`, { waitUntil: 'networkidle2' });
         const urlProtegee = page.url();
         verifie(`B. ${c.nom} : entre le mot de passe et le second facteur, /index.php reste refuse`,
-                !/index\.php$/.test(urlProtegee) || /login|2fa/i.test(urlProtegee),
+                ECRAN_CONNEXION.test(urlProtegee) || ECRAN_SECOND_FACTEUR.test(urlProtegee),
                 urlProtegee.replace(BASE, ''));
         await ctx.close();
     }
@@ -156,7 +168,7 @@ try {
         const { ctx, page } = await nouvelOnglet();
         const apres = await etapeMotDePasse(page, c.nom, 'mot-de-passe-manifestement-faux-42');
         verifie(`C. ${c.nom} : mauvais mot de passe n'authentifie pas`,
-                /login/i.test(apres), apres.replace(BASE, ''));
+                ECRAN_CONNEXION.test(apres), apres.replace(BASE, ''));
         await ctx.close();
     }
 
@@ -175,7 +187,7 @@ try {
         const a = await nouvelOnglet();
         await etapeMotDePasse(a.page, c.nom, MDP);
         const url1 = await etapeSecondFacteur(a.page, code);
-        const premiereOk = !/verify_2fa|login/i.test(url1);
+        const premiereOk = !ECRAN_SECOND_FACTEUR.test(url1) && !ECRAN_CONNEXION.test(url1);
         verifie(`D. ${c.nom} : premiere utilisation du code acceptee`, premiereOk, url1.replace(BASE, ''));
         await a.ctx.close();
 
@@ -187,7 +199,7 @@ try {
             const b = await nouvelOnglet();
             await etapeMotDePasse(b.page, c.nom, MDP);
             const url2 = await etapeSecondFacteur(b.page, code);
-            const rejeuAccepte = !/verify_2fa|login/i.test(url2);
+            const rejeuAccepte = !ECRAN_SECOND_FACTEUR.test(url2) && !ECRAN_CONNEXION.test(url2);
             constate('D. rejeu du meme code depuis une session neuve', rejeuAccepte ? 'ACCEPTE' : 'refuse');
             // Le garde du legacy (`last_totp_hash`) est pose UNIQUEMENT dans la
             // branche de succes de verify_2fa.php ligne 96, puis supprime onze
@@ -221,7 +233,7 @@ try {
                 `avant=${avant ? avant.slice(0, 6) + '…' : 'absent'} apres=${apres ? apres.slice(0, 6) + '…' : 'absent'}`);
 
         verifie(`F. ${c.nom} : apres le second facteur, passage par les conditions d'utilisation`,
-                /terms|cgu|conditions/i.test(url), url.replace(BASE, ''));
+                ECRAN_CGU.test(url), url.replace(BASE, ''));
         await ctx.close();
     }
 } catch (e) {

@@ -10,8 +10,12 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ## E-01 — Le rejeu d'un code TOTP doit etre refuse
 
-**Cible legacy : accepte (defaut). Cible Laravel : doit refuser.**
+**Cible legacy : accepte (defaut). Cible Laravel : REFUSE — corrige le 2026-08-17.**
 Releve et mesure le 2026-08-17 · `tests/e2e/go-socle-auth.mjs`, bloc D.
+
+> Etat : le portage refuse desormais le rejeu. Meme test, meme code, meme fenetre de 30 s,
+> session neuve : `cible=laravel : 14 PASS / 0 FAIL / 0 ecart`. Le legacy, lui, l'accepte
+> toujours — le correctif cote legacy attend une decision de l'exploitant.
 
 ### Ce qui a ete mesure
 
@@ -48,14 +52,21 @@ Deux defauts se cumulent :
 C'est le motif « trois pieces justes, resultat inerte » : la comparaison est correcte, le
 hachage est correct, le message d'erreur existe et est traduit — et rien ne se declenche.
 
-### Ce que doit faire le portage
+### Ce qu'a fait le portage
 
-Une garde anti-rejeu portee par le **compte**, persistee en base, pas par la session :
-retenir le dernier compteur de fenetre TOTP consomme par utilisateur et refuser tout code
-appartenant a une fenetre deja consommee.
+`App\Services\Totp` determine **a quelle fenetre** appartient le code presente — un simple
+booleen de validite ne suffisait pas, la garde a besoin du numero de fenetre — puis retient
+la derniere fenetre consommee **par compte** et refuse toute fenetre deja consommee ou
+anterieure.
 
-Le schema appartient au backend Python : la colonne ou la table necessaire se demande
-**cote Python**, par une migration SQL. Aucune migration Laravel.
+Le stockage retenu est le **cache applicatif** (pilote fichier), et non une colonne en base.
+Motif : le schema appartient au backend Python, et une migration SQL pour cette seule garde
+aurait engage un schema partage. Contrepartie assumee : la garde est propre au frontend
+Laravel et ne survit pas a une purge du cache. Elle couvre le scenario reel — un rejeu se
+joue en moins de 30 secondes.
+
+Si l'exploitant prefere une garde partagee entre les deux frontends, il faudra une colonne
+cote Python, par une migration SQL. Aucune migration Laravel dans les deux cas.
 
 ### Portee cote production
 
