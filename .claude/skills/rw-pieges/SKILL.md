@@ -73,6 +73,29 @@ toucher à la zone concernée.
 - Contrat JSON : vérifier la clé réelle renvoyée par le backend Python
   (`machines` vs `servers` legacy PHP). (v1.37.12)
 
+## Poste de développement Windows
+
+- **Git Bash traduit les chemins POSIX en chemins Windows.** Trois dégâts
+  constatés le même jour (2026-08-17) :
+  - `docker exec … ls /var/www/html/x` devient
+    `C:/Program Files/Git/var/www/html/x` → « No such file » trompeur ;
+  - un `/var/www/html/...` passé à un script a créé l'arborescence parasite
+    `www/C:/Program Files/Git/var/www/html/` dans le dépôt ;
+  - `docker exec … curl -o /dev/null` a écrit la réponse dans un fichier
+    littéralement nommé **`nul`** au répertoire de travail du conteneur — donc
+    dans le bind mount, donc dans le dépôt. `nul` est un **nom de périphérique
+    réservé** sous Windows : `git add` échoue avec
+    `error: open("…/nul"): No such file or directory`, et `rm` ne suffit pas.
+    Suppression : `[System.IO.File]::Delete("\\?\" + $chemin)` en PowerShell.
+
+  Parade : `MSYS_NO_PATHCONV=1` devant tout appel portant un chemin absolu, et
+  `-o /tmp/x` plutôt que `-o /dev/null` dans un `docker exec`.
+
+- **Le bind mount est ~258× plus lent que le système de fichiers du conteneur**
+  (9 300 ms contre 36 ms pour lire 1 500 fichiers PHP). Conséquence directe :
+  toute mesure de latence faite sur ce poste compare surtout des nombres de
+  fichiers chargés. Voir la skill `rw-laravel`.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).

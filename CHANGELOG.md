@@ -41,6 +41,51 @@ Le montage change de chemin côté hôte. Après récupération, les conteneurs 
 docker compose --env-file srv-docker.env up -d php
 ```
 
+### Socle — squelette Laravel et conteneur
+
+Squelette Laravel **13.17** neuf dans `laravel/`, servi sur `${LARAVEL_PORT:-8444}` en
+parallèle du legacy (8443), qui reste la référence. Aucune page portée à ce stade.
+
+Le conteneur `rootwarden_laravel` était un **orphelin** : ses étiquettes le rattachaient à un
+service `laravel:` qui n'existait plus dans `docker-compose.yml`. Il est supprimé et le service
+est redéclaré.
+
+**Trois migrations par défaut supprimées** (`create_users_table`, `create_cache_table`,
+`create_jobs_table`). La première est la plus dangereuse : `users` existe déjà avec ses colonnes
+`role_id`, `totp_secret`, `failed_attempts`. Le schéma appartient au backend Python.
+Voir `laravel/database/migrations/README.md`.
+
+Corollaire moins visible : Laravel 13 propose par défaut `SESSION_DRIVER=database`,
+`QUEUE_CONNECTION=database` et `CACHE_STORE=database`, qui exigent précisément les tables
+supprimées. Laissés tels quels, ils cassent l'application à la **première requête**, avec une
+erreur SQL et non un message clair. `.env.example` les place sur `file` / `sync` / `file`.
+
+Identifiants de base lus en repli sur `MYSQL_*` dans `config/database.php` plutôt que recopiés
+sous `DB_*` : un mot de passe présent à deux endroits finit par diverger.
+
+**Vérifié** : `/up` répond 200, la page d'accueil répond 200, `APP_KEY` est générée, Laravel voit
+les **63 tables** partagées, et le schéma est **intact** — aucune table `migrations`, `sessions`,
+`cache` ni `jobs` créée, toujours 63 tables. Le legacy répond toujours sur 8443.
+
+### Conteneur Laravel : la sonde échouait pour une raison mesurable
+
+Le conteneur restait « unhealthy » en permanence, ce qui avait été noté sans être diagnostiqué.
+Cause trouvée : **sur un hôte Windows, le bind mount est ~258× plus lent que le système de
+fichiers du conteneur** — 9 300 ms contre 36 ms pour lire 1 500 fichiers PHP. Le legacy charge
+~5 fichiers par page, Laravel plusieurs centaines : une première requête à froid dépasse 6 s,
+puis retombe à 0,17 s une fois le cache du système chaud. Le délai de la sonde passe de 5 s à
+20 s (`start_period` 60 s). Le conteneur est **healthy**, zéro échec.
+
+⚠ **Conséquence pour toute la migration** : les mesures de latence faites sur cet hôte sont
+suspectes. L'écart relevé précédemment sur la recherche (2,2 s contre 24 ms au legacy) compare
+surtout un nombre de fichiers chargés ; il doit être re-mesuré sur un hôte Linux avant d'être
+traité comme un défaut applicatif.
+
+### Nouvelles variables d'environnement
+
+`LARAVEL_PORT=8444` et `APP_TIMEZONE=Europe/Paris`, ajoutées à `srv-docker.env.example` — les
+exploitants les récupèrent automatiquement via `./maj.sh`.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

@@ -49,6 +49,54 @@ services:
       external:
 
   # ─────────────────────────────────────────────────────────────
+  # Frontend Laravel v2.0 (migration en cours)
+  # Tourne EN PARALLÈLE du frontend legacy (service `php`), sur un port
+  # distinct, pendant toute la durée de la migration. Le legacy reste la
+  # référence tant que la parité d'un module n'est pas prouvée.
+  # Racine documentaire sur public/ (front controller) et non sur la racine.
+  # ─────────────────────────────────────────────────────────────
+  laravel:
+    build:
+      context: .
+      dockerfile: ./laravel/Dockerfile
+    container_name: rootwarden_laravel
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${LARAVEL_PORT:-8444}:80"
+    volumes:
+      - ./laravel:/var/www/html
+    env_file:
+      - srv-docker.env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:80/up", "-o", "/dev/null"]
+      interval: 30s
+      # 20 s et non 5 s : sur un hôte Windows, le bind mount est ~258× plus lent
+      # que le système de fichiers du conteneur (mesuré le 2026-08-17 : 9 300 ms
+      # contre 36 ms pour lire 1 500 fichiers PHP). Le legacy charge ~5 fichiers
+      # par page, Laravel plusieurs centaines : une première requête à froid
+      # dépasse 6 s. Avec 5 s, la sonde échouait toujours et le conteneur restait
+      # « unhealthy » en permanence, sans que l'application ait le moindre défaut.
+      # Sur un hôte Linux, ce délai est sans objet.
+      timeout: 20s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 128M
+    networks:
+      internal:
+      external:
+
+  # ─────────────────────────────────────────────────────────────
   # Backend Python (Flask) - réseau interne uniquement
   # Le frontend PHP le contacte via http://python:5000 (réseau Docker).
   # Ne pas exposer ce port sur l'hôte en production.
