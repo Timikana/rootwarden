@@ -99,11 +99,34 @@ rien et le silence passe pour un zero.
 - `MSYS_NO_PATHCONV=1` devant tout `docker exec` portant un chemin absolu :
   Git Bash traduit `/var/www/html` en `C:/Program Files/Git/var/www/html`.
 
+## Authentification — ce que le legacy fait vraiment
+
+Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
+
+- **Aucun chemin sans second facteur.** `login.php` renvoie vers `enable_2fa.php`
+  si le compte n'a pas de secret, vers `verify_2fa.php` sinon. Entre le mot de
+  passe et le code, la session n'est PAS authentifiee : une page protegee reste
+  refusee. Verifie sur les trois roles.
+- **L'identifiant de session change** apres authentification complete.
+- **Apres le second facteur**, passage par `/terms.php` — sauf
+  `force_password_change`, qui renvoie vers `profile.php?force_change=1`.
+- Limitation de debit du second facteur : 5 tentatives par session sur 60 s,
+  ET un compteur par IP en base (`login_attempts`, `step='2fa'`, seuil 10 sur
+  10 min). Une 2FA reussie repasse sa ligne a `success=1` — sans quoi une
+  reussite comptait comme un echec.
+- **Le garde anti-rejeu TOTP est INERTE** — voir `docs/migration/PARITE.md`
+  E-01. `$_SESSION['last_totp_hash']` n'est pose que dans la branche de succes
+  puis supprime dans la meme requete. Le portage doit porter ce garde par
+  COMPTE, en base, jamais par session : un garde de session ne peut rien contre
+  un rejeu venu d'une session neuve.
+- Step-up : `stepUpVerify($action, 900)`, cle `_step_up_<action>` par ACTION,
+  limitation a 5 tentatives, anti-rejeu `_step_up_last_totp`.
+
 ## Etat du portage
 
-Rien n'est porte a ce jour. Le socle est en cours : squelette (fait), puis
-authentification (TOTP obligatoire + step-up + politique de mot de passe),
-gabarit et navigation, passerelle, i18n.
+Rien n'est porte a ce jour. Le socle est en cours : squelette (fait),
+caracterisation de l'authentification (faite), puis portage de
+l'authentification, gabarit et navigation, passerelle, i18n.
 
 Reference consultable sur la branche abandonnee `laravel` (22 vagues, 2 825
 assertions vertes) : `git show laravel:docs/migration/{AUTH,GATEWAY,LAYOUT,DESIGN-SYSTEM,PORTAGE}.md`

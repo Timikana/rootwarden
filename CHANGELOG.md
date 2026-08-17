@@ -86,6 +86,36 @@ traité comme un défaut applicatif.
 `LARAVEL_PORT=8444` et `APP_TIMEZONE=Europe/Paris`, ajoutées à `srv-docker.env.example` — les
 exploitants les récupèrent automatiquement via `./maj.sh`.
 
+### Socle — caractérisation de l'authentification, et un défaut trouvé
+
+Nouveau test `tests/e2e/go-socle-auth.mjs`, joué avec les **trois comptes de test dédiés** et
+non en superadmin. Il mesure six invariants de la chaîne d'authentification avant d'y toucher :
+page protégée sans session, mot de passe seul insuffisant (aucun chemin sans second facteur,
+pour aucun rôle), page protégée toujours refusée entre le mot de passe et le second facteur,
+mauvais mot de passe, régénération de l'identifiant de session, passage par les conditions
+d'utilisation. **Cible legacy : 13 PASS / 0 FAIL / 1 écart connu.**
+
+#### ⚠ Le rejeu d'un code TOTP est accepté (défaut de production)
+
+Mesuré, pas déduit : sur `rw-test-super` (rôle 3, `can_admin_portal`), **le même code TOTP a
+ouvert deux sessions authentifiées** dans la même fenêtre de 30 secondes, depuis deux contextes
+de navigateur distincts.
+
+`legacy/auth/verify_2fa.php` porte pourtant une garde anti-rejeu. Elle ne se déclenche jamais :
+`$_SESSION['last_totp_hash']` n'est posé que dans la branche de succès (ligne 96) puis supprimé
+onze lignes plus bas (ligne 126), dans la même requête, et jamais posé sur un échec. La condition
+de la ligne 92 est donc structurellement inatteignable.
+
+Et même corrigée, elle resterait sans effet : une garde portée par la **session** ne peut rien
+contre un rejeu venu d'une session **neuve** — c'est-à-dire exactement le scénario d'attaque.
+
+Le portage doit porter cette garde par **compte**, persistée en base (la colonne se demande côté
+Python, aucune migration Laravel). L'écart est consigné dans `docs/migration/PARITE.md` (E-01)
+avec une attente **par cible** : écart connu côté legacy, exigence côté Laravel.
+
+Le défaut est présent sur `main`, donc en production. Il n'est pas corrigé côté legacy à ce
+jour — la décision appartient à l'exploitant.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
