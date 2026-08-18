@@ -68,7 +68,7 @@ for (const format of LARGEURS) {
         const limite = Date.now() + maxMs;
         while (Date.now() < limite) {
             const encoreEnCharge = await page.evaluate(() => {
-                const c = document.querySelector('#cmdlog-tbody, #appr-tbody, #drift-tbody, #backup-tbody');
+                const c = document.querySelector('#cmdlog-tbody, #appr-tbody, #drift-tbody, #backup-tbody, #task-tbody');
                 return c ? /Chargement|Loading/i.test(c.textContent) : false;
             });
             if (!encoreEnCharge) return;
@@ -140,6 +140,11 @@ for (const format of LARGEURS) {
     await page.goto(`${BASE}/sauvegardes`, { waitUntil: 'networkidle2' });
     await attendTableau();
     await prend('09-sauvegardes');
+
+    // 10. Centre de taches
+    await page.goto(`${BASE}/taches`, { waitUntil: 'networkidle2' });
+    await attendTableau();
+    await prend('10-taches');
 
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {

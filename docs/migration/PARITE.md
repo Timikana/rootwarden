@@ -347,6 +347,59 @@ legacy ; l'arbitrage revient à l'exploitant.
 
 ---
 
+## E-10 — Une erreur ne s'avale pas : montrer moins plutôt que montrer faux
+
+**Écart voulu.** Quand un appel échoue, le legacy ne fait rien — il n'écrit pas le tableau, et les
+lignes précédentes restent affichées. Le portage vide le tableau et dit pourquoi.
+
+### Ce que cela produit sur le centre de tâches
+
+`/tasks/list?status=<x>` répond **500 pour tout statut**. La cause est lisible dans les journaux
+du backend :
+
+```
+ERROR:rootwarden:tasks_list: 1052 (23000): Column 'status' in where clause is ambiguous
+```
+
+La requête filtrée joint `machines`, qui porte elle aussi une colonne `status`, et la clause
+`WHERE status = %s` n'est pas qualifiée. La requête de comptage, qui ne joint rien, passe — d'où
+une erreur qui n'apparaît qu'à la seconde requête et laisse le total juste.
+
+Conséquence sur le legacy, mesurée : sélectionner « Échec » laisse à l'écran **cent tâches
+« Réussie »**, sans un mot. La page présente des données exactes comme si elles répondaient à une
+question qu'on ne lui a pas posée. C'est pire qu'un tableau vide — un tableau vide se remarque.
+
+### Ce que fait le portage
+
+Il appelle la même route, obtient le même 500, et alors :
+
+- vide le tableau ;
+- écrit dans la région d'annonce que **le filtrage a échoué côté serveur**, en nommant le statut
+  demandé ;
+- explique que la liste a été vidée plutôt que de montrer des tâches hors sujet.
+
+La règle générale : **montrer moins est préférable à montrer faux.** Un `if (réussi)` sans `else`
+fabrique un écran rassurant et faux, exactement comme un `catch` vide fabrique un rapport
+rassurant et faux.
+
+### Ce qui n'est pas fait ici
+
+Le correctif tient en un mot — `t.status = %s` au lieu de `status = %s` dans
+`backend/routes/tasks.py` — mais il touche le backend, que cette migration laisse intact, et il
+ferait passer le filtre de « toujours en erreur » à « fonctionnel ». C'est un changement de
+comportement : il revient à l'exploitant de l'autoriser. En attendant, le portage ne prétend pas
+que le filtre marche.
+
+### Au passage — un état vide qui nomme son filtre
+
+Le legacy affiche « Aucune tâche enregistrée » lorsqu'un filtre ne rend rien, ce qui est faux :
+il y en a quatre cents, aucune ne porte ce statut. Le portage écrit « Aucune tâche avec le statut
+« Échec » », et rappelle que revenir à « Tous les statuts » les fera réapparaître. Ce chemin
+n'est pas atteignable aujourd'hui sur ce parc — le filtre échoue avant — mais le code le porte et
+le libellé existe dans les deux langues.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

@@ -797,7 +797,14 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-shrink: 0;
+    /*
+     * PAS de `flex-shrink: 0` : le bloc gardait sa largeur naturelle et
+     * debordait de l'ecran au lieu de se replier — a 390 px, « Actualiser
+     * toutes les 5 s » sortait du champ, coupe net. Il peut retrecir, et son
+     * contenu passe a la ligne.
+     */
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 /*
@@ -885,3 +892,28 @@ body {
     word-break: normal;
     white-space: nowrap;
 }
+
+/*
+ * Case a cocher avec son libelle, alignee sur les autres commandes de vue.
+ * La zone cliquable couvre le texte : viser une case de 13 px au doigt est
+ * un exercice, et le libelle est deja la.
+ */
+.rw-case {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 2px;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+    cursor: pointer;
+}
+
+.rw-case input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--rw-accent); }
+.rw-case:hover { color: var(--rw-texte); }
+
+/*
+ * Les commandes de VUE s'alignent par le bas, comme les champs qu'elles
+ * cotoient, et se replient : a 390 px, « Actualiser toutes les 5 s » sortait
+ * du champ, la ligne d'actions ne pouvant pas passer a la ligne.
+ */
+.rw-entete-page__actions { align-items: flex-end; flex-wrap: wrap; }
