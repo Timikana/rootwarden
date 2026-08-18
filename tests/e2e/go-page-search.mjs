@@ -1,0 +1,312 @@
+/**
+ * go-page-search.mjs - Recherche globale (serveurs, utilisateurs, CVE, tickets, audit).
+ *
+ * Vise les DEUX cibles :
+ *   legacy   https://localhost:8443/search/
+ *   laravel  http://localhost:8444/recherche
+ *
+ * LECTURE SEULE. Un seul appel : `GET /search?q=`, plafonne a 10 resultats par
+ * categorie cote backend. Rien a produire, rien a detruire.
+ *
+ * CE QUE CE TEST CHERCHE VRAIMENT : ou menent les liens des resultats. Le
+ * backend Python ne connait qu'un frontend et ecrit ses liens en dur —
+ * `/tickets/index.php`, `/adm/audit_log.php`, `/update/index.php`. Chaque page
+ * archivee par la migration transforme un de ces liens en **404** : la
+ * recherche devient un menu qui mene a des pages disparues. Le test SUIT les
+ * liens et mesure ce qu'ils rendent.
+ *
+ * La latence n'est PAS mesuree : le montage de fichiers de ce poste est ~258x
+ * plus lent que le systeme du conteneur, et tout chiffre releve ici dirait
+ * surtout combien de fichiers chaque cible charge.
+ *
+ * Usage :
+ *   cd tests/e2e
+ *   node go-page-search.mjs                                   (Laravel)
+ *   E2E_BASE=https://localhost:8443 node go-page-search.mjs   (legacy)
+ */
+import puppeteer from 'puppeteer';
+import { createHmac } from 'crypto';
+import { constateArchivage, verifieMenuLegacy, sondeLegacy } from './archive.mjs';
+
+const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const LEGACY = 'https://localhost:8443';
+const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
+const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
+const PAGE = CIBLE === 'laravel' ? '/recherche' : '/search/';
+
+const COMPTES = {
+    'rw-test-user':  { role: 1, secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSW', attendu: 'refuse' },
+    'rw-test-admin': { role: 2, secret: 'KRSXG5BAKBSWY3DPEHPK3PXPKRSXG5BAKBSWY3DPEHPK3PXPKRSX', attendu: 'refuse' },
+    'rw-test-super': { role: 3, secret: 'MZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW', attendu: 'autorise' },
+};
+
+function b32(s){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let b='';for(const c of s.toUpperCase().replace(/=+$/,'')){const v=a.indexOf(c);if(v===-1)continue;b+=v.toString(2).padStart(5,'0')}const r=[];for(let i=0;i+8<=b.length;i+=8)r.push(parseInt(b.slice(i,i+8),2));return Buffer.from(r)}
+function totp(s){const k=b32(s);const c=Math.floor(Date.now()/1000/30);const buf=Buffer.alloc(8);buf.writeBigUInt64BE(BigInt(c));const h=createHmac('sha1',k).update(buf).digest();const o=h[h.length-1]&0x0f;return((h.readUInt32BE(o)&0x7fffffff)%1000000).toString().padStart(6,'0')}
+function dors(ms){return new Promise(r=>setTimeout(r,ms))}
+function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
+
+let echecs = 0;
+const lignes = [];
+function verifie(libelle, ok, detail) {
+    lignes.push(`${ok ? 'PASS' : 'FAIL'}  ${libelle}${detail ? '  — ' + detail : ''}`);
+    if (!ok) echecs++;
+}
+function constate(l, v) { lignes.push(`INFO  ${l} : ${v}`); }
+
+function verifiePortage(libelle, ok, detail) {
+    if (CIBLE === 'laravel') return verifie(libelle, ok, detail);
+    constate(libelle, `non exigible du legacy — ${detail}`);
+}
+
+const navigateur = await puppeteer.launch({
+    headless: 'new',
+    args: ['--ignore-certificate-errors', '--allow-insecure-localhost', '--window-size=1400,900'],
+    defaultViewport: { width: 1400, height: 900 },
+    protocolTimeout: 60000,
+});
+
+async function connecte(nom) {
+    const compte = COMPTES[nom];
+    const ctx = await navigateur.createBrowserContext();
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(30000);
+    page.on('dialog', d => d.dismiss().catch(() => {}));
+
+    const chemins = CIBLE === 'laravel'
+        ? { connexion: '/connexion', cgu: /\/cgu/ }
+        : { connexion: '/auth/login.php', cgu: /terms\.php/ };
+
+    await page.goto(`${BASE}${chemins.connexion}`, { waitUntil: 'networkidle2' });
+    await page.type('input[name="username"]', nom, { delay: 8 });
+    await page.type('input[name="password"]', MDP, { delay: 8 });
+    let nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+    await page.click('button[type="submit"]'); try { await nav; } catch {}
+
+    if (resteFenetre() < 6) await dors((resteFenetre() + 1) * 1000);
+    await page.type('input[name="2fa_code"]', totp(compte.secret), { delay: 8 });
+    nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+    await page.click('button[type="submit"]'); try { await nav; } catch {}
+
+    if (chemins.cgu.test(page.url())) {
+        nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+        const b = await page.$('[data-rw="cgu-accepter"]') || await page.$('button[name="accept_terms"]');
+        if (b) await b.evaluate(x => x.click());
+        try { await nav; } catch {}
+    }
+
+    return { ctx, page };
+}
+
+/** Etat de la page tel qu'il est RENDU. */
+async function releve(page) {
+    return page.evaluate(() => {
+        const zone = document.getElementById('search-results');
+        const texte = (el) => (el?.textContent || '').trim();
+        const liens = [...(zone?.querySelectorAll('a[href]') || [])];
+        return {
+            titre: texte(document.querySelector('h1')),
+            champ: Boolean(document.getElementById('search-input')),
+            meta: texte(document.getElementById('search-meta')),
+            cartes: zone ? zone.querySelectorAll('.rw-tuile, .bg-white, .rw-carte').length : 0,
+            nbLiens: liens.length,
+            liens: liens.map(a => a.getAttribute('href')),
+            libelles: liens.map(a => texte(a).slice(0, 60)),
+            externes: liens.filter(a => a.getAttribute('target') === '_blank').length,
+            cibles: liens.map(a => a.getAttribute('target') || ''),
+            texteZone: texte(zone).slice(0, 200),
+            texteEntier: document.body.innerText,
+        };
+    });
+}
+
+/** Attend la condition qu'on va asserter, jamais une duree fixe. */
+async function attendJusqua(page, predicat, maxMs = 20000) {
+    const limite = Date.now() + maxMs;
+    let dernier = await releve(page);
+    while (Date.now() < limite && ! predicat(dernier)) {
+        await dors(300);
+        dernier = await releve(page);
+    }
+    return dernier;
+}
+
+/**
+ * Saisit un terme et attend que la recherche ait REPONDU.
+ *
+ * Attendre « meta est non vide » ne marche pas : la consigne « tape au moins 2
+ * caracteres » est deja affichee avant toute saisie, la condition est donc
+ * satisfaite d'emblee et la sonde lit l'ecran d'avant. Le premier jet de ce
+ * test croyait ainsi n'avoir aucun resultat pour « Test-Server ».
+ *
+ * On attend donc que la ligne d'etat CHANGE par rapport a ce qu'elle disait
+ * avant la frappe, et qu'elle ne soit plus le marqueur d'attente.
+ */
+async function cherche(page, terme) {
+    const avant = (await releve(page)).meta;
+
+    await page.evaluate((t) => {
+        const c = document.getElementById('search-input');
+        c.value = t;
+        c.dispatchEvent(new Event('input', { bubbles: true }));
+    }, terme);
+
+    /*
+     * « La ligne d'etat a change » ne suffit pas : elle passe d'abord par un
+     * message d'attente, qui satisfait la condition. Le second jet de ce test
+     * lisait ainsi les resultats de la recherche PRECEDENTE.
+     *
+     * Les deux cibles annoncent « N resultat(s) pour "terme" » : attendre que
+     * la ligne CITE LE TERME est donc un signal de fin exact, et il ne depend
+     * d'aucun libelle qu'on pourrait reformuler.
+     */
+    if (terme.trim().length >= 2) {
+        return attendJusqua(page, (e) => e.meta.includes(terme.trim()));
+    }
+
+    // Terme trop court : aucun appel n'est emis, la consigne s'affiche seule.
+    return attendJusqua(page, (e) => e.meta !== '' && e.meta !== avant, 4000);
+}
+
+try {
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: '/search/',
+            fichiers: ['/search/index.php', '/search/js/main.js'], verifie, constate,
+        });
+        if (archivee) {
+            const { ctx, page } = await connecte('rw-test-super');
+            await verifieMenuLegacy(page, '/recherche', verifie);
+            await ctx.close();
+            console.log(lignes.join('\n'));
+            console.log(`\ncible=${CIBLE} : ${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — partie archivee`);
+            await navigateur.close();
+            process.exit(echecs > 0 ? 1 : 0);
+        }
+    }
+
+    // ── La garde reelle, avec les trois comptes ─────────────────────────────
+    for (const [nom, compte] of Object.entries(COMPTES)) {
+        const { ctx, page } = await connecte(nom);
+        const rep = await page.goto(`${BASE}${PAGE}`, { waitUntil: 'networkidle2' });
+        const statut = rep?.status() ?? 0;
+        const affichee = statut === 200
+            && ! /connexion|login\.php/i.test(page.url())
+            && await page.evaluate(() => Boolean(document.getElementById('search-input')));
+
+        verifie(`${nom} (role ${compte.role}) : ${compte.attendu === 'autorise' ? "la page s'affiche" : 'la page est refusee'}`,
+                compte.attendu === 'autorise' ? affichee : ! affichee,
+                `statut=${statut} url=${page.url().replace(BASE, '')}`);
+        await ctx.close();
+        await dors(1200);
+    }
+
+    // ── Le contenu ──────────────────────────────────────────────────────────
+    await dors((resteFenetre() + 1) * 1000);
+    const { ctx, page } = await connecte('rw-test-super');
+    await page.goto(`${BASE}${PAGE}`, { waitUntil: 'networkidle2' });
+    await dors(600);
+
+    const depart = await releve(page);
+    verifie('la page porte un titre', depart.titre.length > 0, depart.titre);
+    verifie('le champ de recherche est present', depart.champ);
+    verifie('aucune cle de traduction morte a l\'ecran',
+            ! /\b(search|nav|auth|accueil|profil|passerelle|tip)\.[a-z_]{3,}\b/.test(depart.texteEntier));
+
+    // ── Un terme trop court n'interroge pas le backend ──────────────────────
+    const court = await cherche(page, 'a');
+    constate('terme d\'un caractere', `« ${court.meta.slice(0, 60) } » · ${court.nbLiens} lien(s)`);
+    verifie('un terme trop court est refuse avec une consigne',
+            court.nbLiens === 0 && court.meta.length > 3,
+            `« ${court.meta.slice(0, 60)} »`);
+
+    // ── Une recherche qui ne rend rien le DIT ───────────────────────────────
+    const vide = await cherche(page, 'zzzintrouvablezzz');
+    constate('terme sans resultat', `« ${vide.meta.slice(0, 60)} » · ${vide.nbLiens} lien(s)`);
+    verifie('une recherche sans resultat le dit, en citant le terme',
+            vide.nbLiens === 0
+            && (vide.texteZone.length > 3 || vide.meta.includes('zzzintrouvablezzz')),
+            `zone « ${vide.texteZone.slice(0, 50)} » meta « ${vide.meta.slice(0, 50)} »`);
+
+    // ── Une recherche reelle, sur une donnee du parc ────────────────────────
+    const trouve = await cherche(page, 'Test-Server');
+    constate('recherche « Test-Server »', `${trouve.nbLiens} lien(s) · meta « ${trouve.meta.slice(0, 70)} »`);
+    verifie('une recherche sur le parc rend des resultats', trouve.nbLiens > 0,
+            trouve.texteZone.slice(0, 80));
+    /*
+     * « Un chiffre est present » passait sur « Tape au moins 2 caracteres » :
+     * une assertion creuse. Ce qu'on exige est que la ligne d'etat parle de LA
+     * RECHERCHE — qu'elle cite le terme cherche.
+     */
+    verifie("la ligne d'etat cite le terme cherche",
+            trouve.meta.includes('Test-Server'), trouve.meta.slice(0, 70));
+
+    // ── Recherche transverse : plusieurs categories ─────────────────────────
+    const large = await cherche(page, 'Ticket');
+    constate('recherche « Ticket »', `${large.nbLiens} lien(s) · ${large.libelles.slice(0, 3).join(' | ')}`);
+
+    /*
+     * ── OU MENENT LES LIENS ? ──────────────────────────────────────────────
+     *
+     * Le backend ecrit ses liens en dur vers l'ANCIEN portail. Chaque partie
+     * archivee en transforme un en 404. On SUIT donc chaque lien distinct et on
+     * regarde ce qu'il rend, sans supposer.
+     */
+    const tousLiens = [...new Set([...trouve.liens, ...large.liens])].filter(Boolean);
+    constate('liens distincts rendus', tousLiens.join(', ') || 'aucun');
+
+    const morts = [];
+    for (const lien of tousLiens) {
+        // Un lien interne au portage se verifie sur SA cible ; un lien vers
+        // l'ancien portail se verifie sur le legacy.
+        const absolu = /^https?:\/\//i.test(lien);
+        const base = absolu ? lien.replace(/(https?:\/\/[^/]+).*/i, '$1') : (CIBLE === 'laravel' ? BASE : LEGACY);
+        const chemin = absolu ? lien.replace(/^https?:\/\/[^/]+/i, '') : lien;
+        let statut = 0;
+        try { statut = await sondeLegacy(base, chemin); } catch { statut = -1; }
+        if (statut === 404) morts.push(`${lien} -> 404`);
+        else constate(`lien ${lien}`, `HTTP ${statut}`);
+    }
+
+    if (morts.length) {
+        constate('LIENS MORTS', morts.join(' · '));
+    }
+    verifiePortage('aucun resultat ne mene a une page archivee',
+                   morts.length === 0,
+                   morts.join(' · ') || 'aucun lien mort');
+
+    if (CIBLE === 'legacy' && morts.length) {
+        constate('defaut du legacy',
+                 `${morts.length} lien(s) de resultat menent a une page archivee — `
+                 + 'le backend ecrit des chemins de l\'ancien portail');
+    }
+
+    /*
+     * Les liens qui restent sur l'ancien portail doivent le DIRE.
+     *
+     * Exiger « il existe au moins un lien marque » etait faux : une recherche
+     * dont tous les resultats sont portes n'en produit aucun, et l'attente
+     * echouait alors que le comportement etait juste. Ce qui doit tenir est une
+     * IMPLICATION — tout lien qui sort vers l'ancien portail porte le marqueur,
+     * et aucun lien interne ne le porte.
+     */
+    const paires = [...trouve.liens.map((h, i) => [h, trouve.cibles[i]]),
+                    ...large.liens.map((h, i) => [h, large.cibles[i]])];
+    const versLegacy = paires.filter(([h]) => String(h).startsWith(LEGACY));
+    const versPortage = paires.filter(([h]) => ! String(h).startsWith(LEGACY));
+
+    constate('liens sortants / internes', `${versLegacy.length} / ${versPortage.length}`);
+    verifiePortage("tout lien sortant est marque, aucun lien interne ne l'est",
+                   versLegacy.every(([, t]) => t === '_blank')
+                   && versPortage.every(([, t]) => t !== '_blank'),
+                   paires.map(([h, t]) => `${h}${t ? ' [' + t + ']' : ''}`).join(' · '));
+
+    await ctx.close();
+} catch (e) {
+    lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
+    echecs++;
+}
+
+console.log(lignes.join('\n'));
+console.log(`\ncible=${CIBLE} : ${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL`);
+await navigateur.close();
+process.exit(echecs > 0 ? 1 : 0);

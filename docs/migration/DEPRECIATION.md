@@ -108,6 +108,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `backups/` | 2026-08-18 | `sauvegardes` | restauration jamais jouee par le test |
 | `tasks/` | 2026-08-18 | `taches` | menu plus strict que la page |
 | `tickets/` | 2026-08-18 | `tickets` | dedoublonnage par machine, formulaire qui s'epuise |
+| `search/` | 2026-08-18 | `recherche` | liens de resultats traduits (E-13) |
 
 ### commandlog — la preuve du cycle
 
@@ -352,3 +353,46 @@ ne finirait jamais dans le second cas.
 
 Le test de la vague 0 collecte **31 liens internes** au menu du legacy, contre 37 au départ :
 exactement les six entrées redirigées vers le portage.
+
+### search — et le 404 que la migration fabriquait
+
+`https://localhost:8443/search/` rendait **302** avant archivage ; après
+`git mv legacy/search legacy/_deprecated/search`, l'URL rend **404**, ainsi que `index.php` et
+`js/main.js`. L'entrée de menu du legacy mène désormais à `LARAVEL_URL` + `/recherche`.
+`git check-ignore` vérifié : l'archive reste suivie.
+
+**Dernière page du gabarit.** Les sept parties du même patron — liste, filtres, actions par ligne
+— sont portées et archivées. La suite (`update/`, `security/`, `supervision/`, `iptables/`,
+`adm/`) demande des sous-lots : ce sont des modules à plusieurs pages, pas des pages isolées.
+
+#### Ce que cette page a révélé sur la migration elle-même
+
+Le backend écrit les liens de ses résultats pour l'**ancien** portail. Chaque archivage en
+transforme un en 404, et c'est mesurable : sur le legacy, une recherche sur « Ticket » rendait
+trois résultats pointant vers `/tickets/index.php`, archivé la vague précédente — **404**.
+
+Le portage traduit ces liens (`App\Support\LiensLegacy`, voir `PARITE.md` E-13). **Mettre à jour
+`LiensLegacy::REMPLACEMENTS` est désormais une étape du cycle d'archivage** :
+
+    git mv legacy/<partie> legacy/_deprecated/<partie>
+    → l'URL rend 404
+    → rediriger l'entree de menu DU LEGACY
+    → AJOUTER '/<partie>/' => '<route>' dans LiensLegacy::REMPLACEMENTS
+    → git check-ignore -v legacy/_deprecated/<partie>/
+    → consigner ici
+
+Le test de la recherche garde cette étape : il suit chaque lien rendu et vérifie qu'aucun ne
+répond 404.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 4 PASS / 0 FAIL — partie archivée |
+| `drift/` | 4 PASS / 0 FAIL — partie archivée |
+| `backups/` | 4 PASS / 0 FAIL — partie archivée |
+| `tasks/` | 4 PASS / 0 FAIL — partie archivée |
+| `tickets/` | 4 PASS / 0 FAIL — partie archivée |
+| `search/` | 4 PASS / 0 FAIL — partie archivée |
+
+Le test de la vague 0 collecte **30 liens internes** au menu du legacy, contre 37 au départ :
+exactement les sept entrées redirigées vers le portage.

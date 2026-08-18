@@ -722,6 +722,65 @@ Le formulaire de création utilise `rw-carte--pleine` : `.rw-carte` est plafonn�
 convient à l'écran de connexion mais laissait ici deux colonnes à l'étroit et 1 200 px de vide à
 côté.
 
+### Septième page métier portée — recherche globale
+
+`search` est porté sur `/recherche`, puis **archivé** : `legacy/search/` a rejoint
+`legacy/_deprecated/`. L'URL legacy répond **404**, `index.php` et `js/main.js` aussi, et
+l'entrée de menu du legacy mène au portage. Le menu du legacy compte **30 liens internes** contre
+37 au départ — exactement les sept pages portées.
+
+**Dernière page du gabarit.** Les sept parties bâties sur le même patron sont portées et
+archivées. La suite (`update/`, `security/`, `supervision/`, `iptables/`, `adm/`) sont des modules
+à plusieurs pages : ils demanderont des sous-lots.
+
+### La recherche menait déjà à une page disparue
+
+Le backend Python ne connaît qu'un frontend : il écrit les liens de ses résultats en dur vers
+l'ancien portail — `/tickets/index.php`, `/adm/audit_log.php`, `/update/index.php`. **Chaque
+partie archivée en transforme un en 404.** Mesuré sur le legacy pendant cette vague : une
+recherche sur « Ticket » rendait trois résultats pointant vers `/tickets/index.php`, archivé à la
+vague précédente — 404.
+
+C'est le défaut relevé dans le legacy — sept 404 ont vécu dans un menu que personne ne suivait —
+sauf qu'ici c'est la migration qui le fabrique, et il se serait aggravé à chaque vague.
+
+**E-13** — `App\Support\LiensLegacy` traduit ces liens : une partie portée mène à sa route sans
+marqueur, une partie encore servie par l'ancien portail y mène avec la **même flèche que le
+menu**, `target="_blank"` et un `title` explicite. La table est construite une fois et servie
+telle quelle au navigateur, pour qu'il n'en existe jamais deux versions.
+
+**Mettre à jour cette table est désormais une étape du cycle d'archivage**, et le test de la
+recherche la garde : il suit chaque lien rendu et vérifie qu'aucun ne répond 404.
+
+### Trois attentes qui mesuraient autre chose
+
+Cette page a coûté trois corrections de sonde, toutes de la même famille :
+
+- **Attendre une condition déjà satisfaite.** « La ligne d'état est non vide » l'était avant
+  toute frappe — la consigne « tapez au moins deux caractères » est affichée au chargement. Le
+  test croyait n'avoir aucun résultat pour « Test-Server ».
+- **Attendre un changement que l'état transitoire satisfait.** « La ligne d'état a changé » est
+  vrai dès l'affichage de « Recherche… » : le test lisait alors les résultats de la recherche
+  précédente. Les deux cibles annonçant « N résultat(s) pour "terme" », l'attente porte désormais
+  sur la **citation du terme** — signal exact, et indépendant de tout libellé.
+- **Une assertion creuse.** « La ligne d'état contient un chiffre » passait sur « Tapez au moins
+  2 caractères ». Elle exige maintenant que la ligne cite le terme cherché.
+
+Et une quatrième, sur le fond : exiger « il existe au moins un lien marqué » échouait sur une
+recherche dont tous les résultats sont portés. Ce qui doit tenir est une **implication** — tout
+lien sortant est marqué, aucun lien interne ne l'est.
+
+### Ce qui n'est pas mesuré
+
+**La latence.** Le montage de fichiers de ce poste est ~258× plus lent que le système du
+conteneur ; l'écart relevé précédemment (2,2 s contre 24 ms) dirait surtout combien de fichiers
+chaque cible charge. Il reste à re-mesurer sur un hôte Linux avant d'être traité comme un défaut.
+
+### Interface
+
+`display: block` sur le libellé du champ de recherche : un `<label>` est en ligne par défaut, et
+`max-width` ne s'applique pas à un élément en ligne. Sans lui, le champ s'étendait sur 1 375 px.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
