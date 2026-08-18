@@ -58,7 +58,7 @@ class Navigation
             ['cle' => 'tickets',        'garde' => 'can_admin_portal',        'legacy' => '/tickets/index.php'],
             ['cle' => 'search',         'garde' => 'can_admin_portal',        'legacy' => '/search/index.php'],
             ['cle' => 'audit_log',      'garde' => 'can_admin_portal',        'legacy' => '/adm/audit_log.php'],
-            ['cle' => 'backups',        'garde' => 'can_admin_portal',        'legacy' => '/backups/index.php'],
+            ['cle' => 'backups',        'garde' => 'can_admin_portal',        'route'  => 'sauvegardes'],
             ['cle' => 'remote_users',   'garde' => 'can_manage_remote_users', 'legacy' => '/adm/server_users.php'],
             ['cle' => 'platform_key',   'garde' => 'can_manage_platform_key', 'legacy' => '/adm/platform_keys.php'],
             ['cle' => 'sudo_policies',  'garde' => 'sa',                      'legacy' => '/adm/server_user_sudo.php'],

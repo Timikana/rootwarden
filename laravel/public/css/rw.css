@@ -849,3 +849,39 @@ body {
 }
 
 .rw-tableau__fort { font-weight: 600; white-space: nowrap; }
+
+/* Liste de guidage dans un encart : trois actions, trois lignes lisibles. */
+.rw-liste-guide {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
+.rw-liste-guide li { margin-top: 5px; line-height: 1.45; }
+
+/*
+ * Le panneau de decision porte parfois un texte avant ses champs — un titre et
+ * son aide. Il passe alors en colonne pour que l'explication precede la saisie
+ * au lieu de la cotoyer.
+ */
+.rw-panneau-decision__texte { flex: 1 1 100%; }
+.rw-panneau-decision__texte .rw-aide { margin: 4px 0 0; }
+
+/*
+ * Un NOM DE FICHIER n'est pas une commande.
+ *
+ * `.rw-code` coupe n'importe ou (`overflow-wrap: anywhere`) parce qu'une
+ * commande journalisee peut mesurer des centaines de caracteres et contenir des
+ * caracteres de shell. Applique a un nom de fichier dans une colonne etroite,
+ * cela donne « rootwa / rden_b / ackup_ » sur six lignes : illisible, et
+ * impossible a comparer d'un coup d'oeil — alors que c'est precisement ce qu'on
+ * demande a l'utilisateur au moment de confirmer une restauration.
+ *
+ * Le nom reste donc d'une piece. Le depassement appartient au cadre du tableau,
+ * qui defile et le DIT.
+ */
+.rw-code--fichier {
+    max-width: none;
+    overflow-wrap: normal;
+    word-break: normal;
+    white-space: nowrap;
+}

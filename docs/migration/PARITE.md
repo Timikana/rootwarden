@@ -277,6 +277,76 @@ qu'il est censé caractériser.
 
 ---
 
+## E-08 — La confirmation d'une restauration **empêche** l'erreur au lieu de la reprocher
+
+**Écart voulu.** Le legacy demande le nom du fichier par `prompt()`, compare **après** la
+saisie, et affiche « le nom ne correspond pas, restauration annulée ». Le portage ouvre une
+confirmation sous la ligne concernée, avec le nom attendu en indication, et **le bouton de
+confirmation reste inactif tant que la saisie diffère**.
+
+### Pourquoi ce n'est pas cosmétique
+
+La restauration fait un `DROP TABLE` sur la base partagée par le legacy, par Laravel et par le
+backend Python. Une confirmation dont le seul rôle est de reprocher après coup ne protège de
+rien : le geste a déjà été fait, et rien n'empêche de recommencer distraitement une seconde plus
+tard. Un bouton inerte tant que le nom ne correspond pas transforme la confirmation en garde-fou
+plutôt qu'en réprimande.
+
+S'y ajoutent les trois raisons déjà énoncées pour E-04 : la boîte native masque la ligne sur
+laquelle on décide, ne se style pas, et bloque tout pilotage — ce dernier point comptant double
+ici, puisqu'il rendait le chemin d'erreur **intestable**.
+
+### Ce que le test fait, et ne fait pas
+
+`tests/e2e/go-page-backups.mjs` ouvre la confirmation, saisit un nom **volontairement faux** et
+vérifie que le bouton reste désactivé et que rien ne change. Il ne mène **jamais** une
+restauration à son terme : elle détruirait les sessions et les données des autres suites en
+cours d'exécution. La restauration réelle reste donc non couverte, ce qui est dit ici plutôt que
+laissé à supposer.
+
+Côté legacy, le chemin d'erreur n'est pas mesurable : `prompt()` est refusé par le gestionnaire
+de dialogue, ce qui annule l'action avant toute saisie. C'est un **constat**, pas un échec.
+
+---
+
+## E-09 — Le contrôle d'une sauvegarde dit **ce qu'il vérifie**, et ce qu'il ne prouve pas
+
+**Écart voulu.** Le legacy nomme l'action « Vérifier » et l'explique ainsi, en trois endroits :
+
+> Test de restauration non destructif : recharge la sauvegarde dans une base temporaire pour
+> confirmer qu'elle est exploitable.
+
+`backend/db_backup.py`, fonction `verify_backup()`, ne fait rien de tel. Il :
+
+1. compare l'empreinte `sha256` au fichier `.sha256` posé à côté, s'il existe ;
+2. décompresse le dump et le découpe en instructions ;
+3. compte celles qui commencent par `CREATE TABLE` ;
+4. déclare la sauvegarde valide si ce compte est supérieur à zéro.
+
+**Aucune instruction n'est exécutée. Aucune base temporaire n'est créée.** Un dump qui se lit
+parfaitement mais échouerait à se réappliquer — contrainte violée, ordre de tables incorrect,
+moteur absent — passe ce contrôle sans réserve.
+
+### Ce que le portage change
+
+Rien au comportement : le portage appelle exactement la même route. Ce qui change, ce sont les
+mots. L'action s'appelle « Contrôler », son aide dit ce qu'elle compare, et le verdict est
+formulé « Sauvegarde lisible et intacte — 63 tables, 5 368 instructions, empreinte conforme »
+plutôt que « valide ».
+
+Un libellé qui promet plus qu'il ne tient est un défaut de sécurité à part entière : il conduit
+à ne pas faire le contrôle que l'on croit déjà fait. Le seul moyen de savoir qu'une sauvegarde
+se réapplique reste de la réappliquer — sur une base jetable, ce que ni le legacy ni le portage
+ne proposent aujourd'hui.
+
+### Ce qui n'est pas fait ici
+
+Le backend n'est pas touché : ajouter une vraie restauration d'essai dans une base temporaire est
+un chantier backend, hors périmètre de cette migration. Le défaut est consigné parmi ceux du
+legacy ; l'arbitrage revient à l'exploitant.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

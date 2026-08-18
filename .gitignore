@@ -38,9 +38,14 @@ legacy/logs/
 # Backups — generes automatiquement
 backend/backups/
 backups/
-# Exception : legacy/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage
+# Exception : legacy/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage.
+# L'archivage la deplace dans legacy/_deprecated/ : sans cette seconde exception, le dossier
+# archive retombe sous la regle `backups/` et tout fichier qu'on y ajouterait deviendrait
+# invisible. Les fichiers deja suivis survivent au deplacement, ce qui masque le probleme.
 !legacy/backups/
 !legacy/backups/**
+!legacy/_deprecated/backups/
+!legacy/_deprecated/backups/**
 
 # Base de donnees locale
 mysql/data/

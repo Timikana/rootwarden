@@ -105,6 +105,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `commandlog/` | 2026-08-18 | `journal-commandes` | premiere page metier portee |
 | `approvals/` | 2026-08-18 | `approbations` | seconde page metier portee |
 | `drift/` | 2026-08-18 | `derive-config` | premiere garde par permission |
+| `backups/` | 2026-08-18 | `sauvegardes` | restauration jamais jouee par le test |
 
 ### commandlog — la preuve du cycle
 
@@ -208,3 +209,51 @@ exécution.
 Le test de la vague 0 collecte maintenant **34 liens internes** au menu du legacy, contre 37 au
 départ : exactement les trois entrées redirigées vers le portage. Cette baisse est la
 progression de la migration.
+
+### backups — et une garde qui ne garde que la page
+
+`https://localhost:8443/backups/` rendait **302** avant archivage ; après
+`git mv legacy/backups legacy/_deprecated/backups`, l'URL rend **404**, ainsi que `index.php` et
+`js/main.js`. L'entrée de menu du legacy mène désormais à `LARAVEL_URL` + `/sauvegardes`.
+
+#### Ce qui a été mesuré, et qui demande un arbitrage
+
+La page exige `can_admin_portal`. **Le backend, lui, ne demande que le rôle 2** sur
+`/admin/backups` — et la passerelle applique la même règle, par conception (elle double la garde
+du backend, elle n'en invente pas).
+
+Mesure : depuis une session `rw-test-admin` (rôle 2, sans `can_admin_portal`), refusée sur la
+page avec un 403, l'appel `GET /api/gateway/admin/backups` répond **200 avec la liste des
+sauvegardes**.
+
+La permission garde donc la **page**, pas la **capacité**. Rien n'a été changé : resserrer la
+passerelle retirerait à un rôle 2 une possibilité qu'il a aujourd'hui, ce qui est un changement
+de droits — pas une décision à prendre au détour d'un portage. Le relevé est ici, l'arbitrage
+appartient à l'exploitant.
+
+#### Ce que le test ne fait jamais
+
+`/admin/backups/restore` fait un `DROP TABLE` sur la base **partagée** par le legacy, Laravel et
+le backend Python. Une suite qui la restaure en pleine exécution détruit les sessions et les
+données des autres suites — y compris les siennes.
+
+Le test vérifie donc que la restauration existe, qu'elle n'est proposée qu'au superadministrateur,
+et qu'un nom de fichier erroné ne la déclenche pas. **Il ne la mène jamais à son terme.** La
+restauration réelle reste non couverte : c'est écrit plutôt que sous-entendu.
+
+#### Ce que le test fait pour de vrai
+
+Le répertoire `/app/backups` était **vide**. Le test crée une sauvegarde (0,27 Mo, 63 tables,
+5 368 instructions) puis la contrôle. Chaque exécution en produit une de plus ; la rétention par
+défaut est de 30 jours (`BACKUP_RETENTION_DAYS`), elles s'accumulent donc en développement. C'est
+une conséquence assumée : un test sur une liste vide ne prouverait rien.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 4 PASS / 0 FAIL — partie archivée |
+| `drift/` | 4 PASS / 0 FAIL — partie archivée |
+| `backups/` | 4 PASS / 0 FAIL — partie archivée |
+
+Le test de la vague 0 collecte **33 liens internes** au menu du legacy, contre 37 au départ :
+exactement les quatre entrées redirigées vers le portage.
