@@ -9,25 +9,36 @@
  */
 return [
 
+    // Etapes de la connexion — annoncer le parcours plutot que le faire decouvrir
+    'etape_identifiants'   => 'Identifiants',
+    'etape_second_facteur' => 'Second facteur',
+    'etape_acces'          => 'Accès',
+    'revenir'              => 'Revenir',
+
     // Connexion
-    'connexion_titre'      => 'Connexion',
-    'connexion_identifiant' => 'Identifiant',
+    'connexion_titre'        => 'Connexion',
+    'connexion_sous_titre'   => 'Connexion au portail',
+    'connexion_identifiant'  => 'Identifiant',
     'connexion_mot_de_passe' => 'Mot de passe',
-    'connexion_valider'    => 'Se connecter',
+    'connexion_valider'      => 'Se connecter',
+    'connexion_aide'         => "Un code à usage unique vous sera demandé à l'étape suivante.",
 
     // Second facteur
     'second_facteur_titre'       => 'Vérification en deux étapes',
     'second_facteur_sous_titre'  => 'Code TOTP',
     'second_facteur_instruction' => 'Entrez le code à 6 chiffres de votre application d\'authentification.',
     'second_facteur_valider'     => 'Vérifier',
+    'second_facteur_aide'        => "Le code change toutes les 30 secondes. Un code déjà utilisé est refusé : attendez le suivant.",
 
     // Enrôlement
     'enrolement_titre'       => 'Second facteur à configurer',
     'enrolement_explication' => 'Ce compte n\'a pas encore de second facteur. L\'enrôlement n\'est pas encore disponible sur cette interface : effectuez-le depuis l\'ancien portail, puis revenez ici.',
 
     // Conditions d'utilisation
-    'cgu_titre'    => 'Conditions d\'utilisation',
-    'cgu_accepter' => 'J\'accepte',
+    'cgu_titre'      => 'Conditions d\'utilisation',
+    'cgu_sous_titre' => 'Dernière étape avant l\'accès au portail.',
+    'cgu_accepter'   => 'J\'accepte',
+    'cgu_refuser'    => 'Refuser et se déconnecter',
 
     // Portail
     'accueil_titre'  => 'Accueil',
