@@ -50,6 +50,21 @@ return [
      * Absent vaut ACTIF, comme lui : un module ne disparait pas parce qu'une
      * variable manque.
      */
+    /*
+     * Backend Python. URL INTERNE au reseau Docker : le navigateur ne la voit
+     * jamais, il passe par la passerelle. A ne pas confondre avec une URL
+     * publique.
+     *
+     * La cle d'API est partagee avec le legacy (meme variable d'environnement)
+     * et ne quitte jamais le serveur.
+     */
+    'backend' => [
+        'url'     => env('BACKEND_INTERNAL_URL', 'https://python:5000'),
+        'cle_api' => env('API_KEY', ''),
+        // Certaines routes de parc (scan CVE, mise a jour) durent longtemps.
+        'delai'   => env('BACKEND_TIMEOUT', 120),
+    ],
+
     'fonctionnalites' => [
         'wazuh' => env('FEATURE_WAZUH', true),
     ],

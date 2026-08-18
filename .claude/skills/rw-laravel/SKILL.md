@@ -172,6 +172,37 @@ Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
 - **Marqueur des pages non portees** : une fleche discrete, expliquee UNE FOIS
   par la legende en tete de menu, avec le detail dans le `title`.
 
+## Passerelle vers le backend
+
+- `App\Support\RoutesBackend` est la SOURCE UNIQUE des listes (blanche, admin,
+  step-up). `App\Http\Controllers\PasserelleController` applique les controles
+  DANS L'ORDRE, fail-closed a chaque etape : session authentifiee (middleware),
+  falsification de requete (middleware `web`), traversee de chemin, liste
+  blanche, reserve a l'administration, re-authentification exigee, transmission.
+- **Comparaison par SEGMENT, jamais par prefixe.** Voir `PARITE.md` E-02. Une
+  entree finissant par `/` est un espace de noms, par `_` ou `-` une racine
+  deliberee, sinon une route exacte. Verifie sur les 201 routes reelles du
+  backend avant de resserrer : zero difference de verdict.
+- Les permissions transmises au backend (`X-User-Permissions`) sont relues EN
+  BASE, pas prises dans la session.
+- Le statut du backend est PROPAGE tel quel : un 404 devenu 200 ferait croire
+  au frontend que l'appel a reussi.
+- **La falsification de requete est deja geree par le cadre.** Laravel 13 place
+  `PreventRequestForgery` dans le groupe `web` : il accepte si la methode est en
+  lecture, si le chemin est exclu, si l'ORIGINE est valide
+  (`Sec-Fetch-Site: same-origin`) ou si le jeton correspond. Ne PAS ajouter
+  `ValidateCsrfToken` par-dessus.
+  Piege de mesure paye le 2026-08-18 : un `fetch` same-origin sans jeton passe,
+  ce qui a fait croire a une absence de controle. C'est le comportement
+  ATTENDU. La propriete a mesurer est qu'une requete **cross-site** soit
+  refusee — et le navigateur interdisant de forger `Sec-Fetch-Site`, il faut
+  rejouer la requete depuis Node avec les cookies de session.
+- **Ne pas sonder le legacy avec des requetes mutantes.** Un POST refuse par son
+  controle CSRF invalide la session ; son JS de sondage part alors vers la page
+  de connexion, et cette navigation DETRUIT le contexte d'execution : le
+  `page.evaluate` en cours ne rend jamais et tout le lot expire sans rien
+  mesurer.
+
 ## Contrat DOM des tests
 
 **Ne jamais ancrer un test sur « le premier bouton submit ».** Deplacer un

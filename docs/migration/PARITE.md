@@ -75,6 +75,59 @@ jour : la decision appartient a l'exploitant. Signale le 2026-08-17.
 
 ---
 
+## E-02 — Le filtrage des routes backend compare des SEGMENTS, pas des prefixes
+
+**Cible legacy : compare par debut de chaine. Cible Laravel : compare par segment.**
+Mesure le 2026-08-18 · `tests/e2e/go-socle-passerelle.mjs`.
+
+### Ce que fait le legacy
+
+`legacy/api_proxy.php` tient une liste blanche de 48 prefixes et une liste de 26 prefixes
+reserves a l'administration. Les deux sont comparees ainsi :
+
+```php
+if ($path === $prefix || strpos($path, $prefix) === 0) { ... }
+```
+
+C'est un filtrage par DEBUT DE CHAINE. Consequence : `/search` etant autorise, `/searchall`
+l'est aussi ; `/groups` autorise `/groupsecret` ; `/tickets` autorise `/ticketsdebug`. Et
+surtout, **toute route Python future dont le nom commence par un prefixe autorise devient
+publique sans que personne ne l'ait decide**.
+
+Mesure : sur le legacy, `POST /api_proxy.php/searchall` rend **405** — c'est-a-dire que la
+passerelle l'a TRANSMIS au backend, qui n'a simplement pas de route de ce nom.
+
+### Ce que fait le portage
+
+`App\Support\RoutesBackend` lit chaque entree selon sa FORME :
+
+| Forme | Sens | Exemple |
+|---|---|---|
+| finit par `/` | espace de noms | `/fail2ban/` couvre tout ce qui commence ainsi |
+| finit par `_` ou `-` | racine deliberee | `/cve_` couvre `/cve_scan` |
+| sinon | route exacte | `/search` couvre `/search` et `/search/xyz`, **pas** `/searchall` |
+
+Meme requete cote portage : **403**, refusee avant d'atteindre le backend.
+
+### Pourquoi le resserrement ne casse rien
+
+Verifie AVANT de le faire, sur les **201 routes reellement declarees** dans `backend/` :
+les deux filtres rendent le **meme verdict**, zero difference — pour la liste blanche comme
+pour la liste reservee a l'administration. Le resserrement ne retire donc aucun acces
+existant ; il refuse en plus des chemins comme `/searchall`, `/command_logger`, `/updateXYZ`.
+
+Resserrer sans mesurer aurait ete une regression silencieuse : c'est la mesure qui autorise
+le changement, pas l'intuition qu'il est plus sur.
+
+### Une difference qui n'en est pas une
+
+La re-authentification ponctuelle (step-up) n'est pas encore portee. La passerelle **refuse**
+les routes qui l'exigent (`/policy/(sudo|sftp)/(deploy|remove)`, `/policy/rollback`) au lieu
+de les transmettre. Ce n'est pas un ecart de parite mais un manque assume : accorder une
+action qui donne root sans le second controle que le legacy exige serait un recul.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

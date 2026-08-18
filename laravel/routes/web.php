@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\ConnexionController;
 use App\Http\Controllers\Auth\SecondFacteurController;
+use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,19 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
+
+    /*
+     * Passerelle vers le backend Python. Elle reste dans le groupe `web` : la
+     * session ET le jeton CSRF s'appliquent, ce qui est le point de la
+     * manoeuvre — c'est l'endpoint le plus puissant du portail, il transmet
+     * toutes les routes du backend.
+     *
+     * `where` autorise le slash dans le parametre, sinon `/fail2ban/status`
+     * ne serait pas capture.
+     */
+    Route::any('/api/gateway/{chemin?}', PasserelleController::class)
+        ->where('chemin', '.*')
+        ->name('passerelle');
 });
 
 /*
