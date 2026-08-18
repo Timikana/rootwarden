@@ -42,6 +42,7 @@ return [
     'erreur_code_deja_utilise'   => 'Ce code a déjà été utilisé. Attendez le prochain code.',
     'erreur_trop_de_tentatives'  => 'Trop de tentatives. Patientez une minute.',
     'erreur_sans_secret'         => 'Aucun second facteur n\'est configuré sur ce compte.',
+    'changement_requis'          => "Votre mot de passe doit être changé. Cette page n'est pas encore portée : effectuez le changement depuis l'ancien portail.",
 
     // Migration
     'socle_avertissement' => 'Seul le socle d\'authentification est porté. Les pages du portail restent sur l\'ancienne interface.',

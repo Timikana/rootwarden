@@ -44,4 +44,13 @@ return [
      * par action. Identique au legacy.
      */
     'step_up_ttl' => 900,
+
+    /*
+     * Drapeaux de fonctionnalite, releves du legacy (feature_enabled()).
+     * Absent vaut ACTIF, comme lui : un module ne disparait pas parce qu'une
+     * variable manque.
+     */
+    'fonctionnalites' => [
+        'wazuh' => env('FEATURE_WAZUH', true),
+    ],
 ];

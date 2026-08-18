@@ -1,0 +1,64 @@
+<?php
+
+/**
+ * Menu labels — English.
+ *
+ * Taken from the legacy frontend on 2026-08-18 and GENERATED, not retyped.
+ * Strict parity with lang/fr/nav.php: same key set, same commit. A missing key
+ * does not fail — it prints its own identifier on screen.
+ */
+return [
+    // Sections
+    'section_navigation' => 'NAVIGATION',
+    'section_admin'      => 'ADMINISTRATION',
+    'section_other'      => 'OTHER',
+
+    // Navigation
+    'dashboard'   => 'Dashboard',
+    'ssh_keys'    => 'SSH Keys',
+    'updates'     => 'Updates',
+    'iptables'    => 'Iptables',
+    'fail2ban'    => 'Fail2ban',
+    'services'    => 'Services',
+    'ssh_audit'   => 'SSH Audit',
+    'supervision' => 'Supervision',
+    'bashrc'      => 'Bashrc',
+    'graylog'     => 'Graylog',
+    'wazuh'       => 'Wazuh',
+    'cve_scan'    => 'CVE Scan',
+    'docker'      => 'Docker containers',
+
+    // Administration
+    'admin'         => 'Admin',
+    'tasks'         => 'Tasks',
+    'groups'        => 'Groups & bulk',
+    'maintenance'   => 'Maintenance',
+    'approvals'     => 'Approvals',
+    'commandlog'    => 'Command log',
+    'chatops'       => 'ChatOps',
+    'tickets'       => 'Tickets',
+    'search'        => 'Search',
+    'audit_log'     => 'Audit log',
+    'backups'       => 'Backups',
+    'remote_users'  => 'Remote Users',
+    'platform_key'  => 'Platform SSH Key',
+    'sudo_policies' => 'Sudo rights',
+    'sftp_policies' => 'SFTP/SSH access',
+    'compliance'    => 'Compliance',
+    'drift'         => 'Config drift',
+
+    // Autre
+    'profil'        => 'Profile',
+    'documentation' => 'Documentation',
+    'api_docs'      => 'API Docs',
+
+    // Chrome
+    'profile' => 'Profile',
+    'logout'  => 'Sign out',
+
+    // Etat du portage
+    'non_porte'       => 'previous portal',
+    'non_porte_titre' => 'This page has not been ported yet: it opens in the previous portal.',
+    'ouvrir_menu'     => 'Open menu',
+    'fermer_menu'     => 'Close menu',
+];
