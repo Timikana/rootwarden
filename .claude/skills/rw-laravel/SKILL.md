@@ -248,7 +248,7 @@ noms de champ.
 |---|---|---|
 | Squelette et conteneur | fait | — |
 | Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
-| Gabarit et navigation (33 entrees, source unique) | fait | navigation 30 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 32 |
 | Interface (largeur, boutons, guidage) | fait | captures regardees |
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
@@ -264,6 +264,7 @@ explicite renvoyant vers l'ancien portail.
 |---|---|---|---|
 | Journal des commandes | `journal-commandes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Approbations a quatre yeux | `approbations` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
+| Derive de configuration | `derive-config` | `role:2` + `perm:can_view_compliance` | oui, 2026-08-18 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -364,9 +365,84 @@ Le motif correct, deux temps :
 
 Vaut aussi pour le script de captures, qui photographiait « Chargement… ».
 
+### Ce que le backend cache dans une infobulle, l'afficher
+
+Un attribut `title` ne s'ouvre ni au doigt, ni au clavier, ni pour un lecteur
+d'ecran. Quand ce qu'il contient est la seule information ACTIONNABLE de la
+page — le detail d'un ecart, la raison d'un refus —, l'afficher
+(`rw-detail-ecart`). Le montrer seulement sur les lignes qui demandent une
+action : repete sur les lignes saines, il noie ce qu'on cherchait.
+
+Meme regle pour les libelles muets : `?` et `—` dans un tableau de conformite
+se lisent aussi bien « inconnu » que « erreur ». Ecrire « Jamais evalue ».
+
+### Annoncer durablement, pas dans une bulle fugace
+
+`toast` est proscrit. Une action qui change ce qui est affiche s'annonce dans
+une region persistante (`rw-annonce`, `role="status"`, `aria-live="polite"`),
+vide au chargement (`:empty { display: none }`). Une bulle disparue ne dit plus
+si les valeurs qu'on relit sont celles d'avant ou celles d'apres.
+
+Cote test, RELEVER l'annonce plutot que l'exiger : le legacy n'a rien de
+durable a annoncer, et une attente identique sur les deux cibles ferait echouer
+le test sur celle qu'il caracterise.
+
+### Lire ce qu'un bouton fait AVANT de cliquer sur un parc de production
+
+`scan_all` de la derive couvre la machine 1. Le code a ete lu avant d'ecrire le
+test : aucun appel SSH, un recalcul depuis la base. La page le DIT desormais a
+l'ecran, description et infobulle du bouton comprises.
+
+### La garde par permission ne se prouve qu'avec un compte qui la porte
+
+`can_admin_portal` n'est portee que par le superadministrateur parmi les
+comptes de test : sur les pages qui l'exigent, rien ne distingue une garde par
+PERMISSION d'une garde par ROLE. `can_view_compliance` est portee par
+`rw-test-admin` (role 2) : le meme compte est autorise sur `derive-config` et
+refuse sur `journal-commandes`. C'est cette paire qui prouve la lecture de la
+permission. Choisir l'ordre de portage en tenant compte de cela.
+
+### Attendre la CONDITION, pas le calme
+
+Le motif « changement puis stabilite » a une faille : pendant une action, le
+bouton affiche « Scan en cours » et le tableau ne bouge PLUS DU TOUT. La sonde
+trouve le calme immediatement, lit l'etat d'avant, et rapporte que l'action n'a
+rien fait — alors que la requete a abouti et la base ete ecrite.
+
+Quand on sait ce qu'on va asserter, ATTENDRE CELA, avec une limite :
+
+    const apres = await attendJusqua(page, e => e.horodatage !== avant);
+
+### Une assertion trop stricte mesure autre chose
+
+« Chaque horodatage a change » echoue quand deux ecritures tombent dans la meme
+seconde : le test mesure alors la resolution de l'affichage, pas l'action. La
+propriete juste etait « le plus ancien d'apres n'est pas anterieur au plus
+recent d'avant ». Comparer des dates AFFICHEES demande de les convertir : a
+l'ordre alphabetique, le 18 janvier passe apres le 17 decembre.
+
+### Un test ne doit pas consommer ce dont il depend
+
+Le test des approbations rejetait une demande a chaque execution et travaillait
+sur des demandes creees a la main : au bout de quelques passages, la file etait
+vide et il echouait sans qu'aucune page ne soit cassee. Il PRODUIT desormais
+ses demandes, avec le compte qui en produit legitimement, sur des cibles
+inexistantes et horodatees (le backend refuse une demande identique deja en
+attente). Il y gagne une assertion : l'action destructrice repond bien 202.
+
+Ne le faire que sur la cible Laravel : sonder le legacy avec une requete
+mutante invalide sa session et detruit le contexte d'execution.
+
+### Grille de tuiles : 160 px, pas 190
+
+Quatre tuiles de resume a `minmax(190px, 1fr)` tiennent sur UNE colonne a
+390 px et repoussent le tableau sous quatre ecrans de contexte. A 160 px elles
+tiennent deux par deux, et sur grand ecran rien ne change : `auto-fit`
+effondre les pistes vides. Classe : `rw-grille--compacte`.
+
 ## Detail
 
-Socle complet. Deux pages metier portees et archivees ; le cycle est rode et se
+Socle complet. Trois pages metier portees et archivees ; le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
 rejeu du LOT, commit.

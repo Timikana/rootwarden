@@ -224,6 +224,59 @@ dans le code et non mesuré** — dit ici, plutôt que passé sous silence.
 
 ---
 
+## E-06 — Le détail d'un écart est **affiché**, pas caché dans une infobulle
+
+**Écart voulu.** Sur la page de dérive, le legacy met le détail de chaque écart dans l'attribut
+`title` de la pastille. Le portage l'affiche sous la pastille, en petit — et uniquement pour les
+catégories **qui ne sont pas conformes**.
+
+### Pourquoi
+
+Ce détail est la seule information actionnable de la page. « Fail2ban installé mais arrêté » ne
+demande pas la même chose que « Fail2ban non installé », et « 3 politiques désirées, 1 déployée —
+redéploiement requis » dit exactement quoi faire. Une infobulle ne s'ouvre ni au doigt, ni au
+clavier, ni pour un lecteur d'écran : sur un téléphone, l'information n'existe tout simplement
+pas.
+
+Elle n'est montrée que pour les catégories en écart ou jamais évaluées. Une machine conforme n'a
+rien à lire, et afficher « 0 politique sudo déployée » sur chaque ligne saine noierait les trois
+lignes qui demandent une action.
+
+### Ce que ça coûte
+
+Des lignes plus hautes quand une machine cumule les écarts. Le compromis est assumé : la page
+existe pour montrer ce qui ne va pas.
+
+### Au passage — deux libellés qui ne disaient rien
+
+Le legacy affiche `?` pour une catégorie jamais évaluée et `—` pour une catégorie absente. Le
+portage écrit « Jamais évalué » et « Non évalué ». Un point d'interrogation dans un tableau de
+conformité se lit aussi bien comme « inconnu » que comme « erreur ».
+
+---
+
+## E-07 — Le résultat d'un scan est **annoncé durablement**, pas dans une bulle fugace
+
+**Écart voulu.** Le legacy signale la fin d'un scan par un `toast` qui s'efface au bout de
+quelques secondes. Le portage écrit dans une région d'annonce (`role="status"`,
+`aria-live="polite"`) qui reste jusqu'à l'action suivante.
+
+Un scan modifie ce qui est affiché à l'écran. Une bulle qui disparaît avant qu'on ait fini de
+relire le tableau ne dit pas si les valeurs qu'on regarde sont celles d'avant ou celles d'après.
+La région persistante répond à cette question, et `aria-live` la fait annoncer aux lecteurs
+d'écran — ce qu'aucune bulle du legacy ne fait.
+
+Elle est vide au chargement et n'occupe alors aucune place (`:empty { display: none }`).
+
+### Mesure
+
+`tests/e2e/go-page-drift.mjs` relève l'annonce après chaque action (« Machine re-scannée. »,
+« Scan terminé (3) »). Le relevé est un **constat**, pas une attente : le legacy n'a rien de
+durable à annoncer, et exiger la même chose des deux cibles ferait échouer le test sur la cible
+qu'il est censé caractériser.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

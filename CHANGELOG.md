@@ -467,6 +467,69 @@ installerait soi-même un 404 dans un menu.
   sont désormais sondés, et `/tasks/index.php` répond 302 : c'est ce qui prouve que le 404 des
   autres vient de l'archivage et non d'un chemin mal écrit.
 
+### Troisième page métier portée — détection de dérive de configuration
+
+`drift` est porté sur `/derive-config`, puis **archivé** : `legacy/drift/` a rejoint
+`legacy/_deprecated/`. L'URL legacy répond **404**, `index.php` et `js/main.js` aussi, et
+l'entrée de menu du legacy mène au portage. Le menu du legacy compte désormais **34 liens
+internes** contre 37 au départ — exactement les trois pages portées.
+
+**La première page dont la permission décide vraiment.** Les deux pages précédentes exigeaient
+`can_admin_portal`, que seul le superadministrateur possède parmi les comptes de test : rien ne
+distinguait une garde par permission d'une garde par rôle. Celle-ci exige
+`can_view_compliance`, que porte `rw-test-admin` (rôle 2). Le même compte est donc **autorisé
+ici et refusé ailleurs** — la seule configuration qui prouve que la permission est lue.
+
+**Le test écrit vraiment en base.** Il re-scanne `Test-Server-Debian` et vérifie que
+l'horodatage affiché avance, puis lance un scan global et vérifie qu'aucune machine n'est
+laissée en arrière. `backend/routes/drift.py` a été lu avant d'écrire ce test : `scan_all` ne
+fait **aucun appel SSH**, il recalcule depuis des données déjà en base. C'est ce qui rend le
+bouton sans danger sur un parc qui contient une machine de production — et la page le dit
+maintenant à l'écran, description et infobulle comprises.
+
+Deux écarts assumés, documentés dans `docs/migration/PARITE.md` :
+
+- **E-06** — le détail d'un écart est **affiché** sous sa pastille, et non caché dans un
+  attribut `title`. C'est la seule information actionnable de la page : « Fail2ban installé mais
+  arrêté » ne demande pas la même chose que « Fail2ban non installé ». Une infobulle ne s'ouvre
+  ni au doigt, ni au clavier, ni pour un lecteur d'écran. Le détail n'apparaît que sur les
+  catégories non conformes, pour ne pas noyer les lignes qui demandent une action. Au passage,
+  `?` et `—` deviennent « Jamais évalué » et « Non évalué » : un point d'interrogation dans un
+  tableau de conformité se lit aussi bien comme « inconnu » que comme « erreur ».
+- **E-07** — le résultat d'un scan est écrit dans une région d'annonce persistante
+  (`role="status"`, `aria-live="polite"`) au lieu d'une bulle qui s'efface. Un scan change ce qui
+  est affiché ; une bulle disparue ne dit plus si les valeurs qu'on relit sont celles d'avant ou
+  celles d'après.
+
+### Deux tests qui mesuraient mal
+
+- **Attendre le calme n'est pas attendre le résultat.** Le test de dérive attendait que le
+  tableau cesse de bouger après un re-scan. Or pendant le scan, le bouton affiche « Scan en
+  cours » et le tableau ne bouge plus du tout : la sonde trouvait le calme immédiatement, lisait
+  les horodatages d'avant, et rapportait que le scan n'avait rien fait — alors que la requête
+  avait abouti et la base été écrite. Il attend désormais **la condition qu'il va asserter**.
+- **Une assertion trop stricte mesure l'horloge.** « Chaque horodatage a changé » échouait quand
+  une machine venait d'être re-scannée dans la même seconde. La propriété juste est que le plus
+  ancien horodatage d'après ne soit pas antérieur au plus récent d'avant : aucune machine
+  oubliée, sans dépendre de la résolution de l'affichage.
+
+### Un test qui détruisait ses propres données
+
+Le test des approbations travaillait sur des demandes créées à la main avant lui, et en rejetait
+une à chaque exécution. Après quelques passages la file était vide et il échouait — non pas
+parce que la page était cassée, mais parce qu'il avait consommé ce dont il dépendait. Il produit
+maintenant ses propres demandes, avec le compte qui en produit légitimement (`rw-test-admin`,
+rôle 2), sur des comptes cible inexistants et horodatés. Il y gagne une assertion : les actions
+destructrices répondent bien **202, en attente d'approbation**.
+
+### Interface
+
+Quatre tuiles de résumé qui remplissent la largeur, action principale en haut à droite. La
+grille des tuiles descend à 160 px de largeur minimale : à 190 px, un téléphone n'en affichait
+qu'une par ligne et repoussait le tableau — la donnée — sous quatre écrans de contexte. Sur
+grand écran, rien ne change : `auto-fit` effondre les pistes vides et les quatre tuiles
+s'étirent.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

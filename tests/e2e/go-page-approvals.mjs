@@ -161,6 +161,46 @@ async function ongletVers(page, statut) {
     await attendStabilite(page);
 }
 
+/**
+ * Produit les demandes sur lesquelles le test va decider.
+ *
+ * La premiere version de ce test travaillait sur des demandes creees A LA MAIN
+ * avant lui. Il rejetait la derniere en attente a chaque execution, si bien
+ * qu'apres quelques passages la file etait vide et le test rapportait un echec
+ * — non pas parce que la page etait cassee, mais parce qu'il avait consomme
+ * ses propres donnees. Un test qui depend d'un etat qu'il detruit ne peut etre
+ * joue qu'une fois.
+ *
+ * Il produit donc lui-meme ses demandes, avec le compte qui en produit
+ * legitimement : `rw-test-admin`, role 2. Les cibles sont des comptes
+ * INEXISTANTS sur la machine 2 — la demande est bloquee par l'approbation, et
+ * meme approuvee elle ne supprimerait rien. Le nom porte l'horodatage : le
+ * backend refuse une demande identique deja en attente.
+ *
+ * Ne tourne QUE sur Laravel. Sonder le legacy avec des requetes mutantes
+ * invalide sa session et detruit le contexte d'execution.
+ */
+async function produitDemandes(page, combien) {
+    const marque = Date.now().toString(36);
+    const resultats = [];
+    for (let i = 0; i < combien; i++) {
+        resultats.push(await page.evaluate(async (cible) => {
+            const jeton = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const r = await fetch('/api/gateway/delete_remote_user', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': jeton,
+                           'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ machine_id: 2, username: cible, remove_home: false }),
+            });
+            let corps = null;
+            try { corps = await r.json(); } catch (e) {}
+            return { statut: r.status, attente: Boolean(corps && corps.pending_approval) };
+        }, `absent-${marque}-${i}`));
+    }
+    return resultats;
+}
+
 try {
     /*
      * PARTIE ARCHIVEE ? Cote legacy, la page a ete portee puis deplacee dans
@@ -195,6 +235,18 @@ try {
         verifie(`${nom} (role ${compte.role}) : ${compte.attendu === 'autorise' ? "la page s'affiche" : 'la page est refusee'}`,
                 compte.attendu === 'autorise' ? affichee : ! affichee,
                 `statut=${statut} url=${page.url().replace(BASE, '')}`);
+
+        // Le compte role 2 est refuse sur la PAGE, mais c'est bien lui qui
+        // produit les demandes : on profite de sa session pour en creer.
+        if (nom === 'rw-test-admin' && CIBLE === 'laravel') {
+            const creees = await produitDemandes(page, 2);
+            constate('demandes produites pour ce passage',
+                     creees.map(r => `${r.statut}${r.attente ? ' en attente' : ''}`).join(', '));
+            verifie('les actions destructrices passent par une approbation',
+                    creees.every(r => r.attente),
+                    creees.map(r => r.statut).join(', '));
+        }
+
         await ctx.close();
         await dors(1200);
     }

@@ -64,7 +64,7 @@ class Navigation
             ['cle' => 'sudo_policies',  'garde' => 'sa',                      'legacy' => '/adm/server_user_sudo.php'],
             ['cle' => 'sftp_policies',  'garde' => 'sa',                      'legacy' => '/adm/server_user_sftp.php'],
             ['cle' => 'compliance',     'garde' => 'can_view_compliance',     'legacy' => '/security/compliance_report.php'],
-            ['cle' => 'drift',          'garde' => 'can_view_compliance',     'legacy' => '/drift/index.php'],
+            ['cle' => 'drift',          'garde' => 'can_view_compliance',     'route'  => 'derive-config'],
         ],
 
         'other' => [
