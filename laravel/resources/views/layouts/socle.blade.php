@@ -12,5 +12,7 @@
 </head>
 <body>
 @yield('corps')
+{{-- Basculer de langue doit etre possible AVANT toute connexion. --}}
+<div class="rw-langues-flottant">@include('composants.langue')</div>
 </body>
 </html>

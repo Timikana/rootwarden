@@ -500,3 +500,58 @@ body {
 }
 
 .rw-inline { display: inline; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Selecteur de langue
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-langues {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 7px;
+    background: var(--rw-surface-2);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+}
+
+.rw-langues__lien,
+.rw-langues__actif {
+    padding: 3px 8px;
+    border-radius: 5px;
+    line-height: 1.2;
+}
+
+.rw-langues__lien {
+    color: var(--rw-texte-doux);
+    text-decoration: none;
+}
+
+.rw-langues__lien:hover { background: var(--rw-surface); color: var(--rw-texte); }
+
+.rw-langues__actif {
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+}
+
+/*
+ * Sur les ecrans d'authentification il n'y a pas d'en-tete : le selecteur se
+ * pose en bas a droite. Il doit rester atteignable AVANT toute connexion — une
+ * personne qui ne lit pas le francais doit pouvoir basculer pour comprendre
+ * l'ecran de connexion lui-meme.
+ */
+.rw-langues-flottant {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 10;
+}
+
+@media (max-width: 900px) {
+    /* En mobile l'en-tete masque le libelle du compte : le selecteur, lui,
+       reste — c'est une commande, pas une information. */
+    .rw-entete__compte .rw-langues { display: inline-flex; }
+}

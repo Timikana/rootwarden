@@ -203,6 +203,32 @@ Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
   `page.evaluate` en cours ne rend jamais et tout le lot expire sans rien
   mesurer.
 
+## i18n
+
+- `App\Http\Middleware\Langue` : priorite `?lang=` > session > cookie > `fr`.
+  La liste blanche `['fr','en']` est un CONTROLE DE SECURITE, pas une
+  commodite : cote legacy, un pentest a montre qu'un cookie forge permettait
+  d'inclure un fichier arbitraire. Toute valeur hors liste retombe sur le
+  defaut, sans exception et sans message.
+- Le selecteur vit dans `composants/langue.blade.php`, inclus par les DEUX
+  gabarits. Il doit rester atteignable AVANT toute connexion : une personne qui
+  ne lit pas le francais doit pouvoir basculer pour comprendre l'ecran de
+  connexion lui-meme.
+- **Le repli de langue MASQUE la moitie des defauts.** Avec
+  `APP_FALLBACK_LOCALE=en`, une cle absente des DEUX langues affiche son
+  identifiant (`auth.xxx`, visible), mais une cle presente en anglais et
+  absente en francais affiche LE TEXTE ANGLAIS — invisible a l'oeil comme a un
+  test qui cherche des identifiants. Il faut donc DEUX controles :
+  1. aucun identifiant a l'ecran, dans les deux langues ;
+  2. **parite des jeux de cles** fr / en, module par module.
+  `tests/e2e/go-socle-i18n.mjs` fait les deux ; le second passe par PHP dans le
+  conteneur, parce qu'analyser des fichiers PHP a l'expression reguliere
+  reviendrait a reecrire un interpreteur — et une cle mal lue serait declaree
+  absente a tort.
+- Le cookie de preference part CHIFFRE (middleware `EncryptCookies`). Le
+  dernier argument booleen de `cookie()` est `raw`, PAS le chiffrement : les
+  confondre conduit a ecrire un commentaire qui dit l'inverse du code.
+
 ## Contrat DOM des tests
 
 **Ne jamais ancrer un test sur « le premier bouton submit ».** Deplacer un
@@ -216,7 +242,26 @@ Les champs de formulaire gardent le nom du legacy (`username`, `password`,
 `2fa_code`) : le MEME test vise les deux cibles, il ne peut pas connaitre deux
 noms de champ.
 
-## Etat du portage
+## Etat du portage — le SOCLE est complet
+
+| Piece | Etat | Lot |
+|---|---|---|
+| Squelette et conteneur | fait | — |
+| Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 28 |
+| Interface (largeur, boutons, guidage) | fait | captures regardees |
+| Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
+| i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
+
+NON PORTE, et signale a l'ecran plutot que silencieusement absent : enrolement
+d'un second facteur, re-authentification ponctuelle (step-up), politique de mot
+de passe, reinitialisation. Un compte sans secret TOTP arrive sur une impasse
+explicite renvoyant vers l'ancien portail.
+
+Aucune page metier n'est portee : `legacy/` est intact, rien n'est encore
+archive dans `legacy/_deprecated/`.
+
+## Detail
 
 Rien n'est porte a ce jour. Le socle est en cours : squelette (fait),
 caracterisation de l'authentification (faite), puis portage de

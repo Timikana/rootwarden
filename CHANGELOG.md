@@ -280,6 +280,50 @@ n'a été déclenchée : le legacy a répondu 403, le backend n'a jamais vu la r
 Nouvelle variable : `BACKEND_INTERNAL_URL` (et `BACKEND_TIMEOUT`) dans `srv-docker.env.example`.
 i18n : module `passerelle`, **6 clés = 6 clés**.
 
+### Socle — i18n : le socle est complet
+
+Bascule FR/EN portée : middleware `Langue` (priorité `?lang=` > session > cookie > `fr`),
+sélecteur inclus par les **deux** gabarits, persistance en session et cookie (365 jours).
+
+La liste blanche `['fr','en']` est reprise comme **contrôle de sécurité**, pas comme
+commodité : côté legacy, un pentest avait montré qu'un cookie `lang` forgé permettait
+d'inclure un fichier arbitraire. Toute valeur hors liste retombe sur le défaut — vérifié avec
+`de`, `../../etc/passwd` et `fr; DROP TABLE users`.
+
+Le sélecteur reste atteignable **avant toute connexion** : quelqu'un qui ne lit pas le français
+doit pouvoir basculer pour comprendre l'écran de connexion lui-même.
+
+#### Le repli de langue masque la moitié des défauts
+
+Avec `APP_FALLBACK_LOCALE=en`, une clé absente des **deux** langues affiche son identifiant —
+visible. Mais une clé présente en anglais et **absente en français** affiche le texte anglais :
+invisible à l'œil, et invisible à un test qui cherche des identifiants à l'écran.
+
+`tests/e2e/go-socle-i18n.mjs` fait donc **deux** contrôles distincts : aucun identifiant à
+l'écran dans les deux langues, **et** parité des jeux de clés module par module. Le second passe
+par PHP dans le conteneur — analyser des fichiers PHP à l'expression régulière reviendrait à
+réécrire un interpréteur, et une clé mal lue serait déclarée absente à tort.
+
+**Vérifié : 23 PASS / 0 FAIL**, 110 clés françaises comparées, zéro écart.
+
+Corrigé au passage un commentaire qui disait l'inverse du code : le cookie de préférence part
+**chiffré** (middleware `EncryptCookies`) ; le dernier argument booléen de `cookie()` est `raw`,
+pas le chiffrement.
+
+#### Le socle est complet
+
+| Pièce | Lot |
+|---|---|
+| Authentification (TOTP obligatoire, anti-rejeu par compte) | 14 PASS · legacy 13 + 1 écart |
+| Gabarit et navigation (33 entrées, source unique) | 28 PASS |
+| Interface (largeur, boutons, guidage) | captures regardées |
+| Passerelle (filtrage par segment) | 10 PASS · legacy 5 + 1 écart |
+| i18n (bascule, parité) | 23 PASS |
+
+Restent **non portés**, et signalés à l'écran plutôt que silencieusement absents : enrôlement
+d'un second facteur, ré-authentification ponctuelle, politique de mot de passe, réinitialisation.
+Aucune page métier n'est portée : `legacy/` est intact, rien n'est encore archivé.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

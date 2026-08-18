@@ -40,6 +40,7 @@
                  cherche. En pied de barre laterale, ils bornaient la liste du
                  menu, qui se coupait en plein libelle. --}}
             <div class="rw-entete__compte">
+                @include('composants.langue')
                 <span>{{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong></span>
                 <form class="rw-inline" method="POST" action="{{ route('deconnexion') }}">
                     @csrf
