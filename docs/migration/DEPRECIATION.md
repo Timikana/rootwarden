@@ -104,6 +104,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 |---|---|---|---|
 | `commandlog/` | 2026-08-18 | `journal-commandes` | premiere page metier portee |
 | `approvals/` | 2026-08-18 | `approbations` | seconde page metier portee |
+| `drift/` | 2026-08-18 | `derive-config` | premiere garde par permission |
 
 ### commandlog — la preuve du cycle
 
@@ -163,3 +164,47 @@ assertion creuse est plus dangereuse qu'une assertion absente : elle occupe la p
 |---|---|
 | `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
 | `approvals/` | 4 PASS / 0 FAIL — partie archivée |
+
+### drift — la première page dont la **permission** décide
+
+`https://localhost:8443/drift/` rendait **302** avant archivage ; après
+`git mv legacy/drift legacy/_deprecated/drift`, l'URL rend **404**, ainsi que `index.php` et
+`js/main.js`. L'entrée de menu du legacy mène désormais à `LARAVEL_URL` + `/derive-config`.
+
+C'est la première partie portée dont la garde n'est pas `can_admin_portal`. Elle exige
+`can_view_compliance`, que porte `rw-test-admin` (rôle 2) :
+
+| Compte | Rôle | `can_view_compliance` | Journal / Approbations | Dérive |
+|---|---|---|---|---|
+| `rw-test-user` | 1 | non | refusé | refusé |
+| `rw-test-admin` | 2 | **oui** | refusé | **autorisé** |
+| `rw-test-super` | 3 | (superadmin) | autorisé | autorisé |
+
+Sur les deux pages précédentes, seul le superadministrateur passait : rien ne distinguait une
+garde par permission d'une garde par rôle. Ici, le compte rôle 2 est autorisé sur cette page et
+refusé sur les autres — c'est la seule configuration qui **prouve** que la permission est lue.
+
+#### Ce que le scan touche, et ce qu'il ne touche pas
+
+Le bouton « scanner tout le parc » couvre la machine de production. Avant d'écrire un test qui
+clique dessus, `backend/routes/drift.py` a été lu : `scan_all` **ne fait aucun appel SSH**. Il
+recalcule depuis des données déjà en base (`user_machine_access`, `server_user_sudo_policies`,
+`ssh_audit_results`, `fail2ban_status`) et écrit dans `config_drift`. Aucun serveur n'est joint.
+La description de la page le dit désormais à l'écran, et l'infobulle du bouton le répète — sur
+un parc de production, on doit pouvoir savoir ce qu'un bouton fait *avant* de le presser.
+
+#### Ce que la vérification en direct a produit
+
+Un re-scan réel de `Test-Server-Debian` fait avancer l'horodatage affiché, et un scan global
+n'oublie aucune machine. Ce sont des écritures réelles en base, faites par le test, à chaque
+exécution.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 4 PASS / 0 FAIL — partie archivée |
+| `drift/` | 4 PASS / 0 FAIL — partie archivée |
+
+Le test de la vague 0 collecte maintenant **34 liens internes** au menu du legacy, contre 37 au
+départ : exactement les trois entrées redirigées vers le portage. Cette baisse est la
+progression de la migration.

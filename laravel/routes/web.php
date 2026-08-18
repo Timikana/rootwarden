@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\ConnexionController;
 use App\Http\Controllers\Auth\SecondFacteurController;
 use App\Http\Controllers\ApprobationsController;
+use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
@@ -50,6 +51,16 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('approbations');
 
+    /*
+     * Derive de configuration. Seule page portee a ce jour dont la garde
+     * n'est PAS `can_admin_portal` : `can_view_compliance` est portee par un
+     * compte role 2, ce qui rend la permission observable independamment du
+     * role.
+     */
+    Route::get('/derive-config', DeriveConfigController::class)
+        ->middleware(['role:2', 'perm:can_view_compliance'])
+        ->name('derive-config');
+
     // Journal des commandes — tracabilite de type bastion, lecture seule.
     Route::get('/journal-commandes', JournalCommandesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
@@ -82,3 +93,4 @@ Route::get('/terms.php', fn () => redirect()->route('cgu'));
 Route::get('/adm/admin_page.php', fn () => redirect()->route('accueil'));
 Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
 Route::get('/approvals/', fn () => redirect()->route('approbations'));
+Route::get('/drift/', fn () => redirect()->route('derive-config'));

@@ -68,7 +68,7 @@ for (const format of LARGEURS) {
         const limite = Date.now() + maxMs;
         while (Date.now() < limite) {
             const encoreEnCharge = await page.evaluate(() => {
-                const c = document.querySelector('#cmdlog-tbody, #appr-tbody');
+                const c = document.querySelector('#cmdlog-tbody, #appr-tbody, #drift-tbody');
                 return c ? /Chargement|Loading/i.test(c.textContent) : false;
             });
             if (!encoreEnCharge) return;
@@ -130,6 +130,11 @@ for (const format of LARGEURS) {
     await page.goto(`${BASE}/approbations`, { waitUntil: 'networkidle2' });
     await attendTableau();
     await prend('07-approbations');
+
+    // 8. Derive de configuration
+    await page.goto(`${BASE}/derive-config`, { waitUntil: 'networkidle2' });
+    await attendTableau();
+    await prend('08-derive-config');
 
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {

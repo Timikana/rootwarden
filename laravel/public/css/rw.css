@@ -775,3 +775,77 @@ body {
 
 .rw-pastille--info   { background: var(--rw-accent-doux); color: var(--rw-accent); }
 .rw-pastille--neutre { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   En-tete de page, tuiles de resume, region d'annonce
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Titre a gauche, action principale a DROITE, sur la meme ligne. Le titre
+ * garde `rw-prose` sur son texte : sans cela, la description occupe toute la
+ * largeur et pousse le bouton hors du champ visuel sur un grand ecran.
+ */
+.rw-entete-page {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.rw-entete-page__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/*
+ * Quatre chiffres de resume tiennent sur une ligne des 1000 px. La grille
+ * generale demande 280 px minimum, ce qui les casserait en deux rangees de
+ * deux sur un ecran moyen — pour quatre nombres et une legende courte, c'est
+ * de la place perdue.
+ */
+/*
+ * 160 px et non 190 : sur un telephone, 190 ne laisse passer qu'UNE colonne,
+ * et les quatre tuiles repoussent le tableau — la donnee — sous quatre ecrans
+ * de contexte. A 160, elles tiennent deux par deux. Sur un grand ecran cela ne
+ * change rien : `auto-fit` effondre les pistes vides et les quatre tuiles
+ * s'etirent sur toute la largeur.
+ */
+.rw-grille--compacte { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.rw-grille--compacte .rw-tuile { padding: 14px 15px; }
+
+.rw-tuile__valeur--ok     { color: var(--rw-succes); }
+.rw-tuile__valeur--alerte { color: var(--rw-danger); }
+
+/*
+ * Region d'annonce, en remplacement des bulles fugaces. Une bulle qui
+ * s'efface au bout de trois secondes n'informe personne d'un scan qui vient
+ * de changer ce qui est affiche ; celle-ci reste, et `aria-live` la fait
+ * annoncer. Vide, elle n'occupe aucune place.
+ */
+.rw-annonce {
+    margin: 14px 0 0;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-annonce:empty { display: none; }
+.rw-annonce--ok    { color: var(--rw-succes); font-weight: 550; }
+.rw-annonce--echec { color: var(--rw-danger); font-weight: 550; }
+
+/*
+ * Detail d'un ecart, sous sa pastille. Le legacy le cache dans un attribut
+ * `title` : invisible au doigt, au clavier et au lecteur d'ecran, alors que
+ * c'est la seule information de la page qui dise quoi faire.
+ */
+.rw-detail-ecart {
+    margin: 5px 0 0;
+    max-width: 34ch;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--rw-texte-doux);
+}
+
+.rw-tableau__fort { font-weight: 600; white-space: nowrap; }
