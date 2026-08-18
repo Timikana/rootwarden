@@ -59,6 +59,23 @@ for (const format of LARGEURS) {
     page.setDefaultTimeout(30000);
     page.on('dialog', d => d.dismiss().catch(() => {}));
 
+    /*
+     * Une page qui remplit son tableau par un appel reseau met un temps
+     * variable. Dormir une duree fixe capture « Chargement… » et donne une
+     * image qui ne montre pas ce qu'on voulait juger.
+     */
+    const attendTableau = async (maxMs = 12000) => {
+        const limite = Date.now() + maxMs;
+        while (Date.now() < limite) {
+            const encoreEnCharge = await page.evaluate(() => {
+                const c = document.querySelector('#cmdlog-tbody, #appr-tbody');
+                return c ? /Chargement|Loading/i.test(c.textContent) : false;
+            });
+            if (!encoreEnCharge) return;
+            await dors(300);
+        }
+    };
+
     const prend = async (etiquette) => {
         const chemin = `${SORTIE}/${format.nom}-${etiquette}.png`;
         await page.screenshot({ path: chemin });
@@ -106,15 +123,20 @@ for (const format of LARGEURS) {
 
     // 6. Journal des commandes — premiere page metier portee
     await page.goto(`${BASE}/journal-commandes`, { waitUntil: 'networkidle2' });
-    await dors(1800); // le tableau se remplit par un appel a la passerelle
+    await attendTableau();
     await prend('06-journal-commandes');
+
+    // 7. Approbations a quatre yeux
+    await page.goto(`${BASE}/approbations`, { waitUntil: 'networkidle2' });
+    await attendTableau();
+    await prend('07-approbations');
 
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });
         await page.evaluate(() => { document.getElementById('rw-tiroir').checked = true; });
         await dors(300);
-        await prend('07-tiroir');
+        await prend('08-tiroir');
     }
 
     await ctx.close();

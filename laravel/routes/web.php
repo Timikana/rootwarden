@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\ConnexionController;
 use App\Http\Controllers\Auth\SecondFacteurController;
+use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
@@ -38,6 +39,23 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
 
     /*
+     * Pages metier reservees a l'administration.
+     *
+     * La garde est ici et NULLE PART ailleurs : ecrite aussi dans le
+     * controleur, elle finirait par diverger.
+     */
+
+    // Approbation a quatre yeux des actions destructrices.
+    Route::get('/approbations', ApprobationsController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('approbations');
+
+    // Journal des commandes — tracabilite de type bastion, lecture seule.
+    Route::get('/journal-commandes', JournalCommandesController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('journal-commandes');
+
+    /*
      * Passerelle vers le backend Python. Elle reste dans le groupe `web` : la
      * session ET le jeton CSRF s'appliquent, ce qui est le point de la
      * manoeuvre — c'est l'endpoint le plus puissant du portail, il transmet
@@ -46,15 +64,6 @@ Route::middleware('session.authentifiee')->group(function () {
      * `where` autorise le slash dans le parametre, sinon `/fail2ban/status`
      * ne serait pas capture.
      */
-    /*
-     * Journal des commandes — lecture seule, reserve a l'administration.
-     * La garde est ici et NULLE PART ailleurs : ecrite aussi dans le
-     * controleur, elle finirait par diverger.
-     */
-    Route::get('/journal-commandes', JournalCommandesController::class)
-        ->middleware(['role:2', 'perm:can_admin_portal'])
-        ->name('journal-commandes');
-
     Route::any('/api/gateway/{chemin?}', PasserelleController::class)
         ->where('chemin', '.*')
         ->name('passerelle');
@@ -72,3 +81,4 @@ Route::get('/profile.php', fn () => redirect()->route('profil'));
 Route::get('/terms.php', fn () => redirect()->route('cgu'));
 Route::get('/adm/admin_page.php', fn () => redirect()->route('accueil'));
 Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
+Route::get('/approvals/', fn () => redirect()->route('approbations'));

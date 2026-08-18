@@ -103,6 +103,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | Partie | Date | Route Laravel qui reprend | Commit |
 |---|---|---|---|
 | `commandlog/` | 2026-08-18 | `journal-commandes` | premiere page metier portee |
+| `approvals/` | 2026-08-18 | `approbations` | seconde page metier portee |
 
 ### commandlog — la preuve du cycle
 
@@ -119,3 +120,46 @@ aurait ete absurde.
 Effet mesurable : le test de la vague 0 collecte desormais **36 liens internes au legacy** au
 lieu de 37, le lien porte etant devenu externe. Cette baisse est la progression de la
 migration, pas une regression.
+
+### approvals — le cycle, et un constat qui ne casse plus
+
+`https://localhost:8443/approvals/` rendait **302** avant archivage. Après
+`git mv legacy/approvals legacy/_deprecated/approvals`, l'URL rend **404**, `index.php` et
+`js/main.js` aussi. L'entrée de menu du legacy mène désormais à `LARAVEL_URL` +
+`/approbations`.
+
+#### Le test d'une partie archivée ne doit pas rester rouge
+
+Archiver `commandlog/` avait laissé sa suite à `4 PASS / 7 FAIL` : le test cherchait une page
+qui n'existe plus. Deux parties archivées, et deux suites rouges en permanence — après quoi
+plus personne ne lit les rouges.
+
+`tests/e2e/archive.mjs` porte désormais le **constat d'archivage**, partagé par toutes les
+pages portées. Sur la cible legacy, le test commence par sonder l'URL : 404 signifie archivée,
+et il bascule alors sur trois vérifications qui *ont* un sens après le déplacement —
+
+| Vérification | Ce qu'elle empêche |
+|---|---|
+| la partie rend 404 | un dossier vidé mais toujours servi |
+| ses fichiers rendent 404 (`index.php`, `js/main.js`) | un script resté joignable, donc une dépendance oubliée |
+| le menu du legacy mène au portage | **installer soi-même un 404 dans un menu** |
+
+La sonde passe par `node:https` et non par `fetch` : le legacy porte un certificat auto-signé.
+La tolérance est bornée à cette sonde — poser `NODE_TLS_REJECT_UNAUTHORIZED` sur tout le
+processus pour lire un code de statut aurait désarmé la vérification TLS de tous les autres
+appels du test.
+
+Elle interroge sans session : Apache rend 404 pour un chemin absent **avant** toute redirection
+de connexion, tandis qu'une partie encore vivante rend 302. `/tasks/index.php` rend bien 302 —
+c'est ce qui prouve que le 404 des deux autres vient de l'archivage et non d'un chemin mal
+écrit.
+
+Ce détail a d'ailleurs été payé : les sous-ressources sondées au premier jet étaient
+`/approvals/approvals.js` et `/commandlog/commandlog.js`. Elles rendaient 404, et l'assertion
+passait — mais ces chemins **n'ont jamais existé**, le script s'appelant `js/main.js`. Une
+assertion creuse est plus dangereuse qu'une assertion absente : elle occupe la place.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 4 PASS / 0 FAIL — partie archivée |
