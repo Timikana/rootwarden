@@ -149,6 +149,42 @@ Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
 - Menu attendu au 2026-08-18 : **33 entrees** au total ; role 1 → 3, role 2
   (8 permissions, sans can_admin_portal) → 13, role 3 → 33.
 
+## Interface — exigences de l'exploitant
+
+- **REGARDER le rendu, pas seulement l'asserter.** `tests/e2e/go-captures-socle.mjs`
+  produit des captures a 1920, 1400 et 390 px ; les OUVRIR. Une assertion DOM
+  ne voit ni un bouton mal place, ni une largeur gaspillee, ni un pave de texte
+  illisible. Trois defauts n'ont ete vus qu'a l'image : ~1000 px vides de
+  chaque cote sur grand ecran, « Connecte en tant que » affiche deux fois, et
+  « ancien portail » repete 31 fois dans le menu.
+- **Utiliser la largeur.** Pas de `max-width` sur la page : `.rw-contenu` prend
+  toute la place et `.rw-grille` (`auto-fit`, minimum 280 px) la remplit. Seule
+  la PROSE se borne, par `.rw-prose` (68ch) — un paragraphe centre sur 1900 px
+  se relit ligne par ligne.
+- **Boutons.** Action principale a DROITE en pied de formulaire (`.rw-actions`),
+  action secondaire a gauche (`.rw-actions__gauche`). Pas de bouton pleine
+  largeur sauf action unique dans une carte etroite. Compte et deconnexion dans
+  l'EN-TETE, pas en pied de barre laterale — la ils bornaient la liste du menu,
+  qui se coupait en plein libelle.
+- **Guidage.** Fil d'etapes sur les ecrans d'authentification (`.rw-etapes`),
+  aide sous les champs (`.rw-aide`), etats vides qui disent ce qui manque ET
+  pourquoi (`.rw-vide`), tuiles d'orientation sur l'accueil (`.rw-tuile`).
+- **Marqueur des pages non portees** : une fleche discrete, expliquee UNE FOIS
+  par la legende en tete de menu, avec le detail dans le `title`.
+
+## Contrat DOM des tests
+
+**Ne jamais ancrer un test sur « le premier bouton submit ».** Deplacer un
+bouton a suffi a faire cliquer « Refuser et se deconnecter » au lieu
+d'« Accepter » : les scripts se deconnectaient en croyant entrer, et l'erreur
+ne se voyait qu'a une exception trois etapes plus loin.
+
+Les elements que les tests pilotent portent un attribut `data-rw="<nom>"`
+stable. Attributs poses a ce jour : `cgu-accepter`, `cgu-refuser`.
+Les champs de formulaire gardent le nom du legacy (`username`, `password`,
+`2fa_code`) : le MEME test vise les deux cibles, il ne peut pas connaitre deux
+noms de champ.
+
 ## Etat du portage
 
 Rien n'est porte a ce jour. Le socle est en cours : squelette (fait),

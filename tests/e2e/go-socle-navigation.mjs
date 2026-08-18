@@ -78,7 +78,9 @@ async function connecte(compte) {
     // On arrive sur les conditions d'utilisation : on les accepte pour entrer.
     if (/\/cgu/.test(page.url())) {
         nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
-        await page.click('button[type="submit"]');
+        // Ancrage sur le CONTRAT DOM : la page CGU porte deux boutons submit,
+        // et refuser vient avant accepter.
+        await page.click('[data-rw="cgu-accepter"]');
         try { await nav; } catch {}
     }
 

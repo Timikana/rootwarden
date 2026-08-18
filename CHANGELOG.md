@@ -198,6 +198,45 @@ la main sont 74 occasions de faute. `lang/{fr,en}/nav.php`, **42 clés = 42 clé
 Lot antérieur rejoué après modification du gabarit : authentification **14 PASS** sur Laravel,
 **13 PASS / 1 écart connu** sur le legacy, vague 0 inchangée.
 
+### Socle — refonte de l'interface, vue à l'image et non seulement assertée
+
+Nouveau `tests/e2e/go-captures-socle.mjs` : 16 captures du socle à **1920, 1400 et 390 px**.
+Elles ont été **ouvertes et jugées** — c'est ce qui a révélé trois défauts qu'aucune assertion
+DOM ne voyait :
+
+- environ **1000 px vides de chaque côté** sur un écran de 1920, à cause d'un
+  `max-width: 960px` sur le contenu ;
+- « Connecté en tant que » affiché **deux fois**, dans l'en-tête et dans le corps ;
+- « ancien portail » répété **31 fois** dans le menu d'un superadmin, noyant les libellés ;
+- la liste du menu **coupée en plein libellé** par le pied de barre latérale.
+
+Refonte :
+- **La page prend toute la largeur.** `.rw-contenu` n'a plus de `max-width` ; `.rw-grille`
+  (`auto-fit`, minimum 280 px) donne 2 colonnes sur écran moyen et 4 sur grand écran. Seule la
+  prose reste bornée à 68 caractères (`.rw-prose`) — un paragraphe centré sur 1900 px se relit
+  ligne par ligne.
+- **Boutons repositionnés.** Action principale à droite en pied de formulaire, action secondaire
+  à gauche. Compte et déconnexion remontent dans l'en-tête : en pied de barre latérale, ils
+  bornaient la liste du menu.
+- **Marqueur des pages non portées** : une flèche discrète, expliquée **une seule fois** par une
+  légende en tête de menu, le détail restant dans le `title` de chaque entrée.
+- **Guidage** : fil d'étapes sur les trois écrans d'authentification (identifiants → second
+  facteur → accès), aide sous les champs, tuiles d'orientation sur l'accueil (modules
+  accessibles, déjà portés, second facteur, ancien portail), et un état vide qui explique
+  *pourquoi* le parc n'est pas encore affiché plutôt que de le laisser manquer.
+
+**Un piège payé et corrigé au passage** : repositionner les boutons a fait de « Refuser et se
+déconnecter » le premier `button[type=submit]` de la page des conditions d'utilisation. Les
+scripts, ancrés sur « le premier bouton », se déconnectaient en croyant entrer. Les éléments
+pilotés par les tests portent désormais un attribut **`data-rw`** stable — un test ancré sur un
+rang dans le DOM est fragile par construction.
+
+i18n : deux modules créés (`accueil`, `profil`), deux étendus (`auth`, `nav`).
+**auth 34 = 34 · nav 43 = 43 · accueil 16 = 16 · profil 7 = 7**, zéro écart.
+
+Lot complet rejoué après refonte du gabarit : navigation **28 PASS**, authentification **14 PASS**
+sur Laravel, **13 PASS / 1 écart connu** sur le legacy, vague 0 inchangée.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

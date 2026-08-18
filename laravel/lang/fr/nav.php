@@ -57,8 +57,9 @@ return [
     'logout'  => 'Deconnexion',
 
     // Etat du portage
-    'non_porte'       => 'ancien portail',
-    'non_porte_titre' => 'Cette page n\'est pas encore portee : elle s\'ouvre dans l\'ancien portail.',
+    'non_porte'              => 'ancien portail',
+    'non_porte_titre'        => "cette page n'est pas encore portée, elle s'ouvre dans l'ancien portail",
+    'legende_ancien_portail' => "Les entrées marquées d'une flèche ouvrent l'ancien portail dans un nouvel onglet.",
     'ouvrir_menu'     => 'Ouvrir le menu',
     'fermer_menu'     => 'Fermer le menu',
 ];

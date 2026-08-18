@@ -23,15 +23,17 @@
         @else
             {{--
               Page NON PORTEE : lien vers l'ancien portail, dans un nouvel
-              onglet, avec un marqueur visible. Un lien qui change de portail
-              sans le dire est un lien qui trahit l'utilisateur.
+              onglet. Le marqueur est une simple fleche : la legende en tete de
+              menu l'explique UNE FOIS. Repeter « ancien portail » sur chaque
+              ligne noyait les libelles — 31 fois a l'ecran pour un superadmin.
+              Le `title` porte l'explication complete, entree par entree.
             --}}
             <a class="rw-menu__lien rw-menu__lien--externe"
                href="{{ rtrim(config('app.url_legacy'), '/') . $entree['legacy'] }}"
                target="_blank" rel="noopener"
-               title="{{ __('nav.non_porte_titre') }}">
+               title="{{ __('nav.' . $entree['cle']) }} — {{ __('nav.non_porte_titre') }}">
                 <span class="rw-menu__libelle">{{ __('nav.' . $entree['cle']) }}</span>
-                <span class="rw-menu__marqueur">{{ __('nav.non_porte') }} ↗</span>
+                <span class="rw-menu__marqueur" aria-label="{{ __('nav.non_porte') }}">↗</span>
             </a>
         @endif
     @endforeach
