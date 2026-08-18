@@ -258,8 +258,36 @@ d'un second facteur, re-authentification ponctuelle (step-up), politique de mot
 de passe, reinitialisation. Un compte sans secret TOTP arrive sur une impasse
 explicite renvoyant vers l'ancien portail.
 
-Aucune page metier n'est portee : `legacy/` est intact, rien n'est encore
-archive dans `legacy/_deprecated/`.
+### Pages metier
+
+| Page | Route | Archivee |
+|---|---|---|
+| Journal des commandes | `journal-commandes` | oui, 2026-08-18 |
+
+Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
+puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
+sert. Penser aussi a rediriger l'entree du menu DU LEGACY vers le nouveau
+portail (`LARAVEL_URL`), sans quoi on installe soi-meme un 404 dans un menu.
+
+### Gardes de page
+
+`role:2` (role au moins administrateur) et `perm:can_admin_portal` (cette
+permission OU superadmin). La garde vit DANS LA ROUTE et nulle part ailleurs.
+Les deux refus rendent 403 avec des messages distincts, sans detailler ce qui
+manque.
+
+### Tableaux et chargements
+
+- Rendu par `textContent`, jamais par interpolation : les donnees journalisees
+  contiennent par nature des caracteres de shell.
+- Les libelles affiches par un script sont poses EN DONNEES dans la page
+  (`@json` sur UNE ligne) : une chaine ecrite en dur dans du JS echappe a la
+  parite FR/EN.
+- **Sequencer les chargements** : numeroter chaque appel et n'ecrire que si le
+  numero est encore le dernier. Sans cela, deux changements de filtre
+  rapproches peuvent laisser la reponse la plus ancienne gagner.
+- Le defilement horizontal appartient au CADRE du tableau, jamais au corps de
+  la page.
 
 ## Detail
 

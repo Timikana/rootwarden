@@ -324,6 +324,44 @@ Restent **non portés**, et signalés à l'écran plutôt que silencieusement ab
 d'un second facteur, ré-authentification ponctuelle, politique de mot de passe, réinitialisation.
 Aucune page métier n'est portée : `legacy/` est intact, rien n'est encore archivé.
 
+### Première page métier portée — et premier archivage du legacy
+
+`commandlog` (journal des commandes, lecture seule) est porté sur `/journal-commandes`, puis
+**archivé** : `legacy/commandlog/` a été déplacé dans `legacy/_deprecated/`.
+
+**La preuve que l'archivage cherchait** : avant, `https://localhost:8443/commandlog/` répondait
+302 ; après le déplacement, la même URL répond **404**, et son script aussi. Plus rien ne les
+sert. C'est réversible par le mouvement inverse — c'est pourquoi `git mv` et non `git rm`.
+
+L'entrée de menu **du legacy** a été redirigée vers le nouveau portail plutôt que laissée sur
+une page archivée : un menu qui mène à un 404 est exactement le défaut que ce chantier corrige.
+Nouvelle variable `LARAVEL_URL`. Effet mesurable : le test de la vague 0 collecte désormais
+**36 liens internes** au lieu de 37 — la progression de la migration, pas une régression.
+
+Le portage :
+- Deux middlewares génériques, `role:2` et `perm:can_admin_portal`, la garde vivant **dans la
+  route** et nulle part ailleurs. Les deux refus donnent des messages distincts sans détailler
+  ce qui manque.
+- Rendu par `textContent`, jamais par interpolation : une commande journalisée contient par
+  nature des caractères de shell.
+- Les libellés que le script affiche sont posés **en données** dans la page : une chaîne écrite
+  en dur dans du JS échappe à la parité FR/EN.
+- Accents rétablis — le legacy écrit « Tracabilite », « Rafraichir », « Resultat ».
+- État vide qui explique quoi faire, et non un tableau muet.
+
+**Les données de test sont réelles** : deux commandes privilégiées ont été déclenchées sur
+`Test-Server-Debian` pour alimenter le journal, plutôt que d'insérer des lignes fictives. Au
+passage, un constat : **`su` échoue sur cette machine** — le mot de passe root enregistré ne
+fonctionne pas, donc aucune mise à jour ne peut y aboutir.
+
+**Vérifié : 14 PASS / 0 FAIL sur les deux cibles**, avec les trois comptes. Lot rejoué :
+navigation 29, i18n 23, auth Laravel 14, passerelle 10, vague 0 inchangée.
+
+`PARITE.md` E-03 consigne une nuance : le legacy ne séquence pas ses chargements, un résultat
+périmé a été observé **une fois**, mais il **ne se reproduit pas de façon fiable**. Le portage
+numérote ses chargements et seul le dernier écrit — la possibilité est retirée par
+construction. C'est ce qui est affirmé, et rien de plus.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

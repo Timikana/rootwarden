@@ -98,8 +98,24 @@ doivent etre **recrees**, pas seulement redemarres :
 
 ## Parties archivees
 
-Aucune a ce jour. Le tableau ci-dessous se remplit une ligne par vague.
+Une ligne par partie portee, ajoutee APRES la preuve du 404.
 
 | Partie | Date | Route Laravel qui reprend | Commit |
 |---|---|---|---|
-| — | — | — | — |
+| `commandlog/` | 2026-08-18 | `journal-commandes` | premiere page metier portee |
+
+### commandlog — la preuve du cycle
+
+Avant archivage, `https://localhost:8443/commandlog/` rendait **302** (renvoi vers la
+connexion). Apres `git mv legacy/commandlog legacy/_deprecated/commandlog`, la meme URL rend
+**404**, et son script `/commandlog/js/main.js` aussi. Plus rien ne les sert : c'est ce que
+l'archivage devait prouver.
+
+L'entree de menu du LEGACY a ete redirigee vers le nouveau portail
+(`LARAVEL_URL` + `/journal-commandes`) au lieu d'etre laissee sur une page archivee. Un menu
+qui mene a un 404 est exactement le defaut que ce chantier corrige — l'installer en archivant
+aurait ete absurde.
+
+Effet mesurable : le test de la vague 0 collecte desormais **36 liens internes au legacy** au
+lieu de 37, le lien porte etant devenu externe. Cette baisse est la progression de la
+migration, pas une regression.

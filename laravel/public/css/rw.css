@@ -555,3 +555,114 @@ body {
        reste — c'est une commande, pas une information. */
     .rw-entete__compte .rw-langues { display: inline-flex; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Filtres et tableaux
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-barre-filtres {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin: 20px 0 16px;
+}
+
+.rw-filtre { display: flex; flex-direction: column; gap: 5px; }
+
+.rw-filtre__etiquette {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+
+.rw-saisie--compacte { width: auto; min-width: 190px; padding: 7px 10px; font-size: 14px; }
+
+/*
+ * Le cadre porte le defilement horizontal, PAS le corps de la page : un
+ * tableau large doit glisser dans sa boite, jamais faire glisser tout l'ecran.
+ */
+.rw-tableau-cadre {
+    overflow-x: auto;
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+}
+
+.rw-tableau {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.rw-tableau thead th {
+    position: sticky;
+    top: 0;
+    padding: 10px 14px;
+    background: var(--rw-surface-2);
+    border-bottom: 1px solid var(--rw-bordure);
+    text-align: left;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+    white-space: nowrap;
+}
+
+.rw-tableau tbody td {
+    padding: 9px 14px;
+    border-top: 1px solid var(--rw-bordure);
+    vertical-align: top;
+}
+
+.rw-tableau tbody tr:hover { background: var(--rw-surface-2); }
+
+.rw-tableau__discret { font-size: 12px; color: var(--rw-texte-doux); white-space: nowrap; }
+
+/* Message pleine largeur : chargement, erreur, ou etat vide. */
+.rw-tableau__message { padding: 30px 20px; text-align: center; color: var(--rw-texte-doux); }
+.rw-tableau__message-titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
+.rw-tableau__message-aide { max-width: 60ch; margin: 0 auto; font-size: 13px; }
+
+/* ── Etiquettes et pastilles ────────────────────────────────────────────── */
+
+.rw-etiquette {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--rw-accent-doux);
+    color: var(--rw-accent);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.rw-pastille {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.rw-pastille--ok      { background: color-mix(in srgb, var(--rw-succes) 18%, transparent); color: var(--rw-succes); }
+.rw-pastille--echec   { background: var(--rw-danger-fond); color: var(--rw-danger); }
+.rw-pastille--attente { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }
+
+/*
+ * Une commande journalisee peut etre tres longue et contenir des caracteres de
+ * shell : elle se coupe n'importe ou plutot que de faire deborder la colonne.
+ */
+.rw-code {
+    display: block;
+    max-width: 60ch;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}

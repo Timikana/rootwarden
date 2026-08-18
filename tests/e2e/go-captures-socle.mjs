@@ -104,12 +104,17 @@ for (const format of LARGEURS) {
     await dors(200);
     await prend('05-profil');
 
+    // 6. Journal des commandes — premiere page metier portee
+    await page.goto(`${BASE}/journal-commandes`, { waitUntil: 'networkidle2' });
+    await dors(1800); // le tableau se remplit par un appel a la passerelle
+    await prend('06-journal-commandes');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });
         await page.evaluate(() => { document.getElementById('rw-tiroir').checked = true; });
         await dors(300);
-        await prend('06-tiroir');
+        await prend('07-tiroir');
     }
 
     await ctx.close();

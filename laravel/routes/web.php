@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\ConnexionController;
 use App\Http\Controllers\Auth\SecondFacteurController;
+use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,15 @@ Route::middleware('session.authentifiee')->group(function () {
      * `where` autorise le slash dans le parametre, sinon `/fail2ban/status`
      * ne serait pas capture.
      */
+    /*
+     * Journal des commandes — lecture seule, reserve a l'administration.
+     * La garde est ici et NULLE PART ailleurs : ecrite aussi dans le
+     * controleur, elle finirait par diverger.
+     */
+    Route::get('/journal-commandes', JournalCommandesController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('journal-commandes');
+
     Route::any('/api/gateway/{chemin?}', PasserelleController::class)
         ->where('chemin', '.*')
         ->name('passerelle');
@@ -61,3 +71,4 @@ Route::get('/index.php', fn () => redirect()->route('accueil'));
 Route::get('/profile.php', fn () => redirect()->route('profil'));
 Route::get('/terms.php', fn () => redirect()->route('cgu'));
 Route::get('/adm/admin_page.php', fn () => redirect()->route('accueil'));
+Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
