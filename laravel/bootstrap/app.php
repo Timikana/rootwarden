@@ -41,6 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // facteur. Entre les deux, la session ne porte qu'un compte
             // temporaire et ne franchit pas ce garde.
             'session.authentifiee' => \App\Http\Middleware\SessionAuthentifiee::class,
+            // `role:2` = administrateur ou au-dessus. `perm:can_x` se lit
+            // « cette permission OU superadmin », comme partout ailleurs.
+            'role' => \App\Http\Middleware\ExigeRole::class,
+            'perm' => \App\Http\Middleware\ExigePermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -128,6 +128,33 @@ action qui donne root sans le second controle que le legacy exige serait un recu
 
 ---
 
+## E-03 — Les chargements du journal des commandes sont sequences
+
+**Cible legacy : aucun sequencement. Cible Laravel : le dernier chargement gagne.**
+2026-08-18 · `tests/e2e/go-page-commandlog.mjs`.
+
+`legacy/commandlog/js/main.js` relance un chargement a chaque changement de filtre, sans
+ordonner les reponses. Rien n'empeche donc, en principe, deux requetes rapprochees d'arriver
+dans le desordre : l'utilisateur verrait alors le resultat d'un filtre qu'il vient de quitter.
+
+**Ce qui a ete observe, et ce qui ne l'a pas ete.** Un premier passage a bien montre le
+tableau conservant deux lignes la ou le filtre demandait zero. Mais le comportement **ne se
+reproduit pas de facon fiable** : les executions suivantes, sur le legacy comme sur le portage,
+donnent le bon resultat. L'ordre d'arrivee des reponses depend du reseau et de la charge.
+
+Ce qui est donc affirme ici est mesure, et rien de plus :
+
+- l'absence de sequencement dans le legacy est un **fait lisible dans son code** ;
+- un resultat perime a ete observe **une fois**, sans reproduction fiable ;
+- le portage numerote ses chargements et **seul le dernier ecrit** dans le tableau, ce qui
+  retire la possibilite par construction plutot que par chance.
+
+Le test porte l'attente sur les deux cibles ; elle passe des deux cotes aujourd'hui. Elle est
+la pour attraper une regression du portage, pas pour accuser le legacy d'un defaut qu'on n'a
+pas su reproduire.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

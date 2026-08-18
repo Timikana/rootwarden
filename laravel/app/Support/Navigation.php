@@ -53,7 +53,7 @@ class Navigation
             ['cle' => 'groups',         'garde' => 'can_admin_portal',        'legacy' => '/groups/index.php'],
             ['cle' => 'maintenance',    'garde' => 'can_admin_portal',        'legacy' => '/maintenance/index.php'],
             ['cle' => 'approvals',      'garde' => 'can_admin_portal',        'legacy' => '/approvals/index.php'],
-            ['cle' => 'commandlog',     'garde' => 'can_admin_portal',        'legacy' => '/commandlog/index.php'],
+            ['cle' => 'commandlog',     'garde' => 'can_admin_portal',        'route'  => 'journal-commandes'],
             ['cle' => 'chatops',        'garde' => 'can_admin_portal',        'legacy' => '/chatops/index.php'],
             ['cle' => 'tickets',        'garde' => 'can_admin_portal',        'legacy' => '/tickets/index.php'],
             ['cle' => 'search',         'garde' => 'can_admin_portal',        'legacy' => '/search/index.php'],
