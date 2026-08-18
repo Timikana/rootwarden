@@ -11,6 +11,8 @@
     --rw-surface: #ffffff;
     --rw-surface-2: #f8fafc;
     --rw-bordure: #d7dee8;
+    /* Bord de defilement : sombre en clair, clair en sombre. */
+    --rw-bord-defilement: rgba(15, 23, 42, .28);
     --rw-texte: #16202e;
     --rw-texte-doux: #5b6b80;
     --rw-accent: #1d4ed8;
@@ -30,6 +32,7 @@
         --rw-surface: #17202e;
         --rw-surface-2: #1c2637;
         --rw-bordure: #2a3746;
+        --rw-bord-defilement: rgba(148, 173, 209, .40);
         --rw-texte: #e8eef6;
         --rw-texte-doux: #9fb0c4;
         --rw-accent: #5b8cff;
@@ -584,11 +587,27 @@ body {
  * Le cadre porte le defilement horizontal, PAS le corps de la page : un
  * tableau large doit glisser dans sa boite, jamais faire glisser tout l'ecran.
  */
+/*
+ * Le cadre porte le defilement horizontal. Sur un ecran etroit, la derniere
+ * colonne — celle des actions — sort du champ SANS que rien ne le signale :
+ * une capture a 390 px montrait deux lignes dont les boutons de decision
+ * etaient invisibles et introuvables.
+ *
+ * Les ombres de bord le disent, sans une ligne de JavaScript. Les deux voiles
+ * `local` glissent avec le contenu et recouvrent l'ombre du cote ou il n'y a
+ * plus rien a atteindre ; les deux ombres `scroll` restent collees au cadre.
+ * Resultat : une ombre a droite tant qu'il reste des colonnes a droite.
+ */
 .rw-tableau-cadre {
     overflow-x: auto;
-    background: var(--rw-surface);
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
+    background:
+        linear-gradient(to right, var(--rw-surface) 40%, transparent) left center / 34px 100% no-repeat local,
+        linear-gradient(to left, var(--rw-surface) 40%, transparent) right center / 34px 100% no-repeat local,
+        radial-gradient(farthest-side at 0 50%, var(--rw-bord-defilement), transparent) left center / 15px 100% no-repeat scroll,
+        radial-gradient(farthest-side at 100% 50%, var(--rw-bord-defilement), transparent) right center / 15px 100% no-repeat scroll,
+        var(--rw-surface);
 }
 
 .rw-tableau {
@@ -666,3 +685,93 @@ body {
     overflow-wrap: anywhere;
     word-break: break-word;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Onglets, decisions en ligne, boutons colores
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-onglets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 20px 0 16px;
+    padding: 3px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 9px;
+    background: var(--rw-surface-2);
+    width: fit-content;
+}
+
+.rw-onglet {
+    padding: 7px 14px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--rw-texte-doux);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 550;
+    cursor: pointer;
+}
+
+.rw-onglet:hover { background: var(--rw-surface); color: var(--rw-texte); }
+
+.rw-onglet--actif {
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+    font-weight: 600;
+}
+
+/* Colonne de decisions : les boutons restent groupes et ne s'etirent pas. */
+.rw-tableau__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.rw-tableau__actions .rw-bouton { padding: 5px 12px; font-size: 13px; }
+
+.rw-bouton--succes { background: var(--rw-succes); color: var(--rw-accent-texte); }
+.rw-bouton--danger { background: var(--rw-danger); color: var(--rw-accent-texte); }
+
+.rw-bouton:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    filter: none;
+}
+
+/*
+ * Confirmation EN LIGNE, dans la ligne concernee. Elle remplace `confirm()` et
+ * `prompt()` : ces boites natives ne se stylent pas, sortent du flux de la
+ * page, et masquent justement la ligne sur laquelle on decide.
+ */
+.rw-panneau-decision {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--rw-surface-2);
+    border-left: 3px solid var(--rw-danger);
+}
+
+.rw-panneau-decision__actions { display: flex; gap: 8px; margin-left: auto; }
+
+.rw-etiquette-champ {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+    min-width: 260px;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+
+.rw-etiquette-champ .rw-saisie { text-transform: none; letter-spacing: normal; font-weight: 400; }
+
+.rw-pastille--info   { background: var(--rw-accent-doux); color: var(--rw-accent); }
+.rw-pastille--neutre { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }

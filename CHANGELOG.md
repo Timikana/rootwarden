@@ -401,10 +401,77 @@ que le nettoyeur ne couvre pas.
 **Non corrigé** : le backend Python est hors du périmètre de cette migration, et une
 modification de ce genre demande un arbitrage. Signalé pour décision.
 
+### Seconde page métier portée — approbations à quatre yeux
+
+`approvals` est porté sur `/approbations`, puis **archivé** : `legacy/approvals/` a rejoint
+`legacy/_deprecated/`. L'URL legacy répond **404**, `index.php` et `js/main.js` aussi, et
+l'entrée de menu du legacy mène désormais au portage.
+
+La page pilote le garde-fou qui protège les actions destructrices — suppression d'un compte
+distant, redémarrage, régénération de la clé de plateforme, révocation d'un compte de service :
+elles exigent l'aval d'un second administrateur. `APPROVAL_ENABLED` documenté dans
+`srv-docker.env.example`, à `false` par défaut.
+
+**Le test décide pour de vrai.** Les demandes sur lesquelles il travaille sont produites par des
+appels réels du compte `rw-test-admin` (rôle 2) sur la machine `id=2`, et il mène un **rejet
+complet** : la demande quitte l'onglet « en attente » et se retrouve dans « rejetées ». Un test
+sur une page vide n'aurait rien prouvé.
+
+Deux écarts assumés, documentés dans `docs/migration/PARITE.md` :
+
+- **E-04** — le motif de rejet ne passe plus par `prompt()` et la confirmation plus par
+  `confirm()`. Une ligne de confirmation s'ouvre **sous la demande concernée**, avec le champ de
+  motif. La boîte native recouvrait précisément la ligne qu'on est en train de juger, ne se
+  stylait pas — action destructrice et annulation au même poids visuel — et bloquait tout
+  pilotage, si bien que le test ne pouvait pas rejeter réellement.
+- **E-05** — la règle des quatre yeux est rendue **visible** : le bouton *Approuver* de sa
+  propre demande est désactivé et porte l'explication, au lieu de laisser cliquer pour rien. La
+  règle reste appliquée par le backend, seul endroit où elle vaut. Cette branche **n'est pas
+  exercée** par le test : aucun compte de test n'est à la fois demandeur et porteur de
+  `can_admin_portal`, et aucun droit n'a été modifié pour forcer le cas.
+
+### Le tableau dit maintenant qu'il défile
+
+Une capture à 390 px a montré deux demandes dont la colonne *Décision* — la seule raison d'être
+de la page — était hors écran, sans le moindre indice qu'on pouvait y accéder. Le cadre de
+tableau porte désormais des ombres de bord : deux voiles qui glissent avec le contenu et deux
+ombres collées au cadre, sans une ligne de JavaScript. L'indice n'apparaît que s'il reste
+quelque chose à atteindre, et disparaît quand le tableau tient dans la largeur.
+
+Le jeton `--rw-bord-defilement` est défini par thème : une ombre noire ne se voit pas sur un
+fond sombre, et la première version était strictement invisible là où elle servait.
+
+### Une partie archivée ne laisse plus une suite rouge derrière elle
+
+Archiver `commandlog` avait laissé son test à `4 PASS / 7 FAIL` : il cherchait une page qui
+n'existe plus. Deux parties archivées auraient fait deux suites rouges permanentes — après quoi
+on ne lit plus les rouges.
+
+`tests/e2e/archive.mjs` porte le **constat d'archivage**, partagé par toutes les pages portées.
+Sur la cible legacy, le test sonde d'abord l'URL ; 404 signifie archivée, et il bascule sur ce
+qui a du sens après le déplacement : la partie et ses fichiers ne répondent plus, et **le menu
+du legacy mène au portage**. Cette dernière vérification est celle qui compte : sans elle, on
+installerait soi-même un 404 dans un menu.
+
+### Deux sondes qui mesuraient autre chose que ce qu'elles croyaient
+
+- **Des attentes fixes de 1,5 s** dans le test du journal des commandes. Elles ont tenu tant que
+  la table était courte, puis ont produit deux faux échecs dès qu'elle a grossi : la passerelle
+  répondait après le réveil et la sonde lisait encore le filtre précédent. Le test annonçait
+  « le filtre ne filtre pas » ; le filtre allait bien. Remplacées par une attente du
+  **changement puis de la stabilité**. Même correction dans le script de captures, qui
+  photographiait « Chargement… ».
+- **Des sous-ressources qui n'ont jamais existé.** Le constat d'archivage sondait
+  `/approvals/approvals.js` : 404, assertion verte — mais le script s'appelle `js/main.js`. Une
+  assertion creuse est pire qu'une assertion absente, elle occupe la place. Les chemins réels
+  sont désormais sondés, et `/tasks/index.php` répond 302 : c'est ce qui prouve que le 404 des
+  autres vient de l'archivage et non d'un chemin mal écrit.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-05)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 
 ---

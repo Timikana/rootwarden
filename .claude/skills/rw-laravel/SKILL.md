@@ -248,7 +248,7 @@ noms de champ.
 |---|---|---|
 | Squelette et conteneur | fait | — |
 | Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
-| Gabarit et navigation (33 entrees, source unique) | fait | navigation 28 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 30 |
 | Interface (largeur, boutons, guidage) | fait | captures regardees |
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
@@ -260,9 +260,10 @@ explicite renvoyant vers l'ancien portail.
 
 ### Pages metier
 
-| Page | Route | Archivee |
-|---|---|---|
-| Journal des commandes | `journal-commandes` | oui, 2026-08-18 |
+| Page | Route | Garde | Archivee |
+|---|---|---|---|
+| Journal des commandes | `journal-commandes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
+| Approbations a quatre yeux | `approbations` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -289,11 +290,86 @@ manque.
 - Le defilement horizontal appartient au CADRE du tableau, jamais au corps de
   la page.
 
+### Aucune boite native — la decision se prend DANS la page
+
+`confirm()` et `prompt()` sont proscrits dans le portage. Une confirmation
+s'ouvre EN LIGNE, sous la ligne concernee, avec ses champs et ses deux boutons
+(`rw-panneau-decision`). Trois raisons :
+
+1. la boite native recouvre precisement la ligne sur laquelle on decide ;
+2. elle ne se style pas — action destructrice et annulation au meme poids ;
+3. elle **bloque Puppeteer**, donc le test ne peut pas mener l'action au bout.
+
+Le bouton de confirmation porte `rw-bouton--danger`, l'annulation reste
+`rw-bouton--discret`, et les deux portent un `data-rw`.
+
+### Une regle appliquee par le backend se REND VISIBLE
+
+Quand le backend refusera de toute facon (regle des quatre yeux : on n'approuve
+pas sa propre demande), le bouton est **desactive** avec l'explication en
+infobulle, plutot que cliquable pour rien. La regle n'est jamais deplacee cote
+navigateur — elle est seulement annoncee plus tot.
+
+Si aucun compte de test ne permet d'exercer la branche, **le dire** dans
+`PARITE.md` plutot que de modifier des droits pour se satisfaire : un test qui
+deplace les droits ne mesure plus l'application reelle.
+
+### Le tableau doit DIRE qu'il defile
+
+`.rw-tableau-cadre` porte des ombres de bord en CSS pur : deux voiles
+`background-attachment: local` qui glissent avec le contenu, deux ombres
+`scroll` collees au cadre. L'indice apparait seulement s'il reste des colonnes
+a atteindre. Le jeton `--rw-bord-defilement` est defini PAR THEME — une ombre
+noire est strictement invisible sur un fond sombre, ce qui etait le cas de la
+premiere version, la ou elle servait.
+
+Cause : une capture a 390 px montrait des lignes dont la colonne d'actions —
+la raison d'etre de la page — etait hors ecran, sans le moindre indice.
+
+### Constat d'archivage : `tests/e2e/archive.mjs`
+
+Une partie archivee ne doit pas laisser une suite ROUGE derriere elle. Deux
+parties archivees, deux suites rouges en permanence, et plus personne ne lit
+les rouges.
+
+Sur la cible legacy, le test commence par sonder l'URL. 404 = archivee, et il
+bascule sur trois verifications qui ont un sens apres le deplacement :
+
+| Verification | Ce qu'elle empeche |
+|---|---|
+| la partie rend 404 | un dossier vide mais toujours servi |
+| ses fichiers reels rendent 404 | un script encore joignable |
+| le menu du legacy mene au portage | installer soi-meme un 404 dans un menu |
+
+Deux details qui ont ete payes :
+
+- la sonde passe par `node:https` (certificat auto-signe), **pas** par
+  `fetch`, et surtout pas en posant `NODE_TLS_REJECT_UNAUTHORIZED` sur tout le
+  processus pour lire un code de statut ;
+- sonder un chemin qui **n'a jamais existe** rend 404 et fait passer
+  l'assertion pour rien. Verifier le nom reel dans `legacy/_deprecated/<partie>/`.
+  Une assertion creuse est pire qu'une assertion absente : elle occupe la place.
+
+### Jamais d'attente FIXE apres un geste qui declenche un appel
+
+Attendre `1500` ms apres un changement de filtre tient tant que la table est
+courte, puis produit de FAUX ECHECS des qu'elle grossit : la sonde lit encore
+le resultat precedent et le test accuse le filtre.
+
+Le motif correct, deux temps :
+
+1. attendre que l'empreinte du corps **change** (et ne soit plus « Chargement ») ;
+2. puis attendre qu'elle **cesse de bouger** — une reponse en retard peut encore
+   ecraser ce qu'on vient de lire.
+
+Vaut aussi pour le script de captures, qui photographiait « Chargement… ».
+
 ## Detail
 
-Rien n'est porte a ce jour. Le socle est en cours : squelette (fait),
-caracterisation de l'authentification (faite), puis portage de
-l'authentification, gabarit et navigation, passerelle, i18n.
+Socle complet. Deux pages metier portees et archivees ; le cycle est rode et se
+deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
+vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
+rejeu du LOT, commit.
 
 Reference consultable sur la branche abandonnee `laravel` (22 vagues, 2 825
 assertions vertes) : `git show laravel:docs/migration/{AUTH,GATEWAY,LAYOUT,DESIGN-SYSTEM,PORTAGE}.md`

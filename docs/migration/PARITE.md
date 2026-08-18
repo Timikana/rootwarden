@@ -155,6 +155,75 @@ pas su reproduire.
 
 ---
 
+## E-04 — Une décision d'approbation se prend **dans la page**, pas dans une boîte native
+
+**Écart voulu.** Sur la page des approbations, le legacy demande le motif de rejet par
+`prompt()` et confirme par `confirm()`. Le portage ouvre à la place une ligne de confirmation
+**sous la demande concernée**, avec un champ de motif, un bouton *Annuler* et un bouton
+*Confirmer*.
+
+### Ce qui a motivé la divergence
+
+Trois raisons, dans l'ordre où elles pèsent :
+
+1. **La boîte native masque ce sur quoi on décide.** `confirm()` s'affiche au centre de la
+   fenêtre, par-dessus le tableau, et recouvre précisément la ligne qu'on est en train de
+   juger. On confirme une suppression de compte distant en lisant « Confirmer ? » sans plus
+   voir sur quelle machine ni pour quel utilisateur.
+2. **Elle ne se style pas.** Aucune des règles d'interface du portage — largeur, contraste,
+   thème sombre, hiérarchie des boutons — ne s'applique à une boîte dessinée par le
+   navigateur. Sur la seule action irréversible de la page, l'action destructrice et l'action
+   d'annulation ont exactement le même poids visuel.
+3. **Elle bloque tout pilotage.** Un dialogue natif suspend l'exécution JavaScript ; un script
+   qui ne l'écoute pas reste bloqué jusqu'au délai d'expiration. Le test de cette page ne
+   pouvait pas rejeter réellement une demande — il ne pouvait que constater que le bouton
+   existe.
+
+Le panneau en ligne lève les trois : la demande reste lisible pendant qu'on décide, le bouton
+de confirmation porte la couleur de danger et le bouton d'annulation reste discret, et le test
+peut mener un rejet réel de bout en bout.
+
+### Ce que ça change pour qui utilise la page
+
+Un geste de plus dans le cas du rejet — ouvrir le panneau, saisir le motif, confirmer — là où
+le legacy enchaînait deux boîtes. L'approbation, elle, reste à un seul clic : elle n'est pas
+destructrice et le backend applique de toute façon la règle des quatre yeux.
+
+### Ce qui est mesuré
+
+`tests/e2e/go-page-approvals.mjs` conduit un rejet **réel** sur une demande **réelle**, produite
+par un `POST /reboot_server` du compte `rw-test-admin` (rôle 2) sur la machine `id=2`. Il vérifie
+que la demande quitte l'onglet « en attente » et se retrouve dans l'onglet « rejetées ».
+
+Le premier jet de ce test avait employé l'en-tête `X-User-Role: 3`. Le superadministrateur
+**contourne la garde par conception** : aucune demande n'était créée, et les deux redémarrages
+partaient directement vers la machine. Une sonde peut mesurer autre chose que ce qu'elle croit.
+
+---
+
+## E-05 — La règle des quatre yeux est **rendue visible**, pas seulement appliquée
+
+**Écart voulu.** Le backend refuse qu'une personne approuve sa propre demande. Le legacy laisse
+le bouton *Approuver* actif et affiche le refus après le clic. Le portage désactive le bouton et
+porte l'explication dans son infobulle.
+
+La règle ne change pas — elle reste appliquée côté backend, seul endroit où elle a une valeur.
+Ce qui change, c'est le moment où on l'apprend : avant le geste plutôt qu'après.
+
+### Ce qui n'est pas prouvé
+
+**Cette branche n'est pas exercée par le test.** Elle exige un compte qui soit à la fois
+demandeur d'une action soumise à approbation et porteur de `can_admin_portal`. Aucun des trois
+comptes de test ne réunit les deux : `rw-test-admin` produit les demandes mais n'a pas la
+permission d'ouvrir la page, `rw-test-super` a la page mais contourne la garde.
+
+Aucun droit n'a été modifié pour forcer le cas. Accorder `can_admin_portal` au compte demandeur
+changerait ce que mesurent toutes les autres attentes de la suite, et un test qui déplace les
+droits pour se satisfaire ne mesure plus l'application réelle. Le comportement est donc **lisible
+dans le code et non mesuré** — dit ici, plutôt que passé sous silence.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et
