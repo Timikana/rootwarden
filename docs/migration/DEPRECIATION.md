@@ -107,6 +107,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `drift/` | 2026-08-18 | `derive-config` | premiere garde par permission |
 | `backups/` | 2026-08-18 | `sauvegardes` | restauration jamais jouee par le test |
 | `tasks/` | 2026-08-18 | `taches` | menu plus strict que la page |
+| `tickets/` | 2026-08-18 | `tickets` | dedoublonnage par machine, formulaire qui s'epuise |
 
 ### commandlog — la preuve du cycle
 
@@ -307,3 +308,47 @@ autorisation.
 
 Le test de la vague 0 collecte **32 liens internes** au menu du legacy, contre 37 au départ :
 exactement les cinq entrées redirigées vers le portage.
+
+### tickets — un formulaire qui s'épuise
+
+`https://localhost:8443/tickets/` rendait **302** avant archivage ; après
+`git mv legacy/tickets legacy/_deprecated/tickets`, l'URL rend **404**, ainsi que `index.php` et
+`js/main.js`. L'entrée de menu du legacy mène désormais à `LARAVEL_URL` + `/tickets`.
+`git check-ignore` vérifié : l'archive reste suivie.
+
+Garde identique de bout en bout pour une fois : `role:2` + `can_admin_portal` sur la page **et**
+sur `/tickets` côté backend. Rien à arbitrer ici.
+
+#### Ce que la caractérisation a révélé
+
+Le dédoublonnage porte sur `(source, ref, machine_id)`. Un ticket manuel n'ayant ni référence ni
+source variable, **la clé se réduit à la machine** : le formulaire manuel ne peut créer qu'un
+ticket par machine, une fois pour toutes. Mesuré en direct — deux résumés entièrement différents
+sur la même machine sont fusionnés, et la page du legacy le signale dans une bulle qui s'efface.
+
+Voir `PARITE.md` E-11 pour ce que le portage en fait.
+
+#### Une leçon de test qui a coûté deux passages
+
+Le test créait toujours sur la machine 2. Il a réussi une fois, puis a rapporté deux échecs dès la
+cible suivante : il avait consommé le seul créneau disponible. « Un test ne doit pas consommer ce
+dont il dépend » se lisait jusqu'ici comme « qu'il produise ses données » ; il faut y ajouter
+**« et qu'il ne sature pas un espace de clés borné »**. Le test choisit désormais un créneau libre,
+exclut la machine de production, et dit laquelle des deux branches il a jouée.
+
+Et une seconde fois le même piège d'attente : après l'envoi, il dormait 1 000 ms puis lisait le
+tableau — donc celui d'avant. Il attend maintenant la **relecture de la liste**, signal qui vaut
+aussi bien pour une création que pour une fusion, là où attendre un changement de nombre de lignes
+ne finirait jamais dans le second cas.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 4 PASS / 0 FAIL — partie archivée |
+| `drift/` | 4 PASS / 0 FAIL — partie archivée |
+| `backups/` | 4 PASS / 0 FAIL — partie archivée |
+| `tasks/` | 4 PASS / 0 FAIL — partie archivée |
+| `tickets/` | 4 PASS / 0 FAIL — partie archivée |
+
+Le test de la vague 0 collecte **31 liens internes** au menu du legacy, contre 37 au départ :
+exactement les six entrées redirigées vers le portage.

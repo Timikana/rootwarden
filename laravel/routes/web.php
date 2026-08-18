@@ -6,6 +6,7 @@ use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
+use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
@@ -81,6 +82,11 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/taches', TachesController::class)
         ->middleware(['role:2'])
         ->name('taches');
+
+    // Ticketing ITSM : liste et creation manuelle.
+    Route::get('/tickets', TicketsController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('tickets');
 
     // Journal des commandes — tracabilite de type bastion, lecture seule.
     Route::get('/journal-commandes', JournalCommandesController::class)

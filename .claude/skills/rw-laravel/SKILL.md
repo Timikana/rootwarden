@@ -248,7 +248,7 @@ noms de champ.
 |---|---|---|
 | Squelette et conteneur | fait | — |
 | Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
-| Gabarit et navigation (33 entrees, source unique) | fait | navigation 34 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 35 |
 | Interface (largeur, boutons, guidage) | fait | captures regardees |
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
@@ -267,6 +267,7 @@ explicite renvoyant vers l'ancien portail.
 | Derive de configuration | `derive-config` | `role:2` + `perm:can_view_compliance` | oui, 2026-08-18 |
 | Sauvegardes de la base | `sauvegardes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Centre de taches | `taches` | `role:2` SEUL (comme le legacy) | oui, 2026-08-18 |
+| Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -574,9 +575,74 @@ sort du champ et son texte est coupe net, meme avec `flex-wrap` sur le parent.
 Retirer `flex-shrink`, poser `min-width: 0` et `flex-wrap: wrap`, et ne pas
 mettre `white-space: nowrap` sur un libelle long.
 
+### Ne JAMAIS definir deux fois la meme classe CSS
+
+`.rw-etiquette` a designe le LIBELLE d'un champ, puis la PASTILLE d'une
+categorie. La seconde regle l'emportant, tous les libelles de formulaire du
+portail — « Identifiant » et « Mot de passe » compris — etaient rendus en
+pastille bleue pendant plusieurs vagues.
+
+Aucune assertion ne pouvait le voir : les libelles etaient presents, corrects,
+traduits, associes a leur champ. SEULE LA CAPTURE le montrait. C'est le defaut
+`escHtml()` defini deux fois du legacy, reproduit dans notre propre feuille.
+
+Avant d'ajouter une regle : `grep -n "^\.rw-<nom> {" rw.css`. Un nom deja pris
+se renomme (`.rw-badge`), il ne se surcharge pas.
+
+### Un test ne doit pas SATURER un espace de cles borne
+
+« Produire ce qu'il consomme » ne suffit pas. Le dedoublonnage des tickets
+porte sur `(source, ref, machine)` : le formulaire manuel ne peut creer qu'UN
+ticket par machine, pour toujours. Un test qui vise toujours la machine 2
+reussit une fois, puis echoue a chaque execution suivante.
+
+Chercher un creneau LIBRE, exclure la machine de production, et si aucun n'est
+disponible, le DIRE et jouer l'autre branche. Les deux branches doivent mesurer
+quelque chose.
+
+### Attendre la RELECTURE, pas un changement d'etat
+
+Apres un envoi, attendre « le nombre de lignes a change » ne finit jamais quand
+l'action a ete DEDOUBLONNEE — rien ne change, et c'est le comportement correct.
+Le signal juste est la requete de relecture que la page declenche apres l'envoi,
+identique dans les deux cas :
+
+    let statut = 0, relectures = 0;
+    page.on('response', r => {
+        if (!/\/tickets(\?|$)/.test(r.url())) return;
+        if (r.request().method() === 'POST') statut = r.status();
+        else if (statut !== 0) relectures++;
+    });
+
+### Extraire AVANT de recopier
+
+Le controleur des tickets allait recopier la liste des machines du controleur du
+journal. `App\Services\Machines` la porte desormais pour les deux. Le service
+documente pourquoi il ne filtre pas par acces (pages d'administration) ET
+avertit de ne pas le reprendre ailleurs — c'est precisement le defaut du tableau
+de bord du legacy.
+
+### `.rw-carte` est plafonnee a 420 px
+
+Elle est faite pour l'ecran de connexion. Un formulaire POSE DANS UNE PAGE prend
+`.rw-carte--pleine`, sans quoi ses colonnes sont a l'etroit avec 1 200 px de
+vide a cote.
+
+### Cacher un formulaire par `hidden`, pas par une classe
+
+L'attribut `hidden` rend l'etat lisible sur la GEOMETRIE
+(`getClientRects().length`), qu'un test mesure sans connaitre nos conventions de
+nommage — et qui vaut pour le legacy comme pour le portage.
+
+### Une URL EXTERNE se pose par `setAttribute`, jamais par interpolation
+
+`external_url` vient de l'ITSM. Filtrer sur `^https?://` puis
+`a.setAttribute('href', url)` : il n'y a alors aucun guillemet a echapper a la
+main, contrairement au `escAttr` que le legacy a du s'inventer.
+
 ## Detail
 
-Socle complet. Cinq pages metier portees et archivees ; le cycle est rode et se
+Socle complet. Six pages metier portees et archivees ; le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
 rejeu du LOT, commit.

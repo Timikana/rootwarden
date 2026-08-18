@@ -91,7 +91,7 @@
 
             const tdContexte = document.createElement('td');
             const badge = document.createElement('span');
-            badge.className = 'rw-etiquette';
+            badge.className = 'rw-badge';
             badge.textContent = c.context || '—';
             tdContexte.appendChild(badge);
             tr.appendChild(tdContexte);

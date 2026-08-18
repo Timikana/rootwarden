@@ -400,6 +400,68 @@ le libellé existe dans les deux langues.
 
 ---
 
+## E-11 — La déduplication est annoncée **avant** le clic, et sur sa vraie clé
+
+**Écart voulu.** Le legacy laisse créer un ticket, puis annonce « Ticket déjà existant
+(dédoublonné) » dans une bulle. Le portage détecte la collision au moment où l'on choisit la
+machine et l'affiche dans le formulaire, en citant le ticket concerné.
+
+### Ce que le legacy annonce, et ce que le code fait
+
+L'encart d'aide de la page dit :
+
+> Les doublons sont **dédoublonnés** automatiquement pour ne pas créer plusieurs tickets pour la
+> même alerte.
+
+`create_or_get_ticket()` dédoublonne sur le triplet `(source, ref, machine_id)`. Pour un ticket
+créé depuis le formulaire manuel, `source` vaut toujours `manual` et `ref` toujours `NULL` : **la
+clé se réduit à la machine**. Deux tickets de sujets entièrement différents sur la même machine
+sont donc fusionnés — ce qui n'a rien à voir avec « la même alerte ».
+
+Conséquence, mesurée en direct : **le formulaire manuel ne peut créer qu'un ticket par machine,
+une fois pour toutes.** Sur un parc de trois machines, il existe quatre créations possibles
+(les trois machines, plus « aucune ») et ensuite plus aucune. Toute soumission ultérieure renvoie
+`deduped: true`, et le legacy l'annonce dans une bulle qui s'efface.
+
+Les tickets nés d'une CVE, eux, portent la référence du CVE : leur dédoublonnage se fait bien par
+alerte, comme l'aide le laisse entendre. Le défaut ne concerne que le chemin manuel.
+
+### Ce que fait le portage
+
+- l'encart d'aide énonce la **vraie** clé, et la conséquence ;
+- choisir une machine déjà pourvue affiche un avertissement **avant** le clic, avec le résumé du
+  ticket existant ;
+- le message de retour dit « aucun ticket créé » — pas « dédoublonné » — et rappelle la clé.
+
+La règle reste appliquée par le backend. Le portage ne fait que la rendre lisible au moment où
+elle compte.
+
+### Ce que le test a dû apprendre
+
+La première version du test créait toujours sur la machine 2. Elle a réussi une fois, puis a
+rapporté deux échecs dès la cible suivante : la clé étant la machine, le premier passage avait
+consommé le seul créneau. Le test choisit désormais une machine **sans** ticket manuel, exclut la
+machine de production, et si aucun créneau n'est libre il le dit et joue la branche de fusion.
+Les deux branches mesurent quelque chose.
+
+---
+
+## E-12 — Un libellé de champ n'est pas une pastille
+
+**Défaut du portage lui-même, trouvé à l'image.** `.rw-etiquette` était défini **deux fois** dans
+la feuille de style : d'abord comme libellé de champ, ensuite comme pastille de catégorie. La
+seconde règle l'emportant, **tous les libellés de formulaire du portail étaient rendus en pastille
+bleue** — y compris « Identifiant » et « Mot de passe » sur l'écran de connexion, le tout premier
+écran du produit.
+
+Aucune assertion ne l'a vu : les libellés étaient présents, corrects, traduits, et associés à leur
+champ. Seule la capture le montrait. C'est exactement le défaut `escHtml()` défini deux fois
+relevé dans le legacy, reproduit ici — et il aura vécu plusieurs vagues.
+
+La pastille s'appelle désormais `.rw-badge`. Le libellé garde `.rw-etiquette`.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

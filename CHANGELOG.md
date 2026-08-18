@@ -655,6 +655,73 @@ pas de savoir si ce qu'on lit date de cinq secondes ou de cinq minutes.
 champ, coupé net. Le bloc peut retrécir et passer à la ligne. Trouvé en regardant la capture, pas
 en assertant.
 
+### Sixième page métier portée — ticketing ITSM
+
+`tickets` est porté sur `/tickets`, puis **archivé** : `legacy/tickets/` a rejoint
+`legacy/_deprecated/`. L'URL legacy répond **404**, `index.php` et `js/main.js` aussi, et l'entrée
+de menu du legacy mène au portage. Le menu du legacy compte **31 liens internes** contre 37 au
+départ — exactement les six pages portées.
+
+Garde identique de bout en bout, pour une fois : `role:2` + `can_admin_portal` sur la page **et**
+sur `/tickets` côté backend.
+
+**Création réelle, sans appel externe.** `TICKETING_ENABLED=false` : le backend ne joint aucun
+ITSM et enregistre un ticket `local`. Lu dans `backend/ticketing.py` avant d'écrire le test —
+cliquer « Créer » sans savoir où part la requête n'aurait pas été raisonnable.
+
+### Le formulaire manuel ne peut créer qu'un ticket par machine
+
+`create_or_get_ticket()` dédoublonne sur `(source, ref, machine_id)`. Un ticket manuel n'ayant ni
+référence ni source variable, **la clé se réduit à la machine**. Deux résumés entièrement
+différents sur la même machine sont fusionnés — mesuré en direct. Sur un parc de trois machines,
+il existe quatre créations manuelles possibles, et ensuite plus aucune.
+
+L'encart d'aide du legacy annonce pourtant « ne pas créer plusieurs tickets pour la même alerte ».
+Les tickets nés d'une CVE portent bien la référence du CVE et se dédoublonnent par alerte ; seul
+le chemin manuel est concerné.
+
+**E-11** — le portage énonce la vraie clé dans son aide, avertit **avant le clic** quand la
+machine choisie est déjà pourvue (en citant le ticket existant), et dit « aucun ticket créé »
+plutôt que « dédoublonné ». La règle reste appliquée par le backend ; elle est seulement rendue
+lisible au moment où elle compte.
+
+### Un libellé de champ n'est pas une pastille — défaut du portage, vu à l'image
+
+**E-12** — `.rw-etiquette` était défini **deux fois** dans la feuille de style : d'abord comme
+libellé de champ, ensuite comme pastille de catégorie. La seconde l'emportant, **tous les libellés
+de formulaire du portail étaient rendus en pastille bleue**, y compris « Identifiant » et « Mot de
+passe » sur l'écran de connexion — le tout premier écran du produit.
+
+Aucune assertion ne pouvait le voir : les libellés étaient présents, corrects, traduits et
+associés à leur champ. Seule la capture le montrait. C'est le défaut `escHtml()` défini deux fois
+relevé dans le legacy, reproduit ici, et il aura vécu plusieurs vagues. La pastille s'appelle
+désormais `.rw-badge`.
+
+### Deux corrections de sonde, dont une déjà connue
+
+- **Un test ne doit pas saturer un espace de clés borné.** Le test créait toujours sur la
+  machine 2 : il a réussi une fois, puis a rapporté deux échecs dès la cible suivante, ayant
+  consommé le seul créneau. Il choisit désormais une machine sans ticket manuel, exclut la machine
+  de production, et dit laquelle des deux branches — création ou fusion — il a jouée.
+- **Encore une attente fixe.** Après l'envoi, le test dormait 1 000 ms puis lisait le tableau
+  d'avant, et rapportait « la création n'ajoute rien » alors que le ticket était bien créé. Il
+  attend maintenant la **relecture de la liste** — signal qui vaut pour une création comme pour une
+  fusion, là où attendre un changement de nombre de lignes ne finirait jamais dans le second cas.
+
+### Une décision recopiée qui ne l'a pas été
+
+Le contrôleur des tickets avait besoin de la liste des machines, déjà écrite dans celui du journal
+des commandes. Plutôt que de la recopier — « une décision recopiée finit par diverger » —, elle
+vit dans `App\Services\Machines`, et le journal y est rebranché. Le service porte en commentaire
+la raison de son absence de filtre d'accès, et l'avertissement de ne pas la reprendre pour une page
+ouverte à des comptes sans permission.
+
+### Interface
+
+Le formulaire de création utilise `rw-carte--pleine` : `.rw-carte` est plafonnée à 420 px, ce qui
+convient à l'écran de connexion mais laissait ici deux colonnes à l'étroit et 1 200 px de vide à
+côté.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
