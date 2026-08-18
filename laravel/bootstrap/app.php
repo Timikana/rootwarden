@@ -27,6 +27,15 @@ return Application::configure(basePath: dirname(__DIR__))
          * CROSS-SITE sans jeton soit refusee, ce que fait
          * tests/e2e/go-socle-passerelle.mjs.
          */
+        /*
+         * La langue se resout sur TOUTE requete web, y compris les ecrans
+         * publics : la page de connexion doit pouvoir basculer avant qu'aucune
+         * session applicative n'existe.
+         */
+        $middleware->web(append: [
+            \App\Http\Middleware\Langue::class,
+        ]);
+
         $middleware->alias([
             // Session COMPLETEMENT authentifiee : mot de passe ET second
             // facteur. Entre les deux, la session ne porte qu'un compte

@@ -59,6 +59,10 @@ return [
     // Etat du portage
     'non_porte'              => 'previous portal',
     'non_porte_titre'        => 'this page has not been ported yet, it opens in the previous portal',
+    'langue'                 => 'Language',
+    'langue_fr'              => 'French',
+    'langue_en'              => 'English',
+    'langue_basculer'        => 'Show the portal in :langue',
     'legende_ancien_portail' => 'Entries marked with an arrow open the previous portal in a new tab.',
     'ouvrir_menu'     => 'Open menu',
     'fermer_menu'     => 'Close menu',
