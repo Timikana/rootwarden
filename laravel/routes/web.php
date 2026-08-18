@@ -6,6 +6,7 @@ use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
+use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
@@ -93,6 +94,15 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/recherche', RechercheController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('recherche');
+
+    /*
+     * Mises a jour Linux — sous-lot U1 du module `update/`, lecture seule.
+     * Garde reprise du legacy : role 1 ADMIS s'il porte can_update_linux, et
+     * cloisonne alors par `user_machine_access`.
+     */
+    Route::get('/mises-a-jour', MisesAJourController::class)
+        ->middleware(['role:1', 'perm:can_update_linux'])
+        ->name('mises-a-jour');
 
     // Journal des commandes — tracabilite de type bastion, lecture seule.
     Route::get('/journal-commandes', JournalCommandesController::class)

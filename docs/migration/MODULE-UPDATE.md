@@ -137,12 +137,19 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 
 | Sous-lot | Contenu | Routes | Risque |
 |---|---|---|---|
-| **U1 — parc et filtres** | tableau, filtres environnement / criticité / réseau / étiquette, rafraîchissement | `list_machines`, `filter_servers`, `linux_version`, `server_status`, `last_reboot` | lecture seule |
+| **U1 — parc et filtres** — PORTÉ | tableau, filtres environnement / criticité / réseau, rafraîchissement, relevés par machine | `filter_servers`, `linux_version`, `server_status`, `last_reboot` | lecture seule |
 | **U2 — journal d'exécution** | zone de journal, fenêtres par serveur | aucune | présentation |
 | **U3 — constats sans effet** | paquets en attente, simulation | `pending_packages`, `dry_run_update` | lecture sur le serveur |
 | **U4 — planification** | les deux fenêtres de planification | `schedule_update`, `schedule_advanced_security_update` | écrit un cron distant |
 | **U5 — redémarrage** | redémarrage sélectionné | `reboot_server` | destructif, déjà soumis à approbation |
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
+
+État au 2026-08-18 : **U1 porté** sur `/mises-a-jour` (voir `PARITE.md` E-14).
+
+**Reste à faire dans U1** : le filtre par **étiquette**. Le legacy le rend bien — un `<select>`
+`tag-filter` alimenté par `SELECT DISTINCT tag FROM machine_tags` — et `/filter_servers` accepte le
+paramètre `tag`. Il n'a pas été porté faute d'avoir été vu à temps ; le noter ici plutôt que de
+déclarer U1 clos.
 
 **Ordre retenu** : U1, U2, U3, U4, U5, puis U6 en dernier.
 

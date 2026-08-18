@@ -1010,3 +1010,20 @@ body {
 }
 
 .rw-vide__texte { margin-top: 6px; font-size: 13px; }
+
+/*
+ * Bouton de relevé, pose dans une cellule : trois par ligne sur un tableau de
+ * treize colonnes. Il reste lisible sans elargir la colonne.
+ */
+.rw-bouton--minuscule { padding: 3px 8px; font-size: 12px; }
+
+/*
+ * Les trois relevés restent sur UNE ligne. Les faire se replier — essaye
+ * d'abord — empile trois boutons par ligne et rend chaque ligne trois fois plus
+ * haute, sur un tableau qui en compte deja treize colonnes. Le debordement
+ * appartient au cadre du tableau, qui defile et le dit.
+ *
+ * `flex-wrap` n'est PAS pose sur `.rw-tableau__actions` : cette classe sert
+ * aussi aux pages d'approbation et de sauvegarde, ou le repli n'a rien a faire.
+ */
+.rw-tableau__actions--releves { flex-wrap: nowrap; }
