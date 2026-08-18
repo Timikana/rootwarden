@@ -1,27 +1,13 @@
-@extends('layouts.socle', ['titre' => __('auth.accueil_titre')])
+@extends('layouts.portail', ['titre' => __('nav.dashboard')])
 
 @section('corps')
-<header class="rw-barre">
-    <span class="rw-barre__marque">{{ config('app.name') }}</span>
-    <span class="rw-barre__droite">
-        {{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong>
-        <form class="rw-inline" method="POST" action="{{ route('deconnexion') }}">
-            @csrf
-            <button class="rw-bouton rw-bouton--discret" type="submit">{{ __('auth.deconnexion') }}</button>
-        </form>
-    </span>
-</header>
+    <h1 class="rw-titre">{{ __('nav.dashboard') }}</h1>
+    <p class="rw-sous-titre">{{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong></p>
 
-<main class="rw-contenu">
-    <h1 class="rw-titre">{{ __('auth.accueil_titre') }}</h1>
-    <p class="rw-sous-titre">{{ __('auth.socle_avertissement') }}</p>
+    <p class="rw-encart">{{ __('auth.socle_avertissement') }}</p>
 
-    {{-- Aucune donnee de parc n'est affichee ici. Le tableau de bord du legacy
-         sert des agregats du parc entier a des comptes sans permission : il
-         sera porte avec son cloisonnement, pas avant. --}}
-    <p class="rw-note">
-        <a class="rw-lien" href="{{ config('app.url_legacy', 'https://localhost:8443') }}/index.php"
-           target="_blank" rel="noopener">{{ __('auth.ouvrir_ancien_portail') }} ↗</a>
-    </p>
-</main>
+    {{-- Aucun agregat de parc n'est affiche ici. Le tableau de bord du legacy
+         sert la taille du parc, les CVE critiques, la note d'audit SSH et les
+         noms de cinq comptes a des roles sans aucune permission. Il sera porte
+         AVEC son cloisonnement, pas avant. --}}
 @endsection

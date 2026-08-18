@@ -122,6 +122,33 @@ Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
 - Step-up : `stepUpVerify($action, 900)`, cle `_step_up_<action>` par ACTION,
   limitation a 5 tentatives, anti-rejeu `_step_up_last_totp`.
 
+## Navigation
+
+- **`App\Support\Navigation` est la SOURCE UNIQUE du menu.** Le legacy decrit
+  le sien DEUX FOIS (barre laterale + tiroir mobile) avec la logique de droits
+  recopiee. Ici, les deux rendus incluent le meme partiel
+  `composants/entrees-menu.blade.php`, et un test verifie qu'ils rendent les
+  memes entrees.
+- Chaque entree porte `route` (page PORTEE, lien interne) **ou** `legacy`
+  (non portee, lien externe), jamais les deux : l'etat du portage se lit d'un
+  coup d'oeil et se verifie par un test.
+- Une entree non portee s'affiche avec un marqueur visible et
+  `target="_blank"`. Un lien qui change de portail sans le dire trahit
+  l'utilisateur. Le test mesure la LARGEUR RENDUE du marqueur : un marqueur
+  present dans le HTML mais large de zero ne previent personne.
+- Gardes reprises telles quelles du legacy : une permission vaut
+  « cette permission OU superadmin (role 3) ». `docker` est garde par le ROLE
+  et non par une permission — releve tel quel, signale dans INVENTAIRE.md, pas
+  corrige en silence pendant un portage de navigation.
+- Les droits sont lus **en base** par `App\Services\Droits` (memorise pour la
+  duree de la requete), jamais depuis la session. Le legacy porte lui-meme
+  l'avertissement « ne jamais utiliser $_SESSION['permissions'] pour une
+  decision de securite ».
+- Une section vide n'est pas rendue : un intitule sans rien dessous laisse
+  croire qu'un contenu a disparu.
+- Menu attendu au 2026-08-18 : **33 entrees** au total ; role 1 → 3, role 2
+  (8 permissions, sans can_admin_portal) → 13, role 3 → 33.
+
 ## Etat du portage
 
 Rien n'est porte a ce jour. Le socle est en cours : squelette (fait),

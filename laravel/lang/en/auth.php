@@ -42,6 +42,7 @@ return [
     'erreur_code_deja_utilise'  => 'This code has already been used. Wait for the next one.',
     'erreur_trop_de_tentatives' => 'Too many attempts. Wait one minute.',
     'erreur_sans_secret'        => 'No second factor is configured on this account.',
+    'changement_requis'         => 'Your password must be changed. This page is not ported yet: change it from the previous portal.',
 
     // Migration
     'socle_avertissement'   => 'Only the authentication foundation has been ported. Portal pages remain on the previous interface.',

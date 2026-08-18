@@ -157,6 +157,47 @@ impasse explicite qui renvoie vers l'ancien portail — jamais sur un accès acc
 `legacy/auth/` **n'est pas archivé** : l'ancien portail sert encore toutes les pages métier et
 a besoin de sa propre authentification.
 
+### Socle — gabarit et navigation
+
+Gabarit du portail porté : barre latérale, en-tête, tiroir mobile, et le menu complet des
+**33 entrées** relevées sur le legacy avec leurs gardes à l'identique.
+
+**Le menu a une source unique.** Le legacy décrit le sien deux fois — barre latérale et tiroir
+mobile — avec la logique de droits recopiée dans les deux. `App\Support\Navigation` le décrit
+une fois ; les deux rendus incluent le même partiel, et un test vérifie qu'ils rendent les mêmes
+entrées.
+
+Chaque entrée porte `route` (page portée, lien interne) **ou** `legacy` (non portée, lien
+externe), jamais les deux : l'état du portage se lit d'un coup d'œil. Les 31 entrées non portées
+s'affichent avec un marqueur visible et s'ouvrent dans un nouvel onglet — un lien qui change de
+portail sans le dire trahit l'utilisateur.
+
+Les droits sont lus **en base** (`App\Services\Droits`, mémorisé pour la durée de la requête),
+jamais depuis la session : le legacy porte lui-même l'avertissement « ne jamais utiliser
+`$_SESSION['permissions']` pour une décision de sécurité », puis s'en sert quand même pour son
+menu.
+
+Le tiroir mobile est piloté par une case à cocher masquée : **aucune ligne de JavaScript**.
+
+**Vérifié** (`tests/e2e/go-socle-navigation.mjs`, **28 PASS / 0 FAIL**), avec les trois comptes
+dédiés et non en superadmin :
+- le menu croît strictement avec les droits — **3 < 13 < 33** ;
+- le superadmin voit les 33 entrées déclarées ; un rôle sans permission ne voit pas la section
+  administration, et ce qu'il voit est un sous-ensemble de ce que voit le superadmin ;
+- barre latérale et tiroir rendent les mêmes entrées ;
+- chaque lien porté **résout en 200** — le test suit les liens, parce que sept entrées de menu
+  ont rendu 404 pendant des semaines sur la tentative précédente sans qu'aucune suite ne clique
+  dessus ;
+- aucune clé de traduction morte à l'écran ;
+- le marqueur « ancien portail » est mesuré **en largeur rendue** : présent dans le HTML mais
+  large de zéro, il ne préviendrait personne.
+
+Libellés du menu **générés** depuis le legacy, non recopiés : 74 libellés accentués transcrits à
+la main sont 74 occasions de faute. `lang/{fr,en}/nav.php`, **42 clés = 42 clés**.
+
+Lot antérieur rejoué après modification du gabarit : authentification **14 PASS** sur Laravel,
+**13 PASS / 1 écart connu** sur le legacy, vague 0 inchangée.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
