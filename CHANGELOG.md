@@ -781,12 +781,63 @@ chaque cible charge. Il reste à re-mesurer sur un hôte Linux avant d'être tra
 `display: block` sur le libellé du champ de recherche : un `<label>` est en ligne par défaut, et
 `max-width` ne s'applique pas à un élément en ligne. Sans lui, le champ s'étendait sur 1 375 px.
 
+### Inventaire du module `update/` — le premier qui ne se porte pas d'une pièce
+
+Les sept pages précédentes tenaient en ~150 lignes chacune. `update/` en pèse **2 094** : 712 de
+PHP et 1 382 de JavaScript, 27 fonctions, 13 routes backend. Le porter d'un bloc produirait un
+commit qu'on ne peut ni relire ni tester. `docs/migration/MODULE-UPDATE.md` le mesure et le
+découpe en six sous-lots — U1 parc et filtres, U2 journal, U3 constats sans effet, U4
+planification, U5 redémarrage, U6 mises à jour — dans cet ordre, U6 en dernier.
+
+Aucun code n'est modifié par cette vague : c'est un relevé, fait avant d'y toucher.
+
+### Ce que la lecture du code a établi
+
+**La permission garde la page, pas la capacité — et ici sur des commandes root.** Dix des douze
+routes du module n'ont ni `require_role` ni `require_permission`, seulement
+`require_machine_access` — lequel accorde tout le parc dès le rôle 2. Un compte rôle 2 sans
+`can_update_linux` est refusé sur la page et peut néanmoins lancer `apt_update`, `custom_update`
+ou `dpkg_repair`. C'est le même écart que sur les sauvegardes, mais il porte sur des actions
+destructrices. **Non mesuré** : aucun compte de test n'a cette forme, et en fabriquer un
+reviendrait à changer des droits.
+
+**La fuite du mot de passe root est plus étroite que ce qui avait été annoncé.**
+`execute_as_root_stream()` a trois branches ; seules celles qui envoient le mot de passe ouvrent
+un PTY, et un PTY fait écho. La branche « compte de service » n'envoie aucun mot de passe.
+`srv-zabbix` (production) a `service_account_deployed = 1` : elle prend cette branche. Les deux
+machines de test ne l'ont pas.
+
+Ce qui avait été signalé — « actif sur les serveurs réels » — était donc trop large : la fuite
+concerne les machines **dont le compte de service n'est pas déployé**. La correction est portée
+au document. Ce qui reste inexpliqué y est écrit comme tel : la défense « Patch A09 » devrait
+couvrir la première ligne, et la mesure place pourtant le mot de passe en ligne 2 ; le mécanisme
+n'est pas établi, il n'est donc pas décrit.
+
+### Une hypothèse vérifiée, et fausse
+
+`/list_machines` ne porte aucun décorateur de rôle. Lu ainsi, il paraissait exposer tout le parc
+— IP et compte SSH compris — à n'importe quel compte authentifié. **Mesuré depuis une session
+rôle 1 sans permission : 200 avec une liste vide.** La route ne délègue pas son cloisonnement à
+un décorateur, elle le fait elle-même en joignant `user_machine_access`.
+
+Consigné parce que la lecture seule menait à une accusation infondée : l'absence de décorateur
+n'est pas l'absence de garde.
+
+### Un doublon qui compte pour le portage
+
+`list_machines` et `filter_servers` existent deux fois — points d'entrée PHP dans
+`legacy/update/functions/`, et routes du backend Python. Le JavaScript du legacy appelle les PHP,
+que le portage ne peut pas atteindre. Il passera par les routes backend, qui rendent **moins de
+colonnes** : U1 devra combler l'écart sous peine de perdre la version Linux et l'horodatage du
+dernier contrôle.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-05)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-13)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
+- `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
 
 ---
 
