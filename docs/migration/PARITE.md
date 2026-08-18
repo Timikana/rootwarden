@@ -462,6 +462,56 @@ La pastille s'appelle désormais `.rw-badge`. Le libellé garde `.rw-etiquette`.
 
 ---
 
+## E-13 — Les liens des résultats de recherche sont **traduits**, pas recopiés
+
+**Écart voulu.** Le backend Python ne connaît qu'un frontend : l'ancien. `GET /search` renvoie,
+pour chaque résultat, un lien de navigation écrit en dur — `/tickets/index.php`,
+`/adm/audit_log.php`, `/update/index.php`. Le legacy les affiche tels quels. Le portage les fait
+passer par `App\Support\LiensLegacy`.
+
+### Le défaut que la migration fabrique elle-même
+
+Chaque partie archivée transforme un de ces liens en **404**. Mesuré sur le legacy pendant cette
+vague : une recherche sur « Ticket » rend trois résultats dont le lien `/tickets/index.php`
+répond **404** — la page ayant été archivée à la vague précédente. La recherche est devenue un
+menu qui mène à une page disparue, ce qui est exactement le défaut relevé dans le legacy — sept
+404 ont vécu dans un menu que personne ne suivait — sauf qu'ici c'est le portage qui le crée.
+
+Ce n'est pas un défaut du backend : il fait ce pour quoi il a été écrit. C'est au frontend de
+décider où envoyer la personne, et c'est ce que fait le portage.
+
+### Comment
+
+`LiensLegacy::REMPLACEMENTS` associe chaque partie archivée à sa route Laravel. Un chemin est
+normalisé (`/tickets/index.php` et `/tickets/` désignent la même partie), cherché dans la table,
+puis :
+
+- **trouvé** → lien interne vers la route portée, sans marqueur ;
+- **absent** → lien vers l'ancien portail, avec la **même flèche que le menu**, `target="_blank"`
+  et un `title` qui l'explique. Changer de portail sans le dire trahit la personne qui clique.
+
+La table est la même en PHP et dans le navigateur : `pourLeNavigateur()` la construit à partir de
+la constante, de sorte qu'il n'en existe jamais deux versions.
+
+**Tenir cette table à jour est désormais une étape du cycle d'archivage**, et le test la garde :
+il suit chaque lien rendu et vérifie qu'aucun ne répond 404.
+
+### Ce que le test mesure exactement
+
+Il ne se contente pas de compter des liens marqués — première version de l'attente, et elle était
+fausse : une recherche dont tous les résultats sont portés n'en produit aucun, et l'attente
+échouait alors que le comportement était juste. Ce qui est exigé est une **implication** : tout
+lien sortant porte le marqueur, aucun lien interne ne le porte.
+
+### Ce qui n'est pas mesuré
+
+**La latence.** Le montage de fichiers de ce poste est ~258× plus lent que le système du
+conteneur ; tout chiffre relevé ici dirait surtout combien de fichiers chaque cible charge. L'écart
+relevé précédemment (2,2 s contre 24 ms) reste donc à re-mesurer sur un hôte Linux avant d'être
+traité comme un défaut.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

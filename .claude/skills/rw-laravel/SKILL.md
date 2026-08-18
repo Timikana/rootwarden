@@ -248,7 +248,7 @@ noms de champ.
 |---|---|---|
 | Squelette et conteneur | fait | — |
 | Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
-| Gabarit et navigation (33 entrees, source unique) | fait | navigation 35 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 36 |
 | Interface (largeur, boutons, guidage) | fait | captures regardees |
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
@@ -268,6 +268,7 @@ explicite renvoyant vers l'ancien portail.
 | Sauvegardes de la base | `sauvegardes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Centre de taches | `taches` | `role:2` SEUL (comme le legacy) | oui, 2026-08-18 |
 | Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
+| Recherche globale | `recherche` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -640,9 +641,65 @@ nommage — et qui vaut pour le legacy comme pour le portage.
 `a.setAttribute('href', url)` : il n'y a alors aucun guillemet a echapper a la
 main, contrairement au `escAttr` que le legacy a du s'inventer.
 
+### Le backend ecrit ses liens pour l'ANCIEN portail
+
+`GET /search` rend, par resultat, un lien en dur : `/tickets/index.php`,
+`/adm/audit_log.php`. CHAQUE PARTIE ARCHIVEE EN TRANSFORME UN EN 404 — mesure :
+une recherche sur « Ticket » menait deja a une page disparue.
+
+`App\Support\LiensLegacy` les traduit. Sa constante `REMPLACEMENTS` associe
+chaque partie archivee a sa route. **La mettre a jour est une ETAPE DU CYCLE
+D'ARCHIVAGE** :
+
+    git mv legacy/<partie> legacy/_deprecated/<partie>
+    -> l'URL rend 404
+    -> rediriger l'entree de menu DU LEGACY
+    -> AJOUTER '/<partie>/' => '<route>' dans LiensLegacy::REMPLACEMENTS
+    -> git check-ignore -v legacy/_deprecated/<partie>/
+    -> consigner dans DEPRECIATION.md
+
+Un lien qui reste sur l'ancien portail garde la MEME FLECHE que le menu,
+`target="_blank"` et un `title`. Changer de portail sans le dire trahit la
+personne qui clique.
+
+`pourLeNavigateur()` sert la table au JS : elle est construite a partir de la
+constante, il n'en existe donc jamais deux versions.
+
+### Attendre une condition DEJA SATISFAITE ne fait pas attendre
+
+« La ligne d'etat est non vide » l'etait avant toute frappe : la consigne
+« tapez au moins deux caracteres » s'affiche au chargement. La sonde rendait la
+main aussitot et lisait l'ecran d'avant.
+
+### Attendre un CHANGEMENT que l'etat transitoire satisfait ne suffit pas non plus
+
+« La ligne d'etat a change » est vrai des l'affichage de « Recherche… ». Le test
+lisait alors les resultats de la recherche PRECEDENTE.
+
+Le signal juste vise le CONTENU attendu, pas son mouvement : les deux cibles
+annoncent « N resultat(s) pour "terme" », donc attendre que la ligne CITE LE
+TERME. Independant de tout libelle qu'on pourrait reformuler.
+
+### Une attente d'EXISTENCE la ou il faut une IMPLICATION
+
+« Il existe au moins un lien marque » echoue sur une recherche dont tous les
+resultats sont portes — et le comportement etait juste. Formuler :
+
+    tout lien sortant est marque ET aucun lien interne ne l'est
+
+Regle generale : quand une propriete porte sur CHAQUE element, l'asserter sur
+CHAQUE element, jamais sur l'existence d'un cas favorable.
+
+### `max-width` ne s'applique pas a un `<label>`
+
+Un `<label>` est EN LIGNE par defaut : `max-width` y est ignore, et le champ
+qu'il contient s'etend sur toute la page (1 375 px pour le champ de recherche).
+Poser `display: block`.
+
 ## Detail
 
-Socle complet. Six pages metier portees et archivees ; le cycle est rode et se
+Socle complet. Sept pages metier portees et archivees — toutes celles du meme
+gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
 rejeu du LOT, commit.

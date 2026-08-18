@@ -6,6 +6,7 @@ use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
+use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\PasserelleController;
@@ -88,6 +89,11 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('tickets');
 
+    // Recherche globale : serveurs, utilisateurs, CVE, tickets, journal d'audit.
+    Route::get('/recherche', RechercheController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('recherche');
+
     // Journal des commandes — tracabilite de type bastion, lecture seule.
     Route::get('/journal-commandes', JournalCommandesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
@@ -123,3 +129,4 @@ Route::get('/approvals/', fn () => redirect()->route('approbations'));
 Route::get('/drift/', fn () => redirect()->route('derive-config'));
 Route::get('/backups/', fn () => redirect()->route('sauvegardes'));
 Route::get('/tasks/', fn () => redirect()->route('taches'));
+Route::get('/search/', fn () => redirect()->route('recherche'));

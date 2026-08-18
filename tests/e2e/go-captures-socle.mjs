@@ -153,6 +153,11 @@ for (const format of LARGEURS) {
     await dors(400);
     await prend('11-tickets');
 
+    // 12. Recherche globale, avec un terme qui rend des resultats
+    await page.goto(`${BASE}/recherche?q=Test-Server`, { waitUntil: 'networkidle2' });
+    await dors(1200);
+    await prend('12-recherche');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });

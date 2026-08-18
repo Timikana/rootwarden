@@ -956,3 +956,57 @@ body {
  * existe deja pour la machine choisie et que creer le rouvrira.
  */
 .rw-annonce--attention { color: var(--rw-avertissement); font-weight: 550; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Recherche globale
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Le champ est l'objet principal de la page : il prend la largeur, borne
+ * seulement pour ne pas devenir une ligne de 1 800 px qu'on relit mal.
+ */
+/*
+ * `display: block` n'est pas decoratif : un `<label>` est EN LIGNE par defaut,
+ * et `max-width` ne s'applique pas a un element en ligne. Sans lui, le champ
+ * s'etendait sur 1 375 px — une ligne de saisie qu'on relit mal.
+ */
+.rw-recherche { display: block; max-width: 780px; margin-bottom: 8px; }
+
+.rw-saisie--large { padding: 13px 15px; font-size: 16px; }
+
+/* Une categorie de resultats. Les liens se touchent, separes d'un filet. */
+.rw-resultats { display: flex; flex-direction: column; margin-top: 4px; }
+
+.rw-resultat {
+    position: relative;
+    display: block;
+    padding: 9px 10px;
+    border-top: 1px solid var(--rw-bordure);
+    border-radius: 6px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.rw-resultat:first-child { border-top: 0; }
+.rw-resultat:hover { background: var(--rw-surface-2); }
+.rw-resultat:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: -2px; }
+
+.rw-resultat__titre  { font-size: 14px; font-weight: 550; }
+.rw-resultat__detail { margin-top: 2px; font-size: 12px; color: var(--rw-texte-doux); }
+
+/*
+ * Meme marqueur que dans le menu pour « cela ouvre l'ancien portail ». La
+ * legende n'est pas repetee sur chaque ligne — l'encart de la page l'explique
+ * une fois, et le `title` la porte entree par entree.
+ */
+.rw-resultat--externe { padding-right: 26px; }
+
+.rw-resultat__marqueur {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-vide__texte { margin-top: 6px; font-size: 13px; }
