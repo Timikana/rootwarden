@@ -248,7 +248,7 @@ noms de champ.
 |---|---|---|
 | Squelette et conteneur | fait | — |
 | Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
-| Gabarit et navigation (33 entrees, source unique) | fait | navigation 33 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 34 |
 | Interface (largeur, boutons, guidage) | fait | captures regardees |
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
@@ -266,6 +266,7 @@ explicite renvoyant vers l'ancien portail.
 | Approbations a quatre yeux | `approbations` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Derive de configuration | `derive-config` | `role:2` + `perm:can_view_compliance` | oui, 2026-08-18 |
 | Sauvegardes de la base | `sauvegardes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
+| Centre de taches | `taches` | `role:2` SEUL (comme le legacy) | oui, 2026-08-18 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -521,9 +522,61 @@ devient invisible. Apres chaque archivage, verifier :
 
 et etendre l'exception si besoin.
 
+### Une erreur ne s'avale pas : montrer moins plutot que montrer faux
+
+Le legacy n'ecrit son tableau que si l'appel a REUSSI, et ne fait RIEN sur
+echec : les lignes precedentes restent affichees. Sur le centre de taches, ou le
+filtre par statut repond 500, cela laisse cent taches « Reussie » a l'ecran
+quand on a demande « Echec ». Des donnees exactes presentees comme la reponse a
+une question qu'on n'a pas posee.
+
+Dans le portage, tout `if (reussi)` a un `else` : vider, et DIRE. Un
+`if` sans `else` fabrique un ecran rassurant et faux, comme un `catch` vide
+fabrique un rapport rassurant et faux.
+
+### Ce qui est CACHE n'est pas GARDE
+
+Deux ecarts symetriques, mesures :
+
+| Page | Ecart |
+|---|---|
+| sauvegardes | la PAGE exige `can_admin_portal`, la CAPACITE se contente du role 2 |
+| taches | le MENU exige `can_admin_portal`, la PAGE se contente du role |
+
+Sur `tasks`, un role 2 sans la permission ne voit pas l'entree et atteint
+pourtant la page en tapant son adresse.
+
+Pour chaque page portee, MESURER la paire (entree de menu, acces direct) quand la
+garde du menu differe de celle de la page. Reproduire l'ecart tel quel et le
+consigner : corriger d'un cote ou de l'autre change des droits.
+
+### Mesurer une fonction, pas ses effets visibles
+
+L'auto-rafraichissement ne se verifie PAS en regardant si le tableau change : sur
+un historique stable, un rafraichissement parfaitement fonctionnel ne change rien
+a l'ecran. Compter les requetes :
+
+    let n = 0;
+    const ecoute = (r) => { if (/\/tasks\/list/.test(r.url())) n++; };
+    page.on('request', ecoute); await dors(7000); page.off('request', ecoute);
+
+Verifier AUSSI que le couper l'arrete vraiment — zero requete.
+
+### Un libelle de periode vaut mieux qu'un libelle d'intention
+
+« Rafraichir auto » ne dit pas si ce qu'on lit date de 5 s ou de 5 min.
+« Actualiser toutes les 5 s » le dit.
+
+### `flex-shrink: 0` fait DEBORDER au lieu de replier
+
+Un bloc d'actions en `flex-shrink: 0` garde sa largeur naturelle : a 390 px il
+sort du champ et son texte est coupe net, meme avec `flex-wrap` sur le parent.
+Retirer `flex-shrink`, poser `min-width: 0` et `flex-wrap: wrap`, et ne pas
+mettre `white-space: nowrap` sur un libelle long.
+
 ## Detail
 
-Socle complet. Quatre pages metier portees et archivees ; le cycle est rode et se
+Socle complet. Cinq pages metier portees et archivees ; le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
 rejeu du LOT, commit.

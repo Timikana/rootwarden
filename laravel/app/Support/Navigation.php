@@ -49,7 +49,7 @@ class Navigation
 
         'admin' => [
             ['cle' => 'admin',          'garde' => 'can_admin_portal',        'legacy' => '/adm/admin_page.php'],
-            ['cle' => 'tasks',          'garde' => 'can_admin_portal',        'legacy' => '/tasks/index.php'],
+            ['cle' => 'tasks',          'garde' => 'can_admin_portal',        'route'  => 'taches'],
             ['cle' => 'groups',         'garde' => 'can_admin_portal',        'legacy' => '/groups/index.php'],
             ['cle' => 'maintenance',    'garde' => 'can_admin_portal',        'legacy' => '/maintenance/index.php'],
             ['cle' => 'approvals',      'garde' => 'can_admin_portal',        'route'  => 'approbations'],

@@ -599,6 +599,62 @@ comparer d'un coup d'œil alors que c'est exactement ce qu'on demande avant de c
 restauration. `.rw-code--fichier` garde le nom d'une pièce ; le débordement appartient au cadre
 du tableau, qui défile et le dit.
 
+### Cinquième page métier portée — centre de tâches
+
+`tasks` est porté sur `/taches`, puis **archivé** : `legacy/tasks/` a rejoint
+`legacy/_deprecated/`. L'URL legacy répond **404**, `index.php` et `js/main.js` aussi, et l'entrée
+de menu du legacy mène au portage. Le menu du legacy compte **32 liens internes** contre 37 au
+départ — exactement les cinq pages portées.
+
+**Gardée par le seul rôle**, sans aucune permission : c'est ce que fait le legacy, et le portage
+le reproduit. Inventer une permission au détour d'un portage serait un changement de droits.
+
+### Deux défauts trouvés en écrivant la caractérisation
+
+**1. Le filtre par statut n'a jamais fonctionné.** `/tasks/list?status=<x>` répond **500** pour
+tout statut. Cause lue dans les journaux du backend : `1052 Column 'status' in where clause is
+ambiguous`. La requête filtrée joint `machines`, qui porte aussi une colonne `status`, et la clause
+`WHERE status = %s` n'est pas qualifiée. La requête de comptage, sans jointure, passe — d'où une
+erreur qui n'apparaît qu'à la seconde requête.
+
+Le legacy n'écrit le tableau que sur succès et ne fait rien sur échec : sélectionner « Échec »
+laisse **cent tâches « Réussie »** affichées, sans un mot. La page présente des données exactes
+comme si elles répondaient à une question qu'on ne lui a pas posée.
+
+**E-10** — le portage vide le tableau et dit que le filtrage a échoué côté serveur, en nommant le
+statut demandé. Montrer moins est préférable à montrer faux ; un `if (réussi)` sans `else` fabrique
+un écran rassurant et faux, exactement comme un `catch` vide fabrique un rapport rassurant et faux.
+
+Le correctif backend tient en un mot — `t.status = %s` — mais il change le comportement du filtre,
+et le backend reste intact pendant cette migration. Il attend une autorisation.
+
+**2. Le menu est plus strict que la page.** La page n'exige aucune permission ; l'entrée de menu
+vit dans un bloc gardé par `can_admin_portal`. Mesuré avec `rw-test-admin` (rôle 2, sans cette
+permission) : l'entrée est **absente du menu**, et `GET /tasks/` répond **200 avec la page**.
+
+C'est le miroir de ce qui a été relevé sur les sauvegardes, dans l'autre sens — là la page était
+plus stricte que la capacité, ici le menu est plus strict que la page. Même leçon : **ce qui est
+caché n'est pas gardé.** L'écart est reproduit tel quel et consigné ; le corriger d'un côté ou de
+l'autre change des droits.
+
+### Un rafraîchissement mesuré par les appels, pas par l'écran
+
+L'auto-rafraîchissement se vérifie en comptant les requêtes vers `/tasks/list`, pas en regardant si
+le tableau change : sur un historique stable, un rafraîchissement parfaitement fonctionnel ne
+change rien à l'écran. Compter les appels mesure la fonction ; regarder le tableau mesurerait la
+stabilité des données. Le test vérifie aussi que décocher la case **arrête vraiment** les appels —
+zéro requête sur sept secondes.
+
+La case dit désormais sa période : « Actualiser toutes les 5 s ». « Rafraîchir auto » ne permettait
+pas de savoir si ce qu'on lit date de cinq secondes ou de cinq minutes.
+
+### Interface
+
+`flex-shrink: 0` sur le bloc d'actions d'en-tête gardait sa largeur naturelle et le faisait
+**déborder de l'écran** au lieu de se replier : à 390 px, « Actualiser toutes les 5 s » sortait du
+champ, coupé net. Le bloc peut retrécir et passer à la ligne. Trouvé en regardant la capture, pas
+en assertant.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

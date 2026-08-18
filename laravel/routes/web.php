@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\SecondFacteurController;
 use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\SauvegardesController;
+use App\Http\Controllers\TachesController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
@@ -70,6 +71,17 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('sauvegardes');
 
+    /*
+     * Centre de taches. `role:2` SEUL, sans permission : c'est ce que fait le
+     * legacy, qui n'appelle que `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`.
+     * L'entree de MENU, elle, vit dans le bloc garde par `can_admin_portal` —
+     * un role 2 sans la permission ne la voit pas et atteint pourtant la page.
+     * Ecart reproduit tel quel et consigne, plutot que corrige sans arbitrage.
+     */
+    Route::get('/taches', TachesController::class)
+        ->middleware(['role:2'])
+        ->name('taches');
+
     // Journal des commandes — tracabilite de type bastion, lecture seule.
     Route::get('/journal-commandes', JournalCommandesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
@@ -104,3 +116,4 @@ Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
 Route::get('/approvals/', fn () => redirect()->route('approbations'));
 Route::get('/drift/', fn () => redirect()->route('derive-config'));
 Route::get('/backups/', fn () => redirect()->route('sauvegardes'));
+Route::get('/tasks/', fn () => redirect()->route('taches'));

@@ -106,6 +106,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `approvals/` | 2026-08-18 | `approbations` | seconde page metier portee |
 | `drift/` | 2026-08-18 | `derive-config` | premiere garde par permission |
 | `backups/` | 2026-08-18 | `sauvegardes` | restauration jamais jouee par le test |
+| `tasks/` | 2026-08-18 | `taches` | menu plus strict que la page |
 
 ### commandlog — la preuve du cycle
 
@@ -257,3 +258,52 @@ une conséquence assumée : un test sur une liste vide ne prouverait rien.
 
 Le test de la vague 0 collecte **33 liens internes** au menu du legacy, contre 37 au départ :
 exactement les quatre entrées redirigées vers le portage.
+
+### tasks — quand le MENU est plus strict que la PAGE
+
+`https://localhost:8443/tasks/` rendait **302** avant archivage ; après
+`git mv legacy/tasks legacy/_deprecated/tasks`, l'URL rend **404**, ainsi que `index.php` et
+`js/main.js`. L'entrée de menu du legacy mène désormais à `LARAVEL_URL` + `/taches`.
+`git check-ignore` vérifié : l'archive reste suivie.
+
+#### L'écart mesuré, et pourquoi il n'est pas corrigé
+
+La page n'appelle que `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` — **aucune permission**. L'entrée
+de menu, elle, vit dans un bloc gardé par `can_admin_portal`.
+
+Mesure avec `rw-test-admin` (rôle 2, sans cette permission) :
+
+| | Résultat |
+|---|---|
+| entrée dans le menu | **absente** |
+| `GET /tasks/` en tapant l'adresse | **200, la page se rend** |
+
+C'est le miroir exact de ce qui a été relevé sur les sauvegardes, dans l'autre sens : là, la page
+était plus stricte que la capacité ; ici, le menu est plus strict que la page. Dans les deux cas
+la même leçon — **ce qui est caché n'est pas gardé**.
+
+Le portage reproduit l'écart tel quel : route en `role:2` seul, entrée de navigation gardée par
+`can_admin_portal`. Corriger d'un côté ou de l'autre change des droits, ce qui ne se décide pas au
+détour d'un portage. L'arbitrage revient à l'exploitant :
+
+- soit la page mérite une permission — et il faut choisir laquelle ;
+- soit elle n'en mérite pas — et l'entrée doit alors être visible pour tout rôle 2.
+
+#### Un filtre qui n'a jamais fonctionné
+
+Trouvé en écrivant la caractérisation : `/tasks/list?status=<x>` répond **500** pour tout statut
+(MySQL 1052, colonne `status` ambiguë après la jointure sur `machines`). Le legacy n'écrit le
+tableau que sur succès : filtrer sur « Échec » laisse cent tâches « Réussie » à l'écran, sans un
+mot. Voir `PARITE.md` E-10. Le portage vide et le dit ; le correctif backend — un mot — attend une
+autorisation.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 4 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 4 PASS / 0 FAIL — partie archivée |
+| `drift/` | 4 PASS / 0 FAIL — partie archivée |
+| `backups/` | 4 PASS / 0 FAIL — partie archivée |
+| `tasks/` | 4 PASS / 0 FAIL — partie archivée |
+
+Le test de la vague 0 collecte **32 liens internes** au menu du legacy, contre 37 au départ :
+exactement les cinq entrées redirigées vers le portage.
