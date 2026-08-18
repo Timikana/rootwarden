@@ -21,6 +21,7 @@
     --rw-danger: #b91c1c;
     --rw-danger-fond: #fef2f2;
     --rw-succes: #15803d;
+    --rw-avertissement: #a16207;
     --rw-rayon: 10px;
     --rw-espace: 16px;
     --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
@@ -41,6 +42,7 @@
         --rw-danger: #fca5a5;
         --rw-danger-fond: #2a1618;
         --rw-succes: #6ee7a8;
+        --rw-avertissement: #fcd34d;
         --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
     }
 }
@@ -78,6 +80,14 @@ body {
 }
 
 .rw-carte--large { max-width: 720px; }
+
+/*
+ * Carte de formulaire POSEE DANS UNE PAGE, par opposition a la carte centree
+ * d'un ecran de connexion. `max-width: 420px` y laissait deux colonnes a
+ * l'etroit et 1 200 px de vide a cote : la page a de la largeur, le formulaire
+ * s'en sert.
+ */
+.rw-carte--pleine { max-width: none; padding: 22px 24px 18px; }
 
 .rw-titre {
     margin: 0 0 4px;
@@ -648,7 +658,18 @@ body {
 
 /* ── Etiquettes et pastilles ────────────────────────────────────────────── */
 
-.rw-etiquette {
+/*
+ * PASTILLE DE CATEGORIE — a ne pas confondre avec `.rw-etiquette`, qui est le
+ * LIBELLE d'un champ de formulaire.
+ *
+ * Ces deux regles ont porte le meme nom pendant plusieurs vagues. La seconde
+ * l'emportant, tous les libelles de formulaire du portail etaient rendus en
+ * pastille bleue — y compris « Identifiant » et « Mot de passe » sur l'ecran
+ * de connexion, le tout premier ecran du produit. Aucune assertion ne l'a vu ;
+ * la capture, si. C'est exactement le defaut `escHtml()` defini deux fois
+ * releve dans le legacy, reproduit ici.
+ */
+.rw-badge {
     display: inline-block;
     padding: 2px 7px;
     border-radius: 5px;
@@ -917,3 +938,21 @@ body {
  * du champ, la ligne d'actions ne pouvant pas passer a la ligne.
  */
 .rw-entete-page__actions { align-items: flex-end; flex-wrap: wrap; }
+
+/* Libelle d'un champ pose dans un `<label>` englobant, avec son aide dessous. */
+.rw-champ__etiquette {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--rw-texte-doux);
+}
+
+.rw-champ .rw-aide { display: block; margin-top: 5px; }
+
+/*
+ * Annonce d'AVERTISSEMENT : ni une reussite, ni un echec. Sert a prevenir
+ * d'une regle que le backend appliquera — par exemple qu'un ticket manuel
+ * existe deja pour la machine choisie et que creer le rouvrira.
+ */
+.rw-annonce--attention { color: var(--rw-avertissement); font-weight: 550; }

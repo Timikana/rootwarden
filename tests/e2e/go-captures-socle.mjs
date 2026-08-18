@@ -68,7 +68,7 @@ for (const format of LARGEURS) {
         const limite = Date.now() + maxMs;
         while (Date.now() < limite) {
             const encoreEnCharge = await page.evaluate(() => {
-                const c = document.querySelector('#cmdlog-tbody, #appr-tbody, #drift-tbody, #backup-tbody, #task-tbody');
+                const c = document.querySelector('#cmdlog-tbody, #appr-tbody, #drift-tbody, #backup-tbody, #task-tbody, #tickets-tbody');
                 return c ? /Chargement|Loading/i.test(c.textContent) : false;
             });
             if (!encoreEnCharge) return;
@@ -145,6 +145,13 @@ for (const format of LARGEURS) {
     await page.goto(`${BASE}/taches`, { waitUntil: 'networkidle2' });
     await attendTableau();
     await prend('10-taches');
+
+    // 11. Tickets ITSM, formulaire ouvert
+    await page.goto(`${BASE}/tickets`, { waitUntil: 'networkidle2' });
+    await attendTableau();
+    await page.evaluate(() => document.getElementById('new-ticket-btn')?.click());
+    await dors(400);
+    await prend('11-tickets');
 
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
