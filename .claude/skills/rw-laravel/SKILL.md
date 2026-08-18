@@ -248,7 +248,7 @@ noms de champ.
 |---|---|---|
 | Squelette et conteneur | fait | — |
 | Authentification (TOTP obligatoire, anti-rejeu par compte) | fait | auth 14 / 13+1 |
-| Gabarit et navigation (33 entrees, source unique) | fait | navigation 32 |
+| Gabarit et navigation (33 entrees, source unique) | fait | navigation 33 |
 | Interface (largeur, boutons, guidage) | fait | captures regardees |
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
@@ -265,6 +265,7 @@ explicite renvoyant vers l'ancien portail.
 | Journal des commandes | `journal-commandes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Approbations a quatre yeux | `approbations` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Derive de configuration | `derive-config` | `role:2` + `perm:can_view_compliance` | oui, 2026-08-18 |
+| Sauvegardes de la base | `sauvegardes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -440,9 +441,89 @@ Quatre tuiles de resume a `minmax(190px, 1fr)` tiennent sur UNE colonne a
 tiennent deux par deux, et sur grand ecran rien ne change : `auto-fit`
 effondre les pistes vides. Classe : `rw-grille--compacte`.
 
+### Une confirmation doit EMPECHER, pas reprocher
+
+Pour une action irreversible, la confirmation en ligne ne suffit pas : le bouton
+de confirmation naît DESACTIVE et ne s'active que lorsque la saisie egale
+exactement ce qui est demande (nom du fichier, nom de la machine). Le legacy
+laissait confirmer puis annoncait « le nom ne correspond pas » — le geste avait
+deja ete fait, et rien n'empechait de recommencer.
+
+Effet de bord utile : le chemin d'erreur devient TESTABLE. Avec `prompt()`, il
+ne l'etait pas — le gestionnaire de dialogue annule avant toute saisie.
+
+### Un libelle qui promet plus que le code ne tient est un defaut
+
+`verify_backup()` compare l'empreinte, decompresse et compte les `CREATE TABLE`.
+Il n'execute AUCUNE instruction. Le legacy l'annonce pourtant, en trois
+endroits, comme un « test de restauration qui recharge la sauvegarde dans une
+base temporaire ». Un dump lisible mais inapplicable passe sans reserve.
+
+Le portage appelle la meme route et ne change que les mots. TOUJOURS LIRE LA
+FONCTION avant de recopier le libelle qui la decrit : une promesse de controle
+conduit a ne pas faire le controle qu'on croit deja fait.
+
+### Ne jamais mener une action destructive sur la base PARTAGEE
+
+`/admin/backups/restore` fait un `DROP TABLE` sur la base que se partagent le
+legacy, Laravel et le backend Python. Un test qui la restaure detruit les
+sessions et les donnees des autres suites — les siennes comprises.
+
+Verifier que l'action EXISTE, qu'elle est gardee, et que le chemin d'erreur ne
+la declenche pas. Puis ECRIRE que la voie nominale n'est pas couverte, plutot
+que de laisser croire qu'elle l'est.
+
+### La garde de la PAGE n'est pas la garde de la CAPACITE
+
+La page des sauvegardes exige `can_admin_portal` ; le backend ne demande que le
+role 2 sur `/admin/backups`, et la passerelle double le backend sans inventer.
+Depuis une session role 2 refusee sur la page avec un 403,
+`GET /api/gateway/admin/backups` repond 200 avec la liste.
+
+MESURER cette paire pour toute page dont la permission differe de celle du
+backend. Ne pas resserrer : retirer une possibilite a un role est un changement
+de droits, pas une decision de portage. Le releve va dans DEPRECIATION.md.
+
+### Attendre le BOUTON, pas la premiere annonce
+
+Une region d'annonce affiche d'abord « en cours ». Une sonde qui lit des qu'elle
+est non vide recolte le message de travail, jamais le verdict. Le signal juste
+est le bouton : desactive pendant l'appel, reactive dans le MEME bloc synchrone
+que l'ecriture du verdict. Il ne depend ni de la cible ni de la langue.
+
+### Ne pas asserter sur un mot qu'on vient soi-meme de changer
+
+Une attente cherchait « valide » dans le verdict d'un controle — alors que le
+portage avait justement renonce a ce mot, le controle ne prouvant pas la
+validite. Asserter sur ce que l'action RAPPORTE (deux nombres : des tables, des
+instructions) tient dans les deux langues et survit a une reformulation.
+
+### Un nom de fichier n'est pas une commande
+
+`.rw-code` coupe a n'importe quel caractere : il est fait pour des commandes de
+plusieurs centaines de caracteres. Applique a un nom de fichier dans une colonne
+etroite, il rend « rootwa / rden_b / ackup_ » sur six lignes. Utiliser
+`.rw-code--fichier` : le nom reste d'une piece, le debordement appartient au
+cadre du tableau.
+
+### L'archivage peut faire tomber une exception de `.gitignore`
+
+`.gitignore` exclut `backups/` (le stockage) avec une exception explicite pour
+`legacy/backups/**`, qui est du CODE. `git mv legacy/backups
+legacy/_deprecated/backups` fait tomber l'exception : le dossier archive
+retombe sous la regle generale.
+
+Les fichiers DEJA SUIVIS survivent au deplacement, ce qui masque entierement le
+probleme — jusqu'au jour ou l'on ajoute un fichier dans l'archive et qu'il
+devient invisible. Apres chaque archivage, verifier :
+
+    git check-ignore -v legacy/_deprecated/<partie>/
+
+et etendre l'exception si besoin.
+
 ## Detail
 
-Socle complet. Trois pages metier portees et archivees ; le cycle est rode et se
+Socle complet. Quatre pages metier portees et archivees ; le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
 rejeu du LOT, commit.

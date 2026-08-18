@@ -530,6 +530,75 @@ qu'une par ligne et repoussait le tableau — la donnée — sous quatre écrans
 grand écran, rien ne change : `auto-fit` effondre les pistes vides et les quatre tuiles
 s'étirent.
 
+### Quatrième page métier portée — sauvegardes de la base
+
+`backups` est porté sur `/sauvegardes`, puis **archivé** : `legacy/backups/` a rejoint
+`legacy/_deprecated/`. L'URL legacy répond **404**, `index.php` et `js/main.js` aussi, et
+l'entrée de menu du legacy mène au portage. Le menu du legacy compte **33 liens internes** contre
+37 au départ — exactement les quatre pages portées.
+
+**Le test crée et contrôle pour de vrai.** Le répertoire de sauvegardes était vide : le test
+produit une sauvegarde (0,27 Mo, 63 tables, 5 368 instructions) puis la contrôle. Il ne **restaure
+jamais** — `/admin/backups/restore` fait un `DROP TABLE` sur la base partagée par le legacy,
+Laravel et le backend Python, ce qui détruirait les sessions et les données des autres suites en
+cours. La restauration réelle reste donc non couverte, et c'est écrit plutôt que sous-entendu.
+
+Deux écarts assumés, documentés dans `docs/migration/PARITE.md` :
+
+- **E-08** — la confirmation d'une restauration **empêche** l'erreur au lieu de la reprocher. Le
+  legacy demande le nom du fichier par `prompt()`, compare après coup et annonce « le nom ne
+  correspond pas » : le geste a déjà été fait. Le portage ouvre une confirmation sous la ligne,
+  et le bouton reste **inactif tant que la saisie diffère**. Le chemin d'erreur devient
+  vérifiable — il ne l'était pas, la boîte native étant annulée avant toute saisie.
+- **E-09** — le contrôle d'une sauvegarde dit ce qu'il vérifie. Le legacy annonce, en trois
+  endroits, qu'il « recharge la sauvegarde dans une base temporaire ». `verify_backup()` ne fait
+  rien de tel : il compare l'empreinte sha256, décompresse le dump et compte les `CREATE TABLE`.
+  **Aucune instruction n'est exécutée.** Un dump lisible mais inapplicable passe le contrôle sans
+  réserve. Le portage appelle la même route et ne change que les mots : « Contrôler », et un
+  verdict « lisible et intacte — 63 tables, 5 368 instructions, empreinte conforme » au lieu de
+  « valide ». Un libellé qui promet plus qu'il ne tient conduit à ne pas faire le contrôle qu'on
+  croit déjà fait.
+
+### Une permission qui garde la page, pas la capacité
+
+Mesuré pendant ce portage, et **laissé tel quel** : la page des sauvegardes exige
+`can_admin_portal`, mais le backend ne demande que le rôle 2 sur `/admin/backups`. Depuis une
+session `rw-test-admin` refusée sur la page avec un 403, l'appel
+`GET /api/gateway/admin/backups` répond **200 avec la liste**.
+
+Rien n'a été changé : resserrer la passerelle retirerait à un rôle 2 une possibilité qu'il a
+aujourd'hui, ce qui est un changement de droits et non une décision de portage. Le relevé est
+consigné, l'arbitrage revient à l'exploitant.
+
+### Deux corrections de sonde
+
+- **Lire la première annonce venue, c'est lire « en cours ».** Le test attendait que la région
+  d'annonce soit non vide et récoltait « Contrôle en cours… » au lieu du verdict. Le signal juste
+  est le bouton, désactivé pendant l'appel et réactivé dans le même bloc synchrone que
+  l'écriture du verdict — il ne dépend ni de la cible ni de la langue.
+- **Asserter sur un mot qu'on a soi-même choisi.** L'attente cherchait « valide » dans le
+  verdict, alors que le portage a précisément renoncé à ce mot. Elle porte désormais sur ce que
+  le contrôle **rapporte** : deux nombres, un compte de tables et un compte d'instructions,
+  quelle que soit la langue.
+
+### Un archivage qui fait tomber une exception de `.gitignore`
+
+`.gitignore` exclut `backups/` — le répertoire de stockage — avec une exception explicite pour
+`legacy/backups/**`, qui est du code. Le déplacement vers `legacy/_deprecated/backups/` a fait
+tomber cette exception : le dossier archivé est retombé sous la règle générale.
+
+Les deux fichiers étant déjà suivis, le renommage les a préservés et rien n'a été perdu — ce qui
+masquait complètement le problème. L'exception est étendue à l'archive. À vérifier après chaque
+archivage : `git check-ignore -v legacy/_deprecated/<partie>/`.
+
+### Interface
+
+Un nom de fichier n'est pas une commande : `.rw-code` coupe à n'importe quel caractère, ce qui
+donnait « rootwa / rden_b / ackup_ » sur six lignes à 390 px — illisible, et impossible à
+comparer d'un coup d'œil alors que c'est exactement ce qu'on demande avant de confirmer une
+restauration. `.rw-code--fichier` garde le nom d'une pièce ; le débordement appartient au cadre
+du tableau, qui défile et le dit.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
