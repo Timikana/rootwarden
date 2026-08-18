@@ -237,6 +237,49 @@ i18n : deux modules créés (`accueil`, `profil`), deux étendus (`auth`, `nav`)
 Lot complet rejoué après refonte du gabarit : navigation **28 PASS**, authentification **14 PASS**
 sur Laravel, **13 PASS / 1 écart connu** sur le legacy, vague 0 inchangée.
 
+### Socle — passerelle vers le backend Python
+
+`/api/gateway/…` remplace `api_proxy.php`. C'est l'endpoint le plus puissant du portail : il
+transmet toutes les routes du backend, clé d'API côté serveur. Les contrôles s'appliquent
+**dans l'ordre** et sont fail-closed à chaque étape : session authentifiée, falsification de
+requête, traversée de chemin, liste blanche, réserve d'administration, ré-authentification
+exigée, transmission.
+
+**Le filtrage compare des segments, plus des préfixes** (`PARITE.md` E-02). Le legacy compare
+par début de chaîne : `/search` autorise `/searchall`, et toute route Python future dont le nom
+commence par un préfixe autorisé devient publique sans décision. Le portage lit chaque entrée
+selon sa forme — espace de noms (`/fail2ban/`), racine délibérée (`/cve_`), ou route exacte.
+
+Vérifié **avant** de resserrer, sur les **201 routes réellement déclarées** dans `backend/` :
+les deux filtres rendent le même verdict, zéro différence. Le resserrement ne retire aucun
+accès et refuse en plus `/searchall`, `/command_logger`, `/updateXYZ`. Mesuré en situation :
+`/searchall` rend **405 sur le legacy** (donc transmis au backend) contre **403 sur le portage**.
+
+Les permissions envoyées au backend sont relues **en base**, pas prises dans la session. Le
+statut du backend est propagé tel quel. La ré-authentification ponctuelle n'étant pas portée,
+les routes qui l'exigent sont **refusées** plutôt que transmises — accorder une action qui donne
+root sans le second contrôle que le legacy exige serait un recul.
+
+**Vérifié** (`tests/e2e/go-socle-passerelle.mjs`) : **Laravel 10 PASS / 0 FAIL**,
+**legacy 5 PASS / 0 FAIL / 1 écart connu**.
+
+#### Deux erreurs de mesure, corrigées
+
+Un `fetch` same-origin sans jeton CSRF passait, ce qui a d'abord fait conclure à une absence de
+protection. C'était faux : Laravel 13 remplace le contrôle par jeton par un contrôle
+**d'origine** (`PreventRequestForgery`), et une requête same-origin **doit** passer — ce n'est
+pas une falsification. La propriété à mesurer est qu'une requête *cross-site* soit refusée ;
+le navigateur interdisant de forger `Sec-Fetch-Site`, le test la rejoue depuis Node avec les
+cookies de session. Résultat : **cross-site 419**, same-origin transmis.
+
+Et les sondes mutantes ne sont plus jouées contre le legacy : un POST refusé par son contrôle
+CSRF invalide la session, son JS de sondage part vers la page de connexion, et cette navigation
+détruit le contexte d'exécution — le lot expirait sans rien mesurer. Vérifié qu'aucune action
+n'a été déclenchée : le legacy a répondu 403, le backend n'a jamais vu la requête.
+
+Nouvelle variable : `BACKEND_INTERNAL_URL` (et `BACKEND_TIMEOUT`) dans `srv-docker.env.example`.
+i18n : module `passerelle`, **6 clés = 6 clés**.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
