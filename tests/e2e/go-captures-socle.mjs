@@ -158,6 +158,11 @@ for (const format of LARGEURS) {
     await dors(1200);
     await prend('12-recherche');
 
+    // 13. Mises a jour Linux (sous-lot U1)
+    await page.goto(`${BASE}/mises-a-jour`, { waitUntil: 'networkidle2' });
+    await dors(700);
+    await prend('13-mises-a-jour');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });

@@ -30,4 +30,37 @@ class Machines
             return [];
         }
     }
+
+    /**
+     * Le parc tel que la page des mises a jour l'affiche : treize colonnes.
+     *
+     * CLOISONNEMENT REPRIS DU LEGACY. `update/index.php` admet le role 1 s'il
+     * porte `can_update_linux`, et ne lui montre alors que les machines de
+     * `user_machine_access`. C'est un cloisonnement REEL — contrairement au
+     * tableau de bord du legacy, qui sert le parc entier a tout le monde. Il est
+     * reproduit ici a l'identique.
+     *
+     * @return list<object>
+     */
+    public function pourMisesAJour(int $roleId, int $userId): array
+    {
+        try {
+            $requete = DB::table('machines as m')->select(
+                'm.id', 'm.name', 'm.ip', 'm.port', 'm.linux_version', 'm.last_checked',
+                'm.online_status', 'm.maj_secu_date', 'm.maj_secu_last_exec_date',
+                'm.last_reboot', 'm.environment', 'm.criticality', 'm.network_type',
+            );
+
+            if ($roleId < 2) {
+                $requete->join('user_machine_access as uma', 'm.id', '=', 'uma.machine_id')
+                        ->where('uma.user_id', $userId);
+            }
+
+            return $requete->orderBy('m.name')->get()->all();
+        } catch (\Throwable) {
+            // Le parc est le contenu de la page : son indisponibilite se voit,
+            // elle n'a pas besoin d'etre masquee par une liste vide silencieuse.
+            return [];
+        }
+    }
 }

@@ -512,6 +512,59 @@ traité comme un défaut.
 
 ---
 
+## E-14 — Rafraîchir la liste ne perd plus de colonnes
+
+**Écart voulu.** La page des mises à jour affiche treize colonnes, rendues au chargement depuis la
+base. Le legacy les recharge ensuite depuis `update/functions/list_machines.php`, qui n'en
+`SELECT`ionne que **onze** : `maj_secu_date`, `maj_secu_last_exec_date` et `last_reboot` en sont
+absentes.
+
+`populateMachineTable()` les lit pourtant, avec un repli `?? "N/A"`. Cliquer « Rafraîchir »
+remplace donc trois colonnes renseignées par « N/A », sans qu'on l'ait demandé et sans rien
+annoncer.
+
+### Mesuré
+
+`tests/e2e/go-page-update-u1.mjs` compte les cellules renseignées avant et après le clic :
+
+```
+avant  {"majSecu":0,"majSecuExec":0,"redemarrage":1,"environnement":1}
+après  {"majSecu":0,"majSecuExec":0,"redemarrage":0,"environnement":3}
+COLONNES PERDUES : redemarrage
+```
+
+Seule `redemarrage` est mesurablement perdue sur ce parc — les deux autres colonnes étaient déjà
+vides, et une colonne vide qui reste vide ne prouve rien. C'est écrit ainsi plutôt que d'affirmer
+une perte de trois colonnes qui n'a pas été observée.
+
+### Ce que fait le portage
+
+Le rafraîchissement **et** le filtrage passent tous deux par `/filter_servers`, qui rend les
+quatorze colonnes, exclut les machines archivées et applique le même cloisonnement par rôle. Un
+rafraîchissement ne peut donc plus appauvrir ce qui était affiché — l'attente le vérifie sur la
+cible portée.
+
+### Au passage — la même donnée par deux chemins
+
+`list_machines` existe deux fois : point d'entrée PHP dans `legacy/update/functions/` et route du
+backend Python. Le legacy appelle le PHP ; la version backend, elle, exclut les machines
+archivées. Deux implémentations de la même intention, qui ont divergé — c'est ce que le portage
+évite en n'en gardant qu'une.
+
+---
+
+## Note de portage — un module porté par morceaux le DIT
+
+`update/` est le premier module découpé (`MODULE-UPDATE.md`). U1 porte le tableau, les filtres et
+les relevés par machine ; le lancement des mises à jour, la planification et le redémarrage
+restent servis par l'ancien portail jusqu'à U6.
+
+La page portée l'annonce dans un encart, avec un lien marqué vers la page complète. Faire
+disparaître des capacités sans un mot ferait croire qu'elles n'existent plus — et l'entrée de menu
+ne peut pas encore être redirigée, puisque la page legacy reste la seule complète.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

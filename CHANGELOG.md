@@ -831,6 +831,55 @@ que le portage ne peut pas atteindre. Il passera par les routes backend, qui ren
 colonnes** : U1 devra combler l'écart sous peine de perdre la version Linux et l'horodatage du
 dernier contrôle.
 
+### Module `update/`, sous-lot U1 — parc et filtres
+
+Premier morceau d'un module découpé. `/mises-a-jour` porte le tableau du parc (treize colonnes),
+les filtres environnement / criticité / réseau, le rafraîchissement et les trois relevés par
+machine — version Linux, disponibilité, dernier redémarrage. Lecture seule.
+
+**La page legacy reste servie** : le lancement des mises à jour, la planification et le
+redémarrage appartiennent à U3–U6. Pas d'archivage, pas de redirection du menu, pas d'entrée dans
+`LiensLegacy` avant la fin du module. La page portée l'annonce dans un encart, avec un lien marqué
+vers la page complète — faire disparaître des capacités sans un mot ferait croire qu'elles
+n'existent plus.
+
+**Garde reprise du legacy** : `role:1` + `perm:can_update_linux`. Le rôle 1 est donc **admis** s'il
+porte la permission, et ne voit alors que les machines de `user_machine_access` — un cloisonnement
+réel, reproduit à l'identique dans `App\Services\Machines::pourMisesAJour()`. **Non exerçable** :
+aucun compte de test ne cumule rôle 1 et `can_update_linux`, et en fabriquer un reviendrait à
+changer des droits. Le test le dit plutôt que de le passer sous silence.
+
+### Rafraîchir la liste vidait une colonne
+
+**E-14** — la page affiche treize colonnes, rendues au chargement depuis la base ; le legacy les
+recharge depuis `update/functions/list_machines.php`, qui n'en `SELECT`ionne que onze.
+`populateMachineTable()` lit pourtant `maj_secu_date`, `maj_secu_last_exec_date` et `last_reboot`,
+avec un repli `?? "N/A"`.
+
+Mesuré : la colonne « dernier redémarrage » passe de renseignée à vide au clic sur « Rafraîchir »,
+sans qu'on l'ait demandé et sans rien annoncer. Les deux autres colonnes étaient déjà vides sur ce
+parc — une colonne vide qui reste vide ne prouve rien, et c'est écrit ainsi plutôt que d'affirmer
+une perte de trois colonnes qui n'a pas été observée.
+
+Le portage fait passer le rafraîchissement **et** le filtrage par `/filter_servers`, qui rend les
+quatorze colonnes, exclut les machines archivées et applique le même cloisonnement. Un
+rafraîchissement ne peut plus appauvrir ce qui était affiché.
+
+### Ce que U1 ne porte pas encore
+
+Le filtre par **étiquette**. Le legacy le rend — un `<select>` alimenté par
+`SELECT DISTINCT tag FROM machine_tags` — et `/filter_servers` accepte le paramètre `tag`. Il a
+été manqué au relevé et n'est pas porté. C'est noté dans `MODULE-UPDATE.md` plutôt que U1 déclaré
+clos.
+
+### Une règle globale posée pour un cas particulier
+
+`flex-wrap: wrap` avait été ajouté à `.rw-tableau__actions` pour que les trois boutons de relevé
+tiennent dans leur colonne. Vu à l'image : ils s'empilaient, chaque ligne devenait trois fois plus
+haute, et la classe est partagée avec les pages d'approbation et de sauvegarde. La règle est
+désormais portée par un modificateur — `.rw-tableau__actions--releves` — et le débordement
+appartient au cadre du tableau, qui défile et le dit.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
