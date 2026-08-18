@@ -247,8 +247,19 @@ services:
     container_name: rootwarden_test_server
     hostname: test-server
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
+    # PAS de `no-new-privileges` ici, contrairement aux autres services.
+    #
+    # Ce drapeau interdit toute elevation de privilege : `su` et `sudo` echouent
+    # quel que soit le mot de passe, avec « The "no new privileges" flag is set ».
+    # Or ce conteneur existe precisement pour recevoir des operations
+    # privilegiees — deploiement de cles, mises a jour, iptables, scan CVE. Le
+    # drapeau y annulait sa seule raison d'etre.
+    #
+    # Constate le 2026-08-18 : le mot de passe root stocke pour la machine 2
+    # etait CORRECT (meme empreinte que TEST_SERVER_ROOT_PASSWORD) ; c'est bien
+    # ce drapeau, et lui seul, qui faisait echouer `su`.
+    #
+    # Le durcissement reste en place sur php, laravel, python et db.
     profiles:
       - preprod
     # Passwords obligatoires depuis v1.17.0 - le container refuse de demarrer

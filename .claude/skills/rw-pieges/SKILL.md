@@ -28,6 +28,21 @@ toucher à la zone concernée.
   vérifier via `id <user>` + flag `-f`, pas via le code retour.
 - Sur test-server (Docker), vérifier via SSH, pas `docker exec` (namespaces).
 
+- **`execute_as_root` rend un TUPLE `(sortie, erreur, code)`**, pas une chaîne.
+  Le traiter comme une chaîne donne `"('0', '', 0)"` : toute recherche de
+  marqueur échoue et on conclut à tort que l'élévation ne marche pas.
+- **Un conteneur de test avec `no-new-privileges:true` ne peut PAS élever ses
+  privilèges.** `su` et `sudo` y échouent quel que soit le mot de passe, avec
+  « The "no new privileges" flag is set ». Constaté le 2026-08-18 sur
+  `test-server` : le drapeau annulait la seule raison d'être du conteneur, et
+  faisait passer un mot de passe pourtant CORRECT pour invalide. Retiré de ce
+  service, conservé sur les autres.
+- **Le mot de passe root fuit dans le flux de `/security_updates`** (ligne 2,
+  3 essais sur 3), par l'écho du terminal, malgré la défense « Patch A09 » de
+  `execute_as_root_stream` qui ne l'attrape pas sur le chemin `mode=sudo`.
+  Les journaux sont propres (`log_scrub.py`) ; la fuite est dans la réponse
+  HTTP affichée par l'interface. NON CORRIGÉ — arbitrage en attente.
+
 ## Scheduler / tâches de fond
 - **`next_run` AVANT l'exécution** : persister last_run/next_run PUIS exécuter
   (`_advance_schedule`) ; si la persistance échoue → SAUTER l'exécution.

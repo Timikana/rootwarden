@@ -362,6 +362,45 @@ périmé a été observé **une fois**, mais il **ne se reproduit pas de façon 
 numérote ses chargements et seul le dernier écrit — la possibilité est retirée par
 construction. C'est ce qui est affirmé, et rien de plus.
 
+### Serveur de test : `su` ne pouvait pas fonctionner — et ce que ça a révélé
+
+Le conteneur `test-server` portait `security_opt: no-new-privileges:true`, un drapeau qui
+**interdit toute élévation de privilège**. `su` et `sudo` y échouaient quel que soit le mot de
+passe, avec « The "no new privileges" flag is set ». Or ce conteneur existe précisément pour
+recevoir des opérations privilégiées — déploiement de clés, mises à jour, iptables, scan CVE.
+Le drapeau annulait sa seule raison d'être. Retiré de ce service, **conservé sur php, laravel,
+python et db**.
+
+Le mot de passe root enregistré pour la machine 2 était **correct** : même empreinte que
+`TEST_SERVER_ROOT_PASSWORD`. Le diagnostic précédent (« le mot de passe ne fonctionne pas »)
+était faux — c'était un symptôme, pas la cause. Vérifié : `whoami` rend `root`, une mise à jour
+de sécurité aboutit en `code 0`.
+
+#### ⚠ Ce que ce déblocage a mis au jour : le mot de passe root fuit dans le flux affiché
+
+Une fois `sudo` fonctionnel, le flux de `/security_updates` contient **le mot de passe root de
+la machine cible, en clair, à la ligne 2** — l'écho du terminal. Ce flux est le texte affiché
+dans l'interface pendant une mise à jour.
+
+**Reproductible : 3 essais sur 3, toujours à la même ligne.**
+
+`execute_as_root_stream` porte pourtant une défense explicite contre exactement cela (« Patch
+A09 » : mise en tampon jusqu'au premier saut de ligne pour jeter la ligne d'écho). Elle est
+présente dans le module chargé, appelée aux deux endroits — et elle ne l'attrape pas sur le
+chemin `mode=sudo`. Le mécanisme précis n'est pas établi.
+
+Portée : quiconque possède `can_update_linux` sur une machine obtient son mot de passe root en
+lançant une mise à jour. Si un mot de passe est réutilisé sur le parc, la portée dépasse la
+machine.
+
+Ce défaut n'apparaissait pas ici tant que `sudo` échouait. Sur un serveur réel, où `sudo`
+fonctionne, **il est actif**. Les journaux, eux, sont propres : `log_scrub.py` filtre — zéro
+occurrence dans les journaux Docker comme dans les fichiers. La fuite est dans la réponse HTTP,
+que le nettoyeur ne couvre pas.
+
+**Non corrigé** : le backend Python est hors du périmètre de cette migration, et une
+modification de ce genre demande un arbitrage. Signalé pour décision.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
