@@ -54,6 +54,11 @@
     function dit(texte, ton) {
         annonce.textContent = texte || '';
         annonce.className = 'rw-annonce' + (ton ? ' rw-annonce--' + ton : '');
+
+        // Le journal d'execution (U2) garde la trace de ce que la page a fait.
+        // L'annonce, elle, ne montre que le dernier etat — les deux se
+        // completent, ils ne se remplacent pas.
+        if (window.rwJournal) window.rwJournal.ajoute(texte, ton === 'echec' ? 'error' : (ton || 'info'));
     }
 
     function heure() { return new Date().toLocaleTimeString(); }

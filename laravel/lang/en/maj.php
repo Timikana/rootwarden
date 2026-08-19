@@ -50,6 +50,16 @@ return [
     'btn_reboot'  => 'Last reboot',
     'tip_reboot'  => 'Reads the last boot time. No effect on the machine.',
 
+    // Journal d'execution (U2)
+    'journal_titre' => 'Execution log',
+    'journal_desc' => 'What RootWarden did on the servers during this visit. One panel per machine, plus a general log. Nothing is kept between visits — durable traceability lives in the command log.',
+    'journal_general' => 'General log',
+    'journal_vide' => 'No activity yet.',
+    'btn_vider' => 'Clear the log',
+    'tip_vider' => 'Clears the display. It erases no recorded trace.',
+    'suivre' => 'Follow',
+    'suivre_aide' => 'Automatically scrolls to new lines. Unticks itself if you scroll up to read.',
+
     // States
     'non_verifie' => 'Not checked',
     'inconnu'     => 'Unknown',

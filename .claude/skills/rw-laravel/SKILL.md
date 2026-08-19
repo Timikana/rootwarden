@@ -696,6 +696,57 @@ Un `<label>` est EN LIGNE par defaut : `max-width` y est ignore, et le champ
 qu'il contient s'etend sur toute la page (1 375 px pour le champ de recherche).
 Poser `display: block`.
 
+### Une DECLARATION GLOBALE ne signale jamais qu'elle en ecrase une autre
+
+TROISIEME occurrence du meme defaut dans ce projet :
+
+| Ou | Quoi |
+|---|---|
+| legacy | `escHtml()` defini deux fois |
+| notre CSS | `.rw-etiquette` : libelle de champ, puis pastille (E-12) |
+| legacy | `appendLog()` : `domManipulation.js` puis `apiCalls.js` (E-15) |
+
+Pour `appendLog`, la consequence mesuree : la zone `#logs` que la page rend n'est
+alimentee par PERSONNE, les messages generaux se deposent parmi les panneaux de
+serveur, et `clearLog()` vide une zone toujours vide.
+
+Dans le portage : un point d'entree UNIQUE et NOMME, declare dans une fermeture
+(`window.rwJournal = { ajoute, vide }`). Rien ne peut l'ecraser par megarde, et
+les autres sous-lots s'y adossent explicitement.
+
+### Contrat du journal d'execution (`window.rwJournal`)
+
+    ajoute(message, type, serveur)   type : 'info' | 'ok' | 'progress' | 'error'
+    vide()
+
+- SANS serveur -> la zone GENERALE (`#logs`), qui dit qu'elle est vide quand elle
+  l'est. JAMAIS le conteneur des panneaux.
+- AVEC serveur -> un panneau cree a la premiere ligne et REUTILISE ensuite.
+- `progress` REMPLACE la ligne de progression precedente : un compteur qui defile
+  sur mille lignes n'informe personne.
+- Le suivi automatique se desactive quand on remonte lire, se reactive quand on
+  redescend. Le defilement PROGRAMMATIQUE porte un drapeau, sans quoi chaque
+  ligne suivie fait clignoter la case.
+
+Les identifiants et classes sont ceux du legacy (`logs-container`, `logs`,
+`.server-log-window`, `.log-window`, `.log-line`, `.log-follow-toggle`) : UN test
+vise les deux cibles.
+
+### Le detail d'une attente decrit ce qu'on a MESURE
+
+`verifie('...', vrai, 'introuvable dans les deux zones')` affiche « introuvable »
+sur un PASS et donne a lire l'inverse du resultat. Le detail se calcule a partir
+de la mesure, il ne pre-suppose pas l'echec.
+
+### Une capture s'arrete au PLI
+
+La prise de vue fait la hauteur du champ visible. Une section basse de page —
+un journal, un pied de formulaire — n'y figure pas. Faire defiler jusqu'a elle
+avant de photographier :
+
+    await page.evaluate(() => document.querySelector('[data-rw="journal"]')
+        ?.scrollIntoView({ block: 'start' }));
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees — toutes celles du meme
