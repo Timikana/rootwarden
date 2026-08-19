@@ -880,6 +880,38 @@ haute, et la classe est partagée avec les pages d'approbation et de sauvegarde.
 désormais portée par un modificateur — `.rw-tableau__actions--releves` — et le débordement
 appartient au cadre du tableau, qui défile et le dit.
 
+### U1 complété — le filtre par étiquette
+
+Le quatrième filtre du parc, manqué au relevé de la vague précédente et noté comme tel plutôt que
+U1 déclaré clos. Il est porté : le contrôleur lit les étiquettes distinctes, le champ les propose,
+et `/filter_servers` reçoit le paramètre `tag`.
+
+**Les étiquettes sont écrites par `adm/`**, module non porté, et **aucune route backend ne permet
+d'en poser**. La page ne fait que les lire. Un parc sans étiquette est un état normal : le champ
+reste affiché mais désactivé, et son libellé dit « Aucune étiquette au parc » — plutôt qu'une
+liste vide qui laisserait croire à une panne.
+
+La table `machine_tags` était vide. Une étiquette de test (`banc-essai` sur `Test-Server-Debian`,
+jamais sur la machine de production) sert de fixture ; le test la consomme sans la consommer —
+elle est idempotente et n'épuise aucun espace de clés. Sans étiquette, le test constate que le
+filtre n'est pas exerçable au lieu d'échouer.
+
+### Deux assertions creuses, dans le même bloc
+
+Le filtre par étiquette a d'abord été mesuré **par-dessus le filtre par environnement resté
+actif**. « 3 → 2 » passait, et les deux lignes rendues étaient celles de l'environnement. Une
+assertion qui mesure la combinaison de deux filtres ne dit rien du second.
+
+Corrigé en deux temps :
+
+- l'attente exige désormais que le résultat soit **exactement la machine étiquetée**, pas un
+  simple décompte — un filtre inopérant qui laisse un autre filtre actif ne peut plus passer ;
+- les autres filtres sont remis à zéro **et le parc complet réaffiché** avant de mesurer. Sans ce
+  retour à un état connu, l'attente « le nombre de lignes a changé » était déjà vraie — l'écran
+  portait encore les deux lignes du filtre précédent — et la sonde rendait la main sur un rendu
+  périmé. C'est la troisième fois que cette famille de piège se paie : **attendre une condition
+  déjà satisfaite n'attend rien**.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

@@ -129,7 +129,10 @@ async function releve(page) {
                 environnement: Boolean(document.getElementById('environment')),
                 criticite: Boolean(document.getElementById('criticality')),
                 reseau: Boolean(document.getElementById('network-type')),
+                etiquette: Boolean(document.getElementById('tag-filter')),
             },
+            etiquettes: [...(document.getElementById('tag-filter')?.options || [])]
+                .map(o => o.value).filter(Boolean),
             nbLignes: lignes.length,
             machines: lignes.map(parLigne),
             texteEntier: document.body.innerText,
@@ -225,6 +228,81 @@ try {
     } else {
         constate('filtre par environnement',
                  `non discriminant — les ${depart.nbLignes} machines partagent « ${envPresents[0] || '?'} »`);
+    }
+
+    /*
+     * ── LE FILTRE PAR ETIQUETTE ────────────────────────────────────────────
+     *
+     * Les etiquettes sont ecrites par le module `adm/`, non porte : cette page
+     * ne fait que les lire, et AUCUNE route backend ne permet d'en poser. La
+     * fixture est donc directement en base — voir MODULE-UPDATE.md pour la
+     * recreer. Sans etiquette au parc, le filtre existe mais n'a rien a
+     * filtrer : le test le CONSTATE au lieu d'echouer.
+     */
+    verifie('le filtre par etiquette est present', depart.filtres.etiquette);
+    constate('etiquettes proposees', depart.etiquettes.join(', ') || 'aucune');
+
+    if (depart.etiquettes.length) {
+        const etiquette = depart.etiquettes[0];
+
+        /*
+         * REMETTRE LES AUTRES FILTRES A ZERO D'ABORD.
+         *
+         * Le premier jet enchainait sur le filtre par environnement reste
+         * actif : « 3 -> 2 » passait, mais les deux lignes rendues etaient
+         * celles de l'environnement, pas de l'etiquette. Une assertion qui
+         * mesure la combinaison de deux filtres ne dit rien du second.
+         */
+        await page.select('#environment', '');
+        await page.select('#criticality', '');
+        await page.select('#network-type', '');
+        await page.evaluate(() => {
+            const b = [...document.querySelectorAll('button')].find(x => /filtr/i.test(x.textContent));
+            if (b) b.click();
+        });
+
+        /*
+         * REPARTIR D'UN ETAT CONNU. Le filtre precedent laissait deux lignes a
+         * l'ecran ; l'attente « le nombre de lignes a change » etait donc DEJA
+         * VRAIE et rendait la main sur un ecran perime — le test lisait le
+         * resultat de l'environnement en croyant lire celui de l'etiquette.
+         */
+        await attendJusqua(page, (e) => e.nbLignes === depart.nbLignes);
+
+        await page.select('#tag-filter', etiquette);
+        await page.evaluate(() => {
+            const b = [...document.querySelectorAll('button')].find(x => /filtr/i.test(x.textContent));
+            if (b) b.click();
+        });
+        const parEtiquette = await attendJusqua(page, (e) => e.nbLignes !== depart.nbLignes);
+
+        constate(`apres filtre « ${etiquette} »`,
+                 `${parEtiquette.nbLignes} ligne(s) : ${parEtiquette.machines.map(m => m.nom).join(', ') || 'aucune'}`);
+
+        /*
+         * L'etiquette de la fixture n'est posee que sur `Test-Server-Debian`.
+         * Compter les lignes ne suffit donc pas : on exige que le resultat soit
+         * EXACTEMENT cette machine. Sans cela, un filtre qui ne s'applique pas
+         * mais laisse un autre filtre actif passerait pour un succes.
+         */
+        verifie(`le filtre « ${etiquette} » ne garde que les machines etiquetees`,
+                parEtiquette.nbLignes > 0
+                && parEtiquette.nbLignes < depart.nbLignes
+                && parEtiquette.machines.every(m => /Test-Server-Debian/i.test(m.nom)),
+                `${depart.nbLignes} -> ${parEtiquette.nbLignes} : `
+                + (parEtiquette.machines.map(m => m.nom).join(', ') || 'aucune'));
+
+        // Remettre le parc entier avant la suite : la mesure du
+        // rafraichissement compare des colonnes, pas un sous-ensemble.
+        await page.select('#tag-filter', '');
+        await page.evaluate(() => {
+            const b = [...document.querySelectorAll('button')].find(x => /filtr/i.test(x.textContent));
+            if (b) b.click();
+        });
+        await attendJusqua(page, (e) => e.nbLignes === depart.nbLignes);
+    } else {
+        constate('filtre par etiquette',
+                 "aucune etiquette au parc — le champ existe, il n'a rien a proposer");
     }
 
     /*

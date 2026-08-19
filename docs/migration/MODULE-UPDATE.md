@@ -146,10 +146,18 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 
 État au 2026-08-18 : **U1 porté** sur `/mises-a-jour` (voir `PARITE.md` E-14).
 
-**Reste à faire dans U1** : le filtre par **étiquette**. Le legacy le rend bien — un `<select>`
-`tag-filter` alimenté par `SELECT DISTINCT tag FROM machine_tags` — et `/filter_servers` accepte le
-paramètre `tag`. Il n'a pas été porté faute d'avoir été vu à temps ; le noter ici plutôt que de
-déclarer U1 clos.
+**U1 est complet** : le filtre par étiquette a été ajouté après coup (il avait été manqué au
+relevé).
+
+**Fixture des étiquettes.** Les étiquettes sont écrites par `adm/`, module non porté, et aucune
+route backend ne permet d'en poser : la page ne fait que les lire. `machine_tags` était vide, donc
+le filtre n'était pas exerçable. Une étiquette de test a été posée directement en base — jamais
+sur la machine de production :
+
+    INSERT IGNORE INTO machine_tags (machine_id, tag) VALUES (2, 'banc-essai');
+
+Elle est idempotente et n'épuise aucun espace de clés. Sans étiquette au parc, le test constate
+que le filtre n'est pas exerçable au lieu d'échouer, et le champ s'affiche désactivé en le disant.
 
 **Ordre retenu** : U1, U2, U3, U4, U5, puis U6 en dernier.
 
