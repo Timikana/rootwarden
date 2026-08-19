@@ -55,6 +55,21 @@
             </select>
         </label>
 
+        {{-- Etiquettes. Elles sont posees par le module `adm/`, non porte : cette
+             page ne fait que les lire. Aucune etiquette au parc est un etat
+             normal — le champ le DIT au lieu de proposer une liste vide. --}}
+        <label class="rw-filtre">
+            <span class="rw-filtre__etiquette">{{ __('maj.f_tag') }}</span>
+            <select class="rw-saisie rw-saisie--compacte" id="tag-filter" data-rw="f-etiquette"
+                    @if (! count($etiquettes)) disabled @endif
+                    title="{{ count($etiquettes) ? __('maj.tip_tag') : __('maj.tip_tag_vide') }}">
+                <option value="">{{ count($etiquettes) ? __('maj.tous') : __('maj.tag_aucune') }}</option>
+                @foreach ($etiquettes as $etiquette)
+                    <option value="{{ $etiquette }}">{{ $etiquette }}</option>
+                @endforeach
+            </select>
+        </label>
+
         <button class="rw-bouton rw-bouton--discret" id="filter-btn" type="button"
                 data-rw="filtrer">{{ __('maj.btn_filter') }}</button>
     </div>

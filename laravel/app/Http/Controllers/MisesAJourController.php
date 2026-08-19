@@ -33,6 +33,7 @@ class MisesAJourController extends Controller
                 (int) $session->get('role_id', 0),
                 (int) $session->get('user_id', 0),
             ),
+            'etiquettes' => $machines->etiquettes(),
         ]);
     }
 }

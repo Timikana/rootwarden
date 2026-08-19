@@ -193,6 +193,8 @@
             environment: document.getElementById('environment').value,
             criticality: document.getElementById('criticality').value,
             networkType: document.getElementById('network-type').value,
+            // `/filter_servers` joint `machine_tags` quand `tag` est fourni.
+            tag: document.getElementById('tag-filter')?.value || '',
         };
     }
 
@@ -247,6 +249,8 @@
         document.getElementById('environment').value = '';
         document.getElementById('criticality').value = '';
         document.getElementById('network-type').value = '';
+        const etiquette = document.getElementById('tag-filter');
+        if (etiquette) etiquette.value = '';
         relit({});
     });
 

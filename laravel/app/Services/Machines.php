@@ -63,4 +63,23 @@ class Machines
             return [];
         }
     }
+
+    /**
+     * Les etiquettes posees sur le parc, pour alimenter le filtre.
+     *
+     * Elles sont ecrites par le module `adm/`, non porte : cette page ne fait
+     * que les lire. Une liste vide est un etat normal — le filtre s'affiche
+     * alors sans rien a proposer, ce que la page DIT plutot que de masquer le
+     * champ.
+     *
+     * @return list<string>
+     */
+    public function etiquettes(): array
+    {
+        try {
+            return DB::table('machine_tags')->distinct()->orderBy('tag')->pluck('tag')->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
 }
