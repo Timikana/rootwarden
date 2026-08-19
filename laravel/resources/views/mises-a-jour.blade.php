@@ -85,6 +85,56 @@
                 data-rw="paquets-en-attente"
                 title="{{ __('maj.tip_paquets') }}">{{ __('maj.btn_paquets') }}</button>
     </div>
+
+    {{-- Planification — sous-lot U4. Un SEUL formulaire pour les deux natures
+         (generale, securite) : les champs sont les memes, seule la route et la
+         lecture de la recurrence changent. Le legacy a deux fenetres modales
+         qui repetent le meme formulaire.
+
+         `hidden` plutot qu'une classe : l'etat se lit sur la geometrie. --}}
+    <form class="rw-carte rw-carte--pleine" id="schedule-form" data-rw="formulaire-planification"
+          hidden onsubmit="return false;">
+        <h2 class="rw-sous-titre-fort" id="sched-titre" data-rw="titre-planification"></h2>
+        <p class="rw-sous-titre rw-prose" id="sched-machine" data-rw="machine-planification"></p>
+
+        <div class="rw-grille rw-grille--compacte">
+            <label class="rw-champ">
+                <span class="rw-champ__etiquette">{{ __('maj.f_date') }}</span>
+                <input type="date" id="sched-date" class="rw-saisie" data-rw="date">
+            </label>
+
+            <label class="rw-champ">
+                <span class="rw-champ__etiquette">{{ __('maj.f_time') }}</span>
+                <input type="time" id="sched-time" class="rw-saisie" data-rw="heure">
+            </label>
+
+            <label class="rw-champ">
+                <span class="rw-champ__etiquette">{{ __('maj.f_repeat') }}</span>
+                <select id="sched-repeat" class="rw-saisie" data-rw="recurrence">
+                    <option value="none">{{ __('maj.repeat_none') }}</option>
+                    <option value="daily">{{ __('maj.repeat_daily') }}</option>
+                    <option value="weekly">{{ __('maj.repeat_weekly') }}</option>
+                    <option value="monthly">{{ __('maj.repeat_monthly') }}</option>
+                </select>
+            </label>
+        </div>
+
+        {{-- CE QUE LE BACKEND VA REELLEMENT ECRIRE, avant le geste. Les quatre
+             recurrences ne veulent pas dire ce que leur nom laisse croire :
+             « ne pas repeter » revient chaque annee, et la planification
+             generale place l'hebdomadaire le LUNDI et le mensuel le PREMIER du
+             mois, quelle que soit la date choisie. --}}
+        <p class="rw-apercu" id="sched-apercu" role="status" aria-live="polite"
+           data-rw="apercu"></p>
+
+        <div class="rw-actions">
+            <button class="rw-bouton rw-bouton--discret rw-actions__gauche" id="sched-cancel"
+                    type="button" data-rw="annuler-planification">{{ __('maj.btn_cancel') }}</button>
+            <button class="rw-bouton" id="sched-save" type="button" data-rw="enregistrer-planification"
+                    title="{{ __('maj.tip_save_sched') }}">{{ __('maj.btn_save_sched') }}</button>
+        </div>
+    </form>
+
     {{-- Les identifiants et les CLASSES de colonne sont ceux du legacy
          (`server-table-body`, `.linux-version`, `.maj-secu-date`...) : le MEME
          test de caracterisation vise les deux cibles. --}}
@@ -94,6 +144,7 @@
                 <tr>
                     <th>{{ __('maj.th_selection') }}</th>
                     <th>{{ __('maj.th_name') }}</th>
+                    <th>{{ __('maj.th_actions') }}</th>
                     <th>{{ __('maj.th_linux') }}</th>
                     <th>{{ __('maj.th_last_check') }}</th>
                     <th>{{ __('maj.th_ip_port') }}</th>
@@ -104,7 +155,6 @@
                     <th>{{ __('maj.th_env') }}</th>
                     <th>{{ __('maj.th_criticality') }}</th>
                     <th>{{ __('maj.th_network') }}</th>
-                    <th>{{ __('maj.th_actions') }}</th>
                 </tr>
             </thead>
             <tbody id="server-table-body"></tbody>
@@ -145,9 +195,12 @@
          sert le premier rendu et les suivants, il ne peut donc pas exister deux
          versions du tableau qui divergent. --}}
     <script id="maj-parc" type="application/json">@json($machines)</script>
-    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle')])
+    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle'), 'btn_planifier' => __('maj.btn_planifier'), 'tip_planifier' => __('maj.tip_planifier'), 'btn_planifier_secu' => __('maj.btn_planifier_secu'), 'tip_planifier_secu' => __('maj.tip_planifier_secu')])
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="maj-libelles" type="application/json">@json($libelles)</script>
+
+    @php($planif = ['titre_general' => __('maj.titre_general'), 'titre_secu' => __('maj.titre_secu'), 'desc_general' => __('maj.desc_general'), 'desc_secu' => __('maj.desc_secu'), 'apercu_incomplet' => __('maj.apercu_incomplet'), 'apercu_daily' => __('maj.apercu_daily'), 'apercu_weekly' => __('maj.apercu_weekly'), 'apercu_monthly' => __('maj.apercu_monthly'), 'apercu_none' => __('maj.apercu_none'), 'reserve_annuel' => __('maj.reserve_annuel'), 'reserve_lundi' => __('maj.reserve_lundi'), 'reserve_premier' => __('maj.reserve_premier'), 'sched_incomplet' => __('maj.sched_incomplet'), 'sched_en_cours' => __('maj.sched_en_cours'), 'sched_pose' => __('maj.sched_pose'), 'sched_ok' => __('maj.sched_ok'), 'sched_err' => __('maj.sched_err'), 'jours' => [__('maj.j_lundi'), __('maj.j_mardi'), __('maj.j_mercredi'), __('maj.j_jeudi'), __('maj.j_vendredi'), __('maj.j_samedi'), __('maj.j_dimanche')]])
+    <script id="maj-planif-libelles" type="application/json">@json($planif)</script>
 
     @php($journal = ['suivre' => __('maj.suivre'), 'suivre_aide' => __('maj.suivre_aide'), 'vide' => __('maj.journal_vide')])
     <script id="journal-libelles" type="application/json">@json($journal)</script>

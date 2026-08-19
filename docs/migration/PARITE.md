@@ -735,3 +735,87 @@ portage n'appelle `/dry_run_update`.
    La route reste joignable par la passerelle du portage alors qu'aucune page ne l'appelle ;
 3. `/security_updates` (sous-lot U6) diffuse par la **même** fonction et fuit de la même façon.
    U6 ne peut pas être porté avant que ce point soit tranché.
+
+---
+
+## E-18 — La planification générale du legacy n'a jamais rien planifié
+
+**Défaut du legacy, mesuré.** `saveAdvancedSchedule()` (`update/js/domManipulation.js`) envoie
+
+```json
+{"machine_id": 2, "date": "2026-09-15", "time": "03:30", "repeat": "weekly"}
+```
+
+à **`/schedule_update`**, qui lit `int(data.get('interval_minutes', 0))` et exige
+`1 <= interval_minutes <= 10080`. La clé n'est pas dans le corps : la validation échoue **avant
+toute session SSH**, et la route rend un 400.
+
+Mesuré sur la machine 2, depuis la page legacy :
+
+| Ce qui a été observé | Valeur |
+|---|---|
+| Route appelée | `schedule_update` |
+| Statut rendu | `400` |
+| `/etc/cron.d/auto_update_advanced` après le geste | `ABSENT` |
+
+La route qui correspond au formulaire existe — **`/schedule_advanced_update`**, qui lit
+`date`, `time` et `repeat` — et **personne ne l'appelle**.
+
+Symétriquement, la fonction qui respecte le contrat de `/schedule_update`, `scheduleUpdate()`
+(`update/js/apiCalls.js:401`), lit `document.getElementById('update-interval').value` : **cet
+élément n'existe nulle part dans la page**, et la fonction elle-même **n'a aucun appelant**. Les
+deux moitiés du mécanisme sont là ; elles ne se rejoignent pas.
+
+### Ce que fait le portage
+
+Il appelle `/schedule_advanced_update` — la route dont le contrat correspond au formulaire. C'est
+une divergence assumée : porter fidèlement aurait porté un bouton qui échoue à chaque clic.
+
+Le test vérifie les deux comportements, chacun sur sa cible : côté legacy, que la réponse est un
+400 et qu'aucun fichier n'est écrit ; côté portage, que le cron attendu se trouve **sur la
+machine**.
+
+---
+
+## E-19 — La récurrence promet ce que cron ne sait pas exprimer
+
+**Défaut du legacy, mesuré.** Les deux formulaires offrent les mêmes quatre choix — ne pas
+répéter, tous les jours, toutes les semaines, tous les mois. Ce que le backend en fait :
+
+| Choix | `/schedule_advanced_update` (générale) | `/schedule_advanced_security_update` (sécurité) |
+|---|---|---|
+| `daily` | `mm hh * * *` | `mm hh * * *` |
+| `weekly` | `mm hh * * 1` — **toujours lundi** | `mm hh * * <jour de la date choisie>` |
+| `monthly` | `mm hh 1 * *` — **toujours le 1er** | `mm hh <jour de la date> * *` |
+| `none` | `mm hh JJ MM *` | `mm hh JJ MM *` |
+
+Deux écarts entre le mot et l'effet :
+
+- **« Ne pas répéter » ne s'arrête jamais.** cron n'a pas de champ année : `mm hh JJ MM *` revient
+  **chaque année** à la même date. Le seul choix qui promet une exécution unique est celui qui en
+  programme une infinité.
+- **La planification générale ignore la date choisie** pour l'hebdomadaire et le mensuel : elle
+  écrit lundi, et le premier du mois. La planification de sécurité, elle, suit la date. Le même
+  mot ne veut donc pas dire la même chose selon le formulaire.
+
+**Mesuré** sur la machine 2, date du **mardi** 15/09/2026, 03:30, « toutes les semaines » :
+
+| Formulaire | Fichier écrit | Expression |
+|---|---|---|
+| Générale | `/etc/cron.d/auto_update_advanced` | `30 03 * * 1` (lundi) |
+| Sécurité | `/etc/cron.d/auto_security_update_advanced` | `30 03 * * 2` (mardi) |
+
+### Ce que fait le portage
+
+Il affiche, **avant le geste**, l'expression cron que le backend écrira et sa lecture en clair :
+
+> Tous les lundis a 03:30 — 30 03 * * 1 — la planification generale place toujours l'hebdomadaire
+> le lundi, quelle que soit la date choisie.
+
+La réserve n'apparaît que lorsqu'elle s'applique : rien si la date choisie est déjà un lundi. Elle
+se distingue par la teinte du liseré — ce n'est pas une erreur, c'est un écart entre le mot de la
+liste et ce que cron sait dire.
+
+Le test compare **l'aperçu affiché** au **fichier posé sur la machine** : deux artefacts
+indépendants, l'un promesse d'écran, l'autre réalité de la machine. Une divergence entre les deux
+serait un défaut du portage.

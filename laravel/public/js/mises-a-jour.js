@@ -128,6 +128,24 @@
             tr.appendChild(tdCase);
 
             tr.appendChild(cellule(m.name ?? '', 'server-name rw-tableau__fort'));
+
+            const tdActions = document.createElement('td');
+            tdActions.className = 'rw-tableau__actions rw-tableau__actions--releves';
+            tdActions.append(
+                boutonReleve(libelles.btn_version, libelles.tip_version, 'version-' + id,
+                             (b) => releveVersion(id, tr, b)),
+                boutonReleve(libelles.btn_statut, libelles.tip_statut, 'statut-' + id,
+                             (b) => releveStatut(id, tr, b)),
+                boutonReleve(libelles.btn_reboot, libelles.tip_reboot, 'reboot-' + id,
+                             (b) => releveRedemarrage(id, tr, b)),
+                boutonReleve(libelles.btn_planifier, libelles.tip_planifier, 'planifier-' + id,
+                             () => ouvrePlanification(id, m.name ?? '', 'generale')),
+                boutonReleve(libelles.btn_planifier_secu, libelles.tip_planifier_secu,
+                             'planifier-secu-' + id,
+                             () => ouvrePlanification(id, m.name ?? '', 'securite')),
+            );
+            tr.appendChild(tdActions);
+
             tr.appendChild(cellule(m.linux_version || libelles.non_verifie, 'linux-version'));
             tr.appendChild(cellule(m.last_checked || libelles.non_verifie, 'last-checked rw-tableau__discret'));
             tr.appendChild(cellule(`${m.ip ?? ''}:${m.port ?? ''}`, 'rw-tableau__discret'));
@@ -142,18 +160,6 @@
             tr.appendChild(cellule(m.environment || 'OTHER', 'environment'));
             tr.appendChild(cellule(m.criticality || 'NON CRITIQUE', 'criticality'));
             tr.appendChild(cellule(m.network_type || 'INTERNE', 'network-type'));
-
-            const tdActions = document.createElement('td');
-            tdActions.className = 'rw-tableau__actions rw-tableau__actions--releves';
-            tdActions.append(
-                boutonReleve(libelles.btn_version, libelles.tip_version, 'version-' + id,
-                             (b) => releveVersion(id, tr, b)),
-                boutonReleve(libelles.btn_statut, libelles.tip_statut, 'statut-' + id,
-                             (b) => releveStatut(id, tr, b)),
-                boutonReleve(libelles.btn_reboot, libelles.tip_reboot, 'reboot-' + id,
-                             (b) => releveRedemarrage(id, tr, b)),
-            );
-            tr.appendChild(tdActions);
 
             corps.appendChild(tr);
         }
@@ -361,6 +367,190 @@
             : libelles.paquets_fin.replace(':nombre', choix.length),
             echecs ? 'echec' : 'ok');
     }
+
+    /* ═════════════════════════════════════════════════════════════════════
+       Sous-lot U4 — la planification
+
+       CE QUE FONT LES ROUTES, LU DANS `backend/routes/updates.py` AVANT DE
+       CLIQUER. Les deux ECRIVENT un fichier dans `/etc/cron.d/` sur la machine
+       distante, en root, puis redemarrent cron :
+
+         /schedule_advanced_update           -> /etc/cron.d/auto_update_advanced
+         /schedule_advanced_security_update  -> /etc/cron.d/auto_security_update_advanced
+                                                + UPDATE machines.maj_secu_date
+
+       POURQUOI LE PORTAGE N'APPELLE PAS LA MEME ROUTE QUE LE LEGACY.
+       `saveAdvancedSchedule()` envoie `{machine_id, date, time, repeat}` a
+       `/schedule_update`, qui attend `interval_minutes` : la validation echoue
+       et la reponse est un 400, toujours. La planification generale du legacy
+       n'a donc jamais rien planifie. La route qui correspond au formulaire est
+       `/schedule_advanced_update`, et personne ne l'appelle. Voir PARITE.md,
+       E-18.
+
+       LA RECURRENCE NE VEUT PAS DIRE CE QUE SON NOM LAISSE CROIRE (E-19) :
+       cron n'a pas de champ ANNEE, donc « ne pas repeter » revient chaque
+       annee ; et la planification generale ecrit l'hebdomadaire le LUNDI
+       (`* * 1`) et le mensuel le PREMIER du mois (`1 * *`), quelle que soit la
+       date choisie — la planification de securite, elle, suit la date. Le
+       formulaire montre l'expression reellement ecrite AVANT le geste.
+       ═════════════════════════════════════════════════════════════════════ */
+
+    const planif = JSON.parse(document.getElementById('maj-planif-libelles')?.textContent || '{}');
+    const formulaire = document.getElementById('schedule-form');
+    const champDate = document.getElementById('sched-date');
+    const champHeure = document.getElementById('sched-time');
+    const champRecurrence = document.getElementById('sched-repeat');
+    const zoneApercu = document.getElementById('sched-apercu');
+    const titrePlanif = document.getElementById('sched-titre');
+    const machinePlanif = document.getElementById('sched-machine');
+    const boutonEnregistrer = document.getElementById('sched-save');
+
+    /** Machine et nature en cours d'edition ; null quand le formulaire est ferme. */
+    let planifEnCours = null;
+
+    /**
+     * Expression cron que le BACKEND va ecrire, et sa lecture en clair.
+     *
+     * Reproduit exactement les deux fonctions Python. Toute divergence entre
+     * cet apercu et le fichier pose sur la machine est un defaut : le test de
+     * U4 compare les deux.
+     */
+    function calculeCron(nature, date, heure, recurrence) {
+        const [hh, mm] = heure.split(':');
+        const [, mois, jour] = date.split('-');
+        const jourJs = new Date(date + 'T00:00:00').getDay();
+        const jourCron = jourJs === 0 ? 7 : jourJs;   // Python : weekday() + 1
+
+        if (recurrence === 'daily') {
+            return { cron: `${mm} ${hh} * * *`, texte: planif.apercu_daily, reserve: '' };
+        }
+        if (recurrence === 'weekly') {
+            if (nature === 'securite') {
+                return {
+                    cron: `${mm} ${hh} * * ${jourCron}`,
+                    texte: planif.apercu_weekly.replace(':jour', planif.jours[jourCron - 1]),
+                    reserve: '',
+                };
+            }
+            return {
+                cron: `${mm} ${hh} * * 1`,
+                texte: planif.apercu_weekly.replace(':jour', planif.jours[0]),
+                reserve: jourCron === 1 ? '' : planif.reserve_lundi,
+            };
+        }
+        if (recurrence === 'monthly') {
+            if (nature === 'securite') {
+                return {
+                    cron: `${mm} ${hh} ${jour} * *`,
+                    texte: planif.apercu_monthly.replace(':jour', String(parseInt(jour, 10))),
+                    reserve: '',
+                };
+            }
+            return {
+                cron: `${mm} ${hh} 1 * *`,
+                texte: planif.apercu_monthly.replace(':jour', '1'),
+                reserve: parseInt(jour, 10) === 1 ? '' : planif.reserve_premier,
+            };
+        }
+        return {
+            cron: `${mm} ${hh} ${jour} ${mois} *`,
+            texte: planif.apercu_none.replace(':jour', String(parseInt(jour, 10)))
+                                     .replace(':mois', String(parseInt(mois, 10))),
+            reserve: planif.reserve_annuel,
+        };
+    }
+
+    function montreApercu() {
+        if (!planifEnCours) return;
+        const d = champDate.value;
+        const h = champHeure.value;
+        if (!d || !h) {
+            zoneApercu.textContent = planif.apercu_incomplet;
+            zoneApercu.className = 'rw-apercu rw-apercu--incomplet';
+            boutonEnregistrer.disabled = true;
+            return;
+        }
+        const r = calculeCron(planifEnCours.nature, d, h, champRecurrence.value);
+        const heureTexte = r.texte.replace(':heure', h);
+        zoneApercu.textContent = heureTexte + '  —  ' + r.cron + (r.reserve ? '  ' + r.reserve : '');
+        zoneApercu.className = 'rw-apercu' + (r.reserve ? ' rw-apercu--reserve' : '');
+        boutonEnregistrer.disabled = false;
+    }
+
+    function ouvrePlanification(id, nom, nature) {
+        planifEnCours = { id: id, nom: nom, nature: nature };
+        titrePlanif.textContent = nature === 'securite' ? planif.titre_secu : planif.titre_general;
+        machinePlanif.textContent = (nature === 'securite' ? planif.desc_secu : planif.desc_general)
+            .replace(':machine', nom);
+        formulaire.hidden = false;
+        montreApercu();
+        formulaire.scrollIntoView({ block: 'nearest' });
+        champDate.focus();
+    }
+
+    function fermePlanification() {
+        planifEnCours = null;
+        formulaire.hidden = true;
+    }
+
+    async function enregistrePlanification() {
+        if (!planifEnCours) return;
+        const d = champDate.value;
+        const h = champHeure.value;
+        if (!d || !h) { dit(planif.sched_incomplet, 'echec'); return; }
+
+        const nature = planifEnCours.nature;
+        const nom = planifEnCours.nom;
+        const attendu = calculeCron(nature, d, h, champRecurrence.value);
+        const chemin = nature === 'securite'
+            ? '/schedule_advanced_security_update'
+            : '/schedule_advanced_update';
+
+        const initial = boutonEnregistrer.textContent;
+        boutonEnregistrer.disabled = true;
+        boutonEnregistrer.textContent = planif.sched_en_cours;
+        dit(planif.sched_en_cours);
+
+        const res = await appelle(chemin, {
+            method: 'POST',
+            body: JSON.stringify({
+                machine_id: planifEnCours.id,
+                date: d,
+                time: h,
+                repeat: champRecurrence.value,
+            }),
+        });
+
+        boutonEnregistrer.disabled = false;
+        boutonEnregistrer.textContent = initial;
+
+        const c = res.corps;
+        if (!res.ok || !c || c.success === false) {
+            // UNE ERREUR NE S'AVALE PAS : le formulaire reste ouvert, avec ce
+            // qui a ete saisi, et la machine est nommee.
+            journal((c && c.message) || planif.sched_err, 'error', nom);
+            dit((c && c.message) || planif.sched_err, 'echec');
+            return;
+        }
+
+        journal(planif.sched_pose.replace(':cron', attendu.cron), 'ok', nom);
+        if (attendu.reserve) journal(attendu.reserve, 'info', nom);
+
+        fermePlanification();
+
+        // La planification de securite ecrit AUSSI `machines.maj_secu_date` :
+        // relire le parc plutot que d'ecrire la cellule nous-memes, pour que la
+        // colonne montre ce que la BASE contient.
+        if (nature === 'securite') await relit(filtresCourants());
+
+        dit(planif.sched_ok.replace(':machine', nom), 'ok');
+    }
+
+    champDate.addEventListener('change', montreApercu);
+    champHeure.addEventListener('change', montreApercu);
+    champRecurrence.addEventListener('change', montreApercu);
+    document.getElementById('sched-cancel').addEventListener('click', fermePlanification);
+    boutonEnregistrer.addEventListener('click', enregistrePlanification);
 
     corps.addEventListener('change', (e) => {
         if (e.target && e.target.name === 'selected_machines[]') compteSelection();

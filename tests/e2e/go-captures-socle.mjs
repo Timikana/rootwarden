@@ -180,6 +180,26 @@ for (const format of LARGEURS) {
     await dors(400);
     await prend('14-journal-execution');
 
+    // 15. Le formulaire de planification (U4), rempli pour que l'apercu montre
+    //     ce que le backend ecrira. AUCUN envoi : la capture ne touche pas la
+    //     machine, elle ouvre le formulaire et pose les champs.
+    await page.evaluate(() => {
+        document.querySelector('[data-rw="planifier-2"]')?.click();
+        const pose = (id, v) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.value = v;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        pose('sched-date', '2026-09-15');
+        pose('sched-time', '03:30');
+        pose('sched-repeat', 'weekly');
+    });
+    await page.evaluate(() => document.getElementById('schedule-form')
+        ?.scrollIntoView({ block: 'start' }));
+    await dors(400);
+    await prend('15-planification');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });
