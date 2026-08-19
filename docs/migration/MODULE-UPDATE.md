@@ -108,8 +108,14 @@ du flux rendu au navigateur — exactement ce que la mesure montrait. Le correct
 plus compter les lignes mais à filtrer tant que la ligne bufferisée **est** le mot de passe ;
 c'est une modification du backend Python, elle n'est pas faite.
 
-Vérifié aussi sur `/dry_run_update`, qui diffuse par la même fonction : la ligne 2 du flux est le
-mot de passe root. C'est pourquoi la simulation n'est pas portée (`PARITE.md`, E-17).
+Vérifié aussi sur `/dry_run_update`, qui diffuse par la même fonction : la ligne 2 du flux était le
+mot de passe root.
+
+**CORRIGÉ le 2026-08-19** (CHANGELOG v1.37.17) : le filtre porte désormais sur le CONTENU et non
+sur la position — toute ligne complète égale au secret est jetée, quel que soit son rang. Mesuré
+après correctif, quatre essais sur quatre : plus aucune trace, pas même un fragment de six
+caractères. Onze cas unitaires figent la règle. Le correctif vaut pour les deux portails, et reste
+à reporter sur `main`.
 
 Les routes **non** streamées (`execute_as_root`) n'ouvrent pas de PTY (`exec_command` sans
 `get_pty`) : elles ne peuvent pas produire cet écho.
@@ -160,7 +166,8 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
 
 État au 2026-08-19 : **U1, U2, la moitié de U3, U4 et U5 portés** sur `/mises-a-jour` (voir
-`PARITE.md` E-14 à E-21). Seul U6 reste — et il est BLOQUÉ par l'arbitrage de E-17.
+`PARITE.md` E-14 à E-21). Seul U6 reste, et il est DÉBLOQUÉ : la fuite du mot de passe root a été
+corrigée le 2026-08-19 (CHANGELOG v1.37.17).
 
 **Correction de lecture** : `getServerLogWindow` n'ouvre AUCUNE fenêtre navigateur — il crée un
 panneau dans la page. La formulation « fenêtres par serveur » de la première version de ce
@@ -227,7 +234,8 @@ décision appartient à l'exploitant.
 
 ## 6. Ce qui devra être décidé avant U6
 
-1. **La fuite** : corriger côté backend, ou porter la page en l'état en le disant à l'écran ?
+1. ~~**La fuite** : corriger côté backend, ou porter la page en l'état ?~~ — CORRIGÉE côté backend
+   le 2026-08-19, sur décision de l'exploitant.
 2. **La garde des routes** : le backend n'exige aucune permission sur des commandes root.
    Resserrer est un changement de droits.
 3. Le module reste servi par l'ancien portail jusqu'à U6 : pendant tout ce temps, l'entrée de

@@ -727,14 +727,28 @@ affiche un mot de passe root reviendrait à la republier. La page renvoie vers l
 l'encart de portage partiel, qui nomme la simulation, et le test vérifie qu'aucune partie du
 portage n'appelle `/dry_run_update`.
 
-**Ce qui reste à arbitrer** (rien n'est fait sans accord) :
+### CORRIGÉ le 2026-08-19, sur décision de l'exploitant
 
-1. corriger `execute_as_root_stream()` — c'est le backend Python, qui doit rester intact ;
-2. retirer ou non `/dry_run_update` de `RoutesBackend::LISTE_BLANCHE`. La liste est aujourd'hui un
-   relevé **fidèle** de `ALLOWED_PROXY_PREFIXES` ; l'en retirer serait une divergence volontaire.
-   La route reste joignable par la passerelle du portage alors qu'aucune page ne l'appelle ;
-3. `/security_updates` (sous-lot U6) diffuse par la **même** fonction et fuit de la même façon.
-   U6 ne peut pas être porté avant que ce point soit tranché.
+`execute_as_root_stream()` ne filtre plus sur une **position** mais sur le **contenu** : toute ligne
+complète égale au secret est jetée, quel que soit son rang. Détail, tests et mesures dans le
+CHANGELOG (v1.37.17) ; onze cas unitaires dans `backend/tests/test_ssh_echo_mot_de_passe.py`.
+
+Mesuré après correctif sur la machine 2, quatre essais sur quatre : plus aucune trace du mot de
+passe dans le flux, pas même un fragment de six caractères, et la sortie de la commande intacte.
+
+**Le correctif vaut pour les deux portails** — ils consomment la même fonction. Il reste à le
+reporter sur `main`.
+
+Les trois points posés ici sont donc clos :
+
+1. ~~corriger `execute_as_root_stream()`~~ — fait ;
+2. `/dry_run_update` reste dans `RoutesBackend::LISTE_BLANCHE`, qui demeure un relevé **fidèle** de
+   `ALLOWED_PROXY_PREFIXES` : la route ne fuit plus, la question de l'en retirer tombe ;
+3. ~~`/security_updates` fuit de la même façon~~ — la même correction le couvre, **U6 est
+   débloqué**.
+
+La simulation reste toutefois **non portée à ce jour** : c'est un reste de portage, plus un
+problème de sécurité. Elle rejoindra le portage avec U6.
 
 ---
 
