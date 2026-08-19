@@ -84,9 +84,41 @@
         <button class="rw-bouton rw-bouton--discret" id="pending-packages-btn" type="button"
                 data-rw="paquets-en-attente"
                 title="{{ __('maj.tip_paquets') }}">{{ __('maj.btn_paquets') }}</button>
+        <button class="rw-bouton rw-bouton--discret" id="dry-run-btn" type="button"
+                data-rw="simulation"
+                title="{{ __('maj.tip_simulation') }}">{{ __('maj.btn_simulation') }}</button>
+        <button class="rw-bouton rw-bouton--danger" id="security-update-btn" type="button"
+                data-rw="maj-securite"
+                title="{{ __('maj.tip_secu_action') }}">{{ __('maj.btn_secu_action') }}</button>
         <button class="rw-bouton rw-bouton--danger" id="reboot-btn" type="button"
                 data-rw="redemarrer"
                 title="{{ __('maj.tip_reboot_action') }}">{{ __('maj.btn_reboot_action') }}</button>
+    </div>
+
+    {{-- Mises a jour de securite — sous-lot U6a. La decision se prend en ligne,
+         et le panneau DIT ce que le libelle du legacy passe sous silence : si
+         apt ou dpkg tourne deja, la route les TUE et supprime leurs verrous
+         avant de reparer. --}}
+    <div class="rw-panneau-decision" id="secu-panneau" data-rw="panneau-securite" hidden>
+        <div class="rw-panneau-decision__texte">
+            <strong>{{ __('maj.secu_titre') }}</strong>
+            <p class="rw-aide" id="secu-machines" data-rw="securite-machines"></p>
+            <p class="rw-aide">{{ __('maj.secu_consequences') }}</p>
+            <p class="rw-aide">{{ __('maj.secu_verrous') }}</p>
+        </div>
+
+        <label class="rw-etiquette-champ">
+            <span id="secu-consigne" data-rw="securite-consigne"></span>
+            <input type="text" class="rw-saisie rw-saisie--compacte" id="secu-confirmation"
+                   data-rw="securite-confirmation" autocomplete="off">
+        </label>
+
+        <div class="rw-panneau-decision__actions">
+            <button class="rw-bouton rw-bouton--discret" id="secu-annuler" type="button"
+                    data-rw="securite-annuler">{{ __('maj.btn_cancel') }}</button>
+            <button class="rw-bouton rw-bouton--danger" id="secu-confirmer" type="button"
+                    data-rw="securite-confirmer" disabled>{{ __('maj.btn_secu_confirmer') }}</button>
+        </div>
     </div>
 
     {{-- Redemarrage — sous-lot U5. La decision se prend EN LIGNE, sous l'action,
@@ -241,7 +273,7 @@
          sert le premier rendu et les suivants, il ne peut donc pas exister deux
          versions du tableau qui divergent. --}}
     <script id="maj-parc" type="application/json">@json($machines)</script>
-    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle'), 'btn_planifier' => __('maj.btn_planifier'), 'tip_planifier' => __('maj.tip_planifier'), 'btn_planifier_secu' => __('maj.btn_planifier_secu'), 'tip_planifier_secu' => __('maj.tip_planifier_secu'), 'reboot_machines' => __('maj.reboot_machines'), 'reboot_consigne' => __('maj.reboot_consigne'), 'reboot_en_cours' => __('maj.reboot_en_cours'), 'reboot_demande' => __('maj.reboot_demande'), 'reboot_attente' => __('maj.reboot_attente'), 'reboot_envoye' => __('maj.reboot_envoye'), 'reboot_fenetre' => __('maj.reboot_fenetre'), 'reboot_err' => __('maj.reboot_err'), 'reboot_fin' => __('maj.reboot_fin'), 'reboot_fin_attente' => __('maj.reboot_fin_attente'), 'reboot_fin_partielle' => __('maj.reboot_fin_partielle')])
+    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle'), 'btn_planifier' => __('maj.btn_planifier'), 'tip_planifier' => __('maj.tip_planifier'), 'btn_planifier_secu' => __('maj.btn_planifier_secu'), 'tip_planifier_secu' => __('maj.tip_planifier_secu'), 'reboot_machines' => __('maj.reboot_machines'), 'reboot_consigne' => __('maj.reboot_consigne'), 'reboot_en_cours' => __('maj.reboot_en_cours'), 'reboot_demande' => __('maj.reboot_demande'), 'reboot_attente' => __('maj.reboot_attente'), 'reboot_envoye' => __('maj.reboot_envoye'), 'reboot_fenetre' => __('maj.reboot_fenetre'), 'reboot_err' => __('maj.reboot_err'), 'reboot_fin' => __('maj.reboot_fin'), 'reboot_fin_attente' => __('maj.reboot_fin_attente'), 'reboot_fin_partielle' => __('maj.reboot_fin_partielle'), 'secu_machines' => __('maj.secu_machines'), 'secu_consigne' => __('maj.secu_consigne'), 'secu_mot' => __('maj.secu_mot'), 'flux_debut' => __('maj.flux_debut'), 'flux_fini' => __('maj.flux_fini'), 'flux_err' => __('maj.flux_err'), 'flux_fin_partielle' => __('maj.flux_fin_partielle'), 'simulation_en_cours' => __('maj.simulation_en_cours'), 'simulation_fin' => __('maj.simulation_fin'), 'secu_en_cours' => __('maj.secu_en_cours'), 'secu_fin' => __('maj.secu_fin')])
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="maj-libelles" type="application/json">@json($libelles)</script>
 

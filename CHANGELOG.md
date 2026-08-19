@@ -1231,6 +1231,68 @@ intacte (42 lignes contre 43 : la ligne d'écho en moins).
 **Ce que cela débloque.** Le sous-lot U6 du module `update/` — les mises à jour de sécurité, qui
 diffusent par cette même fonction — et la simulation, restée au legacy pour cette raison (E-17).
 
+### Module `update/`, sous-lot U6a — la simulation et les mises à jour de sécurité
+
+Les deux actions qui **diffusent** leur sortie. Elles n'étaient pas portables tant que leur flux
+portait le mot de passe root ; le correctif v1.37.17 lève cette raison, et la simulation — restée
+au legacy depuis U3 — rejoint le portage.
+
+Ce que font les routes, **lu avant tout clic** : `/dry_run_update` lance
+`apt-get update && apt-get upgrade --dry-run` et n'installe rien. `/security_updates` lance
+`apt-get update && apt-get upgrade --only-upgrade -y` et **installe**.
+
+### Ce que le libellé du legacy ne dit nulle part
+
+`/security_updates` commence par vérifier si apt ou dpkg tourne déjà. Si c'est le cas, elle fait un
+`killall -9 apt apt-get dpkg`, **supprime les fichiers de verrou** et lance `dpkg --configure -a`
+avant de continuer. Une installation en cours ailleurs est donc interrompue sans préavis. Le
+panneau de décision du portage le dit **avant** le geste ; le bouton « Appliquer » naît désactivé
+et ne s'active que si l'on recopie `SECURITE`.
+
+### Le mot de passe root, vérifié sur le journal réellement affiché
+
+Le test compare le journal **tel qu'il apparaît à l'écran** au mot de passe de la machine, via
+`tests/e2e/secret-absent.py` exécuté dans le conteneur du backend — le secret n'en sort jamais, et
+le script ne répond que par ABSENT ou PRESENT. Vérifié sur les **deux cibles**, après la simulation
+et après la mise à jour : ni le mot de passe entier, ni le moindre fragment de six caractères. Le
+correctif protège donc aussi l'ancien portail, et c'est mesuré.
+
+### La passerelle relaie les flux morceau par morceau
+
+`RoutesBackend::EN_FLUX` nomme les deux routes dont le corps est un flux ; pour elles, la passerelle
+ne lit plus tout le corps avant de répondre — elle relaie par morceaux de 8 Kio, avec un délai
+propre (`BACKEND_TIMEOUT_FLUX`, 900 s par défaut). Une mise à jour de sécurité dépasse largement les
+120 s ordinaires, et garder plusieurs minutes de sortie en mémoire n'a pas de sens.
+
+**Ce que la mesure dit du direct, et qui corrige une hypothèse de départ.** Je pensais que le legacy
+affichait la progression ligne à ligne et que buffer serait une régression. Mesuré : le backend
+livre son corps **d'un seul tenant** entre conteneurs — Guzzle reçoit les en-têtes à 0,5 s puis les
+1 076 octets d'un coup à 7,5 s. Aucune des deux interfaces n'affiche donc de progression
+aujourd'hui. Le relais par morceaux reste juste et utile — il ne bufferise pas de notre côté et
+suivra si le backend se met à livrer progressivement — mais il ne faut pas lui prêter un direct
+qu'il n'a pas.
+
+### `hidden` ne cachait pas — trouvé en regardant la capture
+
+La feuille du navigateur applique `[hidden] { display: none }` avec une spécificité nulle :
+`.rw-panneau-decision { display: flex }` la battait. Le panneau de décision du redémarrage restait
+donc **à l'écran** en permanence, et la capture a montré deux panneaux ouverts côte à côte.
+
+Pire : le test de U5 lisait `p.hidden`, **l'attribut**, et déclarait donc caché un panneau bien
+visible. Une assertion qui mesurait autre chose que ce qu'elle croyait — la même famille de défaut
+que celles déjà payées.
+
+Trois corrections : `[hidden] { display: none !important; }` rend la convention fiable pour tous les
+composants ; ouvrir un panneau de décision **referme les autres** — trois décisions concurrentes sur
+la même sélection ne peuvent que tromper ; et les tests mesurent désormais le **rendu**
+(`getClientRects()`), pas l'attribut.
+
+### Vérification
+
+Nouveau test `tests/e2e/go-page-update-u6.mjs`, vert sur les deux cibles : 8 PASS / 0 FAIL côté
+legacy, 13 PASS / 0 FAIL côté Laravel. Le test de U3, qui affirmait que la simulation n'était pas
+portée, assert désormais l'inverse — cette assertion avait fait son temps.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

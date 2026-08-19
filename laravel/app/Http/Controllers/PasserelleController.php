@@ -102,13 +102,27 @@ class PasserelleController extends Controller
 
         $methode = strtoupper($requete->method());
 
+        // Une poignee de routes tiennent leur reponse ouverte pendant que la
+        // commande tourne sur la machine. Elles sont relayees MORCEAU PAR
+        // MORCEAU : lire tout le corps avant de repondre ferait attendre des
+        // minutes devant un ecran immobile.
+        $enFlux = RoutesBackend::estUnFlux($chemin);
+
         try {
             $client = Http::withHeaders($entetes)
                 // Le backend presente un certificat interne : la verification
                 // n'a pas de sens sur un reseau Docker prive, et le legacy la
                 // desactive deja.
                 ->withoutVerifying()
-                ->timeout((int) config('rootwarden.backend.delai', 120));
+                ->timeout($enFlux
+                    ? (int) config('rootwarden.backend.delai_flux', 900)
+                    : (int) config('rootwarden.backend.delai', 120));
+
+            if ($enFlux) {
+                // Guzzle rend la main des les en-tetes recus ; le corps se lit
+                // ensuite, au rythme ou le backend l'ecrit.
+                $client = $client->withOptions(['stream' => true]);
+            }
 
             $reponse = match (true) {
                 in_array($methode, self::AVEC_CORPS, true) => $client
@@ -120,6 +134,41 @@ class PasserelleController extends Controller
             Log::error('passerelle: backend injoignable', ['chemin' => $chemin, 'erreur' => $e->getMessage()]);
 
             return $this->refus(502, 'passerelle.backend_injoignable');
+        }
+
+        if ($enFlux) {
+            $corps = $reponse->toPsrResponse()->getBody();
+
+            return response()->stream(function () use ($corps) {
+                // MESURE : sans ceci, rien n'arrive avant la fin. Apache
+                // applique `AddOutputFilterByType DEFLATE text/plain`, et
+                // compresser oblige a accumuler toute la reponse — les en-tetes
+                // eux-memes n'atteignaient le navigateur qu'au bout de 8,9 s.
+                if (function_exists('apache_setenv')) {
+                    @apache_setenv('no-gzip', '1');
+                }
+                @ini_set('zlib.output_compression', '0');
+
+                while (! $corps->eof()) {
+                    $morceau = $corps->read(8192);
+                    if ($morceau === '') {
+                        continue;
+                    }
+                    echo $morceau;
+                    // Sans ces deux appels, le morceau reste dans les tampons
+                    // de PHP et d'Apache jusqu'a la fin de la reponse — ce qui
+                    // annulerait tout l'interet du relais morceau par morceau.
+                    if (ob_get_level() > 0) {
+                        @ob_flush();
+                    }
+                    flush();
+                }
+            }, $reponse->status(), [
+                'Content-Type'      => $reponse->header('Content-Type') ?: 'text/plain',
+                'Cache-Control'     => 'no-cache',
+                // Demande explicite aux relais de ne pas accumuler.
+                'X-Accel-Buffering' => 'no',
+            ]);
         }
 
         // Le statut du backend est PROPAGE : un 404 qui deviendrait 200 ferait

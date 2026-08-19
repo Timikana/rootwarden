@@ -201,7 +201,11 @@ const panneau = await page.evaluate(() => {
     if (!p) return null;
     const confirmer = p.querySelector('[data-rw="redemarrage-confirmer"]');
     return {
-        visible: !p.hidden,
+        // Le RENDU, pas l'attribut : `.rw-panneau-decision { display: flex }`
+        // a longtemps battu `[hidden]`, et lire `p.hidden` declarait cache un
+        // panneau qui restait a l'ecran.
+        visible: p.getClientRects().length > 0,
+        attributCache: p.hidden,
         machines: p.querySelector('[data-rw="redemarrage-machines"]')?.textContent.trim() || '',
         approbation: p.querySelector('[data-rw="redemarrage-approbation"]')?.textContent.trim() || '',
         consigne: p.querySelector('[data-rw="redemarrage-consigne"]')?.textContent.trim() || '',

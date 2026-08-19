@@ -167,4 +167,29 @@ return [
     'reboot_fin'              => 'Redemarrage envoye a :nombre machine(s).',
     'reboot_fin_attente'      => ":nombre demande(s) d'approbation en attente. Rien n'a redemarre.",
     'reboot_fin_partielle'    => ':nombre machine(s) ont refuse la demande.',
+
+    // Sous-lot U6a — simulation et mises a jour de securite
+    'btn_simulation' => 'Simuler',
+    'tip_simulation' => "Montre ce qu'une mise a jour changerait, sans rien installer. Rafraichit l'index des paquets de la machine.",
+    'btn_secu_action' => 'Mises a jour de securite',
+    'tip_secu_action' => 'Installe les mises a jour de securite. Action destructive : elle modifie les paquets installes.',
+
+    'secu_titre'        => 'Appliquer les mises a jour de securite',
+    'secu_machines'     => ':nombre machine(s) : :machines',
+    'secu_consequences' => 'Les paquets concernes seront remplaces par leur version corrigee, sans redemarrage. Un service peut etre relance pendant l operation.',
+    'secu_verrous'      => "Si apt ou dpkg tourne deja sur la machine, cette action les ARRETE de force, supprime leurs verrous et repare la base dpkg avant de continuer. Une installation en cours ailleurs sera donc interrompue.",
+    'secu_consigne'     => 'Recopiez SECURITE pour activer le bouton',
+    'secu_mot'          => 'SECURITE',
+    'btn_secu_confirmer' => 'Appliquer',
+
+    'flux_debut'         => 'Connexion a :machine...',
+    'flux_fini'          => 'Termine.',
+    'flux_err'           => "La commande n'a pas pu etre lancee.",
+    'flux_fin_partielle' => ':nombre machine(s) ont echoue.',
+
+    'simulation_en_cours' => 'Simulation en cours...',
+    'simulation_fin'      => 'Simulation terminee sur :nombre machine(s). Rien n a ete installe.',
+
+    'secu_en_cours' => 'Mises a jour de securite en cours...',
+    'secu_fin'      => 'Mises a jour de securite terminees sur :nombre machine(s).',
 ];

@@ -166,4 +166,29 @@ return [
     'reboot_fin'           => 'Reboot sent to :nombre machine(s).',
     'reboot_fin_attente'   => ':nombre approval request(s) queued. Nothing has rebooted.',
     'reboot_fin_partielle' => ':nombre machine(s) refused the request.',
+
+    // Sub-lot U6a — dry run and security updates
+    'btn_simulation' => 'Dry run',
+    'tip_simulation' => 'Shows what an update would change, without installing anything. Refreshes the package index on the machine.',
+    'btn_secu_action' => 'Security updates',
+    'tip_secu_action' => 'Installs the security updates. Destructive action: it changes the installed packages.',
+
+    'secu_titre'        => 'Apply the security updates',
+    'secu_machines'     => ':nombre machine(s): :machines',
+    'secu_consequences' => 'The affected packages will be replaced by their fixed version, without a reboot. A service may be restarted during the operation.',
+    'secu_verrous'      => 'If apt or dpkg is already running on the machine, this action KILLS them, removes their locks and repairs the dpkg database before carrying on. An installation running elsewhere will therefore be interrupted.',
+    'secu_consigne'     => 'Type SECURITY to enable the button',
+    'secu_mot'          => 'SECURITY',
+    'btn_secu_confirmer' => 'Apply',
+
+    'flux_debut'         => 'Connecting to :machine...',
+    'flux_fini'          => 'Done.',
+    'flux_err'           => 'The command could not be started.',
+    'flux_fin_partielle' => ':nombre machine(s) failed.',
+
+    'simulation_en_cours' => 'Dry run in progress...',
+    'simulation_fin'      => 'Dry run complete on :nombre machine(s). Nothing was installed.',
+
+    'secu_en_cours' => 'Security updates in progress...',
+    'secu_fin'      => 'Security updates complete on :nombre machine(s).',
 ];

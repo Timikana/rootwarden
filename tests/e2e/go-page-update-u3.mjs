@@ -12,10 +12,10 @@
  * puis DECOUPE la sortie elle-meme et ne renvoie que des noms et des versions.
  * Elle n'installe rien ; elle REECRIT en revanche l'index local des paquets.
  *
- * LA SIMULATION (`/dry_run_update`) N'EST PAS PORTEE. Elle diffuse le flux SSH
- * tel quel, et ce flux porte le mot de passe root — mesure et mecanisme dans
- * `docs/migration/MODULE-UPDATE.md`. Le test verifie ici qu'aucune partie du
- * portage ne l'appelle.
+ * LA SIMULATION (`/dry_run_update`) etait restee au legacy tant que son flux
+ * portait le mot de passe root. Le correctif du 2026-08-19 leve cette raison :
+ * elle a rejoint le portage avec le sous-lot U6a. Ce test verifie seulement que
+ * le constat des paquets ne l'appelle pas — ce sont deux actions distinctes.
  *
  * MACHINE 1 EN PRODUCTION : jamais cochee. Le test verifie qu'aucune requete
  * ne la designe.
@@ -157,8 +157,11 @@ const aSimulation = await page.$(SEL_SIMULATION);
 if (CIBLE === 'legacy') {
     constate('la simulation existe cote legacy', aSimulation ? 'oui' : 'non');
 } else {
-    verifie("la simulation n'est PAS portee", !aSimulation,
-        'son flux porte le mot de passe root — voir MODULE-UPDATE.md');
+    // La simulation est restee au legacy tant que son flux portait le mot de
+    // passe root. Le correctif du 2026-08-19 leve cette raison : elle a rejoint
+    // le portage avec le sous-lot U6a, qui la couvre.
+    verifie('la simulation est desormais portee', Boolean(aSimulation),
+        'la fuite qui la retenait au legacy est corrigee (CHANGELOG v1.37.17)');
 }
 
 // ── Sans machine cochee : le constat ne part pas ────────────────────────────
@@ -214,8 +217,9 @@ verifie(`la machine ${MACHINE_PROD}, en production, n'est jamais designee`,
     !appels.some(a => /"machine_id"\s*:\s*1\b/.test(a.corps)),
     `${appels.length} appel(s) inspecte(s)`);
 
-verifie('aucun appel a la simulation',
-    !appels.some(a => /dry_run_update/.test(a.url)), 'flux brut non sollicite');
+verifie("le constat des paquets n'appelle pas la simulation",
+    !appels.some(a => /dry_run_update/.test(a.url)),
+    'les deux actions restent distinctes');
 
 const texte = p ? p.texte : '';
 verifie('le panneau nomme le resultat du constat',

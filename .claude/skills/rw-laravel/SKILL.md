@@ -950,11 +950,60 @@ deux autres suites. La trace arrivait, plus tard. Une attente fixe ne mesure pas
 la page, elle mesure la charge de la machine. Interroger le contenu jusqu'a ce
 qu'il soit la.
 
+### `hidden` ne cache pas si la classe pose un `display`
+
+La feuille du navigateur applique `[hidden] { display: none }` avec une
+specificite NULLE : n'importe quelle regle de composant la bat. Mesure payee :
+`.rw-panneau-decision { display: flex }` laissait le panneau de decision du
+redemarrage a l'ecran en permanence, et deux panneaux se sont retrouves ouverts
+cote a cote sur une capture.
+
+Le projet cache par `hidden` plutot que par une classe : une regle
+`[hidden] { display: none !important; }` rend cette convention fiable pour tous
+les composants. C'est le seul cas ou une regle GLOBALE est justifiee ici — elle
+retablit un comportement standard, elle n'habille pas un cas particulier.
+
+Et un test qui lit `element.hidden` mesure l'ATTRIBUT, pas le rendu. Viser
+`getClientRects().length > 0` : c'est ce que l'oeil voit.
+
+### Un seul panneau de decision ouvert a la fois
+
+Trois panneaux — planification, redemarrage, mises a jour de securite — portent
+sur la MEME selection. Deux ouverts en meme temps laissent croire a deux gestes
+en attente. Ouvrir l'un referme les autres.
+
+### Relayer un flux : la liste est EXPLICITE
+
+`RoutesBackend::EN_FLUX` nomme les routes dont le corps est un flux. Pour
+elles seulement, la passerelle passe `stream => true` a Guzzle et rend un
+`StreamedResponse` qui lit le corps par morceaux, avec un delai propre. Le
+relais bufferise reste la regle pour tout le reste.
+
+Deux pieges rencontres :
+ - `response()->stream()` rend un `StreamedResponse`, qui n'herite PAS de
+   `Illuminate\Http\Response` — d'ou le type de retour Symfony deja en place ;
+ - Apache applique `AddOutputFilterByType DEFLATE text/plain`, et compresser
+   oblige a accumuler. `apache_setenv('no-gzip', '1')` dans la fermeture.
+
+MESURE A GARDER EN TETE : le backend livre son corps d'un seul tenant entre
+conteneurs (en-tetes a 0,5 s, tout le corps a 7,5 s). Le relais par morceaux ne
+bufferise pas de notre cote, mais il n'y a AUCUNE progression ligne a ligne
+aujourd'hui — ni dans le portage, ni dans le legacy. Ne pas promettre un direct
+qu'on n'a pas mesure.
+
+### Verifier l'absence d'un secret sans le manipuler
+
+Le journal affiche la sortie brute d'un pseudo-terminal. Pour asserter qu'un mot
+de passe n'y figure pas, le texte part encode en base64 vers un script execute
+DANS le conteneur du backend, qui dechiffre et ne rend que ABSENT ou PRESENT —
+pour le mot entier ET pour tout fragment de six caracteres. Le secret ne quitte
+jamais le conteneur, et l'assertion porte sur ce que l'ecran montre vraiment.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
-(U1, U2, U4, U5 portes ; U3 porte pour moitie, la simulation restant au legacy ;
-U6 bloque par l'arbitrage de la fuite) — toutes celles du meme
+(U1 a U5 portes, U6a porte : la fuite du flux SSH a ete corrigee le 2026-08-19 ;
+reste U6b — apt_update, custom_update, dpkg_repair) — toutes celles du meme
 gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,

@@ -63,6 +63,10 @@ return [
         'cle_api' => env('API_KEY', ''),
         // Certaines routes de parc (scan CVE, mise a jour) durent longtemps.
         'delai'   => env('BACKEND_TIMEOUT', 120),
+        // Les routes RELAYEES EN FLUX tiennent leur reponse ouverte pendant que
+        // la commande tourne : une mise a jour de securite depasse largement le
+        // delai ordinaire. Voir RoutesBackend::EN_FLUX.
+        'delai_flux' => env('BACKEND_TIMEOUT_FLUX', 900),
     ],
 
     'fonctionnalites' => [
