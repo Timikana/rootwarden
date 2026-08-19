@@ -188,6 +188,7 @@
 
         parc = res.corps.machines || [];
         rend(parc, filtreActif);
+        compteSelection();
         dit(filtreActif
             ? libelles.filtre_ok.replace(':nombre', parc.length)
             : libelles.maj_ok.replace(':heure', heure()).replace(':nombre', parc.length));
@@ -249,6 +250,123 @@
             (c) => { if (c.last_reboot) ecrit(tr, 'last-reboot', c.last_reboot); });
     }
 
+    /* ═════════════════════════════════════════════════════════════════════
+       Sous-lot U3 — le constat « paquets en attente »
+
+       CE QUE FAIT LA ROUTE, LU DANS `backend/routes/updates.py` AVANT DE
+       CLIQUER. `/pending_packages` ouvre une session SSH et lance, en root :
+
+           apt-get update -qq 2>/dev/null; apt list --upgradable
+
+       Elle n'installe RIEN et ne supprime rien. Elle n'est pas pour autant
+       sans effet sur la machine : `apt-get update` REECRIT l'index local des
+       paquets. C'est une ecriture, meme si ce n'est pas un changement d'etat
+       du systeme.
+
+       Le backend decoupe lui-meme la sortie et ne renvoie que des noms et des
+       versions : aucune ligne brute ne remonte au navigateur. C'est ce qui
+       permet de porter ce constat-ci alors que la simulation, qui diffuse son
+       flux tel quel, reste au legacy — voir PARITE.md, E-17.
+
+       Le POINT-VIRGULE entre les deux commandes, et la stderr jetee, font
+       qu'un echec du rafraichissement passe inapercu : la reponse vaut alors
+       « 0 paquet » sans distinguer « la machine est a jour » de « je n'ai pas
+       pu regarder ». L'etat vide ne promet donc pas que la machine est a jour.
+       ═════════════════════════════════════════════════════════════════════ */
+
+    const boutonPaquets = document.getElementById('pending-packages-btn');
+    const compteurSelection = document.getElementById('selection-count');
+
+    /** Ligne de journal sur le panneau d'un serveur, ou dans la zone generale. */
+    function journal(texte, genre, serveur) {
+        if (window.rwJournal) window.rwJournal.ajoute(texte, genre, serveur);
+    }
+
+    function machinesCochees() {
+        const choix = [];
+        for (const c of corps.querySelectorAll('input[name="selected_machines[]"]:checked')) {
+            const tr = c.closest('tr');
+            const nom = tr ? (tr.querySelector('.server-name')?.textContent || '') : '';
+            const id = parseInt(c.value, 10);
+            if (id) choix.push({ id: id, nom: nom });
+        }
+        return choix;
+    }
+
+    /*
+     * La regle « il faut au moins une machine » est appliquee par la page comme
+     * par le legacy. Elle se REND VISIBLE avant le geste : le compteur dit
+     * combien de machines sont retenues, plutot que de laisser decouvrir apres
+     * coup qu'il n'y en avait aucune.
+     */
+    function compteSelection() {
+        if (!compteurSelection) return;
+        const n = corps.querySelectorAll('input[name="selected_machines[]"]:checked').length;
+        compteurSelection.textContent = n
+            ? libelles.selection.replace(':nombre', n)
+            : libelles.selection_vide;
+        compteurSelection.setAttribute('data-nombre', String(n));
+    }
+
+    async function paquetsEnAttente() {
+        const choix = machinesCochees();
+        if (!choix.length) {
+            dit(libelles.aucune_selection, 'echec');
+            return;
+        }
+
+        const initial = boutonPaquets.textContent;
+        boutonPaquets.disabled = true;
+        boutonPaquets.textContent = libelles.paquets_en_cours;
+        dit(libelles.paquets_en_cours);
+
+        let echecs = 0;
+
+        // En SERIE : chaque machine ouvre une session SSH et lance un
+        // `apt-get update`. Les lancer toutes de front n'accelere rien et rend
+        // le journal illisible.
+        for (const m of choix) {
+            const res = await appelle('/pending_packages', {
+                method: 'POST',
+                body: JSON.stringify({ machine_id: m.id }),
+            });
+            const c = res.corps;
+
+            if (!res.ok || !c || c.success === false) {
+                echecs++;
+                // UNE ERREUR NE S'AVALE PAS : elle se nomme, sur le panneau du
+                // serveur concerne, et le constat n'est pas annonce comme reussi.
+                journal((c && c.message) || libelles.paquets_err, 'error', m.nom);
+                continue;
+            }
+
+            const nombre = c.count || 0;
+            if (!nombre) {
+                journal(libelles.paquets_aucun, 'ok', m.nom);
+                journal(libelles.paquets_aucun_reserve, 'info', m.nom);
+                continue;
+            }
+
+            journal(libelles.paquets_nombre.replace(':nombre', nombre), 'info', m.nom);
+            for (const p of (c.packages || [])) {
+                const versions = p.current ? p.current + ' -> ' + p.available : p.available;
+                journal('  - ' + p.name + ' (' + versions + ')', 'info', m.nom);
+            }
+        }
+
+        boutonPaquets.disabled = false;
+        boutonPaquets.textContent = initial;
+        dit(echecs
+            ? libelles.paquets_fin_partielle.replace(':nombre', echecs)
+            : libelles.paquets_fin.replace(':nombre', choix.length),
+            echecs ? 'echec' : 'ok');
+    }
+
+    corps.addEventListener('change', (e) => {
+        if (e.target && e.target.name === 'selected_machines[]') compteSelection();
+    });
+    if (boutonPaquets) boutonPaquets.addEventListener('click', paquetsEnAttente);
+
     document.getElementById('filter-btn').addEventListener('click', () => relit(filtresCourants()));
     document.getElementById('refresh-list-btn').addEventListener('click', () => {
         document.getElementById('environment').value = '';
@@ -261,4 +379,5 @@
 
     // Premier rendu : les donnees sont deja la, aucun appel n'est necessaire.
     rend(parc, false);
+    compteSelection();
 })();

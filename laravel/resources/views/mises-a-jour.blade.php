@@ -74,6 +74,17 @@
                 data-rw="filtrer">{{ __('maj.btn_filter') }}</button>
     </div>
 
+
+    {{-- Actions groupees — sous-lot U3. Une seule pour l'instant : le constat
+         « paquets en attente ». La simulation du legacy n'est PAS portee, et
+         l'encart de portage partiel ci-dessus renvoie vers elle. --}}
+    <div class="rw-actions rw-actions--groupe">
+        <p class="rw-actions__compteur" id="selection-count" data-rw="compteur-selection"
+           data-nombre="0" role="status" aria-live="polite">{{ __('maj.selection_vide') }}</p>
+        <button class="rw-bouton rw-bouton--discret" id="pending-packages-btn" type="button"
+                data-rw="paquets-en-attente"
+                title="{{ __('maj.tip_paquets') }}">{{ __('maj.btn_paquets') }}</button>
+    </div>
     {{-- Les identifiants et les CLASSES de colonne sont ceux du legacy
          (`server-table-body`, `.linux-version`, `.maj-secu-date`...) : le MEME
          test de caracterisation vise les deux cibles. --}}
@@ -134,7 +145,7 @@
          sert le premier rendu et les suivants, il ne peut donc pas exister deux
          versions du tableau qui divergent. --}}
     <script id="maj-parc" type="application/json">@json($machines)</script>
-    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok')])
+    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle')])
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="maj-libelles" type="application/json">@json($libelles)</script>
 

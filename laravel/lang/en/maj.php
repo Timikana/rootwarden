@@ -9,8 +9,9 @@ return [
 
     // Partial port — said on screen rather than hidden.
     'partiel_titre' => 'This page is being ported',
-    'partiel_texte' => 'The table, the filters and the per-machine readings are ported. Launching '
-                     . 'updates, scheduling and rebooting are still served by the old portal.',
+    'partiel_texte' => 'The table, the filters, the per-machine readings and the pending-package '
+                     . 'reading are ported. The dry run, launching updates, scheduling and '
+                     . 'rebooting are still served by the old portal.',
     'partiel_lien'  => 'Open the full page on the old portal',
 
     // Filters
@@ -76,4 +77,18 @@ return [
     'err_load'    => 'Could not re-read the fleet.',
     'err_releve'  => 'The reading failed.',
     'releve_ok'   => 'Reading complete.',
+
+    // Sub-lot U3 — pending packages reading
+    'btn_paquets' => 'Pending packages',
+    'tip_paquets' => 'Queries each selected machine and lists its upgradable packages. Installs nothing.',
+    'selection'      => ':nombre machine(s) selected.',
+    'selection_vide' => 'No machine selected — tick at least one row.',
+    'aucune_selection' => 'No machine selected: tick at least one row before running the reading.',
+    'paquets_en_cours' => 'Reading pending packages...',
+    'paquets_err'      => 'The package reading failed.',
+    'paquets_aucun'    => 'No pending package.',
+    'paquets_aucun_reserve' => 'This reading uses the machine\'s local index. It does not guarantee that the index could be refreshed: an unreachable repository looks exactly like an up-to-date system.',
+    'paquets_nombre'   => ':nombre package(s) to upgrade:',
+    'paquets_fin'      => 'Reading complete on :nombre machine(s).',
+    'paquets_fin_partielle' => 'Reading complete, but :nombre machine(s) did not answer.',
 ];
