@@ -1134,3 +1134,33 @@ body {
 .log-line.ok       { color: var(--rw-succes); }
 .log-line.progress { color: var(--rw-accent); }
 .log-line.info     { color: var(--rw-texte); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Actions groupees sur la selection (module update/, sous-lot U3)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Variante de `.rw-actions` posee ENTRE la barre de filtres et le tableau : le
+ * trait du haut ferait un second separateur juste sous celui des filtres.
+ * `flex-wrap` est porte par la VARIANTE, pas par `.rw-actions` : une regle
+ * globale pour un cas particulier casse les pages qui n'ont rien demande.
+ */
+.rw-actions--groupe {
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding-top: 0;
+    border-top: none;
+}
+
+/*
+ * Le compteur occupe la gauche et repousse l'action a droite. Il dit ce qui
+ * manque AVANT le geste : sans machine cochee, le constat ne partira pas.
+ */
+.rw-actions__compteur {
+    margin: 0 auto 0 0;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--rw-texte);
+}
+
+.rw-actions__compteur[data-nombre="0"] { color: var(--rw-texte-doux); }

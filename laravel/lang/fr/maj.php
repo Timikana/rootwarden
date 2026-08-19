@@ -9,9 +9,10 @@ return [
 
     // Portage partiel — dit a l'ecran plutot que masque.
     'partiel_titre' => 'Cette page est en cours de portage',
-    'partiel_texte' => 'Le tableau, les filtres et les relevés par machine sont portes. Le lancement '
-                     . 'des mises a jour, la planification et le redemarrage restent servis par '
-                     . 'l\'ancien portail.',
+    'partiel_texte' => 'Le tableau, les filtres, les releves par machine et le constat des '
+                     . 'paquets en attente sont portes. La simulation, le lancement des mises '
+                     . 'a jour, la planification et le redemarrage restent servis par '
+                     . "l'ancien portail.",
     'partiel_lien'  => 'Ouvrir la page complete sur l\'ancien portail',
 
     // Filtres
@@ -77,4 +78,18 @@ return [
     'err_load'    => 'Impossible de relire le parc.',
     'err_releve'  => 'Le releve a echoue.',
     'releve_ok'   => 'Releve termine.',
+
+    // Sous-lot U3 — constat « paquets en attente »
+    'btn_paquets' => 'Paquets en attente',
+    'tip_paquets' => 'Interroge chaque machine retenue et liste ses paquets a mettre a jour. N\'installe rien.',
+    'selection'      => ':nombre machine(s) retenue(s).',
+    'selection_vide' => 'Aucune machine retenue — cochez au moins une ligne.',
+    'aucune_selection' => 'Aucune machine retenue : cochez au moins une ligne avant de lancer le constat.',
+    'paquets_en_cours' => 'Constat des paquets en attente...',
+    'paquets_err'      => 'Le constat des paquets a echoue.',
+    'paquets_aucun'    => 'Aucun paquet en attente.',
+    'paquets_aucun_reserve' => 'Ce constat lit l\'index local de la machine. Il ne garantit pas que cet index a pu etre rafraichi : un depot injoignable donne le meme resultat qu\'un systeme a jour.',
+    'paquets_nombre'   => ':nombre paquet(s) a mettre a jour :',
+    'paquets_fin'      => 'Constat termine sur :nombre machine(s).',
+    'paquets_fin_partielle' => 'Constat termine, mais :nombre machine(s) n\'ont pas repondu.',
 ];

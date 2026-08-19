@@ -158,7 +158,7 @@ for (const format of LARGEURS) {
     await dors(1200);
     await prend('12-recherche');
 
-    // 13. Mises a jour Linux (sous-lot U1)
+    // 13. Mises a jour Linux (sous-lots U1 et U3 : parc, filtres, actions groupees)
     await page.goto(`${BASE}/mises-a-jour`, { waitUntil: 'networkidle2' });
     await dors(700);
     await prend('13-mises-a-jour');

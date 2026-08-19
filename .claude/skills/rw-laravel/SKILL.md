@@ -747,9 +747,92 @@ avant de photographier :
     await page.evaluate(() => document.querySelector('[data-rw="journal"]')
         ?.scrollIntoView({ block: 'start' }));
 
+### « Sans effet » se lit dans la COMMANDE, pas dans le libelle
+
+Le sous-lot U3 s'appelait « les constats sans effet ». La lecture du backend a
+montre que les deux routes lancent `apt-get update`, qui **reecrit l'index local
+des paquets** de la machine. Elles n'installent rien — ce n'est pas un
+changement d'etat du systeme — mais ce sont des ecritures.
+
+Verifier ce que fait vraiment la commande avant de qualifier une action, et
+corriger le decoupage quand il s'avere faux : c'est un document de migration,
+pas une promesse.
+
+### Une route qui DIFFUSE son flux ne se porte pas sans le lire
+
+Deux routes de constat, deux formes opposees :
+
+| Route | Forme | Ce qui remonte au navigateur |
+|---|---|---|
+| `/pending_packages` | le backend DECOUPE la sortie | des noms et des versions |
+| `/dry_run_update` | `Response(generate(), 'text/plain')` | le flux SSH **tel quel** |
+
+La seconde porte le mot de passe root en ligne 2 (E-17). Elle n'est pas portee.
+
+Regle : avant de porter une capacite qui affiche une sortie de commande,
+regarder si le backend FILTRE ou s'il DIFFUSE. Un flux brut affiche a l'ecran
+publie tout ce que la machine ecrit sur son terminal, y compris ce que le
+backend croyait avoir retire.
+
+### Un correctif qui compte les lignes suppose qu'il n'y en a qu'une
+
+`execute_as_root_stream` jette tout ce qui precede le premier `\n` pour supprimer
+l'echo PTY du mot de passe. La mesure : l'echo apparait **deux fois**. Un jete,
+l'autre passe.
+
+Se mefier des defenses qui portent sur une POSITION (« la premiere ligne »)
+plutot que sur le CONTENU (« tant que la ligne est le secret »). Une position se
+decale ; un contenu, non.
+
+### Un etat vide ne doit pas promettre ce que la fonction ne prouve pas
+
+`apt-get update -qq 2>/dev/null; apt list --upgradable` : stderr jetee,
+point-virgule au lieu de `&&`. Un depot injoignable rend exactement le meme
+`count: 0` qu'un systeme a jour. Le legacy affiche « Aucun paquet en attente. »
+dans les deux cas.
+
+Le portage ne peut pas inventer l'information jetee par le backend ; il peut
+cesser de promettre. L'etat vide porte une seconde ligne qui dit sur quoi le
+constat s'appuie et ce qu'il ne garantit pas. Meme regle que E-09.
+
+### Rendre visible AVANT le geste une regle appliquee APRES
+
+Le legacy verifie « au moins une machine cochee » au moment du clic, et le dit
+par une bulle fugace. Le portage affiche un compteur de selection a cote de
+l'action : la regle se lit avant le geste, et le clic a vide reste explique dans
+l'annonce.
+
+    <p class="rw-actions__compteur" data-rw="compteur-selection" data-nombre="0"
+       role="status" aria-live="polite">
+
+Le decompte est porte par un attribut `data-nombre` : le CSS s'en sert pour la
+teinte, le test pour l'assertion, sans dependre du libelle traduit.
+
+### Mesurer une precondition en REQUETES
+
+« Sans machine cochee, rien ne part » ne se prouve pas par un ecran qui ne
+change pas. Le test compte les requetes vers la route, avant et apres le clic :
+
+    page.on('request', r => { if (/pending_packages/.test(r.url())) appels.push(...) })
+
+Le meme releve sert a prouver qu'un seul appel part pour la machine cochee, et
+qu'**aucun appel ne designe la machine 1**, qui est en production.
+
+### Un gabarit shell collapse les antislashs, meme en heredoc protege
+
+Ecrire de la documentation par `python - <<'PY'` transforme `\r\n` en vraies
+fins de ligne et `\\'` en `\'` puis en `'` — un fichier PHP casse, un bloc de
+code illisible. Construire l'antislash par `chr(92)`, ou ecrire le fichier avec
+l'outil d'ecriture puis le concatener. VERIFIER le resultat (`php -l`, relecture
+du bloc) : le gabarit ne signale rien.
+
+Cote PHP, une apostrophe francaise se pose plus surement par des guillemets
+doubles que par `\'`.
+
 ## Detail
 
-Socle complet. Sept pages metier portees et archivees — toutes celles du meme
+Socle complet. Sept pages metier portees et archivees, module `update/` en cours
+(U1, U2 portes ; U3 porte pour moitie, la simulation restant au legacy) — toutes celles du meme
 gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,

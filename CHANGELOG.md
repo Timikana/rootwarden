@@ -963,11 +963,78 @@ La capture de la page ne montrait pas le journal : il vit sous le pli, et la pri
 hauteur du champ visible. Elle fait maintenant défiler jusqu'à lui avant de photographier — sans
 quoi elle ne montrait rien de ce qui venait d'être porté.
 
+### Module `update/`, sous-lot U3 — le constat des paquets en attente
+
+Porté : « paquets en attente ». **Non porté : la simulation** — la raison est mesurée plus bas.
+
+Ce qui a été **lu dans `backend/routes/updates.py` avant tout clic**, comme la méthode l'exige :
+`/pending_packages` ouvre une session SSH et lance en root
+`apt-get update -qq 2>/dev/null; apt list --upgradable`. Elle n'installe rien et ne supprime rien.
+Elle n'est pas pour autant *sans effet* : `apt-get update` **réécrit l'index local des paquets** de
+la machine. Le sous-lot s'appelait « les constats sans effet » ; c'est une écriture, même si ce
+n'est pas un changement d'état du système, et l'inventaire du module le dit maintenant.
+
+Le backend **découpe lui-même** la sortie et ne renvoie que des noms et des versions : aucune ligne
+brute ne remonte au navigateur. C'est ce qui permet de porter ce constat-ci.
+
+L'action est groupée sur la sélection, comme dans le legacy. Elle porte un **compteur de
+sélection** : la règle « il faut au moins une machine » se lit *avant* le geste au lieu de se
+découvrir après. Le résultat s'écrit dans le journal d'exécution porté en U2, par
+`window.rwJournal`, sur le panneau du serveur concerné. Une machine qui ne répond pas est nommée,
+et le constat n'est alors pas annoncé comme réussi.
+
+### « Aucun paquet en attente » ne veut pas dire « la machine est à jour »
+
+**E-16.** Dans la commande ci-dessus, la stderr d'`apt-get update` part dans `/dev/null` et les
+deux commandes sont séparées par un **point-virgule** et non par `&&`. `apt list` s'exécute donc
+même quand le rafraîchissement a échoué, et rend l'ancien index. La réponse vaut
+`{"success": true, "count": 0}` dans les deux cas.
+
+Mesuré sur la machine 2, à quelques minutes d'intervalle : `/pending_packages` a répondu
+`count: 0`, pendant que le flux de la simulation sur la **même machine** portait
+`W: Failed to fetch ... Temporary failure resolving 'deb.debian.org'` puis `Some index files failed
+to download. They have been ignored, or old ones used instead.` Le rafraîchissement avait échoué et
+le constat annonçait « rien à faire ».
+
+Le portage ne peut pas rendre une information que le backend a jetée. Il cesse en revanche de
+promettre plus que ce que la fonction fait : l'état vide porte une seconde ligne disant que le
+constat lit l'**index local** et ne garantit pas qu'il ait pu être rafraîchi.
+
+### La simulation n'est pas portée : son flux porte le mot de passe root
+
+**E-17.** `/dry_run_update` rend `Response(generate(), 'text/plain')` — le flux SSH tel quel — et le
+legacy dépose **chaque ligne non vide** de ce flux dans le journal. Mesure sur la machine 2 : la
+deuxième ligne du flux est le **mot de passe root en clair**.
+
+Mécanisme, établi cette fois : `execute_as_root_stream()` porte un correctif (« Patch A09 ») qui
+jette tout ce qui précède le premier `\n`, en supposant que l'écho PTY du mot de passe est la
+première ligne. Reproduction du même enchaînement sur une commande inoffensive (`id -u`), morceaux
+bruts lus sur le canal : `'<mot de passe>\r\n'`, `'<mot de passe>\r\n'`, `'0\r\n'`. **Le mot de
+passe est échoté deux fois** ; le correctif n'en jette qu'un.
+
+La branche `service_account` (sudo NOPASSWD, sans PTY ni mot de passe) n'est pas concernée. Seule
+`srv-zabbix` porte `service_account_deployed = 1` : **toutes les autres machines du parc sont dans
+le cas qui fuit**.
+
+Rien n'a été corrigé — c'est le backend Python, qui reste intact, et c'est une décision de sécurité.
+Trois points sont posés dans `PARITE.md` (E-17) : corriger la fonction, retirer ou non
+`/dry_run_update` de la liste blanche de la passerelle, et l'ordre à tenir pour U6, dont
+`/security_updates` diffuse par la **même** fonction.
+
+### Vérification
+
+Nouveau test `tests/e2e/go-page-update-u3.mjs`, vert sur les deux cibles avant le commit :
+9 PASS / 0 FAIL côté legacy, 15 PASS / 0 FAIL côté Laravel. Il mesure en **requêtes** (aucun appel
+n'est émis sans machine cochée ; un seul appel pour la machine cochée ; la machine 1, en production,
+n'est jamais désignée) et attend **le contenu** — la ligne dans le panneau du serveur, puis le
+bouton redevenu actif — plutôt qu'un délai. Il vérifie aussi qu'aucune partie du portage n'appelle
+`/dry_run_update`.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-13)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-17)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
 

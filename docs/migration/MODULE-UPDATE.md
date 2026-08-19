@@ -92,9 +92,24 @@ distinction. Elle concerne les machines dont le **compte de service n'est pas d�
 il l'est, aucun mot de passe ne transite. C'est une différence qui change l'évaluation du
 risque, et elle avait été omise.
 
-**Ce qui reste inexpliqué** : la défense A09 devrait couvrir la première ligne, et la mesure
-place pourtant le mot de passe en ligne 2. Le mécanisme n'est pas établi ; il n'est donc pas
-décrit ici. Ce qui est établi : la mesure, et le fait que le chemin sans PTY ne peut pas fuir.
+**Le mécanisme, établi le 2026-08-19 pendant U3.** La défense A09 jette tout ce qui précède le
+premier `\n`, en supposant que l'écho PTY du mot de passe est la première ligne renvoyée. La
+supposition est juste ; ce qui est faux, c'est qu'il n'y en aurait **qu'une**.
+
+Reproduction du même enchaînement que le code (`sudo -S -p '' sh -c 'id -u'`, PTY, écriture
+immédiate du mot de passe) sur la machine 2, morceaux bruts lus sur le canal :
+
+    morceau 1 : '<mot de passe>\r\n'
+    morceau 2 : '<mot de passe>\r\n'
+    morceau 3 : '0\r\n'
+
+Le mot de passe est **échoté deux fois**. A09 en jette un, le second traverse et arrive en ligne 2
+du flux rendu au navigateur — exactement ce que la mesure montrait. Le correctif tiendrait à ne
+plus compter les lignes mais à filtrer tant que la ligne bufferisée **est** le mot de passe ;
+c'est une modification du backend Python, elle n'est pas faite.
+
+Vérifié aussi sur `/dry_run_update`, qui diffuse par la même fonction : la ligne 2 du flux est le
+mot de passe root. C'est pourquoi la simulation n'est pas portée (`PARITE.md`, E-17).
 
 Les routes **non** streamées (`execute_as_root`) n'ouvrent pas de PTY (`exec_command` sans
 `get_pty`) : elles ne peuvent pas produire cet écho.
@@ -139,12 +154,13 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 |---|---|---|---|
 | **U1 — parc et filtres** — PORTÉ | tableau, filtres environnement / criticité / réseau, rafraîchissement, relevés par machine | `filter_servers`, `linux_version`, `server_status`, `last_reboot` | lecture seule |
 | **U2 — journal d'exécution** — PORTÉ | zone générale, panneaux par serveur, suivi automatique, effacement | aucune | présentation |
-| **U3 — constats sans effet** | paquets en attente, simulation | `pending_packages`, `dry_run_update` | lecture sur le serveur |
+| **U3 — constats** — PORTÉ EN PARTIE | paquets en attente PORTÉ ; simulation NON PORTÉE (E-17) | `pending_packages`, `dry_run_update` | lecture sur le serveur, mais `apt-get update` réécrit l'index |
 | **U4 — planification** | les deux fenêtres de planification | `schedule_update`, `schedule_advanced_security_update` | écrit un cron distant |
 | **U5 — redémarrage** | redémarrage sélectionné | `reboot_server` | destructif, déjà soumis à approbation |
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
 
-État au 2026-08-19 : **U1 et U2 portés** sur `/mises-a-jour` (voir `PARITE.md` E-14 et E-15).
+État au 2026-08-19 : **U1, U2 et la moitié de U3 portés** sur `/mises-a-jour` (voir `PARITE.md`
+E-14 à E-17).
 
 **Correction de lecture** : `getServerLogWindow` n'ouvre AUCUNE fenêtre navigateur — il crée un
 panneau dans la page. La formulation « fenêtres par serveur » de la première version de ce
@@ -176,7 +192,12 @@ décision appartient à l'exploitant.
   `user_machine_access` — **non exerçable** avec les comptes actuels, aucun ne cumulant rôle 1 et
   `can_update_linux` ; les filtres réduisent sans mentir ; un filtre qui échoue ne laisse pas de
   lignes non filtrées à l'écran (E-10).
-- **U3** : une simulation ne modifie rien — à vérifier sur la machine 2, et à écrire.
+- **U3** : ~~une simulation ne modifie rien~~ — VÉRIFIÉ, et la formule était trop large.
+  `/pending_packages` lance `apt-get update -qq 2>/dev/null; apt list --upgradable` et
+  `/dry_run_update` lance `apt-get update -qq && apt-get upgrade --dry-run`. Aucune des deux
+  n'installe ni ne supprime, mais **les deux réécrivent l'index local des paquets** : ce sont des
+  lectures pour l'état du système, pas pour le disque. « Sans effet » était faux.
+  Le constat des paquets est porté ; la simulation ne l'est pas — voir ci-dessous.
 - **U4** : un cron écrit sur la machine 2 et **relu**, sans quoi la planification n'est pas
   prouvée.
 - **U5** : la demande d'approbation est créée, pas le redémarrage. Le redémarrage réel n'est pas

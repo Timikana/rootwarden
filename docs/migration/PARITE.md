@@ -633,3 +633,105 @@ apres portage. Ils sont mesures par `go-socle-auth.mjs`.
 | F | Apres le second facteur, on passe par les conditions d'utilisation |
 
 Etat au 2026-08-17, cible legacy : **13 PASS / 0 FAIL / 1 ecart connu**.
+
+---
+
+## E-16 — « Aucun paquet en attente » ne veut pas dire « la machine est à jour »
+
+**Défaut du legacy, mesuré.** `/pending_packages` lance sur la machine, en root :
+
+```
+apt-get update -qq 2>/dev/null; apt list --upgradable 2>/dev/null | grep -v '^Listing'
+```
+
+Deux choix, dans une seule ligne, font qu'un échec ne se voit pas :
+
+- la **stderr** d'`apt-get update` part dans `/dev/null` — c'est là que vont les avertissements de
+  dépôt injoignable ;
+- les deux commandes sont séparées par un **point-virgule**, pas par `&&` : `apt list` s'exécute
+  même quand le rafraîchissement a échoué, et rend alors l'ancien index.
+
+La réponse vaut donc `{"success": true, "count": 0}` aussi bien pour une machine à jour que pour
+une machine dont l'index n'a pas pu être rafraîchi. Le legacy affiche « Aucun paquet en attente. »
+dans les deux cas.
+
+**Mesuré sur la machine 2**, à quelques minutes d'intervalle :
+
+| Appel | Ce qui remonte |
+|---|---|
+| `/pending_packages` | `{"count":0,"packages":[],"success":true}` |
+| `/dry_run_update` (même machine, même moment) | `W: Failed to fetch http://deb.debian.org/... Temporary failure resolving 'deb.debian.org'` puis `W: Some index files failed to download. They have been ignored, or old ones used instead.` |
+
+Le rafraîchissement avait échoué, et le constat annonçait quand même « rien à faire ».
+
+### Ce que fait le portage
+
+Il ne peut pas rendre l'information que le backend a jetée — le backend reste intact. Il cesse en
+revanche de **promettre plus que ce que la fonction fait** : l'état vide porte une seconde ligne,
+
+> Ce constat lit l'index local de la machine. Il ne garantit pas que cet index a pu être
+> rafraîchi : un dépôt injoignable donne le même résultat qu'un système à jour.
+
+C'est la même règle que pour `verify_backup()` et pour « Vérifier » (E-09) : un libellé ne promet
+jamais plus que ce que la fonction fait, et on le sait en **lisant la fonction**.
+
+**Ce qui reste à arbitrer** : faire dire au backend la différence entre « à jour » et « je n'ai pas
+pu regarder » tient en deux caractères — `&&` au lieu de `;` — plus la remontée de la stderr. C'est
+une modification du backend Python : elle n'est pas faite.
+
+---
+
+## E-17 — La simulation n'est **pas** portée : son flux porte le mot de passe root
+
+**Défaut du legacy, mesuré, mécanisme établi.**
+
+`/dry_run_update` ne collecte rien côté serveur : elle rend `Response(generate(), 'text/plain')`,
+c'est-à-dire le flux SSH **tel quel**. Le legacy, lui, découpe ce flux sur `\n` et dépose **chaque
+ligne non vide** dans le journal (`apiCalls.js`, `dryRunUpdate()`). Ce qui sort de la machine
+s'affiche donc à l'écran sans filtre.
+
+**Mesure**, machine 2, `service_account_deployed = 0` :
+
+```
+L1  "Début de l'exécution..."      <- ligne émise par le générateur
+L2  <mot de passe root>            <- écho PTY, en clair
+L3  W: Failed to fetch http://deb.debian.org/...
+```
+
+### Le mécanisme
+
+`execute_as_root_stream()` porte un correctif — commentaire « Patch A09 » — qui jette **tout ce qui
+précède le premier `\n`**, en supposant que l'écho du mot de passe est la première ligne renvoyée.
+
+Reproduction du même enchaînement (`sudo -S -p '' sh -c 'id -u'`, PTY, écriture immédiate du mot de
+passe), morceaux bruts lus sur le canal :
+
+```
+morceau 1 : '<mot de passe>\r\n'
+morceau 2 : '<mot de passe>\r\n'
+morceau 3 : '0\r\n'
+```
+
+**Le mot de passe est écho­té deux fois.** Le correctif n'en jette qu'un ; le second traverse. La
+supposition « l'écho est la PREMIÈRE ligne » est juste — c'est « il n'y en a qu'une » qui est
+fausse.
+
+Le mode `service_account` (branche `NOPASSWD`) n'envoie aucun mot de passe et n'est pas concerné :
+seule `srv-zabbix` porte `service_account_deployed = 1`. **Toutes les autres machines du parc sont
+dans le cas qui fuit.**
+
+### Ce que fait le portage
+
+Rien : **la simulation n'est pas portée**. Porter une capacité dont on vient de mesurer qu'elle
+affiche un mot de passe root reviendrait à la republier. La page renvoie vers l'ancien portail par
+l'encart de portage partiel, qui nomme la simulation, et le test vérifie qu'aucune partie du
+portage n'appelle `/dry_run_update`.
+
+**Ce qui reste à arbitrer** (rien n'est fait sans accord) :
+
+1. corriger `execute_as_root_stream()` — c'est le backend Python, qui doit rester intact ;
+2. retirer ou non `/dry_run_update` de `RoutesBackend::LISTE_BLANCHE`. La liste est aujourd'hui un
+   relevé **fidèle** de `ALLOWED_PROXY_PREFIXES` ; l'en retirer serait une divergence volontaire.
+   La route reste joignable par la passerelle du portage alors qu'aucune page ne l'appelle ;
+3. `/security_updates` (sous-lot U6) diffuse par la **même** fonction et fuit de la même façon.
+   U6 ne peut pas être porté avant que ce point soit tranché.
