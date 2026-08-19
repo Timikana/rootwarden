@@ -69,6 +69,21 @@ body {
     padding: var(--rw-espace);
 }
 
+/*
+ * `hidden` doit CACHER, meme quand la classe pose un `display`.
+ *
+ * La feuille de style du navigateur applique `[hidden] { display: none }` avec
+ * une specificite nulle : n'importe quelle regle de composant la bat. Mesure
+ * qui a impose ceci : `.rw-panneau-decision { display: flex }` rendait
+ * `panneau.hidden = true` sans aucun effet — le panneau de decision du
+ * redemarrage restait a l'ecran, et le test, qui lisait l'ATTRIBUT et non le
+ * rendu, le declarait cache.
+ *
+ * Le projet cache par `hidden` et non par une classe : cette regle rend cette
+ * convention fiable pour tous les composants, presents et a venir.
+ */
+[hidden] { display: none !important; }
+
 .rw-carte {
     width: 100%;
     max-width: 420px;

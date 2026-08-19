@@ -280,6 +280,22 @@
        pu regarder ». L'etat vide ne promet donc pas que la machine est a jour.
        ═════════════════════════════════════════════════════════════════════ */
 
+    /**
+     * Referme tous les panneaux de decision sauf celui qu'on ouvre.
+     *
+     * Trois panneaux — planification, redemarrage, mises a jour de securite —
+     * portent sur la MEME selection. Deux ouverts en meme temps laissent croire
+     * a deux gestes en attente ; la capture l'a montre avant que ce ne soit une
+     * regle.
+     */
+    function fermeLesAutresPanneaux(garde) {
+        for (const id of ['schedule-form', 'reboot-panneau', 'secu-panneau']) {
+            if (id === garde) continue;
+            const el = document.getElementById(id);
+            if (el) el.hidden = true;
+        }
+    }
+
     const boutonPaquets = document.getElementById('pending-packages-btn');
     const compteurSelection = document.getElementById('selection-count');
 
@@ -482,6 +498,7 @@
         titrePlanif.textContent = nature === 'securite' ? planif.titre_secu : planif.titre_general;
         machinePlanif.textContent = (nature === 'securite' ? planif.desc_secu : planif.desc_general)
             .replace(':machine', nom);
+        fermeLesAutresPanneaux('schedule-form');
         formulaire.hidden = false;
         montreApercu();
         formulaire.scrollIntoView({ block: 'nearest' });
@@ -608,6 +625,7 @@
 
         champNombre.value = '';
         boutonConfirmer.disabled = true;
+        fermeLesAutresPanneaux('reboot-panneau');
         panneauRedemarrage.hidden = false;
         panneauRedemarrage.scrollIntoView({ block: 'nearest' });
         champNombre.focus();
@@ -686,6 +704,177 @@
     champNombre.addEventListener('input', verifieConsigne);
     document.getElementById('reboot-annuler').addEventListener('click', fermeRedemarrage);
     boutonConfirmer.addEventListener('click', confirmeRedemarrage);
+
+    /* ═════════════════════════════════════════════════════════════════════
+       Sous-lot U6a — les deux actions qui DIFFUSENT leur sortie
+
+       CE QUE FONT LES ROUTES, LU DANS `backend/routes/updates.py` AVANT DE
+       CLIQUER.
+
+       `/dry_run_update` : `apt-get update && apt-get upgrade --dry-run`.
+       N'installe rien. Reecrit l'index local des paquets.
+
+       `/security_updates` : `apt-get update && apt-get upgrade --with-new-pkgs
+       --only-upgrade -y`. INSTALLE. Et, si elle trouve apt ou dpkg deja en
+       cours, elle fait un `killall -9` puis SUPPRIME LES VERROUS avant de
+       lancer `dpkg --configure -a`. Le libelle du legacy ne le dit nulle part ;
+       le panneau de decision du portage le dit avant le geste.
+
+       Les deux rendent `Response(generate(), 'text/plain')` : leur corps est un
+       FLUX. C'est ce flux qui portait le mot de passe root jusqu'au correctif du
+       2026-08-19 — d'ou le fait que la simulation soit restee au legacy
+       jusqu'ici (PARITE.md, E-17).
+
+       CE QUE LA MESURE DIT DU DIRECT : la passerelle relaie morceau par morceau
+       (`RoutesBackend::EN_FLUX`), mais le backend livre son corps d'un seul
+       tenant entre conteneurs. Aucune des deux interfaces n'affiche donc de
+       progression ligne a ligne aujourd'hui. Le journal recoit tout a la fin.
+       ═════════════════════════════════════════════════════════════════════ */
+
+    const boutonSimuler = document.getElementById('dry-run-btn');
+    const boutonSecurite = document.getElementById('security-update-btn');
+    const panneauSecurite = document.getElementById('secu-panneau');
+    const listeSecurite = document.getElementById('secu-machines');
+    const champSecurite = document.getElementById('secu-confirmation');
+    const consigneSecurite = document.getElementById('secu-consigne');
+    const boutonSecuriteOk = document.getElementById('secu-confirmer');
+
+    /** Machines retenues au moment de l'ouverture du panneau de securite. */
+    let securiteEnCours = null;
+
+    /**
+     * Verse un flux `text/plain` dans le journal du serveur, ligne par ligne.
+     *
+     * Passe par la passerelle comme tout le reste ; `appelle()` ne convient pas
+     * ici, car il tente de lire du JSON.
+     */
+    async function verseLeFlux(chemin, machine) {
+        const reponse = await fetch(PASSERELLE + chemin, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': jetonCsrf(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ machine_id: machine.id }),
+        });
+
+        if (!reponse.ok) {
+            // 423 : hors fenetre de maintenance. Le backend le dit en JSON.
+            let message = libelles.flux_err;
+            try {
+                const corps = await reponse.json();
+                if (corps && corps.message) message = corps.message;
+            } catch (e) { /* reponse non JSON */ }
+            journal(message, 'error', machine.nom);
+            return false;
+        }
+
+        const lecteur = reponse.body.getReader();
+        const decodeur = new TextDecoder();
+        let reste = '';
+
+        // Les lignes sont ecrites au fur et a mesure de leur ARRIVEE. Si le
+        // backend se met un jour a livrer progressivement, l'affichage suivra
+        // sans qu'il y ait rien a changer ici.
+        for (;;) {
+            const { done, value } = await lecteur.read();
+            if (done) break;
+            reste += decodeur.decode(value, { stream: true });
+            const lignes = reste.split('\n');
+            reste = lignes.pop();
+            for (const ligne of lignes) {
+                const propre = ligne.replace(/\r$/, '');
+                if (propre.trim()) journal(propre, 'info', machine.nom);
+            }
+        }
+        if (reste.trim()) journal(reste.replace(/\r$/, ''), 'info', machine.nom);
+        return true;
+    }
+
+    /** Enchaine un flux sur chaque machine retenue, en serie. */
+    async function surChaqueMachine(bouton, chemin, choix, libelleEnCours, libelleFin) {
+        const initial = bouton.textContent;
+        bouton.disabled = true;
+        bouton.textContent = libelleEnCours;
+        dit(libelleEnCours);
+
+        let echecs = 0;
+        for (const m of choix) {
+            journal(libelles.flux_debut.replace(':machine', m.nom), 'info', m.nom);
+            let ok = false;
+            try {
+                ok = await verseLeFlux(chemin, m);
+            } catch (e) {
+                journal(libelles.flux_err, 'error', m.nom);
+            }
+            if (!ok) echecs++;
+            else journal(libelles.flux_fini, 'ok', m.nom);
+        }
+
+        bouton.disabled = false;
+        bouton.textContent = initial;
+        dit(echecs
+            ? libelles.flux_fin_partielle.replace(':nombre', echecs)
+            : libelleFin.replace(':nombre', choix.length),
+            echecs ? 'echec' : 'ok');
+    }
+
+    async function simule() {
+        const choix = machinesCochees();
+        if (!choix.length) { dit(libelles.aucune_selection, 'echec'); return; }
+        await surChaqueMachine(boutonSimuler, '/dry_run_update', choix,
+            libelles.simulation_en_cours, libelles.simulation_fin);
+    }
+
+    function ouvreSecurite() {
+        const choix = machinesCochees();
+        if (!choix.length) { dit(libelles.aucune_selection, 'echec'); return; }
+        securiteEnCours = choix;
+
+        listeSecurite.textContent = libelles.secu_machines
+            .replace(':nombre', choix.length)
+            .replace(':machines', choix.map(m => m.nom).join(', '));
+        consigneSecurite.textContent = libelles.secu_consigne;
+
+        champSecurite.value = '';
+        boutonSecuriteOk.disabled = true;
+        fermeLesAutresPanneaux('secu-panneau');
+        panneauSecurite.hidden = false;
+        panneauSecurite.scrollIntoView({ block: 'nearest' });
+        champSecurite.focus();
+    }
+
+    function fermeSecurite() {
+        securiteEnCours = null;
+        panneauSecurite.hidden = true;
+    }
+
+    /*
+     * Recopier le mot demande. Une mise a jour de securite installe des paquets
+     * et peut tuer un apt en cours : le geste doit differer d'un simple clic.
+     */
+    function verifieConsigneSecurite() {
+        boutonSecuriteOk.disabled =
+            champSecurite.value.trim().toUpperCase() !== libelles.secu_mot.toUpperCase();
+    }
+
+    async function confirmeSecurite() {
+        if (!securiteEnCours) return;
+        const choix = securiteEnCours;
+        fermeSecurite();
+        await surChaqueMachine(boutonSecurite, '/security_updates', choix,
+            libelles.secu_en_cours, libelles.secu_fin);
+        // La date de derniere execution a pu changer en base.
+        await relit(filtresCourants());
+    }
+
+    if (boutonSimuler) boutonSimuler.addEventListener('click', simule);
+    if (boutonSecurite) boutonSecurite.addEventListener('click', ouvreSecurite);
+    champSecurite.addEventListener('input', verifieConsigneSecurite);
+    document.getElementById('secu-annuler').addEventListener('click', fermeSecurite);
+    boutonSecuriteOk.addEventListener('click', confirmeSecurite);
 
     corps.addEventListener('change', (e) => {
         if (e.target && e.target.name === 'selected_machines[]') compteSelection();

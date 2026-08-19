@@ -217,6 +217,17 @@ for (const format of LARGEURS) {
     await dors(400);
     await prend('16-redemarrage');
 
+    // 17. Le panneau de decision des mises a jour de securite (U6a). AUCUN
+    //     envoi : le bouton reste desactive tant que le mot n'est pas recopie.
+    await page.evaluate(() => {
+        document.getElementById('reboot-annuler')?.click();
+        document.querySelector('[data-rw="maj-securite"]')?.click();
+    });
+    await page.evaluate(() => document.getElementById('secu-panneau')
+        ?.scrollIntoView({ block: 'center' }));
+    await dors(400);
+    await prend('17-maj-securite');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });

@@ -166,8 +166,16 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
 
 État au 2026-08-19 : **U1, U2, la moitié de U3, U4 et U5 portés** sur `/mises-a-jour` (voir
-`PARITE.md` E-14 à E-21). Seul U6 reste, et il est DÉBLOQUÉ : la fuite du mot de passe root a été
-corrigée le 2026-08-19 (CHANGELOG v1.37.17).
+`PARITE.md` E-14 à E-21). **U6a porté** : la simulation — enfin — et les mises à jour de sécurité,
+les deux actions qui diffusent leur sortie, une fois la fuite corrigée le 2026-08-19
+(CHANGELOG v1.37.17).
+
+**Reste U6b** : `apt_update` (mise à jour complète), `custom_update` (paquets choisis) et
+`dpkg_repair`. Trois actions destructives qui rendent du JSON, sans flux.
+
+**À noter pour U6b** : `/apt_update` et `/dpkg_repair` ne consultent **pas** la fenêtre de
+maintenance, là où `/update`, `/security_updates` et `/custom_update` le font. `dpkg_repair` tue
+les processus apt et supprime leurs verrous — sans fenêtre, sans approbation, et sans permission.
 
 **Correction de lecture** : `getServerLogWindow` n'ouvre AUCUNE fenêtre navigateur — il crée un
 panneau dans la page. La formulation « fenêtres par serveur » de la première version de ce

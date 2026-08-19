@@ -93,6 +93,31 @@ class RoutesBackend
         return self::correspond($chemin, self::ADMIN_SEULEMENT);
     }
 
+    /**
+     * Routes dont la reponse est un FLUX `text/plain`, tenu ouvert pendant que
+     * la commande tourne sur la machine.
+     *
+     * La passerelle les relaie morceau par morceau au lieu de lire tout le
+     * corps avant de repondre : une mise a jour de securite dure des minutes,
+     * et un ecran qui ne bouge pas ne distingue pas un travail long d'un
+     * blocage. Liste EXPLICITE et courte : le relais bufferise reste la regle,
+     * et c'est lui que le reste du portage utilise.
+     *
+     * Le contenu de ces flux vient d'un pseudo-terminal. Il a porte le mot de
+     * passe root jusqu'au 2026-08-19 — voir `filtre_echo_mot_de_passe()` cote
+     * backend et PARITE.md, E-17.
+     */
+    public const EN_FLUX = [
+        '/dry_run_update',
+        '/security_updates',
+    ];
+
+    /** Le chemin doit-il etre relaye morceau par morceau ? */
+    public static function estUnFlux(string $chemin): bool
+    {
+        return in_array(rtrim($chemin, '/'), self::EN_FLUX, true);
+    }
+
     /** Le chemin exige-t-il une re-authentification ponctuelle ? */
     public static function exigeStepUp(string $chemin): bool
     {
