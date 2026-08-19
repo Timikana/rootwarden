@@ -155,12 +155,12 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 | **U1 — parc et filtres** — PORTÉ | tableau, filtres environnement / criticité / réseau, rafraîchissement, relevés par machine | `filter_servers`, `linux_version`, `server_status`, `last_reboot` | lecture seule |
 | **U2 — journal d'exécution** — PORTÉ | zone générale, panneaux par serveur, suivi automatique, effacement | aucune | présentation |
 | **U3 — constats** — PORTÉ EN PARTIE | paquets en attente PORTÉ ; simulation NON PORTÉE (E-17) | `pending_packages`, `dry_run_update` | lecture sur le serveur, mais `apt-get update` réécrit l'index |
-| **U4 — planification** | les deux fenêtres de planification | `schedule_update`, `schedule_advanced_security_update` | écrit un cron distant |
+| **U4 — planification** — PORTÉ | les deux planifications, en un seul formulaire | `schedule_advanced_update` (et non `schedule_update`, E-18), `schedule_advanced_security_update` | écrit un cron distant |
 | **U5 — redémarrage** | redémarrage sélectionné | `reboot_server` | destructif, déjà soumis à approbation |
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
 
-État au 2026-08-19 : **U1, U2 et la moitié de U3 portés** sur `/mises-a-jour` (voir `PARITE.md`
-E-14 à E-17).
+État au 2026-08-19 : **U1, U2, la moitié de U3 et U4 portés** sur `/mises-a-jour` (voir
+`PARITE.md` E-14 à E-19).
 
 **Correction de lecture** : `getServerLogWindow` n'ouvre AUCUNE fenêtre navigateur — il crée un
 panneau dans la page. La formulation « fenêtres par serveur » de la première version de ce
@@ -198,8 +198,18 @@ décision appartient à l'exploitant.
   n'installe ni ne supprime, mais **les deux réécrivent l'index local des paquets** : ce sont des
   lectures pour l'état du système, pas pour le disque. « Sans effet » était faux.
   Le constat des paquets est porté ; la simulation ne l'est pas — voir ci-dessous.
-- **U4** : un cron écrit sur la machine 2 et **relu**, sans quoi la planification n'est pas
-  prouvée.
+- **U4** : ~~un cron écrit sur la machine 2 et **relu**~~ — FAIT. `tests/e2e/cron-machine.py`
+  relit le fichier par SSH depuis le conteneur du backend, et le test nettoie avant et après.
+  Ce que la lecture a révélé en plus :
+  - la planification générale du legacy appelle une route qui attend un autre paramètre et
+    répond 400 à chaque fois (E-18) — elle n'a jamais rien planifié ;
+  - « ne pas répéter » revient chaque année, et l'hebdomadaire de la planification générale tombe
+    toujours le lundi (E-19) ;
+  - le serveur de test **n'a pas de démon cron** : le fichier est écrit, rien ne le lira. C'est
+    aussi ce qui rend le banc d'essai sûr — aucun `apt full-upgrade` ne peut s'y déclencher ;
+  - le cron de sécurité embarque un jeton HMAC dans un fichier en **0644**. Il ne permet que de
+    marquer `maj_secu_last_exec_date` pour SA machine : un utilisateur local peut faire passer sa
+    machine pour à jour. Signalé, non corrigé — c'est le backend.
 - **U5** : la demande d'approbation est créée, pas le redémarrage. Le redémarrage réel n'est pas
   joué : deux l'ont déjà été par erreur pendant la vague `approvals`.
 - **U6** : à arbitrer avant d'être porté.

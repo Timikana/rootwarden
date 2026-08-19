@@ -1030,11 +1030,79 @@ n'est jamais désignée) et attend **le contenu** — la ligne dans le panneau d
 bouton redevenu actif — plutôt qu'un délai. Il vérifie aussi qu'aucune partie du portage n'appelle
 `/dry_run_update`.
 
+### Module `update/`, sous-lot U4 — la planification
+
+Portées : la planification générale et la planification de mise à jour de sécurité. Ce que les
+deux routes font, **lu avant tout clic** : elles écrivent un fichier dans `/etc/cron.d/` sur la
+machine distante, en root, puis redémarrent cron. La seconde écrit en plus `machines.maj_secu_date`
+dans la base partagée.
+
+Le legacy présente deux fenêtres modales qui répètent le même formulaire ; le portage n'en pose
+qu'un, ouvert par les deux actions de la ligne, et adapte son titre, sa description et sa route.
+
+### La planification générale n'avait jamais rien planifié
+
+**E-18.** `saveAdvancedSchedule()` envoie `{machine_id, date, time, repeat}` à `/schedule_update`,
+qui attend `interval_minutes` et refuse **avant toute session SSH**. Mesuré sur la machine 2 depuis
+la page legacy : réponse **400**, et `/etc/cron.d/auto_update_advanced` **absent** après le geste.
+
+La route dont le contrat correspond au formulaire existe — `/schedule_advanced_update` — et
+personne ne l'appelle. Symétriquement, la fonction qui respecte le contrat de `/schedule_update`,
+`scheduleUpdate()`, lit `#update-interval`, un élément qui n'existe nulle part dans la page, et
+n'a elle-même aucun appelant. Les deux moitiés sont là, elles ne se rejoignent pas.
+
+Le portage appelle la route qui correspond au formulaire. Porter fidèlement aurait porté un bouton
+qui échoue à chaque clic.
+
+### La récurrence promet ce que cron ne sait pas exprimer
+
+**E-19.** cron n'a pas de champ année : « ne pas répéter » écrit `mm hh JJ MM *`, qui revient
+**chaque année**. Le seul choix qui promet une exécution unique en programme une infinité.
+
+Et le même mot ne veut pas dire la même chose selon le formulaire : la planification générale place
+l'hebdomadaire le **lundi** et le mensuel le **premier du mois**, quelle que soit la date choisie,
+là où la planification de sécurité suit la date. Mesuré sur la machine 2, avec le **mardi**
+15/09/2026 à 03:30 en « toutes les semaines » : `30 03 * * 1` d'un côté, `30 03 * * 2` de l'autre.
+
+Le portage affiche, **avant le geste**, l'expression cron qui sera écrite et sa lecture en clair,
+avec la réserve quand elle s'applique — et seulement quand elle s'applique. Le test compare
+l'**aperçu affiché** au **fichier posé sur la machine** : une promesse d'écran et une réalité de
+machine, deux artefacts indépendants.
+
+### La colonne des actions ne pouvait plus être atteinte
+
+Cinq boutons par ligne au lieu de trois : la colonne, **dernière de treize**, sortait entièrement
+du champ à 1920 px — seul le premier bouton restait visible. La borner ne changeait rien, puisque
+c'était sa position qui la mettait hors d'atteinte. Elle est remontée juste après le nom du
+serveur et se replie dans une largeur bornée. Les lignes sont plus hautes ; les données, elles, se
+parcourent en défilant sans dommage. Le commentaire de la règle CSS, qui plaidait le contraire
+depuis U1, a été récrit avec elle.
+
+### Ce que U4 a montré sans que ce soit un défaut de parité
+
+- Le serveur de test **n'a pas de démon cron** : `systemctl restart cron || service cron restart
+  || true` réussit silencieusement, le fichier est écrit et rien ne le lira. Le test mesure donc le
+  **fichier**, ce qui est exactement ce que la route produit — et aucun `apt full-upgrade` ne peut
+  se déclencher sur le banc d'essai.
+- Le cron de sécurité embarque un **jeton HMAC** (`X-Update-Token`) dans un fichier en **0644**. Ce
+  jeton ne permet qu'une chose, et pour cette machine seulement : marquer `maj_secu_last_exec_date`
+  à l'instant présent. Un utilisateur local de la machine peut donc la faire passer pour « mise à
+  jour » sans qu'elle le soit. La défense tient contre un porteur de compte du portail, pas contre
+  un utilisateur local de la machine concernée. Signalé, non corrigé — c'est le backend.
+
+### Vérification
+
+Nouveau test `tests/e2e/go-page-update-u4.mjs`, vert sur les deux cibles avant le commit :
+7 PASS / 0 FAIL côté legacy, 14 PASS / 0 FAIL côté Laravel. Il **relit le cron sur la machine 2**
+par `tests/e2e/cron-machine.py`, exécuté dans le conteneur du backend — une planification qu'on ne
+relit pas n'est pas prouvée. Il nettoie avant **et** après : les deux fichiers cron effacés,
+`maj_secu_date` remise à NULL.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-17)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-19)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
 

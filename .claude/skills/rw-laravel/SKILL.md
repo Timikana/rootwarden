@@ -829,10 +829,64 @@ du bloc) : le gabarit ne signale rien.
 Cote PHP, une apostrophe francaise se pose plus surement par des guillemets
 doubles que par `\'`.
 
+### Lire LES DEUX cotes du contrat : le corps envoye et la signature attendue
+
+La planification generale du legacy envoie `{machine_id, date, time, repeat}` a une route qui lit
+`interval_minutes`. Elle repond 400 depuis toujours. La route qui correspond au formulaire existe
+et personne ne l'appelle ; la fonction qui respecte l'autre contrat lit un element absent de la
+page et n'a aucun appelant. Les deux moities sont la, elles ne se rejoignent pas.
+
+Un bouton present ne prouve pas une capacite. Avant de porter, comparer le CORPS que le JS envoie
+aux CLES que la route lit. Ici, porter fidelement aurait porte un bouton qui echoue a chaque clic.
+
+### Une ecriture distante se prouve en la RELISANT sur la machine
+
+Un 200 rendu par le backend ne prouve pas qu'un fichier existe. Le test de U4 relit
+`/etc/cron.d/...` par SSH, via un script execute DANS le conteneur du backend — le seul a savoir
+dechiffrer les mots de passe et a joindre le parc :
+
+    execFileSync('docker', ['exec','-i','rootwarden_python','python','-', 'lit', '2', chemin],
+                 { input: readFileSync('cron-machine.py'), encoding: 'utf-8' })
+
+Le script n'imprime jamais de secret. Le test NETTOIE avant ET apres : repartir d'un etat connu
+vaut autant que rendre la fixture intacte.
+
+Sur `test-server`, verifier par SSH et non par `docker exec` : les espaces de noms different.
+
+### Montrer l'EXPRESSION que le backend ecrira, avant le geste
+
+Les quatre recurrences offertes ne veulent pas dire ce que leur nom laisse croire : cron n'a pas
+de champ annee, donc « ne pas repeter » revient chaque annee ; et la planification generale place
+l'hebdomadaire le lundi et le mensuel le premier du mois, quelle que soit la date choisie.
+
+Le portage affiche l'expression cron et sa lecture en clair, avec la reserve UNIQUEMENT quand elle
+s'applique — rien si la date choisie est deja un lundi. Une reserve permanente devient un decor
+qu'on ne lit plus.
+
+Et le test compare l'APERCU AFFICHE au FICHIER POSE : une promesse d'ecran et une realite de
+machine, deux artefacts independants. Comparer le portage a une valeur recalculee par la meme
+formule ne mesurerait que lui-meme.
+
+### Une colonne DERNIERE de treize ne se rattrape pas en la bornant
+
+Cinq boutons par ligne au lieu de trois, et la colonne d'actions sortait entierement du champ a
+1920 px. Lui poser un `max-width` n'y changeait rien : ce n'etait pas sa largeur, c'etait sa
+POSITION. Remontee juste apres le nom du serveur, avec `flex-wrap` et une largeur bornee des deux
+cotes — sans plancher, le tableau lui donne sa largeur minimale et empile les boutons un par ligne.
+
+Les donnees se parcourent en defilant sans dommage ; une capacite qu'on n'atteint qu'en decouvrant
+le defilement horizontal n'est pas offerte.
+
+### Quand une regle change, son commentaire change avec elle
+
+La regle disait `nowrap` et son commentaire expliquait pourquoi le repli etait mauvais — argument
+juste pour trois boutons, faux pour cinq. Laisser le commentaire aurait fabrique un piege pour la
+lecture suivante. Un commentaire qui MENT est pire que pas de commentaire.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
-(U1, U2 portes ; U3 porte pour moitie, la simulation restant au legacy) — toutes celles du meme
+(U1, U2, U4 portes ; U3 porte pour moitie, la simulation restant au legacy) — toutes celles du meme
 gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,

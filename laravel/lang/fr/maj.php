@@ -92,4 +92,52 @@ return [
     'paquets_nombre'   => ':nombre paquet(s) a mettre a jour :',
     'paquets_fin'      => 'Constat termine sur :nombre machine(s).',
     'paquets_fin_partielle' => 'Constat termine, mais :nombre machine(s) n\'ont pas repondu.',
+
+    // Sous-lot U4 — planification
+    'btn_planifier'      => 'Planifier',
+    'tip_planifier'      => "Ecrit un cron sur la machine : mise a jour complete (apt-get upgrade) a l'heure choisie.",
+    'btn_planifier_secu' => 'Planifier securite',
+    'tip_planifier_secu' => "Ecrit un cron sur la machine : mises a jour de securite seules, et enregistre la date en base.",
+
+    'f_date'   => 'Date',
+    'f_time'   => 'Heure',
+    'f_repeat' => 'Recurrence',
+
+    'repeat_none'    => 'Ne pas repeter',
+    'repeat_daily'   => 'Tous les jours',
+    'repeat_weekly'  => 'Toutes les semaines',
+    'repeat_monthly' => 'Tous les mois',
+
+    'btn_cancel'     => 'Annuler',
+    'btn_save_sched' => 'Enregistrer la planification',
+    'tip_save_sched' => "Ecrit le fichier cron sur la machine distante, en root, et redemarre cron.",
+
+    'titre_general' => 'Planifier une mise a jour',
+    'titre_secu'    => 'Planifier une mise a jour de securite',
+    'desc_general'  => 'Sur :machine — apt-get update puis apt-get upgrade, journalise dans /var/log/auto_update.log.',
+    'desc_secu'     => 'Sur :machine — mises a jour de securite seules, journalisees dans /var/log/auto_security_update.log. La date planifiee est aussi enregistree en base.',
+
+    'apercu_incomplet' => 'Choisissez une date et une heure pour voir ce qui sera ecrit sur la machine.',
+    'apercu_daily'     => 'Tous les jours a :heure',
+    'apercu_weekly'    => 'Tous les :jour a :heure',
+    'apercu_monthly'   => 'Le :jour de chaque mois a :heure',
+    'apercu_none'      => 'Le :jour/:mois a :heure',
+
+    'reserve_annuel'  => "— et chaque annee ensuite : cron n'a pas de champ annee, « ne pas repeter » ne s'arrete jamais.",
+    'reserve_lundi'   => "— la planification generale place toujours l'hebdomadaire le lundi, quelle que soit la date choisie.",
+    'reserve_premier' => '— la planification generale place toujours le mensuel le premier du mois, quel que soit le jour choisi.',
+
+    'j_lundi'    => 'lundis',
+    'j_mardi'    => 'mardis',
+    'j_mercredi' => 'mercredis',
+    'j_jeudi'    => 'jeudis',
+    'j_vendredi' => 'vendredis',
+    'j_samedi'   => 'samedis',
+    'j_dimanche' => 'dimanches',
+
+    'sched_incomplet' => "Indiquez une date et une heure avant d'enregistrer.",
+    'sched_en_cours'  => 'Ecriture du cron sur la machine...',
+    'sched_pose'      => 'Cron pose : :cron',
+    'sched_ok'        => 'Planification enregistree sur :machine.',
+    'sched_err'       => "L'ecriture du cron a echoue.",
 ];

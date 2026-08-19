@@ -91,4 +91,52 @@ return [
     'paquets_nombre'   => ':nombre package(s) to upgrade:',
     'paquets_fin'      => 'Reading complete on :nombre machine(s).',
     'paquets_fin_partielle' => 'Reading complete, but :nombre machine(s) did not answer.',
+
+    // Sub-lot U4 — scheduling
+    'btn_planifier'      => 'Schedule',
+    'tip_planifier'      => 'Writes a cron file on the machine: full upgrade (apt-get upgrade) at the chosen time.',
+    'btn_planifier_secu' => 'Schedule security',
+    'tip_planifier_secu' => 'Writes a cron file on the machine: security updates only, and records the date in the database.',
+
+    'f_date'   => 'Date',
+    'f_time'   => 'Time',
+    'f_repeat' => 'Recurrence',
+
+    'repeat_none'    => 'Do not repeat',
+    'repeat_daily'   => 'Every day',
+    'repeat_weekly'  => 'Every week',
+    'repeat_monthly' => 'Every month',
+
+    'btn_cancel'     => 'Cancel',
+    'btn_save_sched' => 'Save the schedule',
+    'tip_save_sched' => 'Writes the cron file on the remote machine, as root, and restarts cron.',
+
+    'titre_general' => 'Schedule an update',
+    'titre_secu'    => 'Schedule a security update',
+    'desc_general'  => 'On :machine — apt-get update then apt-get upgrade, logged to /var/log/auto_update.log.',
+    'desc_secu'     => 'On :machine — security updates only, logged to /var/log/auto_security_update.log. The scheduled date is also recorded in the database.',
+
+    'apercu_incomplet' => 'Pick a date and a time to see what will be written on the machine.',
+    'apercu_daily'     => 'Every day at :heure',
+    'apercu_weekly'    => 'Every :jour at :heure',
+    'apercu_monthly'   => 'On day :jour of every month at :heure',
+    'apercu_none'      => 'On :jour/:mois at :heure',
+
+    'reserve_annuel'  => '— and every year after that: cron has no year field, so "do not repeat" never stops.',
+    'reserve_lundi'   => '— general scheduling always puts the weekly job on Monday, whatever date you pick.',
+    'reserve_premier' => '— general scheduling always puts the monthly job on the first of the month, whatever day you pick.',
+
+    'j_lundi'    => 'Monday',
+    'j_mardi'    => 'Tuesday',
+    'j_mercredi' => 'Wednesday',
+    'j_jeudi'    => 'Thursday',
+    'j_vendredi' => 'Friday',
+    'j_samedi'   => 'Saturday',
+    'j_dimanche' => 'Sunday',
+
+    'sched_incomplet' => 'Enter a date and a time before saving.',
+    'sched_en_cours'  => 'Writing the cron file on the machine...',
+    'sched_pose'      => 'Cron written: :cron',
+    'sched_ok'        => 'Schedule saved on :machine.',
+    'sched_err'       => 'Writing the cron file failed.',
 ];

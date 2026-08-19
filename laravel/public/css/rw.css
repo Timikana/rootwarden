@@ -1018,15 +1018,27 @@ body {
 .rw-bouton--minuscule { padding: 3px 8px; font-size: 12px; }
 
 /*
- * Les trois relevés restent sur UNE ligne. Les faire se replier — essaye
- * d'abord — empile trois boutons par ligne et rend chaque ligne trois fois plus
- * haute, sur un tableau qui en compte deja treize colonnes. Le debordement
- * appartient au cadre du tableau, qui defile et le dit.
+ * La colonne d'actions se REPLIE dans une largeur bornee.
  *
- * `flex-wrap` n'est PAS pose sur `.rw-tableau__actions` : cette classe sert
- * aussi aux pages d'approbation et de sauvegarde, ou le repli n'a rien a faire.
+ * Elle tenait sur une ligne tant qu'elle portait trois relevés ; U4 y a ajoute
+ * les deux planifications. Cinq boutons en file poussaient la colonne entiere
+ * hors du champ — a 1920 px, seul le premier restait visible, et la borner ne
+ * changeait rien : elle etait DERNIERE de treize colonnes. Elle est donc
+ * remontee juste apres le nom du serveur, et se replie dans une largeur bornee.
+ * Une capacite qu'on n'atteint qu'en decouvrant le defilement horizontal n'est
+ * pas offerte ; les donnees, elles, se parcourent en defilant sans dommage.
+ *
+ * `flex-wrap` reste pose sur la VARIANTE : `.rw-tableau__actions` sert aussi
+ * aux pages d'approbation et de sauvegarde, ou le repli n'a rien a faire.
  */
-.rw-tableau__actions--releves { flex-wrap: nowrap; }
+.rw-tableau__actions--releves {
+    flex-wrap: wrap;
+    /* Plancher ET plafond : sans plancher, le tableau donne a la colonne sa
+       largeur minimale et empile les cinq boutons un par ligne. */
+    min-width: 210px;
+    max-width: 230px;
+    white-space: normal;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    Journal d'execution (module update/, sous-lot U2)
@@ -1164,3 +1176,31 @@ body {
 }
 
 .rw-actions__compteur[data-nombre="0"] { color: var(--rw-texte-doux); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Apercu de planification (module update/, sous-lot U4)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Ce que le backend va REELLEMENT ecrire, montre avant le geste. La reserve
+ * — « et chaque annee ensuite », « toujours le lundi » — se distingue par la
+ * teinte : ce n'est pas une erreur, c'est un ecart entre le mot choisi dans la
+ * liste et ce que cron sait exprimer.
+ */
+.rw-apercu {
+    margin: 4px 0 18px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--rw-accent);
+    border-radius: 0 var(--rw-rayon) var(--rw-rayon) 0;
+    background: var(--rw-surface-2);
+    font-size: 13px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.rw-apercu--incomplet {
+    border-left-color: var(--rw-bordure);
+    color: var(--rw-texte-doux);
+}
+
+.rw-apercu--reserve { border-left-color: var(--rw-avertissement); }
