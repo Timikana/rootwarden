@@ -1164,6 +1164,73 @@ Nouveau test `tests/e2e/go-page-update-u5.mjs`, vert sur les deux cibles : 9 PAS
 legacy, 17 PASS / 0 FAIL côté Laravel. Le garde-fou d'état vit dans `tests/e2e/reboot-garde.py`,
 qui ne touche aucune machine — il lit et nettoie la seule base.
 
+### Correctif backend — le mot de passe root ne sort plus dans le flux SSH (v1.37.17)
+
+**Ce concerne aussi l'ancien portail**, pas seulement le portage : les deux consomment la même
+fonction. À reporter sur `main`.
+
+**Symptôme, mesuré.** Les routes qui diffusent leur sortie SSH en direct — `/dry_run_update` et
+`/security_updates` — plaçaient le **mot de passe root en clair à la deuxième ligne** du flux rendu
+au navigateur. Le legacy dépose chaque ligne de ce flux dans le journal d'exécution : le mot de
+passe s'affichait donc à l'écran. Reproductible 3 fois sur 3.
+
+Périmètre : toutes les machines dont le compte de service **n'est pas déployé** — soit, sur ce
+parc, toutes sauf `srv-zabbix`. La branche `service_account` (sudo NOPASSWD, sans PTY ni mot de
+passe) n'a jamais été concernée.
+
+**Cause racine.** `execute_as_root_stream()` portait un correctif — commenté « Patch A09 » — qui
+jetait tout ce qui précède le **premier saut de ligne**, en supposant que l'écho PTY du mot de
+passe est la première ligne renvoyée. La supposition était juste ; ce qui était faux, c'est qu'il
+n'y en aurait **qu'une**.
+
+Reproduction du même enchaînement sur une commande inoffensive (`sudo -S -p '' sh -c 'id -u'`, PTY,
+écriture immédiate du mot de passe), morceaux bruts lus sur le canal :
+
+```
+morceau 1 : '<mot de passe>\r\n'
+morceau 2 : '<mot de passe>\r\n'
+morceau 3 : '0\r\n'
+```
+
+Le mot de passe est **échoté deux fois**. Le filtre en jetait un ; le second traversait.
+
+**Correctif.** Le filtre ne porte plus sur une **position** mais sur le **contenu** : sur une
+fenêtre bornée de début de flux, toute **ligne complète égale au secret** est jetée, quel que soit
+son rang, et les autres passent. Il couvre ainsi l'écho double, l'écho unique, l'absence d'écho, et
+l'invite « Mot de passe : » que `su` écrit avant.
+
+Le texte est bufferisé jusqu'au saut de ligne : un écho scindé sur une frontière `recv(4096)` est
+reconstitué **avant** d'être comparé — ce qu'un simple `replace` ne savait pas faire, et qui était
+la raison d'être du correctif précédent. La fenêtre est bornée **en lignes et en octets** pour que
+le flux ne puisse jamais rester bloqué dans le tampon.
+
+La logique est remontée au niveau module, dans `filtre_echo_mot_de_passe()` : une règle qui protège
+un secret ne doit pas vivre enfermée dans une fermeture où rien ne peut l'éprouver.
+
+**Tests.** `backend/tests/test_ssh_echo_mot_de_passe.py`, 11 cas : l'écho double (le défaut mesuré),
+l'écho simple, l'absence d'écho, l'écho scindé entre deux lectures, l'invite de `su` avant l'écho,
+une ligne qui *cite* le secret sans l'être, les deux bornes de la fenêtre, le fragment final sans
+saut de ligne, le secret vide, et l'absence de tout fragment de six caractères.
+
+Le fichier charge le **vrai** module par `importlib` : `conftest.py` remplace `ssh_utils` par un
+`MagicMock`, et un mock se laisse dépaqueter en silence — le test aurait été vert sans rien
+mesurer.
+
+Suite backend complète : **296 tests verts**.
+
+**Vérification en direct**, sur la machine 2, avant/après :
+
+| | Ligne 2 du flux de `/dry_run_update` |
+|---|---|
+| avant | le mot de passe root, en clair (3 essais sur 3) |
+| après | `W: Failed to fetch ...` — la vraie sortie (4 essais sur 4) |
+
+Aucun fragment de six caractères du mot de passe ne subsiste, et la sortie de la commande est
+intacte (42 lignes contre 43 : la ligne d'écho en moins).
+
+**Ce que cela débloque.** Le sous-lot U6 du module `update/` — les mises à jour de sécurité, qui
+diffusent par cette même fonction — et la simulation, restée au legacy pour cette raison (E-17).
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

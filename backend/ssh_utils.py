@@ -580,6 +580,92 @@ def execute_as_root(client: paramiko.SSHClient, command: str, root_password: str
         raise
 
 
+def filtre_echo_mot_de_passe(secret, lignes_surveillees=8, octets_surveilles=4096):
+    """
+    Filtre les lignes d'ECHO d'un mot de passe en tete d'un flux PTY.
+
+    Rend un couple ``(sans_echo, fin_de_tampon)`` :
+
+    - ``sans_echo(texte)`` rend le texte a emettre, ampute des LIGNES COMPLETES
+      qui SONT le secret ;
+    - ``fin_de_tampon()`` rend le dernier fragment retenu, une fois la commande
+      terminee — vide s'il n'etait que le secret.
+
+    POURQUOI UN FILTRE PAR CONTENU ET NON PAR POSITION.
+
+    Le correctif precedent jetait tout ce qui precede le PREMIER saut de ligne,
+    en supposant que l'echo du mot de passe est la premiere ligne renvoyee. La
+    supposition est juste ; ce qui etait faux, c'est qu'il n'y en aurait QU'UNE.
+
+    Mesure sur une machine du parc (``sudo -S -p '' sh -c 'id -u'``, PTY,
+    ecriture immediate du mot de passe), morceaux bruts lus sur le canal ::
+
+        morceau 1 : '<mot de passe>\\r\\n'
+        morceau 2 : '<mot de passe>\\r\\n'
+        morceau 3 : '0\\r\\n'
+
+    Le mot de passe est echote DEUX fois. L'ancien filtre en jetait un ; le
+    second traversait et arrivait en ligne 2 du flux rendu au navigateur — donc
+    a l'ecran, dans le journal d'execution du module `update/`.
+
+    Un filtre qui porte sur une POSITION suppose qu'il sait combien de lignes le
+    precedent. Celui-ci porte sur le CONTENU : sur une fenetre bornee de debut
+    de flux, toute ligne complete egale au secret est jetee, quel que soit son
+    rang, et les autres passent. Il couvre ainsi l'echo double, l'echo unique,
+    l'absence d'echo, et l'invite « Mot de passe : » que ``su`` ecrit avant.
+
+    Le texte est bufferise jusqu'au saut de ligne : un echo scinde sur une
+    frontiere ``recv(4096)`` est donc reconstitue avant d'etre compare, ce qu'un
+    simple ``replace`` ne savait pas faire.
+
+    La fenetre est bornee EN LIGNES ET EN OCTETS pour que le flux ne puisse
+    jamais rester bloque dans le tampon : au-dela, le filtre laisse tout passer.
+    Un secret vide desactive le filtre.
+    """
+    secret = (secret or '').strip()
+    etat = {'surveille': bool(secret), 'tampon': '', 'lignes': 0, 'octets': 0}
+
+    def sans_echo(texte):
+        if not etat['surveille']:
+            return texte
+
+        etat['tampon'] += texte
+        etat['octets'] += len(texte)
+        sortie = []
+
+        while True:
+            coupure = etat['tampon'].find('\n')
+            if coupure == -1:
+                break
+            ligne = etat['tampon'][:coupure]
+            etat['tampon'] = etat['tampon'][coupure + 1:]
+            etat['lignes'] += 1
+            if ligne.strip('\r \t') != secret:
+                sortie.append(ligne + '\n')
+            if etat['lignes'] >= lignes_surveillees:
+                etat['surveille'] = False
+                sortie.append(etat['tampon'])
+                etat['tampon'] = ''
+                break
+
+        if etat['surveille'] and etat['octets'] > octets_surveilles:
+            # Sortie de fenetre sans saut de ligne : le flux doit couler.
+            etat['surveille'] = False
+            sortie.append(etat['tampon'])
+            etat['tampon'] = ''
+
+        return ''.join(sortie)
+
+    def fin_de_tampon():
+        reste = etat['tampon']
+        etat['tampon'] = ''
+        if reste.strip('\r \t') == secret:
+            return ''
+        return reste
+
+    return sans_echo, fin_de_tampon
+
+
 def execute_as_root_stream(client: paramiko.SSHClient, command: str,
                             root_password: str, logger=None):
     """
@@ -666,25 +752,11 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
 
         yield "Début de l'exécution...\n"
 
-        # Patch A09 : l'echo PTY du mot de passe (root_password + '\n') est la
-        # PREMIERE ligne renvoyee. L'ancien `text.replace(root_password, '')`
-        # echouait si l'echo etait scinde sur une frontiere recv(4096) -> fuite
-        # partielle du mot de passe dans le flux. On bufferise desormais jusqu'au
-        # premier '\n' et on jette tout ce qui precede (la ligne d'echo entiere),
-        # quel que soit le decoupage en chunks.
-        _skip_password = True
-        _skip_buf = ''
-
-        def _strip_pw_echo(text):
-            """Retourne (texte_a_emettre, skip_encore_actif)."""
-            nonlocal _skip_buf
-            _skip_buf += text
-            nl = _skip_buf.find('\n')
-            if nl == -1:
-                return '', True       # encore dans la ligne d'echo, ne rien emettre
-            remainder = _skip_buf[nl + 1:]
-            _skip_buf = ''
-            return remainder, False   # ligne d'echo jetee, suite normale
+        # L'echo PTY du mot de passe est filtre PAR CONTENU, pas par position :
+        # il apparait DEUX fois, et l'ancien correctif n'en jetait qu'un. Le
+        # detail, la mesure et les bornes sont dans `filtre_echo_mot_de_passe`,
+        # remontee au niveau module pour etre testable seule.
+        _sans_echo, _fin_de_tampon = filtre_echo_mot_de_passe(root_password)
 
         while True:
             r, _, _ = select.select([stdout.channel], [], [], 0.5)
@@ -692,27 +764,23 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
                 chunk = stdout.channel.recv(4096)
                 if not chunk:
                     break
-                text = chunk.decode('utf-8', errors='replace')
-                if _skip_password:
-                    text, _skip_password = _strip_pw_echo(text)
-                    if _skip_password:
-                        continue
-                text = _ansi_re.sub('', text)
+                # L'ANSI est retire AVANT la comparaison : une sequence de
+                # controle collee a l'echo le rendrait meconnaissable.
+                text = _sans_echo(_ansi_re.sub('', chunk.decode('utf-8', errors='replace')))
                 if text.strip():
                     yield text
             elif stdout.channel.exit_status_ready():
                 while stdout.channel.recv_ready():
                     chunk = stdout.channel.recv(4096)
                     if chunk:
-                        text = chunk.decode('utf-8', errors='replace')
-                        if _skip_password:
-                            text, _skip_password = _strip_pw_echo(text)
-                            if _skip_password:
-                                continue
-                        text = _ansi_re.sub('', text)
+                        text = _sans_echo(_ansi_re.sub('', chunk.decode('utf-8', errors='replace')))
                         if text.strip():
                             yield text
                 break
+
+        _reste = _fin_de_tampon()
+        if _reste.strip():
+            yield _reste
 
         code = stdout.channel.recv_exit_status()
         yield f"\nExécution terminée (code {code}).\n"
