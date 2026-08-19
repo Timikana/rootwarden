@@ -51,6 +51,16 @@ return [
     'btn_reboot'  => 'Dernier redemarrage',
     'tip_reboot'  => 'Lit la date du dernier demarrage. Sans effet sur la machine.',
 
+    // Journal d'execution (U2)
+    'journal_titre' => 'Journal d\'execution',
+    'journal_desc' => 'Ce que RootWarden a fait sur les serveurs pendant cette visite. Un panneau par machine, plus un journal general. Rien n\'est conserve d\'une visite a l\'autre — la tracabilite durable est dans le journal des commandes.',
+    'journal_general' => 'Journal general',
+    'journal_vide' => 'Aucune activite pour l\'instant.',
+    'btn_vider' => 'Vider le journal',
+    'tip_vider' => 'Efface l\'affichage. N\'efface aucune trace enregistree.',
+    'suivre' => 'Suivre',
+    'suivre_aide' => 'Descend automatiquement sur les nouvelles lignes. Se decoche si vous remontez lire.',
+
     // Etats
     'non_verifie' => 'Non verifie',
     'inconnu'     => 'Inconnu',

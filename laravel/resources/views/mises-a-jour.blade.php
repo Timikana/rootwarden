@@ -102,6 +102,34 @@
 
     <p class="rw-annonce" id="maj-annonce" role="status" aria-live="polite" data-rw="annonce"></p>
 
+    {{-- Journal d'execution — sous-lot U2. Presentation pure : il est alimente
+         par les autres sous-lots via `window.rwJournal`. Les identifiants et
+         les classes sont ceux du legacy (`logs-container`, `logs`,
+         `.server-log-window`, `.log-window`, `.log-line`) : le MEME test vise
+         les deux cibles. --}}
+    <section class="rw-journal" data-rw="journal">
+        <div class="rw-entete-page">
+            <div>
+                <h2 class="rw-sous-titre-fort">{{ __('maj.journal_titre') }}</h2>
+                <p class="rw-sous-titre rw-prose">{{ __('maj.journal_desc') }}</p>
+            </div>
+            <div class="rw-entete-page__actions">
+                <button class="rw-bouton rw-bouton--discret" id="clear-logs-btn" type="button"
+                        data-rw="vider-journal"
+                        title="{{ __('maj.tip_vider') }}">{{ __('maj.btn_vider') }}</button>
+            </div>
+        </div>
+
+        {{-- Zone GENERALE. Le legacy la rend aussi mais ne l'alimente jamais :
+             `appendLog` y est defini deux fois et la seconde definition ecrase
+             la premiere. Ici elle recoit vraiment les messages sans serveur. --}}
+        <div class="rw-journal__general" id="logs" data-rw="journal-general"
+             aria-label="{{ __('maj.journal_general') }}"></div>
+
+        {{-- Un panneau par serveur, cree a la premiere ligne. --}}
+        <div class="rw-journal__panneaux" id="logs-container" data-rw="journal-panneaux"></div>
+    </section>
+
     {{-- Le parc est rendu par le script a partir de ces donnees : le MEME code
          sert le premier rendu et les suivants, il ne peut donc pas exister deux
          versions du tableau qui divergent. --}}
@@ -110,5 +138,11 @@
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="maj-libelles" type="application/json">@json($libelles)</script>
 
+    @php($journal = ['suivre' => __('maj.suivre'), 'suivre_aide' => __('maj.suivre_aide'), 'vide' => __('maj.journal_vide')])
+    <script id="journal-libelles" type="application/json">@json($journal)</script>
+
+    {{-- Le journal AVANT la page : les autres sous-lots s'appuieront sur
+         `window.rwJournal`, il doit exister quand ils s'initialisent. --}}
+    <script src="/js/journal-execution.js?v={{ @filemtime(public_path('js/journal-execution.js')) ?: '0' }}"></script>
     <script src="/js/mises-a-jour.js?v={{ @filemtime(public_path('js/mises-a-jour.js')) ?: '0' }}"></script>
 @endsection

@@ -138,13 +138,17 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 | Sous-lot | Contenu | Routes | Risque |
 |---|---|---|---|
 | **U1 — parc et filtres** — PORTÉ | tableau, filtres environnement / criticité / réseau, rafraîchissement, relevés par machine | `filter_servers`, `linux_version`, `server_status`, `last_reboot` | lecture seule |
-| **U2 — journal d'exécution** | zone de journal, fenêtres par serveur | aucune | présentation |
+| **U2 — journal d'exécution** — PORTÉ | zone générale, panneaux par serveur, suivi automatique, effacement | aucune | présentation |
 | **U3 — constats sans effet** | paquets en attente, simulation | `pending_packages`, `dry_run_update` | lecture sur le serveur |
 | **U4 — planification** | les deux fenêtres de planification | `schedule_update`, `schedule_advanced_security_update` | écrit un cron distant |
 | **U5 — redémarrage** | redémarrage sélectionné | `reboot_server` | destructif, déjà soumis à approbation |
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
 
-État au 2026-08-18 : **U1 porté** sur `/mises-a-jour` (voir `PARITE.md` E-14).
+État au 2026-08-19 : **U1 et U2 portés** sur `/mises-a-jour` (voir `PARITE.md` E-14 et E-15).
+
+**Correction de lecture** : `getServerLogWindow` n'ouvre AUCUNE fenêtre navigateur — il crée un
+panneau dans la page. La formulation « fenêtres par serveur » de la première version de ce
+document laissait entendre des popups.
 
 **U1 est complet** : le filtre par étiquette a été ajouté après coup (il avait été manqué au
 relevé).

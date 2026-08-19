@@ -163,6 +163,23 @@ for (const format of LARGEURS) {
     await dors(700);
     await prend('13-mises-a-jour');
 
+    // 14. Le journal d'execution garni — sans lui, la zone est vide et la
+    //     capture ne montre pas ce qu'on a porte.
+    await page.evaluate(() => {
+        if (!window.rwJournal) return;
+        window.rwJournal.ajoute('Parc relu — 3 machines.', 'info');
+        window.rwJournal.ajoute('Lecture de la version Linux...', 'info', 'Test-Server-Debian');
+        window.rwJournal.ajoute('Debian GNU/Linux 12 (bookworm)', 'ok', 'Test-Server-Debian');
+        window.rwJournal.ajoute('Progression : 2/3 paquets', 'progress', 'Test-Server-Debian');
+        window.rwJournal.ajoute('Machine injoignable sur le port 22.', 'error', 'OpenCVE-Test-OnPrem');
+    });
+    // Amener le journal dans le champ : sans cela, la capture s'arrete au pli
+    // et ne montre rien de ce qu'on vient de porter.
+    await page.evaluate(() => document.querySelector('[data-rw="journal"]')
+        ?.scrollIntoView({ block: 'start' }));
+    await dors(400);
+    await prend('14-journal-execution');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });

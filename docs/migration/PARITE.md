@@ -565,6 +565,59 @@ ne peut pas encore être redirigée, puisque la page legacy reste la seule compl
 
 ---
 
+## E-15 — Le journal a **un seul** point d'entrée, et sa zone générale sert vraiment
+
+**Défaut du legacy, mesuré.** `appendLog` est défini **deux fois** :
+
+| Fichier | Signature | Écrit dans |
+|---|---|---|
+| `update/js/domManipulation.js:34` | `appendLog(message)` | `#logs`, la zone générale |
+| `update/js/apiCalls.js:645` | `appendLog(message, type, serverName)` | `#logs-container` ou un panneau |
+
+Les deux sont des déclarations globales, et `index.php` charge `domManipulation.js` **puis**
+`apiCalls.js` : la seconde définition gagne, la première est du code mort.
+
+Conséquences, toutes deux mesurées :
+
+- **`#logs` n'est alimentée par personne.** La page rend un cadre — 12 rem de haut dans le
+  legacy — qui reste vide quoi qu'il arrive.
+- **Les messages généraux se déposent parmi les panneaux de serveur.** `appendToLogs(msg)` appelle
+  `appendLog(msg)` sans nom de serveur, donc la version d'`apiCalls.js`, qui écrit un `<p>` nu dans
+  `#logs-container` — le conteneur des panneaux. Relevé du test : après un message général, `#logs`
+  est vide et un élément hors panneau porte le texte.
+- **`clearLog()` vide une zone toujours vide.** Cinq fonctions l'appellent.
+
+C'est la troisième fois que ce défaut apparaît dans ce projet : `escHtml()` défini deux fois dans
+le legacy, `.rw-etiquette` défini deux fois dans notre propre feuille de style (E-12), et
+maintenant `appendLog`. Une déclaration globale ne signale jamais qu'elle en écrase une autre.
+
+### Ce que fait le portage
+
+Un point d'entrée **unique et nommé**, `window.rwJournal.ajoute(message, type, serveur)`, déclaré
+dans une fermeture : rien ne peut l'écraser par mégarde, et les sous-lots U3 à U6 s'y adosseront.
+
+Un message sans serveur va dans la zone générale, qui est réellement affichée et qui **dit qu'elle
+est vide** quand elle l'est. Les panneaux de serveur restent séparés.
+
+### Ce qui est repris à l'identique
+
+Le contrat de rendu, vérifié par le même test sur les deux cibles :
+
+- un panneau par serveur, créé à la première ligne et **réutilisé** ensuite ;
+- un en-tête fixe portant le nom du serveur et une case « Suivre » ;
+- une ligne de type `progress` qui **remplace** la précédente au lieu de s'empiler ;
+- le type du message porté par la classe de la ligne ;
+- un suivi automatique qui se désactive quand on remonte lire, et se réactive quand on redescend —
+  avec le drapeau de défilement programmatique qui empêche la case de clignoter.
+
+### Ce que le portage ajoute
+
+Un bouton « Vider le journal ». Le legacy n'expose `clearLogs()` qu'aux actions internes : rien ne
+permet de repartir d'un journal propre à la main. L'infobulle précise que cela n'efface **aucune
+trace enregistrée** — la traçabilité durable vit dans le journal des commandes, pas ici.
+
+---
+
 ## Invariants verifies identiques sur les deux cibles
 
 Ceux-ci ne sont pas des ecarts : ils doivent se comporter **de la meme facon** avant et

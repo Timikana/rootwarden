@@ -912,6 +912,57 @@ Corrigé en deux temps :
   périmé. C'est la troisième fois que cette famille de piège se paie : **attendre une condition
   déjà satisfaite n'attend rien**.
 
+### Module `update/`, sous-lot U2 — le journal d'exécution
+
+Présentation pure : aucune route backend. Le journal est alimenté par les autres sous-lots, qui
+l'atteindront par `window.rwJournal`. Porté avec son contrat complet — un panneau par serveur créé
+une seule fois, en-tête fixe avec case « Suivre », ligne de progression qui se remplace, suivi
+automatique qui se désactive quand on remonte lire.
+
+**Correction d'une lecture faite trop vite** : `getServerLogWindow` n'ouvre **aucune fenêtre
+navigateur**. Il crée un panneau dans la page. L'inventaire du module parlait de « fenêtres par
+serveur », ce qui laissait entendre des popups — ce n'en sont pas.
+
+### `appendLog` était défini deux fois
+
+**E-15** — dans `domManipulation.js`, qui écrit dans la zone générale `#logs`, puis dans
+`apiCalls.js`, qui écrit dans `#logs-container`. Deux déclarations globales, `apiCalls.js` chargé
+en second : sa définition gagne, l'autre est du code mort.
+
+Mesuré :
+
+- **`#logs` n'est alimentée par personne** — la page rend un cadre qui reste vide quoi qu'il
+  arrive ;
+- **les messages généraux se déposent parmi les panneaux de serveur**, `appendToLogs()` appelant
+  `appendLog()` sans nom de serveur ;
+- **`clearLog()` vide une zone toujours vide**, et cinq fonctions l'appellent.
+
+Troisième occurrence de ce défaut dans le projet : `escHtml()` défini deux fois dans le legacy,
+`.rw-etiquette` dans notre propre feuille de style (E-12), et maintenant `appendLog`. Une
+déclaration globale ne signale jamais qu'elle en écrase une autre.
+
+Le portage expose un point d'entrée **unique et nommé**, déclaré dans une fermeture. Un message
+sans serveur va dans la zone générale, qui est réellement affichée et **dit qu'elle est vide**
+quand elle l'est.
+
+### Un bouton pour vider
+
+Le legacy n'expose `clearLogs()` qu'à ses actions internes : rien ne permet de repartir d'un
+journal propre à la main. Le portage ajoute le bouton, avec une infobulle qui précise qu'il
+n'efface **aucune trace enregistrée** — la traçabilité durable vit dans le journal des commandes.
+
+### Deux détails d'assertion qui annonçaient l'inverse du résultat
+
+`verifie('...', vrai, 'introuvable dans les deux zones')` affichait « introuvable » sur un **PASS**.
+Le détail d'une attente décrit ce qu'on a **mesuré**, pas ce qu'on aurait dit en cas d'échec. Deux
+occurrences corrigées dans le test de U2.
+
+### Une capture qui s'arrêtait au pli
+
+La capture de la page ne montrait pas le journal : il vit sous le pli, et la prise de vue est de la
+hauteur du champ visible. Elle fait maintenant défiler jusqu'à lui avant de photographier — sans
+quoi elle ne montrait rien de ce qui venait d'être porté.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
