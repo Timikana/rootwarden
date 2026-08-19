@@ -883,10 +883,78 @@ La regle disait `nowrap` et son commentaire expliquait pourquoi le repli etait m
 juste pour trois boutons, faux pour cinq. Laisser le commentaire aurait fabrique un piege pour la
 lecture suivante. Un commentaire qui MENT est pire que pas de commentaire.
 
+### Prouver qu'une action destructive N'A PAS eu lieu
+
+Un test de redemarrage qui redemarre vraiment est un accident — deux l'ont ete
+sur la machine 2 le 2026-08-18. Ne pas se contenter d'un statut HTTP : chercher
+la trace que le backend n'ecrit QU'APRES l'execution.
+
+Pour `/reboot_server`, c'est `command_log` de contexte `reboot`, ecrit apres la
+session SSH. Compte avant, compte apres : inchange, la commande n'est jamais
+partie. La preuve vient du systeme, pas de l'ecran.
+
+Et poser le garde-fou AVANT de cliquer : `approvals.gate()` laisse passer si une
+demande DEJA APPROUVEE existe (elle est consommee) ou si le demandeur est role
+3. Le test verifie l'absence de demande approuvee et s'arrete sans cliquer si
+elle existe — fail-closed, pas fail-open.
+
+### Un `confirm()` peut afficher une CLE au lieu d'un texte
+
+Mesure : les deux confirmations de redemarrage du legacy affichent
+« updates.reboot_confirm1 » et « updates.reboot_confirm2 ». Les textes existent,
+longs et soignes, dans le catalogue PHP lu par `t()` ; `__()` lit celui de `js.`.
+
+Puppeteer donne acces au texte reel :
+
+    page.on('dialog', async d => { boites.push(d.message()); await d.accept(); });
+
+Lire le catalogue ne suffit pas : il faut voir CE QUI S'AFFICHE. Un texte range
+dans le mauvais catalogue est un texte que personne ne lit jamais.
+
+### Deux fois la meme question ne font pas deux decisions
+
+Le legacy empile deux `confirm()` identiques. Deux « OK » d'affilee sont un
+reflexe. Une confirmation EMPECHE quand elle demande un geste different de
+l'acquiescement : recopier le nombre de machines, recopier un nom de fichier
+(voir les sauvegardes). Le bouton naît DESACTIVE et ne s'active qu'a l'egalite
+exacte — et le test verifie les DEUX cotes : une saisie fausse laisse le bouton
+inerte, la bonne l'active.
+
+### Un statut 202 n'est pas un echec
+
+`/reboot_server` rend `202` avec `success: false` et `pending_approval: true` :
+c'est le fonctionnement NOMINAL de la regle des quatre yeux. Le legacy ne
+regarde que `success` et peint donc en rouge une demande correctement creee.
+
+Regle : lire le champ qui porte le SENS (`pending_approval`), pas seulement le
+booleen generique. Et l'annoncer avec son numero de demande, pour que
+l'operateur puisse la suivre.
+
+### Une capacite que le backend accepte et que l'interface cache
+
+`/reboot_server` accepte `delay_minutes` de 0 a 1440 et lance alors
+`shutdown -r +N`, qui previent les sessions ouvertes. Le legacy envoie toujours
+`0`. Lire la SIGNATURE de la route, pas seulement l'appel : le portage a offert
+le delai sans rien changer au backend.
+
+### `scrollIntoView({block: 'start'})` glisse sous l'en-tete fixe
+
+Pour une capture, `start` amene l'element en tete de fenetre — la ou l'en-tete
+colle du gabarit le recouvre. Le titre du panneau et la ligne qui NOMME les
+machines disparaissaient. `block: 'center'` les rend visibles.
+
+### Une attente fixe passe seule et echoue en serie
+
+Le test U2 attendait 2 500 ms apres un filtrage : vert joue seul, rouge derriere
+deux autres suites. La trace arrivait, plus tard. Une attente fixe ne mesure pas
+la page, elle mesure la charge de la machine. Interroger le contenu jusqu'a ce
+qu'il soit la.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
-(U1, U2, U4 portes ; U3 porte pour moitie, la simulation restant au legacy) — toutes celles du meme
+(U1, U2, U4, U5 portes ; U3 porte pour moitie, la simulation restant au legacy ;
+U6 bloque par l'arbitrage de la fuite) — toutes celles du meme
 gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,

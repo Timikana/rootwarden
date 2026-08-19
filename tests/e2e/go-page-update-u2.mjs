@@ -282,7 +282,20 @@ try {
         const b = [...document.querySelectorAll('button')].find(x => /filtr/i.test(x.textContent));
         if (b) b.click();
     });
-    await dors(2500);
+    // Attendre LE CONTENU, pas un delai : un 2500 ms fixe passe quand la
+    // machine est libre et echoue quand elle enchaine les navigateurs. C'est
+    // le journal qu'on attend, alors c'est le journal qu'on interroge.
+    const tracesDuFiltre = () => page.evaluate(() => {
+        const conteneur = document.getElementById('logs-container');
+        const horsPanneau = conteneur
+            ? [...conteneur.children].filter(el => !el.hasAttribute('data-server-name'))
+                .map(el => el.innerText).join(' ')
+            : '';
+        return ((document.getElementById('logs')?.innerText || '') + ' ' + horsPanneau).trim();
+    });
+    const limiteFiltre = Date.now() + 30000;
+    while (Date.now() < limiteFiltre && !(await tracesDuFiltre())) await dors(300);
+
     const apresFiltre = await releve(page);
 
     const trace = apresFiltre.texteGlobale + ' ' + apresFiltre.texteHorsPanneau

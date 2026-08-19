@@ -140,4 +140,31 @@ return [
     'sched_pose'      => 'Cron pose : :cron',
     'sched_ok'        => 'Planification enregistree sur :machine.',
     'sched_err'       => "L'ecriture du cron a echoue.",
+
+    // Sous-lot U5 — redemarrage
+    'btn_reboot_action' => 'Redemarrer',
+    'tip_reboot_action' => "Coupe les sessions et interrompt les services des machines retenues. Soumis a l'approbation d'un second administrateur.",
+
+    'reboot_titre'        => 'Redemarrer les machines retenues',
+    'reboot_machines'     => ':nombre machine(s) : :machines',
+    'reboot_consequences' => 'Toutes les sessions SSH ouvertes seront coupees, et les services (web, base de donnees) interrompus le temps du redemarrage.',
+    'reboot_quatre_yeux'  => "Un redemarrage demande l'accord d'un second administrateur : votre demande sera mise en attente, pas executee. Une demande deja en attente pour la meme machine n'est pas dupliquee, et garde le delai qu'elle portait.",
+
+    'reboot_delai'    => 'Quand',
+    'reboot_delai_0'  => 'Immediatement',
+    'reboot_delai_5'  => 'Dans 5 minutes',
+    'reboot_delai_15' => 'Dans 15 minutes',
+    'reboot_delai_60' => 'Dans 1 heure',
+
+    'reboot_consigne'         => 'Recopiez le nombre de machines (:nombre) pour activer le bouton',
+    'btn_reboot_confirmer'    => 'Redemarrer',
+    'reboot_en_cours'         => 'Envoi de la demande de redemarrage...',
+    'reboot_demande'          => 'Demande de redemarrage pour :machine',
+    'reboot_attente'          => "Demande d'approbation #:id creee : un second administrateur doit la valider avant tout redemarrage.",
+    'reboot_envoye'           => 'Redemarrage envoye a la machine.',
+    'reboot_fenetre'          => 'Redemarrage refuse : hors fenetre de maintenance autorisee.',
+    'reboot_err'              => 'La demande de redemarrage a echoue.',
+    'reboot_fin'              => 'Redemarrage envoye a :nombre machine(s).',
+    'reboot_fin_attente'      => ":nombre demande(s) d'approbation en attente. Rien n'a redemarre.",
+    'reboot_fin_partielle'    => ':nombre machine(s) ont refuse la demande.',
 ];

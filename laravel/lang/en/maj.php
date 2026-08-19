@@ -139,4 +139,31 @@ return [
     'sched_pose'      => 'Cron written: :cron',
     'sched_ok'        => 'Schedule saved on :machine.',
     'sched_err'       => 'Writing the cron file failed.',
+
+    // Sub-lot U5 — reboot
+    'btn_reboot_action' => 'Reboot',
+    'tip_reboot_action' => 'Cuts the sessions and interrupts the services of the selected machines. Requires a second administrator to approve.',
+
+    'reboot_titre'        => 'Reboot the selected machines',
+    'reboot_machines'     => ':nombre machine(s): :machines',
+    'reboot_consequences' => 'Every open SSH session will be cut, and the services (web, database) interrupted for the duration of the reboot.',
+    'reboot_quatre_yeux'  => 'A reboot needs a second administrator to agree: your request will be queued, not executed. A request already queued for the same machine is not duplicated, and keeps the delay it carried.',
+
+    'reboot_delai'    => 'When',
+    'reboot_delai_0'  => 'Immediately',
+    'reboot_delai_5'  => 'In 5 minutes',
+    'reboot_delai_15' => 'In 15 minutes',
+    'reboot_delai_60' => 'In 1 hour',
+
+    'reboot_consigne'      => 'Type the number of machines (:nombre) to enable the button',
+    'btn_reboot_confirmer' => 'Reboot',
+    'reboot_en_cours'      => 'Sending the reboot request...',
+    'reboot_demande'       => 'Reboot request for :machine',
+    'reboot_attente'       => 'Approval request #:id created: a second administrator must approve it before anything reboots.',
+    'reboot_envoye'        => 'Reboot sent to the machine.',
+    'reboot_fenetre'       => 'Reboot refused: outside the allowed maintenance window.',
+    'reboot_err'           => 'The reboot request failed.',
+    'reboot_fin'           => 'Reboot sent to :nombre machine(s).',
+    'reboot_fin_attente'   => ':nombre approval request(s) queued. Nothing has rebooted.',
+    'reboot_fin_partielle' => ':nombre machine(s) refused the request.',
 ];
