@@ -819,3 +819,93 @@ liste et ce que cron sait dire.
 Le test compare **l'aperçu affiché** au **fichier posé sur la machine** : deux artefacts
 indépendants, l'un promesse d'écran, l'autre réalité de la machine. Une divergence entre les deux
 serait un défaut du portage.
+
+---
+
+## E-20 — Avant l'action la plus destructive, le legacy affiche **la clé de traduction**
+
+**Défaut du legacy, mesuré.** `rebootSelected()` pose deux `confirm()` natifs :
+
+```js
+if (!confirm(__('updates.reboot_confirm1').replace('%count', machineIds.length))) return;
+if (!confirm(__('updates.reboot_confirm2').replace('%count', machineIds.length))) return;
+```
+
+Les deux textes existent, longs et soignés, dans `legacy/lang/fr/updates.php` — ils énumèrent les
+conséquences (sessions SSH coupées, services interrompus 30-60 s, connexions clients perdues) et
+annoncent qu'aucun retour en arrière n'est possible. Mais ils vivent dans le catalogue **PHP**, lu
+par `t()`, alors que `__()` lit le catalogue **`js.`**. La clé n'y est pas.
+
+**Relevé du test**, dialogues capturés au vol sur la page legacy :
+
+```
+boite 1 : « updates.reboot_confirm1 »
+boite 2 : « updates.reboot_confirm2 »
+```
+
+L'opérateur voit donc, deux fois d'affilée, un identifiant technique. Aucune conséquence, aucun nom
+de machine, aucun décompte — devant l'action la plus destructive du module.
+
+Deux remarques supplémentaires, **lues** et non mesurées :
+
+- même atteignable, le texte ne s'afficherait pas comme prévu : il contient `\n\n` dans une chaîne
+  PHP à guillemets **simples**, où ces deux caractères restent littéraux ;
+- `%count` est remplacé par `.replace()`, mais les catalogues du projet utilisent `:nombre` — la
+  substitution vise une convention que ce fichier est seul à employer.
+
+### La deuxième confirmation ne demande rien de plus que la première
+
+Les deux boîtes posent la **même** question. Deux « OK » d'affilée ne sont pas deux décisions :
+c'est un réflexe, et une confirmation qui se franchit par réflexe n'empêche rien. C'est le même
+défaut que E-08, aggravé par le fait que le texte est illisible.
+
+---
+
+## E-21 — Le portage empêche l'erreur au lieu de la répéter
+
+**Ce que fait le portage.** La décision se prend **en ligne**, sous l'action, dans un panneau qui :
+
+- **nomme les machines** concernées (`1 machine(s) : Test-Server-Debian`) ;
+- dit ce qui sera interrompu ;
+- annonce **avant le geste** que la règle des quatre yeux s'applique : la demande sera mise en
+  attente, pas exécutée — et qu'une demande déjà en attente pour la même machine n'est pas
+  dupliquée et **garde le délai qu'elle portait** (le rapprochement se fait sur la cible `reboot`,
+  qui ignore `delay_minutes`) ;
+- naît avec son bouton de confirmation **désactivé**, et ne l'active que si le nombre de machines
+  est **recopié**. Mesuré : une machine retenue, « 2 » saisi → bouton toujours désactivé ; « 1 »
+  saisi → bouton actif.
+
+**Le délai est offert.** `/reboot_server` accepte `delay_minutes` de 0 à 1440 et lance alors
+`shutdown -r +N`, qui prévient les sessions ouvertes. Le legacy envoie **toujours** `0`. Le portage
+propose immédiat, 5 min, 15 min, 1 heure — une capacité que le backend avait et que l'interface
+cachait.
+
+**Une demande d'approbation n'est pas une erreur.** Le backend rend `202` avec
+`{'success': false, 'pending_approval': true, 'request_id': N}`. Le legacy ne regarde que `success`
+et peint donc en **rouge** le fonctionnement nominal de la règle des quatre yeux. Le portage lit
+`pending_approval` et annonce la demande pour ce qu'elle est, avec son numéro. Mesuré : zéro ligne
+d'erreur dans le panneau du serveur après la demande.
+
+**Le journal range la ligne sous le nom de la machine.** Le legacy cherche
+`document.getElementById('server-' + id)` pour retrouver ce nom ; cet élément **n'existe pas** dans
+la page — seul `#server-table-body` existe — et le nom retombe sur `#<id>`. Mesuré sur les deux
+cibles, après la même demande :
+
+| Cible | Panneau créé dans le journal |
+|---|---|
+| legacy | `#2` |
+| portage | `Test-Server-Debian` |
+
+### Ce que le test prouve, et comment
+
+Un test de redémarrage qui redémarre vraiment est un accident : deux l'ont été le 2026-08-18, et
+leurs traces sont encore dans `command_log`. Le test de U5 ne joue donc jamais de redémarrage, et
+le prouve plutôt que de l'affirmer :
+
+- il se connecte en **rôle 2**, jamais en rôle 3 — `approvals.gate()` laisse passer le superadmin ;
+- il **vérifie avant de cliquer** qu'aucune demande *approuvée* n'attend d'être consommée, et
+  s'arrête sans rien faire si ce n'est pas le cas ;
+- il compte les traces `command_log` de contexte `reboot` **avant et après**. Elles ne s'écrivent
+  qu'après l'exécution SSH : inchangées, la commande n'est jamais partie. Relevé : `2` avant, `2`
+  après, sur les deux cibles ;
+- il efface la demande qu'il a créée, si elle est encore en attente.

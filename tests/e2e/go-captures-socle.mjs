@@ -200,6 +200,23 @@ for (const format of LARGEURS) {
     await dors(400);
     await prend('15-planification');
 
+    // 16. Le panneau de decision du redemarrage (U5). AUCUN envoi : cocher une
+    //     machine et ouvrir le panneau ne declenche rien, et le bouton de
+    //     confirmation reste desactive tant que le nombre n'est pas recopie.
+    await page.evaluate(() => {
+        document.getElementById('sched-cancel')?.click();
+        const c = document.querySelector('input[name="selected_machines[]"][value="2"]');
+        if (c) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); }
+        document.querySelector('[data-rw="redemarrer"]')?.click();
+    });
+    // `center` et non `start` : l'en-tete fixe recouvre le haut d'un element
+    // amene en tete de fenetre, et c'est justement la que le panneau NOMME les
+    // machines concernees.
+    await page.evaluate(() => document.getElementById('reboot-panneau')
+        ?.scrollIntoView({ block: 'center' }));
+    await dors(400);
+    await prend('16-redemarrage');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });

@@ -1098,11 +1098,77 @@ par `tests/e2e/cron-machine.py`, exécuté dans le conteneur du backend — une 
 relit pas n'est pas prouvée. Il nettoie avant **et** après : les deux fichiers cron effacés,
 `maj_secu_date` remise à NULL.
 
+### Module `update/`, sous-lot U5 — le redémarrage
+
+Ce que fait la route, **lu avant tout clic** : `/reboot_server` est la seule route mutante du module
+à exiger un rôle (`@require_role(2)`), et elle passe **deux gardes avant toute session SSH** — la
+fenêtre de maintenance (423 en dehors) puis l'approbation à quatre yeux (202 avec l'identifiant de
+la demande). Elle ne laisse passer que dans trois cas : action non soumise à approbation, demandeur
+superadmin, ou **demande déjà approuvée** — consommée, et le redémarrage part. C'est ce dernier cas
+qui a envoyé deux redémarrages réels sur la machine 2 le 2026-08-18.
+
+### Avant l'action la plus destructive, le legacy affiche la clé de traduction
+
+**E-20.** `rebootSelected()` pose deux `confirm()` natifs. Les deux textes existent, longs et
+soignés, dans `legacy/lang/fr/updates.php` : ils énumèrent les sessions coupées, les services
+interrompus, l'absence de retour en arrière. Mais ils vivent dans le catalogue **PHP**, lu par
+`t()`, alors que `__()` lit le catalogue **`js.`**.
+
+Dialogues capturés au vol sur la page legacy : « **updates.reboot_confirm1** » puis
+« **updates.reboot_confirm2** ». L'opérateur voit deux fois un identifiant technique — aucune
+conséquence, aucun nom de machine, aucun décompte.
+
+Et les deux boîtes posent la **même** question : deux « OK » d'affilée sont un réflexe, pas deux
+décisions.
+
+### Le portage empêche l'erreur au lieu de la répéter
+
+**E-21.** La décision se prend en ligne, dans un panneau qui nomme les machines, dit ce qui sera
+interrompu, et annonce **avant le geste** que la demande sera mise en attente et non exécutée. Le
+bouton de confirmation naît **désactivé** et ne s'active que si le nombre de machines est recopié —
+mesuré : « 2 » saisi pour une machine laisse le bouton inerte, « 1 » l'active.
+
+**Le délai est offert.** `/reboot_server` accepte `delay_minutes` de 0 à 1440 et lance alors
+`shutdown -r +N`, qui prévient les sessions ouvertes ; le legacy envoie toujours `0`. Le portage
+propose immédiat, 5 min, 15 min, 1 heure — une capacité que le backend avait et que l'interface
+cachait.
+
+**Une demande d'approbation n'est pas une erreur.** Le backend rend `202` avec `success: false` et
+`pending_approval: true` ; le legacy ne regarde que `success` et peint en rouge le fonctionnement
+nominal de la règle des quatre yeux. Le portage lit `pending_approval` et annonce la demande avec
+son numéro. Mesuré : zéro ligne d'erreur dans le panneau après la demande.
+
+**Le journal range la ligne sous le nom de la machine.** Le legacy cherche
+`getElementById('server-' + id)`, un élément qui n'existe pas dans la page, et retombe sur `#<id>`.
+Mesuré, après la même demande : panneau `#2` côté legacy, `Test-Server-Debian` côté portage.
+
+### Un test de redémarrage qui ne redémarre pas — et qui le prouve
+
+Le test ne joue jamais de redémarrage, et ne se contente pas de l'affirmer : il se connecte en
+**rôle 2** (jamais 3, que la porte laisse passer), **vérifie avant de cliquer** qu'aucune demande
+approuvée n'attend d'être consommée — et s'arrête sans rien faire sinon —, puis compte les traces
+`command_log` de contexte `reboot` **avant et après**. Elles ne s'écrivent qu'après l'exécution
+SSH : inchangées, la commande n'est jamais partie. Relevé : `2` avant, `2` après, sur les deux
+cibles. La demande créée est effacée à la fin.
+
+### Une attente fixe qui passait seule et échouait en série
+
+Le test U2 attendait 2 500 ms après un filtrage avant de lire le journal. Joué seul il passait ;
+enchaîné derrière deux autres suites, il échouait — « aucune trace ». La trace arrivait, plus tard.
+L'attente interroge désormais le journal jusqu'à ce qu'il porte quelque chose. C'est la règle déjà
+payée trois fois : viser le contenu attendu, jamais un délai.
+
+### Vérification
+
+Nouveau test `tests/e2e/go-page-update-u5.mjs`, vert sur les deux cibles : 9 PASS / 0 FAIL côté
+legacy, 17 PASS / 0 FAIL côté Laravel. Le garde-fou d'état vit dans `tests/e2e/reboot-garde.py`,
+qui ne touche aucune machine — il lit et nettoie la seule base.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-19)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-21)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
 

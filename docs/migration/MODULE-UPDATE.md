@@ -156,11 +156,11 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 | **U2 — journal d'exécution** — PORTÉ | zone générale, panneaux par serveur, suivi automatique, effacement | aucune | présentation |
 | **U3 — constats** — PORTÉ EN PARTIE | paquets en attente PORTÉ ; simulation NON PORTÉE (E-17) | `pending_packages`, `dry_run_update` | lecture sur le serveur, mais `apt-get update` réécrit l'index |
 | **U4 — planification** — PORTÉ | les deux planifications, en un seul formulaire | `schedule_advanced_update` (et non `schedule_update`, E-18), `schedule_advanced_security_update` | écrit un cron distant |
-| **U5 — redémarrage** | redémarrage sélectionné | `reboot_server` | destructif, déjà soumis à approbation |
+| **U5 — redémarrage** — PORTÉ | redémarrage des machines retenues, délai offert | `reboot_server` | destructif, soumis à approbation — le test ne le joue JAMAIS |
 | **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
 
-État au 2026-08-19 : **U1, U2, la moitié de U3 et U4 portés** sur `/mises-a-jour` (voir
-`PARITE.md` E-14 à E-19).
+État au 2026-08-19 : **U1, U2, la moitié de U3, U4 et U5 portés** sur `/mises-a-jour` (voir
+`PARITE.md` E-14 à E-21). Seul U6 reste — et il est BLOQUÉ par l'arbitrage de E-17.
 
 **Correction de lecture** : `getServerLogWindow` n'ouvre AUCUNE fenêtre navigateur — il crée un
 panneau dans la page. La formulation « fenêtres par serveur » de la première version de ce
@@ -210,8 +210,19 @@ décision appartient à l'exploitant.
   - le cron de sécurité embarque un jeton HMAC dans un fichier en **0644**. Il ne permet que de
     marquer `maj_secu_last_exec_date` pour SA machine : un utilisateur local peut faire passer sa
     machine pour à jour. Signalé, non corrigé — c'est le backend.
-- **U5** : la demande d'approbation est créée, pas le redémarrage. Le redémarrage réel n'est pas
-  joué : deux l'ont déjà été par erreur pendant la vague `approvals`.
+- **U5** : ~~la demande d'approbation est créée, pas le redémarrage~~ — FAIT, et **prouvé** plutôt
+  qu'affirmé. `tests/e2e/reboot-garde.py` compte les traces `command_log` de contexte `reboot`
+  avant et après : elles ne s'écrivent qu'après l'exécution SSH, et sont restées à `2` — les deux
+  redémarrages joués par erreur le 2026-08-18. Le test se connecte en rôle 2 (le rôle 3 franchit
+  la porte), refuse de cliquer s'il existe une demande *approuvée* en attente de consommation, et
+  efface la demande qu'il a créée.
+  Ce que la lecture a révélé en plus :
+  - les deux `confirm()` du legacy affichent **la clé de traduction** (E-20) : le texte vit dans le
+    catalogue PHP, `__()` lit celui de `js.` ;
+  - `delay_minutes` (0 à 1440, `shutdown -r +N`) existe côté backend et le legacy envoie toujours
+    `0` — le portage l'offre ;
+  - un `202 pending_approval` est peint en rouge par le legacy, qui ne regarde que `success` ;
+  - le journal du legacy range la ligne sous `#<id>` : il cherche `#server-<id>`, qui n'existe pas.
 - **U6** : à arbitrer avant d'être porté.
 
 ## 6. Ce qui devra être décidé avant U6

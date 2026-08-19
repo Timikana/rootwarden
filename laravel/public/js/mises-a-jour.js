@@ -552,6 +552,141 @@
     document.getElementById('sched-cancel').addEventListener('click', fermePlanification);
     boutonEnregistrer.addEventListener('click', enregistrePlanification);
 
+    /* ═════════════════════════════════════════════════════════════════════
+       Sous-lot U5 — le redemarrage
+
+       CE QUE FAIT LA ROUTE, LU DANS `backend/routes/monitoring.py` AVANT DE
+       CLIQUER. `/reboot_server` est la SEULE route mutante du module a exiger
+       un role (`@require_role(2)`), et elle passe DEUX gardes avant toute
+       session SSH :
+
+         1. la fenetre de maintenance (`maintenance.is_allowed`) -> 423 dehors ;
+         2. l'approbation a quatre yeux (`approvals.gate`) -> 202 avec
+            `pending_approval` et l'identifiant de la demande.
+
+       La porte ne laisse passer que dans trois cas : l'action n'est pas soumise
+       a approbation, le demandeur est SUPERADMIN (role 3, contournement
+       journalise), ou une demande DEJA APPROUVEE existe — elle est alors
+       consommee et le redemarrage part. C'est ce troisieme cas qui a envoye
+       deux redemarrages reels sur la machine 2 le 2026-08-18.
+
+       Ensuite seulement : `systemctl reboot` si le delai vaut 0, sinon
+       `shutdown -r +N` avec un message diffuse aux sessions ouvertes.
+
+       CE QUE LE PORTAGE CHANGE (voir PARITE.md, E-20 et E-21) :
+       - la decision se prend EN LIGNE et le bouton naît DESACTIVE ; le legacy
+         empile deux `confirm()` natifs qui posent deux fois la meme question ;
+       - le delai est OFFERT : le backend accepte 0 a 1440 minutes, le legacy
+         envoie toujours 0 ;
+       - une demande d'approbation creee est annoncee pour ce qu'elle est, et
+         non comme une erreur.
+       ═════════════════════════════════════════════════════════════════════ */
+
+    const boutonRedemarrer = document.getElementById('reboot-btn');
+    const panneauRedemarrage = document.getElementById('reboot-panneau');
+    const listeMachines = document.getElementById('reboot-machines');
+    const champNombre = document.getElementById('reboot-nombre');
+    const consigneNombre = document.getElementById('reboot-consigne');
+    const champDelai = document.getElementById('reboot-delai');
+    const boutonConfirmer = document.getElementById('reboot-confirmer');
+
+    /** Machines retenues au moment de l'ouverture du panneau. */
+    let redemarrageEnCours = null;
+
+    function ouvreRedemarrage() {
+        const choix = machinesCochees();
+        if (!choix.length) {
+            dit(libelles.aucune_selection, 'echec');
+            return;
+        }
+        redemarrageEnCours = choix;
+
+        listeMachines.textContent = libelles.reboot_machines
+            .replace(':nombre', choix.length)
+            .replace(':machines', choix.map(m => m.nom).join(', '));
+        consigneNombre.textContent = libelles.reboot_consigne.replace(':nombre', choix.length);
+
+        champNombre.value = '';
+        boutonConfirmer.disabled = true;
+        panneauRedemarrage.hidden = false;
+        panneauRedemarrage.scrollIntoView({ block: 'nearest' });
+        champNombre.focus();
+    }
+
+    function fermeRedemarrage() {
+        redemarrageEnCours = null;
+        panneauRedemarrage.hidden = true;
+    }
+
+    /*
+     * Le bouton ne s'active que si le nombre de machines est RECOPIE. Deux « OK »
+     * d'affilee sont un reflexe ; recopier un nombre est un geste.
+     */
+    function verifieConsigne() {
+        const attendu = redemarrageEnCours ? String(redemarrageEnCours.length) : '';
+        boutonConfirmer.disabled = champNombre.value.trim() !== attendu;
+    }
+
+    async function confirmeRedemarrage() {
+        if (!redemarrageEnCours) return;
+        const choix = redemarrageEnCours;
+        const delai = parseInt(champDelai.value, 10) || 0;
+
+        boutonConfirmer.disabled = true;
+        const initial = boutonConfirmer.textContent;
+        boutonConfirmer.textContent = libelles.reboot_en_cours;
+        dit(libelles.reboot_en_cours);
+
+        let demandes = 0;
+        let echecs = 0;
+
+        for (const m of choix) {
+            journal(libelles.reboot_demande.replace(':machine', m.nom), 'info', m.nom);
+
+            const res = await appelle('/reboot_server', {
+                method: 'POST',
+                body: JSON.stringify({ machine_id: m.id, delay_minutes: delai }),
+            });
+            const c = res.corps;
+
+            // 202 + `pending_approval` N'EST PAS UNE ERREUR : c'est le
+            // fonctionnement normal de la regle des quatre yeux. Le legacy
+            // l'affiche en rouge parce qu'il ne regarde que `success`.
+            if (c && c.pending_approval) {
+                demandes++;
+                journal(libelles.reboot_attente.replace(':id', c.request_id), 'ok', m.nom);
+                continue;
+            }
+            if (res.statut === 423) {
+                echecs++;
+                journal((c && c.message) || libelles.reboot_fenetre, 'error', m.nom);
+                continue;
+            }
+            if (!res.ok || !c || c.success === false) {
+                echecs++;
+                journal((c && c.message) || libelles.reboot_err, 'error', m.nom);
+                continue;
+            }
+            journal(c.message || libelles.reboot_envoye, 'ok', m.nom);
+        }
+
+        boutonConfirmer.textContent = initial;
+        fermeRedemarrage();
+
+        if (echecs) {
+            dit(libelles.reboot_fin_partielle.replace(':nombre', echecs), 'echec');
+        } else if (demandes) {
+            dit(libelles.reboot_fin_attente.replace(':nombre', demandes), 'ok');
+        } else {
+            dit(libelles.reboot_fin.replace(':nombre', choix.length), 'ok');
+        }
+    }
+
+    if (boutonRedemarrer) boutonRedemarrer.addEventListener('click', ouvreRedemarrage);
+    champNombre.addEventListener('input', verifieConsigne);
+    document.getElementById('reboot-annuler').addEventListener('click', fermeRedemarrage);
+    boutonConfirmer.addEventListener('click', confirmeRedemarrage);
+
     corps.addEventListener('change', (e) => {
         if (e.target && e.target.name === 'selected_machines[]') compteSelection();
     });
