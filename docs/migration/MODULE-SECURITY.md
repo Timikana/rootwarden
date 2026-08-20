@@ -175,7 +175,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S2c** ✔ | export CSV du rapport — **PORTÉ le 2026-08-20** (v1.37.22) | aucune | non | non |
 | **S2b** ✔ | export PDF du rapport — **PORTÉ le 2026-08-20** (v1.37.23) | aucune | non | non |
 | **S3** ✔ | consultation des CVE, lecture seule — **PORTÉ le 2026-08-20** (v1.37.24) | aucune : lecture en base | non | non |
-| **S4** | planification des scans | `GET/POST/PUT/DELETE /cve_schedules`, `GET /cron_preview` | non | oui |
+| **S4** ✔ | planification des scans — **PORTÉ le 2026-08-20** (v1.37.25) | aucune : lecture et ecriture en base | non | oui |
 | **S5** | suivi et ticketing | `POST /cve_remediation`, `POST /tickets` | non | oui + **sortie tierce** |
 | **S6** | re-priorisation EPSS / KEV | `POST /cve_reprioritize` | non | oui |
 | **S7** | le scan lui-même | `POST /cve_scan` — **FLUX** | **oui** | oui + **destructif** |
@@ -587,6 +587,46 @@ avant, pas le découvrir en route.
 clé i18n manquante du `confirm()`, et E-28 à trancher. Le scheduler reste Python
 (`backend/scheduler.py:614-628`) : Laravel n'écrit que la table, il ne déclenche rien. Test existant
 à reprendre : `tests/e2e/go-cve-schedules.mjs`.
+
+**S4 — porté le 2026-08-20** (v1.37.25) : `PlanificationsCve` + `PlanificationsCveController`, le
+bloc de planification ajouté à `scan-cve.blade.php`, `public/js/planification-cve.js`, et un fichier de
+langue `planif` (**63 = 63** clés). Cinq routes internes sous **`role:2`** + `perm:can_scan_cve` — le
+bloc du legacy vit sous `$role >= 2` et ses routes portent `require_role(2)` : la garde est reprise cran
+par cran, la consultation restant ouverte au rôle 1.
+
+Suite `go-page-cve-planification` : **20 PASS côté portage, 16 côté legacy** (les quatre écarts sont
+mesurés et rendus en constat).
+
+**Aucune dépendance ajoutée** : `dragonmantank/cron-expression`, déjà présent comme dépendance du
+framework, valide une expression et calcule deux occurrences successives — donc l'intervalle. Il rend la
+**même échéance** que `croniter` côté Python, vérifié.
+
+Ce que S4 a refermé : **E-51** (le clamp anti-fréquence n'était pas rejoué à la modification — mesuré
+d'abord dans le code, puis **prouvé en fonctionnement** : un `PUT` avec `* * * * *` rendait 200 et la
+base portait l'expression), **E-52** (routes internes plutôt que la passerelle), **E-53** (la phrase de
+récurrence produite en Python, donc intraduisible, remplacée par les cinq prochaines dates), **E-54**
+(`created_by` jamais écrit), **E-55** (trois validations manquantes, dont un `ENUM` sans liste blanche
+qui rendait un **500 en HTML** au lieu d'un 400), **E-56** (le `confirm()` natif et l'appel émis pour un
+rôle qui n'a pas le bloc).
+
+**Ce qui reste au backend, et attend une décision** : les cinq routes Python sont inchangées. Un rôle 2
+sans `can_scan_cve` peut donc toujours créer, modifier et supprimer une planification, et le clamp y
+reste contournable par un `PUT`.
+
+### La sûreté a commandé la conception du test, et c'est le point à retenir de S4
+
+Une planification **arme le scheduler**, démarré **sans condition** par `backend/server.py:240-247` :
+aucune variable d'environnement ne le gouverne, il tourne comme thread dans `rootwarden_python`,
+**invisible à `ps`**, se réveille toutes les 60 s et prend toute ligne `enabled = 1` dont l'échéance est
+passée. Un test qui crée une planification par minute **peut déclencher un vrai scan SSH**, sur
+`srv-zabbix` qui est en production.
+
+La parade est **structurelle** : toutes les planifications créées visent `target_type = 'tag'` avec un
+**tag qui n'existe pas**. La branche correspondante (`scheduler.py:190-197`) fait une jointure interne
+sur `machine_tags` : zéro machine, zéro SSH. **`all` et `machines` sont interdits comme cibles de
+test** — `machines` avec une liste vide ou illisible **retombe sur tout le parc**
+(`scheduler.py:198-209`). Vérifié après chaque rejeu : un seul scan CVE en base, celui du 25/07, et zéro
+planification résiduelle.
 
 **S5** : premier lot avec un effet **hors du parc** — sortie HTTP vers Jira/GLPI/ServiceNow derrière
 le garde SSRF de `ticketing._post`. E-27 et E-29 s'y règlent.
