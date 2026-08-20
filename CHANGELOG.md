@@ -1529,6 +1529,23 @@ La sequence exacte de la route, jouee dix fois en isolation, passe dix fois. **U
 authentifie avant d'etre pret a servir** — le meme piege que `mysqladmin ping`, et une session
 reussie ne suffit pas a le prouver : celle du controle d'attente avait rendu `uid 0`.
 
+### Le harnais E2E redevient reproductible
+
+`.gitignore` ignorait `package-lock.json` a tous les niveaux. `tests/e2e/package-lock.json`
+existait donc sur chaque poste sans etre suivi : `npm ci` refusait de tourner, seul `npm install`
+passait, et chaque poste resolvait ses propres versions de puppeteer et de ses dependances. Un LOT
+de tests dont l'outillage varie d'un poste a l'autre ne mesure pas la meme chose partout.
+
+Le verrou du harnais est desormais suivi (`!tests/e2e/package-lock.json`), l'exclusion generale
+restant en place pour le reste du depot. `npm ci` reinstalle le harnais a l'identique ; verifie en
+effacant `node_modules`, en le reconstruisant par `npm ci`, puis en rejouant deux suites.
+
+Deux points laisses ouverts, volontairement. `npm audit` signale quatre vulnerabilites hautes,
+toutes dans `extract-zip`, dependance transitive de puppeteer 23 qui sert a decompresser Chromium a
+l'installation ; le correctif passe par une montee de version majeure de puppeteer, qui touche tout
+le harnais. Et `laravel/package.json` n'a pas de verrou : la chaine Vite/Tailwind n'est pas
+installee sur la VM, `laravel/public/css/rw.css` etant compile et suivi.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

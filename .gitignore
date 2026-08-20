@@ -9,6 +9,10 @@ node_modules/
 tests/e2e/go-test-pentest.mjs
 tests/e2e/*-pentest.mjs
 package-lock.json
+# ... sauf celui du harnais E2E : sans lui `npm ci` refuse de tourner et
+# seul `npm install` passe, ce qui laisse chaque poste resoudre ses propres
+# versions. Le LOT de tests n'est reproductible qu'a cette condition.
+!tests/e2e/package-lock.json
 vendor/
 !vendor/composer/
 !legacy/vendor/.htaccess
