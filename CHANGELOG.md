@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.23** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.24** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2029,15 +2029,80 @@ portage** — l'ecart est E-45, mesure cote legacy mais rendu en constat par `ve
 du LOT comptant tout `FAIL` comme une regression. Tout le reste inchange et rejoue vert sur les deux
 versants, pytest compris.
 
+### v1.37.24 — module `security/`, sous-lot S3 : la consultation des resultats CVE
+
+`ScanCveController` + `ComparaisonCveController`, la vue `scan-cve.blade.php`,
+`public/js/scan-cve.js`, cinq methodes ajoutees a `ScansCve`. Routes `/scan-cve` et
+`/scan-cve/comparaison` sous `role:1` + `perm:can_scan_cve` — la garde de la page legacy, celle que S1
+porte deja. **L'entree de menu est basculee** : 12 entrees portees, 21 encore sur l'ancien portail.
+
+**AUCUNE ROUTE BACKEND N'EST APPELEE, et c'est une decision mesuree.** Le legacy peint cette page par
+un `GET /cve_results` par machine a travers le proxy. Trois mesures ont impose un autre chemin :
+`grep -c require_permission backend/routes/cve.py` rend **0** sur 19 routes et `can_scan_cve` n'existe
+dans tout le backend que dans une fixture de test — la permission ne garde aucune requete, seulement
+des pages ; `require_machine_access` resout l'identifiant de machine par le CORPS JSON d'abord
+(`helpers.py:331-332`) alors que les trois routes GET lisent EXCLUSIVEMENT `request.args`, si bien que
+le garde autoriserait une machine et la route en servirait une autre ; et le decorateur ne refuse pas
+quand aucun identifiant n'est trouve. Le portage lit donc la base, comme S1, derriere sa propre garde.
+Le backend Python n'est pas touche. Les routes backend restent ouvertes : **une decision de
+l'exploitant est en attente**.
+
+**E-49 — LE TABLEAU SE DESALIGNAIT DES QU'ON L'UTILISAIT.** L'en-tete du legacy porte six colonnes et
+un seul de ses quatre generateurs de lignes en produit six. Mesure dans le navigateur :
+
+    apres chargement     50 lignes : 50x6 cellules
+    apres « Voir plus » 100 lignes : 50x5 cellules ET 50x6
+    apres une recherche   9 lignes : 9x5
+    apres un filtre     100 lignes : 100x5
+
+Le meme tableau melange les deux formes apres une pagination et la colonne « Suivi » disparait des
+qu'on filtre — **sans aucune erreur JS**. Le commentaire de `sevCell` revendique pourtant d'avoir
+« centralise pour rester coherent entre buildRows et la pagination » : une colonne sur six. Le portage
+n'a **qu'UN generateur**, appele par tous les gestes, et son en-tete est rendu par le gabarit. Le
+compteur existe desormais meme sous 50 CVE, et le bouton de pagination se cache au lieu de quitter le
+DOM.
+
+**E-46 et E-47 — deux fuites de perimetre.** Le filtre des machines archivees est present dans la
+branche `role >= 2` de la page et **absent de la branche role 1** : un lecteur voit une machine qu'un
+administrateur ne voit plus. Et le resume de parc n'est joint ni a `machines` ni a
+`user_machine_access` : il agrege le dernier scan de TOUTE la base, archivees comprises, des que le
+compte voit deux machines. Le portage pose le filtre UNE FOIS avant le branchement de role, et calcule
+le resume SUR LA LISTE QU'IL AFFICHE. Un agregat doit porter le meme perimetre que la liste qu'il
+resume.
+
+**E-50** — rien n'etait rendu par `textContent`, et `esc()` n'echappe pas l'apostrophe alors que son
+docblock affirme empecher l'XSS (latent : ses deux sites en contexte d'attribut ne recoivent qu'un
+identifiant CVE, qui n'en porte pas). Le portage rend tout par `textContent`.
+
+**TROIS DEFAUTS D'AFFICHAGE QUE SEULE L'IMAGE A MONTRES**, sur mon propre rendu, alors que le test
+etait vert : l'identifiant CVE se coupait sur TROIS lignes, et le resume, en s'etalant, poussait le
+tableau a 1789 px dans un cadre de 1048 — chassant hors du champ la colonne « Suivi », celle dont
+l'absence etait justement le defaut du legacy. Corrige en trois temps, chacun re-mesure : identifiant
+insecable, resume tronque avec son texte entier en infobulle (1048 px, le cadre exact), et sous 720 px
+le prefixe `CVE-` s'efface avec des cellules resserrees — 367 px au lieu de 427, ce qui ramene la
+severite dans le champ sans defilement. Deux autres corrections venues de la meme capture : six
+apostrophes manquantes dans les libelles francais (« d un », « l ancien »), et trois tuiles qui
+portaient la MEME legende « a corriger en premier » alors qu'elle est fausse pour deux d'entre elles.
+
+**CE QUE CE SOUS-LOT NE PROUVE PAS, et le dit** : la base ne porte qu'UN scan complet, donc le diff de
+deux scans n'est pas mesurable — seul son etat « moins de deux scans » l'est, et la suite l'exige ; le
+defaut « pas de compteur sous 50 CVE » n'est pas mesurable non plus ; et la branche role 1, donc E-46
+et E-47, exige le compte de fixture de **D-5**. Fabriquer un second scan changerait les chiffres que
+les suites de conformite asserent deja.
+
+**Reference du LOT** : `go-page-cve-consultation` entre avec **13 PASS sur le legacy** et **16 sur le
+portage**. 47 nouvelles cles i18n, `cve` a **63 = 63**. Tout le reste rejoue vert sur les deux versants,
+pytest compris.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-45**)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-50**)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/METHODE-SOUS-LOT.md` — l'ordre de travail d'un sous-lot, et ce que chaque étape attrape
 - `docs/migration/MODULE-UPDATE.md` — module `update/` : inventaire et découpage (**porté et archivé**)
-- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c portés**)
+- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c, S3 portés**)
 - `docs/migration/MODULE-AUTH.md` — module `auth/` : **condition de sortie de la v2.0**, rien de porté
 - `docs/migration/MODULE-SSH.md` — module `ssh/` : inventaire, rien de porté
 - `docs/migration/MODULE-SUPERVISION.md` — module `supervision/` : inventaire, rien de porté

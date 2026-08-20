@@ -10,8 +10,10 @@ use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
+use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ExportCveController;
 use App\Http\Controllers\RapportConformiteController;
+use App\Http\Controllers\ScanCveController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
 use App\Http\Controllers\PasserelleController;
@@ -152,6 +154,28 @@ Route::middleware('session.authentifiee')->group(function () {
      * existe et se teste, mais n'est atteignable qu'en tapant son adresse. Dit
      * ici pour que personne ne cherche l'entree manquante dans Navigation.
      */
+    /*
+     * Consultation des scans CVE — module `security/`, sous-lot S3.
+     *
+     * GARDE REPRISE TELLE QUELLE de la page legacy (`security/index.php:37-38`) :
+     * `checkAuth([USER,ADMIN,SUPERADMIN])` + `checkPermission('can_scan_cve')`,
+     * soit role >= 1 AVEC la permission. C'est la meme que l'export de S1.
+     *
+     * ECART ASSUME (E-48) : cote legacy cette permission ne garde que la PAGE.
+     * Le proxy met `/cve_` en liste blanche pour tout role >= 1 sans jamais
+     * regarder de permission, et sur les 19 routes CVE du backend
+     * `require_permission` apparait zero fois. Ici la lecture ne passe pas par
+     * une route backend : elle est faite en base par le controleur, DERRIERE
+     * cette garde. La permission garde donc enfin la requete.
+     */
+    Route::get('/scan-cve', ScanCveController::class)
+        ->middleware(['role:1', 'perm:can_scan_cve'])
+        ->name('scan-cve');
+
+    Route::get('/scan-cve/comparaison', ComparaisonCveController::class)
+        ->middleware(['role:1', 'perm:can_scan_cve'])
+        ->name('scan-cve.comparaison');
+
     Route::get('/export-cve', ExportCveController::class)
         ->middleware(['role:1', 'perm:can_scan_cve'])
         ->name('export-cve');

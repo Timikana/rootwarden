@@ -1359,3 +1359,146 @@ du module `security/` lisent désormais la base par `tests/e2e/lib-base.mjs`, qu
 **Le même lecteur de base était recopié cinq fois** dans les trois suites du module. Cinq copies d'un
 accès à la base divergent : la première qui apprend quelque chose ne l'apprend pas aux autres. C'est
 la même raison qui a fait retirer la copie des prérequis du LOT de `rw-pieges`.
+
+---
+
+## E-46 — Le filtre des machines archivées manquait dans la branche du rôle le moins privilégié
+
+`legacy/security/index.php` liste les machines par deux requêtes selon le rôle :
+
+| Branche | Filtre `lifecycle_status != 'archived'` |
+|---|---|
+| `role >= 2` (`:42-45`) | **présent** |
+| `role 1` (`:47-54`) | **ABSENT** |
+| la requête de S4 (`:292-296`) | présent |
+
+Deux moitiés sur trois corrigées, et l'oubli tombe **précisément sur la branche de l'utilisateur le
+moins privilégié** : un lecteur voit — et peut faire scanner — une machine qu'un administrateur ne voit
+plus. Le module CVE du backend ne compense rien : `grep -c lifecycle_status` rend **0** sur
+`backend/routes/cve.py` **et** sur `backend/cve_scanner.py`, alors que dix autres fichiers du backend
+l'appliquent.
+
+**Le portage pose le filtre UNE FOIS, avant le branchement de rôle**
+(`ScansCve::machinesVisibles()`). Il ne peut plus manquer dans une moitié.
+
+---
+
+## E-47 — Le résumé de parc fuyait ce que la liste juste en dessous filtrait
+
+`index.php:196-207` n'est joint **ni à `machines` ni à `user_machine_access`**. Il agrège le dernier
+scan complet de **toutes** les machines de la base, archivées comprises, et s'affiche dès que le compte
+en voit deux. Conséquences, chacune mesurée :
+
+- un rôle 1 avec deux machines attribuées lit les compteurs CVE de **la flotte entière** ;
+- un administrateur y voit des machines **absentes du tableau qui suit**, puisque la liste exclut les
+  archivées et que l'agrégat les inclut.
+
+**Le portage calcule le résumé SUR LA LISTE QU'IL AFFICHE** (`ScansCve::resumeParc($ids)`), avec les
+mêmes identifiants que les cartes en dessous. Précédent accepté : `Conformite::serveurs()` en S2a a
+ajouté le filtre de cycle de vie que le legacy n'avait pas.
+
+**Un agrégat doit porter le même périmètre que la liste qu'il résume.**
+
+---
+
+## E-48 — La permission ne gardait que la page ; dans le portage elle garde la requête
+
+Sixième occurrence du motif, et la plus large mesurée à ce jour.
+
+| Endroit | Ce qui est appliqué |
+|---|---|
+| la **page** `index.php:37-38` | `checkAuth([USER,ADMIN,SUPERADMIN])` + `checkPermission('can_scan_cve')` |
+| le **proxy** `api_proxy.php` | rôle ≥ 1, `/cve_` en liste blanche (`:119`), **absent** de `$ADMIN_ONLY_PREFIXES`, et `checkPermission` n'y figure pas une seule fois |
+| la **passerelle** `RoutesBackend.php:35` | `/cve_` en liste blanche, **absent** de `ADMIN_SEULEMENT` — relevé fidèle du legacy, défaut inclus |
+| le **backend** `cve.py` | `cve_results` et `cve_compare` : `require_api_key` + `require_machine_access` + `threaded_route`. **Ni rôle, ni permission.** |
+
+`grep -c require_permission backend/routes/cve.py` rend **0** sur 19 routes, et `can_scan_cve`
+n'existe dans tout le backend **que dans une fixture de test**. Un rôle 1 sans la permission peut donc
+lire les CVE de ses machines, **déclencher un scan SSH**, et lire les tendances de la flotte ; un rôle 2
+sans la permission a l'accès CVE complet, lecture **et** écriture, sur toutes les machines.
+
+**Le portage ne passe pas par la passerelle.** Il lit la base derrière `role:1` + `perm:can_scan_cve`,
+comme S1. La permission garde donc enfin la requête, sans qu'une ligne du backend Python soit touchée.
+Cela referme du même coup un second écart : `require_machine_access` résout l'identifiant de machine
+par le **corps JSON** d'abord (`helpers.py:331-332`) alors que les trois routes GET lisent
+**exclusivement** `request.args` — le garde autoriserait une machine et la route en servirait une
+autre. Aucune des deux passerelles ne relaie le corps d'un GET, donc c'est fermé aujourd'hui, **mais
+par accident et non par décision**. Les deux doivent être dits.
+
+**Ce que le portage ne corrige PAS** : les routes backend restent telles quelles, et un appel direct à
+`/api/gateway/cve_results` reste ouvert à un rôle 1 sans permission. Il faut une décision de
+l'exploitant sur le backend — elle est en attente.
+
+---
+
+## E-49 — Le tableau des vulnérabilités se désalignait dès qu'on l'utilisait
+
+L'en-tête du legacy porte **six** colonnes — CVE, Package, Version, Severite, Resume, Suivi — et
+**un seul** de ses quatre générateurs de lignes en produit six. Mesuré dans le navigateur, sur la
+machine réellement scannée :
+
+| geste | ce que devient le tableau |
+|---|---|
+| chargement | 50 lignes, **toutes à 6 cellules** |
+| « Voir plus » | 100 lignes : **50 à 6 cellules ET 50 à 5** |
+| recherche | 9 lignes, toutes à **5** |
+| filtre | 100 lignes, toutes à **5** |
+
+Le même tableau mélange donc les deux formes après une pagination, l'en-tête ne correspond plus aux
+lignes, et la colonne de suivi disparaît dès qu'on filtre — **sans aucune erreur JS**. Et le
+commentaire de `sevCell` (`js/main.js:45-48`) revendique précisément d'avoir « centralisé pour rester
+coherent entre buildRows et la pagination » : il a centralisé **une colonne sur six**, et la jumelle
+non protégée est justement celle qui manque.
+
+**Dans le portage il n'existe qu'UN générateur de lignes**, appelé par tous les gestes, et l'en-tête
+est rendu par le gabarit — traduit, une seule fois. Les trois assertions correspondantes passent au
+vert côté portage et sont rendues en constat côté legacy.
+
+Deux effets de bord refermés au passage :
+
+- **le compteur « n / m » existe même en dessous de 50 CVE.** Le legacy ne le crée que s'il y a une
+  page suivante, alors que sa recherche et ses filtres l'écrivent dans tous les cas — gardé par un
+  `if`, donc silencieusement sans effet. Non mesurable sur ce parc, la seule machine scannée en portant
+  1458 : dit ici plutôt que prouvé ;
+- **le bouton « Voir plus » se cache au lieu de quitter le DOM** : un élément qui disparaît et
+  réapparaît fait perdre le focus.
+
+---
+
+## E-50 — Aucune donnée CVE n'était rendue par `textContent`
+
+Tout le tableau du legacy est assemblé par interpolation dans `innerHTML`, et son `esc()`
+(`js/main.js:739`) échappe `& < > "` **mais pas l'apostrophe**, alors que son docblock affirme
+« éviter toute injection XSS via les données CVE ». Sur 32 appels, **deux** interpolent dans une chaîne
+JS délimitée par apostrophes à l'intérieur d'un attribut (`:485` `onchange`, `:492` `onclick`) et tous
+deux ne reçoivent que `f.cve_id`. Un identifiant CVE ne porte pas d'apostrophe : **le défaut est latent,
+pas armé**, et ces deux sites appartiennent à la colonne « Suivi », donc à S5.
+
+**Le portage rend tout par `textContent`**, et le lien reçoit son adresse par propriété avec
+`encodeURIComponent`. Rien n'est interpolé : la question ne se pose plus.
+
+---
+
+## Quatre constats de S3, dont trois choses que ce sous-lot ne peut pas prouver
+
+**Ce qui n'est pas mesurable, et pourquoi c'est dit plutôt que contourné.**
+
+1. **Le diff de deux scans.** La base ne porte qu'**un** scan complet ; seul l'état « moins de deux
+   scans » est mesurable, et la suite l'exige. Fabriquer un second scan changerait les chiffres que les
+   suites de conformité assertent déjà — le remède serait pire.
+2. **Le compteur absent en dessous de 50 CVE** (voir E-49) : la seule machine scannée en porte 1458.
+3. **La branche rôle 1** — donc E-46 et E-47 — exige un compte de fixture portant `can_scan_cve` **et**
+   une ligne `user_machine_access` (**D-5**). Sans lui, le cloisonnement du portage est écrit et relu,
+   pas mesuré. Un test qui déplacerait des droits pour se satisfaire ne mesurerait plus l'application
+   réelle.
+
+**Et un constat de mise en page, trouvé à l'image et nulle part ailleurs.** Le premier rendu du
+portage était correct au test et fautif à l'œil : l'identifiant CVE se coupait sur **trois lignes**
+(« CVE- / 2026- / 53046 »), et le résumé, en s'étalant, poussait le tableau à **1789 px** dans un cadre
+de 1048 — chassant hors du champ la colonne « Suivi », celle dont l'absence était justement le défaut
+du legacy. La rétablir puis la chasser de l'écran n'aurait rien réglé. Corrigé en trois temps, chacun
+re-mesuré : l'identifiant ne se coupe plus, le résumé se tronque en gardant son texte entier en
+infobulle (1048 px, le cadre exact), et sous 720 px le préfixe `CVE-` s'efface avec des cellules
+resserrées — **367 px au lieu de 427**, ce qui ramène la sévérité, la donnée qui décide, dans le champ
+sans défilement. À 390 px la colonne de suivi demande encore un petit défilement, que le cadre
+indique : elle ne porte aujourd'hui qu'un tiret, et devra être revue quand S5 la rendra actionnable.

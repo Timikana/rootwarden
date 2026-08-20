@@ -174,7 +174,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S2a** ✔ | rapport de conformité, page HTML — **PORTÉ le 2026-08-20** (v1.37.21) | aucune | non | non |
 | **S2c** ✔ | export CSV du rapport — **PORTÉ le 2026-08-20** (v1.37.22) | aucune | non | non |
 | **S2b** ✔ | export PDF du rapport — **PORTÉ le 2026-08-20** (v1.37.23) | aucune | non | non |
-| **S3** | consultation des CVE, lecture seule | `GET /cve_results`, `GET /cve_compare` | non | non |
+| **S3** ✔ | consultation des CVE, lecture seule — **PORTÉ le 2026-08-20** (v1.37.24) | aucune : lecture en base | non | non |
 | **S4** | planification des scans | `GET/POST/PUT/DELETE /cve_schedules`, `GET /cron_preview` | non | oui |
 | **S5** | suivi et ticketing | `POST /cve_remediation`, `POST /tickets` | non | oui + **sortie tierce** |
 | **S6** | re-priorisation EPSS / KEV | `POST /cve_reprioritize` | non | oui |
@@ -431,6 +431,29 @@ déplaçant des droits : un test qui déplace les droits ne mesure plus l'applic
 **S3 en troisième** : deux routes sans écriture ni SSH, mais c'est là que vit tout le rendu du
 module. Le gros du travail de vues et des ~35 clés i18n se paie ici, une fois ; les lots suivants
 s'y branchent. E-24 et le point mort `#conn-status` se corrigent dans ce lot.
+
+**S3 — porté le 2026-08-20** (v1.37.24) : `ScanCveController` + `ComparaisonCveController`, la vue
+`scan-cve.blade.php`, `public/js/scan-cve.js`, et cinq méthodes ajoutées à `ScansCve`. Routes
+`/scan-cve` et `/scan-cve/comparaison`, toutes deux sous `role:1` + `perm:can_scan_cve` — la garde de
+la page legacy, celle que S1 porte déjà. **L'entrée de menu `cve_scan` est basculée** : 12 entrées
+portées, 21 encore sur l'ancien portail.
+
+Suite de caractérisation `go-page-cve-consultation` : **16 PASS côté portage, 13 côté legacy**. L'écart
+est E-49, mesuré côté legacy et rendu en constat.
+
+**Aucune route backend appelée.** Le portage lit la base, comme S1. Trois mesures l'ont imposé, toutes
+dans E-48 : la permission ne garde aucune requête, le garde d'accès ne lit pas le même paramètre que sa
+route, et il ne refuse pas quand aucun identifiant n'est trouvé. Conséquence : le diff de deux scans,
+fait en Python (`cve.py:368-370`), est réimplémenté dans `ScansCve::comparaison()`.
+
+Ce que S3 a rapporté : **E-46** (filtre `archived` absent de la seule branche du rôle 1), **E-47** (le
+résumé de parc agrège toute la base), **E-48** (la permission ne garde que la page), **E-49** (trois
+générateurs de lignes sur quatre oublient une colonne), **E-50** (rien n'est rendu par `textContent`,
+et `esc()` n'échappe pas l'apostrophe).
+
+**Le contrat de rendu est figé**, et c'était la condition pour porter S3 sans hypothéquer S7 : le
+générateur de lignes est unique et partagé par tous les gestes, l'en-tête vit dans le gabarit, et les
+identifiants DOM sont ceux du legacy — un seul test vise les deux portails.
 
 ### Inventaires de S4, S5 et S6 — mesurés le 2026-08-20
 
