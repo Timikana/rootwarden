@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.24** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.25** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2094,15 +2094,92 @@ les suites de conformite asserent deja.
 portage**. 47 nouvelles cles i18n, `cve` a **63 = 63**. Tout le reste rejoue vert sur les deux versants,
 pytest compris.
 
+### v1.37.25 — module `security/`, sous-lot S4 : la planification des scans CVE
+
+`PlanificationsCve` + `PlanificationsCveController`, le bloc de planification ajoute a
+`scan-cve.blade.php`, `public/js/planification-cve.js`, et un fichier de langue `planif` (**63 = 63**
+cles). Cinq routes internes — liste, creation, modification, suppression, apercu — sous **`role:2`** +
+`perm:can_scan_cve` : le bloc du legacy vit sous `$role >= 2` et ses routes portent `require_role(2)`,
+la garde est donc reprise cran par cran, la consultation restant ouverte au role 1.
+
+**AUCUNE DEPENDANCE AJOUTEE.** `dragonmantank/cron-expression`, deja present comme dependance du
+framework, valide une expression ET calcule deux occurrences successives — donc l'intervalle. Il rend
+la MEME echeance que `croniter` cote Python : `0 3 * * *` → `2026-08-21 03:00:00` des deux cotes,
+verifie.
+
+**E-51 — LE CLAMP ANTI-FREQUENCE N'ETAIT PAS REJOUE A LA MODIFICATION.** C'est le seul defaut de cette
+migration mesure d'abord dans le code, puis **PROUVE EN FONCTIONNEMENT** :
+
+    creation « * * * * * »           400, « Frequence cron trop elevee », rien ecrit
+    MODIFICATION vers « * * * * * »  200 — ET LA BASE PORTE « * * * * * »
+    modification « pas du cron »     200 — ET LA BASE PORTE « pas du cron »
+
+A la creation (`cve.py:500-517`) le code valide, calcule DEUX occurrences et refuse sous 600 s ; son
+commentaire nomme le risque — « `* * * * *` lancait un scan par minute -> ban OpenCVE upstream + DoS
+interne ». Au PUT (`cve.py:549-566`), `cron_expression` est ajoute a la requete LIGNE 556, AVANT toute
+validation ; le bloc suivant ne recalcule que `next_run`, sans `is_valid` ni comparaison, et un
+`except Exception: pass` avale l'echec — l'`UPDATE` ecrit quand meme. **Neuvieme « a moitie corrige »
+du projet**, et le commentaire qui nomme le risque est quarante lignes au-dessus de la branche non
+protegee. Dans le portage, la MEME fonction valide les deux chemins : son parametre `$creation` ne
+change QUE la liste des champs obligatoires, jamais la severite des controles.
+
+**E-55 — trois validations manquaient, dont une qui rendait un 500 au lieu d'un 400.** `target_type`
+est un `ENUM('all','tag','machines')` sans aucune liste blanche cote code : une valeur hors liste
+remontait l'erreur MySQL 1265 nue, donc une page HTML d'erreur 500 (mesure). `min_cvss` n'etait ni
+borne ni meme converti au PUT, alors que la colonne est un `DECIMAL(3,1)`. `name` etait exige non vide
+a la creation mais PAS au PUT. `scan_source`, juste a cote dans la meme boucle de champs, a sa liste
+blanche et elle EST rejouee — le motif « a moitie corrige » a l'echelle d'une seule fonction.
+Le portage ajoute en outre un refus que le scheduler exige : une cible `machines` dont la liste est
+vide ou illisible est REFUSEE, parce que cote scheduler une telle cible **retombe sur tout le parc**.
+
+**E-54 — une planification n'avait pas d'auteur.** La colonne `created_by` existe et pointe vers
+`users(id)` ; le legacy ne l'ecrit jamais. Ce n'est pas une attribution falsifiable, c'est une
+attribution ABSENTE. Mesure : `NULL` cote legacy, `15` cote portage.
+
+**E-53 — la phrase de recurrence etait produite en Python, donc intraduisible.** Le legacy rend « Tous
+les jours a 03:00 » fabrique par `cve.py:460-474`, avec ses abreviations de jours francaises : aucun
+mecanisme du portage ne peut la traduire. Le portage affiche les cinq prochaines executions reelles,
+dans la langue de la session — et il dit « Trop frequent » EN ROUGE au fil de la saisie, la ou le
+legacy ne le signale qu'a l'envoi.
+
+**E-56 — deux gestes non reproduits** : le `confirm()` natif de la suppression, remplace par une
+confirmation EN LIGNE sous la ligne concernee ; et l'appel emis pour un role qui n'a pas le bloc — le
+legacy branche `loadSchedules` pour TOUS les roles alors que son bloc est sous `$role >= 2`, si bien
+qu'un role 1 emet un `GET /cve_schedules` refuse a chaque affichage de page. Le portage ne rend le bloc
+NI ne charge son script en dessous du role 2.
+
+**LA SURETE A COMMANDE LA CONCEPTION DU TEST, et c'est le point a retenir.** Une planification arme le
+scheduler, demarre SANS CONDITION par `backend/server.py:240-247` : aucune variable d'environnement ne
+le gouverne, il tourne comme thread dans le conteneur, **invisible a `ps`**, se reveille toutes les
+60 s et prend toute ligne active dont l'echeance est passee. Un test qui cree une planification par
+minute peut donc declencher un vrai scan SSH, sur `srv-zabbix` qui est EN PRODUCTION. La parade n'est
+pas un nettoyage rapide mais une cible inoffensive PAR CONSTRUCTION : toutes les planifications creees
+visent un tag QUI N'EXISTE PAS, dont la branche fait une jointure interne — zero machine, zero SSH.
+`all` et `machines` sont interdits comme cibles de test, `machines` avec une liste illisible retombant
+sur tout le parc. Verifie apres chaque rejeu : un seul scan CVE en base, celui du 25/07, et zero
+planification residuelle.
+
+**DEUX ERREURS DE MA PART, corrigees.** Un intitule de colonne nommait autre chose que son contenu —
+« Suivi » au lieu d'« Actions », par reemploi d'une cle de S5 — vu a la capture. Et j'avais annonce 21
+assertions cote portage : la mesure en donne **20**, parce qu'il n'y a que QUATRE `verifiePortage`, le
+clamp a la creation tenant des deux cotes. Une reference se mesure, elle ne se deduit pas.
+
+**CE QUI RESTE AU BACKEND, et attend une decision** : les cinq routes Python sont inchangees. Un role 2
+sans `can_scan_cve` peut toujours creer, modifier et supprimer une planification, et le clamp y reste
+contournable par un PUT.
+
+**Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
+portage**.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-50**)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-56**)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/METHODE-SOUS-LOT.md` — l'ordre de travail d'un sous-lot, et ce que chaque étape attrape
 - `docs/migration/MODULE-UPDATE.md` — module `update/` : inventaire et découpage (**porté et archivé**)
-- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c, S3 portés**)
+- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c, S3, S4 portés**)
 - `docs/migration/MODULE-AUTH.md` — module `auth/` : **condition de sortie de la v2.0**, rien de porté
 - `docs/migration/MODULE-SSH.md` — module `ssh/` : inventaire, rien de porté
 - `docs/migration/MODULE-SUPERVISION.md` — module `supervision/` : inventaire, rien de porté

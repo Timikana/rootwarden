@@ -50,8 +50,10 @@ use Illuminate\View\View;
  */
 class ScanCveController extends Controller
 {
-    public function __construct(private readonly ScansCve $scans)
-    {
+    public function __construct(
+        private readonly ScansCve $scans,
+        private readonly \App\Services\PlanificationsCve $planifs,
+    ) {
     }
 
     public function __invoke(Request $requete): View
@@ -73,6 +75,13 @@ class ScanCveController extends Controller
         }
 
         return view('scan-cve', [
+            // LE BLOC DE PLANIFICATION N'EST PAS RENDU EN DESSOUS DU ROLE 2, et le
+            // script ne s'initialise donc pas : le legacy, lui, branche
+            // `loadSchedules` pour TOUS les roles (`js/main.js:991`) alors que son
+            // bloc est sous `$role >= 2`. Un role 1 y emet un `GET /cve_schedules`
+            // a chaque chargement de page, refuse en 403 et avale en silence.
+            'peutPlanifier' => $role >= 2,
+            'tags'          => $role >= 2 ? $this->planifs->tagsDisponibles() : [],
             'machines'   => $machines,
             'derniers'   => $derniers,
             'findings'   => $findings,
@@ -80,6 +89,7 @@ class ScanCveController extends Controller
             'resume'      => $this->scans->resumeParc($ids),
             'seuilDefaut' => (int) (getenv('CVE_MIN_CVSS') ?: 0),
             'libelles'    => $this->libelles(),
+            'libellesPlanif' => $role >= 2 ? $this->libellesPlanif() : [],
         ]);
     }
 
@@ -115,6 +125,36 @@ class ScanCveController extends Controller
             // lit des dates francaises.
             'langue' => app()->getLocale(),
         ];
+    }
+
+    /**
+     * Les libelles du bloc de planification, POSES EN DONNEES.
+     *
+     * Le script du legacy en porte VINGT-SIX en dur, donc hors de toute parite
+     * FR/EN — dont ses deux pluriels fabriques par concatenation.
+     *
+     * @return array<string,string>
+     */
+    private function libellesPlanif(): array
+    {
+        $cles = ['aucune', 'actives', 'selection', 'apercu_titre', 'apercu_invalide',
+                 'apercu_trop_frequent', 'col_nom', 'col_recurrence', 'col_cible',
+                 'col_prochaine', 'col_derniere', 'col_auteur', 'col_etat', 'etat_active',
+                 'etat_suspendue', 'activer', 'suspendre', 'supprimer', 'confirmer_suppression',
+                 'confirmer_oui', 'confirmer_non', 'jamais', 'auteur_inconnu', 'creee',
+                 'supprimee', 'modifiee', 'err_reseau', 'cible_all', 'cible_tag',
+                 'cible_machines'];
+        $libelles = [];
+        foreach ($cles as $c) {
+            // Les compteurs gardent leur marqueur : le script le remplace, il ne
+            // fabrique pas de pluriel par concatenation.
+            $libelles[$c] = __('planif.' . $c, ['nombre' => '{nombre}']);
+        }
+        $libelles['url_planifs'] = route('scan-cve.planifs');
+        $libelles['url_apercu'] = route('scan-cve.apercu-cron');
+        $libelles['langue'] = app()->getLocale();
+
+        return $libelles;
     }
 
     /**

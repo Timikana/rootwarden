@@ -1502,3 +1502,149 @@ infobulle (1048 px, le cadre exact), et sous 720 px le préfixe `CVE-` s'efface 
 resserrées — **367 px au lieu de 427**, ce qui ramène la sévérité, la donnée qui décide, dans le champ
 sans défilement. À 390 px la colonne de suivi demande encore un petit défilement, que le cadre
 indique : elle ne porte aujourd'hui qu'un tiret, et devra être revue quand S5 la rendra actionnable.
+
+---
+
+## E-51 — Le garde anti-fréquence n'était pas rejoué à la modification
+
+**Le défaut central de S4, et le seul de la migration mesuré d'abord dans le code puis PROUVÉ EN
+FONCTIONNEMENT.**
+
+À la création, `backend/routes/cve.py:500-517` valide l'expression, calcule **deux** occurrences
+successives et refuse en dessous de 600 s. Son commentaire nomme le risque :
+
+> Patch A04-INSEC-N1 […] refuse les schedules plus frequents que 10 minutes. Sans ce clamp,
+> `* * * * *` lancait un scan par minute → ban OpenCVE upstream + DoS interne + abus admin malveillant
+
+Au `PUT` (`cve.py:549-566`), `cron_expression` est ajouté à la requête **ligne 556, avant toute
+validation**. Le bloc suivant ne recalcule que `next_run` — ni `is_valid`, ni comparaison de deux
+occurrences — et un `except Exception: pass` avale l'échec : l'`UPDATE` de la ligne 570 écrit
+l'expression quand même.
+
+Mesuré par `go-page-cve-planification`, sur la pile réelle :
+
+| geste | legacy | portage |
+|---|---|---|
+| création `* * * * *` | **400**, « Fréquence cron trop élevée », rien écrit | **400** |
+| **modification** vers `* * * * *` | **200**, et la base porte `* * * * *` | **400**, base intacte |
+| modification vers `pas du cron` | **200**, et la base porte `pas du cron` | **400**, base intacte |
+
+**Neuvième « à moitié corrigé » du projet**, et le plus coûteux : le commentaire qui nomme le risque
+est quarante lignes au-dessus de la branche non protégée. Conséquence si elle était exploitée — un
+scan SSH par minute sur les machines ciblées, `srv-zabbix` en production comprise, plus un
+bannissement probable côté OpenCVE.
+
+**Dans le portage, la même fonction valide les deux chemins** (`PlanificationsCve::valide()`, avec un
+paramètre `$creation` qui ne change **que la liste des champs obligatoires**, jamais la sévérité des
+contrôles). Il n'existe plus d'endroit où le clamp puisse manquer.
+
+**Le correctif backend, lui, n'est pas fait** : les cinq routes Python restent telles quelles, et un
+rôle 2 sans `can_scan_cve` peut encore les appeler. C'est une décision de l'exploitant, en attente.
+
+---
+
+## E-52 — Les routes de planification du portage remplacent celles du backend
+
+Cinq routes internes — liste, création, modification, suppression, aperçu — sous `role:2` +
+`perm:can_scan_cve`, au lieu de relayer `cve_schedules` et `cron_preview` par la passerelle. Même
+décision qu'en S3 (E-48) et pour les mêmes trois mesures : `require_permission` apparaît **zéro** fois
+sur les 19 routes CVE du backend, le garde d'accès ne lit pas le même paramètre que sa route, et il ne
+refuse pas quand aucun identifiant n'est trouvé.
+
+`role:2` **et non `role:1`** : le bloc du legacy vit sous `if ($role >= 2)`
+(`legacy/security/index.php:231`) et ses cinq routes portent `require_role(2)`. La consultation reste
+ouverte au rôle 1, l'écriture non — la garde est reprise cran par cran.
+
+Conséquence sur la caractérisation : **le même test vise deux surfaces différentes**, par une table de
+chemins par cible. C'est assumé — la propriété mesurée est le **comportement**, pas l'adresse. Aucune
+dépendance ajoutée : `dragonmantank/cron-expression`, déjà présent comme dépendance du framework, sait
+valider une expression et calculer deux occurrences successives, et rend la **même échéance** que
+`croniter` côté Python (vérifié : `0 3 * * *` → `2026-08-21 03:00:00` des deux côtés).
+
+---
+
+## E-53 — La phrase de récurrence était produite en Python, donc intraduisible
+
+Le legacy rend, à côté des prochaines dates, une **phrase en français** fabriquée par
+`cve.py:460-474` : « Tous les jours a 03:00 », « Toutes les N minutes », avec ses abréviations de jours
+`dim/lun/mar/…`. Elle traverse le proxy et s'affiche telle quelle : **aucun mécanisme du portage ne
+peut la traduire**, et elle restera française pour un utilisateur anglais.
+
+**Le portage ne la reprend pas.** Il affiche les **cinq prochaines exécutions réelles**, calculées en
+PHP et mises en forme dans la langue de la session. Elles disent la même chose et davantage — et elles
+disent aussi, en rouge et au fil de la saisie, quand la fréquence est refusée, ce que le legacy ne
+signale qu'au moment de l'envoi.
+
+---
+
+## E-54 — Une planification n'avait pas d'auteur
+
+La colonne `created_by` existe (`mysql/init.sql:317`, clé étrangère vers `users(id)`) et le legacy
+**ne l'écrit jamais** : `cve.py:522-526` insère sept colonnes, pas celle-là. Toute planification créée
+par l'API reste donc sans auteur, alors que `get_current_user()` fournit l'identifiant juste à côté.
+
+Ce n'est pas le défaut d'attribution habituel — la valeur ne vient pas du client, elle est simplement
+**absente**. Aucune planification ne se reproche à personne.
+
+**Le portage la remplit depuis la session.** Mesuré : `created_by = NULL` côté legacy, `15` côté
+portage — l'identifiant du compte qui a créé la ligne. La liste affiche la colonne « Créé par ».
+
+---
+
+## E-55 — Trois validations manquaient, et l'une rendait un 500 au lieu d'un 400
+
+| champ | legacy | portage |
+|---|---|---|
+| `target_type` | **aucune liste blanche**, alors que la colonne est un `ENUM('all','tag','machines')` — une valeur hors liste remonte l'erreur MySQL 1265 nue, donc un **500 avec une page HTML** (mesuré) | liste blanche → **400** avec un motif nommé |
+| `min_cvss` | `float()` sans borne à la création, **aucune conversion** au `PUT` ; la colonne est un `DECIMAL(3,1)`, donc `999` remonte une erreur MySQL | borné 0-10, converti aux deux chemins |
+| `name` | non vide exigé à la création, **pas au `PUT`** — un renommage en chaîne vide passe ; aucune borne contre le `VARCHAR(100)` | non vide et ≤ 100 aux deux chemins |
+
+`scan_source`, juste à côté dans le même code, **a** sa liste blanche et elle est rejouée au `PUT`.
+C'est le motif « à moitié corrigé » à l'échelle d'une même boucle de champs.
+
+Et un contrôle que le portage **ajoute** parce que le scheduler l'exige : une cible `machines` dont la
+liste est vide ou illisible est **refusée**. Ce n'est pas du zèle — côté scheduler
+(`scheduler.py:198-209`), une telle cible **retombe sur tout le parc**. Accepter la ligne, c'est armer
+un scan complet sans que personne l'ait demandé.
+
+---
+
+## E-56 — Deux gestes que le portage ne reproduit pas
+
+**Le `confirm()` natif de la suppression** (`js/main.js:865`). Le portage ouvre une confirmation **en
+ligne**, sous la ligne concernée, avec ses deux boutons et leurs `data-rw`. Trois raisons, déjà
+écrites pour les sept pages portées : la boîte native recouvre précisément la ligne sur laquelle on
+décide, elle ne se style pas — action destructrice et annulation au même poids —, et elle bloque
+Puppeteer, donc un test ne peut pas mener l'action au bout. La caractérisation cherche le bouton par
+l'un **ou** l'autre contrat, et **dit lequel elle a joué** : « confirmation EN LIGNE » côté portage,
+« native » côté legacy.
+
+**L'appel émis pour un rôle qui n'a pas le bloc.** Le legacy branche `loadSchedules` sur
+`DOMContentLoaded` pour **tous** les rôles (`js/main.js:991`) alors que son bloc vit sous
+`$role >= 2` : un rôle 1 émet donc un `GET /cve_schedules` à chaque affichage de page, refusé en 403 et
+avalé par un `if (!d.success) return;`. Le portage ne rend le bloc **ni ne charge son script** en
+dessous du rôle 2 — ne pas charger le script est la seule façon de ne pas émettre l'appel.
+
+---
+
+## Trois constats de S4
+
+**Un intitulé de colonne qui nommait autre chose que son contenu.** La dernière colonne du tableau des
+planifications portait « Suivi », parce que j'avais réemployé la clé de S5 — or elle contient les
+boutons. Vu à la capture, corrigé en `planif.col_actions`. **Un en-tête doit nommer ce que la colonne
+contient**, et c'est le défaut que ce même document reproche au legacy ailleurs.
+
+**Une référence se mesure, elle ne se déduit pas.** J'avais annoncé 21 assertions côté portage — 16
+plus les cinq propriétés que le legacy ne tient pas. La mesure en donne **20** : il n'y a que **quatre**
+`verifiePortage`, le clamp *à la création* tenant des deux côtés. L'arithmétique était fausse, la mesure
+l'a corrigée.
+
+**Le test lui-même a dû être rendu sûr par construction, et c'est le point le plus important de ce
+sous-lot.** Une planification arme le scheduler, démarré **sans condition** par
+`backend/server.py:240-247` — aucune variable d'environnement ne le gouverne, donc il tourne comme
+thread dans le conteneur, invisible à `ps`, se réveille toutes les 60 s et prend toute ligne active dont
+l'échéance est passée. Un test qui crée une planification par minute peut donc déclencher un vrai scan
+SSH. La parade n'est pas un nettoyage rapide : toutes les planifications créées visent un **tag qui
+n'existe pas**, dont la branche fait une jointure interne sur `machine_tags` — zéro machine, zéro SSH.
+Vérifié après coup : la base porte toujours **un seul** scan CVE, celui du 25/07, et zéro planification.
+`all` et `machines` sont interdits comme cibles de test, et l'en-tête de la suite dit pourquoi.

@@ -55,6 +55,136 @@
             </div>
         </section>
 
+        @if ($peutPlanifier)
+            {{-- PLANIFICATION — sous-lot S4. Rendu SEULEMENT au-dela du role 2,
+                 comme le bloc du legacy. La difference : ici le script ne
+                 s'initialise pas non plus, alors que le legacy branche son
+                 chargeur pour tous les roles et emet donc un appel refuse a
+                 chaque affichage de page. --}}
+            <section class="rw-section" id="planification">
+                <div class="rw-section__entete">
+                    <h2 class="rw-sous-titre-fort">{{ __('planif.titre') }}</h2>
+                    <span class="rw-aide" id="schedule-count"></span>
+                </div>
+                <p class="rw-aide rw-prose">{{ __('planif.description') }}</p>
+
+                <div class="rw-carte rw-carte--pleine">
+                    <div class="rw-barre-filtres">
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-champ__etiquette">{{ __('planif.champ_nom') }}</span>
+                            <input type="text" id="sched-name" class="rw-saisie rw-saisie--compacte"
+                                   maxlength="100" data-rw="planif-nom">
+                        </label>
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-champ__etiquette">{{ __('planif.champ_cron') }}</span>
+                            <input type="text" id="sched-cron" class="rw-saisie rw-saisie--compacte"
+                                   value="0 3 * * *" data-rw="planif-cron">
+                        </label>
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-champ__etiquette">{{ __('planif.champ_seuil') }}</span>
+                            <select id="sched-cvss" class="rw-saisie rw-saisie--compacte">
+                                <option value="0">0</option>
+                                <option value="4">4</option>
+                                <option value="7" selected>7</option>
+                                <option value="9">9</option>
+                            </select>
+                        </label>
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-champ__etiquette">{{ __('planif.champ_source') }}</span>
+                            <select id="sched-source" class="rw-saisie rw-saisie--compacte"
+                                    title="{{ __('planif.source_aide') }}">
+                                <option value="fast">{{ __('planif.source_fast') }}</option>
+                                <option value="hybrid" selected>{{ __('planif.source_hybrid') }}</option>
+                                <option value="precise">{{ __('planif.source_precise') }}</option>
+                            </select>
+                        </label>
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-champ__etiquette">{{ __('planif.champ_cible') }}</span>
+                            <select id="sched-target" class="rw-saisie rw-saisie--compacte">
+                                <option value="all">{{ __('planif.cible_all') }}</option>
+                                @foreach ($tags as $tag)
+                                    <option value="tag:{{ $tag }}">{{ __('planif.cible_tag') }} — {{ $tag }}</option>
+                                @endforeach
+                                <option value="multi">{{ __('planif.cible_machines') }}</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    {{-- Selection multiple : masquee tant que la cible ne la
+                         demande pas. Une liste vide serait refusee par le
+                         service — et pour cause, cote scheduler une cible
+                         `machines` illisible retombe sur TOUT le parc. --}}
+                    <div id="sched-multi-list" class="rw-barre-filtres" hidden>
+                        @foreach ($machines as $m)
+                            <label class="rw-case">
+                                <input type="checkbox" class="sched-multi-cb"
+                                       value="{{ (int) $m->id }}" data-nom="{{ $m->name }}">
+                                <span>{{ $m->name }}</span>
+                            </label>
+                        @endforeach
+                        <span class="rw-aide" id="sched-multi-count"></span>
+                        <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                data-rw="planif-tout-cocher">{{ __('planif.tout_cocher') }}</button>
+                        <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                data-rw="planif-tout-decocher">{{ __('planif.tout_decocher') }}</button>
+                    </div>
+
+                    {{-- L'apercu remplace la PHRASE du legacy, fabriquee en Python
+                         et donc intraduisible (E-53) : les cinq dates reelles,
+                         mises en forme dans la langue de la session. --}}
+                    <p class="rw-aide" id="cron-preview" aria-live="polite"></p>
+
+                    <div class="rw-actions">
+                        <div class="rw-actions__gauche">
+                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                    data-rw="planif-presets">{{ __('planif.presets') }}</button>
+                        </div>
+                        <button type="button" class="rw-bouton"
+                                data-rw="planif-ajouter">{{ __('planif.ajouter') }}</button>
+                    </div>
+                </div>
+
+                {{-- Modeles de recurrence : un panneau EN LIGNE, pas une boite
+                     native — elle recouvre la ligne sur laquelle on decide, ne se
+                     style pas, et bloque Puppeteer. --}}
+                <div class="rw-panneau-decision" id="cron-presets-modal" hidden>
+                    <p class="rw-panneau-decision__texte">{{ __('planif.presets_titre') }}</p>
+                    <div class="rw-barre-filtres">
+                        <button type="button" class="rw-onglet" data-cron="0 * * * *">{{ __('planif.preset_horaire') }}</button>
+                        <button type="button" class="rw-onglet" data-cron="0 */6 * * *">{{ __('planif.preset_6h') }}</button>
+                        <button type="button" class="rw-onglet" data-cron="0 3 * * *">{{ __('planif.preset_quotidien') }}</button>
+                        <button type="button" class="rw-onglet" data-cron="0 3 * * 1">{{ __('planif.preset_hebdo') }}</button>
+                    </div>
+                    <div class="rw-panneau-decision__actions">
+                        <button type="button" class="rw-bouton rw-bouton--discret"
+                                data-rw="planif-presets-fermer">{{ __('planif.confirmer_non') }}</button>
+                    </div>
+                </div>
+
+                <div class="rw-tableau-cadre">
+                    <table class="rw-tableau">
+                        <thead>
+                            <tr>
+                                <th>{{ __('planif.col_nom') }}</th>
+                                <th>{{ __('planif.col_recurrence') }}</th>
+                                <th class="rw-colonne-secondaire">{{ __('planif.col_cible') }}</th>
+                                <th>{{ __('planif.col_prochaine') }}</th>
+                                <th class="rw-colonne-secondaire">{{ __('planif.col_derniere') }}</th>
+                                <th class="rw-colonne-secondaire">{{ __('planif.col_auteur') }}</th>
+                                <th>{{ __('planif.col_etat') }}</th>
+                                {{-- « Actions », et non « Suivi » : cette colonne
+                                     porte les boutons, pas l'etat de remediation
+                                     de S5. Un en-tete doit nommer ce que la
+                                     colonne CONTIENT. --}}
+                                <th>{{ __('planif.col_actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedules-list"></tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+
         <section class="rw-section">
             <div class="rw-section__entete">
                 <h2 class="rw-sous-titre-fort">{{ __('cve.section_serveurs') }}</h2>
@@ -213,5 +343,11 @@
          @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="cve-findings" type="application/json">@json($findings)</script>
     <script id="cve-libelles" type="application/json">@json($libelles)</script>
+    @if ($peutPlanifier)
+        <script id="planif-libelles" type="application/json">@json($libellesPlanif)</script>
+    @endif
     <script src="/js/scan-cve.js?v={{ @filemtime(public_path('js/scan-cve.js')) ?: '0' }}"></script>
+    @if ($peutPlanifier)
+        <script src="/js/planification-cve.js?v={{ @filemtime(public_path('js/planification-cve.js')) ?: '0' }}"></script>
+    @endif
 @endsection

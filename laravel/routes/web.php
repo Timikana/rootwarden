@@ -17,6 +17,7 @@ use App\Http\Controllers\ScanCveController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
 use App\Http\Controllers\PasserelleController;
+use App\Http\Controllers\PlanificationsCveController;
 use App\Http\Controllers\PortailController;
 use Illuminate\Support\Facades\Route;
 
@@ -175,6 +176,31 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/scan-cve/comparaison', ComparaisonCveController::class)
         ->middleware(['role:1', 'perm:can_scan_cve'])
         ->name('scan-cve.comparaison');
+
+    /*
+     * Planification des scans CVE — sous-lot S4.
+     *
+     * `role:2` ET NON `role:1` : le bloc de planification du legacy vit sous
+     * `if ($role >= 2)` (`legacy/security/index.php:231`), et ses cinq routes
+     * backend portent `require_role(2)`. La consultation reste ouverte au role 1,
+     * l'ecriture non — la garde est reprise telle quelle, cran par cran.
+     *
+     * ECART ASSUME (E-52) : ces routes REMPLACENT `cve_schedules` et
+     * `cron_preview` du backend, elles ne les appellent pas. Meme raison qu'en S3
+     * — la permission ne garde aucune requete backend, et le garde d'acces ne lit
+     * pas le meme parametre que sa route. Ici `perm:can_scan_cve` garde enfin
+     * l'ecriture.
+     */
+    Route::get('/scan-cve/planifications', [PlanificationsCveController::class, 'index'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.planifs');
+    Route::post('/scan-cve/planifications', [PlanificationsCveController::class, 'store'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.planifs.creer');
+    Route::put('/scan-cve/planifications/{id}', [PlanificationsCveController::class, 'update'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')->name('scan-cve.planifs.modifier');
+    Route::delete('/scan-cve/planifications/{id}', [PlanificationsCveController::class, 'destroy'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')->name('scan-cve.planifs.supprimer');
+    Route::get('/scan-cve/apercu-cron', [PlanificationsCveController::class, 'apercu'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.apercu-cron');
 
     Route::get('/export-cve', ExportCveController::class)
         ->middleware(['role:1', 'perm:can_scan_cve'])
