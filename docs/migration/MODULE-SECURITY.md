@@ -236,10 +236,13 @@ documenté dans l'OpenAPI mais jamais envoyé.
 
 ## 6. Les décisions à prendre avant S2
 
-- **D-1 — `compliance_report.php` et le rôle 1.** Porter la garde telle quelle (`ROLE_USER` admis,
-  parc entier, aucun cloisonnement) ou la restreindre à `role >= 2` comme son en-tête l'affirme
-  déjà ? Le premier choix porte la fuite dans le neuf ; le second corrige un défaut de sécurité
-  sous couvert de migration, et prive peut-être d'un usage réel. **Question d'exploitant.**
+- **D-1 — TRANCHÉE le 2026-08-20 : le portage restreint à `role >= 2`.** Décision de l'exploitant.
+  Le portage appliquera donc la garde que l'en-tête du fichier annonce depuis toujours, et non celle
+  que son `checkAuth` appliquait. À porter dans S2, avec une entrée dans `PARITE.md` : c'est une
+  divergence VOULUE avec le legacy, pas un oubli. Le legacy lui-même n'est pas modifié par cette
+  décision — il est archivé au moment où S2 aboutit.
+  Reste ouvert : faut-il une lecture pour un rôle 1 sur SES machines seulement ? Rien ne l'exige
+  aujourd'hui, la page n'ayant jamais su cloisonner ; à rouvrir si un usage se manifeste.
 - **D-2 — le hash d'intégrité.** Retirer `totp_secret` et `ssh_key` de l'antécédent (§2) rend
   l'empreinte recalculable, mais **change la valeur du hash** : les rapports déjà émis ne se
   vérifieront plus contre la nouvelle formule. À dire dans le CHANGELOG.

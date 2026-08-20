@@ -1138,6 +1138,70 @@ Le bloc `constateArchivage` est inerte tant que la partie rend autre chose que
 normalement. Une fois le `git mv` fait, il bascule seul. Verifier l'inertie
 avant de deplacer.
 
+### Le LOT fait deborder le compteur du second facteur, et le silence ressemble a un bug
+
+Trois FAIL de `go-socle-passerelle` — « route hors liste blanche : refusee — statut=200 » — sans
+qu'aucun compte ne soit verrouille. La reponse etait la PAGE DE CONNEXION, rendue en 200 : la
+connexion de la suite avait echoue, donc chaque appel de passerelle atterrissait sur `/connexion`,
+et toute assertion « refusee » lisait 200 au lieu de 403.
+
+Cause : le second facteur a un compteur PAR IP en base (`login_attempts`, `step='2fa'`, seuil 10 sur
+10 min). Enchainer les suites du LOT le fait deborder tout seul — chaque suite s'authentifie une a
+plusieurs fois. `failed_attempts` sur `users` reste a zero : chercher un compte verrouille ne trouve
+rien et fait conclure a une regression.
+
+**Remettre les compteurs a zero AVANT CHAQUE SUITE, pas une fois au debut du LOT :**
+
+    UPDATE users SET failed_attempts=0, locked_until=NULL;
+    DELETE FROM login_attempts WHERE 1=1;
+
+Et quand une assertion « refusee » echoue sur un 200, regarder le CORPS avant de suspecter le code :
+une page HTML la ou on attend du JSON dit que la session n'a pas tenu.
+
+### Une affirmation dans un commentaire n'est pas un test
+
+« Les quatre panneaux vident desormais leurs champs et redesactivent leur bouton a l'ouverture » —
+ecrit dans ce document, et faux : le champ de DELAI du panneau de redemarrage n'etait pas remis a
+zero, seul des quatre. Un delai choisi pour une machine repartait avec la suivante.
+
+Ce qui a laisse passer le defaut : le geste delibere porte sur le NOMBRE a recopier, donc l'oeil ne
+relit jamais le delai, et le test ne verifiait que le champ sur lequel le geste porte.
+
+Quand une note affirme qu'une regle vaut pour N elements, l'ASSERTER sur les N. Et pour un panneau,
+la propriete juste n'est pas « il s'ouvre » mais « il s'ouvre dans le meme etat que la premiere
+fois » : reouvrir apres avoir touche a chaque champ, et relire chacun.
+
+### Le meme code de rendu ne garantit pas les memes DONNEES
+
+Le `<tbody>` de la page des mises a jour est vide en Blade : le parc part en JSON et le JS rend
+toutes les lignes, premier rendu comme relectures. D'ou le commentaire « le MEME code sert le
+premier rendu et les suivants, il ne peut donc pas exister deux versions du tableau qui divergent ».
+Vrai du RENDU. Faux des DONNEES — elles venaient de deux sources qui ne s'accordaient pas :
+
+| | premier rendu | relectures |
+|---|---|---|
+| source | `Machines::pourMisesAJour()` | `/filter_servers` |
+| machines archivees | **incluses** | exclues |
+| horodatages | format MySQL | `isoformat()` Python |
+
+Une machine archivee etait donc affichee, cochable, et pouvait recevoir un `apt full-upgrade` ou un
+redemarrage — puis disparaissait sans un mot au premier « Rafraichir ». Et quatre colonnes de dates
+changeaient de forme au meme clic.
+
+Quand une page a deux sources pour la meme table, comparer leurs REQUETES clause par clause, pas
+seulement leurs colonnes. Et normaliser au point COMMUN — un helper `horodatage()` sur les six
+points de rendu, plutot que six correctifs qui divergeront.
+
+### Une assertion nouvelle doit avoir des DENTS, et cela se mesure
+
+Ecrire l'assertion puis constater qu'elle est verte ne prouve rien : elle peut etre verte parce
+qu'elle ne mesure rien. Neutraliser le correctif le temps d'une execution, voir l'assertion ROUGIR
+en citant la valeur fautive, puis restaurer. Deux des quatre correctifs de v1.37.19 ont ete valides
+ainsi — l'un a rendu « delai relu : 60 minute(s) », l'autre « 2026-07-25T14:29:14 ».
+
+C'est le pendant de « prouver la couverture avant de retirer un test » : prouver la portee avant
+d'ajouter un test.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
