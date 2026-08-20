@@ -63,7 +63,7 @@ class Navigation
             ['cle' => 'platform_key',   'garde' => 'can_manage_platform_key', 'legacy' => '/adm/platform_keys.php'],
             ['cle' => 'sudo_policies',  'garde' => 'sa',                      'legacy' => '/adm/server_user_sudo.php'],
             ['cle' => 'sftp_policies',  'garde' => 'sa',                      'legacy' => '/adm/server_user_sftp.php'],
-            ['cle' => 'compliance',     'garde' => 'can_view_compliance',     'legacy' => '/security/compliance_report.php'],
+            ['cle' => 'compliance',     'garde' => 'can_view_compliance',     'route'  => 'rapport-conformite'],
             ['cle' => 'drift',          'garde' => 'can_view_compliance',     'route'  => 'derive-config'],
         ],
 

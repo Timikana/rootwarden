@@ -171,7 +171,8 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | Lot | Contenu | Routes | SSH | Écrit |
 |---|---|---|---|---|
 | **S1** ✔ | export CSV d'un scan (`cve_export.php`) — **PORTÉ le 2026-08-20** (v1.37.20) | aucune | non | non |
-| **S2** | rapport de conformité, HTML + CSV | aucune | non | non |
+| **S2a** ✔ | rapport de conformité, page HTML — **PORTÉ le 2026-08-20** (v1.37.21) | aucune | non | non |
+| **S2c** | export CSV du rapport | aucune | non | non |
 | **S2b** | export PDF du rapport | aucune | non | non |
 | **S3** | consultation des CVE, lecture seule | `GET /cve_results`, `GET /cve_compare` | non | non |
 | **S4** | planification des scans | `GET/POST/PUT/DELETE /cve_schedules`, `GET /cron_preview` | non | oui |
@@ -196,8 +197,33 @@ Ce que S1 a rapporté, au-delà de lui-même :
   arbitrer.
 - **E-35** — la route n'est atteignable qu'en tapant son adresse jusqu'à S3.
 
-**S2 ensuite** : aucune route, aucun SSH, aucun état à remettre à zéro entre deux mesures, mais
-beaucoup de SQL et deux décisions de sécurité qui méritent leur propre commit (D-1 et D-2 ci-dessous).
+**S2 s'est révélé trop gros pour un seul sous-lot, et a été redécoupé** — un document de migration
+n'est pas une promesse. `compliance_report.php` pèse 579 lignes : sept collectes SQL, une notation de
+posture, sept sections HTML **et** un export CSV. Le HTML et le CSV sont désormais **S2a** et **S2c**.
+
+**S2a — porté le 2026-08-20** (v1.37.21) : `App\Services\Conformite` (les sept collectes + la
+posture + l'empreinte), `RapportConformiteController`, `resources/views/rapport-conformite.blade.php`,
+route `/rapport-conformite` gardée `role:2` + `perm:can_view_compliance`, catalogue `conformite.php`
+FR+EN (64 clés), et l'entrée `Navigation` basculée de `legacy` vers `route`.
+`tests/e2e/go-page-conformite.mjs` — 13 PASS sur chaque cible.
+
+Ce que S2a a rapporté :
+- **D-1 appliquée** (E-36) : la garde passe à `role:2`, celle que l'en-tête du fichier annonçait.
+  Mais la divergence **n'est mesurable par aucun compte de test** — même manque de fixture que E-34.
+- **La première mesure du module qui distingue une garde par PERMISSION d'une garde par RÔLE** :
+  `rw-test-admin` entre ici et reste refusé sur `journal-commandes`. Le premier jet de cette
+  assertion visait `/commandlog/`, **archivé donc 404** — elle passait au vert sans rien mesurer.
+- **L'empreinte est identique à l'octet** entre legacy et portage (E-37) : 4 480 octets d'antécédent
+  et le même SHA-256, à date figée. D-2 reste donc ouverte sans risque de régression.
+- **Six libellés d'écarts étaient en dur** dans le PHP du legacy (E-38) : la colonne « Écarts »
+  restait en français quelle que soit la langue.
+- Les exports CSV et PDF restent servis par l'ancien portail, **et la page le dit** (E-39).
+
+**S2c** portera l'export CSV, où **E-33 se rejoue** : `compliance_report.php` écrit lui aussi au fil
+de l'eau dans `php://output`. Sa branche PDF porte déjà un `ob_end_clean()` dont le commentaire
+nomme exactement le défaut — « purger tout output parasite (notices PHP capturées par ob_start en
+mode debug) avant d'émettre le binaire PDF » —, mais la branche CSV, elle, n'a jamais été protégée.
+Quelqu'un avait rencontré le problème et n'en avait corrigé qu'une moitié.
 
 **S2b séparé** de S2 : dépendance Composer distincte, sortie binaire, et la purge `ob_end_clean()`
 sans laquelle le PDF est corrompu — un piège déjà payé une fois, à ne pas re-payer en même temps

@@ -1714,6 +1714,79 @@ Aucune capture : ce sous-lot n'a pas d'interface, il rend un fichier.
 LOT entier rejoue, versant Laravel et versant legacy, tout conforme ; 296 pytest verts ; parite i18n
 504 = 504.
 
+### v1.37.21 — module `security/`, sous-lot S2a : le rapport de conformite
+
+`compliance_report.php` pesait 579 lignes pour sept collectes SQL, une notation de posture, sept
+sections HTML ET un export CSV. **Trop gros pour un seul sous-lot** : le decoupage a ete corrige en
+S2a (la page) et S2c (l'export CSV) — un document de migration n'est pas une promesse.
+
+`App\Services\Conformite` porte les sept collectes, le bareme de posture et l'empreinte ;
+`RapportConformiteController` assemble ; la vue rend sept sections ; la route est gardee `role:2` +
+`perm:can_view_compliance` ; le catalogue `conformite.php` compte 64 cles en FR et en EN. L'entree
+`Navigation` passe de `legacy` a `route` — sans quoi la page portee n'aurait ete joignable qu'en
+tapant son adresse, comme l'entree `updates` l'a ete pendant sept sous-lots.
+
+**D-1 appliquee (E-36).** Le fichier annoncait « Acces : admin (2) et superadmin (3) » et sa garde
+admettait `ROLE_USER`, sans cloisonner aucune donnee : un role 1 porteur de `can_view_compliance`
+obtenait tout le parc avec IP, port et utilisateur SSH, tous les comptes, la posture par serveur AVEC
+LES ECARTS EN CLAIR, et les dix dernieres modifications de pare-feu avec leur auteur. Le commentaire
+faux est ce qui a rendu le defaut durable. La route porte desormais la garde que le fichier
+annoncait — et la divergence **n'est mesurable par aucun compte de test**, ce qui est dit plutot que
+tu : elle exige un role 1 PORTANT la permission, et il n'en existe pas.
+
+**Ce que S2a mesure, et que rien ne mesurait encore dans ce module** : la paire qui distingue une
+garde par PERMISSION d'une garde par ROLE. `rw-test-admin` porte `can_view_compliance` et pas
+`can_admin_portal` : il entre sur le rapport et reste refuse sur `journal-commandes`. Le premier jet
+de cette assertion etait un FAUX VERT — elle visait `/commandlog/`, partie ARCHIVEE qui rend 404, et
+se contentait de « pas 200 ». La page temoin doit etre VIVANTE et l'assertion exiger 403.
+
+**L'empreinte est reprise telle quelle, et elle est identique a l'octet (E-37).** Son antecedent
+porte `totp_secret` et `ssh_key`, absentes du rapport — le lecteur ne peut donc pas la recalculer, et
+une preuve invraisemblable vaut autant que pas de preuve. La corriger change sa valeur, donc c'est la
+decision D-2, en attente. Mesure faite pour que cette decision se prenne sans risque : a date figee,
+les deux implementations rendent **4 480 octets d'antecedent et le meme SHA-256**. Le portage
+n'introduit aucune derive.
+
+**Six libelles echappaient a la parite FR/EN (E-38)** : le legacy construisait ses motifs d'ecart en
+francais, en dur, dans son calcul de posture. La colonne « Ecarts » — celle qui dit quoi faire —
+restait en francais quelle que soit la langue. Six cles desormais.
+
+**Les cinq collectes facultatives journalisent leur echec.** Le legacy les entoure d'un
+`catch (\Exception $e) {}` VIDE : une table absente rend une section vide, et rien n'en garde trace.
+Un vide est un etat NORMAL ici — ces tables appartiennent a des modules qui peuvent n'avoir jamais
+tourne — mais un vide et une erreur ne doivent pas se ressembler.
+
+**Ce que seules les CAPTURES ont montre.** Deux defauts qu'aucune assertion ne voyait :
+les legendes des tuiles de resume ne voulaient rien dire — des cles d'en-tete de colonne reutilisees,
+« Utilisateur » sous « 4 / 10 », « Age de la cle » sous « 0 » ; et a 390 px la colonne « Ecarts »
+etait **entierement hors du champ**, exactement comme la colonne d'actions des mises a jour. Sous
+720 px l'IP s'efface et les ecarts reviennent sous le nom du serveur, avec le composant
+`.rw-detail-ecart` deja employe par la derive de configuration — une information qu'on n'atteint
+qu'en decouvrant le defilement horizontal n'est pas offerte. La page porte aussi ses regles
+d'impression : c'est sa raison d'etre, et la barre laterale n'a rien a faire sur le papier.
+
+**Trois defauts de mes propres outils, releves en cours de route.** Le script de captures se
+reconnectait a chaque largeur avec le meme compte : le garde anti-rejeu a refuse, et il a
+**photographie l'ecran de connexion en annoncant « quatre vues »** — il verifie desormais qu'il est
+sur la bonne page avant de declencher. Un `grep -c` rendant 0 **sort avec un code non nul** et a
+coupe une chaine `&&`, si bien qu'une modification de gabarit n'a jamais tourne alors que la
+commande semblait avoir reussi. Et le garde anti-rejeu **traverse les suites** : deux suites
+consecutives utilisant le meme compte dans la meme fenetre de 30 s se telescopent, la session reste
+anonyme, et les appels rendent la page de connexion en 200. `go-socle-passerelle` rougissait une fois
+sur deux et `go-page-update-u3` mourait sur un `null` : ce n'etait pas de la flakiness. Le lanceur du
+LOT attend maintenant le basculement de la fenetre.
+
+**Un constat qui ne vient pas du portage** : cinq comptes `e2e_test_*` abandonnes par
+`02-admin-users.test.mjs` faussent la posture du rapport — « 2FA activee : 4 / 10 » la ou le parc
+reel compte cinq comptes. Une page faite pour reveler une posture faible la mesure faussement, a
+cause d'une suite qui ne nettoie pas ce qu'elle pose. Rien n'a ete supprime : ce sont des lignes
+d'une base partagee.
+
+**Reference du LOT mise a jour** : `go-socle-navigation` passe de 38 a **40** (une entree de plus est
+portee), `go-socle-i18n` compare **568 cles** au lieu de 504, et `go-page-conformite` entre au LOT
+avec **13 PASS sur chaque cible**. Tout le reste est inchange et rejoue vert sur les deux versants,
+296 pytest compris.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

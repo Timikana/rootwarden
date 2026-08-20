@@ -1230,3 +1230,71 @@ body {
 }
 
 .rw-apercu--reserve { border-left-color: var(--rw-avertissement); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Rapport de conformite (module security/, sous-lot S2a)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Une page a SEPT sections. Sans separation, elles se lisent comme un seul mur
+   de tableaux — la capture a 1920 le montrait avant toute assertion. Verifie
+   absent de la feuille avant d'etre ajoute : une classe deja prise se renomme,
+   elle ne se surcharge pas. */
+.rw-section {
+    margin: 30px 0 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--rw-bordure);
+}
+.rw-section:first-of-type { margin-top: 18px; }
+.rw-section__entete {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+/* La note de posture : trois teintes, parce qu'un F rendu comme un A ne
+   signale rien. Le rouge est reserve a ce qui exige une action — D et F. */
+.rw-badge--ok        { background: color-mix(in srgb, var(--rw-succes) 16%, transparent);       color: var(--rw-succes); }
+.rw-badge--attention { background: color-mix(in srgb, var(--rw-avertissement) 18%, transparent); color: var(--rw-avertissement); }
+.rw-badge--alerte    { background: var(--rw-danger-fond);                                        color: var(--rw-danger); }
+.rw-badge--note      { min-width: 2.1em; text-align: center; font-size: 13px; font-weight: 700; }
+
+/* Le rapport s'imprime : c'est sa raison d'etre. La barre laterale, l'en-tete et
+   les actions n'ont rien a faire sur le papier, et une section ne doit pas se
+   couper en deux pages au milieu d'un tableau. */
+@media print {
+    .rw-laterale, .rw-entete, .rw-tiroir, .rw-entete-page__actions, .rw-annonce { display: none !important; }
+    .rw-contenu { padding: 0 !important; }
+    .rw-section { break-inside: avoid; border-top-color: #ccc; }
+    .rw-tableau-cadre { overflow: visible !important; }
+}
+
+/* Une colonne d'appoint s'efface quand la place manque, pour que la colonne qui
+   porte l'information ACTIONNABLE revienne dans le champ. A 390 px, la colonne
+   « Ecarts » du rapport de conformite — la raison d'etre du tableau — etait
+   entierement hors ecran ; l'IP, elle, ne sert qu'a confirmer un nom de serveur
+   deja unique. Meme lecon que la colonne d'actions des mises a jour : une
+   information qu'on n'atteint qu'en decouvrant le defilement horizontal n'est
+   pas offerte. */
+@media (max-width: 720px) {
+    .rw-colonne-secondaire { display: none; }
+}
+
+/* Ne se montre QUE lorsque la place manque. Sert a ramener dans le champ ce que
+   `.rw-colonne-secondaire` vient d'en retirer — pas a dupliquer un contenu :
+   les deux classes sont complementaires, jamais visibles ensemble. */
+.rw-etroit-seul { display: none; }
+@media (max-width: 720px) {
+    /* `white-space: normal` explicitement : la cellule hote porte
+       `.rw-tableau__fort`, donc `nowrap`, et le detail en heritait — il se
+       coupait net au bord du cadre au lieu de se replier sur deux lignes.
+       `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir
+       a la ligne. */
+    .rw-etroit-seul {
+        display: block;
+        white-space: normal;
+        max-width: 30ch;
+    }
+}

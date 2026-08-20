@@ -11,6 +11,7 @@ use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\ExportCveController;
+use App\Http\Controllers\RapportConformiteController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
 use Illuminate\Support\Facades\Route;
@@ -104,6 +105,21 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/mises-a-jour', MisesAJourController::class)
         ->middleware(['role:1', 'perm:can_update_linux'])
         ->name('mises-a-jour');
+
+    /*
+     * Rapport de conformite — module `security/`, sous-lot S2a.
+     *
+     * GARDE VOLONTAIREMENT PLUS STRICTE QUE LE LEGACY (decision D-1). Le legacy
+     * admet `ROLE_USER` et ne cloisonne aucune donnee, alors que l'en-tete de son
+     * fichier annonce « Acces : admin (2) et superadmin (3) ». Un role 1 porteur
+     * de `can_view_compliance` obtenait donc tout le parc avec IP, port et
+     * utilisateur SSH, tous les comptes, et la posture par serveur avec les
+     * ecarts en clair. La route porte la garde que le fichier annoncait.
+     * Consigne dans PARITE.md : c'est une divergence, pas un oubli.
+     */
+    Route::get('/rapport-conformite', RapportConformiteController::class)
+        ->middleware(['role:2', 'perm:can_view_compliance'])
+        ->name('rapport-conformite');
 
     /*
      * Export CSV d'un scan CVE — module `security/`, sous-lot S1.
