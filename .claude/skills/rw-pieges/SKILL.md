@@ -192,6 +192,29 @@ suites, jamais un delai fixe :
 Le legacy, lui, tolere le rejeu : son garde est inerte (`PARITE.md` E-01). Une
 suite verte sur le legacy ne prouve donc rien du portage.
 
+## Un secret passe en ARGUMENT ressort dans le message d'echec
+
+`mysql` ne prend son mot de passe que par la ligne de commande, et
+`execFileSync` (Node) comme `subprocess.run` recopient **tout l'argv** dans le
+message quand la commande echoue. Une suite E2E qui tombait imprimait donc :
+
+    Command failed: docker exec rootwarden_db mysql -uroot -p<le mot de passe> ...
+
+C'est le defaut corrige cote SSH en **v1.37.17**, reapparu dans l'outillage de
+test. Deux parades, dans cet ordre :
+
+1. **ne pas relayer l'erreur telle quelle** — la rattraper et la renvoyer
+   expurgee (`.replace(secret, '***')` ET `.replace(/-p\S+/g, '-p***')`, la
+   seconde attrapant le cas ou le secret lu differe de celui affiche) ;
+2. **un seul lecteur** pour tout le depot — `tests/e2e/lib-base.mjs`. Le meme
+   acces a la base etait recopie **cinq fois** dans trois suites : cinq copies
+   divergent, et la premiere qui apprend quelque chose ne l'apprend pas aux
+   autres.
+
+Etat au 2026-08-20 : les trois suites du module `security/` passent par
+`lib-base.mjs`. **Trois suites plus anciennes portent encore le motif** —
+`07-maintenance`, `08-approvals`, `09-docker-idor`.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).
