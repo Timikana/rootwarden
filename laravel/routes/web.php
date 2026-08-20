@@ -10,6 +10,7 @@ use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
+use App\Http\Controllers\ExportCveController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
 use Illuminate\Support\Facades\Route;
@@ -103,6 +104,22 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/mises-a-jour', MisesAJourController::class)
         ->middleware(['role:1', 'perm:can_update_linux'])
         ->name('mises-a-jour');
+
+    /*
+     * Export CSV d'un scan CVE — module `security/`, sous-lot S1.
+     *
+     * Garde reprise du legacy : `checkAuth([1,2,3])` + `can_scan_cve`. Le role 1
+     * est bien ADMIS ; c'est le cloisonnement par `user_machine_access`, dans le
+     * controleur, qui borne ce qu'il peut lire — et son refus rend 404, pas 403.
+     *
+     * PAS D'ENTREE DE MENU : le legacy la declenche depuis un bouton de la page
+     * des vulnerabilites, qui appartient au sous-lot S3. Jusque-la la route
+     * existe et se teste, mais n'est atteignable qu'en tapant son adresse. Dit
+     * ici pour que personne ne cherche l'entree manquante dans Navigation.
+     */
+    Route::get('/export-cve', ExportCveController::class)
+        ->middleware(['role:1', 'perm:can_scan_cve'])
+        ->name('export-cve');
 
     // Journal des commandes — tracabilite de type bastion, lecture seule.
     Route::get('/journal-commandes', JournalCommandesController::class)
