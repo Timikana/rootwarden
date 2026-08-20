@@ -16,18 +16,15 @@
         <div class="rw-entete-page__actions">
             <button class="rw-bouton" type="button" data-rw="imprimer"
                     onclick="window.print()">{{ __('conformite.btn_print') }}</button>
-            {{-- L'export CSV est PORTE (S2c) : lien interne, pas de marqueur, pas de
-                 nouvel onglet. Le PDF, lui, reste sur l'ancien portail (S2b). --}}
+            {{-- LES DEUX EXPORTS SONT PORTES — CSV en S2c, PDF en S2b : liens
+                 internes, sans marqueur « ancien portail » et sans nouvel
+                 onglet. Plus aucun aller-retour depuis ce rapport. --}}
             <a class="rw-bouton rw-bouton--discret" data-rw="export-csv"
                href="{{ route('rapport-conformite.csv') }}">{{ __('conformite.btn_csv') }}</a>
-            <a class="rw-bouton rw-bouton--discret" data-rw="export-pdf" target="_blank" rel="noopener"
-               title="{{ __('conformite.export_a_venir') }}"
-               href="{{ rtrim(config('app.url_legacy'), '/') }}/security/compliance_report.php?format=pdf">
-                {{ __('conformite.btn_pdf') }} <span class="rw-fleche">↗</span></a>
+            <a class="rw-bouton rw-bouton--discret" data-rw="export-pdf"
+               href="{{ route('rapport-conformite.pdf') }}">{{ __('conformite.btn_pdf') }}</a>
         </div>
     </div>
-
-    <p class="rw-annonce rw-annonce--attention" data-rw="annonce">{{ __('conformite.pdf_a_venir') }}</p>
 
     {{-- Resume executif : six indicateurs. `rw-grille--compacte` les tient deux
          par deux a 390 px au lieu de repousser le rapport sous six ecrans. --}}
