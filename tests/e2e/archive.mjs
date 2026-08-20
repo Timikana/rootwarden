@@ -76,6 +76,29 @@ export async function constateArchivage({ base, chemin, fichiers = [], verifie, 
  * l'ancienne page. Se lit dans une session ouverte, le menu n'existant pas pour
  * un visiteur anonyme.
  */
+/**
+ * Le lien du menu MENE-T-IL quelque part ?
+ *
+ * Verifier que le `href` CITE la route ne prouve rien : mesure du 2026-08-20 —
+ * `LARAVEL_URL` valait `https://localhost:8444` alors que le portage ecoute en
+ * clair, et les huit entrees redirigees menaient a un echec TLS. La chaine
+ * etait juste, le lien mort.
+ */
+async function repond(url) {
+    const u = new URL(url);
+    const client = u.protocol === 'https:' ? https : http;
+    return new Promise((resolve) => {
+        const req = client.request(
+            { hostname: u.hostname, port: u.port, path: u.pathname + u.search,
+              method: 'GET', rejectUnauthorized: false, timeout: 8000 },
+            r => { r.resume(); resolve(r.statusCode); },
+        );
+        req.on('error', () => resolve(0));
+        req.on('timeout', () => { req.destroy(); resolve(0); });
+        req.end();
+    });
+}
+
 export async function verifieMenuLegacy(page, routeportee, verifie) {
     const liens = await page.evaluate(() =>
         [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
@@ -83,4 +106,12 @@ export async function verifieMenuLegacy(page, routeportee, verifie) {
     verifie("l'entree de menu du legacy mene au portage",
             mene.length > 0,
             mene.length ? mene[0] : `aucun lien vers « ${routeportee} » parmi ${liens.length} liens`);
+
+    // Et surtout : que ce lien REPONDE. Un menu qui cite la bonne route mais
+    // n'aboutit pas est le defaut qu'on croyait corriger.
+    if (mene.length) {
+        const statut = await repond(mene[0]);
+        verifie('ce lien aboutit', statut > 0 && statut < 500,
+                statut ? `HTTP ${statut}` : 'aucune reponse (hote, port ou protocole)');
+    }
 }

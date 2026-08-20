@@ -37,6 +37,7 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
@@ -133,6 +134,39 @@ console.log(`\n=== Module update/, sous-lot U6a — les deux flux (${CIBLE}) ===
 constate('cible', `${BASE}${PAGE}`);
 constate('ce que font les routes, lu dans backend/routes/updates.py',
     'flux text/plain ; la mise a jour de securite INSTALLE et peut tuer un apt en cours');
+
+/*
+ * MODULE ARCHIVE ? Cote legacy, `update/` a ete porte en sept sous-lots puis
+ * deplace dans `legacy/_deprecated/`. Ses URL rendent 404 : ce n'est pas un
+ * echec, c'est l'aboutissement du portage. Le test le CONSTATE — et verifie
+ * surtout que le menu du legacy mene desormais au portage, sans quoi on aurait
+ * installe soi-meme un 404 dans un menu.
+ *
+ * Tant que le module est servi, ce bloc est inerte et la suite se joue.
+ */
+if (CIBLE === 'legacy') {
+    const archivee = await constateArchivage({
+        base: BASE,
+        chemin: '/update/',
+        fichiers: [
+        '/update/index.php',
+        '/update/js/apiCalls.js',
+        '/update/js/domManipulation.js',
+        '/update/functions/list_machines.php',
+        '/update/functions/filter_servers.php',
+        ],
+        verifie, constate,
+    });
+    if (archivee) {
+        const { ctx, page } = await connecte('rw-test-admin', SECRET_ADMIN);
+        await verifieMenuLegacy(page, '/mises-a-jour', verifie);
+        await ctx.close();
+        console.log(lignes.join('\n'));
+        console.log(`\n${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+        await navigateur.close();
+        process.exit(echecs > 0 ? 1 : 0);
+    }
+}
 
 const { ctx, page } = await connecte('rw-test-admin', SECRET_ADMIN);
 

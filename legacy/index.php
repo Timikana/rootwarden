@@ -363,7 +363,7 @@ try {
             if (($permissions['can_deploy_keys'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/ssh/', 'label' => t('dashboard.sc_ssh_keys'), 'desc' => t('dashboard.sc_ssh_desc')];
             if (($permissions['can_update_linux'] ?? false) || $isSA)
-                $shortcuts[] = ['url' => '/update/', 'label' => t('dashboard.sc_updates'), 'desc' => t('dashboard.sc_updates_desc')];
+                $shortcuts[] = ['url' => rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') . '/mises-a-jour', 'label' => t('dashboard.sc_updates'), 'desc' => t('dashboard.sc_updates_desc')];
             if (($permissions['can_manage_iptables'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/iptables/', 'label' => t('dashboard.sc_iptables'), 'desc' => t('dashboard.sc_iptables_desc')];
             if (($permissions['can_scan_cve'] ?? false) || $isSA)

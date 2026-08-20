@@ -13,7 +13,6 @@ return [
                      . 'server capabilities are deliberately left out: updating a chosen list '
                      . 'of packages, and excluding packages. The old page carried the code for '
                      . 'them, but no button ever reached it.',
-    'partiel_lien'  => 'Open the full page on the old portal',
 
     // Filters
     'filtres_titre'   => 'Filter the fleet',

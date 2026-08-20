@@ -14,7 +14,6 @@ return [
                      . "reprises : la mise a jour de paquets choisis et l'exclusion de "
                      . "paquets. L'ancienne page en portait le code, mais aucun bouton ne "
                      . "les atteignait.",
-    'partiel_lien'  => 'Ouvrir la page complete sur l\'ancien portail',
 
     // Filtres
     'filtres_titre'   => 'Filtrer le parc',

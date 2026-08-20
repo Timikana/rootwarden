@@ -1075,11 +1075,74 @@ oublie dans une liste — qu'aucun test ne montrait, parce qu'aucun ne CASSAIT.
 Un fichier qui grossit par accumulation merite une relecture entiere, pas
 seulement des tests verts.
 
+### Porter une page ne la rend pas ATTEIGNABLE
+
+`App\Support\Navigation` porte une entree par ligne de menu, avec `route` OU
+`legacy`. L'entree `updates` est restee sur `'legacy' => '/update/'` pendant
+SEPT sous-lots : la page portee n'etait joignable que par URL directe, et chaque
+clic dans le portail neuf renvoyait a l'ancien.
+
+Au moment ou une page devient servie par le portage, DEUX menus se redirigent :
+celui du legacy et celui du portage. Le second s'oublie parce qu'aucun test ne
+rougit — le menu marche, il mene juste ailleurs.
+
+### Un MODULE a plus de portes qu'une page
+
+Les sept pages archivees n'avaient qu'un lien, dans la barre laterale de
+`legacy/menu.php`. `update/` en avait QUATRE, dont trois jamais rencontres :
+le tiroir mobile (`menu.php`, ecrit a la main sans `$sideLink`), le raccourci
+clavier (`head.php`), et la tuile du tableau de bord (`index.php`).
+
+Avant de deplacer quoi que ce soit, chercher TOUTES les formes du chemin dans
+`legacy/`, en PHP comme en JS : les guillemets simples, les doubles, et les
+`href=` ecrits a la main.
+
+### Verifier qu'un lien CITE la bonne route ne prouve pas qu'il MENE quelque part
+
+`verifieMenuLegacy()` comparait des chaines. Mesure du 2026-08-20 :
+`LARAVEL_URL` valait `https://...` alors que le portage ecoute en clair — les
+HUIT entrees redirigees menaient a un echec TLS, et huit suites vertes
+declaraient le menu repare.
+
+Une assertion sur une URL se termine par une REQUETE. `archive.mjs` suit
+desormais le lien et verifie qu'il repond.
+
+### Prouver la couverture AVANT de retirer un test
+
+`go-update-filter.mjs` gardait une regression et allait devenir rouge en
+permanence. Avant de la retirer, verifier que sa regression est couverte
+ailleurs — elle ne l'etait pas tout a fait : `filtre.machines.every(...)` passe
+au vert sur un tableau VIDE, puisque `[].every()` rend `true`. C'etait
+exactement le defaut garde.
+
+Ajouter l'assertion manquante D'ABORD, la voir verte, puis retirer.
+
+### Un faux vert vaut moins que pas de test
+
+Une etape allait sur `/update/` puis verifiait l'ABSENCE d'un selecteur. Sur une
+page 404 il est absent aussi : l'etape serait passee au vert sans rien mesurer.
+Retiree plutot que laissee.
+
+### Une archive n'est pas protegee, elle est seulement DEPLACEE
+
+`legacy/_deprecated/` n'a ni `.htaccess` ni regle Apache : le dossier reste sous
+la racine documentaire. Ce qui rend 404, c'est le CHEMIN d'origine, pas le
+contenu. Les cinq points d'entree PHP de `update/` rendent 500 a leur nouvelle
+adresse — leurs `require_once` relatifs ne resolvent plus — mais c'est un
+accident, pas un garde. Le mesurer a chaque archivage.
+
+### Greffer le constat d'archivage AVANT le deplacement
+
+Le bloc `constateArchivage` est inerte tant que la partie rend autre chose que
+404 : on peut donc le committer, le jouer, et voir la suite se derouler
+normalement. Une fois le `git mv` fait, il bascule seul. Verifier l'inertie
+avant de deplacer.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
-(module `update/` ENTIEREMENT porte : U1 a U6b ; `apt_update` et `custom_update`
-volontairement non portees, rien ne les appelait — E-22. Reste l'archivage) — toutes celles du meme
+(module `update/` porte ET ARCHIVE le 2026-08-20 — premier module, sept sous-lots.
+Restent security/, supervision/, iptables/, adm/) — toutes celles du meme
 gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,

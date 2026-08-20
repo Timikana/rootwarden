@@ -34,6 +34,10 @@ class LiensLegacy
         '/backups/'    => 'sauvegardes',
         '/tasks/'      => 'taches',
         '/tickets/'    => 'tickets',
+        // Le backend ecrit `/update/index.php` en dur pour CHAQUE machine trouvee
+        // (`backend/routes/search.py`) : pour ce module, la table cesse d'etre
+        // preventive. Sans cette ligne, la recherche mene a un 404 mesurable.
+        '/update/'     => 'mises-a-jour',
     ];
 
     /**

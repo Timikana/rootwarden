@@ -205,7 +205,7 @@ function toast(message, type = 'info', duration = 4000) {
         }
         if (gPressed) {
             gPressed = false;
-            const routes = {h: '/', s: '/services/', S: '/ssh/', u: '/update/',
+            const routes = {h: '/', s: '/services/', S: '/ssh/', u: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') ?>/mises-a-jour',
                            c: '/security/', a: '/adm/admin_page.php', A: '/ssh-audit/', i: '/iptables/',
                            d: '/documentation.php', p: '/profile.php', r: '/security/compliance_report.php',
                            k: '/adm/platform_keys.php', m: '/adm/server_users.php', v: '/supervision/'};
