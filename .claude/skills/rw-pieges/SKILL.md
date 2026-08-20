@@ -173,6 +173,49 @@ premier rejeu du LOT sur la VM.
   `E2E_USER=rw-test-super` / `E2E_PASS=RootWarden@2026-Test!` et le secret TOTP
   du compte, plutôt que de toucher à `superadmin`.
 
+## Outillage de shell
+
+- **`grep -c` rendant 0 SORT AVEC UN CODE NON NUL.** Dans une chaine
+  `grep -c motif fichier && python3 - <<'PY' ...`, l'absence de correspondance
+  fait echouer le `grep` et **le reste de la chaine ne tourne jamais** — sans le
+  moindre message. Paye le 2026-08-20 : une modification de gabarit Blade
+  n'existait pas, alors que la commande semblait avoir reussi, et le defaut n'a
+  ete trouve qu'en mesurant le DOM rendu. Meme famille pour `grep -q` et pour
+  tout comptage a zero. Parade : `grep -c … || true`, ou separer les commandes
+  par `;` plutot que par `&&` quand l'une n'est qu'un releve.
+
+- **`cd` dans une commande ne survit pas toujours a la suivante.** Le repertoire
+  de travail se reinitialise entre certains appels : prefixer les chemins, ou
+  refaire le `cd` en tete de chaque commande. Un `node script.mjs` lance depuis
+  le mauvais dossier echoue sur `ERR_MODULE_NOT_FOUND` (les dependances vivent
+  dans `tests/e2e/node_modules`).
+
+## Suites E2E : le garde anti-rejeu TRAVERSE les suites
+
+Le portage porte un garde anti-rejeu TOTP **par compte et en base**. Il ne
+s'arrete donc pas au bord d'une suite : **deux suites consecutives qui ouvrent
+une session avec le meme compte dans la meme fenetre de 30 s rejouent le meme
+code.** La seconde est refusee, la session reste anonyme, et chaque appel part
+vers la page de connexion — qui rend **200 en HTML**. On lit alors des assertions
+« refusee » qui echouent sur un 200, **sans qu'aucun compte ne soit verrouille** :
+la piste evidente ne mene nulle part.
+
+Deux suites ont ete declarees « flaky » pour cette seule raison, a tort :
+`go-socle-passerelle` (rouge une fois sur deux, trois FAIL a 200) et
+`go-page-update-u3` (mort sur un `null`, faute de trouver un bouton sur ce qui
+etait en realite l'ecran de connexion). Aucune des deux ne l'etait.
+
+Parade dans le lanceur du LOT — attendre le basculement de la fenetre entre deux
+suites, jamais un delai fixe :
+
+    attendFenetreTotp() {
+      debut=$(( $(date +%s) / 30 ))
+      while [ $(( $(date +%s) / 30 )) -eq "$debut" ]; do sleep 2; done
+    }
+
+Le legacy, lui, tolere le rejeu : son garde est inerte (`PARITE.md` E-01). Une
+suite verte sur le legacy ne prouve donc rien du portage.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).

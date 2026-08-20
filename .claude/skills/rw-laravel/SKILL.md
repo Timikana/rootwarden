@@ -1272,6 +1272,76 @@ Ne pas accorder la permission a `rw-test-user` pour s'en sortir : c'est la refer
 permission » de toutes les autres suites, et la modifier changerait silencieusement ce qu'elles
 mesurent. Ecrire l'ecart (`PARITE.md` E-34) et demander un compte de fixture supplementaire.
 
+### Un script de captures doit VERIFIER qu'il est sur la bonne page
+
+Premier jet du script de captures du rapport de conformite : une connexion par
+largeur, avec le meme compte, a quelques secondes d'intervalle. Le garde
+anti-rejeu a refuse la deuxieme et la troisieme — et le script a **photographie
+l'ecran de connexion en annoncant « quatre vues »** pour chacune. Trois largeurs,
+douze fichiers, un succes affiche, et rien de la page dedans.
+
+Deux corrections, la seconde plus importante que la premiere : **une seule
+connexion, puis on REDIMENSIONNE** ; et un garde-fou avant chaque declenchement.
+
+    const surLaBonnePage = await page.evaluate(() =>
+        Boolean(document.querySelector('[data-rw="empreinte"]')));
+    if (!surLaBonnePage) { console.log(`${f.nom} : PAS SUR LA PAGE (${page.url()})`); continue; }
+
+Un script qui produit des fichiers doit dire ce qu'il y a DEDANS, pas qu'il en a
+produit.
+
+### Une page temoin de refus doit etre VIVANTE, et l'assertion doit exiger 403
+
+Pour prouver qu'une garde lit une PERMISSION et non un role, on verifie qu'un
+compte autorise ici est refuse sur une page exigeant une AUTRE permission.
+Premier jet : `/commandlog/` — **une partie archivee, qui rend 404**. L'assertion
+etait `statut !== 200` : elle passait au vert sans rien mesurer.
+
+Deux regles qui en decoulent :
+- la page temoin doit etre **encore servie** — apres chaque archivage, les
+  temoins d'un test de droits sont a re-verifier ;
+- une assertion de refus exige **le code exact** (`=== 403`), jamais « autre chose
+  que 200 » : un 404, un 500 ou une redirection la satisferaient.
+
+C'est la paire `rw-test-admin` / `can_view_compliance` contre `can_admin_portal`
+qui porte cette preuve — la seule du module `security/` a la porter.
+
+### Quand deux mesures se contredisent, chercher ce que CHACUNE regarde
+
+L'empreinte du rapport semblait differer entre le legacy et le portage. A date
+figee, les deux rendent **4 480 octets d'antecedent et le meme SHA-256** : l'ecart
+n'etait que la date, arrondie a la minute. Meme lecon que le BOM de S1, ou
+`charCodeAt(0)` rendait `0x3c` et les octets bruts `EF BB BF`.
+
+Avant de conclure a une divergence, **figer ce qui varie** et re-mesurer. Et le
+dire quand la mesure est ponctuelle : comparer ces empreintes en continu
+demanderait de figer la date des deux cotes, ce que la suite ne fait pas.
+
+### Une legende de tuile doit dire ce que le nombre MESURE
+
+Reutiliser des cles d'en-tete de colonne comme legendes de tuiles donne
+« Utilisateur » sous « 4 / 10 » et « Age de la cle » sous « 0 ». Les cles
+existent, sont traduites, sont a parite — **aucune assertion ne voit qu'un libelle
+ne veut rien dire.** Seule la capture le montre. Sixieme defaut de ce projet
+visible uniquement a l'image.
+
+### Une colonne d'appoint s'efface pour que l'actionnable revienne dans le champ
+
+A 390 px, la colonne « Ecarts » du rapport de conformite — celle qui dit quoi
+faire — etait entierement hors ecran. Exactement la colonne d'actions des mises a
+jour, sous un autre nom.
+
+Le motif retenu, en deux classes complementaires jamais visibles ensemble :
+`.rw-colonne-secondaire` (l'IP, qui ne fait que confirmer un nom deja unique)
+s'efface sous 720 px, et `.rw-etroit-seul` ramene l'ecart **sous le nom du
+serveur** avec `.rw-detail-ecart`, le composant que la derive de configuration
+emploie deja.
+
+Piege dans le piege : la cellule hote porte `.rw-tableau__fort`, donc
+`white-space: nowrap`, dont le detail HERITE — il se coupait net au bord du cadre.
+Un `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir a la
+ligne : poser `white-space: normal` explicitement.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
