@@ -20,7 +20,7 @@
  *   node go-socle-i18n.mjs
  */
 import puppeteer from 'puppeteer';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { createHmac } from 'crypto';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
@@ -69,9 +69,15 @@ function pariteDesCles() {
         'echo json_encode(["total" => $total, "ecarts" => $ecarts]);',
     ].join(' ');
 
-    const sortie = execSync(
-        `docker exec rootwarden_laravel php -r ${JSON.stringify(script)}`,
-        { encoding: 'utf-8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
+    // Le PHP part par un TABLEAU d'arguments, jamais par une chaine de shell :
+    // il porte des `$variable`, et un shell POSIX les remplace par du vide des
+    // lors qu'elles sont entre guillemets — le code arrivait mutile cote
+    // conteneur. `execFileSync` remet argv tel quel a `docker`, sans shell
+    // intermediaire, donc sans expansion.
+    const sortie = execFileSync(
+        'docker',
+        ['exec', 'rootwarden_laravel', 'php', '-r', script],
+        { encoding: 'utf-8' },
     );
 
     return JSON.parse(sortie);
