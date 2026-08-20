@@ -192,6 +192,32 @@ suites, jamais un delai fixe :
 Le legacy, lui, tolere le rejeu : son garde est inerte (`PARITE.md` E-01). Une
 suite verte sur le legacy ne prouve donc rien du portage.
 
+## Une ecriture de test peut ARMER un declencheur
+
+Avant d'ecrire dans une table, chercher **qui la CONSOMME**. En S4, ecrire une
+planification arme le scheduler — demarre **sans condition** par
+`backend/server.py:240-247`, aucune variable d'environnement ne le gouverne. Il
+tourne donc comme thread dans `rootwarden_python`, **invisible a `ps`**, se
+reveille toutes les 60 s (`scheduler.py:30`) et prend toute ligne
+`enabled = 1 AND (next_run IS NULL OR next_run <= now)`. Un test qui cree une
+planification par minute **declenche un vrai scan SSH** — sur `srv-zabbix`, qui
+est en production.
+
+La parade n'est pas un nettoyage rapide : c'est une cible **inoffensive par
+construction**. Ici, `target_type = 'tag'` avec un tag **qui n'existe pas** — la
+branche fait une jointure INTERNE sur `machine_tags` (`scheduler.py:190-197`),
+donc zero machine et zero SSH.
+
+**Et le choix de la cible sure se LIT, il ne se devine pas** : `all` scannerait
+tout le parc, et `machines` avec une liste vide ou illisible **retombe sur tout le
+parc** (`scheduler.py:198-209`) — c'est un piege deguise en cible restreinte.
+
+Nettoyer quand meme, en ENTREE et dans un `finally`, et **directement en base** :
+passer par la route de suppression demanderait une session valide au moment du
+nettoyage, or c'est precisement quand la suite a echoue que le nettoyage compte le
+plus. Puis VERIFIER l'absence d'effet de bord — ici : un seul scan CVE en base, et
+zero planification residuelle.
+
 ## Decouper un fichier entre deux ancres capture ce qui s'est insere entre-temps
 
 Pour separer deux blocs d'un meme fichier en deux commits, j'ai extrait « du titre
