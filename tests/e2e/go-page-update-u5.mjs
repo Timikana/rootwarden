@@ -262,6 +262,39 @@ verifiePortage('le delai que le backend accepte est offert',
     Boolean(panneau) && panneau.delais.length > 1 && panneau.delais.includes('60'),
     panneau ? `choix : ${panneau.delais.join(', ')} minutes` : 'aucun panneau de decision');
 
+// Le panneau doit REPARTIR D'UN ETAT CONNU a chaque ouverture. Le nombre a
+// recopier est bien remis a vide, mais le DELAI ne l'etait pas : choisi pour une
+// machine, il survivait a la fermeture et repartait avec la suivante. Le geste
+// delibere porte sur le NOMBRE, pas sur le delai — personne ne relit un champ
+// qu'il n'a pas touche, et `shutdown -r +60` part alors a la place du
+// redemarrage immediat attendu.
+if (CIBLE === 'laravel' && panneau) {
+    await page.evaluate(() => {
+        const champ = document.querySelector('[data-rw="redemarrage-delai"]');
+        champ.value = '60';
+        champ.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.evaluate(() =>
+        document.querySelector('[data-rw="redemarrage-annuler"]').click());
+    await dors(300);
+
+    // Retablir la selection : fermer le panneau re-rend le tableau et decoche.
+    await page.evaluate((id) => {
+        const c = document.querySelector(`input[name="selected_machines[]"][value="${id}"]`);
+        if (!c) return;
+        c.checked = true;
+        c.dispatchEvent(new Event('change', { bubbles: true }));
+    }, MACHINE_TEST);
+    await page.evaluate(() =>
+        document.getElementById('reboot-btn').click());
+    await dors(500);
+
+    const delaiRouvert = await page.evaluate(() =>
+        document.querySelector('[data-rw="redemarrage-delai"]')?.value ?? null);
+    verifie('le delai repart de son defaut a la reouverture du panneau',
+        delaiRouvert === '0', `delai relu : « ${delaiRouvert} » minute(s)`);
+}
+
 if (CIBLE === 'legacy') {
     // Les deux confirmations du legacy : ce qu'elles DISENT vraiment.
     constate('boites natives posees', String(boites.length));

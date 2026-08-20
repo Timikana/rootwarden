@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Liste de reference des machines du parc, pour les selecteurs et les filtres.
@@ -40,6 +41,14 @@ class Machines
      * tableau de bord du legacy, qui sert le parc entier a tout le monde. Il est
      * reproduit ici a l'identique.
      *
+     * LES MACHINES ARCHIVEES SONT EXCLUES, comme le fait `/filter_servers`, qui
+     * sert les relectures de la meme page. Sans ce filtre les deux sources ne
+     * montraient pas le meme parc : une machine archivee s'affichait au premier
+     * rendu, etait cochable, pouvait recevoir un `apt full-upgrade` ou un
+     * redemarrage — puis disparaissait sans un mot au premier « Rafraichir »,
+     * le nombre de lignes changeant tout seul. Le rendu est commun aux deux
+     * sources ; les DONNEES doivent l'etre aussi.
+     *
      * @return list<object>
      */
     public function pourMisesAJour(int $roleId, int $userId): array
@@ -49,7 +58,10 @@ class Machines
                 'm.id', 'm.name', 'm.ip', 'm.port', 'm.linux_version', 'm.last_checked',
                 'm.online_status', 'm.maj_secu_date', 'm.maj_secu_last_exec_date',
                 'm.last_reboot', 'm.environment', 'm.criticality', 'm.network_type',
-            );
+            )->where(function ($q) {
+                $q->whereNull('m.lifecycle_status')
+                  ->orWhere('m.lifecycle_status', '!=', 'archived');
+            });
 
             if ($roleId < 2) {
                 $requete->join('user_machine_access as uma', 'm.id', '=', 'uma.machine_id')
@@ -57,9 +69,12 @@ class Machines
             }
 
             return $requete->orderBy('m.name')->get()->all();
-        } catch (\Throwable) {
-            // Le parc est le contenu de la page : son indisponibilite se voit,
-            // elle n'a pas besoin d'etre masquee par une liste vide silencieuse.
+        } catch (\Throwable $e) {
+            // Une base injoignable rend EXACTEMENT le meme ecran qu'un parc vide,
+            // texte d'aide compris. L'ancien commentaire pretendait le contraire
+            // (« son indisponibilite se voit ») : elle ne se voyait pas, et rien
+            // n'en gardait trace. Au moins la journaliser.
+            Log::error('[Machines::pourMisesAJour] parc illisible : ' . $e->getMessage());
             return [];
         }
     }

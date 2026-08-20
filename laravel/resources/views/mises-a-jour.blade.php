@@ -76,9 +76,12 @@
     </div>
 
 
-    {{-- Actions groupees — sous-lot U3. Une seule pour l'instant : le constat
-         « paquets en attente ». La simulation du legacy n'est PAS portee, et
-         l'encart de portage partiel ci-dessus renvoie vers elle. --}}
+    {{-- Actions groupees, sous-lots U3 a U6b : constat des paquets en attente,
+         simulation, mises a jour de securite, mise a jour complete, reparation
+         dpkg, redemarrage. Toutes portent sur la MEME selection, d'ou le
+         compteur ci-dessous et un seul panneau de decision ouvert a la fois.
+         La simulation EST portee depuis que la fuite du mot de passe root qui
+         la retenait au legacy est corrigee (CHANGELOG v1.37.17). --}}
     <div class="rw-actions rw-actions--groupe">
         <p class="rw-actions__compteur" id="selection-count" data-rw="compteur-selection"
            data-nombre="0" role="status" aria-live="polite">{{ __('maj.selection_vide') }}</p>

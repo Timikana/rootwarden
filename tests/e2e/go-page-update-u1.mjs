@@ -396,11 +396,90 @@ try {
                        perdues.length === 0,
                        perdues.length ? `perdues : ${perdues.join(', ')}` : 'aucune perte');
 
+        // Les quatre colonnes de dates viennent de DEUX sources : le controleur
+        // au premier rendu (format MySQL) et `/filter_servers` aux relectures
+        // (`isoformat()` cote Python). Sans normalisation, elles changeaient de
+        // forme au premier clic. On mesure la FORME, pas la valeur : un `T`
+        // entre la date et l'heure suffit a la trahir.
+        const formes = await page.evaluate(() => {
+            const lu = (classe) => [...document.querySelectorAll('td.' + classe)]
+                .map(td => td.textContent.trim())
+                .filter(t => /^\d{4}-\d{2}-\d{2}/.test(t));
+            return {
+                verifie: lu('last-checked'),
+                secu: lu('maj-secu-date'),
+                exec: lu('maj-secu-lastexec-date'),
+                reboot: lu('last-reboot'),
+            };
+        });
+        const horodatages = Object.values(formes).flat();
+        constate('horodatages relus apres rafraichissement', String(horodatages.length));
+        // `[].every()` rend `true` : asserter d'abord qu'il y en a.
+        verifiePortage("aucune date ne change de forme au rafraichissement",
+            horodatages.length > 0 && horodatages.every(t => !t.includes('T')),
+            horodatages.length
+                ? `${horodatages.length} date(s), exemple « ${horodatages[0]} »`
+                : 'aucune date rendue — assertion sans objet');
+
         if (CIBLE === 'legacy' && perdues.length) {
             constate('defaut du legacy',
                      `rafraichir la liste vide ${perdues.join(', ')} — `
                      + 'list_machines.php ne SELECTionne pas ces colonnes');
         }
+    }
+
+    // ── Ce que le compteur dit quand la relecture ECHOUE ────────────────────
+    // Un tableau vide et un compteur qui annonce des machines retenues sont deux
+    // affirmations contradictoires affichees en meme temps — et l'action suivante
+    // repond « aucune machine selectionnee », ce que l'ecran contredit. On mesure
+    // sur `data-nombre`, pose par le code a cote du libelle : l'assertion ne
+    // depend d'aucune traduction.
+    if (CIBLE === 'laravel') {
+        const nombreDe = () => page.evaluate(() =>
+            document.querySelector('[data-rw="compteur-selection"]')?.getAttribute('data-nombre'));
+
+        await page.evaluate(() => {
+            const c = document.querySelector('input[name="selected_machines[]"]');
+            if (!c) return;
+            c.checked = true;
+            c.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        const avantEchec = await nombreDe();
+        verifie('precondition : une machine est retenue', avantEchec === '1',
+            `compteur : ${avantEchec}`);
+
+        // Faire echouer la relecture, plutot que d'attendre qu'elle echoue seule.
+        await page.setRequestInterception(true);
+        const coupe = (req) => {
+            if (/filter_servers/.test(req.url())) req.abort('failed').catch(() => {});
+            else req.continue().catch(() => {});
+        };
+        page.on('request', coupe);
+
+        await page.evaluate(() => document.getElementById('refresh-list-btn')?.click()
+            ?? [...document.querySelectorAll('button')]
+                .find(x => /rafra|refresh|actualis/i.test(x.textContent))?.click());
+
+        // Viser LE CONTENU : le message d'echec dans le tableau. Attendre la
+        // stabilite s'arreterait avant, le tableau ne bougeant pas entre-temps.
+        const limite = Date.now() + 20000;
+        let texte = '';
+        while (Date.now() < limite) {
+            texte = await page.evaluate(() =>
+                document.querySelector('tbody')?.textContent.trim() || '');
+            if (/Impossible de relire|could not be re-read|unable/i.test(texte)) break;
+            await dors(300);
+        }
+        page.off('request', coupe);
+        await page.setRequestInterception(false);
+
+        verifie("l'echec de relecture vide le tableau et le DIT",
+            /Impossible de relire|could not be re-read|unable/i.test(texte),
+            `tableau : « ${texte.slice(0, 60)} »`);
+
+        const apresEchec = await nombreDe();
+        verifie('le compteur ne survit pas au tableau qu\'il decrivait',
+            apresEchec === '0', `compteur : ${apresEchec} apres un tableau vide`);
     }
 
     await ctx.close();
