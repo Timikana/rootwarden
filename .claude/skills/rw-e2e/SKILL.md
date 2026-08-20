@@ -43,6 +43,24 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
   direct (pas de restart necessaire).
 
 ## Lancement
+
+**Passer par le lanceur, jamais par `node go-*.mjs` a la main** :
+
+```bash
+./scripts/rejouer-lot.sh --laravel go-<sujet>
+./scripts/rejouer-lot.sh                     # tout le LOT, les deux versants
+```
+
+Il porte les six prealables sans lesquels rien ne marche et compare a la
+reference. **Voir le skill `rw-lot`** : les prealables, les chiffres de reference
+et les trois signatures d'echec qui ont deja trompe y vivent, et nulle part
+ailleurs.
+
+Pour se connecter A LA MAIN a un portail : `node tests/e2e/code-totp.mjs <compte>`
+imprime le code a six chiffres.
+
+### L'ancienne invocation, pour memoire
+
 ```bash
 cd tests/e2e
 E2E_TOTP_SECRET='<secret>' node go-<sujet>.mjs
