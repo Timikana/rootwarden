@@ -1497,6 +1497,38 @@ du backend avant tout clic, le harnais Puppeteer, les regles d'attente, la mesur
 captures qu'il faut REGARDER. Les ecarts restent dans `PARITE.md`, la recette d'archivage dans
 `DEPRECIATION.md` : le document dit dans quel ORDRE travailler, il ne les repete pas.
 
+### Rejeu du LOT sur la VM Debian : un controle qui ne controlait plus rien
+
+Le LOT entier a ete rejoue sur la VM. Deux suites sont tombees, aucune pour une raison de code.
+
+`go-socle-i18n` rendait 0 PASS / 1 FAIL. Elle fait lire les catalogues de langue par PHP *dans le
+conteneur*, et lui passait le script ainsi :
+
+```js
+execSync(`docker exec rootwarden_laravel php -r ${JSON.stringify(script)}`)
+```
+
+`JSON.stringify` entoure le script de guillemets DOUBLES, et `execSync` remet le tout a `/bin/sh`.
+Un shell POSIX developpe `$variable` entre guillemets doubles : `$ecarts`, `$total`, `$f`, `$m`,
+`$fr`, `$en`, `$k` sont tous arrives VIDES cote conteneur. Le PHP n'etait plus du PHP. Sur le poste
+Windows la commande ne passait pas par le meme shell, et le defaut ne se voyait pas — d'ou le
+`MSYS_NO_PATHCONV` que le code portait encore.
+
+Le script part desormais par un TABLEAU d'arguments, via `execFileSync`, sans shell intermediaire
+donc sans developpement — sur toute plateforme. La suite rend 23 PASS, et le controle qu'elle porte
+existe a nouveau : 490 cles francaises comparees, jeux de cles fr/en identiques, `maj` a 170 = 170.
+
+**Ce que le defaut coutait** : une suite qui echoue bruyamment se remarque. Celle-ci echouait a
+l'appel, avant la moindre assertion — la parite FR/EN n'etait plus verifiee par personne, et rien
+ne le disait.
+
+`go-page-update-u4` rendait 11 PASS / 3 FAIL, puis 14 PASS aux deux passages suivants, sans
+qu'une ligne change. Le banc d'essai venait d'etre cree : sa premiere session SSH a ete acceptee,
+authentifiee, puis fermee par le serveur (`EOF in transport thread` juste apres `userauth is OK`).
+La sequence exacte de la route, jouee dix fois en isolation, passe dix fois. **Un `sshd` frais
+authentifie avant d'etre pret a servir** — le meme piege que `mysqladmin ping`, et une session
+reussie ne suffit pas a le prouver : celle du controle d'attente avait rendu `uid 0`.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
