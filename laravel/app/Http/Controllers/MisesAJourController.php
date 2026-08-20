@@ -7,13 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Mises a jour Linux — sous-lot U1 : le parc et ses filtres, LECTURE SEULE.
+ * Mises a jour Linux — le module `update/` PORTE EN ENTIER.
  *
- * Le module `update/` du legacy pese 2 094 lignes ; son decoupage en six
- * sous-lots est dans `docs/migration/MODULE-UPDATE.md`. U1 porte le tableau,
- * les filtres, le rafraichissement et les trois relevés par machine. Les mises
- * a jour, la planification et le redemarrage restent servis par l'ancien
- * portail jusqu'a U6 — la page le DIT plutot que de les faire disparaitre.
+ * Le module `update/` du legacy pesait 2 094 lignes ; son decoupage en sept
+ * sous-lots (U1 a U6b) est dans `docs/migration/MODULE-UPDATE.md`. Tout est
+ * porte, et `legacy/update/` est archive dans `legacy/_deprecated/` depuis le
+ * 2026-08-20 : plus rien ici ne renvoie a l'ancien portail.
  *
  * Le parc est lu EN BASE, comme le fait le legacy : les treize colonnes
  * affichees ne sont pas toutes servies par la passerelle. Le cloisonnement du

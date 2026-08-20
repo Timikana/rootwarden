@@ -1590,6 +1590,66 @@ vaut autant que pas de preuve.
 
 Aucune ligne de code n'a ete portee : ce document precede le premier sous-lot.
 
+### v1.37.19 — les quatre defauts sortis par la relecture integrale de `mises-a-jour.js`
+
+`laravel/public/js/mises-a-jour.js` a pris sept sous-lots dans une seule fermeture. Une relecture
+entiere du fichier — pas des tests verts — y a trouve quatre defauts, tous les quatre reproduits
+par une assertion AVANT d'etre corriges, et deux d'entre eux exercent des actions destructrices sur
+des machines reelles.
+
+**Le delai de redemarrage ne repartait pas d'un etat connu.** `ouvreRedemarrage()` remettait le
+nombre a recopier a vide et redesactivait son bouton, mais **jamais le champ de delai** — le seul
+des quatre panneaux dans ce cas, alors que la note de la vague precedente affirmait deja que « les
+quatre panneaux vident desormais leurs champs ». Consequence : un delai choisi pour une machine
+survivait a la fermeture du panneau et repartait avec la suivante. Le geste delibere porte sur le
+NOMBRE, donc personne ne relit un delai qu'il n'a pas touche : `shutdown -r +60` partait a la place
+du redemarrage immediat attendu. L'assertion, avant correctif : « delai relu : « 60 » minute(s) ».
+
+**Le compteur de selection survivait au tableau qu'il decrivait.** La branche d'erreur de la
+relecture du parc vide le tableau puis `return` — avant l'appel a `compteSelection()`, qui ne vit
+que dans la branche de succes. A l'ecran, deux affirmations contradictoires en meme temps : le
+tableau dit « Impossible de relire le parc. » et le compteur dit « 1 machine retenue » ; l'action
+suivante repond alors « aucune machine retenue », ce que l'ecran dementait. Mesure sur
+`data-nombre`, pose par le code a cote du libelle : l'assertion ne depend d'aucune traduction.
+
+**Une machine ARCHIVEE etait affichee, cochable, et pouvait recevoir un `apt full-upgrade` ou un
+redemarrage** — puis disparaissait sans un mot au premier « Rafraichir », le nombre de lignes
+changeant tout seul. `Machines::pourMisesAJour()` n'avait aucun filtre sur `lifecycle_status` la ou
+`/filter_servers`, qui sert les relectures de la MEME page, exclut les archivees. Le commentaire de
+la vue affirmait pourtant que « le MEME code sert le premier rendu et les suivants, il ne peut donc
+pas exister deux versions du tableau qui divergent » : c'etait vrai du RENDU, faux des DONNEES.
+Mesure : la machine 3 archivee le temps du controle, les deux sources interrogees, la valeur
+d'origine (`active`, et non `NULL`) remise ensuite.
+
+**Quatre colonnes de dates changeaient de forme au rafraichissement.** Le premier rendu les tient
+du controleur, au format MySQL (`2026-07-25 14:29:14`) ; les relectures les tiennent de
+`/filter_servers`, qui applique `isoformat()` cote Python (`2026-07-25T14:29:14`). Le rendu etant
+commun aux deux sources, la normalisation l'est aussi : un helper `horodatage()`, applique aux six
+points de rendu, plutot que six correctifs. L'assertion a ete verifiee AVEC DENTS — le helper
+neutralise le temps d'une mesure, elle echoue en citant la forme ISO.
+
+**Trois commentaires qui mentaient** ont ete corriges avec eux, la regle du projet etant qu'un
+commentaire faux est pire que pas de commentaire : l'en-tete du JS annoncait « sous-lot U1 : parc et
+filtres » pour un fichier qui porte U1 a U6b ; le commentaire du groupe d'actions annoncait « une
+seule pour l'instant » et « la simulation n'est PAS portee » devant six boutons dont la simulation ;
+et l'en-tete du controleur affirmait que les mises a jour, la planification et le redemarrage
+« restent servis par l'ancien portail jusqu'a U6 », faux depuis l'archivage.
+
+Enfin, `pourMisesAJour()` journalise desormais son echec. Son commentaire pretendait que
+« l'indisponibilite du parc se voit » : une base injoignable rendait exactement le meme ecran qu'un
+parc vide, texte d'aide compris, et rien n'en gardait trace.
+
+**Ce que la relecture n'a PAS trouve**, et qui est dit ici pour que la prochaine ne le recherche
+pas : aucune declaration en double ni masquage de portee sur 87 declarations, aucun ecouteur pose
+deux fois sur 22, aucune fonction sans appelant sur 41, aucun `getElementById` visant un
+identifiant absent sur 49 compares, et la liste des panneaux freres de `fermeLesAutresPanneaux`
+enumere bien les quatre — la regression du sous-lot precedent est reparee. Parite i18n inchangee a
+170 = 170 : les quatre correctifs n'ont demande aucune cle nouvelle.
+
+**Reference du LOT mise a jour** : `go-page-update-u1` passe de 14 a **18** (precondition de
+selection, message d'echec, compteur, forme des dates) et `go-page-update-u5` de 17 a **18** (delai
+remis a son defaut). Tout le reste du LOT est inchange et rejoue vert, backend compris (296 pytest).
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

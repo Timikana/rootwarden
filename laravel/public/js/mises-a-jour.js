@@ -1,5 +1,11 @@
 /**
- * mises-a-jour.js - Module `update/`, sous-lot U1 : parc et filtres.
+ * mises-a-jour.js - Module `update/`, PORTE EN ENTIER (sous-lots U1 a U6b).
+ *
+ * Parc et filtres, constats, planification, redemarrage, mises a jour de
+ * securite, mise a jour complete et reparation dpkg. Le legacy est archive.
+ * Un fichier qui a grossi par accumulation : le relire EN ENTIER avant d'y
+ * ajouter quoi que ce soit — une relecture integrale y a trouve quatre defauts
+ * qu'aucun test ne montrait.
  *
  * Rendu par `textContent` et `createElement`, jamais par interpolation.
  *
@@ -80,6 +86,21 @@
     }
 
     function heure() { return new Date().toLocaleTimeString(); }
+
+    /**
+     * Normalise un horodatage, d'ou qu'il vienne.
+     *
+     * Les quatre colonnes de dates arrivent sous DEUX formes : le premier rendu
+     * les tient du controleur, qui rend le format MySQL (`2026-08-19 14:03:00`),
+     * et les relectures les tiennent de `/filter_servers`, qui applique
+     * `isoformat()` cote Python (`2026-08-19T14:03:00`). Quatre colonnes
+     * changeaient donc de forme au premier « Rafraichir ». Le rendu etant
+     * commun, la normalisation l'est aussi : un seul endroit, pas six.
+     */
+    function horodatage(valeur) {
+        if (!valeur) return valeur;
+        return String(valeur).replace('T', ' ').slice(0, 19);
+    }
 
     function cellule(texte, classes) {
         const td = document.createElement('td');
@@ -165,13 +186,13 @@
             tr.appendChild(tdActions);
 
             tr.appendChild(cellule(m.linux_version || libelles.non_verifie, 'linux-version'));
-            tr.appendChild(cellule(m.last_checked || libelles.non_verifie, 'last-checked rw-tableau__discret'));
+            tr.appendChild(cellule(horodatage(m.last_checked) || libelles.non_verifie, 'last-checked rw-tableau__discret'));
             tr.appendChild(cellule(`${m.ip ?? ''}:${m.port ?? ''}`, 'rw-tableau__discret'));
             tr.appendChild(cellule(m.online_status || libelles.inconnu, 'online-status'));
-            tr.appendChild(cellule(m.maj_secu_date || libelles.aucune, 'maj-secu-date rw-tableau__discret'));
-            tr.appendChild(cellule(m.maj_secu_last_exec_date || libelles.aucune, 'maj-secu-lastexec-date rw-tableau__discret'));
+            tr.appendChild(cellule(horodatage(m.maj_secu_date) || libelles.aucune, 'maj-secu-date rw-tableau__discret'));
+            tr.appendChild(cellule(horodatage(m.maj_secu_last_exec_date) || libelles.aucune, 'maj-secu-lastexec-date rw-tableau__discret'));
 
-            const tdRedemarrage = cellule(m.last_reboot || libelles.aucune, 'last-reboot rw-tableau__discret');
+            const tdRedemarrage = cellule(horodatage(m.last_reboot) || libelles.aucune, 'last-reboot rw-tableau__discret');
             tdRedemarrage.id = 'last-reboot-' + id;
             tr.appendChild(tdRedemarrage);
 
@@ -206,6 +227,11 @@
             // L'erreur ne s'avale pas : garder les lignes precedentes les ferait
             // passer pour le resultat de la demande.
             message(libelles.err_load);
+            // Recompter APRES avoir vide le tableau : sans cela le compteur
+            // continuait d'annoncer les machines d'un tableau qui n'existe plus.
+            // Deux affirmations contradictoires a l'ecran, et l'action suivante
+            // repondait « aucune machine retenue » — ce que l'ecran dementait.
+            compteSelection();
             dit(libelles.err_load, 'echec');
             return;
         }
@@ -258,7 +284,7 @@
             () => appelle('/linux_version', { method: 'POST', body: JSON.stringify({ machine_id: id }) }),
             (c) => {
                 if (c.linux_version) ecrit(tr, 'linux-version', c.linux_version);
-                if (c.last_checked) ecrit(tr, 'last-checked', c.last_checked);
+                if (c.last_checked) ecrit(tr, 'last-checked', horodatage(c.last_checked));
             });
     }
 
@@ -271,7 +297,7 @@
     function releveRedemarrage(id, tr, bouton) {
         return releve(bouton,
             () => appelle('/last_reboot', { method: 'POST', body: JSON.stringify({ machine_id: id }) }),
-            (c) => { if (c.last_reboot) ecrit(tr, 'last-reboot', c.last_reboot); });
+            (c) => { if (c.last_reboot) ecrit(tr, 'last-reboot', horodatage(c.last_reboot)); });
     }
 
     /* ═════════════════════════════════════════════════════════════════════
@@ -652,6 +678,12 @@
         consigneNombre.textContent = libelles.reboot_consigne.replace(':nombre', choix.length);
 
         champNombre.value = '';
+        // Le delai aussi : c'est le seul champ des quatre panneaux qui restait
+        // en place. Le geste delibere porte sur le NOMBRE, donc personne ne
+        // relit un delai qu'il n'a pas touche — celui choisi pour une machine
+        // repartait avec la suivante, et `shutdown -r +60` prenait la place du
+        // redemarrage immediat attendu.
+        champDelai.selectedIndex = 0;
         boutonConfirmer.disabled = true;
         fermeLesAutresPanneaux('reboot-panneau');
         panneauRedemarrage.hidden = false;
