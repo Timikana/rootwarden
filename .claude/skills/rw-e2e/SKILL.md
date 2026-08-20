@@ -42,6 +42,28 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
   `docker restart rootwarden_python` avant de lancer l'E2E. Le PHP/JS est servi
   direct (pas de restart necessaire).
 
+## Apres avoir edite une suite : `node --check`
+
+Une seconde, et cela attrape ce qu'aucune relecture ne voit. En S2b, une
+fonction ajoutee a declare un `const COMPTES` alors que le fichier portait deja
+une carte des comptes de test du meme nom : `SyntaxError: Identifier 'COMPTES'
+has already been declared`. Sans le controle, la suite mourait au chargement et
+le rejeu du LOT l'aurait rapportee « 0 PASS » — le symptome qui a deja fait
+diagnostiquer trois fois de la flakiness a tort.
+
+Verifier aussi les **imports devenus morts** apres une extraction : ils ne
+cassent rien, mais ils mentent sur ce dont le fichier depend.
+`grep -c "execFileSync(" <suite>` a 0 alors que l'import est la = import mort.
+
+## Lire la base depuis une suite : `lib-base.mjs`, jamais a la main
+
+    import { litEnBase, compteEnBase } from './lib-base.mjs';
+
+Il lit le mot de passe dans `srv-docker.env` (jamais en dur : gitleaks est
+bloquant en CI) et **expurge l'erreur** en cas d'echec — `mysql` prend son mot de
+passe en argument, et Node recopie l'argv complet dans le message. Voir
+`rw-pieges`.
+
 ## Lancement
 
 **Passer par le lanceur, jamais par `node go-*.mjs` a la main** :

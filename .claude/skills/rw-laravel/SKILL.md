@@ -1342,6 +1342,52 @@ Piege dans le piege : la cellule hote porte `.rw-tableau__fort`, donc
 Un `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir a la
 ligne : poser `white-space: normal` explicitement.
 
+### Un livrable BINAIRE se regarde en IMAGES, pas en texte extrait
+
+Pour un PDF, `pdftotext` prouve le contenu mais **ne voit rien de la mise en page**.
+Le defaut trouve en S2b — un tableau qui change de page et perd son en-tete —
+est INVISIBLE au texte extrait : l'en-tete y figure, une fois. Il a fallu :
+
+    pdftoppm -png -r 110 -f 1 -l 2 rapport.pdf ./screenshots/xxx/page
+
+puis OUVRIR les images. Quatrieme defaut d'affichage que seule l'image revele.
+
+Et pour l'ancrer en test, la mesure doit devenir **page par page** : `pdfinfo`
+donne le nombre de pages, `pdftotext -layout -f N -l N` le texte de chacune.
+Une propriete de MISE EN PAGE ne se mesure pas sur un document aplati.
+
+### dompdf : sans `<thead>`, un tableau perd ses colonnes en changeant de page
+
+dompdf ne repete un en-tete que s'il est dans un `<thead>`. Le legacy monte tous
+les tableaux de son PDF en `<table><tr><th>` — les dix lignes de comptes arrivent
+page 2 et leur en-tete reste page 1 : dix lignes de « Oui / Non / — » sans rien
+qui nomme les colonnes. Envelopper les en-tetes, et ecrire
+`thead { display: table-header-group; }` pour que l'intention ne dependant pas
+d'un defaut de feuille de style soit lisible.
+
+Autres points dompdf, mesures en S2b :
+- **vue DEDIEE**, pas un `@media print` de la page du portail : le gabarit porte
+  une barre laterale, un en-tete collant et des jetons de theme dont dompdf ne
+  sait rien. CSS EN LIGNE, couleurs en dur — un PDF n'a pas de theme sombre.
+- `isRemoteEnabled` a **false**, police `DejaVu Sans` (elle porte les accents).
+- la dependance n'exige que `ext-dom` et `ext-mbstring` ; `gd` n'est que
+  *suggere*, « needed to process images ».
+- **aucun tampon a ouvrir.** Le legacy purge avec `while (ob_get_level() > 0)`
+  parce qu'il a un `ob_start()` vestigial ; assembler puis rendre d'un bloc rend
+  la purge sans objet. Ne pas reproduire le remede d'une maladie qu'on n'a pas :
+  un lecteur croirait le portage expose.
+
+### Un ecart VOULU se rend en CONSTAT sur la cible qui ne le tient pas
+
+Le rejeu du LOT compte **tout `FAIL` comme une regression**. Une assertion qui
+mesure une amelioration du portage echouerait donc sur le legacy et ferait passer
+un ecart assume pour une regression. C'est `verifiePortage` qui sert la : cote
+legacy la propriete est **mesuree** et rendue en `INFO`, avec sa valeur reelle
+dans le detail — on garde la mesure, on perd le faux rouge.
+
+Ne pas confondre avec ne pas mesurer : le journal du legacy doit dire
+« en-tete absent page(s) 2 », pas « non applicable ».
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
