@@ -290,6 +290,144 @@ depuis ce rapport.
 
 **Le module `security/` n'est donc PAS archivable** : S3 à S7 vivent encore dans `cve_scan.php`.
 
+### Inventaire de S3 — mesuré le 2026-08-20 (METHODE-SOUS-LOT §1)
+
+Trois inventaires menés en parallèle sur des fichiers **disjoints** : le PHP de la page, son JS, et le
+versant backend + passerelle. **Tout ce qui suit a été re-vérifié à la main** — un rapport d'agent
+n'est pas une mesure. Les rares points non revérifiés sont marqués comme tels.
+
+#### La garde, aux trois endroits — sixième occurrence du défaut
+
+| Endroit | Ce qui est appliqué |
+|---|---|
+| la **page** `legacy/security/index.php:37-38` | `checkAuth([USER,ADMIN,SUPERADMIN])` + `checkPermission('can_scan_cve')` → rôle ≥ 1 **avec** la permission |
+| le **proxy** `legacy/api_proxy.php` | `checkAuth` rôle ≥ 1, `/cve_` en liste blanche (`:119`), **absent de `$ADMIN_ONLY_PREFIXES`**, et `checkPermission` n'y apparaît pas une seule fois |
+| la **passerelle** `laravel/app/Support/RoutesBackend.php:35` | `/cve_` en liste blanche, **absent** de `ADMIN_SEULEMENT` et de `MOTIFS_STEP_UP` — relevé fidèle du legacy, défaut inclus |
+| le **backend** `backend/routes/cve.py` | `cve_results` (`:207-210`) et `cve_compare` (`:311-314`) portent `require_api_key` + `require_machine_access` + `threaded_route`. **Ni rôle, ni permission.** |
+
+**`grep -c require_permission backend/routes/cve.py` rend 0**, et `can_scan_cve` n'existe dans tout le
+backend **que dans une fixture de test** (`backend/tests/conftest.py:152`). La permission ne coupe donc
+**rien** sur le chemin de la requête : elle ne garde que des pages. C'est la sixième fois que ce défaut
+est mesuré dans ce projet.
+
+Conséquence pour le portage : la route de S3 portera `role:1` + `perm:can_scan_cve`, comme celle de S1
+(`laravel/routes/web.php:156`) — **le portage sera donc plus strict que le legacy sur ce chemin**, et
+il faut le déclarer.
+
+#### Le décorateur d'accès et la route ne lisent pas le même paramètre
+
+`require_machine_access` (`backend/routes/helpers.py:331-332`) résout l'identifiant ainsi :
+
+```python
+single = (data.get('machine_id') or request.args.get('machine_id')
+          or data.get('server_id') or request.args.get('server_id'))
+```
+
+**le corps JSON d'abord, la query ensuite.** Or `cve_results` (`cve.py:217`), `cve_compare`
+(`cve.py:322`) et `cve_history` (`cve.py:302`) lisent **exclusivement** `request.args`. Un GET portant
+un corps JSON avec une machine autorisée et une query avec la machine d'autrui ferait donc autoriser
+l'une et servir l'autre.
+
+**Précondition mesurée : aucune des deux passerelles ne relaie le corps d'un GET.** Le portage
+l'exclut explicitement (`AVEC_CORPS = ['POST','PUT','PATCH']`,
+`PasserelleController.php:35`) ; le legacy ne lit `php://input` qu'à `api_proxy.php:260`, hors de sa
+branche GET. Le trou est **réel dans le backend et fermé aujourd'hui par accident** — pas par
+décision. À dire des deux façons : ce n'est pas exploitable, et ce n'est pas protégé.
+
+Et le décorateur **ne refuse pas quand aucun identifiant n'est trouvé** : `ids` reste vide, `denied`
+aussi, la route est appelée. Son propre docstring nomme pourtant ce défaut — « le décorateur était un
+no-op et n'imposait aucun contrôle » — pour la variante au pluriel qu'un correctif antérieur a
+traitée. **La moitié corrigée est celle du nom de clé, pas celle de l'absence.** Le motif « à moitié
+corrigé », cette fois dans le commentaire qui décrit le défaut.
+
+#### Le module CVE ignore entièrement le cycle de vie des machines
+
+`grep -c lifecycle_status` rend **0** sur `backend/routes/cve.py` **et** sur `backend/cve_scanner.py`,
+alors que **dix autres fichiers** du backend l'appliquent. Côté page, même motif à l'intérieur du même
+fichier :
+
+| Requête | Filtre `archived` |
+|---|---|
+| `index.php:42-45`, branche **rôle ≥ 2** | **présent** |
+| `index.php:47-54`, branche **rôle 1** | **ABSENT** |
+| `index.php:292-296` (S4) | présent |
+
+L'oubli tombe sur la branche de l'utilisateur le moins privilégié : un rôle 1 voit et peut scanner une
+machine qu'un admin ne voit plus. Et `cve_scan_all` (`cve.py:42-44`) fait
+`SELECT ... FROM machines` **sans aucune clause `WHERE`** alors que le chemin planifié équivalent
+(`backend/scheduler.py:299`) filtre bien les archivées — le scan-all manuel se connecte donc en SSH à
+des machines retirées du parc. *(le point sur `scheduler.py` vient d'un inventaire d'agent, non
+revérifié ; le `SELECT` sans `WHERE`, lui, est vérifié.)*
+
+#### Le résumé de parc fuit ce que la liste filtre
+
+`index.php:196-207` n'est joint **ni à `machines` ni à `user_machine_access`** : il agrège le dernier
+scan complet de **toutes** les machines de la base, archivées comprises, et s'affiche dès que le compte
+en a deux. Un rôle 1 lit donc les compteurs CVE de la flotte entière ; un admin y voit des machines
+absentes du tableau juste en dessous. **Le portage le bornera aux machines réellement affichées** —
+précédent accepté : `Conformite::serveurs()` en S2a a ajouté le filtre de cycle de vie qui manquait.
+
+#### Le tableau des vulnérabilités se désaligne dès qu'on l'utilise
+
+L'en-tête (`js/main.js:542-547`) a **six** colonnes — CVE, Package, Version, Severite, Resume,
+Suivi — et `buildRows` en produit six. Mais **les trois autres générateurs n'en produisent que cinq**
+(comptage refait à la main) :
+
+| Générateur | `<td>` |
+|---|---|
+| `buildRows` (`:467-498`) | 6 |
+| `loadMoreFindings` (`:589-599`) | **5** |
+| `searchFindings` (`:624-634`) | **5** |
+| `filterFindings` (`:660-671`) | **5** |
+
+Pire : « Voir plus » **ajoute** ses lignes à cinq colonnes derrière les lignes à six — le même tableau
+mélange les deux formes. Et le commentaire de `sevCell` (`:45-48`) revendique précisément d'avoir
+« centralisé pour rester cohérent entre `buildRows` et la pagination » : il a centralisé **une colonne
+sur six**, et la jumelle non protégée est justement celle qui manque.
+
+#### Le reste, mesuré et à traiter dans ce lot
+
+- **`loadLastResults` (`:121-134`), seul chargeur de S3, est muet en panne** : ses trois chemins
+  d'échec n'écrivent que dans la console. Proxy tombé = carte serveur vide, sans un mot.
+- **Le compteur « n / m CVE » ne s'affiche jamais en dessous de 50 CVE** : `#findings-count-{id}` et
+  `#load-more-{id}` ne sont créés que s'il y a une page suivante, alors que la recherche et les
+  filtres s'en servent toujours. Gardés par un `if`, donc silencieux.
+- **Aucune donnée CVE n'est insérée par `textContent`** : tout passe par `innerHTML`. Le portage rendra
+  par `textContent`, comme les sept pages déjà portées.
+- **`esc()` (`:739`) n'échappe pas l'apostrophe** alors que son docblock affirme empêcher l'XSS. Sur 32
+  appels, **deux** sont dans une chaîne JS délimitée par apostrophes à l'intérieur d'un attribut
+  (`:485`, `:492`) et tous deux ne reçoivent que `f.cve_id`. Un identifiant CVE n'en porte pas :
+  **latent, pas armé** — et ces deux sites sont dans la colonne « Suivi », donc **S5**.
+- **`#conn-status` (`index.php:106`) est un bandeau figé au rendu serveur**, jamais touché par le JS
+  (zéro occurrence) : si le backend tombe ou revient, l'écran ne bouge pas avant rechargement.
+  `#servers-container` et `$api_url` sont morts aussi.
+- **24 chaînes d'interface en dur** côté PHP, et beaucoup plus côté JS ; les dates sont figées en
+  `'fr-FR'` (`:392`, `:925-926`) alors que le socle expose la langue. `<html lang="fr">` est codé en
+  dur (`index.php:85`).
+- **Le test de connexion OpenCVE est fait en PHP** par cURL direct sur `https://python:5000`
+  (`index.php:68`), hors proxy, **vérification TLS désactivée** (`:72-73`), `API_KEY` en clair (`:63`).
+  L'en-tête du fichier (`:23-26`) l'annonce pourtant « côté client (JavaScript) » : **cinquième
+  en-tête du projet qui ne dit pas le code**.
+
+#### La contrainte qui commande l'ordre des lots
+
+`renderResults` est appelé depuis **deux** endroits : `loadLastResults` (S3) et `runScan` (S7). S3 ne
+peut donc pas être porté sans **figer dès maintenant un contrat de rendu** que S7 réutilisera — sinon
+le portage de S7 dupliquera le générateur, exactement ce que le legacy a fait quatre fois.
+
+Second point d'architecture : **le portage lira la base directement**, comme S1 l'a fait avec
+`ScansCve`, plutôt que de passer par la passerelle. Cela ferme d'un coup, pour le portage, l'absence de
+permission sur la requête et l'écart corps/query du décorateur — sans toucher au backend Python. En
+contrepartie, la comparaison de deux scans (dont le diff est fait en Python, `cve.py:368-370`) devra
+être réimplémentée dans le service. C'est la ligne déjà suivie par S1.
+
+#### Ce que S3 ne pourra pas prouver
+
+Sans compte de fixture de rôle 1 portant `can_scan_cve` **et** une ligne `user_machine_access`
+(**D-5**), la branche rôle 1 de cette page — donc son filtre `archived` manquant et son résumé de parc
+qui fuit — **n'est pas mesurable par un test**. À dire dans `PARITE.md` plutôt qu'à contourner en
+déplaçant des droits : un test qui déplace les droits ne mesure plus l'application réelle.
+
 **S3 en troisième** : deux routes sans écriture ni SSH, mais c'est là que vit tout le rendu du
 module. Le gros du travail de vues et des ~35 clés i18n se paie ici, une fois ; les lots suivants
 s'y branchent. E-24 et le point mort `#conn-status` se corrigent dans ce lot.
