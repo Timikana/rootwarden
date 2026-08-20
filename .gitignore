@@ -82,6 +82,8 @@ Thumbs.db
 
 # Screenshots E2E (generes par Puppeteer)
 tests/e2e/screenshots/
+# Captures prises a la racine (rendus PDF, planches d'ecrans) : artefacts, jamais suivis.
+screenshots/
 
 # Artefacts temporaires
 legacy/_ul
