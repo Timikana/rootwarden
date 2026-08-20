@@ -1342,6 +1342,55 @@ Piege dans le piege : la cellule hote porte `.rw-tableau__fort`, donc
 Un `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir a la
 ligne : poser `white-space: normal` explicitement.
 
+### Le gabarit n'a AUCUNE pile de scripts — `@push` ne rend RIEN
+
+`layouts/portail.blade.php` n'expose qu'un `@yield('corps')` : aucun `@stack`.
+Un `@push('scripts')` est donc silencieusement perdu, et le fichier JS n'est
+jamais charge — sans erreur, sans page blanche, juste une page inerte. Les
+balises `<script>` vont DANS la section `corps`, comme le font les pages deja
+portees.
+
+Et `@json` MULTILIGNE casse le PHP compile : assembler le tableau dans le
+CONTROLEUR et n'ecrire qu'un `@json($libelles)` sur une ligne.
+
+### Une classe CSS peut EXISTER et vouloir dire autre chose
+
+Verifier qu'une classe existe ne suffit pas — il faut lire ce qu'elle fait.
+Deux pieges payes en S3 :
+
+- `.rw-etiquette` existe, mais c'est un **label de formulaire**
+  (`display: block; margin-bottom: 6px`), pas une pastille ;
+- `.rw-carte` est bornee a **420 px** — c'est la carte de connexion. Pour un
+  panneau pleine largeur, `.rw-carte--pleine`.
+
+Le vocabulaire est deja riche : `.rw-badge` + `--ok/--attention/--alerte`,
+`.rw-pastille` + variantes, `.rw-barre-filtres`, `.rw-filtre__etiquette`,
+`.rw-onglet` / `--actif`, `.rw-recherche`, `.rw-panneau-decision`,
+`.rw-tableau-cadre`, `.rw-colonne-secondaire` / `.rw-etroit-seul`. Lister d'abord
+(`grep -oE "^\.rw-[a-z0-9_-]+" rw.css | sort -u`), inventer ensuite — et sans
+etape de construction, une classe absente ne style rien du tout.
+
+### Reparer une colonne manquante puis la chasser de l'ecran ne regle rien
+
+En S3 le test etait vert a 16/16 et le rendu fautif. L'identifiant CVE se coupait
+sur TROIS lignes, et le resume — une colonne d'appoint — s'etalait au point de
+porter le tableau a 1789 px dans un cadre de 1048, chassant hors du champ la
+colonne « Suivi », celle dont l'absence etait justement le defaut qu'on venait de
+corriger.
+
+L'ordre des remedes, chacun re-mesure :
+
+1. la CLE ne se coupe jamais : `white-space: nowrap` sur sa cellule ;
+2. l'APPOINT se tronque (`max-width` en `ch` + `text-overflow: ellipsis`) et
+   garde son texte entier en infobulle ;
+3. quand il ne reste que des colonnes essentielles, gagner la place PERDUE :
+   resserrer les cellules et abreger ce qui se repete a l'identique sur toutes
+   les lignes (le prefixe `CVE-` coutait 35 px par ligne) — 367 px au lieu de 427
+   a 390 px, ce qui ramene la severite dans le champ.
+
+Et pour abreger un texte en ligne, `.rw-etroit-seul` ne convient pas : sa regle
+large passe en `display: block`. Utiliser `.rw-etroit-seul--inline`.
+
 ### Un livrable BINAIRE se regarde en IMAGES, pas en texte extrait
 
 Pour un PDF, `pdftotext` prouve le contenu mais **ne voit rien de la mise en page**.
