@@ -1060,3 +1060,104 @@ personne ne cherche l'entrée manquante dans `App\Support\Navigation`.
 
 Ce n'est pas un oubli : c'est la conséquence du découpage. S3 posera le bouton, et
 `docs/migration/MODULE-SECURITY.md` le porte au tableau de ses sous-lots.
+
+---
+
+## E-36 — Le portage restreint le rapport de conformité à `role >= 2`, et cela ne se mesure pas
+
+**Décision D-1, prise par l'exploitant le 2026-08-20.** `compliance_report.php` annonce dans son
+en-tête « Acces : admin (2) et superadmin (3) » et sa garde réelle est
+`checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`. Aucune de ses sept collectes ne filtre par
+utilisateur. Un rôle 1 porteur de `can_view_compliance` obtenait donc, en HTML comme en CSV et en
+PDF : tout le parc avec IP, port et utilisateur SSH ; tous les comptes avec e-mail, présence de 2FA
+et âge de clé ; **la posture par serveur avec les écarts en clair** — « sshd non audité »,
+« N CVE critique(s) », « fail2ban absent » —, soit une liste de cibles priorisée ; et les dix
+dernières modifications de pare-feu avec leur auteur.
+
+C'est le **commentaire faux** qui a rendu le défaut durable : une relecture de l'en-tête ne pouvait
+pas le voir. La route du portage porte `role:2` + `perm:can_view_compliance`.
+
+**Cette divergence n'est mesurable par aucun compte de test**, et il faut le dire plutôt que de
+laisser croire qu'elle est couverte. Elle exige un rôle 1 **portant** `can_view_compliance` :
+
+| compte | rôle | `can_view_compliance` | legacy | portage |
+|---|---|---|---|---|
+| `rw-test-user` | 1 | **0** | 403 (par la permission) | 403 (par le rôle) |
+| `rw-test-admin` | 2 | 1 | 200 | 200 |
+| `rw-test-super` | 3 | 0 | 200 (superadmin) | 200 (superadmin) |
+
+Le même résultat des deux côtés, pour deux raisons différentes — le test ne peut pas les
+distinguer. Même manque de fixture que **E-34**, et le même arbitrage en attente.
+
+### Ce que S2a mesure en revanche, et que rien ne mesurait encore dans ce module
+
+`rw-test-admin` porte `can_view_compliance` et **pas** `can_admin_portal`. Il entre sur le rapport
+et reste refusé sur `journal-commandes` : c'est cette paire, et elle seule, qui prouve qu'une
+PERMISSION est lue et non un rôle.
+
+**Le premier jet de cette assertion était un faux vert.** Elle visait `/commandlog/` côté legacy —
+une partie **archivée**, qui rend 404 — et se contentait de « pas 200 ». Elle passait donc sans rien
+mesurer. Corrigée : la page témoin doit être **vivante** (`groups/` côté legacy) et l'assertion exige
+**403**, pas « autre chose que 200 ».
+
+---
+
+## E-37 — L'empreinte d'intégrité est reprise telle quelle, et elle est identique à l'octet
+
+Le legacy calcule `hash('sha256', json_encode(compact('servers','users','remStats','date')))`.
+L'antécédent porte les colonnes `totp_secret` et `ssh_key`, **qui ne figurent nulle part dans le
+rapport** — elles n'en sortent qu'en booléen, vérifié aux trois rendus. Le lecteur ne peut donc pas
+recalculer l'empreinte à partir de ce qu'il tient : une preuve d'intégrité invérifiable vaut autant
+que pas de preuve. Le legacy énonce d'ailleurs la règle à l'endroit où il la viole — son commentaire
+dit que les mots de passe chiffrés n'ont rien à faire « ni dans le hash SHA-256 d'integrite ».
+
+**Le portage reproduit le calcul sans le corriger**, parce que le corriger change la valeur de
+l'empreinte : les rapports déjà émis ne se vérifieraient plus. C'est la décision **D-2**, en attente.
+
+**Mesure faite pour que cette décision se prenne sans risque** : à date figée, les deux
+implémentations produisent **4 480 octets d'antécédent** et **le même SHA-256**
+(`fdb844d0f497e8a6…`). Le portage n'introduit donc aucune dérive ; ce qui différait entre deux
+lectures n'était que la date, arrondie à la minute. Mesure ponctuelle, pas propriété couverte par une
+suite : la comparer en continu demanderait de figer la date des deux côtés.
+
+---
+
+## E-38 — Six libellés d'écarts échappaient à la parité FR/EN
+
+Le calcul de posture du legacy construit ses motifs d'écart **en français, en dur**, dans le PHP :
+`'sshd non audite'`, `"$crit CVE critique(s)"`, `"$high CVE haute(s)"`, `'fail2ban absent'`,
+`"$dc derive(s) config"`, `'conforme'`. La colonne « Écarts » du rapport restait donc en français
+quelle que soit la langue choisie — et c'est la colonne qui dit quoi faire.
+
+Le portage en fait six clés, `conformite.ecart_*`, présentes en FR et en EN.
+
+---
+
+## E-39 — Les exports CSV et PDF restent servis par l'ancien portail, et la page le dit
+
+Le rapport porte trois actions : imprimer, exporter en CSV, exporter en PDF. Seule l'impression est
+portée — elle appartient au navigateur. Les deux exports sont les sous-lots **S2c** et **S2b**.
+
+Plutôt que de faire disparaître deux boutons, la page les garde et les **marque** : même flèche que
+le menu, `target="_blank"`, et une infobulle qui dit où ils mènent. Une annonce persistante en tête
+de page le répète. Changer de portail sans le dire trahit la personne qui clique.
+
+---
+
+## Deux constats relevés pendant S2a, qui ne sont pas des divergences de portage
+
+**Cinq comptes de test abandonnés faussent la posture du rapport.**
+`tests/e2e/02-admin-users.test.mjs` crée des comptes `e2e_test_<horodatage>` et n'en supprime pas :
+`e2e_test_1784983218694`, `…768927`, `…865542`, `…179068`, `…939393`, créés entre le 2026-07-25 et le
+2026-08-12, tous actifs, rôle 1, **sans 2FA**. Le rapport annonce donc « 2FA activée : 4 / 10 » là où
+le parc réel compte cinq comptes. Une page dont la raison d'être est de révéler une posture faible
+la mesure faussement, à cause d'une suite qui produit ce qu'elle consomme sans nettoyer ce qu'elle
+pose. Rien n'a été supprimé : ce sont des lignes d'une base partagée.
+
+**Le garde anti-rejeu TOTP traverse les suites.** Il est par compte et en base : deux suites
+consécutives qui ouvrent une session avec le même compte dans la même fenêtre de 30 s rejouent le
+même code, la seconde est refusée, la session reste anonyme, et chaque appel rend **la page de
+connexion en 200** — d'où des assertions « refusée » qui échouent sur un 200 sans qu'aucun compte ne
+soit verrouillé. `go-socle-passerelle` a rougi ainsi une fois sur deux, et `go-page-update-u3`
+mourait sur un `null` faute de trouver un bouton : ce n'était pas de la flakiness, c'était cela. Le
+lanceur du LOT attend désormais le basculement de la fenêtre entre deux suites.
