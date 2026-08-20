@@ -39,7 +39,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
-import { execFileSync } from 'child_process';
+import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
@@ -80,25 +80,8 @@ function verifiePortage(libelle, ok, detail) {
  * base » ne passe que si elle est complete. Et rien n'est ecrit en dur : un
  * nombre fige accuserait la page au premier ajout de machine ou de compte.
  */
-function litEnBase(requete) {
-    const mdp = execFileSync('sh', ['-c',
-        "grep -m1 MYSQL_ROOT_PASSWORD /home/utilisateur/Documents/Gestion_SSH_KEY/srv-docker.env | cut -d= -f2"],
-        { encoding: 'utf-8' }).trim();
-    return execFileSync('docker',
-        ['exec', 'rootwarden_db', 'mysql', '-uroot', `-p${mdp}`, '-N', '-B', '-e', requete],
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] })
-        .trim().split('\n').filter(Boolean);
-}
-
-function compteEnBase(requete) {
-    const mdp = execFileSync('sh', ['-c',
-        "grep -m1 MYSQL_ROOT_PASSWORD /home/utilisateur/Documents/Gestion_SSH_KEY/srv-docker.env | cut -d= -f2"],
-        { encoding: 'utf-8' }).trim();
-    const sortie = execFileSync('docker',
-        ['exec', 'rootwarden_db', 'mysql', '-uroot', `-p${mdp}`, '-N', '-B', '-e', requete],
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return parseInt(sortie.trim(), 10);
-}
+// Les deux lecteurs vivent dans `lib-base.mjs` : voir son en-tete pour la
+// raison — le mot de passe ne doit pas sortir dans un message d'echec.
 
 /**
  * Decoupe un CSV en ENREGISTREMENTS, pas en lignes physiques : un champ entre
