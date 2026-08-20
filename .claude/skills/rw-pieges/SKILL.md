@@ -192,6 +192,23 @@ suites, jamais un delai fixe :
 Le legacy, lui, tolere le rejeu : son garde est inerte (`PARITE.md` E-01). Une
 suite verte sur le legacy ne prouve donc rien du portage.
 
+## Decouper un fichier entre deux ancres capture ce qui s'est insere entre-temps
+
+Pour separer deux blocs d'un meme fichier en deux commits, j'ai extrait « du titre
+du premier bloc jusqu'a l'ancre suivante ». Or un second bloc avait ete insere
+entre les deux : le retrait a emporte LES DEUX, le fichier est redevenu identique
+a `HEAD`, et le commit n'a rien enregistre.
+
+Le symptome etait honnete — git dit « aucune modification n'a ete ajoutee a la
+validation » — mais sans le lire on croit le commit fait. Deux parades :
+
+1. decouper sur la **frontiere reelle** (le titre du bloc suivant), pas sur une
+   ancre lointaine ;
+2. poser des **assertions de garde** sur ce qu'on croit avoir extrait :
+   `assert "<titre de l'autre bloc>" not in extrait` et une borne sur sa taille.
+
+Et verifier apres coup : `git diff --cached --stat` avant de committer.
+
 ## Un secret passe en ARGUMENT ressort dans le message d'echec
 
 `mysql` ne prend son mot de passe que par la ligne de commande, et

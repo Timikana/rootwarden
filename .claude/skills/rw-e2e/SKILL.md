@@ -42,6 +42,25 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
   `docker restart rootwarden_python` avant de lancer l'E2E. Le PHP/JS est servi
   direct (pas de restart necessaire).
 
+## Trois pieges de mesure payes en S3
+
+**UN BLOC REPLIE NE RECOIT PAS LES FRAPPES.** Le champ de recherche existait dans
+le DOM, `page.$()` le trouvait, `type()` ne levait pas — et rien ne se passait,
+parce que le bloc etait masque. Les gestes ne mesuraient rien, et la suite mourait
+vingt lignes plus loin sur « Node is either not clickable ». **Deplier d'abord, et
+l'asserter** : `getBoundingClientRect().height > 0` et `display !== 'none'`.
+
+**UN COMPTEUR SE LIT AVANT LE GESTE QUI LE CHANGE.** Lu apres un filtre, il
+annonce le sous-total du filtre — ce qui est correct. L'asserter la comparait deux
+grandeurs differentes. Mon erreur, pas celle du legacy.
+
+**UN TEST QUI NE PEUT PAS ECHOUER.** `go-cve-schedules.mjs:98-113` : le seul test
+d'interface de la suite est une branche `if (beforeHtml)` dont le resultat du clic
+est simplement `console.log`e. Si le bouton manque, ou si le clic ne change rien,
+la suite passe quand meme — alors que son en-tete annonce verifier exactement ce
+bug. Se defier de toute branche conditionnelle et de tout resultat seulement
+journalise.
+
 ## Apres avoir edite une suite : `node --check`
 
 Une seconde, et cela attrape ce qu'aucune relecture ne voit. En S2b, une
