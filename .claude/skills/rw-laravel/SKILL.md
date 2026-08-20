@@ -1342,6 +1342,30 @@ Piege dans le piege : la cellule hote porte `.rw-tableau__fort`, donc
 Un `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir a la
 ligne : poser `white-space: normal` explicitement.
 
+### Un en-tete de colonne doit nommer ce que la colonne CONTIENT
+
+Reemployer la cle d'un autre sous-lot parce que le mot ressemble suffit a mentir :
+en S4, la colonne des BOUTONS s'intitulait « Suivi » (`cve.col_suivi`, qui designe
+l'etat de remediation de S5). Vu seulement a la capture. C'est le meme defaut que
+la legende de tuile qui ne dit pas ce que le nombre mesure — et le meme reproche
+que ce projet adresse au legacy ailleurs.
+
+### Valider un cron en PHP : `dragonmantank/cron-expression` est deja la
+
+C'est une dependance du framework, donc **aucun ajout a faire**. Elle fournit tout
+ce qu'il faut pour reprendre les gardes du scheduler Python :
+
+    Cron\CronExpression::isValidExpression($expr)          // validite
+    (new Cron\CronExpression($expr))->getNextRunDate()      // prochaine
+    $c->getNextRunDate($premiere)                            // la suivante
+                                                             // -> l'INTERVALLE
+
+Verifie en S4 : elle rend la MEME echeance que `croniter` cote Python
+(`0 3 * * *` -> `2026-08-21 03:00:00` des deux cotes). Et calculer l'echeance en
+`datetime` NAIF, comme le legacy : poser un UTC decalerait le declenchement de
+l'ecart de fuseau — dans le sens qui declenche tout de suite si l'ecart est
+negatif.
+
 ### Le gabarit n'a AUCUNE pile de scripts — `@push` ne rend RIEN
 
 `layouts/portail.blade.php` n'expose qu'un `@yield('corps')` : aucun `@stack`.

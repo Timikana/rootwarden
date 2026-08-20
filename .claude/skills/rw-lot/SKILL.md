@@ -98,3 +98,24 @@ transforme chaque rejeu en enquête.
   **exact**, et vérifier que le témoin est encore servi.
 - **Ne pas se reconnecter avec le même compte** dans la même fenêtre TOTP :
   conserver la session ouverte.
+
+## Lire un journal : prendre le repertoire LE PLUS RECENT
+
+Le lanceur cree un repertoire par rejeu (`/tmp/rw-lot-XXXXXX/`). Un glob
+`cat /tmp/rw-lot-*/laravel-<suite>.log` **concatene tous les rejeux precedents**,
+et `tail` montre alors la fin d'un ANCIEN resultat. Paye en S4 : le lanceur
+annoncait 20 PASS / 0 FAIL et le « detail » 16 / 4, pour cette seule raison.
+
+    DERNIER=$(ls -dt /tmp/rw-lot-*/ | head -1)
+    tail -20 "$DERNIER/laravel-<suite>.log"
+
+C'est un cas particulier de la regle generale : **quand deux mesures se
+contredisent, chercher ce que CHACUNE regarde.**
+
+## Une reference se mesure, elle ne se deduit pas
+
+En S4 j'ai annonce 21 assertions cote portage — 16 plus les cinq proprietes que le
+legacy ne tient pas. La mesure en donne **20** : il n'y a que QUATRE
+`verifiePortage`, la cinquieme propriete tenant des deux cotes. Renseigner
+`REF_LARAVEL` par arithmetique fait donc apparaitre un faux ecart au rejeu
+suivant. Jouer la suite, LIRE le chiffre, puis l'inscrire.
