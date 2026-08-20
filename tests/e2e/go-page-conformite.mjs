@@ -43,7 +43,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
-import { execFileSync } from 'child_process';
+import { compteEnBase } from './lib-base.mjs';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
 /**
@@ -58,14 +58,7 @@ import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
  * shell POSIX viderait les `$` du SQL. Le relais `docker` est celui du lanceur.
  */
 function parcEnBase() {
-    const mdp = execFileSync('sh', ['-c',
-        "grep -m1 MYSQL_ROOT_PASSWORD /home/utilisateur/Documents/Gestion_SSH_KEY/srv-docker.env | cut -d= -f2"],
-        { encoding: 'utf-8' }).trim();
-    const sortie = execFileSync('docker',
-        ['exec', 'rootwarden_db', 'mysql', '-uroot', `-p${mdp}`, '-N', '-B',
-         '-e', 'SELECT COUNT(*) FROM rootwarden.machines'],
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
-    return parseInt(sortie.trim(), 10);
+    return compteEnBase('SELECT COUNT(*) FROM rootwarden.machines');
 }
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
