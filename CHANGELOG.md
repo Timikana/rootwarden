@@ -1787,6 +1787,31 @@ portee), `go-socle-i18n` compare **568 cles** au lieu de 504, et `go-page-confor
 avec **13 PASS sur chaque cible**. Tout le reste est inchange et rejoue vert sur les deux versants,
 296 pytest compris.
 
+### Ouvrir les deux portails depuis un autre poste
+
+Les deux portails se pointaient l'un vers l'autre par des URL en `localhost`, ce qui ne vaut que
+depuis la machine hote : **un lien servi a un navigateur mene au localhost DU VISITEUR.** Depuis un
+poste du reseau, les huit entrees de menu du legacy redirigees vers le portage, la vingtaine
+d'entrees « ancien portail » du portage, et les deux boutons d'export du rapport de conformite
+menaient tous nulle part.
+
+C'est le second piege de cette variable. Le premier etait le SCHEMA — `srv-docker.env.example`
+portait encore `LARAVEL_URL=https://…` alors que le portage ecoute EN CLAIR sur ce port : une
+installation neuve reproduisait le lien mort. Les deux sont corriges dans l'exemple, avec
+`LEGACY_URL`, qui n'y figurait pas du tout, et un avertissement pose la ou `SERVER_NAME=localhost`
+est defini — c'est cette valeur qui alimente les deux.
+
+**Et la suite de navigation ecrivait l'adresse du legacy EN DUR** (`https://localhost:8443`) : trois
+assertions tombaient des que `LEGACY_URL` pointait ailleurs. Elle mesurait une VALEUR DE DEPLOIEMENT
+la ou la propriete a verifier est « l'entree vise le portail legacy, quelle que soit son adresse ».
+Elle lit desormais la meme source que la page (`app.url_legacy`), et ne peut donc plus la
+contredire ; `E2E_LEGACY` reste prioritaire pour forcer la main.
+
+Verification faite par des REQUETES et non par comparaison de chaines, sur l'adresse reseau de la
+VM et non sur localhost : les deux portails repondent, le rapport de conformite et l'export CSV
+renvoient vers la connexion faute de session. La VM ne porte aucun pare-feu, les trois ports
+(8080, 8443, 8444) ecoutent sur toutes les interfaces.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
