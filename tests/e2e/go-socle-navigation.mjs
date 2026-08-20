@@ -21,10 +21,36 @@
  *   node go-socle-navigation.mjs
  */
 import puppeteer from 'puppeteer';
+import { execFileSync } from 'child_process';
 import { createHmac } from 'crypto';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
-const LEGACY = process.env.E2E_LEGACY || 'https://localhost:8443';
+/**
+ * La base du legacy, LUE DANS LA CONFIGURATION DU PORTAGE et non ecrite en dur.
+ *
+ * L'ancienne valeur figee `https://localhost:8443` faisait echouer trois
+ * assertions des que `LEGACY_URL` pointait ailleurs — par exemple sur l'adresse
+ * de la VM, ce qu'il FAUT poser pour ouvrir les deux portails depuis un autre
+ * poste : un lien « ancien portail » en localhost mene au localhost DU VISITEUR.
+ *
+ * Le test mesurait donc une VALEUR de deploiement la ou la propriete a verifier
+ * est « l'entree vise le portail legacy, quelle que soit son adresse ». Il lit
+ * desormais la meme source que la page — il ne peut plus la contredire.
+ * `E2E_LEGACY` reste prioritaire pour forcer la main.
+ */
+function baseLegacyConfiguree() {
+    if (process.env.E2E_LEGACY) return process.env.E2E_LEGACY;
+    try {
+        const sortie = execFileSync('docker',
+            ['exec', 'rootwarden_laravel', 'php', 'artisan', 'config:show', 'app'],
+            { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+        const ligne = sortie.split('\n').find(l => /^\s+url_legacy\s/.test(l));
+        const url = ligne && ligne.match(/(https?:\/\/\S+)/);
+        if (url) return url[1].replace(/\/+$/, '');
+    } catch { /* le relais docker peut manquer : on retombe sur le defaut */ }
+    return 'https://localhost:8443';
+}
+const LEGACY = baseLegacyConfiguree();
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 
 const COMPTES = [
