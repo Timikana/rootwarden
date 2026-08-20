@@ -432,6 +432,134 @@ déplaçant des droits : un test qui déplace les droits ne mesure plus l'applic
 module. Le gros du travail de vues et des ~35 clés i18n se paie ici, une fois ; les lots suivants
 s'y branchent. E-24 et le point mort `#conn-status` se corrigent dans ce lot.
 
+### Inventaires de S4, S5 et S6 — mesurés le 2026-08-20
+
+Menés par agents en parallèle, sur des périmètres **disjoints**, pendant un rejeu du LOT — le seul
+travail parallélisable ici. **Les constats qui portent une décision ont été re-vérifiés à la main** ;
+les autres sont attribués comme non revérifiés.
+
+#### S4 — le garde anti-fréquence n'est pas rejoué à la modification (**vérifié**)
+
+À la création (`backend/routes/cve.py:500-517`) le code valide l'expression cron, calcule **deux**
+occurrences successives et refuse en dessous de 600 s. Son commentaire nomme le risque :
+
+> `* * * * *` lançait un scan par minute → ban OpenCVE upstream + DoS interne + abus admin malveillant
+
+Au `PUT` (`cve.py:549-566`), `cron_expression` est ajouté à la requête **ligne 556, avant toute
+validation**. Le bloc suivant ne recalcule que `next_run` — ni `is_valid`, ni comparaison de deux
+occurrences — et un `except Exception: pass` avale l'échec : l'`UPDATE` de la ligne 570 écrit
+l'expression quand même. **Un `PUT` avec `* * * * *` est accepté et persisté**, et une expression
+invalide l'est aussi, le scheduler retombant alors sur son repli `+24 h`.
+
+**Neuvième « à moitié corrigé » du projet**, et cette fois le commentaire qui nomme le risque est
+quarante lignes au-dessus de la branche non protégée. Correctif **backend** : décision de l'exploitant.
+
+#### S4 — le reste, mesuré
+
+- les 5 routes de planification portent `require_role(2)` mais **aucun `require_permission`** : un
+  rôle 2 sans `can_scan_cve` peut créer, modifier, supprimer. Le proxy et la passerelle ne gardent rien
+  (`/cve_` absent des deux listes admin) : **le backend est le rempart unique** ;
+- **`created_by` n'est jamais écrit** alors que la colonne existe (`mysql/init.sql:317`, clé étrangère
+  vers `users(id)`) et que la session fournit l'identifiant. Ici l'attribution ne vient pas du client :
+  elle est simplement **absente**. Le portage doit la remplir plutôt que reporter le trou ;
+- **`target_type` est un `ENUM` en base (`init.sql:312`) sans liste blanche côté code**, ni à la
+  création (`cve.py:490`) ni au `PUT` — alors que `scan_source`, juste à côté, en a une ;
+- **le scheduler ne filtre pas les machines archivées** (`scheduler.py:191,206,211`) alors que
+  l'interface les exclut (`index.php:290-294`) : une machine sélectionnée puis archivée continue d'être
+  scannée. Et une cible `machines` dont le `target_value` est illisible **retombe sur tout le parc**
+  (`scheduler.py:198-209`) ;
+- `min_cvss` non borné (500 au lieu de 400) et non converti au `PUT` ; `name` non vérifié non vide au
+  `PUT` ; noms de colonnes interpolés en f-string (liste fermée, donc non injectable, mais à ne pas
+  recopier) ;
+- **`loadSchedules` est branché pour tous les rôles** (`js/main.js:991`) alors que le bloc n'existe que
+  pour `role >= 2` : un rôle 1 émet un `GET /cve_schedules` à chaque chargement, 403 avalé ;
+- **`confirm()` natif** à la suppression (`js/main.js:865`) — proscrit dans le portage ;
+- i18n : 6 littéraux PHP traduisibles (dont tout le champ « Source CVE », qui n'a aucune clé) et
+  **26 chaînes en dur dans le JS** ; pluriels fabriqués par concaténation ; la description humaine du
+  cron est produite **en Python** (`cve.py:460-474`), donc non traduisible — à trancher au portage.
+
+**Le couplage avec le scheduler, qui commande ce que Laravel pourra écrire.** `next_run` a trois
+écrivains, tous en `datetime` **naïf** : `cve.py:504`, `cve.py:562`, et `scheduler.py:118` via
+`_advance_schedule`, qui l'écrit **avant** l'exécution (fix v1.37.14) et saute l'exécution si l'`UPDATE`
+échoue. Donc : Laravel **ne doit jamais écrire `last_run`**, ni laisser `next_run` NULL sur une ligne
+`enabled = 1` — la requête de `scheduler.py:614` déclencherait immédiatement — ni déclencher un scan à
+la création. *(couplage repris de l'inventaire, non revérifié ligne à ligne.)*
+
+**Le test existant `tests/e2e/go-cve-schedules.mjs` nettoie bien derrière lui** (préfixe `TEST_`,
+nettoyage en entrée **et** en `finally`), mais **son seul test d'interface ne peut pas échouer** :
+branche conditionnelle et résultat du clic simplement journalisé (`:98-113`). Il ne couvre ni le clamp,
+ni `cron_preview`, ni les gardes, ni le formulaire, ni `target_type` autre que `all`, ni `next_run`.
+
+#### S5 et S6 — trois constats vérifiés à la main
+
+1. **`POST /cve_reprioritize` n'a NI rôle NI permission** (`cve.py:227-231`) : `require_api_key` +
+   `require_machine_access` + `threaded_route`. Un rôle 1 portant `can_scan_cve` et disposant d'une
+   machine attribuée déclenche donc **1458 `UPDATE` sur `cve_findings`** — la seule écriture du module
+   ouverte au rôle 1. La passerelle du portage la transmet déjà (`/cve_` en liste blanche, absent de
+   `ADMIN_SEULEMENT`) : le backend est le rempart unique.
+2. **Une panne réseau ne rend pas une erreur : elle détruit des données.** `enrich_findings`
+   (`backend/cve_enrich.py:243-250`) rattrape **lui-même** les deux échecs — EPSS et KEV — et ne les
+   journalise qu'en `debug`, en rendant normalement. La branche 503 de `cve.py:270-274` est donc
+   inatteignable pour une panne réseau, et l'`UPDATE` écrit `1 if f.get('kev') else 0`, soit **`kev = 0`
+   pour tous les findings**, `epss_score` à NULL et `priority_score` recalculé sur le CVSS seul. L'écran
+   affiche « Re-priorisation terminée — KEV: 0, EPSS: 0 ». **Un clic pendant une coupure vers CISA
+   effface le drapeau des CVE réellement exploitées**, sans trace au-dessus de `debug`.
+3. **La table `cve_whitelist` n'a aucun lecteur.** Hors tests, deux requêtes en tout : son propre
+   listing (`cve.py:604`) et sa suppression (`cve.py:658`). Le scanner ne la consulte jamais,
+   `expires_at` n'est évalué nulle part. **Blanchir une CVE n'a aucun effet observable** — ni exclusion
+   du scan suivant, ni marquage. Porter S5 tel quel offrirait une capacité qui n'existe pas côté
+   serveur : à trancher avant, pas après.
+
+#### S5 et S6 — le reste, repris de l'inventaire
+
+- **`whitelisted_by` vient du CLIENT** (`cve.py:628`, envoyé par `main.js:1020`) : une acceptation de
+  risque peut être signée du nom de n'importe qui. `tickets.created_by`, lui, vient bien de la session
+  (`tickets.py:114`). `cve_remediation` n'a **aucune colonne d'auteur**, et `cve_reprioritize` ne laisse
+  aucune trace : **aucune des quatre écritures n'est journalisée**.
+- **un changement de statut écrase quatre champs.** Le client n'envoie que `{cve_id, machine_id,
+  status}` ; l'`ON DUPLICATE KEY UPDATE` (`cve.py:731-733`) réaffecte les cinq colonnes, donc
+  `assigned_to`, `deadline`, `resolution_note` et `resolved_at` sont vidés — ce qui défait en silence
+  l'auto-résolution du scanner (`cve_scanner.py:1092`).
+- **le select de suivi n'affiche jamais l'état stocké** : aucune option `selected`, et le JS ne fait
+  **aucun `GET /cve_remediation`**. La cellule montre `-` même quand une remédiation existe.
+- **`cve_remediation.status` est un `ENUM` non contrôlé** : un statut inventé produit un **500 non
+  géré**, pas un 400 (la route n'a qu'un `try/finally`). L'ENUM contient `resolved`, que l'interface
+  n'offre pas. Et `cve_whitelist` a une clé unique sur `(cve_id, machine_id)` avec `machine_id` NULLable
+  : InnoDB traitant les NULL comme distincts, l'`ON DUPLICATE KEY UPDATE` **ne se déclenche jamais**
+  pour une entrée globale — chaque POST crée une ligne de plus.
+- **`whitelistCve` est du code MORT** (`main.js:1013-1026`) : aucun élément d'interface ne l'appelle,
+  et elle est la seule consommatrice de `window._cveConfig.username`. C'est elle qui porte le seul
+  `prompt()` du périmètre.
+- **les six colonnes d'enrichissement ne sont pas dans `init.sql`** : elles viennent de la migration
+  `054`. Le legacy les **nomme dans son `SELECT` et trie dessus** (`cve_scanner.py:1230-1241`) : sans la
+  migration, `GET /cve_results` rend 500 et **toute la consultation** tombe, muette. Le portage de S3 ne
+  les sélectionne pas, donc il n'en dépend pas — **porter S6 introduira cette dépendance**.
+- i18n : 15 chaînes en dur hors code mort, dont **deux vocabulaires pour un même état**
+  (`Open`/`Accepte` dans le select, `Ouverte`/`Acceptee` dans le toast). Une clé déclarée en FR et EN et
+  jamais utilisée : `js.cve_reprio_running`, le bouton affichant `…` en dur.
+
+#### Ce que S5 et S6 ne pourront pas mesurer sans fabriquer des données
+
+Mesurable tel quel : les gardes de page, les refus de `POST /tickets`, `/cve_remediation` et
+`/cve_whitelist` pour un rôle 1, le fait que la passerelle **transmet** `/cve_reprioritize` (le 403
+venant alors du backend, et cette distinction *est* la mesure), et la sixième colonne du portage.
+
+Exige des données, donc une décision : **toute écriture d'un rôle 1 autorisé** — il n'existe aucun
+compte rôle 1 avec `can_scan_cve` **et** une ligne `user_machine_access`, c'est **D-5** ; l'écrasement
+des quatre champs, qui demande une ligne préexistante complète ; les doublons de whitelist globale ; et
+la destruction du drapeau KEV, qui demanderait de couper l'accès à CISA **et** des findings déjà marqués
+— probablement à laisser en lecture de code, en le disant.
+
+**Un avertissement qui vaut pour toute suite de S5 ou S6** : appeler `POST /cve_reprioritize` sur la
+machine 1 **réécrit les six colonnes d'enrichissement des 1458 findings du seul scan complet du parc**,
+sans retour en arrière. Une telle suite doit viser un scan de fixture qu'elle a créé, ou relever les six
+colonnes avant et après pour les restaurer. Et créer une ligne `cve_remediation` **fait apparaître une
+section et cinq tuiles** dans le rapport de conformité, ce qui change son empreinte SHA-256 — les
+assertions actuelles y survivent (bornes inférieures, forme de l'empreinte), mais il faut le savoir
+avant, pas le découvrir en route.
+
+**Numéros d'écart libres : à partir de E-51.**
+
 **S4** : quatre écritures en base, un `@require_role(2)` à respecter **côté vue aussi** (E-26), la
 clé i18n manquante du `confirm()`, et E-28 à trancher. Le scheduler reste Python
 (`backend/scheduler.py:614-628`) : Laravel n'écrit que la table, il ne déclenche rien. Test existant
