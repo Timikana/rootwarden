@@ -1202,6 +1202,76 @@ ainsi — l'un a rendu « delai relu : 60 minute(s) », l'autre « 2026-07-25T14
 C'est le pendant de « prouver la couverture avant de retirer un test » : prouver la portee avant
 d'ajouter un test.
 
+### Un telechargement ne doit JAMAIS heriter de `display_errors`
+
+Le legacy ecrit ses CSV au fil de l'eau dans `php://output`. `verify.php` posant
+`display_errors=1` quand `DEBUG_MODE=true`, et PHP 8.4 depreciant `fputcsv()` sans son argument
+`$escape`, chacun des 1 465 appels de `cve_export.php` a injecte un bloc HTML `<b>Deprecated</b>`
+DANS le fichier telecharge : 4 374 enregistrements pour 1 458 vulnerabilites, et un fichier qui
+n'est plus un CSV. Une production a `DEBUG_MODE=false` n'est pas touchee — la corruption est propre
+au dev et a la preprod, ce qui explique qu'elle ait vecu si longtemps.
+
+La parade n'est pas de faire taire l'avertissement, c'est de **fermer la porte** : assembler la
+charge utile EN MEMOIRE (`php://temp`), puis la rendre d'un bloc. Rien ne part avant que tout soit
+ecrit, donc aucun avertissement — quelle qu'en soit la cause future — ne peut s'y glisser. Vaut pour
+tout ce qui rend un fichier : CSV, PDF, archive.
+
+Et quand une depreciation porte sur l'ABSENCE d'un argument, le passer **a sa valeur historique**
+tait l'avertissement sans changer un octet de la sortie. Changer sa valeur au passage serait un
+changement de comportement deguise en correctif de portage.
+
+### `Response.text()` RETIRE le BOM : mesurer les octets, pas le texte decode
+
+`charCodeAt(0) === 0xFEFF` ne peut JAMAIS reussir sur un corps lu par `res.text()` : le decodage
+UTF-8 de la specification Fetch supprime un BOM en tete. L'assertion mesurait la lentille, pas le
+fichier.
+
+    const octets = [...new Uint8Array((await r.arrayBuffer()).slice(0, 3))];  // EF BB BF
+
+Cote legacy la meme lecture rendait `<` en premier caractere — le BOM etait bien la, et
+l'avertissement du premier `fputcsv` s'inserait juste apres. **Les deux mesures disaient vrai ; elles
+ne regardaient pas le meme octet.** Quand deux mesures se contredisent, chercher ce que chacune
+regarde avant de conclure qu'une se trompe.
+
+### Un CSV se compte en ENREGISTREMENTS, jamais en lignes
+
+Un resume de CVE contient des retours a la ligne. Entre guillemets ils appartiennent au champ :
+c'est du CSV valide (RFC 4180). Le decoupage naif `split(/\r?\n/)` rendait 7 576 « lignes » pour
+1 458 vulnerabilites, et faisait passer les suites de champ pour des lignes etrangeres — deux
+assertions rouges sur une sortie parfaitement correcte. Decouper en respectant les guillemets rend
+exactement 1 458, soit le compte de la base : **une mesure croisee avec la source vaut mieux qu'une
+mesure de forme.**
+
+Meme artefact ailleurs : les « 33 cellules lisibles comme une formule » relevees au premier passage
+etaient des fragments de champ, pas des cellules. Avec un decoupage correct, aucune.
+
+### Se reconnecter avec le MEME compte dans la meme fenetre TOTP echoue — sur le portage seulement
+
+Le portage porte un garde anti-rejeu **par compte, en base**. Rouvrir une session pour le meme
+compte moins de 30 s apres rejoue le meme code : le garde refuse, la session reste anonyme, et
+chaque appel part alors vers la page de connexion — qui rend **200 en HTML**. Treize assertions ont
+echoue ainsi sur un portage qui fonctionnait, avec pour seul indice un `text/html` la ou on attendait
+du CSV.
+
+Le legacy, lui, tolerait le rejeu : son garde est INERTE (`PARITE.md` E-01). Le meme test l'avait
+donc traverse sans rien voir. **Une suite verte sur la cible la plus permissive ne prouve rien de
+l'autre** — et c'est le sens du portage que de ne plus etre la plus permissive.
+
+Parade : CONSERVER la session ouverte plutot que de la refermer et la rouvrir. Un contexte de
+navigateur par compte, et on le garde tant qu'on en a besoin.
+
+### Un sous-lot peut ne pas prouver ce qu'on attendait de lui, et il faut le dire
+
+S1 avait ete choisi en premier parce que son controle IDOR devait « valider le harnais de
+permissions avant tout le reste ». Mesure faite : la branche exige un role 1 **portant**
+`can_scan_cve`, et aucun compte de test ne l'est — `rw-test-user` a zero permission, et
+`user_machine_access` n'attribue aucune machine aux comptes de test. Le lot valide les gardes de
+ROLE et de PERMISSION, pas le cloisonnement par machine.
+
+Ne pas accorder la permission a `rw-test-user` pour s'en sortir : c'est la reference « role 1, zero
+permission » de toutes les autres suites, et la modifier changerait silencieusement ce qu'elles
+mesurent. Ecrire l'ecart (`PARITE.md` E-34) et demander un compte de fixture supplementaire.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
