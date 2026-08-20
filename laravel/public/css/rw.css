@@ -771,6 +771,17 @@ body {
 .rw-bouton--succes { background: var(--rw-succes); color: var(--rw-accent-texte); }
 .rw-bouton--danger { background: var(--rw-danger); color: var(--rw-accent-texte); }
 
+/*
+ * Entre le discret et le rouge : une action qui MODIFIE la machine sans etre
+ * exceptionnelle. La barre du module `update/` en porte quatre destructives ;
+ * les peindre toutes en rouge revient a n'en signaler aucune. Le rouge reste
+ * pour ce qui interrompt un service — reparation dpkg, redemarrage.
+ */
+.rw-bouton--avertissement {
+    background: var(--rw-avertissement);
+    color: var(--rw-accent-texte);
+}
+
 .rw-bouton:disabled {
     opacity: .45;
     cursor: not-allowed;

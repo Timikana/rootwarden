@@ -163,15 +163,26 @@ la page legacy restant servie tant qu'il reste une capacité non portée.
 | **U3 — constats** — PORTÉ EN PARTIE | paquets en attente PORTÉ ; simulation NON PORTÉE (E-17) | `pending_packages`, `dry_run_update` | lecture sur le serveur, mais `apt-get update` réécrit l'index |
 | **U4 — planification** — PORTÉ | les deux planifications, en un seul formulaire | `schedule_advanced_update` (et non `schedule_update`, E-18), `schedule_advanced_security_update` | écrit un cron distant |
 | **U5 — redémarrage** — PORTÉ | redémarrage des machines retenues, délai offert | `reboot_server` | destructif, soumis à approbation — le test ne le joue JAMAIS |
-| **U6 — mises à jour** | globale, sécurité (flux), personnalisée, réparation dpkg | `apt_update`, `security_updates`, `custom_update`, `dpkg_repair` | **destructif, et porte la fuite** |
+| **U6a — les deux flux** — PORTÉ | simulation, mises à jour de sécurité | `dry_run_update`, `security_updates` | destructif ; portait la fuite, corrigée le 2026-08-19 |
+| **U6b — mise à jour complète et réparation** — PORTÉ | mise à jour complète (flux), réparation dpkg | `update`, `dpkg_repair` | destructif ; `apt_update` et `custom_update` NON portées (E-22) |
 
 État au 2026-08-19 : **U1, U2, la moitié de U3, U4 et U5 portés** sur `/mises-a-jour` (voir
 `PARITE.md` E-14 à E-21). **U6a porté** : la simulation — enfin — et les mises à jour de sécurité,
 les deux actions qui diffusent leur sortie, une fois la fuite corrigée le 2026-08-19
 (CHANGELOG v1.37.17).
 
-**Reste U6b** : `apt_update` (mise à jour complète), `custom_update` (paquets choisis) et
-`dpkg_repair`. Trois actions destructives qui rendent du JSON, sans flux.
+**U6b porté** : la mise à jour complète (`/update`, un FLUX — et non `/apt_update`, que rien
+n'appelle) et la réparation dpkg. Le module est donc **entièrement porté** pour ce que l'ancienne
+page offrait réellement.
+
+**Correction de périmètre.** Le bouton libellé « mise à jour » de l'ancienne page appelle
+`updateLinux()` → **`/update`**, pas `/apt_update`. Et `/apt_update` comme `/custom_update` sont
+**injoignables** depuis le legacy : `aptUpdate()` et `customUpdate()` n'ont aucun appelant et
+lisent cinq éléments de formulaire absents de la page (E-22). Elles ne sont pas portées — porter
+une capacité que personne ne pouvait demander, ce n'est plus migrer.
+
+**Prochaine étape : l'archivage du module**, maintenant que tout ce qui était atteignable est
+porté.
 
 **À noter pour U6b** : `/apt_update` et `/dpkg_repair` ne consultent **pas** la fenêtre de
 maintenance, là où `/update`, `/security_updates` et `/custom_update` le font. `dpkg_repair` tue

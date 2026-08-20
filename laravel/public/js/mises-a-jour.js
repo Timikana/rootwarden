@@ -45,7 +45,25 @@
                 'Content-Type': 'application/json',
             });
         }
-        const r = await fetch(PASSERELLE + chemin, parametres);
+        // `fetch` REJETTE quand le reseau lache ou que la passerelle ne repond
+        // pas. Sans ce filet, la promesse remonte jusqu'a l'appelant, qui
+        // s'arrete AVANT de reactiver son bouton : l'ecran reste fige sur « en
+        // cours » indefiniment. Cinq appelants etaient dans ce cas.
+        //
+        // L'erreur n'est pas AVALEE : elle part en console et l'appel rend un
+        // echec explicite, que chaque appelant sait deja annoncer.
+        let r;
+        try {
+            r = await fetch(PASSERELLE + chemin, parametres);
+        } catch (e) {
+            console.error('passerelle injoignable :', chemin, e);
+            return {
+                ok: false,
+                statut: 0,
+                corps: { success: false, message: libelles.err_reseau },
+            };
+        }
+
         let corpsJson = null;
         try { corpsJson = await r.json(); } catch (e) { /* reponse non JSON */ }
         return { ok: r.ok, statut: r.status, corps: corpsJson };
@@ -283,13 +301,14 @@
     /**
      * Referme tous les panneaux de decision sauf celui qu'on ouvre.
      *
-     * Trois panneaux — planification, redemarrage, mises a jour de securite —
+     * Quatre panneaux — planification, redemarrage, mises a jour de securite,
+     * et le panneau generique de U6b —
      * portent sur la MEME selection. Deux ouverts en meme temps laissent croire
      * a deux gestes en attente ; la capture l'a montre avant que ce ne soit une
      * regle.
      */
     function fermeLesAutresPanneaux(garde) {
-        for (const id of ['schedule-form', 'reboot-panneau', 'secu-panneau']) {
+        for (const id of ['schedule-form', 'reboot-panneau', 'secu-panneau', 'action-panneau']) {
             if (id === garde) continue;
             const el = document.getElementById(id);
             if (el) el.hidden = true;
@@ -431,8 +450,9 @@
      * cet apercu et le fichier pose sur la machine est un defaut : le test de
      * U4 compare les deux.
      */
-    function calculeCron(nature, date, heure, recurrence) {
-        const [hh, mm] = heure.split(':');
+    function calculeCron(nature, date, heureChoisie, recurrence) {
+        // `heureChoisie` et non `heure` : `heure()` est l'horloge du journal.
+        const [hh, mm] = heureChoisie.split(':');
         const [, mois, jour] = date.split('-');
         const jourJs = new Date(date + 'T00:00:00').getDay();
         const jourCron = jourJs === 0 ? 7 : jourJs;   // Python : weekday() + 1
@@ -499,6 +519,14 @@
         machinePlanif.textContent = (nature === 'securite' ? planif.desc_secu : planif.desc_general)
             .replace(':machine', nom);
         fermeLesAutresPanneaux('schedule-form');
+        // Repartir d'un etat connu, comme les trois autres panneaux : sans
+        // cela, la date saisie pour une AUTRE machine reste dans le champ et
+        // l'apercu la declare valide — le bouton naît actif.
+        champDate.value = '';
+        champHeure.value = '';
+        champRecurrence.selectedIndex = 0;
+        boutonEnregistrer.disabled = true;
+
         formulaire.hidden = false;
         montreApercu();
         formulaire.scrollIntoView({ block: 'nearest' });
@@ -762,12 +790,15 @@
 
         if (!reponse.ok) {
             // 423 : hors fenetre de maintenance. Le backend le dit en JSON.
-            let message = libelles.flux_err;
+            // Noms distincts de `message()` (l'etat vide du tableau) et de
+            // `corps` (le <tbody>) : deux declarations de plus haut que ce bloc
+            // masquait sans le dire.
+            let messageErreur = libelles.flux_err;
             try {
-                const corps = await reponse.json();
-                if (corps && corps.message) message = corps.message;
+                const corpsJson = await reponse.json();
+                if (corpsJson && corpsJson.message) messageErreur = corpsJson.message;
             } catch (e) { /* reponse non JSON */ }
-            journal(message, 'error', machine.nom);
+            journal(messageErreur, 'error', machine.nom);
             return false;
         }
 
@@ -794,7 +825,9 @@
     }
 
     /** Enchaine un flux sur chaque machine retenue, en serie. */
-    async function surChaqueMachine(bouton, chemin, choix, libelleEnCours, libelleFin) {
+    async function surChaqueMachine(bouton, chemin, choix, libelleEnCours, libelleFin, executeUne) {
+        // Sans quatrieme forme, on deverse un FLUX — le comportement de U6a.
+        const executeSurUne = executeUne || verseLeFlux;
         const initial = bouton.textContent;
         bouton.disabled = true;
         bouton.textContent = libelleEnCours;
@@ -805,7 +838,7 @@
             journal(libelles.flux_debut.replace(':machine', m.nom), 'info', m.nom);
             let ok = false;
             try {
-                ok = await verseLeFlux(chemin, m);
+                ok = await executeSurUne(chemin, m);
             } catch (e) {
                 journal(libelles.flux_err, 'error', m.nom);
             }
@@ -875,6 +908,154 @@
     champSecurite.addEventListener('input', verifieConsigneSecurite);
     document.getElementById('secu-annuler').addEventListener('click', fermeSecurite);
     boutonSecuriteOk.addEventListener('click', confirmeSecurite);
+
+    /* ═════════════════════════════════════════════════════════════════════
+       Sous-lot U6b — la mise a jour complete et la reparation dpkg
+
+       CE QUE FONT LES ROUTES, LU AVANT DE CLIQUER.
+
+       `/update` (backend/routes/updates.py) : consulte la fenetre de
+       maintenance (423 dehors), puis, si apt ou dpkg tourne deja, les TUE
+       (`killall -9`), supprime leurs quatre verrous et lance
+       `dpkg --configure -a` — avant seulement de diffuser
+       `apt update && apt full-upgrade -y`. C'est un FLUX `text/plain`.
+
+       `/dpkg_repair` : `killall -9 apt apt-get dpkg`, `rm -f` sur les quatre
+       verrous, puis `dpkg --configure -a`. Rend du JSON avec `output`.
+       Elle ne consulte NI la fenetre de maintenance, NI l'approbation, et
+       n'ecrit AUCUNE trace bastion — c'est l'action la plus destructive du
+       module et la moins tracee. Constat porte dans MODULE-UPDATE.md.
+
+       CE QUI N'EST PAS PORTE, ET POURQUOI. `/apt_update` et `/custom_update`
+       existent cote backend mais AUCUN bouton du legacy ne les appelle :
+       `aptUpdate()` et `customUpdate()` n'ont pas d'appelant et lisent cinq
+       elements de formulaire absents de la page. Les porter reviendrait a
+       inventer une capacite, pas a en migrer une. Voir PARITE.md, E-22.
+       ═════════════════════════════════════════════════════════════════════ */
+
+    const boutonComplete = document.getElementById('full-update-btn');
+    const boutonDpkg = document.getElementById('dpkg-repair-btn');
+    const panneauAction = document.getElementById('action-panneau');
+    const titreAction = document.getElementById('action-titre');
+    const machinesAction = document.getElementById('action-machines');
+    const consequencesAction = document.getElementById('action-consequences');
+    const reserveAction = document.getElementById('action-reserve');
+    const consigneAction = document.getElementById('action-consigne');
+    const champAction = document.getElementById('action-confirmation');
+    const boutonActionOk = document.getElementById('action-confirmer');
+
+    /** Machines retenues et reglage de l'action en cours de decision. */
+    let actionEnCours = null;
+
+    /**
+     * Les deux actions de U6b, decrites plutot que codees deux fois.
+     *
+     * `mode` dit comment la reponse se lit : un FLUX se deverse ligne a ligne
+     * dans le journal, un JSON s'y depose d'un bloc.
+     */
+    const ACTIONS = {
+        complete: {
+            bouton: () => boutonComplete,
+            chemin: '/update',
+            mode: 'flux',
+            titre: () => libelles.complete_titre,
+            consequences: () => libelles.complete_consequences,
+            reserve: () => libelles.complete_reserve,
+            mot: () => libelles.complete_mot,
+            consigne: () => libelles.complete_consigne,
+            libelleBouton: () => libelles.complete_bouton,
+            enCours: () => libelles.complete_en_cours,
+            fin: () => libelles.complete_fin,
+        },
+        dpkg: {
+            bouton: () => boutonDpkg,
+            chemin: '/dpkg_repair',
+            mode: 'json',
+            titre: () => libelles.dpkg_titre,
+            consequences: () => libelles.dpkg_consequences,
+            reserve: () => libelles.dpkg_reserve,
+            mot: () => libelles.dpkg_mot,
+            consigne: () => libelles.dpkg_consigne,
+            libelleBouton: () => libelles.dpkg_bouton,
+            enCours: () => libelles.dpkg_en_cours,
+            fin: () => libelles.dpkg_fin,
+        },
+    };
+
+    /** Verse une reponse JSON dans le journal du serveur. */
+    async function verseLeJson(chemin, machine) {
+        const res = await appelle(chemin, {
+            method: 'POST',
+            body: JSON.stringify({ machine_id: machine.id }),
+        });
+        const c = res.corps;
+
+        if (!res.ok || !c || c.success === false) {
+            journal((c && c.message) || libelles.dpkg_err, 'error', machine.nom);
+            return false;
+        }
+        if (c.message) journal(c.message, 'ok', machine.nom);
+        // `/dpkg_repair` rend la sortie de `dpkg --configure -a` dans `output`.
+        for (const ligne of String(c.output || '').split('\n')) {
+            const propre = ligne.replace(/\r$/, '');
+            if (propre.trim()) journal(propre, 'info', machine.nom);
+        }
+        return true;
+    }
+
+    function ouvreAction(nom) {
+        const reglage = ACTIONS[nom];
+        const choix = machinesCochees();
+        if (!choix.length) {
+            dit(libelles.aucune_selection, 'echec');
+            return;
+        }
+        actionEnCours = { choix: choix, reglage: reglage };
+
+        titreAction.textContent = reglage.titre();
+        machinesAction.textContent = libelles.action_machines
+            .replace(':nombre', choix.length)
+            .replace(':machines', choix.map(m => m.nom).join(', '));
+        consequencesAction.textContent = reglage.consequences();
+        reserveAction.textContent = reglage.reserve();
+        consigneAction.textContent = reglage.consigne();
+        boutonActionOk.textContent = reglage.libelleBouton();
+
+        champAction.value = '';
+        boutonActionOk.disabled = true;
+        fermeLesAutresPanneaux('action-panneau');
+        panneauAction.hidden = false;
+        panneauAction.scrollIntoView({ block: 'nearest' });
+        champAction.focus();
+    }
+
+    function fermeAction() {
+        actionEnCours = null;
+        panneauAction.hidden = true;
+    }
+
+    function verifieConsigneAction() {
+        const attendu = actionEnCours ? actionEnCours.reglage.mot() : null;
+        boutonActionOk.disabled =
+            !attendu || champAction.value.trim().toUpperCase() !== attendu.toUpperCase();
+    }
+
+    async function confirmeAction() {
+        if (!actionEnCours) return;
+        const { choix, reglage } = actionEnCours;
+        fermeAction();
+        await surChaqueMachine(reglage.bouton(), reglage.chemin, choix,
+            reglage.enCours(), reglage.fin(),
+            reglage.mode === 'json' ? verseLeJson : null);
+    }
+
+    if (boutonComplete) boutonComplete.addEventListener('click', () => ouvreAction('complete'));
+    if (boutonDpkg) boutonDpkg.addEventListener('click', () => ouvreAction('dpkg'));
+    if (champAction) champAction.addEventListener('input', verifieConsigneAction);
+    if (panneauAction) {
+        document.getElementById('action-annuler').addEventListener('click', fermeAction);
+        boutonActionOk.addEventListener('click', confirmeAction);
+    }
 
     corps.addEventListener('change', (e) => {
         if (e.target && e.target.name === 'selected_machines[]') compteSelection();

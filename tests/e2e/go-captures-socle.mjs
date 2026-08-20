@@ -228,6 +228,17 @@ for (const format of LARGEURS) {
     await dors(400);
     await prend('17-maj-securite');
 
+    // 18. Le panneau de decision generique (U6b), ouvert sur la reparation
+    //     dpkg — l'action la plus destructive du module. AUCUN envoi.
+    await page.evaluate(() => {
+        document.getElementById('secu-annuler')?.click();
+        document.querySelector('[data-rw="reparation-dpkg"]')?.click();
+    });
+    await page.evaluate(() => document.getElementById('action-panneau')
+        ?.scrollIntoView({ block: 'center' }));
+    await dors(400);
+    await prend('18-reparation-dpkg');
+
     // 6. Tiroir ouvert — n'a de sens qu'en mobile
     if (format.nom === 'mobile') {
         await page.goto(`${BASE}/accueil`, { waitUntil: 'networkidle2' });

@@ -8,11 +8,12 @@ return [
              . 'des mises a jour de securite et dernier redemarrage.',
 
     // Portage partiel — dit a l'ecran plutot que masque.
-    'partiel_titre' => 'Cette page est en cours de portage',
-    'partiel_texte' => 'Le tableau, les filtres, les releves par machine et le constat des '
-                     . 'paquets en attente sont portes. La simulation, le lancement des mises '
-                     . 'a jour, la planification et le redemarrage restent servis par '
-                     . "l'ancien portail.",
+    'partiel_titre' => 'Ce que cette page ne reprend pas',
+    'partiel_texte' => "Tout ce que l'ancien portail proposait sur les mises a jour est "
+                     . "desormais ici. Deux capacites du serveur ne sont volontairement pas "
+                     . "reprises : la mise a jour de paquets choisis et l'exclusion de "
+                     . "paquets. L'ancienne page en portait le code, mais aucun bouton ne "
+                     . "les atteignait.",
     'partiel_lien'  => 'Ouvrir la page complete sur l\'ancien portail',
 
     // Filtres
@@ -192,4 +193,32 @@ return [
 
     'secu_en_cours' => 'Mises a jour de securite en cours...',
     'secu_fin'      => 'Mises a jour de securite terminees sur :nombre machine(s).',
+
+    // Sous-lot U6b — mise a jour complete et reparation dpkg
+    'btn_complete' => 'Mise a jour complete',
+    'tip_complete' => 'Met a jour TOUS les paquets, pas seulement ceux de securite. Action destructive.',
+    'btn_dpkg'     => 'Reparation dpkg',
+    'tip_dpkg'     => "Arrete de force les processus apt et dpkg, supprime leurs verrous, puis repare la base des paquets.",
+
+    'complete_titre'        => 'Mettre a jour tous les paquets',
+    'complete_consequences' => 'apt full-upgrade remplace TOUS les paquets ayant une version plus recente, pas seulement ceux qui corrigent une faille. Des services peuvent etre relances, et des fichiers de configuration remplaces.',
+    'complete_reserve'      => "Si apt ou dpkg tourne deja sur la machine, cette action les ARRETE de force, supprime leurs verrous et repare la base dpkg avant de continuer. Une installation en cours ailleurs sera interrompue.",
+    'complete_mot'          => 'MISE A JOUR',
+    'complete_consigne'     => 'Recopiez MISE A JOUR pour activer le bouton',
+    'complete_bouton'       => 'Mettre a jour',
+    'complete_en_cours'     => 'Mise a jour complete en cours...',
+    'complete_fin'          => 'Mise a jour complete terminee sur :nombre machine(s).',
+
+    'dpkg_titre'        => 'Reparer la base des paquets',
+    'dpkg_consequences' => "Les processus apt, apt-get et dpkg en cours sont TUES (killall -9), leurs quatre fichiers de verrou supprimes, puis dpkg --configure -a termine les installations laissees a moitie.",
+    'dpkg_reserve'      => "A n'utiliser que si la machine refuse toute mise a jour pour cause de verrou. Une installation legitime en cours sera perdue en l'etat, et devra etre relancee.",
+    'dpkg_mot'          => 'REPARER',
+    'dpkg_consigne'     => 'Recopiez REPARER pour activer le bouton',
+    'dpkg_bouton'       => 'Reparer',
+    'dpkg_en_cours'     => 'Reparation dpkg en cours...',
+    'dpkg_fin'          => 'Reparation terminee sur :nombre machine(s).',
+    'dpkg_err'          => 'La reparation a echoue.',
+
+    'err_reseau'      => 'La passerelle est injoignable. Rien n a ete envoye a la machine.',
+    'action_machines' => ':nombre machine(s) : :machines',
 ];
