@@ -1546,6 +1546,50 @@ l'installation ; le correctif passe par une montee de version majeure de puppete
 le harnais. Et `laravel/package.json` n'a pas de verrou : la chaine Vite/Tailwind n'est pas
 installee sur la VM, `laravel/public/css/rw.css` etant compile et suivi.
 
+### Inventaire du module `security/`, avant tout portage
+
+`docs/migration/MODULE-SECURITY.md` mesure le module (2255 lignes, 4 fichiers) et le decoupe en
+huit sous-lots, du plus simple — l'export CSV d'un scan — au plus risque : le scan lui-meme, seul
+lot qui ouvre des sessions SSH et seul a repondre par un FLUX et non par un JSON.
+
+**Deux corrections de perimetre d'entree.** `backend/routes/policies.py` n'appartient pas a ce
+module : ses neuf routes ne sont appelees que par `adm/`, sont toutes `@require_role(3)` et portent
+un step-up 2FA — les embarquer ici aurait melange deux niveaux de risque. Et deux des trois pages
+(`compliance_report.php`, `cve_export.php`) n'appellent AUCUNE route backend : elles sont du PDO
+local de bout en bout.
+
+**Ce que le croisement JS ↔ backend a donne.** Aucun desaccord de cles, contrairement a `update/`
+ou le JS envoyait `{date,time,repeat}` a une route qui lisait `interval_minutes` (E-18). Ici ce sont
+les **reponses d'erreur** qui sont perdues : `runScan` ne teste jamais `resp.ok` avant de lire le
+flux, si bien que les deux 429 structurels du backend — throttle de 60 s par utilisateur, verrou
+global de scan — sont avales en silence. Le bouton se reactive, et rien ne s'affiche (E-23).
+
+Le defaut le plus consequent est ailleurs : **la colonne « Suivi » disparait des qu'on filtre,
+cherche ou pagine** (E-24). `buildRows` produit six cellules, `loadMoreFindings`, `searchFindings`
+et `filterFindings` en reconstruisent cinq. Deux des trois ecritures utilisateur du module ne sont
+donc joignables que sur la premiere page non filtree. Dix ecarts en tout, E-23 a E-32.
+
+**Un seul code mort** — `whitelistCve`, une declaration et aucun appelant — la ou `update/` en avait
+trois. La capacite « accepter un faux positif » existe cote serveur et personne n'a jamais pu la
+demander depuis cette page ; `whitelisted_by` y etait de surcroit fourni par le client, donc
+l'attribution d'une acceptation de risque etait falsifiable. Non portee.
+
+**Deux constats de securite qui attendent une decision d'exploitant.** `compliance_report.php`
+annonce dans son en-tete « Acces : admin (2) et superadmin (3) » et admet en realite `ROLE_USER`,
+sans aucun cloisonnement des donnees : un role 1 obtient tout le parc avec IP, port et utilisateur
+SSH, tous les comptes avec leur e-mail et l'age de leur cle, et la posture par serveur **avec les
+ecarts en clair** — une liste de cibles priorisee. Le commentaire qui mentait est ce qui rend le
+defaut durable : une relecture de l'en-tete ne pouvait pas le voir.
+
+Et le hash « preuve d'integrite » du rapport n'est verifiable par personne : le code enonce
+lui-meme, ligne 28, que les secrets chiffres n'ont rien a faire dans l'antecedent du SHA-256, puis
+la requete suivante y fait entrer `totp_secret` et `ssh_key`. Ce n'est **pas** une fuite — verifie
+aux trois rendus, ces colonnes ne sortent qu'en booleen — mais l'antecedent contient des champs
+absents du rapport, donc le lecteur ne peut pas recalculer l'empreinte. Une preuve invraisemblable
+vaut autant que pas de preuve.
+
+Aucune ligne de code n'a ete portee : ce document precede le premier sous-lot.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
