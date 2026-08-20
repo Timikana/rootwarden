@@ -19,7 +19,7 @@
 
 return [
     'title'         => 'Rapport de conformite',
-    'desc'          => 'Rapport de conformite du parc. La page est imprimable ; l\'export CSV et l\'export PDF portent la meme empreinte SHA-256.',
+    'desc'          => 'Rapport de conformite du parc. La page est imprimable ; les exports CSV et PDF portent chacun une empreinte SHA-256 du rapport, calculee au moment de sa generation.',
     'generated_by'  => 'Genere le',
     'btn_print'     => 'Imprimer',
     'btn_csv'       => 'Exporter en CSV',
@@ -117,6 +117,4 @@ return [
     'sans_config'      => 'sans configuration',
     'footer_generated' => 'Rapport genere le',
     'empreinte'        => 'Empreinte SHA-256 du rapport',
-    'export_a_venir'   => 'Les exports CSV et PDF sont encore servis par l\'ancien portail.',
-    'pdf_a_venir'      => 'L\'export PDF est encore servi par l\'ancien portail.',
 ];

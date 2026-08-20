@@ -1220,6 +1220,12 @@ décision, pas un effet de bord de portage. Le service nomme donc les deux popul
 (`comptes` et `comptesActifs`) pour qu'on ne les confonde pas, et le test l'asserte : la section du
 CSV doit porter **10** comptes quand la base en a 10, actifs ou non.
 
+**Complété en S2b : le PDF suit le CSV, pas la page.** La boucle des comptes du PDF
+(`compliance_report.php:262`) n'a elle non plus **aucun filtre** — vérifié en lisant la branche, puis
+mesuré : les 10 comptes de la base sont nommés dans le PDF. Ce sont donc les **deux exports** qui
+couvrent tous les comptes et la **page seule** qui saute les inactifs. Le périmètre reste repris tel
+quel des deux côtés.
+
 ---
 
 ## E-42 — Une même donnée, un seul calcul
@@ -1251,3 +1257,105 @@ trois fois de suite comme de la flakiness, faute de savoir ce que la page conten
 maintenant par le chemin normal, en disant l'URL réellement atteinte, le titre de la page, et si
 c'est l'écran de connexion ou le bouton qui manque. **Une suite qui meurt sur un `null` ne dit pas ce
 qu'elle a mesuré.**
+
+---
+
+## E-43 — La branche PDF portait la moitié corrigée du défaut, et le portage n'a rien à purger
+
+`compliance_report.php` commet E-33/E-40 dans sa branche CSV et s'en protège dans sa branche PDF, à
+douze lignes d'écart :
+
+```php
+while (ob_get_level() > 0) { ob_end_clean(); }   // avant $dompdf->stream()
+```
+
+Son commentaire nomme le défaut mot pour mot — « évite un PDF corrompu préfixé de `<br />...` ».
+**C'est la seule des cinq occurrences du motif « le legacy documente son défaut là où il le commet »
+où la moitié protégée l'était vraiment**, et la mesure le confirme : côté legacy, le PDF commence
+bien par `%PDF-` en tout premier octet et ne porte aucun fragment HTML. La suite exige la propriété
+**des deux côtés** — c'est ce qui en fait une mesure et non une hypothèse.
+
+L'`ob_start()` de la ligne 276 est en revanche **vestigial** : le HTML est monté par concaténation de
+chaînes, rien n'est capturé. Il n'existe que pour donner quelque chose à purger à `ob_end_clean()`.
+
+**Le portage ne le reproduit pas.** Il n'ouvre aucun tampon, donc il n'a rien à purger : la charge
+utile est assemblée en mémoire puis rendue d'un bloc, comme en S1 et S2c. Reproduire la purge aurait
+été reproduire le remède d'une maladie qu'on n'a pas — et un lecteur aurait cru le portage exposé.
+
+---
+
+## E-44 — Le PDF du portage en dit plus que celui du legacy : une section et une colonne
+
+Le PDF du legacy porte **six** sections, sa page en porte sept ; le tableau de ses comptes porte cinq
+colonnes, celui de sa page six. **Ce qu'on imprime en dit donc moins que ce qu'on regarde**, alors que
+c'est la version imprimée qu'on archive et qu'on transmet à un auditeur.
+
+Le portage aligne le PDF sur la page :
+
+| Ajout | Ce qu'il rend visible |
+|---|---|
+| section **pare-feu** | l'historique des règles appliquées, absent du PDF du legacy |
+| colonne **âge de la clé (jours)** | la tuile « clés de plus de 90 jours » compte, sans jamais dire *lesquelles* |
+
+**Divergence voulue, et assumée comme telle** : elle ne change aucun calcul, elle expose des données
+que le rapport possédait déjà. Les deux sections conditionnelles du portage — pare-feu et supervision
+— suivent la même règle que le legacy pour la seconde : *pas de donnée, pas de section*. Sur le parc
+actuel les deux collections sont vides, donc **ni l'une ni l'autre n'apparaît** ; l'ajout ne se lira
+que sur un parc qui a de l'historique. Dit autrement : cette entrée décrit une capacité, pas un
+changement visible aujourd'hui.
+
+---
+
+## E-45 — Un tableau qui change de page perdait son en-tête, et aucune assertion ne pouvait le voir
+
+Le legacy monte tous les tableaux de son PDF en `<table><tr><th>`, **sans `<thead>`** — zéro
+occurrence dans les 105 lignes de la branche. dompdf ne répète alors aucun en-tête d'une page à
+l'autre. Mesuré sur le document réel :
+
+| | pages | lignes de comptes | en-tête sur la page qui les porte |
+|---|---|---|---|
+| legacy | 2 | **les 10, page 2** | **absent** — resté page 1 |
+| portage | 2 | 7 page 1, 3 page 2 | présent sur les deux |
+
+Côté legacy le tableau des comptes arrive donc **en entier** sur une page où rien ne nomme ses
+colonnes : dix lignes de « Oui / Non / — ». Sur un rapport de conformité, dont la raison d'être est
+d'être lu par quelqu'un qui ne connaît pas l'outil, la colonne anonyme ne dit rien.
+
+**Le portage enveloppe ses six en-têtes dans `<thead>`** (plus `display: table-header-group`, écrit
+explicitement pour que l'intention ne dépende pas d'un défaut de feuille de style). Divergence voulue.
+
+Deux choses à retenir de la façon dont ce défaut a été trouvé :
+
+1. **Aucune assertion de texte ne pouvait le voir.** Sur le document aplati, l'en-tête est présent —
+   une fois. Il a fallu **rendre les pages en images** (`pdftoppm`) et les regarder. C'est le
+   quatrième défaut d'affichage que seule l'image révèle.
+2. **La mesure a donc dû devenir page par page** pour être ancrée dans un test : `pdfinfo` donne le
+   nombre de pages, `pdftotext -f N -l N` le texte de chacune, et l'assertion exige que toute page
+   portant au moins deux noms de comptes *lus en base* porte aussi l'en-tête. Une propriété de mise
+   en page ne se mesure pas sur un document aplati.
+
+Côté legacy la propriété est **mesurée et rendue en constat** (`verifiePortage`), pas en échec : le
+rejeu du LOT compte tout `FAIL` comme une régression, et un écart assumé n'en est pas une.
+
+---
+
+## Trois constats relevés pendant S2b, qui ne sont pas des divergences de portage
+
+**L'empreinte d'intégrité n'est pas reproductible, et c'est mesuré.** E-42 l'annonçait comme une
+hypothèse (« deux appels à une minute d'intervalle produiraient deux empreintes ») : deux générations
+du même rapport, à 17 h 11 et 17 h 16, donnent bien deux empreintes différentes. L'instant de
+génération entre dans l'antécédent. Conséquence : **l'empreinte ne peut pas servir à vérifier que deux
+exports décrivent le même état** — elle ne prouve que la non-altération d'un fichier donné. Comportement
+du legacy, repris tel quel ; à trancher avec **D-2**, qui porte déjà sur le contenu de cet antécédent.
+
+**Le mot de passe root de la base sortait dans les messages d'échec des suites.** `mysql` ne prend son
+mot de passe que par la ligne de commande, et `execFileSync` recopie tout l'argv dans le message quand
+la commande échoue : une suite qui tombait imprimait `docker exec ... mysql -uroot -p<le mot de passe>`.
+C'est le défaut corrigé côté SSH en **v1.37.17**, réapparu dans l'outillage de test. Les trois suites
+du module `security/` lisent désormais la base par `tests/e2e/lib-base.mjs`, qui expurge l'erreur.
+**Trois suites plus anciennes portent encore le motif** (`07-maintenance`, `08-approvals`,
+`09-docker-idor`) : hors périmètre de S2b, signalé.
+
+**Le même lecteur de base était recopié cinq fois** dans les trois suites du module. Cinq copies d'un
+accès à la base divergent : la première qui apprend quelque chose ne l'apprend pas aux autres. C'est
+la même raison qui a fait retirer la copie des prérequis du LOT de `rw-pieges`.

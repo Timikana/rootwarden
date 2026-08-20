@@ -7,6 +7,13 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.23** et n'a jamais ete
+> fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
+> `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
+> mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
+> `git push origin main` ne publierait rien — il faut d'abord la materialiser depuis `origin/main`.
+> Le retroportage de ces deux correctifs attend une decision de l'exploitant.
+
 ### Vague 0 — `www/` devient `legacy/`
 
 Le frontend legacy est renommé `www/` → `legacy/` (227 fichiers). **Aucun changement de
@@ -1953,14 +1960,88 @@ copies auraient vecu separement — c'est exactement le defaut « a moitie corri
 que ce catalogue reproche au legacy cinq fois. `rw-e2e` renvoie desormais au
 lanceur plutot qu'a l'invocation manuelle.
 
+### v1.37.23 — module `security/`, sous-lot S2b : l'export PDF du rapport
+
+`ExportConformitePdfController` et une vue dediee `rapport-conformite-pdf.blade.php` — pas un
+`@media print` de la page : le gabarit du portail porte une barre laterale, un en-tete collant et des
+jetons de theme dont dompdf ne sait rien. Route `/rapport-conformite/pdf`, meme garde que la page et
+le CSV (`role:2` + `perm:can_view_compliance`). `Conformite::rapport()` portait deja tout : ce
+sous-lot n'ecrit que le rendu. Le bouton PDF de la page est passe sur la route portee et l'annonce
+`conformite.pdf_a_venir` a disparu — **plus aucun aller-retour vers l'ancien portail depuis ce
+rapport**.
+
+**La dependance manquait.** `dompdf` etait absent du portage : ajoute en `^3.1`, resolu en **v3.1.6**,
+soit exactement la version du legacy — **6 paquets ajoutes, 0 retire, 0 modifie**. Il n'exige que
+`ext-dom` et `ext-mbstring`, tous deux presents ; `gd` n'est que *suggere*, « needed to process
+images », et le rapport n'en porte aucune.
+
+**Comment on mesure un binaire.** Un PDF ne se lit pas comme du texte : dompdf compresse ses flux,
+donc un `grep` sur les octets ne trouve pas le contenu. La suite mesure a deux niveaux — la STRUCTURE
+sur les octets bruts (`%PDF-` en tout premier, l'equivalent du BOM de S1 et S2c, plus `%%EOF`), et le
+CONTENU par `pdftotext`, croise avec la base : le rapport doit NOMMER chaque machine du parc. Le
+fichier temporaire porte des donnees du parc, il est efface dans un `finally`.
+
+**E-43 — la moitie protegee l'etait vraiment.** Contrairement aux quatre autres occurrences du motif
+« le legacy documente son defaut la ou il le commet », la branche PDF tient sa promesse : mesure faite
+des deux cotes, le PDF du legacy commence bien par `%PDF-` et ne porte aucun fragment HTML. Son
+`ob_start()` (ligne 276) est en revanche **vestigial** — le HTML est monte par concatenation, rien
+n'est capture ; il n'existe que pour donner quelque chose a purger a `ob_end_clean()`. Le portage ne le
+reproduit pas : il n'ouvre aucun tampon, donc il n'a rien a purger.
+
+**E-45 — un tableau qui changeait de page perdait son en-tete.** Le legacy monte ses tableaux en
+`<table><tr><th>` sans un seul `<thead>` : dompdf ne repete alors rien. Mesure sur le document reel —
+cote legacy, les **10 lignes de comptes arrivent en page 2 et leur en-tete est reste en page 1** : dix
+lignes de « Oui / Non / — » sans rien qui nomme les colonnes, sur un document dont la raison d'etre
+est d'etre lu par quelqu'un qui ne connait pas l'outil. Le portage enveloppe ses six en-tetes dans
+`<thead>`. **Aucune assertion de texte ne pouvait voir ce defaut** : sur le document aplati l'en-tete
+est present, une fois. Il a fallu rendre les pages en images (`pdftoppm`) et les REGARDER — quatrieme
+defaut d'affichage que seule l'image revele. L'ancrage en test a donc du devenir une mesure PAGE PAR
+PAGE : toute page portant au moins deux noms de comptes lus en base doit porter l'en-tete.
+
+**E-44 — le PDF du legacy en dit moins que sa propre page** : six sections contre sept, cinq colonnes
+de comptes contre six. Ce qu'on imprime et qu'on archive en disait moins que ce qu'on regarde. Le
+portage aligne le PDF sur la page — section pare-feu, colonne « age de la cle ». Ecart voulu, aucun
+calcul change.
+
+**L'empreinte d'integrite n'est pas reproductible, et c'est desormais mesure.** E-42 l'annoncait comme
+une hypothese : deux generations du meme rapport a cinq minutes d'ecart donnent bien deux empreintes,
+l'instant de generation entrant dans l'antecedent. Elle ne prouve donc que la non-alteration d'un
+fichier donne, pas que deux exports decrivent le meme etat. Comportement du legacy, repris tel quel ;
+a trancher avec **D-2**.
+
+**Le mot de passe root de la base sortait dans les messages d'echec des suites.** `mysql` ne prend son
+mot de passe que par la ligne de commande, et `execFileSync` recopie tout l'argv dans le message quand
+la commande echoue : une suite qui tombait imprimait `docker exec ... mysql -uroot -p<le mot de
+passe>`. C'est le defaut corrige cote SSH en **v1.37.17**, reapparu dans l'outillage de test. Les
+trois suites du module lisent desormais la base par `tests/e2e/lib-base.mjs`, qui expurge l'erreur —
+et qui supprime au passage **cinq copies du meme lecteur**. Trois suites plus anciennes portent encore
+le motif (`07-maintenance`, `08-approvals`, `09-docker-idor`) : hors perimetre, signale.
+
+**`compliance_report.php` est integralement porte** — ses points d'entree ont ete enumeres, il n'en a
+que trois (la page, `format=csv`, `format=pdf`), et le `$_GET['_pdf_render'] = true;` de la ligne 194
+est **ecrit et jamais lu**, second vestige de l'approche abandonnee. Le fichier reste neanmoins servi :
+l'archivage se fait par module et `cve_scan.php` porte encore S3 a S7. Ses quatre portes sont deja
+mesurees (les memes quatre que `update/`), et il a ete verifie qu'**aucune des sept pages archivees ne
+figure encore dans la table des raccourcis clavier** du legacy.
+
+**Reference du LOT** : `go-page-conformite-pdf` entre avec **13 PASS sur le legacy** et **14 sur le
+portage** — l'ecart est E-45, mesure cote legacy mais rendu en constat par `verifiePortage`, le rejeu
+du LOT comptant tout `FAIL` comme une regression. Tout le reste inchange et rejoue vert sur les deux
+versants, pytest compris.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-22)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-45**)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
-- `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
 - `docs/migration/METHODE-SOUS-LOT.md` — l'ordre de travail d'un sous-lot, et ce que chaque étape attrape
+- `docs/migration/MODULE-UPDATE.md` — module `update/` : inventaire et découpage (**porté et archivé**)
+- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c portés**)
+- `docs/migration/MODULE-AUTH.md` — module `auth/` : **condition de sortie de la v2.0**, rien de porté
+- `docs/migration/MODULE-SSH.md` — module `ssh/` : inventaire, rien de porté
+- `docs/migration/MODULE-SUPERVISION.md` — module `supervision/` : inventaire, rien de porté
+- `docs/migration/MODULE-FILTRAGE.md` — `iptables/` et `fail2ban/` : inventaire, rien de porté
 
 ---
 

@@ -17,7 +17,7 @@
 
 return [
     'title'         => 'Compliance report',
-    'desc'          => 'Compliance report for the fleet. The page is printable; the CSV and PDF exports carry the same SHA-256 digest.',
+    'desc'          => 'Compliance report for the fleet. The page is printable; the CSV and PDF exports each carry a SHA-256 digest of the report, computed when it is generated.',
     'generated_by'  => 'Generated on',
     'btn_print'     => 'Print',
     'btn_csv'       => 'Export as CSV',
@@ -115,6 +115,4 @@ return [
     'sans_config'      => 'no configuration',
     'footer_generated' => 'Report generated on',
     'empreinte'        => 'Report SHA-256 digest',
-    'export_a_venir'   => 'The CSV and PDF exports are still served by the legacy portal.',
-    'pdf_a_venir'      => 'The PDF export is still served by the legacy portal.',
 ];

@@ -173,7 +173,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S1** ✔ | export CSV d'un scan (`cve_export.php`) — **PORTÉ le 2026-08-20** (v1.37.20) | aucune | non | non |
 | **S2a** ✔ | rapport de conformité, page HTML — **PORTÉ le 2026-08-20** (v1.37.21) | aucune | non | non |
 | **S2c** ✔ | export CSV du rapport — **PORTÉ le 2026-08-20** (v1.37.22) | aucune | non | non |
-| **S2b** | export PDF du rapport | aucune | non | non |
+| **S2b** ✔ | export PDF du rapport — **PORTÉ le 2026-08-20** (v1.37.23) | aucune | non | non |
 | **S3** | consultation des CVE, lecture seule | `GET /cve_results`, `GET /cve_compare` | non | non |
 | **S4** | planification des scans | `GET/POST/PUT/DELETE /cve_schedules`, `GET /cron_preview` | non | oui |
 | **S5** | suivi et ticketing | `POST /cve_remediation`, `POST /tickets` | non | oui + **sortie tierce** |
@@ -234,6 +234,61 @@ Quelqu'un avait rencontré le problème et n'en avait corrigé qu'une moitié.
 **S2b séparé** de S2 : dépendance Composer distincte, sortie binaire, et la purge `ob_end_clean()`
 sans laquelle le PDF est corrompu — un piège déjà payé une fois, à ne pas re-payer en même temps
 qu'autre chose.
+
+**S2b — porté le 2026-08-20** (v1.37.23) : `ExportConformitePdfController` + la vue dédiée
+`rapport-conformite-pdf.blade.php`, route `/rapport-conformite/pdf` sous la **même** garde que la page
+et le CSV (`role:2` + `perm:can_view_compliance`). `Conformite::rapport()` portait déjà tout : S2b
+n'écrit que le rendu. Le bouton PDF de la page S2a est passé sur la route portée et l'annonce
+`conformite.pdf_a_venir` a disparu. Suite de caractérisation `go-page-conformite-pdf` : **14 PASS**
+côté portage, **13** côté legacy (l'écart est E-45, mesuré et rendu en constat).
+
+La dépendance : `dompdf/dompdf ^3.1` était **absente du portage** et a été ajoutée — **6 paquets, 0
+retiré, 0 modifié**, en v3.1.6, soit exactement la version du legacy. Elle n'exige que `ext-dom` et
+`ext-mbstring`, tous deux présents ; `gd` n'est que *suggéré*, « needed to process images », et le
+rapport n'en porte aucune.
+
+Ce que S2b a rapporté :
+
+- **E-43** — la branche PDF est **la seule des cinq** occurrences du motif « le legacy documente son
+  défaut là où il le commet » où la moitié protégée l'était vraiment. Vérifié des deux côtés. Son
+  `ob_start()` est vestigial ; le portage n'ouvre aucun tampon, donc n'a rien à purger.
+- **E-44** — le PDF du legacy en dit **moins** que sa propre page : six sections contre sept, cinq
+  colonnes de comptes contre six. Le portage l'aligne (pare-feu, âge des clés). Écart voulu.
+- **E-45** — aucun `<thead>` dans les tableaux du PDF du legacy : les 10 lignes de comptes arrivent
+  page 2 **sans en-tête**, resté page 1. Corrigé dans le portage. **Ce défaut ne se voyait pas sur le
+  texte extrait** — il a fallu rendre les pages en images.
+- l'empreinte d'intégrité **n'est pas reproductible** : deux générations du même rapport à cinq
+  minutes d'écart donnent deux empreintes. Ce que E-42 annonçait, désormais mesuré → **D-2**.
+- le mot de passe root de la base **sortait dans les messages d'échec** des suites : corrigé pour les
+  trois suites du module (`tests/e2e/lib-base.mjs`), signalé pour trois suites plus anciennes.
+
+### `compliance_report.php` est intégralement porté, et pourtant pas archivable
+
+Ses points d'entrée ont été énumérés : **`format=csv`, `format=pdf`, et la page**. Rien d'autre. Le
+`$_GET['_pdf_render'] = true;` de la ligne 194 est **écrit et jamais lu** — un second vestige de
+l'approche abandonnée, à côté de l'`ob_start()` vestigial. Les trois branches sont donc portées, par
+S2a, S2c et S2b.
+
+**Il reste néanmoins servi**, parce que `cve_scan.php` (S3 à S7) l'est aussi et que l'archivage se
+fait par module, pas par fichier. Ses quatre portes sont déjà mesurées — les mêmes quatre que
+`update/`, ce qui confirme la règle apprise là-bas :
+
+| Point d'entrée | Fichier |
+|---|---|
+| barre latérale | `legacy/menu.php:155` |
+| tiroir mobile | `legacy/menu.php:250` |
+| tuile « accès rapides » | `legacy/index.php:384` |
+| raccourci clavier `g` puis `r` | `legacy/head.php:210` |
+
+Contrôlé au passage : **aucune des sept pages déjà archivées ne figure encore dans la table des
+raccourcis clavier**, et `update/` y a bien été redirigé vers le portage. Pas de 404 atteignable au
+clavier.
+
+Le menu du portage, lui, pointe déjà sur la route interne (`Navigation.php:66`), et les deux boutons
+d'export de la page portée sont internes depuis S2b : plus aucun aller-retour vers l'ancien portail
+depuis ce rapport.
+
+**Le module `security/` n'est donc PAS archivable** : S3 à S7 vivent encore dans `cve_scan.php`.
 
 **S3 en troisième** : deux routes sans écriture ni SSH, mais c'est là que vit tout le rendu du
 module. Le gros du travail de vues et des ~35 clés i18n se paie ici, une fois ; les lots suivants
