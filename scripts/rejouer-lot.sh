@@ -54,14 +54,18 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 #
 # Mis a jour a chaque sous-lot qui ajoute ou retire une assertion. Un ecart n'est
 # pas forcement une regression — mais il doit toujours etre EXPLIQUE.
+# `go-socle-navigation` a passe de 40 a 42 au portage de S3 : la suite asserte
+# DYNAMIQUEMENT que chaque entree portee du menu resout, donc basculer `cve_scan`
+# de `legacy` a `route` ajoute une assertion pour `rw-test-admin` et une pour
+# `rw-test-super`. Ce n'est pas un chiffre ajuste pour faire passer le rejeu.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=40 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=42 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
   [go-page-update-u5]=18 [go-page-update-u6]=13 [go-page-update-u6b]=20
   [go-page-cve-export]=20 [go-page-conformite]=13 [go-page-conformite-csv]=17
-  [go-page-conformite-pdf]=14
+  [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -76,7 +80,8 @@ declare -A REF_LEGACY=(
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
   go-page-commandlog go-page-approvals go-page-drift go-page-backups go-page-tasks
   go-page-tickets go-page-search go-page-cve-export go-page-conformite
-  go-page-conformite-csv go-page-conformite-pdf go-page-update-u1 go-page-update-u2 go-page-update-u3
+  go-page-conformite-csv go-page-conformite-pdf go-page-cve-consultation
+  go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-backups go-page-tasks go-page-tickets go-page-search go-page-cve-export

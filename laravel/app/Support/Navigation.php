@@ -40,7 +40,7 @@ class Navigation
             ['cle' => 'bashrc',         'garde' => 'can_manage_bashrc',       'legacy' => '/bashrc/'],
             ['cle' => 'graylog',        'garde' => 'can_manage_graylog',      'legacy' => '/graylog/'],
             ['cle' => 'wazuh',          'garde' => 'can_manage_wazuh',        'legacy' => '/wazuh/', 'feature' => 'wazuh'],
-            ['cle' => 'cve_scan',       'garde' => 'can_scan_cve',            'legacy' => '/security/'],
+            ['cle' => 'cve_scan',       'garde' => 'can_scan_cve',            'route'  => 'scan-cve'],
             // Garde par ROLE et non par permission : releve tel quel du legacy.
             // L'ecart est signale dans INVENTAIRE.md — a arbitrer, pas a corriger
             // en silence pendant un portage de navigation.
