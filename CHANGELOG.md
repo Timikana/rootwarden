@@ -1466,6 +1466,37 @@ que quatre points d'entrée ont été redirigés : il ne collecte que la barre l
 `/index.php`. La formule des sept pages — « exactement les N entrées redirigées » — ne vaut plus
 pour un module.
 
+### Bascule du poste de developpement vers une VM Debian
+
+Le developpement quitte Windows pour une VM Debian 13 (`192.168.0.245`). Deux scripts portent la
+bascule : `scripts/migrer-vers-vm.sh` (poste source, avec `--dry-run`) et
+`scripts/installer-sur-vm.sh` (moitie distante).
+
+Le depot passe par **`git bundle`** et non par un `git clone` : les commits de
+`Migration-Laravel` n'etaient pousses nulle part, le depot distant ne les connaissait pas.
+`srv-docker.env`, `laravel/.env`, un `mysqldump` et la memoire du projet suivent a part — aucun
+n'est suivi par git.
+
+**Deux pieges payes pendant la bascule.** Le bloc distant etait d'abord embarque dans un heredoc,
+lui-meme dans une chaine passee a `eval` : trois couches de citation, les `$` sont arrives
+litteralement et `apt-get` a recu « $besoin » comme nom de paquet. Il vit desormais dans son propre
+fichier. Et `mysqladmin ping` REUSSIT pendant l'initialisation de MySQL, avant que le mot de passe
+root ne soit applique : l'attente rendait « base prete » et la restauration echouait ensuite sur
+« Access denied ». Elle attend maintenant une requete qui S'AUTHENTIFIE.
+
+Trois choses que Windows masquait : `laravel/.env` absent du bundle (gitignore) faisait rendre 500
+a Laravel ; le meme fichier en `600 root:root` restait illisible pour Apache, qui tourne en
+`www-data` ; et Chromium refuse de tourner en root sans `--no-sandbox`, ce qui impose de jouer les
+suites sous un compte ordinaire.
+
+### La methode d'un sous-lot, ecrite
+
+`docs/migration/METHODE-SOUS-LOT.md` — l'ordre de travail des sept sous-lots de `update/`, avec
+pour chaque etape les defauts qu'elle a reellement attrapes : l'inventaire par agents, la lecture
+du backend avant tout clic, le harnais Puppeteer, les regles d'attente, la mesure en requetes, les
+captures qu'il faut REGARDER. Les ecarts restent dans `PARITE.md`, la recette d'archivage dans
+`DEPRECIATION.md` : le document dit dans quel ORDRE travailler, il ne les repete pas.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
@@ -1473,6 +1504,7 @@ pour un module.
 - `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-22)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
+- `docs/migration/METHODE-SOUS-LOT.md` — l'ordre de travail d'un sous-lot, et ce que chaque étape attrape
 
 ---
 
