@@ -12,6 +12,7 @@ use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\ExportCveController;
 use App\Http\Controllers\RapportConformiteController;
+use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PortailController;
 use Illuminate\Support\Facades\Route;
@@ -120,6 +121,14 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/rapport-conformite', RapportConformiteController::class)
         ->middleware(['role:2', 'perm:can_view_compliance'])
         ->name('rapport-conformite');
+
+    /*
+     * Export CSV du meme rapport — sous-lot S2c. MEME garde que la page, et
+     * memes chiffres : tout vient de `Conformite::rapport()`, jamais recalcule.
+     */
+    Route::get('/rapport-conformite/csv', ExportConformiteController::class)
+        ->middleware(['role:2', 'perm:can_view_compliance'])
+        ->name('rapport-conformite.csv');
 
     /*
      * Export CSV d'un scan CVE — module `security/`, sous-lot S1.

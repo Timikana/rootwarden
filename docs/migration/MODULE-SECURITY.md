@@ -172,7 +172,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 |---|---|---|---|---|
 | **S1** ✔ | export CSV d'un scan (`cve_export.php`) — **PORTÉ le 2026-08-20** (v1.37.20) | aucune | non | non |
 | **S2a** ✔ | rapport de conformité, page HTML — **PORTÉ le 2026-08-20** (v1.37.21) | aucune | non | non |
-| **S2c** | export CSV du rapport | aucune | non | non |
+| **S2c** ✔ | export CSV du rapport — **PORTÉ le 2026-08-20** (v1.37.22) | aucune | non | non |
 | **S2b** | export PDF du rapport | aucune | non | non |
 | **S3** | consultation des CVE, lecture seule | `GET /cve_results`, `GET /cve_compare` | non | non |
 | **S4** | planification des scans | `GET/POST/PUT/DELETE /cve_schedules`, `GET /cron_preview` | non | oui |
@@ -219,7 +219,13 @@ Ce que S2a a rapporté :
   restait en français quelle que soit la langue.
 - Les exports CSV et PDF restent servis par l'ancien portail, **et la page le dit** (E-39).
 
-**S2c** portera l'export CSV, où **E-33 se rejoue** : `compliance_report.php` écrit lui aussi au fil
+**S2c — porté le 2026-08-20** (v1.37.22) : `ExportConformiteController`, route
+`/rapport-conformite/csv` gardée comme la page, et `Conformite::rapport()` **extrait** pour que la
+page et l'export ne puissent pas divergerr. 10 PASS sur le legacy, **17 sur le portage**. E-33 s'y est
+rejoué exactement : 34 blocs d'avertissement, sections gonflées à 13/13/34 contre 3/3/10 — voir
+E-40 à E-42.
+
+~~S2c portera l'export CSV, où **E-33 se rejoue**~~ : `compliance_report.php` écrit lui aussi au fil
 de l'eau dans `php://output`. Sa branche PDF porte déjà un `ob_end_clean()` dont le commentaire
 nomme exactement le défaut — « purger tout output parasite (notices PHP capturées par ob_start en
 mode debug) avant d'émettre le binaire PDF » —, mais la branche CSV, elle, n'a jamais été protégée.

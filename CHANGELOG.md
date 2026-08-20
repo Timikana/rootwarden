@@ -1812,6 +1812,59 @@ VM et non sur localhost : les deux portails repondent, le rapport de conformite 
 renvoient vers la connexion faute de session. La VM ne porte aucun pare-feu, les trois ports
 (8080, 8443, 8444) ecoutent sur toutes les interfaces.
 
+### v1.37.22 — module `security/`, sous-lot S2c : l'export CSV du rapport
+
+`ExportConformiteController` rend le fichier, la route `/rapport-conformite/csv` porte la meme garde
+que la page (`role:2` + `perm:can_view_compliance`), et **`Conformite::rapport()` a ete EXTRAIT** :
+la page et l'export presentent les memes chiffres, et deux calculs separes finissent par ne plus dire
+la meme chose. C'est la prevention du defaut trouve sur la page des mises a jour, ou le premier rendu
+et les relectures venaient de deux requetes qui ne s'accordaient pas. La date est passee par
+l'appelant et non calculee dans le service : elle entre dans l'antecedent de l'empreinte, et deux
+appels a une minute d'intervalle produiraient deux empreintes pour un meme rapport.
+
+**E-33 s'est rejoue exactement (E-40).** Mesure sur le meme rapport, au meme instant : le legacy rend
+**34 blocs d'avertissement PHP** dans le fichier, s'ouvre sur `<br />` au lieu de son titre, et gonfle
+ses sections a **13 / 13 / 34** la ou le parc compte 3 machines et la base 10 comptes. Le portage rend
+**3 / 3 / 10**, soit exactement la source, et zero avertissement.
+
+**Ce qui rend ce defaut remarquable, c'est qu'il etait deja connu.** La branche PDF DU MEME FICHIER
+porte un `ob_end_clean()` dont le commentaire le nomme mot pour mot — « purger tout output parasite
+(notices PHP captures par ob_start en mode debug) avant d'emettre le binaire PDF -> evite un PDF
+corrompu prefixe de "<br />..." ». Quelqu'un l'a rencontre, l'a nomme precisement, et n'a protege
+**qu'une branche sur deux**. C'est le troisieme « a moitie corrige » de ce seul fichier, apres
+l'en-tete qui annonce une garde plus stricte que le code (E-36) et la regle du hash enoncee a
+l'endroit ou elle est violee (E-37).
+
+Le BOM part desormais par `fwrite` et non par `fprintf` : le legacy passe les trois octets du BOM en
+deuxieme argument de `fprintf`, qui est un **format**. Aucun n'est un caractere special, donc il s'en
+sort — par chance, pas par construction.
+
+**Deux perimetres differents, repris tels quels (E-41)** : le CSV liste TOUS les comptes, la page
+saute les inactifs. Le service nomme les deux populations separement pour qu'on ne les confonde pas,
+et le test l'asserte. Restreindre l'un ou elargir l'autre change ce que le rapport DIT.
+
+**D-2 reste ouverte** : l'empreinte est reprise telle quelle, avec son antecedent qui porte des
+colonnes absentes du rapport. Mesure deja faite (E-37) : la corriger ne fait que changer sa valeur.
+
+### Deux suites corrigees, pour la meme raison
+
+`go-page-search` ecrivait l'adresse du legacy EN DUR. Des que `LEGACY_URL` a pointe sur l'adresse de
+la VM, les liens legacy ont cesse de commencer par la constante, ont ete classes comme INTERNES, et
+leur `target="_blank"` a fait tomber « aucun lien interne n'est marque ». **Deuxieme suite atteinte**
+apres `go-socle-navigation` : un test ne doit pas ecrire en dur une valeur de DEPLOIEMENT, il doit la
+lire a la meme source que la page. Les deux lisent maintenant `app.url_legacy`.
+
+`go-page-update-u3` mourait sur un `null` vingt lignes apres l'assertion qui le detectait :
+`TypeError` non rattrapee, tampon de resultats jamais imprime, « 0 PASS » rapporte. L'echec a ete
+diagnostique **trois fois de suite** comme de la flakiness, faute de savoir ce que la page contenait.
+Elle sort maintenant par le chemin normal, en disant l'URL reellement atteinte, le titre, et si c'est
+l'ecran de connexion ou le bouton qui manque. Une suite qui meurt sur un `null` ne dit pas ce qu'elle
+a mesure.
+
+**Reference du LOT** : `go-page-conformite-csv` entre avec **10 PASS sur le legacy** et **17 sur le
+portage** ; `go-socle-i18n` compare **581 cles**. Tout le reste inchange et rejoue vert sur les deux
+versants, 296 pytest compris.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

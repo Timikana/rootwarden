@@ -25,11 +25,38 @@
  *   E2E_BASE=https://localhost:8443 node go-page-search.mjs   (legacy)
  */
 import puppeteer from 'puppeteer';
+import { execFileSync } from 'child_process';
 import { createHmac } from 'crypto';
 import { constateArchivage, verifieMenuLegacy, sondeLegacy } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
-const LEGACY = 'https://localhost:8443';
+/**
+ * La base du legacy, LUE DANS LA CONFIGURATION DU PORTAGE.
+ *
+ * Ecrite en dur, elle faisait echouer l'assertion des marqueurs des que
+ * `LEGACY_URL` pointait ailleurs — par exemple sur l'adresse de la VM, ce qu'il
+ * FAUT poser pour ouvrir les deux portails depuis un autre poste. Les liens
+ * legacy cessaient alors de commencer par la constante, etaient classes comme
+ * INTERNES, et leur `target="_blank"` faisait tomber « aucun lien interne n'est
+ * marque ».
+ *
+ * DEUXIEME suite atteinte par ce defaut apres `go-socle-navigation` : un test ne
+ * doit pas ecrire en dur une valeur de DEPLOIEMENT, il doit la lire a la meme
+ * source que la page — sinon il la contredit.
+ */
+function baseLegacyConfiguree() {
+    if (process.env.E2E_LEGACY) return process.env.E2E_LEGACY;
+    try {
+        const sortie = execFileSync('docker',
+            ['exec', 'rootwarden_laravel', 'php', 'artisan', 'config:show', 'app'],
+            { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+        const ligne = sortie.split('\n').find(l => /^\s+url_legacy\s/.test(l));
+        const url = ligne && ligne.match(/(https?:\/\/\S+)/);
+        if (url) return url[1].replace(/\/+$/, '');
+    } catch { /* le relais docker peut manquer : on retombe sur le defaut */ }
+    return 'https://localhost:8443';
+}
+const LEGACY = baseLegacyConfiguree();
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
 const PAGE = CIBLE === 'laravel' ? '/recherche' : '/search/';

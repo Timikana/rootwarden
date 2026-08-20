@@ -1161,3 +1161,93 @@ connexion en 200** — d'où des assertions « refusée » qui échouent sur un 
 soit verrouillé. `go-socle-passerelle` a rougi ainsi une fois sur deux, et `go-page-update-u3`
 mourait sur un `null` faute de trouver un bouton : ce n'était pas de la flakiness, c'était cela. Le
 lanceur du LOT attend désormais le basculement de la fenêtre entre deux suites.
+
+---
+
+## E-40 — L'export CSV du rapport de conformité est corrompu, et une moitié du défaut était déjà corrigée
+
+**E-33 se rejoue, à l'identique.** `compliance_report.php` écrit son CSV au fil de l'eau dans
+`php://output` ; `verify.php` pose `display_errors=1` sous `DEBUG_MODE=true` ; PHP 8.4 déprécie
+`fputcsv()` appelé sans son argument `$escape`. Mesure, même rapport, même instant :
+
+| | legacy | portage |
+|---|---|---|
+| blocs d'avertissement PHP dans le fichier | **34** | 0 |
+| premier enregistrement | **`<br />`** | son titre |
+| section « posture par serveur » | **13 lignes** | **3** |
+| section « serveurs » | **13 lignes** | **3** |
+| section « utilisateurs » | **34 lignes** | **10** |
+
+Le parc compte 3 machines et la base 10 comptes : le portage rend exactement la source, le legacy la
+multiplie par les avertissements intercalés.
+
+**Ce qui rend ce défaut remarquable, c'est qu'il était déjà connu.** La branche PDF **du même
+fichier** porte cette parade, avec son commentaire :
+
+```php
+// Patch : purger tout output parasite (notices PHP captures par ob_start en
+// mode debug) avant d'emettre le binaire PDF -> evite un PDF corrompu prefixe
+// de "<br />..." selon les donnees.
+while (ob_get_level() > 0) { ob_end_clean(); }
+```
+
+Quelqu'un a rencontré exactement ce défaut, l'a nommé précisément, et n'a protégé **qu'une branche
+sur deux**. C'est le troisième « à moitié corrigé » relevé dans ce seul fichier, après l'en-tête qui
+annonce une garde plus stricte que le code (E-36) et la règle du hash énoncée à l'endroit où elle est
+violée (E-37).
+
+### Ce que fait le portage
+
+La charge utile est **assemblée en mémoire puis rendue d'un bloc** — rien ne part avant que tout soit
+écrit, donc aucun avertissement, quelle qu'en soit la cause future, ne peut s'y glisser. Et `$escape`
+est passé **explicitement, à sa valeur historique** : la dépréciation porte sur l'*absence* de
+l'argument, pas sur sa valeur.
+
+Le BOM part par `fwrite` et non par `fprintf`. Le legacy écrit
+`fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF))` — le deuxième argument de `fprintf` est un **format**.
+Les trois octets du BOM n'en contiennent aucun de spécial, donc il s'en sort — par chance, pas par
+construction.
+
+---
+
+## E-41 — Le CSV et la page ne couvrent pas la même population de comptes
+
+Le CSV parcourt **tous** les comptes (`compliance_report.php:173`) ; le tableau de la page saute les
+inactifs (`:457`, `if (!$u['active']) continue;`). Deux vues du même rapport, deux périmètres.
+
+**Repris tel quel.** Restreindre l'un ou élargir l'autre change ce que le rapport *dit* — c'est une
+décision, pas un effet de bord de portage. Le service nomme donc les deux populations séparément
+(`comptes` et `comptesActifs`) pour qu'on ne les confonde pas, et le test l'asserte : la section du
+CSV doit porter **10** comptes quand la base en a 10, actifs ou non.
+
+---
+
+## E-42 — Une même donnée, un seul calcul
+
+La page et l'export présentent les mêmes chiffres. `Conformite::rapport()` les calcule **une fois**,
+les deux contrôleurs s'y adossent. La date est passée par l'appelant et non calculée dans le service :
+elle entre dans l'antécédent de l'empreinte, et deux appels à une minute d'intervalle produiraient
+deux empreintes pour un même rapport.
+
+Ce n'est pas une divergence avec le legacy — c'est la prévention de celle qui a été trouvée sur la
+page des mises à jour, où le premier rendu et les relectures venaient de deux requêtes qui ne
+s'accordaient ni sur les machines archivées ni sur le format des dates. Deux calculs séparés
+finissent par ne plus dire la même chose.
+
+---
+
+## Deux suites corrigées, pour la même raison
+
+**`go-page-search` écrivait l'adresse du legacy en dur** (`const LEGACY = 'https://localhost:8443'`).
+Dès que `LEGACY_URL` a pointé sur l'adresse de la VM, les liens legacy ont cessé de commencer par la
+constante, ont été classés comme **internes**, et leur `target="_blank"` a fait tomber « aucun lien
+interne n'est marqué ». **Deuxième suite atteinte** après `go-socle-navigation` : un test ne doit pas
+écrire en dur une valeur de *déploiement*, il doit la lire à la même source que la page — sinon il la
+contredit. Les deux lisent désormais `app.url_legacy`.
+
+**`go-page-update-u3` mourait sur un `null`** vingt lignes après l'assertion qui le détectait :
+`TypeError` non rattrapée, `lignes` jamais imprimé, « 0 PASS » rapporté. L'échec a été diagnostiqué
+trois fois de suite comme de la flakiness, faute de savoir ce que la page contenait. Elle sort
+maintenant par le chemin normal, en disant l'URL réellement atteinte, le titre de la page, et si
+c'est l'écran de connexion ou le bouton qui manque. **Une suite qui meurt sur un `null` ne dit pas ce
+qu'elle a mesuré.**

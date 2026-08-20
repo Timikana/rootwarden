@@ -92,6 +92,23 @@ return [
     'tuile_ssh_texte'         => 'average of the latest audits',
     'tuile_supervision_texte' => 'servers carrying an agent',
 
+    // Export CSV (sous-lot S2c). Les marqueurs de section sont TRADUITS, comme
+    // le reste du fichier : un rapport se lit dans la langue de qui l'exporte.
+    // Le test les repere par leur FORME (`=== … ===`) et non par leur texte,
+    // sans quoi il rougirait en anglais.
+    'csv_section_resume'     => 'SUMMARY',
+    'csv_section_posture'    => 'POSTURE PER SERVER (sshd + CVE + fail2ban + drift)',
+    'csv_section_serveurs'   => 'SERVERS',
+    'csv_section_comptes'    => 'USERS',
+    'csv_comptes_actifs'     => 'Active users',
+    'csv_age_cle'            => 'Key age (days)',
+    'th_statut'              => 'Status',
+    'th_environnement'       => 'Environment',
+    'th_derniere_maj'        => 'Last check',
+    'th_actif'               => 'Active',
+    'oui'                    => 'Yes',
+    'non'                    => 'No',
+
     // Misc
     'never'            => 'Never',
     'by'               => 'by',
@@ -99,4 +116,5 @@ return [
     'footer_generated' => 'Report generated on',
     'empreinte'        => 'Report SHA-256 digest',
     'export_a_venir'   => 'The CSV and PDF exports are still served by the legacy portal.',
+    'pdf_a_venir'      => 'The PDF export is still served by the legacy portal.',
 ];
