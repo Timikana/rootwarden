@@ -187,6 +187,25 @@ verifie('le parc est rendu', nbLignes > 0, `${nbLignes} ligne(s)`);
 const aPaquets = await page.$(SEL_PAQUETS);
 verifie("l'action « paquets en attente » est presente", Boolean(aPaquets));
 
+// SORTIR PAR LE CHEMIN NORMAL quand le bouton manque.
+//
+// Sans ce garde, la suite mourait vingt lignes plus bas sur
+// `aPaquets.evaluate` — une `TypeError` non rattrapee, donc `lignes` jamais
+// imprime, donc « 0 PASS » rapporte. Une suite qui meurt sur un `null` ne dit
+// pas ce qu'elle a mesure, et l'echec a ete diagnostique trois fois de suite
+// comme « flaky » faute de savoir ce que la page contenait.
+if (! aPaquets) {
+    constate('page reellement atteinte', page.url());
+    constate('titre de la page', await page.title());
+    constate('diagnostic', /connexion|login/i.test(page.url())
+        ? 'la session n\'a pas tenu : c\'est l\'ecran de connexion, pas la page'
+        : 'la page est bien la, le bouton en est absent');
+    console.log(lignes.join('\n'));
+    console.log(`\ncible=${CIBLE} : ${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL`);
+    await navigateur.close();
+    process.exit(1);
+}
+
 const aSimulation = await page.$(SEL_SIMULATION);
 if (CIBLE === 'legacy') {
     constate('la simulation existe cote legacy', aSimulation ? 'oui' : 'non');

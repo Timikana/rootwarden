@@ -254,6 +254,85 @@ class Conformite
     }
 
     /**
+     * TOUT le rapport, en une lecture.
+     *
+     * EXTRAIT ICI PLUTOT QUE RECOPIE dans deux controleurs. La page et l'export
+     * CSV presentent les MEMES chiffres : s'ils les calculaient chacun de leur
+     * cote, ils finiraient par ne plus dire la meme chose — c'est exactement le
+     * defaut trouve sur la page des mises a jour, ou le premier rendu et les
+     * relectures venaient de deux requetes qui ne s'accordaient pas.
+     *
+     * `$date` est passee par l'appelant et non calculee ici : elle entre dans
+     * l'antecedent de l'empreinte, et deux appels a une minute d'intervalle
+     * produiraient deux empreintes pour un meme rapport.
+     *
+     * @return array<string,mixed>
+     */
+    public function rapport(string $date): array
+    {
+        $serveurs = $this->serveurs();
+        $comptes  = $this->comptes();
+        $remStats = $this->remediation();
+        $auditSsh = $this->auditSsh();
+        $agents   = $this->agentsSupervision();
+        $posture  = $this->posture($serveurs, $auditSsh);
+
+        $comptesActifs = array_values(array_filter($comptes, static fn ($c) => (bool) $c->active));
+
+        $scoreSshMoyen = $auditSsh === [] ? null : (int) (
+            array_sum(array_map(static fn ($a) => (int) $a->score, $auditSsh)) / count($auditSsh));
+        $postureMoyenne = $posture === [] ? 0 : (int) (
+            array_sum(array_column($posture, 'score')) / count($posture));
+
+        return [
+            'date'            => $date,
+            'serveurs'        => $serveurs,
+            // Les DEUX populations, nommees pour qu'on ne les confonde pas : la
+            // page ne montre que les comptes actifs, le CSV les liste tous.
+            'comptes'         => $comptes,
+            'comptesActifs'   => $comptesActifs,
+            'remStats'        => $remStats,
+            'parefeu'         => $this->historiqueParefeu(),
+            'auditSsh'        => $auditSsh,
+            'agentsParMachine' => $this->grouperAgents($agents),
+            'posture'         => $posture,
+            'nbServeurs'      => count($serveurs),
+            'nbEnLigne'       => count(array_filter($serveurs, static fn ($s) =>
+                                    strtolower((string) ($s->online_status ?? '')) === 'online')),
+            'nbComptesActifs' => count($comptesActifs),
+            'nbAvec2fa'       => count(array_filter($comptesActifs, static fn ($c) => ! empty($c->totp_secret))),
+            'nbCles90j'       => count(array_filter($comptesActifs, static fn ($c) =>
+                                    $c->ssh_key && $c->ssh_key_updated_at
+                                    && strtotime((string) $c->ssh_key_updated_at) < strtotime('-90 days'))),
+            'scoreSshMoyen'   => $scoreSshMoyen,
+            'nbAvecAgent'     => count(array_unique(array_map(
+                                    static fn ($a) => $a->machine_id, $agents))),
+            'postureMoyenne'  => $postureMoyenne,
+            'noteMoyenne'     => $this->note($postureMoyenne),
+            'empreinte'       => $this->empreinte($serveurs, $comptes, $remStats, $date),
+        ];
+    }
+
+    /**
+     * Un serveur, ses agents. Le regroupement appartient au service et non a la
+     * vue : une vue qui calcule finit par calculer differemment de l'export qui
+     * la double.
+     *
+     * @param  list<object>  $agents
+     * @return array<int,array{nom:string,ip:string,agents:list<object>}>
+     */
+    private function grouperAgents(array $agents): array
+    {
+        $parMachine = [];
+        foreach ($agents as $a) {
+            $parMachine[$a->machine_id]['nom'] = (string) $a->name;
+            $parMachine[$a->machine_id]['ip'] = (string) $a->ip;
+            $parMachine[$a->machine_id]['agents'][] = $a;
+        }
+        return $parMachine;
+    }
+
+    /**
      * L'empreinte d'integrite du rapport.
      *
      * REPRISE TELLE QUELLE DU LEGACY, et ce n'est pas satisfaisant : l'antecedent
