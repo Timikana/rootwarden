@@ -113,65 +113,41 @@ toucher à la zone concernée.
 
 ## Poste de développement VM Debian (depuis le 2026-08-20)
 
-Les pièges Windows ci-dessus ne s'appliquent plus. Ceux-là, si — tous relevés au
-premier rejeu du LOT sur la VM.
+Les pièges Windows ci-dessus ne s'appliquent plus.
 
-- **Ne jamais passer du code à `docker exec` par une chaîne de shell.**
-  `execSync("docker exec … php -r " + JSON.stringify(script))` fait entourer le
-  script de guillemets **doubles**, et `execSync` remet la chaîne à `/bin/sh`.
-  Un shell POSIX développe `$variable` entre guillemets doubles : tout `$x` du
-  PHP arrive **vide** dans le conteneur. Sous Windows la commande ne passait pas
-  par ce shell et le défaut ne se voyait pas — un `MSYS_NO_PATHCONV` oublié dans
-  le code trahit cette origine. Parade : `execFileSync('docker', ['exec', …,
-  'php', '-r', script])`, argv tel quel, sans shell.
+**Les six prérequis d'exécution du LOT — relais docker, profil compose `preprod`,
+`E2E_BASE` dans les deux sens, `login_attempts`, fenêtre TOTP, cas de vague 0 —
+vivent dans le skill `rw-lot` et dans `scripts/rejouer-lot.sh`, et NULLE PART
+AILLEURS.** Ils y sont opérationnels ; les recopier ici ferait deux listes qui
+divergeraient — c'est précisément le défaut « à moitié corrigé » que ce catalogue
+reproche au legacy cinq fois.
 
-  Ce que ça coûtait : la suite échouait **à l'appel**, avant la moindre
-  assertion — donc sans dire ce qu'elle ne vérifiait plus. La parité FR/EN des
-  catalogues n'était contrôlée par personne.
+Ne restent ici que les pièges de l'environnement qui ne sont pas des étapes du
+lanceur :
 
-- **`utilisateur` n'est PAS dans le groupe `docker`** malgré ce qu'affirme la
-  doc de bascule (`id` le dit). Toute suite qui appelle `docker exec` échoue sur
-  « permission denied … /var/run/docker.sock ». Ne pas l'ajouter au groupe pour
-  contourner : l'appartenance vaut un accès root permanent. Un relais
-  `docker → sudo -n docker` en tête de `PATH` suffit pour une session de tests.
-
-- **Le banc d'essai vit derrière le profil compose `preprod`.** `mock-opencve` et
-  `test-server` (machine 2, `10.10.10.10`) ne démarrent qu'avec
-  `--profile preprod`, activé par `DEBUG_MODE=true` — mais seulement si la pile
-  est lancée par `./start.sh` ou `./maj.sh`. Un `docker compose up -d` nu les
-  laisse à terre, et `update/` U3 comme U4 tombent : l'un rend « Erreur
-  interne », l'autre meurt **dans son propre nettoyage**, avant la première
-  assertion, sur un hôte injoignable.
-
-- **Un `sshd` frais authentifie avant d'être prêt à servir.** Sur un conteneur
-  qui vient d'être créé, la première session SSH est acceptée, authentifiée,
-  puis fermée par le serveur (`EOF in transport thread` juste après
-  `userauth is OK`) — la route écrit son fichier puis meurt sur « Socket is
-  closed ». C'est le piège de `mysqladmin ping` sous une forme neuve, en pire :
-  **une session réussie ne prouve pas que le démon est prêt.** Le contrôle
-  d'attente avait rendu `uid 0`, et la session suivante est tombée quand même.
-  La même séquence rejouée dix fois passe dix fois.
-
-- **Ne rien poser dans `E2E_BASE` ne désigne aucune cible.** Les suites n'ont pas
-  le même défaut : `go-socle-auth` vise le **legacy** (`https://localhost:8443`),
-  les pages et sous-lots visent **Laravel** (`http://localhost:8444`). Un
-  lanceur qui se contente d'effacer la variable joue `go-socle-auth` contre le
-  legacy en croyant mesurer le portage — 13 PASS au lieu de 14, sans un seul
-  FAIL. Poser la base **explicitement dans les deux sens**.
-
-- **La RAM est sous le plancher** : 3,8 Gio pour 2,9 Gio de plafonds déclarés
-  plus ~525 Mio par suite E2E. Le LOT tourne, mais avec ~2,3 Gio de swap occupé
-  en permanence. Passer la VM à 8 Gio est un réglage Hyper-V et un redémarrage.
-
-- **L'identité git n'est pas configurée** sur la VM : le premier `git commit`
-  échoue sur « Identité d'auteur inconnue ». La régler **localement au dépôt**,
-  sur celle de l'historique de la branche, jamais en `--global`.
-
-- **Le mot de passe de `superadmin` en base n'est pas celui que les suites
-  attendent**, et son `force_password_change` vaut 1 : `go-vague0-legacy`, qui
-  vise ce compte par défaut, ne peut pas se connecter. Le jouer avec
-  `E2E_USER=rw-test-super` / `E2E_PASS=RootWarden@2026-Test!` et le secret TOTP
-  du compte, plutôt que de toucher à `superadmin`.
+- **`utilisateur` n'est PAS dans le groupe `docker`**, contrairement à ce
+  qu'affirmait la doc de bascule — `id` le dit. Ne pas l'ajouter au groupe pour
+  contourner : l'appartenance vaut un **accès root permanent**. Le lanceur passe
+  par `sudo -n docker`.
+- **L'identité git n'est pas configurée** : le premier commit échoue sur
+  « Identité d'auteur inconnue ». La régler **localement au dépôt**, sur celle de
+  l'historique, jamais en `--global`.
+- **Le mot de passe de `superadmin` en base n'est pas celui qu'attendent les
+  suites**, et son `force_password_change` vaut 1. Ne pas y toucher : utiliser un
+  compte `rw-test-*`.
+- **Les secrets TOTP des comptes `rw-test-*` sont EN DUR** dans
+  `go-socle-auth.mjs` (vecteurs déterministes). `tests/e2e/code-totp.mjs` les y
+  lit pour imprimer un code : le secret ne circule pas.
+- **Un `sshd` frais authentifie AVANT d'être prêt à servir.** Sur un conteneur qui
+  vient d'être créé, la première session est acceptée, authentifiée, puis fermée
+  par le serveur (`EOF in transport thread` juste après `userauth is OK`). C'est
+  le piège de `mysqladmin ping` sous une forme neuve, et en pire : **une session
+  réussie ne prouve pas que le démon est prêt** — le contrôle d'attente avait
+  obtenu un `uid 0`, et la session suivante est tombée quand même.
+- **La RAM a été portée à 6 Go** le 2026-08-20 (5,8 Gio vus par le système,
+  hot-add sans redémarrage). Le plancher est franchi. Cela ne rend PAS l'exécution
+  parallèle des suites possible : c'est le garde anti-rejeu par compte qui
+  l'interdit, pas la mémoire.
 
 ## Outillage de shell
 

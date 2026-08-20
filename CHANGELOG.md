@@ -1909,6 +1909,50 @@ ligne `users` — dont `login.php:155` a chaque connexion reussie — repousse l
 d'expiration serait alors neutralisee par l'usage normal. A mesurer sur une base reelle avant de
 porter quoi que ce soit de `auth/`.
 
+### Le lanceur du LOT entre dans le depot, et deux skills avec lui
+
+Le lanceur du LOT vivait dans un repertoire temporaire et **mourait avec la
+session** : chaque reprise repayait les six prealables un par un.
+`scripts/rejouer-lot.sh` les porte desormais, compare le resultat aux chiffres de
+reference et rend `conforme`, `ECART attendu=N` ou `ECHEC`.
+
+```bash
+./scripts/rejouer-lot.sh                    # tout, les deux versants
+./scripts/rejouer-lot.sh --legacy go-page-conformite
+```
+
+Les six prealables, chacun paye par au moins une seance de diagnostic : le relais
+`sudo -n docker` (plutot que d'accorder au compte une appartenance au groupe, qui
+vaut un acces root permanent), le profil compose `preprod` pour le banc d'essai,
+`E2E_BASE` posee DANS LES DEUX SENS, `login_attempts` vide avant CHAQUE suite,
+l'attente du basculement de la fenetre TOTP entre deux suites, et le cas
+particulier de `go-vague0-legacy`.
+
+**Deux skills nouvelles**, sur les deux manques les plus repetes :
+
+`rw-lot` porte les prealables, les chiffres de reference et **les trois signatures
+d'echec qui ont deja trompe** — une assertion « refusee » qui echoue sur un 200
+sans qu'aucun compte ne soit verrouille (la session n'a pas tenu, regarder le
+CORPS) ; un « 0 PASS » qui veut dire « la suite n'a rien DIT », pas « elle n'a
+rien mesure » ; et un ecart de +1/-1 sans FAIL, souvent une assertion
+conditionnelle. Elle dit aussi pourquoi l'execution parallele des suites reste
+impossible, et que ce n'est pas une question de memoire.
+
+`rw-inventaire` porte le gabarit d'un inventaire de module : les douze questions a
+poser pour chaque route, la **checklist des gardes en TROIS endroits** — la page,
+le proxy, le backend, un seul suffit a laisser passer — et les quatre motifs de
+defaut qui reviennent : l'en-tete qui mente (quatre fichiers), le « a moitie
+corrige » (cinq occurrences), le code mort parfois plus dangereux que le vivant,
+et la capacite inatteignable. Elle rappelle enfin qu'un rapport d'agent n'est pas
+une mesure : les affirmations lourdes se verifient soi-meme, et les preconditions
+se mesurent.
+
+**Et un doublon supprime avant qu'il ne divergе.** `rw-pieges` portait deja les
+prealables du LOT ; ils n'y sont plus, remplaces par un renvoi vers `rw-lot`. Deux
+copies auraient vecu separement — c'est exactement le defaut « a moitie corrige »
+que ce catalogue reproche au legacy cinq fois. `rw-e2e` renvoie desormais au
+lanceur plutot qu'a l'invocation manuelle.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
