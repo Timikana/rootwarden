@@ -1293,11 +1293,103 @@ Nouveau test `tests/e2e/go-page-update-u6.mjs`, vert sur les deux cibles : 8 PAS
 legacy, 13 PASS / 0 FAIL côté Laravel. Le test de U3, qui affirmait que la simulation n'était pas
 portée, assert désormais l'inverse — cette assertion avait fait son temps.
 
+### Module `update/`, sous-lot U6b — la mise à jour complète et la réparation dpkg
+
+Le module `update/` est **entièrement porté** pour ce que l'ancienne page offrait réellement.
+
+Ce que font les routes, **lu avant tout clic**. `/update` consulte la fenêtre de maintenance
+(423 dehors), puis — si apt ou dpkg tourne déjà — les **tue** (`killall -9`), supprime leurs quatre
+verrous et lance `dpkg --configure -a`, avant seulement de diffuser
+`apt update && apt full-upgrade -y`. C'est un flux, ajouté à `RoutesBackend::EN_FLUX`.
+`/dpkg_repair` fait `killall -9 apt apt-get dpkg`, `rm -f` sur les quatre verrous, puis
+`dpkg --configure -a`, et rend du JSON.
+
+Le panneau de décision est **générique** : les deux actions ont la même forme — nommer les
+machines, dire les conséquences, dire la réserve, exiger un mot recopié (`MISE A JOUR`, `REPARER`).
+U4, U5 et U6a en ont chacun un ; en ajouter deux de plus n'aurait rien appris à la page.
+
+### Deux routes du serveur ne sont pas portées, et c'est un constat mesuré
+
+**E-22.** `/apt_update` et `/custom_update` existent côté backend, mais **aucun bouton de l'ancienne
+page ne les appelle** : `aptUpdate()` (`apiCalls.js:444`) et `customUpdate()` (`apiCalls.js:490`)
+n'ont aucun appelant, et lisent cinq éléments de formulaire — `#apt-method`, `#specific-packages`,
+`#excluded-packages`, `#update-packages`, `#exclude-packages` — **absents de la page**. Chacune
+lèverait un `TypeError` dès sa première ligne si on l'atteignait.
+
+C'est le troisième cas de cette famille dans ce module, après `scheduleUpdate()` (E-18) et
+`#server-<id>` (E-21). Le test le **constate sur la cible legacy** plutôt que de le supposer :
+aucun `onclick` ne les nomme, et les cinq champs sont introuvables.
+
+Les porter reviendrait à **inventer une capacité**, pas à en migrer une. La page le dit à l'écran
+plutôt que de les faire disparaître en silence : l'encart, qui annonçait un portage partiel,
+énumère désormais ce qui n'est **pas** repris et pourquoi.
+
+### Ce que la relecture du portage a trouvé
+
+Le fichier `mises-a-jour.js` a grossi sur sept sous-lots. Une relecture intégrale a sorti quatre
+défauts, dont un que je venais d'introduire :
+
+- **`fermeLesAutresPanneaux` ignorait le panneau de U6b.** Ouvrir « Mise à jour complète » puis
+  « Redémarrer » laissait **deux panneaux ouverts**, deux boutons de confirmation activables et
+  deux sélections figées en même temps. Le docblock disait « trois panneaux » ; il y en a quatre.
+- **La planification ne réinitialisait aucun champ à l'ouverture.** Planifier sur une machine,
+  fermer, rouvrir sur une autre : la date de la première restait, l'aperçu la déclarait valide et
+  **le bouton naissait actif**. Un clic posait le cron avec la date d'une autre machine. Les trois
+  autres panneaux repartaient d'un état connu ; celui-là non. Et `sched-save` était le seul bouton
+  de confirmation sans `disabled` dans la vue.
+- **Un `fetch` qui rejette laissait cinq boutons figés pour toujours.** Le `try` d'`appelle()`
+  n'entourait que `r.json()`, pas `fetch()` : une coupure réseau remontait à l'appelant, qui
+  s'arrêtait **avant** de réactiver son bouton. Corrigé à la source — `appelle()` ne rejette plus,
+  il rend un échec explicite que chaque appelant sait déjà annoncer, et l'erreur part en console
+  plutôt que d'être avalée.
+- **Trois masquages de portée** : `message`, `corps` et `heure` redéclarés dans des blocs
+  imbriqués. Rien ne cassait, mais c'est la famille `escHtml` / `appendLog` / `.rw-etiquette`,
+  payée trois fois. Renommés.
+
+### Une attente qui s'arrêtait avant la première ligne
+
+Le test attendait que le journal **cesse de changer**. Or entre l'envoi de la requête et l'arrivée
+du flux, il porte déjà l'annonce « en cours » et ne bouge plus pendant qu'apt travaille : l'attente
+s'arrêtait donc **avant** la sortie — 5 lignes relevées côté portage contre 128 côté legacy. Elle
+vise maintenant le contenu attendu. Quatrième fois que cette règle se paie.
+
+Et le test perdait sa sélection entre deux actions : le legacy relit le parc après une mise à jour
+et re-rend le tableau, ce qui décoche tout. La machine de test est désormais retenue **avant chaque
+action**, et le test le vérifie.
+
+### Quatre boutons rouges ne signalent plus rien
+
+La barre porte six actions, dont quatre destructives. Toutes en rouge, aucune ne ressort. Le rouge
+reste pour ce qui **interrompt un service** — réparation dpkg, redémarrage ; les deux mises à jour
+prennent une teinte d'avertissement.
+
+### Vérification
+
+Nouveau test `tests/e2e/go-page-update-u6b.mjs`, vert sur les deux cibles : 14 PASS / 0 FAIL côté
+legacy, 20 PASS / 0 FAIL côté Laravel. Il vérifie aussi que le mot de passe root reste absent du
+journal après les deux actions, sur les deux cibles.
+
+### Ce qui reste à signaler, non corrigé
+
+- **`/apt_update` et `/dpkg_repair` ne consultent pas la fenêtre de maintenance**, là où `/update`,
+  `/security_updates` et `/custom_update` le font. `dpkg_repair` tue des processus apt et supprime
+  des verrous **sans fenêtre, sans approbation et sans permission**.
+- **`/custom_update` et `/dpkg_repair` n'écrivent aucune trace bastion.** La plus destructive des
+  trois est la moins tracée.
+- **`/apt_update` journalise sous le contexte `custom_update`** (`updates.py:461`) : les traces
+  d'un `full-upgrade` se rangent sous le nom d'une autre route.
+- **`apt-mark unhold` n'est pas dans un `finally`** : si `apt-get` lève, les paquets exclus restent
+  `hold` indéfiniment sur la machine.
+- **Les noms de paquets non conformes sont filtrés en silence** : un envoi partiellement invalide
+  reçoit un 200 de succès alors que seule une partie a été traitée.
+- **Les cinq actions de la page ne s'excluent pas mutuellement** : rien n'empêche de lancer une
+  réparation dpkg pendant une simulation, alors qu'elle tuerait l'apt de celle-ci.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-21)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (E-01 à E-22)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/MODULE-UPDATE.md` — inventaire du module `update/` et son découpage en sous-lots
 

@@ -8,10 +8,11 @@ return [
              . 'security updates and last reboot.',
 
     // Partial port — said on screen rather than hidden.
-    'partiel_titre' => 'This page is being ported',
-    'partiel_texte' => 'The table, the filters, the per-machine readings and the pending-package '
-                     . 'reading are ported. The dry run, launching updates, scheduling and '
-                     . 'rebooting are still served by the old portal.',
+    'partiel_titre' => 'What this page does not carry over',
+    'partiel_texte' => 'Everything the old portal offered about updates now lives here. Two '
+                     . 'server capabilities are deliberately left out: updating a chosen list '
+                     . 'of packages, and excluding packages. The old page carried the code for '
+                     . 'them, but no button ever reached it.',
     'partiel_lien'  => 'Open the full page on the old portal',
 
     // Filters
@@ -191,4 +192,32 @@ return [
 
     'secu_en_cours' => 'Security updates in progress...',
     'secu_fin'      => 'Security updates complete on :nombre machine(s).',
+
+    // Sub-lot U6b — full upgrade and dpkg repair
+    'btn_complete' => 'Full upgrade',
+    'tip_complete' => 'Upgrades EVERY package, not only the security ones. Destructive action.',
+    'btn_dpkg'     => 'Repair dpkg',
+    'tip_dpkg'     => 'Force-stops the apt and dpkg processes, removes their locks, then repairs the package database.',
+
+    'complete_titre'        => 'Upgrade every package',
+    'complete_consequences' => 'apt full-upgrade replaces EVERY package that has a newer version, not only those fixing a flaw. Services may be restarted, and configuration files replaced.',
+    'complete_reserve'      => 'If apt or dpkg is already running on the machine, this action KILLS them, removes their locks and repairs the dpkg database before carrying on. An installation running elsewhere will be interrupted.',
+    'complete_mot'          => 'UPGRADE',
+    'complete_consigne'     => 'Type UPGRADE to enable the button',
+    'complete_bouton'       => 'Upgrade',
+    'complete_en_cours'     => 'Full upgrade in progress...',
+    'complete_fin'          => 'Full upgrade complete on :nombre machine(s).',
+
+    'dpkg_titre'        => 'Repair the package database',
+    'dpkg_consequences' => 'The running apt, apt-get and dpkg processes are KILLED (killall -9), their four lock files removed, then dpkg --configure -a finishes the half-done installations.',
+    'dpkg_reserve'      => 'Use only when the machine refuses every update because of a lock. A legitimate installation in progress will be lost as it stands, and will have to be started again.',
+    'dpkg_mot'          => 'REPAIR',
+    'dpkg_consigne'     => 'Type REPAIR to enable the button',
+    'dpkg_bouton'       => 'Repair',
+    'dpkg_en_cours'     => 'Repairing dpkg...',
+    'dpkg_fin'          => 'Repair complete on :nombre machine(s).',
+    'dpkg_err'          => 'The repair failed.',
+
+    'err_reseau'      => 'The gateway is unreachable. Nothing was sent to the machine.',
+    'action_machines' => ':nombre machine(s): :machines',
 ];

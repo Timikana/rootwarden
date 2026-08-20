@@ -87,12 +87,46 @@
         <button class="rw-bouton rw-bouton--discret" id="dry-run-btn" type="button"
                 data-rw="simulation"
                 title="{{ __('maj.tip_simulation') }}">{{ __('maj.btn_simulation') }}</button>
-        <button class="rw-bouton rw-bouton--danger" id="security-update-btn" type="button"
+        <button class="rw-bouton rw-bouton--avertissement" id="security-update-btn" type="button"
                 data-rw="maj-securite"
                 title="{{ __('maj.tip_secu_action') }}">{{ __('maj.btn_secu_action') }}</button>
+        <button class="rw-bouton rw-bouton--avertissement" id="full-update-btn" type="button"
+                data-rw="maj-complete"
+                title="{{ __('maj.tip_complete') }}">{{ __('maj.btn_complete') }}</button>
+        <button class="rw-bouton rw-bouton--danger" id="dpkg-repair-btn" type="button"
+                data-rw="reparation-dpkg"
+                title="{{ __('maj.tip_dpkg') }}">{{ __('maj.btn_dpkg') }}</button>
         <button class="rw-bouton rw-bouton--danger" id="reboot-btn" type="button"
                 data-rw="redemarrer"
                 title="{{ __('maj.tip_reboot_action') }}">{{ __('maj.btn_reboot_action') }}</button>
+    </div>
+
+    {{-- Panneau de decision GENERIQUE — sous-lot U6b.
+         Les deux actions qu'il sert (mise a jour complete, reparation dpkg) ont
+         la meme forme : nommer les machines, dire les consequences, dire la
+         reserve, exiger un mot recopie. Un seul panneau parametre plutot que
+         deux de plus : U4, U5 et U6a en ont deja chacun le leur, et les
+         multiplier n'apprendrait rien de neuf a la page. --}}
+    <div class="rw-panneau-decision" id="action-panneau" data-rw="panneau-action" hidden>
+        <div class="rw-panneau-decision__texte">
+            <strong id="action-titre" data-rw="action-titre"></strong>
+            <p class="rw-aide" id="action-machines" data-rw="action-machines"></p>
+            <p class="rw-aide" id="action-consequences" data-rw="action-consequences"></p>
+            <p class="rw-aide" id="action-reserve" data-rw="action-reserve"></p>
+        </div>
+
+        <label class="rw-etiquette-champ">
+            <span id="action-consigne" data-rw="action-consigne"></span>
+            <input type="text" class="rw-saisie rw-saisie--compacte" id="action-confirmation"
+                   data-rw="action-confirmation" autocomplete="off">
+        </label>
+
+        <div class="rw-panneau-decision__actions">
+            <button class="rw-bouton rw-bouton--discret" id="action-annuler" type="button"
+                    data-rw="action-annuler">{{ __('maj.btn_cancel') }}</button>
+            <button class="rw-bouton rw-bouton--danger" id="action-confirmer" type="button"
+                    data-rw="action-confirmer" disabled></button>
+        </div>
     </div>
 
     {{-- Mises a jour de securite — sous-lot U6a. La decision se prend en ligne,
@@ -208,8 +242,10 @@
         <div class="rw-actions">
             <button class="rw-bouton rw-bouton--discret rw-actions__gauche" id="sched-cancel"
                     type="button" data-rw="annuler-planification">{{ __('maj.btn_cancel') }}</button>
+            {{-- `disabled` au depart comme les trois autres confirmations : le
+                 script ne l'active qu'une fois la date ET l'heure choisies. --}}
             <button class="rw-bouton" id="sched-save" type="button" data-rw="enregistrer-planification"
-                    title="{{ __('maj.tip_save_sched') }}">{{ __('maj.btn_save_sched') }}</button>
+                    title="{{ __('maj.tip_save_sched') }}" disabled>{{ __('maj.btn_save_sched') }}</button>
         </div>
     </form>
 
@@ -273,7 +309,7 @@
          sert le premier rendu et les suivants, il ne peut donc pas exister deux
          versions du tableau qui divergent. --}}
     <script id="maj-parc" type="application/json">@json($machines)</script>
-    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle'), 'btn_planifier' => __('maj.btn_planifier'), 'tip_planifier' => __('maj.tip_planifier'), 'btn_planifier_secu' => __('maj.btn_planifier_secu'), 'tip_planifier_secu' => __('maj.tip_planifier_secu'), 'reboot_machines' => __('maj.reboot_machines'), 'reboot_consigne' => __('maj.reboot_consigne'), 'reboot_en_cours' => __('maj.reboot_en_cours'), 'reboot_demande' => __('maj.reboot_demande'), 'reboot_attente' => __('maj.reboot_attente'), 'reboot_envoye' => __('maj.reboot_envoye'), 'reboot_fenetre' => __('maj.reboot_fenetre'), 'reboot_err' => __('maj.reboot_err'), 'reboot_fin' => __('maj.reboot_fin'), 'reboot_fin_attente' => __('maj.reboot_fin_attente'), 'reboot_fin_partielle' => __('maj.reboot_fin_partielle'), 'secu_machines' => __('maj.secu_machines'), 'secu_consigne' => __('maj.secu_consigne'), 'secu_mot' => __('maj.secu_mot'), 'flux_debut' => __('maj.flux_debut'), 'flux_fini' => __('maj.flux_fini'), 'flux_err' => __('maj.flux_err'), 'flux_fin_partielle' => __('maj.flux_fin_partielle'), 'simulation_en_cours' => __('maj.simulation_en_cours'), 'simulation_fin' => __('maj.simulation_fin'), 'secu_en_cours' => __('maj.secu_en_cours'), 'secu_fin' => __('maj.secu_fin')])
+    @php($libelles = ['non_verifie' => __('maj.non_verifie'), 'inconnu' => __('maj.inconnu'), 'aucune' => __('maj.aucune'), 'en_cours' => __('maj.en_cours'), 'btn_version' => __('maj.btn_version'), 'tip_version' => __('maj.tip_version'), 'btn_statut' => __('maj.btn_statut'), 'tip_statut' => __('maj.tip_statut'), 'btn_reboot' => __('maj.btn_reboot'), 'tip_reboot' => __('maj.tip_reboot'), 'vide' => __('maj.vide'), 'vide_aide' => __('maj.vide_aide'), 'vide_filtre' => __('maj.vide_filtre'), 'vide_filtre_aide' => __('maj.vide_filtre_aide'), 'maj_ok' => __('maj.maj_ok'), 'filtre_ok' => __('maj.filtre_ok'), 'err_load' => __('maj.err_load'), 'err_releve' => __('maj.err_releve'), 'releve_ok' => __('maj.releve_ok'), 'selection' => __('maj.selection'), 'selection_vide' => __('maj.selection_vide'), 'aucune_selection' => __('maj.aucune_selection'), 'paquets_en_cours' => __('maj.paquets_en_cours'), 'paquets_err' => __('maj.paquets_err'), 'paquets_aucun' => __('maj.paquets_aucun'), 'paquets_aucun_reserve' => __('maj.paquets_aucun_reserve'), 'paquets_nombre' => __('maj.paquets_nombre'), 'paquets_fin' => __('maj.paquets_fin'), 'paquets_fin_partielle' => __('maj.paquets_fin_partielle'), 'btn_planifier' => __('maj.btn_planifier'), 'tip_planifier' => __('maj.tip_planifier'), 'btn_planifier_secu' => __('maj.btn_planifier_secu'), 'tip_planifier_secu' => __('maj.tip_planifier_secu'), 'reboot_machines' => __('maj.reboot_machines'), 'reboot_consigne' => __('maj.reboot_consigne'), 'reboot_en_cours' => __('maj.reboot_en_cours'), 'reboot_demande' => __('maj.reboot_demande'), 'reboot_attente' => __('maj.reboot_attente'), 'reboot_envoye' => __('maj.reboot_envoye'), 'reboot_fenetre' => __('maj.reboot_fenetre'), 'reboot_err' => __('maj.reboot_err'), 'reboot_fin' => __('maj.reboot_fin'), 'reboot_fin_attente' => __('maj.reboot_fin_attente'), 'reboot_fin_partielle' => __('maj.reboot_fin_partielle'), 'secu_machines' => __('maj.secu_machines'), 'secu_consigne' => __('maj.secu_consigne'), 'secu_mot' => __('maj.secu_mot'), 'flux_debut' => __('maj.flux_debut'), 'flux_fini' => __('maj.flux_fini'), 'flux_err' => __('maj.flux_err'), 'flux_fin_partielle' => __('maj.flux_fin_partielle'), 'simulation_en_cours' => __('maj.simulation_en_cours'), 'simulation_fin' => __('maj.simulation_fin'), 'secu_en_cours' => __('maj.secu_en_cours'), 'secu_fin' => __('maj.secu_fin'), 'complete_titre' => __('maj.complete_titre'), 'complete_consequences' => __('maj.complete_consequences'), 'complete_reserve' => __('maj.complete_reserve'), 'complete_mot' => __('maj.complete_mot'), 'complete_consigne' => __('maj.complete_consigne'), 'complete_bouton' => __('maj.complete_bouton'), 'complete_en_cours' => __('maj.complete_en_cours'), 'complete_fin' => __('maj.complete_fin'), 'dpkg_titre' => __('maj.dpkg_titre'), 'dpkg_consequences' => __('maj.dpkg_consequences'), 'dpkg_reserve' => __('maj.dpkg_reserve'), 'dpkg_mot' => __('maj.dpkg_mot'), 'dpkg_consigne' => __('maj.dpkg_consigne'), 'dpkg_bouton' => __('maj.dpkg_bouton'), 'dpkg_en_cours' => __('maj.dpkg_en_cours'), 'dpkg_fin' => __('maj.dpkg_fin'), 'dpkg_err' => __('maj.dpkg_err'), 'err_reseau' => __('maj.err_reseau'), 'action_machines' => __('maj.action_machines')])
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="maj-libelles" type="application/json">@json($libelles)</script>
 

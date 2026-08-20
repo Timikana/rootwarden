@@ -108,6 +108,7 @@ class RoutesBackend
      * backend et PARITE.md, E-17.
      */
     public const EN_FLUX = [
+        '/update',
         '/dry_run_update',
         '/security_updates',
     ];

@@ -999,11 +999,87 @@ DANS le conteneur du backend, qui dechiffre et ne rend que ABSENT ou PRESENT —
 pour le mot entier ET pour tout fragment de six caracteres. Le secret ne quitte
 jamais le conteneur, et l'assertion porte sur ce que l'ecran montre vraiment.
 
+### Un frontend accumule des demi-branchements que rien ne signale
+
+Trois fois dans le seul module `update/` : une fonction JS existe, elle lit des
+elements de formulaire qui n'existent nulle part, et aucun bouton ne l'appelle.
+`scheduleUpdate()` (`#update-interval`), `rebootSelected()` (`#server-<id>`),
+puis `aptUpdate()` et `customUpdate()` (cinq champs). La route backend
+correspondante existe pourtant, et la passerelle l'autorise.
+
+AVANT DE PORTER UNE CAPACITE, VERIFIER QU'ELLE EST ATTEIGNABLE : chercher
+l'appelant de la fonction, et croiser chaque `getElementById` avec la page.
+Porter une capacite que personne ne pouvait demander, ce n'est plus migrer,
+c'est concevoir — et cela merite une decision, pas un effet de bord.
+
+### Un panneau de decision de plus, c'est une liste a mettre a jour
+
+`fermeLesAutresPanneaux(garde)` porte la liste des identifiants de panneaux.
+U6b en a ajoute un et la liste ne l'a pas suivi : ouvrir une action puis une
+autre laissait DEUX panneaux ouverts, deux boutons de confirmation activables et
+deux selections figees. Le docblock disait encore « trois panneaux ».
+
+Quand une liste enumere des freres, l'ajout d'un frere DOIT la traverser — et le
+commentaire avec.
+
+### Un panneau qui s'ouvre repart d'un etat connu
+
+`ouvrePlanification` ne reinitialisait pas ses champs : planifier sur une
+machine, fermer, rouvrir sur une AUTRE, et la date de la premiere etait encore
+la — l'apercu la declarait valide et le bouton naissait ACTIF. Un clic posait le
+cron avec la date d'une autre machine.
+
+Les quatre panneaux vident desormais leurs champs et redesactivent leur bouton a
+l'ouverture. Et dans la vue, tout bouton de confirmation naît `disabled`.
+
+### `fetch` REJETTE, et le bouton reste fige pour toujours
+
+Le `try` d'`appelle()` n'entourait que `r.json()`, pas `fetch()`. Une coupure
+reseau ou une session expiree faisait rejeter la promesse : l'appelant s'arretait
+AVANT de reactiver son bouton, et l'ecran restait sur « en cours » indefiniment.
+Cinq appelants etaient dans ce cas.
+
+Corriger a la SOURCE plutot qu'aux cinq appels : `appelle()` ne rejette plus, il
+rend `{ok: false, statut: 0, corps: {message}}` — un echec que chaque appelant
+sait deja annoncer — et l'erreur part en console. Une erreur qui n'est pas
+avalee, et un bouton qui revient.
+
+### Attendre que le journal CESSE de changer n'attend rien
+
+Entre l'envoi de la requete et l'arrivee du flux, le journal porte deja
+l'annonce « en cours » et ne bouge plus pendant que la commande travaille. Une
+attente qui s'arrete a la stabilite s'arrete donc AVANT la premiere ligne de
+sortie : 5 lignes relevees contre 128 sur l'autre cible.
+
+Viser LE CONTENU attendu — une ligne d'apt, un mot de la sortie. Quatrieme fois
+que cette regle se paie, sous une forme nouvelle a chaque fois.
+
+### Une action qui re-rend le tableau DECOCHE la selection
+
+Le legacy relit le parc apres une mise a jour. Un test qui coche une machine
+puis enchaine deux actions mesure la seconde sur une selection VIDE — sans
+erreur, juste zero appel. Retablir la selection AVANT CHAQUE action, et le
+verifier.
+
+### Quatre boutons rouges ne signalent plus rien
+
+Une barre d'actions ou tout ce qui est destructif est rouge n'a plus de
+hierarchie. Reserver le rouge a ce qui INTERROMPT UN SERVICE ; ce qui modifie
+sans interrompre prend une teinte d'avertissement (`.rw-bouton--avertissement`).
+
+### Faire relire le fichier qui grossit
+
+`mises-a-jour.js` a pris sept sous-lots dans une seule fermeture. Une relecture
+integrale a sorti quatre defauts — dont trois masquages de portee et un panneau
+oublie dans une liste — qu'aucun test ne montrait, parce qu'aucun ne CASSAIT.
+Un fichier qui grossit par accumulation merite une relecture entiere, pas
+seulement des tests verts.
+
 ## Detail
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
-(U1 a U5 portes, U6a porte : la fuite du flux SSH a ete corrigee le 2026-08-19 ;
-reste U6b — apt_update, custom_update, dpkg_repair) — toutes celles du meme
+(module `update/` ENTIEREMENT porte : U1 a U6b ; `apt_update` et `custom_update`
+volontairement non portees, rien ne les appelait — E-22. Reste l'archivage) — toutes celles du meme
 gabarit. Le cycle est rode et se
 deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
 vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,

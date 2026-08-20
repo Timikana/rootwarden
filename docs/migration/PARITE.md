@@ -923,3 +923,34 @@ le prouve plutôt que de l'affirmer :
   qu'après l'exécution SSH : inchangées, la commande n'est jamais partie. Relevé : `2` avant, `2`
   après, sur les deux cibles ;
 - il efface la demande qu'il a créée, si elle est encore en attente.
+
+---
+
+## E-22 — Deux routes du serveur que l'ancienne page n'atteignait pas
+
+**Constat mesuré, sur la cible legacy.** `/apt_update` et `/custom_update` existent côté backend et
+sont même autorisées par la passerelle, mais l'ancienne page ne les appelle **jamais** :
+
+| Fonction | Fichier | Appelants | Éléments lus, absents de la page |
+|---|---|---|---|
+| `aptUpdate()` | `update/js/apiCalls.js:444` | **aucun** | `#apt-method`, `#specific-packages`, `#excluded-packages` |
+| `customUpdate()` | `update/js/apiCalls.js:490` | **aucun** | `#update-packages`, `#exclude-packages` |
+
+Chacune lèverait un `TypeError` dès sa première ligne si un bouton l'atteignait. Le bouton
+`index.php:222`, libellé « mise à jour », appelle `updateLinux()` → **`/update`**, une autre route.
+
+Relevé du test, côté legacy : aucun attribut `onclick` de la page ne nomme `aptUpdate` ni
+`customUpdate`, et les cinq éléments sont introuvables dans tout `legacy/`.
+
+C'est la troisième fois dans ce seul module : `scheduleUpdate()` lit `#update-interval`, absent
+(E-18) ; `rebootSelected()` lit `#server-<id>`, absent (E-21). Un frontend accumule des demi-branchements que rien ne signale.
+
+### Ce que fait le portage
+
+Il ne les porte pas. Porter une capacité que l'ancienne page n'offrait pas, ce n'est plus migrer,
+c'est concevoir — et cela mérite une décision, pas un effet de bord. La page le **dit** plutôt que
+de les faire disparaître en silence : l'encart, qui annonçait un portage partiel, énumère
+maintenant ce qui n'est pas repris et pourquoi.
+
+**À arbitrer** : faut-il offrir la mise à jour de paquets choisis et l'exclusion de paquets ? Le
+serveur sait les faire ; personne n'a jamais pu les demander.
