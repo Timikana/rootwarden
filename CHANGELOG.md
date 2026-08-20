@@ -1650,6 +1650,70 @@ enumere bien les quatre — la regression du sous-lot precedent est reparee. Par
 selection, message d'echec, compteur, forme des dates) et `go-page-update-u5` de 17 a **18** (delai
 remis a son defaut). Tout le reste du LOT est inchange et rejoue vert, backend compris (296 pytest).
 
+### v1.37.20 — module `security/`, sous-lot S1 : l'export CSV d'un scan
+
+Premier sous-lot du deuxieme module. `App\Services\ScansCve` porte les lectures de `cve_scans` et
+`cve_findings` — les sous-lots S3 et S6 s'y adosseront plutot que de recopier les memes requetes —,
+`ExportCveController` rend le fichier, et la route `/export-cve` est gardee `role:1` +
+`perm:can_scan_cve`, exactement la garde du legacy. Catalogue `cve.php` en FR et EN, 14 cles
+identiques de part et d'autre : les libelles du fichier exporte n'ont rien a faire en dur dans un
+controleur, un rapport se lit dans la langue de qui l'exporte.
+
+**Le controle de cloisonnement porte sur l'OBJET RESOLU, pas sur le parametre recu** : on verifie
+l'acces au `machine_id` DU SCAN, jamais a celui recu dans l'URL — `?scan_id=N` n'en porte aucun, et
+un garde qui lirait le parametre laisserait passer toute cette branche. Son refus rend **404 et non
+403**, avec le MEME corps que « aucun scan trouve » ; le test verifie que les deux corps sont
+identiques, deux reponses distinctes suffisant a renseigner sur l'existence de la machine.
+
+**Ce que la caracterisation a trouve, et qui n'etait pas cherche (E-33).** Sur ce poste, l'export du
+legacy N'EST PAS UN CSV. `verify.php` pose `display_errors=1` quand `DEBUG_MODE=true` ; sur
+PHP 8.4.24 chaque `fputcsv()` sans son argument `$escape` leve un `E_DEPRECATED` ; et les
+**1 465 appels** du fichier injectent autant de blocs HTML `<b>Deprecated</b>` DANS le flux
+telecharge. Mesure croisee sur le meme scan : 4 374 enregistrements cote legacy contre 1 458 cote
+portage, pour 1 458 vulnerabilites reelles en base — soit 2 916 enregistrements etrangers, exactement
+deux par ligne. `srv-docker.env.example` posant `DEBUG_MODE=false`, une production neuve n'est pas
+touchee : la corruption est propre au dev et a la preprod. Elle vaut pour les trois fichiers de
+l'application qui appellent `fputcsv`, dont `compliance_report.php`, que S2 portera.
+
+La parade est **structurelle** : la charge utile est assemblee en memoire puis rendue d'un bloc, au
+lieu d'etre ecrite au fil de l'eau dans `php://output`. Rien ne part avant que tout soit ecrit, donc
+aucun avertissement ne peut s'y glisser — **un telechargement ne doit jamais heriter de
+`display_errors`**. Et `$escape` est passe explicitement A SA VALEUR HISTORIQUE : la depreciation
+porte sur l'ABSENCE de l'argument, pas sur sa valeur ; le passer tait l'avertissement sans changer un
+octet. Basculer sur `''`, conforme a la RFC 4180 et futur defaut, modifierait les cellules portant un
+antislash — c'est une decision, pas un effet de bord.
+
+**Deux mesures qui disaient vrai en regardant des octets differents.** Le BOM UTF-8 semblait absent
+du portage : `charCodeAt(0)` rendait `0x22`. Il etait bien la — `Response.text()` RETIRE le BOM au
+decodage, par specification, donc chercher `U+FEFF` dans le texte decode ne peut jamais reussir.
+Lire les octets bruts donne `EF BB BF` sur les DEUX cibles. Cote legacy, le premier caractere apres
+decodage etait `<` : le BOM est ecrit avant la premiere ligne, et l'avertissement du premier
+`fputcsv` s'insere juste apres.
+
+**Et un test qui comptait des lignes la ou il fallait compter des enregistrements.** Un resume de CVE
+contient des retours a la ligne ; entre guillemets ils appartiennent au champ, ce qui est du CSV
+valide. Le decoupage naif rendait 7 576 « lignes » pour 1 458 vulnerabilites, et faisait passer les
+suites de champ pour des lignes etrangeres. Le test decoupe desormais en respectant les guillemets,
+et rend exactement 1 458 — le compte de la base. Les « 33 cellules lisibles comme une formule »
+relevees au premier passage etaient le meme artefact : avec un decoupage correct, il n'y en a aucune.
+
+**Ce que ce lot ne prouve PAS (E-34).** Son intention de depart etait de valider le harnais de
+permissions. Il valide les gardes de ROLE et de PERMISSION — un role 1 sans `can_scan_cve` recolte
+403, les roles 2 et 3 exportent — mais **pas le cloisonnement par machine** : cette branche exige un
+role 1 PORTANT `can_scan_cve`, et aucun compte de test ne l'est. `rw-test-user` a zero permission,
+et `user_machine_access` n'attribue aucune machine aux comptes de test. Le test le CONSTATE plutot
+que de deplacer des droits pour se satisfaire : `rw-test-user` est la reference « role 1, zero
+permission » de toutes les autres suites.
+
+**E-35** : la route n'est atteignable qu'en tapant son adresse. Le legacy declenche l'export depuis
+un bouton de `security/index.php`, qui appartient au sous-lot S3 — aucune entree de menu ne manque,
+c'est le decoupage.
+
+Aucune capture : ce sous-lot n'a pas d'interface, il rend un fichier.
+
+LOT entier rejoue, versant Laravel et versant legacy, tout conforme ; 296 pytest verts ; parite i18n
+504 = 504.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage

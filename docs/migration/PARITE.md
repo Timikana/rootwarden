@@ -954,3 +954,109 @@ maintenant ce qui n'est pas repris et pourquoi.
 
 **À arbitrer** : faut-il offrir la mise à jour de paquets choisis et l'exclusion de paquets ? Le
 serveur sait les faire ; personne n'a jamais pu les demander.
+
+---
+
+## E-33 — L'export CSV du legacy n'est pas un CSV, en dev et en préprod
+
+**Constat mesuré, sur la cible legacy, le 2026-08-20.** L'export d'un scan CVE rend un fichier dont
+**1 465 blocs HTML** sont mêlés au contenu :
+
+```
+<b>Deprecated</b>:  fputcsv(): the $escape parameter must be provided as its
+default value will change in <b>/var/www/html/security/cve_export.php</b> on line <b>83</b><br />
+```
+
+La chaîne complète, dans l'ordre :
+
+1. `cve_export.php:9` requiert `auth/verify.php` ;
+2. `verify.php:23-27` pose `error_reporting(E_ALL)` et `display_errors=1` **quand
+   `DEBUG_MODE=true`** ;
+3. le conteneur tourne sous **PHP 8.4.24**, où `fputcsv()` appelé sans son argument `$escape` lève
+   un `E_DEPRECATED` ;
+4. le fichier appelle `fputcsv()` **1 465 fois** (5 métadonnées + 1 ligne vide + 1 en-tête +
+   1 458 vulnérabilités) — et chaque appel écrit son avertissement **dans `php://output`**, c'est-à-dire
+   dans le fichier téléchargé.
+
+Mesures croisées, même scan, même machine :
+
+| | legacy | portage |
+|---|---|---|
+| blocs d'avertissement PHP dans le fichier | **1 465** | 0 |
+| enregistrements après l'en-tête | **4 374** | **1 458** |
+| dont porteurs d'un identifiant CVE | 1 458 | 1 458 |
+| enregistrements étrangers au tableau | **2 916** (= 2 × 1 458) | 0 |
+| taille | 788 096 o | 521 466 o |
+| ligne vide entre métadonnées et en-tête | **un avertissement** | une ligne vide |
+
+Le BOM UTF-8 est bien écrit **avant** la première ligne, des deux côtés — c'est ce qui le suit
+immédiatement qui diffère. Lire le corps décodé donnait `<` en premier caractère parce que
+`Response.text()` **retire le BOM** ; lire les octets bruts donne `EF BB BF` sur les deux cibles.
+Les deux mesures disaient vrai, elles ne regardaient pas le même octet.
+
+**Ce que ce défaut n'est PAS.** `srv-docker.env.example` pose `DEBUG_MODE=false` : une installation
+de production neuve n'est pas touchée, `error_reporting(0)` supprimant l'avertissement. La
+corruption est propre au **dev et à la préprod**. Elle n'en est pas moins réelle, et elle vaut pour
+les trois fichiers de l'application qui appellent `fputcsv` — `security/cve_export.php`,
+`security/compliance_report.php` (sous-lot S2) et `adm/audit_log.php` (module `adm/`, non porté).
+
+### Ce que fait le portage
+
+**Deux corrections, dont une structurelle.**
+
+La charge utile est **assemblée en mémoire puis rendue d'un bloc**, au lieu d'être écrite au fil de
+l'eau dans `php://output`. Rien ne part avant que tout soit écrit : aucun avertissement, quelle
+qu'en soit la cause, ne peut plus s'y glisser. C'est la propriété à retenir — **un téléchargement ne
+doit jamais hériter de `display_errors`**, et le seul moyen fiable de le garantir est que la sortie
+ne soit pas ouverte pendant qu'on la calcule.
+
+Et `$escape` est passé **explicitement, à sa valeur historique** (`'\\'`). La dépréciation de
+PHP 8.4 porte sur l'*absence* de l'argument, pas sur sa valeur : le passer tait l'avertissement sans
+changer un octet de la sortie. Basculer sur `''`, la valeur conforme à la RFC 4180 qui deviendra le
+défaut, modifierait le rendu des cellules contenant un antislash — **c'est une décision, pas un
+effet de bord de portage.**
+
+Le test vérifie les deux propriétés côté portage (`verifiePortage`) et **mesure** le legacy sans rien
+lui exiger : une suite qui échouerait en permanence sur la cible qu'elle caractérise finit par ne
+plus être lue.
+
+---
+
+## E-34 — La branche de cloisonnement de l'export n'est mesurable par aucun compte de test
+
+**Constat mesuré en base, le 2026-08-20.** `cve_export.php` porte un contrôle IDOR explicite : un
+rôle < 2 ne peut exporter que les scans des machines de `user_machine_access`, et le refus rend
+**404** — pas 403 — pour ne pas divulguer l'existence de la machine. Le portage le reproduit à
+l'identique, avec **le même corps de réponse** que « aucun scan trouvé », vérifié par le test : deux
+corps différents renseigneraient à eux seuls.
+
+Cette branche exige un rôle 1 **portant `can_scan_cve`**. Aucun compte de test ne l'est :
+
+| compte | rôle | `can_scan_cve` | ce qui se passe |
+|---|---|---|---|
+| `rw-test-user` | 1 | **0** | refusé par la permission, **avant** d'atteindre la branche |
+| `rw-test-admin` | 2 | 1 | autorisé, mais le rôle 2 **saute** le cloisonnement |
+| `rw-test-super` | 3 | 0 | autorisé par le contournement superadmin, **saute** aussi |
+
+S'ajoute une seconde contrainte : `user_machine_access` ne porte que deux lignes (comptes 1 et 2),
+donc **aucun compte de test n'a de machine attribuée**.
+
+Le test le **constate** et le dit, plutôt que de déplacer les droits d'un compte pour se satisfaire :
+`rw-test-user` est la référence « rôle 1, zéro permission » de toutes les autres suites, et lui
+accorder une permission changerait silencieusement ce qu'elles mesurent.
+
+**À arbitrer** : créer un quatrième compte de fixture — rôle 1, `can_scan_cve` seul, une ligne dans
+`user_machine_access` sur la machine 2 — rendrait la branche mesurable sans toucher aux trois
+existants. C'est un compte porteur d'une permission : la décision revient à l'exploitant.
+
+---
+
+## E-35 — L'export n'est atteignable qu'en tapant son adresse
+
+Le legacy déclenche l'export depuis un bouton de `security/index.php`, page qui appartient au
+sous-lot **S3**. La route `/export-cve` existe donc, est gardée et se teste, mais **aucune entrée de
+menu et aucun bouton ne la désignent** dans le portage — c'est normal à ce stade, et dit ici pour que
+personne ne cherche l'entrée manquante dans `App\Support\Navigation`.
+
+Ce n'est pas un oubli : c'est la conséquence du découpage. S3 posera le bouton, et
+`docs/migration/MODULE-SECURITY.md` le porte au tableau de ses sous-lots.

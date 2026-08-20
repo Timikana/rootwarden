@@ -170,7 +170,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 
 | Lot | Contenu | Routes | SSH | Écrit |
 |---|---|---|---|---|
-| **S1** | export CSV d'un scan (`cve_export.php`) | aucune | non | non |
+| **S1** ✔ | export CSV d'un scan (`cve_export.php`) — **PORTÉ le 2026-08-20** (v1.37.20) | aucune | non | non |
 | **S2** | rapport de conformité, HTML + CSV | aucune | non | non |
 | **S2b** | export PDF du rapport | aucune | non | non |
 | **S3** | consultation des CVE, lecture seule | `GET /cve_results`, `GET /cve_compare` | non | non |
@@ -180,9 +180,21 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S7** | le scan lui-même | `POST /cve_scan` — **FLUX** | **oui** | oui + **destructif** |
 
 **S1 d'abord** parce que c'est le plus petit périmètre du module et qu'il porte une règle d'accès
-explicite : le contrôle IDOR à reproduire à l'identique, **404 et non 403**. Son test de
-caractérisation — deux comptes, deux machines, un 404 attendu — valide le harnais de permissions
-avant tout le reste.
+explicite : le contrôle IDOR à reproduire à l'identique, **404 et non 403**.
+
+**Porté le 2026-08-20** (v1.37.20) : `App\Services\ScansCve` + `ExportCveController`, route
+`/export-cve` gardée `role:1` + `perm:can_scan_cve`, catalogue `cve.php` FR+EN.
+`tests/e2e/go-page-cve-export.mjs` — 16 PASS sur le legacy, 20 sur le portage.
+
+Ce que S1 a rapporté, au-delà de lui-même :
+- **E-33** — l'export du legacy n'est pas un CSV en dev/préprod : 1 465 blocs HTML `Deprecated`
+  mêlés au fichier. La parade du portage est structurelle (charge utile assemblée avant envoi) et
+  vaut pour S2, qui hérite du même défaut sur `compliance_report.php`.
+- **E-34** — le contrôle IDOR n'est mesurable par AUCUN compte de test. L'intention de départ
+  (« ce lot valide le harnais de permissions ») ne tient donc pas : il valide les gardes de rôle et
+  de permission, mais pas le cloisonnement par machine. Un quatrième compte de fixture est à
+  arbitrer.
+- **E-35** — la route n'est atteignable qu'en tapant son adresse jusqu'à S3.
 
 **S2 ensuite** : aucune route, aucun SSH, aucun état à remettre à zéro entre deux mesures, mais
 beaucoup de SQL et deux décisions de sécurité qui méritent leur propre commit (D-1 et D-2 ci-dessous).
