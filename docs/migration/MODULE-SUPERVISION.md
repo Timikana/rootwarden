@@ -1,0 +1,141 @@
+# Module `supervision/` — inventaire et découpage
+
+Établi le 2026-08-20, en lecture seule, selon `METHODE-SOUS-LOT.md` §1.
+**1 462 lignes** de frontend (`index.php` 611, `js/main.js` 619, `js/profiles.js` 232) contre
+**1 891 lignes** et **30 routes** de backend. Déploiement d'agents Zabbix, Centreon, Prometheus,
+Telegraf sur le parc.
+
+## 1. La garde — et quatre routes qui l'oublient
+
+La page exige `role >= 2` + `can_manage_supervision`. **26 routes sur 30** portent
+`@require_api_key` → `@require_role(2)` → `@require_permission` [→ `@require_machine_access`].
+
+**Les quatre routes de profils n'ont AUCUN `@require_role`** — vérifié : `list_profiles` (1734),
+`upsert_profile` (1760), `delete_profile` (1801), `profile_assignments` (1817) portent
+`@require_api_key` + `@require_permission('can_manage_supervision')` et rien d'autre. Et
+`/supervision/` est **absent** de `$ADMIN_ONLY_PREFIXES` du proxy.
+
+Un rôle 1 porteur de `can_manage_supervision` — y compris par **permission temporaire** — ne peut pas
+ouvrir la page mais peut appeler `DELETE /supervision/profiles/<id>` : `ON DELETE CASCADE` sur
+`machine_supervision_profile` ⇒ **toutes les assignations du parc disparaissent**, et le prochain
+`reconfigure` retombe silencieusement sur la config globale. La route voisine
+`machines/<mid>/profile` porte, elle, le commentaire « Patch A01 » **et** `@require_role(2)` : le
+correctif a été appliqué à une route et pas aux quatre autres.
+
+## 2. La priorité de configuration — la mémoire dit vrai, la pratique dit non
+
+`overrides > profil > globale` est bien implémenté (`_build_config_lines`, `supervision.py:180-259`)
+— **pour Zabbix seulement**. Trois constats :
+
+- **le niveau le plus fort est inatteignable.** `POST /supervision/overrides/<mid>` n'a **aucun
+  appelant** dans tout le dépôt. Les cinq clés `supervision.overrides_*` existent en FR **et** en EN,
+  et **aucun élément d'interface** n'y correspond. La table reste vide : la précédence *effective* est
+  **profil > globale** ;
+- **pour Centreon / Prometheus / Telegraf, le profil n'est JAMAIS lu.**
+  `_build_agent_config_content` ne prend pas d'argument `profile`, et `_get_machine_profile` est
+  toujours appelé avec `platform='zabbix'` **en dur**. Or le dropdown de la colonne « Profil »
+  s'affiche pour les quatre plateformes : un admin assigne un profil sur Telegraf, le toast confirme,
+  la ligne est écrite en base, **et rien n'est appliqué, jamais** ;
+- **le docstring se contredit lui-même** : `:181` annonce « profil → overrides → global », `:183-187`
+  annoncent l'ordre inverse (le bon).
+
+## 3. Le défaut qui casse la configuration en deux clics
+
+`supervision.py:508` : `SELECT id, tls_psk_value FROM supervision_config ORDER BY id DESC LIMIT 1`
+— **sans `WHERE platform`**, alors que la lecture filtre bien sur `platform`.
+
+Séquence reproductible : enregistrer la config Centreon (crée la ligne id=2), revenir sur Zabbix,
+enregistrer → l'`UPDATE` frappe **id=2**, y écrit les valeurs Zabbix, **écrase `hostname_pattern` de
+Centreon** et laisse `platform='centreon'`. Ensuite `_get_global_config('zabbix')` ne trouve plus rien
+⇒ tout déploiement Zabbix répond **400 « Aucune configuration globale »** alors que le formulaire
+affiche des valeurs.
+
+## 4. Le scan du parc — il contredit une règle écrite dans le code
+
+**Il n'existe aucune route `scan-all`.** Le bouton déclenche une **rafale côté navigateur** :
+`4 × N` requêtes `POST /supervision/<platform>/version`, synchrones (`@threaded_route` =
+`future.result()`, bloquant), **hors centre de tâches**, sur **toutes** les machines non archivées —
+sans tenir compte du filtre appliqué ni des cases cochées.
+
+C'est textuellement le scénario que `helpers.py:25-29` documente comme cause des 504/500 en cascade :
+« les operations longues de parc doivent passer en tache de fond (centre de taches), jamais
+monopoliser ce pool ». Pool de 32, `SSH_TIMEOUT` 360 s. Avec 20 machines : **80 requêtes**, dont
+**3N sessions SSH garanties inutiles** (trois plateformes sur quatre ne sont installées nulle part).
+
+Au portage : tâche de fond, plafond de concurrence, et **plateforme active par défaut**.
+
+## 5. Ce que le déploiement fait à la machine
+
+Six routes **diffusent** un flux (`Response(generate())`, protocole `START_MACHINE::` /
+`SUCCESS_MACHINE::` / `ERROR_MACHINE::`). Les commandes, à recopier littéralement dans l'en-tête des
+tests :
+
+- **`apt-get purge` de l'agent AVANT de le réinstaller** (fenêtre de cécité de supervision) ;
+- `wget` d'un `.deb` externe puis `dpkg -i` ;
+- **`echo 'deb …' > /etc/apt/sources.list.d/*.list` + clé GPG** — ajout d'un **dépôt tiers
+  permanent** ;
+- `apt-get update -y` — **réécrit l'index local des paquets** ;
+- `sed -i` clé par clé puis append, écrasement complet du `.conf`, `systemctl restart && enable` ;
+- désinstallation : `apt-get purge` + `autoremove`.
+
+Aucun de ces effets n'est annoncé à l'écran ; le bouton dit seulement « Déployer ».
+
+**Zéro fenêtre de maintenance, zéro approbation, zéro `command_log`** dans les 1 891 lignes — vérifié.
+Ce module installe des paquets, écrase des configurations et redémarre des services en production
+sans aucun des trois garde-fous des modules voisins. **La recette de `METHODE-SOUS-LOT.md` §6 est
+donc inapplicable** : le seul témoin exploitable est la présence d'un `.bak.YYYYMMDD_HHMMSS` sur la
+cible, ou `supervision_agents`.
+
+Pas d'injection shell : tout passe par base64, les clés libres sont filtrées, `backup_name` par une
+regex qui interdit `/`. En revanche `_build_agent_config_content` interpole **sans échapper** dans du
+YAML/TOML — injection de *configuration*, pas de shell.
+
+## 6. Ce que les catalogues disent et que l'écran ne dit pas
+
+**Parité FR/EN parfaite** : 114 clés `supervision.*` identiques des deux côtés. Mais **35 sont
+orphelines**, et **17 d'entre elles sont exactement celles que le JS essaie de lire**.
+
+Mécanisme : `__()` ne charge que les clés préfixées `js.` ; il cherche `js.<clé>` puis `<clé>` puis
+**retourne la clé**. Une clé retournée étant une chaîne non vide, l'idiome `__('x') || 'repli'`
+**ne déclenche jamais le repli**.
+
+Conséquence : **les trois confirmations les plus dangereuses du module affichent leur identifiant
+technique** — `confirm_deploy`, `confirm_uninstall` — le bouton du modal s'intitule `btn_restore`, et
+dix toasts affichent leur clé. La traduction existe, en FR et en EN, **dans le mauvais catalogue** :
+le portage n'a pas à traduire, il a à **déplacer**.
+
+Et `reconfigure` — qui écrase le `.conf` et redémarre l'agent — **n'a aucune confirmation**.
+
+## 7. Découpage
+
+| Lot | Contenu | Flux | SSH | Modifie la machine |
+|---|---|---|---|---|
+| **V1** | la page et ses quatre onglets, lecture seule | non | non | non |
+| **V2** | catalogue de profils, lecture | non | non | non |
+| **V3** | configuration globale, lecture | non | non | non |
+| **V4** | configuration globale, écriture — corrige le `WHERE platform` manquant | non | non | non |
+| **V5** | profils : CRUD + assignation — pose `@require_role(2)` sur les quatre routes | non | non | non |
+| **V6** | détection de version, une machine | non | **oui** | non |
+| **V7** | éditeur de config distant, lecture + liste des sauvegardes | non | **oui** | non |
+| **V8** | scan du parc — **à reconcevoir** en tâche de fond | non | **oui, borné** | non |
+| **V9** | éditeur distant, écriture + restauration | non | **oui** | **OUI** |
+| **V10** | reconfiguration — **FLUX** | **oui** | **oui** | **OUI** |
+| **V11** | désinstallation — **FLUX** | **oui** | **oui** | **OUI, détruit** |
+| **V12** | déploiement — **FLUX**, le plus risqué | **oui** | **oui** | **OUI** |
+
+**V1 d'abord** : aucune route, et il absorbe à lui seul les défauts d'affichage et le gros de la dette
+i18n — dette qui, sinon, se paierait douze fois.
+
+**Hors lot** : les **overrides par machine**. Aucune interface n'a jamais existé. Porter cette
+capacité, c'est **concevoir**, pas migrer. Trois options — ne rien porter et supprimer les deux routes
+et les cinq clés, porter les routes sans interface, ou concevoir l'écran. **Décision d'exploitant à
+arbitrer avant V10**, car la précédence documentée du module en dépend.
+
+## 8. Ce qui reste à mesurer
+
+La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`
+— si l'inverse de ce qui est supposé était vrai, il y aurait un `@threaded_route` **imbriqué** sur
+chaque déploiement Zabbix, donc un risque d'interblocage du pool. Un `curl` avec journalisation
+tranche en une minute · le périmètre de scan Tailwind v4 pour `laravel/public/js/*.js` : si ces
+fichiers ne sont pas scannés, les quatre palettes de badges **disparaissent en production** · le
+nombre exact de canaux `exec_command` par session de déploiement.

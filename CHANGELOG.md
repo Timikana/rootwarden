@@ -1865,6 +1865,50 @@ a mesure.
 portage** ; `go-socle-i18n` compare **581 cles**. Tout le reste inchange et rejoue vert sur les deux
 versants, 296 pytest compris.
 
+### Quatre modules inventories, et un defaut qui revient cinq fois
+
+`docs/migration/MODULE-AUTH.md`, `MODULE-SSH.md`, `MODULE-SUPERVISION.md` et `MODULE-FILTRAGE.md`
+mesurent quatre chantiers avant de les toucher, selon METHODE-SOUS-LOT.md §1. Aucune ligne portee.
+
+**Le meme defaut, cinq fois : la garde protege la PAGE, pas la REQUETE.** Verifie dans le code,
+module par module. `POST /deploy` porte `@require_api_key` + `@threaded_route` et rien d'autre — son
+docstring l'assume sans le voir, « la route n'est pas decoree car elle utilise deja un thread dedie »,
+et un thread n'est pas une garde. Quatre routes de profils de supervision n'ont aucun
+`@require_role`. Sur les 23 routes de filtrage reseau, DEUX portent un `@require_permission`. Et
+`/deploy`, `/supervision/` et `/iptables` sont tous absents de `$ADMIN_ONLY_PREFIXES` du proxy.
+
+**Et QUATRE en-tetes de fichier annoncent un acces plus strict que le code n'applique** :
+`ssh/index.php:12-15` « Acces refuse pour les utilisateurs standards (role_id = 1) »,
+`iptables/index.php:14` « superadmin uniquement », `fail2ban/index.php:5` « admin (2), superadmin
+(3) », apres `compliance_report.php:13` (E-36). Ce qui rend ces trous durables, ce n'est pas leur
+subtilite : c'est qu'une relecture d'en-tete les CONFIRME.
+
+**Le motif « a moitie corrige », cinq fois aussi.** La branche PDF de `compliance_report.php` porte
+la parade que sa branche CSV n'a pas (E-40). `manage_whitelist` compose sa ligne en base64 dans une
+branche de son `||` et l'interpole brute dans l'autre. La branche preflight de `ssh/js/main.js`
+echappe tout, sa branche de journal fait `innerHTML +=`. L'attribution d'une action a ete corrigee
+dans `iptables` et pas dans `fail2ban`. Les fuites de connexion MySQL, corrigees dans un helper et
+oubliees a cinq autres endroits du meme fichier.
+
+**Ce que les inventaires ont evite de porter** : un ecran d'enrolement 2FA qui divulgue le secret
+d'un compte deja enrole a qui n'a que le mot de passe ; un `clean_up_users()` mort portant `userdel -r`
+— ici le code mort est PLUS dangereux que le code vivant ; une capacite d'overrides par machine dont
+aucune interface n'a jamais existe ; et un scan de parc synchrone qui contredit textuellement une
+regle ecrite dans `helpers.py`.
+
+**Le blocage de sortie de la 2.0 est identifie** : `legacy/auth/` porte quatre capacites non portees,
+dont l'enrolement du second facteur. Aucun chemin d'authentification ne passe sans 2FA, donc on ne
+peut pas eteindre le legacy tant que l'enrolement n'existe que la — un compte neuf arrive sur une
+impasse. Ce n'est pas un module metier, c'est une condition de sortie, et elle n'etait dans aucun
+plan.
+
+Chaque document se termine par ce qui reste A MESURER et n'a pas ete deduit. Le plus urgent :
+`mysql/init.sql:40` declare `users.password_updated_at` en `ON UPDATE CURRENT_TIMESTAMP`, et
+`verify.php:158` calcule l'expiration du mot de passe dessus. Si c'est effectif, toute ecriture sur la
+ligne `users` — dont `login.php:155` a chaque connexion reussie — repousse la date. La politique
+d'expiration serait alors neutralisee par l'usage normal. A mesurer sur une base reelle avant de
+porter quoi que ce soit de `auth/`.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
