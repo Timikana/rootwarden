@@ -109,6 +109,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `tasks/` | 2026-08-18 | `taches` | menu plus strict que la page |
 | `tickets/` | 2026-08-18 | `tickets` | dedoublonnage par machine, formulaire qui s'epuise |
 | `search/` | 2026-08-18 | `recherche` | liens de resultats traduits (E-13) |
+| `update/` | 2026-08-20 | `mises-a-jour` | premier MODULE archive — 7 sous-lots, 4 points d'entree |
 
 ### commandlog — la preuve du cycle
 
@@ -396,3 +397,123 @@ répond 404.
 
 Le test de la vague 0 collecte **30 liens internes** au menu du legacy, contre 37 au départ :
 exactement les sept entrées redirigées vers le portage.
+
+### update — le premier MODULE, et un menu qui menait nulle part
+
+Sept sous-lots (U1 à U6b), 2 094 lignes, huit fichiers dans deux sous-dossiers. C'est le premier
+**module** archivé — les sept précédents étaient des pages du même gabarit.
+
+`https://localhost:8443/update/` rendait **302** avant archivage ; après
+`git mv legacy/update legacy/_deprecated/update`, **neuf URL** rendent 404 : la page, les deux
+scripts (`js/apiCalls.js`, `js/domManipulation.js`) et les cinq `functions/*.php`. Le couple
+302 → 404 est mesuré des deux côtés, sans quoi le 404 ne prouverait rien.
+`git check-ignore -v legacy/_deprecated/update/` ne rend rien : l'archive reste suivie.
+
+#### Quatre points d'entrée, pas un
+
+C'est l'écart principal avec les sept pages. Elles n'avaient qu'un lien, dans la barre latérale de
+`legacy/menu.php`. `update/` en avait **quatre**, dont trois qu'aucun archivage n'avait rencontrés :
+
+| Point d'entrée | Fichier | Déjà rencontré ? |
+|---|---|---|
+| barre latérale | `legacy/menu.php:77` | oui, les sept fois |
+| tiroir mobile | `legacy/menu.php:233` | **non** — écrit à la main, sans `$sideLink` |
+| raccourci clavier `g` puis `u` | `legacy/head.php:208` | **non** |
+| tuile « accès rapides » du tableau de bord | `legacy/index.php:366` | **non** |
+
+Un module a plus de portes qu'une page. La vérification qui les trouve toutes :
+
+    grep -rn "'/<partie>/\|\"/<partie>/\|href=\"/<partie>" legacy/ --include=*.php --include=*.js
+
+#### Le menu du portage envoyait encore vers l'ancien portail
+
+Trouvé en relisant `App\Support\Navigation` : l'entrée `updates` portait toujours
+`'legacy' => '/update/'`. La page `/mises-a-jour` existait depuis sept sous-lots et **n'était
+atteignable que par URL directe** — chaque clic sur « Mises a jour » dans le portail neuf renvoyait
+à l'ancien. Basculée en `'route' => 'mises-a-jour'`.
+
+À retenir pour les modules suivants : **porter une page ne la rend pas atteignable**. Les deux
+menus se redirigent, celui du legacy *et* celui du portage.
+
+#### `LiensLegacy` cesse d'être préventif
+
+Pour les sept pages précédentes, la table des remplacements était une précaution : le backend
+n'émettait aucun de ces chemins. Ici, `backend/routes/search.py` écrit `/update/index.php` **en dur
+pour chaque machine trouvée**. Sans `'/update/' => 'mises-a-jour'` dans le même commit que le
+`git mv`, la recherche globale mène à un 404 mesurable. Vérifié après coup : le lien rendu est
+`http://localhost:8444/mises-a-jour`, interne, non marqué comme sortant.
+
+#### Le menu menait au portage — et le lien ne répondait pas
+
+Le défaut le plus utile de cet archivage, et il ne vient pas de `update/`.
+
+`verifieMenuLegacy()` vérifiait que le `href` **cite** la route portée. Il ne l'a jamais suivi.
+Mesuré ici : `LARAVEL_URL` valait `https://localhost:8444` alors que le portage écoute **en clair**
+sur ce port — la poignée de main TLS échoue franchement (code 0). Les **huit** entrées redirigées,
+les sept précédentes comprises, menaient donc à un lien mort depuis le 2026-08-18.
+
+L'assertion mesurait la chaîne, pas l'accessibilité. `archive.mjs` suit désormais le lien et
+vérifie qu'il répond ; les sept suites déjà archivées passent de 4 à **5 PASS**. La valeur de
+`LARAVEL_URL` a été corrigée dans `srv-docker.env` (fichier local, jamais commité) ;
+`srv-docker.env.example` garde `https://${SERVER_NAME}:${LARAVEL_PORT}`, qui est juste en
+production derrière TLS.
+
+#### Ce que rend l'archive à sa nouvelle adresse
+
+`legacy/_deprecated/` n'est protégé par aucun `.htaccess` ni aucune règle Apache : le dossier reste
+sous la racine documentaire. C'est le premier module à y poser des **points d'entrée serveur**, les
+cinq `functions/*.php`. Mesuré :
+
+| Nouvelle adresse | Code | Corps |
+|---|---|---|
+| `/_deprecated/update/index.php` | 500 | vide |
+| `/_deprecated/update/functions/list_machines.php` | 500 | vide |
+| `/_deprecated/update/functions/filter_servers.php` | 500 | vide |
+| `/_deprecated/update/functions/machines.php` | 500 | vide |
+| `/_deprecated/update/js/apiCalls.js` | 200 | le script, déjà public avant |
+
+Les 500 viennent des `require_once __DIR__ . '/../../db.php'` qui ne résolvent plus d'un niveau
+plus bas. **Aucune donnée n'est servie** — mais c'est un accident de chemin, pas un garde. Si un
+module archivé porte un jour un point d'entrée sans `require` relatif, il restera joignable. À
+mesurer à chaque archivage, pas à supposer.
+
+#### Sept suites converties, une retirée, quatre corrigées
+
+Les sept `go-page-update-u*.mjs` reçoivent le constat d'archivage, greffé **avant** le `git mv` :
+tant que le module est servi, le bloc est inerte et la suite se joue. Vérifié avant de déplacer.
+
+`go-update-filter.mjs` — régression v1.37.12, codée en dur sur `https://localhost:8443/update/`,
+sans bascule de cible — est **retirée**. Avant de la retirer, il fallait prouver que sa régression
+était couverte ailleurs : elle ne l'était pas tout à fait. `go-page-update-u1.mjs` assertait
+`filtre.machines.every(...)`, et `[].every()` rend `true` — un tableau **vidé** passait au vert,
+c'est-à-dire exactement la régression gardée. U1 assert désormais d'abord que le filtre
+**repeuple** le tableau.
+
+Quatre suites hors-lot citaient encore la page : `go.mjs` (balayage des modules),
+`go-sec-v1.23.mjs` (visite), `go-security-fixes.mjs` (assertion `200`, retournée en `404` et
+devenue témoin de l'archivage), et `06-supervision.test.mjs`, dont l'étape [6] vérifiait
+l'**absence** d'un sélecteur sur `/update/` — sur une page 404 il est absent aussi, donc l'étape
+serait passée au vert sans rien mesurer. Retirée : un faux vert vaut moins que pas de test.
+
+#### Deux capacités disparaissent sans avoir jamais été atteignables
+
+`/apt_update` et `/custom_update` (E-22) ne sont pas portées. Leur code JS existait dans
+`legacy/update/js/apiCalls.js`, sans appelant, et lisait cinq champs de formulaire absents de la
+page. L'archivage les emporte. Le serveur sait toujours les faire ; l'encart de la page portée le
+**dit**, sans plus renvoyer vers une page qui n'existe pas.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `commandlog/` | 5 PASS / 0 FAIL — partie archivée |
+| `approvals/` | 5 PASS / 0 FAIL — partie archivée |
+| `drift/` | 5 PASS / 0 FAIL — partie archivée |
+| `backups/` | 5 PASS / 0 FAIL — partie archivée |
+| `tasks/` | 5 PASS / 0 FAIL — partie archivée |
+| `tickets/` | 5 PASS / 0 FAIL — partie archivée |
+| `search/` | 5 PASS / 0 FAIL — partie archivée |
+| `update/` (×7 sous-lots) | 8 PASS / 0 FAIL — module archivé |
+
+Le test de la vague 0 collecte **29 liens internes** au menu du legacy, contre 30 avant. La baisse
+est de **un**, alors que quatre points d'entrée ont été redirigés : il ne collecte que la barre
+latérale depuis `/index.php`. La formule des sept pages — « exactement les N entrées redirigées » —
+ne vaut plus pour un module.

@@ -181,8 +181,9 @@ page offrait réellement.
 lisent cinq éléments de formulaire absents de la page (E-22). Elles ne sont pas portées — porter
 une capacité que personne ne pouvait demander, ce n'est plus migrer.
 
-**Prochaine étape : l'archivage du module**, maintenant que tout ce qui était atteignable est
-porté.
+**ARCHIVÉ le 2026-08-20** : `legacy/update/` a rejoint `legacy/_deprecated/`, neuf URL rendent 404,
+quatre points d'entrée du legacy sont redirigés et `LiensLegacy` traduit `/update/`. Le registre
+complet est dans `DEPRECIATION.md`.
 
 **À noter pour U6b** : `/apt_update` et `/dpkg_repair` ne consultent **pas** la fenêtre de
 maintenance, là où `/update`, `/security_updates` et `/custom_update` le font. `dpkg_repair` tue

@@ -27,6 +27,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
@@ -157,6 +158,39 @@ function renseignee(valeur) {
 }
 
 try {
+    /*
+     * MODULE ARCHIVE ? Cote legacy, `update/` a ete porte en sept sous-lots puis
+     * deplace dans `legacy/_deprecated/`. Ses URL rendent 404 : ce n'est pas un
+     * echec, c'est l'aboutissement du portage. Le test le CONSTATE — et verifie
+     * surtout que le menu du legacy mene desormais au portage, sans quoi on aurait
+     * installe soi-meme un 404 dans un menu.
+     *
+     * Tant que le module est servi, ce bloc est inerte et la suite se joue.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE,
+            chemin: '/update/',
+            fichiers: [
+            '/update/index.php',
+            '/update/js/apiCalls.js',
+            '/update/js/domManipulation.js',
+            '/update/functions/list_machines.php',
+            '/update/functions/filter_servers.php',
+            ],
+            verifie, constate,
+        });
+        if (archivee) {
+            const { ctx, page } = await connecte('rw-test-admin');
+            await verifieMenuLegacy(page, '/mises-a-jour', verifie);
+            await ctx.close();
+            console.log(lignes.join('\n'));
+            console.log(`\ncible=${CIBLE} : ${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+            await navigateur.close();
+            process.exit(echecs > 0 ? 1 : 0);
+        }
+    }
+
     // ── La garde reelle, avec les trois comptes ─────────────────────────────
     for (const [nom, compte] of Object.entries(COMPTES)) {
         const { ctx, page } = await connecte(nom);
@@ -222,8 +256,21 @@ try {
         const filtre = await attendJusqua(page, (e) => e.nbLignes < depart.nbLignes || e.nbLignes === 0);
 
         constate(`apres filtre « ${cible} »`, `${filtre.nbLignes} ligne(s)`);
+
+        /*
+         * D'ABORD : le tableau est REPEUPLE. `[].every()` rend `true`, donc
+         * l'assertion suivante passerait sur un tableau VIDE — c'est-a-dire
+         * exactement sur la regression que `go-update-filter.mjs` gardait
+         * (mauvaise cle JSON, `forEach` sur `undefined`, tableau jamais
+         * regarni). L'environnement vise vient du parc reel : au moins une
+         * machine le porte.
+         */
+        verifie(`le filtre « ${cible} » repeuple le tableau`,
+                filtre.nbLignes > 0,
+                `${filtre.nbLignes} ligne(s) pour un environnement porte par le parc`);
+
         verifie(`le filtre « ${cible} » ne garde que cet environnement`,
-                filtre.machines.every(m => m.environnement === cible),
+                filtre.machines.length > 0 && filtre.machines.every(m => m.environnement === cible),
                 filtre.machines.map(m => m.environnement).join(', ') || 'aucune ligne');
     } else {
         constate('filtre par environnement',

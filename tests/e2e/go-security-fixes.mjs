@@ -95,8 +95,11 @@ try {
         document.querySelectorAll('#server option').length);
     check('[ssh-audit] selecteur de serveurs peuple pour un superadmin', auditOptions > 1);
 
+    // `update/` a ete porte sur Laravel puis archive le 2026-08-20. Le controle
+    // de non-regression devient le TEMOIN de cet archivage : la page ne doit
+    // plus repondre du tout.
     r = await visit(`${BASE}/update/`);
-    check('[update] rend en 200 (non modifie, controle de non-regression)', r.status === 200 && !r.phpError);
+    check('[update] archive : ne repond plus (404)', r.status === 404);
 
     // ── Export CVE : le superadmin doit toujours pouvoir exporter ───────────
     const exportStatus = await page.evaluate(async (base) => {

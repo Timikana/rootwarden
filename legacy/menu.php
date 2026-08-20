@@ -74,7 +74,9 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
         <?php endif; ?>
 
         <?php if (($perms['can_update_linux'] ?? false) || $isSA): ?>
-        <?= $sideLink('/update/', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>', t('nav.updates'), t('nav.tip_updates')) ?>
+        <?php /* PORTE vers Laravel (2026-08-20) : le module a ete archive dans
+                 legacy/_deprecated/. L'entree renvoie au nouveau portail. */ ?>
+        <?= $sideLink(rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') . '/mises-a-jour', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>', t('nav.updates'), t('nav.tip_updates')) ?>
         <?php endif; ?>
 
         <?php if (($perms['can_manage_iptables'] ?? false) || $isSA): ?>
@@ -230,7 +232,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
         <nav class="px-3 py-3 space-y-1">
             <a href="/index.php" title="<?= t('nav.tip_dashboard') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.dashboard') ?></a>
             <?php if (($perms['can_deploy_keys'] ?? false) || $isSA): ?><a href="/ssh/" title="<?= t('nav.tip_ssh_keys') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.ssh_keys') ?></a><?php endif; ?>
-            <?php if (($perms['can_update_linux'] ?? false) || $isSA): ?><a href="/update/" title="<?= t('nav.tip_updates') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.updates') ?></a><?php endif; ?>
+            <?php if (($perms['can_update_linux'] ?? false) || $isSA): ?><a href="<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') ?>/mises-a-jour" title="<?= t('nav.tip_updates') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.updates') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_iptables'] ?? false) || $isSA): ?><a href="/iptables/" title="<?= t('nav.tip_iptables') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.iptables') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_fail2ban'] ?? false) || $isSA): ?><a href="/fail2ban/" title="<?= t('nav.tip_fail2ban') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.fail2ban') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_services'] ?? false) || $isSA): ?><a href="/services/" title="<?= t('nav.tip_services') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.services') ?></a><?php endif; ?>

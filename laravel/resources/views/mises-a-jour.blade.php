@@ -12,16 +12,17 @@
         </div>
     </div>
 
-    {{-- Portage PARTIEL, dit a l'ecran. Un module qu'on porte par morceaux
-         laisse forcement des capacites derriere lui : les faire disparaitre
-         sans un mot ferait croire qu'elles n'existent plus. --}}
+    {{-- Le module est ARCHIVE depuis le 2026-08-20 : `legacy/update/` a rejoint
+         `legacy/_deprecated/` et ses URL rendent 404. L'encart ne renvoie donc
+         PLUS vers l'ancien portail — un lien vers une page disparue est le
+         defaut qu'on corrige, pas celui qu'on installe.
+
+         Il reste pour dire les deux capacites que le serveur sait faire et que
+         l'ancienne page n'a jamais offertes (E-22). Les taire reviendrait a
+         faire croire qu'elles n'existent pas. --}}
     <div class="rw-encart rw-prose">
         <strong>{{ __('maj.partiel_titre') }}</strong>
         <p class="rw-tuile__texte">{{ __('maj.partiel_texte') }}</p>
-        <p class="rw-tuile__lien">
-            <a class="rw-lien" href="{{ rtrim(config('app.url_legacy'), '/') }}/update/"
-               target="_blank" rel="noopener" data-rw="vers-legacy">{{ __('maj.partiel_lien') }} ↗</a>
-        </p>
     </div>
 
     <div class="rw-barre-filtres">
