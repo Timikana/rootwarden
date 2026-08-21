@@ -1342,6 +1342,34 @@ Piege dans le piege : la cellule hote porte `.rw-tableau__fort`, donc
 Un `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir a la
 ligne : poser `white-space: normal` explicitement.
 
+### Ajouter une colonne ACTIONNABLE elargit le tableau : l'appoint doit ceder
+
+Mesure en S5, en trois temps. La sixieme colonne a recu un selecteur et un
+bouton : le tableau est passe de **1048 px** — le cadre exact obtenu en S3 — a
+1102, puis a **1203** quand un `flex; nowrap` a empeche l'empilement, avec le
+bouton **hors du champ**. Ce n'est pas la colonne actionnable qu'on retaille,
+c'est l'APPOINT : le resume est passe de 46 a 28 caracteres, son texte entier
+restant en infobulle.
+
+Et deux pieges de mise en page qui se voient seulement a l'image :
+
+- **un texte qui se coupe sur deux lignes DOUBLE la hauteur de chaque ligne.**
+  La version (`6.12.90+deb13-amd64`) se coupait : 78 px de ligne au lieu de 41.
+  `white-space: nowrap` sur la cellule ;
+- **empecher l'empilement rend de la hauteur mais coute de la largeur.** Les deux
+  effets se compensent mal : il faut mesurer les deux, pas en choisir un.
+
+Quand il ne reste que des colonnes decisionnelles, le defilement est la bonne
+reponse — et il se DIT. A 390 px les deux colonnes d'appoint sont deja masquees ;
+cacher le paquet ou la severite retirerait ce dont on a besoin pour agir.
+
+### Verifier aussi ce que le CSS prevoit DEJA
+
+Avant de « corriger » un rendu, chercher la regle existante. En S5 j'ai cru qu'un
+bouton desactive avait l'air actif : `.rw-bouton:disabled` existait, avec
+`opacity: .45`, et la capture le montrait bien. Corriger un defaut inexistant
+aurait ajoute une regle en double.
+
 ### Un en-tete de colonne doit nommer ce que la colonne CONTIENT
 
 Reemployer la cle d'un autre sous-lot parce que le mot ressemble suffit a mentir :
