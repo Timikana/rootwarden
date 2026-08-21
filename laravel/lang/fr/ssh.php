@@ -33,4 +33,17 @@ return [
     'confirmer_avertissement' => "Sur chaque serveur coche, et en tant que root : le paquet sudo est installe s'il manque, les comptes habilites sont crees, leur fichier authorized_keys est REECRIT, et une politique sudoers est posee. Les cles de tout compte ayant perdu son habilitation sont REVOQUEES. Rien de tout cela n'est reversible depuis cette page.",
     'non_porte' => "Le declenchement du deploiement et la lecture de son journal ne sont pas encore portes.",
     'non_porte_lien' => "Les lancer depuis l'ancien portail",
+    // ── Le constat avant deploiement (sous-lot K2) ──────────────────────────
+    'verifier' => 'Verifier les prerequis',
+    'verifier_aide' => "Interroge les serveurs coches en LECTURE seule et rend un constat. Ne deploie rien.",
+    'verif_en_cours' => 'Verification en cours...',
+    'verif_echec' => 'La verification a echoue (code :statut)',
+    'verif_pret' => 'Aucun prerequis manquant',
+    'verif_bloque' => ':nombre serveur(s) bloque(s) : corrigez ci-dessous ou decochez-les',
+    'cles_aucune' => "ATTENTION : aucun compte actif ne porte de cle SSH — un deploiement ne deploierait rien",
+    'cles_nombre' => ':nombre compte(s) actif(s) avec une cle SSH',
+    'inventaire' => ':nombre compte(s) inventorie(s) sur ce serveur',
+    'a_creer' => 'Comptes qui seront crees :',
+    'a_revoquer' => 'Acces qui seront REVOQUES (cle retiree, compte conserve) :',
+    'lien_comptes_distants' => 'Ouvrir Utilisateurs distants',
 ];

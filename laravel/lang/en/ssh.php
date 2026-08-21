@@ -33,4 +33,17 @@ return [
     'confirmer_avertissement' => 'On every checked server, as root: the sudo package is installed if missing, entitled accounts are created, their authorized_keys file is REWRITTEN, and a sudoers policy is installed. Keys belonging to any account that lost its entitlement are REVOKED. None of this can be undone from this page.',
     'non_porte' => 'Starting the deployment and reading its log are not ported yet.',
     'non_porte_lien' => 'Run them from the legacy portal',
+    // ── The pre-deployment check (sub-batch K2) ─────────────────────────────
+    'verifier' => 'Check prerequisites',
+    'verifier_aide' => 'Queries the checked servers READ-ONLY and reports back. Deploys nothing.',
+    'verif_en_cours' => 'Checking...',
+    'verif_echec' => 'The check failed (code :statut)',
+    'verif_pret' => 'No missing prerequisite',
+    'verif_bloque' => ':nombre server(s) blocked: fix below or uncheck them',
+    'cles_aucune' => 'WARNING: no active account carries an SSH key — a deployment would deploy nothing',
+    'cles_nombre' => ':nombre active account(s) with an SSH key',
+    'inventaire' => ':nombre account(s) inventoried on this server',
+    'a_creer' => 'Accounts that will be created:',
+    'a_revoquer' => 'Access that will be REVOKED (key removed, account kept):',
+    'lien_comptes_distants' => 'Open Remote users',
 ];

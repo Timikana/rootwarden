@@ -66,6 +66,19 @@ class ClesSshController extends Controller
         return [
             'aucune_selection' => __('ssh.aucune_selection'),
             'selection' => __('ssh.selection', ['nombre' => '{nombre}']),
+            // ── Le constat avant deploiement (sous-lot K2) ────────────────
+            'verif_en_cours' => __('ssh.verif_en_cours'),
+            'verif_echec' => __('ssh.verif_echec', ['statut' => '{statut}']),
+            'verif_pret' => __('ssh.verif_pret'),
+            'verif_bloque' => __('ssh.verif_bloque', ['nombre' => '{nombre}']),
+            'cles_aucune' => __('ssh.cles_aucune'),
+            'cles_nombre' => __('ssh.cles_nombre', ['nombre' => '{nombre}']),
+            'a_creer' => __('ssh.a_creer'),
+            'a_revoquer' => __('ssh.a_revoquer'),
+            'inventaire' => __('ssh.inventaire', ['nombre' => '{nombre}']),
+            'url_preflight' => url('/api/gateway/preflight_check'),
+            'url_comptes_distants' => config('app.url_legacy') . '/adm/server_users.php',
+            'lien_comptes_distants' => __('ssh.lien_comptes_distants'),
         ];
     }
 }

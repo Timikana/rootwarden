@@ -2063,3 +2063,61 @@ La suite s'ancre désormais sur la classe `.machine-item`, que les deux portails
 Enfin, un `<a>` stylé en `.rw-bouton` gardait son soulignement de lien — il se lisait comme un bouton
 *et* comme un lien. Le défaut existait déjà sur « Exporter en CSV » du scan CVE ; un bouton-lien de plus
 l'a simplement rendu visible.
+
+## E-70 — Le constat avant déploiement devient un geste à part, et il ne l'était pas
+
+C'est la propriété centrale de K2. Côté legacy, `preflight_check` et `deploy` vivent dans **la même
+chaîne `fetch`** (`ssh/js/main.js:110-200`) : si le constat passe, le déploiement part **immédiatement**,
+sans reprise de main. Il n'existe donc **aucun moyen de vérifier sans risquer d'écrire** — et écrire, ici,
+veut dire `apt-get install sudo`, `useradd`, l'écrasement d'`authorized_keys` et la **révocation** de
+clés, en root, sur chaque machine cochée.
+
+Le portage offre un bouton **« Vérifier les prérequis »** qui n'appelle que `preflight_check` et
+n'enchaîne rien. C'est ce qui rend le geste testable : la suite peut le cliquer, le legacy non.
+
+| | legacy | portage |
+|---|---|---|
+| vérifier sans déployer | **impossible** | bouton dédié |
+| forme du constat | une fenêtre de texte monospace unique | un bloc par machine, en grille |
+| « accès qui seront RÉVOQUÉS » | une ligne parmi l'inventaire, l'OS et le disque | en rouge, distinguée |
+| statut HTTP du refus | jamais lu (`.then(r => r.json())`) | lu **d'abord** |
+| lien vers le prérequis manquant | `/adm/server_users.php` en dur | lien inter-portails avec `↗` |
+
+**Ce que la mesure a donné.** `preflight_check` porte quatre portes avant d'ouvrir quoi que ce soit :
+serveur jamais scanné, utilisateurs en attente de classification, ni mot de passe ni keypair, port
+injoignable. Le parc réel en offre deux **sans aucune session SSH** :
+
+- `Test-Server-Debian` (id 2) a `users_scanned_at` à `NULL` → première porte, `scan_required` ;
+- `OpenCVE-Test-OnPrem` (id 3) est scannée mais porte **un utilisateur en `pending_review`** → deuxième
+  porte.
+
+Seule la machine 1 irait jusqu'à la session SSH, et c'est `srv-zabbix`, en **production** : elle n'est
+jamais visée. La suite n'ouvre donc **aucune session SSH** et n'a pas besoin d'en ouvrir.
+
+**Une donnée que le constat rend et qui décide de tout : `users_with_keys`.** Mesure du jour : **zéro
+compte actif ne porte de clé SSH**. Un déploiement ne déploierait donc rien, et le legacy en fait — à
+juste titre — un motif d'échec du constat. Le portage l'énonce en clair (« aucun compte actif ne porte de
+clé SSH — un déploiement ne déploierait rien ») plutôt que par un « 0 » au milieu d'un journal.
+
+**Non mesurable, et dit tel quel** : `preflight_check` n'a **aucune garde de rôle** — seulement
+`@require_api_key` + `@threaded_route` — alors qu'elle énumère les comptes UNIX distants, ce que
+`/scan_server_users` réserve au rôle 2 **et** place dans `ADMIN_ONLY_PREFIXES` du proxy. C'est donc un
+contournement. Aucun compte de rôle 1 ne porte à la fois `can_deploy_keys` et un accès machine, donc le
+contournement n'est pas exerçable avec les comptes existants. Même limite que D-5. Le fermer demanderait
+`@require_permission` sur la route, donc **modifier le backend** : décision de l'exploitant.
+
+**Deux défauts de mes propres tests, tous deux catalogués et payés quand même.** La précondition de la
+première porte était lue par `COALESCE(CAST(users_scanned_at AS CHAR), '')` : `litEnBase` fait un `trim()`
+puis un `.filter(Boolean)`, donc **la chaîne vide disparaît** et la valeur arrivait à `undefined`. La
+suite annonçait « la machine 2 porte désormais un scan (« undefined ») » et **sautait la porte qu'elle
+venait mesurer**. Une sentinelle explicite (`'JAMAIS'`) règle cela. Et la sonde qui relève
+`users_with_keys` visait la machine 2 **sans reprendre le garde de précondition** appliqué juste au-dessus
+— deux poids, deux mesures pour le même risque ; elle vise désormais un identifiant valide mais
+inexistant, qui ne franchit aucune porte.
+
+Enfin, une assertion exigeait le **chiffre** `0` dans le rapport là où le portage énonce l'absence en
+mots. Elle condamnait le meilleur des deux rendus : elle mesure maintenant la propriété, pas la forme.
+
+**Vu à l'image** : les blocs du rapport portaient `.rw-carte`, plafonnée à 420 px, et restaient étroits
+sur une page de 1400. Ils sont désormais rangés en `.rw-grille` (`auto-fit`, minimum 280 px) et prennent
+la largeur disponible.

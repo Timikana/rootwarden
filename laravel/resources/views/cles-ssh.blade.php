@@ -106,9 +106,32 @@
                          politique sudoers — et la REVOCATION des cles de tout
                          compte ayant perdu son habilitation. `srv-zabbix` est en
                          PRODUCTION et figure dans la liste. --}}
+                    {{-- LE CONSTAT EST SEPARE DU DEPLOIEMENT — c'est tout K2.
+                         Cote legacy, `preflight_check` et `deploy` vivent dans la
+                         MEME chaine `fetch` : si le constat passe, le deploiement
+                         part immediatement, sans reprise de main. Il n'existe donc
+                         aucun moyen de VERIFIER sans risquer d'ECRIRE. Ici le
+                         constat est un geste a part entiere, qui ne joint les
+                         serveurs qu'en lecture et n'enchaine rien. --}}
+                    <button type="button" class="rw-bouton rw-bouton--discret"
+                            id="verifier-btn" data-rw="ssh-verifier"
+                            disabled
+                            title="{{ __('ssh.verifier_aide') }}">{{ __('ssh.verifier') }}</button>
                     <button type="button" class="rw-bouton rw-bouton--danger"
                             id="deploy-btn" data-rw="ssh-deployer"
                             disabled>{{ __('ssh.deployer') }}</button>
+                </div>
+
+                {{-- LE RAPPORT DU CONSTAT, machine par machine. Le legacy le
+                     deverse dans une fenetre de texte unique, ou la ligne la plus
+                     importante du module — les acces qui vont etre REVOQUES — se
+                     perd au milieu du reste. --}}
+                <div id="preflight-rapport" hidden>
+                    <p class="rw-aide" id="preflight-cles" aria-live="polite"></p>
+                    {{-- En GRILLE : `auto-fit` a 280 px minimum, donc les blocs se
+                         rangent cote a cote sur un grand ecran et s'empilent sur un
+                         petit. La page a de la largeur, le rapport s'en sert. --}}
+                    <div class="rw-grille" id="preflight-machines"></div>
                 </div>
 
                 <div class="rw-panneau-decision" id="deploy-panneau" hidden>
