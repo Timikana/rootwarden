@@ -255,3 +255,59 @@ class TestCveRemediation:
     def test_remediation_stats_no_api_key(self, client):
         resp = client.get('/cve_remediation/stats')
         assert resp.status_code == 401
+
+
+class TestCveReprioritizeNeDetruitPas:
+    """`/cve_reprioritize` ne doit pas ecraser l'enrichissement qu'il n'a pas pu lire.
+
+    `enrich_findings` rattrape lui-meme les echecs EPSS et KEV et rend
+    normalement, si bien que la branche 503 de la route etait inatteignable pour
+    une panne reseau. L'UPDATE ecrivait alors `kev = 0` pour TOUS les findings et
+    `epss_score` a NULL — un clic pendant une coupure vers CISA effacait le
+    drapeau des CVE reellement exploitees, et l'ecran affichait
+    « Re-priorisation terminee ».
+    """
+
+    def _prepare(self, mock_cursor):
+        """Un scan complet ET un finding, dans UNE SEULE ligne.
+
+        Le curseur factice rend `_results[0]` pour `fetchone` et la liste ENTIERE
+        pour `fetchall` : deux formes de lignes ne peuvent donc pas cohabiter. Une
+        ligne portant a la fois `id` (lu comme le scan) et `cve_id`/`cvss_score`
+        (lus comme le finding) satisfait les deux lectures.
+        """
+        mock_cursor._results = [
+            {'id': 42, 'cve_id': 'CVE-2024-0001', 'cvss_score': 9.8},
+        ]
+
+    def test_refuse_d_ecrire_quand_kev_est_indisponible(self, client, admin_headers, mock_cursor):
+        self._prepare(mock_cursor)
+        faux = {'epss': 0, 'kev': 0, 'epss_echoue': False, 'kev_echoue': True}
+        with patch('cve_enrich.enrich_findings', return_value=faux):
+            resp = client.post('/cve_reprioritize', headers=admin_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 503
+        assert 'KEV' in resp.get_json()['message']
+        # ET RIEN N'A ETE ECRIT : la derniere requete n'est pas un UPDATE des
+        # findings. Un 503 qui aurait quand meme ecrit ne vaudrait rien.
+        assert 'update cve_findings' not in mock_cursor._last_query
+
+    def test_refuse_d_ecrire_quand_epss_est_indisponible(self, client, admin_headers, mock_cursor):
+        self._prepare(mock_cursor)
+        faux = {'epss': 0, 'kev': 0, 'epss_echoue': True, 'kev_echoue': False}
+        with patch('cve_enrich.enrich_findings', return_value=faux):
+            resp = client.post('/cve_reprioritize', headers=admin_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 503
+        assert 'EPSS' in resp.get_json()['message']
+        assert 'update cve_findings' not in mock_cursor._last_query
+
+    def test_ecrit_normalement_quand_l_enrichissement_a_reussi(self, client, admin_headers, mock_cursor):
+        """Le chemin nominal doit rester intact : le refus ne doit pas tout bloquer."""
+        self._prepare(mock_cursor)
+        bon = {'epss': 1, 'kev': 1, 'epss_echoue': False, 'kev_echoue': False}
+        with patch('cve_enrich.enrich_findings', return_value=bon):
+            resp = client.post('/cve_reprioritize', headers=admin_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 200
+        assert resp.get_json()['success'] is True

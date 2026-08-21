@@ -273,6 +273,32 @@ def cve_reprioritize():
             logger.error("cve_reprioritize enrich failed: %s", e)
             return jsonify({'success': False, 'message': 'Enrichissement indisponible'}), 503
 
+        # UNE PANNE RESEAU NE DOIT PAS DETRUIRE DES DONNEES.
+        #
+        # `enrich_findings` rattrape lui-meme les echecs EPSS et KEV et rend
+        # normalement : la branche 503 ci-dessus etait donc inatteignable pour une
+        # panne reseau. L'UPDATE qui suit ecrit `1 if f.get('kev') else 0`, soit
+        # **kev = 0 pour TOUS les findings** quand le catalogue CISA n'a pas
+        # repondu, `epss_score` a NULL, et un `priority_score` recalcule sur le
+        # CVSS seul. Autrement dit : un clic pendant une coupure effacait le
+        # drapeau des CVE reellement exploitees, et l'ecran affichait
+        # « Re-priorisation terminee ».
+        #
+        # On refuse donc d'ECRIRE ce que l'on n'a pas pu LIRE. Les donnees en base
+        # restent celles du dernier enrichissement reussi.
+        if stats.get('kev_echoue') or stats.get('epss_echoue'):
+            sources = [n for n, k in (('KEV', 'kev_echoue'), ('EPSS', 'epss_echoue'))
+                       if stats.get(k)]
+            logger.warning(
+                "cve_reprioritize refuse d'ecrire : enrichissement indisponible (%s) "
+                "pour machine_id=%s", ', '.join(sources), machine_id
+            )
+            return jsonify({
+                'success': False,
+                'message': ('Enrichissement indisponible (' + ', '.join(sources) +
+                            ') : les donnees existantes ne sont pas ecrasees.')
+            }), 503
+
         upd = conn.cursor()
         for r, f in zip(rows, findings):
             upd.execute(
