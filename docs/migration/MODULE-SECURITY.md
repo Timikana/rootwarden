@@ -177,7 +177,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S3** ✔ | consultation des CVE, lecture seule — **PORTÉ le 2026-08-20** (v1.37.24) | aucune : lecture en base | non | non |
 | **S4** ✔ | planification des scans — **PORTÉ le 2026-08-20** (v1.37.25) | aucune : lecture et ecriture en base | non | oui |
 | **S5** ✔ | suivi et ticketing — **PORTÉ le 2026-08-21** (v1.37.26), whitelist NON portée | passerelle pour le ticket seul |
-| **S6** | re-priorisation EPSS / KEV | `POST /cve_reprioritize` | non | oui |
+| **S6** ✔ | enrichissement EPSS / KEV et priorisation — **PORTÉ le 2026-08-21** (v1.37.27) | passerelle pour la re-priorisation seule |
 | **S7** | le scan lui-même | `POST /cve_scan` — **FLUX** | **oui** | oui + **destructif** |
 
 **S1 d'abord** parce que c'est le plus petit périmètre du module et qu'il porte une règle d'accès
@@ -653,6 +653,28 @@ de chaque ligne**.
 **S6** : la route réécrit en bloc les scores de tous les findings du dernier scan, et son résultat
 dépend de deux services externes (FIRST.org EPSS, CISA KEV), avec un 503 si indisponibles.
 L'attente du test doit viser **le contenu**, jamais un délai.
+
+**S6 — porté le 2026-08-21** (v1.37.27) : cinq des six colonnes d'enrichissement de la migration 054
+entrent dans `ScansCve::resultats()`, et le tri devient `kev DESC, priority_score DESC, sévérité, CVSS`
+— **c'est le portage de S3 qui était fautif ici, pas le legacy** (E-61). Le portage dépend donc
+désormais de la migration 054, ce que l'inventaire annonçait.
+
+Suite de caractérisation `go-page-cve-priorite` : **8 PASS sur le legacy, 14 sur le portage**. Base
+rouge relevée avant portage : 4 PASS / 5 FAIL, ce qui prouve que la suite pouvait échouer.
+
+Ce que S6 a refermé : **E-61** (les cinq vulnérabilités réellement exploitées enterrées derrière 103
+CRITICAL, et le `priority_label` calculé mais jamais montré), **E-62** (la pastille KEV du legacy peinte
+par une classe Tailwind purgée — contraste **1,06:1**, portée à **6,47:1**), **E-63** (les deux marques
+ajoutées avaient rouvert le défaut de largeur que S5 venait de fermer : le bouton de ticket ressorti du
+champ, la hauteur de ligne de 54 à 63 px, et un tableau débordant sans que le cadre enregistre un
+défilement — donc une colonne inatteignable), **E-64** (la re-priorisation déclenchée sur un simple clic
+côté legacy, désormais précédée d'une décision qui nomme les 1458 lignes réécrites et l'absence de
+retour).
+
+Ce que S6 **ne** porte pas, et le dit : l'attribution d'une re-priorisation, faute de colonne d'auteur
+et de droit de migrer (même limite que E-60). Et la suite ne déclenche **jamais** `/cve_reprioritize` :
+elle mesure au réseau qu'aucun appel n'est parti, et le geste lui-même est conditionné à la cible, parce
+que sur le legacy il n'y a rien à cliquer sans détruire les données mesurées.
 
 **S7 en dernier**, et c'est le seul qui touche les machines. Ce qu'il faut avoir en tête :
 - c'est un **flux**, pas un JSON (§3) ;

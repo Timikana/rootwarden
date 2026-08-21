@@ -133,6 +133,21 @@ class ScanCveController extends Controller
             'comparaison_ajoutees' => __('cve.comparaison_ajoutees'),
             'comparaison_corrigees' => __('cve.comparaison_corrigees'),
             'comparaison_inchangees' => __('cve.comparaison_inchangees'),
+            // ── Enrichissement EPSS / KEV (sous-lot S6) ──────────────────────
+            'kev_aide' => __('cve.kev_aide'),
+            'kev_depuis' => __('cve.kev_depuis', ['date' => '{date}']),
+            'epss_aide' => __('cve.epss_aide'),
+            'priorite_aide' => __('cve.priorite_aide', ['libelle' => '{libelle}']),
+            'non_enrichi' => __('cve.non_enrichi'),
+            'reprio_encours' => __('cve.reprio_encours'),
+            'reprio_ok' => __('cve.reprio_ok', ['kev' => '{kev}', 'epss' => '{epss}']),
+            'reprio_echec' => __('cve.reprio_echec'),
+            // LA RE-PRIORISATION PASSE PAR LA PASSERELLE, et pour la meme raison
+            // que le ticket de S5 : elle interroge deux services EXTERNES
+            // (FIRST.org pour l'EPSS, le catalogue CISA pour le KEV). La
+            // reimplementer ici dupliquerait cette integration, et le portage n'a
+            // aucune raison de porter un client HTTP vers l'exterieur.
+            'url_reprio' => url('/api/gateway/cve_reprioritize'),
             'comparaison_identique' => __('cve.comparaison_identique'),
             'fermer' => __('cve.fermer'),
             'suivi_a_venir' => __('cve.suivi_a_venir'),
@@ -224,15 +239,19 @@ class ScanCveController extends Controller
      * script, donc hors de toute parite FR/EN.
      *
      * @param  list<array<string,mixed>>  $findings
-     * @return array{severites:array<string,int>,annees:array<string,int>,total:int}
+     * @return array{severites:array<string,int>,annees:array<string,int>,total:int,kev:int}
      */
     private function facettes(array $findings): array
     {
         $ordre = ['CRITICAL' => 0, 'HIGH' => 1, 'MEDIUM' => 2, 'LOW' => 3, 'NONE' => 4];
         $severites = [];
         $annees = [];
+        $kev = 0;
 
         foreach ($findings as $f) {
+            if (! empty($f['k'])) {
+                $kev++;
+            }
             $sev = (string) ($f['s'] ?: 'NONE');
             $severites[$sev] = ($severites[$sev] ?? 0) + 1;
             // L'annee vient de l'identifiant CVE, jamais d'une date de scan :
@@ -244,6 +263,14 @@ class ScanCveController extends Controller
         uksort($severites, fn ($a, $b) => ($ordre[$a] ?? 9) <=> ($ordre[$b] ?? 9));
         krsort($annees);
 
-        return ['severites' => $severites, 'annees' => $annees, 'total' => count($findings)];
+        return [
+            'severites' => $severites,
+            'annees' => $annees,
+            'total' => count($findings),
+            // Le compte des vulnerabilites REELLEMENT exploitees. Comme sur le
+            // legacy, le bouton de filtre n'existe que s'il y en a : un filtre
+            // « KEV (0) » invite a un clic qui ne peut rien montrer.
+            'kev' => $kev,
+        ];
     }
 }

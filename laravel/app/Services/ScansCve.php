@@ -57,8 +57,25 @@ class ScansCve
     public function resultats(int $scanId): array
     {
         return DB::table('cve_findings')
-            ->select('cve_id', 'package_name', 'package_version', 'cvss_score', 'severity', 'summary')
+            ->select(
+                'cve_id', 'package_name', 'package_version', 'cvss_score', 'severity', 'summary',
+                // Enrichissement EPSS / KEV — colonnes de la migration 054.
+                'epss_score', 'kev', 'kev_date_added', 'priority_score', 'priority_label',
+            )
             ->where('scan_id', $scanId)
+            // CE QUI EST REELLEMENT EXPLOITE PASSE DEVANT CE QUI EST GRAVE EN THEORIE.
+            // Les cinq findings KEV du parc sont HIGH (7,1 a 7,8) : un tri par
+            // severite les enterrait derriere 103 CRITICAL a 9,8. Le legacy trie
+            // deja ainsi (`backend/cve_scanner.py:1230-1241`), et son script
+            // retriait par-dessus ; ici l'ordre est etabli UNE FOIS, en SQL, et le
+            // script ne fait plus que filtrer — donc aucun geste ne peut le defaire.
+            //
+            // MySQL classe NULL comme la plus petite valeur : en DESC, un finding
+            // non enrichi arrive donc APRES tous les autres, exactement ce que le
+            // legacy obtenait par `priority_score ?? -1`. Le comportement est
+            // identique ; ce qui change, c'est que la page l'EXPLIQUE desormais.
+            ->orderByDesc('kev')
+            ->orderByDesc('priority_score')
             ->orderByRaw("FIELD(severity,'CRITICAL','HIGH','MEDIUM','LOW','NONE')")
             ->orderByDesc('cvss_score')
             ->get()
@@ -196,6 +213,15 @@ class ScansCve
             's' => (string) ($f->severity ?? 'NONE'),
             'n' => (float) ($f->cvss_score ?? 0),
             'r' => mb_substr((string) ($f->summary ?? ''), 0, 200),
+            // L'ENRICHISSEMENT EST TRANSMIS, PARCE QU'IL EST AFFICHE. Le
+            // `priority_label` en particulier etait calcule, stocke, et jamais
+            // montre par le legacy : c'est le meme defaut que l'etat de suivi de
+            // S5 (E-57). Ici il explique en infobulle pourquoi une ligne est la ou
+            // elle est — sans ajouter de colonne, donc sans elargir le tableau.
+            'k' => (int) ($f->kev ?? 0) === 1,
+            'kd' => (string) ($f->kev_date_added ?? ''),
+            'e' => $f->epss_score === null ? null : (float) $f->epss_score,
+            'pl' => (string) ($f->priority_label ?? ''),
         ], $this->resultats($scanId));
     }
 

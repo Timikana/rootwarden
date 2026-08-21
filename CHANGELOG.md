@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.26** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.27** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,54 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.27 — module `security/`, sous-lot S6 : l'enrichissement EPSS / KEV et la priorisation
+
+**Symptôme.** Sur le portage, les cinq vulnérabilités du parc dont l'exploitation est **constatée**
+(catalogue CISA KEV) étaient affichées en 104ᵉ position. Elles sont toutes de sévérité HIGH (CVSS 7,1 à
+7,8), et le portage de S3 triait par sévérité puis par score : les 103 CRITICAL à 9,8 passaient devant,
+sur une page qui montre cinquante lignes. Ni la pastille KEV, ni la probabilité d'exploitation EPSS, ni
+le libellé de priorité n'étaient affichés.
+
+**Cause racine.** `ScansCve::resultats()` ne sélectionnait que six colonnes et ignorait les colonnes
+d'enrichissement de la migration 054. Le legacy, lui, trie correctement
+(`backend/cve_scanner.py:1230-1241`) : **le défaut était dans le portage, pas dans le legacy**.
+
+**Correctif.**
+- Le tri devient `kev DESC, priority_score DESC, sévérité, CVSS DESC`, établi **une seule fois en SQL** —
+  le script ne fait plus que filtrer, donc aucun geste ne peut le défaire.
+- Pastille KEV, pourcentage EPSS (signalé au-delà de 50 %), libellé de priorité en infobulle, et une
+  ligne au-dessus du tableau qui **explique** le tri : sans elle, un HIGH au-dessus d'un CRITICAL
+  ressemble à un défaut.
+- Filtre « KEV (n) », rendu seulement s'il y a de quoi filtrer.
+- Re-priorisation précédée d'une **décision en ligne** nommant les 1458 lignes réécrites et l'absence de
+  retour en arrière ; l'appel passe par la passerelle (deuxième et dernière exception du module après le
+  ticket de S5, même motif : deux services externes).
+
+**Trois défauts d'interface que seule la mesure a montrés** (E-63) : la cellule de sévérité se repliait
+sur deux lignes (hauteur de ligne 54 → 63 px, sur 1458 lignes) ; `.rw-tableau` en `width: 100%` laissait
+le tableau déborder de sa propre boîte en gardant `scrollWidth == clientWidth`, rendant la dernière
+colonne **inatteignable** — ni visible, ni accessible par défilement — d'où le passage à `min-width` ;
+et les deux nouvelles marques avaient rejeté hors du champ le bouton de ticket que S5 venait d'y ramener,
+d'où l'effacement du résumé sous 1500 px. Sous 720 px la pastille KEV passe devant la sévérité : elle
+était coupée en deux au bord du cadre.
+
+**Défaut du legacy mesuré au style calculé** (E-62) : sa pastille KEV est peinte par `bg-rose-600`, une
+classe Tailwind **absente du CSS compilé** (PurgeCSS). Fond transparent, texte blanc, contraste
+**1,06:1** — invisible, alors que le HTML est correct et qu'aucune assertion sur le DOM ne pouvait le
+voir. Le portage mesure **6,47:1**.
+
+**Tests.** `tests/e2e/go-page-cve-priorite.mjs` — **8 PASS sur le legacy, 14 sur le portage**. Base rouge
+relevée avant portage : 4 PASS / 5 FAIL. La suite ne déclenche **jamais** `/cve_reprioritize` : elle
+interpose un compteur réseau et exige zéro appel, et le geste lui-même est conditionné à la cible, parce
+que sur le legacy le bouton agit au premier clic. Captures regardées à 1920, 1400 et 390 px.
+
+**Notes d'exploitation.** Le portage dépend désormais de la **migration 054** (colonnes `epss_score`,
+`kev`, `kev_date_added`, `priority_score`, `priority_label`), dont le legacy dépendait déjà pour trier.
+`min-width: 100%` sur `.rw-tableau` touche **tous** les tableaux du portage — LOT complet rejoué. Aucune
+variable d'environnement, aucune migration ajoutée.
+
+---
 
 ### v1.37.26 — module `security/`, sous-lot S5 : le suivi et le ticketing des CVE
 
