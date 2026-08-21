@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.28** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.29** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,58 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.29 — module `ssh/` (« Cles SSH »), sous-lot K1 : la page nue
+
+**Symptome.** L'entree « Cles SSH » — la PREMIERE du menu — renvoyait encore a l'ancien portail. Cote
+legacy, trois defauts sur cette page : l'ecran affichait « 3 **:count** serveur(s) disponible(s) », le
+bouton de deploiement etait actif sans qu'aucune machine ne soit cochee, et la liste des tags de filtrage
+n'etait PAS cloisonnee.
+
+**Cause racine.** Le gabarit ecrit `count($machines)` PUIS `t('ssh.servers_available')`, dont la valeur
+est « :count serveur(s) disponible(s) » : le jeton n'est jamais substitue. Aucun controle ne le voyait —
+`go-socle-i18n` cherche des identifiants `module.cle`, pas des jetons `:xxx`. Et `index.php:61` fait un
+`SELECT DISTINCT tag FROM machine_tags` sans filtre, deux lignes au-dessus d'un `$allEnvs` qui, lui,
+derive de la liste deja cloisonnee.
+
+**Correctif.**
+- Route `/cles-ssh`, garde **REPRISE TELLE QUELLE** du legacy : `role:1` + `perm:can_deploy_keys`.
+- `App\Services\ParcSsh` derive les DEUX listes de filtrage du meme ensemble de machines visibles ; le
+  filtre de cycle de vie est pose UNE FOIS, avant la branche de role (lecon E-46).
+- Le compteur est substitue ; la suite mesure desormais TOUT jeton `:mot` visible a l'ecran.
+- Le bouton de deploiement **nait desactive** et n'ouvre qu'une DECISION, qui NOMME les machines
+  cochees et enonce ce qu'un deploiement engage : sur chaque serveur et en root, installation de `sudo`,
+  creation de comptes, ECRASEMENT d'`authorized_keys`, politique sudoers, et REVOCATION des cles de tout
+  compte ayant perdu son habilitation.
+- **Une machine masquee par un filtre est decochee** : on ne deploie pas sur ce qu'on ne voit plus. Le
+  legacy laissait la coche en place.
+- K4 n'etant pas porte, l'action principale du panneau est un lien vers l'ancien portail, avec le
+  marqueur des entrees non portees. Un panneau dont la seule issue serait « Annuler » ne serait pas une
+  decision.
+- Entree `Navigation` « Cles SSH » basculee sur `route` : une fleche de moins dans le menu.
+
+**Non mesurable, et dit tel quel** : aucun compte de role 1 ne porte `can_deploy_keys`, donc aucun role 1
+ne peut ouvrir cette page et la fuite du vocabulaire de tags n'est pas exercable. Elle est corrigee
+quand meme — corriger un defaut non exercable reste correct, pretendre l'avoir mesure ne l'est pas.
+
+**Ecart declare, non tranche** : l'en-tete de `ssh/index.php` annonce « Acces refuse pour les
+utilisateurs standards (role_id = 1) », ce que son `checkAuth` n'applique pas. Consequence plus lourde
+qu'E-36 : `POST /deploy` n'a NI role NI permission, donc un role 1 habilite pourrait declencher le
+deploiement, et `GET /logs` etant `@require_role(2)` il ne pourrait pas en lire le resultat. Restreindre
+serait un CHANGEMENT DE DROITS — a trancher avec D-1.
+
+**Tests.** `tests/e2e/go-page-ssh-parc.mjs` — **11 PASS sur le legacy, 14 sur le portage**. Base rouge :
+3 PASS / 5 FAIL. **Le bouton de deploiement n'est JAMAIS clique** : qu'il declenche immediatement cote
+legacy se lit dans son `onclick`. LOT complet rejoue. Captures regardees a 1920, 1400 et 390 px — elles
+ont sorti deux defauts qu'aucune assertion ne voyait : le nom de machine qui ramassait la pastille
+d'environnement, et un `<a class="rw-bouton">` qui gardait son soulignement de lien (defaut deja present
+sur « Exporter en CSV »).
+
+**Notes d'exploitation.** `legacy/ssh/` n'est PAS archive : l'archivage se fait par MODULE et K2
+(preflight), K3 (flux SSE) et K4 (deploiement) y vivent encore. Aucune variable d'environnement, aucune
+migration ajoutee.
+
+---
 
 ### v1.37.28 — module `security/`, sous-lot S7a : le declenchement d'un scan et ses refus
 

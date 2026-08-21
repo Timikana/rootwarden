@@ -784,6 +784,15 @@ body {
 .rw-bouton--danger { background: var(--rw-danger); color: var(--rw-accent-texte); }
 
 /*
+ * Un LIEN stylé en bouton ne garde pas son soulignement : il se lit comme un
+ * bouton ou comme un lien, pas comme les deux. Vu a l'image sur « Les lancer
+ * depuis l'ancien portail » (module ssh/), mais le defaut existait deja sur
+ * « Exporter en CSV » du scan CVE — un `<a class="rw-bouton">` de plus l'aurait
+ * simplement rendu plus visible.
+ */
+a.rw-bouton, a.rw-bouton:hover { text-decoration: none; }
+
+/*
  * Entre le discret et le rouge : une action qui MODIFIE la machine sans etre
  * exceptionnelle. La barre du module `update/` en porte quatre destructives ;
  * les peindre toutes en rouge revient a n'en signaler aucune. Le rouge reste
@@ -1585,3 +1594,49 @@ body {
     background: var(--rw-accent);
     transition: width .25s ease-out;
 }
+
+/*
+ * LISTE A COCHER — sous-lot K1 du module `ssh/`.
+ *
+ * Ce n'est pas un tableau : chaque entree est une DECISION (cocher ou non), pas
+ * une ligne de donnees a comparer colonne par colonne. Une liste dit cela mieux
+ * qu'un tableau a une seule colonne utile, et elle n'a pas besoin de defiler
+ * lateralement — ce qui evite d'emblee tout le probleme de largeur qu'E-63 a
+ * coute au tableau des CVE.
+ *
+ * L'etiquette englobe la case ET le texte : toute la ligne devient cliquable,
+ * alors qu'une case de 16 px est une cible minuscule au doigt.
+ */
+.rw-liste-selection {
+    list-style: none;
+    margin: 12px 0;
+    padding: 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.rw-liste-selection__ligne + .rw-liste-selection__ligne {
+    border-top: 1px solid var(--rw-bordure);
+}
+.rw-liste-selection__etiquette {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+.rw-liste-selection__etiquette:hover { background: var(--rw-surface-2); }
+.rw-liste-selection__corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rw-liste-selection__nom { font-weight: 550; display: flex; align-items: center; gap: 6px; }
+.rw-liste-selection__detail {
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+/* Une ligne masquee par un filtre sort du flux : elle ne doit pas laisser de
+   bordure orpheline derriere elle. */
+.rw-liste-selection__ligne[hidden] { display: none; }

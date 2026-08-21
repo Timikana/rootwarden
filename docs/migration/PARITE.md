@@ -1999,3 +1999,67 @@ dans le DOM, **sans cliquer** : un portail qui déclenche au clic ne se teste pa
 anti-rejeu TOTP. Il est posé par utilisateur, et `rw-test-admin` est partagé. La suite attend donc la
 fenêtre — le délai est lu dans le refus lui-même — et attend 63 s avant de piloter le client, parce
 qu'une sonde acceptée ferme la fenêtre de son processus et que le processus suivant n'est pas choisi.
+
+## E-69 — « Clés SSH » : le premier sous-lot du module le plus dangereux du dépôt, et il ne touche aucune route
+
+Le module `ssh/` fait 458 lignes — le plus petit des restants — mais un seul de ses boutons lance
+`configure_servers.py` (1 015 lignes) **en root, sur chaque machine cochée, cinq en parallèle** :
+`apt-get install -y sudo`, `useradd`, **écrasement** d'`authorized_keys`, installation d'une politique
+sudoers, et **révocation** des clés de tout compte ayant perdu son habilitation. `srv-zabbix`,
+`PROD`/`CRITIQUE`, porte ce bouton comme les autres. Aucune ligne n'entre dans `command_log` : la seule
+trace est `deployment.log`, **tronqué à chaque déploiement**.
+
+D'où le découpage en quatre : **K1** la page nue (aucune route, aucun SSH, rien d'écrit), **K2** le
+constat avant déploiement (`POST /preflight_check`, lecture seule), **K3** la lecture du flux SSE, **K4**
+le déploiement. K1 d'abord, précisément parce qu'il ne peut rien casser tout en portant les deux tiers
+du travail réutilisable.
+
+**Ce que K1 ferme.**
+
+| | legacy | portage |
+|---|---|---|
+| jeton de substitution à l'écran | **« 3 :count serveur(s) disponible(s) »** | « 3 serveur(s) disponible(s) » |
+| bouton de déploiement à l'arrivée | **actif, sans aucune sélection** | désactivé |
+| déclenchement | `onclick="deploySSH()"`, cascade immédiate | ouvre une décision qui **nomme les machines** |
+| vocabulaire de filtrage | tags **non cloisonnés** | dérivé des machines visibles |
+
+**Le `:count` échappait à tous les contrôles.** Le gabarit écrit `count($machines)` **puis**
+`t('ssh.servers_available')`, dont la valeur est « :count serveur(s) disponible(s) » : le jeton n'est
+jamais substitué et s'affiche en clair. `go-socle-i18n` ne pouvait pas le voir — il cherche des
+identifiants de la forme `module.cle`, pas des jetons `:xxx`. La suite de K1 mesure désormais **tout
+jeton de la forme `:mot`** visible dans le corps de la page.
+
+**Le cloisonnement du vocabulaire, corrigé sans être mesurable.** `index.php:61` fait un
+`SELECT DISTINCT tag FROM machine_tags` **sans le moindre filtre**, deux lignes au-dessus d'un
+`$allEnvs` qui, lui, dérive de la liste déjà cloisonnée : une ligne cloisonnée, sa voisine non. Un
+rôle 1 lirait donc le vocabulaire de tags de machines qu'il ne peut pas voir. Le portage dérive les
+**deux** listes du même ensemble de machines.
+
+Mesure : **aucun compte de rôle 1 ne porte `can_deploy_keys`** (seuls `superadmin` et
+`rw-test-admin`), donc aucun rôle 1 ne peut ouvrir cette page et la fuite n'est pas exerçable. La suite
+le **dit**, et vérifie que c'est bien la cause — elle ne prétend pas l'avoir mesurée. Même limite que
+D-5 : **corriger un défaut non exerçable reste correct ; prétendre l'avoir mesuré ne l'est pas.**
+
+**La garde est REPRISE DU LEGACY, l'écart est déclaré, la décision reste ouverte.** L'en-tête de
+`ssh/index.php` annonce depuis toujours « Accès refusé pour les utilisateurs standards (role_id = 1) » ;
+son `checkAuth` autorise `[ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN]` + `can_deploy_keys`. Même nature que
+E-36, avec une conséquence plus lourde : `POST /deploy` n'a **ni rôle ni permission**, donc un rôle 1
+habilité pourrait déclencher le déploiement, et `GET /logs` étant `@require_role(2)` il ne pourrait
+**pas en lire le résultat**. Le portage applique donc `role:1` + `perm:can_deploy_keys` — restreindre
+serait un changement de droits, à trancher avec D-1 pour ne pas laisser deux pages en désaccord.
+
+**K4 n'est pas porté, et la page ne fait pas semblant.** Le panneau de décision explique ce qu'un
+déploiement engage, nomme les machines cochées, puis offre comme action principale un lien vers l'ancien
+portail, avec le marqueur `↗` et une nouvelle fenêtre. Un panneau dont la seule issue serait « Annuler »
+ne serait pas une décision.
+
+**Deux défauts de mon propre fait, tous deux vus autrement que par une assertion.** Le nom de la machine
+affiché dans la décision ramassait la pastille d'environnement (« OpenCVE-Test-OnPrem DEV ») — vu **à
+l'image**. Et l'attribut `data-rw="machine-nom"` que j'ai ajouté a été attrapé par le sélecteur
+`[data-rw^="machine-"]` de la suite, qui comptait alors **six lignes pour trois machines** : un sélecteur
+par préfixe finit toujours par attraper autre chose, et cette fois j'ai fourni l'autre chose moi-même.
+La suite s'ancre désormais sur la classe `.machine-item`, que les deux portails portent.
+
+Enfin, un `<a>` stylé en `.rw-bouton` gardait son soulignement de lien — il se lisait comme un bouton
+*et* comme un lien. Le défaut existait déjà sur « Exporter en CSV » du scan CVE ; un bouton-lien de plus
+l'a simplement rendu visible.

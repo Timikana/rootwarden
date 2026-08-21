@@ -59,7 +59,7 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # de `legacy` a `route` ajoute une assertion pour `rw-test-admin` et une pour
 # `rw-test-super`. Ce n'est pas un chiffre ajuste pour faire passer le rejeu.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=42 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=44 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -67,7 +67,7 @@ declare -A REF_LARAVEL=(
   [go-page-cve-export]=21 [go-page-conformite]=13 [go-page-conformite-csv]=17
   [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
   [go-page-cve-planification]=20 [go-page-cve-suivi]=10 [go-page-cve-priorite]=14
-  [go-page-cve-scan-refus]=16
+  [go-page-cve-scan-refus]=16 [go-page-ssh-parc]=14
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -78,7 +78,7 @@ declare -A REF_LEGACY=(
   [go-page-cve-export]=17 [go-page-conformite]=13 [go-page-conformite-csv]=10
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
   [go-page-cve-planification]=16 [go-page-cve-suivi]=6 [go-page-cve-priorite]=8
-  [go-page-cve-scan-refus]=12
+  [go-page-cve-scan-refus]=12 [go-page-ssh-parc]=11
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -86,13 +86,14 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-tickets go-page-search go-page-cve-export go-page-conformite
   go-page-conformite-csv go-page-conformite-pdf go-page-cve-consultation
   go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
+  go-page-ssh-parc
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-backups go-page-tasks go-page-tickets go-page-search go-page-cve-export
   go-page-conformite go-page-conformite-csv go-page-conformite-pdf
   go-page-cve-consultation go-page-cve-planification go-page-cve-suivi
-  go-page-cve-priorite go-page-cve-scan-refus
+  go-page-cve-priorite go-page-cve-scan-refus go-page-ssh-parc
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
