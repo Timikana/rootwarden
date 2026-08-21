@@ -1767,3 +1767,133 @@ dans aucune ligne du tableau, et l'assertion « le suivi affiche l'état stocké
 d'une **autre** ligne — pour laquelle « vide » est la bonne réponse. Le test échouait sur le portage
 alors que le portage avait raison. La fixture porte désormais sur la **première CVE réellement
 affichée**, et le repérage se fait par le texte de la ligne, ce qui marche sur les deux portails.
+
+## E-61 — Ce qui est réellement exploité passe désormais devant ce qui est grave en théorie
+
+**Le portage de S3 triait par sévérité, et enterrait les cinq vulnérabilités les plus dangereuses du
+parc.** Les cinq findings marqués KEV — le catalogue CISA des vulnérabilités dont l'exploitation est
+*constatée* — sont tous de sévérité **HIGH** (CVSS 7,1 à 7,8). Un tri par sévérité puis par score les
+place donc **derrière les 103 CRITICAL à 9,8**, en 104ᵉ position d'une page qui en montre cinquante :
+invisibles. C'est tout l'écart entre « la plus grave sur le papier » et « celle qu'on exploite
+aujourd'hui ».
+
+Le legacy, lui, trie bien — `backend/cve_scanner.py:1230-1241` ordonne par `kev DESC, priority_score
+DESC, FIELD(severity,…), cvss_score DESC`, et son script retrie par-dessus. **Le défaut était donc dans
+mon portage, pas dans le legacy**, et la caractérisation le dit : l'assertion « les vulnérabilités
+réellement exploitées sont affichées en tête » est un `verifie` plein, vert sur le legacy et **rouge sur
+le portage** avant ce sous-lot. Mesure de départ : 0 des 5 premières lignes étaient KEV côté portage,
+5 sur 5 côté legacy.
+
+L'ordre est maintenant établi **une seule fois, en SQL** (`ScansCve::resultats()`), et le script ne fait
+plus que filtrer : aucun geste ne peut le défaire. MySQL classant `NULL` comme la plus petite valeur, un
+finding non enrichi arrive en `DESC` après tous les autres — exactement ce que le legacy obtenait par
+`priority_score ?? -1`. Le comportement est identique ; ce qui change, c'est que **la page l'explique
+désormais**, par une ligne au-dessus du tableau. Sans elle, un HIGH au-dessus d'un CRITICAL ressemble à
+un défaut, et le legacy ne l'annonce jamais.
+
+Le `priority_label` (URGENT, HIGH, MEDIUM, LOW) était calculé, stocké, et **jamais montré** — le même
+défaut que l'état de suivi de S5 (E-57). Il apparaît en infobulle de la sévérité, donc sans ajouter de
+colonne.
+
+**Une colonne reste stockée et affichée par aucun des deux portails : `epss_percentile`.** La route en
+écrit six, le portage en sélectionne cinq. Le percentile est pourtant plus parlant qu'un score brut pour
+un humain — « plus exposée que 99 % des CVE connues » se comprend mieux que « 0,0008 ». Elle n'est pas
+portée parce que le legacy ne l'affiche pas non plus et que l'afficher élargirait encore la cellule de
+sévérité, dont E-63 raconte précisément le coût. **Décision à prendre par l'exploitant**, pas par le
+portage : l'ajouter demande de retirer autre chose.
+
+## E-62 — La pastille KEV du legacy est invisible : contraste mesuré 1,06:1
+
+**Le signal le plus important de la page n'est pas peint.** Le legacy rend la pastille avec
+`class="… bg-rose-600 text-white"`. Or `bg-rose-600` **n'est pas dans le CSS compilé** : Tailwind est
+compilé localement avec PurgeCSS, qui ne garde que les classes qu'il a vues. Le fond reste donc
+transparent et le texte blanc sur le fond clair de la ligne.
+
+**Aucune assertion sur le DOM ne pouvait le voir** : la pastille *est* dans le HTML, son texte *est*
+« KEV », et un test qui cherche la marque la trouve. Seul le style **calculé** le dit. Mesure au
+navigateur, sur les deux portails :
+
+| Cible | Fond calculé | Texte | Contraste |
+|---|---|---|---|
+| legacy | `rgba(0, 0, 0, 0)` | `rgb(255, 255, 255)` | **1,06:1** |
+| portage | `rgb(185, 28, 28)` | `rgb(255, 255, 255)` | **6,47:1** |
+
+Le seuil retenu par l'assertion est 4,5:1. Le couple du portage est celui de `.rw-bouton--danger`,
+défini **par thème dans les deux sens** : rouge foncé sur blanc en clair, rose clair sur bleu nuit en
+sombre — une pastille rouge est strictement invisible sur un fond sombre, et c'était déjà la cause de la
+première version de l'ombre de défilement.
+
+C'est la troisième fois que ce projet paie une classe Tailwind purgée. La leçon est dans
+`rw-pieges` : **une classe utilitaire peut exister dans le source et manquer dans le binaire.**
+
+## E-63 — Deux marques de plus ont rouvert le défaut que S5 venait de fermer
+
+**Ajouter la pastille KEV et le pourcentage EPSS a élargi la cellule de sévérité de 86 px, et le bouton
+de ticket de S5 est ressorti du champ.** C'est exactement le défaut que S5 avait fermé en ramenant le
+résumé de 46ch à 28ch. Un sous-lot peut donc rouvrir ce que le précédent a corrigé, et seule la mesure
+le voit.
+
+Trois défauts, trois mesures, trois corrections :
+
+1. **La cellule de sévérité se repliait sur deux lignes.** Portant désormais trois marques, elle passait
+   à 63 px de haut à 1400 px et 85 px à 390 px — soit 1458 lignes rallongées pour un repli. Elle reçoit
+   un `nowrap` et prend la largeur qu'il lui faut : **54 px aux trois largeurs**.
+2. **Le tableau débordait de sa propre boîte sans que le cadre le sache.** Avec `width: 100%`, un
+   tableau dont les cellules exigent plus que la place offerte déborde en gardant `scrollWidth ==
+   clientWidth` : l'ombre de bord de S5 ne peut pas s'afficher et la dernière colonne devient
+   **littéralement inatteignable** — ni visible, ni accessible par défilement. `.rw-tableau` passe donc
+   à `min-width: 100%`.
+3. **Le résumé s'effaçait déjà de fait.** À 24ch il affichait « In the Linux kernel, the … » sur les
+   1458 lignes du parc : un début de phrase identique partout, qui ne distinguait plus rien. Il est
+   **entièrement caché sous 1500 px**, ce qui rend 183 px à la colonne actionnable. À 1920 px il revient
+   en entier, et l'identifiant CVE reste un lien vers la description complète à toutes les largeurs.
+
+Mesures après correction — le cadre visé est celui **du tableau des findings**, et non le premier
+`.rw-tableau-cadre` de la page, qui appartient aux planifications (erreur de mesure payée en route : le
+sondage annonçait 78 px de rognage contre 73 px réels, et un défilement absent là où il existait) :
+
+| Largeur | Cadre | Tableau | Défile | Hauteur de ligne | Colonne de suivi |
+|---|---|---|---|---|---|
+| 1920 px | 1568 | 1568 | non | 54 px | entière |
+| 1400 px | 1048 | 1048 | non | 54 px | entière, bouton de ticket compris |
+| 390 px | 306 | 536 | **oui, et indiqué** | 54 px | atteignable par défilement |
+
+**À 390 px, la pastille KEV était coupée en deux au bord du cadre** — le signal le plus important réduit
+à un liseré rouge tant qu'on n'avait pas défilé. Elle passe donc **devant** la sévérité sous 720 px, par
+un `order: -1` dans un conteneur souple. « KEV HIGH 7.8 » se lit moins bien que « HIGH 7.8 KEV » sur un
+grand écran ; sur un petit, ce qui compte est ce qu'on voit **sans** défiler. Le conteneur est un `span`
+et non la cellule : une `td` doit rester `table-cell`, la passer en `flex` la sortirait de la
+disposition du tableau.
+
+Le pourcentage EPSS s'efface aussi sous 720 px : c'est un affinage de la priorité, quand la pastille KEV
+est un **constat** d'exploitation. L'appoint cède, le constat reste.
+
+## E-64 — La re-priorisation demande avant d'agir, et le test prouve qu'aucune requête n'est partie
+
+`POST /cve_reprioritize` réécrit les **six** colonnes d'enrichissement de **tous** les findings du dernier
+scan de la machine — 1458 lignes sur le parc mesuré — après dix-neuf appels à FIRST.org et un au
+catalogue CISA. Il n'y a **pas de retour en arrière**, et une coupure réseau en cours de route remet
+`kev` à zéro partout (défaut mesuré, corrigé sur la branche `security/backend-cve`). **Le legacy
+déclenche cela sur un simple clic.**
+
+Côté portage, le clic **ouvre une décision en ligne** qui nomme le nombre de lignes réécrites et
+l'absence de retour, selon la convention du module : jamais de `confirm()` — la boîte native recouvre
+précisément ce sur quoi on décide, ne se style pas, et bloque Puppeteer.
+
+L'appel passe par la **passerelle**, deuxième et dernière exception du module après le ticket de S5, et
+pour la même raison : il interroge deux services **externes**. Le portage n'a aucune raison d'embarquer
+un client HTTP vers l'extérieur.
+
+**Ce que la caractérisation mesure, et ce qu'elle refuse de mesurer.** La propriété qui compte n'est pas
+« la requête était bornée », c'est **« il n'y a pas eu de requête »** — et elle se mesure au réseau, pas
+au DOM : un panneau peut s'ouvrir *et* l'appel partir quand même. La suite interpose donc un compteur
+sur `/cve_reprioritize` et exige zéro.
+
+**Le geste lui-même est conditionnel, pas seulement l'assertion.** Sur le legacy, ce bouton appelle la
+route au premier clic : cliquer « pour mesurer qu'il ne se passe rien » réécrirait les 1458 findings du
+seul scan complet du parc. Un `verifiePortage` n'aurait protégé que le verdict, pas les données. La
+suite déclare donc explicitement, côté legacy, que la propriété est **non mesurable sans détruire ce
+qu'elle mesure**.
+
+**Non porté, et dit :** l'attribution d'une re-priorisation. La table ne porte aucune colonne d'auteur,
+et une migration est interdite au portage — même limite que E-60.

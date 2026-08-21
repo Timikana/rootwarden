@@ -270,6 +270,19 @@
                                     @foreach ($f['severites'] as $sev => $n)
                                         <button type="button" class="rw-onglet" data-sev="{{ $sev }}">{{ $sev }} ({{ $n }})</button>
                                     @endforeach
+                                    {{-- KEV n'est PAS une severite : c'est le
+                                         constat qu'une faille est exploitee. Le
+                                         bouton partage pourtant la barre des
+                                         severites, comme sur le legacy, parce que
+                                         les deux repondent a la meme question —
+                                         « que dois-je regarder d'abord ? » — et
+                                         qu'une seule pastille doit rester active.
+                                         Il n'existe que s'il y a de quoi filtrer :
+                                         un « KEV (0) » invite a un clic vide. --}}
+                                    @if ($f['kev'] > 0)
+                                        <button type="button" class="rw-onglet rw-onglet--kev" data-sev="KEV"
+                                                title="{{ __('cve.kev_aide') }}">KEV ({{ $f['kev'] }})</button>
+                                    @endif
                                 </div>
                                 <div class="rw-barre-filtres" data-machine="{{ $id }}">
                                     <span class="rw-filtre__etiquette">{{ __('cve.filtre_annee') }}</span>
@@ -285,6 +298,41 @@
                                         <input type="text" class="rw-saisie rw-saisie--compacte" data-machine="{{ $id }}"
                                                placeholder="{{ __('cve.recherche') }}">
                                     </label>
+                                </div>
+
+                                {{-- LE TRI SE DIT. Un HIGH place au-dessus d'un
+                                     CRITICAL ressemble a un defaut tant que la
+                                     page n'explique pas pourquoi : ce qui est
+                                     REELLEMENT exploite passe devant ce qui est
+                                     grave en theorie. Le legacy applique ce tri
+                                     sans jamais l'annoncer. --}}
+                                <div class="rw-cve-priorite-barre">
+                                    <p class="rw-aide rw-cve-priorite-note">{{ __('cve.tri_explication') }}</p>
+                                    {{-- LA RE-PRIORISATION EST DESTRUCTRICE : elle
+                                         reecrit les six colonnes d'enrichissement
+                                         de TOUS les findings du scan, sans retour
+                                         en arriere. Le bouton n'agit donc pas : il
+                                         ouvre une decision EN LIGNE qui nomme la
+                                         consequence, selon la convention du
+                                         portage (jamais de boite native). --}}
+                                    <button type="button" class="rw-bouton rw-bouton--discret"
+                                            id="reprio-btn-{{ $id }}" data-rw="cve-reprioriser-{{ $id }}"
+                                            data-machine="{{ $id }}" data-total="{{ $f['total'] }}"
+                                            title="{{ __('cve.reprio_aide') }}">↻ {{ __('cve.reprio') }}</button>
+                                </div>
+                                <div class="rw-panneau-decision" id="reprio-panneau-{{ $id }}" hidden>
+                                    <div class="rw-panneau-decision__texte">
+                                        <strong>{{ __('cve.reprio_confirmer_titre') }}</strong>
+                                        <p class="rw-aide">{{ __('cve.reprio_avertissement', ['nombre' => $f['total']]) }}</p>
+                                    </div>
+                                    <div class="rw-panneau-decision__actions">
+                                        <button type="button" class="rw-bouton rw-bouton--discret"
+                                                data-rw="cve-reprio-annuler-{{ $id }}"
+                                                data-reprio-annule="{{ $id }}">{{ __('cve.reprio_annuler') }}</button>
+                                        <button type="button" class="rw-bouton rw-bouton--danger"
+                                                data-rw="cve-reprio-confirmer-{{ $id }}"
+                                                data-reprio-confirme="{{ $id }}">{{ __('cve.reprio_confirmer') }}</button>
+                                    </div>
                                 </div>
 
                                 {{-- L'EN-TETE EST RENDU ICI, UNE FOIS, ET TRADUIT.

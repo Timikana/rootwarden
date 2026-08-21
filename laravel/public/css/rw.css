@@ -636,7 +636,19 @@ body {
 }
 
 .rw-tableau {
-    width: 100%;
+    /*
+     * `min-width` ET NON `width`. Avec `width: 100%`, un tableau dont les
+     * cellules exigent plus que la place offerte deborde de sa propre boite SANS
+     * que le cadre enregistre un defilement : `scrollWidth` reste egal a
+     * `clientWidth`, l'indicateur de bord ne s'affiche pas, et la derniere
+     * colonne devient litteralement INATTEIGNABLE — ni visible, ni accessible
+     * par defilement. Mesure a 1 400 px avant correction : colonne de suivi
+     * rognee de 78 px, `scroll` = `client` = 1 098.
+     *
+     * Avec `min-width`, le tableau prend la largeur qu'il lui faut, le cadre
+     * defile, et l'ombre de bord de S5 previent qu'il reste des colonnes.
+     */
+    min-width: 100%;
     border-collapse: collapse;
     font-size: 14px;
 }
@@ -1280,6 +1292,23 @@ body {
    pas offerte. */
 @media (max-width: 720px) {
     .rw-colonne-secondaire { display: none; }
+    /*
+     * A 390 px, le tableau defile deja et la colonne de suivi — sa raison d'etre
+     * — est hors du champ. C'est donc L'APPOINT qui cede : le pourcentage EPSS
+     * est un affinage de la priorite, la pastille KEV est un constat
+     * d'exploitation. La premiere se retire, la seconde reste, et la hauteur de
+     * ligne retombe de 85 px a une seule ligne.
+     */
+    .rw-cve-epss { display: none; }
+    /*
+     * A 390 px le tableau defile de 230 px, et la pastille KEV se trouvait
+     * COUPEE EN DEUX au bord du cadre : le signal le plus important de la page
+     * n'etait plus qu'un liseré rouge tant qu'on n'avait pas defile. Elle passe
+     * donc devant la severite. « KEV HIGH 7.8 » se lit moins bien que
+     * « HIGH 7.8 KEV » sur un grand ecran — mais sur un petit, ce qui compte est
+     * ce qu'on voit SANS defiler.
+     */
+    .rw-cve-marques .rw-badge--kev { order: -1; }
 }
 
 /* Ne se montre QUE lorsque la place manque. Sert a ramener dans le champ ce que
@@ -1381,13 +1410,41 @@ body {
        l'appoint — il cede la place, et son texte entier reste en infobulle.
        Mesure : 1203 px de tableau pour 1048 px de cadre avant, le bouton de
        ticket hors du champ. */
-    max-width: 28ch;
+    /* 24ch depuis S6 : la cellule de severite porte desormais la pastille KEV et
+       le pourcentage EPSS, et ces deux marques ont repris 78 px a la colonne de
+       suivi. L'appoint cede encore, pour que le tableau tienne SANS defiler a
+       1 400 px — le defilement reste la solution des ecrans etroits, pas celle
+       d'un ecran de bureau. */
+    max-width: 24ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 @media (max-width: 900px) {
-    .rw-cve-resume { max-width: 24ch; }
+    .rw-cve-resume { max-width: 18ch; }
+}
+
+/*
+ * SOUS 1 500 px, LE RESUME S'EFFACE ENTIEREMENT.
+ *
+ * Mesure a 1 400 px avec les marques de S6 : tableau 1 121 px pour un cadre de
+ * 1 048 — 73 px de defilement, et dans ces 73 px se trouvait le BOUTON DE TICKET
+ * de S5. C'est exactement le defaut que S5 avait ferme en ramenant le resume de
+ * 46ch a 28ch, et que les deux marques d'enrichissement viennent de rouvrir.
+ *
+ * Le resume est l'appoint, le bouton est l'action : c'est l'appoint qui cede, et
+ * la forme la plus franche du renoncement est l'effacement. A 24ch il affichait
+ * de toute facon « In the Linux kernel, the … » sur les 1 458 lignes du parc,
+ * soit un en-tete de phrase identique partout — il ne distinguait plus rien. A
+ * 1 920 px il revient en entier, et l'identifiant CVE reste un lien vers la
+ * description complete a toutes les largeurs.
+ *
+ * L'effacement se fait par `display: none` : la cellule RESTE dans le document,
+ * donc la ligne garde ses six cellules et le tableau ne se desaligne pas de son
+ * en-tete — c'est le defaut que le legacy porte encore (E-49).
+ */
+@media (max-width: 1500px) {
+    .rw-cve-resume { display: none; }
 }
 
 /* Sous 720 px il ne reste que quatre colonnes — identifiant, paquet, severite,
@@ -1430,3 +1487,67 @@ body {
     .rw-cve-suivi [data-rw^="cve-ticket-"] { display: none; }
     .rw-cve-suivi select { min-width: 0; }
 }
+
+/*
+ * ENRICHISSEMENT EPSS / KEV — sous-lot S6.
+ *
+ * LA PASTILLE KEV EST LE SIGNAL LE PLUS IMPORTANT DE LA PAGE : elle dit qu'une
+ * faille est REELLEMENT exploitee, et c'est a ce titre qu'elle passe devant les
+ * severites elevees jamais exploitees. Elle est donc PLEINE, la ou les autres
+ * badges se contentent d'un fond pale.
+ *
+ * Cote legacy elle est peinte par `bg-rose-600` — une classe Tailwind absente du
+ * CSS compile, PurgeCSS ne gardant que celles qu'il a vues. Fond non peint,
+ * texte `text-white` : contraste mesure au navigateur 1,06:1, donc illisible,
+ * alors que le HTML, lui, est parfaitement correct. Le couple retenu ici est
+ * celui de `.rw-bouton--danger`, defini PAR THEME dans les deux sens : rouge
+ * fonce / blanc en clair, rose clair / bleu nuit en sombre.
+ */
+.rw-badge--kev {
+    background: var(--rw-danger);
+    color: var(--rw-accent-texte);
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+/*
+ * La probabilite d'exploitation. Rendue en pourcent : entre 0,0008 et 0,9455 on
+ * hesite, entre « 0 % » et « 95 % » non. Au-dela de 50 % l'exploitation est plus
+ * probable qu'improbable, et la valeur cesse d'etre un chiffre parmi d'autres.
+ */
+.rw-cve-epss {
+    font-size: 11px;
+    color: var(--rw-texte-doux);
+    white-space: nowrap;
+}
+.rw-cve-epss--haut { color: var(--rw-danger); font-weight: 600; }
+
+/*
+ * LA CELLULE DE SEVERITE NE SE REPLIE PAS. Elle porte maintenant trois marques
+ * — severite, KEV, EPSS — et a 1 400 px elle se coupait en deux lignes : la
+ * hauteur de CHAQUE ligne du tableau passait de 54 a 63 px, soit 1 458 lignes
+ * rallongees pour un repli. Elle prend donc la largeur qu'il lui faut, et c'est
+ * le resume — colonne d'appoint, deja bornee et tronquee — qui cede.
+ */
+.rw-cve-severite { white-space: nowrap; }
+.rw-cve-marques { display: inline-flex; align-items: center; gap: 5px; }
+/* Un finding non enrichi le DIT : une case vide se lit « aucun risque ». */
+.rw-cve-epss--absent { font-style: italic; }
+
+/* Le filtre KEV partage la barre des severites sans etre une severite. */
+.rw-onglet--kev { border-color: var(--rw-danger); color: var(--rw-danger); }
+.rw-onglet--kev.rw-onglet--actif { background: var(--rw-danger); color: var(--rw-accent-texte); }
+
+/*
+ * La ligne qui EXPLIQUE le tri, et l'action qui le rafraichit. L'explication
+ * prend la place restante, le bouton reste a droite : un HIGH au-dessus d'un
+ * CRITICAL ressemble a un defaut tant que la page ne dit pas pourquoi.
+ */
+.rw-cve-priorite-barre {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 10px 0 6px;
+}
+.rw-cve-priorite-barre .rw-cve-priorite-note { flex: 1 1 24ch; margin: 0; }

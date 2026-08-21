@@ -59,7 +59,12 @@
         const tout = donnees[mid] || [];
         const q = e.recherche.trim().toLowerCase();
         return tout.filter((f) => {
-            if (e.severite !== 'ALL' && (f.s || 'NONE') !== e.severite) return false;
+            // KEV partage la dimension des severites sans en etre une : compare
+            // a `f.s`, la valeur « KEV » ne correspondrait a aucune ligne et le
+            // filtre viderait le tableau en silence.
+            if (e.severite === 'KEV') {
+                if (!f.k) return false;
+            } else if (e.severite !== 'ALL' && (f.s || 'NONE') !== e.severite) return false;
             if (e.annee !== 'ALL') {
                 const an = /^CVE-(\d{4})-/.exec(f.c || '');
                 if ((an ? an[1] : '?') !== e.annee) return false;
@@ -129,6 +134,7 @@
         // abreviation sont donc rendus tous les deux, et les deux classes
         // complementaires n'en montrent qu'un seul a la fois.
         const tdSev = document.createElement('td');
+        tdSev.className = 'rw-cve-severite';
         const badge = document.createElement('span');
         const sev = f.s || 'NONE';
         badge.className = CLASSE_SEVERITE[sev] || CLASSE_SEVERITE.NONE;
@@ -139,8 +145,21 @@
         etroit.className = 'rw-etroit-seul--inline';
         etroit.textContent = ABREGE_SEVERITE[sev] || sev;
         badge.append(large, etroit, document.createTextNode(' ' + Number(f.n || 0).toFixed(1)));
-        badge.title = sev;
-        tdSev.appendChild(badge);
+        // Le `priority_label` etait calcule, stocke et jamais montre. Il explique
+        // ici le RANG de la ligne, en infobulle : aucune colonne de plus.
+        badge.title = f.pl
+            ? sev + ' — ' + (L.priorite_aide || '').replace('{libelle}', String(f.pl))
+            : sev;
+        // Les marques vivent dans un conteneur, et non directement dans la
+        // cellule : une `td` doit rester `table-cell`, la passer en `flex` la
+        // sortirait de la disposition du tableau. Le conteneur, lui, peut etre
+        // flexible — c'est lui qui permet de remettre KEV en tete quand la place
+        // manque, sans dependre d'un ordre du DOM qui ne reagirait pas au
+        // redimensionnement.
+        const marques = document.createElement('span');
+        marques.className = 'rw-cve-marques';
+        marques.append(badge, ...marquesEnrichissement(f));
+        tdSev.appendChild(marques);
         tr.appendChild(tdSev);
 
         // Le resume est une colonne D'APPOINT : il se tronque plutot que
@@ -156,6 +175,54 @@
         tr.appendChild(celluleSuivi(f, mid));
 
         return tr;
+    }
+
+    /**
+     * LA PASTILLE KEV ET LA PROBABILITE EPSS, accrochees a la severite.
+     *
+     * KEV = la faille est REELLEMENT exploitee (catalogue CISA). C'est le signal
+     * le plus important de la page — et cote legacy il est ILLISIBLE : la
+     * pastille y est peinte par `bg-rose-600`, une classe Tailwind absente du CSS
+     * compile (PurgeCSS ne garde que ce qu'il a vu). Le fond n'est donc pas
+     * peint, le texte est blanc, et le contraste mesure au navigateur vaut
+     * 1,06:1 — invisible. Aucune assertion sur le DOM ne le voyait : la pastille
+     * EST bien dans le HTML. Ici la classe est ecrite a la main, donc peinte.
+     *
+     * EPSS = probabilite d'exploitation a 30 jours. Elle est rendue en POURCENT
+     * plutot qu'en decimales : 0,0008 et 0,9455 se distinguent mal d'un coup
+     * d'oeil, « 0 % » et « 95 % » non. Un finding non enrichi le DIT, au lieu de
+     * laisser une case vide qui se confond avec « aucun risque ».
+     */
+    function marquesEnrichissement(f) {
+        const marques = [];
+
+        if (f.k) {
+            const kev = document.createElement('span');
+            kev.className = 'rw-badge rw-badge--kev';
+            kev.textContent = 'KEV';
+            const depuis = f.kd
+                ? ' — ' + (L.kev_depuis || '').replace('{date}', String(f.kd))
+                : '';
+            kev.title = (L.kev_aide || '') + depuis;
+            marques.push(kev);
+        }
+
+        const epss = document.createElement('span');
+        if (f.e === null || f.e === undefined) {
+            epss.className = 'rw-cve-epss rw-cve-epss--absent';
+            epss.textContent = L.non_enrichi || '';
+            epss.title = L.epss_aide || '';
+        } else {
+            // Au-dela de 50 %, l'exploitation est plus probable qu'improbable :
+            // la valeur se signale, au lieu de rester un chiffre parmi d'autres.
+            const chaud = Number(f.e) >= 0.5;
+            epss.className = 'rw-cve-epss' + (chaud ? ' rw-cve-epss--haut' : '');
+            epss.textContent = 'EPSS ' + Math.round(Number(f.e) * 100) + '%';
+            epss.title = L.epss_aide || '';
+        }
+        marques.push(epss);
+
+        return marques;
     }
 
     /**
@@ -270,6 +337,71 @@
         }
         bouton.disabled = false;
     }
+
+    /**
+     * LA RE-PRIORISATION, ET POURQUOI ELLE DEMANDE D'ABORD.
+     *
+     * `POST /cve_reprioritize` reecrit les SIX colonnes d'enrichissement de TOUS
+     * les findings du dernier scan de la machine — 1458 lignes sur le parc mesure
+     * — apres dix-neuf appels a FIRST.org et un au catalogue CISA. Il n'y a pas
+     * de retour en arriere, et une coupure reseau en cours de route remet `kev` a
+     * zero partout. Le legacy declenche cela sur un simple clic.
+     *
+     * Ici le clic OUVRE une decision, sous le bouton, qui nomme le nombre de
+     * lignes concernees et l'absence de retour. Convention du portage : jamais de
+     * `confirm()` — la boite native recouvre precisement ce sur quoi on decide,
+     * ne se style pas, et bloque Puppeteer, donc empeche de mener l'action au
+     * bout dans un test.
+     */
+    function ouvreDecisionReprio(mid) {
+        const panneau = document.getElementById('reprio-panneau-' + mid);
+        if (panneau) panneau.hidden = false;
+    }
+
+    function fermeDecisionReprio(mid) {
+        const panneau = document.getElementById('reprio-panneau-' + mid);
+        if (panneau) panneau.hidden = true;
+    }
+
+    async function reprioriseCve(mid) {
+        const bouton = document.getElementById('reprio-btn-' + mid);
+        fermeDecisionReprio(mid);
+        if (bouton) bouton.disabled = true;
+        annonce(L.reprio_encours || '', true);
+        try {
+            const rep = await fetch(L.url_reprio, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machine_id: Number(mid) }),
+            });
+            const d = await rep.json().catch(() => ({}));
+            if (rep.ok && d.success !== false) {
+                annonce((L.reprio_ok || '')
+                    .replace('{kev}', String(d.kev ?? 0))
+                    .replace('{epss}', String(d.epss ?? 0)), true);
+                // Les donnees en memoire sont desormais PERIMEES : le tableau
+                // afficherait un enrichissement que la base ne porte plus. Le
+                // portage recharge la page plutot que de recoudre son etat —
+                // l'ordre de tri vient du SQL, il ne se recalcule pas ici.
+                window.location.reload();
+            } else {
+                annonce(d.message || L.reprio_echec || '', false);
+            }
+        } catch {
+            annonce(L.reprio_echec || '', false);
+        }
+        if (bouton) bouton.disabled = false;
+    }
+
+    document.querySelectorAll('[id^="reprio-btn-"]').forEach((bouton) => {
+        bouton.addEventListener('click', () => ouvreDecisionReprio(bouton.dataset.machine));
+    });
+    document.querySelectorAll('[data-reprio-annule]').forEach((b) => {
+        b.addEventListener('click', () => fermeDecisionReprio(b.dataset.reprioAnnule));
+    });
+    document.querySelectorAll('[data-reprio-confirme]').forEach((b) => {
+        b.addEventListener('click', () => reprioriseCve(b.dataset.reprioConfirme));
+    });
 
     /** Un message a l'ecran, jamais seulement dans la console. */
     function annonce(texte, ok) {
