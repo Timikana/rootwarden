@@ -131,6 +131,47 @@ capacité, c'est **concevoir**, pas migrer. Trois options — ne rien porter et 
 et les cinq clés, porter les routes sans interface, ou concevoir l'écran. **Décision d'exploitant à
 arbitrer avant V10**, car la précédence documentée du module en dépend.
 
+## 7 bis. Vérification de cet inventaire sur le code courant (2026-08-22)
+
+L'inventaire datait du 2026-08-20. Avant de s'en servir pour porter, ses affirmations ont été
+**re-mesurées** — celui de K4 avait corrigé trois résumés qu'on croyait sûrs. Trois tenues, une affinée.
+
+**TENUE — les quatre routes de profils n'ont toujours aucun `@require_role`.** Mesuré aux lignes que
+l'inventaire cite : `1734` (GET), `1760` (POST), `1801` (DELETE), `1817` (assignments) portent
+`@require_api_key` + `@require_permission('can_manage_supervision')` et **rien d'autre**. La cinquième,
+`machines/<mid>/profile` (`1846`), porte bien `@require_role(2)` avec son commentaire « Patch A01 » —
+le correctif a été appliqué à une route et pas aux quatre voisines.
+*Au passage : le suivi de chantier disait « 3 des 4 ». Il en manque bien **quatre**.*
+
+**TENUE — `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES`.** Les 25 préfixes du proxy ont été
+énumérés : `/deploy_service_account`, `/scan_server_users`, `/admin/`, `/policy/`, `/drift/`, `/tasks/`,
+`/approvals`, `/tickets`… aucun ne couvre `/supervision`.
+
+**TENUE — le mécanisme d'i18n du JS.** `head.php:76-78` fait
+`window._i18n = getJsTranslations('js.')` puis
+`let s = window._i18n['js.' + key] || window._i18n[key] || key;`. Une clé absente est donc **retournée
+telle quelle**, et comme c'est une chaîne non vide, l'idiome `__('x') || 'repli'` **ne déclenche jamais
+son repli**.
+
+**AFFINÉE — ce ne sont pas 17 clés qui s'affichent en identifiant, mais 11.** Le JS de `supervision/`
+lit bien **17** clés ; six d'entre elles sont présentes dans `js.php` et se résolvent normalement
+(`select_machine`, `sup_profile_assigned`, `sup_profile_cleared`, `sup_profile_none`, `sup_profile_tip`,
+`toast_error`). Les **onze** autres sont absentes de `js.php` :
+
+`backup_restored` · `btn_restore` · `config_loaded` · `config_remote_saved` · `config_saved` ·
+**`confirm_deploy`** · **`confirm_uninstall`** · `editor_select_server` · `no_backups` ·
+`scan_all_done` · `scan_all_running`
+
+Les onze existent dans `supervision.php`, **en FR et en EN**. La conclusion de l'inventaire tient donc
+mot pour mot : **le portage n'a pas à traduire, il a à déplacer.** Et les deux confirmations les plus
+dangereuses du module — celle du déploiement et celle de la désinstallation — sont bien dans le lot.
+
+**Conséquence pour le découpage** : V1 reste le bon point d'entrée (aucune route, aucun SSH, rien de
+modifié), mais toutes les clés cassées ne s'y mesurent pas. `confirm_deploy` et `confirm_uninstall`
+n'apparaissent qu'au moment d'une action destructrice : leur défaut se **lit dans le catalogue**, il ne
+se déclenche pas. Les autres (`editor_select_server`, `no_backups`, `config_loaded`…) sont atteignables
+sans action distante.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`
