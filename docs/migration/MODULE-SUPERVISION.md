@@ -172,6 +172,56 @@ n'apparaissent qu'au moment d'une action destructrice : leur défaut se **lit da
 se déclenche pas. Les autres (`editor_select_server`, `no_backups`, `config_loaded`…) sont atteignables
 sans action distante.
 
+## 7 ter. V1 caractérisé — et le découpage corrigé (2026-08-22)
+
+Suite `go-page-supervision-onglets` : **10 PASS sur le legacy, 0 FAIL**. Rien n'est modifié, aucune
+machine jointe.
+
+**CORRECTION DU DÉCOUPAGE — V1 n'est PAS « aucune route ».** Mesuré au navigateur : la page émet **deux
+requêtes backend dès son chargement**, `GET /supervision/profiles?platform=zabbix` et
+`GET /supervision/profiles/assignments?platform=zabbix`. Le catalogue de profils est donc chargé
+d'emblée, **pas à l'ouverture de son onglet** — et il est **rechargé à chaque bascule** (mesuré :
+`profiles` → 1 appel, `deploy` → 2, `editor` → 0). Le tableau du §7 annonçait « V1 | aucune route » :
+c'était optimiste. Les deux routes sont en **lecture seule**, donc V1 reste inoffensif ; mais la
+frontière V1/V2 n'existe pas côté legacy.
+
+Le portage la crée : il **lit la base directement** (décision S3/S4), donc sa page se peint sans aucun
+appel client, et changer d'onglet n'en émet aucun. C'est l'assertion que la suite pose en
+`verifiePortage`.
+
+**Ce que la page rend, mesuré :** les quatre onglets dans l'ordre `config, profiles, deploy, editor`,
+**un seul panneau actif** à l'arrivée et après chaque bascule ; les **quatre** blocs de plateforme
+(`zabbix`, `centreon`, `prometheus`, `telegraf`) présents, **un seul visible**.
+
+**La garde de la page s'accorde avec son en-tête**, contrairement à celle de `ssh/` :
+`checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` + `checkPermission('can_manage_supervision')` — donc rôle ≥ 2,
+exactement ce que l'en-tête annonce. **Aucun écart à déclarer ici.** Et `rw-test-admin` **porte bien**
+`can_manage_supervision` (vérifié en base) : V1 est donc entièrement mesurable avec les comptes
+existants, sans toucher aucun droit.
+
+**Sur les onze clés, UNE SEULE est atteignable dans V1.** Localisation mesurée de chacune :
+
+| clé | où elle est lue | atteignable sans action distante |
+|---|---|---|
+| `editor_select_server` | `main.js:519,536,555` — garde « aucun serveur choisi » | **oui** |
+| `config_loaded` | `:526` après une lecture SSH réussie | non (V7) |
+| `config_saved` | `:301` après écriture de la config globale | non (V4) |
+| `config_remote_saved` | `:546` après écriture distante | non (V9) |
+| `no_backups` · `btn_restore` · `backup_restored` | `:565`, `:583`, `:612` | non (V7/V9) |
+| `scan_all_running` · `scan_all_done` | `:93`, `:110` | non (V8) |
+| `confirm_deploy` · `confirm_uninstall` | `:468`, `:488` — dans un `confirm()` | non (V11/V12) |
+
+Mesure du garde : il **n'émet aucun appel distant** et affiche bel et bien `editor_select_server` en
+clair. La suite l'assert, liste les jetons de forme `mot_avec_underscores` visibles en constat (pour
+qu'une **nouvelle** fuite se remarque à la lecture — `zabbix_agent2` en est un, mais c'est une valeur
+légitime, d'où une assertion nominative sur les onze clés plutôt qu'un motif générique qui produirait
+des faux positifs), et vérifie qu'**aucune boîte native** ne s'ouvre.
+
+**Un point que l'inventaire ne disait pas : `confirm_deploy` et `confirm_uninstall` sont passées à
+`confirm()` NATIF.** La convention du portage l'interdit — boîte non stylable, qui recouvre la ligne sur
+laquelle on décide et qui bloque Puppeteer. Ces deux clés ne seront donc pas « déplacées » mais
+**remplacées** par un panneau de décision, en V11 et V12. Neuf clés à déplacer, deux à remplacer.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`
