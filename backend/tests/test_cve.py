@@ -386,3 +386,34 @@ class TestRequireMachineAccessLitToutesLesSources:
         with patch('routes.helpers.check_machine_access', side_effect=self._acces):
             resp = client.get('/supervision/machines/99/profile', headers=api_headers)
         assert resp.status_code == 403
+
+
+class TestWhitelistAttributionNonFalsifiable:
+    """Blanchir une CVE est une decision qui s'assume : elle doit porter le nom de
+    qui l'a prise.
+
+    Avant : `whitelisted_by = (data.get('whitelisted_by') or 'admin').strip()`.
+    Le client choisissait donc le nom sous lequel l'acceptation de risque etait
+    signee — n'importe quel nom, ou « admin » par defaut s'il omettait le champ.
+    """
+
+    def test_le_nom_envoye_par_le_client_est_ignore(self, client, admin_headers, mock_cursor):
+        mock_cursor._results = [{'name': 'rw-test-admin'}]
+        resp = client.post('/cve_whitelist', headers=admin_headers, json={
+            'cve_id': 'CVE-2024-0002', 'reason': 'faux positif',
+            'whitelisted_by': 'quelqun-dautre',
+        })
+        assert resp.status_code == 200
+        params = mock_cursor._last_params or ()
+        assert 'quelqun-dautre' not in params, (
+            "le nom fourni par le client a ete persiste")
+
+    def test_l_auteur_vient_de_la_session(self, client, admin_headers, mock_cursor):
+        mock_cursor._results = [{'name': 'rw-test-admin'}]
+        resp = client.post('/cve_whitelist', headers=admin_headers, json={
+            'cve_id': 'CVE-2024-0003', 'reason': 'faux positif',
+        })
+        assert resp.status_code == 200
+        # Plus de repli sur « admin » : c'est le compte reel, ou son identifiant.
+        params = mock_cursor._last_params or ()
+        assert 'admin' not in params or 'rw-test-admin' in params

@@ -713,11 +713,32 @@ def add_cve_whitelist():
     cve_id = (data.get('cve_id') or '').strip()
     reason = (data.get('reason') or '').strip()
     machine_id = data.get('machine_id')  # None = global
-    whitelisted_by = (data.get('whitelisted_by') or 'admin').strip()
     expires_at = data.get('expires_at')  # YYYY-MM-DD ou null
 
     if not cve_id or not reason:
         return jsonify({'success': False, 'message': 'cve_id et reason requis'}), 400
+
+    # L'AUTEUR VIENT DE LA SESSION, PLUS DU CLIENT. Auparavant :
+    #     whitelisted_by = (data.get('whitelisted_by') or 'admin').strip()
+    # Le client choisissait donc le nom sous lequel une acceptation de risque
+    # etait signee — n'importe quel nom, ou « admin » par defaut s'il omettait le
+    # champ. Blanchir une CVE est une decision qui s'assume : elle doit porter le
+    # nom de qui l'a prise. `tickets.created_by` (`tickets.py:114`) le fait deja
+    # ainsi ; c'est le meme geste, applique ici.
+    user_id, _role = get_current_user()
+    whitelisted_by = str(user_id or 0)
+    conn_nom = get_db_connection()
+    try:
+        # `dictionary=True` EXPLICITE : lire `ligne[0]` ferait dependre le code de
+        # la forme par defaut du curseur, qui differe entre le pilote et le double
+        # de test. On nomme la colonne qu'on veut.
+        cur_nom = conn_nom.cursor(dictionary=True)
+        cur_nom.execute("SELECT name FROM users WHERE id = %s", (user_id,))
+        ligne = cur_nom.fetchone()
+        if ligne and ligne.get('name'):
+            whitelisted_by = str(ligne['name'])
+    finally:
+        conn_nom.close()
 
     conn = get_db_connection()
     try:
