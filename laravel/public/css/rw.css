@@ -1551,3 +1551,37 @@ body {
     margin: 10px 0 6px;
 }
 .rw-cve-priorite-barre .rw-cve-priorite-note { flex: 1 1 24ch; margin: 0; }
+
+/*
+ * AVANCEMENT D'UN SCAN — sous-lot S7a.
+ *
+ * Aucune jauge n'existait dans le portage : celle du legacy est faite de classes
+ * Tailwind, et un scan dure plusieurs MINUTES. Sans signe de vie, la page semble
+ * figee et l'utilisateur reclique — ce qui, sur le legacy, relancait un scan.
+ *
+ * La jauge se remplit par la largeur d'un enfant plutot que par une couleur de
+ * fond en degrade : la largeur est ce que le flux fournit (paquet courant sur
+ * total), et c'est aussi ce qu'un test peut mesurer.
+ */
+.rw-scan-avancement {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+}
+.rw-scan-avancement .rw-aide { margin: 0; }
+
+.rw-jauge {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    overflow: hidden;
+}
+.rw-jauge__part {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--rw-accent);
+    transition: width .25s ease-out;
+}

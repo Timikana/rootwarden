@@ -221,6 +221,14 @@
                                     @endif
                                 @endif
                             </span>
+                            {{-- LE BOUTON DE SCAN EXISTE AVEC OU SANS SCAN PRECEDENT :
+                                 c'est justement une machine jamais scannee qu'on
+                                 veut pouvoir scanner. Le legacy le rend aussi dans
+                                 les deux cas ; le portage le rendait nulle part. --}}
+                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                    id="btn-{{ $id }}" data-rw="cve-scanner-{{ $id }}"
+                                    data-machine="{{ $id }}" data-nom="{{ $m->name }}"
+                                    title="{{ __('cve.scan_aide') }}">{{ __('cve.scan') }}</button>
                             @if ($scan)
                                 <a class="rw-bouton rw-bouton--discret" data-rw="export-csv-{{ $id }}"
                                    href="{{ route('export-cve', ['machine_id' => $id]) }}">{{ __('cve.export_csv') }}</a>
@@ -229,6 +237,55 @@
                                         title="{{ __('cve.comparer_aide') }}">{{ __('cve.comparer') }}</button>
                             @endif
                         </div>
+                    </div>
+
+                    {{-- LA DECISION DE SCANNER SE PREND DANS LA PAGE, et elle NOMME
+                         ce qu'un scan coute : une session SSH sur la machine, neuf
+                         commandes, plusieurs minutes, une ligne de plus en base — et
+                         un RAPPORT PAR COURRIEL. Le legacy declenche tout cela sur un
+                         simple clic, sans rien annoncer : un clic de travers sur une
+                         machine de PRODUCTION suffit. Les deux parametres du scan
+                         (seuil CVSS et source des donnees) vivent ICI plutot que dans
+                         l'en-tete de la carte : on les choisit au moment ou on decide,
+                         et la carte ne s'elargit pas (lecon E-63). --}}
+                    <div class="rw-panneau-decision" id="scan-panneau-{{ $id }}" hidden>
+                        <div class="rw-panneau-decision__texte">
+                            <strong>{{ __('cve.scan_confirmer_titre', ['nom' => $m->name]) }}</strong>
+                            <p class="rw-aide">{{ __('cve.scan_avertissement') }}</p>
+                        </div>
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-etiquette">{{ __('cve.scan_seuil') }}</span>
+                            <select class="rw-saisie rw-saisie--compacte" id="scan-seuil-{{ $id }}">
+                                @foreach ([0, 4, 7, 9] as $seuil)
+                                    <option value="{{ $seuil }}" @selected($seuil === 7)>{{ $seuil }}+</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="rw-etiquette-champ">
+                            <span class="rw-etiquette">{{ __('cve.scan_source') }}</span>
+                            <select class="rw-saisie rw-saisie--compacte" id="scan-source-{{ $id }}">
+                                @foreach (['fast', 'hybrid', 'precise'] as $src)
+                                    <option value="{{ $src }}" @selected($src === 'hybrid')>{{ __('cve.scan_source_' . $src) }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <div class="rw-panneau-decision__actions">
+                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                    data-rw="cve-scan-annuler-{{ $id }}"
+                                    data-scan-annule="{{ $id }}">{{ __('cve.scan_annuler') }}</button>
+                            <button type="button" class="rw-bouton rw-bouton--danger"
+                                    data-rw="cve-scan-confirmer-{{ $id }}"
+                                    data-scan-confirme="{{ $id }}">{{ __('cve.scan_confirmer') }}</button>
+                        </div>
+                    </div>
+
+                    {{-- L'AVANCEMENT. Le flux du backend emet des evenements
+                         `progress` avec un paquet courant et un total : sans zone
+                         pour les rendre, un scan de plusieurs minutes n'aurait
+                         aucun signe de vie. --}}
+                    <div class="rw-scan-avancement" id="scan-avancement-{{ $id }}" hidden>
+                        <p class="rw-aide" id="scan-etape-{{ $id }}"></p>
+                        <div class="rw-jauge"><span class="rw-jauge__part" id="scan-jauge-{{ $id }}"></span></div>
                     </div>
 
                     @if (! $scan)
