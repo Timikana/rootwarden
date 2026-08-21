@@ -258,6 +258,103 @@ Etat au 2026-08-20 : les trois suites du module `security/` passent par
 `lib-base.mjs`. **Trois suites plus anciennes portent encore le motif** —
 `07-maintenance`, `08-approvals`, `09-docker-idor`.
 
+## Une classe utilitaire peut exister dans le SOURCE et manquer dans le BINAIRE
+
+Troisieme fois que ce projet le paie. Le legacy peint sa pastille KEV — le signal
+« vulnerabilite reellement exploitee », le plus important de sa page — avec
+`class="… bg-rose-600 text-white"`. Or Tailwind est compile localement avec
+PurgeCSS, qui ne garde que les classes **vues a la compilation** : `bg-rose-600`
+n'est pas dans le CSS produit. Fond transparent, texte blanc sur ligne claire,
+contraste mesure **1,06:1**. Invisible.
+
+**Aucune assertion sur le DOM ne pouvait le voir** : la pastille est bien dans le
+HTML, son texte est bien « KEV », et un test qui la cherche la trouve. Il faut
+mesurer le style **CALCULE** :
+
+```js
+const st = getComputedStyle(pastille);
+// Un fond translucide laisse voir celui de la ligne : c'est LUI qui compte.
+// Remonter les parents jusqu'au premier fond opaque avant de calculer.
+```
+
+Et calculer un vrai rapport de contraste (seuil 4,5:1), pas seulement « le fond
+est-il pose ». Verifier aussi `grep -c "bg-<classe>" *.css` avant d'utiliser une
+classe utilitaire nouvelle.
+
+## `width: 100%` sur un tableau CACHE son propre debordement
+
+Avec `width: 100%`, un tableau dont les cellules exigent plus que la place offerte
+deborde de sa boite **en gardant `scrollWidth == clientWidth`**. Consequences :
+le cadre en `overflow-x: auto` ne defile pas, l'ombre de bord ne s'affiche pas, et
+la derniere colonne devient **litteralement inatteignable** — ni visible, ni
+accessible par defilement. Mesure a 1400 px : colonne de suivi rognee de 73 px,
+`scroll` = `client` = 1048.
+
+`min-width: 100%` corrige : le tableau prend la largeur qu'il lui faut, le cadre
+defile, l'indicateur previent. C'est desormais la regle de `.rw-tableau`.
+
+## `querySelector` sur une page qui porte PLUSIEURS tableaux prend le PREMIER
+
+Le sondage de largeur visait `.rw-tableau-cadre` et mesurait donc le cadre des
+**planifications**, pas celui des findings. Il a annonce 78 px de rognage la ou il
+y en avait 73, et **un defilement absent la ou il existait** — soit un faux defaut
+structurel, sur lequel j'ai commence a legiferer.
+
+Ancrer sur la donnee, pas sur la classe :
+
+```js
+const corps = document.getElementById('findings-body-1');
+const cadre = corps?.closest('.rw-tableau-cadre');
+```
+
+## Un sous-lot peut ROUVRIR ce que le precedent a corrige
+
+S5 avait ramene le resume de 46ch a 28ch pour faire rentrer son bouton de ticket
+dans le champ. S6 a ajoute deux marques dans la cellule de severite : +86 px, et
+le bouton est ressorti. **La correction de largeur d'un sous-lot n'est pas
+acquise** — la mesurer a nouveau des qu'on ajoute quoi que ce soit dans une ligne.
+
+Et un texte qui se replie sur deux lignes **double la hauteur de CHAQUE ligne** :
+54 -> 63 px ici, sur 1458 lignes. `nowrap` sur la cellule decisionnelle, et c'est
+l'appoint qui cede.
+
+## Une `td` doit rester `table-cell`
+
+Pour disposer plusieurs marques dans une cellule (ordre souple, espacement), le
+`display: flex` va dans un `span` INTERIEUR. Le poser sur la `td` la sort de la
+disposition du tableau.
+
+C'est ce conteneur qui permet un `order: -1` en media query — remettre la pastille
+KEV devant la severite quand la place manque, sans dependre d'un ordre du DOM qui
+ne reagirait pas au redimensionnement.
+
+## LE GESTE doit etre conditionnel, pas seulement l'assertion
+
+`verifiePortage` protege le VERDICT, pas les DONNEES. Sur le legacy, le bouton de
+re-priorisation appelle sa route au premier clic : cliquer « pour mesurer qu'il ne
+se passe rien » aurait reecrit les six colonnes d'enrichissement des 1458 findings
+du seul scan du parc, sans retour en arriere.
+
+```js
+if (CIBLE === 'laravel') { /* cliquer, puis asserter */ }
+else { constate('...', 'NON MESURABLE SANS DETRUIRE CE QUI EST MESURE'); }
+```
+
+Et la propriete qui compte n'est pas « la requete etait bornee », c'est **« il n'y
+a pas eu de requete »** — mesuree au RESEAU, pas au DOM : un panneau de
+confirmation peut s'ouvrir ET l'appel partir quand meme.
+
+```js
+page.on('request', (r) => { if (/route_dangereuse/.test(r.url())) appels.push(r.url()); });
+```
+
+## `textContent` mesure la PRESENCE, pas la VISIBILITE
+
+Il inclut le texte des elements en `display: none`. Une assertion « chaque ligne
+affiche X » ecrite ainsi passe meme quand une media query a masque X. Elle vaut
+donc a la largeur ou la suite tourne — le DIRE en commentaire, et mesurer le style
+calcule quand la visibilite est justement la propriete en jeu.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).
