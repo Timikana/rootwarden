@@ -176,7 +176,7 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S2b** ✔ | export PDF du rapport — **PORTÉ le 2026-08-20** (v1.37.23) | aucune | non | non |
 | **S3** ✔ | consultation des CVE, lecture seule — **PORTÉ le 2026-08-20** (v1.37.24) | aucune : lecture en base | non | non |
 | **S4** ✔ | planification des scans — **PORTÉ le 2026-08-20** (v1.37.25) | aucune : lecture et ecriture en base | non | oui |
-| **S5** | suivi et ticketing | `POST /cve_remediation`, `POST /tickets` | non | oui + **sortie tierce** |
+| **S5** ✔ | suivi et ticketing — **PORTÉ le 2026-08-21** (v1.37.26), whitelist NON portée | passerelle pour le ticket seul |
 | **S6** | re-priorisation EPSS / KEV | `POST /cve_reprioritize` | non | oui |
 | **S7** | le scan lui-même | `POST /cve_scan` — **FLUX** | **oui** | oui + **destructif** |
 
@@ -630,6 +630,25 @@ planification résiduelle.
 
 **S5** : premier lot avec un effet **hors du parc** — sortie HTTP vers Jira/GLPI/ServiceNow derrière
 le garde SSRF de `ticketing._post`. E-27 et E-29 s'y règlent.
+
+**S5 — porté le 2026-08-21** (v1.37.26) : `SuiviCve` + `SuiviCveController`, la sixième colonne du
+tableau devenue fonctionnelle, et un fichier de langue `suivi` (**21 = 21** clés). Deux routes internes
+sous `role:1` + `perm:can_scan_cve`. Suite `go-page-cve-suivi` : **10 PASS côté portage, 6 côté
+legacy**.
+
+Ce que S5 a refermé : **E-57** (l'état stocké jamais affiché, un changement de statut qui efface trois
+champs, l'`ENUM` non contrôlé qui rendait un 500), **E-58** (le ticket passe par la passerelle — seule
+exception du module, parce qu'il appelle un fournisseur ITSM externe — et son bouton est désormais
+**désactivé avec son explication** quand le backend refusera).
+
+Ce que S5 **ne** porte pas, et le dit : **E-59** la whitelist, capacité inerte — la table n'a aucun
+lecteur ; **E-60** l'attribution d'un changement de statut, impossible — `cve_remediation` n'a aucune
+colonne d'auteur et la migration est interdite au portage.
+
+Trois mesures de rendu ont été nécessaires : la sixième colonne a élargi le tableau de 1048 à 1203 px
+avec le bouton hors du champ, et c'est le **résumé** — la colonne d'appoint — qui a dû céder, de 46 à
+28 caractères. La version a reçu un `nowrap` : elle se coupait sur deux lignes et **doublait la hauteur
+de chaque ligne**.
 
 **S6** : la route réécrit en bloc les scores de tous les findings du dernier scan, et son résultat
 dépend de deux services externes (FIRST.org EPSS, CISA KEV), avec un 503 si indisponibles.

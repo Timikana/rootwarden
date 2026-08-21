@@ -34,6 +34,9 @@
 
     const donnees = lisJson('cve-findings') || {};
     const L = lisJson('cve-libelles') || {};
+    /** Le suivi stocke, par machine puis par identifiant de CVE — sous-lot S5. */
+    const SUIVI = lisJson('cve-suivi') || {};
+    const S = lisJson('suivi-libelles') || {};
     const PAR_PAGE = 50;
 
     /** L'etat d'affichage de chaque machine. Une seule source. */
@@ -93,7 +96,7 @@
      * Rien n'est interpole : le lien recoit son texte et son adresse par
      * propriete, jamais par une chaine de HTML.
      */
-    function ligne(f) {
+    function ligne(f, mid) {
         const tr = document.createElement('tr');
 
         const tdCve = document.createElement('td');
@@ -119,7 +122,7 @@
         tr.appendChild(tdCve);
 
         tr.appendChild(cellule(f.p || '', 'rw-tableau__fort'));
-        tr.appendChild(cellule(f.v || '', 'rw-colonne-secondaire'));
+        tr.appendChild(cellule(f.v || '', 'rw-colonne-secondaire rw-cve-version'));
 
         // LA SEVERITE EST LA DONNEE QUI DECIDE : elle ne doit jamais etre coupee.
         // A 390 px, « CRITICAL 9.8 » se tronquait en « CR… ». Le mot entier et son
@@ -147,14 +150,138 @@
         tdResume.title = f.r || '';
         tr.appendChild(tdResume);
 
-        // Sixieme colonne — le SUIVI. Il appartient au sous-lot S5 : la cellule
-        // dit ou il vit plutot que de disparaitre. C'est precisement la colonne
-        // que trois generateurs du legacy omettaient.
-        const tdSuivi = cellule('—', 'rw-tableau__discret');
-        tdSuivi.title = L.suivi_a_venir || '';
-        tr.appendChild(tdSuivi);
+        // Sixieme colonne — LE SUIVI (sous-lot S5). C'est precisement la colonne
+        // que trois generateurs du legacy omettaient, et le seul generateur d'ici
+        // la produit donc pour tous les gestes.
+        tr.appendChild(celluleSuivi(f, mid));
 
         return tr;
+    }
+
+    /**
+     * La cellule de suivi : l'etat STOCKE, et le bouton de ticket.
+     *
+     * L'ETAT STOCKE EST AFFICHE. Le legacy ne posait aucune option `selected` et
+     * ne lisait jamais `cve_remediation` depuis la page : son selecteur montrait
+     * un tiret meme quand une remediation existait, et le choix qu'on venait de
+     * faire disparaissait au rechargement.
+     *
+     * `resolved` est AFFICHE mais pas PROPOSE : il est pose par le scanner seul,
+     * quand une CVE disparait d'un scan suivant. Proposer a un humain de
+     * « resoudre » ce que le scanner constate brouillerait les deux gestes — la
+     * ligne concernee montre donc un libelle en clair, avec son explication, au
+     * lieu d'un selecteur.
+     */
+    function celluleSuivi(f, mid) {
+        const td = document.createElement('td');
+        td.className = 'rw-cve-suivi';
+        const cveId = String(f.c || '');
+        const actuel = (SUIVI[mid] || {})[cveId] || '';
+
+        if (actuel === 'resolved') {
+            const badge = document.createElement('span');
+            badge.className = 'rw-badge rw-badge--ok';
+            badge.textContent = (S.statuts || {}).resolved || 'resolved';
+            badge.title = S.resolved_aide || '';
+            td.appendChild(badge);
+            return td;
+        }
+
+        const select = document.createElement('select');
+        select.className = 'rw-saisie rw-saisie--compacte';
+        select.dataset.rw = 'cve-suivi-' + cveId;
+        const vide = document.createElement('option');
+        vide.value = '';
+        vide.textContent = S.aucun || '';
+        select.appendChild(vide);
+        for (const st of (S.choisissables || [])) {
+            const o = document.createElement('option');
+            o.value = st;
+            o.textContent = (S.statuts || {})[st] || st;
+            if (st === actuel) o.selected = true;
+            select.appendChild(o);
+        }
+        select.value = actuel;
+        select.addEventListener('change', () => poseSuivi(mid, cveId, select));
+        td.appendChild(select);
+
+        const bouton = document.createElement('button');
+        bouton.type = 'button';
+        bouton.className = 'rw-bouton rw-bouton--minuscule';
+        bouton.dataset.rw = 'cve-ticket-' + cveId;
+        // Libelle COURT dans le bouton, libelle entier en infobulle : la colonne
+        // doit tenir a cote du selecteur sans pousser le tableau hors du cadre.
+        bouton.textContent = S.ticket_court || S.ticket || '';
+        if (S.peut_ticket) {
+            bouton.title = S.ticket_aide || '';
+            bouton.addEventListener('click', () => creeTicket(mid, cveId, bouton));
+        } else {
+            // DESACTIVE, ET IL DIT POURQUOI. Le backend refuserait de toute facon :
+            // offrir le geste serait mentir sur ce qui est possible.
+            bouton.disabled = true;
+            bouton.title = S.ticket_refuse || '';
+        }
+        td.appendChild(bouton);
+
+        return td;
+    }
+
+    async function poseSuivi(mid, cveId, select) {
+        const voulu = select.value;
+        if (!voulu) return;
+        let ok = false;
+        try {
+            const rep = await fetch(S.url_suivi, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cve_id: cveId, machine_id: Number(mid), status: voulu }),
+            });
+            const d = await rep.json().catch(() => ({}));
+            ok = rep.ok && d.success === true;
+            if (ok) {
+                // La source de verite locale suit la base : sans cela, un
+                // re-rendu (pagination, filtre) reafficherait l'ancien etat.
+                SUIVI[mid] = SUIVI[mid] || {};
+                SUIVI[mid][cveId] = voulu;
+            }
+            annonce(ok ? (S.enregistre || '') : (d.message || S.err_reseau || ''), ok);
+        } catch {
+            annonce(S.err_reseau || '', false);
+        }
+        if (!ok) select.value = (SUIVI[mid] || {})[cveId] || '';
+    }
+
+    async function creeTicket(mid, cveId, bouton) {
+        bouton.disabled = true;
+        try {
+            const rep = await fetch(S.url_ticket, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source: 'cve', ref: cveId, machine_id: Number(mid) }),
+            });
+            const d = await rep.json().catch(() => ({}));
+            if (rep.ok && d.success !== false) {
+                annonce(d.deduped ? (S.ticket_existant || '') : (S.ticket_cree || ''), true);
+            } else {
+                annonce(d.message || S.ticket_echec || '', false);
+            }
+        } catch {
+            annonce(S.ticket_echec || '', false);
+        }
+        bouton.disabled = false;
+    }
+
+    /** Un message a l'ecran, jamais seulement dans la console. */
+    function annonce(texte, ok) {
+        let zone = document.getElementById('cve-annonce');
+        if (!zone) {
+            zone = document.createElement('p');
+            zone.id = 'cve-annonce';
+            zone.setAttribute('aria-live', 'polite');
+            document.querySelector('.rw-entete-page')?.after(zone);
+        }
+        zone.className = ok ? 'rw-annonce rw-annonce--ok' : 'rw-annonce rw-annonce--echec';
+        zone.textContent = texte;
     }
 
     /** Le rendu, unique point d'ecriture du tableau. */
@@ -167,7 +294,7 @@
         const jusqua = Math.min(liste.length, e.page * PAR_PAGE);
 
         corps.replaceChildren();
-        for (let i = 0; i < jusqua; i++) corps.appendChild(ligne(liste[i]));
+        for (let i = 0; i < jusqua; i++) corps.appendChild(ligne(liste[i], mid));
 
         if (liste.length === 0) {
             const tr = document.createElement('tr');

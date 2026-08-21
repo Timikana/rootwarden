@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.25** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.26** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,15 +2171,83 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.26 — module `security/`, sous-lot S5 : le suivi et le ticketing des CVE
+
+`SuiviCve` + `SuiviCveController`, la sixieme colonne du tableau des vulnerabilites devenue
+FONCTIONNELLE, et un fichier de langue `suivi` (**21 = 21** cles). Deux routes internes sous
+`role:1` + `perm:can_scan_cve`.
+
+E-57 — TROIS DEFAUTS D'UNE MEME COLONNE, tous mesures sur la pile reelle.
+
+**L'etat stocke n'etait jamais affiche.** Le generateur du legacy ne pose aucune option `selected` et
+son JS ne fait AUCUN `GET /cve_remediation` — sa seule occurrence est le POST. La cellule montrait donc
+un tiret meme quand une remediation existait, et le choix qu'on venait de faire disparaissait au
+rechargement alors qu'il etait bien enregistre.
+
+**Un changement de statut effacait trois champs**, avec une remediation complete posee avant l'appel :
+
+    avant            open        | 16   | 2026-12-31 | « note a preserver »
+    apres, legacy    in_progress | VIDE | VIDE       | VIDE
+    apres, portage   in_progress | 16   | 2026-12-31 | « note a preserver »
+
+Le client n'envoie que `{cve_id, machine_id, status}` ; cote backend les trois autres colonnes
+retombent a leur defaut et l'`ON DUPLICATE KEY UPDATE` reaffecte les CINQ. Deplacer une CVE de « a
+traiter » a « en cours » effacait donc l'assignataire, l'echeance et la note — et defaisait en silence
+l'auto-resolution du scanner. Le portage n'ecrit QUE la colonne demandee.
+
+**Le statut n'etait controle par rien** : un ENUM sans liste blanche, donc un 500 avec une page HTML au
+lieu d'un 400. Le portage refuse par un 400 qui NOMME le statut recu.
+Choix a signaler : l'ENUM contient `resolved`, que l'interface ne PROPOSE pas — il est pose par le
+scanner seul. Le portage l'AFFICHE en clair avec son explication, sans le mettre dans le selecteur :
+proposer a quelqu'un de « resoudre » ce que le scanner constate brouillerait les deux gestes.
+
+E-58 — LE TICKET PASSE PAR LA PASSERELLE, seule exception du module, et elle est fondee :
+`POST /tickets` appelle un FOURNISSEUR ITSM EXTERNE quand il est configure, et le reimplementer
+dupliquerait une integration et ses identifiants. La chaine de gardes y est deja en place.
+Ce que le portage ajoute, c'est l'honnetete de l'ecran : la page exige `can_scan_cve`, le ticket exige
+`can_admin_portal`, et un compte qui porte la premiere sans la seconde se voyait offrir un bouton
+cliquable dont l'appel rend 403 — mesure. Le bouton est desormais DESACTIVE avec son explication, sans
+que la regle soit deplacee cote navigateur : c'est toujours le backend qui refuse.
+
+CE QUE S5 NE PORTE PAS, ET LE DIT.
+**E-59 — la whitelist.** La table `cve_whitelist` n'a AUCUN lecteur : hors tests, deux requetes, son
+listing et sa suppression. Le scanner ne la consulte jamais, `expires_at` n'est evalue nulle part.
+Blanchir une CVE n'a donc aucun effet observable, et sa seule fonction d'appel cote legacy est du code
+MORT. Decision de l'exploitant : ne pas la porter. Porter l'ecran livrerait un bouton qui enregistre une
+ligne que rien ne lit — exactement ce que la v2.0 doit cesser de faire.
+**E-60 — l'attribution d'un changement de statut.** `cve_remediation` n'a AUCUNE colonne d'auteur
+(`assigned_to` est un assignataire, pas un auteur), le schema appartient au backend et la migration est
+interdite au portage. Poser l'auteur dans `resolution_note` serait detourner une colonne de son sens :
+la correction demande une migration SQL, donc une decision.
+
+TROIS MESURES DE RENDU, et la colonne d'appoint a du ceder. Ajouter un selecteur et un bouton a la
+sixieme colonne a elargi le tableau de 1048 px — le cadre exact obtenu en S3 — a 1102, puis a **1203**
+quand j'ai empeche l'empilement, avec le bouton de ticket HORS DU CHAMP. La regle du projet a tranche :
+le resume est passe de 46 a **28** caracteres de largeur maximale, son texte entier restant en
+infobulle. Et la version a recu un `nowrap` : elle se coupait sur deux lignes, ce qui DOUBLAIT la
+hauteur de chaque ligne (78 px au lieu de 41). Mesure finale : 1568 px pour un cadre de 1568 a 1920 px,
+bouton dans le champ a 1400 px. A 390 px le defilement reste necessaire et c'est DIT : les quatre
+colonnes restantes sont toutes decisionnelles, en cacher une retirerait des donnees necessaires pour
+agir.
+
+UN DEFAUT DE MA PROPRE CARACTERISATION, qui aurait pu faire condamner un portage correct. La premiere
+version posait la remediation de fixture sur un identifiant INVENTE : il n'apparaissait dans aucune
+ligne du tableau, et l'assertion « le suivi affiche l'etat stocke » lisait le selecteur d'une AUTRE
+ligne — pour laquelle « vide » est la bonne reponse. Le test echouait sur le portage alors que le
+portage avait raison. La fixture porte desormais sur la premiere CVE REELLEMENT AFFICHEE, reperee par le
+texte de sa ligne, ce qui marche sur les deux portails.
+
+**Reference du LOT** : `go-page-cve-suivi` entre avec **6 PASS sur le legacy** et **10 sur le portage**.
+
 ### Documents de migration
 
 - `docs/migration/INVENTAIRE.md` — état chiffré du legacy avant portage
 - `docs/migration/ARCHITECTURE-UI.md` — Filament écarté, Blade retenu, décision argumentée
-- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-56**)
+- `docs/migration/PARITE.md` — écarts assumés entre legacy et portage (**E-01 à E-60**)
 - `docs/migration/DEPRECIATION.md` — registre du retrait, partie par partie
 - `docs/migration/METHODE-SOUS-LOT.md` — l'ordre de travail d'un sous-lot, et ce que chaque étape attrape
 - `docs/migration/MODULE-UPDATE.md` — module `update/` : inventaire et découpage (**porté et archivé**)
-- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c, S3, S4 portés**)
+- `docs/migration/MODULE-SECURITY.md` — module `security/` : 8 sous-lots (**S1, S2a, S2b, S2c, S3, S4, S5 portés**)
 - `docs/migration/MODULE-AUTH.md` — module `auth/` : **condition de sortie de la v2.0**, rien de porté
 - `docs/migration/MODULE-SSH.md` — module `ssh/` : inventaire, rien de porté
 - `docs/migration/MODULE-SUPERVISION.md` — module `supervision/` : inventaire, rien de porté

@@ -342,6 +342,11 @@
          du texte. Cote legacy tout passe par `innerHTML` (E-50).
          @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="cve-findings" type="application/json">@json($findings)</script>
+    {{-- Le suivi STOCKE, et les libelles du sous-lot S5. `peut_ticket` voyage avec
+         eux : le script en a besoin pour desactiver le bouton, pas pour decider —
+         c'est le backend qui refuse. --}}
+    <script id="cve-suivi" type="application/json">@json($suivi)</script>
+    <script id="suivi-libelles" type="application/json">@json($libellesSuivi + ['peut_ticket' => $peutTicket])</script>
     <script id="cve-libelles" type="application/json">@json($libelles)</script>
     @if ($peutPlanifier)
         <script id="planif-libelles" type="application/json">@json($libellesPlanif)</script>
