@@ -269,12 +269,42 @@ explicite renvoyant vers l'ancien portail.
 | Centre de taches | `taches` | `role:2` SEUL (comme le legacy) | oui, 2026-08-18 |
 | Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Recherche globale | `recherche` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
-| Scan de vulnerabilites CVE | `scan-cve` | `role:1` + `perm:can_scan_cve` | non — `security/` porte a S6 sur 7 |
+| Scan de vulnerabilites CVE | `scan-cve` | `role:1` + `perm:can_scan_cve` | non — `security/` porte a S7a sur 7 |
+| Cles SSH | `cles-ssh` | `role:1` + `perm:can_deploy_keys` | non — `ssh/` porte a K1 sur 4 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
 sert. Penser aussi a rediriger l'entree du menu DU LEGACY vers le nouveau
 portail (`LARAVEL_URL`), sans quoi on installe soi-meme un 404 dans un menu.
+
+### Une LISTE A COCHER n'est pas un tableau
+
+Quand chaque entree est une DECISION (cocher ou non) et non une ligne de donnees a
+comparer colonne par colonne, `.rw-liste-selection` dit mieux les choses qu'un
+tableau a une seule colonne utile — et elle n'a pas besoin de defiler
+lateralement, ce qui evite d'emblee tout le probleme de largeur d'E-63.
+
+L'etiquette englobe la case ET le texte : toute la ligne devient cliquable, alors
+qu'une case de 16 px est une cible minuscule au doigt.
+
+Deux regles qui vont avec, et qui manquaient au legacy :
+
+- **un bouton d'action de masse nait `disabled`** tant que rien n'est selectionne,
+  et le NOMBRE de selections est annonce (`aria-live`) : decider d'un geste sans
+  savoir sur combien d'objets il porte n'a pas de sens ;
+- **une ligne masquee par un filtre est DECOCHEE.** Le filtrage masque plutot que
+  de retirer ; laisser la coche en place ferait agir sur ce qu'on ne voit plus.
+
+### Une capacite non portee n'est pas un bouton inerte
+
+Quand le declencheur d'une action n'est pas encore porte, le bouton ouvre un
+panneau qui EXPLIQUE ce que l'action engage, puis offre comme **action
+principale** un lien vers l'ancien portail — marqueur `↗`, `target="_blank"`,
+`rel="noopener"`. Un panneau dont la seule issue serait « Annuler » ne serait pas
+une decision.
+
+Corollaire CSS : `a.rw-bouton` ne garde pas son soulignement de lien. Un element
+se lit comme un bouton OU comme un lien, pas comme les deux.
 
 ### Tableaux : les regles de largeur, toutes payees en mesure
 
