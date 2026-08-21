@@ -495,6 +495,60 @@ Asserter la PROPRIETE, pas la forme : quand le compte vaut zero, exiger que
 l'absence soit **enoncee** ; sinon exiger le nombre. Un test qui impose une mise
 en forme empeche de l'ameliorer.
 
+## Un JETON DE PROTOCOLE n'est pas un libelle : il ne va pas dans les fichiers de langue
+
+`GET /logs` termine son flux par `data: [Fin du flux de logs]`, et le client
+compare `event.data` a cette chaine **litteralement**. Le texte est francais, il
+ressemble a un libelle, et il est donc a un `__()` de disparaitre : **le traduire
+ferait que le flux ne se termine jamais** — le bouton resterait fige, et seul le
+gestionnaire d'erreur finirait par le rendre, donc par le chemin d'echec, sans
+message de succes.
+
+La parade est structurelle, pas une note en commentaire : **poser le jeton en
+constante cote controleur, hors de `lang/`**, et le verifier —
+`grep -c "Fin du flux de logs" lang/*/ssh.php` doit rendre **0**.
+
+Regle generale : si une chaine est **comparee** quelque part, ce n'est pas un
+libelle. Un libelle se lit, un jeton se compare.
+
+## `EventSource` ne peut pas lire un statut HTTP
+
+C'est la cause d'un silence, pas une commodite. `GET /logs` est
+`@require_role(2)` : pour un role 1 il rend 403, ce qui declenche `onerror` — ou
+le legacy ecrit « [Fin du flux] », rend le bouton et **ne dit rien**. Comme
+`POST /deploy` n'a ni role ni permission, ce role 1 peut declencher le
+deploiement et conclure que tout s'est bien passe.
+
+Lire un flux par **`fetch` + `body.getReader()`** rend le statut lisible, et
+supprime au passage la reconnexion automatique d'`EventSource`. Cote test, le
+TYPE de requete se mesure : `page.on('request')` puis `r.resourceType()` rend
+`eventsource` ou `fetch`. **Remettre le collecteur a zero avant de piloter le
+client**, sinon il compte aussi les sondes de la suite et l'assertion reussit
+meme quand la page n'a rien demande.
+
+## Mesurer une XSS sans ecrire de charge executable
+
+`innerHTML +=` sur des lignes de journal : `configure_servers.py:112` y injecte
+`machines.name` sans validation. Pour le prouver, inutile d'ecrire une charge qui
+s'execute — la propriete a mesurer est **« est-ce interprete »**, pas « peut-on
+executer ».
+
+Poser une balise BENIGNE portant un attribut repere
+(`<b data-rw="k3-balise">SONDE</b>`), puis compter :
+
+```js
+z.querySelectorAll('[data-rw="k3-balise"]').length   // 1 = interprete
+z.innerText.includes('<b data-rw="k3-balise">')      // true = rendu en texte
+```
+
+Les deux mesures ensemble : l'une dit que c'est devenu un noeud, l'autre que ce
+n'en est pas devenu un. Une seule des deux laisserait un doute.
+
+Et si la mesure demande d'ecrire dans un fichier de l'application (ici
+`deployment.log`, vide, gitignore, tronque par l'appli a chaque deploiement) :
+ecrire par le conteneur qui le possede, **restaurer dans un `finally`**, et
+ANNONCER l'etat restaure dans le journal de la suite.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).

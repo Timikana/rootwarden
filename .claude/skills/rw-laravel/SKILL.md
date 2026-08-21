@@ -270,7 +270,7 @@ explicite renvoyant vers l'ancien portail.
 | Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Recherche globale | `recherche` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Scan de vulnerabilites CVE | `scan-cve` | `role:1` + `perm:can_scan_cve` | non — `security/` porte a S7a sur 7 |
-| Cles SSH | `cles-ssh` | `role:1` + `perm:can_deploy_keys` | non — `ssh/` porte a K2 sur 4 |
+| Cles SSH | `cles-ssh` | `role:1` + `perm:can_deploy_keys` | non — `ssh/` porte a K3 sur 4 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
