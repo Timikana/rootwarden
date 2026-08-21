@@ -1897,3 +1897,105 @@ qu'elle mesure**.
 
 **Non porté, et dit :** l'attribution d'une re-priorisation. La table ne porte aucune colonne d'auteur,
 et une migration est interdite au portage — même limite que E-60.
+
+## E-65 — Le déclenchement d'un scan existe enfin sur le portage, et l'écran ne prétend plus le contraire
+
+Jusqu'à S7a, le portage affichait les résultats d'un scan sans jamais pouvoir en lancer un : l'état
+vide d'une machine jamais scannée disait *« Le déclenchement d'un scan reste sur l'ancien portail »*.
+Le bouton existe désormais, **avec ou sans scan précédent** — c'est précisément une machine jamais
+scannée qu'on veut pouvoir scanner, et le legacy le rend dans les deux cas.
+
+**Le texte de l'état vide a été corrigé dans le même mouvement**, et il ne l'a pas été par un test :
+il a été vu à l'image. Une assertion sur le DOM n'a aucun moyen de savoir qu'une phrase juste hier est
+devenue fausse aujourd'hui. C'est la même famille que les commentaires du legacy qui affirment un accès
+plus strict que leur code.
+
+Les deux paramètres du scan — seuil CVSS et source des données — vivent dans le panneau de décision et
+non dans l'en-tête de la carte : on les choisit au moment où on décide, et la carte ne s'élargit pas
+(la leçon d'E-63 a coûté assez cher pour être appliquée d'avance).
+
+## E-66 — Un scan refusé se dit. Le legacy en avalait deux sortes en silence
+
+**Silence n° 1 : le statut HTTP n'est jamais lu.** `runScan` fait `resp.body.getReader()` sans regarder
+`resp.status`. Or le corps d'un refus — 429 du garde-fou de débit, 403 d'accès machine, 400 de
+paramètre — est un JSON sur **une seule ligne, sans saut final**. Le lecteur le met dans son tampon,
+`split('\n')` rend un unique élément que `pop()` remet dans le tampon, et le tampon est abandonné à la
+sortie de la boucle. **Rien n'est jamais parsé.** Les boutons reviennent au repos, aucun message
+n'apparaît : cliquer « Scanner » et être refusé est *indiscernable de ne rien faire*.
+
+**Silence n° 2 : un événement d'erreur sans `machine_id`.** C'est le cas de « Aucun serveur trouvé »,
+que le backend émet quand l'identifiant demandé n'existe pas. `handleEvent` lit `ev.machine_id`, donc
+`id` vaut `undefined`, et `showError` cherche `results-undefined` : `getElementById` ne trouve rien et
+la fonction sort sans écrire. Le message existe, traverse le réseau, est parsé — et disparaît.
+
+Mesures, sur les deux portails :
+
+| | legacy | portage |
+|---|---|---|
+| erreur sans `machine_id` | RIEN | « Le scan a échoué : Aucun serveur trouvé » |
+| scan refusé (429) | RIEN | « Patientez 53s avant un nouveau scan CVE. » |
+
+Le portage lit **le statut d'abord** et n'ouvre le flux que si la réponse est bonne ; un événement sans
+`machine_id` retombe sur l'annonce globale de la page. Il traite aussi **le reste du tampon** à la fin
+de la boucle plutôt que de le jeter — c'est exactement le mécanisme du silence n° 1 — et dit qu'un flux
+terminé sans `done` ni `error` laisse un résultat incertain, au lieu de rester muet.
+
+## E-67 — Un scan est précédé d'une décision qui nomme son coût, courriel compris
+
+Le legacy déclenche le scan **au clic** : `onclick="scanServer(id)"` appelle `runScan` directement. Un
+clic de travers sur une machine de **production** suffit — et `srv-zabbix`, `PROD`/`CRITIQUE`, porte ce
+bouton comme les autres.
+
+Ce qu'un scan engage, et que le legacy n'annonce nulle part :
+
+- une session SSH vers la machine, et neuf commandes de **lecture seule** — rien n'est modifié sur la
+  cible, ce qui mérite d'être dit aussi, pour ne pas faire craindre plus que ce qui a lieu ;
+- plusieurs **minutes** (l'enrichissement NVD tourne sans clé d'API, à 5 requêtes / 30 s) ;
+- un nouveau résultat en base, qui **remplace le précédent à l'affichage** ;
+- **un rapport par courriel** (`send_cve_report`, appelé dès que l'événement `done` porte des
+  findings). Dans cet environnement, `MAIL_ENABLED=true` avec un SMTP et un destinataire réels : le
+  courriel part pour de bon, et rien ne le rappelle.
+
+Le portage ouvre donc un panneau de décision en ligne qui nomme les quatre, selon la convention du
+module — jamais de `confirm()`. Une **jauge d'avancement** a été ajoutée : le flux émet un paquet
+courant sur un total, et sans zone pour les rendre, un scan de plusieurs minutes n'a aucun signe de
+vie. Le legacy en a une, faite de classes Tailwind ; le portage n'en avait aucune.
+
+`srv-zabbix` garde son bouton, comme sur le legacy : la garde n'est pas déplacée, elle est **annoncée
+plus tôt**. Restreindre le scan des machines critiques serait un changement de droits, donc une
+décision de l'exploitant.
+
+## E-68 — Le garde-fou de débit et le verrou du scan sont par PROCESSUS, et un test l'a payé
+
+`backend/hypercorn_config.py` déclare `workers = 4`. Or `cve.py` porte deux garde-fous **en mémoire de
+processus** :
+
+- `_user_scan_throttle`, censé refuser un second scan dans les 60 s par utilisateur — son commentaire
+  dit le poser pour empêcher « un user role=1 de spammer /cve_scan, chaque tentative consommant un
+  thread+DB ». Il autorise en réalité **un scan par processus** avant de mordre. Motif mesuré sur douze
+  appels consécutifs : `200 200 429 429 200 429 429 429 429 429 429 429` ;
+- `_scan_lock`, le verrou « un seul scan à la fois », qui autorise donc **jusqu'à quatre scans
+  simultanés**, sur un conteneur borné à 512 Mo et 1 CPU.
+
+C'est le défaut déjà corrigé pour le scheduler en v1.37.5 par un verrou `GET_LOCK` en base. Le scan CVE
+ne l'a pas reçu. **Le backend n'est pas touché** : c'est une décision de l'exploitant.
+
+**Ce que la caractérisation a payé pour l'apprendre.** La première version saturait le garde-fou puis
+cliquait le vrai bouton, en tenant trois refus consécutifs pour la preuve qu'aucun scan ne pouvait
+partir. La prémisse était fausse : la boucle s'arrêtait au troisième refus sans avoir forcément touché
+le quatrième processus, dont la fenêtre était libre. **Deux vrais scans de `Test-Server-Debian` ont
+démarré** — un par portail. Tous deux ont été interrompus avant leur événement `done`, donc avant
+`send_cve_report` ; vérifié : aucune ligne `cve_scans` pour la machine 2, 1458 findings inchangés,
+aucune trace SMTP.
+
+La correction n'est pas de renforcer le garde-fou, c'est de **retirer la cible** : plus aucun geste de
+la suite ne vise une machine scannable. Le bouton réel est cliqué uniquement là où le clic est local
+(il ouvre un panneau), puis **annulé**, et l'absence d'appel est mesurée au réseau. Les refus se
+mesurent sur un identifiant de machine **inexistant**, qui traverse le garde d'accès pour un rôle ≥ 2
+et ne peut rien produire d'autre qu'une erreur. Et l'absence de panneau de décision côté legacy se lit
+dans le DOM, **sans cliquer** : un portail qui déclenche au clic ne se teste pas en cliquant.
+
+**Contrainte de LOT, nouvelle :** ce garde-fou de débit **traverse les suites**, comme le garde
+anti-rejeu TOTP. Il est posé par utilisateur, et `rw-test-admin` est partagé. La suite attend donc la
+fenêtre — le délai est lu dans le refus lui-même — et attend 63 s avant de piloter le client, parce
+qu'une sonde acceptée ferme la fenêtre de son processus et que le processus suivant n'est pas choisi.

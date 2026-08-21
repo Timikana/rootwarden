@@ -148,6 +148,20 @@ class ScanCveController extends Controller
             // reimplementer ici dupliquerait cette integration, et le portage n'a
             // aucune raison de porter un client HTTP vers l'exterieur.
             'url_reprio' => url('/api/gateway/cve_reprioritize'),
+            // ── Le scan (sous-lot S7a) ───────────────────────────────────────
+            'scan_en_cours' => __('cve.scan_en_cours'),
+            'scan_demarre' => __('cve.scan_demarre'),
+            'scan_paquet' => __('cve.scan_paquet', [
+                'paquet' => '{paquet}', 'courant' => '{courant}', 'total' => '{total}',
+            ]),
+            'scan_termine' => __('cve.scan_termine', ['paquets' => '{paquets}', 'cve' => '{cve}']),
+            'scan_erreur' => __('cve.scan_erreur', ['message' => '{message}']),
+            'scan_refuse' => __('cve.scan_refuse', ['statut' => '{statut}']),
+            'scan_interrompu' => __('cve.scan_interrompu'),
+            // LE SCAN EST UN FLUX SERVI PAR LE BACKEND : il passe par la
+            // passerelle, comme le ticket de S5 et la re-priorisation de S6. Il ne
+            // se reimplemente pas — c'est lui qui ouvre les sessions SSH.
+            'url_scan' => url('/api/gateway/cve_scan'),
             'comparaison_identique' => __('cve.comparaison_identique'),
             'fermer' => __('cve.fermer'),
             'suivi_a_venir' => __('cve.suivi_a_venir'),

@@ -178,7 +178,8 @@ Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
 | **S4** ✔ | planification des scans — **PORTÉ le 2026-08-20** (v1.37.25) | aucune : lecture et ecriture en base | non | oui |
 | **S5** ✔ | suivi et ticketing — **PORTÉ le 2026-08-21** (v1.37.26), whitelist NON portée | passerelle pour le ticket seul |
 | **S6** ✔ | enrichissement EPSS / KEV et priorisation — **PORTÉ le 2026-08-21** (v1.37.27) | passerelle pour la re-priorisation seule |
-| **S7** | le scan lui-même | `POST /cve_scan` — **FLUX** | **oui** | oui + **destructif** |
+| **S7a** ✔ | les refus et la forme du flux — **PORTÉ le 2026-08-21** (v1.37.28) | passerelle |
+| **S7b** | le scan qui aboutit — **EN ATTENTE D'UNE AUTORISATION** : il envoie un courriel réel |
 
 **S1 d'abord** parce que c'est le plus petit périmètre du module et qu'il porte une règle d'accès
 explicite : le contrôle IDOR à reproduire à l'identique, **404 et non 403**.
@@ -675,6 +676,25 @@ Ce que S6 **ne** porte pas, et le dit : l'attribution d'une re-priorisation, fau
 et de droit de migrer (même limite que E-60). Et la suite ne déclenche **jamais** `/cve_reprioritize` :
 elle mesure au réseau qu'aucun appel n'est parti, et le geste lui-même est conditionné à la cible, parce
 que sur le legacy il n'y a rien à cliquer sans détruire les données mesurées.
+
+**S7a — porté le 2026-08-21** (v1.37.28) : le bouton de scan, le panneau de décision qui nomme le coût
+(SSH, minutes, remplacement du résultat, **rapport par courriel**), la jauge d'avancement, la lecture du
+STATUT avant le flux, et l'annonce d'une erreur même sans `machine_id`. Suite
+`go-page-cve-scan-refus` : **12 PASS sur le legacy, 16 sur le portage**. Base rouge relevée avant
+portage : 10 PASS / 3 FAIL.
+
+Ce que S7a a refermé : **E-65** (aucun déclenchement de scan sur le portage, et un état vide qui
+affirmait le contraire), **E-66** (les deux silences du legacy : le statut HTTP jamais lu, et un
+événement d'erreur sans `machine_id` envoyé à `results-undefined`), **E-67** (le scan déclenché au clic,
+sans annoncer ni la session SSH, ni la durée, ni le courriel), **E-68** (le garde-fou de débit et le
+verrou du scan sont par PROCESSUS avec `workers = 4` — mesuré, **non corrigé**, décision de
+l'exploitant).
+
+**S7b — LE SCAN QUI ABOUTIT, EN ATTENTE.** Il envoie un rapport par courriel à une adresse réelle, écrit
+une ligne `cve_scans` que les suites S3 à S6 lisent, et résout automatiquement les remédiations. Deux
+scans réels ont démarré par accident pendant S7a, tous deux interrompus avant tout envoi (voir E-68).
+Avant de porter S7b : rendre `go-page-cve-export` indépendante — elle code en dur
+`MACHINE_SANS_SCAN = 2` avec « machine existante mais jamais scannée : 404 » et `?scan_id=2`.
 
 **S7 en dernier**, et c'est le seul qui touche les machines. Ce qu'il faut avoir en tête :
 - c'est un **flux**, pas un JSON (§3) ;

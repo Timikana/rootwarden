@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.27** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.28** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,50 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.28 — module `security/`, sous-lot S7a : le declenchement d'un scan et ses refus
+
+**Symptome.** Le portage affichait les resultats d'un scan sans jamais pouvoir en lancer un, et son etat
+vide affirmait que « le declenchement d'un scan reste sur l'ancien portail ». Cote legacy, un scan
+refuse etait **indiscernable de ne rien faire**.
+
+**Cause racine.** `runScan` (legacy) fait `resp.body.getReader()` **sans jamais lire `resp.status`**. Le
+corps d'un refus est un JSON sur une seule ligne, sans saut final : le lecteur le met dans son tampon,
+`split()` rend un unique element que `pop()` y remet, et le tampon est abandonne a la sortie de la
+boucle. Rien n'est parse. Second silence : un evenement d'erreur sans `machine_id` — le cas de « Aucun
+serveur trouve » — part vers `results-undefined`, que `getElementById` ne trouve pas.
+
+**Correctif.**
+- Bouton de scan par machine, **avec ou sans scan precedent** ; l'etat vide ne ment plus.
+- **Le statut est lu D'ABORD** ; le flux n'est ouvert que si la reponse est bonne. Le reste du tampon
+  est traite en fin de boucle plutot que jete, et un flux qui se termine sans `done` ni `error` le DIT.
+- Une erreur sans `machine_id` retombe sur l'annonce globale de la page.
+- **Panneau de decision** qui nomme les quatre engagements d'un scan : session SSH et neuf commandes de
+  LECTURE seule, plusieurs minutes, un resultat qui remplace le precedent, et **un rapport par
+  courriel** — que le legacy n'annonce nulle part alors qu'il declenche au clic. Seuil CVSS et source
+  des donnees vivent dans ce panneau, pas dans l'en-tete de la carte (lecon E-63).
+- **Jauge d'avancement** : le flux emet un paquet courant sur un total ; sans zone pour les rendre, un
+  scan de plusieurs minutes n'a aucun signe de vie.
+
+**Defaut backend mesure, NON corrige** (E-68) : `_user_scan_throttle` et `_scan_lock` sont en memoire de
+PROCESSUS et `hypercorn_config.py` declare `workers = 4`. La limite « 60 s entre deux scans » autorise
+donc un scan PAR PROCESSUS, et le verrou « un seul scan a la fois » en autorise quatre — sur un
+conteneur borne a 512 Mo et 1 CPU. Meme defaut que le scheduler, corrige en v1.37.5 par un `GET_LOCK`
+en base. Decision de l'exploitant.
+
+**Tests.** `tests/e2e/go-page-cve-scan-refus.mjs` — **12 PASS sur le legacy, 16 sur le portage**. Base
+rouge relevee avant portage : 10 PASS / 3 FAIL. **Aucun scan n'est declenche** : les refus se mesurent
+sur un identifiant de machine inexistant, le bouton reel n'est clique que la ou le clic est local puis
+ANNULE, et l'absence d'appel est mesuree au reseau. L'absence de panneau cote legacy se lit dans le DOM
+sans cliquer. Deux vrais scans avaient demarre avec une premiere version du garde-fou — interrompus
+avant tout envoi, verifie (aucune ligne `cve_scans`, 1458 findings inchanges, aucune trace SMTP).
+LOT complet rejoue. Captures regardees a 1920, 1400 et 390 px.
+
+**Notes d'exploitation.** Le garde-fou de debit **traverse les suites** (pose par utilisateur, compte
+partage) : la suite attend la fenetre, le delai etant lu dans le refus lui-meme. Aucune variable
+d'environnement, aucune migration ajoutee.
+
+---
 
 ### v1.37.27 — module `security/`, sous-lot S6 : l'enrichissement EPSS / KEV et la priorisation
 

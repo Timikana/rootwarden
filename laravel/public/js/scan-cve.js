@@ -403,6 +403,169 @@
         b.addEventListener('click', () => reprioriseCve(b.dataset.reprioConfirme));
     });
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  LE SCAN (sous-lot S7a) — ET SURTOUT CE QU'ON FAIT D'UN REFUS
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // DEUX SILENCES DU LEGACY SONT FERMES ICI.
+    //
+    //  1. **`runScan` ne regarde JAMAIS `resp.status`.** Sur un refus — 429 du
+    //     garde-fou de debit, 403 d'acces machine, 400 de parametre — le corps est
+    //     un JSON sur UNE ligne, sans saut final. Son lecteur de flux le met dans
+    //     un tampon, `split('\n')` rend un seul element que `pop()` remet dans le
+    //     tampon, et le tampon est abandonne a la sortie de la boucle. Rien n'est
+    //     jamais parse : le bouton revient au repos et **rien ne distingue
+    //     « refuse » de « jamais clique »**. Ici le statut est lu D'ABORD, et le
+    //     flux n'est ouvert que si la reponse est bonne.
+    //
+    //  2. **Un evenement d'erreur SANS `machine_id`** — c'est le cas de « Aucun
+    //     serveur trouve » — visait `results-undefined` cote legacy, que
+    //     `getElementById` ne trouve pas : le message disparaissait. Ici il tombe
+    //     sur l'annonce GLOBALE de la page.
+    //
+    // Le scan est lance par une DECISION explicite, jamais par le clic seul.
+
+    function panneauScan(mid, ouvert) {
+        const p = document.getElementById('scan-panneau-' + mid);
+        if (p) p.hidden = !ouvert;
+    }
+
+    function avancement(mid, visible) {
+        const z = document.getElementById('scan-avancement-' + mid);
+        if (z) z.hidden = !visible;
+    }
+
+    function etape(mid, texte, pourcent) {
+        const t = document.getElementById('scan-etape-' + mid);
+        if (t) t.textContent = texte;
+        const j = document.getElementById('scan-jauge-' + mid);
+        if (j) j.style.width = (pourcent === null ? 0 : Math.max(0, Math.min(100, pourcent))) + '%';
+    }
+
+    /** Un evenement du flux. `mid` est celui du scan demande, pas celui de l'evenement. */
+    function evenementScan(ev, mid, compte) {
+        const cible = ev.machine_id === undefined || ev.machine_id === null ? mid : ev.machine_id;
+        switch (ev.type) {
+            case 'start':
+                avancement(cible, true);
+                etape(cible, L.scan_demarre || '', 0);
+                break;
+            case 'progress':
+                avancement(cible, true);
+                if (ev.current && ev.total) {
+                    const pct = ev.percent || Math.round((ev.current / ev.total) * 100);
+                    etape(cible, (L.scan_paquet || '{paquet} ({courant}/{total})')
+                        .replace('{paquet}', String(ev.package || ''))
+                        .replace('{courant}', String(ev.current))
+                        .replace('{total}', String(ev.total)), pct);
+                } else {
+                    etape(cible, String(ev.message || L.scan_demarre || ''), null);
+                }
+                break;
+            case 'finding':
+                compte.findings += 1;
+                break;
+            case 'done':
+                compte.termine = true;
+                avancement(cible, false);
+                annonce((L.scan_termine || '')
+                    .replace('{paquets}', String(ev.packages_scanned ?? 0))
+                    .replace('{cve}', String(ev.total_findings ?? compte.findings)), true);
+                break;
+            case 'error':
+                // MEME SANS `machine_id`, le message est dit. C'est tout l'ecart
+                // avec le legacy, qui l'envoyait a un element inexistant.
+                avancement(cible, false);
+                annonce((L.scan_erreur || '{message}')
+                    .replace('{message}', String(ev.message || '')), false);
+                compte.erreur = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    async function lanceScan(mid) {
+        panneauScan(mid, false);
+        const bouton = document.getElementById('btn-' + mid);
+        const seuil = document.getElementById('scan-seuil-' + mid);
+        const source = document.getElementById('scan-source-' + mid);
+        const libelleRepos = bouton ? bouton.textContent : '';
+        if (bouton) { bouton.disabled = true; bouton.textContent = L.scan_en_cours || '…'; }
+        const compte = { findings: 0, termine: false, erreur: false };
+
+        try {
+            const rep = await fetch(L.url_scan, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    machine_id: Number(mid),
+                    min_cvss: seuil ? Number(seuil.value) : 7,
+                    scan_source: source ? source.value : 'hybrid',
+                }),
+            });
+
+            // LE STATUT D'ABORD. Un refus n'est pas un flux : l'ouvrir comme tel
+            // est precisement ce qui le faisait disparaitre.
+            if (!rep.ok) {
+                const brut = await rep.text();
+                let message = '';
+                try { message = String(JSON.parse(brut).message || ''); } catch { message = ''; }
+                annonce(message || (L.scan_refuse || '')
+                    .replace('{statut}', String(rep.status)), false);
+                return;
+            }
+
+            const lecteur = rep.body.getReader();
+            const decodeur = new TextDecoder();
+            let tampon = '';
+            for (;;) {
+                const { done, value } = await lecteur.read();
+                if (done) break;
+                tampon += decodeur.decode(value, { stream: true });
+                const lignes = tampon.split('\n');
+                tampon = lignes.pop();
+                for (const l of lignes) {
+                    if (!l.trim()) continue;
+                    try { evenementScan(JSON.parse(l), mid, compte); } catch { /* ligne partielle */ }
+                }
+            }
+            // LE RESTE DU TAMPON EST TRAITE, pas jete : un flux dont la derniere
+            // ligne n'est pas terminee par un saut perdrait son dernier evenement
+            // — c'est exactement le mecanisme du silence du legacy.
+            if (tampon.trim()) {
+                try { evenementScan(JSON.parse(tampon), mid, compte); } catch { /* incomplet */ }
+            }
+            // Un flux qui se termine sans `done` ni `error` n'est pas un succes :
+            // le dire, plutot que de laisser la page muette.
+            if (!compte.termine && !compte.erreur) {
+                annonce(L.scan_interrompu || '', false);
+            }
+            if (compte.termine) {
+                // Les findings arrivent NON enrichis dans le flux (EPSS/KEV sont
+                // poses en bloc apres coup, cote backend) et le tri vient du SQL :
+                // on recharge plutot que de recoudre un etat qui serait faux.
+                window.location.reload();
+            }
+        } catch (e) {
+            annonce((L.scan_erreur || '{message}').replace('{message}',
+                String(e && e.message ? e.message : e)), false);
+        } finally {
+            avancement(mid, false);
+            if (bouton) { bouton.disabled = false; bouton.textContent = libelleRepos; }
+        }
+    }
+
+    document.querySelectorAll('[data-rw^="cve-scanner-"]').forEach((b) => {
+        b.addEventListener('click', () => panneauScan(b.dataset.machine, true));
+    });
+    document.querySelectorAll('[data-scan-annule]').forEach((b) => {
+        b.addEventListener('click', () => panneauScan(b.dataset.scanAnnule, false));
+    });
+    document.querySelectorAll('[data-scan-confirme]').forEach((b) => {
+        b.addEventListener('click', () => lanceScan(b.dataset.scanConfirme));
+    });
+
     /** Un message a l'ecran, jamais seulement dans la console. */
     function annonce(texte, ok) {
         let zone = document.getElementById('cve-annonce');

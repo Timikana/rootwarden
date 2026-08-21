@@ -67,6 +67,7 @@ declare -A REF_LARAVEL=(
   [go-page-cve-export]=20 [go-page-conformite]=13 [go-page-conformite-csv]=17
   [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
   [go-page-cve-planification]=20 [go-page-cve-suivi]=10 [go-page-cve-priorite]=14
+  [go-page-cve-scan-refus]=16
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -77,20 +78,21 @@ declare -A REF_LEGACY=(
   [go-page-cve-export]=16 [go-page-conformite]=13 [go-page-conformite-csv]=10
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
   [go-page-cve-planification]=16 [go-page-cve-suivi]=6 [go-page-cve-priorite]=8
+  [go-page-cve-scan-refus]=12
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
   go-page-commandlog go-page-approvals go-page-drift go-page-backups go-page-tasks
   go-page-tickets go-page-search go-page-cve-export go-page-conformite
   go-page-conformite-csv go-page-conformite-pdf go-page-cve-consultation
-  go-page-cve-planification go-page-cve-suivi go-page-cve-priorite
+  go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-backups go-page-tasks go-page-tickets go-page-search go-page-cve-export
   go-page-conformite go-page-conformite-csv go-page-conformite-pdf
   go-page-cve-consultation go-page-cve-planification go-page-cve-suivi
-  go-page-cve-priorite
+  go-page-cve-priorite go-page-cve-scan-refus
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
