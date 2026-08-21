@@ -1648,3 +1648,122 @@ SSH. La parade n'est pas un nettoyage rapide : toutes les planifications créée
 n'existe pas**, dont la branche fait une jointure interne sur `machine_tags` — zéro machine, zéro SSH.
 Vérifié après coup : la base porte toujours **un seul** scan CVE, celui du 25/07, et zéro planification.
 `all` et `machines` sont interdits comme cibles de test, et l'en-tête de la suite dit pourquoi.
+
+---
+
+## E-57 — Le suivi d'une vulnérabilité n'affichait jamais son état, et un changement l'effaçait
+
+Trois défauts d'une même colonne, tous mesurés sur la pile réelle.
+
+**L'état stocké n'était jamais affiché.** Le générateur du legacy ne pose aucune option `selected`, et
+son JS ne fait **aucun** `GET /cve_remediation` — sa seule occurrence est le POST. La cellule montrait
+donc un tiret même quand une remédiation existait en base, et après un rechargement le choix qu'on
+venait de faire disparaissait de l'écran alors qu'il était bien enregistré.
+
+**Un changement de statut effaçait trois champs.** Le client n'envoie que `{cve_id, machine_id,
+status}` ; côté backend `assigned_to`, `deadline` et `resolution_note` retombent à leur défaut, et
+l'`ON DUPLICATE KEY UPDATE` réaffecte les **cinq** colonnes. Mesure, avec une remédiation complète
+posée avant l'appel :
+
+| | statut | assignataire | échéance | note |
+|---|---|---|---|---|
+| avant | `open` | 16 | 2026-12-31 | « note a preserver » |
+| après, **legacy** | `in_progress` | **vide** | **vide** | **vide** |
+| après, **portage** | `in_progress` | 16 | 2026-12-31 | « note a preserver » |
+
+Déplacer une CVE de « à traiter » à « en cours » effaçait donc l'assignataire, l'échéance et la note —
+et défaisait en silence l'auto-résolution du scanner (`cve_scanner.py:1092`). Le portage n'écrit **que
+la colonne demandée**.
+
+**Le statut n'était contrôlé par rien.** La colonne est un `ENUM` ; une valeur inventée remontait
+l'erreur MySQL 1265 nue, donc un **500 avec une page HTML** au lieu d'un 400. Le portage refuse par un
+400 qui nomme le statut reçu.
+
+Un choix de portage à signaler : l'ENUM contient `resolved`, que l'interface **ne propose pas** — il
+est posé par le scanner seul quand une CVE disparaît d'un scan suivant. Le portage l'**affiche** en
+clair, avec son explication en infobulle, mais ne le met pas dans le sélecteur : proposer à quelqu'un
+de « résoudre » ce que le scanner constate brouillerait les deux gestes.
+
+---
+
+## E-58 — La création de ticket passe par la passerelle, contrairement au reste du module
+
+S3 et S4 lisent et écrivent la base directement (E-48, E-52). **La création de ticket ne le peut pas** :
+`POST /tickets` appelle un **fournisseur ITSM externe** quand il est configuré
+(`backend/routes/tickets.py`, `ticketing.create_ticket`). Le réimplémenter côté portage dupliquerait
+une intégration et ses identifiants — c'est-à-dire le contraire de ce que la migration cherche.
+
+Elle passe donc par la passerelle, où la chaîne de gardes est **déjà** en place : `/tickets` figure
+dans `ADMIN_SEULEMENT` de `RoutesBackend`, donc la passerelle exige le rôle 2, et le backend exige
+`can_admin_portal`.
+
+**Ce que le portage ajoute, c'est l'honnêteté de l'écran.** La page exige `can_scan_cve` ; le ticket
+exige `can_admin_portal`. `rw-test-admin` porte la première et pas la seconde : le legacy lui offre
+donc un bouton cliquable dont l'appel rend **403**. Mesuré. Dans le portage le bouton est
+**désactivé**, avec l'explication en infobulle — et la règle n'est pas déplacée côté navigateur : c'est
+toujours le backend qui refuse.
+
+---
+
+## E-59 — La whitelist n'est PAS portée, et c'est une décision
+
+**La table `cve_whitelist` n'a aucun lecteur.** Hors tests, deux requêtes en tout : son propre listing
+(`cve.py:604`) et sa suppression (`cve.py:658`). Le scanner ne la consulte jamais, `expires_at` n'est
+évalué nulle part. Blanchir une CVE n'a donc **aucun effet observable** — ni exclusion du scan suivant,
+ni marquage, ni filtrage d'affichage.
+
+Sa seule fonction d'appel côté legacy, `whitelistCve` (`js/main.js:1013-1026`), est du **code mort** :
+`grep` sur tout le dépôt ne rend que sa déclaration. C'est elle qui porte le seul `prompt()` du
+périmètre, et la seule consommatrice de `window._cveConfig.username`.
+
+**Décision de l'exploitant : ne pas la porter.** Le portage ne propose donc pas de blanchiment. Porter
+l'écran livrerait une capacité inerte — un bouton qui enregistre une ligne que rien ne lit —, ce qui est
+exactement ce que la v2.0 doit cesser de faire. Rendre la fonctionnalité opérante demande une décision
+sur le scanner, pas un portage d'interface.
+
+À noter : un correctif de la branche `security/backend-cve` rend l'attribution de ce blanchiment honnête
+(`whitelisted_by` pris de la session au lieu du client). Il **ne rend pas** la fonctionnalité opérante.
+
+---
+
+## E-60 — L'attribution d'un changement de statut reste impossible
+
+`cve_remediation` porte `id, cve_id, machine_id, status, assigned_to, deadline, resolution_note,
+opened_at, resolved_at`. **Aucune colonne d'auteur.** `assigned_to` est un *assignataire* — à qui le
+travail revient —, pas un auteur — qui a décidé du statut.
+
+Le schéma appartient au backend Python et la migration est interdite au portage (base partagée). Le
+portage ne peut donc pas enregistrer qui change un statut, quel que soit le soin qu'on y mette, et
+aucune des écritures du module n'est journalisée par ailleurs (`grep log_action` sur `cve.py` : une
+seule ligne, et elle appartient au scan).
+
+**Dit plutôt que contourné.** Poser l'auteur dans `resolution_note` serait détourner une colonne de
+son sens et rendre la note inutilisable. La correction demande une migration SQL côté backend, donc une
+décision.
+
+---
+
+## Trois constats de S5
+
+**Le rendu a coûté trois mesures, et la colonne d'appoint a dû céder.** Ajouter un sélecteur et un
+bouton à la sixième colonne a élargi le tableau : de 1048 px — le cadre exact obtenu en S3 — à 1102,
+puis à **1203** quand j'ai empêché l'empilement, avec le bouton de ticket **hors du champ**. La règle du
+projet a tranché : *une colonne d'appoint s'efface pour que l'actionnable revienne dans le champ*. Le
+résumé est passé de 46 à **28 caractères** de largeur maximale, son texte entier restant en infobulle,
+et la version a reçu un `nowrap` — elle se coupait sur deux lignes, ce qui **doublait la hauteur de
+chaque ligne** (78 px au lieu de 41). Résultat mesuré : 1568 px pour un cadre de 1568 à 1920 px, et le
+bouton dans le champ à 1400 px.
+
+**Et à 390 px, le défilement reste nécessaire, ce qui est dit plutôt que masqué.** Sous 720 px les deux
+colonnes d'appoint sont déjà cachées ; il ne reste que l'identifiant, le paquet, la sévérité et le
+suivi — toutes décisionnelles. Le bouton de ticket s'efface aussi (l'action première est le sélecteur,
+et pour un compte sans la permission le bouton est de toute façon désactivé), ce qui ramène le tableau
+de 561 à **498 px** pour un cadre de 306. Cacher le paquet ou la sévérité retirerait des données
+nécessaires pour agir : le cadre défile donc, et il l'indique.
+
+**Un défaut de ma propre caractérisation, qui aurait pu faire condamner un portage correct.** La
+première version posait la remédiation de fixture sur un identifiant **inventé**. Il n'apparaissait donc
+dans aucune ligne du tableau, et l'assertion « le suivi affiche l'état stocké » lisait le sélecteur
+d'une **autre** ligne — pour laquelle « vide » est la bonne réponse. Le test échouait sur le portage
+alors que le portage avait raison. La fixture porte désormais sur la **première CVE réellement
+affichée**, et le repérage se fait par le texte de la ligne, ce qui marche sur les deux portails.

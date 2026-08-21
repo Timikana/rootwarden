@@ -14,6 +14,7 @@ use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ExportCveController;
 use App\Http\Controllers\RapportConformiteController;
 use App\Http\Controllers\ScanCveController;
+use App\Http\Controllers\SuiviCveController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
 use App\Http\Controllers\PasserelleController;
@@ -201,6 +202,24 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')->name('scan-cve.planifs.supprimer');
     Route::get('/scan-cve/apercu-cron', [PlanificationsCveController::class, 'apercu'])
         ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.apercu-cron');
+
+    /*
+     * Suivi de remediation — sous-lot S5.
+     *
+     * `role:1` + `perm:can_scan_cve`, la garde de la page : le suivi se consulte
+     * et se pose depuis le tableau des vulnerabilites, pas depuis un ecran
+     * d'administration.
+     *
+     * LA CREATION DE TICKET N'EST PAS ICI, et c'est deliberé (E-58) :
+     * `POST /tickets` appelle un fournisseur ITSM EXTERNE quand il est configure.
+     * Elle passe donc par la PASSERELLE, ou `/tickets` est deja dans
+     * `ADMIN_SEULEMENT` — role 2 exige par la passerelle, `can_admin_portal` par
+     * le backend.
+     */
+    Route::get('/scan-cve/suivi', [SuiviCveController::class, 'index'])
+        ->middleware(['role:1', 'perm:can_scan_cve'])->name('scan-cve.suivi');
+    Route::post('/scan-cve/suivi', [SuiviCveController::class, 'store'])
+        ->middleware(['role:1', 'perm:can_scan_cve'])->name('scan-cve.suivi.poser');
 
     Route::get('/export-cve', ExportCveController::class)
         ->middleware(['role:1', 'perm:can_scan_cve'])

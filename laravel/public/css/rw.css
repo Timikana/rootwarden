@@ -1376,7 +1376,12 @@ body {
    rien regle. */
 .rw-cve-id { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rw-cve-resume {
-    max-width: 46ch;
+    /* 28ch et non 46 depuis le sous-lot S5 : la colonne de suivi porte un
+       selecteur et un bouton, et c'est elle l'ACTIONNABLE. Le resume est
+       l'appoint — il cede la place, et son texte entier reste en infobulle.
+       Mesure : 1203 px de tableau pour 1048 px de cadre avant, le bouton de
+       ticket hors du champ. */
+    max-width: 28ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1396,4 +1401,32 @@ body {
     .rw-tableau th.rw-cve-id { padding-left: 8px; padding-right: 8px; }
     .rw-tableau tbody td { padding-left: 8px; padding-right: 8px; }
     .rw-cve-prefixe { display: none; }
+}
+
+/* La colonne de suivi (sous-lot S5) a repris de la largeur au tableau, et deux
+   defauts sont apparus a l'image — nulle part ailleurs :
+
+   - la VERSION se coupait sur deux lignes (« 6.12.90+deb13- » / « amd64 »), ce
+     qui DOUBLAIT la hauteur de chaque ligne. Une version de paquet ne se lit pas
+     coupee, et 41 px de ligne valent mieux que 78 ;
+   - le selecteur et le bouton de la cellule de suivi s'EMPILAIENT, et le bouton
+     se retrouvait rogne au bord du cadre. Ils tiennent sur une ligne. */
+.rw-cve-version { white-space: nowrap; }
+.rw-cve-suivi {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.rw-cve-suivi select { min-width: 7.5em; }
+
+@media (max-width: 720px) {
+    /* Sous 720 px les deux colonnes d'appoint sont deja masquees, et il ne reste
+       que l'identifiant, le paquet, la severite et le suivi — toutes
+       decisionnelles. Le SELECTEUR est l'action premiere ; la creation de ticket
+       est secondaire, et pour un compte sans la permission elle est de toute
+       facon desactivee. Elle s'efface donc, et le selecteur perd sa largeur
+       minimale : c'est ce qui ramene l'action dans le champ. */
+    .rw-cve-suivi [data-rw^="cve-ticket-"] { display: none; }
+    .rw-cve-suivi select { min-width: 0; }
 }

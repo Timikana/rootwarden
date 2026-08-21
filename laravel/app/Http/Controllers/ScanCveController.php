@@ -53,6 +53,8 @@ class ScanCveController extends Controller
     public function __construct(
         private readonly ScansCve $scans,
         private readonly \App\Services\PlanificationsCve $planifs,
+        private readonly \App\Services\SuiviCve $suivi,
+        private readonly \App\Services\Droits $droits,
     ) {
     }
 
@@ -74,6 +76,15 @@ class ScanCveController extends Controller
             $findings[$machineId] = $this->scans->findingsPourAffichage((int) $scan->id);
         }
 
+        // LE SUIVI STOCKE, machine par machine — sous-lot S5. Le legacy ne lit
+        // JAMAIS cette table depuis la page : son selecteur montrait un tiret meme
+        // quand une remediation existait, et le choix qu'on venait de faire
+        // disparaissait au rechargement.
+        $suivi = [];
+        foreach (array_keys($derniers) as $machineId) {
+            $suivi[$machineId] = $this->suivi->parMachine((int) $machineId);
+        }
+
         return view('scan-cve', [
             // LE BLOC DE PLANIFICATION N'EST PAS RENDU EN DESSOUS DU ROLE 2, et le
             // script ne s'initialise donc pas : le legacy, lui, branche
@@ -86,10 +97,18 @@ class ScanCveController extends Controller
             'derniers'   => $derniers,
             'findings'   => $findings,
             'facettes'   => array_map([$this, 'facettes'], $findings),
+            'suivi'       => $suivi,
+            // UNE REGLE APPLIQUEE PAR LE BACKEND SE REND VISIBLE. `POST /tickets`
+            // exige `can_admin_portal` ; sans elle, le bouton est DESACTIVE avec
+            // son explication plutot que cliquable pour rien. La regle n'est pas
+            // deplacee cote navigateur : c'est toujours le backend qui refuse.
+            'peutTicket'  => $role >= 3
+                || ($this->droits->permissions($idCompte)['can_admin_portal'] ?? false),
             'resume'      => $this->scans->resumeParc($ids),
             'seuilDefaut' => (int) (getenv('CVE_MIN_CVSS') ?: 0),
             'libelles'    => $this->libelles(),
             'libellesPlanif' => $role >= 2 ? $this->libellesPlanif() : [],
+            'libellesSuivi'  => $this->libellesSuivi(),
         ]);
     }
 
@@ -124,6 +143,44 @@ class ScanCveController extends Controller
             // locale de ses dates a trois endroits, donc un utilisateur anglais y
             // lit des dates francaises.
             'langue' => app()->getLocale(),
+        ];
+    }
+
+    /**
+     * Les libelles du suivi, POSES EN DONNEES.
+     *
+     * Le legacy en portait DEUX JEUX pour les memes statuts — `Open`/`Accepte`
+     * dans son selecteur, `Ouverte`/`Acceptee` dans son message de confirmation,
+     * dont un en anglais. Ici il n'y en a qu'un.
+     *
+     * @return array<string,mixed>
+     */
+    private function libellesSuivi(): array
+    {
+        $statuts = [];
+        foreach (\App\Services\SuiviCve::STATUTS as $st) {
+            $statuts[$st] = __('suivi.' . $st);
+        }
+
+        return [
+            'statuts' => $statuts,
+            'choisissables' => \App\Services\SuiviCve::STATUTS_CHOISISSABLES,
+            'aucun' => __('suivi.aucun'),
+            'resolved_aide' => __('suivi.resolved_aide'),
+            'ticket' => __('suivi.ticket'),
+            'ticket_court' => __('suivi.ticket_court'),
+            'ticket_aide' => __('suivi.ticket_aide'),
+            'ticket_refuse' => __('suivi.ticket_refuse'),
+            'ticket_cree' => __('suivi.ticket_cree'),
+            'ticket_existant' => __('suivi.ticket_existant'),
+            'ticket_echec' => __('suivi.ticket_echec'),
+            'enregistre' => __('suivi.enregistre'),
+            'err_reseau' => __('suivi.err_reseau'),
+            'url_suivi' => route('scan-cve.suivi'),
+            // LE TICKET PASSE PAR LA PASSERELLE, contrairement au reste du module :
+            // `POST /tickets` appelle un fournisseur ITSM externe quand il est
+            // configure, et le reimplementer dupliquerait une integration.
+            'url_ticket' => url('/api/gateway/tickets'),
         ];
     }
 
