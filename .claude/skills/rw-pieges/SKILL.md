@@ -355,6 +355,64 @@ affiche X » ecrite ainsi passe meme quand une media query a masque X. Elle vaut
 donc a la largeur ou la suite tourne — le DIRE en commentaire, et mesurer le style
 calcule quand la visibilite est justement la propriete en jeu.
 
+## Ne pas ARMER un garde-fou dont la premisse est fausse : RETIRER la cible
+
+Le defaut le plus cher de S7a, et il etait de moi.
+
+Pour tester « un scan refuse est-il annonce ? », la premiere version saturait le
+garde-fou de debit de `/cve_scan` par des appels repetes, tenait **trois refus
+consecutifs** pour la preuve qu'aucun scan ne pouvait plus partir, puis cliquait
+le vrai bouton. La premisse etait fausse : le compteur est **par processus** et
+`hypercorn_config.py` declare `workers = 4`. La boucle s'arretait au troisieme
+refus sans avoir forcement touche le quatrieme processus, dont la fenetre etait
+libre. **Deux vrais scans ont demarre** — un par portail — chacun avec sa session
+SSH, sa ligne en base a venir et son rapport PAR COURRIEL vers une adresse reelle.
+Interrompus a temps par un `docker restart rootwarden_python`, avant l'evenement
+`done` donc avant l'envoi ; verifie ensuite : aucune ligne creee, aucune trace
+SMTP.
+
+Ce qui est ironique et instructif : **le piege « un compteur en memoire de
+processus est multiplie par les workers » etait deja ecrit dans ce fichier**, et
+j'ai quand meme construit un garde qui supposait un compteur partage.
+
+La regle qui en sort :
+
+1. **Un garde-fou probabiliste n'est pas un garde-fou.** « J'ai observe N refus »
+   ne se transforme pas en « le prochain appel sera refuse ».
+2. **Retirer la cible plutot que renforcer le garde.** Le geste dangereux ne doit
+   pas viser une machine qui peut repondre. Ici : les refus se mesurent sur un
+   `machine_id` VALIDE MAIS INEXISTANT, qui traverse le garde d'acces pour un
+   role >= 2 et ne peut produire qu'un evenement d'erreur.
+3. **Un portail qui declenche AU CLIC ne se teste pas en cliquant.** L'absence
+   d'un panneau de decision est une propriete du DOM : `getElementById(...) ===
+   null`, et le declencheur immediat se lit dans l'attribut `onclick`. Aucun clic
+   necessaire.
+4. **Le clic n'est permis que la ou il est LOCAL** (il ouvre un panneau), et on
+   ANNULE ensuite, en mesurant au reseau qu'aucun appel n'est parti.
+5. **Prouver le non-effet en base**, pas a l'ecran : un bouton revenu au repos ne
+   distingue pas « refuse » de « scan en cours ».
+
+Signe qu'un declenchement a eu lieu malgre tout : bouton encore desactive,
+annonce restee sur le message precedent, et dans `docker logs rootwarden_python`
+des lignes `paramiko.transport` avec des `keepalive@lag.net`. Une ligne
+`CVE scan request: machine_id=...` ne prouve RIEN : elle est journalisee AVANT le
+controle de debit.
+
+## Un garde-fou de debit par UTILISATEUR traverse les suites
+
+`/cve_scan` refuse un second scan dans les 60 s pour un meme utilisateur, et les
+suites partagent `rw-test-admin`. Meme nature que le garde anti-rejeu TOTP : une
+suite qui suppose la fenetre libre echoue pour une raison etrangere a ce qu'elle
+mesure — trois assertions rouges, aucune liee au portage.
+
+Deux attentes, toutes deux explicites :
+
+- au demarrage, si le premier appel rend 429, lire le delai **dans le refus**
+  (`/Patientez (\d+)s/`) et attendre ce delai + 3 s ;
+- avant de piloter le client de la page, attendre la fenetre ENTIERE (63 s) : une
+  sonde acceptee ferme la fenetre de SON processus, et le processus qui servira
+  l'appel suivant n'est pas choisi.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).

@@ -102,6 +102,29 @@ bloquant en CI) et **expurge l'erreur** en cas d'echec — `mysql` prend son mot
 passe en argument, et Node recopie l'argv complet dans le message. Voir
 `rw-pieges`.
 
+## Une action a effet SORTANT ne se teste pas en la declenchant
+
+Avant de faire cliquer un test sur une action, chercher ce qu'elle ENVOIE :
+`send_*`, `notify_*`, un webhook, un appel a un service externe — et verifier si
+l'environnement est reellement configure pour l'envoyer (`MAIL_ENABLED`,
+`MAIL_TO`, un SMTP joignable). Le scan CVE envoie un rapport par courriel des que
+son evenement `done` porte des findings ; ici vers une adresse reelle.
+
+Consequences pour la conception d'une suite :
+
+- **le geste dangereux ne vise jamais une cible qui peut repondre** — viser un
+  identifiant valide mais inexistant, qui traverse les gardes et ne produit
+  qu'une erreur ;
+- **ne jamais s'appuyer sur un garde-fou serveur qu'on a « arme »** : voir
+  `rw-pieges`, une limite en memoire de processus est multipliee par les workers
+  et N refus observes ne predisent pas le N+1 ;
+- **la propriete « rien n'est parti » se mesure au RESEAU** (`page.on('request')`)
+  et **« rien n'a ete ecrit » se mesure EN BASE**, avant et apres ;
+- si un declenchement accidentel a lieu : `sudo -n docker restart
+  rootwarden_python` coupe le flux avant son evenement final, donc avant l'envoi
+  — puis PROUVER l'absence d'effet (aucune ligne creee, aucune trace SMTP) et le
+  dire.
+
 ## Lancement
 
 **Passer par le lanceur, jamais par `node go-*.mjs` a la main** :
