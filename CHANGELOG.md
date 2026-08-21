@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.30** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.31** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,48 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.31 — module `ssh/`, sous-lot K3 : la lecture du journal de deploiement
+
+**Symptome.** Le portage ne pouvait pas lire le journal du dernier deploiement. Cote legacy, trois
+defauts s'y cachaient — dont une XSS STOCKEE — et un quatrieme non repertorie.
+
+**Cause racine.** Le client ouvre le flux par un `EventSource`, qui **ne permet pas de lire un statut
+HTTP** ; il compare le marqueur de fin `[Fin du flux de logs]` LITTERALEMENT ; et il fait
+`logWindow.innerHTML += event.data` en pretendant « pas de donnees utilisateur non maitrisees », alors
+que `configure_servers.py:112` injecte `machines.name` dans CHAQUE ligne sans validation.
+
+**Correctif.**
+- **Le marqueur de fin est pose en CONSTANTE dans le controleur, hors des fichiers de langue** : c'est
+  un jeton de protocole, emis en dur par le backend. Le traduire ferait que le flux ne se termine
+  JAMAIS — le bouton resterait fige et seul le chemin d'erreur le rendrait.
+- **Le flux est lu par `fetch`**, dont le statut est lisible : un 403 est ANNONCE au lieu de tomber dans
+  un `onerror` muet. `GET /logs` etant `@require_role(2)` et `POST /deploy` n'ayant ni role ni
+  permission, un role 1 pouvait declencher le deploiement et conclure que tout s'etait bien passe.
+- **Chaque ligne est posee par `textContent`**, jamais par `innerHTML`.
+- **Un flux qui s'arrete sans son marqueur le DIT** au lieu de passer pour un succes.
+- **Un seul chemin de sortie remet le bouton** : le legacy en avait deux, avec des libelles differents
+  (« Deployer les cles » au succes, « Lancer le Deploiement » a l'erreur).
+
+**Tests.** `tests/e2e/go-page-ssh-flux.mjs` — **8 PASS sur le legacy, 10 sur le portage**. Base rouge :
+6 / 4. L'XSS est DEMONTREE PAR LA MESURE : la suite pose dans le journal une balise BENIGNE et compte les
+elements correspondants — **1 cote legacy** (elle est devenue un noeud du document), **0 cote portage**,
+qui affiche la chaine litterale. La propriete mesuree est « est-ce interprete », pas « peut-on
+executer » : une charge executable n'aurait rien prouve de plus.
+La fixture ecrit dans `deployment.log` via le conteneur et **le remet a zero dans un `finally`** —
+verifie apres chaque execution (`journal restaure : 0 octet(s)`). Le fichier etait vide au depart, il est
+ignore par git, et l'application le tronque de toute facon a chaque deploiement.
+LOT complet rejoue. Captures regardees a 1400 et 390 px.
+
+**Non mesurable, dit tel quel** : ce que le legacy fait du 403 sur SA page — un role 1 n'a pas
+`can_deploy_keys`, donc il ne peut pas ouvrir `/ssh/` et n'atteint jamais le client. La route, elle,
+refuse bien (verifie). Meme limite que D-5.
+
+**Notes d'exploitation.** `legacy/ssh/` n'est PAS archive : K4 (le deploiement) y vit encore. La fuite
+d'un mot de passe genere dans `deployment.log`, diffusee verbatim par ce flux, reste ouverte — elle
+touche le backend, donc decision de l'exploitant. Aucune variable d'environnement, aucune migration.
+
+---
 
 ### v1.37.30 — module `ssh/`, sous-lot K2 : le constat avant deploiement
 

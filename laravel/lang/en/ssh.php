@@ -46,4 +46,12 @@ return [
     'a_creer' => 'Accounts that will be created:',
     'a_revoquer' => 'Access that will be REVOKED (key removed, account kept):',
     'lien_comptes_distants' => 'Open Remote users',
+    // ── The deployment log (sub-batch K3) ───────────────────────────────────
+    'journal' => 'View the last deployment log',
+    'journal_aide' => 'Reads the log already written. Contacts no server and triggers nothing.',
+    'journal_ouverture' => 'Reading the log...',
+    'journal_vide' => 'The log is empty: no deployment has been started yet.',
+    'journal_fin' => '— end of log —',
+    'journal_refus' => 'The log was refused by the server (code :statut)',
+    'journal_interrompu' => 'The stream ended before the log did: what precedes is incomplete',
 ];

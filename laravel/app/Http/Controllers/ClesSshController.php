@@ -77,6 +77,21 @@ class ClesSshController extends Controller
             'a_revoquer' => __('ssh.a_revoquer'),
             'inventaire' => __('ssh.inventaire', ['nombre' => '{nombre}']),
             'url_preflight' => url('/api/gateway/preflight_check'),
+            // ── Le journal du deploiement (sous-lot K3) ───────────────────
+            'journal_ouverture' => __('ssh.journal_ouverture'),
+            'journal_vide' => __('ssh.journal_vide'),
+            'journal_fin' => __('ssh.journal_fin'),
+            'journal_refus' => __('ssh.journal_refus', ['statut' => '{statut}']),
+            'journal_interrompu' => __('ssh.journal_interrompu'),
+            'url_journal' => url('/api/gateway/logs'),
+            /*
+             * LE MARQUEUR DE FIN DU FLUX N'EST PAS UN LIBELLE : c'est un JETON DE
+             * PROTOCOLE, emis en dur par `backend/routes/ssh.py` et compare
+             * litteralement. Il est pose ici en CONSTANTE, hors des fichiers de
+             * langue, precisement pour qu'aucune relecture de traduction ne le
+             * change : le traduire ferait que le flux ne se termine plus jamais.
+             */
+            'marqueur_fin' => '[Fin du flux de logs]',
             'url_comptes_distants' => config('app.url_legacy') . '/adm/server_users.php',
             'lien_comptes_distants' => __('ssh.lien_comptes_distants'),
         ];

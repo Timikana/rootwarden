@@ -2121,3 +2121,60 @@ mots. Elle condamnait le meilleur des deux rendus : elle mesure maintenant la pr
 **Vu à l'image** : les blocs du rapport portaient `.rw-carte`, plafonnée à 420 px, et restaient étroits
 sur une page de 1400. Ils sont désormais rangés en `.rw-grille` (`auto-fit`, minimum 280 px) et prennent
 la largeur disponible.
+
+## E-71 — Le journal du déploiement : un marqueur qu'il ne faut pas traduire, un statut illisible, et une XSS stockée
+
+K3 ne déploie rien : `GET /logs` ouvre `deployment.log`, envoie son contenu, puis suit le fichier pendant
+**30 secondes d'inactivité** avant d'émettre son marqueur de fin. Aucune machine n'est jointe — ce qui
+rend le sous-lot entièrement mesurable.
+
+**Le marqueur de fin est un JETON DE PROTOCOLE, pas un libellé.** Le backend émet en dur
+`data: [Fin du flux de logs]` et le client compare `event.data` à cette chaîne, littéralement. **Le
+traduire côté portage ferait que le flux ne se termine jamais** : le bouton resterait figé, et seul le
+gestionnaire d'erreur finirait par le rendre — donc par le chemin d'échec, sans message de succès. Il est
+donc posé en **constante dans le contrôleur**, hors des fichiers de langue, précisément pour qu'aucune
+relecture de traduction ne le change.
+
+**Un `EventSource` ne peut pas lire un statut HTTP.** `GET /logs` est `@require_role(2)` ; pour un rôle 1
+il rend **403**, ce qui déclenche `onerror` — où le legacy écrit « [Fin du flux] », rend le bouton et **ne
+dit rien**. Or `POST /deploy` n'a ni rôle ni permission : un rôle 1 peut donc déclencher le déploiement et
+conclure que tout s'est bien passé. Le portage lit le flux par `fetch`, dont le statut **est** lisible, et
+annonce le refus.
+
+| | legacy | portage |
+|---|---|---|
+| type de requête | `eventsource` (statut invisible) | `fetch` (statut lu **d'abord**) |
+| une ligne de journal | **interprétée comme du balisage** | rendue comme du **texte** |
+| marqueur de fin | comparé littéralement, non affiché | idem, en **constante** hors i18n |
+| flux interrompu sans marqueur | rien | « le flux s'est interrompu… c'est incomplet » |
+| état final du bouton | **deux libellés selon le chemin** | un seul chemin de sortie |
+
+**L'XSS stockée, démontrée par la mesure.** `main.js:264` fait `logWindow.innerHTML += event.data` et son
+commentaire affirme « pas de données utilisateur non maîtrisées ». C'est faux :
+`configure_servers.py:112` injecte `machines.name` dans **chaque** ligne sans validation, et `:785`
+journalise verbatim les noms d'utilisateur refusés. La branche preflight du **même fichier** échappe tout
+par `_escHtml` — une moitié traitée, l'autre pas.
+
+La suite pose dans le journal une balise **bénigne** — `<b data-rw="k3-balise">` — et compte les éléments
+correspondants dans la fenêtre. Mesure : **1 sur le legacy** (la balise est devenue un nœud du document,
+le texte affiché ne montre pas les chevrons), **0 sur le portage**, qui affiche la chaîne littérale. La
+propriété mesurée est « est-ce interprété », pas « peut-on exécuter » : écrire une charge exécutable
+n'aurait rien prouvé de plus et aurait laissé une trace inutile.
+
+**Un quatrième défaut, non annoncé par l'inventaire.** Les deux chemins de sortie du legacy ne laissent
+pas la page dans le même état : le succès remet le libellé « Deployer les cles » et affiche un toast,
+l'échec écrit « Lancer le Deploiement » et n'affiche rien. L'état de la page dépend donc de la façon dont
+le flux s'est terminé. Le portage n'a qu'un seul chemin de sortie.
+
+**La fixture, et sa restauration.** Mesurer le rendu d'une ligne demande une ligne. `deployment.log` est
+vide, ignoré par git, et tronqué par l'application elle-même à chaque déploiement : la suite y ajoute une
+ligne via le conteneur — seul propriétaire du fichier — puis **le remet à zéro dans un `finally`**, et le
+journal l'annonce (`journal restauré : 0 octet(s)`). Vérifié après chaque exécution.
+
+**Non mesurable, et dit tel quel** : ce que le legacy fait du 403 sur sa propre page. Un rôle 1 n'a pas
+`can_deploy_keys`, donc il ne peut pas ouvrir `/ssh/` et n'atteint jamais le client. La route, elle,
+refuse bien — c'est vérifié. Même limite que D-5.
+
+**Un défaut de ma suite, corrigé** : le collecteur de types de requêtes comptait aussi la sonde `fetch`
+de la suite elle-même, si bien que l'assertion « pas d'`EventSource` » aurait réussi même si le client de
+la page n'avait rien demandé. Il est remis à zéro juste avant de piloter le client.

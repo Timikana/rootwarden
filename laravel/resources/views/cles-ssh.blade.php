@@ -122,6 +122,17 @@
                             disabled>{{ __('ssh.deployer') }}</button>
                 </div>
 
+                {{-- LE JOURNAL DU DERNIER DEPLOIEMENT. Il se LIT, il ne se
+                     declenche pas : `GET /logs` ouvre un fichier deja ecrit et
+                     ne joint aucun serveur. Le bouton est donc actif sans
+                     selection, contrairement aux deux autres. --}}
+                <div class="rw-actions">
+                    <p class="rw-aide rw-actions__gauche">{{ __('ssh.journal_aide') }}</p>
+                    <button type="button" class="rw-bouton rw-bouton--discret"
+                            id="journal-btn" data-rw="ssh-journal">{{ __('ssh.journal') }}</button>
+                </div>
+                <pre class="rw-journal" id="journal-flux" hidden aria-live="polite"></pre>
+
                 {{-- LE RAPPORT DU CONSTAT, machine par machine. Le legacy le
                      deverse dans une fenetre de texte unique, ou la ligne la plus
                      importante du module — les acces qui vont etre REVOQUES — se
