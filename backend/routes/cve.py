@@ -3,7 +3,7 @@ import time
 import threading
 from datetime import datetime
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
 from ssh_utils import ssh_session, validate_machine_id
 from config import Config
 from cve_scanner import scan_server, get_last_scan_results, get_scan_history, get_opencve_client
@@ -226,6 +226,23 @@ def cve_results():
 
 @bp.route('/cve_reprioritize', methods=['POST'])
 @require_api_key
+# `can_scan_cve` EXIGEE : cette route ECRIT — elle reecrit les six colonnes
+# d'enrichissement de tous les findings du dernier scan, soit 1458 lignes sur la
+# seule machine scannee du parc. Elle n'avait NI role NI permission : un role 1
+# disposant d'une machine attribuee pouvait donc la declencher, alors que la page
+# qui porte son bouton exige `can_scan_cve` depuis toujours
+# (`legacy/security/index.php:38`). La garde protegeait la page, pas la requete.
+#
+# POURQUOI SEULEMENT CELLE-CI. Les autres routes CVE ne peuvent pas recevoir ce
+# decorateur sans casser des appels legitimes : `cve_results`, `cve_history` et
+# `cve_trends` figurent dans les scopes `readonly` et `monitoring` des cles d'API
+# (`legacy/adm/api_keys.php:362,405`), et un appel par cle n'a pas de session —
+# `get_current_user()` rend (0,0), donc `require_permission` refuserait. Aucune
+# route du depot ne combine aujourd'hui un scope de cle et une permission : le
+# motif n'existe pas, et l'inventer ici casserait la tuile CVE du tableau de bord
+# (`legacy/index.php:305`) ainsi que `adm/health_check.php`. C'est une decision de
+# conception, pas un correctif — elle est signalee, pas prise.
+@require_permission('can_scan_cve')
 @require_machine_access
 @threaded_route
 def cve_reprioritize():

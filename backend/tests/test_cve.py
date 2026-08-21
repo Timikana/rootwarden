@@ -311,3 +311,24 @@ class TestCveReprioritizeNeDetruitPas:
                                json={'machine_id': 1})
         assert resp.status_code == 200
         assert resp.get_json()['success'] is True
+
+    def test_reprioritize_exige_la_permission(self, client, mock_cursor, api_headers):
+        """La seule ECRITURE du module qui n'avait ni role ni permission.
+
+        Un role 1 disposant d'une machine attribuee pouvait reecrire les six
+        colonnes d'enrichissement de tous les findings du dernier scan — alors que
+        la page qui porte le bouton exige `can_scan_cve` depuis toujours. La garde
+        protegeait la page, pas la requete.
+
+        On simule un compte SANS la permission : `role_id < 3` et un jeu de
+        permissions vide.
+        """
+        self._prepare(mock_cursor)
+        with patch('routes.helpers.get_current_user', return_value=(10, 1)), \
+             patch('routes.helpers.get_user_permissions', return_value={}):
+            resp = client.post('/cve_reprioritize', headers=api_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 403
+        # Et rien n'a ete ecrit : un 403 qui aurait quand meme reecrit les
+        # findings ne prouverait rien.
+        assert 'update cve_findings' not in mock_cursor._last_query
