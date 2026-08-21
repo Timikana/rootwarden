@@ -211,6 +211,134 @@ La fixture écrit une ligne dans `deployment.log` via le conteneur et **le remet
 
 Reste **K4**, le déploiement. Avant lui, l'exploitant doit trancher le repli `NOPASSWD: ALL`.
 
+## 6 quinquies. Inventaire de K4 — `configure_servers.py` lu en entier (2026-08-22)
+
+Lecture intégrale des 1 015 lignes, en lecture seule. **Rien n'a été déployé, aucune session SSH
+ouverte.** Cet inventaire corrige plusieurs points que les résumés précédents avaient simplifiés.
+
+### 6q.1 Ce que `POST /deploy` accepte, et ce qu'il en fait
+
+`@require_api_key` + `@threaded_route`, **ni rôle ni permission** — le docstring dit que « la route
+n'est pas décorée car elle utilise déjà un thread dédié », ce qui confond un thread avec une garde.
+
+| corps | comportement |
+|---|---|
+| `machines` absent, ou corps vide | **400** `Aucune machine selectionnee` |
+| `machines: []` | la clé EST présente → passe le 400, la boucle d'accès ne tourne pas, le script est lancé **sans argument** → argparse exige au moins un positionnel → sortie 2. **La route a déjà répondu `success: true, "Deploiement lance avec succes"`** |
+| identifiant inconnu | filtré par `str(m['id']) in machines_to_configure` → « Aucune machine valide sélectionnée » → `sys.exit(1)`. **Même succès annoncé** |
+| identifiant refusé | **403**, la machine est nommée dans le message |
+
+**La route annonce donc un succès pour trois déploiements qui n'ont pas lieu.** Le portage doit dire
+« lancé », pas « réussi » — et K3 fournit déjà le moyen de savoir ce qui s'est réellement passé.
+
+**L'injection d'`argv`, dont l'inventaire disait « la primitive existe, son effet non établi » — il est
+maintenant établi.** `machine_ids = [str(m) for m in data['machines']]`, sans validation de forme, est
+passé à `subprocess.Popen(["python3", ".../configure_servers.py"] + machine_ids)`. La liste évite
+**toute** interprétation par un shell : il n'y a pas d'exécution de commande. Mais `parse_arguments`
+accepte `--log` et `--workers`, et `check_machine_access` laisse passer n'importe quelle chaîne pour un
+rôle ≥ 2 (elle ne tente le `int()` que pour un rôle 1). Un corps
+`{"machines": ["--log=/tmp/ailleurs.log", "2"]}` est donc accepté et :
+
+- **`--log` détourne le journal structuré** vers un chemin choisi. Le flux SSE, lui, lit le fichier que
+  la route a ouvert comme `stdout` du sous-processus : **l'écran n'afficherait presque rien pendant que
+  le vrai journal part ailleurs** ;
+- **`--workers=<grand nombre>`** change le parallélisme, donc la charge.
+
+Portée exacte, pour ne pas surestimer : cela demande un rôle ≥ 2, c'est-à-dire quelqu'un qui peut déjà
+déployer. Ce n'est pas une élévation de privilège, c'est un **détournement de la trace**.
+
+### 6q.2 Les écritures distantes, dans l'ordre et avec leur condition
+
+`configure()` ouvre une session root puis, **si la machine n'a pas de compte de service**, appelle
+`ensure_sudo_installed` (installation d'`apt` si `sudo` manque). Puis `configure_users`, et rien d'autre.
+
+Pour **chaque** compte dont `allowed_servers` contient la machine :
+
+| # | commande distante | condition |
+|---|---|---|
+| 1 | `useradd -m -s /bin/bash <u>` | compte `active` **et** absent de la machine |
+| 2 | `mkdir -p /home/<u>/.ssh` + `chown` + `chmod 700` | `active` **et** `ssh_key` non vide |
+| 3 | `printf '%s' '<b64>' \| base64 -d > authorized_keys` + `chown` + `chmod 600` | idem |
+| 4 | **`rm -f /home/<u>/.ssh/authorized_keys`** | **`active` faux OU `ssh_key` vide** |
+| 5 | écriture sudoers via `/tmp` + `visudo -cf` + `mv` atomique | `active` **et** politique résolue |
+| 6 | `rm -f /etc/sudoers.d/<u>` (purge du nommage historique) | après toute installation sudoers |
+
+Puis, pour les comptes de l'inventaire marqués `managed` / `managed_by = 'rootwarden'` **qui ne sont pas
+autorisés** : `rm -f authorized_keys` + `remove_from_sudoers`, **compte conservé**.
+
+### 6q.3 La règle de révocation, en entier — et ce qu'elle change aujourd'hui
+
+**Trois chemins retirent un `authorized_keys`, pas un seul :**
+
+1. compte autorisé mais **inactif** ;
+2. compte autorisé, actif, **mais sans clé SSH enregistrée** ;
+3. compte `managed` de l'inventaire ayant **perdu** son autorisation.
+
+Le deuxième est celui que les résumés manquaient, et il change l'état du parc :
+**`users_with_keys` vaut ZÉRO** — aucun compte actif ne porte de clé SSH. Un déploiement lancé
+aujourd'hui ne « ne ferait rien » : il prendrait la branche 4 pour **chaque compte autorisé de chaque
+machine cochée** et **supprimerait leur `authorized_keys`**. Ce n'est pas une absence d'effet, c'est une
+révocation générale.
+
+Le preflight de K2 refuse justement de continuer quand `users_with_keys` vaut zéro — c'est ce garde,
+et lui seul, qui empêche aujourd'hui cette révocation. **Le portage de K4 doit donc le rendre
+infranchissable, pas seulement affiché.**
+
+**Aucun compte n'est supprimé par un déploiement** : `clean_up_users` (qui fait des `userdel`) **n'est
+jamais appelée**, et `configure()` le dit en commentaire — la suppression passe par
+Administration > Utilisateurs distants.
+
+### 6q.4 Le repli `NOPASSWD: ALL` a DEUX chemins, pas un
+
+`add_to_sudoers` retombe sur `<u> ALL=(ALL:ALL) NOPASSWD: ALL` dans deux cas :
+
+1. **aucune politique** pour ce couple utilisateur/machine → repli sur le booléen historique
+   `users.sudo` ;
+2. **une politique existe mais `sudo_manager.render_policy()` lève** (`ValueError` ou `ImportError`) →
+   `policy = None`, et le même repli s'applique.
+
+Le second est le plus grave : **une politique configurée mais invalide dégrade vers les pleins pouvoirs
+sans mot de passe.** C'est un repli qui ÉLARGIT le périmètre — l'inverse d'un repli. Et c'est le même
+fichier `/etc/sudoers.d/rootwarden-<u>` que `/policy/sudo/deploy` protège, lui, par `@require_role(3)`
+**et** une ré-authentification.
+
+Mesure : **aucun compte actif de rôle 1 ne porte `users.sudo = 1`** (seul `superadmin`, rôle 3). Le trou
+est **réel et à un `UPDATE` d'être exploitable** — les deux à la fois, et il faut dire les deux.
+
+À l'inverse, ce qui est **sain** et mérite d'être noté : la validation `visudo -cf` est **fail-closed**,
+et le piège de l'écho PTY (v1.37.11) est traité par des marqueurs concaténés et un contrôle positif.
+
+### 6q.5 Le parallélisme, et la cohérence du journal
+
+`ThreadPoolExecutor(max_workers=args.workers)`, **5 par défaut**. Chaque future est attendue par
+`as_completed` et **son exception est rattrapée individuellement** : une machine en échec n'arrête pas
+les autres, et son erreur est journalisée avec son nom.
+
+Conséquence pour K3 et K4 : les lignes des cinq machines **s'entrelacent** dans un fichier unique. C'est
+le préfixe de nom posé par `MachineLoggerAdapter` qui rend le journal lisible — et c'est aussi lui qui
+injecte `machines.name` sans validation dans chaque ligne, donc le vecteur de l'XSS que K3 a fermée.
+
+### 6q.6 Le code mort, à signaler et non à porter
+
+Deux fonctions **sans aucun appelant** :
+
+- **`clean_up_users`** — elle fait des `userdel`. La laisser en place, c'est la laisser à un appel de sa
+  réactivation ; elle est encore citée dans le docstring de la classe, qui annonce donc un comportement
+  que le code n'a plus ;
+- **`manage_ssh_keys`** — **duplicat intégral** de la logique de clé de `deploy_user_config`, seule
+  réellement appelée. Deux copies de la même règle de révocation : corriger l'une sans l'autre donnerait
+  un correctif qui ne s'applique pas.
+
+Aucune des deux ne se porte. Les deux se **signalent** à l'exploitant.
+
+### 6q.7 Ce que K4 devra faire, une fois l'arbitrage rendu
+
+- un **panneau de décision** qui nomme les machines, **énonce que des accès seront RÉVOQUÉS** et liste
+  les comptes concernés — le preflight les connaît déjà et K2 les affiche ;
+- **naître `disabled`** jusqu'à recopie d'une confirmation, parce que la conséquence est irréversible ;
+- **dire « lancé », jamais « réussi »** : la route répond avant que le script ait démarré ;
+- **refuser de soumettre** quand `users_with_keys` vaut zéro, sans se contenter de l'afficher.
+
 ## 7. Décisions avant K1
 
 - **la garde de rôle de la page** — l'en-tête annonce « rôle 1 refusé » depuis toujours. Même nature
