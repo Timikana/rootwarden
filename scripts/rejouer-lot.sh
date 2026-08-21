@@ -64,7 +64,7 @@ declare -A REF_LARAVEL=(
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
   [go-page-update-u5]=18 [go-page-update-u6]=13 [go-page-update-u6b]=20
-  [go-page-cve-export]=20 [go-page-conformite]=13 [go-page-conformite-csv]=17
+  [go-page-cve-export]=21 [go-page-conformite]=13 [go-page-conformite-csv]=17
   [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
   [go-page-cve-planification]=20 [go-page-cve-suivi]=10 [go-page-cve-priorite]=14
   [go-page-cve-scan-refus]=16
@@ -75,7 +75,7 @@ declare -A REF_LEGACY=(
   [go-page-tasks]=5 [go-page-tickets]=5 [go-page-search]=5
   [go-page-update-u1]=8 [go-page-update-u2]=8 [go-page-update-u3]=8 [go-page-update-u4]=8
   [go-page-update-u5]=8 [go-page-update-u6]=8 [go-page-update-u6b]=8
-  [go-page-cve-export]=16 [go-page-conformite]=13 [go-page-conformite-csv]=10
+  [go-page-cve-export]=17 [go-page-conformite]=13 [go-page-conformite-csv]=10
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
   [go-page-cve-planification]=16 [go-page-cve-suivi]=6 [go-page-cve-priorite]=8
   [go-page-cve-scan-refus]=12
