@@ -269,11 +269,35 @@ explicite renvoyant vers l'ancien portail.
 | Centre de taches | `taches` | `role:2` SEUL (comme le legacy) | oui, 2026-08-18 |
 | Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Recherche globale | `recherche` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
+| Scan de vulnerabilites CVE | `scan-cve` | `role:1` + `perm:can_scan_cve` | non — `security/` porte a S6 sur 7 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
 sert. Penser aussi a rediriger l'entree du menu DU LEGACY vers le nouveau
 portail (`LARAVEL_URL`), sans quoi on installe soi-meme un 404 dans un menu.
+
+### Tableaux : les regles de largeur, toutes payees en mesure
+
+- **`.rw-tableau` est en `min-width: 100%`, PAS `width: 100%`.** Avec `width`, un
+  tableau dont les cellules exigent plus que la place offerte deborde de sa boite
+  en gardant `scrollWidth == clientWidth` : le cadre ne defile pas, l'ombre de
+  bord ne s'affiche pas, et la derniere colonne devient **inatteignable**.
+- **La colonne ACTIONNABLE ne cede jamais.** C'est l'appoint qui s'efface, et la
+  forme la plus franche du renoncement est `display: none` — la cellule reste
+  dans le document, donc la ligne garde son compte de cellules et le tableau ne
+  se desaligne pas de son en-tete. Etat du tableau des findings : resume masque
+  sous **1500 px**, resume + version masques sous **720 px**.
+- **La cellule qui porte la donnee decisionnelle prend un `nowrap`.** Un repli sur
+  deux lignes double la hauteur de CHAQUE ligne (54 -> 63 px sur 1458 lignes).
+- **Plusieurs marques dans une cellule : le `flex` va dans un `span` interieur.**
+  Une `td` doit rester `table-cell`. C'est ce conteneur qui permet un `order: -1`
+  en media query — sous 720 px la pastille KEV passe devant la severite, parce
+  qu'elle etait coupee en deux au bord du cadre.
+- **Mesurer le cadre DU BON tableau** : `document.getElementById('<corps>')
+  .closest('.rw-tableau-cadre')`, jamais `querySelector('.rw-tableau-cadre')` —
+  une page en porte plusieurs, et le premier n'est pas celui qu'on croit.
+- **Un etat stocke et jamais montre est un defaut**, mais l'afficher ne doit pas
+  couter une colonne : `priority_label` vit en infobulle de la severite.
 
 ### Gardes de page
 
@@ -1490,6 +1514,13 @@ Ne pas confondre avec ne pas mesurer : le journal du legacy doit dire
 « en-tete absent page(s) 2 », pas « non applicable ».
 
 ## Detail
+
+Module `security/` : **S1 a S6 portes** (v1.37.27), S7 — le scan lui-meme, FLUX +
+SSH + destructif — en dernier. Le portage LIT ET ECRIT LA BASE directement, avec
+**deux exceptions declarees**, toutes deux parce qu'elles appellent des services
+EXTERNES : la creation de ticket (fournisseur ITSM) et la re-priorisation
+(FIRST.org + catalogue CISA). Toute action destructrice passe par une decision
+EN LIGNE qui nomme sa consequence chiffree.
 
 Socle complet. Sept pages metier portees et archivees, module `update/` en cours
 (module `update/` porte ET ARCHIVE le 2026-08-20 — premier module, sept sous-lots.
