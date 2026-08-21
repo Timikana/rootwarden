@@ -452,6 +452,49 @@ Mesurer les trois. Le second se cherche par `(document.body.innerText.match(
 /:[a-z_]{3,}/g) || [])` — et l'assertion doit exiger que la page ait bien rendu
 quelque chose, sinon elle passe sur un 404 qui ne contient aucun jeton.
 
+## Une valeur VIDE disparait de `litEnBase`, et un garde peut alors SAUTER en silence
+
+Deja ecrit dans ce fichier, paye une fois de plus au sous-lot K2 — et sous une
+forme pire qu'un faux echec.
+
+La precondition d'une sonde etait lue par
+`SELECT COALESCE(CAST(users_scanned_at AS CHAR), '')`. `litEnBase` fait un
+`trim()` puis un `.filter(Boolean)` : la chaine vide **sort de la liste**, la
+destructuration rend `undefined`, et la comparaison `=== ''` echoue. Le garde a
+donc conclu « la machine porte desormais un scan (« undefined ») » et **saute la
+porte qu'il etait la pour mesurer**. Un test qui echoue se voit ; un test qui se
+saute tout seul en annoncant une raison plausible, non.
+
+**Toujours une sentinelle explicite** — `COALESCE(..., 'JAMAIS')`, ou mieux un
+booleen `col IS NULL` — jamais une comparaison a `''`.
+
+## Un garde de precondition posé sur UNE sonde et pas sur sa voisine
+
+Toujours K2. La sonde qui exercait la premiere porte etait protegee par
+`if (SCAN_M2 === 'JAMAIS')` — parce que sans ce garde, l'appel aurait ouvert une
+session SSH. La sonde suivante, qui ne voulait qu'un compteur global, visait la
+**meme machine sans reprendre le garde**. Deux poids, deux mesures pour un risque
+identique.
+
+Deux regles :
+
+1. **si un risque justifie un garde, il le justifie partout** — relire toutes les
+   sondes qui touchent la meme cible ;
+2. **mieux qu'un garde : une cible qui ne peut pas porter le risque.** Ici un
+   `machine_id` valide mais INEXISTANT rend le compteur global sans franchir
+   aucune porte. C'est le meme vecteur que S7a, et c'est toujours le bon.
+
+## Une assertion qui exige un RENDU condamne le meilleur des deux rendus
+
+Une assertion cherchait le chiffre `0` dans le rapport (« combien de comptes sont
+deployables »). Le portage, lui, ecrit « aucun compte actif ne porte de cle
+SSH — un deploiement ne deploierait rien », ce qui est plus clair qu'un « 0 »
+perdu dans un journal. L'assertion a donc **echoue sur le meilleur rendu**.
+
+Asserter la PROPRIETE, pas la forme : quand le compte vaut zero, exiger que
+l'absence soit **enoncee** ; sinon exiger le nombre. Un test qui impose une mise
+en forme empeche de l'ameliorer.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).

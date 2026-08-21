@@ -270,7 +270,7 @@ explicite renvoyant vers l'ancien portail.
 | Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Recherche globale | `recherche` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Scan de vulnerabilites CVE | `scan-cve` | `role:1` + `perm:can_scan_cve` | non — `security/` porte a S7a sur 7 |
-| Cles SSH | `cles-ssh` | `role:1` + `perm:can_deploy_keys` | non — `ssh/` porte a K1 sur 4 |
+| Cles SSH | `cles-ssh` | `role:1` + `perm:can_deploy_keys` | non — `ssh/` porte a K2 sur 4 |
 
 Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
 puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
@@ -294,6 +294,30 @@ Deux regles qui vont avec, et qui manquaient au legacy :
   savoir sur combien d'objets il porte n'a pas de sens ;
 - **une ligne masquee par un filtre est DECOCHEE.** Le filtrage masque plutot que
   de retirer ; laisser la coche en place ferait agir sur ce qu'on ne voit plus.
+
+### Quand le legacy enchaine VERIFIER et AGIR, le portage les SEPARE
+
+Le module `ssh/` mettait `preflight_check` et `deploy` dans la MEME chaine
+`fetch` : le deploiement partait des que le constat passait, sans reprise de main.
+Il n'existait donc aucun moyen de verifier sans risquer d'ecrire — et ecrire, la,
+voulait dire ecraser des `authorized_keys` en root.
+
+Separer les deux n'est pas un confort, c'est ce qui **rend le geste testable** :
+une suite peut cliquer « Verifier » sur le portage, et ne peut pas cliquer sur le
+legacy. Chaque fois qu'un bouton du legacy enchaine un controle et son action,
+le portage en fait deux gestes.
+
+Corollaires de rendu, tous deux vus a l'image :
+
+- **un rapport n'est pas un journal.** Un bloc par objet, en `.rw-grille`
+  (`auto-fit`, minimum 280 px), et non un deversement de texte monospace ou la
+  ligne la plus importante se perd entre une version d'OS et un espace disque ;
+- **les blocs d'un rapport ne portent PAS `.rw-carte`** : elle est plafonnee a
+  420 px et le rapport reste etroit sur une page de 1 400 ;
+- **la consequence destructrice se distingue** : « acces qui seront REVOQUES » en
+  rouge, pas au meme poids typographique que le reste ;
+- **un compteur a zero s'enonce** (« aucun compte ne porte de cle — un
+  deploiement ne deploierait rien ») plutot que de s'afficher comme un « 0 ».
 
 ### Une capacite non portee n'est pas un bouton inerte
 
