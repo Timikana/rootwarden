@@ -137,7 +137,7 @@ Deploiement » — qui **n'existe dans aucun catalogue**.
 
 | Lot | Contenu | Routes | SSH | Écrit à distance |
 |---|---|---|---|---|
-| **K1** | la page nue : liste cloisonnée, filtres, sélection, i18n | **aucune** | non | non |
+| **K1** ✔ | la page nue — **PORTÉ le 2026-08-21** (v1.37.29), route `/cles-ssh` | **aucune** | non | non |
 | **K2** | le constat avant déploiement | `POST /preflight_check` | oui, **LECTURE** | non |
 | **K3** | la lecture du flux | `GET /logs` — **SSE** | non | non |
 | **K4** | le déploiement | `POST /deploy` | oui | **oui, massivement** |
@@ -163,6 +163,23 @@ un**.
 
 **Découpage à NE PAS faire** : réunir K2 et K4 en pariant sur « c'est le même bouton ». C'est
 justement parce que c'est le même bouton, sans reprise de main, qu'il faut les séparer.
+
+## 6 bis. K1 — porté le 2026-08-21 (v1.37.29)
+
+Suite `go-page-ssh-parc` : **11 PASS sur le legacy, 14 sur le portage**. Base rouge relevée avant
+portage : **3 PASS / 5 FAIL**. Aucune route appelée, aucun SSH, rien d'écrit — et le bouton de
+déploiement n'est **jamais** cliqué : qu'il déclenche immédiatement côté legacy se lit dans son
+attribut `onclick`.
+
+Les trois défauts annoncés sont fermés (E-69) : le jeton `:count` affiché en clair, le vocabulaire de
+tags non cloisonné, et le bouton actif sans sélection. S'y ajoutent une décision qui **nomme les
+machines** avant tout déploiement, et un lien explicite vers l'ancien portail — K4 n'étant pas porté, la
+page le dit plutôt que d'offrir un bouton inerte.
+
+Garde **reprise telle quelle** : `role:1` + `perm:can_deploy_keys`. L'écart avec l'en-tête du fichier
+legacy est déclaré, pas tranché : restreindre serait un changement de droits.
+
+`legacy/ssh/` **n'est PAS archivé** : l'archivage se fait par MODULE, et K2, K3, K4 y vivent encore.
 
 ## 7. Décisions avant K1
 

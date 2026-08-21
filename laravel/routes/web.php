@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\ConnexionController;
 use App\Http\Controllers\Auth\SecondFacteurController;
 use App\Http\Controllers\ApprobationsController;
+use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
@@ -70,6 +71,28 @@ Route::middleware('session.authentifiee')->group(function () {
      * compte role 2, ce qui rend la permission observable independamment du
      * role.
      */
+    /*
+     * Deploiement des cles SSH — module `ssh/`, sous-lot K1 : la page nue.
+     *
+     * GARDE REPRISE TELLE QUELLE DU LEGACY : `ssh/index.php:34-35` fait
+     * `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])` puis
+     * `checkPermission('can_deploy_keys')` — donc role >= 1 PORTANT la permission.
+     *
+     * ECART DECLARE, non tranche ici (voir PARITE) : l'en-tete du fichier legacy
+     * annonce depuis toujours « Acces refuse pour les utilisateurs standards
+     * (role_id = 1) », ce que son `checkAuth` n'applique pas. Meme nature que
+     * E-36, avec une consequence plus lourde : `POST /deploy` n'a ni role ni
+     * permission, donc un role 1 habilite pourrait declencher le deploiement, et
+     * `GET /logs` etant `@require_role(2)` il ne pourrait pas en lire le
+     * resultat. Restreindre serait un CHANGEMENT DE DROITS : decision de
+     * l'exploitant, a prendre avec D-1.
+     *
+     * K1 n'appelle AUCUNE route du backend.
+     */
+    Route::get('/cles-ssh', ClesSshController::class)
+        ->middleware(['role:1', 'perm:can_deploy_keys'])
+        ->name('cles-ssh');
+
     Route::get('/derive-config', DeriveConfigController::class)
         ->middleware(['role:2', 'perm:can_view_compliance'])
         ->name('derive-config');
