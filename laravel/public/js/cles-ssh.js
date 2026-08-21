@@ -84,9 +84,158 @@
                 ? (L.aucune_selection || '')
                 : (L.selection || '{nombre}').replace('{nombre}', String(n));
         }
-        const bouton = document.getElementById('deploy-btn');
-        if (bouton) bouton.disabled = n === 0;
+        for (const id of ['deploy-btn', 'verifier-btn']) {
+            const b = document.getElementById(id);
+            if (b) b.disabled = n === 0;
+        }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  LE CONSTAT AVANT DEPLOIEMENT (sous-lot K2)
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // IL NE DECLENCHE RIEN D'AUTRE. Cote legacy, `preflight_check` et `deploy`
+    // sont dans la meme chaine `fetch` : le deploiement part des que le constat
+    // passe, sans reprise de main. Verifier exposait donc a ecrire sur toutes les
+    // machines cochees. Ici le constat est un geste a part.
+    //
+    // LE STATUT EST LU D'ABORD. Le legacy fait `.then(r => r.json())` sans
+    // regarder `resp.ok` : un refus non-JSON tombe dans un `.catch` qui affiche
+    // « Erreur pre-flight » sans jamais dire lequel.
+
+    function texte(parent, classe, contenu) {
+        const p = document.createElement('p');
+        p.className = classe;
+        p.textContent = contenu;
+        parent.appendChild(p);
+        return p;
+    }
+
+    function listeNommee(parent, titre, noms, classe) {
+        if (!noms || noms.length === 0) return;
+        texte(parent, 'rw-aide rw-preflight__titre', titre);
+        const ul = document.createElement('ul');
+        ul.className = classe;
+        for (const nom of noms) {
+            const li = document.createElement('li');
+            li.textContent = String(nom);
+            ul.appendChild(li);
+        }
+        parent.appendChild(ul);
+    }
+
+    function rendUneMachine(r) {
+        const bloc = document.createElement('article');
+        // PAS `.rw-carte` : elle est plafonnee a 420 px, et le rapport restait
+        // etroit sur une page de 1400. Vu a l'image, invisible a toute assertion.
+        bloc.className = 'rw-preflight__machine';
+        bloc.dataset.rw = 'preflight-machine-' + r.machine_id;
+
+        const enTete = document.createElement('p');
+        enTete.className = 'rw-preflight__entete';
+        const etat = document.createElement('span');
+        etat.className = 'rw-badge ' + (r.ssh_ok ? 'rw-badge--ok' : 'rw-badge--alerte');
+        etat.textContent = r.ssh_ok ? 'OK' : 'FAIL';
+        const nom = document.createElement('strong');
+        nom.textContent = `${r.name || ''} (${r.ip || ''})`;
+        enTete.append(etat, nom);
+        bloc.appendChild(enTete);
+
+        for (const e of r.errors || []) {
+            texte(bloc, 'rw-annonce rw-annonce--echec', String(e));
+        }
+        // LE PREREQUIS MANQUANT MENE A L'ENDROIT OU ON LE CORRIGE. `adm/` n'etant
+        // pas porte, le lien est explicitement inter-portails.
+        if (r.scan_required) {
+            const a = document.createElement('a');
+            a.className = 'rw-lien';
+            a.href = L.url_comptes_distants || '#';
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = (L.lien_comptes_distants || '') + ' \u2197';
+            bloc.appendChild(a);
+        }
+
+        if (r.os_version) texte(bloc, 'rw-aide', String(r.os_version));
+        if (r.disk_free) texte(bloc, 'rw-aide', String(r.disk_free));
+
+        if (Array.isArray(r.user_impact) && r.user_impact.length) {
+            texte(bloc, 'rw-aide', (L.inventaire || '{nombre}')
+                .replace('{nombre}', String(r.user_impact.length)));
+        }
+        listeNommee(bloc, L.a_creer || '', r.users_to_create, 'rw-preflight__liste');
+        // CE QUI VA ETRE REVOQUE EST LA LIGNE LA PLUS IMPORTANTE DU MODULE : elle
+        // se distingue, au lieu de se perdre au milieu d'une fenetre de texte.
+        listeNommee(bloc, L.a_revoquer || '', r.users_revoked,
+            'rw-preflight__liste rw-preflight__liste--danger');
+
+        return bloc;
+    }
+
+    async function verifie() {
+        const cibles = selection().map((m) => Number(m.id));
+        if (cibles.length === 0) return;
+        const zone = document.getElementById('preflight-rapport');
+        const machines = document.getElementById('preflight-machines');
+        const cles = document.getElementById('preflight-cles');
+        const bouton = document.getElementById('verifier-btn');
+        const repos = bouton ? bouton.textContent : '';
+        if (bouton) { bouton.disabled = true; bouton.textContent = L.verif_en_cours || '…'; }
+        if (machines) machines.replaceChildren();
+        if (zone) zone.hidden = false;
+        if (cles) cles.textContent = L.verif_en_cours || '';
+
+        try {
+            const rep = await fetch(L.url_preflight, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machines: cibles }),
+            });
+            // LE STATUT D'ABORD, et le message du corps s'il en porte un.
+            if (!rep.ok) {
+                const brut = await rep.text();
+                let message = '';
+                try { message = String(JSON.parse(brut).message || ''); } catch { message = ''; }
+                if (cles) {
+                    cles.textContent = message
+                        || (L.verif_echec || '').replace('{statut}', String(rep.status));
+                    cles.className = 'rw-annonce rw-annonce--echec';
+                }
+                return;
+            }
+            const d = await rep.json();
+            const resultats = d.results || [];
+            for (const r of resultats) machines?.appendChild(rendUneMachine(r));
+
+            // ZERO COMPTE PORTEUR D'UNE CLE veut dire qu'un deploiement ne
+            // deploierait RIEN. C'est la moitie utile du constat, et elle vaut
+            // pour tout le parc — pas machine par machine.
+            const n = Number(d.users_with_keys ?? 0);
+            const bloquantes = resultats.filter((r) => (r.errors || []).length > 0).length;
+            if (cles) {
+                const morceaux = [
+                    n === 0 ? (L.cles_aucune || '')
+                        : (L.cles_nombre || '{nombre}').replace('{nombre}', String(n)),
+                    bloquantes > 0
+                        ? (L.verif_bloque || '{nombre}').replace('{nombre}', String(bloquantes))
+                        : (L.verif_pret || ''),
+                ].filter(Boolean);
+                cles.textContent = morceaux.join(' — ');
+                cles.className = (n === 0 || bloquantes > 0)
+                    ? 'rw-annonce rw-annonce--echec' : 'rw-annonce rw-annonce--ok';
+            }
+        } catch (e) {
+            if (cles) {
+                cles.textContent = (L.verif_echec || '{statut}')
+                    .replace('{statut}', String(e && e.message ? e.message : e));
+                cles.className = 'rw-annonce rw-annonce--echec';
+            }
+        } finally {
+            if (bouton) { bouton.disabled = selection().length === 0; bouton.textContent = repos; }
+        }
+    }
+
+    document.getElementById('verifier-btn')?.addEventListener('click', verifie);
 
     document.getElementById('filter-tag')?.addEventListener('change', appliqueFiltres);
     document.getElementById('filter-env')?.addEventListener('change', appliqueFiltres);

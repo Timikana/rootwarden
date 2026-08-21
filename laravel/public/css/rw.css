@@ -1640,3 +1640,29 @@ a.rw-bouton, a.rw-bouton:hover { text-decoration: none; }
 /* Une ligne masquee par un filtre sort du flux : elle ne doit pas laisser de
    bordure orpheline derriere elle. */
 .rw-liste-selection__ligne[hidden] { display: none; }
+
+/*
+ * RAPPORT DU CONSTAT AVANT DEPLOIEMENT — sous-lot K2 du module `ssh/`.
+ *
+ * Le legacy deverse ce rapport dans une fenetre de texte monospace unique, ou la
+ * ligne la plus importante du module — les acces qui vont etre REVOQUES — se
+ * perd au milieu de l'inventaire, des versions d'OS et de l'espace disque. Ici
+ * chaque machine a son bloc, et la revocation se distingue.
+ */
+.rw-preflight__machine {
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-left: 3px solid var(--rw-danger);
+    border-radius: var(--rw-rayon);
+    padding: 12px 14px;
+}
+.rw-preflight__entete { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.rw-preflight__titre { margin: 8px 0 2px; font-weight: 550; }
+.rw-preflight__liste {
+    margin: 0 0 4px;
+    padding-left: 22px;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+}
+/* Une revocation n'est pas une information de meme poids qu'une version d'OS. */
+.rw-preflight__liste--danger { color: var(--rw-danger); font-weight: 550; }

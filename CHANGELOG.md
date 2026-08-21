@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.29** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.30** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,55 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.30 — module `ssh/`, sous-lot K2 : le constat avant deploiement
+
+**Symptome.** Cote legacy, il n'existait **aucun moyen de verifier les prerequis sans risquer de
+deployer** : `preflight_check` et `deploy` vivent dans la MEME chaine `fetch`, et le deploiement part des
+que le constat passe, sans reprise de main. Or deployer veut dire `apt-get install sudo`, `useradd`,
+ecrasement d'`authorized_keys` et REVOCATION de cles, en root, sur chaque machine cochee.
+
+**Cause racine.** `ssh/js/main.js:110-200` enchaine les deux appels dans la meme promesse, et
+`.then(r => r.json())` ne regarde jamais `resp.ok` : un refus non-JSON tombe dans un `.catch` qui affiche
+« Erreur pre-flight » sans jamais dire lequel.
+
+**Correctif.**
+- Bouton **« Verifier les prerequis »** dedie, qui n'appelle que `preflight_check` et n'enchaine RIEN.
+- **Le statut est lu d'abord**, et le message du corps est affiche s'il en porte un.
+- Le rapport est rendu **machine par machine**, en grille, au lieu d'une fenetre de texte monospace
+  unique ou la ligne la plus importante du module se perdait.
+- **Les acces qui seront REVOQUES sont distingues en rouge** : ce n'est pas une information de meme
+  poids qu'une version d'OS ou un espace disque.
+- `users_with_keys` a zero est ENONCE (« aucun compte actif ne porte de cle SSH — un deploiement ne
+  deploierait rien ») plutot que rendu par un « 0 » au milieu d'un journal.
+- Le prerequis manquant mene a l'endroit ou on le corrige, par un lien inter-portails marque `↗` —
+  `adm/` n'etant pas porte — au lieu d'un `/adm/server_users.php` ecrit en dur.
+
+**Non mesurable, et dit tel quel** : `preflight_check` n'a AUCUNE garde de role (seulement
+`@require_api_key` + `@threaded_route`) alors qu'elle enumere les comptes UNIX distants, ce que
+`/scan_server_users` reserve au role 2 ET place dans `ADMIN_ONLY_PREFIXES`. Aucun compte de role 1 ne
+porte a la fois `can_deploy_keys` et un acces machine, donc le contournement n'est pas exercable.
+Le fermer demande de MODIFIER LE BACKEND : decision de l'exploitant.
+
+**Tests.** `tests/e2e/go-page-ssh-preflight.mjs` — **10 PASS sur le legacy, 15 sur le portage**. Base
+rouge : 10 / 1. **AUCUNE session SSH n'est ouverte** : les deux portes bloquantes du preflight sont
+atteintes par le parc reel (machine 2 jamais scannee, machine 3 avec un utilisateur en attente de
+classification), et la machine 1 — la production — n'est jamais visee. Les preconditions sont verifiees
+AVANT chaque sonde, qui est sautee si l'etat a change. Le bouton de deploiement n'est jamais clique.
+LOT complet rejoue. Captures regardees a 1400 et 390 px — elles ont sorti un defaut qu'aucune assertion
+ne voyait : les blocs du rapport portaient `.rw-carte`, plafonnee a 420 px, et restaient etroits sur une
+page de 1400.
+
+**Deux defauts de mes propres tests, catalogues et payes quand meme.** La precondition de la premiere
+porte etait lue par un `COALESCE(..., '')` : `litEnBase` filtrant les chaines vides, la valeur arrivait a
+`undefined` et la suite SAUTAIT la porte qu'elle venait mesurer — une sentinelle explicite regle cela. Et
+la sonde relevant `users_with_keys` visait la machine 2 sans reprendre le garde de precondition applique
+juste au-dessus ; elle vise desormais un identifiant valide mais inexistant.
+
+**Notes d'exploitation.** `legacy/ssh/` n'est PAS archive : K3 (flux SSE) et K4 (deploiement) y vivent
+encore. Aucune variable d'environnement, aucune migration ajoutee.
+
+---
 
 ### v1.37.29 — module `ssh/` (« Cles SSH »), sous-lot K1 : la page nue
 

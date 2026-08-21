@@ -138,7 +138,7 @@ Deploiement » — qui **n'existe dans aucun catalogue**.
 | Lot | Contenu | Routes | SSH | Écrit à distance |
 |---|---|---|---|---|
 | **K1** ✔ | la page nue — **PORTÉ le 2026-08-21** (v1.37.29), route `/cles-ssh` | **aucune** | non | non |
-| **K2** | le constat avant déploiement | `POST /preflight_check` | oui, **LECTURE** | non |
+| **K2** ✔ | le constat avant déploiement — **PORTÉ le 2026-08-21** (v1.37.30) | `POST /preflight_check` | oui, **LECTURE** | non |
 | **K3** | la lecture du flux | `GET /logs` — **SSE** | non | non |
 | **K4** | le déploiement | `POST /deploy` | oui | **oui, massivement** |
 
@@ -180,6 +180,21 @@ Garde **reprise telle quelle** : `role:1` + `perm:can_deploy_keys`. L'écart ave
 legacy est déclaré, pas tranché : restreindre serait un changement de droits.
 
 `legacy/ssh/` **n'est PAS archivé** : l'archivage se fait par MODULE, et K2, K3, K4 y vivent encore.
+
+## 6 ter. K2 — porté le 2026-08-21 (v1.37.30)
+
+Suite `go-page-ssh-preflight` : **10 PASS sur le legacy, 15 sur le portage**. Base rouge : 10 PASS /
+1 FAIL — l'unique échec était le contrat lui-même, « le constat est séparable du déploiement ».
+
+**Aucune session SSH n'est ouverte**, et ce n'est pas une précaution : les deux portes bloquantes du
+preflight sont atteintes par le parc réel (machine 2 jamais scannée, machine 3 avec un utilisateur en
+`pending_review`). Seule la machine 1 irait jusqu'au SSH, et c'est la production. Les préconditions sont
+vérifiées **avant** chaque sonde, qui est sautée si l'état a changé — le scheduler scanne les comptes
+distants tout seul, donc l'état de la machine 3 n'est pas stable.
+
+E-70 ferme : le constat inséparable du déploiement, le statut HTTP jamais lu, le rapport déversé en bloc
+de texte, et le lien en dur vers `/adm/server_users.php`. Reste déclaré et non tranché : l'absence de
+garde de rôle sur `preflight_check`, qui contourne `/scan_server_users`.
 
 ## 7. Décisions avant K1
 
