@@ -237,6 +237,103 @@
 
     document.getElementById('verifier-btn')?.addEventListener('click', verifie);
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  LE JOURNAL DU DEPLOIEMENT (sous-lot K3)
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // TROIS DEFAUTS DU LEGACY SONT FERMES ICI.
+    //
+    //  1. **`innerHTML +=` FAISAIT DE CHAQUE LIGNE UN FRAGMENT DE DOCUMENT.** Le
+    //     commentaire du legacy pretend « pas de donnees utilisateur non
+    //     maitrisees » ; c'est faux, `configure_servers.py:112` injecte
+    //     `machines.name` dans CHAQUE ligne sans validation, et `:785` journalise
+    //     verbatim les noms d'utilisateur refuses. Mesure : une balise posee dans
+    //     le journal devient un ELEMENT sur le legacy. Ici tout passe par
+    //     `textContent`.
+    //  2. **UN `EventSource` NE PEUT PAS LIRE UN STATUT HTTP.** `GET /logs` est
+    //     `@require_role(2)` ; pour un role 1 il rend 403, ce qui declenche
+    //     `onerror` — ou le legacy ecrit « [Fin du flux] », rend le bouton et ne
+    //     dit RIEN. On lit donc le flux par `fetch`, dont le statut est lisible,
+    //     et un refus est ANNONCE.
+    //  3. **LES DEUX CHEMINS LAISSAIENT LA PAGE DANS DES ETATS DIFFERENTS** : le
+    //     succes remettait « Deployer les cles », l'erreur « Lancer le
+    //     Deploiement ». Ici un seul chemin de sortie remet le bouton.
+    //
+    // LE MARQUEUR DE FIN EST UN JETON DE PROTOCOLE, PAS UN LIBELLE. Il vient du
+    // backend en dur et se compare litteralement : le traduire ferait que le flux
+    // ne se termine JAMAIS. Il est donc pose en constante cote controleur, hors
+    // des fichiers de langue.
+
+    function ajouteLigne(zone, texte, classe) {
+        const ligne = document.createElement('div');
+        if (classe) ligne.className = classe;
+        // `textContent` et jamais `innerHTML` : le contenu vient d'un journal ou
+        // le nom d'une machine est recopie sans validation.
+        ligne.textContent = texte;
+        zone.appendChild(ligne);
+        zone.scrollTop = zone.scrollHeight;
+    }
+
+    async function ouvreJournal() {
+        const zone = document.getElementById('journal-flux');
+        const bouton = document.getElementById('journal-btn');
+        if (!zone) return;
+        const repos = bouton ? bouton.textContent : '';
+        if (bouton) { bouton.disabled = true; bouton.textContent = L.journal_ouverture || '…'; }
+        zone.hidden = false;
+        zone.replaceChildren();
+
+        let recues = 0;
+        try {
+            const rep = await fetch(L.url_journal, { credentials: 'same-origin' });
+            // LE STATUT D'ABORD — c'est tout l'interet de ne pas utiliser
+            // `EventSource`, qui ne permet pas de le lire.
+            if (!rep.ok) {
+                ajouteLigne(zone, (L.journal_refus || '{statut}')
+                    .replace('{statut}', String(rep.status)), 'rw-journal__erreur');
+                return;
+            }
+            const lecteur = rep.body.getReader();
+            const decodeur = new TextDecoder();
+            let tampon = '';
+            let fini = false;
+            while (!fini) {
+                const { done, value } = await lecteur.read();
+                if (done) break;
+                tampon += decodeur.decode(value, { stream: true });
+                const morceaux = tampon.split('\n');
+                tampon = morceaux.pop();
+                for (const m of morceaux) {
+                    if (!m.startsWith('data: ')) continue;
+                    const donnee = m.slice(6);
+                    // LE MARQUEUR PILOTE, IL NE S'AFFICHE PAS.
+                    if (donnee === L.marqueur_fin) {
+                        ajouteLigne(zone, L.journal_fin || '', 'rw-journal__fin');
+                        fini = true;
+                        break;
+                    }
+                    ajouteLigne(zone, donnee);
+                    recues += 1;
+                }
+            }
+            try { await lecteur.cancel(); } catch { /* deja ferme */ }
+            if (!fini) {
+                // Un flux qui s'arrete sans son marqueur n'est pas un succes.
+                ajouteLigne(zone, L.journal_interrompu || '', 'rw-journal__erreur');
+            } else if (recues === 0) {
+                ajouteLigne(zone, L.journal_vide || '');
+            }
+        } catch (e) {
+            ajouteLigne(zone, (L.journal_refus || '{statut}')
+                .replace('{statut}', String(e && e.message ? e.message : e)), 'rw-journal__erreur');
+        } finally {
+            // UN SEUL chemin de sortie remet le bouton, donc un seul etat final.
+            if (bouton) { bouton.disabled = false; bouton.textContent = repos; }
+        }
+    }
+
+    document.getElementById('journal-btn')?.addEventListener('click', ouvreJournal);
+
     document.getElementById('filter-tag')?.addEventListener('change', appliqueFiltres);
     document.getElementById('filter-env')?.addEventListener('change', appliqueFiltres);
     document.querySelector('[data-rw="ssh-cocher-filtre"]')

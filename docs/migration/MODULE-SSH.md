@@ -139,7 +139,7 @@ Deploiement » — qui **n'existe dans aucun catalogue**.
 |---|---|---|---|---|
 | **K1** ✔ | la page nue — **PORTÉ le 2026-08-21** (v1.37.29), route `/cles-ssh` | **aucune** | non | non |
 | **K2** ✔ | le constat avant déploiement — **PORTÉ le 2026-08-21** (v1.37.30) | `POST /preflight_check` | oui, **LECTURE** | non |
-| **K3** | la lecture du flux | `GET /logs` — **SSE** | non | non |
+| **K3** ✔ | la lecture du flux — **PORTÉ le 2026-08-21** (v1.37.31) | `GET /logs` — **SSE** | non | non |
 | **K4** | le déploiement | `POST /deploy` | oui | **oui, massivement** |
 
 **K1 d'abord** : aucune route, et il porte les deux tiers du travail réutilisable — le service de
@@ -195,6 +195,21 @@ distants tout seul, donc l'état de la machine 3 n'est pas stable.
 E-70 ferme : le constat inséparable du déploiement, le statut HTTP jamais lu, le rapport déversé en bloc
 de texte, et le lien en dur vers `/adm/server_users.php`. Reste déclaré et non tranché : l'absence de
 garde de rôle sur `preflight_check`, qui contourne `/scan_server_users`.
+
+## 6 quater. K3 — porté le 2026-08-21 (v1.37.31)
+
+Suite `go-page-ssh-flux` : **8 PASS sur le legacy, 10 sur le portage**. Base rouge : 6 / 4.
+Aucun déploiement, aucune machine jointe — le flux lit un fichier déjà écrit.
+
+E-71 ferme quatre défauts : le marqueur de fin traduisible (posé en **constante hors i18n** : le traduire
+ferait que le flux ne se termine jamais), le statut HTTP illisible par `EventSource` (remplacé par
+`fetch`), l'**XSS stockée** de `innerHTML +=` (démontrée par une balise bénigne : 1 élément interprété
+côté legacy, 0 côté portage), et deux chemins de sortie laissant la page dans des états différents.
+
+La fixture écrit une ligne dans `deployment.log` via le conteneur et **le remet à zéro dans un
+`finally`** — vérifié après chaque exécution.
+
+Reste **K4**, le déploiement. Avant lui, l'exploitant doit trancher le repli `NOPASSWD: ALL`.
 
 ## 7. Décisions avant K1
 

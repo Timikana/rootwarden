@@ -46,4 +46,12 @@ return [
     'a_creer' => 'Comptes qui seront crees :',
     'a_revoquer' => 'Acces qui seront REVOQUES (cle retiree, compte conserve) :',
     'lien_comptes_distants' => 'Ouvrir Utilisateurs distants',
+    // ── Le journal du deploiement (sous-lot K3) ─────────────────────────────
+    'journal' => 'Voir le journal du dernier deploiement',
+    'journal_aide' => "Lit le journal deja ecrit. Ne joint aucun serveur et ne declenche rien.",
+    'journal_ouverture' => 'Lecture du journal...',
+    'journal_vide' => 'Le journal est vide : aucun deploiement n\'a encore ete lance.',
+    'journal_fin' => '— fin du journal —',
+    'journal_refus' => 'Le journal a ete refuse par le serveur (code :statut)',
+    'journal_interrompu' => "Le flux s'est interrompu avant la fin du journal : ce qui precede est incomplet",
 ];

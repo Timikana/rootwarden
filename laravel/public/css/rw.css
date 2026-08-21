@@ -1666,3 +1666,29 @@ a.rw-bouton, a.rw-bouton:hover { text-decoration: none; }
 }
 /* Une revocation n'est pas une information de meme poids qu'une version d'OS. */
 .rw-preflight__liste--danger { color: var(--rw-danger); font-weight: 550; }
+
+/*
+ * JOURNAL DE DEPLOIEMENT — sous-lot K3 du module `ssh/`.
+ *
+ * Un journal se lit en chasse fixe et defile ; c'est le seul endroit du portage
+ * ou cela se justifie, parce que les lignes viennent d'un fichier ou l'alignement
+ * porte du sens. Chaque ligne est un element a part, pose par `textContent` :
+ * le legacy y faisait `innerHTML +=`, ce qui transformait le nom d'une machine
+ * en fragment de document.
+ */
+.rw-journal {
+    margin: 10px 0;
+    padding: 12px 14px;
+    max-height: 380px;
+    overflow: auto;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.rw-journal__erreur { color: var(--rw-danger); font-weight: 550; }
+.rw-journal__fin { color: var(--rw-texte-doux); font-style: italic; margin-top: 6px; }
