@@ -42,6 +42,25 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
   `docker restart rootwarden_python` avant de lancer l'E2E. Le PHP/JS est servi
   direct (pas de restart necessaire).
 
+## Une fixture doit porter sur une donnee REELLEMENT AFFICHEE
+
+Paye en S5, et le prix etait eleve : la remediation de fixture etait posee sur un
+identifiant de CVE **invente**. Il n'apparaissait donc dans aucune ligne du
+tableau, et l'assertion « le suivi affiche l'etat stocke » lisait le selecteur
+d'une AUTRE ligne — pour laquelle « vide » est la bonne reponse. **Le test
+echouait sur le portage alors que le portage avait raison.**
+
+Deux regles qui en sortent :
+
+1. la fixture se choisit DANS les donnees rendues — ici la premiere CVE dans
+   l'ordre d'affichage, ce qui garantit en plus qu'elle est sur la premiere page ;
+2. le reperage se fait par le CONTENU de la ligne (`tr.textContent.includes(...)`),
+   pas par « le premier element de ce type » : c'est le seul reperage qui vise la
+   meme chose sur les deux portails.
+
+Et quand une assertion echoue sur la cible corrigee, se demander d'abord si c'est
+LA MESURE qui vise a cote.
+
 ## Trois pieges de mesure payes en S3
 
 **UN BLOC REPLIE NE RECOIT PAS LES FRAPPES.** Le champ de recherche existait dans
