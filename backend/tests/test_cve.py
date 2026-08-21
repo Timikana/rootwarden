@@ -332,3 +332,57 @@ class TestCveReprioritizeNeDetruitPas:
         # Et rien n'a ete ecrit : un 403 qui aurait quand meme reecrit les
         # findings ne prouverait rien.
         assert 'update cve_findings' not in mock_cursor._last_query
+
+
+class TestRequireMachineAccessLitToutesLesSources:
+    """Le garde d'acces doit controler TOUTE machine presente dans la requete.
+
+    L'ancienne resolution enchainait les sources par `or` et gardait la PREMIERE
+    trouvee -- le corps JSON avant la query string. Or `cve_results`,
+    `cve_history` et `cve_compare` lisent EXCLUSIVEMENT `request.args`. Un GET
+    portant un corps avec une machine autorisee et une query avec celle d'autrui
+    faisait donc autoriser l'une et servir l'autre. Flask parse le corps d'un GET
+    des que le `Content-Type` est `application/json`.
+    """
+
+    @staticmethod
+    def _acces(mid):
+        """Machine 1 autorisee, tout le reste refuse."""
+        try:
+            return int(mid) == 1
+        except (TypeError, ValueError):
+            return False
+
+    def test_refuse_quand_la_query_porte_une_machine_interdite(self, client, api_headers, mock_cursor):
+        """LE CONTOURNEMENT : corps autorise, query interdite."""
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/cve_results?machine_id=99', headers=api_headers,
+                              json={'machine_id': 1})
+        assert resp.status_code == 403
+
+    def test_refuse_quand_le_corps_porte_une_machine_interdite(self, client, api_headers, mock_cursor):
+        """Et la symetrie : query autorisee, corps interdit. Les deux comptent."""
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/cve_results?machine_id=1', headers=api_headers,
+                              json={'machine_id': 99})
+        assert resp.status_code == 403
+
+    def test_autorise_une_source_unique_legitime(self, client, api_headers, mock_cursor):
+        """Non-regression : un appel normal n'a qu'une source, et il passe."""
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/cve_results?machine_id=1', headers=api_headers)
+        assert resp.status_code != 403
+
+    def test_lit_l_identifiant_du_CHEMIN(self, client, api_headers, mock_cursor):
+        """`/supervision/machines/<mid>/profile` porte son id dans l'URL.
+
+        Le decorateur ne regardait ni le chemin ni les `kwargs` : il ne trouvait
+        donc aucun identifiant et laissait tout passer.
+        """
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/supervision/machines/99/profile', headers=api_headers)
+        assert resp.status_code == 403
