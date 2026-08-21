@@ -413,6 +413,45 @@ Deux attentes, toutes deux explicites :
   sonde acceptee ferme la fenetre de SON processus, et le processus qui servira
   l'appel suivant n'est pas choisi.
 
+## Un selecteur par PREFIXE finit par attraper ce que le portage ajoute ensuite
+
+La suite de K1 comptait ses lignes avec
+`querySelectorAll('.machine-item, [data-rw^="machine-"]')`. Le portage a ensuite
+pose un `data-rw="machine-nom"` sur le nom de chaque machine — attrape par le
+meme prefixe. **Six lignes comptees pour trois machines**, et trois assertions
+rouges qui n'avaient rien a voir avec ce qu'elles mesuraient.
+
+Le piege est retors parce que les deux moities sont de moi : le selecteur ET
+l'attribut qui le casse. Regles :
+
+1. **s'ancrer sur une classe exacte** que les deux portails portent
+   (`.machine-item`), pas sur un prefixe d'attribut ;
+2. **qualifier les attributs de test** ajoutes par le portage (`data-rw="ssh-nom"`
+   et non `data-rw="machine-nom"`) ;
+3. quand une suite compte soudain un multiple exact de ce qu'elle devrait
+   compter, chercher un selecteur trop large avant de chercher un defaut de
+   donnees.
+
+## Un jeton de substitution non remplace s'affiche EN CLAIR, et aucun controle d'i18n ne le voit
+
+`ssh/index.php` ecrit `count($machines)` PUIS `t('ssh.servers_available')`, dont
+la valeur est `:count serveur(s) disponible(s)`. Le jeton n'est jamais substitue :
+l'ecran porte **« 3 :count serveur(s) disponible(s) »**.
+
+`go-socle-i18n` ne pouvait pas le voir — il cherche des identifiants de la forme
+`module.cle` (une cle absente rend son identifiant), pas des jetons `:mot`. Ce
+sont **deux defauts distincts** :
+
+| defaut | ce qui s'affiche | ce qui le voit |
+|---|---|---|
+| cle absente des deux langues | `ssh.titre` | recherche de `module.cle` |
+| jeton non substitue | `:count` | recherche de `:mot` |
+| cle absente d'UNE langue | le texte de l'autre langue | comparaison des JEUX de cles |
+
+Mesurer les trois. Le second se cherche par `(document.body.innerText.match(
+/:[a-z_]{3,}/g) || [])` — et l'assertion doit exiger que la page ait bien rendu
+quelque chose, sinon elle passe sur un 404 qui ne contient aucun jeton.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).
