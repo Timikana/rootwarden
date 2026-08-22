@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.40** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.41** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,55 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.41 — securite : la valeur d'un override ne peut plus devenir une ligne de configuration
+
+**Symptome.** `_SAFE_PARAM_RE` ne portait que sur le NOM d'un override. La valeur partait en
+`f"{key}={value}\n"`, encodee en base64 et AJOUTEE au fichier de configuration de l'agent : une valeur
+portant un saut de ligne produisait donc **une directive autonome**, que personne n'avait demandee par
+aucun parametre nomme.
+
+**Mesure du 2026-08-22 sur Test-Server-Debian (id 2, DEV), charge deliberement inoffensive.**
+
+    POST /supervision/overrides/2  {"Timeout": "3\nLIGNE_INJECTEE=temoin"}
+      -> {"success":true,"message":"Overrides sauvegardes"}
+      -> la base retient  33 0A 4C49474E45...   (saut de ligne BRUT)
+
+    POST /supervision/zabbix/reconfigure  {"machine_ids":[2]}
+      -> fichier ecrit :   7  Timeout=3
+                           8  LIGNE_INJECTEE_PAR_LA_MESURE=temoin   <- directive autonome
+
+**Portee.** Sur un agent Zabbix reel, cette ligne peut etre un `UserParameter` — donc **l'execution d'une
+commande arbitraire par l'agent**, sur la machine supervisee. La route d'ecriture porte
+`@require_role(2)` + `@require_permission('can_manage_supervision')` : **un role 2 qui n'est PAS
+administrateur du portail suffit**. Si personne ne l'a fait, c'est qu'**aucune interface n'ecrit dans
+cette table** — le trou etait atteignable par l'API, pas par un ecran.
+
+**Fix.** `_SAFE_VALUE_RE = ^[^\x00-\x1f\x7f]*$` : une valeur de configuration agent tient sur UNE
+ligne, tout caractere de controle est refuse. **Applique DEUX FOIS** :
+ - a l'**ecriture** (`save_overrides`), parce que c'est la porte d'entree ;
+ - a la **relecture** (`_build_config_lines`), parce que la base peut deja contenir des lignes posees
+   avant ce correctif — une validation qui ne garde que l'entree laisse le fichier a la merci de
+   l'historique. Un refus a la relecture est journalise en `warning` avec la machine et la cle.
+
+**UN REFUS SILENCIEUX N'EST PAS UN REFUS.** L'ancien code sautait les noms invalides sans rien dire :
+l'appelant recevait « Overrides sauvegardes » et croyait avoir enregistre ce qu'il venait d'ecrire. La
+reponse **NOMME** desormais les entrees refusees et chiffre les deux cotes. Mesure apres correctif :
+
+    {"success":true,"saved":1,"message":"1 override(s) enregistre(s), 1 refuse(s).",
+     "rejected":[{"param":"Timeout","raison":"valeur multiligne ou avec un caractere de controle"}]}
+
+`ListenPort=10051`, legitime, passe : le correctif ne ferme pas la porte a tout.
+
+**RESTE DECLARE ET NON CORRIGE, hors du perimetre autorise** : `POST /supervision/overrides/<id>` est la
+**seule route du module touchant une machine sans `@require_machine_access`** — son `machine_id` vient du
+chemin d'URL. Inerte au role 2 (`check_machine_access` rend vrai des ce niveau), mais absent. Voir E-85.
+
+**Tests.** 11 tests neufs (`test_supervision_overrides.py`), **329 pytest** au total. Verification ciblee
+des trois suites supervision les plus proches (onglets 14, config 17, ecriture 38) : conformes. Le LOT
+complet n'a pas ete rejoue pour ce commit : le changement est borne a `supervision_overrides` (0 ligne en
+base) et a `_build_config_lines`, appele par les seules routes de reconfiguration et de deploiement, ni
+portees ni couvertes par une suite. Le rejeu complet accompagne le commit suivant, qui touche le portage.
 
 ### v1.37.40 — module `supervision/`, sous-lot V9 : l'ecriture distante, et le troisieme cas enfin dit
 
