@@ -63,6 +63,15 @@ Decisions et mesures : `docs/migration/{INVENTAIRE,ARCHITECTURE-UI,DEPRECIATION}
   erreur. Mesurer les cles MORTES : trois pieces justes peuvent donner un
   ecran inerte.
 
+## `ConvertEmptyStringsToNull` : « vide » arrive comme « absent »
+
+L'intergiciel est dans le groupe `web` par defaut. `input('x')` rend `null` pour
+`x=""` — indiscernable d'un champ non soumis — alors que `has('x')` rend `true`.
+Des qu'un champ vide a un SENS (« supprime ce reglage » contre « ne le touche
+pas »), il faut `has()` pour l'existence et `input() ?? ''` pour la valeur.
+Mesure du 2026-08-22, sous-lot V10a : le code testait `=== null` et ne
+supprimait jamais rien.
+
 ## i18n
 
 Parite FR/EN **stricte**, dans le meme commit. Point de depart mesure au
