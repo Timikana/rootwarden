@@ -130,6 +130,30 @@ Consequences pour la conception d'une suite :
   — puis PROUVER l'absence d'effet (aucune ligne creee, aucune trace SMTP) et le
   dire.
 
+## Deux connexions dans la meme suite : attendre la fenetre TOTP
+
+Le garde anti-rejeu est par COMPTE et EN BASE : un contexte de navigateur neuf
+n'y echappe pas. Une suite qui se connecte deux fois (passe FR puis passe EN)
+doit **attendre le basculement de la fenetre** entre les deux, **asserter que la
+seconde session a tenu** (URL != page de connexion), et reproposer une fois un
+code neuf si le second facteur est refuse.
+
+Sans la deuxieme piece, les controles d'i18n passent sur l'ecran de connexion —
+qui ne porte evidemment aucun identifiant de traduction. Un PASS dont on ne sait
+pas pourquoi il passe ne vaut rien.
+
+## Cliquer un bouton dont l'action joindrait la production
+
+Motif eprouve sur V8 (`go-page-supervision-releve`) : activer
+`page.setRequestInterception(true)`, **avorter la seule requete dangereuse** et
+laisser passer le reste. On clique alors le vrai bouton, on mesure la requete
+emise (methode, chemin, corps) — et rien n'atteint la machine.
+
+Le contrat du backend se mesure a part, sur une **portee explicite** qui ne peut
+pas atteindre la production (`machine_ids: [2]`). Et le chemin « tout le parc »,
+qu'aucun navigateur ne peut declencher sans danger, s'exerce cote **pytest** en
+patchant le helper de creation de thread.
+
 ## Lancement
 
 **Passer par le lanceur, jamais par `node go-*.mjs` a la main** :
