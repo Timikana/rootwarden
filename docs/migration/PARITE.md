@@ -2825,9 +2825,12 @@ distinctes — mais il ne produit pas de faux compte aujourd'hui, et le dire est
 **LA DÉCISION N'EST PAS « COMMENT PORTER » MAIS « FAUT-IL UN RELEVÉ DE PARC ».** Les trois options
 étudiées — ne pas porter, porter en tâche de fond, porter en séquentiel borné — **joignent toutes la
 production** dès lors que le parc est « toutes les machines non archivées ». Reconcevoir le relevé change
-sa charge, pas sa cible. La règle de sûreté en vigueur — *`srv-zabbix` n'est jamais jointe, même en
-lecture* — ne laisse donc de place qu'à la première : la détection **par ligne** de V6, sur une machine
-qu'on a désignée. Arbitrage porté à l'exploitant ; **rien n'a été porté sans lui**.
+sa charge, pas sa cible. Arbitrage porté à l'exploitant ; **rien n'a été porté sans lui**.
+
+> **SUITE DONNÉE — cette entrée s'arrête à la mesure, elle n'est pas la conclusion.** L'exploitant a
+> tranché pour la **tâche de fond**, avec autorisation explicite d'écrire la route backend manquante.
+> L'écart signalé — cette option joint la production en usage réel — a été redit avant de commencer, et
+> la décision maintenue. Le portage est décrit en **E-82**.
 
 ## E-81 — Le `@threaded_route` imbriqué n'existe pas. Huit branches mortes l'arment pour le jour où l'on nettoiera.
 
@@ -2879,3 +2882,129 @@ et aucune interne n'obtiendrait jamais le sien. Le pool ne ralentit pas, il se b
 **Ce n'est pas un défaut à corriger pendant un portage** : le code mort est inerte, et le retirer touche
 le backend. Il est nommé ici pour que la suppression du « doublon » ne se fasse jamais sans retirer
 d'abord le `@threaded_route` de l'un des deux étages.
+
+
+## E-82 — Le relevé de parc porté en tâche de fond : la rafale devient une tâche, et le coût s'énonce avant le geste
+
+**Module `supervision/`, sous-lot V8 : le relevé des agents de tout le parc.** Suite :
+`tests/e2e/go-page-supervision-releve.mjs` — **11 PASS sur le legacy, 28 sur le portage** (base rouge
+relevée avant portage : **3 PASS / 4 FAIL**). Plus **12 tests backend** neufs.
+**PREMIÈRE ROUTE PYTHON ÉCRITE PENDANT CETTE MIGRATION**, sur autorisation explicite de l'exploitant
+(voir E-80) : `POST /supervision/scan-all`.
+
+**CE QUE LA ROUTE REMPLACE.** Le relevé n'existait que dans le navigateur. Mesuré :
+`3 machines × 4 plateformes = 12 requêtes` lancées dans la même boucle synchrone, chacune ouvrant sa
+session SSH, chacune `@threaded_route` — donc chacune consommant un slot du pool **partagé par toutes
+les routes du backend**, celui dont le commentaire interdit précisément cet usage. Désormais : une
+réponse immédiate `{queued, background, task_id}`, puis un **unique thread démon** qui balaie le parc
+**séquentiellement**. Le pool partagé n'est plus touché du tout.
+
+**UNE SEULE SESSION SSH PAR MACHINE, ET C'EST MESURÉ AU JOURNAL PARAMIKO.** Le legacy ouvre une session
+par plateforme, puisqu'il envoie une requête par plateforme. Ici les quatre lectures partagent la
+session de la machine :
+
+```
+INFO  paramiko.transport: Authentication (password) successful!
+DEBUG paramiko.transport: Secsh channel 0 opened.   zabbix_agent2 -V
+DEBUG paramiko.transport: Secsh channel 1 opened.   centreon-monitoring-agent --version
+DEBUG paramiko.transport: Secsh channel 2 opened.   node_exporter --version
+DEBUG paramiko.transport: Secsh channel 3 opened.   telegraf --version
+DEBUG paramiko.transport: EOF in transport thread
+```
+
+Un transport authentifié, quatre canaux. Sur le parc courant : **3 sessions au lieu de 12**. La mesure a
+aussi levé un doute qu'elle **exonère** : l'échec `Authentication (publickey) failed` visible avant le
+mot de passe n'est pas un drapeau de compte de service périmé — `service_account_deployed = 0` pour cette
+machine, la base dit donc la vérité, c'est la négociation normale de paramiko.
+
+**LE COÛT S'ÉNONCE AVANT LE GESTE, ET LA PRODUCTION EST NOMMÉE.** Le bouton n'envoie rien : il ouvre un
+panneau de décision rendu par le serveur — `3 machine(s), 4 plateforme(s), 3 session(s) SSH — une par
+machine, pas une par plateforme` et, en dessous, `Machines de PRODUCTION concernées : srv-zabbix.`
+**Nommer plutôt que compter est le point** : « 3 machines » ne prévient personne, « dont srv-zabbix (PROD) »
+prévient. Le legacy n'annonce ni le nombre de machines, ni le nombre de sessions, ni que la production
+est dans le lot — et son relevé ignore le filtre de la table, donc les machines jointes ne sont même pas
+celles qui sont à l'écran (E-80).
+
+**LE CORPS DE LA REQUÊTE EST VIDE, ET LE TEST EN FAIT UNE PROPRIÉTÉ.** La portée vient du **serveur**.
+Envoyer une liste d'identifiants lue dans le tableau, c'est exactement le défaut du legacy : sa liste ne
+correspond plus à ce qui est affiché dès qu'on filtre. La suite assert que le POST part avec `{}`.
+
+**COMMENT ON CLIQUE UN BOUTON QUI JOINDRAIT LA PRODUCTION.** C'était la difficulté de ce sous-lot. La
+suite clique le vrai déclencheur, puis le vrai bouton de confirmation — et **la requête de confirmation
+est interceptée et avortée**. Le geste est exercé de bout en bout, la requête est mesurée (méthode,
+chemin, corps), et aucune machine n'est jointe. Les deux règles tiennent ensemble : *cliquer le bouton,
+pas appeler la fonction* et *ne jamais joindre srv-zabbix*. Le contrat de mise en file, lui, se mesure
+sur une **portée explicite** (`machine_ids: [2]`, DEV) : **200 en 230 ms**, là où le legacy tient la
+connexion ouverte pendant tout le balayage.
+
+**ET LE CHEMIN « TOUT LE PARC » N'EST PAS LAISSÉ SANS MESURE.** Une suite de navigateur ne peut pas le
+déclencher. Les **12 tests backend** le peuvent, parce que `_spawn_scan_all_thread` est isolé pour être
+patchable — jamais `threading.Thread` globalement, dont le `ThreadPoolExecutor` de `@threaded_route`
+dépend pour créer ses workers. Le thread patché, on lit **quelles machines auraient été balayées**.
+
+**UN GARDE SANS OBJET NE GARDE RIEN, ET CETTE ROUTE EN FAISAIT UN CAS D'ÉCOLE.**
+`@require_machine_access` lit `machine_id`/`machine_ids` dans le corps et fail-close sur tout identifiant
+refusé — mais un corps vide ne lui donne **rien à refuser**. Sur une route dont le corps vide *signifie
+tout le parc*, il aurait eu l'apparence d'un garde sans en être un. Le parc implicite est donc filtré
+dans le handler, par `check_machine_access`, machine par machine — et un test le prouve en refusant
+l'accès à la machine 1. Ce filtre **ne retire rien aujourd'hui** (la route exige le rôle 2, et
+`check_machine_access` rend vrai dès le rôle 2) : c'est dit plutôt que sous-entendu.
+
+**AUCUNE NOTIFICATION, DÉLIBÉRÉMENT.** `/ssh-audit/scan-all`, le modèle suivi par ailleurs, appelle
+`notify_subscribed` pour chaque machine auditée. Un relevé de version n'est ni une alerte ni un verdict :
+rien ne part. Un effet sortant ne se défait pas, et il n'y a rien à signaler à personne quand on constate
+qu'un agent est en 7.0.
+
+**LE PRIVILÈGE DE LA COMMANDE N'A PAS ÉTÉ CHANGÉ.** La lecture passe par `execute_as_root`, comme les
+routes par machine. Lire un numéro de version n'exige aucun privilège — défaut déjà déclaré (E-78) — mais
+changer le niveau de privilège d'une commande distante est un **changement de droits**, qui ne se fait pas
+au détour d'un portage ; et une lecture qui échouerait sans root produirait un écart de comportement avec
+les routes existantes.
+
+**DEUX DÉFAUTS DE MON PROPRE PORTAGE, VUS À L'IMAGE :**
+- **le coût s'affichait en vert de réussite** (`rw-confirmation`) à l'intérieur d'un panneau à bordure
+  rouge. Le vert invite à cliquer alors que la phrase énonce un **coût** — passé en encart neutre. Aucune
+  assertion DOM ne voit une incohérence de sens ;
+- **le bouton était à plus de mille pixels de la phrase qui l'explique.** La convention « action
+  principale à droite » vaut pour un **pied de formulaire**, où l'œil descend une colonne de champs ; pour
+  une action unique attachée à une explication, elle rompt la chaîne. Ramené sous son texte.
+
+**UN DÉFAUT DE MA PROPRE SUITE, trouvé par la suite elle-même.** Son premier nettoyage supprimait les
+tâches **par type** : il aurait effacé l'historique d'un relevé lancé par un exploitant, sans que rien ne
+le signale. Elle ne supprime plus que la tâche dont elle a retenu l'identifiant, et sa propriété de sortie
+est un **delta**, pas un zéro — compter les tâches préexistantes comme un échec la ferait échouer sur
+l'historique de quelqu'un d'autre.
+
+**UN TEXTE QUI ALLAIT DEVENIR FAUX, corrigé dans le même commit.** Le bloc « pas encore porté » annonçait
+« le relevé de tout le parc en une fois » parmi les gestes à venir. V8 le porte : la phrase est réduite aux
+trois gestes qui **modifient** les serveurs.
+
+**UN NEUVIÈME FRANÇAIS EN DUR, relevé et non porté** : `updateAgentCounter` (`main.js:84`) rend
+`0/3 avec zabbix`. Le portage n'a pas de compteur d'agents ; l'assertion correspondante est une garde
+tournée vers l'avenir, et elle le dit — la prendre pour une mesure serait se tromper.
+
+**DEUX AUTRES DÉFAUTS DE MA SUITE, TROUVÉS PAR LE LOT ET PAS PAR L'EXÉCUTION ISOLÉE.** Elle passait
+25/0 seule et **24/1 dans le LOT** — la marque d'un défaut de la suite, pas du portage :
+
+- **une attente FIXE après un geste.** Le clic d'onglet était suivi de `dors(1200)`. Seule, la suite
+  avait le temps ; sous la charge des autres suites, le script de la page n'avait pas encore pris la
+  main, **le clic ne faisait rien**, le panneau restait caché, et son texte anglais n'existait donc pas
+  dans `innerText`. Une assertion juste échouait pour une raison étrangère à ce qu'elle mesure. On attend
+  maintenant la PROPRIÉTÉ — le panneau est visible — avec une borne, et on **re-clique** tant qu'elle
+  n'est pas obtenue : c'est le geste qui peut être perdu, pas seulement son effet ;
+
+- **le garde anti-rejeu TOTP traverse les contextes de navigateur, et c'était le vrai coupable.** Cette
+  suite est la première du module à se connecter **deux fois** (une passe FR, une passe EN). Le garde
+  étant par COMPTE et EN BASE, la seconde connexion dans la même fenêtre de 30 s rejoue un code déjà
+  consommé : la session n'est pas authentifiée et **la page servie est celle de connexion**. Or les deux
+  contrôles d'i18n *passaient* sur cet écran — qui ne porte évidemment aucun identifiant de traduction.
+  **Un PASS dont on ne sait pas pourquoi il passe ne vaut rien.** Correction en trois pièces : attendre le
+  basculement de la fenêtre avant la seconde connexion, **asserter que la session a tenu** (sans quoi tout
+  ce qui suit mesure la mauvaise page), et proposer une seule fois un code neuf si le second facteur est
+  refusé. Quatre exécutions consécutives à 28/0, puis conforme dans le LOT complet — plutôt que de
+  déclarer la suite instable, ce qui a déjà été fait à tort pour deux autres suites de ce dépôt.
+
+**ET UN CHIFFRE HÉRITÉ QUI N'ÉTAIT PAS UNE MESURE.** Le suivi de chantier annonçait « 65 suites » depuis
+plusieurs sous-lots. Compté dans le journal du rejeu : **74 exécutions de suite** (38 portage, 36 legacy)
+pour **974 assertions**, donc 72 avant V8. Même règle que pour les références de suite — on compte, on ne
+reconduit pas.

@@ -149,6 +149,15 @@ class SupervisionController extends Controller
             'profilModifie' => $this->profilDemande($requete),
             'agents' => $this->supervision->agentsParMachine(),
             'cheminsConfig' => $this->supervision->cheminsConfiguration(),
+            /*
+             * LE COUT DU RELEVE DE PARC VIENT DU SERVEUR — sous-lot V8. Nombre de
+             * machines, de plateformes, de sessions SSH, et le NOM des machines de
+             * production concernees. Le calculer cote client reviendrait a compter
+             * les lignes du tableau : c'est exactement l'erreur du legacy, dont le
+             * releve ignore le filtre et joint des machines qui ne sont plus a
+             * l'ecran.
+             */
+            'coutReleve' => $this->supervision->coutDuReleve(),
             'libelles' => $this->libelles(),
         ]);
     }
@@ -396,6 +405,17 @@ class SupervisionController extends Controller
             'editeur_echec' => __('superv.editeur_echec'),
             'sauvegardes_aucune' => __('superv.sauvegardes_aucune'),
             'sauvegardes_nombre' => __('superv.sauvegardes_nombre', ['nombre' => '{nombre}']),
+            // ── Sous-lot V8 : le releve du parc en tache de fond ───────────
+            'url_releve_parc' => url('/api/gateway/supervision/scan-all'),
+            'url_taches' => route('taches'),
+            'releve_en_cours' => __('superv.releve_en_cours'),
+            'releve_lance' => __('superv.releve_lance', [
+                'machines' => '{machines}', 'tache' => '{tache}',
+            ]),
+            'releve_aucune' => __('superv.releve_aucune'),
+            'releve_refus' => __('superv.releve_refus', ['statut' => '{statut}']),
+            'releve_echec' => __('superv.releve_echec'),
+            'releve_voir_taches' => __('superv.releve_voir_taches'),
         ];
     }
 }

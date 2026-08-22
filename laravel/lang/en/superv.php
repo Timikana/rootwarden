@@ -176,7 +176,23 @@ return [
     'a_venir_profils' => 'The profile catalogue and its assignment arrive with the following sub-lots. Until then they stay on the previous portal.',
     // A TEXT CAN BECOME FALSE WITHOUT ANY TEST SEEING IT: the fleet table is
     // ported as of V6, so the sentence announcing it "for later" no longer was.
-    'a_venir_deploiement' => 'Installing, reconfiguring and uninstalling an agent, along with surveying the whole fleet at once, arrive with the following sub-lots: those acts CHANGE the servers, and surveying the whole fleet needs redesigning as a background task. Until then they stay on the previous portal.',
+    'a_venir_deploiement' => 'Installing, reconfiguring and uninstalling an agent arrive with the following sub-lots: those acts CHANGE the servers. Until then they stay on the previous portal.',
     'a_venir_editeur' => 'Reading and writing the remote file arrive with the following sub-lots. Until then they stay on the previous portal.',
     'vers_legacy' => 'Open on the previous portal',
+
+    // ── Sub-lot V8: surveying the fleet as a background task ──────────────
+    'releve_titre' => 'Survey monitoring agents across the fleet',
+    'releve_description' => 'Asks every server which monitoring agents are installed on it, and at which version. This is a READ: nothing is installed, reconfigured or restarted. The survey runs as a background task and its progress is followed in the task centre.',
+    'releve_bouton' => 'Survey the fleet',
+    'releve_cout' => ':machines machine(s), :plateformes platform(s), :sessions SSH session(s) — one per machine, not one per platform.',
+    'releve_production' => 'PRODUCTION machines involved: :machines.',
+    'releve_aide_fond' => 'The survey does not block this page: the response is immediate and the sweep carries on in the background, one server after another.',
+    'releve_annuler' => 'Cancel',
+    'releve_confirmer' => 'Start the survey',
+    'releve_en_cours' => 'Queueing the survey...',
+    'releve_lance' => 'Survey started on :machines machine(s) — task #:tache.',
+    'releve_aucune' => 'No machine to survey.',
+    'releve_refus' => 'Survey refused (status :statut).',
+    'releve_echec' => 'The survey could not be started.',
+    'releve_voir_taches' => 'Follow in the task centre',
 ];

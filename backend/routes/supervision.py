@@ -19,6 +19,7 @@ Routes :
 
 import re
 import json
+import threading
 import base64
 import logging
 import datetime
@@ -27,6 +28,7 @@ from flask import Blueprint, jsonify, request, Response
 from routes.helpers import (
     require_api_key, require_role, require_machine_access, require_permission,
     threaded_route, get_db_connection, server_decrypt_password, get_current_user, logger,
+    check_machine_access,
 )
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
@@ -1193,6 +1195,228 @@ def get_machine_agents_route(machine_id):
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Releve du parc en tache de fond
+#
+# POURQUOI CETTE ROUTE EXISTE. Le releve de parc n'existait que dans le
+# navigateur : `scanAllAgents` (supervision/js/main.js) bouclait sur toutes les
+# machines x 4 plateformes et lancait TOUTES les requetes en parallele, chacune
+# ouvrant sa propre session SSH. Mesure sur le parc courant : 3 machines = 12
+# sessions simultanees, sans etalement ni plafond ni file. Chaque requete etant
+# `@threaded_route`, la rafale se payait sur le pool PARTAGE par toutes les
+# routes — exactement ce que son propre commentaire interdit :
+#
+#     « les operations longues de parc (ex. /ssh-audit/scan-all) doivent elles
+#       passer en tache de fond (centre de taches), jamais monopoliser ce pool »
+#
+# C'est le sinistre du fix v1.37.13 (504 en cascade sur toute l'interface).
+# `ssh-audit` a ete corrige dans cette vague ; `supervision/` avait ete oublie.
+#
+# CE QUE LE PASSAGE EN TACHE DE FOND CHANGE VRAIMENT :
+#   - la reponse HTTP est immediate (`{queued, task_id}`), plus aucune connexion
+#     tenue ouverte pendant le balayage ;
+#   - le balayage est SEQUENTIEL dans un unique thread demon : il ne consomme
+#     AUCUN slot du pool partage, donc le reste du portail ne ralentit pas ;
+#   - **une seule session SSH par machine** sert les quatre releves, au lieu
+#     d'une par plateforme : 3 sessions au lieu de 12 sur le parc courant.
+#
+# Motif aligne sur `/ssh-audit/scan-all` (routes/ssh_audit.py), y compris le
+# helper de creation de thread isole : il reste patchable en test SANS stubber
+# `threading.Thread` globalement, ce qui interbloquerait le ThreadPoolExecutor
+# de `@threaded_route` (il en depend pour creer ses workers).
+#
+# CE QUE CETTE ROUTE N'ENVOIE PAS, DELIBEREMENT. `/ssh-audit/scan-all` appelle
+# `notify_subscribed` pour chaque machine auditee. Un releve de version n'est ni
+# une alerte ni un verdict : aucune notification n'est emise ici. Un effet
+# sortant ne se defait pas, et il n'y a rien a signaler a personne quand on
+# constate qu'un agent est en 7.0.
+# ══════════════════════════════════════════════════════════════════════════════
+
+SCAN_ALL_PLATEFORMES = ('zabbix', 'centreon', 'prometheus', 'telegraf')
+
+
+def _releve_agents_machine(row, platforms):
+    """Releve les versions d'agent d'UNE machine, en UNE session SSH.
+
+    Retourne {plateforme: version_ou_None}. La commande est celle de
+    AGENT_REGISTRY, identique a celle des routes par machine : une lecture pure
+    (`command -v <binaire> && <binaire> -V | head -1 || echo 'NOT_INSTALLED'`).
+    Rien n'installe, rien n'ecrit, rien ne redemarre.
+
+    Note : `execute_as_root` est conserve tel quel. Lire un numero de version
+    n'exige aucun privilege (defaut declare en PARITE.md E-78), mais changer le
+    niveau de privilege d'une commande distante est un changement de droits — il
+    ne se fait pas au detour d'un portage, et une lecture qui echouerait sans
+    root produirait un ecart de comportement avec les routes par machine.
+    """
+    ip, port, ssh_user, ssh_pass, root_pass, svc_account = _get_ssh_creds(row)
+    trouve = {}
+    with ssh_session(ip, port, ssh_user, ssh_pass,
+                     logger=logger, service_account=svc_account) as client:
+        for plateforme in platforms:
+            agent_info = AGENT_REGISTRY.get(plateforme)
+            if not agent_info:
+                continue
+            out, _, _rc = execute_as_root(
+                client, agent_info['version_cmd'], root_pass, timeout=15)
+            out = (out or '').strip()
+            if 'NOT_INSTALLED' in out or not out:
+                trouve[plateforme] = None
+                continue
+            match = re.search(r'(\d+\.\d+[\.\d]*)', out)
+            trouve[plateforme] = match.group(1) if match else out[:30]
+    return trouve
+
+
+def _run_scan_all_background(machines, platforms, task_id):
+    """Releve le parc en ARRIERE-PLAN. Ne touche jamais au contexte de requete.
+
+    SEQUENTIEL par construction : une machine apres l'autre. C'est ce qui
+    remplace la rafale du navigateur — et c'est aussi ce qui rend la
+    progression lisible dans le centre de taches.
+    """
+    from task_tracker import update_task
+    total = max(1, len(machines))
+    ok, absents, erreurs = 0, 0, []
+
+    for idx, row in enumerate(machines, start=1):
+        nom = row.get('name') or row['id']
+        try:
+            trouve = _releve_agents_machine(row, platforms)
+            for plateforme, version in trouve.items():
+                # Meme regle que les routes par machine : un agent qu'on ne
+                # trouve plus DISPARAIT de l'inventaire. L'inventaire suit
+                # l'etat reel des machines, y compris les desinstallations
+                # faites hors du portail.
+                if version:
+                    _upsert_agent(row['id'], plateforme, version)
+                    ok += 1
+                else:
+                    _remove_agent(row['id'], plateforme)
+                    absents += 1
+        except Exception as e:
+            logger.error("[supervision/scan-all] machine #%s: %s", row['id'], e)
+            erreurs.append({'machine_id': row['id'], 'error': str(e)})
+        finally:
+            update_task(task_id, progress=int(idx * 100 / total),
+                        detail=f"{idx}/{len(machines)} - {nom} "
+                               f"({ok} agent(s), {absents} absent(s), "
+                               f"{len(erreurs)} erreur(s))")
+
+    detail = (f"{ok} agent(s) releve(s), {absents} absent(s), "
+              f"{len(erreurs)} erreur(s) sur {len(machines)} machine(s)")
+    update_task(task_id,
+                status='error' if erreurs and not ok else 'success',
+                progress=100, detail=detail, finished=True)
+    logger.info("[supervision/scan-all] termine : %s", detail)
+
+
+def _spawn_scan_all_thread(machines, platforms, task_id):
+    """Cree et demarre le thread demon du releve de parc.
+
+    Isole dans un helper pour rester patchable en test SANS stubber
+    `threading.Thread` globalement : le ThreadPoolExecutor de `@threaded_route`
+    en depend pour creer ses workers, et le stubber globalement interbloque le
+    pool."""
+    t = threading.Thread(target=_run_scan_all_background,
+                         args=(machines, platforms, task_id), daemon=True)
+    t.start()
+    return t
+
+
+@bp.route('/supervision/scan-all', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_supervision')
+@require_machine_access
+@threaded_route
+def supervision_scan_all():
+    """Releve les agents de supervision du parc, en tache de fond.
+
+    Corps (tout est optionnel) :
+      machine_ids : liste explicite de machines. ABSENT = tout le parc non
+                    archive. Une portee explicite est ce qui permet de mesurer
+                    cette route sans balayer le parc entier — et donc sans
+                    joindre une machine de production.
+      platforms   : liste de plateformes. ABSENT = les quatre.
+
+    Reponse IMMEDIATE : {queued, background, task_id}. La progression se lit
+    dans le centre de taches (`/tasks/list`), les resultats dans
+    `GET /supervision/agents`.
+
+    LE GARDE D'ACCES AUX MACHINES A BESOIN D'UN OBJET. `@require_machine_access`
+    lit `machine_id`/`machine_ids` dans le corps et fail-close sur tout id
+    refuse — mais quand le corps n'en porte AUCUN, sa liste est vide, donc rien
+    n'est refuse : sur une route de parc, il aurait l'apparence d'un garde sans
+    en etre un. Le parc implicite est donc filtre ICI, par `check_machine_access`
+    machine par machine. Aujourd'hui ce filtre ne retire rien — la route exige
+    deja le role 2, et `check_machine_access` rend True des le role 2 — et c'est
+    dit plutot que sous-entendu : il est en place pour que le jour ou cette
+    route s'ouvrirait plus bas, le parc implicite soit garde comme la liste
+    explicite.
+    """
+    data = request.get_json(silent=True) or {}
+
+    plateformes_demandees = data.get('platforms')
+    if isinstance(plateformes_demandees, list) and plateformes_demandees:
+        platforms = [p for p in plateformes_demandees if p in SCAN_ALL_PLATEFORMES]
+        if not platforms:
+            return jsonify({'success': False, 'message': 'Aucune plateforme connue'}), 400
+    else:
+        platforms = list(SCAN_ALL_PLATEFORMES)
+
+    portee = data.get('machine_ids')
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            if isinstance(portee, list) and portee:
+                try:
+                    ids = [validate_machine_id(m) for m in portee]
+                except ValueError as e:
+                    return jsonify({'success': False, 'message': str(e)}), 400
+                trous = ','.join(['%s'] * len(ids))
+                cur.execute(
+                    "SELECT id, name, ip, port, user, password, root_password, "
+                    "service_account_deployed FROM machines "
+                    f"WHERE id IN ({trous}) "
+                    "AND (lifecycle_status IS NULL OR lifecycle_status != 'archived') "
+                    "ORDER BY name", tuple(ids))
+            else:
+                cur.execute(
+                    "SELECT id, name, ip, port, user, password, root_password, "
+                    "service_account_deployed FROM machines "
+                    "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
+                    "ORDER BY name")
+            machines = cur.fetchall()
+    except Exception as e:
+        logger.error("[supervision/scan-all] BDD: %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+    # Le parc IMPLICITE est filtre ici : voir la docstring.
+    machines = [m for m in machines if check_machine_access(m['id'])]
+
+    if not machines:
+        return jsonify({'success': True, 'queued': 0, 'background': True,
+                        'task_id': None, 'message': 'Aucune machine a relever'})
+
+    from task_tracker import create_task
+    try:
+        cree_par = int(request.headers.get('X-User-ID', 0)) or None
+    except (TypeError, ValueError):
+        cree_par = None
+    task_id = create_task(
+        'supervision_scan',
+        f'Releve des agents de supervision ({len(machines)} machine(s), '
+        f'{len(platforms)} plateforme(s))',
+        created_by=cree_par)
+
+    _spawn_scan_all_thread(machines, platforms, task_id)
+
+    return jsonify({'success': True, 'queued': len(machines),
+                    'platforms': platforms, 'background': True,
+                    'task_id': task_id})
 
 
 # ══════════════════════════════════════════════════════════════════════════════

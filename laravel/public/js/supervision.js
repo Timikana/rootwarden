@@ -304,4 +304,103 @@
             });
         });
     }
+
+    /* ── Le releve du parc, en tache de fond ─────────────────── sous-lot V8
+     *
+     * DEUX TEMPS, ET LE PREMIER N'ENVOIE RIEN. Le bouton ouvre un panneau de
+     * decision qui chiffre le cout et NOMME les machines de production ; seule
+     * la confirmation part. Le legacy, lui, lance la rafale au clic, sans rien
+     * annoncer : `ids x 4 plateformes` requetes en parallele, filtre de table
+     * ignore, production comprise.
+     *
+     * LE VERDICT RESTE A L'ECRAN. Une reponse de mise en file arrive en moins
+     * d'une seconde, mais le balayage lui-meme dure des minutes : le resultat se
+     * lit dans le centre de taches, et l'annonce y renvoie par un lien plutot
+     * que de faire croire que tout est fini.
+     */
+    var boutonReleve = document.querySelector('[data-rw="superv-relever-parc"]');
+    var panneauReleve = document.querySelector('[data-rw="superv-panneau-releve"]');
+    var messageReleve = document.querySelector('[data-rw="superv-releve-message"]');
+    var annulerReleve = document.querySelector('[data-rw="superv-releve-annuler"]');
+    var confirmerReleve = document.querySelector('[data-rw="superv-releve-confirmer"]');
+
+    if (boutonReleve && panneauReleve && messageReleve && annulerReleve && confirmerReleve) {
+        boutonReleve.addEventListener('click', function () {
+            // OUVRIR N'EST PAS ENVOYER : aucune requete ne part d'ici.
+            panneauReleve.hidden = false;
+            boutonReleve.hidden = true;
+            messageReleve.className = 'rw-annonce';
+            messageReleve.textContent = '';
+            annulerReleve.focus();
+        });
+
+        annulerReleve.addEventListener('click', function () {
+            panneauReleve.hidden = true;
+            boutonReleve.hidden = false;
+            boutonReleve.focus();
+        });
+
+        confirmerReleve.addEventListener('click', function () {
+            confirmerReleve.disabled = true;
+            annulerReleve.disabled = true;
+            messageReleve.className = 'rw-annonce';
+            messageReleve.textContent = libelles.releve_en_cours;
+
+            var jeton = document.querySelector('meta[name="csrf-token"]');
+            fetch(libelles.url_releve_parc, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                },
+                /*
+                 * Corps VIDE : la portee est le parc, et c'est le SERVEUR qui
+                 * l'etablit. Envoyer une liste d'identifiants lue dans le
+                 * tableau reviendrait a laisser le navigateur decider quelles
+                 * machines sont jointes — le defaut meme du legacy, dont la
+                 * liste ne correspond plus a ce qui est affiche des qu'on
+                 * filtre.
+                 */
+                body: '{}',
+            }).then(function (reponse) {
+                // LE STATUT D'ABORD. Un refus ne se confond ni avec un parc
+                // vide ni avec une panne : ce sont trois cas.
+                if (! reponse.ok) {
+                    messageReleve.className = 'rw-annonce rw-annonce--echec';
+                    messageReleve.textContent = libelles.releve_refus
+                        .replace('{statut}', String(reponse.status));
+
+                    return null;
+                }
+
+                return reponse.json();
+            }).then(function (donnees) {
+                if (! donnees) { return; }
+                if (! donnees.queued) {
+                    messageReleve.className = 'rw-annonce rw-annonce--attention';
+                    messageReleve.textContent = libelles.releve_aucune;
+
+                    return;
+                }
+                messageReleve.className = 'rw-annonce rw-annonce--ok';
+                messageReleve.textContent = libelles.releve_lance
+                    .replace('{machines}', String(donnees.queued))
+                    .replace('{tache}', String(donnees.task_id || '?'));
+                // Le suivi vit dans le centre de taches, deja porte.
+                var lien = document.createElement('a');
+                lien.className = 'rw-lien';
+                lien.href = libelles.url_taches;
+                lien.textContent = ' ' + libelles.releve_voir_taches;
+                messageReleve.appendChild(lien);
+            }).catch(function () {
+                messageReleve.className = 'rw-annonce rw-annonce--echec';
+                messageReleve.textContent = libelles.releve_echec;
+            }).finally(function () {
+                panneauReleve.hidden = true;
+                boutonReleve.hidden = false;
+                confirmerReleve.disabled = false;
+                annulerReleve.disabled = false;
+            });
+        });
+    }
 }());

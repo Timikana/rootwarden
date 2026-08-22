@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.38** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.39** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,91 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.39 — module `supervision/`, sous-lot V8 : le releve de parc devient une tache de fond
+
+**Symptome.** Le releve de parc n'existait que dans le navigateur : un clic sur « Scanner tous les
+agents » lancait `machines x 4 plateformes` requetes en parallele, chacune ouvrant sa session SSH,
+chacune `@threaded_route` — donc chacune consommant un slot du pool PARTAGE par toutes les routes du
+backend, celui dont le commentaire interdit precisement cet usage. Et le filtre de la table ne bornait
+pas ce releve : une ligne visible, trois machines jointes, dont la production (E-80).
+
+**Arbitrage.** L'exploitant a tranche pour la tache de fond, avec autorisation explicite d'ecrire la
+route backend manquante. L'ecart signale — cette option joint la production en usage reel — a ete redit
+avant de commencer, et la decision maintenue.
+
+**Fix.** PREMIERE ROUTE PYTHON ECRITE PENDANT CETTE MIGRATION : `POST /supervision/scan-all`. Reponse
+immediate `{queued, background, task_id}`, puis un unique thread demon qui balaie le parc
+SEQUENTIELLEMENT. Le pool partage n'est plus touche du tout. Motif aligne sur `/ssh-audit/scan-all`
+(v1.37.13), y compris le helper `_spawn_scan_all_thread` isole pour rester patchable sans stubber
+`threading.Thread` globalement — le ThreadPoolExecutor de `@threaded_route` en depend pour creer ses
+workers, et le stubber globalement interbloque le pool.
+
+**UNE SEULE SESSION SSH PAR MACHINE, MESUREE AU JOURNAL PARAMIKO.** Les quatre lectures partagent la
+session de la machine :
+
+    INFO  Authentication (password) successful!
+    DEBUG Secsh channel 0 opened.   zabbix_agent2 -V
+    DEBUG Secsh channel 1 opened.   centreon-monitoring-agent --version
+    DEBUG Secsh channel 2 opened.   node_exporter --version
+    DEBUG Secsh channel 3 opened.   telegraf --version
+    DEBUG EOF in transport thread
+
+Un transport authentifie, quatre canaux : le parc passe de 12 sessions a 3. La mesure exonere au passage
+l'echec `publickey` visible avant le mot de passe — `service_account_deployed = 0` pour cette machine,
+la base dit vrai, c'est la negociation normale de paramiko.
+
+**LE COUT S'ENONCE AVANT LE GESTE, ET LA PRODUCTION EST NOMMEE.** Le bouton n'envoie rien : il ouvre un
+panneau de decision rendu par le SERVEUR — « 3 machine(s), 4 plateforme(s), 3 session(s) SSH — une par
+machine, pas une par plateforme », puis « Machines de PRODUCTION concernees : srv-zabbix. » Nommer
+plutot que compter est le point : « 3 machines » ne previent personne. **Le corps de la requete est
+vide** : la portee vient du serveur, jamais d'une liste lue dans le tableau.
+
+**COMMENT ON CLIQUE UN BOUTON QUI JOINDRAIT LA PRODUCTION.** La suite clique le vrai declencheur puis le
+vrai bouton de confirmation, et la requete est INTERCEPTEE ET AVORTEE : le geste est exerce de bout en
+bout, la requete est mesuree (methode, chemin, corps), aucune machine n'est jointe. Le contrat de mise en
+file se mesure a part, sur une portee explicite (`machine_ids: [2]`, DEV) : 200 en 230 ms, la ou le legacy
+tient la connexion pendant tout le balayage. Et le chemin « tout le parc », qu'aucun navigateur ne peut
+declencher ici, est exerce par les tests backend avec le thread patche — on lit QUELLES machines auraient
+ete balayees.
+
+**UN GARDE SANS OBJET NE GARDE RIEN.** `@require_machine_access` lit `machine_id`/`machine_ids` dans le
+corps et fail-close sur tout id refuse — mais un corps vide ne lui donne RIEN a refuser, et ici le corps
+vide signifie « tout le parc ». Il aurait eu l'apparence d'un garde sans en etre un. Le parc implicite est
+donc filtre dans le handler par `check_machine_access`, et un test le prouve. Ce filtre ne retire rien
+aujourd'hui (role 2 requis) : c'est dit plutot que sous-entendu.
+
+**AUCUNE NOTIFICATION, DELIBEREMENT.** `/ssh-audit/scan-all` appelle `notify_subscribed` par machine ; un
+releve de version n'est ni une alerte ni un verdict. Un effet sortant ne se defait pas. **LE PRIVILEGE
+N'A PAS ETE CHANGE** : la lecture passe par `execute_as_root` comme les routes par machine — E-78 reste
+declare, un changement de droits ne se fait pas au detour d'un portage, et une lecture qui echouerait
+sans root produirait un ecart avec les routes existantes.
+
+**DEUX DEFAUTS DE MON PORTAGE, VUS A L'IMAGE.** Le cout s'affichait en vert de reussite
+(`rw-confirmation`) dans un panneau a bordure rouge — le vert invite a cliquer alors que la phrase enonce
+un COUT ; passe en encart neutre. Et le bouton etait a plus de mille pixels de la phrase qui l'explique :
+la convention « action principale a droite » vaut pour un PIED DE FORMULAIRE, pas pour une action unique
+attachee a une explication. Aucune assertion DOM ne voit ni l'un ni l'autre.
+
+**UN DEFAUT DE MA SUITE, TROUVE PAR ELLE-MEME.** Son premier nettoyage supprimait les taches PAR TYPE :
+il aurait efface l'historique d'un releve lance par un exploitant. Elle ne supprime plus que la tache
+dont elle a retenu l'identifiant, et sa propriete de sortie est un DELTA, pas un zero.
+
+**UN TEXTE QUI ALLAIT DEVENIR FAUX**, corrige dans le meme commit : le bloc « pas encore porte »
+annoncait « le releve de tout le parc en une fois » parmi les gestes a venir.
+
+**Tests.** `go-page-supervision-releve` : base rouge 3 PASS / 4 FAIL, puis **28 PASS sur le portage** et
+**11 sur le legacy**. 12 tests backend neufs (`test_supervision_scan_all.py`), **308 pytest** au total.
+i18n : 14 cles FR + 14 EN dans le meme commit, **135 = 135**.
+
+**Reference du LOT** : `go-page-supervision-releve` entre avec **11 PASS sur le legacy** et **28 sur le
+portage**. Le LOT passe a **74 executions de suite** (38 cote portage, 36 cote legacy), pour **974
+assertions**.
+
+**UN CHIFFRE HERITE N'EST PAS UNE MESURE.** Le suivi de chantier annoncait « 65 suites » depuis
+plusieurs sous-lots ; le decompte reel avant V8 etait de **72**. Le nombre a donc ete COMPTE dans le
+journal du rejeu plutot que deduit de l'ancien total — meme regle que pour les references de suite, qui
+se mesurent au lieu de s'annoncer.
+
 ### mesure — module `supervision/`, sous-lot V8 : le releve de parc n'est pas porte, et c'est le resultat
 
 *Aucun changement de comportement, aucune version : ce commit ne porte que la mesure et la declaration.*
@@ -2237,7 +2322,7 @@ la production**, puisque le parc est « toutes les machines non archivees ». Re
 pas la cible. Sous la regle en vigueur — `srv-zabbix` n'est jamais jointe, meme en lecture — seule la
 premiere tient, et la detection PAR LIGNE de V6 la couvre deja. **Rien n'a ete porte sans arbitrage.**
 
-**Reference du LOT** : inchangee, **65 suites**. V8 n'ajoute aucune suite — il n'y a rien a caracteriser
+**Reference du LOT** : inchangee. V8 n'ajoute aucune suite — il n'y a rien a caracteriser
 tant que la cible n'est pas tranchee, et une suite qui ne peut pas echouer occuperait la place d'un test.
 
 ### v1.37.38 — module `supervision/`, sous-lot V7 : l'editeur distant en lecture
