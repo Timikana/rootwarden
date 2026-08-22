@@ -131,7 +131,7 @@ return [
     // The legacy portal shows a path hardcoded in the client: see PARITE E-79.
     // BEFORE THE READ, THE PAGE CANNOT SAY "READ": nothing has been. Two labels,
     // and the script switches from the first to the second once the read lands.
-    'editeur_chemin' => 'File to read:',
+    'editeur_chemin' => 'Target file:',
     'editeur_chemin_lu' => 'File read:',
     'editeur_contenu' => 'File content',
     'editeur_vide' => 'Pick a server then read its configuration to display it here.',
@@ -177,7 +177,6 @@ return [
     // A TEXT CAN BECOME FALSE WITHOUT ANY TEST SEEING IT: the fleet table is
     // ported as of V6, so the sentence announcing it "for later" no longer was.
     'a_venir_deploiement' => 'Installing, reconfiguring and uninstalling an agent arrive with the following sub-lots: those acts CHANGE the servers. Until then they stay on the previous portal.',
-    'a_venir_editeur' => 'Reading and writing the remote file arrive with the following sub-lots. Until then they stay on the previous portal.',
     'vers_legacy' => 'Open on the previous portal',
 
     // ── Sub-lot V8: surveying the fleet as a background task ──────────────
@@ -195,4 +194,30 @@ return [
     'releve_refus' => 'Survey refused (status :statut).',
     'releve_echec' => 'The survey could not be started.',
     'releve_voir_taches' => 'Follow in the task centre',
+
+    // ── Sub-lot V9: writing the remote file and restoring a backup ─────────
+    'editeur_sauver' => 'Write to the server',
+    'editeur_sauver_vide' => 'The content is empty: nothing would be written. Read the file first, or type a configuration.',
+    'editeur_sauver_cout' => 'This acts on :chemin, on the selected server.',
+    'editeur_effet_sauvegarde' => 'a timestamped copy of the current file is created on the server, before anything is written',
+    'editeur_effet_ecriture' => 'the file is replaced by the content shown above',
+    'editeur_effet_redemarrage' => 'the monitoring agent is restarted so it picks up the new configuration',
+    'editeur_sauver_annuler' => 'Cancel',
+    'editeur_sauver_confirmer' => 'Write and restart',
+    'editeur_sauver_en_cours' => 'Writing...',
+    'editeur_sauve_et_redemarre' => 'File written and agent restarted.',
+    'editeur_sauve_sans_redemarrage' => 'File written, but the agent did NOT restart. The configuration is in place and the service is not running: check it before relying on this server being monitored.',
+    'editeur_sauver_refus' => 'Write refused (status :statut).',
+    'editeur_sauver_echec' => 'The file was not written.',
+    'restaurer_bouton' => 'Restore',
+    'restaurer_cout' => 'Restoring :nom will overwrite :chemin on the selected server.',
+    'restaurer_aide' => 'The current file is copied first as well: a restore can therefore be undone. The agent is restarted afterwards.',
+    'restaurer_annuler' => 'Cancel',
+    'restaurer_confirmer' => 'Restore and restart',
+    'restaurer_en_cours' => 'Restoring :nom...',
+    'restaure_et_redemarre' => ':nom restored and agent restarted.',
+    'restaure_sans_redemarrage' => ':nom restored, but the agent did NOT restart. The file is in place and the service is not running.',
+    'restaurer_refus' => 'Restore refused (status :statut).',
+    'restaurer_echec' => 'The restore did not go through.',
+    'editeur_change_serveur' => 'Server changed: the editing area was cleared. Anything typed there was not saved.',
 ];

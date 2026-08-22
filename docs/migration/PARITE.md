@@ -3113,3 +3113,98 @@ V6→V12 : le SSH appartient au backend). Porter l'écriture sur les quatre plat
 de l'affirmation fabriquée** pour trois d'entre elles — le portage annoncerait à son tour une réussite
 qu'il n'a pas vérifiée. Arbitrage porté à l'exploitant : corriger les trois routes génériques (elles
 mentent aujourd'hui aux DEUX portails) ou porter l'écriture pour Zabbix seul et dire pourquoi.
+
+## E-84 — L'écriture distante portée : le troisième cas dit, et un défaut de mon propre portage de V7
+
+**Module `supervision/`, sous-lot V9 : l'écriture du fichier distant et la restauration.** **PREMIER
+SOUS-LOT DU MODULE QUI MODIFIE UNE MACHINE.** Suite :
+`tests/e2e/go-page-supervision-ecriture.mjs` — **18 PASS sur le legacy, 38 sur le portage** (base rouge
+relevée avant portage : **5 PASS / 4 FAIL**). Plus **10 tests backend** neufs ; **318 pytest** au total.
+
+**POURQUOI CETTE SUITE PEUT CLIQUER, LÀ OÙ CELLE DE V8 NE POUVAIT PAS.** Le geste de V8 joignait
+`srv-zabbix` **par construction** ; il fallait intercepter et avorter. Ici le geste porte sur **une**
+machine, celle qu'on choisit dans la liste : **Test-Server-Debian (id 2, DEV)**. La production n'est
+jamais sélectionnée, donc jamais jointe, et le vrai bouton est cliqué des deux côtés. Ce que le geste
+écrit et rien de plus : `/etc/zabbix/zabbix_agent2.conf` et ses copies datées, nettoyés à l'entrée et dans
+un `finally`, et l'état rendu est **relu pour être prouvé** plutôt qu'affirmé.
+
+**LE CORRECTIF BACKEND, AUTORISÉ PAR L'EXPLOITANT** (voir E-83). `generic_config_save` et
+`generic_restore` vérifient désormais leurs codes de retour, restaurent la sauvegarde si l'écriture échoue,
+et distinguent le troisième cas. Mesuré sur l'appel qui mentait :
+
+```
+avant : 200 {"success":true,  "message":"Config telegraf sauvegardee et agent redemarre."}
+apres : 500 {"success":false, "message":"Ecriture echouee: cannot create /etc/telegraf/telegraf.conf: Directory nonexistent"}
+```
+
+`zabbix_restore` a été corrigé **par cohérence, au-delà de la lettre de l'autorisation** : elle portait le
+même défaut — le code de retour du redémarrage jeté, un « agent redémarré » non vérifié — et laisser la
+route générique plus honnête que sa jumelle Zabbix aurait recréé l'incohérence à l'envers. C'est un choix
+de jugement, il est dit ici pour pouvoir être défait seul. **`restarted` est un booléen ajouté aux quatre
+routes** : un client n'a pas à deviner l'issue en analysant une phrase française. Ajout purement additif.
+**`_backup_agent_config` n'a PAS été touché** : la correction du `A && B || C` n'a pas été autorisée, et
+six routes en dépendent, dont le déploiement. Le défaut reste déclaré en E-83.
+
+**LE TROISIÈME CAS EST DIT, ET C'EST TOUTE LA DIFFÉRENCE.** La machine de test n'a ni agent ni
+`systemctl` : l'écriture réussit, le redémarrage échoue. Mesuré des deux côtés, sur le même geste :
+
+```
+legacy  : ✓ config_remote_saved                       ← coche verte, clé cassée, pas un mot du redémarrage
+portage : Fichier ecrit, mais l'agent n'a PAS redemarre. La configuration est en place
+          et le service ne tourne pas : verifiez-le avant de compter sur la supervision
+          de ce serveur.
+```
+
+Le legacy ne cache pas l'avertissement par négligence d'affichage : **la dette i18n le supprime**. Son
+`toast(__('config_remote_saved') || res.message, 'success')` n'atteint jamais `res.message`, puisqu'une clé
+absente est rendue telle quelle donc non vide. Le portage lit le **booléen** et dit l'issue, traduite —
+sans jeter à l'écran la sortie d'erreur brute de la commande distante, que le test vérifie absente.
+
+**UN DÉFAUT DE MON PROPRE PORTAGE DE V7, TROUVÉ EN LISANT UN TEXTE DEVENU FAUX.** Le bloc « pas encore
+porté » de l'éditeur annonçait encore « la lecture et l'écriture arrivent avec les sous-lots suivants »
+alors que la lecture était portée depuis V7. En le corrigeant, la question s'est posée : la route suit-elle
+la plateforme ? **Non.** Les quatre URL étaient **figées** sur `/supervision/zabbix/...` pendant que le
+chemin affiché suivait le sélecteur. La base rouge le prouve :
+
+```
+FAIL  aucune plateforme ne voit la route et le chemin divergents
+      — centreon: route vise zabbix | prometheus: route vise zabbix | telegraf: route vise zabbix
+```
+
+Choisir Telegraf annonçait `/etc/telegraf/telegraf.conf` et lisait `/etc/zabbix/zabbix_agent2.conf` :
+**exactement le défaut E-79 que V7 reprochait au legacy**, revenu par la ROUTE au lieu du CHEMIN. V7 avait
+raisonné sur la bonne source pour le chemin et n'avait pas regardé l'adresse. Et sa suite ne pouvait pas
+le voir : elle n'exerçait que Zabbix, la seule plateforme où l'URL figée se trouvait être la bonne.
+Chemins et routes viennent maintenant de la **même** table serveur, indexée par la même clé, et la
+propriété est mesurée **sur les quatre plateformes** — par interception, donc sans une seule session SSH.
+
+**UN AUTRE DÉFAUT DE MON PORTAGE, SURGI D'UNE ERREUR DE MA SUITE.** La suite échouait à ouvrir le panneau ;
+le portage avait raison. Changer de serveur **vide la zone d'édition** (mon code de V7), et j'avais rempli
+avant de choisir. Vider est correct — la configuration d'un serveur n'a aucun sens pour un autre — mais
+V7 laissait ce champ en **lecture seule**, donc vider ne perdait rien. Depuis que V9 le rend modifiable, le
+même geste peut effacer ce que quelqu'un vient de taper : un effacement silencieux devient une **perte de
+travail**. Il est désormais annoncé, et une assertion le mesure.
+
+**LE COÛT S'ÉNONCE, ET LES TROIS EFFETS SONT ÉNUMÉRÉS.** Le bouton n'envoie rien : il ouvre un panneau qui
+nomme le chemin exact et liste, un par un, la copie datée créée avant, le remplacement du fichier, et le
+redémarrage du service. « Enregistrer » cache deux effets sur trois. Le legacy n'annonce rien du tout.
+
+**LA RESTAURATION CESSE D'ÊTRE UN CLIC SANS FILET.** Côté legacy, la liste s'ouvre dans une fenêtre modale
+et chaque ligne porte un bouton qui, d'un seul clic, écrase la configuration courante et redémarre
+l'agent — ni `confirm()`, ni panneau, rien. Ici le bouton **ouvre** un panneau qui nomme la sauvegarde
+visée **et** le fichier qui sera écrasé, et le test assert qu'ouvrir n'émet aucune requête. Son bouton
+affichait par ailleurs l'identifiant `btn_restore`.
+
+**LA PROPRIÉTÉ DE LA SAUVEGARDE A DEUX MOITIÉS, et les deux sont mesurées** : elle existe, **et elle porte
+l'ancienne version** — la suite écrit `10.0.0.1`, réécrit `10.0.0.2`, et vérifie que la copie datée
+contient `10.0.0.1` et pas `10.0.0.2`.
+
+**UNE ASSERTION QUI PASSAIT POUR LA MAUVAISE RAISON, resserrée.** Le contrôle du message de restauration
+lisait tout le panneau visible : le message de l'**écriture**, encore à l'écran, le satisfaisait. Il lit
+maintenant le porte-messages de la restauration et exige qu'il **nomme la sauvegarde**.
+
+**TROIS CLÉS DE PLUS FERMÉES** — `config_remote_saved`, `backup_restored`, `btn_restore` (15e, 16e, 17e).
+**Le huitième français en dur** (`'Configuration vide'`, `main.js:539`) est mesuré à l'écran du legacy.
+L'onglet de l'éditeur est **complet** : son bloc « pas encore porté » a été retiré, et la clé devenue
+inutile avec lui. Le libellé du chemin dit désormais « Fichier cible » et non « Fichier à lire » —
+l'éditeur écrit aussi.

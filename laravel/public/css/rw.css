@@ -266,6 +266,19 @@ body {
     font-size: 14px;
 }
 
+/* TROIS EFFETS ENUMERES, pas une phrase qui les noie. Sous-lot V9 : enregistrer
+   une configuration distante SAUVEGARDE, ECRIT et REDEMARRE un service — dire
+   « enregistrer » cache les deux derniers. Une classe explicite plutot que le
+   style par defaut d'un `ul` : la feuille ne definit rien pour les listes, donc
+   le rendu aurait dependu d'un reset qu'on n'a pas mesure. */
+.rw-liste-effets {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    list-style: disc;
+}
+
+.rw-liste-effets li { margin: 2px 0; }
+
 .rw-note {
     margin: 22px 0 0;
     padding-top: 16px;

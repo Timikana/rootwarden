@@ -132,7 +132,7 @@ return [
     // AVANT LA LECTURE, LA PAGE NE PEUT PAS DIRE « LU » : rien ne l'a ete. Deux
     // libelles, et le script passe du premier au second quand la lecture aboutit.
     // Vu a l'image — meme famille qu'un texte qui devient faux.
-    'editeur_chemin' => 'Fichier a lire :',
+    'editeur_chemin' => 'Fichier cible :',
     'editeur_chemin_lu' => 'Fichier lu :',
     'editeur_contenu' => 'Contenu du fichier',
     'editeur_vide' => 'Choisissez un serveur puis lisez sa configuration pour l\'afficher ici.',
@@ -179,7 +179,6 @@ return [
     // parc est porte depuis V6, la phrase qui l'annoncait « pour plus tard » ne
     // l'etait plus. Vu a l'image.
     'a_venir_deploiement' => "Installer, reconfigurer et desinstaller un agent arrivent avec les sous-lots suivants : ces gestes MODIFIENT les serveurs. En attendant, ils restent sur l'ancien portail.",
-    'a_venir_editeur' => 'La lecture et l\'ecriture du fichier distant arrivent avec les sous-lots suivants. En attendant, elles restent sur l\'ancien portail.',
     'vers_legacy' => 'Ouvrir sur l\'ancien portail',
 
     // ── Sous-lot V8 : le releve du parc en tache de fond ──────────────────
@@ -197,4 +196,30 @@ return [
     'releve_refus' => 'Releve refuse (statut :statut).',
     'releve_echec' => "Le releve n'a pas pu etre lance.",
     'releve_voir_taches' => 'Suivre dans le centre de taches',
+
+    // ── Sous-lot V9 : l'ecriture distante et la restauration ──────────────
+    'editeur_sauver' => 'Enregistrer sur le serveur',
+    'editeur_sauver_vide' => "Le contenu est vide : rien ne sera ecrit. Lisez d'abord le fichier, ou saisissez une configuration.",
+    'editeur_sauver_cout' => 'Ce geste porte sur :chemin, sur le serveur choisi.',
+    'editeur_effet_sauvegarde' => "une copie datee du fichier actuel est creee sur le serveur, avant toute ecriture",
+    'editeur_effet_ecriture' => 'le fichier est remplace par le contenu affiche ci-dessus',
+    'editeur_effet_redemarrage' => "l'agent de supervision est redemarre pour prendre la nouvelle configuration",
+    'editeur_sauver_annuler' => 'Annuler',
+    'editeur_sauver_confirmer' => 'Ecrire et redemarrer',
+    'editeur_sauver_en_cours' => 'Ecriture en cours...',
+    'editeur_sauve_et_redemarre' => "Fichier ecrit et agent redemarre.",
+    'editeur_sauve_sans_redemarrage' => "Fichier ecrit, mais l'agent n'a PAS redemarre. La configuration est en place et le service ne tourne pas : verifiez-le avant de compter sur la supervision de ce serveur.",
+    'editeur_sauver_refus' => "Ecriture refusee (statut :statut).",
+    'editeur_sauver_echec' => "Le fichier n'a pas ete ecrit.",
+    'restaurer_bouton' => 'Restaurer',
+    'restaurer_cout' => 'Restaurer :nom ecrasera :chemin sur le serveur choisi.',
+    'restaurer_aide' => "Le fichier actuel est d'abord copie, lui aussi : une restauration se defait donc. L'agent est redemarre ensuite.",
+    'restaurer_annuler' => 'Annuler',
+    'restaurer_confirmer' => 'Restaurer et redemarrer',
+    'restaurer_en_cours' => 'Restauration de :nom...',
+    'restaure_et_redemarre' => ':nom restaure et agent redemarre.',
+    'restaure_sans_redemarrage' => ":nom restaure, mais l'agent n'a PAS redemarre. Le fichier est en place et le service ne tourne pas.",
+    'restaurer_refus' => 'Restauration refusee (statut :statut).',
+    'restaurer_echec' => "La restauration n'a pas abouti.",
+    'editeur_change_serveur' => "Serveur change : la zone d'edition a ete videe. Ce qui y etait tape n'a pas ete enregistre.",
 ];

@@ -366,11 +366,37 @@ class SupervisionController extends Controller
      *
      * @return array<string,string>
      */
+    /**
+     * Les routes de la passerelle, PAR PLATEFORME — correctif de V7, porte en V9.
+     *
+     * Quatre gestes par plateforme : lire le fichier, lister les sauvegardes,
+     * ecrire, restaurer. Le backend expose une route statique pour Zabbix et une
+     * route generique pour les trois autres ; les deux formes rendent le meme
+     * verdict, mais il faut viser la bonne — une URL figee sur Zabbix lit le
+     * fichier de Zabbix quelle que soit la plateforme affichee.
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function routesParPlateforme(): array
+    {
+        $routes = [];
+
+        foreach ($this->supervision->plateformes() as $plateforme) {
+            $routes[$plateforme] = [
+                'lecture' => url("/api/gateway/supervision/{$plateforme}/config/read"),
+                'sauvegardes' => url("/api/gateway/supervision/{$plateforme}/backups"),
+                'ecriture' => url("/api/gateway/supervision/{$plateforme}/config/save"),
+                'restauration' => url("/api/gateway/supervision/{$plateforme}/restore"),
+            ];
+        }
+
+        return $routes;
+    }
+
     private function libelles(): array
     {
         return [
             'editeur_sans_serveur' => __('superv.editeur_sans_serveur'),
-            'editeur_non_porte' => __('superv.a_venir_editeur'),
             // ── Sous-lot V6 : la detection de version ─────────────────────
             'url_version' => url('/api/gateway/supervision/zabbix/version'),
             /*
@@ -395,7 +421,23 @@ class SupervisionController extends Controller
              * SERVEUR, donc de la meme source que celle que le backend lira.
              */
             'chemins_config' => json_encode($this->supervision->cheminsConfiguration()),
-            'url_lecture_config' => url('/api/gateway/supervision/zabbix/config/read'),
+            /*
+             * LES ROUTES SUIVENT LA PLATEFORME, comme les chemins — ET C'EST UN
+             * CORRECTIF DE MON PROPRE PORTAGE DE V7. Ces quatre URL etaient
+             * FIGEES sur `/supervision/zabbix/...` alors que le chemin affiche,
+             * lui, suivait le selecteur de plateforme. Choisir Telegraf faisait
+             * donc annoncer `/etc/telegraf/telegraf.conf` et lire
+             * `/etc/zabbix/zabbix_agent2.conf` : exactement le defaut E-79 que V7
+             * reprochait au legacy, reintroduit par une porte que je n'avais pas
+             * regardee — le CHEMIN venait du serveur, la ROUTE non.
+             *
+             * La suite de V7 ne pouvait pas le voir : elle n'exercait que Zabbix,
+             * la seule plateforme ou l'URL figee se trouvait etre la bonne.
+             *
+             * Chemins et routes viennent desormais de la MEME source, indexes par
+             * la meme cle : ils ne peuvent plus diverger.
+             */
+            'routes_machine' => json_encode($this->routesParPlateforme()),
             'url_sauvegardes' => url('/api/gateway/supervision/zabbix/backups'),
             'editeur_chemin_lu' => __('superv.editeur_chemin_lu'),
             'editeur_lecture_en_cours' => __('superv.editeur_lecture_en_cours', ['nom' => '{nom}']),
@@ -416,6 +458,30 @@ class SupervisionController extends Controller
             'releve_refus' => __('superv.releve_refus', ['statut' => '{statut}']),
             'releve_echec' => __('superv.releve_echec'),
             'releve_voir_taches' => __('superv.releve_voir_taches'),
+            // ── Sous-lot V9 : l'ecriture distante et la restauration ───────
+            'editeur_change_serveur' => __('superv.editeur_change_serveur'),
+            'editeur_sauver_vide' => __('superv.editeur_sauver_vide'),
+            'editeur_sauver_cout' => __('superv.editeur_sauver_cout', ['chemin' => '{chemin}']),
+            'editeur_sauver_en_cours' => __('superv.editeur_sauver_en_cours'),
+            /*
+             * LE MESSAGE DU BACKEND N'EST PAS REPRIS TEL QUEL. Il est en francais
+             * uniquement et porte la sortie d'erreur brute de la commande
+             * distante (« sh: 1: systemctl: not found »). Le portage dit l'ISSUE,
+             * traduite, et lit le BOOLEEN `restarted` plutot qu'une phrase.
+             */
+            'editeur_sauve_et_redemarre' => __('superv.editeur_sauve_et_redemarre'),
+            'editeur_sauve_sans_redemarrage' => __('superv.editeur_sauve_sans_redemarrage'),
+            'editeur_sauver_refus' => __('superv.editeur_sauver_refus', ['statut' => '{statut}']),
+            'editeur_sauver_echec' => __('superv.editeur_sauver_echec'),
+            'restaurer_bouton' => __('superv.restaurer_bouton'),
+            'restaurer_cout' => __('superv.restaurer_cout', [
+                'nom' => '{nom}', 'chemin' => '{chemin}',
+            ]),
+            'restaurer_en_cours' => __('superv.restaurer_en_cours', ['nom' => '{nom}']),
+            'restaure_et_redemarre' => __('superv.restaure_et_redemarre', ['nom' => '{nom}']),
+            'restaure_sans_redemarrage' => __('superv.restaure_sans_redemarrage', ['nom' => '{nom}']),
+            'restaurer_refus' => __('superv.restaurer_refus', ['statut' => '{statut}']),
+            'restaurer_echec' => __('superv.restaurer_echec'),
         ];
     }
 }

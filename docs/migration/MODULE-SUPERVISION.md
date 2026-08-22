@@ -546,6 +546,50 @@ sur les quatre plateformes, c'est **hériter de l'affirmation fabriquée** pour 
 Corriger les trois routes génériques — qui mentent aujourd'hui aux DEUX portails — ou porter Zabbix seul
 et dire pourquoi.
 
+## 7 quaterdecies. V9 porté — l'écriture distante, et le troisième cas enfin dit (2026-08-22)
+
+L'exploitant a tranché : **corriger les routes génériques**. Suite `go-page-supervision-ecriture` : base
+rouge **5 PASS / 4 FAIL**, puis **38 PASS** sur le portage et **18** sur le legacy. Plus **10 tests
+backend** ; **318 pytest**. Détail en `PARITE.md` E-84.
+
+**CETTE SUITE PEUT CLIQUER, contrairement à celle de V8** : le geste porte sur UNE machine, celle qu'on
+choisit — Test-Server-Debian (id 2, DEV). La production n'est jamais sélectionnée. Le fichier écrit et ses
+copies datées sont nettoyés dans un `finally`, et l'état rendu est **relu pour être prouvé**.
+
+**LE CORRECTIF BACKEND.** `generic_config_save` et `generic_restore` vérifient leurs codes de retour,
+restaurent la sauvegarde si l'écriture échoue, et distinguent le troisième cas. L'appel qui mentait rend
+maintenant `500 « Ecriture echouee: cannot create /etc/telegraf/telegraf.conf »`. `zabbix_restore` corrigé
+**par cohérence, au-delà de la lettre de l'autorisation** — dit comme tel pour pouvoir être défait seul.
+`restarted` est un **booléen** ajouté aux quatre routes. `_backup_agent_config` **non touché** : le
+`A && B || C` n'était pas dans l'autorisation, et six routes en dépendent.
+
+**LE TROISIÈME CAS EST DIT** — mesuré des deux côtés sur le même geste :
+
+```
+legacy  : ✓ config_remote_saved     ← coche verte, clé cassée, pas un mot du redémarrage
+portage : Fichier ecrit, mais l'agent n'a PAS redemarre. […] le service ne tourne pas
+```
+
+La dette i18n ne défigurait pas un libellé : elle **supprimait** l'avertissement. Le portage lit le booléen
+et dit l'issue, traduite, sans jeter la sortie d'erreur brute à l'écran — le test vérifie son absence.
+
+**DEUX DÉFAUTS DE MON PROPRE PORTAGE DE V7, trouvés en corrigeant un texte devenu faux :**
+- **les quatre URL de l'éditeur étaient figées sur Zabbix** pendant que le chemin suivait le sélecteur :
+  choisir Telegraf annonçait `/etc/telegraf/telegraf.conf` et lisait `/etc/zabbix/zabbix_agent2.conf` —
+  **E-79 revenu par la ROUTE au lieu du CHEMIN**. La base rouge le prouve sur trois plateformes. La suite
+  de V7 ne pouvait pas le voir : elle n'exerçait que Zabbix. Chemins et routes viennent désormais de la
+  même table serveur, et la propriété est mesurée **sur les quatre plateformes**, par interception ;
+- **changer de serveur vidait la zone d'édition en silence.** Correct quand le champ était en lecture
+  seule (V7), c'est une **perte de travail** depuis que V9 le rend modifiable. Désormais annoncé.
+
+**LE COÛT S'ÉNONCE, LES TROIS EFFETS SONT ÉNUMÉRÉS** : la copie datée, le remplacement du fichier, le
+redémarrage du service. « Enregistrer » cache deux effets sur trois. **La restauration cesse d'être un clic
+sans filet** : côté legacy un bouton dans une modale suffit à écraser et redémarrer ; ici il OUVRE un
+panneau qui nomme la sauvegarde et le fichier écrasé.
+
+**Reste du module** : V10 (reconfiguration, FLUX, aucune confirmation côté legacy), V11 (désinstallation,
+DÉTRUIT), V12 (déploiement).
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et
