@@ -319,6 +319,39 @@ class Supervision
     }
 
     /**
+     * Le chemin du fichier de configuration d'agent, par plateforme — sous-lot V7.
+     *
+     * CE CALCUL EST UN DOUBLON ASSUME DE `_config_file_path` (`supervision.py:281`),
+     * ET LE TEST EN FAIT LA CONDITION. Le legacy, lui, affiche un chemin ECRIT EN
+     * DUR cote client (`main.js:27-32`) : des que la configuration globale designe
+     * l'agent historique, sa page nomme `zabbix_agent2.conf` alors que le portail
+     * lit `zabbix_agentd.conf`. Mesure faite — voir PARITE E-79 : l'exploitant
+     * croit editer un fichier et voit le contenu d'un autre.
+     *
+     * Ici le chemin vient de la MEME source que celle du backend (`agent_type` en
+     * base), et la suite asserte que le chemin ANNONCE est bien celui qui a ete LU.
+     * Un doublon mesure vaut mieux qu'une valeur en dur que rien ne confronte.
+     *
+     * @return array<string,string>
+     */
+    public function cheminsConfiguration(): array
+    {
+        $configuration = $this->configurationParPlateforme();
+        // Le legacy retient `zabbix-agent2` quand rien n'est enregistre : la
+        // colonne porte ce meme defaut, et le backend l'applique aussi.
+        $typeZabbix = $configuration['zabbix']->agent_type ?? 'zabbix-agent2';
+
+        return [
+            'zabbix' => $typeZabbix === 'zabbix-agent'
+                ? '/etc/zabbix/zabbix_agentd.conf'
+                : '/etc/zabbix/zabbix_agent2.conf',
+            'centreon' => '/etc/centreon-monitoring-agent/centagent.yaml',
+            'prometheus' => '/etc/default/prometheus-node-exporter',
+            'telegraf' => '/etc/telegraf/telegraf.conf',
+        ];
+    }
+
+    /**
      * Les agents releves, par machine puis par plateforme — sous-lot V6.
      *
      * CETTE TABLE EST UN INVENTAIRE, PAS UNE VERITE. `supervision_agents` n'est

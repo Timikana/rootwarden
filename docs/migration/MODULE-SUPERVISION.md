@@ -387,6 +387,36 @@ calculé puis jeté.
 
 **Reste du module** : V7 (éditeur distant en lecture, SSH) est le prochain. V8 reste à reconcevoir.
 
+## 7 decies. V7 porté — l'éditeur distant en lecture (2026-08-22)
+
+Suite `go-page-supervision-editeur` : base rouge **10 PASS / 5 FAIL**, puis **16 PASS** sur le portage et
+**12** sur le legacy. Détail en `PARITE.md` E-79.
+
+**Les deux commandes distantes ont été lues mot pour mot** : `cat … || echo 'FILE_NOT_FOUND'` et
+`LC_ALL=C ls -la ….bak.* || echo 'NONE'`. Lectures pures. **Troisième exonération d'affilée** : les deux
+routes portent `@require_role(2)` et un fichier absent rend **404 en nommant le chemin**.
+
+**LE DÉFAUT CENTRAL — deux chemins à l'écran, dont un faux.** Le badge du legacy est écrit en dur côté
+client (`main.js:27-32`) ; le backend calcule `_config_file_path(agent_type)` depuis la base. Avec l'agent
+historique, la page nomme `zabbix_agent2.conf` et le portail lit `zabbix_agentd.conf`. Mesuré. Le portage
+tient son chemin du **serveur**, donc de la même source — doublon assumé, et **le test en fait la
+condition**.
+
+**La propriété assertée est négative** : aucun chemin affiché ne doit différer de celui qui a été lu.
+« Le chemin lu est affiché quelque part » passerait aussi sur le legacy, dont le badge continue de mentir.
+
+**Ce qu'un éditeur montre légitimement** : le fichier porte un `TLSPSKIdentity`, et un éditeur existe pour
+montrer ce qu'on édite. Ce qui se mesure est la **seconde copie** — au plus une occurrence dans le source.
+
+**Trois cas séparés** côté portage (absent / refusé / échoué), là où le legacy jette
+`HTTP 404: {json}` à l'écran.
+
+**Deux défauts de mon portage, vus à l'image** : `$plateforme` utilisé hors de sa boucle (l'éditeur
+annonçait le chemin de Telegraf), et « Fichier lu » affiché avant toute lecture.
+
+**Reste du module** : V8 (relevé du parc, à reconcevoir en tâche de fond) et V9 (écriture + restauration,
+qui modifient la machine).
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`

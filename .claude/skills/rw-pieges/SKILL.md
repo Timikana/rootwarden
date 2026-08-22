@@ -592,6 +592,29 @@ defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails es
 faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
 declenche rien trop tot). Voir `PARITE.md` E-73.
 
+## UNE VARIABLE DE BOUCLE UTILISEE HORS DE SA BOUCLE
+
+Blade laisse fuiter `$plateforme` apres son `@foreach` : un bloc ecrit APRES la
+boucle et qui s'en sert reprend la DERNIERE valeur — silencieusement. L'editeur
+de supervision annoncait ainsi le chemin de Telegraf alors que Zabbix etait
+choisi. Aucune erreur, aucun avertissement : **la valeur existe, elle est juste
+fausse**. Verifier qu'un bloc est bien DANS la boucle dont il emprunte la
+variable, ou nommer explicitement ce qu'il veut.
+
+## UNE PROPRIETE NEGATIVE VAUT MIEUX QU'UNE PROPRIETE POSITIVE
+
+« Le chemin lu est affiche quelque part » passe aussi sur un portail qui affiche
+DEUX chemins dont un faux. La propriete utile est negative : **aucun chemin
+affiche ne differe de celui qui a ete lu**. Collecter TOUT ce que le bloc nomme,
+et comparer a la seule valeur que la fixture rendait possible.
+
+## AVANT L'ACTION, LA PAGE NE PEUT PAS DIRE QUE L'ACTION A EU LIEU
+
+« Fichier lu : /etc/… » affiche avant toute lecture est faux des le premier
+rendu. Deux libelles — « a lire » puis « lu » — et le script bascule quand
+l'action aboutit. Meme famille qu'un texte qui devient faux, en pire : celui-ci
+l'etait des le depart.
+
 ## UN MESSAGE EPHEMERE NE SE LIT PAS APRES COUP
 
 `toast()` s'efface au bout de **4 s** (`head.php:172`). Une session SSH en demande

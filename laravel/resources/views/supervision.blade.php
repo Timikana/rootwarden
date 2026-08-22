@@ -476,10 +476,45 @@
                          la boite recouvre la ligne sur laquelle on decide, ne se
                          style pas, et bloque le test qui doit mener le geste au
                          bout. --}}
-                    <p class="rw-aide" data-rw="superv-editeur-message" aria-live="polite" hidden></p>
+                    <p class="rw-annonce" data-rw="superv-editeur-message" aria-live="polite"></p>
+
+                    {{-- LE CHEMIN VIENT DU SERVEUR, ET DE LA MEME SOURCE QUE CELLE
+                         QUE LE BACKEND LIRA (`agent_type` en base). Le legacy
+                         affiche un chemin ECRIT EN DUR cote client : des que la
+                         configuration globale designe l'agent historique, sa page
+                         nomme `zabbix_agent2.conf` alors que le portail lit
+                         `zabbix_agentd.conf` — mesure faite, voir PARITE E-79. --}}
+                    <p class="rw-aide rw-note">
+                        <span data-rw="superv-editeur-chemin-etiquette">{{ __('superv.editeur_chemin') }}</span>
+                        {{-- LE PANNEAU DE L'EDITEUR N'EST PAS DANS LA BOUCLE DES
+                             PLATEFORMES : y ecrire `$plateforme` reprenait la
+                             DERNIERE valeur laissee par le `@foreach` — donc
+                             Telegraf — et l'editeur annoncait le chemin d'une
+                             plateforme qu'on n'avait pas choisie. Blade laisse
+                             fuiter la variable sans broncher. Le chemin part donc
+                             de Zabbix, plateforme par defaut, et le script le suit
+                             au changement. --}}
+                        <code data-rw="superv-editeur-chemin">{{ $cheminsConfig['zabbix'] ?? '' }}</code>
+                    </p>
+
+                    {{-- LECTURE SEULE : V7 rapatrie le fichier, V9 l'ecrira. Un
+                         champ modifiable dont l'enregistrement n'existe pas
+                         laisserait croire qu'on peut editer. --}}
+                    <label class="rw-etiquette-champ">
+                        <span class="rw-etiquette">{{ __('superv.editeur_contenu') }}</span>
+                        <textarea class="rw-saisie" rows="16" readonly
+                                  data-rw="superv-editeur-contenu"
+                                  placeholder="{{ __('superv.editeur_vide') }}"></textarea>
+                    </label>
+
+                    <div class="rw-actions">
+                        <p class="rw-aide rw-actions__gauche" data-rw="superv-sauvegardes">{{ __('superv.sauvegardes_titre') }}</p>
+                        <button type="button" class="rw-bouton rw-bouton--discret"
+                                data-rw="superv-lire-sauvegardes">{{ __('superv.sauvegardes_lister') }}</button>
+                    </div>
                 @endif
 
-                <div class="rw-vide">
+                <div class="rw-vide rw-note">
                     <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
                     <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_editeur') }}</p>
                     <div class="rw-vide__action">

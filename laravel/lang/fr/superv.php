@@ -126,6 +126,26 @@ return [
     'editeur_serveur' => 'Serveur',
     'editeur_choisir_serveur' => 'Choisir un serveur',
     'editeur_lire' => 'Lire la configuration',
+    // ── L'editeur distant, sous-lot V7 (lecture seule) ────────────────────
+    // LE CHEMIN ANNONCE VIENT DE LA MEME SOURCE QUE CELUI QUI SERA LU. Le legacy
+    // affiche un chemin ecrit en dur cote client : voir PARITE E-79.
+    // AVANT LA LECTURE, LA PAGE NE PEUT PAS DIRE « LU » : rien ne l'a ete. Deux
+    // libelles, et le script passe du premier au second quand la lecture aboutit.
+    // Vu a l'image — meme famille qu'un texte qui devient faux.
+    'editeur_chemin' => 'Fichier a lire :',
+    'editeur_chemin_lu' => 'Fichier lu :',
+    'editeur_contenu' => 'Contenu du fichier',
+    'editeur_vide' => 'Choisissez un serveur puis lisez sa configuration pour l\'afficher ici.',
+    'editeur_lecture_en_cours' => 'Lecture du fichier sur :nom en cours...',
+    'editeur_lu' => 'Fichier :chemin lu sur :nom.',
+    // TROIS CAS SEPARES : un fichier absent est une REPONSE, pas une panne.
+    'editeur_absent' => 'Le fichier :chemin n\'existe pas sur :nom. Aucun agent n\'y est probablement installe.',
+    'editeur_refus' => 'La lecture a ete refusee (statut :statut). Aucune conclusion ne peut en etre tiree.',
+    'editeur_echec' => 'La lecture n\'a pas abouti : le serveur est peut-etre injoignable.',
+    'sauvegardes_titre' => 'Sauvegardes du fichier sur le serveur.',
+    'sauvegardes_lister' => 'Lister les sauvegardes',
+    'sauvegardes_aucune' => 'Aucune sauvegarde sur ce serveur.',
+    'sauvegardes_nombre' => ':nombre sauvegarde(s) :',
     // LE GARDE QUE V1 FERME. Cote legacy, ce message est la cle
     // `editor_select_server` affichee telle quelle, en clair, dans une boite.
     'editeur_sans_serveur' => 'Choisissez d\'abord un serveur : sans serveur, il n\'y a aucune configuration a lire.',

@@ -148,6 +148,7 @@ class SupervisionController extends Controller
              */
             'profilModifie' => $this->profilDemande($requete),
             'agents' => $this->supervision->agentsParMachine(),
+            'cheminsConfig' => $this->supervision->cheminsConfiguration(),
             'libelles' => $this->libelles(),
         ]);
     }
@@ -377,6 +378,24 @@ class SupervisionController extends Controller
             'version_absente' => __('superv.version_absente', ['nom' => '{nom}']),
             'version_refus' => __('superv.version_refus', ['statut' => '{statut}']),
             'version_echec' => __('superv.version_echec'),
+            // ── Sous-lot V7 : la lecture du fichier distant ────────────────
+            /*
+             * LES QUATRE CHEMINS SONT POSES EN DONNEES : le script suit la
+             * plateforme choisie, comme le legacy le fait pour son badge — a une
+             * difference pres, qui est tout le sujet de E-79 : ici ils viennent du
+             * SERVEUR, donc de la meme source que celle que le backend lira.
+             */
+            'chemins_config' => json_encode($this->supervision->cheminsConfiguration()),
+            'url_lecture_config' => url('/api/gateway/supervision/zabbix/config/read'),
+            'url_sauvegardes' => url('/api/gateway/supervision/zabbix/backups'),
+            'editeur_chemin_lu' => __('superv.editeur_chemin_lu'),
+            'editeur_lecture_en_cours' => __('superv.editeur_lecture_en_cours', ['nom' => '{nom}']),
+            'editeur_lu' => __('superv.editeur_lu', ['chemin' => '{chemin}', 'nom' => '{nom}']),
+            'editeur_absent' => __('superv.editeur_absent', ['chemin' => '{chemin}', 'nom' => '{nom}']),
+            'editeur_refus' => __('superv.editeur_refus', ['statut' => '{statut}']),
+            'editeur_echec' => __('superv.editeur_echec'),
+            'sauvegardes_aucune' => __('superv.sauvegardes_aucune'),
+            'sauvegardes_nombre' => __('superv.sauvegardes_nombre', ['nombre' => '{nombre}']),
         ];
     }
 }
