@@ -576,6 +576,22 @@ au-dessus, qui se lit barree. Donner un bloc a l'action (`.rw-vide__action`).
 Les quatre ne se voient qu'a l'image. `pdftotext` ne voit pas une mise en page,
 et `querySelector` ne voit pas un chevauchement : **REGARDER les captures**.
 
+## Deux horloges : une assertion qui compare des valeurs de reperes differents mesure les horloges
+
+`rootwarden_python` tourne en **UTC**, l'hote en **CEST**. `croniter` y calcule
+`next_run` et la valeur est stockee SANS fuseau. Comparer cette valeur a
+`new Date()` cote hote ne mesure pas « le prochain declenchement est a venir »
+mais **« les deux horloges concordent »** : l'assertion reussissait 22 heures sur
+24 et echouait entre 03:00 et 05:00, sans aucun defaut applicatif. Un faux rouge
+qui, repete, apprend a ne plus lire les rouges.
+
+**Le repere se choisit, et c'est celui qui a PRODUIT la valeur** :
+`docker exec rootwarden_python date +%Y-%m-%dT%H:%M:%S`. Et **constater l'ecart en
+clair** dans le journal de la suite — sinon le correctif du test absorbe le
+defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails est
+faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
+declenche rien trop tot). Voir `PARITE.md` E-73.
+
 ## Un test qui ne peut pas echouer occupe la place d'un test
 
 Assertion ecrite pour V1 : « aucune cle de traduction ne s'affiche en

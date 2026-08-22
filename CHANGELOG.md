@@ -2229,6 +2229,17 @@ voisines. Et `/supervision/` est absent des 25 prefixes de `$ADMIN_ONLY_PREFIXES
 
 **`legacy/supervision/` N'EST PAS ARCHIVE** : V2 a V12 y vivent encore.
 
+**Un defaut trouve PAR ce LOT, dans un autre module.** `go-page-cve-planification` est tombee a
+15/16 sur le legacy a 03:07 : `next_run` est calcule par `croniter` dans `rootwarden_python`, qui tourne
+en **UTC**, et stocke sans fuseau ; l'hote est en **CEST**. Le scheduler, dans le meme conteneur, compare
+avec la meme horloge et **ne declenche donc rien trop tot** — mais tout lecteur qui compare cette valeur a
+l'heure locale se trompe de deux heures, affichage des deux portails compris. **Non corrige** : le
+corriger demande de choisir entre poser le fuseau, convertir a l'affichage ou aligner les horloges, sur
+plusieurs modules. L'assertion, elle, est corrigee : elle comparait la valeur a l'horloge de l'HOTE, donc
+elle mesurait la concordance des horloges et non la propriete, et echouait chaque nuit entre 03:00 et
+05:00. Elle compare desormais a l'heure du conteneur qui a calcule la valeur, et **constate l'ecart en
+clair** pour que le defaut reste visible. Voir `PARITE.md` E-73.
+
 **Reference du LOT** : `go-page-supervision-onglets` entre avec **11 PASS sur le legacy** et **14 sur le
 portage** (base rouge relevee avant portage : 6 PASS / 7 FAIL). `go-socle-navigation` passe de **44 a
 46** : l'entree « Supervision » devient un lien interne, verifie pour chacun des deux comptes qui la
