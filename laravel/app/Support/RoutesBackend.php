@@ -66,6 +66,18 @@ class RoutesBackend
         '/server_lifecycle', '/update_security_exec', '/drift/', '/tasks/',
         '/groups', '/maintenance/windows', '/approvals', '/command_log',
         '/chatops/users', '/tickets', '/search',
+        /*
+         * `/supervision/` EST ABSENT DE `ADMIN_ONLY_PREFIXES` COTE LEGACY, et cette
+         * liste en etait le releve fidele — elle recopiait donc le trou. Or la page
+         * de supervision exige `role:2` des deux cotes : personne de legitime ne
+         * perd un acces en l'ajoutant ici, et un role 1 porteur de
+         * `can_manage_supervision` cesse de pouvoir appeler
+         * `/api/gateway/supervision/profiles` — que le backend, lui, ne garde par
+         * aucun `@require_role` (E-77). C'est exactement la defense en profondeur
+         * que le commentaire de cette classe annonce : on ne depend jamais d'un
+         * seul rempart. Le legacy garde son trou, et il est declare.
+         */
+        '/supervision/',
     ];
 
     /**

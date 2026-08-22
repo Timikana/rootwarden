@@ -131,6 +131,22 @@ return [
     'editeur_sans_serveur' => 'Select a server first: with no server there is no configuration to read.',
 
     'aucune_machine' => 'No server in the fleet',
+    // ── The fleet and version detection, sub-lot V6 ───────────────────────
+    'machine_nom' => 'Server',
+    'machine_adresse' => 'Address',
+    'machine_environnement' => 'Environment',
+    'machine_agents' => 'Recorded agents',
+    // NO AGENT IS A FINDING, not a silence: a detection that finds nothing
+    // deletes the recorded row.
+    'agent_aucun' => 'Nothing recorded',
+    'version_detecter' => 'Detect version',
+    'version_en_cours' => 'Reading the version on :nom...',
+    'version_trouvee' => 'Version detected on :nom: :version.',
+    'version_absente' => 'No agent installed on :nom. The previous record was cleared.',
+    // A REFUSAL IS NOT "NO AGENT": a client that does not read the status would
+    // conclude "nothing installed" without having measured anything.
+    'version_refus' => 'The read was refused (status :statut). No conclusion can be drawn from it.',
+    'version_echec' => 'The read did not complete: the server may be unreachable.',
     'aucune_machine_aide' => 'Every machine is archived, or the fleet is empty.',
 
     // What V1 does not port yet SAYS SO, rather than leaving a bare panel.
@@ -139,7 +155,9 @@ return [
     'pas_encore_porte' => 'Not ported to this portal yet',
     'a_venir_config' => 'Reading and saving this configuration arrive with the following sub-lots. Until then they stay on the previous portal.',
     'a_venir_profils' => 'The profile catalogue and its assignment arrive with the following sub-lots. Until then they stay on the previous portal.',
-    'a_venir_deploiement' => 'The fleet table and the deployment actions arrive with the following sub-lots: they reach the servers over SSH and change their configuration, they are not ported lightly. Until then they stay on the previous portal.',
+    // A TEXT CAN BECOME FALSE WITHOUT ANY TEST SEEING IT: the fleet table is
+    // ported as of V6, so the sentence announcing it "for later" no longer was.
+    'a_venir_deploiement' => 'Installing, reconfiguring and uninstalling an agent, along with surveying the whole fleet at once, arrive with the following sub-lots: those acts CHANGE the servers, and surveying the whole fleet needs redesigning as a background task. Until then they stay on the previous portal.',
     'a_venir_editeur' => 'Reading and writing the remote file arrive with the following sub-lots. Until then they stay on the previous portal.',
     'vers_legacy' => 'Open on the previous portal',
 ];

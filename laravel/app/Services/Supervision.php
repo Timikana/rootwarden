@@ -319,6 +319,30 @@ class Supervision
     }
 
     /**
+     * Les agents releves, par machine puis par plateforme — sous-lot V6.
+     *
+     * CETTE TABLE EST UN INVENTAIRE, PAS UNE VERITE. `supervision_agents` n'est
+     * ecrite que par une detection : elle dit ce que le portail a CONSTATE la
+     * derniere fois qu'on lui a demande, pas ce qui tourne a l'instant. Une
+     * detection qui ne trouve rien SUPPRIME la ligne (`_remove_agent`), donc
+     * l'absence d'agent y est un fait, pas un silence.
+     *
+     * @return array<int,array<string,string>> [machine_id][plateforme] => version
+     */
+    public function agentsParMachine(): array
+    {
+        $parMachine = [];
+        foreach (DB::table('supervision_agents')
+            ->select('machine_id', 'platform', 'agent_version')
+            ->get() as $ligne) {
+            $parMachine[(int) $ligne->machine_id][(string) $ligne->platform]
+                = (string) ($ligne->agent_version ?? '');
+        }
+
+        return $parMachine;
+    }
+
+    /**
      * Le parc que la page a le droit de montrer : tout, sauf les archivees.
      *
      * Le filtre de cycle de vie est pose UNE FOIS et non dans une branche : le

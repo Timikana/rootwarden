@@ -147,6 +147,7 @@ class SupervisionController extends Controller
              * mesures, `notes` comprise.
              */
             'profilModifie' => $this->profilDemande($requete),
+            'agents' => $this->supervision->agentsParMachine(),
             'libelles' => $this->libelles(),
         ]);
     }
@@ -360,6 +361,22 @@ class SupervisionController extends Controller
         return [
             'editeur_sans_serveur' => __('superv.editeur_sans_serveur'),
             'editeur_non_porte' => __('superv.a_venir_editeur'),
+            // ── Sous-lot V6 : la detection de version ─────────────────────
+            'url_version' => url('/api/gateway/supervision/zabbix/version'),
+            /*
+             * TOUS LES JETONS SONT SUBSTITUES, y compris ceux que le script
+             * remplacera. `__('x')` sans son argument laisse `:nom` EN CLAIR a
+             * l'ecran — le module `ssh/` l'a paye : « 3 :count serveur(s)
+             * disponible(s) », et aucun controle d'i18n ne le voyait, puisqu'ils
+             * cherchent des identifiants `module.cle`, pas des jetons.
+             */
+            'version_en_cours' => __('superv.version_en_cours', ['nom' => '{nom}']),
+            'version_trouvee' => __('superv.version_trouvee', [
+                'version' => '{version}', 'nom' => '{nom}',
+            ]),
+            'version_absente' => __('superv.version_absente', ['nom' => '{nom}']),
+            'version_refus' => __('superv.version_refus', ['statut' => '{statut}']),
+            'version_echec' => __('superv.version_echec'),
         ];
     }
 }

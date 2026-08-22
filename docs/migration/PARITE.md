@@ -2598,3 +2598,79 @@ dialogue du legacy comme pour l'adresse du portage.
 
 **Un défaut d'affichage vu À L'IMAGE** : le titre du formulaire se collait au dernier paragraphe du
 catalogue, et les deux se lisaient d'un bloc. Le formulaire porte désormais un séparateur (`.rw-note`).
+
+## E-78 — La détection de version : premier SSH du module, et un message qui disparaît avant son effet
+
+**Module `supervision/`, sous-lot V6 : la détection de version d'agent.** Suite :
+`tests/e2e/go-page-supervision-version.mjs` — **12 PASS sur le legacy, 14 sur le portage** (base rouge
+relevée avant portage : **8 PASS / 5 FAIL**). **Premier sous-lot du module qui ouvre une session SSH
+réelle**, sur Test-Server-Debian (id 2, DEV). `srv-zabbix` (id 1, PRODUCTION) n'est jamais jointe.
+
+**LA COMMANDE DISTANTE A ÉTÉ LUE MOT POUR MOT AVANT LE MOINDRE CLIC**, et c'est ce qui a autorisé le
+geste : `command -v zabbix_agent2 … && zabbix_agent2 -V | head -1 || … || echo 'NOT_INSTALLED'`. Rien
+n'installe, rien n'écrit à distance, rien ne redémarre. `command -v` évite même le « sh: not found » qui
+polluerait la sortie.
+
+**DEUX EXONÉRATIONS, et une correction de supposition.**
+- **La route est bien gardée** : `zabbix_version` (`:732`) et `generic_version` (`:1293`) portent
+  `@require_api_key` + **`@require_role(2)`** (« Patch A01 : aligné sur les autres routes supervision »)
+  + `@require_permission` + `@require_machine_access`. Contrairement aux quatre routes de profils (E-77),
+  celles-ci ont bien reçu le correctif.
+- **La détection écrit `supervision_agents` SEULEMENT.** La question posée était : cette table,
+  `machines.zabbix_agent_version`, ou les deux ? Mesuré : la seconde existe, la page la lit dans son
+  `SELECT`, et **personne ne l'écrit ici**.
+
+**LA PROPRIÉTÉ CENTRALE, EXERCÉE : une détection qui ne trouve rien SUPPRIME l'agent enregistré.**
+`_remove_agent` fait un `DELETE FROM supervision_agents WHERE machine_id AND platform`. Aucun agent n'est
+installé sur Test-Server-Debian : la suite pose une ligne d'agent en fixture, clique, et constate **0
+ligne** après. L'inventaire suit donc l'état réel des machines, y compris quand un agent a été désinstallé
+hors du portail — et cela ne se mesure qu'en base.
+
+**AUCUN APPEL DANGEREUX N'A PU PARTIR, et c'est mesuré, pas supposé.** Sur le legacy, le bouton de
+détection partage sa barre d'outils avec « Déployer la sélection », « Reconfigurer » et
+« Désinstaller » : la suite collecte les requêtes émises et assert qu'aucune ne contient `deploy`,
+`uninstall` ni `reconfigure`. Une seule requête part : `POST …/supervision/zabbix/version`.
+
+**LE PORTAGE REND L'ERREUR DE MASSE STRUCTURELLEMENT IMPOSSIBLE.** Le legacy fonctionne par cases à
+cocher plus une barre partagée, avec un « Tout cocher » qui embarque **srv-zabbix, en PRODUCTION**. Le
+portage donne à chaque ligne **son** bouton et n'a **aucune case** — mesuré : 0. On ne compte pas sur la
+prudence de qui clique.
+
+**UN MESSAGE ÉPHÉMÈRE NE SE LIT PAS APRÈS COUP, et ici c'est structurel.** `toast()` s'effacé au bout de
+4 s (`head.php:172`) alors qu'une session SSH en demande 9 : le verdict a **toujours** disparu au moment
+où son effet devient mesurable. Ma première mesure lisait le DOM après l'attente et déclarait « verdict
+non énoncé » un verdict parfaitement affiché. Un `MutationObserver` installé **avant** le clic accumule
+désormais le porte-messages, et la propriété devient « le verdict a été énoncé » — non « il est encore à
+l'écran à l'instant où je regarde ». Côté portage, le verdict s'écrit dans la page **et y reste**.
+
+**Et une seconde version fausse de la même mesure, corrigée.** L'observateur lisait le nœud ajouté :
+`toast()` insère un `<div>` puis y met deux `<span>`, si bien qu'il voyait passer l'**icône seule** (« ℹ »)
+avant que le texte existe. Avec un motif assez lâche, l'assertion passait alors pour une raison qui
+n'était pas la bonne — pire qu'un échec. Elle relit désormais le porte-messages entier, le motif exige le
+verdict lui-même, et **le fragment retenu est imprimé** dans le journal :
+`« Aucun agent » dans « Aucun agent installe sur Test-Server-Debian… »`.
+
+**LE PORTAGE FERME, CHEZ LUI, LE TROU DÉCLARÉ EN E-72.** `App\Support\RoutesBackend::ADMIN_SEULEMENT`
+était le relevé fidèle de `ADMIN_ONLY_PREFIXES` — il recopiait donc l'absence de `/supervision/`. Or la
+page exige `role:2` des deux côtés : personne de légitime ne perd un accès en l'ajoutant, et un rôle 1
+porteur de `can_manage_supervision` cesse de pouvoir appeler `/api/gateway/supervision/profiles`, que le
+backend ne garde par aucun `@require_role`. C'est la défense en profondeur que le commentaire de cette
+classe annonce. **Le legacy garde son trou**, et il reste déclaré.
+
+**Un client qui ne lit pas `resp.status` avale tous les refus** : le portage lit le statut **d'abord** et
+dit « la lecture a été refusée (statut N), aucune conclusion ne peut en être tirée » — un 403 ne se
+confond pas avec « aucun agent installé ».
+
+**Deux défauts trouvés à la lecture, déclarés et non corrigés** — c'est du backend :
+- **une LECTURE passe par `execute_as_root`** : relever un numéro de version n'exige aucun privilège ;
+- **`agent_type` est calculé puis jeté** : la route distingue `zabbix-agent2` de `zabbix-agent`, le
+  renvoie au client, et `_upsert_agent` ne prend que la version. Aucune colonne ne reçoit le type.
+
+**Un texte devenu faux, vu À L'IMAGE.** Le bloc « Pas encore porté » annonçait que « le tableau du parc
+arrive avec les sous-lots suivants » — alors que V6 vient de le porter. Il ne parle plus que de ce qui
+reste : installer, reconfigurer, désinstaller, et le relevé du parc entier.
+
+**Non porté, et dit tel quel** : le déploiement, la reconfiguration, la désinstallation (V10 à V12) et le
+relevé de tout le parc en une fois (V8, à reconcevoir en tâche de fond — `scanAllAgents` lance quatre
+requêtes par serveur en parallèle). Aucun de ces boutons n'existe dans le portage : un bouton présent mais
+inerte serait pire qu'absent.
