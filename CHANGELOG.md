@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.36** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.37** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2169,6 +2169,73 @@ sans `can_scan_cve` peut toujours creer, modifier et supprimer une planification
 contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
+portage**.
+
+### v1.37.37 — module `supervision/`, sous-lot V6 : la detection de version, premier SSH du module
+
+**Symptome.** Le portage ne pouvait pas relever la version d'un agent. Cote legacy, le verdict de la
+detection disparaissait avant que son effet soit constatable, et le bouton partageait sa barre d'outils
+avec « Deployer », « Reconfigurer » et « Desinstaller ».
+
+**Cause racine.** `toast()` s'effacé au bout de 4 s (`head.php:172`) alors qu'une session SSH en demande
+9 : le message a TOUJOURS disparu au moment ou l'effet devient mesurable. Et la selection par cases a
+cocher, partagee entre quatre actions dont trois modifient la machine, met « Tout cocher » — donc
+`srv-zabbix`, en PRODUCTION — a un clic des gestes les plus lourds du module.
+
+**Fix.** Le parc est rendu cote serveur avec ses agents releves, et **chaque ligne porte SON bouton de
+detection** : il n'y a AUCUNE case a cocher, donc une action de masse est structurellement impossible —
+on ne compte pas sur la prudence de qui clique. Le verdict s'ecrit dans la page ET Y RESTE. La detection
+passe par la passerelle : c'est le backend qui ouvre le SSH, exception declaree du meme ordre que
+K2/K3/K4.
+
+**LA COMMANDE DISTANTE A ETE LUE MOT POUR MOT AVANT LE MOINDRE CLIC**, et c'est ce qui a autorise le
+geste : `command -v zabbix_agent2 … && zabbix_agent2 -V | head -1 || … || echo 'NOT_INSTALLED'`. Rien
+n'installe, rien n'ecrit a distance, rien ne redemarre.
+
+**DEUX EXONERATIONS, ET UNE CORRECTION DE SUPPOSITION.** La route porte bien `@require_api_key` +
+`@require_role(2)` (« Patch A01 ») + `@require_permission` + `@require_machine_access` — contrairement aux
+quatre routes de profils (E-77), celles-ci ont recu le correctif. Et la detection ecrit
+**`supervision_agents` SEULEMENT** : `machines.zabbix_agent_version` existe, la page la lit, personne ne
+l'ecrit ici.
+
+**LA PROPRIETE CENTRALE EST EXERCEE** : une detection qui ne trouve rien SUPPRIME l'agent enregistre
+(`_remove_agent`). Fixture posee sur la machine de DEV, clic, ZERO ligne apres — l'inventaire suit donc
+l'etat reel des machines, y compris quand un agent a ete desinstalle hors du portail.
+
+**AUCUN APPEL DANGEREUX NE PART, et c'est mesure** : la suite collecte les requetes emises et assert
+qu'aucune ne contient `deploy`, `uninstall` ni `reconfigure`. Une seule part.
+
+**LE PORTAGE FERME CHEZ LUI LE TROU DECLARE EN E-72.** `RoutesBackend::ADMIN_SEULEMENT` etait le releve
+fidele de `ADMIN_ONLY_PREFIXES` — il recopiait donc l'absence de `/supervision/`. La page exige `role:2`
+des deux cotes : personne de legitime ne perd un acces, et un role 1 porteur de
+`can_manage_supervision` cesse de pouvoir appeler `/api/gateway/supervision/profiles`, que le backend ne
+garde par aucun `@require_role`. Le legacy garde son trou, et il reste declare.
+
+**Un client qui ne lit pas `resp.status` avale tous les refus** : le portage lit le statut D'ABORD, et un
+403 ne se confond pas avec « aucun agent installe ».
+
+**DEUX MESURES FAUSSES DE LA SUITE, CORRIGEES.** La premiere lisait le DOM apres l'attente et declarait
+« verdict non enonce » un verdict parfaitement affiche : un `MutationObserver` installe AVANT le clic
+mesure desormais « le verdict a ete enonce ». La seconde lisait le NOEUD AJOUTE : `toast()` insere un
+`<div>` puis y met deux `<span>`, si bien que l'observateur voyait passer l'ICONE seule (« ℹ ») avant que
+le texte existe — et un motif assez lache faisait passer l'assertion pour une raison qui n'etait pas la
+bonne. Elle relit le porte-messages entier, le motif exige le verdict, et LE FRAGMENT RETENU EST IMPRIME.
+
+**Un jeton non substitue, evite de justesse** : les libelles du script partent avec TOUS leurs jetons
+remplaces, y compris `:nom`. `__('x')` sans son argument laisse `:nom` en clair a l'ecran — le module
+`ssh/` l'a paye (« 3 :count serveur(s) disponible(s) »), et aucun controle d'i18n ne le voit.
+
+**Un texte devenu faux, vu A L'IMAGE** : le bloc « Pas encore porte » annoncait que « le tableau du parc
+arrive avec les sous-lots suivants » alors que V6 vient de le porter. Il ne parle plus que de ce qui
+reste.
+
+**DEUX DEFAUTS DECLARES, NON CORRIGES — c'est du backend** : une LECTURE passe par `execute_as_root`
+(relever un numero de version n'exige aucun privilege), et `agent_type` est calcule, renvoye au client,
+puis JETE — aucune colonne ne le recoit.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V7 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-version` entre avec **12 PASS sur le legacy** et **14 sur le
 portage**.
 
 ### v1.37.36 — module `supervision/`, sous-lot V5 : le CRUD des profils

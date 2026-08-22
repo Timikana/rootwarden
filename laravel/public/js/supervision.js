@@ -93,6 +93,68 @@
         });
     });
 
+    /* ── La detection de version — sous-lot V6 ──────────────────────────────
+     * LE SEUL GESTE DE CETTE PAGE QUI JOINT UNE MACHINE. Il passe par la
+     * passerelle parce que c'est le backend qui ouvre la session SSH (exception
+     * declaree, comme K2/K3/K4).
+     *
+     * UN CLIENT QUI NE LIT PAS `resp.status` AVALE TOUS LES REFUS : un 403 ou un
+     * 500 y ressemble a une reponse vide, et l'ecran conclut « aucun agent »
+     * alors que personne n'a rien mesure. On lit donc le statut D'ABORD.
+     *
+     * Et le verdict RESTE a l'ecran : le legacy le passe a un `toast()` de 4 s
+     * alors qu'une session SSH en demande le double — le message disparaissait
+     * avant que son effet soit constatable.
+     */
+    var messageVersion = document.querySelector('[data-rw="superv-version-message"]');
+    [].slice.call(document.querySelectorAll('[data-rw="superv-detecter-version"]'))
+        .forEach(function (bouton) {
+            bouton.addEventListener('click', function () {
+                if (! messageVersion) { return; }
+                var nom = bouton.dataset.nom || '';
+                messageVersion.className = 'rw-annonce';
+                messageVersion.textContent = libelles.version_en_cours.replace('{nom}', nom);
+                bouton.disabled = true;
+
+                var jeton = document.querySelector('meta[name="csrf-token"]');
+                fetch(libelles.url_version, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                    },
+                    body: JSON.stringify({ machine_id: Number(bouton.dataset.machine) }),
+                }).then(function (reponse) {
+                    if (! reponse.ok) {
+                        // Le statut d'abord : un refus ne se confond pas avec
+                        // « aucun agent installe ».
+                        messageVersion.className = 'rw-annonce rw-annonce--echec';
+                        messageVersion.textContent = libelles.version_refus
+                            .replace('{statut}', String(reponse.status));
+                        return null;
+                    }
+                    return reponse.json();
+                }).then(function (donnees) {
+                    if (! donnees) { return; }
+                    if (donnees.version) {
+                        messageVersion.className = 'rw-annonce rw-annonce--ok';
+                        messageVersion.textContent = libelles.version_trouvee
+                            .replace('{version}', donnees.version)
+                            .replace('{nom}', nom);
+                    } else {
+                        messageVersion.className = 'rw-annonce';
+                        messageVersion.textContent = libelles.version_absente
+                            .replace('{nom}', nom);
+                    }
+                }).catch(function () {
+                    messageVersion.className = 'rw-annonce rw-annonce--echec';
+                    messageVersion.textContent = libelles.version_echec;
+                }).finally(function () {
+                    bouton.disabled = false;
+                });
+            });
+        });
+
     /* ── Le garde de l'editeur ──────────────────────────────────────────────
      * LE SEUL GESTE DE V1. Sans serveur choisi, il refuse — DANS la page, avec
      * une phrase traduite, et sans joindre quoi que ce soit. Cote legacy, ce

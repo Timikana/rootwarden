@@ -353,16 +353,84 @@
             </article>
         </div>
 
-        {{-- ══ ONGLET 3 : deploiement ═════════════════════════════════════════
-             C'est le panneau le plus dangereux du module : trois boutons y
-             installent, reconfigurent ou DESINSTALLENT l'agent sur chaque machine
-             cochee. Aucun d'eux n'est porte dans V1, et aucun n'est ici — un
-             bouton present mais inerte serait pire qu'absent. --}}
+        {{-- ══ ONGLET 3 : deploiement ═══════════════════════════════════════
+             SOUS-LOT V6 : le parc, ses agents releves, et la DETECTION DE
+             VERSION — le premier geste du module qui ouvre une session SSH.
+
+             CE QUI N'EST PAS ICI EST VOLONTAIRE. Deployer, reconfigurer et
+             desinstaller (V10 a V12) modifient la machine ; le scan du parc
+             entier (V8) lance quatre requetes par serveur et doit etre reconcu
+             en tache de fond. Aucun de ces boutons n'existe donc encore, et la
+             page le DIT — un bouton present mais inerte serait pire qu'absent.
+
+             LA DETECTION PASSE PAR LA PASSERELLE, et c'est l'exception declaree
+             du module : c'est le backend qui ouvre le SSH, comme pour K2/K3/K4.
+             Il n'y a AUCUNE case a cocher : chaque ligne porte son propre
+             bouton. Une selection multiple appellerait le scan du parc par la
+             porte de V6, et surtout « tout cocher » embarquerait srv-zabbix,
+             qui est en PRODUCTION. --}}
         <div id="panneau-deploy" data-rw="panneau-deploy" role="tabpanel" hidden>
             <article class="rw-carte rw-carte--pleine">
                 <h3 class="rw-sous-titre">{{ __('superv.deploiement_titre') }}</h3>
                 <p class="rw-aide rw-prose">{{ __('superv.deploiement_description') }}</p>
-                <div class="rw-vide">
+
+                @if (count($machines) === 0)
+                    <div class="rw-vide">
+                        <p class="rw-vide__titre">{{ __('superv.aucune_machine') }}</p>
+                        <p class="rw-vide__texte rw-prose">{{ __('superv.aucune_machine_aide') }}</p>
+                    </div>
+                @else
+                    <div class="rw-tableau-cadre">
+                        <table class="rw-tableau">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('superv.machine_nom') }}</th>
+                                    <th>{{ __('superv.machine_adresse') }}</th>
+                                    <th>{{ __('superv.machine_environnement') }}</th>
+                                    <th>{{ __('superv.machine_agents') }}</th>
+                                    <th>{{ __('superv.profil_actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($machines as $m)
+                                    @php($sesAgents = $agents[(int) $m->id] ?? [])
+                                    <tr data-rw="superv-machine-{{ $m->id }}">
+                                        <td><strong>{{ $m->name }}</strong></td>
+                                        <td><code>{{ $m->ip }}:{{ $m->port }}</code></td>
+                                        <td>{{ $m->environment ?: __('superv.champ_vide') }}</td>
+                                        {{-- L'INVENTAIRE DIT CE QU'IL SAIT, ET
+                                             DEPUIS QUAND IL NE SAIT RIEN. Une
+                                             absence d'agent est un CONSTAT :
+                                             une detection qui ne trouve rien
+                                             supprime la ligne. --}}
+                                        <td data-rw="superv-agents-{{ $m->id }}">
+                                            @if (count($sesAgents) === 0)
+                                                <span class="rw-badge rw-badge--neutre">{{ __('superv.agent_aucun') }}</span>
+                                            @else
+                                                @foreach ($sesAgents as $plateforme => $version)
+                                                    <span class="rw-badge">{{ ucfirst($plateforme) }} {{ $version !== '' ? $version : '?' }}</span>
+                                                @endforeach
+                                            @endif
+                                        </td>
+                                        <td class="rw-tableau__actions">
+                                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                                    data-rw="superv-detecter-version"
+                                                    data-machine="{{ $m->id }}"
+                                                    data-nom="{{ $m->name }}">{{ __('superv.version_detecter') }}</button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    {{-- LE VERDICT S'ECRIT DANS LA PAGE ET Y RESTE. Le legacy le
+                         passe a un `toast()` qui s'efface au bout de 4 s, alors
+                         qu'une session SSH en demande le double : le message a
+                         disparu avant que son effet soit constatable. --}}
+                    <p class="rw-annonce" data-rw="superv-version-message" aria-live="polite"></p>
+                @endif
+
+                <div class="rw-vide rw-note">
                     <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
                     <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_deploiement') }}</p>
                     <div class="rw-vide__action">

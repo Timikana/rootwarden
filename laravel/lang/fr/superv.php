@@ -131,6 +131,22 @@ return [
     'editeur_sans_serveur' => 'Choisissez d\'abord un serveur : sans serveur, il n\'y a aucune configuration a lire.',
 
     'aucune_machine' => 'Aucun serveur dans le parc',
+    // ── Le parc et la detection de version, sous-lot V6 ───────────────────
+    'machine_nom' => 'Serveur',
+    'machine_adresse' => 'Adresse',
+    'machine_environnement' => 'Environnement',
+    'machine_agents' => 'Agents releves',
+    // UNE ABSENCE D'AGENT EST UN CONSTAT, pas un silence : une detection qui ne
+    // trouve rien supprime la ligne enregistree.
+    'agent_aucun' => 'Aucun releve',
+    'version_detecter' => 'Detecter la version',
+    'version_en_cours' => 'Lecture de la version sur :nom en cours...',
+    'version_trouvee' => 'Version detectee sur :nom : :version.',
+    'version_absente' => 'Aucun agent installe sur :nom. Le releve precedent a ete efface.',
+    // UN REFUS NE SE CONFOND PAS AVEC « AUCUN AGENT » : un client qui ne lit pas
+    // le statut conclurait « rien d'installe » sans avoir rien mesure.
+    'version_refus' => 'La lecture a ete refusee (statut :statut). Aucune conclusion ne peut en etre tiree.',
+    'version_echec' => 'La lecture n\'a pas abouti : le serveur est peut-etre injoignable.',
     'aucune_machine_aide' => 'Toutes les machines sont archivees, ou le parc est vide.',
 
     // Ce que V1 ne porte pas encore le DIT, plutot que de laisser un panneau nu.
@@ -139,7 +155,10 @@ return [
     'pas_encore_porte' => 'Pas encore porte sur ce portail',
     'a_venir_config' => 'La lecture et l\'enregistrement de cette configuration arrivent avec les sous-lots suivants. En attendant, ils restent sur l\'ancien portail.',
     'a_venir_profils' => 'Le catalogue de profils et son assignation arrivent avec les sous-lots suivants. En attendant, ils restent sur l\'ancien portail.',
-    'a_venir_deploiement' => "Le tableau du parc et les actions de deploiement arrivent avec les sous-lots suivants : elles joignent les serveurs en SSH et modifient leur configuration, elles ne se portent pas a la legere. En attendant, elles restent sur l'ancien portail.",
+    // UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE VOIE : le tableau du
+    // parc est porte depuis V6, la phrase qui l'annoncait « pour plus tard » ne
+    // l'etait plus. Vu a l'image.
+    'a_venir_deploiement' => "Installer, reconfigurer et desinstaller un agent, ainsi que le releve de tout le parc en une fois, arrivent avec les sous-lots suivants : ces gestes MODIFIENT les serveurs, et le releve du parc entier demande d'etre reconcu en tache de fond. En attendant, ils restent sur l'ancien portail.",
     'a_venir_editeur' => 'La lecture et l\'ecriture du fichier distant arrivent avec les sous-lots suivants. En attendant, elles restent sur l\'ancien portail.',
     'vers_legacy' => 'Ouvrir sur l\'ancien portail',
 ];

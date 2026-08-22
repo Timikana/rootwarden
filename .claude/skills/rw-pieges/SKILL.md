@@ -592,6 +592,35 @@ defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails es
 faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
 declenche rien trop tot). Voir `PARITE.md` E-73.
 
+## UN MESSAGE EPHEMERE NE SE LIT PAS APRES COUP
+
+`toast()` s'efface au bout de **4 s** (`head.php:172`). Une session SSH en demande
+**9**. Le verdict a donc TOUJOURS disparu au moment ou son effet devient
+mesurable : une suite qui lit le DOM apres l'attente ne verra jamais rien — ou,
+pire, verra quelque chose sur un chemin rapide et plus rien sur un chemin lent,
+ce qui fait passer un test pour instable alors qu'il mesure mal.
+
+**Installer un `MutationObserver` AVANT le geste**, et y accumuler le texte. La
+propriete devient « le message a ete enonce », non « il est encore la quand je
+regarde ».
+
+**Et lire le PORTE-MESSAGES ENTIER, pas le noeud ajoute** : `toast()` insere un
+`<div>` puis y met deux `<span>`, donc l'observateur voit passer l'ICONE seule
+(« ℹ ») avant que le texte existe. Avec un motif lache, l'assertion passe alors
+pour une raison qui n'est pas la bonne — **pire qu'un echec**. Serrer le motif,
+et **imprimer le fragment retenu** : un PASS dont on ne sait pas pourquoi il
+passe ne vaut rien.
+
+## PAS DE CASE A COCHER = PAS D'ACTION DE MASSE POSSIBLE
+
+Le legacy coche des machines puis clique une barre d'outils partagee entre
+« Detecter », « Deployer », « Reconfigurer » et « Desinstaller » — et son « Tout
+cocher » embarque `srv-zabbix`, en PRODUCTION. Donner a chaque LIGNE son propre
+bouton rend l'erreur impossible au lieu de compter sur la prudence de qui clique.
+Et cote test : collecter les requetes emises et **asserter qu'aucune ne contient
+`deploy`, `uninstall` ni `reconfigure`** — le voisinage d'un bouton dangereux se
+mesure, il ne se suppose pas.
+
 ## CLIQUER LE BOUTON, PAS APPELER LA FONCTION
 
 `page.evaluate(() => saveProfile())` prouve que la fonction marche. Ca ne prouve

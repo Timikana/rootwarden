@@ -355,6 +355,38 @@ précédent, la clé primaire étant `(machine_id, platform)`. Ce serait concevo
 
 **Reste du module** : V6 (détection de version, **premier sous-lot SSH**) est le prochain.
 
+## 7 nonies. V6 porté — la détection de version, premier SSH du module (2026-08-22)
+
+Suite `go-page-supervision-version` : base rouge **8 PASS / 5 FAIL**, puis **14 PASS** sur le portage et
+**12** sur le legacy. Détail en `PARITE.md` E-78. Cible : Test-Server-Debian (id 2, DEV). `srv-zabbix`
+n'est jamais jointe.
+
+**La commande distante a été lue mot pour mot avant le moindre clic** : `command -v … -V | head -1 ||
+echo 'NOT_INSTALLED'`. Lecture pure.
+
+**Deux exonérations** : la route porte bien `@require_role(2)` (« Patch A01 »), contrairement aux quatre
+routes de profils ; et la détection écrit **`supervision_agents` seulement** —
+`machines.zabbix_agent_version` est lue par la page et écrite par personne ici.
+
+**La propriété centrale est exercée** : une détection qui ne trouve rien **supprime** l'agent enregistré
+(`_remove_agent`). Fixture posée, clic, zéro ligne après.
+
+**Aucun appel dangereux ne part** — mesuré : sur le legacy le bouton partage sa barre avec « Déployer »,
+« Reconfigurer » et « Désinstaller ». Le portage donne à chaque ligne son bouton et **aucune case à
+cocher** : « tout cocher » embarquerait srv-zabbix, en PRODUCTION.
+
+**Un message éphémère ne se lit pas après coup** : `toast()` dure 4 s, la session SSH 9. Un
+`MutationObserver` installé avant le clic mesure « le verdict a été énoncé ». Côté portage, le verdict
+reste à l'écran.
+
+**Le portage ferme chez lui le trou d'E-72** : `/supervision/` entre dans `ADMIN_SEULEMENT`, la liste que
+le portage tenait pour relevé fidèle — et qui recopiait donc l'absence. Le legacy garde le sien.
+
+**Deux défauts déclarés, non corrigés** : une lecture qui passe par `execute_as_root`, et `agent_type`
+calculé puis jeté.
+
+**Reste du module** : V7 (éditeur distant en lecture, SSH) est le prochain. V8 reste à reconcevoir.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`
