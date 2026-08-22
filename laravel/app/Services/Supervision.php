@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SecretSupervision;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -49,6 +50,62 @@ class Supervision
     public function onglets(): array
     {
         return ['config', 'profiles', 'deploy', 'editor'];
+    }
+
+    /**
+     * Enregistre la configuration globale d'UNE plateforme — sous-lot V4.
+     *
+     * `WHERE platform = ?` — ET C'EST TOUT LE SUJET. Le backend
+     * (`supervision.py:508`) fait `SELECT id ... ORDER BY id DESC LIMIT 1` SANS
+     * filtre de plateforme puis `UPDATE ... WHERE id`. Mesure du 2026-08-22 :
+     * enregistrer le formulaire Zabbix a ecrit la valeur tapee DANS LA LIGNE
+     * CENTREON, et laisse la ligne Zabbix intacte — l'exploitant voit un succes,
+     * sa configuration Zabbix n'a pas bouge, et celle de Centreon est corrompue.
+     * Ecrire en base plutot que par cette route, c'est ne pas heriter du defaut.
+     *
+     * LE SECRET SUIT LA REGLE DU LEGACY, POUR LA MEME RAISON. Un PSK absent du
+     * formulaire veut dire « ne change rien », jamais « efface » : le champ porte
+     * un masque, pas la valeur, donc un enregistrement de routine ne doit pas
+     * effacer un secret que personne n'a voulu toucher.
+     *
+     * @param  array<string,mixed>  $valeurs  colonnes deja bornees par l'appelant
+     */
+    public function enregistreConfiguration(string $plateforme, array $valeurs,
+                                            ?string $pskClair, int $idCompte): void
+    {
+        if (! in_array($plateforme, $this->plateformes(), true)) {
+            // Liste FERMEE : une plateforme venue d'une requete n'ecrit rien.
+            return;
+        }
+
+        $chiffre = SecretSupervision::chiffre($pskClair);
+        if ($chiffre !== null) {
+            $valeurs['tls_psk_value'] = $chiffre;
+        }
+        $valeurs['updated_by'] = $idCompte > 0 ? $idCompte : null;
+
+        // La ligne COURANTE de cette plateforme, au sens ou les deux portails
+        // l'entendent : la plus recente. Pas « la » ligne — il n'y a aucune
+        // contrainte d'unicite sur `platform` (voir PARITE E-75).
+        $courante = DB::table('supervision_config')
+            ->where('platform', $plateforme)
+            ->orderByDesc('id')
+            ->value('id');
+
+        if ($courante === null) {
+            $valeurs['platform'] = $plateforme;
+            DB::table('supervision_config')->insert($valeurs);
+
+            return;
+        }
+
+        DB::table('supervision_config')
+            ->where('id', $courante)
+            // La plateforme est REPETEE dans le filtre : `id` suffirait, mais une
+            // relecture doit pouvoir constater le cloisonnement sans remonter a
+            // la requete qui a choisi cet `id`.
+            ->where('platform', $plateforme)
+            ->update($valeurs);
     }
 
     /**

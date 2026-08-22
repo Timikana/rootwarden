@@ -303,6 +303,31 @@ secrètes, il rend deux booléens de présence.
 **Reste du module** : V4 (écriture de la configuration globale) est le prochain, et il porte le
 correctif du `WHERE platform`.
 
+## 7 septies. V4 porté — l'écriture de la configuration globale (2026-08-22)
+
+**Premier sous-lot du module qui écrit.** Suite `go-page-supervision-config-ecriture` : base rouge
+**11 PASS / 3 FAIL**, puis **16 PASS** sur le portage et **11** sur le legacy. Détail en `PARITE.md` E-76.
+
+**LE DÉFAUT DE `:508` EST MESURÉ, plus seulement lu.** Avec une ligne `centreon` plus récente qu'une
+ligne `zabbix`, enregistrer le formulaire Zabbix sur le legacy écrit la valeur tapée **dans la ligne
+Centreon** et laisse la ligne Zabbix intacte. Le portage écrit avec `WHERE platform = ?`.
+
+**La compatibilité du chiffrement a été MESURÉE avant d'écrire une ligne** : un blob produit depuis le
+conteneur `laravel` est déchiffré par `Encryption().decrypt_password()` dans `rootwarden_python`.
+`App\Support\SecretSupervision` chiffre donc en base directement — sans méthode de déchiffrement, et
+avec l'étiquette HKDF `rootwarden-aes`, distincte du `rootwarden-totp` de `TotpCrypto`.
+
+**Douzième clé cassée confirmée** : `__('supervision.zabbix_server')` (`main.js:294`) ne peut pas être
+trouvée — `__()` préfixe déjà par `js.` — et l'écran rend l'identifiant brut suivi de « requis », écrit
+en dur en français.
+
+**Deux défauts corrigés côté portage** : les colonnes `enum` ont des listes fermées, revalidées côté
+serveur (la première version en faisait des champs de texte libre — vu à l'image) ; et ce qui est
+affiché est ce qui est écrit, là où `savePlatformConfig()` jette `hostname_pattern` et `extra_config`.
+
+**Reste du module** : V5 (profils CRUD + assignation) est le prochain, et il pose `@require_role(2)` sur
+les quatre routes non gardées.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`

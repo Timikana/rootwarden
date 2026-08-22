@@ -37,18 +37,27 @@
         </div>
 
         {{-- ══ ONGLET 1 : configuration globale ════════════════════════════
-             LECTURE SEULE (V3). Les quatre blocs sont peints ICI, cote serveur,
-             et le script n'en montre qu'un : changer de plateforme n'emet AUCUN
-             appel. Le legacy, lui, rend Zabbix cote serveur et les TROIS AUTRES
-             par un `GET /supervision/config/<plateforme>` declenche au
-             changement — deux chemins pour une meme donnee.
+             LECTURE (V3) ET ECRITURE (V4). Les quatre blocs sont peints ICI, cote
+             serveur, et le script n'en montre qu'un : changer de plateforme
+             n'emet AUCUN appel. Le legacy, lui, rend Zabbix cote serveur et les
+             TROIS AUTRES par un `GET /supervision/config/<plateforme>` declenche
+             au changement.
 
-             LES DEUX SECRETS NE SONT PAS LUS EN BASE : le service ne rend qu'un
-             booleen de presence. Le legacy affiche `********` dans un
-             `<input type="password">`, donc la valeur reelle ne sort pas non
-             plus — mesure faite, aucun defaut de ce cote — mais ne pas la lire
-             du tout ferme la question au lieu de la surveiller. --}}
+             L'ENREGISTREMENT EST UNE SOUMISSION DE FORMULAIRE, PAS UN APPEL
+             CLIENT : rien ne part du navigateur en arriere-plan, donc la
+             propriete « cette page n'appelle personne » reste vraie.
+
+             LE SECRET N'EST PAS LU EN BASE : le service rend un booleen de
+             presence, et le champ part VIDE. Vide veut dire « ne change rien ». --}}
         <div id="panneau-config" data-rw="panneau-config" role="tabpanel">
+            @if (session('superv_message'))
+                <p class="rw-confirmation" data-rw="superv-config-message"
+                   role="status">{{ session('superv_message') }}</p>
+            @elseif (session('superv_erreur'))
+                <p class="rw-erreur" data-rw="superv-config-message"
+                   role="alert">{{ session('superv_erreur') }}</p>
+            @endif
+
             @foreach ($plateformes as $plateforme)
                 @php($config = $configuration[$plateforme] ?? null)
                 <article id="config-{{ $plateforme }}" class="rw-carte rw-carte--pleine"
@@ -57,40 +66,76 @@
                     <p class="rw-aide rw-prose">{{ __('superv.config_description') }}</p>
 
                     @if ($config === null)
-                        {{-- L'ABSENCE SE DIT. Sans ligne en base, les deux
-                             portails affichent des valeurs par defaut : sans
-                             avertissement, un exploitant les lit comme une
-                             configuration enregistree. --}}
+                        {{-- L'ABSENCE SE DIT. Sans ligne en base, le formulaire
+                             part vide : sans avertissement, un exploitant lirait
+                             ses champs vides comme une configuration enregistree. --}}
                         <div class="rw-vide" data-rw="superv-config-vide">
                             <p class="rw-vide__titre">{{ __('superv.config_aucune') }}</p>
                             <p class="rw-vide__texte rw-prose">{{ __('superv.config_aucune_aide', ['plateforme' => ucfirst($plateforme)]) }}</p>
                         </div>
-                    @else
+                    @endif
+
+                    <form method="POST" action="{{ route('supervision.configuration') }}"
+                          data-rw="superv-config-form-{{ $plateforme }}">
+                        @csrf
+                        <input type="hidden" name="plateforme" value="{{ $plateforme }}">
+
                         <div class="rw-tableau-cadre" data-rw="superv-config-corps">
                             <table class="rw-tableau">
                                 <tbody>
                                     @foreach ($champs[$plateforme] as $colonne => $cle)
                                         <tr>
-                                            <th scope="row">{{ __('superv.champ_' . $cle) }}</th>
+                                            <th scope="row">
+                                                <label for="cfg-{{ $plateforme }}-{{ $colonne }}">{{ __('superv.champ_' . $cle) }}</label>
+                                            </th>
                                             <td>
-                                                @if (trim((string) ($config->$colonne ?? '')) === '')
-                                                    <span class="rw-aide">{{ __('superv.champ_vide') }}</span>
+                                                @if (isset($choix[$colonne]))
+                                                    {{-- CHOIX FERME : la colonne est
+                                                         un `enum` en base, ou sa liste
+                                                         de valeurs est fermee cote
+                                                         deploiement. --}}
+                                                    <select class="rw-saisie rw-saisie--compacte"
+                                                            id="cfg-{{ $plateforme }}-{{ $colonne }}"
+                                                            name="{{ $colonne }}"
+                                                            data-rw="superv-config-champ-{{ $colonne }}">
+                                                        @foreach ($choix[$colonne] as $valeur)
+                                                            <option value="{{ $valeur }}" @selected(($config->$colonne ?? '') === $valeur)>{{ $valeur }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @elseif ($colonne === 'extra_config')
+                                                    <textarea class="rw-saisie" rows="3"
+                                                              id="cfg-{{ $plateforme }}-{{ $colonne }}"
+                                                              name="{{ $colonne }}"
+                                                              data-rw="superv-config-champ-{{ $colonne }}">{{ $config->$colonne ?? '' }}</textarea>
                                                 @else
-                                                    <code>{{ $config->$colonne }}</code>
+                                                    <input class="rw-saisie" type="text"
+                                                           id="cfg-{{ $plateforme }}-{{ $colonne }}"
+                                                           name="{{ $colonne }}"
+                                                           value="{{ $config->$colonne ?? '' }}"
+                                                           data-rw="superv-config-champ-{{ $colonne }}">
                                                 @endif
                                             </td>
                                         </tr>
                                     @endforeach
 
-                                    {{-- LA PRESENCE D'UN SECRET, JAMAIS SA
-                                         VALEUR. Le service ne selectionne meme
-                                         pas la colonne. --}}
+                                    {{-- LE SECRET : UN CHAMP QUI PART TOUJOURS VIDE.
+                                         Le legacy y met `********`, ce qui oblige son
+                                         backend a reconnaitre son propre masque pour
+                                         ne pas l'ecrire. Un champ vide dont le
+                                         libelle dit « laisser vide pour conserver »
+                                         n'a pas besoin de cette gymnastique. --}}
                                     @if ($plateforme === 'zabbix')
                                         <tr data-rw="superv-config-psk">
-                                            <th scope="row">{{ __('superv.champ_psk_valeur') }}</th>
+                                            <th scope="row">
+                                                <label for="cfg-zabbix-psk">{{ __('superv.champ_psk_valeur') }}</label>
+                                            </th>
                                             <td>
-                                                <span class="rw-badge @if (! $config->psk_pose) rw-badge--neutre @endif">{{ $config->psk_pose ? __('superv.secret_pose') : __('superv.secret_absent') }}</span>
-                                                <span class="rw-aide rw-cellule-note">{{ __('superv.secret_jamais_affiche') }}</span>
+                                                <input class="rw-saisie" type="password"
+                                                       id="cfg-zabbix-psk" name="tls_psk_value" value=""
+                                                       autocomplete="new-password"
+                                                       data-rw="superv-config-champ-tls_psk_value">
+                                                <span class="rw-badge @if (! ($config->psk_pose ?? false)) rw-badge--neutre @endif">{{ ($config->psk_pose ?? false) ? __('superv.secret_pose') : __('superv.secret_absent') }}</span>
+                                                <span class="rw-aide rw-cellule-note">{{ __('superv.secret_conserve') }}</span>
                                             </td>
                                         </tr>
                                     @endif
@@ -98,29 +143,30 @@
                                         <tr data-rw="superv-config-jeton">
                                             <th scope="row">{{ __('superv.champ_telegraf_jeton') }}</th>
                                             <td>
-                                                <span class="rw-badge @if (! $config->jeton_pose) rw-badge--neutre @endif">{{ $config->jeton_pose ? __('superv.secret_pose') : __('superv.secret_absent') }}</span>
-                                                <span class="rw-aide rw-cellule-note">{{ __('superv.secret_jamais_affiche') }}</span>
+                                                <span class="rw-badge @if (! ($config->jeton_pose ?? false)) rw-badge--neutre @endif">{{ ($config->jeton_pose ?? false) ? __('superv.secret_pose') : __('superv.secret_absent') }}</span>
+                                                {{-- LE JETON TELEGRAF N'EST PAS PORTE :
+                                                     son ecriture vit dans une route a part
+                                                     du backend, et l'inventer ici serait
+                                                     concevoir. La page le DIT. --}}
+                                                <span class="rw-aide rw-cellule-note">{{ __('superv.secret_jeton_non_porte') }}</span>
                                             </td>
                                         </tr>
                                     @endif
                                 </tbody>
                             </table>
                         </div>
-                        <p class="rw-aide rw-prose">{{ __('superv.config_plus_recente') }}</p>
-                    @endif
 
-                    {{-- L'ECRITURE N'EST PAS PORTEE (V4), et la page le dit
-                         plutot que d'offrir un formulaire qui n'enregistrerait
-                         rien. --}}
-                    <div class="rw-vide">
-                        <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
-                        <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_config') }}</p>
-                        <div class="rw-vide__action">
-                            <a class="rw-bouton rw-bouton--discret"
-                               href="{{ config('app.url_legacy') }}/supervision/"
-                               target="_blank" rel="noopener">{{ __('superv.vers_legacy') }} ↗</a>
+                        @if ($config !== null)
+                            <p class="rw-aide rw-prose">{{ __('superv.config_plus_recente') }}</p>
+                        @endif
+
+                        {{-- Action principale a DROITE en pied de formulaire. --}}
+                        <div class="rw-actions">
+                            <p class="rw-aide rw-actions__gauche">{{ __('superv.enregistrement_portee', ['plateforme' => ucfirst($plateforme)]) }}</p>
+                            <button type="submit" class="rw-bouton"
+                                    data-rw="superv-config-enregistrer">{{ __('superv.enregistrer') }}</button>
                         </div>
-                    </div>
+                    </form>
                 </article>
             @endforeach
         </div>

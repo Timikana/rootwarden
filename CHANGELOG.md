@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.34** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.35** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,72 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.35 — module `supervision/`, sous-lot V4 : l'ecriture de la configuration globale
+
+**Symptome.** Enregistrer la configuration Zabbix pouvait ecrire dans la ligne CENTREON : l'exploitant
+voyait un succes, sa configuration Zabbix n'avait pas bouge, et celle de Centreon etait corrompue.
+
+**Cause racine, MESUREE et plus seulement lue.** `backend/routes/supervision.py:508` fait
+`SELECT id, tls_psk_value FROM supervision_config ORDER BY id DESC LIMIT 1` — **sans `WHERE platform`** —
+puis `UPDATE ... WHERE id = %s`. Avec une ligne `centreon` plus recente qu'une ligne `zabbix`, la suite a
+releve en base : ligne zabbix INCHANGEE, et la valeur tapee dans le formulaire Zabbix ecrite dans la
+ligne centreon. Le meme effet se voit sur la colonne du secret — le nouveau blob `sodium:` atterrit dans
+la ligne centreon.
+
+**Fix.** Le portage ecrit en base avec `WHERE platform = ?` (decision S3/S4) et n'herite donc pas du
+defaut. L'enregistrement est une SOUMISSION DE FORMULAIRE, pas un appel client : la propriete « cette
+page n'appelle personne », assertee par les trois suites du module, reste vraie.
+
+**LA COMPATIBILITE DU CHIFFREMENT A ETE MESUREE, PAS SUPPOSEE — et c'est ce qui a permis d'ecrire en
+base.** La consigne etait : si l'interoperabilite PHP vers Python n'est pas demontrable, faire passer
+l'ecriture du PSK par la passerelle. Aller-retour execute : un blob produit depuis le conteneur `laravel`
+(HKDF-SHA256 `rootwarden-aes` + `secretbox`, prefixe `sodium:`) est dechiffre par
+`Encryption().decrypt_password()` dans `rootwarden_python` et rend la chaine d'origine.
+`App\Support\SecretSupervision` porte cette mesure en commentaire. L'etiquette HKDF n'est PAS celle du
+TOTP (`rootwarden-totp`) : les usages sont separes des deux cotes. Et il n'y a **deliberement aucune
+methode de dechiffrement** dans cette classe — V3 a pris soin de ne pas charger le PSK, un `dechiffre()`
+l'offrirait a la premiere vue distraite.
+
+**UNE DOUZIEME CLE CASSEE, non repertoriee, atteignable seulement ici.** `main.js:294` appelle
+`__('supervision.zabbix_server')` — avec son prefixe de module — alors que `__()` prefixe DEJA par `js.`
+et cherche dans `js.php`. Mesure faite en soumettant le formulaire avec un serveur vide : l'ecran rend
+`supervision.zabbix_server` suivi du mot « requis », ecrit en dur en francais, et il reste francais quand
+la page est demandee en anglais. `config_saved` est confirmee au passage.
+
+**Le secret non retape est preserve des deux cotes, mais pas pour la meme raison.** Le legacy y arrive
+parce que son backend reconnait son propre masque (`if psk_value == '********'`). Le portage n'a pas
+besoin de cette gymnastique : son champ part TOUJOURS vide, et vide veut dire « ne change rien ». Le
+legacy doit deviner l'intention, le portage la lit.
+
+**Un PSK reellement saisi arrive chiffre** — mesure sur TOUTE la table et non sur la ligne visee : sur le
+legacy l'ecriture atterrit dans la ligne d'a cote, donc une assertion visant la seule ligne zabbix
+n'aurait rien vu.
+
+**Une mesure fausse de la suite, corrigee.** Elle declarait le refus « non enonce » alors qu'il l'etait :
+elle ne lisait que le bloc de configuration, or le legacy passe ce message a `toast()`, qui ecrit dans
+`#toast-container`. Chercher dans le seul bloc concerne est la bonne regle quand on cherche CE QUE LE
+BLOC AFFICHE ; ici on cherchait un MESSAGE, et c'est la cible qui decide ou elle le met.
+
+**Un defaut de mon propre portage, vu A L'IMAGE et corrige.** La premiere version du formulaire rendait
+`tls_connect` et `tls_accept` en champs de TEXTE LIBRE par-dessus des colonnes
+`enum('unencrypted','psk','cert')` : une valeur hors liste aurait produit une erreur d'ecriture la ou
+l'utilisateur attendait un enregistrement. Ce sont desormais des listes fermees, **revalidees cote
+serveur** — un `<select>` empeche la faute a l'ecran, il n'empeche rien dans une requete forgee.
+
+**Ce que le portage corrige au passage** : `savePlatformConfig()` (`main.js:186`) force
+`hostname_pattern` et `extra_config` pour les trois plateformes non-Zabbix, quelles que soient les
+valeurs a l'ecran — deux champs que l'utilisateur remplit et que l'enregistrement jette. Ici, ce qui est
+affiche est ce qui est ecrit.
+
+**Non porte, et dit tel quel** : l'ecriture du `telegraf_output_token`, qui vit dans une route a part du
+backend. **Non corrige — c'est du backend** : le `WHERE platform` manquant de `:508` reste en place pour
+tout appelant du legacy.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V5 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-config-ecriture` entre avec **11 PASS sur le legacy** et
+**16 sur le portage**.
 
 ### v1.37.34 — module `supervision/`, sous-lot V3 : la configuration globale, en lecture
 

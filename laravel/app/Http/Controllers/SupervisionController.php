@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\Supervision;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -40,6 +42,26 @@ class SupervisionController extends Controller
      * page le decalage declare en PARITE E-73. V3 montre la configuration, pas sa
      * piste d'audit.
      */
+    /**
+     * Les colonnes a CHOIX FERME, et leurs valeurs admises.
+     *
+     * `tls_connect` et `tls_accept` sont des `enum` EN BASE
+     * (`enum('unencrypted','psk','cert')`) : un champ de texte libre par-dessus
+     * une colonne enumeree laisse taper une valeur que MySQL refusera — une
+     * erreur d'ecriture la ou l'utilisateur attendait un enregistrement. Vu a
+     * l'image sur la premiere version de ce formulaire.
+     *
+     * `agent_type` et `agent_version` sont des `varchar`, mais le legacy n'y offre
+     * que deux valeurs chacun : les laisser libres inviterait a inventer un nom
+     * d'agent que le deploiement ne saurait pas installer.
+     */
+    private const CHOIX_PAR_COLONNE = [
+        'agent_type' => ['zabbix-agent', 'zabbix-agent2'],
+        'agent_version' => ['7.0', '7.2'],
+        'tls_connect' => ['unencrypted', 'psk', 'cert'],
+        'tls_accept' => ['unencrypted', 'psk', 'cert'],
+    ];
+
     private const CHAMPS_PAR_PLATEFORME = [
         'zabbix' => [
             'agent_type' => 'type_agent',
@@ -96,8 +118,87 @@ class SupervisionController extends Controller
              * qui ne s'appliquent pas a lui.
              */
             'champs' => self::CHAMPS_PAR_PLATEFORME,
+            'choix' => self::CHOIX_PAR_COLONNE,
             'libelles' => $this->libelles(),
         ]);
+    }
+
+    /**
+     * Enregistre la configuration globale d'une plateforme — sous-lot V4.
+     *
+     * UNE SOUMISSION DE FORMULAIRE, PAS UN APPEL CLIENT. Le portage n'ouvre
+     * aucune requete depuis le navigateur : le formulaire part en POST, le
+     * controleur ecrit, et la page revient avec son message. Trois suites du
+     * module assertent qu'aucun appel client ne partait de cette page — cette
+     * propriete reste vraie.
+     *
+     * LES CHAMPS ECRITS SONT CEUX DE `CHAMPS_PAR_PLATEFORME`, et eux seuls. Le
+     * legacy, lui, force `hostname_pattern` et `extra_config` pour les trois
+     * plateformes non-Zabbix (`main.js:186`) : deux champs que l'utilisateur
+     * remplit et que l'enregistrement jette. Ici ce qui est affiche est ce qui est
+     * ecrit.
+     */
+    public function enregistrer(Request $requete): RedirectResponse
+    {
+        $plateforme = (string) $requete->input('plateforme', '');
+        if (! array_key_exists($plateforme, self::CHAMPS_PAR_PLATEFORME)) {
+            return redirect()->route('supervision')
+                ->with('superv_erreur', __('superv.enregistrement_plateforme_inconnue'));
+        }
+
+        // LE CHAMP EXIGE, PAR PLATEFORME. Le legacy refuse un `zabbix_server`
+        // vide ; le meme raisonnement vaut pour l'hote Centreon, qui sans valeur
+        // produirait une configuration d'agent inerte.
+        $exiges = ['zabbix' => 'zabbix_server', 'centreon' => 'centreon_host'];
+        $exige = $exiges[$plateforme] ?? null;
+        if ($exige !== null && trim((string) $requete->input($exige, '')) === '') {
+            return redirect()->route('supervision')
+                ->with('superv_erreur', __('superv.enregistrement_champ_exige', [
+                    'champ' => __('superv.champ_' . self::CHAMPS_PAR_PLATEFORME[$plateforme][$exige]),
+                ]));
+        }
+
+        $valeurs = [];
+        foreach (array_keys(self::CHAMPS_PAR_PLATEFORME[$plateforme]) as $colonne) {
+            $brut = $requete->input($colonne);
+            $brut = is_string($brut) ? trim($brut) : $brut;
+            // Une colonne nullable vide se stocke a NULL, pas a la chaine vide :
+            // la lecture (V3) distingue « non renseigne » de « renseigne vide »,
+            // et l'ecriture doit lui donner de quoi le faire.
+            $valeurs[$colonne] = ($brut === '' || $brut === null) ? null : $brut;
+
+            /*
+             * UNE COLONNE A CHOIX FERME NE PREND QUE SES VALEURS. La liste est
+             * cote serveur : un `<select>` empeche la faute a l'ecran, il
+             * n'empeche rien du tout dans une requete forgee — et derriere il y a
+             * un `enum` MySQL qui refuserait l'ecriture, donc une erreur au lieu
+             * d'un refus lisible. Hors liste : on garde la valeur DEJA en base.
+             */
+            if (isset(self::CHOIX_PAR_COLONNE[$colonne])
+                && ! in_array($valeurs[$colonne], self::CHOIX_PAR_COLONNE[$colonne], true)) {
+                unset($valeurs[$colonne]);
+            }
+        }
+        // `listen_port` et `centreon_port` sont des entiers en base : une chaine
+        // vide y deviendrait 0, un port qui n'existe pas.
+        foreach (['listen_port', 'centreon_port'] as $entier) {
+            if (array_key_exists($entier, $valeurs)) {
+                $valeurs[$entier] = $valeurs[$entier] === null ? null : (int) $valeurs[$entier];
+            }
+        }
+
+        $this->supervision->enregistreConfiguration(
+            $plateforme,
+            $valeurs,
+            // Un PSK vide veut dire « ne change rien », jamais « efface ».
+            $plateforme === 'zabbix' ? (string) $requete->input('tls_psk_value', '') : null,
+            (int) $requete->session()->get('user_id', 0),
+        );
+
+        return redirect()->route('supervision')
+            ->with('superv_message', __('superv.enregistrement_fait', [
+                'plateforme' => ucfirst($plateforme),
+            ]));
     }
 
     /**
