@@ -468,6 +468,12 @@ body {
 
 .rw-vide__titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
 
+/* L'ACTION D'UN ETAT VIDE A BESOIN DE SON PROPRE ESPACE. `.rw-vide p` est a
+   `margin: 0` — juste pour du texte, faux des qu'un bouton s'y trouve : sa
+   hauteur de ligne recouvrait alors la derniere ligne du paragraphe au-dessus,
+   qui se lisait barree. Vu a l'image, invisible a toute assertion DOM. */
+.rw-vide__action { margin-top: 16px; }
+
 /* ── Tiroir mobile ──────────────────────────────────────────────────────── */
 
 .rw-tiroir { display: none; }
@@ -792,6 +798,13 @@ body {
  */
 a.rw-bouton, a.rw-bouton:hover { text-decoration: none; }
 
+/* UN BOUTON QUI EST UN LIEN RESTE UNE BOITE. Un `<a>` est en ligne : quand son
+   libelle depasse la largeur disponible — a 390 px, « Ouvrir sur l'ancien
+   portail ↗ » — le texte passe a la ligne mais la BOITE, elle, sort du cadre par
+   la droite, remplissage compris. En `inline-block` elle se replie proprement.
+   Vu a l'image sur mobile, aucune assertion DOM ne le voit. */
+a.rw-bouton { display: inline-block; }
+
 /*
  * Entre le discret et le rouge : une action qui MODIFIE la machine sans etre
  * exceptionnelle. La barre du module `update/` en porte quatre destructives ;
@@ -840,6 +853,18 @@ a.rw-bouton, a.rw-bouton:hover { text-decoration: none; }
 }
 
 .rw-etiquette-champ .rw-saisie { text-transform: none; letter-spacing: normal; font-weight: 400; }
+
+/* UN CHOIX A QUATRE VALEURS N'A PAS BESOIN DE 1100 PX. `.rw-etiquette-champ`
+   est en `flex: 1` : son `<select>` s'etirait sur toute la colonne restante, et
+   sur 1920 px le menu des plateformes traversait la moitie de la page. Borner le
+   `<select>` seul ne suffit pas — l'enveloppe garde la place et renvoie le
+   bouton voisin a l'autre bout de la carte. C'est donc l'ENVELOPPE qui se
+   borne. Vu a l'image, invisible a toute assertion DOM. */
+.rw-etiquette-champ--borne { flex: 0 0 auto; min-width: 0; }
+
+/* SPECIFICITE EGALE, DONC C'EST L'ORDRE QUI TRANCHE : cette regle doit rester
+   APRES `.rw-etiquette-champ`, sinon son `flex: 1` la remporte et le bornage
+   n'a aucun effet — premiere version ecrite 380 lignes plus haut, sans effet. */
 
 .rw-pastille--info   { background: var(--rw-accent-doux); color: var(--rw-accent); }
 .rw-pastille--neutre { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }

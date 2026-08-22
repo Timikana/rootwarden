@@ -36,7 +36,7 @@ class Navigation
             ['cle' => 'fail2ban',       'garde' => 'can_manage_fail2ban',     'legacy' => '/fail2ban/'],
             ['cle' => 'services',       'garde' => 'can_manage_services',     'legacy' => '/services/'],
             ['cle' => 'ssh_audit',      'garde' => 'can_audit_ssh',           'legacy' => '/ssh-audit/'],
-            ['cle' => 'supervision',    'garde' => 'can_manage_supervision',  'legacy' => '/supervision/'],
+            ['cle' => 'supervision',    'garde' => 'can_manage_supervision',  'route' => 'supervision'],
             ['cle' => 'bashrc',         'garde' => 'can_manage_bashrc',       'legacy' => '/bashrc/'],
             ['cle' => 'graylog',        'garde' => 'can_manage_graylog',      'legacy' => '/graylog/'],
             ['cle' => 'wazuh',          'garde' => 'can_manage_wazuh',        'legacy' => '/wazuh/', 'feature' => 'wazuh'],

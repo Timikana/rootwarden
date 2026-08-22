@@ -262,6 +262,7 @@ explicite renvoyant vers l'ancien portail.
 
 | Page | Route | Garde | Archivee |
 |---|---|---|---|
+| Supervision (V1 : page + 4 onglets) | `supervision` | `role:2` + `perm:can_manage_supervision` | NON, V2..V12 y vivent |
 | Journal des commandes | `journal-commandes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Approbations a quatre yeux | `approbations` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
 | Derive de configuration | `derive-config` | `role:2` + `perm:can_view_compliance` | oui, 2026-08-18 |

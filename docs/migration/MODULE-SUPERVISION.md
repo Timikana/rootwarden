@@ -222,6 +222,35 @@ des faux positifs), et vérifie qu'**aucune boîte native** ne s'ouvre.
 laquelle on décide et qui bloque Puppeteer. Ces deux clés ne seront donc pas « déplacées » mais
 **remplacées** par un panneau de décision, en V11 et V12. Neuf clés à déplacer, deux à remplacer.
 
+## 7 quater. V1 porté (2026-08-22)
+
+Route du portage **`/supervision`**. Garde **`role:2` + `perm:can_manage_supervision`**, reprise telle
+quelle — **aucun écart à déclarer**, l'en-tête du fichier legacy et son code s'accordent. Suite
+`go-page-supervision-onglets` : base rouge **6 PASS / 7 FAIL**, puis **14 PASS** sur le portage et
+**11 PASS** sur le legacy. Détail complet en `PARITE.md` E-72.
+
+**Ce que le portage rend vrai, mesuré :** page servie à un rôle 2 habilité (200) et refusée à un rôle 1
+par un **403 exact** · quatre onglets dans l'ordre `config, profiles, deploy, editor`, un seul panneau
+actif à l'arrivée et après chaque bascule · quatre blocs de plateforme présents, un seul visible ·
+**zéro appel client au backend**, au chargement comme à chaque bascule (le legacy en fait 2 puis 1 ou 2)
+· le refus « aucun serveur choisi » est **énoncé dans la page**, traduit, sans joindre personne · aucune
+des onze clés cassées n'apparaît · aucune boîte native, aucune erreur JS.
+
+**Frontière V1 / suite du module.** Le portage crée la frontière que le legacy n'a pas : les quatre
+panneaux non portés portent un état vide nommé, l'explication de ce qui arrive plus tard, et un lien
+vers l'ancien portail avec le marqueur des entrées non portées. `legacy/supervision/` **n'est pas
+archivé** — V2 à V12 y vivent encore, et l'entrée de menu du portail legacy reste en place.
+
+**Dette i18n : structurellement fermée pour le portage.** Il n'y a pas deux catalogues. Les libellés du
+script partent du même `lang/{fr,en}/superv.php` que la page, posés en données sur une ligne. Le défaut
+du legacy — un second catalogue où onze clés manquent, et une clé absente rendue telle quelle — ne peut
+pas se reformer ici. Les onze clés restent à traiter côté legacy tant que V2…V12 y vivent.
+
+**Trois défauts d'affichage du socle, vus à l'image et corrigés** : l'action d'un état vide recouvrait le
+paragraphe au-dessus ; un `<select>` dans un `.rw-etiquette-champ` s'étirait sur toute la largeur et
+renvoyait son bouton à l'autre bout de la carte ; un `<a class="rw-bouton">`, élément en ligne, sortait
+de son cadre à 390 px. Le troisième correctif vaut pour **toutes** les pages du portage.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`

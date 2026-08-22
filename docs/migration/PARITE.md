@@ -2178,3 +2178,83 @@ refuse bien — c'est vérifié. Même limite que D-5.
 **Un défaut de ma suite, corrigé** : le collecteur de types de requêtes comptait aussi la sonde `fetch`
 de la suite elle-même, si bien que l'assertion « pas d'`EventSource` » aurait réussi même si le client de
 la page n'avait rien demandé. Il est remis à zéro juste avant de piloter le client.
+
+## E-72 — « Supervision » : la page se peint sans rien demander, et une clé technique quitte l'écran
+
+**Module `supervision/`, sous-lot V1 : la page et ses quatre onglets.** Route du portage `/supervision`.
+Suite : `tests/e2e/go-page-supervision-onglets.mjs` — **11 PASS sur le legacy, 14 sur le portage**
+(base rouge relevée avant portage : **6 PASS / 7 FAIL**). Les trois assertions supplémentaires sont
+celles que le legacy ne peut pas satisfaire, rendues en INFO chez lui.
+
+**La garde est reprise telle quelle, et pour une fois il n'y a aucun écart à déclarer.**
+`supervision/index.php:17-18` fait `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` puis
+`checkPermission('can_manage_supervision')`, et l'en-tête du fichier annonce exactement cela :
+« Permissions : admin (2) + superadmin (3) + can_manage_supervision ». La route porte donc `role:2` +
+`perm:can_manage_supervision`. Contrairement à `ssh/` (E-69) et à `security/` (E-36 / D-1), il n'y a rien
+à arbitrer ici. Mesuré : un rôle 1 sans la permission reçoit **403**, un rôle 2 habilité **200**.
+
+**LE DÉCOUPAGE ÉTAIT OPTIMISTE : V1 N'EST PAS « AUCUNE ROUTE ».** L'inventaire (§7 de MODULE-SUPERVISION)
+annonçait un premier sous-lot sans aucun appel. Mesuré au navigateur : la page legacy émet **deux**
+requêtes backend dès son chargement — `GET /supervision/profiles?platform=zabbix` et
+`GET /supervision/profiles/assignments?platform=zabbix` — puis les **rejoue à chaque bascule d'onglet**
+(`profiles` 1 appel, `deploy` 2, `editor` 0). Le catalogue de profils arrive donc d'emblée : la frontière
+V1/V2 n'existe pas côté legacy. Les deux routes sont en lecture, donc V1 reste inoffensif, mais
+l'affirmation était fausse et c'est la mesure qui l'a dit.
+
+**Le portage, lui, n'appelle rien du tout** : ni au chargement, ni au changement d'onglet, ni au
+changement de plateforme. Tout est peint côté serveur (décision S3/S4) et le script ne fait que montrer
+et cacher des panneaux déjà rendus. Mesuré à `resourceType()` : **0 requête**, contre 2 puis 1 ou 2 par
+bascule.
+
+**UNE CLÉ DE TRADUCTION QUITTE L'ÉCRAN.** `head.php:76-78` charge `getJsTranslations('js.')` puis rend
+`_i18n['js.' + cle] || _i18n[cle] || cle` : une clé absente est **retournée telle quelle**. Comme c'est
+une chaîne non vide, l'idiome `__('x') || 'repli'` **ne déclenche jamais son repli** — la panne est
+silencieuse. Onze clés du module sont dans ce cas, présentes dans `supervision.php` en FR et en EN mais
+absentes de `js.php`. **Une seule est atteignable sans joindre une machine** : `editor_select_server`, le
+garde qui refuse de lire une configuration quand aucun serveur n'est choisi. Mesuré : le legacy affiche
+`editor_select_server` en clair dans son toast ; le portage affiche la phrase traduite, et **aucune des
+onze** n'apparaît dans son corps de page.
+
+**Neuf clés à déplacer, deux à REMPLACER.** Ce que l'inventaire ne disait pas : `confirm_deploy` et
+`confirm_uninstall` sont consommées dans des `confirm()` **natifs** (`main.js:468` et `:488`). La
+convention du portage les interdit — une boîte native recouvre la ligne sur laquelle on décide, ne se
+style pas, et bloque le test qui doit mener le geste au bout. Ces deux-là ne seront donc pas déplacées
+mais remplacées par un panneau de décision, en V11 et V12.
+
+**Ce que V1 ne porte pas, il le DIT.** Les quatre panneaux portent un état vide nommé « Pas encore porté
+sur ce portail », l'explication de ce qui arrive plus tard, et un lien vers l'ancien portail avec le
+marqueur des entrées non portées. Trois onglets sur quatre sont dans ce cas ; le quatrième porte le
+garde de l'éditeur, seul geste réel du sous-lot.
+
+**Défauts du backend constatés, NON corrigés — ils demanderaient de modifier le backend.**
+Les quatre routes de profils (`1734` GET, `1760` POST, `1801` DELETE, `1817` assignments) portent
+`@require_api_key` + `@require_permission('can_manage_supervision')` et **aucun `@require_role`** ; la
+cinquième (`machines/<mid>/profile`, `1846`) porte bien `@require_role(2)` avec son commentaire
+« Patch A01 » — le correctif a été appliqué à une route et pas à ses quatre voisines. Et `/supervision/`
+est **absent** des 25 préfixes de `$ADMIN_ONLY_PREFIXES` du proxy legacy. Un rôle 1 porteur de
+`can_manage_supervision` ne peut donc pas ouvrir la page mais pourrait appeler
+`DELETE /supervision/profiles/<id>`. Décision d'exploitant.
+
+**Trois défauts vus À L'IMAGE, qu'aucune assertion DOM ne voit** — et corrigés :
+- `.rw-vide p { margin: 0 }` est juste pour du texte et faux dès qu'un bouton s'y trouve : la hauteur de
+  ligne du bouton **recouvrait** la dernière ligne du paragraphe au-dessus, qui se lisait barrée.
+  L'action a désormais son bloc (`.rw-vide__action`) ;
+- `.rw-etiquette-champ` est en `flex: 1` : sur 1920 px le menu des plateformes traversait la moitié de la
+  page. Borner le `<select>` seul ne suffisait pas — l'enveloppe gardait la place et renvoyait le bouton
+  voisin à l'autre bout de la carte. C'est l'enveloppe qui se borne (`--borne`), **et la règle doit
+  rester après celle qu'elle surcharge** : à spécificité égale, c'est l'ordre du fichier qui tranche, et
+  la première version, écrite 380 lignes plus haut, n'avait aucun effet ;
+- un `<a class="rw-bouton">` est un élément **en ligne** : à 390 px son libellé passait à la ligne mais sa
+  boîte sortait du cadre par la droite, remplissage compris. `display: inline-block` la replie. Ce
+  correctif est dans le socle : il vaut pour toutes les pages qui portent un bouton-lien.
+
+**Un défaut de ma suite, corrigé avant de l'inscrire.** L'assertion « aucune clé ne s'affiche en
+identifiant » réussissait aussi pour un garde qui n'aurait **rien** affiché : ne rien dire, c'est ne dire
+aucun identifiant. La suite mesure donc d'abord que le refus est **énoncé à l'écran**, en comparant au
+texte que chaque cible déclare comme son refus — côté portage lu dans l'îlot de données de la page, pour
+ne pas recopier un catalogue de traduction dans un test.
+
+**Non porté, et dit tel quel** : le catalogue de profils (V2), la lecture et l'écriture de la
+configuration globale (V3, V4), l'assignation (V5), tout ce qui passe par SSH (V6 à V12). Et **hors
+lot** : les *overrides* par machine, qui n'ont jamais eu d'interface — les porter, c'est concevoir, pas
+migrer. À arbitrer **avant V10**, car la précédence documentée du module en dépend.
