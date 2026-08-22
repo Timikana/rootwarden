@@ -183,6 +183,17 @@
     var contenu = document.querySelector('[data-rw="superv-editeur-contenu"]');
     var cheminAffiche = document.querySelector('[data-rw="superv-editeur-chemin"]');
     var sauvegardes = document.querySelector('[data-rw="superv-sauvegardes"]');
+    /*
+     * DECLAREES ICI, PAS PLUS BAS. La liste des sauvegardes est rendue plus haut
+     * dans ce fichier que le panneau de restauration, et ses boutons s'en
+     * servent : les declarer apres ne tenait que par le hoisting de `var`, ce qui
+     * marche et se lit comme un defaut.
+     */
+    var panneauRestaurer = document.querySelector('[data-rw="superv-panneau-restaurer"]');
+    var messageRestaurer = document.querySelector('[data-rw="superv-restaurer-message"]');
+    var annulerRestaurer = document.querySelector('[data-rw="superv-restaurer-annuler"]');
+    var confirmerRestaurer = document.querySelector('[data-rw="superv-restaurer-confirmer"]');
+    var coutRestaurer = document.querySelector('[data-rw="superv-restaurer-cout"]');
 
     /** Le nom du serveur choisi, pour que les messages nomment leur cible. */
     function nomDuServeur() {
@@ -192,6 +203,12 @@
     }
 
     function appelleLaMachine(url, sur, alors) {
+        /*
+         * UN REPLI QUI NE REFUSE PAS N'EST PAS UN REPLI. `fetch('')` ne « ne part
+         * pas » : il POSTe sur la page courante. Une route inconnue doit donc
+         * arreter le geste ici, franchement.
+         */
+        if (! url) { return Promise.reject(new Error('route inconnue')); }
         var jeton = document.querySelector('meta[name="csrf-token"]');
         return fetch(url, {
             method: 'POST',
@@ -228,7 +245,7 @@
             message.textContent = libelles.editeur_lecture_en_cours.replace('{nom}', nom);
             bouton.disabled = true;
 
-            appelleLaMachine(libelles.url_lecture_config, serveur.value, function (donnees) {
+            appelleLaMachine(routeCourante('lecture'), serveur.value, function (donnees) {
                 if (donnees.absent) {
                     message.className = 'rw-annonce';
                     message.textContent = libelles.editeur_absent
@@ -267,8 +284,18 @@
             });
         });
         serveur.addEventListener('change', function () {
-            message.textContent = '';
+            message.className = 'rw-annonce';
+            /*
+             * CHANGER DE SERVEUR VIDE LA ZONE — ET LE DIT, DEPUIS V9. La
+             * configuration d'un serveur n'a aucun sens pour un autre : la vider
+             * est correct. Mais V7 laissait ce champ en LECTURE SEULE, donc la
+             * vider ne perdait rien ; depuis que V9 le rend modifiable, le meme
+             * geste peut effacer ce que quelqu'un vient de taper. Un effacement
+             * silencieux devient une perte de travail : on l'annonce.
+             */
+            var avait = contenu && contenu.value.trim() !== '';
             if (contenu) { contenu.value = ''; }
+            message.textContent = avait ? libelles.editeur_change_serveur : '';
         });
     }
 
@@ -285,22 +312,318 @@
                 return;
             }
             boutonSauvegardes.disabled = true;
-            appelleLaMachine(libelles.url_sauvegardes, serveur.value, function (donnees) {
+            appelleLaMachine(routeCourante('sauvegardes'), serveur.value, function (donnees) {
                 if (donnees.absent || donnees.refus) {
                     sauvegardes.textContent = libelles.editeur_refus
                         .replace('{statut}', String(donnees.refus || 404));
 
                     return;
                 }
+                /*
+                 * V9 : la liste porte un bouton par ligne. Elle est rendue par
+                 * `textContent`, jamais par interpolation — un nom de fichier
+                 * vient d'une machine distante, donc d'une source qu'on ne
+                 * controle pas.
+                 */
                 var liste = donnees.backups || [];
-                sauvegardes.textContent = liste.length === 0
-                    ? libelles.sauvegardes_aucune
-                    : libelles.sauvegardes_nombre.replace('{nombre}', String(liste.length))
-                        + ' ' + liste.map(function (b) { return b.filename; }).join(', ');
+                sauvegardes.textContent = '';
+                if (liste.length === 0) {
+                    var vide = document.createElement('p');
+                    vide.className = 'rw-aide';
+                    vide.textContent = libelles.sauvegardes_aucune;
+                    sauvegardes.appendChild(vide);
+
+                    return;
+                }
+                var titre = document.createElement('p');
+                titre.className = 'rw-aide';
+                titre.textContent = libelles.sauvegardes_nombre
+                    .replace('{nombre}', String(liste.length));
+                sauvegardes.appendChild(titre);
+
+                liste.forEach(function (b) {
+                    var ligne = document.createElement('div');
+                    ligne.className = 'rw-actions';
+                    ligne.setAttribute('data-rw', 'superv-sauvegarde');
+
+                    var nom = document.createElement('code');
+                    nom.className = 'rw-actions__gauche';
+                    nom.textContent = b.filename;
+                    ligne.appendChild(nom);
+
+                    var bouton = document.createElement('button');
+                    bouton.type = 'button';
+                    bouton.className = 'rw-bouton rw-bouton--discret';
+                    bouton.setAttribute('data-rw', 'superv-restaurer');
+                    bouton.setAttribute('data-cible', b.filename);
+                    bouton.textContent = libelles.restaurer_bouton;
+                    /*
+                     * LE BOUTON OUVRE, IL N'ENVOIE PAS. Cote legacy le meme clic
+                     * ecrase la configuration et redemarre l'agent, sans la
+                     * moindre confirmation.
+                     */
+                    bouton.addEventListener('click', function () {
+                        if (! panneauRestaurer || ! coutRestaurer) { return; }
+                        panneauRestaurer.setAttribute('data-cible', b.filename);
+                        coutRestaurer.textContent = libelles.restaurer_cout
+                            .replace('{nom}', b.filename)
+                            .replace('{chemin}', cheminCourant());
+                        panneauRestaurer.hidden = false;
+                        if (messageRestaurer) {
+                            messageRestaurer.className = 'rw-annonce';
+                            messageRestaurer.textContent = '';
+                        }
+                        annulerRestaurer.focus();
+                    });
+                    ligne.appendChild(bouton);
+                    sauvegardes.appendChild(ligne);
+                });
             }).catch(function () {
                 sauvegardes.textContent = libelles.editeur_echec;
             }).finally(function () {
                 boutonSauvegardes.disabled = false;
+            });
+        });
+    }
+
+    /* ── L'ecriture du fichier distant ───────────────────────── sous-lot V9
+     *
+     * TROIS ISSUES, LUES SUR UN BOOLEEN. Le backend distingue « ecrit et
+     * redemarre », « ecrit mais le service n'a pas redemarre » et « pas ecrit » ;
+     * il l'exprime par `restarted`, ajoute exprès pour que le client n'ait pas a
+     * analyser une phrase francaise. Le legacy, lui, perd le cas du milieu : son
+     * `toast(__('config_remote_saved') || res.message, 'success')` n'atteint
+     * jamais `res.message`, puisqu'une cle absente est RENDUE TELLE QUELLE donc
+     * non vide. L'avertissement que le backend prend la peine de construire
+     * n'arrive donc jamais a l'ecran — et l'ecran affiche `config_remote_saved`
+     * en vert.
+     *
+     * LE MESSAGE DU BACKEND N'EST PAS REPRIS TEL QUEL : il est en francais
+     * uniquement et porte la sortie d'erreur brute de la commande distante
+     * (« sh: 1: systemctl: not found »). Le portage dit l'ISSUE, traduite, et
+     * garde la trace technique hors de l'ecran.
+     */
+    var boutonSauver = document.querySelector('[data-rw="superv-sauver"]');
+    var panneauSauver = document.querySelector('[data-rw="superv-panneau-sauver"]');
+    var messageSauver = document.querySelector('[data-rw="superv-sauver-message"]');
+    var annulerSauver = document.querySelector('[data-rw="superv-sauver-annuler"]');
+    var confirmerSauver = document.querySelector('[data-rw="superv-sauver-confirmer"]');
+    var coutSauver = document.querySelector('[data-rw="superv-sauver-cout"]');
+
+    /**
+     * LA ROUTE SUIT LA PLATEFORME, comme le chemin — correctif de V7.
+     *
+     * Les quatre URL etaient FIGEES sur `/supervision/zabbix/...` pendant que le
+     * chemin affiche suivait le selecteur : choisir Telegraf annoncait
+     * `/etc/telegraf/telegraf.conf` et lisait `/etc/zabbix/zabbix_agent2.conf`.
+     * C'est le defaut E-79 que V7 reprochait au legacy, revenu par la ROUTE au
+     * lieu du CHEMIN. Les deux viennent maintenant du serveur, indexes par la
+     * meme cle.
+     *
+     * Repli fail-closed : sans route connue on rend une chaine vide, et
+     * l'appelant ne part pas. Mieux vaut un geste qui ne se fait pas qu'un geste
+     * qui vise le mauvais fichier.
+     */
+    function routeCourante(geste) {
+        var plateforme = choixPlateforme ? choixPlateforme.value : 'zabbix';
+        try {
+            var table = JSON.parse(libelles.routes_machine || '{}');
+
+            return (table[plateforme] && table[plateforme][geste]) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    /**
+     * LE CHEMIN ANNONCE EST CELUI QUE LA PAGE AFFICHE, qui vient du SERVEUR.
+     * Le relire ici plutot que de recalculer depuis une table locale evite
+     * exactement le defaut du legacy (E-79) : deux chemins a l'ecran, dont un
+     * faux. Une seule source, donc un seul chemin possible.
+     */
+    function cheminCourant() {
+        return cheminAffiche ? cheminAffiche.textContent.trim() : '';
+    }
+
+    if (boutonSauver && panneauSauver && messageSauver && annulerSauver
+        && confirmerSauver && contenu && serveur) {
+        boutonSauver.addEventListener('click', function () {
+            messageSauver.className = 'rw-annonce';
+            // Les deux gardes AVANT d'ouvrir : ouvrir un panneau de decision pour
+            // un geste qui sera refuse fait decider dans le vide.
+            if (serveur.value === '') {
+                messageSauver.textContent = libelles.editeur_sans_serveur;
+
+                return;
+            }
+            if (contenu.value.trim() === '') {
+                messageSauver.textContent = libelles.editeur_sauver_vide;
+
+                return;
+            }
+            // Le chemin annonce suit la plateforme choisie, comme la lecture.
+            if (coutSauver && cheminCourant()) {
+                coutSauver.textContent = libelles.editeur_sauver_cout
+                    .replace('{chemin}', cheminCourant());
+            }
+            panneauSauver.hidden = false;
+            boutonSauver.hidden = true;
+            annulerSauver.focus();
+        });
+
+        annulerSauver.addEventListener('click', function () {
+            panneauSauver.hidden = true;
+            boutonSauver.hidden = false;
+            boutonSauver.focus();
+        });
+
+        confirmerSauver.addEventListener('click', function () {
+            confirmerSauver.disabled = true;
+            annulerSauver.disabled = true;
+            messageSauver.className = 'rw-annonce';
+            messageSauver.textContent = libelles.editeur_sauver_en_cours;
+
+            var jeton = document.querySelector('meta[name="csrf-token"]');
+            var routeEcriture = routeCourante('ecriture');
+            if (! routeEcriture) {
+                messageSauver.className = 'rw-annonce rw-annonce--echec';
+                messageSauver.textContent = libelles.editeur_sauver_echec;
+                confirmerSauver.disabled = false; annulerSauver.disabled = false;
+
+                return;
+            }
+            fetch(routeEcriture, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                },
+                body: JSON.stringify({
+                    machine_id: Number(serveur.value),
+                    config: contenu.value,
+                }),
+            }).then(function (reponse) {
+                // LE STATUT D'ABORD : un refus n'est pas un echec d'ecriture.
+                if (! reponse.ok) {
+                    messageSauver.className = 'rw-annonce rw-annonce--echec';
+                    messageSauver.textContent = libelles.editeur_sauver_refus
+                        .replace('{statut}', String(reponse.status));
+
+                    return null;
+                }
+
+                return reponse.json();
+            }).then(function (donnees) {
+                if (! donnees) { return; }
+                if (! donnees.success) {
+                    messageSauver.className = 'rw-annonce rw-annonce--echec';
+                    messageSauver.textContent = libelles.editeur_sauver_echec;
+
+                    return;
+                }
+                if (donnees.restarted === false) {
+                    // LE TROISIEME CAS : le fichier EST ecrit, le service ne
+                    // tourne pas. Ni une reussite ni un echec.
+                    messageSauver.className = 'rw-annonce rw-annonce--attention';
+                    messageSauver.textContent = libelles.editeur_sauve_sans_redemarrage;
+
+                    return;
+                }
+                messageSauver.className = 'rw-annonce rw-annonce--ok';
+                messageSauver.textContent = libelles.editeur_sauve_et_redemarre;
+            }).catch(function () {
+                messageSauver.className = 'rw-annonce rw-annonce--echec';
+                messageSauver.textContent = libelles.editeur_sauver_echec;
+            }).finally(function () {
+                panneauSauver.hidden = true;
+                boutonSauver.hidden = false;
+                confirmerSauver.disabled = false;
+                annulerSauver.disabled = false;
+            });
+        });
+    }
+
+    /* ── La restauration d'une sauvegarde ────────────────────── sous-lot V9
+     *
+     * LE LEGACY N'A AUCUNE CONFIRMATION : sa liste s'ouvre dans une fenetre
+     * modale et chaque ligne porte un bouton qui, d'un SEUL clic, ecrase la
+     * configuration courante et redemarre l'agent. Ici la restauration passe par
+     * le panneau de decision partage, qui NOMME la sauvegarde visee.
+     */
+
+    function fermeRestauration() {
+        if (! panneauRestaurer) { return; }
+        panneauRestaurer.hidden = true;
+        panneauRestaurer.removeAttribute('data-cible');
+    }
+
+    if (panneauRestaurer && messageRestaurer && annulerRestaurer && confirmerRestaurer) {
+        annulerRestaurer.addEventListener('click', function () {
+            fermeRestauration();
+        });
+
+        confirmerRestaurer.addEventListener('click', function () {
+            var nom = panneauRestaurer.getAttribute('data-cible') || '';
+            if (nom === '' || ! serveur || serveur.value === '') { return; }
+            confirmerRestaurer.disabled = true;
+            annulerRestaurer.disabled = true;
+            messageRestaurer.className = 'rw-annonce';
+            messageRestaurer.textContent = libelles.restaurer_en_cours.replace('{nom}', nom);
+
+            var jeton = document.querySelector('meta[name="csrf-token"]');
+            var routeRestauration = routeCourante('restauration');
+            if (! routeRestauration) {
+                messageRestaurer.className = 'rw-annonce rw-annonce--echec';
+                messageRestaurer.textContent = libelles.restaurer_echec;
+                confirmerRestaurer.disabled = false; annulerRestaurer.disabled = false;
+
+                return;
+            }
+            fetch(routeRestauration, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                },
+                body: JSON.stringify({
+                    machine_id: Number(serveur.value),
+                    backup_name: nom,
+                }),
+            }).then(function (reponse) {
+                if (! reponse.ok) {
+                    messageRestaurer.className = 'rw-annonce rw-annonce--echec';
+                    messageRestaurer.textContent = libelles.restaurer_refus
+                        .replace('{statut}', String(reponse.status));
+
+                    return null;
+                }
+
+                return reponse.json();
+            }).then(function (donnees) {
+                if (! donnees) { return; }
+                if (! donnees.success) {
+                    messageRestaurer.className = 'rw-annonce rw-annonce--echec';
+                    messageRestaurer.textContent = libelles.restaurer_echec;
+
+                    return;
+                }
+                if (donnees.restarted === false) {
+                    messageRestaurer.className = 'rw-annonce rw-annonce--attention';
+                    messageRestaurer.textContent = libelles.restaure_sans_redemarrage
+                        .replace('{nom}', nom);
+
+                    return;
+                }
+                messageRestaurer.className = 'rw-annonce rw-annonce--ok';
+                messageRestaurer.textContent = libelles.restaure_et_redemarre
+                    .replace('{nom}', nom);
+            }).catch(function () {
+                messageRestaurer.className = 'rw-annonce rw-annonce--echec';
+                messageRestaurer.textContent = libelles.restaurer_echec;
+            }).finally(function () {
+                fermeRestauration();
+                confirmerRestaurer.disabled = false;
+                annulerRestaurer.disabled = false;
             });
         });
     }

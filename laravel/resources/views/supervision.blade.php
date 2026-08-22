@@ -571,32 +571,93 @@
                         <code data-rw="superv-editeur-chemin">{{ $cheminsConfig['zabbix'] ?? '' }}</code>
                     </p>
 
-                    {{-- LECTURE SEULE : V7 rapatrie le fichier, V9 l'ecrira. Un
-                         champ modifiable dont l'enregistrement n'existe pas
-                         laisserait croire qu'on peut editer. --}}
+                    {{-- MODIFIABLE DEPUIS V9. V7 laissait ce champ en lecture
+                         seule parce que l'enregistrement n'existait pas : un champ
+                         editable sans enregistrement laisse croire qu'on peut
+                         editer. --}}
                     <label class="rw-etiquette-champ">
                         <span class="rw-etiquette">{{ __('superv.editeur_contenu') }}</span>
-                        <textarea class="rw-saisie" rows="16" readonly
+                        <textarea class="rw-saisie" rows="16"
                                   data-rw="superv-editeur-contenu"
                                   placeholder="{{ __('superv.editeur_vide') }}"></textarea>
                     </label>
 
+                    {{-- ══ SOUS-LOT V9 : L'ECRITURE ═══════════════════════════
+                         LE COUT S'ENONCE AVANT LE GESTE, et il est ENUMERE : le
+                         chemin exact ecrit, la sauvegarde creee avant, et le
+                         service redemarre apres. Le legacy n'annonce rien du tout
+                         et n'a aucune confirmation.
+
+                         L'action principale est a DROITE : ici c'est bien un pied
+                         de formulaire — l'oeil descend la zone d'edition puis
+                         trouve le bouton. --}}
                     <div class="rw-actions">
-                        <p class="rw-aide rw-actions__gauche" data-rw="superv-sauvegardes">{{ __('superv.sauvegardes_titre') }}</p>
+                        <button type="button" class="rw-bouton"
+                                data-rw="superv-sauver">{{ __('superv.editeur_sauver') }}</button>
+                    </div>
+
+                    <div class="rw-panneau-decision" data-rw="superv-panneau-sauver" hidden>
+                        <div class="rw-panneau-decision__texte">
+                            <p class="rw-encart" data-rw="superv-sauver-cout">
+                                {{ __('superv.editeur_sauver_cout', ['chemin' => $cheminsConfig['zabbix'] ?? '']) }}
+                            </p>
+                            {{-- TROIS EFFETS, ENUMERES. Une phrase qui dit
+                                 « enregistrer » cache qu'on redemarre un service. --}}
+                            <ul class="rw-aide rw-prose rw-liste-effets" data-rw="superv-sauver-effets">
+                                <li>{{ __('superv.editeur_effet_sauvegarde') }}</li>
+                                <li>{{ __('superv.editeur_effet_ecriture') }}</li>
+                                <li>{{ __('superv.editeur_effet_redemarrage') }}</li>
+                            </ul>
+                        </div>
+                        <div class="rw-panneau-decision__actions">
+                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                    data-rw="superv-sauver-annuler">{{ __('superv.editeur_sauver_annuler') }}</button>
+                            <button type="button" class="rw-bouton rw-bouton--danger"
+                                    data-rw="superv-sauver-confirmer">{{ __('superv.editeur_sauver_confirmer') }}</button>
+                        </div>
+                    </div>
+
+                    <p class="rw-annonce" data-rw="superv-sauver-message" aria-live="polite"></p>
+
+                    {{-- ══ LES SAUVEGARDES, ET LEUR RESTAURATION ══════════════
+                         Cote legacy la liste s'ouvre dans une fenetre MODALE et
+                         chaque ligne porte un bouton qui, d'un SEUL clic, ecrase
+                         la configuration courante et redemarre l'agent : ni
+                         `confirm()` natif, ni panneau, rien. Ici la liste est dans
+                         la page, et chaque restauration passe par le panneau de
+                         decision partage, cible par `data-cible`. --}}
+                    <div class="rw-actions">
+                        <p class="rw-aide rw-actions__gauche">{{ __('superv.sauvegardes_titre') }}</p>
                         <button type="button" class="rw-bouton rw-bouton--discret"
                                 data-rw="superv-lire-sauvegardes">{{ __('superv.sauvegardes_lister') }}</button>
                     </div>
+
+                    <div data-rw="superv-sauvegardes"></div>
+
+                    <div class="rw-panneau-decision" data-rw="superv-panneau-restaurer" hidden>
+                        <div class="rw-panneau-decision__texte">
+                            <p class="rw-avertissement" data-rw="superv-restaurer-cout"></p>
+                            <p class="rw-aide rw-prose">{{ __('superv.restaurer_aide') }}</p>
+                        </div>
+                        <div class="rw-panneau-decision__actions">
+                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                    data-rw="superv-restaurer-annuler">{{ __('superv.restaurer_annuler') }}</button>
+                            <button type="button" class="rw-bouton rw-bouton--danger"
+                                    data-rw="superv-restaurer-confirmer">{{ __('superv.restaurer_confirmer') }}</button>
+                        </div>
+                    </div>
+
+                    <p class="rw-annonce" data-rw="superv-restaurer-message" aria-live="polite"></p>
                 @endif
 
-                <div class="rw-vide rw-note">
-                    <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
-                    <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_editeur') }}</p>
-                    <div class="rw-vide__action">
-                        <a class="rw-bouton rw-bouton--discret"
-                           href="{{ config('app.url_legacy') }}/supervision/"
-                           target="_blank" rel="noopener">{{ __('superv.vers_legacy') }} ↗</a>
-                    </div>
-                </div>
+                {{-- LE BLOC « PAS ENCORE PORTE » A ETE RETIRE ICI, et c'est le
+                     point : l'onglet est COMPLET depuis V9 — lecture (V7),
+                     ecriture, liste des sauvegardes et restauration. Le texte
+                     annoncait encore « la lecture et l'ecriture arrivent avec les
+                     sous-lots suivants » alors que la lecture etait portee depuis
+                     V7 : il etait devenu faux d'une moitie sans qu'aucun test ne
+                     le voie. Un renvoi vers l'ancien portail sur un onglet acheve
+                     y renverrait pour rien. --}}
             </article>
         </div>
     </section>

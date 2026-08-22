@@ -984,13 +984,13 @@ def zabbix_config_save():
                 f"systemctl restart {service_name}", root_pass, timeout=15)
             if rc_r != 0:
                 return jsonify({
-                    'success': True,
+                    'success': True, 'restarted': False,
                     'message': f'Config sauvegardee mais restart echoue: {stderr_r}',
                     'backup': backup_path,
                 })
 
             return jsonify({
-                'success': True,
+                'success': True, 'restarted': True,
                 'message': 'Configuration sauvegardee et agent redemarre.',
                 'backup': backup_path,
             })
@@ -1090,9 +1090,16 @@ def zabbix_restore_backup():
                 return jsonify({'success': False, 'message': f'Restauration echouee: {stderr}'}), 500
 
             # Restart
-            execute_as_root(client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            _, stderr_r, rc_r = execute_as_root(
+                client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            if rc_r != 0:
+                return jsonify({
+                    'success': True, 'restarted': False,
+                    'message': f'Backup {backup_name} restaure mais restart echoue: {stderr_r}',
+                })
 
-            return jsonify({'success': True, 'message': f'Backup {backup_name} restaure et agent redemarre.'})
+            return jsonify({'success': True, 'restarted': True,
+                            'message': f'Backup {backup_name} restaure et agent redemarre.'})
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -1698,7 +1705,34 @@ def generic_config_read(platform):
 @require_machine_access
 @threaded_route
 def generic_config_save(platform):
-    """Sauvegarde le fichier de config d'un agent distant."""
+    """Sauvegarde le fichier de config d'un agent distant.
+
+    CORRECTIF v1.37.40 — CETTE ROUTE ANNONCAIT UNE REUSSITE QU'ELLE N'AVAIT PAS
+    VERIFIEE. Mesure du 2026-08-22 sur Test-Server-Debian : un POST vers
+    `/etc/telegraf/`, repertoire INEXISTANT, rendait
+    `200 {"success": true, "message": "Config telegraf sauvegardee et agent
+    redemarre."}` — rien n'avait ete ecrit, aucun agent redemarre. Les TROIS
+    codes de retour etaient jetes : celui de la sauvegarde, celui de l'ecriture,
+    celui du redemarrage. Cela valait pour Centreon, Prometheus et Telegraf, soit
+    trois des quatre plateformes de la page ; seule `zabbix_config_save` disait la
+    verite (voir docs/migration/PARITE.md, E-83).
+
+    Alignee desormais sur elle, protection par protection :
+      - l'ecriture qui echoue rend 500 ET restaure la sauvegarde ;
+      - le redemarrage n'est pas meme TENTE si l'ecriture a echoue ;
+      - un redemarrage qui echoue est un TROISIEME cas : la configuration EST
+        ecrite, l'agent ne tourne pas, et la reponse le dit.
+
+    `restarted` est un BOOLEEN, ajoute aux quatre routes de ce chemin : un client
+    n'a pas a deviner l'issue en analysant une phrase francaise. Ajout ADDITIF —
+    aucune valeur existante ne change.
+
+    RESTE DECLARE ET NON CORRIGE : `_backup_agent_config` execute
+    `test -f X && cp X Y || echo NO_FILE`, ou un `cp` en echec est indiscernable
+    d'un fichier absent (meme sortie, meme rc=0). La sauvegarde rend alors `None`
+    et le repli ci-dessus, garde par `if backup_path:`, est desarme. Six routes
+    en dependent, dont le deploiement : la correction n'a pas ete autorisee ici.
+    """
     if platform == 'zabbix':
         return zabbix_config_save()
     err = _validate_platform(platform)
@@ -1722,12 +1756,34 @@ def generic_config_save(platform):
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
-            _backup_agent_config(client, root_pass, config_path)
+            backup_path = _backup_agent_config(client, root_pass, config_path)
+
             new_config = new_config.replace('\r\n', '\n').replace('\r', '\n')
             b64 = base64.b64encode(new_config.encode('utf-8')).decode('ascii')
-            execute_as_root(client, f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
-            execute_as_root(client, f"systemctl restart {service_name}", root_pass, timeout=15)
-            return jsonify({'success': True, 'message': f'Config {platform} sauvegardee et agent redemarre.'})
+            _, stderr, rc = execute_as_root(
+                client, f"printf '%s' '{b64}' | base64 -d > {config_path}",
+                root_pass, logger=logger)
+            if rc != 0:
+                # Meme repli que la route Zabbix : on remet la version d'avant.
+                if backup_path:
+                    execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
+                return jsonify({'success': False, 'restarted': False,
+                                'message': f'Ecriture echouee: {stderr}'}), 500
+
+            _, stderr_r, rc_r = execute_as_root(
+                client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            if rc_r != 0:
+                return jsonify({
+                    'success': True, 'restarted': False,
+                    'message': f'Config {platform} sauvegardee mais restart echoue: {stderr_r}',
+                    'backup': backup_path,
+                })
+
+            return jsonify({
+                'success': True, 'restarted': True,
+                'message': f'Config {platform} sauvegardee et agent redemarre.',
+                'backup': backup_path,
+            })
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -1815,9 +1871,23 @@ def generic_restore(platform):
             if rc != 0:
                 return jsonify({'success': False, 'message': f'Backup introuvable: {backup_name}'}), 404
             _backup_agent_config(client, root_pass, config_path)
-            execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
-            execute_as_root(client, f"systemctl restart {service_name}", root_pass, timeout=15)
-            return jsonify({'success': True, 'message': f'Backup restaure et {service_name} redemarre.'})
+
+            _, stderr, rc = execute_as_root(
+                client, f"cp {backup_path} {config_path}", root_pass, logger=logger)
+            if rc != 0:
+                return jsonify({'success': False, 'restarted': False,
+                                'message': f'Restauration echouee: {stderr}'}), 500
+
+            _, stderr_r, rc_r = execute_as_root(
+                client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            if rc_r != 0:
+                return jsonify({
+                    'success': True, 'restarted': False,
+                    'message': f'Backup {backup_name} restaure mais restart echoue: {stderr_r}',
+                })
+
+            return jsonify({'success': True, 'restarted': True,
+                            'message': f'Backup {backup_name} restaure et {service_name} redemarre.'})
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
