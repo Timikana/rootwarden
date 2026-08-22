@@ -779,6 +779,59 @@ attendu **dans l'ilot de donnees de la page** (`#<page>-libelles`) : la suite
 mesure alors « la page affiche ce qu'elle declare afficher », qui reste vrai
 apres une relecture de traduction.
 
+## `ConvertEmptyStringsToNull` rend « vide » indiscernable d'« absent »
+
+Laravel place cet intergiciel dans le groupe `web` : une chaine vide arrive en
+`null`, exactement comme un champ qui n'a pas ete soumis. Mesure du 2026-08-22 :
+
+    POST a="" b="v"   ->  input('a') = NULL   has('a') = true   input('b') = "v"
+
+Or les deux ne veulent pas dire la meme chose des qu'un champ vide a un SENS :
+en V10a, vide signifiait « supprime ce reglage » et absent « ne le touche pas ».
+Le code testait `input(...) === null` et ne supprimait donc JAMAIS rien —
+trouve par la suite E2E, pas a la relecture.
+
+Utiliser **`has()`** pour savoir si le champ a ete soumis, et
+`input(...) ?? ''` pour sa valeur. Un intergiciel du cadre peut rendre deux
+choses differentes identiques : c'est le genre de defaut qu'aucune lecture du
+code applicatif ne montre.
+
+## Ne pas offrir d'entree libre plutot que la valider
+
+`supervision_overrides` accepte n'importe quel nom de parametre, et le backend
+injecte tout nom inconnu dans le fichier de configuration de l'agent. La cle
+etait validee, la VALEUR non : un saut de ligne y produisait une directive
+autonome — sur Zabbix, un `UserParameter`, donc l'execution d'une commande.
+
+Le correctif backend valide la valeur (aux DEUX bouts : ecriture ET relecture,
+parce que la base peut deja contenir des lignes d'avant). Mais le portage, lui,
+**n'installe pas de champ de nom** : huit champs, huit noms fixes. Une entree
+libre validee se contourne par une requete forgee ; une entree libre absente,
+non. Quand les deux sont possibles, choisir de ne pas offrir.
+
+Corollaire : **on n'affiche pas seulement ce qu'on sait ecrire.** Un reglage
+pose hors de la liste fermee, par l'API ou avant le portage, EXISTE et AGIT — le
+cacher laisserait croire qu'il n'y en a pas. L'ecran le nomme, en disant qu'il
+ne peut pas le modifier.
+
+## Une navigation referme l'onglet, et l'echec apparait deux gestes plus loin
+
+Les panneaux du portage arrivent `hidden` et c'est le script qui en ouvre un.
+Apres chaque aller-retour de formulaire, le bouton suivant vit donc dans un
+panneau cache : `page.click` rend « Node is either not clickable » — et pas a
+l'endroit ou l'on croit, puisque les `page.evaluate` intermediaires, eux,
+fonctionnent tres bien sur un element cache. Rouvrir l'onglet apres CHAQUE
+navigation.
+
+## Un motif trop large echoue sur un champ juste
+
+Pour prouver qu'aucun champ ne saisit un NOM de parametre, un premier jet
+cherchait `/nom|name|param/` dans les noms de champs. `override_Hostname`
+contient « name » : l'assertion tombait sur un champ legitime, et elle ne disait
+rien de plus que celle qui comparait a la liste FERMEE. Deux lecons : un motif
+se serre, et une assertion qui duplique sa voisine occupe la place d'une
+assertion qui mesurerait autre chose.
+
 ## Un defaut corrige peut revenir par la porte qu'on n'a pas regardee
 
 V7 avait corrige E-79 : « le chemin du fichier vient du SERVEUR, donc il n'y a
