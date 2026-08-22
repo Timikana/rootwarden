@@ -3208,3 +3208,104 @@ maintenant le porte-messages de la restauration et exige qu'il **nomme la sauveg
 L'onglet de l'éditeur est **complet** : son bloc « pas encore porté » a été retiré, et la clé devenue
 inutile avec lui. Le libellé du chemin dit désormais « Fichier cible » et non « Fichier à lire » —
 l'éditeur écrit aussi.
+
+## E-85 — La valeur d'un override devient une ligne de configuration à elle seule
+
+**Module `supervision/`, sous-lot V10 : la reconfiguration.** Mesures faites sur **Test-Server-Debian
+(id 2, DEV)** ; `srv-zabbix` jamais jointe. Deux fixtures posées (une ligne `supervision_config`, un
+override), supprimées ensuite, et l'état **relu pour être prouvé** : 0 ligne dans les deux tables,
+`/etc/zabbix/` vide.
+
+**LE DÉFAUT CENTRAL : LA CLÉ D'UN OVERRIDE EST VALIDÉE, SA VALEUR NE L'EST PAS.**
+`_build_config_lines` traite huit paramètres nommés (`Hostname`, `Server`, `ServerActive`,
+`HostMetadata`, `ListenPort`, `TLSConnect`, `TLSAccept`, `TLSPSKIdentity`) puis — c'est le point — boucle
+sur **tout le reste** :
+
+```python
+# Overrides libres non pris en charge ci-dessus : injection directe avec interpolation.
+for key, value in overrides.items():
+    if key in _handled or not value: continue
+    if not _SAFE_PARAM_RE.match(key): continue   # <- la CLE est validee
+    lines[key] = _interpolate(value, machine_row)  # <- la VALEUR ne l'est pas
+```
+
+`_interpolate` ne fait que deux remplacements de chaîne. La valeur part ensuite en
+`line = f"{key}={value}\n"`, encodée en base64 et **ajoutée au fichier**. Une valeur portant un saut de
+ligne produit donc **une directive supplémentaire**, que personne n'a demandée par aucun paramètre nommé.
+
+**MESURÉ DE BOUT EN BOUT, avec une charge délibérément INOFFENSIVE.**
+`POST /supervision/overrides/2` avec `{"overrides":{"Timeout":"3\nLIGNE_INJECTEE_PAR_LA_MESURE=temoin"}}`
+rend `{"success":true,"message":"Overrides sauvegardes"}`. Ce que la base retient, en hexadécimal :
+
+```
+Timeout -> 33 0A 4C49474E455F494E4A45435445455F5041525F4C415F4D45535552453D74656D6F696E
+            3  \n  L  I  G  N  E  _  I  N  J  E  C  T  E  E …
+```
+
+Un saut de ligne **brut**, accepté par l'API. Puis `POST /supervision/zabbix/reconfigure` sur la machine
+DEV, et le fichier écrit :
+
+```
+     1  Server=10.0.0.250
+     …
+     7  Timeout=3
+     8  LIGNE_INJECTEE_PAR_LA_MESURE=temoin      ← directive autonome, demandee par personne
+```
+
+Le flux l'annonce lui-même : `INFO: Cle 'Timeout' definie a '3⏎LIGNE_INJECTEE_PAR_LA_MESURE=temoin'.`
+**Sur un agent Zabbix réel, cette ligne peut être un `UserParameter`** — c'est-à-dire l'exécution d'une
+commande arbitraire par l'agent, sur la machine supervisée. Le témoin employé ici n'exécute rien ; le
+mécanisme est identique.
+
+**QUI PEUT LE FAIRE.** La route d'écriture porte `@require_api_key` + `@require_role(2)` +
+`@require_permission('can_manage_supervision')` — donc **un rôle 2 qui n'est PAS administrateur du
+portail** suffit (`rw-test-admin` a exactement ce profil). Et elle est **la seule route du module touchant
+une machine à ne pas porter `@require_machine_access`** : son `machine_id` vient du chemin d'URL et n'est
+confronté à aucun contrôle d'accès. Ce garde est inerte au rôle 2 (`check_machine_access` rend vrai dès
+ce niveau) — c'est dit plutôt que sous-entendu — mais son absence est réelle.
+
+**POURQUOI PERSONNE NE L'A FAIT : IL N'Y A AUCUNE INTERFACE.** `supervision_overrides` a **0 ligne**, et
+aucune page des deux portails n'écrit dedans. Le trou est atteignable **par l'API**, pas par un écran.
+**Porter une interface d'overrides, c'est donc mettre ce mécanisme derrière un formulaire.** C'est
+exactement la décision qui attendait l'exploitant avant V10, et elle n'est pas de nature technique.
+
+**LE GESTE DE V10 EST AUJOURD'HUI INATTEIGNABLE POUR ZABBIX.** `zabbix_reconfigure` commence par
+`if not global_cfg: return 400 'Aucune configuration globale.'` — et `supervision_config` a **0 ligne**.
+Le cas nominal de la reconfiguration Zabbix sur cette installation est donc **un refus**, et il a fallu
+poser une fixture de configuration globale pour atteindre le chemin réel.
+
+**MAIS `generic_reconfigure` NE REFUSE PAS**, et c'est la même famille que le défaut corrigé en V9 : son
+`if global_cfg:` **saute simplement l'écriture**, redémarre le service, puis annonce
+`SUCCESS_MACHINE::… Reconfiguration reussie`. Sur les trois plateformes non-Zabbix et sans configuration
+globale, la reconfiguration ne fait donc **que redémarrer** — en annonçant qu'elle a reconfiguré.
+
+**LE MARQUEUR TERMINAL DU FLUX MENT, LUI AUSSI.** Mesuré, à la suite immédiate :
+
+```
+Début de l'exécution...
+sh: 1: systemctl: not found
+Exécution terminée (code 127).
+SUCCESS_MACHINE::2::Reconfiguration reussie pour Test-Server-Debian.
+```
+
+Le redémarrage a échoué avec le code 127 et le flux conclut à la réussite. V9 a appris au portage à
+distinguer « écrit mais pas redémarré » ; ici l'information existe dans le flux — deux lignes plus haut —
+et le marquer que les clients lisent l'ignore.
+
+**QUATRE EFFETS, PAS TROIS.** Le découpage annonçait sauvegarde + écriture + redémarrage. La mesure en
+trouve un quatrième : si la configuration globale porte un PSK, la route **écrit une clé secrète** dans
+`/etc/zabbix/zabbix_agent2.d/server.key` (`chmod 640`). Et si son déchiffrement échoue, l'échec n'est que
+**journalisé** : `psk_value` reste `None`, la clé n'est pas écrite, et rien ne le dit à l'écran — alors
+que le fichier de configuration continue, lui, de référencer `TLSPSKFile`.
+
+**UNE DIFFÉRENCE DE FOND AVEC `config/save`, QUI N'EST PAS UN DÉFAUT MAIS QUI SE DÉCLARE.**
+`_write_config_stream` procède **clé par clé** : `sed -i -E '/^[#[:space:]]*CLE[[:space:]]*=/d'` puis
+ajout en fin de fichier. La reconfiguration **fusionne** donc dans le fichier existant et **préserve** les
+lignes qu'elle ne connaît pas ; `config/save`, lui, **tronque** (`>`) et les détruit. Deux gestes voisins,
+deux sémantiques opposées sur le même fichier.
+
+**TROIS EXONÉRATIONS :** la **clé** d'un override est bien validée (`^[a-zA-Z0-9_.:-]+$`), donc ni espace
+ni `;` ni `$` dans le nom, et le `sed` l'échappe par `re.escape` — aucune injection de commande par la clé ;
+le chemin du fichier reste un littéral ; le contenu voyage en base64. Et côté Zabbix, un échec de
+sauvegarde est **annoncé dans le flux** (`WARN: Backup echoue`) — plus honnête que le `None` silencieux de
+`config/save` — même si l'écriture continue quand même. La version générique, elle, ignore ce retour.

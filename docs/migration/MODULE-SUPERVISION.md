@@ -590,6 +590,47 @@ panneau qui nomme la sauvegarde et le fichier écrasé.
 **Reste du module** : V10 (reconfiguration, FLUX, aucune confirmation côté legacy), V11 (désinstallation,
 DÉTRUIT), V12 (déploiement).
 
+## 7 quindecies. V10 mesuré — la valeur d'un override devient une ligne de configuration (2026-08-22)
+
+Détail en `PARITE.md` E-85. Mesures sur **Test-Server-Debian (id 2, DEV)** ; deux fixtures posées puis
+supprimées, état **relu pour être prouvé** (0 ligne dans les deux tables, `/etc/zabbix/` vide).
+
+**LE DÉFAUT CENTRAL.** `_build_config_lines` valide la **clé** d'un override (`^[a-zA-Z0-9_.:-]+$`) et
+**pas sa valeur**. Une valeur portant un saut de ligne produit une **directive autonome**. Mesuré de bout
+en bout : `POST /supervision/overrides/2` accepte `"3\nLIGNE_INJECTEE=temoin"` (saut de ligne `0A` retenu
+en base), et la reconfiguration écrit `Timeout=3` en ligne 7 puis `LIGNE_INJECTEE=temoin` en **ligne 8**.
+Sur un agent Zabbix réel, cette ligne peut être un `UserParameter` — donc l'exécution d'une commande
+arbitraire par l'agent. Le témoin employé n'exécute rien ; le mécanisme est identique.
+
+**QUI PEUT LE FAIRE** : un rôle 2 avec `can_manage_supervision`, **pas nécessairement administrateur du
+portail**. Et `POST /supervision/overrides/<id>` est **la seule route du module touchant une machine sans
+`@require_machine_access`** — inerte au rôle 2, mais absente.
+
+**POURQUOI PERSONNE NE L'A FAIT : aucune interface n'écrit dans cette table.** Le trou est atteignable par
+l'API, pas par un écran. **Porter une interface d'overrides, c'est mettre ce mécanisme derrière un
+formulaire** — d'où l'arbitrage.
+
+**LE GESTE EST AUJOURD'HUI INATTEIGNABLE POUR ZABBIX** : `zabbix_reconfigure` rend 400 « Aucune
+configuration globale » et `supervision_config` a 0 ligne. **Mais `generic_reconfigure` ne refuse pas** :
+son `if global_cfg:` saute l'écriture, redémarre, et annonce `SUCCESS_MACHINE:: Reconfiguration reussie`.
+Même famille que le défaut corrigé en V9.
+
+**LE MARQUEUR TERMINAL DU FLUX MENT** : `sh: 1: systemctl: not found`, `code 127`, puis
+`SUCCESS_MACHINE::2::Reconfiguration reussie`. L'information est dans le flux deux lignes plus haut ; le
+marqueur que les clients lisent l'ignore.
+
+**QUATRE EFFETS, PAS TROIS** : la route écrit aussi une **clé PSK** dans
+`/etc/zabbix/zabbix_agent2.d/server.key`. Un échec de déchiffrement n'est que journalisé — la clé n'est
+pas écrite et rien ne le dit, alors que le `.conf` continue de référencer `TLSPSKFile`.
+
+**UNE DIFFÉRENCE DE SÉMANTIQUE À DÉCLARER** : `_write_config_stream` procède **clé par clé** (purge par
+`sed` puis ajout), donc la reconfiguration **fusionne** et préserve les lignes inconnues, là où
+`config/save` **tronque** et les détruit. Deux gestes voisins, deux comportements opposés.
+
+**TROIS EXONÉRATIONS** : la clé est bien validée et `re.escape`ée dans le `sed` ; le chemin reste un
+littéral ; le contenu voyage en base64. Et côté Zabbix un échec de sauvegarde est **annoncé** dans le flux
+(`WARN:`), plus honnête que le `None` silencieux de `config/save` — la version générique, elle, l'ignore.
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et
