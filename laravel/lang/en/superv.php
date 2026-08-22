@@ -58,6 +58,17 @@ return [
     'secret_pose' => 'Set',
     'secret_absent' => 'Not set',
     'secret_jamais_affiche' => 'The value stays in the database: this portal does not read it.',
+    // ── Saving, sub-lot V4 ────────────────────────────────────────────────
+    'secret_conserve' => 'Leaving this empty keeps the key already recorded. This portal never reads it.',
+    'secret_jeton_non_porte' => 'Editing this token is not ported yet: it stays on the previous portal.',
+    'enregistrer' => 'Save',
+    // THE SCOPE OF A SAVE IS STATED. The legacy portal writes to the most recent
+    // row with NO platform filter: saving Zabbix overwrites a Centreon row there.
+    // Here the write is scoped, and the screen says so.
+    'enregistrement_portee' => 'This save only changes the :plateforme configuration.',
+    'enregistrement_fait' => ':plateforme configuration saved.',
+    'enregistrement_champ_exige' => 'The ":champ" field is required: without it the deployed configuration would be inert.',
+    'enregistrement_plateforme_inconnue' => 'Unknown platform: nothing was saved.',
 
     'profils_titre' => 'Monitoring profiles',
     // ── The catalogue, sub-lot V2 (read-only) ─────────────────────────────

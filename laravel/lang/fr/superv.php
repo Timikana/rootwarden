@@ -58,6 +58,17 @@ return [
     'secret_pose' => 'Defini',
     'secret_absent' => 'Non defini',
     'secret_jamais_affiche' => 'La valeur reste en base : ce portail ne la lit pas.',
+    // ── L'enregistrement, sous-lot V4 ─────────────────────────────────────
+    'secret_conserve' => 'Laisser vide conserve la cle deja enregistree. Ce portail ne la lit jamais.',
+    'secret_jeton_non_porte' => 'La modification de ce jeton n\'est pas encore portee : elle reste sur l\'ancien portail.',
+    'enregistrer' => 'Enregistrer',
+    // LA PORTEE DE L'ENREGISTREMENT SE DIT. Le legacy ecrit dans la ligne la plus
+    // recente SANS filtre de plateforme : enregistrer Zabbix y ecrase une ligne
+    // Centreon. Ici l'ecriture est cloisonnee, et l'ecran l'annonce.
+    'enregistrement_portee' => 'Cet enregistrement ne modifie que la configuration de :plateforme.',
+    'enregistrement_fait' => 'Configuration de :plateforme enregistree.',
+    'enregistrement_champ_exige' => 'Le champ « :champ » est indispensable : sans lui, la configuration deployee serait inerte.',
+    'enregistrement_plateforme_inconnue' => 'Plateforme inconnue : rien n\'a ete enregistre.',
 
     'profils_titre' => 'Profils de supervision',
     // ── Le catalogue, sous-lot V2 (lecture seule) ─────────────────────────

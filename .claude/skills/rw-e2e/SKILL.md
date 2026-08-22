@@ -27,6 +27,11 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
 - `check(label, ok)` : log `PASS/FAIL`, compteur d'echecs, verdict final `=== TOUT OK ===`.
 - Capturer `page.on('pageerror')` et asserter zero erreur JS.
 - Screenshots dans `./screenshots/<sujet>/NN_etape.png` (dossier gitignore).
+- **LES CAPTURES SE DEPOSENT ET S'ENVOIENT.** Un script ad hoc lance depuis le
+  scratchpad y laisse ses images : personne ne les voit. Ecrire dans
+  `tests/e2e/screenshots/<module>/` **et** les envoyer (SendUserFile) a chaque
+  sous-lot — grand ecran, pied de la page concernee, mobile 390. « Capture
+  regardee » dans un CHANGELOG ne remplace pas l'image.
 
 ## Regles d'or
 - **Attendre le TOTP** : si `30 - (epoch % 30) < 6`, dormir jusqu'a la fenetre suivante.

@@ -116,9 +116,28 @@ Route::middleware('session.authentifiee')->group(function () {
      * de `$ADMIN_ONLY_PREFIXES` cote proxy legacy. Les fermer demanderait de
      * modifier le backend : decision de l'exploitant.
      */
-    Route::get('/supervision', SupervisionController::class)
+    Route::get('/supervision', [SupervisionController::class, '__invoke'])
         ->middleware(['role:2', 'perm:can_manage_supervision'])
         ->name('supervision');
+
+    /*
+     * Enregistrement de la configuration globale — sous-lot V4.
+     *
+     * MEME GARDE QUE LA PAGE, et posee ICI : `role:2` +
+     * `perm:can_manage_supervision`. Le legacy passe par
+     * `POST /supervision/config`, dont l'`UPDATE` derive d'un
+     * `SELECT ... ORDER BY id DESC LIMIT 1` SANS filtre de plateforme
+     * (`supervision.py:508`) : enregistrer Zabbix y ecrase une ligne Centreon plus
+     * recente — mesure faite, voir PARITE E-76. Le portage ecrit en base avec
+     * `WHERE platform = ?` (decision S3/S4) et n'herite donc pas du defaut.
+     *
+     * Le PSK est chiffre par `App\Support\SecretSupervision`, dont
+     * l'interoperabilite avec `encryption.py` a ete MESUREE par aller-retour, pas
+     * supposee.
+     */
+    Route::post('/supervision/configuration', [SupervisionController::class, 'enregistrer'])
+        ->middleware(['role:2', 'perm:can_manage_supervision'])
+        ->name('supervision.configuration');
 
     Route::get('/derive-config', DeriveConfigController::class)
         ->middleware(['role:2', 'perm:can_view_compliance'])

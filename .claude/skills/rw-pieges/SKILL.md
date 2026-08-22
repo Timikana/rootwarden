@@ -592,6 +592,35 @@ defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails es
 faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
 declenche rien trop tot). Voir `PARITE.md` E-73.
 
+## Un champ de TEXTE LIBRE par-dessus une colonne `enum`
+
+`supervision_config.tls_connect` est un `enum('unencrypted','psk','cert')`. Un
+`<input type="text">` par-dessus laisse taper une valeur que MySQL REFUSERA :
+l'utilisateur attend un enregistrement et recoit une erreur d'ecriture. Liste
+fermee dans la vue — **et revalidee cote serveur** : un `<select>` empeche la
+faute a l'ecran, il n'empeche rien dans une requete forgee. Hors liste : garder
+la valeur deja en base, jamais ecrire n'importe quoi. Vu a l'image.
+
+## Chercher un MESSAGE n'est pas chercher ce qu'un BLOC affiche
+
+Regle de V2 : chercher dans le bloc concerne, pas dans `body` — un mot voisin
+accuse le mauvais coupable. Mais un MESSAGE d'enregistrement, c'est la CIBLE qui
+decide ou elle le met : le legacy passe le sien a `toast()`, qui ecrit dans
+`#toast-container`, tres loin du bloc. Une suite qui ne lisait que le bloc a
+declare « refus non enonce » un refus parfaitement affiche. Lire le bloc **et**
+le porte-messages — et rien d'autre.
+
+## L'interoperabilite d'un chiffrement se DEMONTRE par un aller-retour
+
+Avant d'ecrire un secret en base depuis le portage, chiffrer depuis
+`rootwarden_laravel` et dechiffrer avec `Encryption().decrypt_password()` dans
+`rootwarden_python` : si la chaine revient, la compatibilite est acquise. Le
+schema est `sodium:base64(nonce + secretbox(clair, nonce, HKDF-SHA256(cle,
+'rootwarden-aes')))`. **L'etiquette HKDF des secrets TOTP est differente**
+(`rootwarden-totp`) : les melanger rend le secret illisible par le portail qui ne
+l'a pas ecrit. Sans cette mesure, faire passer l'ecriture par la passerelle — un
+secret mal chiffre ne casse rien AUJOURD'HUI, il casse le prochain deploiement.
+
 ## Un secret : ne pas le LIRE vaut mieux que le masquer
 
 `supervision_config.tls_psk_value` et `telegraf_output_token` sont rendus

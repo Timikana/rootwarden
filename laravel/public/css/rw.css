@@ -234,6 +234,21 @@ body {
     font-size: 14px;
 }
 
+/* LE PENDANT DE `.rw-erreur` POUR UNE REUSSITE. Le socle avait une boite pour
+   dire ce qui a echoue et rien pour dire ce qui a marche : un enregistrement
+   reussi se signalait donc du meme gris que le reste de la page. Memes
+   dimensions que `.rw-erreur`, pour que les deux messages occupent la meme place
+   et ne fassent pas sauter la mise en page en se remplacant. */
+.rw-confirmation {
+    margin: 0 0 18px;
+    padding: 11px 13px;
+    border: 1px solid var(--rw-succes);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--rw-succes) 12%, transparent);
+    color: var(--rw-succes);
+    font-size: 14px;
+}
+
 .rw-note {
     margin: 22px 0 0;
     padding-top: 16px;

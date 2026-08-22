@@ -2434,3 +2434,83 @@ le fuseau du conteneur de base, et l'afficher ferait entrer dans cette page le d
 
 **Non porté, et dit tel quel** : l'écriture de la configuration (V4), qui corrigera le `WHERE platform`
 manquant. Le panneau le dit et mène à l'ancien portail.
+
+## E-76 — Enregistrer la configuration Zabbix écrivait dans la ligne Centreon. Mesuré.
+
+**Module `supervision/`, sous-lot V4 : l'écriture de la configuration globale** — le premier sous-lot du
+module qui écrit. Suite : `tests/e2e/go-page-supervision-config-ecriture.mjs` — **11 PASS sur le legacy,
+16 sur le portage** (base rouge relevée avant portage : **11 PASS / 3 FAIL**).
+
+**LE DÉFAUT N'EST PLUS DÉDUIT, IL EST MESURÉ.** E-75 l'avait localisé par lecture :
+`supervision.py:508` fait `SELECT id, tls_psk_value FROM supervision_config ORDER BY id DESC LIMIT 1` —
+sans `WHERE platform` — puis `UPDATE ... WHERE id = %s`. La suite pose une ligne `zabbix`, **puis** une
+ligne `centreon` (id plus grand), tape une valeur dans le formulaire Zabbix, enregistre, et lit la base :
+
+```
+apres enregistrement — ligne zabbix   : zabbix_server=rw-e2e-v4-zbx-avant.example   ← INCHANGÉE
+apres enregistrement — ligne centreon : zabbix_server=rw-e2e-v4-zbx-tape.example    ← la valeur tapée
+```
+
+L'exploitant voit un succès, **sa configuration Zabbix n'a pas bougé**, et **la ligne Centreon porte
+désormais des réglages Zabbix**. Le même effet est visible sur la colonne du secret : le nouveau blob
+`sodium:` atterrit dans la ligne Centreon tandis que la ligne Zabbix garde l'ancien.
+
+**Le portage écrit avec `WHERE platform = ?`** et n'hérite donc pas du défaut. Mesuré : la ligne Zabbix
+prend la valeur tapée (`zbx-tape`, port `10077`) et la ligne Centreon est **intacte**. La propriété
+assertée a **deux moitiés** — la ligne visée a changé, ET la voisine n'a pas bougé : mesurer seulement la
+première laisserait passer un `UPDATE` qui écrit au bon endroit *et* à côté.
+
+**LA COMPATIBILITÉ DU CHIFFREMENT A ÉTÉ MESURÉE, PAS SUPPOSÉE — et c'est ce qui a permis d'écrire en
+base.** La consigne était : si l'interopérabilité PHP↔Python n'est pas démontrable, faire passer
+l'écriture du PSK par la passerelle. Aller-retour exécuté le 2026-08-22 : un blob produit depuis le
+conteneur `laravel` (HKDF-SHA256 `rootwarden-aes` + `secretbox`, préfixe `sodium:`) a été déchiffré par
+`Encryption().decrypt_password()` dans `rootwarden_python` et a rendu la chaîne d'origine. L'écriture
+directe est donc tenable, et `App\Support\SecretSupervision` porte cette mesure en commentaire.
+**L'étiquette HKDF n'est pas celle du TOTP** (`rootwarden-totp`, dans `TotpCrypto`) : les usages sont
+séparés des deux côtés, et les mélanger rendrait les secrets illisibles par le portail qui ne les a pas
+écrits. **Il n'y a délibérément aucune méthode de déchiffrement** dans cette classe : V3 a pris soin de ne
+pas charger le PSK, un `dechiffre()` l'offrirait à la première vue distraite.
+
+**UNE DOUZIÈME CLÉ CASSÉE, non répertoriée, et elle n'était atteignable qu'ici.** `main.js:294` appelle
+`__('supervision.zabbix_server')` — avec son préfixe de module. Or `__()` préfixe **déjà** par `js.` et
+cherche dans `js.php` : la clé ne peut pas être trouvée. Mesuré en soumettant le formulaire avec un
+serveur vide, l'écran rend **`supervision.zabbix_server`** suivi du mot **« requis »**, écrit en dur en
+français — et il reste français quand la page est demandée en anglais.
+
+**`config_saved` confirmée** : le message de succès du legacy affiche l'identifiant brut. C'est l'une des
+onze, et seul V4 la rendait atteignable.
+
+**Une mesure fausse, corrigée.** La première version de la suite déclarait le refus « non énoncé » alors
+qu'il l'était : elle ne lisait que le bloc de configuration, or le legacy passe ce message à `toast()`,
+qui écrit dans `#toast-container`, très loin dans le document. Chercher dans le seul bloc concerné est la
+bonne règle quand on cherche **ce que le bloc affiche** ; ici on cherchait un **message**, et c'est la
+cible qui décide où elle le met. La suite lit désormais le bloc **et** le porte-messages — et rien
+d'autre : `body` entier ramènerait le menu et les libellés du gabarit.
+
+**Le secret non retapé est préservé, des deux côtés.** Le legacy y arrive parce que son backend reconnaît
+son propre masque (`if psk_value == '********'`). Le portage n'a pas besoin de cette gymnastique : son
+champ part **toujours vide**, et vide veut dire « ne change rien ». La différence n'est pas cosmétique —
+le legacy doit deviner l'intention, le portage la lit.
+
+**Et un PSK réellement saisi arrive chiffré**, mesuré sur **toute la table** et non sur la ligne visée :
+sur le legacy l'écriture atterrit dans la ligne d'à côté, donc une assertion visant la seule ligne Zabbix
+n'aurait rien vu. Zéro ligne porte la valeur en clair ; le blob stocké porte bien le préfixe `sodium:`.
+
+**Un défaut de mon propre portage, vu À L'IMAGE et corrigé.** La première version du formulaire rendait
+`tls_connect` et `tls_accept` en **champs de texte libre** — par-dessus des colonnes
+`enum('unencrypted','psk','cert')`. Une valeur hors liste aurait produit une **erreur d'écriture** là où
+l'utilisateur attendait un enregistrement. Ce sont désormais des listes fermées, et **la liste est
+revalidée côté serveur** : un `<select>` empêche la faute à l'écran, il n'empêche rien dans une requête
+forgée. Hors liste, la valeur déjà en base est conservée.
+
+**Ce que le portage corrige au passage** : `savePlatformConfig()` (`main.js:186`) force
+`hostname_pattern: '{machine.name}'` et `extra_config: null` pour les trois plateformes non-Zabbix,
+quelles que soient les valeurs à l'écran — deux champs que l'utilisateur remplit et que l'enregistrement
+jette. Ici, ce qui est affiché est ce qui est écrit.
+
+**Non porté, et dit tel quel** : l'écriture du `telegraf_output_token`. Elle vit dans une route à part du
+backend, et l'inventer ici serait concevoir. La ligne du jeton affiche sa présence et renvoie à l'ancien
+portail.
+
+**Non corrigé — c'est du backend** : le `WHERE platform` manquant de `:508` reste en place pour tout
+appelant du legacy. Le portage ne passe simplement plus par là.
