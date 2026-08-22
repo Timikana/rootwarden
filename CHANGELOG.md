@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.37** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.38** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2169,6 +2169,69 @@ sans `can_scan_cve` peut toujours creer, modifier et supprimer une planification
 contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
+portage**.
+
+### v1.37.38 — module `supervision/`, sous-lot V7 : l'editeur distant en lecture
+
+**Symptome.** La page de l'editeur nommait un fichier de configuration, et le portail en lisait un autre.
+
+**Cause racine, MESUREE.** L'ecran affiche `CONFIG_PATHS[plateforme]`, **ecrit en dur cote client**
+(`main.js:27-32`) : pour Zabbix, toujours `/etc/zabbix/zabbix_agent2.conf`. Le backend, lui, calcule
+`_config_file_path(agent_type)` depuis `supervision_config.agent_type` EN BASE
+(`supervision.py:281-287`) : `zabbix-agent` donne `/etc/zabbix/zabbix_agentd.conf`. Des que la
+configuration globale designe l'agent historique, la page nomme un fichier et le portail en lit un autre.
+Releve avec la fixture posee :
+
+    legacy  : /etc/zabbix/zabbix_agent2.conf | /etc/zabbix/zabbix_agentd.conf   DEUX, dont un faux
+    portage : /etc/zabbix/zabbix_agentd.conf                                    celui qui a ete lu
+
+**Fix.** Le chemin vient du SERVEUR, donc de la meme source que celle que le backend lira. C'est un
+doublon assume de `_config_file_path`, et LE TEST EN FAIT LA CONDITION : un doublon mesure vaut mieux
+qu'une valeur en dur que rien ne confronte. La zone d'edition est en LECTURE SEULE — l'ecriture est V9,
+et un champ modifiable dont l'enregistrement n'existe pas laisserait croire qu'on peut editer.
+
+**LA PROPRIETE ASSERTEE EST NEGATIVE, et c'est ce qui la rend utile.** « Le chemin lu est affiche quelque
+part » ne suffirait pas : le legacy le fait aussi, dans `#editor-path`. Ce qui le trahit, c'est que son
+badge CONTINUE d'annoncer l'autre. La suite collecte donc TOUS les chemins visibles du panneau et assert
+qu'aucun ne differe de celui de la fixture.
+
+**LES DEUX COMMANDES DISTANTES ONT ETE LUES MOT POUR MOT AVANT LE MOINDRE CLIC** :
+`cat <chemin> || echo 'FILE_NOT_FOUND'` et `LC_ALL=C ls -la <dir>/<fichier>.bak.* || echo 'NONE'`. Rien
+n'ecrit, rien ne redemarre. `LC_ALL=C` fixe le format de `ls` — sans lui, la locale du serveur changerait
+les colonnes que le backend analyse.
+
+**TROIS EXONERATIONS, troisieme d'affilee dans ce module** : les deux routes portent `@require_api_key` +
+`@require_role(2)` + `@require_permission` + `@require_machine_access` ; un fichier absent rend 404 EN
+NOMMANT LE CHEMIN, donc le backend distingue « absent » d'« erreur interne » ; et `supervisionFetch` lit
+`res.ok`, donc le refus n'est pas avale.
+
+**CE QU'UN EDITEUR MONTRE LEGITIMEMENT — dit ainsi plutot qu'accuse.** Le fichier de fixture porte un
+`TLSPSKIdentity` : un `.conf` d'agent PEUT contenir un secret, et un editeur existe pour montrer le
+fichier qu'on edite. Le cacher le rendrait inutile. Ce qui se mesure est la SECONDE copie : au plus une
+occurrence dans le source servi. Ce que la borne interdit, c'est l'ilot de donnees, l'attribut, le champ
+cache.
+
+**TROIS CAS SEPARES, la ou le legacy en mele deux.** Le portage distingue « le fichier n'existe pas »
+(404 — une REPONSE, pas une panne), « la lecture a ete refusee (statut N) » et « la lecture n'a pas
+abouti ». Le legacy jette `HTTP 404: {"success":false,…}` a l'ecran : lisible pour qui developpe, pas pour
+qui exploite.
+
+**`config_loaded` est desormais EXERCEE** : l'ecran du legacy rend `✓ config_loaded`. C'est un ecart
+declare, donc l'assertion est reservee au portage — en faire une exigence des deux cotes ferait echouer
+une suite qui mesure exactement ce qu'elle doit.
+
+**DEUX DEFAUTS DE MON PROPRE PORTAGE, VUS A L'IMAGE ET CORRIGES.** Le panneau de l'editeur n'est pas dans
+le `@foreach` des plateformes : y ecrire `$plateforme` reprenait la DERNIERE valeur laissee par la boucle
+— donc Telegraf — et l'editeur annoncait le chemin d'une plateforme qu'on n'avait pas choisie ; Blade
+laisse fuiter la variable sans broncher. Et la page disait « Fichier lu » AVANT toute lecture : deux
+libelles desormais, « Fichier a lire » jusqu'au premier succes.
+
+**Un huitieme francais en dur, releve au passage** : `saveRemoteConfig` (`main.js:539`) porte
+`'Configuration vide'`. Il appartient au chemin de V9.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V8 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-editeur` entre avec **12 PASS sur le legacy** et **16 sur le
 portage**.
 
 ### v1.37.37 — module `supervision/`, sous-lot V6 : la detection de version, premier SSH du module

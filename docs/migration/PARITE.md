@@ -2674,3 +2674,80 @@ reste : installer, reconfigurer, désinstaller, et le relevé du parc entier.
 relevé de tout le parc en une fois (V8, à reconcevoir en tâche de fond — `scanAllAgents` lance quatre
 requêtes par serveur en parallèle). Aucun de ces boutons n'existe dans le portage : un bouton présent mais
 inerte serait pire qu'absent.
+
+## E-79 — L'éditeur distant : la page nommait un fichier, le portail en lisait un autre
+
+**Module `supervision/`, sous-lot V7 : l'éditeur de configuration distant, en lecture.** Deuxième
+sous-lot SSH. Suite : `tests/e2e/go-page-supervision-editeur.mjs` — **12 PASS sur le legacy, 16 sur le
+portage** (base rouge relevée avant portage : **10 PASS / 5 FAIL**).
+
+**LES DEUX COMMANDES DISTANTES ONT ÉTÉ LUES MOT POUR MOT AVANT LE MOINDRE CLIC** :
+`cat <chemin> 2>/dev/null || echo 'FILE_NOT_FOUND'` et
+`LC_ALL=C ls -la <dir>/<fichier>.bak.* 2>/dev/null || echo 'NONE'`. Rien n'écrit, rien ne redémarre.
+`LC_ALL=C` fixe le format de `ls` — sans lui, la locale du serveur changerait les colonnes que le backend
+analyse.
+
+**TROIS EXONÉRATIONS, et la troisième d'affilée dans ce module.** Les deux routes portent
+`@require_api_key` + `@require_role(2)` + `@require_permission` + `@require_machine_access`. Un fichier
+absent rend **404 en nommant le chemin** — le backend distingue donc « absent » d'« erreur interne ». Et
+`supervisionFetch` lit `res.ok` : le refus n'est pas avalé.
+
+**LE DÉFAUT CENTRAL : DEUX CHEMINS À L'ÉCRAN, DONT UN FAUX.** L'écran affiche
+`CONFIG_PATHS[plateforme]`, **écrit en dur côté client** (`main.js:27-32`) — pour Zabbix, toujours
+`/etc/zabbix/zabbix_agent2.conf`. Le backend, lui, calcule `_config_file_path(agent_type)` depuis
+`supervision_config.agent_type` **en base** (`supervision.py:281-287`) : `zabbix-agent` →
+`/etc/zabbix/zabbix_agentd.conf`. Dès que la configuration globale désigne l'agent historique, **la page
+nomme un fichier et le portail en lit un autre**.
+
+Mesuré, avec `agent_type = 'zabbix-agent'` en base et le fichier posé sur la machine de test :
+
+```
+legacy  : /etc/zabbix/zabbix_agent2.conf | /etc/zabbix/zabbix_agentd.conf   ← DEUX, dont un faux
+portage : /etc/zabbix/zabbix_agentd.conf                                    ← celui qui a ete lu
+```
+
+**La propriété assertée est NÉGATIVE, et c'est ce qui la rend utile.** « Le chemin lu est affiché quelque
+part » ne suffirait pas : le legacy le fait aussi, dans `#editor-path`. Ce qui le trahit, c'est que son
+badge **continue** d'annoncer l'autre. La suite collecte donc **tous** les chemins visibles du panneau et
+assert qu'aucun ne diffère de celui de la fixture — le seul que le backend pouvait lire.
+
+**Côté portage, le chemin vient du SERVEUR et de la même source que la lecture.** C'est un doublon assumé
+de `_config_file_path`, et **le test en fait la condition** : un doublon mesuré vaut mieux qu'une valeur
+en dur que rien ne confronte. La même dérive vaudrait pour la liste des sauvegardes, qui dérive du même
+chemin.
+
+**CE QU'UN ÉDITEUR MONTRE LÉGITIMEMENT — et il faut le dire ainsi plutôt que d'accuser.** Le fichier de
+fixture porte un `TLSPSKIdentity` : un `.conf` d'agent **peut** contenir un secret, et un éditeur existe
+pour montrer le fichier qu'on édite. Le cacher le rendrait inutile. Ce qui se mesure est donc la **seconde
+copie** : la suite compte les occurrences de l'identité PSK dans le source servi et exige **au plus une**.
+Côté legacy le contenu arrive par JavaScript dans la `value` d'un `<textarea>`, donc zéro dans le source ;
+côté portage, un rendu ne l'y mettrait qu'une fois. Ce que la borne interdit, c'est l'îlot de données,
+l'attribut, le champ caché.
+
+**TROIS CAS SÉPARÉS, LÀ OÙ LE LEGACY EN MÊLE DEUX.** Le portage distingue « le fichier n'existe pas »
+(404 — une **réponse**, pas une panne), « la lecture a été refusée (statut N) » et « la lecture n'a pas
+abouti ». Le legacy, lui, jette `HTTP 404: {"success":false,"message":…}` à l'écran : lisible pour qui
+développe, pas pour qui exploite. La suite le mesure comme une **trace technique** dans les messages.
+
+**`config_loaded` est désormais EXERCÉE, pas seulement repérée.** V4 l'avait trouvée dans le catalogue ;
+ici l'écran rend `✓ config_loaded`. C'est un écart déclaré du legacy — l'assertion est donc réservée au
+portage. En faire une exigence des deux côtés ferait échouer une suite qui mesure exactement ce qu'elle
+doit.
+
+**DEUX DÉFAUTS DE MON PROPRE PORTAGE, vus À L'IMAGE et corrigés :**
+- **une variable de boucle utilisée hors de sa boucle.** Le panneau de l'éditeur n'est pas dans le
+  `@foreach` des plateformes : y écrire `$plateforme` reprenait la **dernière** valeur laissée par la
+  boucle — donc Telegraf — et l'éditeur annonçait le chemin d'une plateforme qu'on n'avait pas choisie.
+  Blade laisse fuiter la variable sans broncher. Le chemin part maintenant de Zabbix et le script le suit
+  au changement de plateforme, depuis les quatre valeurs posées en données ;
+- **la page disait « Fichier lu » avant toute lecture.** Deux libellés désormais : « Fichier à lire »
+  jusqu'au premier succès, « Fichier lu » ensuite. Même famille qu'un texte qui devient faux — sauf qu'ici
+  il l'était dès le départ.
+
+**Non porté, et dit tel quel** : l'écriture du fichier distant et la restauration d'une sauvegarde (V9,
+qui **modifient** la machine). La zone d'édition est en lecture seule — un champ modifiable dont
+l'enregistrement n'existe pas laisserait croire qu'on peut éditer. La liste des sauvegardes se lit ; le
+bouton « Restaurer » n'existe pas.
+
+**Un huitième français en dur, relevé au passage** : `saveRemoteConfig` (`main.js:539`) porte
+`'Configuration vide'`. Il appartient au chemin de V9.

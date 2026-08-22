@@ -126,6 +126,25 @@ return [
     'editeur_serveur' => 'Server',
     'editeur_choisir_serveur' => 'Select a server',
     'editeur_lire' => 'Read configuration',
+    // ── The remote editor, sub-lot V7 (read-only) ─────────────────────────
+    // THE ANNOUNCED PATH COMES FROM THE SAME SOURCE AS THE ONE THAT WILL BE READ.
+    // The legacy portal shows a path hardcoded in the client: see PARITE E-79.
+    // BEFORE THE READ, THE PAGE CANNOT SAY "READ": nothing has been. Two labels,
+    // and the script switches from the first to the second once the read lands.
+    'editeur_chemin' => 'File to read:',
+    'editeur_chemin_lu' => 'File read:',
+    'editeur_contenu' => 'File content',
+    'editeur_vide' => 'Pick a server then read its configuration to display it here.',
+    'editeur_lecture_en_cours' => 'Reading the file on :nom...',
+    'editeur_lu' => 'File :chemin read on :nom.',
+    // THREE DISTINCT CASES: a missing file is an ANSWER, not a failure.
+    'editeur_absent' => 'The file :chemin does not exist on :nom. No agent is likely installed there.',
+    'editeur_refus' => 'The read was refused (status :statut). No conclusion can be drawn from it.',
+    'editeur_echec' => 'The read did not complete: the server may be unreachable.',
+    'sauvegardes_titre' => 'Backups of the file on the server.',
+    'sauvegardes_lister' => 'List backups',
+    'sauvegardes_aucune' => 'No backup on this server.',
+    'sauvegardes_nombre' => ':nombre backup(s):',
     // THE GUARD V1 CLOSES. On the legacy portal this message is the key
     // `editor_select_server`, rendered verbatim, in a native dialog.
     'editeur_sans_serveur' => 'Select a server first: with no server there is no configuration to read.',

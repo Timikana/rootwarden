@@ -73,6 +73,20 @@
             blocs.forEach(function (b) {
                 b.bloc.hidden = b.nom !== choixPlateforme.value;
             });
+            /*
+             * LE CHEMIN DE L'EDITEUR SUIT LA PLATEFORME. Les quatre valeurs
+             * viennent du SERVEUR, donc de la meme source que celle que le
+             * backend lira — la ou le legacy les tient en dur cote client
+             * (`main.js:27-32`) et finit par nommer un fichier qu'il ne lit pas.
+             */
+            var cible = document.querySelector('[data-rw="superv-editeur-chemin"]');
+            if (! cible) { return; }
+            try {
+                var chemins = JSON.parse(libelles.chemins_config || '{}');
+                if (chemins[choixPlateforme.value]) {
+                    cible.textContent = chemins[choixPlateforme.value];
+                }
+            } catch (e) { /* un chemin inchange vaut mieux qu'un chemin invente */ }
         });
     }
 
@@ -166,22 +180,128 @@
     var bouton = document.querySelector('[data-rw="superv-lire-config"]');
     var message = document.querySelector('[data-rw="superv-editeur-message"]');
     var serveur = document.querySelector('[data-rw="superv-serveur"]');
+    var contenu = document.querySelector('[data-rw="superv-editeur-contenu"]');
+    var cheminAffiche = document.querySelector('[data-rw="superv-editeur-chemin"]');
+    var sauvegardes = document.querySelector('[data-rw="superv-sauvegardes"]');
+
+    /** Le nom du serveur choisi, pour que les messages nomment leur cible. */
+    function nomDuServeur() {
+        if (! serveur) { return ''; }
+        var opt = serveur.options[serveur.selectedIndex];
+        return opt ? opt.textContent.trim() : '';
+    }
+
+    function appelleLaMachine(url, sur, alors) {
+        var jeton = document.querySelector('meta[name="csrf-token"]');
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': jeton ? jeton.content : '',
+            },
+            body: JSON.stringify({ machine_id: Number(sur) }),
+        }).then(function (reponse) {
+            /*
+             * LE STATUT D'ABORD, ET LES TROIS CAS SEPARES. Un 404 veut dire
+             * « le fichier n'existe pas » — ce qui est une reponse, pas une
+             * panne ; un autre refus veut dire « on ne vous a pas laisse
+             * regarder ». Les confondre fait conclure a tort.
+             */
+            if (reponse.status === 404) { return { absent: true }; }
+            if (! reponse.ok) { return { refus: reponse.status }; }
+            return reponse.json();
+        }).then(alors);
+    }
 
     if (bouton && message && serveur) {
         bouton.addEventListener('click', function () {
-            /*
-             * DEUX refus, jamais un silence. Sans serveur, c'est le garde du
-             * legacy — la seule des onze cles cassees atteignable ici. Avec un
-             * serveur, la lecture distante n'est pas portee (V7) et la page le
-             * DIT : un bouton qui ne repond rien laisse croire a une panne.
-             */
-            message.textContent = serveur.value === ''
-                ? libelles.editeur_sans_serveur
-                : libelles.editeur_non_porte;
-            message.hidden = false;
+            if (serveur.value === '') {
+                // Le garde du legacy, seule des onze cles cassees atteignable
+                // sans joindre une machine (ferme depuis V1).
+                message.className = 'rw-annonce';
+                message.textContent = libelles.editeur_sans_serveur;
+
+                return;
+            }
+            var nom = nomDuServeur();
+            message.className = 'rw-annonce';
+            message.textContent = libelles.editeur_lecture_en_cours.replace('{nom}', nom);
+            bouton.disabled = true;
+
+            appelleLaMachine(libelles.url_lecture_config, serveur.value, function (donnees) {
+                if (donnees.absent) {
+                    message.className = 'rw-annonce';
+                    message.textContent = libelles.editeur_absent
+                        .replace('{chemin}', cheminAffiche ? cheminAffiche.textContent : '')
+                        .replace('{nom}', nom);
+                    if (contenu) { contenu.value = ''; }
+
+                    return;
+                }
+                if (donnees.refus) {
+                    message.className = 'rw-annonce rw-annonce--echec';
+                    message.textContent = libelles.editeur_refus
+                        .replace('{statut}', String(donnees.refus));
+
+                    return;
+                }
+                // LE CHEMIN AFFICHE DEVIENT CELUI QUI A ETE LU. Le legacy garde
+                // le sien, ecrit en dur, meme quand le backend en lit un autre.
+                if (cheminAffiche && donnees.path) {
+                    cheminAffiche.textContent = donnees.path;
+                    // « Fichier a lire » devient « Fichier lu » : la page ne
+                    // pretend une lecture qu'une fois qu'elle a eu lieu.
+                    var etiquette = document.querySelector('[data-rw="superv-editeur-chemin-etiquette"]');
+                    if (etiquette) { etiquette.textContent = libelles.editeur_chemin_lu; }
+                }
+                if (contenu) { contenu.value = donnees.config || ''; }
+                message.className = 'rw-annonce rw-annonce--ok';
+                message.textContent = libelles.editeur_lu
+                    .replace('{chemin}', donnees.path || '')
+                    .replace('{nom}', nom);
+            }).catch(function () {
+                message.className = 'rw-annonce rw-annonce--echec';
+                message.textContent = libelles.editeur_echec;
+            }).finally(function () {
+                bouton.disabled = false;
+            });
         });
         serveur.addEventListener('change', function () {
-            message.hidden = true;
+            message.textContent = '';
+            if (contenu) { contenu.value = ''; }
+        });
+    }
+
+    /* ── La liste des sauvegardes — sous-lot V7, lecture seule ──────────────
+     * RESTAURER une sauvegarde MODIFIE la machine : c'est V9. Ici on ne fait que
+     * compter ce qui existe, et le dire.
+     */
+    var boutonSauvegardes = document.querySelector('[data-rw="superv-lire-sauvegardes"]');
+    if (boutonSauvegardes && sauvegardes && serveur) {
+        boutonSauvegardes.addEventListener('click', function () {
+            if (serveur.value === '') {
+                sauvegardes.textContent = libelles.editeur_sans_serveur;
+
+                return;
+            }
+            boutonSauvegardes.disabled = true;
+            appelleLaMachine(libelles.url_sauvegardes, serveur.value, function (donnees) {
+                if (donnees.absent || donnees.refus) {
+                    sauvegardes.textContent = libelles.editeur_refus
+                        .replace('{statut}', String(donnees.refus || 404));
+
+                    return;
+                }
+                var liste = donnees.backups || [];
+                sauvegardes.textContent = liste.length === 0
+                    ? libelles.sauvegardes_aucune
+                    : libelles.sauvegardes_nombre.replace('{nombre}', String(liste.length))
+                        + ' ' + liste.map(function (b) { return b.filename; }).join(', ');
+            }).catch(function () {
+                sauvegardes.textContent = libelles.editeur_echec;
+            }).finally(function () {
+                boutonSauvegardes.disabled = false;
+            });
         });
     }
 }());
