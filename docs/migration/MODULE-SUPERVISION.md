@@ -251,6 +251,29 @@ paragraphe au-dessus ; un `<select>` dans un `.rw-etiquette-champ` s'étirait su
 renvoyait son bouton à l'autre bout de la carte ; un `<a class="rw-bouton">`, élément en ligne, sortait
 de son cadre à 390 px. Le troisième correctif vaut pour **toutes** les pages du portage.
 
+## 7 quinquies. V2 porté — le catalogue de profils, en lecture (2026-08-22)
+
+Suite `go-page-supervision-profils` : base rouge **12 PASS / 6 FAIL**, puis **18 PASS** sur le portage et
+**14 PASS** sur le legacy. Détail complet en `PARITE.md` E-74.
+
+**LE SCHÉMA A CORRIGÉ DEUX SUPPOSITIONS DU DÉCOUPAGE.** La table est
+`supervision_metadata_profiles`. Le « nombre de machines » vient de `machine_supervision_profile`, clé
+primaire `(machine_id, platform)` : **une machine porte un profil PAR PLATEFORME**, et le compte se
+filtre par plateforme. Et `fk_msp_profile` porte bien le `ON DELETE CASCADE` que E-72 supposait — la
+conséquence de l'absence de `@require_role` sur `DELETE /supervision/profiles/<id>` est donc confirmée.
+
+**Les quatre catalogues sont peints côté serveur**, le script n'en montre qu'un : ouvrir l'onglet et
+changer de plateforme émettent **zéro appel**. Le legacy en émet 1 puis **4** — dont deux fois la même
+requête, jouée par son `onchange` et par le crochet `DOMContentLoaded` de `profiles.js`.
+
+**Trois défauts du legacy mesurés, aucun corrigé chez lui** : « Editer » et « Supprimer » écrits en dur
+dans le JS (donc hors parité FR/EN — le catalogue reste français en anglais) ; le profil entier sérialisé
+dans un attribut `onclick` (652 et 671 caractères, `notes` comprise) ; et `SELECT *` côté backend, qui
+envoie au navigateur cinq colonnes qu'il n'affiche pas.
+
+**Reste du module** : V3 (configuration globale, lecture) est le prochain. `notes` n'est affiché par
+aucun des deux portails hors de la boîte de modification : il entrera avec V5.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`

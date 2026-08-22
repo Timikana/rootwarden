@@ -6,7 +6,10 @@ use App\Services\Supervision;
 use Illuminate\View\View;
 
 /**
- * Supervision — module `supervision/`, sous-lot V1 : la page et ses quatre onglets.
+ * Supervision — module `supervision/`.
+ *
+ * Sous-lot V1 : la page et ses quatre onglets. Sous-lot V2 : le catalogue de
+ * profils, en LECTURE — le CRUD et l'assignation restent a V5.
  *
  * La garde vit DANS LA ROUTE et nulle part ailleurs : `role:2` +
  * `perm:can_manage_supervision`, REPRISE TELLE QUELLE du legacy
@@ -35,6 +38,7 @@ class SupervisionController extends Controller
             'onglets' => $this->supervision->onglets(),
             'plateformes' => $this->supervision->plateformes(),
             'machines' => $this->supervision->machines(),
+            'profils' => $this->supervision->profilsParPlateforme(),
             'libelles' => $this->libelles(),
         ]);
     }

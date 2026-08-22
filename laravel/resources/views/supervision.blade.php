@@ -60,11 +60,77 @@
             @endforeach
         </div>
 
-        {{-- ══ ONGLET 2 : profils ═════════════════════════════════════════════ --}}
+        {{-- ══ ONGLET 2 : profils ═════════════════════════════════════════
+             LECTURE SEULE (V2). Les quatre catalogues sont peints ICI, cote
+             serveur, et le script n'en montre qu'un : changer de plateforme
+             n'emet donc AUCUN appel. Le legacy, lui, rejoue
+             `GET /supervision/profiles` a l'ouverture de l'onglet ET a chaque
+             bascule — et la bascule en emet QUATRE, dont deux identiques. --}}
         <div id="panneau-profiles" data-rw="panneau-profiles" role="tabpanel" hidden>
             <article class="rw-carte rw-carte--pleine">
                 <h3 class="rw-sous-titre">{{ __('superv.profils_titre') }}</h3>
                 <p class="rw-aide rw-prose">{{ __('superv.profils_description') }}</p>
+
+                @foreach ($plateformes as $plateforme)
+                    @php($catalogue = $profils[$plateforme] ?? [])
+                    <div id="profils-{{ $plateforme }}" @if (! $loop->first) hidden @endif>
+                        @if (count($catalogue) === 0)
+                            <div class="rw-vide" data-rw="superv-profils-vide">
+                                <p class="rw-vide__titre">{{ __('superv.profils_aucun') }}</p>
+                                <p class="rw-vide__texte rw-prose">{{ __('superv.profils_aucun_aide', ['plateforme' => ucfirst($plateforme)]) }}</p>
+                            </div>
+                        @else
+                            {{-- Le defilement appartient au CADRE du tableau,
+                                 jamais au corps de la page. --}}
+                            <div class="rw-tableau-cadre">
+                                <table class="rw-tableau">
+                                    <thead>
+                                        <tr>
+                                            <th>{{ __('superv.profil_nom') }}</th>
+                                            <th>{{ __('superv.profil_metadonnees') }}</th>
+                                            <th>{{ __('superv.profil_serveur') }}</th>
+                                            <th>{{ __('superv.profil_mandataire') }}</th>
+                                            <th>{{ __('superv.profil_machines') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-rw="superv-profils-corps">
+                                        @foreach ($catalogue as $profil)
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ $profil->name }}</strong>
+                                                    @if (trim((string) $profil->description) !== '')
+                                                        <span class="rw-aide rw-cellule-note">{{ $profil->description }}</span>
+                                                    @endif
+                                                </td>
+                                                <td>{{ trim((string) $profil->host_metadata) !== '' ? $profil->host_metadata : __('superv.profil_herite') }}</td>
+                                                {{-- UNE VALEUR ABSENTE DIT CE QU'ELLE
+                                                     SIGNIFIE. Le legacy ecrit « - »,
+                                                     qui n'apprend rien : ici, NULL veut
+                                                     dire « la configuration globale
+                                                     s'applique », et c'est ce qui est
+                                                     ecrit. --}}
+                                                <td>{{ trim((string) $profil->zabbix_server) !== '' ? $profil->zabbix_server : __('superv.profil_herite') }}</td>
+                                                <td>{{ trim((string) $profil->zabbix_proxy) !== '' ? $profil->zabbix_proxy : __('superv.profil_herite') }}</td>
+                                                <td>
+                                                    <span class="rw-badge rw-badge--note @if ((int) $profil->machines === 0) rw-badge--neutre @endif">{{ $profil->machines }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            {{-- L'astuce ne vaut que s'il y a des valeurs dont
+                                 parler : sur une plateforme sans profil, elle
+                                 decrivait un contenu absent. --}}
+                            <p class="rw-aide rw-prose">{{ __('superv.profils_interpolation') }}</p>
+                        @endif
+                    </div>
+                @endforeach
+
+                {{-- LA MODIFICATION N'EST PAS PORTEE (V5), et la page le dit
+                     plutot que d'offrir des boutons inertes. Le legacy, lui,
+                     serialise le profil ENTIER — `notes` comprise — dans un
+                     attribut `onclick` de chacune de ses lignes. --}}
                 <div class="rw-vide">
                     <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
                     <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_profils') }}</p>

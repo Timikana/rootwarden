@@ -54,12 +54,24 @@
      */
     var choixPlateforme = document.querySelector('[data-rw="superv-plateforme"]');
     if (choixPlateforme) {
-        var blocs = [].slice.call(choixPlateforme.options).map(function (o) {
-            return { nom: o.value, bloc: document.getElementById('config-' + o.value) };
+        /*
+         * Les blocs a basculer sont NOMMES ici, un par famille : la
+         * configuration (V1) et le catalogue de profils (V2). Une liste
+         * explicite plutot qu'un selecteur par prefixe — un prefixe attraperait
+         * ce qu'un sous-lot suivant ajoutera, et le ferait disparaitre sans
+         * qu'aucun test ne l'ait demande.
+         */
+        var familles = ['config-', 'profils-'];
+        var blocs = [];
+        [].slice.call(choixPlateforme.options).forEach(function (o) {
+            familles.forEach(function (prefixe) {
+                var bloc = document.getElementById(prefixe + o.value);
+                if (bloc) { blocs.push({ nom: o.value, bloc: bloc }); }
+            });
         });
         choixPlateforme.addEventListener('change', function () {
             blocs.forEach(function (b) {
-                if (b.bloc) { b.bloc.hidden = b.nom !== choixPlateforme.value; }
+                b.bloc.hidden = b.nom !== choixPlateforme.value;
             });
         });
     }

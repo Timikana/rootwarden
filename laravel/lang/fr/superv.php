@@ -27,6 +27,19 @@ return [
     'config_description' => 'Ces parametres servent de modele a tous les deploiements. Chaque serveur peut porter ses propres valeurs.',
 
     'profils_titre' => 'Profils de supervision',
+    // ── Le catalogue, sous-lot V2 (lecture seule) ─────────────────────────
+    'profil_nom' => 'Nom',
+    'profil_metadonnees' => 'HostMetadata',
+    'profil_serveur' => 'Serveur',
+    'profil_mandataire' => 'Mandataire',
+    'profil_machines' => 'Machines',
+    // UNE VALEUR ABSENTE DIT CE QU'ELLE SIGNIFIE. Le legacy ecrit « - », qui
+    // n'apprend rien : ici, l'absence veut dire que la configuration globale
+    // s'applique, et c'est ce qui est ecrit.
+    'profil_herite' => 'Configuration globale',
+    'profils_aucun' => 'Aucun profil pour cette plateforme',
+    'profils_aucun_aide' => 'Aucun profil de supervision n\'est defini pour :plateforme. Les profils sont propres a chaque plateforme.',
+    'profils_interpolation' => 'Les valeurs peuvent contenir {machine.name} ou {machine.ip} : elles sont remplacees au moment du deploiement.',
     'profils_description' => "Reglages reutilisables (metadonnees d'hote, serveur, mandataire). Le catalogue est ecrit une fois, puis chaque serveur est rattache a un profil.",
 
     'deploiement_titre' => 'Deploiement des agents',
