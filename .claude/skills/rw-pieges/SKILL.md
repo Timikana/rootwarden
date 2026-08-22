@@ -779,6 +779,78 @@ attendu **dans l'ilot de donnees de la page** (`#<page>-libelles`) : la suite
 mesure alors « la page affiche ce qu'elle declare afficher », qui reste vrai
 apres une relecture de traduction.
 
+## Le garde anti-rejeu TOTP traverse les contextes de navigateur
+
+Une suite qui se connecte **deux fois** avec le meme compte (une passe FR, une
+passe EN) rejoue le meme code si les deux connexions tombent dans la meme
+fenetre de 30 s. Le garde etant par COMPTE et EN BASE, un contexte de navigateur
+neuf n'y change rien : la seconde session n'est pas authentifiee et **la page
+servie est celle de connexion**.
+
+Le piege n'est pas l'echec, c'est le FAUX SUCCES : les controles d'i18n
+(« aucun identifiant de traduction a l'ecran ») passent parfaitement sur un
+ecran de connexion. Mesure du 2026-08-22 sur `go-page-supervision-releve` : la
+suite rendait 24/1 dans le LOT et 25/0 seule, et l'assertion qui tombait n'etait
+pas celle qui avait le probleme.
+
+Trois pieces, pas une :
+1. attendre le basculement de la fenetre AVANT la seconde connexion ;
+2. **asserter que la session a tenu** (l'URL n'est pas celle de connexion) —
+   sans quoi tout ce qui suit mesure la mauvaise page ;
+3. reproposer UNE fois un code neuf si le second facteur est refuse, plutot que
+   de declarer la suite instable (deja fait a tort pour deux suites du depot).
+
+Le runner, lui, attend deja le basculement ENTRE deux suites : le trou est a
+l'interieur d'une suite.
+
+## Jamais d'attente FIXE apres un clic d'onglet
+
+`dors(1200)` apres un clic tient quand la suite tourne seule et lache dans le
+LOT : le script de la page n'a pas encore pris la main, **le clic ne fait rien**,
+et le panneau reste cache — donc son texte n'existe pas dans `innerText`. Une
+assertion juste echoue pour une raison etrangere a ce qu'elle mesure.
+
+Attendre la PROPRIETE (le panneau est visible), avec une borne, et **re-cliquer**
+tant qu'elle n'est pas obtenue : c'est le GESTE qui peut avoir ete perdu, pas
+seulement son effet. Et faire de l'ouverture une assertion : un onglet qui ne
+s'ouvre pas doit se voir comme tel, pas se deguiser en defaut de traduction.
+
+## Un nettoyage qui supprime PAR TYPE en retire plus qu'il n'en a pose
+
+Premier jet du nettoyage de V8 :
+`DELETE FROM tasks WHERE task_type = 'supervision_scan'`. Il aurait efface
+l'historique d'un releve lance par un exploitant, sans que rien ne le signale.
+
+Retenir l'identifiant de ce qu'on cree et ne supprimer que celui-la. Et faire de
+la propriete de sortie un **DELTA**, pas un zero : compter les lignes
+preexistantes comme un echec fait echouer la suite sur l'historique d'autrui.
+
+## Un garde sans objet ne garde rien — cas d'ecole sur une route de parc
+
+`@require_machine_access` lit `machine_id`/`machine_ids` dans le corps et
+fail-close sur tout identifiant refuse. Mais un corps VIDE ne lui donne **rien a
+refuser**. Sur une route dont le corps vide signifie *tout le parc*
+(`/supervision/scan-all`), il a donc l'apparence d'un garde sans en etre un.
+
+Le decorateur couvre la liste explicite ; le parc IMPLICITE doit etre filtre dans
+le handler, machine par machine. Et quand le filtre est inerte au niveau de role
+exige, le DIRE plutot que de le laisser croire actif.
+
+## Huit branches mortes qui armeraient un @threaded_route imbrique
+
+Dans `routes/supervision.py`, huit paires statique/generique
+(`/supervision/zabbix/<verbe>` contre `/supervision/<platform>/<verbe>`) portent
+`@threaded_route` **des deux cotes**, et chaque handler generique commence par
+`if platform == 'zabbix': return zabbix_<verbe>()`.
+
+Ces branches sont **inatteignables** : Werkzeug trie par complexite, la regle
+statique gagne, dans les deux ordres de declaration (mesure). Le danger est que
+la regle statique **ressemble a un doublon** : la supprimer rend la branche
+vivante, et chaque appel Zabbix prend alors DEUX slots du meme pool, l'externe
+attendant l'interne. Un releve de 16 machines demanderait 128 slots pour 32 : le
+pool ne ralentit pas, il se bloque. Ne jamais retirer la regle statique sans
+retirer d'abord le `@threaded_route` d'un des deux etages.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).
