@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.41** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.42** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,64 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.42 — module `supervision/`, sous-lot V10a : les reglages par machine, avec une liste FERMEE
+
+**Ce n'est pas un portage, c'est une conception autorisee.** `supervision_overrides` n'avait JAMAIS eu
+d'interface, dans aucun des deux portails : la priorite `overrides > profil > globale` existait avec son
+etage le plus fort INATTEIGNABLE. L'exploitant a tranche pour « corriger l'injection ET porter une
+interface bornee » — v1.37.41 a corrige, ce commit porte.
+
+**LA DECISION DE DESSIN : NE PAS OFFRIR D'ENTREE LIBRE PLUTOT QUE LA VALIDER.** Huit champs, huit noms
+fixes — exactement ceux que `_build_config_lines` traite par leur nom (`Hostname`, `Server`,
+`ServerActive`, `HostMetadata`, `ListenPort`, `TLSConnect`, `TLSAccept`, `TLSPSKIdentity`) — et AUCUN champ
+ou saisir un NOM de parametre. Valider une entree libre et ne pas en offrir ne se valent pas : la seconde
+ne se contourne pas par une requete forgee. La suite en emet une, justement, pour exercer la revalidation
+du controleur : valeur multiligne refusee, valeur hors liste fermee refusee, port hors bornes refuse.
+
+**LE FORMULAIRE POSTE VERS LE PORTAGE, PAS VERS LA PASSERELLE, et le test en fait une propriete.**
+`POST /supervision/overrides/<id>` est la seule route du module touchant une machine SANS
+`@require_machine_access` (E-85, declare et non corrige, hors du perimetre autorise). Ecrire en base avec
+une liste fermee, c'est ne pas heriter de cette laxite — meme raison qu'en V4.
+
+**CE GESTE NE JOINT AUCUNE MACHINE, ET LA PAGE LE DIT.** Ces valeurs vivent en base et ne partiront qu'a
+la prochaine reconfiguration. La suite le MESURE : zero requete vers la passerelle pendant
+l'enregistrement. C'est ce qui distingue ce sous-lot de V9. **Vider un champ SUPPRIME le reglage**, il ne
+l'enregistre pas vide — un `param_value` vide serait relu comme une ligne `Cle=`, une directive sans
+valeur.
+
+**UN DEFAUT DE MON PROPRE PORTAGE, TROUVE PAR MA PROPRE SUITE, ET SA CAUSE EST DANS LE CADRE.** Le premier
+jet ne supprimait JAMAIS rien. Laravel place `ConvertEmptyStringsToNull` dans le groupe `web` : une chaine
+vide arrive donc en `null`, EXACTEMENT comme un champ absent — alors que vide signifie « supprime ce
+reglage » et absent « ne le touche pas ». Mesure :
+
+    POST a="" b="v"   ->  input('a') = NULL     has('a') = true     input('b') = "v"
+
+Le code testait `input(...) === null` et sautait les champs vides. Corrige par `has()`. Un intergiciel du
+cadre avait rendu deux choses differentes identiques, et seule la suite l'a vu — pas la relecture.
+
+**DEUX DEFAUTS DE MA SUITE.** Un motif `/nom|name|param/`, cense prouver qu'aucun champ ne saisit un NOM
+de parametre, echouait sur `override_Hostname` — il contient « name » — et ne disait rien de plus que la
+comparaison a la liste FERMEE ; remplace par une propriete non mesuree jusque-la (le formulaire poste vers
+le portage). Et une NAVIGATION referme l'onglet : les panneaux arrivent `hidden`, donc apres chaque
+aller-retour de formulaire le bouton suivant vit dans un panneau cache — l'echec apparaissait deux gestes
+plus loin, en « Node is either not clickable ».
+
+**ON N'AFFICHE PAS SEULEMENT CE QU'ON SAIT ECRIRE.** Un reglage pose hors de la liste fermee — par l'API,
+ou avant ce portage — EXISTE et AGIT. L'ecran l'annonce en le nommant, tout en disant qu'il ne peut pas le
+modifier. Mesure avec une fixture `Timeout`.
+
+**UN DEFAUT VU A L'IMAGE.** `.rw-etiquette-champ` met TOUTE l'etiquette en capitales gras — juste pour un
+intitule, illisible pour une phrase — et seule `.rw-saisie` y etait remise a plat : chaque champ portait
+cinq lignes de capitales sous lui. Corrige par une regle placee JUSTE APRES celle de `.rw-saisie`, parce
+qu'a specificite egale l'ordre tranche.
+
+**Tests.** `go-page-supervision-reglages` : base rouge 5 PASS / 8 FAIL, puis **32 PASS sur le portage** et
+**8 sur le legacy** (cote legacy, la suite ne mesure qu'une chose : qu'il n'y a rien). i18n : 31 cles FR +
+31 EN dans le meme commit, **189 = 189**. 329 pytest inchanges.
+
+**Reference du LOT** : `go-page-supervision-reglages` entre avec **8 PASS sur le legacy** et **32 sur le
+portage**. Le LOT passe a **78 executions de suite** pour **1070 assertions** (compte au journal du rejeu).
 
 ### v1.37.41 — securite : la valeur d'un override ne peut plus devenir une ligne de configuration
 

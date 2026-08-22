@@ -166,6 +166,18 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:2', 'perm:can_manage_supervision'])
         ->name('supervision.profils.supprimer');
 
+    /*
+     * Les reglages par machine — sous-lot V10a. La garde est la MEME que celle
+     * des autres gestes du module : elle vit DANS LA ROUTE et nulle part ailleurs.
+     * A noter que la route backend equivalente
+     * (`POST /supervision/overrides/<id>`) est la seule route du module touchant
+     * une machine sans `@require_machine_access` (PARITE E-85) : le portage
+     * n'emprunte pas ce chemin, il ecrit en base avec une liste fermee.
+     */
+    Route::post('/supervision/reglages', [SupervisionController::class, 'enregistrerOverrides'])
+        ->middleware(['role:2', 'perm:can_manage_supervision'])
+        ->name('supervision.reglages.enregistrer');
+
     Route::get('/derive-config', DeriveConfigController::class)
         ->middleware(['role:2', 'perm:can_view_compliance'])
         ->name('derive-config');

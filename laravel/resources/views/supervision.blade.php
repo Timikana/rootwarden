@@ -417,6 +417,13 @@
                                                     data-rw="superv-detecter-version"
                                                     data-machine="{{ $m->id }}"
                                                     data-nom="{{ $m->name }}">{{ __('superv.version_detecter') }}</button>
+                                            {{-- LES REGLAGES SONT UNE ADRESSE, pas un
+                                                 enregistrement pose dans le DOM : le serveur
+                                                 pre-remplit le formulaire depuis `?reglages=<id>`.
+                                                 Meme principe qu'en V5 pour les profils. --}}
+                                            <a class="rw-bouton rw-bouton--discret"
+                                               data-rw="superv-reglages-lien-{{ $m->id }}"
+                                               href="{{ route('supervision', ['reglages' => $m->id]) }}#reglages">{{ __('superv.reglages_lien') }}</a>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -428,6 +435,110 @@
                          qu'une session SSH en demande le double : le message a
                          disparu avant que son effet soit constatable. --}}
                     <p class="rw-annonce" data-rw="superv-version-message" aria-live="polite"></p>
+
+                    {{-- ══ SOUS-LOT V10a : LES REGLAGES PAR MACHINE ══════════
+                         POURQUOI CE FORMULAIRE N'A PAS DE CHAMP DE NOM. La table
+                         `supervision_overrides` est libre, et le backend injecte
+                         tout nom qu'il ne connait pas directement dans le fichier
+                         de configuration. C'est par cette porte qu'un saut de
+                         ligne dans la VALEUR produisait une directive autonome —
+                         sur un agent Zabbix, un `UserParameter`, donc l'execution
+                         d'une commande arbitraire (PARITE E-85, corrige en
+                         v1.37.41). Ici les huit champs sont ceux que le backend
+                         traite PAR LEUR NOM, et il n'y a pas de neuvieme : la
+                         seule facon de ne pas rouvrir cette porte est de ne pas
+                         l'installer.
+
+                         ET CE GESTE NE JOINT AUCUNE MACHINE. Ces reglages vivent
+                         en base et ne prennent effet qu'a la prochaine
+                         reconfiguration : la page le DIT, plutot que de laisser
+                         croire qu'enregistrer modifie le serveur. --}}
+                    <section class="rw-note" id="reglages" data-rw="superv-reglages">
+                        <h4 class="rw-sous-titre">{{ __('superv.reglages_titre') }}</h4>
+                        <p class="rw-aide rw-prose">{{ __('superv.reglages_description') }}</p>
+
+                        @if (session('superv_reglages_message'))
+                            <p class="rw-confirmation" data-rw="superv-reglages-message"
+                               role="status">{{ session('superv_reglages_message') }}</p>
+                        @elseif (session('superv_reglages_erreur'))
+                            <p class="rw-erreur" data-rw="superv-reglages-message"
+                               role="alert">{{ session('superv_reglages_erreur') }}</p>
+                        @endif
+
+                        @if ($machineReglee === null)
+                            <div class="rw-vide">
+                                <p class="rw-vide__titre">{{ __('superv.reglages_aucune_machine') }}</p>
+                                <p class="rw-vide__texte rw-prose">{{ __('superv.reglages_aucune_machine_aide') }}</p>
+                            </div>
+                        @else
+                            <p class="rw-encart" data-rw="superv-reglages-machine">
+                                {{ __('superv.reglages_pour', ['nom' => $machineReglee->name]) }}
+                            </p>
+                            <p class="rw-avertissement" data-rw="superv-reglages-effet">
+                                {{ __('superv.reglages_effet_differe') }}
+                            </p>
+
+                            <form method="POST" action="{{ route('supervision.reglages.enregistrer') }}"
+                                  data-rw="superv-reglages-form">
+                                @csrf
+                                <input type="hidden" name="machine_id" value="{{ $machineReglee->id }}">
+
+                                <div class="rw-grille">
+                                    @foreach ($champsOverride as $nom => $champ)
+                                        @php($valeur = $overrides[$nom] ?? '')
+                                        <label class="rw-etiquette-champ">
+                                            <span class="rw-etiquette">{{ __('superv.' . $champ['cle']) }}</span>
+                                            @if ($champ['nature'] === 'liste')
+                                                {{-- LISTE FERMEE, revalidee cote serveur : un
+                                                     champ libre par-dessus une valeur attendue
+                                                     dans un jeu fini est un defaut deja paye en V4. --}}
+                                                <select class="rw-saisie" name="override_{{ $nom }}"
+                                                        data-rw="superv-reglage-{{ $nom }}">
+                                                    <option value="">{{ __('superv.reglages_herite') }}</option>
+                                                    @foreach ($choix[$champ['colonne']] ?? [] as $option)
+                                                        <option value="{{ $option }}" @selected($valeur === $option)>{{ $option }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @else
+                                                <input class="rw-saisie" type="text"
+                                                       name="override_{{ $nom }}"
+                                                       value="{{ $valeur }}"
+                                                       data-rw="superv-reglage-{{ $nom }}"
+                                                       placeholder="{{ __('superv.reglages_herite') }}"
+                                                       @if ($champ['nature'] === 'port') inputmode="numeric" @endif>
+                                            @endif
+                                            <span class="rw-aide">{{ __('superv.' . $champ['cle'] . '_aide') }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+
+                                <div class="rw-actions">
+                                    <a class="rw-bouton rw-bouton--discret rw-actions__gauche"
+                                       href="{{ route('supervision') }}#reglages"
+                                       data-rw="superv-reglages-fermer">{{ __('superv.reglages_fermer') }}</a>
+                                    <button type="submit" class="rw-bouton"
+                                            data-rw="superv-reglages-enregistrer">{{ __('superv.reglages_enregistrer') }}</button>
+                                </div>
+                            </form>
+
+                            {{-- UN CHAMP VIDE EFFACE LE REGLAGE, et il faut le dire :
+                                 un `param_value` vide serait relu comme une ligne
+                                 `Cle=` — une directive sans valeur. --}}
+                            <p class="rw-aide rw-prose">{{ __('superv.reglages_vide_efface') }}</p>
+
+                            @if (count(array_diff_key($overrides, $champsOverride)) > 0)
+                                {{-- ON N'AFFICHE PAS SEULEMENT CE QU'ON SAIT ECRIRE.
+                                     Un reglage pose hors de la liste fermee — par
+                                     l'API, ou avant ce portage — existe et agit :
+                                     le cacher laisserait croire qu'il n'y en a pas. --}}
+                                <p class="rw-avertissement" data-rw="superv-reglages-hors-liste">
+                                    {{ __('superv.reglages_hors_liste', [
+                                        'champs' => implode(', ', array_keys(array_diff_key($overrides, $champsOverride))),
+                                    ]) }}
+                                </p>
+                            @endif
+                        @endif
+                    </section>
 
                     {{-- ══ SOUS-LOT V8 : le releve du parc, en tache de fond ══
                          CE QUE LE LEGACY NE DIT PAS, ET QUE CE BLOC DIT.

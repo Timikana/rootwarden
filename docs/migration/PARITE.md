@@ -3309,3 +3309,72 @@ ni `;` ni `$` dans le nom, et le `sed` l'échappe par `re.escape` — aucune inj
 le chemin du fichier reste un littéral ; le contenu voyage en base64. Et côté Zabbix, un échec de
 sauvegarde est **annoncé dans le flux** (`WARN: Backup echoue`) — plus honnête que le `None` silencieux de
 `config/save` — même si l'écriture continue quand même. La version générique, elle, ignore ce retour.
+
+## E-86 — Les réglages par machine, portés avec une liste FERMÉE : ne pas offrir d'entrée libre plutôt que la valider
+
+**Module `supervision/`, sous-lot V10a : les réglages par machine
+(`supervision_overrides`).** **CE N'EST PAS UN PORTAGE, C'EST UNE CONCEPTION AUTORISÉE.** La table n'avait
+**jamais eu d'interface**, dans aucun des deux portails : la priorité `overrides > profil > globale`
+existait avec son étage le plus fort **inatteignable**. Suite :
+`tests/e2e/go-page-supervision-reglages.mjs` — **8 PASS sur le legacy, 32 sur le portage** (base rouge
+relevée : **5 PASS / 8 FAIL**). Côté legacy, la suite ne mesure qu'une chose : qu'il n'y a rien.
+
+**LA DÉCISION DE DESSIN, ET SA RAISON MESURÉE.** E-85 avait établi qu'un saut de ligne dans la valeur d'un
+override produisait une **directive autonome** dans le fichier de configuration — sur un agent Zabbix, un
+`UserParameter`, donc l'exécution d'une commande arbitraire. Le backend valide désormais la valeur
+(v1.37.41). **Le portage va plus loin : il n'offre pas d'entrée libre du tout.** Huit champs, huit noms
+fixes, aucun neuvième, et **aucun champ où saisir un NOM de paramètre**. Valider une entrée libre et ne
+pas en offrir ne se valent pas : la seconde ne se contourne pas par une requête forgée.
+
+Ces huit noms sont **exactement** ceux que `_build_config_lines` traite par leur nom : `Hostname`,
+`Server`, `ServerActive`, `HostMetadata`, `ListenPort`, `TLSConnect`, `TLSAccept`, `TLSPSKIdentity`.
+
+**LE FORMULAIRE POSTE VERS LE PORTAGE, PAS VERS LA PASSERELLE — et le test en fait une propriété.**
+`POST /supervision/overrides/<id>` est la seule route du module touchant une machine **sans**
+`@require_machine_access` (E-85, déclaré et non corrigé, hors du périmètre autorisé). Écrire en base avec
+une liste fermée, c'est ne pas hériter de cette laxité — même raison qu'en V4 pour la configuration
+globale.
+
+**CE GESTE NE JOINT AUCUNE MACHINE, ET LA PAGE LE DIT.** Ces valeurs vivent en base et ne partiront qu'à
+la prochaine reconfiguration. Le taire laisserait croire qu'enregistrer modifie le serveur. La suite le
+**mesure** : zéro requête vers la passerelle pendant l'enregistrement. C'est ce qui distingue ce sous-lot
+de V9.
+
+**VIDER UN CHAMP SUPPRIME LE RÉGLAGE, il ne l'enregistre pas vide** — un `param_value` vide serait relu
+comme une ligne `Clé=`, donc une directive sans valeur.
+
+**UN DÉFAUT DE MON PROPRE PORTAGE, TROUVÉ PAR MA PROPRE SUITE, ET SA CAUSE EST DANS LE CADRE.** Le premier
+jet ne supprimait **jamais** rien. Laravel place `ConvertEmptyStringsToNull` dans le groupe `web` : une
+chaîne vide arrive donc en `null`, **exactement comme un champ absent**. Or les deux ne veulent pas dire la
+même chose — vide signifie « supprime ce réglage », absent signifie « ne le touche pas ». Mesuré :
+
+```
+POST a="" b="v"   ->  input('a') = NULL     has('a') = true     input('b') = "v"
+```
+
+Le code testait `input(...) === null` et sautait donc les champs vidés. Corrigé par `has()`. **Un
+intergiciel du cadre avait rendu deux choses différentes identiques**, et seule la suite l'a vu — pas la
+relecture.
+
+**UNE ASSERTION QUI ÉCHOUAIT SUR UN CHAMP JUSTE.** Pour prouver qu'aucun champ ne saisit un NOM de
+paramètre, un premier jet cherchait `/nom|name|param/` dans les noms de champs — et `override_Hostname`
+contient « name ». L'assertion tombait sur un champ légitime, et **elle ne disait rien de plus** que celle
+qui compare à la liste fermée. Remplacée par une propriété qui n'était pas mesurée : le formulaire poste
+vers la route du portage.
+
+**UNE NAVIGATION REFERME L'ONGLET, et la suite l'a payé.** Les panneaux arrivent `hidden` et c'est le
+script qui en ouvre un : après chaque aller-retour de formulaire, le bouton suivant vit dans un panneau
+caché et n'est pas cliquable. L'échec apparaissait **deux gestes plus loin**, sous la forme « Node is
+either not clickable ».
+
+**ON N'AFFICHE PAS SEULEMENT CE QU'ON SAIT ÉCRIRE.** Un réglage posé hors de la liste fermée — par l'API,
+ou avant ce portage — **existe et agit**. Le cacher laisserait croire qu'il n'y en a pas : l'écran
+l'annonce, en le nommant, tout en disant qu'il ne peut pas le modifier. Mesuré avec une fixture `Timeout`.
+
+**LE STYLE DE L'AIDE, VU À L'IMAGE.** `.rw-etiquette-champ` met **toute** l'étiquette en capitales gras —
+juste pour un intitulé, illisible pour une phrase. Seule `.rw-saisie` y était remise à plat : chaque champ
+portait donc cinq lignes de capitales sous lui. Corrigé par une règle placée **juste après** celle de
+`.rw-saisie`, parce qu'à spécificité égale l'ordre tranche.
+
+**CE QUI RESTE À V10** : la reconfiguration elle-même, qui **écrit** cette configuration sur la machine.
+Son étage le plus fort n'est plus inatteignable.

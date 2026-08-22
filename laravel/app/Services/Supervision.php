@@ -385,6 +385,82 @@ class Supervision
      * @return list<object>
      */
     /**
+     * LES REGLAGES PAR MACHINE, TELS QUE LE BACKEND LES LIT — sous-lot V10a.
+     *
+     * `supervision_overrides` est une table LIBRE : `param_name varchar(100)`,
+     * `param_value text`, sans contrainte sur le contenu. Le backend, lui, ne
+     * traite par leur nom que HUIT parametres ; tout le reste passe par une
+     * boucle d'« overrides libres » qui les injecte tels quels dans le fichier.
+     *
+     * MESURE DU 2026-08-22 (PARITE.md E-85) : la valeur n'etait pas validee, et
+     * un saut de ligne y produisait une DIRECTIVE AUTONOME dans le `.conf` — sur
+     * un agent Zabbix reel, un `UserParameter`, donc l'execution d'une commande
+     * arbitraire. Le backend valide desormais la valeur (v1.37.41).
+     *
+     * LE PORTAGE VA PLUS LOIN, ET C'EST DELIBERE : il n'ecrit QUE les huit
+     * parametres nommes. Pas de champ libre, donc pas de nom arbitraire a
+     * valider — la seule facon de ne pas rouvrir la porte est de ne pas
+     * l'installer. Un reglage pose hors de cette liste par une autre voie reste
+     * LU et AFFICHE (on ne cache pas ce qui existe), mais l'ecran ne permet pas
+     * d'en creer.
+     *
+     * @return array<string, string>
+     */
+    public function overridesDeLaMachine(int $idMachine): array
+    {
+        $valeurs = [];
+
+        foreach (DB::table('supervision_overrides')
+            ->select('param_name', 'param_value')
+            ->where('machine_id', $idMachine)
+            ->orderBy('param_name')
+            ->get() as $ligne) {
+            $valeurs[(string) $ligne->param_name] = (string) $ligne->param_value;
+        }
+
+        return $valeurs;
+    }
+
+    /**
+     * Enregistre les reglages d'une machine — sous-lot V10a.
+     *
+     * ECRITURE EN BASE, PAS PAR LA PASSERELLE. Meme raison qu'en V4 pour la
+     * configuration globale : la route backend correspondante
+     * (`POST /supervision/overrides/<id>`) est la SEULE route du module touchant
+     * une machine sans `@require_machine_access` (E-85, declare et non corrige).
+     * Ecrire ici, avec une liste fermee, c'est ne pas heriter de cette laxite.
+     *
+     * UN REGLAGE VIDE EST UNE SUPPRESSION, pas une valeur vide. Un
+     * `param_value` vide serait relu par le backend comme une ligne
+     * `Cle=` dans le fichier — donc une directive sans valeur. Le vide efface
+     * la ligne : c'est la seule lecture qui ne fabrique rien.
+     *
+     * @param  array<string, string>  $valeurs  cles DEJA restreintes par l'appelant
+     */
+    public function enregistreOverrides(int $idMachine, array $valeurs): void
+    {
+        DB::transaction(function () use ($idMachine, $valeurs) {
+            foreach ($valeurs as $nom => $valeur) {
+                $valeur = trim((string) $valeur);
+
+                if ($valeur === '') {
+                    DB::table('supervision_overrides')
+                        ->where('machine_id', $idMachine)
+                        ->where('param_name', $nom)
+                        ->delete();
+
+                    continue;
+                }
+
+                DB::table('supervision_overrides')->updateOrInsert(
+                    ['machine_id' => $idMachine, 'param_name' => $nom],
+                    ['param_value' => $valeur],
+                );
+            }
+        });
+    }
+
+    /**
      * CE QU'UN RELEVE DE PARC COUTE, CALCULE PAR LE SERVEUR — sous-lot V8.
      *
      * Le legacy ne dit rien de ce coût : son bouton « Scanner tous les agents »
