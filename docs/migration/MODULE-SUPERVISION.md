@@ -274,6 +274,35 @@ envoie au navigateur cinq colonnes qu'il n'affiche pas.
 **Reste du module** : V3 (configuration globale, lecture) est le prochain. `notes` n'est affiché par
 aucun des deux portails hors de la boîte de modification : il entrera avec V5.
 
+## 7 sexies. V3 porté — la configuration globale, en lecture (2026-08-22)
+
+Suite `go-page-supervision-config` : **17 PASS** sur le portage, **15** sur le legacy. Détail complet en
+`PARITE.md` E-75.
+
+**`supervision_config` EST VIDE** — zéro ligne pour les quatre plateformes. La suite pose donc une
+fixture, nettoyée à l'entrée et dans un `finally`. Vérifié avant de l'écrire : le scheduler ne lit
+**jamais** cette table, donc la fixture n'arme aucun déclencheur.
+
+**AUCUNE CONTRAINTE D'UNICITÉ sur `platform`** : la clé primaire est `id` seul, et les deux portails
+lisent `ORDER BY id DESC LIMIT 1`. « La » configuration globale est donc **la plus récente**. Mesuré avec
+deux lignes Zabbix. Le portage reproduit le choix — le corriger serait une migration — mais il le
+**nomme** à l'écran.
+
+**LE DÉFAUT QUE V4 DEVRA CORRIGER, maintenant localisé** : `supervision.py:508` sélectionne la ligne la
+plus récente **sans filtre de plateforme** puis l'`UPDATE` par `id`. Enregistrer le formulaire Zabbix
+peut donc écraser une ligne Centreon.
+
+**Le secret ne fuit pas** — mesuré, contrairement à ce que le suivi de chantier soupçonnait. Le legacy
+rend `********` et la valeur réelle n'est nulle part dans le source servi ; le backend refuse d'écrire le
+masque par-dessus le vrai PSK. Le portage va plus loin : il **ne sélectionne même pas** les deux colonnes
+secrètes, il rend deux booléens de présence.
+
+**L'asymétrie confirmée** : Zabbix est rendu côté serveur, les trois autres par
+`GET /supervision/config/<plateforme>` — 3 requêtes mesurées à la bascule. Le portage : 0.
+
+**Reste du module** : V4 (écriture de la configuration globale) est le prochain, et il porte le
+correctif du `WHERE platform`.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`

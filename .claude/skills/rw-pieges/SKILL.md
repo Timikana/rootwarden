@@ -592,6 +592,40 @@ defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails es
 faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
 declenche rien trop tot). Voir `PARITE.md` E-73.
 
+## Un secret : ne pas le LIRE vaut mieux que le masquer
+
+`supervision_config.tls_psk_value` et `telegraf_output_token` sont rendus
+`'********'` par le legacy — et c'est correct, mesure : la valeur reelle n'est
+pas dans le source servi, et le backend refuse d'ecrire le masque par-dessus le
+vrai secret. **Le dire tel quel** : soupconner une fuite ne la demontre pas.
+
+Mais un portage fait mieux en ne SELECTIONNANT pas la colonne : il rend un
+BOOLEEN de presence. Masquer une valeur deja chargee la laisse en memoire, dans
+la vue, et a portee du premier gabarit qui l'affichera par megarde.
+
+**Et la mesure se fait dans `page.content()`, pas dans le texte visible** : un
+attribut peut porter autre chose que ce que l'oeil lit — c'est exactement le cas
+d'un `<input type="password">`, dont la `value` ne s'affiche jamais.
+
+## « LA » configuration n'existe pas s'il n'y a pas de contrainte d'unicite
+
+`supervision_config` a `id` pour seule cle primaire, et tout le code lit
+`ORDER BY id DESC LIMIT 1`. « La » configuration globale d'une plateforme est
+donc **la plus recente**, et rien n'empeche d'en accumuler. Se mesure en posant
+DEUX lignes et en verifiant laquelle s'affiche. Corollaire trouve au meme
+endroit : `supervision.py:508` selectionne cette ligne **sans filtre de
+plateforme** puis l'`UPDATE` par `id` — enregistrer le formulaire Zabbix peut
+ecraser une ligne Centreon.
+
+## Une etiquette de ligne de tableau : a gauche sur grand ecran, repliable sur petit
+
+`.rw-tableau` ne stylait que les `th` du `thead`. Un `th scope="row"` dans le
+corps retombe sur le defaut du navigateur — **centre** — et sur une colonne large
+l'etiquette se retrouve au milieu du vide, loin de la valeur qu'elle nomme.
+`text-align: left; width: 1%; white-space: nowrap` corrige — mais **a 390 px ce
+`nowrap` repousse la VALEUR hors du cadre** : on garde le mot et on perd la
+donnee. Le replier sous 700 px. Les deux defauts ne se voient qu'a l'image.
+
 ## Un libelle ecrit en dur dans du JS echappe a TOUS les controles d'i18n
 
 `profiles.js` construit ses lignes avec `>Editer<` et `>Supprimer<` en clair.

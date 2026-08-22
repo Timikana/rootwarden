@@ -28,6 +28,54 @@ use Illuminate\View\View;
  */
 class SupervisionController extends Controller
 {
+    /**
+     * Ce que chaque plateforme affiche, dans l'ordre : cle de colonne => cle i18n.
+     *
+     * `hostname_pattern` et `extra_config` sont communs aux quatre. Les deux
+     * secrets (`tls_psk_value`, `telegraf_output_token`) n'y figurent PAS : ils ne
+     * sont meme pas lus en base, seule leur presence l'est.
+     *
+     * `updated_at` n'est volontairement pas affiche : il est ecrit par MySQL, donc
+     * dans le fuseau du conteneur de base, et l'afficher ferait entrer dans cette
+     * page le decalage declare en PARITE E-73. V3 montre la configuration, pas sa
+     * piste d'audit.
+     */
+    private const CHAMPS_PAR_PLATEFORME = [
+        'zabbix' => [
+            'agent_type' => 'type_agent',
+            'agent_version' => 'version_agent',
+            'zabbix_server' => 'serveur',
+            'zabbix_server_active' => 'serveur_actif',
+            'listen_port' => 'port',
+            'hostname_pattern' => 'motif_nom',
+            'tls_connect' => 'tls_connexion',
+            'tls_accept' => 'tls_acceptation',
+            'tls_psk_identity' => 'psk_identite',
+            'host_metadata_template' => 'metadonnees',
+            'extra_config' => 'config_supplementaire',
+        ],
+        'centreon' => [
+            'centreon_host' => 'centreon_hote',
+            'centreon_port' => 'centreon_port',
+            'hostname_pattern' => 'motif_nom',
+            'extra_config' => 'config_supplementaire',
+        ],
+        'prometheus' => [
+            'prometheus_listen' => 'prometheus_ecoute',
+            'prometheus_collectors' => 'prometheus_collecteurs',
+            'hostname_pattern' => 'motif_nom',
+            'extra_config' => 'config_supplementaire',
+        ],
+        'telegraf' => [
+            'telegraf_output_url' => 'telegraf_url',
+            'telegraf_output_org' => 'telegraf_organisation',
+            'telegraf_output_bucket' => 'telegraf_seau',
+            'telegraf_inputs' => 'telegraf_entrees',
+            'hostname_pattern' => 'motif_nom',
+            'extra_config' => 'config_supplementaire',
+        ],
+    ];
+
     public function __construct(private Supervision $supervision)
     {
     }
@@ -39,6 +87,15 @@ class SupervisionController extends Controller
             'plateformes' => $this->supervision->plateformes(),
             'machines' => $this->supervision->machines(),
             'profils' => $this->supervision->profilsParPlateforme(),
+            'configuration' => $this->supervision->configurationParPlateforme(),
+            /*
+             * Les champs a rendre, PAR PLATEFORME. Une liste explicite plutot
+             * qu'un parcours des colonnes : `supervision_config` porte les
+             * colonnes des QUATRE plateformes sur la meme ligne, et les afficher
+             * toutes ferait lire a un exploitant de Centreon des reglages Zabbix
+             * qui ne s'appliquent pas a lui.
+             */
+            'champs' => self::CHAMPS_PAR_PLATEFORME,
             'libelles' => $this->libelles(),
         ]);
     }

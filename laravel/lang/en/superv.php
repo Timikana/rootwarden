@@ -26,6 +26,39 @@ return [
     'config_titre' => 'Agent template configuration',
     'config_description' => 'These settings act as a template for every deployment. Each server may carry its own values.',
 
+    // ── The global configuration, sub-lot V3 (read-only) ─────────────────
+    'config_aucune' => 'No global configuration recorded',
+    'config_aucune_aide' => 'No global configuration is recorded for :plateforme. The agent template defaults will apply on the next deployment.',
+    // THERE IS NO SUCH THING AS "THE" GLOBAL CONFIGURATION: the table carries no
+    // uniqueness constraint on the platform, and both portals read the row with
+    // the highest id. Say it, rather than implying a single record.
+    'config_plus_recente' => 'Several configurations may coexist for one platform: the most recently recorded one applies, and that is the one shown here.',
+    'champ_vide' => 'Not set',
+    'champ_type_agent' => 'Agent type',
+    'champ_version_agent' => 'Agent version',
+    'champ_serveur' => 'Server',
+    'champ_serveur_actif' => 'Active server',
+    'champ_port' => 'Listen port',
+    'champ_motif_nom' => 'Hostname pattern',
+    'champ_tls_connexion' => 'TLS connect',
+    'champ_tls_acceptation' => 'TLS accept',
+    'champ_psk_identite' => 'PSK identity',
+    'champ_psk_valeur' => 'PSK key',
+    'champ_metadonnees' => 'Host metadata template',
+    'champ_config_supplementaire' => 'Extra lines',
+    'champ_centreon_hote' => 'Centreon host',
+    'champ_centreon_port' => 'Centreon port',
+    'champ_prometheus_ecoute' => 'Listen address',
+    'champ_prometheus_collecteurs' => 'Collectors',
+    'champ_telegraf_url' => 'Output URL',
+    'champ_telegraf_organisation' => 'Organisation',
+    'champ_telegraf_seau' => 'Bucket',
+    'champ_telegraf_entrees' => 'Inputs',
+    'champ_telegraf_jeton' => 'Output token',
+    'secret_pose' => 'Set',
+    'secret_absent' => 'Not set',
+    'secret_jamais_affiche' => 'The value stays in the database: this portal does not read it.',
+
     'profils_titre' => 'Monitoring profiles',
     // ── The catalogue, sub-lot V2 (read-only) ─────────────────────────────
     'profil_nom' => 'Name',

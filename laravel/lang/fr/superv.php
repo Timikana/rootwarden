@@ -26,6 +26,39 @@ return [
     'config_titre' => 'Configuration du modele d\'agent',
     'config_description' => 'Ces parametres servent de modele a tous les deploiements. Chaque serveur peut porter ses propres valeurs.',
 
+    // ── La configuration globale, sous-lot V3 (lecture seule) ────────────
+    'config_aucune' => 'Aucune configuration globale enregistree',
+    'config_aucune_aide' => 'Aucune configuration globale n\'est enregistree pour :plateforme. Les valeurs par defaut du modele d\'agent s\'appliqueront au prochain deploiement.',
+    // « LA » CONFIGURATION GLOBALE N'EXISTE PAS : la table n'a aucune contrainte
+    // d'unicite sur la plateforme, et les deux portails lisent la ligne d'`id` le
+    // plus grand. Le dire, plutot que de laisser croire a un enregistrement unique.
+    'config_plus_recente' => 'Plusieurs configurations peuvent coexister pour une meme plateforme : c\'est la plus recemment enregistree qui s\'applique, et c\'est celle affichee ici.',
+    'champ_vide' => 'Non renseigne',
+    'champ_type_agent' => 'Type d\'agent',
+    'champ_version_agent' => 'Version de l\'agent',
+    'champ_serveur' => 'Serveur',
+    'champ_serveur_actif' => 'Serveur actif',
+    'champ_port' => 'Port d\'ecoute',
+    'champ_motif_nom' => 'Motif du nom d\'hote',
+    'champ_tls_connexion' => 'TLS en connexion',
+    'champ_tls_acceptation' => 'TLS en acceptation',
+    'champ_psk_identite' => 'Identite PSK',
+    'champ_psk_valeur' => 'Cle PSK',
+    'champ_metadonnees' => 'Modele de metadonnees d\'hote',
+    'champ_config_supplementaire' => 'Lignes supplementaires',
+    'champ_centreon_hote' => 'Hote Centreon',
+    'champ_centreon_port' => 'Port Centreon',
+    'champ_prometheus_ecoute' => 'Adresse d\'ecoute',
+    'champ_prometheus_collecteurs' => 'Collecteurs',
+    'champ_telegraf_url' => 'URL de sortie',
+    'champ_telegraf_organisation' => 'Organisation',
+    'champ_telegraf_seau' => 'Seau',
+    'champ_telegraf_entrees' => 'Entrees',
+    'champ_telegraf_jeton' => 'Jeton de sortie',
+    'secret_pose' => 'Defini',
+    'secret_absent' => 'Non defini',
+    'secret_jamais_affiche' => 'La valeur reste en base : ce portail ne la lit pas.',
+
     'profils_titre' => 'Profils de supervision',
     // ── Le catalogue, sous-lot V2 (lecture seule) ─────────────────────────
     'profil_nom' => 'Nom',

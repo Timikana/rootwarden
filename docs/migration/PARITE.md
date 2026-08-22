@@ -2367,3 +2367,70 @@ profil, où elle décrivait un contenu absent — elle est désormais dans la br
 **Non porté, et dit tel quel** : la création, la modification et la suppression d'un profil, ainsi que
 son assignation à une machine (V5). Le panneau le dit et mène à l'ancien portail. `notes` n'est affiché
 par aucun des deux portails hors de la boîte de modification : il reste donc hors de V2.
+
+## E-75 — « La » configuration globale n'existe pas : c'est la plus récente. Et un `UPDATE` sans `WHERE platform`
+
+**Module `supervision/`, sous-lot V3 : la configuration globale, en lecture.** Suite :
+`tests/e2e/go-page-supervision-config.mjs` — **15 PASS sur le legacy, 17 sur le portage**.
+
+**LA TABLE EST VIDE, ET C'EST LA PREMIÈRE MESURE.** `supervision_config` ne porte **aucune ligne**, pour
+aucune des quatre plateformes. Un sous-lot de lecture sur une table vide ne mesurerait qu'un écran
+d'absence : la suite pose donc une **fixture**, nettoyée à l'entrée et dans un `finally`, et elle
+**annonce l'état restauré**. Vérifié avant de l'écrire : `backend/scheduler.py` ne lit **jamais**
+`supervision_config` (zéro occurrence) — seuls un déploiement ou une reconfiguration la lisent, et
+aucun des deux ne part sans un clic. La fixture n'arme donc aucun déclencheur.
+
+**AUCUNE CONTRAINTE D'UNICITÉ SUR `platform`.** La clé primaire est `id` seul. Or `_get_global_config()`
+(`supervision.py:132`) et la page legacy lisent tous deux `ORDER BY id DESC LIMIT 1` : « la »
+configuration globale d'une plateforme est en réalité **la plus récemment enregistrée**, et rien
+n'empêche d'en accumuler. Ce n'est pas la même chose. **Mesuré** : la suite pose **deux** lignes Zabbix
+et vérifie que c'est la seconde qui s'affiche — sur les deux portails. Le portage reproduit ce choix,
+parce que le corriger serait une migration, mais il le **nomme** à l'écran plutôt que de laisser croire à
+un enregistrement unique.
+
+**UN `UPDATE` SANS `WHERE platform`, et c'est le défaut que V4 devra corriger.** `supervision.py:508`
+fait `SELECT id, tls_psk_value FROM supervision_config ORDER BY id DESC LIMIT 1` — **sans filtre de
+plateforme** — puis `UPDATE ... WHERE id = %s`. Enregistrer le formulaire Zabbix peut donc écraser une
+ligne **Centreon** si celle-ci est la plus récente. Localisé par lecture, non exercé : V3 est en lecture,
+et l'exercer voudrait dire écrire. À corriger en V4.
+
+**LE SECRET NE FUIT PAS — mesuré, et c'est une bonne nouvelle qu'il faut dire telle quelle.** La
+suspicion portée par le suivi de chantier était que `tls_psk_value` pouvait sortir en clair. **Faux** :
+le legacy rend `'********'` dans son `<input type="password">`, et la valeur réelle posée en fixture
+(`rw-e2e-v3-PSK-…`) **n'apparaît nulle part dans le source servi** — recherche faite dans
+`page.content()`, pas dans le texte visible, précisément parce qu'un attribut peut porter autre chose que
+ce que l'œil lit. Le backend est correct lui aussi : `POST /supervision/config` refuse d'écrire
+`'********'` par-dessus le vrai PSK (`if psk_value == '********' or not psk_value: psk_final =
+existing[...]`).
+
+**Le portage va plus loin, structurellement : il ne LIT pas les deux secrets.**
+`configurationParPlateforme()` ne sélectionne ni `tls_psk_value` ni `telegraf_output_token` — elle rend
+deux **booléens** de présence. Masquer une valeur déjà chargée la laisse en mémoire, dans la vue, et à
+portée du premier gabarit qui l'affichera par mégarde ; ne pas la lire ferme la question.
+
+**Une asymétrie du legacy, mesurée deux fois.** La configuration **Zabbix** est rendue côté serveur
+(`$globalConfig` dans `index.php`) ; les **trois autres** sont rendues avec des valeurs par défaut en dur
+puis remplies par un appel client `GET /supervision/config/<plateforme>` (`main.js:159`). Deux chemins
+pour une même donnée, et **3 requêtes** mesurées à la bascule vers Centreon. Le portage peint les quatre
+côté serveur : **0 appel**.
+
+**Un défaut latent, dit avec ses deux moitiés.** `GET /supervision/config` (`supervision.py:455`) masque
+`tls_psk_value` mais **pas** `telegraf_output_token`, alors que sa voisine par plateforme
+(`supervision.py:1602`) masque les deux — un garde posé sur une sonde et pas sur l'autre. En pratique
+cette route ne lit que la ligne `zabbix`, où la colonne du jeton est normalement `NULL`, donc **la fuite
+n'est pas vive** : elle est à un enregistrement de l'être. Le seul appelant est
+`legacy/adm/health_check.php`. Non corrigé — c'est du backend.
+
+**Deux défauts d'affichage vus À L'IMAGE.** `.rw-tableau` ne stylait que les `th` du `thead` : un
+`th scope="row"` retombait sur le défaut du navigateur — **centré** — et sur une colonne de 690 px
+l'étiquette se retrouvait au milieu du vide, à l'autre bout de la valeur qu'elle nomme. Puis, le
+correctif appliqué, **à 390 px l'étiquette en `nowrap` prenait 215 des 350 px disponibles et repoussait
+la VALEUR hors du cadre** : on gardait le mot et on perdait la donnée. Elle se replie désormais sous
+700 px. Aucune assertion DOM ne voyait ni l'un ni l'autre.
+
+**Non affiché délibérément** : `updated_at` et `updated_by`. `updated_at` est écrit par MySQL, donc dans
+le fuseau du conteneur de base, et l'afficher ferait entrer dans cette page le décalage déclaré en
+**E-73**. V3 montre la configuration, pas sa piste d'audit.
+
+**Non porté, et dit tel quel** : l'écriture de la configuration (V4), qui corrigera le `WHERE platform`
+manquant. Le panneau le dit et mène à l'ancien portail.
