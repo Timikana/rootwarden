@@ -38,6 +38,33 @@ bp = Blueprint('supervision', __name__)
 _VERSION_RE = re.compile(r'^\d+\.\d+(\.\d+)?$')
 _BACKUP_NAME_RE = re.compile(r'^[\w.-]+\.bak\.\d{8}_\d{6}$')
 _SAFE_PARAM_RE = re.compile(r'^[a-zA-Z0-9_.:-]+$')
+
+# CORRECTIF v1.37.41 - LA VALEUR D'UN OVERRIDE N'ETAIT PAS VALIDEE.
+#
+# `_SAFE_PARAM_RE` ne porte que sur le NOM du parametre. La valeur, elle, partait
+# en `f"{key}={value}\n"` puis en base64, ajoutee au fichier de configuration :
+# une valeur portant un saut de ligne produisait donc UNE DIRECTIVE AUTONOME, que
+# personne n'avait demandee par aucun parametre nomme.
+#
+# Mesure du 2026-08-22 sur Test-Server-Debian, charge deliberement inoffensive.
+# `POST /supervision/overrides/2` avec {"Timeout": "3\nLIGNE_INJECTEE=temoin"} a
+# ete accepte (saut de ligne 0A retenu en base), et la reconfiguration a ecrit :
+#
+#     7  Timeout=3
+#     8  LIGNE_INJECTEE_PAR_LA_MESURE=temoin      <- directive autonome
+#
+# Sur un agent Zabbix reel, cette ligne peut etre un `UserParameter` - donc
+# l'execution d'une commande arbitraire par l'agent, sur la machine supervisee.
+# La route d'ecriture est atteignable par tout role 2 portant
+# `can_manage_supervision`, sans etre administrateur du portail. Voir
+# docs/migration/PARITE.md, E-85.
+#
+# Une valeur de configuration agent tient sur UNE ligne : le motif refuse donc
+# tout caractere de controle, saut de ligne compris. Il est applique DEUX FOIS -
+# a l'ecriture ET a la relecture - parce que la base peut deja contenir des
+# lignes posees avant ce correctif, et qu'une validation qui ne protege que le
+# chemin d'entree laisse le fichier a la merci de l'historique.
+_SAFE_VALUE_RE = re.compile(r'^[^\x00-\x1f\x7f]*$')
 _VALID_PLATFORMS = {'zabbix', 'centreon', 'prometheus', 'telegraf'}
 _SAFE_HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9._-]+$')
 
@@ -255,7 +282,15 @@ def _build_config_lines(global_cfg, machine_row, overrides=None, profile=None):
             continue
         if not _SAFE_PARAM_RE.match(key):
             continue  # cle invalide (anti-injection)
-        lines[key] = _interpolate(value, machine_row)
+        valeur = _interpolate(value, machine_row)
+        if not isinstance(valeur, str) or not _SAFE_VALUE_RE.match(valeur):
+            # Une valeur multiligne produirait une directive supplementaire : on
+            # la refuse ICI AUSSI, pour les lignes posees avant le correctif.
+            logger.warning(
+                "Override refuse a la relecture (valeur non conforme) : machine=%s cle=%s",
+                machine_row.get('id'), key)
+            continue
+        lines[key] = valeur
 
     return lines
 
@@ -1131,20 +1166,45 @@ def save_overrides(machine_id):
     data = request.get_json(silent=True) or {}
     overrides = data.get('overrides', {})
 
+    # UN REFUS SILENCIEUX N'EST PAS UN REFUS. Avant ce correctif, un nom de
+    # parametre invalide etait simplement saute : l'appelant recevait
+    # « Overrides sauvegardes » et croyait avoir enregistre ce qu'il venait
+    # d'ecrire. Les entrees refusees sont desormais NOMMEES dans la reponse.
+    refuses = []
+    retenus = {}
+    for param, value in overrides.items():
+        texte = str(value)
+        if not _SAFE_PARAM_RE.match(str(param)):
+            refuses.append({'param': str(param)[:100], 'raison': 'nom invalide'})
+            continue
+        if not _SAFE_VALUE_RE.match(texte):
+            # Le cas mesure : un saut de ligne dans la valeur produisait une
+            # directive autonome dans le fichier de configuration (E-85).
+            refuses.append({'param': str(param)[:100],
+                            'raison': 'valeur multiligne ou avec un caractere de controle'})
+            continue
+        retenus[str(param)] = texte
+
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
             # Supprimer les anciens
             cur.execute("DELETE FROM supervision_overrides WHERE machine_id = %s", (machine_id,))
             # Inserer les nouveaux
-            for param, value in overrides.items():
-                if not _SAFE_PARAM_RE.match(param):
-                    continue
+            for param, texte in retenus.items():
                 cur.execute(
                     "INSERT INTO supervision_overrides (machine_id, param_name, param_value) "
-                    "VALUES (%s, %s, %s)", (machine_id, param, str(value)))
+                    "VALUES (%s, %s, %s)", (machine_id, param, texte))
             conn.commit()
-        return jsonify({'success': True, 'message': 'Overrides sauvegardes'})
+
+        if refuses:
+            return jsonify({
+                'success': True, 'saved': len(retenus), 'rejected': refuses,
+                'message': f'{len(retenus)} override(s) enregistre(s), {len(refuses)} refuse(s).',
+            })
+
+        return jsonify({'success': True, 'saved': len(retenus), 'rejected': [],
+                        'message': 'Overrides sauvegardes'})
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
