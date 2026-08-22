@@ -592,6 +592,37 @@ defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails es
 faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
 declenche rien trop tot). Voir `PARITE.md` E-73.
 
+## CLIQUER LE BOUTON, PAS APPELER LA FONCTION
+
+`page.evaluate(() => saveProfile())` prouve que la fonction marche. Ca ne prouve
+PAS que le bouton l'atteint. Un bouton non cable, cable au mauvais gestionnaire,
+ou recouvert par un autre element est **invisible** a un appel de fonction — et
+cette famille a deja coute cher : un bouton deplace faisait cliquer « Refuser et
+se deconnecter » au lieu d'« Accepter ».
+
+**Partir de la DONNEE AFFICHEE et descendre jusqu'au bouton de SA ligne** :
+```js
+const ligne = [...bloc.querySelectorAll('tr')].find(tr => tr.innerText.includes(nom));
+const bouton = ligne.querySelector('[data-rw^="superv-profil-modifier-"]')
+            || ligne.querySelector('[onclick*="editProfile"]');
+```
+Cela verifie en plus qu'un bouton agit sur la ligne ou il se trouve — un `onclick`
+qui porterait le mauvais identifiant passerait toute autre mesure. Sur le legacy on
+vise l'`onclick` et non le libelle : un libelle traduit casse la mesure en anglais,
+et c'est justement le cablage qu'on eprouve.
+
+**Et le clic peut NAVIGUER.** Un « Modifier » rendu cote serveur (`?profil=<id>`)
+navigue, et une navigation DETRUIT le contexte d'execution : un `page.evaluate` qui
+clique puis lit ne rend jamais. Trois temps : cliquer, attendre une navigation
+EVENTUELLE dehors (`waitForNavigation` dans un `try`), puis remplir.
+
+## Un refus peut vivre HORS du document
+
+`alert()` et `confirm()` ne sont pas dans le DOM : `innerText` ne les voit pas, et
+une suite qui cherche le message dans la page declare « non enonce » un refus
+parfaitement affiche. Joindre les messages des dialogues au texte cherche — et
+compter leur ouverture a part, car c'est elle-meme un ecart.
+
 ## Un champ de TEXTE LIBRE par-dessus une colonne `enum`
 
 `supervision_config.tls_connect` est un `enum('unencrypted','psk','cert')`. Un

@@ -76,6 +76,23 @@
         });
     }
 
+    /* ── Les panneaux de decision, ouverts sous leur ligne ──────────────────
+     * Une suppression de profil est destructrice : elle emporte les assignations
+     * (`ON DELETE CASCADE`). La decision se prend DONC dans la page, sous la ligne
+     * concernee — une boite native recouvre precisement la ligne sur laquelle on
+     * decide, ne se style pas, et bloque le test qui doit mener le geste au bout.
+     *
+     * Le bouton NOMME sa cible par `data-cible` : pas de selecteur derive du
+     * `data-rw`, qui attraperait ce qu'un sous-lot suivant ajoutera.
+     */
+    [].slice.call(document.querySelectorAll('[data-cible]')).forEach(function (bouton) {
+        bouton.addEventListener('click', function () {
+            var panneau = document.getElementById(bouton.dataset.cible);
+            if (! panneau) { return; }
+            panneau.hidden = ! panneau.hidden;
+        });
+    });
+
     /* ── Le garde de l'editeur ──────────────────────────────────────────────
      * LE SEUL GESTE DE V1. Sans serveur choisi, il refuse — DANS la page, avec
      * une phrase traduite, et sans joindre quoi que ce soit. Cote legacy, ce

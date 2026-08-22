@@ -2514,3 +2514,87 @@ portail.
 
 **Non corrigé — c'est du backend** : le `WHERE platform` manquant de `:508` reste en place pour tout
 appelant du legacy. Le portage ne passe simplement plus par là.
+
+## E-77 — Le CRUD des profils : sept chaînes en dur, deux boîtes natives, et deux mesures qui DÉDOUANENT
+
+**Module `supervision/`, sous-lot V5 : créer, modifier et supprimer un profil.** Suite :
+`tests/e2e/go-page-supervision-profils-crud.mjs` — **16 PASS sur le legacy, 19 sur le portage** (base
+rouge relevée avant portage : **10 PASS / 9 FAIL**).
+
+**DEUX FAITS MESURÉS QUI EXONÈRENT LE CODE EXISTANT, et il faut le dire aussi clairement qu'une
+accusation.**
+
+1. **`upsert_profile` porte bien `WHERE id=%s AND platform=%s`** (`supervision.py:1780`). Le défaut mesuré
+   en V4 — un `UPDATE` dérivé d'un `SELECT ... ORDER BY id DESC LIMIT 1` **sans** filtre de plateforme —
+   **n'est pas généralisé**. C'est une route particulière qui l'a, pas une habitude du module.
+2. **La contrainte d'unicité EXISTE** : `UNIQUE KEY uk_platform_name (platform, name)`, lue au
+   `SHOW CREATE TABLE`. Le message d'erreur du backend doute de lui-même — « nom déjà pris **?** », avec
+   un point d'interrogation — mais il a raison sur le fond. Deux profils homonymes ne peuvent pas
+   coexister sur une même plateforme, donc l'assignation n'est pas ambiguë. Le point d'interrogation
+   était une hésitation de rédaction, pas un trou. Au passage : la contrainte porte sur le **couple**,
+   donc deux profils de même nom sur deux plateformes différentes sont légitimes — et c'est voulu.
+
+**TOUT EST MESURÉ AU CLIC, PAS PAR APPEL DE FONCTION — et c'est une correction de méthode.** La première
+version de la suite déclenchait le legacy par `saveProfile()`, `editProfile()`, `deleteProfile()`. Cela
+prouve que la fonction marche ; cela ne prouve pas que **le bouton l'atteint**. Un bouton non câblé, câblé
+au mauvais gestionnaire, ou recouvert par un autre élément est **invisible** à un appel de fonction — et
+cette famille de défaut a déjà coûté cher ici : un bouton déplacé faisait cliquer « Refuser et se
+déconnecter » au lieu d'« Accepter ». La suite part désormais du **nom affiché** dans le tableau, descend
+jusqu'au bouton de **sa** ligne, et clique. Cela vérifie en outre qu'un bouton agit sur la ligne où il se
+trouve, ce qu'aucune autre mesure n'attrape si un `onclick` porte le mauvais identifiant.
+
+**SEPT CHAÎNES FRANÇAISES ÉCRITES EN DUR dans `profiles.js`** — invisibles à tout contrôle d'i18n, qui
+cherche des identifiants `module.cle` et la parité des jeux de clés, pas du français parfaitement
+lisible : `Editer` (`:43`), `Supprimer` (`:45`), `Nouveau profil` (`:60`), `Editer profil : ` (`:79`),
+`Le nom est obligatoire.` (`:96`), le texte entier du `confirm` de suppression (`:111`) et
+`Erreur reseau` (`:105`, `:118`). Mesuré en anglais : le catalogue rend **`Editer`, `Supprimer`,
+`Nouveau profil`** en français.
+
+**DEUX BOÎTES NATIVES, dont une TROISIÈME confirmation non répertoriée.** Mesuré : un `alert()` — « Erreur
+interne (nom deja pris ?) » — et un `confirm()` : « Supprimer le profil "…" ? Les serveurs assignés
+perdront leur profil. » Ce `confirm` n'est **ni `confirm_deploy` ni `confirm_uninstall`** : c'est une
+troisième confirmation native, absente des douze clés cassées — et pour cause, elle n'utilise même pas le
+catalogue. La convention du portage les interdit toutes deux : elles recouvrent la ligne sur laquelle on
+décide, ne se stylent pas, et bloquent le test qui doit mener le geste au bout.
+
+**DIX ATTRIBUTS `onclick` dans le catalogue, jusqu'à 671 caractères.** Le portage : **zéro**. « Modifier »
+y est une **adresse** — `?profil=<id>` — et le serveur pré-remplit le formulaire : l'enregistrement n'est
+jamais dans la page deux fois, ni dans un attribut de gestionnaire, et il n'y a aucun gabarit JavaScript.
+
+**LA CASCADE EST EXERCÉE, PAS DÉDUITE.** `machine_supervision_profile` est vide dans ce parc : la
+conséquence la plus lourde d'une suppression — les serveurs perdent leur profil — ne se mesurerait pas
+sans fixture. La suite pose une assignation sur la machine 2 (DEV, seule cible mutante autorisée),
+supprime le profil, et constate **0 assignation orpheline**. Le portage **annonce ce coût avant le
+geste**, dans le panneau de décision et chiffré (« :machines serveur(s) perdront ce profil ») ; le legacy
+le dit dans un `confirm()` natif au texte français en dur.
+
+**Une propriété d'écriture a deux moitiés, ici encore** : la ligne visée a changé **et** le profil témoin
+— posé en base, pas par l'interface — n'a pas bougé. Vrai des deux côtés, puisque `upsert_profile` porte
+son filtre.
+
+**L'ASSIGNATION N'EST PAS PORTÉE, et c'est une décision, pas un oubli.** Son unique point d'entrée est le
+*dropdown* du tableau de déploiement (`profiles.js:loadDeployProfileSelectors`), que le portage ne porte
+pas encore. Côté legacy on choisit **un profil pour une machine** ; assigner depuis le catalogue
+inverserait la relation — on choisirait **des machines pour un profil** — et comme la clé primaire de
+`machine_supervision_profile` est `(machine_id, platform)`, une machine ne porte qu'un profil par
+plateforme : l'inversion aurait l'effet non évident de **retirer la machine de son profil précédent**. Ce
+serait concevoir, pas migrer. La page dit donc où se fait l'assignation, et la colonne « Machines » du
+catalogue rend l'absence visible plutôt que muette.
+
+**Ce qui reste au backend, et attend une décision** : les quatre routes de profils (`1734`, `1760`,
+`1801`, `1817`) portent `@require_permission` mais **aucun `@require_role`**, alors que la cinquième
+(`machines/<mid>/profile`, `1846`) porte `@require_role(2)` avec un commentaire « Patch A01 » — le
+correctif a été appliqué à une route et pas à ses quatre voisines. Et `/supervision/` reste absent de
+`$ADMIN_ONLY_PREFIXES`. Le portage écrit en base derrière la garde de la page, donc **chez lui la
+permission garde enfin la requête** ; le legacy, lui, reste tel quel.
+
+**Deux mesures fausses de ma suite, corrigées.** Le refus du doublon était déclaré « non énoncé » alors
+qu'il l'était : le legacy le passe à `alert()`, **hors du document**, donc invisible à `innerText` — les
+boîtes natives sont désormais jointes au texte cherché, et leur ouverture reste un écart mesuré à part.
+Et le geste de modification était écrit en un seul `page.evaluate` : côté portage « Modifier » **navigue**,
+et une navigation détruit le contexte d'exécution. Le geste se fait maintenant en trois temps — cliquer,
+attendre une navigation *éventuelle* dehors, puis remplir et enregistrer — ce qui marche pour la boîte de
+dialogue du legacy comme pour l'adresse du portage.
+
+**Un défaut d'affichage vu À L'IMAGE** : le titre du formulaire se collait au dernier paragraphe du
+catalogue, et les deux se lisaient d'un bloc. Le formulaire porte désormais un séparateur (`.rw-note`).

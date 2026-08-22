@@ -53,6 +53,103 @@ class Supervision
     }
 
     /**
+     * Un profil precis, ou null — sous-lot V5, pour pre-remplir le formulaire.
+     *
+     * PRE-REMPLIR COTE SERVEUR PLUTOT QUE PORTER L'ENREGISTREMENT DANS LE DOM.
+     * Le legacy serialise le profil ENTIER dans un attribut `onclick`
+     * (652 et 671 caracteres mesures, `notes` d'exploitation comprise). Ici,
+     * modifier un profil est une ADRESSE : `?profil=<id>`, et le formulaire arrive
+     * rempli par le serveur. L'enregistrement n'est donc jamais dans la page deux
+     * fois, et jamais dans un attribut de gestionnaire.
+     */
+    public function profil(int $id): ?object
+    {
+        return DB::table('supervision_metadata_profiles')
+            ->select('id', 'platform', 'name', 'description', 'host_metadata',
+                     'zabbix_server', 'zabbix_server_active', 'zabbix_proxy',
+                     'listen_port', 'notes')
+            ->where('id', $id)
+            ->first();
+    }
+
+    /**
+     * Cree ou met a jour un profil — sous-lot V5.
+     *
+     * LE DOUBLON EST REFUSE PAR LA BASE, PAS PAR UNE POLITESSE D'INTERFACE.
+     * `supervision_metadata_profiles` porte `UNIQUE KEY uk_platform_name
+     * (platform, name)` — verifie au schema, pas suppose : le message du backend
+     * doute de lui-meme (« nom deja pris ? ») mais il a raison. On tente donc
+     * l'ecriture et on RATTRAPE la violation, au lieu de la devancer par un
+     * `SELECT` : entre les deux, un autre enregistrement peut passer.
+     *
+     * @param  array<string,mixed>  $valeurs
+     * @return 'ok'|'doublon'|'inconnu'
+     */
+    public function enregistreProfil(string $plateforme, array $valeurs, ?int $id): string
+    {
+        if (! in_array($plateforme, $this->plateformes(), true)) {
+            return 'inconnu';
+        }
+
+        try {
+            if ($id === null) {
+                $valeurs['platform'] = $plateforme;
+                DB::table('supervision_metadata_profiles')->insert($valeurs);
+
+                return 'ok';
+            }
+
+            // La plateforme est dans le filtre, comme pour la configuration : un
+            // `id` suffirait, mais une relecture doit constater le cloisonnement
+            // sans remonter a la requete qui a choisi cet `id`.
+            $touchees = DB::table('supervision_metadata_profiles')
+                ->where('id', $id)
+                ->where('platform', $plateforme)
+                ->update($valeurs);
+
+            return $touchees > 0 ? 'ok' : 'inconnu';
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 23000 : violation de contrainte d'integrite — ici, l'unicite du
+            // couple (plateforme, nom). Toute autre erreur remonte.
+            if ($e->getCode() === '23000') {
+                return 'doublon';
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Supprime un profil — sous-lot V5. GESTE DESTRUCTEUR.
+     *
+     * `fk_msp_profile` porte un `ON DELETE CASCADE` VERIFIE au schema : supprimer
+     * un profil emporte ses assignations, donc les serveurs concernes retombent
+     * sur la configuration globale au prochain deploiement. Ce n'est pas un effet
+     * de bord, c'est l'effet — et il doit etre annonce AVANT le geste, pas
+     * constate apres.
+     *
+     * @return int nombre de lignes supprimees
+     */
+    public function supprimeProfil(int $id, string $plateforme): int
+    {
+        if (! in_array($plateforme, $this->plateformes(), true)) {
+            return 0;
+        }
+
+        return DB::table('supervision_metadata_profiles')
+            ->where('id', $id)
+            ->where('platform', $plateforme)
+            ->delete();
+    }
+
+    /** Combien de machines perdraient leur profil si celui-ci disparaissait. */
+    public function machinesAssignees(int $idProfil): int
+    {
+        return DB::table('machine_supervision_profile')
+            ->where('profile_id', $idProfil)
+            ->count();
+    }
+
+    /**
      * Enregistre la configuration globale d'UNE plateforme — sous-lot V4.
      *
      * `WHERE platform = ?` — ET C'EST TOUT LE SUJET. Le backend

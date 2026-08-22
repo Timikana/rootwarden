@@ -139,6 +139,33 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:2', 'perm:can_manage_supervision'])
         ->name('supervision.configuration');
 
+    /*
+     * Profils de supervision : creation, modification, suppression — sous-lot V5.
+     *
+     * MEME GARDE QUE LA PAGE : `role:2` + `perm:can_manage_supervision`. C'est la
+     * difference avec le legacy, et elle est nette : ses quatre routes de profils
+     * (`supervision.py` 1734, 1760, 1801, 1817) portent `@require_permission` mais
+     * **aucun `@require_role`** — la cinquieme, `machines/<mid>/profile`, porte bien
+     * `@require_role(2)` avec un commentaire « Patch A01 ». Le correctif a ete
+     * applique a UNE route et pas a ses quatre voisines. Et `/supervision/` est
+     * absent des 25 prefixes de `$ADMIN_ONLY_PREFIXES` du proxy legacy.
+     * Ici, l'ecriture se fait en base derriere cette garde : la permission garde
+     * enfin la REQUETE et plus seulement la PAGE. Poser `@require_role(2)` sur les
+     * quatre routes backend reste une decision d'exploitant — declaree en PARITE,
+     * pas prise ici.
+     *
+     * LA SUPPRESSION EST DESTRUCTRICE : `ON DELETE CASCADE` (verifie au schema)
+     * emporte les assignations, donc les serveurs concernes retombent sur la
+     * configuration globale.
+     */
+    Route::post('/supervision/profils', [SupervisionController::class, 'enregistrerProfil'])
+        ->middleware(['role:2', 'perm:can_manage_supervision'])
+        ->name('supervision.profils.enregistrer');
+
+    Route::post('/supervision/profils/supprimer', [SupervisionController::class, 'supprimerProfil'])
+        ->middleware(['role:2', 'perm:can_manage_supervision'])
+        ->name('supervision.profils.supprimer');
+
     Route::get('/derive-config', DeriveConfigController::class)
         ->middleware(['role:2', 'perm:can_view_compliance'])
         ->name('derive-config');
