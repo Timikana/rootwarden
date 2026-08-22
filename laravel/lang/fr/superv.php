@@ -178,7 +178,23 @@ return [
     // UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE VOIE : le tableau du
     // parc est porte depuis V6, la phrase qui l'annoncait « pour plus tard » ne
     // l'etait plus. Vu a l'image.
-    'a_venir_deploiement' => "Installer, reconfigurer et desinstaller un agent, ainsi que le releve de tout le parc en une fois, arrivent avec les sous-lots suivants : ces gestes MODIFIENT les serveurs, et le releve du parc entier demande d'etre reconcu en tache de fond. En attendant, ils restent sur l'ancien portail.",
+    'a_venir_deploiement' => "Installer, reconfigurer et desinstaller un agent arrivent avec les sous-lots suivants : ces gestes MODIFIENT les serveurs. En attendant, ils restent sur l'ancien portail.",
     'a_venir_editeur' => 'La lecture et l\'ecriture du fichier distant arrivent avec les sous-lots suivants. En attendant, elles restent sur l\'ancien portail.',
     'vers_legacy' => 'Ouvrir sur l\'ancien portail',
+
+    // ── Sous-lot V8 : le releve du parc en tache de fond ──────────────────
+    'releve_titre' => 'Relever les agents de tout le parc',
+    'releve_description' => "Interroge chaque serveur pour savoir quels agents de supervision y sont installes, et en quelle version. C'est une LECTURE : rien n'est installe, rien n'est reconfigure, rien n'est redemarre. Le releve part en tache de fond et son avancement se suit dans le centre de taches.",
+    'releve_bouton' => 'Relever le parc',
+    'releve_cout' => ':machines machine(s), :plateformes plateforme(s), :sessions session(s) SSH — une par machine, pas une par plateforme.',
+    'releve_production' => 'Machines de PRODUCTION concernees : :machines.',
+    'releve_aide_fond' => "Le releve ne bloque pas cette page : la reponse est immediate et le balayage continue en arriere-plan, un serveur apres l'autre.",
+    'releve_annuler' => 'Annuler',
+    'releve_confirmer' => 'Lancer le releve',
+    'releve_en_cours' => 'Mise en file du releve...',
+    'releve_lance' => 'Releve lance sur :machines machine(s) — tache n° :tache.',
+    'releve_aucune' => 'Aucune machine a relever.',
+    'releve_refus' => 'Releve refuse (statut :statut).',
+    'releve_echec' => "Le releve n'a pas pu etre lance.",
+    'releve_voir_taches' => 'Suivre dans le centre de taches',
 ];

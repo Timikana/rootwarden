@@ -454,6 +454,55 @@ piège** pour le jour où l'on supprimera la règle statique en la prenant pour 
 les trois options — ne pas porter, tâche de fond, séquentiel borné — **joignent toutes la production**,
 puisque le parc est « toutes les machines non archivées ». Reconcevoir change la charge, pas la cible.
 
+## 7 duodecies. V8 porté — le relevé de parc devient une tâche de fond (2026-08-22)
+
+L'exploitant a tranché pour la **tâche de fond**, avec autorisation explicite d'écrire la route backend
+manquante. L'écart signalé — cette option joint la production en usage réel — a été redit avant de
+commencer, et la décision maintenue. Suite `go-page-supervision-releve` : base rouge **3 PASS / 4 FAIL**,
+puis **28 PASS** sur le portage et **11** sur le legacy. Plus **12 tests backend** (308 pytest en tout).
+Détail en `PARITE.md` E-82.
+
+**PREMIÈRE ROUTE PYTHON ÉCRITE PENDANT CETTE MIGRATION** : `POST /supervision/scan-all`. Réponse
+immédiate `{queued, background, task_id}`, puis un unique thread démon qui balaie le parc
+**séquentiellement**. Le pool partagé par toutes les routes `@threaded_route` n'est plus touché — c'était
+tout le problème. Motif aligné sur `/ssh-audit/scan-all`, y compris le helper `_spawn_scan_all_thread`
+isolé pour rester patchable sans stubber `threading.Thread` globalement.
+
+**UNE SESSION SSH PAR MACHINE, MESURÉE AU JOURNAL PARAMIKO** : un transport authentifié portant les canaux
+0 à 3, un par commande de version. Le parc passe de **12 sessions à 3**. Et une exonération au passage :
+l'échec `publickey` visible avant le mot de passe n'est pas un drapeau de compte de service périmé —
+`service_account_deployed = 0` pour cette machine, la base dit vrai.
+
+**LE COÛT S'ÉNONCE AVANT LE GESTE, ET LA PRODUCTION EST NOMMÉE.** Le bouton ouvre un panneau de décision
+rendu par le serveur : trois nombres, puis `Machines de PRODUCTION concernées : srv-zabbix.` Nommer plutôt
+que compter est le point. **Le corps de la requête est vide** : la portée vient du serveur, jamais d'une
+liste lue dans le tableau — le défaut même du legacy, dont la liste ne correspond plus à l'écran dès qu'on
+filtre.
+
+**COMMENT ON CLIQUE UN BOUTON QUI JOINDRAIT LA PRODUCTION.** La suite clique le vrai déclencheur puis le
+vrai bouton de confirmation, et **la requête est interceptée et avortée** : le geste est exercé de bout en
+bout, la requête est mesurée, aucune machine n'est jointe. Le contrat de mise en file se mesure à part, sur
+une portée explicite (`machine_ids: [2]`, DEV) : **200 en 230 ms**. Et le chemin « tout le parc », qu'aucun
+navigateur ne peut déclencher ici, est exercé par les tests backend avec le thread patché.
+
+**UN GARDE SANS OBJET NE GARDE RIEN.** `@require_machine_access` ne trouve aucun identifiant dans un corps
+vide — or ici le corps vide signifie *tout le parc*. Le parc implicite est donc filtré dans le handler par
+`check_machine_access`, et un test le prouve. Ce filtre ne retire rien aujourd'hui (rôle 2 requis), et
+c'est dit plutôt que sous-entendu.
+
+**AUCUNE NOTIFICATION, délibérément** : le modèle suivi (`ssh-audit`) en émet une par machine ; un relevé
+de version n'est ni une alerte ni un verdict. **Le privilège n'a pas été changé** : la lecture passe par
+`execute_as_root` comme les routes par machine — E-78 reste déclaré, un changement de droits ne se fait pas
+au détour d'un portage.
+
+**Deux défauts de mon portage, vus à l'image** : le coût s'affichait en vert de réussite dans un panneau à
+bordure rouge, et le bouton était à mille pixels de la phrase qui l'explique. **Un défaut de ma suite,
+trouvé par elle-même** : son nettoyage supprimait les tâches par TYPE, donc celles qu'elle n'avait pas
+créées.
+
+**Reste du module** : V9 (éditeur en écriture + restauration), V10 (reconfiguration), V11 (désinstallation),
+V12 (déploiement) — tous **modifient** ou **détruisent**.
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et

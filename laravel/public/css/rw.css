@@ -249,6 +249,23 @@ body {
     font-size: 14px;
 }
 
+/* LE TROISIEME ETAT, entre `.rw-erreur` et `.rw-confirmation`. Il ne dit ni
+   « c'est cassé » ni « c'est fait » : il previent d'un cout qu'on est en train
+   d'accepter. Sous-lot V8 : un releve de parc joint des machines de PRODUCTION,
+   et l'ecrire en rouge d'erreur ferait croire a une panne, en vert de reussite a
+   une confirmation. Memes dimensions que les deux autres, pour la meme raison :
+   les trois messages occupent la meme place et ne font pas sauter la mise en
+   page en se remplacant. */
+.rw-avertissement {
+    margin: 0 0 18px;
+    padding: 11px 13px;
+    border: 1px solid var(--rw-avertissement);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--rw-avertissement) 12%, transparent);
+    color: var(--rw-avertissement);
+    font-size: 14px;
+}
+
 .rw-note {
     margin: 22px 0 0;
     padding-top: 16px;

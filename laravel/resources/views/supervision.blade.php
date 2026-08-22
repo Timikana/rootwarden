@@ -428,6 +428,80 @@
                          qu'une session SSH en demande le double : le message a
                          disparu avant que son effet soit constatable. --}}
                     <p class="rw-annonce" data-rw="superv-version-message" aria-live="polite"></p>
+
+                    {{-- ══ SOUS-LOT V8 : le releve du parc, en tache de fond ══
+                         CE QUE LE LEGACY NE DIT PAS, ET QUE CE BLOC DIT.
+                         « Scanner tous les agents » y boucle sur toutes les lignes
+                         du tableau x quatre plateformes et lance TOUT en parallele.
+                         Mesure : le filtre de la table ne borne PAS ce releve —
+                         filtre sur un nom, une ligne visible, trois machines
+                         jointes, dont la production. Ici le cout est enonce AVANT
+                         le geste, par le SERVEUR, et la production est NOMMEE.
+
+                         LE BOUTON N'ENVOIE RIEN. Il ouvre un panneau de decision :
+                         pas de `confirm()` natif, qui recouvre precisement la ligne
+                         sur laquelle on decide, ne se style pas, et bloque le test
+                         au point de l'empecher de mener l'action au bout. --}}
+                    <section class="rw-note" data-rw="superv-releve-bloc">
+                        <h4 class="rw-sous-titre">{{ __('superv.releve_titre') }}</h4>
+                        <p class="rw-aide rw-prose">{{ __('superv.releve_description') }}</p>
+
+                        {{-- LE BOUTON RESTE AVEC SA PHRASE. La convention « action
+                             principale a droite » vaut pour un PIED DE FORMULAIRE,
+                             ou l'oeil descend une colonne de champs. Ici c'est une
+                             action unique attachee a une explication : vu a l'image
+                             sur 1920 px, la version alignee a droite laissait plus
+                             de mille pixels vides entre le texte et le bouton, et la
+                             chaine explication -> geste se rompait. --}}
+                        <div class="rw-actions">
+                            <div class="rw-actions__gauche">
+                                <button type="button" class="rw-bouton"
+                                        data-rw="superv-relever-parc">{{ __('superv.releve_bouton') }}</button>
+                            </div>
+                        </div>
+
+                        <div class="rw-panneau-decision" data-rw="superv-panneau-releve" hidden>
+                            <div class="rw-panneau-decision__texte">
+                                {{-- LE COUT, CHIFFRE. Trois nombres, tous venus du
+                                     serveur : machines, plateformes, sessions SSH.
+                                     Une session par machine et non une par
+                                     plateforme — c'est ce que la tache de fond
+                                     permet, et c'est mesure au journal paramiko. --}}
+                                {{-- NEUTRE, PAS VERT. Un premier jet rendait ce
+                                     chiffrage en `rw-confirmation`, donc en vert
+                                     de reussite, dans un panneau a bordure rouge :
+                                     vu a l'image, l'incoherence saute — le vert
+                                     invite a cliquer alors que la phrase enonce un
+                                     COUT. Aucune assertion DOM ne voit ca. --}}
+                                <p class="rw-encart" data-rw="superv-releve-cout">
+                                    {{ __('superv.releve_cout', [
+                                        'machines' => $coutReleve['machines'],
+                                        'plateformes' => $coutReleve['plateformes'],
+                                        'sessions' => $coutReleve['sessions'],
+                                    ]) }}
+                                </p>
+                                @if (count($coutReleve['production']) > 0)
+                                    {{-- NOMMER LA PRODUCTION, PAS LA COMPTER.
+                                         « 3 machines » ne previent personne ;
+                                         « dont srv-zabbix (PROD) » previent. --}}
+                                    <p class="rw-avertissement" data-rw="superv-releve-production">
+                                        {{ __('superv.releve_production', [
+                                            'machines' => implode(', ', $coutReleve['production']),
+                                        ]) }}
+                                    </p>
+                                @endif
+                                <p class="rw-aide rw-prose">{{ __('superv.releve_aide_fond') }}</p>
+                            </div>
+                            <div class="rw-panneau-decision__actions">
+                                <button type="button" class="rw-bouton rw-bouton--discret"
+                                        data-rw="superv-releve-annuler">{{ __('superv.releve_annuler') }}</button>
+                                <button type="button" class="rw-bouton"
+                                        data-rw="superv-releve-confirmer">{{ __('superv.releve_confirmer') }}</button>
+                            </div>
+                        </div>
+
+                        <p class="rw-annonce" data-rw="superv-releve-message" aria-live="polite"></p>
+                    </section>
                 @endif
 
                 <div class="rw-vide rw-note">

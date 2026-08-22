@@ -384,6 +384,55 @@ class Supervision
      *
      * @return list<object>
      */
+    /**
+     * CE QU'UN RELEVE DE PARC COUTE, CALCULE PAR LE SERVEUR — sous-lot V8.
+     *
+     * Le legacy ne dit rien de ce coût : son bouton « Scanner tous les agents »
+     * boucle sur toutes les lignes du tableau x quatre plateformes et lance tout
+     * en parallele. Mesure du 2026-08-22 : **le filtre de la table ne borne pas
+     * le releve**. Filtre saisi sur `Test-Server`, une seule ligne visible, et
+     * TROIS machines jointes — dont la production. Quelqu'un qui a reduit son
+     * tableau pour n'agir que sur une machine en touche trois sans le savoir.
+     *
+     * Ici le coût est enonce AVANT le geste, et il est enonce par la meme source
+     * que le tableau : le nombre de machines, le nombre de plateformes, le nombre
+     * de sessions SSH, et **le nom des machines de production qui seront
+     * jointes**. Nommer la production plutot que la compter est le point : « 3
+     * machines » ne previent personne, « dont srv-zabbix (PROD) » previent.
+     *
+     * @return array{machines: int, plateformes: int, sessions: int, production: list<string>}
+     */
+    public function coutDuReleve(): array
+    {
+        $machines = $this->machines();
+        $production = [];
+
+        foreach ($machines as $machine) {
+            /*
+             * Le critere est celui de la colonne, pas une liste d'identifiants
+             * ecrite ici : une machine promue en production doit apparaitre dans
+             * cet avertissement sans qu'on ait a y penser.
+             */
+            if (strtoupper((string) ($machine->environment ?? '')) === 'PROD') {
+                $production[] = (string) $machine->name;
+            }
+        }
+
+        return [
+            'machines' => count($machines),
+            'plateformes' => count($this->plateformes()),
+            /*
+             * UNE session SSH par machine, pas une par plateforme. C'est ce que
+             * le passage en tache de fond permet, et c'est MESURE : le journal
+             * paramiko d'un releve montre un transport authentifie unique
+             * portant les canaux 0 a 3, un par commande de version. Le legacy, en
+             * lancant quatre requetes, ouvre quatre sessions par machine.
+             */
+            'sessions' => count($machines),
+            'production' => $production,
+        ];
+    }
+
     public function machines(): array
     {
         return DB::table('machines')
