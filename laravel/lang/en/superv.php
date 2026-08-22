@@ -73,6 +73,38 @@ return [
     'profils_titre' => 'Monitoring profiles',
     // ── The catalogue, sub-lot V2 (read-only) ─────────────────────────────
     'profil_nom' => 'Name',
+    'profil_actions' => 'Actions',
+    // ── The CRUD, sub-lot V5 ──────────────────────────────────────────────
+    'champ_profil_nom' => 'Name',
+    'champ_profil_description' => 'Description',
+    'champ_profil_metadonnees' => 'HostMetadata',
+    'champ_profil_serveur' => 'Server',
+    'champ_profil_serveur_actif' => 'Active server',
+    'champ_profil_mandataire' => 'Proxy',
+    'champ_profil_port' => 'Listen port',
+    'champ_profil_notes' => 'Notes',
+    'profil_modifier' => 'Edit',
+    'profil_supprimer' => 'Delete',
+    'profil_nouveau' => 'New profile',
+    'profil_titre_nouveau' => 'New profile',
+    'profil_titre_modifier' => 'Edit profile :nom',
+    'profil_nom_exige' => 'The name is required: it is what links the profile to an auto-registration rule.',
+    // THE CONSTRAINT IS IN THE DATABASE (`uk_platform_name`), verified against the
+    // schema: the refusal is a property of the data, not a courtesy of the UI.
+    'profil_doublon' => 'A profile named ":nom" already exists for :plateforme. Names are unique per platform.',
+    'profil_introuvable' => 'This profile does not exist, or no longer does.',
+    'profil_cree' => 'Profile ":nom" created.',
+    'profil_modifie' => 'Profile ":nom" updated.',
+    'profil_supprime' => 'Profile ":nom" deleted. :machines server(s) fall back to the global configuration.',
+    'profil_supprimer_titre' => 'Delete profile ":nom"?',
+    // THE COST IS STATED BEFORE THE ACT, not observed after it.
+    'profil_supprimer_cout' => ':machines server(s) will lose this profile and fall back to the global configuration on the next deployment. This deletion cannot be undone.',
+    'profil_supprimer_confirmer' => 'Delete permanently',
+    'annuler' => 'Cancel',
+    // ASSIGNMENT IS NOT PORTED, and that is a decision: its entry point is the
+    // deployment table, and inverting it (picking machines for a profile) would be
+    // designing, not migrating.
+    'profils_assignation_ailleurs' => 'Attaching a server to a profile is done from the deployment table, which is not ported yet.',
     'profil_metadonnees' => 'HostMetadata',
     'profil_serveur' => 'Server',
     'profil_mandataire' => 'Proxy',

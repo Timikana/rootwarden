@@ -178,6 +178,14 @@
              `GET /supervision/profiles` a l'ouverture de l'onglet ET a chaque
              bascule — et la bascule en emet QUATRE, dont deux identiques. --}}
         <div id="panneau-profiles" data-rw="panneau-profiles" role="tabpanel" hidden>
+            @if (session('superv_profil_message'))
+                <p class="rw-confirmation" data-rw="superv-profil-message"
+                   role="status">{{ session('superv_profil_message') }}</p>
+            @elseif (session('superv_profil_erreur'))
+                <p class="rw-erreur" data-rw="superv-profil-message"
+                   role="alert">{{ session('superv_profil_erreur') }}</p>
+            @endif
+
             <article class="rw-carte rw-carte--pleine">
                 <h3 class="rw-sous-titre">{{ __('superv.profils_titre') }}</h3>
                 <p class="rw-aide rw-prose">{{ __('superv.profils_description') }}</p>
@@ -202,6 +210,7 @@
                                             <th>{{ __('superv.profil_serveur') }}</th>
                                             <th>{{ __('superv.profil_mandataire') }}</th>
                                             <th>{{ __('superv.profil_machines') }}</th>
+                                            <th>{{ __('superv.profil_actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody data-rw="superv-profils-corps">
@@ -225,6 +234,49 @@
                                                 <td>
                                                     <span class="rw-badge rw-badge--note @if ((int) $profil->machines === 0) rw-badge--neutre @endif">{{ $profil->machines }}</span>
                                                 </td>
+                                                {{-- LES ACTIONS DE LA LIGNE.
+                                                     « Modifier » est une ADRESSE :
+                                                     le serveur pre-remplit le
+                                                     formulaire. Le legacy, lui,
+                                                     serialise le profil ENTIER dans
+                                                     un attribut `onclick` — 671
+                                                     caracteres mesures, `notes`
+                                                     d'exploitation comprise. --}}
+                                                <td class="rw-tableau__actions">
+                                                    <a class="rw-bouton rw-bouton--discret"
+                                                       href="{{ route('supervision', ['profil' => $profil->id]) }}#config-{{ $plateforme }}"
+                                                       data-rw="superv-profil-modifier-{{ $profil->id }}">{{ __('superv.profil_modifier') }}</a>
+                                                    <button type="button" class="rw-bouton rw-bouton--discret"
+                                                            data-rw="superv-profil-supprimer-{{ $profil->id }}"
+                                                            data-cible="profil-suppression-{{ $profil->id }}">{{ __('superv.profil_supprimer') }}</button>
+                                                </td>
+                                            </tr>
+                                            {{-- LA DECISION SE PREND DANS LA PAGE,
+                                                 sous la ligne concernee, et elle
+                                                 NOMME son cout : le nombre de
+                                                 machines qui perdront leur profil.
+                                                 Le legacy le dit dans un `confirm()`
+                                                 natif au texte francais en dur. --}}
+                                            <tr id="profil-suppression-{{ $profil->id }}" hidden>
+                                                <td colspan="6">
+                                                    <form class="rw-panneau-decision" method="POST"
+                                                          action="{{ route('supervision.profils.supprimer') }}">
+                                                        @csrf
+                                                        <input type="hidden" name="plateforme" value="{{ $plateforme }}">
+                                                        <input type="hidden" name="id" value="{{ $profil->id }}">
+                                                        <div class="rw-panneau-decision__texte">
+                                                            <strong>{{ __('superv.profil_supprimer_titre', ['nom' => $profil->name]) }}</strong>
+                                                            <p class="rw-aide">{{ __('superv.profil_supprimer_cout', ['machines' => $profil->machines]) }}</p>
+                                                        </div>
+                                                        <div class="rw-panneau-decision__actions">
+                                                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                                                    data-rw="superv-profil-annuler-{{ $profil->id }}"
+                                                                    data-cible="profil-suppression-{{ $profil->id }}">{{ __('superv.annuler') }}</button>
+                                                            <button type="submit" class="rw-bouton rw-bouton--danger"
+                                                                    data-rw="superv-profil-confirmer">{{ __('superv.profil_supprimer_confirmer') }}</button>
+                                                        </div>
+                                                    </form>
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -234,23 +286,70 @@
                                  parler : sur une plateforme sans profil, elle
                                  decrivait un contenu absent. --}}
                             <p class="rw-aide rw-prose">{{ __('superv.profils_interpolation') }}</p>
+                            {{-- L'ASSIGNATION N'EST PAS PORTEE, et la colonne
+                                 « Machines » ci-dessus le rend visible : elle
+                                 compte des rattachements qu'on ne peut pas encore
+                                 faire d'ici. Le taire laisserait chercher. --}}
+                            <p class="rw-aide rw-prose">{{ __('superv.profils_assignation_ailleurs') }}</p>
                         @endif
                     </div>
                 @endforeach
 
-                {{-- LA MODIFICATION N'EST PAS PORTEE (V5), et la page le dit
-                     plutot que d'offrir des boutons inertes. Le legacy, lui,
-                     serialise le profil ENTIER — `notes` comprise — dans un
-                     attribut `onclick` de chacune de ses lignes. --}}
-                <div class="rw-vide">
-                    <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
-                    <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_profils') }}</p>
-                    <div class="rw-vide__action">
-                        <a class="rw-bouton rw-bouton--discret"
-                           href="{{ config('app.url_legacy') }}/supervision/"
-                           target="_blank" rel="noopener">{{ __('superv.vers_legacy') }} ↗</a>
+                {{-- CREER OU MODIFIER. UN SEUL formulaire, et son contenu vient
+                     du SERVEUR : `?profil=<id>` le pre-remplit. Pas de gabarit
+                     JavaScript, donc pas d'enregistrement recopie dans le DOM. --}}
+                {{-- LE FORMULAIRE EST UNE AUTRE SECTION QUE LE CATALOGUE, et ca
+                     doit se voir : sans separateur, son titre se collait au dernier
+                     paragraphe du tableau et les deux se lisaient d'un bloc.
+                     Vu a l'image. --}}
+                <form class="rw-note" method="POST" action="{{ route('supervision.profils.enregistrer') }}"
+                      data-rw="superv-profil-form">
+                    @csrf
+                    <input type="hidden" name="plateforme" value="{{ $plateforme }}">
+                    <input type="hidden" name="id" data-rw="superv-profil-champ-id"
+                           value="{{ ($profilModifie && $profilModifie->platform === $plateforme) ? $profilModifie->id : '' }}">
+
+                    <h4 class="rw-sous-titre">{{ ($profilModifie && $profilModifie->platform === $plateforme) ? __('superv.profil_titre_modifier', ['nom' => $profilModifie->name]) : __('superv.profil_titre_nouveau') }}</h4>
+
+                    <div class="rw-tableau-cadre">
+                        <table class="rw-tableau">
+                            <tbody>
+                                @foreach ($champsProfil as $colonne => $cle)
+                                    <tr>
+                                        <th scope="row">
+                                            <label for="prof-{{ $plateforme }}-{{ $colonne }}">{{ __('superv.champ_' . $cle) }}</label>
+                                        </th>
+                                        <td>
+                                            @if ($colonne === 'notes')
+                                                <textarea class="rw-saisie" rows="3"
+                                                          id="prof-{{ $plateforme }}-{{ $colonne }}"
+                                                          name="{{ $colonne }}"
+                                                          data-rw="superv-profil-champ-{{ $colonne }}">{{ ($profilModifie && $profilModifie->platform === $plateforme) ? $profilModifie->$colonne : '' }}</textarea>
+                                            @else
+                                                <input class="rw-saisie" type="text"
+                                                       id="prof-{{ $plateforme }}-{{ $colonne }}"
+                                                       name="{{ $colonne }}"
+                                                       value="{{ ($profilModifie && $profilModifie->platform === $plateforme) ? $profilModifie->$colonne : '' }}"
+                                                       data-rw="superv-profil-champ-{{ $colonne }}">
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+
+                    <div class="rw-actions">
+                        {{-- « Nouveau profil » vide le formulaire : c'est un LIEN
+                             vers la page sans `?profil`, donc le serveur rend un
+                             formulaire vierge. Aucun etat a remettre a zero en JS. --}}
+                        <a class="rw-bouton rw-bouton--discret rw-actions__gauche"
+                           href="{{ route('supervision') }}#config-{{ $plateforme }}"
+                           data-rw="superv-profil-nouveau">{{ __('superv.profil_nouveau') }}</a>
+                        <button type="submit" class="rw-bouton"
+                                data-rw="superv-profil-enregistrer">{{ __('superv.enregistrer') }}</button>
+                    </div>
+                </form>
             </article>
         </div>
 

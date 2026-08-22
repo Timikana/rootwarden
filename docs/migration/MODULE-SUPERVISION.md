@@ -328,6 +328,33 @@ affiché est ce qui est écrit, là où `savePlatformConfig()` jette `hostname_p
 **Reste du module** : V5 (profils CRUD + assignation) est le prochain, et il pose `@require_role(2)` sur
 les quatre routes non gardées.
 
+## 7 octies. V5 porté — le CRUD des profils (2026-08-22)
+
+Suite `go-page-supervision-profils-crud` : base rouge **10 PASS / 9 FAIL**, puis **19 PASS** sur le
+portage et **16** sur le legacy. Détail en `PARITE.md` E-77.
+
+**DEUX MESURES QUI DÉDOUANENT le code existant** : `upsert_profile` porte bien
+`WHERE id=%s AND platform=%s` — le défaut du `:508` n'est pas généralisé — et la contrainte
+`UNIQUE KEY uk_platform_name (platform, name)` existe bel et bien, malgré le « nom déjà pris **?** » du
+message d'erreur.
+
+**TOUT EST MESURÉ AU CLIC.** La première version déclenchait `saveProfile()` / `deleteProfile()` : cela
+prouve que la fonction marche, pas que le bouton l'atteint. La suite part du nom affiché, descend au
+bouton de sa ligne, et clique.
+
+**Sept chaînes françaises en dur** dans `profiles.js`, **deux boîtes natives** (dont une **troisième**
+confirmation non répertoriée), **dix attributs `onclick`** jusqu'à 671 caractères. Le portage : zéro des
+trois. « Modifier » y est une **adresse** (`?profil=<id>`), le formulaire est pré-rempli par le serveur.
+
+**La cascade est exercée** : une assignation posée sur la machine 2, le profil supprimé, zéro assignation
+orpheline. Le portage annonce ce coût **chiffré avant le geste**.
+
+**L'assignation n'est pas portée, et c'est une décision** : son point d'entrée est le tableau de
+déploiement, et l'inverser (choisir des machines pour un profil) retirerait la machine de son profil
+précédent, la clé primaire étant `(machine_id, platform)`. Ce serait concevoir.
+
+**Reste du module** : V6 (détection de version, **premier sous-lot SSH**) est le prochain.
+
 ## 8. Ce qui reste à mesurer
 
 La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`

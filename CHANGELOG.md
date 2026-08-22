@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.35** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.36** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,66 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.36 — module `supervision/`, sous-lot V5 : le CRUD des profils
+
+**Symptome.** Le catalogue de profils affichait « Editer », « Supprimer » et « Nouveau profil » en
+francais meme en anglais, ouvrait DEUX boites natives, et portait dix attributs `onclick` dont le plus
+long faisait 671 caracteres.
+
+**Cause racine.** `profiles.js` ecrit SEPT chaines francaises EN DUR — `Editer` (`:43`), `Supprimer`
+(`:45`), `Nouveau profil` (`:60`), `Editer profil : ` (`:79`), `Le nom est obligatoire.` (`:96`), le texte
+entier du `confirm` de suppression (`:111`), `Erreur reseau` (`:105`, `:118`). Aucun controle d'i18n ne
+les voit : ils cherchent des identifiants `module.cle` et la parite des JEUX de cles, pas du francais
+parfaitement lisible. Et le `confirm()` de suppression n'est **ni `confirm_deploy` ni
+`confirm_uninstall`** : c'est une TROISIEME confirmation native, absente des douze cles cassees — pour
+cause, elle n'utilise meme pas le catalogue.
+
+**Fix.** Creation, modification et suppression en base, derriere la garde de la page. Zero boite native :
+la suppression ouvre un panneau de decision SOUS SA LIGNE, qui **chiffre son cout** avant le geste.
+« Modifier » est une ADRESSE — `?profil=<id>` — et le serveur pre-remplit le formulaire : l'enregistrement
+n'est jamais dans la page deux fois, ni dans un attribut de gestionnaire, et il n'y a aucun gabarit
+JavaScript. Tous les libelles viennent du meme catalogue FR/EN que la page.
+
+**DEUX MESURES QUI DEDOUANENT LE CODE EXISTANT, et il faut le dire aussi clairement qu'une accusation.**
+`upsert_profile` porte bien `WHERE id=%s AND platform=%s` (`supervision.py:1780`) : le defaut mesure en V4
+n'est PAS generalise. Et la contrainte d'unicite EXISTE — `UNIQUE KEY uk_platform_name (platform, name)`,
+lue au `SHOW CREATE TABLE` : le message d'erreur du backend doute de lui-meme (« nom deja pris ? ») mais
+il a raison sur le fond. Le point d'interrogation etait une hesitation de redaction, pas un trou.
+
+**TOUT EST MESURE AU CLIC, PAS PAR APPEL DE FONCTION — correction de methode.** La premiere version de la
+suite declenchait `saveProfile()`, `editProfile()`, `deleteProfile()`. Cela prouve que la fonction marche ;
+cela ne prouve pas que LE BOUTON L'ATTEINT. Un bouton non cable, cable au mauvais gestionnaire, ou
+recouvert par un autre element est INVISIBLE a un appel de fonction — et cette famille a deja coute cher
+ici : un bouton deplace faisait cliquer « Refuser et se deconnecter » au lieu d'« Accepter ». La suite
+part du NOM AFFICHE dans le tableau, descend au bouton de SA ligne, et clique.
+
+**LA CASCADE EST EXERCEE, PAS DEDUITE.** `machine_supervision_profile` est vide : la consequence la plus
+lourde d'une suppression ne se mesurerait pas sans fixture. La suite pose une assignation sur la machine 2
+(DEV, seule cible mutante autorisee), supprime, et constate ZERO assignation orpheline.
+
+**L'ASSIGNATION N'EST PAS PORTEE, et c'est une decision, pas un oubli.** Son unique point d'entree est le
+dropdown du tableau de deploiement, non porte. Cote legacy on choisit UN PROFIL POUR UNE MACHINE ;
+assigner depuis le catalogue inverserait la relation, et comme la cle primaire est
+`(machine_id, platform)`, une machine ne porte qu'un profil par plateforme : l'inversion RETIRERAIT la
+machine de son profil precedent. Ce serait concevoir, pas migrer. La page dit ou se fait l'assignation.
+
+**Deux mesures fausses de la suite, corrigees.** Le refus du doublon etait declare « non enonce » alors
+qu'il l'etait : le legacy le passe a `alert()`, HORS du document, donc invisible a `innerText`. Et le geste
+de modification tenait en un seul `page.evaluate` : cote portage « Modifier » NAVIGUE, et une navigation
+detruit le contexte d'execution. Le geste se fait desormais en trois temps.
+
+**Un defaut d'affichage vu A L'IMAGE** : le titre du formulaire se collait au dernier paragraphe du
+catalogue. Separateur ajoute.
+
+**CE QUI RESTE AU BACKEND** : les quatre routes de profils sans `@require_role` et l'absence de
+`/supervision/` dans `$ADMIN_ONLY_PREFIXES`. Le portage ecrit en base derriere la garde de la page, donc
+CHEZ LUI la permission garde enfin la requete.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V6 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-profils-crud` entre avec **16 PASS sur le legacy** et **19 sur
+le portage**.
 
 ### v1.37.35 — module `supervision/`, sous-lot V4 : l'ecriture de la configuration globale
 

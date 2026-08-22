@@ -73,6 +73,38 @@ return [
     'profils_titre' => 'Profils de supervision',
     // ── Le catalogue, sous-lot V2 (lecture seule) ─────────────────────────
     'profil_nom' => 'Nom',
+    'profil_actions' => 'Actions',
+    // ── Le CRUD, sous-lot V5 ──────────────────────────────────────────────
+    'champ_profil_nom' => 'Nom',
+    'champ_profil_description' => 'Description',
+    'champ_profil_metadonnees' => 'HostMetadata',
+    'champ_profil_serveur' => 'Serveur',
+    'champ_profil_serveur_actif' => 'Serveur actif',
+    'champ_profil_mandataire' => 'Mandataire',
+    'champ_profil_port' => 'Port d\'ecoute',
+    'champ_profil_notes' => 'Notes',
+    'profil_modifier' => 'Modifier',
+    'profil_supprimer' => 'Supprimer',
+    'profil_nouveau' => 'Nouveau profil',
+    'profil_titre_nouveau' => 'Nouveau profil',
+    'profil_titre_modifier' => 'Modifier le profil :nom',
+    'profil_nom_exige' => 'Le nom est indispensable : c\'est lui qui relie le profil a une regle d\'auto-enregistrement.',
+    // LA CONTRAINTE EST EN BASE (`uk_platform_name`), verifiee au schema : le
+    // refus n'est pas une politesse d'interface, c'est une propriete de la donnee.
+    'profil_doublon' => 'Un profil nomme « :nom » existe deja pour :plateforme. Les noms sont uniques par plateforme.',
+    'profil_introuvable' => 'Ce profil n\'existe pas, ou plus.',
+    'profil_cree' => 'Profil « :nom » cree.',
+    'profil_modifie' => 'Profil « :nom » modifie.',
+    'profil_supprime' => 'Profil « :nom » supprime. :machines serveur(s) retombent sur la configuration globale.',
+    'profil_supprimer_titre' => 'Supprimer le profil « :nom » ?',
+    // LE COUT EST ANNONCE AVANT LE GESTE, pas constate apres.
+    'profil_supprimer_cout' => ':machines serveur(s) perdront ce profil et retomberont sur la configuration globale au prochain deploiement. Cette suppression ne se defait pas.',
+    'profil_supprimer_confirmer' => 'Supprimer definitivement',
+    'annuler' => 'Annuler',
+    // L'ASSIGNATION N'EST PAS PORTEE, et c'est une decision : son point d'entree
+    // est le tableau de deploiement, et l'inverser (choisir des machines pour un
+    // profil) serait concevoir, pas migrer.
+    'profils_assignation_ailleurs' => 'Rattacher un serveur a un profil se fait depuis le tableau de deploiement, qui n\'est pas encore porte.',
     'profil_metadonnees' => 'HostMetadata',
     'profil_serveur' => 'Serveur',
     'profil_mandataire' => 'Mandataire',

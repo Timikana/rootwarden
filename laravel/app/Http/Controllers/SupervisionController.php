@@ -62,6 +62,26 @@ class SupervisionController extends Controller
         'tls_accept' => ['unencrypted', 'psk', 'cert'],
     ];
 
+    /**
+     * Les champs d'un profil, dans l'ordre du formulaire : colonne => cle i18n.
+     *
+     * Ce sont ceux de la boite de dialogue du legacy. `platform` n'y est pas : elle
+     * vient du bloc dans lequel le formulaire vit, pas d'un champ que l'on pourrait
+     * changer en cours de route — deplacer un profil d'une plateforme a l'autre
+     * n'est pas une modification, c'est une autre operation, et le legacy ne
+     * l'offre pas non plus.
+     */
+    private const CHAMPS_PROFIL = [
+        'name' => 'profil_nom',
+        'description' => 'profil_description',
+        'host_metadata' => 'profil_metadonnees',
+        'zabbix_server' => 'profil_serveur',
+        'zabbix_server_active' => 'profil_serveur_actif',
+        'zabbix_proxy' => 'profil_mandataire',
+        'listen_port' => 'profil_port',
+        'notes' => 'profil_notes',
+    ];
+
     private const CHAMPS_PAR_PLATEFORME = [
         'zabbix' => [
             'agent_type' => 'type_agent',
@@ -102,7 +122,7 @@ class SupervisionController extends Controller
     {
     }
 
-    public function __invoke(): View
+    public function __invoke(Request $requete): View
     {
         return view('supervision', [
             'onglets' => $this->supervision->onglets(),
@@ -119,6 +139,14 @@ class SupervisionController extends Controller
              */
             'champs' => self::CHAMPS_PAR_PLATEFORME,
             'choix' => self::CHOIX_PAR_COLONNE,
+            'champsProfil' => self::CHAMPS_PROFIL,
+            /*
+             * LE PROFIL EN COURS DE MODIFICATION VIENT DE L'ADRESSE, pas du DOM.
+             * `?profil=<id>` : le serveur pre-remplit le formulaire. Le legacy, lui,
+             * serialise le profil entier dans un attribut `onclick` — 671 caracteres
+             * mesures, `notes` comprise.
+             */
+            'profilModifie' => $this->profilDemande($requete),
             'libelles' => $this->libelles(),
         ]);
     }
@@ -198,6 +226,116 @@ class SupervisionController extends Controller
         return redirect()->route('supervision')
             ->with('superv_message', __('superv.enregistrement_fait', [
                 'plateforme' => ucfirst($plateforme),
+            ]));
+    }
+
+    /**
+     * Le profil que l'adresse demande a modifier, s'il existe vraiment.
+     *
+     * FAIL-CLOSED : un identifiant inconnu ou d'une autre plateforme rend null, et
+     * le formulaire repart en creation. Pre-remplir avec « rien » vaut mieux que
+     * pre-remplir avec la ligne d'un autre.
+     */
+    private function profilDemande(Request $requete): ?object
+    {
+        $id = (int) $requete->query('profil', 0);
+        if ($id <= 0) {
+            return null;
+        }
+
+        return $this->supervision->profil($id);
+    }
+
+    /**
+     * Cree ou modifie un profil — sous-lot V5.
+     *
+     * LA GARDE EST DANS LA ROUTE, comme partout. Et c'est ce qui change par rapport
+     * au legacy : ses quatre routes de profils (`supervision.py` 1734, 1760, 1801,
+     * 1817) portent `@require_permission` mais **aucun `@require_role`** — la
+     * cinquieme, elle, porte `@require_role(2)` avec un commentaire « Patch A01 ».
+     * Le correctif a ete applique a une route et pas a ses voisines. Ici l'ecriture
+     * se fait en base derriere la garde de la PAGE, donc la permission garde enfin
+     * la REQUETE. Poser `@require_role(2)` sur les quatre routes backend reste une
+     * decision d'exploitant : non faite, declaree.
+     */
+    public function enregistrerProfil(Request $requete): RedirectResponse
+    {
+        $plateforme = (string) $requete->input('plateforme', '');
+        if (! array_key_exists($plateforme, self::CHAMPS_PAR_PLATEFORME)) {
+            return redirect()->route('supervision')
+                ->with('superv_profil_erreur', __('superv.enregistrement_plateforme_inconnue'));
+        }
+
+        $nom = trim((string) $requete->input('name', ''));
+        if ($nom === '') {
+            return redirect()->route('supervision')
+                ->with('superv_profil_erreur', __('superv.profil_nom_exige'));
+        }
+
+        $valeurs = [];
+        foreach (array_keys(self::CHAMPS_PROFIL) as $colonne) {
+            $brut = $requete->input($colonne);
+            $brut = is_string($brut) ? trim($brut) : $brut;
+            $valeurs[$colonne] = ($brut === '' || $brut === null) ? null : $brut;
+        }
+        $valeurs['name'] = $nom;
+        // `listen_port` est un entier nullable : une chaine vide y deviendrait 0.
+        $valeurs['listen_port'] = $valeurs['listen_port'] === null
+            ? null : (int) $valeurs['listen_port'];
+
+        $id = (int) $requete->input('id', 0);
+        $verdict = $this->supervision->enregistreProfil(
+            $plateforme, $valeurs, $id > 0 ? $id : null);
+
+        if ($verdict === 'doublon') {
+            return redirect()->route('supervision')
+                ->with('superv_profil_erreur',
+                    __('superv.profil_doublon', ['nom' => $nom, 'plateforme' => ucfirst($plateforme)]));
+        }
+        if ($verdict === 'inconnu') {
+            return redirect()->route('supervision')
+                ->with('superv_profil_erreur', __('superv.profil_introuvable'));
+        }
+
+        return redirect()->route('supervision')
+            ->with('superv_profil_message', $id > 0
+                ? __('superv.profil_modifie', ['nom' => $nom])
+                : __('superv.profil_cree', ['nom' => $nom]));
+    }
+
+    /**
+     * Supprime un profil — sous-lot V5. GESTE DESTRUCTEUR.
+     *
+     * `ON DELETE CASCADE` VERIFIE au schema : les assignations partent avec le
+     * profil, donc les serveurs concernes retombent sur la configuration globale.
+     * Le nombre de machines touchees est annonce AVANT le geste, dans le panneau de
+     * decision — le legacy, lui, le dit dans un `confirm()` natif dont le texte est
+     * ecrit en francais en dur.
+     */
+    public function supprimerProfil(Request $requete): RedirectResponse
+    {
+        $plateforme = (string) $requete->input('plateforme', '');
+        $id = (int) $requete->input('id', 0);
+
+        if ($id <= 0 || ! array_key_exists($plateforme, self::CHAMPS_PAR_PLATEFORME)) {
+            return redirect()->route('supervision')
+                ->with('superv_profil_erreur', __('superv.profil_introuvable'));
+        }
+
+        $profil = $this->supervision->profil($id);
+        $nom = $profil->name ?? '';
+        $machines = $this->supervision->machinesAssignees($id);
+        $supprimees = $this->supervision->supprimeProfil($id, $plateforme);
+
+        if ($supprimees === 0) {
+            return redirect()->route('supervision')
+                ->with('superv_profil_erreur', __('superv.profil_introuvable'));
+        }
+
+        return redirect()->route('supervision')
+            ->with('superv_profil_message', __('superv.profil_supprime', [
+                'nom' => $nom,
+                'machines' => $machines,
             ]));
     }
 
