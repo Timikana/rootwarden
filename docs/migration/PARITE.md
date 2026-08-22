@@ -3008,3 +3008,108 @@ tournée vers l'avenir, et elle le dit — la prendre pour une mesure serait se 
 plusieurs sous-lots. Compté dans le journal du rejeu : **74 exécutions de suite** (38 portage, 36 legacy)
 pour **974 assertions**, donc 72 avant V8. Même règle que pour les références de suite — on compte, on ne
 reconduit pas.
+
+## E-83 — Trois plateformes sur quatre annoncent une réussite qu'elles n'ont pas vérifiée
+
+**Module `supervision/`, sous-lot V9 : l'écriture du fichier distant et la restauration d'une
+sauvegarde.** Mesures faites sur **Test-Server-Debian (id 2, DEV)** ; `srv-zabbix` jamais jointe. La
+machine de test a `/etc/zabbix/` mais **ni agent ni `systemctl`** : le cas nominal y est donc « écriture
+réussie, redémarrage impossible », exactement celui qu'il fallait mesurer. État rendu à l'identique en
+sortie (répertoire vide, comme à l'entrée).
+
+**LE DÉFAUT CENTRAL, MESURÉ SUR UNE ÉCRITURE QUI NE POUVAIT PAS ABOUTIR.** `POST
+/supervision/telegraf/config/save` vers un répertoire `/etc/telegraf/` **qui n'existe pas** :
+
+```
+reponse : 200 {"success":true,"message":"Config telegraf sauvegardee et agent redemarre."}
+realite : ls: cannot access '/etc/telegraf/': No such file or directory
+```
+
+Rien n'a été écrit. Aucun agent n'a été redémarré. Le portail affirme les deux. Cause :
+`generic_config_save` **jette les trois codes de retour** — celui de la sauvegarde, celui de l'écriture,
+celui du redémarrage — et rend un succès inconditionnel. `generic_restore` fait de même pour le `cp` et
+le redémarrage. Cela vaut pour **Centreon, Prometheus et Telegraf**, soit trois des quatre plateformes de
+la page.
+
+**LA ROUTE ZABBIX, ELLE, DIT LA VÉRITÉ — et c'est ce qui rend l'écart si net.** Sur la MÊME machine, avec
+le MÊME `systemctl` manquant :
+
+```
+zabbix    : 200 {"success":true,"message":"Config sauvegardee mais restart echoue: sh: 1: systemctl: not found"}
+telegraf  : 200 {"success":true,"message":"Config telegraf sauvegardee et agent redemarre."}
+```
+
+Même page, même bouton, même échec : une réponse exacte et une réponse fabriquée. `zabbix_config_save`
+vérifie le `rc` de l'écriture, **restaure la sauvegarde si elle échoue**, et distingue explicitement le
+troisième cas (« sauvegardée mais restart échoué »). Trois protections que ses trois voisines n'ont pas.
+
+**MAIS `zabbix_restore` MENT AUSSI, ET C'EST LE CHEMIN DE SECOURS.** Mesuré :
+
+```
+POST /supervision/zabbix/restore  ->  200 {"success":true,
+    "message":"Backup zabbix_agent2.conf.bak.20260822_171737 restaure et agent redemarre."}
+```
+
+Sur une machine **sans `systemctl`**. Le redémarrage n'a pas pu avoir lieu ; la route jette son code de
+retour, là où sa jumelle `config/save` le vérifie. La restauration est précisément le geste qu'on fait
+quand quelque chose est déjà cassé : c'est la pire des quatre routes où placer une affirmation non
+vérifiée. Le `cp` de restauration, lui, EST vérifié — seul le redémarrage est passé sous silence.
+
+**UN `A && B || C` QUI EFFACE LA DIFFÉRENCE ENTRE « RIEN À SAUVEGARDER » ET « SAUVEGARDE ÉCHOUÉE ».**
+`_backup_agent_config` exécute `test -f X && cp X Y || echo 'NO_FILE'`. Mesuré sur la machine de test, les
+trois cas :
+
+```
+fichier absent                 -> sortie [NO_FILE]  rc=0     (comportement voulu)
+fichier present, cp reussi     -> sortie []         rc=0
+fichier present, cp ECHOUE     -> sortie [NO_FILE]  rc=0     <- INDISCERNABLE du premier
+```
+
+Un `cp` en échec emprunte donc la branche « pas de fichier » : la fonction rend `None`, l'écriture
+continue **sans sauvegarde**, et comme le rollback est gardé par `if backup_path:`, **il est désarmé au
+moment précis où il servirait**. Le `>` tronquant le fichier avant d'écrire, un échec à ce stade laisse
+une configuration tronquée et rien pour la rétablir.
+
+**CINQ EXONÉRATIONS, dites aussi nettement qu'une accusation :**
+- **la traversée de chemin est refusée.** `_BACKUP_NAME_RE = ^[\w.-]+\.bak\.\d{8}_\d{6}$` interdit le
+  `/` : rien ne sort du répertoire. Mesuré — `{"backup_name":"../../etc/passwd"}` rend
+  `{"message":"Nom de backup invalide"}`. La même expression interdit espaces, guillemets, `$` et `;`,
+  donc l'interpolation de `backup_path` dans `cp` n'est pas injectable non plus ;
+- **le chemin de configuration n'est jamais choisi par le client** : `_config_file_path` rend deux
+  littéraux, et les plateformes non-Zabbix le lisent dans `AGENT_REGISTRY` ;
+- **le contenu voyage en base64**, et le transport est fidèle à l'octet. Vérifié à `od -c` : les sauts de
+  ligne arrivent réels, le `\r\n` est normalisé avant l'encodage ;
+- **la sauvegarde est faite AVANT l'écriture, et elle contient bien l'ancienne version.** Mesuré : une
+  seconde écriture a produit `zabbix_agent2.conf.bak.20260822_171737` de 35 octets — la version
+  précédente — pendant que le fichier passait à 39 ;
+- **les quatre routes portent les quatre gardes** : `@require_api_key`, `@require_role(2)`,
+  `@require_permission('can_manage_supervision')`, `@require_machine_access`. Et le `restore` vérifie
+  l'existence du backup avant d'agir (404 en le nommant).
+
+**LE CLIENT PERD LE SEUL AVERTISSEMENT QUE LE BACKEND AVAIT PRIS LA PEINE D'ÉMETTRE.** `saveRemoteConfig`
+fait `toast(__('config_remote_saved') || res.message, 'success')`. Comme `__()` rend la clé absente
+**telle quelle** — donc non vide — `res.message` **n'est jamais lu**. Le message
+« sauvegardée mais restart échoué », que la route Zabbix construit exprès, n'atteint donc **jamais
+l'écran** ; et ce que l'écran affiche est la chaîne littérale `config_remote_saved`, en toast **vert**.
+La dette i18n ne fait pas que défigurer un libellé : ici elle **supprime un avertissement**.
+`restoreBackup` a la même forme et affiche `backup_restored`.
+
+**TROIS CLÉS DE PLUS DANS LA MÊME FAMILLE — 15e, 16e, 17e.** `config_remote_saved`, `backup_restored` et
+`btn_restore` existent sous `supervision.*` et **dans aucun des deux `js.php`** : mesuré nominativement,
+`fr=1 en=1` côté module, `fr=0 en=0` côté JS. Le bouton de restauration affiche donc l'identifiant
+`btn_restore`. `no_backups` avait déjà été relevée en V7, même cause.
+
+**ET LA RESTAURATION N'A AUCUNE CONFIRMATION.** La liste des sauvegardes s'ouvre dans une fenêtre
+modale ; chaque ligne porte un bouton qui, **d'un seul clic**, écrase la configuration courante et
+redémarre l'agent. Ni `confirm()` natif, ni panneau : rien. C'est le même trou que `reconfigure` (V10).
+
+**LE HUITIÈME FRANÇAIS EN DUR est bien là où il était annoncé** : `saveRemoteConfig` (`main.js:539`)
+porte `'Configuration vide'`. À noter que le backend rend lui aussi ses messages en français seulement, et
+que les deux portails les affichent tels quels — un écran en anglais annonce donc
+« Config sauvegardee mais restart echoue » en français.
+
+**CE QUE CETTE MESURE POSE COMME QUESTION.** Le portage passe par la passerelle vers le backend (décision
+V6→V12 : le SSH appartient au backend). Porter l'écriture sur les quatre plateformes, c'est donc **hériter
+de l'affirmation fabriquée** pour trois d'entre elles — le portage annoncerait à son tour une réussite
+qu'il n'a pas vérifiée. Arbitrage porté à l'exploitant : corriger les trois routes génériques (elles
+mentent aujourd'hui aux DEUX portails) ou porter l'écriture pour Zabbix seul et dire pourquoi.

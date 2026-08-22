@@ -503,6 +503,49 @@ créées.
 **Reste du module** : V9 (éditeur en écriture + restauration), V10 (reconfiguration), V11 (désinstallation),
 V12 (déploiement) — tous **modifient** ou **détruisent**.
 
+## 7 terdecies. V9 mesuré — trois plateformes sur quatre annoncent une réussite non vérifiée (2026-08-22)
+
+Détail en `PARITE.md` E-83. Mesures sur **Test-Server-Debian (id 2, DEV)**, qui a `/etc/zabbix/` mais **ni
+agent ni `systemctl`** : le cas nominal y est « écriture réussie, redémarrage impossible » — précisément
+celui à mesurer. État rendu à l'identique en sortie.
+
+**LE DÉFAUT CENTRAL.** `POST /supervision/telegraf/config/save` vers un répertoire **inexistant** rend
+`200 {"success":true,"message":"Config telegraf sauvegardee et agent redemarre."}`. Rien n'a été écrit,
+aucun agent redémarré. `generic_config_save` jette **les trois codes de retour** et rend un succès
+inconditionnel ; `generic_restore` de même. Cela couvre **Centreon, Prometheus et Telegraf**.
+
+**LA ROUTE ZABBIX DIT LA VÉRITÉ**, sur la même machine et le même `systemctl` manquant :
+`"Config sauvegardee mais restart echoue: sh: 1: systemctl: not found"`. Elle vérifie le `rc` de
+l'écriture, **restaure la sauvegarde si elle échoue**, et distingue le troisième cas. Trois protections
+que ses trois voisines n'ont pas.
+
+**MAIS `zabbix_restore` MENT AUSSI** — et c'est le chemin de secours :
+`"Backup … restaure et agent redemarre."` sur une machine sans `systemctl`. Son `cp` est vérifié, son
+redémarrage non.
+
+**UN `A && B || C` AVEUGLE LA SAUVEGARDE.** `test -f X && cp X Y || echo 'NO_FILE'` : mesuré, un `cp` en
+échec rend exactement `NO_FILE` et `rc=0`, comme un fichier absent. `_backup_agent_config` rend donc
+`None`, l'écriture continue **sans sauvegarde**, et le rollback — gardé par `if backup_path:` — est
+**désarmé au moment où il servirait**.
+
+**CINQ EXONÉRATIONS** : traversée de chemin refusée (regex mesurée sur `../../etc/passwd`), chemin jamais
+choisi par le client, transport base64 fidèle à l'octet (`od -c`), sauvegarde faite avant l'écriture et
+contenant bien l'ancienne version, et les quatre gardes présentes sur les quatre routes.
+
+**LE CLIENT PERD L'AVERTISSEMENT.** `toast(__('config_remote_saved') || res.message, 'success')` : la clé
+absente étant **rendue telle quelle**, `res.message` n'est jamais lu. Le « restart échoué » que la route
+Zabbix construit exprès n'atteint jamais l'écran, et l'écran affiche `config_remote_saved` en **vert**.
+La dette i18n ne défigure pas un libellé ici : elle **supprime un avertissement**. Trois clés de plus dans
+cette famille (15e, 16e, 17e) : `config_remote_saved`, `backup_restored`, `btn_restore`.
+
+**LA RESTAURATION N'A AUCUNE CONFIRMATION** : un bouton dans une fenêtre modale, un clic, la configuration
+est écrasée et l'agent redémarré. Même trou que `reconfigure` (V10).
+
+**CE QUI ATTEND L'EXPLOITANT.** Le portage passe par la passerelle (décision V6→V12) : porter l'écriture
+sur les quatre plateformes, c'est **hériter de l'affirmation fabriquée** pour trois d'entre elles.
+Corriger les trois routes génériques — qui mentent aujourd'hui aux DEUX portails — ou porter Zabbix seul
+et dire pourquoi.
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et
