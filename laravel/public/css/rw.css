@@ -1317,6 +1317,29 @@ a.rw-bouton { display: inline-block; }
    assertion ne bougeait. Vu a l'image. */
 .rw-cellule-note { display: block; margin-top: 2px; }
 
+/* UNE ETIQUETTE DE LIGNE SE LIT A GAUCHE, PRES DE SA VALEUR. `.rw-tableau` ne
+   stylait que les `th` du `thead` : un `th scope="row"` dans le corps retombait
+   sur le defaut du navigateur — centre, et sur une colonne de 690 px l'etiquette
+   se retrouvait au milieu du vide, a l'autre bout de la valeur qu'elle nomme.
+   `width: 1%` + `nowrap` reduisent la colonne a ce que le texte demande.
+   Vu a l'image, aucune assertion DOM ne le voit. */
+.rw-tableau tbody th[scope="row"] {
+    width: 1%;
+    padding: 10px 14px;
+    text-align: left;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--rw-texte-doux);
+}
+
+/* MAIS SUR PETIT ECRAN, C'EST L'ETIQUETTE QUI CEDE. A 390 px, un libelle en
+   `nowrap` prenait 215 des 350 px disponibles et repoussait la VALEUR hors du
+   cadre : on gardait le mot et on perdait la donnee. Repliee sur deux lignes,
+   l'etiquette laisse la valeur lisible. Vu a l'image. */
+@media (max-width: 700px) {
+    .rw-tableau tbody th[scope="row"] { white-space: normal; }
+}
+
 .rw-badge--neutre {
     background: var(--rw-surface-2);
     color: var(--rw-texte-doux);

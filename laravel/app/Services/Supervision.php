@@ -52,6 +52,65 @@ class Supervision
     }
 
     /**
+     * La configuration globale, par plateforme — sous-lot V3, LECTURE SEULE.
+     *
+     * « LA » CONFIGURATION GLOBALE N'EXISTE PAS : C'EST LA PLUS RECENTE.
+     * `supervision_config` n'a **aucune contrainte d'unicite** sur `platform` —
+     * sa cle primaire est `id` seul. Le backend (`supervision.py:132`) et la page
+     * legacy lisent tous deux `ORDER BY id DESC LIMIT 1` : rien n'empeche
+     * d'accumuler des lignes pour une meme plateforme, et c'est la derniere ecrite
+     * qui gagne. Le portage reproduit ce choix — le corriger serait une migration,
+     * donc une decision d'exploitant — mais il le NOMME au lieu de le supposer.
+     *
+     * LES DEUX SECRETS NE SONT JAMAIS SELECTIONNES. `tls_psk_value` et
+     * `telegraf_output_token` ne sortent pas de la base : la requete rend un
+     * BOOLEEN qui dit s'ils sont poses. Masquer une valeur deja chargee laisse
+     * cette valeur en memoire, dans la vue, et a portee du premier gabarit qui
+     * l'affichera par megarde ; ne pas la lire ferme la question.
+     *
+     * @return array<string,?object> indexe par plateforme, null si rien d'enregistre
+     */
+    public function configurationParPlateforme(): array
+    {
+        // La ligne la plus recente de CHAQUE plateforme, en une requete.
+        $derniers = DB::table('supervision_config')
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('platform')
+            ->pluck('id')
+            ->all();
+
+        $configuration = array_fill_keys($this->plateformes(), null);
+
+        if ($derniers === []) {
+            return $configuration;
+        }
+
+        $lignes = DB::table('supervision_config')
+            ->select('id', 'platform', 'agent_type', 'agent_version', 'zabbix_server',
+                     'zabbix_server_active', 'listen_port', 'hostname_pattern',
+                     'tls_connect', 'tls_accept', 'tls_psk_identity',
+                     'host_metadata_template', 'extra_config',
+                     'centreon_host', 'centreon_port',
+                     'prometheus_listen', 'prometheus_collectors',
+                     'telegraf_output_url', 'telegraf_output_org',
+                     'telegraf_output_bucket', 'telegraf_inputs')
+            // LES DEUX SECRETS RESTENT EN BASE : on ne lit que leur PRESENCE.
+            ->selectRaw("(tls_psk_value IS NOT NULL AND tls_psk_value <> '') as psk_pose")
+            ->selectRaw("(telegraf_output_token IS NOT NULL AND telegraf_output_token <> '') as jeton_pose")
+            ->whereIn('id', $derniers)
+            ->get();
+
+        foreach ($lignes as $ligne) {
+            $plateforme = (string) $ligne->platform;
+            if (array_key_exists($plateforme, $configuration)) {
+                $configuration[$plateforme] = $ligne;
+            }
+        }
+
+        return $configuration;
+    }
+
+    /**
      * Le catalogue de profils, par plateforme — sous-lot V2, LECTURE SEULE.
      *
      * LE SCHEMA A ETE MESURE AVANT D'ECRIRE CETTE REQUETE, et il a corrige deux

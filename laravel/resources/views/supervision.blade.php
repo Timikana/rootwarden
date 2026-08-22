@@ -36,17 +36,82 @@
             @endforeach
         </div>
 
-        {{-- ══ ONGLET 1 : configuration globale ═══════════════════════════════
-             Les quatre blocs de plateforme sont TOUS rendus, un seul visible. La
-             lecture de leurs valeurs (V3) et leur enregistrement (V4) ne sont pas
-             dans V1 : le panneau le DIT et mene a l'ancien portail, plutot que
-             d'offrir un formulaire qui n'enregistrerait rien. --}}
+        {{-- ══ ONGLET 1 : configuration globale ════════════════════════════
+             LECTURE SEULE (V3). Les quatre blocs sont peints ICI, cote serveur,
+             et le script n'en montre qu'un : changer de plateforme n'emet AUCUN
+             appel. Le legacy, lui, rend Zabbix cote serveur et les TROIS AUTRES
+             par un `GET /supervision/config/<plateforme>` declenche au
+             changement — deux chemins pour une meme donnee.
+
+             LES DEUX SECRETS NE SONT PAS LUS EN BASE : le service ne rend qu'un
+             booleen de presence. Le legacy affiche `********` dans un
+             `<input type="password">`, donc la valeur reelle ne sort pas non
+             plus — mesure faite, aucun defaut de ce cote — mais ne pas la lire
+             du tout ferme la question au lieu de la surveiller. --}}
         <div id="panneau-config" data-rw="panneau-config" role="tabpanel">
             @foreach ($plateformes as $plateforme)
+                @php($config = $configuration[$plateforme] ?? null)
                 <article id="config-{{ $plateforme }}" class="rw-carte rw-carte--pleine"
                          @if (! $loop->first) hidden @endif>
                     <h3 class="rw-sous-titre">{{ __('superv.config_titre') }} — {{ ucfirst($plateforme) }}</h3>
                     <p class="rw-aide rw-prose">{{ __('superv.config_description') }}</p>
+
+                    @if ($config === null)
+                        {{-- L'ABSENCE SE DIT. Sans ligne en base, les deux
+                             portails affichent des valeurs par defaut : sans
+                             avertissement, un exploitant les lit comme une
+                             configuration enregistree. --}}
+                        <div class="rw-vide" data-rw="superv-config-vide">
+                            <p class="rw-vide__titre">{{ __('superv.config_aucune') }}</p>
+                            <p class="rw-vide__texte rw-prose">{{ __('superv.config_aucune_aide', ['plateforme' => ucfirst($plateforme)]) }}</p>
+                        </div>
+                    @else
+                        <div class="rw-tableau-cadre" data-rw="superv-config-corps">
+                            <table class="rw-tableau">
+                                <tbody>
+                                    @foreach ($champs[$plateforme] as $colonne => $cle)
+                                        <tr>
+                                            <th scope="row">{{ __('superv.champ_' . $cle) }}</th>
+                                            <td>
+                                                @if (trim((string) ($config->$colonne ?? '')) === '')
+                                                    <span class="rw-aide">{{ __('superv.champ_vide') }}</span>
+                                                @else
+                                                    <code>{{ $config->$colonne }}</code>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+
+                                    {{-- LA PRESENCE D'UN SECRET, JAMAIS SA
+                                         VALEUR. Le service ne selectionne meme
+                                         pas la colonne. --}}
+                                    @if ($plateforme === 'zabbix')
+                                        <tr data-rw="superv-config-psk">
+                                            <th scope="row">{{ __('superv.champ_psk_valeur') }}</th>
+                                            <td>
+                                                <span class="rw-badge @if (! $config->psk_pose) rw-badge--neutre @endif">{{ $config->psk_pose ? __('superv.secret_pose') : __('superv.secret_absent') }}</span>
+                                                <span class="rw-aide rw-cellule-note">{{ __('superv.secret_jamais_affiche') }}</span>
+                                            </td>
+                                        </tr>
+                                    @endif
+                                    @if ($plateforme === 'telegraf')
+                                        <tr data-rw="superv-config-jeton">
+                                            <th scope="row">{{ __('superv.champ_telegraf_jeton') }}</th>
+                                            <td>
+                                                <span class="rw-badge @if (! $config->jeton_pose) rw-badge--neutre @endif">{{ $config->jeton_pose ? __('superv.secret_pose') : __('superv.secret_absent') }}</span>
+                                                <span class="rw-aide rw-cellule-note">{{ __('superv.secret_jamais_affiche') }}</span>
+                                            </td>
+                                        </tr>
+                                    @endif
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="rw-aide rw-prose">{{ __('superv.config_plus_recente') }}</p>
+                    @endif
+
+                    {{-- L'ECRITURE N'EST PAS PORTEE (V4), et la page le dit
+                         plutot que d'offrir un formulaire qui n'enregistrerait
+                         rien. --}}
                     <div class="rw-vide">
                         <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
                         <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_config') }}</p>

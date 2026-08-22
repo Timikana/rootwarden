@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.33** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.34** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2169,6 +2169,67 @@ sans `can_scan_cve` peut toujours creer, modifier et supprimer une planification
 contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
+portage**.
+
+### v1.37.34 — module `supervision/`, sous-lot V3 : la configuration globale, en lecture
+
+**Symptome.** L'onglet « Configuration globale » du portage n'affichait rien de la configuration reelle.
+Et cote legacy, « la » configuration globale d'une plateforme n'est pas ce qu'elle annonce.
+
+**Cause racine, mesuree.** `supervision_config` ne porte **aucune contrainte d'unicite** sur `platform` —
+sa cle primaire est `id` seul. Or `_get_global_config()` (`supervision.py:132`) et la page legacy lisent
+tous deux `ORDER BY id DESC LIMIT 1` : « la » configuration globale est en realite **la plus recemment
+enregistree**, et rien n'empeche d'en accumuler. Ce n'est pas la meme chose.
+
+**Fix.** Les quatre configurations sont peintes COTE SERVEUR, une par plateforme, en lecture seule : le
+script n'en montre qu'une, donc changer de plateforme emet **zero appel**. Le legacy, lui, rend Zabbix
+cote serveur et les TROIS AUTRES par un `GET /supervision/config/<plateforme>` declenche au changement —
+deux chemins pour une meme donnee, et **3 requetes** mesurees a la bascule vers Centreon. La page NOMME
+la regle de la ligne la plus recente plutot que de laisser croire a un enregistrement unique.
+
+**LES DEUX SECRETS NE SONT MEME PAS LUS.** `configurationParPlateforme()` ne selectionne ni
+`tls_psk_value` ni `telegraf_output_token` : elle rend deux BOOLEENS de presence. Masquer une valeur deja
+chargee la laisse en memoire, dans la vue, et a portee du premier gabarit qui l'affichera par megarde ;
+ne pas la lire ferme la question.
+
+**Le secret ne fuyait PAS cote legacy — mesure, et il faut le dire tel quel.** La suspicion portee par le
+suivi de chantier etait que `tls_psk_value` pouvait sortir en clair. Faux : le legacy rend `********`
+dans son `<input type="password">`, et la valeur reelle posee en fixture n'apparait **nulle part dans le
+source servi** — recherche faite dans le HTML complet, pas dans le texte visible, precisement parce qu'un
+attribut peut porter autre chose que ce que l'oeil lit. Le backend est correct lui aussi : il refuse
+d'ecrire `'********'` par-dessus le vrai PSK.
+
+**LE DEFAUT QUE V4 DEVRA CORRIGER, maintenant localise.** `supervision.py:508` fait
+`SELECT id, tls_psk_value FROM supervision_config ORDER BY id DESC LIMIT 1` — **sans filtre de
+plateforme** — puis `UPDATE ... WHERE id = %s`. Enregistrer le formulaire Zabbix peut donc ecraser une
+ligne **Centreon** si celle-ci est la plus recente. Localise par lecture, non exerce : V3 est en lecture.
+
+**Un defaut latent, dit avec ses deux moities.** `GET /supervision/config` (`supervision.py:455`) masque
+`tls_psk_value` mais **pas** `telegraf_output_token`, alors que sa voisine par plateforme masque les
+deux. En pratique cette route ne lit que la ligne `zabbix`, ou la colonne du jeton est normalement NULL :
+la fuite n'est pas vive, elle est a un enregistrement de l'etre. Seul appelant :
+`legacy/adm/health_check.php`. Non corrige — c'est du backend.
+
+**La fixture, et pourquoi elle est sure.** `supervision_config` est **VIDE** : un sous-lot de lecture sur
+une table vide ne mesurerait qu'un ecran d'absence. La suite pose donc deux lignes Zabbix et une
+Centreon, nettoie A L'ENTREE et dans un `finally`, et ANNONCE l'etat restaure. Verifie avant de l'ecrire :
+`backend/scheduler.py` ne lit JAMAIS cette table — seuls un deploiement ou une reconfiguration la lisent,
+et aucun des deux ne part sans un clic.
+
+**Deux defauts d'affichage vus A L'IMAGE.** `.rw-tableau` ne stylait que les `th` du `thead` : un
+`th scope="row"` retombait sur le defaut du navigateur — CENTRE — et sur une colonne de 690 px
+l'etiquette se retrouvait au milieu du vide, a l'autre bout de la valeur qu'elle nomme. Puis, le
+correctif applique, **a 390 px l'etiquette en `nowrap` prenait 215 des 350 px disponibles et repoussait
+la VALEUR hors du cadre** : on gardait le mot et on perdait la donnee. Elle se replie desormais sous
+700 px.
+
+**Non affiche deliberement** : `updated_at` et `updated_by`. `updated_at` est ecrit par MySQL, donc dans
+le fuseau du conteneur de base, et l'afficher ferait entrer dans cette page le decalage declare en
+E-73. V3 montre la configuration, pas sa piste d'audit.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V4 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-config` entre avec **15 PASS sur le legacy** et **17 sur le
 portage**.
 
 ### v1.37.33 — module `supervision/`, sous-lot V2 : le catalogue de profils, en lecture
