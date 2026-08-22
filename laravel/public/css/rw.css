@@ -899,6 +899,19 @@ a.rw-bouton { display: inline-block; }
 
 .rw-etiquette-champ .rw-saisie { text-transform: none; letter-spacing: normal; font-weight: 400; }
 
+/* MEME RAISON QUE LA LIGNE AU-DESSUS, POUR L'AIDE. `.rw-etiquette-champ` met
+   TOUTE l'etiquette en capitales gras : juste pour un intitule de champ,
+   illisible pour une phrase. Seule `.rw-saisie` etait remise a plat — vu a
+   l'image en V10a, chaque champ portait cinq lignes de capitales sous lui. Place
+   ici, juste apres, parce qu'a specificite egale l'ORDRE tranche. */
+.rw-etiquette-champ .rw-aide {
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
 /* UN CHOIX A QUATRE VALEURS N'A PAS BESOIN DE 1100 PX. `.rw-etiquette-champ`
    est en `flex: 1` : son `<select>` s'etirait sur toute la colonne restante, et
    sur 1920 px le menu des plateformes traversait la moitie de la page. Borner le

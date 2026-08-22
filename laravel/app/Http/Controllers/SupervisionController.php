@@ -82,6 +82,34 @@ class SupervisionController extends Controller
         'notes' => 'profil_notes',
     ];
 
+    /**
+     * LES HUIT REGLAGES PAR MACHINE — sous-lot V10a. LISTE FERMEE.
+     *
+     * Ce sont EXACTEMENT les huit noms que `_build_config_lines` traite par leur
+     * nom, dans l'ordre ou il les lit. Rien de plus : le backend accepte aussi
+     * des noms libres, qu'il injecte tels quels dans le fichier de configuration
+     * — c'est par cette porte qu'un saut de ligne dans la valeur produisait une
+     * directive autonome (E-85, corrige en v1.37.41). Le portage ne l'installe
+     * pas : pas de champ de nom, donc pas de nom arbitraire.
+     *
+     * `nature` dit comment le champ se rend et se valide :
+     *   texte   saisie libre sur UNE ligne
+     *   port    entier borne
+     *   liste   `<select>` sur `CHOIX_PAR_COLONNE`
+     */
+    private const CHAMPS_OVERRIDE = [
+        'Hostname' => ['cle' => 'override_hostname', 'nature' => 'texte'],
+        'Server' => ['cle' => 'override_serveur', 'nature' => 'texte'],
+        'ServerActive' => ['cle' => 'override_serveur_actif', 'nature' => 'texte'],
+        'HostMetadata' => ['cle' => 'override_metadonnees', 'nature' => 'texte'],
+        'ListenPort' => ['cle' => 'override_port', 'nature' => 'port'],
+        'TLSConnect' => ['cle' => 'override_tls_connect', 'nature' => 'liste',
+                         'colonne' => 'tls_connect'],
+        'TLSAccept' => ['cle' => 'override_tls_accept', 'nature' => 'liste',
+                        'colonne' => 'tls_accept'],
+        'TLSPSKIdentity' => ['cle' => 'override_psk_identite', 'nature' => 'texte'],
+    ];
+
     private const CHAMPS_PAR_PLATEFORME = [
         'zabbix' => [
             'agent_type' => 'type_agent',
@@ -158,6 +186,14 @@ class SupervisionController extends Controller
              * l'ecran.
              */
             'coutReleve' => $this->supervision->coutDuReleve(),
+            /*
+             * LA MACHINE DONT ON REGLE LES OVERRIDES VIENT DE L'ADRESSE — meme
+             * principe qu'en V5 pour les profils : `?reglages=<id>`, et le
+             * serveur pre-remplit. Rien n'est serialise dans le DOM.
+             */
+            'champsOverride' => self::CHAMPS_OVERRIDE,
+            'machineReglee' => $this->machineReglee($requete),
+            'overrides' => $this->overridesDemandes($requete),
             'libelles' => $this->libelles(),
         ]);
     }
@@ -366,6 +402,152 @@ class SupervisionController extends Controller
      *
      * @return array<string,string>
      */
+    /**
+     * La machine dont l'adresse demande les reglages, ou null — sous-lot V10a.
+     *
+     * VERIFIER QUE LA MACHINE EXISTE ET N'EST PAS ARCHIVEE, plutot que de faire
+     * confiance a l'identifiant de l'adresse : `?reglages=999` ne doit pas
+     * ouvrir un formulaire sur une machine inexistante, ni `?reglages=<archivee>`
+     * sur une machine qu'on a retiree du parc.
+     */
+    private function machineReglee(Request $requete): ?object
+    {
+        $demande = $requete->query('reglages');
+
+        if ($demande === null || ! ctype_digit((string) $demande)) {
+            return null;
+        }
+
+        foreach ($this->supervision->machines() as $machine) {
+            if ((int) $machine->id === (int) $demande) {
+                return $machine;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Les reglages de la machine demandee — sous-lot V10a.
+     *
+     * @return array<string, string>
+     */
+    private function overridesDemandes(Request $requete): array
+    {
+        $machine = $this->machineReglee($requete);
+
+        return $machine === null
+            ? []
+            : $this->supervision->overridesDeLaMachine((int) $machine->id);
+    }
+
+    /**
+     * Enregistre les reglages d'une machine — sous-lot V10a.
+     *
+     * UNE SOUMISSION DE FORMULAIRE, PAS UN APPEL CLIENT : le portage n'ouvre
+     * aucune requete depuis le navigateur pour ce geste. Il n'y a d'ailleurs rien
+     * a joindre — ces reglages vivent en base et ne prennent effet qu'a la
+     * prochaine reconfiguration. La page le DIT, plutot que de laisser croire
+     * qu'enregistrer modifie le serveur.
+     *
+     * LES CLES SONT CELLES DE `CHAMPS_OVERRIDE`, ET ELLES SEULES. Un nom envoye
+     * hors de cette liste n'est pas « refuse » : il n'est jamais regarde. C'est
+     * la difference entre valider une entree libre et ne pas offrir d'entree
+     * libre — et c'est ce qui empeche de rouvrir E-85 par le formulaire.
+     */
+    public function enregistrerOverrides(Request $requete): RedirectResponse
+    {
+        $idMachine = (int) $requete->input('machine_id');
+
+        $machine = null;
+        foreach ($this->supervision->machines() as $candidate) {
+            if ((int) $candidate->id === $idMachine) {
+                $machine = $candidate;
+                break;
+            }
+        }
+
+        if ($machine === null) {
+            return redirect()->route('supervision')
+                ->with('superv_reglages_erreur', __('superv.reglages_machine_inconnue'));
+        }
+
+        $valeurs = [];
+        $refuses = [];
+
+        foreach (self::CHAMPS_OVERRIDE as $nom => $champ) {
+            $champHtml = 'override_' . $nom;
+
+            /*
+             * `has()` ET NON `input() !== null`. Laravel place
+             * `ConvertEmptyStringsToNull` dans le groupe `web` : une chaine vide
+             * arrive donc en `null`, exactement comme un champ ABSENT. Or les deux
+             * ne veulent pas dire la meme chose ici — vide signifie « supprime ce
+             * reglage », absent signifie « ne le touche pas ». Mesure du
+             * 2026-08-22 : `input('a')` rend `null` pour `a=""`, alors que
+             * `has('a')` rend `true`. Le premier jet testait `=== null` et ne
+             * supprimait donc JAMAIS rien — trouve par la suite, pas a la
+             * relecture.
+             */
+            if (! $requete->has($champHtml)) {
+                continue;
+            }
+
+            $valeur = trim((string) ($requete->input($champHtml) ?? ''));
+
+            /*
+             * MEME MOTIF QUE LE BACKEND, REVALIDE ICI. Une valeur de
+             * configuration agent tient sur UNE ligne : un saut de ligne y
+             * produirait une directive autonome (E-85). Le champ est un
+             * `<input>`, donc en pratique il n'en porte pas — mais une requete
+             * forgee, elle, en porterait.
+             */
+            if (preg_match('/[\x00-\x1f\x7f]/', $valeur) === 1) {
+                $refuses[] = $nom;
+
+                continue;
+            }
+
+            if ($champ['nature'] === 'liste') {
+                $permis = self::CHOIX_PAR_COLONNE[$champ['colonne']] ?? [];
+                if ($valeur !== '' && ! in_array($valeur, $permis, true)) {
+                    $refuses[] = $nom;
+
+                    continue;
+                }
+            }
+
+            if ($champ['nature'] === 'port' && $valeur !== '') {
+                $entier = filter_var($valeur, FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1, 'max_range' => 65535]]);
+                if ($entier === false) {
+                    $refuses[] = $nom;
+
+                    continue;
+                }
+                $valeur = (string) $entier;
+            }
+
+            $valeurs[$nom] = $valeur;
+        }
+
+        $this->supervision->enregistreOverrides($idMachine, $valeurs);
+
+        // UN REFUS SE DIT, il ne se devine pas — meme lecon que le correctif
+        // backend de v1.37.41, ou un rejet silencieux passait pour un succes.
+        if ($refuses !== []) {
+            return redirect()->route('supervision', ['reglages' => $idMachine])
+                ->with('superv_reglages_erreur', __('superv.reglages_refuses', [
+                    'champs' => implode(', ', $refuses),
+                ]));
+        }
+
+        return redirect()->route('supervision', ['reglages' => $idMachine])
+            ->with('superv_reglages_message', __('superv.reglages_enregistres', [
+                'nom' => $machine->name,
+            ]));
+    }
+
     /**
      * Les routes de la passerelle, PAR PLATEFORME — correctif de V7, porte en V9.
      *

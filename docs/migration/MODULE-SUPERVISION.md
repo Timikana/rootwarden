@@ -631,6 +631,42 @@ pas écrite et rien ne le dit, alors que le `.conf` continue de référencer `TL
 littéral ; le contenu voyage en base64. Et côté Zabbix un échec de sauvegarde est **annoncé** dans le flux
 (`WARN:`), plus honnête que le `None` silencieux de `config/save` — la version générique, elle, l'ignore.
 
+## 7 sexdecies. V10a porté — les réglages par machine, avec une liste FERMÉE (2026-08-22)
+
+L'exploitant a tranché : **corriger l'injection ET porter une interface bornée**. Deux commits — le
+correctif de sécurité (v1.37.41), puis l'interface (v1.37.42). Suite
+`go-page-supervision-reglages` : base rouge **5 PASS / 8 FAIL**, puis **32 PASS** sur le portage et **8**
+sur le legacy. Détail en `PARITE.md` E-86.
+
+**CE N'EST PAS UN PORTAGE.** `supervision_overrides` n'avait jamais eu d'interface : la priorité
+`overrides > profil > globale` existait avec son étage le plus fort **inatteignable**. Côté legacy, la
+suite ne mesure qu'une chose — qu'il n'y a rien.
+
+**LA DÉCISION DE DESSIN : ne pas offrir d'entrée libre plutôt que la valider.** Huit champs, huit noms
+fixes — exactement ceux que `_build_config_lines` traite par leur nom — et **aucun champ où saisir un NOM
+de paramètre**. Valider une entrée libre et ne pas en offrir ne se valent pas : la seconde ne se contourne
+pas par une requête forgée. La suite en émet une, justement, pour exercer la revalidation du contrôleur.
+
+**LE FORMULAIRE POSTE VERS LE PORTAGE, pas vers la passerelle** — et le test en fait une propriété :
+`POST /supervision/overrides/<id>` est la seule route du module touchant une machine sans
+`@require_machine_access`. **Le geste ne joint AUCUNE machine**, la page le dit, et la suite le mesure
+(zéro requête pendant l'enregistrement). **Vider un champ SUPPRIME le réglage**, il ne l'enregistre pas
+vide.
+
+**UN DÉFAUT DE MON PORTAGE, TROUVÉ PAR MA SUITE, ET SA CAUSE EST DANS LE CADRE.** Le premier jet ne
+supprimait jamais rien : `ConvertEmptyStringsToNull` (groupe `web`) rend une chaîne vide en `null`,
+**exactement comme un champ absent** — alors que vide veut dire « supprime » et absent « ne touche pas ».
+Mesuré : `input('a')` = NULL et `has('a')` = true pour `a=""`. Corrigé par `has()`.
+
+**DEUX DÉFAUTS DE MA SUITE** : un motif `/nom|name|param/` qui échouait sur `override_Hostname` (il
+contient « name ») et ne disait rien de plus que la comparaison à la liste fermée ; et une **navigation qui
+referme l'onglet**, dont l'échec apparaissait deux gestes plus loin.
+
+**ET UN DÉFAUT VU À L'IMAGE** : `.rw-etiquette-champ` met toute l'étiquette en capitales gras, et seule
+`.rw-saisie` y était remise à plat — chaque champ portait cinq lignes de capitales sous lui.
+
+**Reste du module** : V10 (la reconfiguration elle-même), V11 (désinstallation), V12 (déploiement).
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et
