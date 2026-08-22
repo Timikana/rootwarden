@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.32** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.33** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2169,6 +2169,64 @@ sans `can_scan_cve` peut toujours creer, modifier et supprimer une planification
 contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
+portage**.
+
+### v1.37.33 — module `supervision/`, sous-lot V2 : le catalogue de profils, en lecture
+
+**Symptome.** Le catalogue de profils affichait « Editer » et « Supprimer » en francais meme en anglais,
+portait le profil ENTIER dans un attribut `onclick` de chaque ligne, et rejouait quatre requetes backend
+a chaque changement de plateforme — dont deux identiques.
+
+**Cause racine.** Trois causes distinctes, plus une decouverte par la mesure.
+`profiles.js:43-46` ecrit ses deux libelles d'action EN DUR dans le HTML qu'il construit : ils echappent
+donc a toute parite FR/EN, et aucun controle d'i18n ne les voit — ils cherchent des identifiants
+`module.cle`, pas du francais. La meme ligne fait
+`editProfile(${JSON.stringify(p)...})` : le document porte, dans un attribut de gestionnaire
+d'evenement, toutes les colonnes de la ligne, `notes` comprise (652 et 671 caracteres mesures). Et la
+route backend fait `SELECT *`, donc le navigateur recoit `notes`, `tls_connect`, `tls_accept`,
+`created_at` et `updated_at` pour un tableau de cinq colonnes.
+**Le quatrieme defaut n'etait pas repertorie** : changer de plateforme emet `config/<p>`,
+`profiles?platform=<p>` **deux fois**, et `profiles/assignments?platform=<p>` — la meme requete jouee par
+le `onchange` de la page ET par le crochet `DOMContentLoaded` de `profiles.js`.
+
+**Fix.** Les quatre catalogues sont peints COTE SERVEUR, le script n'en montre qu'un : ouvrir l'onglet
+et changer de plateforme emettent **zero appel**. C'est ce que V1 a rendu possible. Les colonnes sont
+NOMMEES, jamais `SELECT *` : la page ne recoit que ce qu'elle affiche. Aucun gestionnaire en attribut.
+Tous les libelles viennent du meme catalogue FR/EN que la page.
+
+**LE SCHEMA A ETE MESURE AVANT D'ECRIRE LA REQUETE, et il a corrige deux suppositions.** La table
+s'appelle `supervision_metadata_profiles`, pas `supervision_profiles`. Et le « nombre de machines » ne
+vient d'aucune colonne de `machines` : il vient de `machine_supervision_profile`, cle primaire
+`(machine_id, platform)` — une machine porte donc UN profil PAR PLATEFORME, et le compte se filtre par
+plateforme. Deduire ces deux points de l'affichage aurait produit une requete fausse qui SEMBLAIT juste
+sur ce parc. Verifie au passage, comme E-72 le demandait : `fk_msp_profile` porte bien un
+`ON DELETE CASCADE`, donc la consequence de l'absence de `@require_role` sur
+`DELETE /supervision/profiles/<id>` est confirmee.
+
+**Une divergence assumee, et c'est une amelioration.** Le legacy ecrit `-` dans les colonnes Serveur et
+Mandataire quand la valeur est NULL. `-` n'apprend rien ; NULL veut dire « la configuration globale
+s'applique », et c'est ce que le portage ecrit. La suite ne cherche donc pas `-` : elle asserte
+qu'aucune valeur absente n'est rendue par un MOT DE CODE (`null`, `undefined`, `NaN`,
+`[object Object]`).
+
+**Un defaut de la suite, corrige entre la mesure du legacy et le portage.** Elle comptait les lignes du
+tableau SANS regarder si elles etaient visibles. Sur le legacy cela passait — il vide son `tbody` a
+chaque bascule — mais un portage qui peint les quatre plateformes et en cache trois aurait fait mesurer
+le catalogue de Zabbix en croyant mesurer celui de Centreon. `textContent` mesure la presence, pas la
+visibilite. Corrigee puis re-mesuree sur le legacy : 14 PASS, inchange.
+
+**Deux defauts d'affichage vus A L'IMAGE** : la description d'un profil, rendue en ligne, etirait la
+colonne du nom a 780 px sur un ecran de 1920 et poussait les quatre autres a droite
+(`.rw-cellule-note`) ; et l'astuce sur `{machine.name}` s'affichait meme sur une plateforme sans aucun
+profil, ou elle decrivait un contenu absent.
+
+**CE QUI RESTE AU BACKEND, et attend une decision** : les quatre routes de profils sans `@require_role`,
+l'absence de `/supervision/` dans `$ADMIN_ONLY_PREFIXES`, le `SELECT *` de `list_profiles` et la requete
+jouee en double. Aucune ligne de backend modifiee.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V3 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-profils` entre avec **14 PASS sur le legacy** et **18 sur le
 portage**.
 
 ### v1.37.32 — module `supervision/`, sous-lot V1 : la page, ses quatre onglets, et une cle qui quitte l'ecran

@@ -1307,6 +1307,22 @@ a.rw-bouton { display: inline-block; }
 .rw-badge--alerte    { background: var(--rw-danger-fond);                                        color: var(--rw-danger); }
 .rw-badge--note      { min-width: 2.1em; text-align: center; font-size: 13px; font-weight: 700; }
 
+/* UN COMPTE DE ZERO NE DOIT PAS CRIER. La pastille de base est a la couleur
+   d'accent : un « 0 » machines assignees y prenait le meme poids visuel qu'un
+   « 12 », alors qu'il dit precisement qu'il n'y a rien. Contraste verifie sur
+   les deux themes. */
+/* UNE PRECISION SOUS UN LIBELLE, PAS A COTE. En ligne, la description d'un
+   profil etirait sa colonne a 780 px sur un ecran de 1920 et poussait les
+   quatre autres a droite : le tableau devenait illisible alors qu'aucune
+   assertion ne bougeait. Vu a l'image. */
+.rw-cellule-note { display: block; margin-top: 2px; }
+
+.rw-badge--neutre {
+    background: var(--rw-surface-2);
+    color: var(--rw-texte-doux);
+    border: 1px solid var(--rw-bordure);
+}
+
 /* Le rapport s'imprime : c'est sa raison d'etre. La barre laterale, l'en-tete et
    les actions n'ont rien a faire sur le papier, et une section ne doit pas se
    couper en deux pages au milieu d'un tableau. */

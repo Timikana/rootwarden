@@ -2300,3 +2300,70 @@ qu'absorbé par le correctif. Références inchangées : legacy 16, portage 20.
 
 **La leçon, au-delà de ce cas** : une assertion qui compare deux valeurs venues de deux horloges mesure
 les horloges, pas la propriété. Le repère se choisit — et c'est celui qui a produit la valeur.
+
+## E-74 — Le catalogue de profils : deux libellés hors de toute traduction, un enregistrement entier dans un attribut `onclick`
+
+**Module `supervision/`, sous-lot V2 : le catalogue de profils, en lecture.** Suite :
+`tests/e2e/go-page-supervision-profils.mjs` — **14 PASS sur le legacy, 18 sur le portage** (base rouge
+relevée avant portage : **12 PASS / 6 FAIL**).
+
+**LE SCHÉMA A ÉTÉ MESURÉ AVANT D'ÉCRIRE UNE SEULE REQUÊTE, et il a corrigé deux suppositions du brief.**
+La table s'appelle **`supervision_metadata_profiles`**, pas `supervision_profiles`. Et le « nombre de
+machines » du tableau ne vient d'aucune colonne de `machines` : il vient de
+**`machine_supervision_profile`**, dont la clé primaire est `(machine_id, platform)` — une machine porte
+donc **un profil par plateforme**, et le compte se filtre par plateforme. Déduire ces deux points de
+l'affichage aurait produit une requête fausse qui *semblait* juste sur ce parc.
+
+**Vérifié, comme E-72 le demandait** : `fk_msp_profile` porte bien un `ON DELETE CASCADE` vers
+`supervision_metadata_profiles`. La conséquence annoncée tient donc mot pour mot :
+`DELETE /supervision/profiles/<id>`, qui n'a **aucun `@require_role`**, emporte les assignations avec le
+profil.
+
+**Défaut 1 — deux libellés écrits en dur dans le JS, donc hors de toute parité FR/EN.**
+`profiles.js:43-46` construit chaque ligne avec `>Editer<` et `>Supprimer<` en clair. Mesuré en
+demandant la page en anglais : le catalogue rend **`Editer, Supprimer`** en français. Aucun contrôle
+d'i18n ne le voyait — ils cherchent des identifiants `module.cle`, pas du français. La suite mesure ces
+mots **dans le catalogue**, pas dans la page : « Supprimer » apparaît ailleurs dans les deux portails, et
+une recherche sur `body` accuserait le tableau de ce que fait son voisin.
+
+**Défaut 2 — le profil ENTIER est sérialisé dans un attribut `onclick`.**
+`editProfile(${JSON.stringify(p)...})` : le document porte, dans un attribut de gestionnaire
+d'événement, toutes les colonnes de la ligne — `notes` comprise, qui contient les consignes
+d'exploitation Zabbix. **Mesuré** : deux attributs de **652 et 671 caractères** sur deux profils. Le
+portage n'a aucun gestionnaire en attribut : la mesure est donc « zéro attribut », pas « un attribut
+court ».
+
+**Défaut 3 — la route backend fait `SELECT *`.** `list_profiles` renvoie au navigateur `notes`,
+`tls_connect`, `tls_accept`, `created_at` et `updated_at` alors que le tableau n'affiche que cinq
+colonnes. Le portage nomme ses colonnes : la page ne reçoit que ce qu'elle montre. **Non corrigé côté
+backend** — la route reste inchangée.
+
+**Défaut 4, non annoncé par l'inventaire, et découvert par la mesure du réseau.** Changer de plateforme
+émet **quatre** requêtes sur le legacy — `config/<p>`, `profiles?platform=<p>` **deux fois**, et
+`profiles/assignments?platform=<p>`. La même requête est donc jouée en double : le gestionnaire
+`onchange` de la page et le crochet `DOMContentLoaded` de `profiles.js` la déclenchent tous les deux.
+
+**Le portage n'émet RIEN**, et c'est ce que V1 a rendu possible : les quatre catalogues sont peints côté
+serveur, le script n'en montre qu'un. Ouvrir l'onglet : **0 appel**. Changer de plateforme : **0 appel**.
+
+**Une divergence assumée, et c'est une amélioration.** Le legacy écrit `-` dans les colonnes Serveur et
+Mandataire quand la valeur est `NULL`. `-` n'apprend rien ; `NULL` veut dire ici « la configuration
+globale s'applique », et c'est ce que le portage écrit. La suite ne cherche donc pas `-` : elle asserte
+qu'aucune valeur absente n'est rendue par un **mot de code** (`null`, `undefined`, `NaN`,
+`[object Object]`) — la propriété, pas la forme.
+
+**Un défaut de ma suite, corrigé entre la mesure du legacy et le portage.** Elle comptait les `tr` du
+corps du tableau **sans regarder s'ils étaient visibles**. Sur le legacy cela passait — il vide son
+`tbody` à chaque bascule — mais un portage qui peint les quatre plateformes et en cache trois aurait fait
+mesurer le catalogue de Zabbix en croyant mesurer celui de Centreon. La suite prend maintenant le
+catalogue **visible** et ses lignes **visibles** : `textContent` mesure la présence, pas la visibilité.
+Corrigée puis re-mesurée sur le legacy — 14 PASS, inchangé.
+
+**Deux défauts d'affichage vus À L'IMAGE :** la description d'un profil, rendue en ligne, étirait la
+colonne du nom à 780 px sur un écran de 1920 et poussait les quatre autres à droite (`.rw-cellule-note`
+la met sous le nom) ; et l'astuce sur `{machine.name}` s'affichait même sur une plateforme sans aucun
+profil, où elle décrivait un contenu absent — elle est désormais dans la branche garnie.
+
+**Non porté, et dit tel quel** : la création, la modification et la suppression d'un profil, ainsi que
+son assignation à une machine (V5). Le panneau le dit et mène à l'ancien portail. `notes` n'est affiché
+par aucun des deux portails hors de la boîte de modification : il reste donc hors de V2.

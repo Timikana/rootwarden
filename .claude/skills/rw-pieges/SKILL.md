@@ -592,6 +592,35 @@ defaut reel au lieu de le rendre visible (ici : l'affichage des deux portails es
 faux de deux heures ; le scheduler, lui, compare dans son propre repere et ne
 declenche rien trop tot). Voir `PARITE.md` E-73.
 
+## Un libelle ecrit en dur dans du JS echappe a TOUS les controles d'i18n
+
+`profiles.js` construit ses lignes avec `>Editer<` et `>Supprimer<` en clair.
+Les controles d'i18n cherchent des IDENTIFIANTS (`module.cle`) et la parite des
+JEUX DE CLES : ni l'un ni l'autre ne voit du francais parfaitement lisible dans
+une chaine de gabarit. **Demander la page en anglais et chercher les mots
+francais** est la seule mesure qui le trouve.
+
+Et la chercher **dans le bloc concerne**, pas dans `body` : « Supprimer »
+apparait ailleurs dans les deux portails, et une recherche globale accuse un
+tableau de ce que fait son voisin.
+
+## Compter des lignes sans regarder si elles sont VISIBLES
+
+Une suite qui compte les `tr` d'un `tbody` passe tant que la page vide son
+tableau a chaque changement de filtre. Un portage qui peint TOUTES les variantes
+cote serveur et en cache toutes sauf une casse cette hypothese en silence : on
+mesure alors le tableau de la premiere variante en croyant mesurer celui de la
+variante affichee. Prendre le conteneur VISIBLE (`offsetParent !== null`) puis
+ses lignes visibles. Meme regle pour l'etat vide.
+
+## Un enregistrement entier serialise dans un attribut de gestionnaire
+
+`onclick='editProfile(${JSON.stringify(p)})'` met toutes les colonnes de la
+ligne dans le document, `notes` d'exploitation comprise (652 et 671 caracteres
+mesures). La mesure est la LONGUEUR de l'attribut ; pour un portage sans
+gestionnaire en attribut, la propriete attendue est **zero attribut**, pas « un
+attribut court ».
+
 ## Un test qui ne peut pas echouer occupe la place d'un test
 
 Assertion ecrite pour V1 : « aucune cle de traduction ne s'affiche en

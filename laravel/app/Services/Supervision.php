@@ -52,6 +52,60 @@ class Supervision
     }
 
     /**
+     * Le catalogue de profils, par plateforme — sous-lot V2, LECTURE SEULE.
+     *
+     * LE SCHEMA A ETE MESURE AVANT D'ECRIRE CETTE REQUETE, et il a corrige deux
+     * suppositions : la table s'appelle `supervision_metadata_profiles` (pas
+     * `supervision_profiles`), et le nombre de machines assignees ne vit pas dans
+     * une colonne de `machines` mais dans `machine_supervision_profile`, dont la
+     * cle primaire est `(machine_id, platform)` — une machine porte donc UN profil
+     * PAR PLATEFORME, et le compte se filtre par plateforme.
+     *
+     * LES COLONNES SONT NOMMEES, jamais `SELECT *`. La route backend, elle, fait
+     * `SELECT *` et envoie au navigateur `notes`, `tls_connect`, `tls_accept`,
+     * `created_at` et `updated_at` alors que son tableau n'affiche que cinq
+     * colonnes. Ici la page ne recoit que ce qu'elle montre.
+     *
+     * @return array<string,list<object>> indexe par plateforme
+     */
+    public function profilsParPlateforme(): array
+    {
+        $comptes = DB::table('machine_supervision_profile')
+            ->select('profile_id', 'platform')
+            ->selectRaw('COUNT(*) as machines')
+            ->groupBy('profile_id', 'platform')
+            ->get();
+
+        $parProfil = [];
+        foreach ($comptes as $ligne) {
+            $parProfil[(int) $ligne->profile_id][(string) $ligne->platform] = (int) $ligne->machines;
+        }
+
+        $catalogue = array_fill_keys($this->plateformes(), []);
+
+        $profils = DB::table('supervision_metadata_profiles')
+            ->select('id', 'platform', 'name', 'description', 'host_metadata',
+                     'zabbix_server', 'zabbix_server_active', 'zabbix_proxy', 'listen_port')
+            ->whereIn('platform', $this->plateformes())
+            ->orderBy('name')
+            ->get();
+
+        foreach ($profils as $p) {
+            $plateforme = (string) $p->platform;
+            // La plateforme vient d'une colonne de la base : on ne cree JAMAIS
+            // une entree pour une valeur inattendue, sinon un enregistrement
+            // decide de la structure de la page.
+            if (! array_key_exists($plateforme, $catalogue)) {
+                continue;
+            }
+            $p->machines = $parProfil[(int) $p->id][$plateforme] ?? 0;
+            $catalogue[$plateforme][] = $p;
+        }
+
+        return $catalogue;
+    }
+
+    /**
      * Le parc que la page a le droit de montrer : tout, sauf les archivees.
      *
      * Le filtre de cycle de vie est pose UNE FOIS et non dans une branche : le

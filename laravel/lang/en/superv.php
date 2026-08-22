@@ -27,6 +27,19 @@ return [
     'config_description' => 'These settings act as a template for every deployment. Each server may carry its own values.',
 
     'profils_titre' => 'Monitoring profiles',
+    // ── The catalogue, sub-lot V2 (read-only) ─────────────────────────────
+    'profil_nom' => 'Name',
+    'profil_metadonnees' => 'HostMetadata',
+    'profil_serveur' => 'Server',
+    'profil_mandataire' => 'Proxy',
+    'profil_machines' => 'Machines',
+    // AN ABSENT VALUE SAYS WHAT IT MEANS. The legacy portal writes "-", which
+    // teaches nothing: here the absence means the global configuration applies,
+    // and that is what is written.
+    'profil_herite' => 'Global configuration',
+    'profils_aucun' => 'No profile for this platform',
+    'profils_aucun_aide' => 'No monitoring profile is defined for :plateforme. Profiles belong to one platform each.',
+    'profils_interpolation' => 'Values may contain {machine.name} or {machine.ip}: they are substituted at deployment time.',
     'profils_description' => 'Reusable presets (host metadata, server, proxy). The catalogue is written once, then each server is attached to a profile.',
 
     'deploiement_titre' => 'Agent deployment',
