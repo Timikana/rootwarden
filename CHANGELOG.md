@@ -2171,6 +2171,75 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### mesure — module `supervision/`, sous-lot V8 : le releve de parc n'est pas porte, et c'est le resultat
+
+*Aucun changement de comportement, aucune version : ce commit ne porte que la mesure et la declaration.*
+
+**Symptome.** Le decoupage annoncait V8 comme « a reconcevoir en tache de fond ». La mesure montre que la
+reconception ne repond pas a la vraie question : **le releve joint la PRODUCTION par construction.**
+
+**CE QU'UN CLIC ENVOIE, COMPTE SANS CLIQUER.** `scanAllAgents` (`main.js:88`) itere
+`#deploy-table-body tr[data-machine-id]` et boucle sur les quatre plateformes. La page charge toutes les
+machines non archivees — `srv-zabbix` (id 1, PROD) comprise. Parc actuel : 3 machines, donc
+**3 x 4 = 12 sessions SSH dans la meme boucle synchrone**, sans etalement ni plafond ni file. La mesure a
+ete faite par LECTURE du code et OBSERVATION DU RESEAU : `requetes_envoyees: []`, prouve, le bouton n'a
+pas ete touche.
+
+**LE DEFAUT LE PLUS CONCRET : le filtre borne une action de masse et pas sa voisine.** Filtre saisi sur
+`Test-Server`, onglet actif :
+
+    lignes reellement visibles      : 1   (Test-Server-Debian)
+    lignes visees par scanAllAgents : 3   (OpenCVE-Test-OnPrem, srv-zabbix, Test-Server-Debian)
+
+`filterDeployTable` masque par `row.style.display`, que le selecteur du releve ne regarde pas — alors que
+celui de « Tout cocher » le regarde (`tr:not([style*="display: none"])`). Meme tableau, meme barre
+d'actions, deux perimetres opposes, et rien a l'ecran qui le dise.
+
+**LE BACKEND CONDAMNE CE CHEMIN DANS SON PROPRE COMMENTAIRE** (`routes/helpers.py:24-30`) : les operations
+longues de parc « doivent passer en tache de fond (centre de taches), **jamais monopoliser ce pool** ».
+C'est ecrit parce que le sinistre a eu lieu : le fix v1.37.13 relate une boucle SSH de parc DANS la
+requete HTTP, 504 en cascade sur toute l'interface. `ssh-audit/scan-all` a ete corrige dans cette vague ;
+**`supervision/` ne l'a pas ete.** Et `threaded_route` bloque sur `future.result()` SANS timeout : au-dela
+des 32 slots, les requetes ne tombent pas, elles s'empilent.
+
+**IL N'EXISTE AUCUNE ROUTE DE PARC COTE BACKEND.** Les 30 routes du blueprint sont toutes par machine ; le
+releve n'existe que dans le JS. Le « porter en tache de fond » serait donc ECRIRE UNE ROUTE QUI N'A JAMAIS
+EXISTE — pas un portage.
+
+**DEUX CLES i18n CASSEES, cause racine MIROIR de celle de V4.** `scan_all_running` et `scan_all_done`
+existent — mais sous `supervision.*`, que `window._i18n` (peuple par `getJsTranslations('js.')`) ne
+contient pas. Resolu dans la page : `__('scan_all_running')` rend **`"scan_all_running"`**. Comme `__()`
+retourne la cle, le repli `|| 'Scan en cours...'` NE SE DECLENCHE JAMAIS. Treizieme et quatorzieme.
+`select_machine`, elle, est bien dans `js.php` : **exoneree**.
+
+**UN NEUVIEME FRANCAIS EN DUR, celui-la TOUJOURS affiche.** `updateAgentCounter` (`main.js:84`) construit
+`count + '/' + total + ' avec ' + currentPlatform` — mesure a l'ecran : **`0/3 avec zabbix`**. Ce n'est pas
+un repli inatteignable comme les huit precedents.
+
+**DEUX EXONERATIONS, dites aussi nettement qu'une accusation.** Le compteur `startsWith(letter)` ne
+confond aucune plateforme avec le jeu de badges actuel (Z/C/P/T distincts, aucun autre element arrondi
+dans la cellule) — le selecteur reste fragile, il ne produit pas de faux compte. Et le `@threaded_route`
+**imbriqué n'existe pas** : mesure avec le Werkzeug du conteneur, la regle statique
+`/supervision/zabbix/version` gagne sur `/supervision/<platform>/version` **dans les deux ordres de
+declaration**. Une lecture prend un slot, pas deux.
+
+**MAIS HUIT BRANCHES MORTES ARMENT LE PIEGE (nouveau, E-81).** Les huit paires statique/generique du
+module portent `@threaded_route` **des deux cotes**, et le `if platform == 'zabbix': return zabbix_xxx()`
+de chaque handler generique est inatteignable par HTTP. La regle statique ressemble a un doublon : le jour
+ou on la supprime, la branche devient vivante et chaque appel Zabbix prend DEUX slots du meme pool,
+l'externe attendant l'interne. Un releve de 16 machines demanderait 128 slots pour 32 : le pool ne
+ralentit pas, il se bloque. Ce point etait liste « a mesurer » depuis le debut du module ; il est
+**referme** par une refutation ET un piege nomme.
+
+**CE QUI ATTEND L'EXPLOITANT.** La decision n'est pas « comment porter » mais « faut-il un releve de
+parc » : les trois options etudiees — ne pas porter, tache de fond, sequentiel borne — **joignent toutes
+la production**, puisque le parc est « toutes les machines non archivees ». Reconcevoir change la charge,
+pas la cible. Sous la regle en vigueur — `srv-zabbix` n'est jamais jointe, meme en lecture — seule la
+premiere tient, et la detection PAR LIGNE de V6 la couvre deja. **Rien n'a ete porte sans arbitrage.**
+
+**Reference du LOT** : inchangee, **65 suites**. V8 n'ajoute aucune suite — il n'y a rien a caracteriser
+tant que la cible n'est pas tranchee, et une suite qui ne peut pas echouer occuperait la place d'un test.
+
 ### v1.37.38 — module `supervision/`, sous-lot V7 : l'editeur distant en lecture
 
 **Symptome.** La page de l'editeur nommait un fichier de configuration, et le portail en lisait un autre.
