@@ -417,11 +417,48 @@ annonçait le chemin de Telegraf), et « Fichier lu » affiché avant toute lect
 **Reste du module** : V8 (relevé du parc, à reconcevoir en tâche de fond) et V9 (écriture + restauration,
 qui modifient la machine).
 
+## 7 undecies. V8 mesuré, non porté — le relevé de parc est une décision, pas un portage (2026-08-22)
+
+**Aucune ligne de portage n'a été écrite**, et c'est le résultat. `scanAllAgents` joint `srv-zabbix`
+(id 1, PRODUCTION) par construction : la mesure s'est donc faite **par lecture du code et observation du
+réseau**, sans jamais cliquer le bouton. Détail en `PARITE.md` E-80 et E-81.
+
+**Ce qu'un clic envoie** : le parc compte 3 machines non archivées, la boucle balaie 4 plateformes,
+soit **12 sessions SSH lancées dans la même boucle synchrone** — sans étalement, sans plafond, sans file.
+
+**Le défaut le plus concret : le filtre borne « Tout cocher » et pas le relevé.** Mesuré, filtre saisi
+sur `Test-Server` : **1 ligne visible, 3 lignes visées** — dont la production. `filterDeployTable` masque
+par `style.display`, que le sélecteur du relevé ne regarde pas, alors que celui des cases le regarde.
+Deux actions de masse voisines, deux périmètres opposés, rien à l'écran qui le dise.
+
+**Le backend condamne ce chemin dans son propre commentaire** (`routes/helpers.py:24-30`) : les opérations
+longues de parc *« doivent passer en tache de fond (centre de taches), jamais monopoliser ce pool »*.
+`ssh-audit/scan-all` a été corrigé dans la vague v1.37.13 après un sinistre de 504 en cascade ;
+**`supervision/` ne l'a pas été**. Et il n'existe **aucune route de parc** côté backend : le relevé
+n'existe que dans le JS. Le « porter en tâche de fond » serait donc **écrire une route qui n'a jamais
+existé** — pas un portage.
+
+**Deux clés i18n cassées, cause racine miroir de celle de V4** : `scan_all_running` et `scan_all_done`
+sont traduites sous `supervision.*`, que `window._i18n` (peuplé par `getJsTranslations('js.')`) ne contient
+pas. L'écran rend l'identifiant, et le repli français ne se déclenche jamais. `select_machine`, elle, est
+bien dans `js.php` — **exonérée**. Un neuvième français en dur, celui-là toujours affiché :
+`updateAgentCounter` construit `0/3 avec zabbix`.
+
+**Deux exonérations.** Le compteur `startsWith(letter)` ne confond aucune plateforme avec le jeu de badges
+actuel (Z/C/P/T distincts, aucun autre élément arrondi dans la cellule). Et le `@threaded_route`
+**imbriqué n'existe pas** : Werkzeug préfère la règle statique, dans les deux ordres de déclaration. Mais
+les **huit** branches `if platform == 'zabbix'` des handlers génériques sont du **code mort qui arme le
+piège** pour le jour où l'on supprimera la règle statique en la prenant pour un doublon (E-81).
+
+**La décision portée à l'exploitant** n'est pas « comment porter » mais « faut-il un relevé de parc » :
+les trois options — ne pas porter, tâche de fond, séquentiel borné — **joignent toutes la production**,
+puisque le parc est « toutes les machines non archivées ». Reconcevoir change la charge, pas la cible.
+
 ## 8. Ce qui reste à mesurer
 
-La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et `/supervision/<platform>/deploy`
-— si l'inverse de ce qui est supposé était vrai, il y aurait un `@threaded_route` **imbriqué** sur
-chaque déploiement Zabbix, donc un risque d'interblocage du pool. Un `curl` avec journalisation
-tranche en une minute · le périmètre de scan Tailwind v4 pour `laravel/public/js/*.js` : si ces
+~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et
+`/supervision/<platform>/deploy`~~ — **TRANCHÉ en V8, voir `PARITE.md` E-81** : la règle statique gagne,
+dans les deux ordres de déclaration, donc aucune imbrication. En revanche les **huit** branches de
+délégation sont du code mort qui armerait le piège si l'on supprimait la règle statique · le périmètre de scan Tailwind v4 pour `laravel/public/js/*.js` : si ces
 fichiers ne sont pas scannés, les quatre palettes de badges **disparaissent en production** · le
 nombre exact de canaux `exec_command` par session de déploiement.

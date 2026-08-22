@@ -2751,3 +2751,131 @@ bouton « Restaurer » n'existe pas.
 
 **Un huitième français en dur, relevé au passage** : `saveRemoteConfig` (`main.js:539`) porte
 `'Configuration vide'`. Il appartient au chemin de V9.
+
+## E-80 — Le relevé de parc : le filtre borne une action de masse et pas sa voisine, et la production est dans le lot
+
+**Module `supervision/`, sous-lot V8 : le relevé de tout le parc.** **Aucun portage n'a été écrit** — la
+mesure a montré que ce n'était pas un portage à faire mais une décision d'exploitation à prendre. Ce qui
+suit a été établi **par lecture du code et observation du réseau, sans jamais déclencher le geste** :
+`scanAllAgents` joint `srv-zabbix` (id 1, PRODUCTION) par construction.
+
+**CE QU'UN CLIC ENVOIE, COMPTÉ.** `scanAllAgents` (`main.js:88`) itère
+`#deploy-table-body tr[data-machine-id]` et, pour chaque ligne, boucle sur les **quatre** plateformes.
+Le parc compte **3 machines non archivées** — la requête de la page est
+`WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'`, donc `srv-zabbix` en fait partie.
+Un clic ouvre donc **3 × 4 = 12 sessions SSH**, toutes lancées dans la **même boucle synchrone**, sans
+étalement, sans plafond, sans file.
+
+**LE DÉFAUT LE PLUS CONCRET : LE FILTRE NE BORNE PAS LE RELEVÉ.** Mesuré sur la page, l'onglet actif,
+avec le filtre saisi sur `Test-Server` :
+
+```
+lignes réellement visibles          : 1   (Test-Server-Debian)
+lignes visées par scanAllAgents     : 3   (OpenCVE-Test-OnPrem, srv-zabbix, Test-Server-Debian)
+requêtes émises par la mesure       : 0   (prouvé au réseau — le bouton n'a pas été cliqué)
+```
+
+`filterDeployTable` pose `row.style.display = 'none'` mais laisse `data-machine-id` : le sélecteur du
+relevé ne regarde pas la visibilité. Or **« Tout cocher », dans la même barre d'actions, la regarde** —
+son sélecteur est `tr:not([style*="display: none"])`. Deux actions de masse voisines, sur le même
+tableau, avec deux périmètres opposés, et rien à l'écran ne le dit. Quelqu'un qui filtre son parc pour
+n'agir que sur une machine touche une machine par le chemin des cases, et **trois — dont la
+production — par celui du relevé**.
+
+**LE BACKEND CONDAMNE LUI-MÊME CE CHEMIN, TEXTUELLEMENT.** Le pool partagé par toutes les routes
+`@threaded_route` porte ce commentaire (`routes/helpers.py:24-30`) : *« les operations longues de parc
+(ex. /ssh-audit/scan-all) doivent elles passer en tache de fond (centre de taches), **jamais monopoliser
+ce pool** »*. Il y est écrit parce que le sinistre a déjà eu lieu : le fix v1.37.13 relate qu'une boucle
+SSH de parc **dans la requête HTTP** a produit des 504 en cascade sur toute l'interface. `ssh-audit` a
+été corrigé dans cette vague ; **`supervision/` ne l'a pas été.** Et `threaded_route` bloque sur
+`future.result()` **sans timeout** : au-delà des 32 slots, les requêtes ne tombent pas, elles s'empilent,
+connexion HTTP tenue ouverte.
+
+**IL N'EXISTE AUCUNE ROUTE DE PARC CÔTÉ BACKEND.** Les 30 routes du blueprint `supervision` sont toutes
+par machine ; le relevé de parc n'existe **que** dans le JS du navigateur. Le porter « en tâche de fond »
+n'est donc pas un portage : c'est **écrire une route backend qui n'a jamais existé**.
+
+**DEUX CLÉS i18n CASSÉES, ET LA CAUSE RACINE EST L'IMAGE MIROIR DE CELLE DE V4.** Mesuré en résolvant
+les clés dans la page, sans déclencher le relevé :
+
+```
+__('scan_all_running')  ->  "scan_all_running"                              ← l'identifiant à l'écran
+__('scan_all_done')     ->  "scan_all_done"                                 ← l'identifiant à l'écran
+__('select_machine')    ->  "Veuillez selectionner au moins une machine."    ← EXONÉRÉE
+```
+
+`window._i18n = getJsTranslations('js.')` (`head.php:76`) ne contient **que** l'espace `js.`. Les deux
+clés existent bel et bien — mais dans `lang/{fr,en}/supervision.php`, sous `supervision.scan_all_running`,
+que le JS ne peut pas atteindre. Symétrique de `supervision.zabbix_server` (V4), où la clé était appelée
+**avec** son préfixe : ici elle est **écrite avec** et appelée **sans**. Et comme `__()` rend la clé
+telle quelle, le repli `|| 'Scan en cours...'` **ne se déclenche jamais**. Treizième et quatorzième.
+
+**UN NEUVIÈME FRANÇAIS EN DUR, celui-là toujours affiché.** `updateAgentCounter` (`main.js:84`) construit
+`count + '/' + total + ' avec ' + currentPlatform`. Mesuré à l'écran : **`0/3 avec zabbix`**. Ce n'est pas
+un repli inatteignable comme les précédents — c'est le texte que la page rend en anglais comme en français,
+à chaque chargement et à chaque bascule de plateforme.
+
+**UNE ACCUSATION QUE LA MESURE RETIRE.** Le suivi de chantier soupçonnait `updateAgentCounter` de
+confondre les plateformes, parce qu'il compte par `b.textContent.trim().startsWith(letter)`. Vérifié :
+les quatre lettres sont `Z`, `C`, `P`, `T`, les badges valent `letter + ' ' + version`, et
+`.deploy-agents` ne contient aucun autre élément arrondi. **Aucune confusion possible avec le jeu de
+badges actuel.** Le sélecteur reste fragile — il tient à ce que les quatre initiales restent
+distinctes — mais il ne produit pas de faux compte aujourd'hui, et le dire est aussi net que l'accuser.
+
+**LA DÉCISION N'EST PAS « COMMENT PORTER » MAIS « FAUT-IL UN RELEVÉ DE PARC ».** Les trois options
+étudiées — ne pas porter, porter en tâche de fond, porter en séquentiel borné — **joignent toutes la
+production** dès lors que le parc est « toutes les machines non archivées ». Reconcevoir le relevé change
+sa charge, pas sa cible. La règle de sûreté en vigueur — *`srv-zabbix` n'est jamais jointe, même en
+lecture* — ne laisse donc de place qu'à la première : la détection **par ligne** de V6, sur une machine
+qu'on a désignée. Arbitrage porté à l'exploitant ; **rien n'a été porté sans lui**.
+
+## E-81 — Le `@threaded_route` imbriqué n'existe pas. Huit branches mortes l'arment pour le jour où l'on nettoiera.
+
+**Mesure faite en marge de V8**, parce que la question portait sur le pool que le relevé de parc allait
+solliciter. Elle **referme** un point listé « à mesurer » depuis le début du module, par une réfutation
+suivie d'un constat plus gênant que la supposition.
+
+**LA SUPPOSITION ÉTAIT : Werkzeug pourrait router `/supervision/zabbix/version` vers le handler
+générique**, qui délègue par `if platform == 'zabbix': return zabbix_version()`. Comme les deux fonctions
+portent `@threaded_route`, chaque lecture Zabbix aurait consommé **deux** slots du pool partagé —
+l'externe bloquée sur `future.result()` en attendant l'interne, dans le même pool. Sous un relevé de parc,
+c'est un interblocage, pas un ralentissement.
+
+**RÉFUTÉ, ET DANS LES DEUX ORDRES DE DÉCLARATION.** Mesuré avec le Werkzeug du conteneur, sur les deux
+règles seules :
+
+```
+/supervision/zabbix/version    -> ('zabbix_version', {})                        ← la règle STATIQUE gagne
+/supervision/centreon/version  -> ('generic_version', {'platform': 'centreon'})
+ordre de déclaration inversé   -> ('zabbix_version', {})                        ← inchangé
+```
+
+Werkzeug trie ses règles par complexité, pas par ordre d'écriture : une règle sans variable passe devant.
+**Aucune imbrication aujourd'hui.** Une lecture de version prend un slot, pas deux ; les 12 sessions d'un
+relevé de parc prennent 12 slots sur 32.
+
+**MAIS LES BRANCHES DE DÉLÉGATION SONT DU CODE MORT, ET ELLES SONT HUIT.** Toutes les paires
+statique/générique du module sont dans ce cas, et **les deux côtés de chacune portent
+`@threaded_route`** :
+
+```
+/supervision/zabbix/deploy        <->  /supervision/<platform>/deploy
+/supervision/zabbix/version       <->  /supervision/<platform>/version
+/supervision/zabbix/uninstall     <->  /supervision/<platform>/uninstall
+/supervision/zabbix/reconfigure   <->  /supervision/<platform>/reconfigure
+/supervision/zabbix/config/read   <->  /supervision/<platform>/config/read
+/supervision/zabbix/config/save   <->  /supervision/<platform>/config/save
+/supervision/zabbix/backups       <->  /supervision/<platform>/backups
+/supervision/zabbix/restore       <->  /supervision/<platform>/restore
+```
+
+Le `if platform == 'zabbix'` de chaque handler générique est **inatteignable par HTTP**. C'est exactement
+ce qui rend le piège dangereux : la règle statique ressemble à un doublon de la générique, et la supprimer
+est le geste de nettoyage le plus naturel du monde. **Le jour où on la supprime, la branche morte devient
+vivante et chaque appel Zabbix prend deux slots du même pool** — l'externe attendant l'interne. Avec 32
+slots, un relevé de 16 machines sur 4 plateformes demanderait 128 slots : les externes prendraient les 32,
+et aucune interne n'obtiendrait jamais le sien. Le pool ne ralentit pas, il se bloque.
+
+**Ce n'est pas un défaut à corriger pendant un portage** : le code mort est inerte, et le retirer touche
+le backend. Il est nommé ici pour que la suppression du « doublon » ne se fasse jamais sans retirer
+d'abord le `@threaded_route` de l'un des deux étages.
