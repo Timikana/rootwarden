@@ -779,6 +779,71 @@ attendu **dans l'ilot de donnees de la page** (`#<page>-libelles`) : la suite
 mesure alors « la page affiche ce qu'elle declare afficher », qui reste vrai
 apres une relecture de traduction.
 
+## Un defaut corrige peut revenir par la porte qu'on n'a pas regardee
+
+V7 avait corrige E-79 : « le chemin du fichier vient du SERVEUR, donc il n'y a
+qu'un chemin possible ». Le raisonnement etait juste et incomplet — il portait
+sur le CHEMIN et pas sur l'ADRESSE. Les quatre URL de l'editeur restaient figees
+sur `/supervision/zabbix/...` pendant que le chemin affiche suivait le selecteur
+de plateforme : choisir Telegraf annoncait `/etc/telegraf/telegraf.conf` et
+lisait `/etc/zabbix/zabbix_agent2.conf`. Le meme defaut, par l'autre bout.
+
+Et la suite de V7 ne pouvait pas le voir : **elle n'exercait qu'UNE des quatre
+plateformes**, la seule ou l'URL figee se trouvait etre la bonne. Une propriete
+negative bien ecrite reste aveugle sur ce qu'elle n'exerce pas.
+
+Quand deux valeurs doivent s'accorder, les faire venir de la MEME table serveur,
+indexee par la MEME cle — et mesurer l'accord **sur toutes les cles**, pas sur
+celle qui marche.
+
+## Un champ qui devient modifiable change le sens du code qui l'entoure
+
+`serveur.addEventListener('change', () => contenu.value = '')` : correct en V7,
+ou la zone d'edition etait en LECTURE SEULE — vider n'y perdait rien. Depuis que
+V9 la rend modifiable, le MEME geste efface ce que quelqu'un vient de taper.
+
+Aucune ligne n'a change, le sens si. Quand on lève une contrainte (readonly,
+disabled, cache), relire ce qui touchait a l'element : un effacement silencieux
+devient une perte de travail, et doit s'annoncer.
+
+## `A && B || C` en shell efface la difference entre « A a echoue » et « B a echoue »
+
+`_backup_agent_config` fait `test -f X && cp X Y || echo 'NO_FILE'`. Mesure sur
+la machine de test :
+
+    fichier absent              -> [NO_FILE]  rc=0   (voulu)
+    fichier present, cp reussi  -> []         rc=0
+    fichier present, cp ECHOUE  -> [NO_FILE]  rc=0   <- INDISCERNABLE du premier
+
+Un `cp` en echec emprunte la branche « pas de fichier » : la fonction rend
+`None`, l'ecriture continue SANS sauvegarde, et le rollback — garde par
+`if backup_path:` — est **desarme au moment precis ou il servirait**. Pour
+distinguer, il faut deux commandes ou un code de sortie explicite.
+
+## La dette i18n ne defigure pas un libelle : elle peut SUPPRIMER un avertissement
+
+`toast(__('config_remote_saved') || res.message, 'success')`. La cle etant
+absente, `__()` rend l'IDENTIFIANT — donc une chaine non vide — donc
+`|| res.message` ne se declenche JAMAIS. Or `res.message` etait le seul endroit
+ou le backend disait « configuration ecrite mais l'agent n'a PAS redemarre ».
+
+Resultat mesure : une coche VERTE, la chaine `config_remote_saved` a l'ecran, et
+l'avertissement perdu. Chercher ce motif partout : `__('x') || <valeur utile>`
+n'est pas un repli, c'est une suppression.
+
+## Un porte-messages partage fait passer une assertion sur le message du voisin
+
+Le controle du message de RESTAURATION lisait tout le panneau visible : le
+message de l'ECRITURE, encore a l'ecran, le satisfaisait — l'assertion passait
+sans jamais regarder la restauration. Lire le porte-messages PRECIS, et exiger
+qu'il nomme sa cible (ici le nom de la sauvegarde).
+
+## `fetch('')` ne « ne part pas » : il POSTe sur la page courante
+
+Un repli qui rend une URL vide n'arrete rien. Refuser franchement —
+`return Promise.reject(...)` ou un message a l'ecran — plutot que de laisser
+partir une requete vers une adresse qu'on n'a pas choisie.
+
 ## Le garde anti-rejeu TOTP traverse les contextes de navigateur
 
 Une suite qui se connecte **deux fois** avec le meme compte (une passe FR, une
