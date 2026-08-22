@@ -549,6 +549,45 @@ Et si la mesure demande d'ecrire dans un fichier de l'application (ici
 ecrire par le conteneur qui le possede, **restaurer dans un `finally`**, et
 ANNONCER l'etat restaure dans le journal de la suite.
 
+## CSS : trois pieges payes le 2026-08-22, tous invisibles a une assertion DOM
+
+**A SPECIFICITE EGALE, C'EST L'ORDRE DU FICHIER QUI TRANCHE.** Une classe
+modificatrice (`.rw-truc--borne`) posee AVANT la classe qu'elle surcharge
+(`.rw-truc { flex: 1 }`) n'a **aucun effet** : meme specificite, donc la
+derniere regle du fichier gagne. Ecrite 380 lignes trop haut, elle passe la
+revue, passe le test, et ne fait rien. Une regle modificatrice se pose **juste
+apres** celle qu'elle modifie.
+
+**BORNER L'ENFANT NE BORNE PAS LE PARENT.** `.rw-etiquette-champ` est en
+`flex: 1` : mettre un `max-width` sur son `<select>` retrecit le champ mais
+l'enveloppe garde sa place — et le bouton voisin part a l'autre bout de la
+carte. C'est l'ENVELOPPE qui se borne (`flex: 0 0 auto; min-width: 0`).
+
+**UN `<a>` STYLE EN BOUTON RESTE UN ELEMENT EN LIGNE.** Quand son libelle
+depasse la largeur disponible, le texte passe a la ligne mais la BOITE sort du
+cadre par la droite, remplissage compris — visible seulement a 390 px.
+`display: inline-block` la replie. Vaut pour tout bouton-lien.
+
+**UNE REGLE `margin: 0` SUR `p` EST JUSTE POUR DU TEXTE, FAUSSE POUR UN BOUTON.**
+`.rw-vide p { margin: 0 }` : des qu'un `.rw-bouton` se trouve dans un de ces
+paragraphes, sa hauteur de ligne RECOUVRE la derniere ligne du paragraphe
+au-dessus, qui se lit barree. Donner un bloc a l'action (`.rw-vide__action`).
+
+Les quatre ne se voient qu'a l'image. `pdftotext` ne voit pas une mise en page,
+et `querySelector` ne voit pas un chevauchement : **REGARDER les captures**.
+
+## Un test qui ne peut pas echouer occupe la place d'un test
+
+Assertion ecrite pour V1 : « aucune cle de traduction ne s'affiche en
+identifiant ». Elle reussit aussi pour un garde qui n'affiche **RIEN** — ne rien
+dire, c'est ne dire aucun identifiant. Il faut donc DEUX mesures : d'abord que
+le message est **enonce a l'ecran**, ensuite qu'il n'est pas un identifiant.
+
+Et pour ne pas recopier un catalogue de traduction dans un test, lire le texte
+attendu **dans l'ilot de donnees de la page** (`#<page>-libelles`) : la suite
+mesure alors « la page affiche ce qu'elle declare afficher », qui reste vrai
+apres une relecture de traduction.
+
 ## Python
 - Ruff F823 : jamais de `import X` local si `X` est déjà importé globalement
   (referenced-before-assignment).

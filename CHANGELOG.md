@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.31** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.32** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,69 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.32 — module `supervision/`, sous-lot V1 : la page, ses quatre onglets, et une cle qui quitte l'ecran
+
+**Symptome.** La page `supervision/` affichait `editor_select_server` en clair a ses exploitants, et
+rechargeait son catalogue de profils par deux requetes backend a chaque bascule d'onglet.
+
+**Cause racine.** Deux causes distinctes.
+
+`head.php:76-78` charge `getJsTranslations('js.')` puis rend `_i18n['js.' + cle] || _i18n[cle] || cle` :
+une cle absente est **retournee telle quelle**. Comme c'est une chaine NON VIDE, l'idiome
+`__('x') || 'repli'` **ne declenche jamais son repli** — la panne est silencieuse. Onze cles du module
+sont dans ce cas : presentes dans `supervision.php` en FR et en EN, absentes de `js.php`. Le portage
+n'avait donc pas a traduire, il avait a **deplacer**.
+
+Et la page peint son contenu depuis le client : deux `GET` des le chargement
+(`/supervision/profiles`, `/supervision/profiles/assignments`), rejoues a chaque changement d'onglet.
+
+**Fix.** Route `/supervision`, garde **reprise telle quelle** du legacy : `role:2` +
+`perm:can_manage_supervision`. **Aucun ecart a declarer**, pour une fois : l'en-tete du fichier legacy
+annonce « admin (2) + superadmin (3) + can_manage_supervision » et son code applique exactement cela.
+La page est peinte cote serveur (decision S3/S4) et son script **ne parle a personne** : ni au
+chargement, ni au changement d'onglet, ni au changement de plateforme. Les libelles du script partent du
+MEME catalogue que la page, en donnees : le defaut d'i18n ne peut pas se reformer.
+
+Ce que V1 ne porte pas encore le DIT — etat vide nomme, explication, et lien vers l'ancien portail avec
+le marqueur des entrees non portees.
+
+**LE DECOUPAGE ETAIT OPTIMISTE, et c'est la mesure qui l'a dit.** L'inventaire annoncait « V1 | aucune
+route ». Il y en a **deux**, en lecture, des le chargement : la frontiere V1/V2 n'existe pas cote legacy.
+
+**Neuf cles a deplacer, DEUX a remplacer.** `confirm_deploy` et `confirm_uninstall` sont consommees dans
+des `confirm()` NATIFS, que la convention du portage interdit : elles seront remplacees par un panneau
+de decision, en V11 et V12.
+
+**Trois defauts vus A L'IMAGE, qu'aucune assertion DOM ne voit — corriges dans le socle :**
+- `.rw-vide p { margin: 0 }` faisait recouvrir la derniere ligne d'un paragraphe par la hauteur de ligne
+  du bouton place dessous, qui se lisait barree. L'action a desormais son bloc (`.rw-vide__action`) ;
+- `.rw-etiquette-champ` est en `flex: 1` : sur 1920 px le menu des plateformes traversait la moitie de la
+  page. Borner le `<select>` seul ne suffisait pas — l'enveloppe gardait la place et renvoyait le bouton
+  voisin a l'autre bout de la carte. C'est l'enveloppe qui se borne (`--borne`), **et la regle doit rester
+  APRES celle qu'elle surcharge** : a specificite egale, c'est l'ordre du fichier qui tranche, et la
+  premiere version, ecrite 380 lignes plus haut, n'avait aucun effet ;
+- un `<a class="rw-bouton">` est un element EN LIGNE : a 390 px son libelle passait a la ligne mais sa
+  boite sortait du cadre par la droite, remplissage compris. `display: inline-block` la replie. **Ce
+  correctif vaut pour toutes les pages** qui portent un bouton-lien.
+
+**Un defaut de ma suite, corrige avant de l'inscrire.** L'assertion « aucune cle ne s'affiche en
+identifiant » reussissait aussi pour un garde qui n'aurait RIEN affiche : ne rien dire, c'est ne dire
+aucun identifiant. La suite mesure donc d'abord que le refus est **enonce a l'ecran**, en comparant au
+texte que chaque cible declare comme son refus — cote portage lu dans l'ilot de donnees de la page, pour
+ne pas recopier un catalogue de traduction dans un test.
+
+**CE QUI RESTE AU BACKEND, et attend une decision.** Les quatre routes de profils (`1734`, `1760`,
+`1801`, `1817`) portent `@require_api_key` + `@require_permission` et **aucun `@require_role`** ; la
+cinquieme porte bien `@require_role(2)` — le correctif a ete applique a une route et pas a ses quatre
+voisines. Et `/supervision/` est absent des 25 prefixes de `$ADMIN_ONLY_PREFIXES` du proxy legacy.
+
+**`legacy/supervision/` N'EST PAS ARCHIVE** : V2 a V12 y vivent encore.
+
+**Reference du LOT** : `go-page-supervision-onglets` entre avec **11 PASS sur le legacy** et **14 sur le
+portage** (base rouge relevee avant portage : 6 PASS / 7 FAIL). `go-socle-navigation` passe de **44 a
+46** : l'entree « Supervision » devient un lien interne, verifie pour chacun des deux comptes qui la
+voient.
 
 ### v1.37.31 — module `ssh/`, sous-lot K3 : la lecture du journal de deploiement
 

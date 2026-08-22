@@ -16,6 +16,7 @@ use App\Http\Controllers\ExportCveController;
 use App\Http\Controllers\RapportConformiteController;
 use App\Http\Controllers\ScanCveController;
 use App\Http\Controllers\SuiviCveController;
+use App\Http\Controllers\SupervisionController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
 use App\Http\Controllers\PasserelleController;
@@ -92,6 +93,32 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/cles-ssh', ClesSshController::class)
         ->middleware(['role:1', 'perm:can_deploy_keys'])
         ->name('cles-ssh');
+
+    /*
+     * Supervision — module `supervision/`, sous-lot V1 : la page et ses quatre
+     * onglets.
+     *
+     * GARDE REPRISE TELLE QUELLE DU LEGACY (`supervision/index.php:17-18`) :
+     * `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` puis
+     * `checkPermission('can_manage_supervision')`, soit role >= 2 PORTANT la
+     * permission.
+     *
+     * AUCUN ECART A DECLARER, et c'est assez rare ici pour etre dit : l'en-tete du
+     * fichier legacy annonce « admin (2) + superadmin (3) + can_manage_supervision »
+     * et son code applique exactement cela. Rien a arbitrer, contrairement a `ssh/`
+     * (en-tete plus strict que le code) et a `security/` (D-1).
+     *
+     * V1 N'APPELLE AUCUNE ROUTE DU BACKEND. Le legacy en appelle DEUX des le
+     * chargement et les rejoue a chaque bascule d'onglet.
+     *
+     * DEFAUTS DU BACKEND CONSTATES ET NON CORRIGES ICI (voir PARITE) : les quatre
+     * routes de profils n'ont aucun `@require_role`, et `/supervision/` est absent
+     * de `$ADMIN_ONLY_PREFIXES` cote proxy legacy. Les fermer demanderait de
+     * modifier le backend : decision de l'exploitant.
+     */
+    Route::get('/supervision', SupervisionController::class)
+        ->middleware(['role:2', 'perm:can_manage_supervision'])
+        ->name('supervision');
 
     Route::get('/derive-config', DeriveConfigController::class)
         ->middleware(['role:2', 'perm:can_view_compliance'])
