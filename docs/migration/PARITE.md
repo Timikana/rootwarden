@@ -2258,3 +2258,45 @@ ne pas recopier un catalogue de traduction dans un test.
 configuration globale (V3, V4), l'assignation (V5), tout ce qui passe par SSH (V6 à V12). Et **hors
 lot** : les *overrides* par machine, qui n'ont jamais eu d'interface — les porter, c'est concevoir, pas
 migrer. À arbitrer **avant V10**, car la précédence documentée du module en dépend.
+
+## E-73 — `next_run` est calculé en UTC et lu en heure locale : deux heures d'écart, et un test qui échouait chaque nuit
+
+**Découvert par le LOT du 2026-08-22 à 03:07**, pas par une relecture. `go-page-cve-planification` est
+tombée à **15 PASS / 1 FAIL** sur le legacy alors qu'elle était verte depuis S4 : « `next_run` est posé et
+strictement dans le futur — next_run=2026-08-22 03:00:00 », pour une planification `0 3 * * *` créée à
+03:07.
+
+**Mesuré, pas déduit.** L'hôte est en `CEST +0200`, le conteneur `rootwarden_python` en `UTC +0000` :
+
+```
+hôte    : 2026-08-22 03:21:34 CEST +0200
+backend : 2026-08-22 01:21:34 UTC  +0000
+croniter dans le conteneur : next('0 3 * * *') = 2026-08-22 03:00:00
+```
+
+`cve.py:504` fait `croniter(cron_expr).get_next(datetime)` — donc **la prochaine occurrence est correcte
+dans le repère du conteneur**, et elle est stockée **sans fuseau** dans `cve_scan_schedules.next_run`.
+
+**Le scheduler n'est PAS en défaut**, et c'est important : il tourne dans le même conteneur et compare
+`next_run <= now` avec la même horloge (`scheduler.py:614`). Les deux valeurs sont dans le même repère,
+donc rien ne se déclenche trop tôt. **Aucun scan n'a été lancé en avance** — vérifié à la lecture du
+code, et la suite nettoie ses lignes de toute façon.
+
+**Ce qui EST en défaut** : tout lecteur qui compare cette valeur à l'heure locale. Les deux portails
+l'affichent telle quelle — un exploitant en CEST lit donc un prochain déclenchement **deux heures avant
+l'heure réelle**, et en hiver une heure. Le même raisonnement vaut pour `ssh_audit_schedules`, pour
+`last_run`, et pour toute colonne d'horodatage écrite par le backend. **Non corrigé** : la corriger
+demande de choisir entre poser le fuseau du conteneur, stocker en UTC assumé et convertir à l'affichage,
+ou aligner les deux horloges — un choix d'exploitant qui touche le backend et l'affichage de plusieurs
+modules.
+
+**Et un défaut de la suite, lui, corrigé.** L'assertion comparait la valeur stockée à `new Date()` de
+l'hôte : elle ne mesurait donc pas « le prochain déclenchement est à venir » mais **« les deux horloges
+concordent »**. Elle réussissait 22 heures sur 24 et échouait entre 03:00 et 05:00, sans qu'aucun défaut
+de planification n'existe — un faux rouge qui, répété, apprend à ne plus lire les rouges. Elle compare
+désormais à l'heure **du conteneur qui a calculé la valeur**, et la suite **constate l'écart en clair**
+(`decalage horaire hote / conteneur backend : 2 h`) pour que le défaut réel reste visible plutôt
+qu'absorbé par le correctif. Références inchangées : legacy 16, portage 20.
+
+**La leçon, au-delà de ce cas** : une assertion qui compare deux valeurs venues de deux horloges mesure
+les horloges, pas la propriété. Le repère se choisit — et c'est celui qui a produit la valeur.
