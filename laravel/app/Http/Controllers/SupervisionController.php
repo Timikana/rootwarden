@@ -176,6 +176,8 @@ class SupervisionController extends Controller
              */
             'profilModifie' => $this->profilDemande($requete),
             'agents' => $this->supervision->agentsParMachine(),
+            'deploiement' => $this->etapesDuDeploiement(),
+            'boutonsBloques' => $this->boutonsBloques(),
             'cheminsConfig' => $this->supervision->cheminsConfiguration(),
             /*
              * LE COUT DU RELEVE DE PARC VIENT DU SERVEUR — sous-lot V8. Nombre de
@@ -560,6 +562,141 @@ class SupervisionController extends Controller
      *
      * @return array<string, array<string, string>>
      */
+    /**
+     * Les etapes d'un deploiement, PAR PLATEFORME — sous-lot V12.
+     *
+     * ELLES SONT NOMMEES, PAS COMPTEES. Un decompte ecrit dans une phrase
+     * vieillit mal : V10 annoncait trois effets et en avait quatre. Ici la
+     * liste EST le decompte.
+     *
+     * ET ELLES DIFFERENT VRAIMENT D'UNE PLATEFORME A L'AUTRE. Mesure du
+     * backend :
+     *
+     *   zabbix     : renomme la config en `.old`, PURGE les agents en place,
+     *                supprime trois greffons, telecharge un `.deb` sur
+     *                repo.zabbix.com, installe le depot, rafraichit apt,
+     *                installe le paquet, ecrit la PSK, ecrit la config, ajoute
+     *                l'extra, redemarre, inscrit l'inventaire ;
+     *   centreon   : cle GPG + `sources.list` sur packages.centreon.com, apt,
+     *                installe, SAUVEGARDE la config, l'ecrit, extra, redemarre ;
+     *   prometheus : AUCUN depot externe — le paquet est dans Debian ;
+     *   telegraf   : depot repos.influxdata.com, et l'extra n'est JAMAIS ajoute
+     *                (`platform != 'telegraf'` cote backend).
+     *
+     * Rendre les etapes de Zabbix pendant que le selecteur est sur Telegraf
+     * reproduirait E-79 par un autre bout : le libelle qui ne suit pas la cle.
+     *
+     * `refuse_sans_config` porte l'autre asymetrie mesuree : `zabbix_deploy`
+     * rend 400 sans configuration globale (mesure : 513 ms), `generic_deploy`
+     * installe quand meme et n'ecrit simplement aucune configuration.
+     *
+     * Les noms de paquet et de service RECOPIENT `AGENT_REGISTRY` cote backend,
+     * comme `cheminsConfiguration()` recopie ses chemins. Aucune route ne les
+     * expose ; la duplication est assumee et signalee, pas silencieuse.
+     *
+     * @return array<string,array{refuse_sans_config:bool,etapes:list<string>}>
+     */
+    private function etapesDuDeploiement(): array
+    {
+        $configuration = $this->supervision->configurationParPlateforme();
+        $chemins = $this->supervision->cheminsConfiguration();
+
+        $paquets = [
+            'centreon' => 'centreon-monitoring-agent',
+            'prometheus' => 'prometheus-node-exporter',
+            'telegraf' => 'telegraf',
+        ];
+        $depots = [
+            'centreon' => 'packages.centreon.com',
+            'telegraf' => 'repos.influxdata.com',
+        ];
+
+        $table = [];
+
+        foreach ($this->supervision->plateformes() as $plateforme) {
+            $config = $configuration[$plateforme] ?? null;
+            $chemin = $chemins[$plateforme] ?? '';
+            $etapes = [];
+
+            if ($plateforme === 'zabbix') {
+                $paquet = ($config->agent_type ?? 'zabbix-agent2') === 'zabbix-agent'
+                    ? 'zabbix-agent'
+                    : 'zabbix-agent2';
+
+                $etapes[] = __('superv.depl_effet_ancienne', ['chemin' => $chemin]);
+                $etapes[] = __('superv.depl_effet_purge');
+                $etapes[] = __('superv.depl_effet_greffons');
+                $etapes[] = __('superv.depl_effet_depot_externe', ['hote' => 'repo.zabbix.com']);
+                $etapes[] = __('superv.depl_effet_index');
+                $etapes[] = __('superv.depl_effet_installation', ['paquet' => $paquet]);
+
+                // UNE CLE SECRETE N'EST ANNONCEE QUE SI ELLE EXISTE. `psk_pose`
+                // est un booleen calcule en SQL : la valeur chiffree elle-meme
+                // n'est jamais selectionnee.
+                if ($config?->psk_pose) {
+                    $etapes[] = __('superv.depl_effet_psk');
+                }
+                $etapes[] = __('superv.depl_effet_configuration', ['chemin' => $chemin]);
+                if (($config->extra_config ?? '') !== '') {
+                    $etapes[] = __('superv.depl_effet_extra');
+                }
+                $etapes[] = __('superv.depl_effet_service', ['service' => $paquet]);
+                $etapes[] = __('superv.depl_effet_inventaire');
+
+                $table[$plateforme] = ['refuse_sans_config' => true, 'etapes' => $etapes];
+
+                continue;
+            }
+
+            if (isset($depots[$plateforme])) {
+                $etapes[] = __('superv.depl_effet_depot_externe', ['hote' => $depots[$plateforme]]);
+            }
+            $etapes[] = __('superv.depl_effet_index');
+            $etapes[] = __('superv.depl_effet_installation', ['paquet' => $paquets[$plateforme] ?? $plateforme]);
+
+            if ($config !== null) {
+                $etapes[] = __('superv.depl_effet_sauvegarde', ['chemin' => $chemin]);
+                $etapes[] = __('superv.depl_effet_configuration', ['chemin' => $chemin]);
+
+                // TELEGRAF NE RECOIT JAMAIS L'EXTRA : le backend l'exclut
+                // nommement. L'annoncer serait promettre une etape qui n'a pas lieu.
+                if (($config->extra_config ?? '') !== '' && $plateforme !== 'telegraf') {
+                    $etapes[] = __('superv.depl_effet_extra');
+                }
+            }
+            $etapes[] = __('superv.depl_effet_service', ['service' => $paquets[$plateforme] ?? $plateforme]);
+            $etapes[] = __('superv.depl_effet_inventaire');
+
+            $table[$plateforme] = ['refuse_sans_config' => false, 'etapes' => $etapes];
+        }
+
+        return $table;
+    }
+
+    /**
+     * Quels boutons le backend refuserait, PAR PLATEFORME — sous-lot V12.
+     *
+     * @return array{deploiement:array<string,bool>,reconfiguration:array<string,bool>}
+     */
+    private function boutonsBloques(): array
+    {
+        $configuration = $this->supervision->configurationParPlateforme();
+        $etapes = $this->etapesDuDeploiement();
+        $deploiement = [];
+        $reconfiguration = [];
+
+        foreach ($this->supervision->plateformes() as $plateforme) {
+            $sansConfig = ($configuration[$plateforme] ?? null) === null;
+            // Le deploiement n'est refuse que la ou le backend refuse vraiment.
+            $deploiement[$plateforme] = $sansConfig
+                && ($etapes[$plateforme]['refuse_sans_config'] ?? false);
+            // `<platform>/reconfigure` refuse partout sans configuration globale.
+            $reconfiguration[$plateforme] = $sansConfig;
+        }
+
+        return ['deploiement' => $deploiement, 'reconfiguration' => $reconfiguration];
+    }
+
     private function routesParPlateforme(): array
     {
         $routes = [];
@@ -573,6 +710,7 @@ class SupervisionController extends Controller
                 'reconfiguration' => url("/api/gateway/supervision/{$plateforme}/reconfigure"),
                 'desinstallation' => url("/api/gateway/supervision/{$plateforme}/uninstall"),
                 'version' => url("/api/gateway/supervision/{$plateforme}/version"),
+                'deploiement' => url("/api/gateway/supervision/{$plateforme}/deploy"),
             ];
         }
 
@@ -707,6 +845,50 @@ class SupervisionController extends Controller
             'desinst_verif_absent' => __('superv.desinst_verif_absent'),
             'desinst_verif_present' => __('superv.desinst_verif_present', ['version' => '{version}']),
             'desinst_verif_impossible' => __('superv.desinst_verif_impossible'),
+            // ── Sous-lot V12 : le deploiement ──────────────────────────────
+            'depl_cout' => __('superv.depl_cout', ['plateforme' => '{plateforme}', 'nom' => '{nom}']),
+            'depl_production' => __('superv.depl_production', ['nom' => '{nom}']),
+            'depl_en_cours' => __('superv.depl_en_cours', ['nom' => '{nom}']),
+            'depl_reussi' => __('superv.depl_reussi', ['nom' => '{nom}']),
+            'depl_echouee' => __('superv.depl_echouee', ['nom' => '{nom}', 'codes' => '{codes}']),
+            'depl_inachevee' => __('superv.depl_inachevee', ['nom' => '{nom}']),
+            'depl_refus' => __('superv.depl_refus', ['statut' => '{statut}']),
+            'depl_echec' => __('superv.depl_echec'),
+            'depl_verif_en_cours' => __('superv.depl_verif_en_cours'),
+            'depl_verif_conforme' => __('superv.depl_verif_conforme', ['version' => '{version}']),
+            'depl_verif_divergente' => __('superv.depl_verif_divergente', [
+                'trouvee' => '{trouvee}', 'attendue' => '{attendue}',
+            ]),
+            'depl_verif_absente' => __('superv.depl_verif_absente', ['nom' => '{nom}']),
+            'depl_verif_impossible' => __('superv.depl_verif_impossible'),
+            /*
+             * L'ETAT BLOQUE D'UN BOUTON SUIT LA PLATEFORME. Deux tables, une
+             * par geste, indexees par la MEME cle que `routesParPlateforme()`.
+             *
+             * Corrige au passage un defaut de mon propre portage (V10) : le
+             * bouton « Reconfigurer » se desactivait d'apres la configuration de
+             * ZABBIX quel que soit le selecteur. C'est la famille E-79 — un etat
+             * fige sur une plateforme pendant que l'ecran en annonce une autre —
+             * et V12 l'aurait reproduite en la recopiant.
+             *
+             * `depl_bloque` n'est vrai que quand le backend refuserait VRAIMENT :
+             * Zabbix rend 400 sans configuration globale, les trois autres
+             * installent quand meme.
+             */
+            /*
+             * LA VERSION DEMANDEE, PAR PLATEFORME. Seul Zabbix en declare une :
+             * `supervision_config.agent_version`. Les trois autres installent le
+             * paquet de la distribution ou du depot, sans version choisie — la
+             * table est donc VIDE pour elles, et la verification ne compare rien
+             * plutot que de comparer a une valeur inventee.
+             */
+            'depl_versions' => json_encode(array_filter([
+                'zabbix' => (string) ($this->supervision->configurationParPlateforme()['zabbix']->agent_version ?? ''),
+            ], static fn (string $v): bool => $v !== '')),
+            'depl_bloque' => json_encode($this->boutonsBloques()['deploiement']),
+            'reconf_bloque' => json_encode($this->boutonsBloques()['reconfiguration']),
+            'depl_sans_config' => __('superv.depl_sans_config'),
+            'reconf_sans_config' => __('superv.reconf_sans_config'),
         ];
     }
 }

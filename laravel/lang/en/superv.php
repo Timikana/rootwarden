@@ -299,4 +299,48 @@ return [
     'desinst_verif_present' => 'WARNING: an agent is STILL detected on this server (version :version). The command returned a success, yet the agent is still there.',
     'desinst_verif_impossible' => 'The verification could not complete: the real state of the server was not established.',
     'desinst_production' => ':nom is a PRODUCTION server. Monitoring of it stops as soon as the agent is gone.',
+    /*
+     * ── SUB-LOT V12: DEPLOYMENT ──────────────────────────────────────────
+     *
+     * STEPS ARE NAMED, NOT COUNTED, and they are rendered PER PLATFORM.
+     * Measured: `zabbix_deploy` and `generic_deploy` do not do the same work.
+     * Zabbix starts by PURGING the agent in place, renames the configuration to
+     * `.old` and downloads a `.deb` from repo.zabbix.com; Prometheus adds no
+     * external repository; Centreon and Telegraf lay down a GPG key and a
+     * `sources.list`. Listing the Zabbix steps while the selector is on
+     * Telegraf would be defect E-79 through another door.
+     */
+    'depl_bouton' => 'Deploy',
+    'depl_titre' => 'Agent deployment',
+    'depl_description' => 'Installs the agent on one server, then writes the configuration built from the global configuration, the machine settings and its profile. The gesture applies to ONE machine: the one on the chosen row.',
+    'depl_sans_config' => 'No global configuration: deployment would be refused.',
+    'depl_sans_config_aide' => 'For Zabbix, the backend returns a 400 error until the Configuration tab has been saved. Fill it in first: deployment takes the agent version, the server to reach and the hostname pattern from it.',
+    'depl_sans_config_generique' => 'No global configuration for this platform: the agent will be installed, but NO configuration will be written on the machine. Unlike Zabbix, the backend does not refuse this case.',
+    'depl_cout' => 'Deploy the :plateforme agent on :nom. The following steps will run on the machine:',
+    'depl_production' => ':nom is a PRODUCTION server. Check the steps below before deciding: some of them interrupt monitoring while they run.',
+    'depl_effet_purge' => 'Zabbix agents already installed are PURGED: deploying starts by uninstalling.',
+    'depl_effet_ancienne' => 'The current configuration :chemin is renamed to .old — a second deployment will overwrite that copy.',
+    'depl_effet_greffons' => 'Three plugins already in place (postgresql, mssql, mongodb) are removed.',
+    'depl_effet_depot_externe' => 'The :hote repository is added to the machine, which must be able to reach it over the Internet.',
+    'depl_effet_index' => 'The machine apt indexes are refreshed.',
+    'depl_effet_installation' => 'The :paquet package is installed.',
+    'depl_effet_psk' => 'A PSK key is written on the machine, in /etc/zabbix/zabbix_agent2.d/server.key.',
+    'depl_effet_sauvegarde' => 'The existing configuration :chemin is backed up, timestamped.',
+    'depl_effet_configuration' => 'The :chemin file is written.',
+    'depl_effet_extra' => 'The extra configuration is appended at the end of the file.',
+    'depl_effet_service' => 'The :service service is restarted, then enabled at boot.',
+    'depl_effet_inventaire' => 'The inventory records the agent as deployed — even if the previous steps failed.',
+    'depl_annuler' => 'Cancel',
+    'depl_confirmer' => 'Deploy now',
+    'depl_en_cours' => 'Deployment running on :nom...',
+    'depl_reussi' => 'Deployment finished on :nom: every step returned a success.',
+    'depl_echouee' => 'Deployment on :nom FAILED (code :codes). The portal recorded the agent in its inventory anyway.',
+    'depl_inachevee' => 'Deployment on :nom did not complete: no step concludes.',
+    'depl_refus' => 'Deployment was refused (status :statut). Nothing was sent to the machine.',
+    'depl_echec' => 'Deployment could not be started.',
+    'depl_verif_en_cours' => 'Checking what is actually installed...',
+    'depl_verif_conforme' => 'Checked: agent detected in version :version.',
+    'depl_verif_divergente' => 'WARNING: the detected version is :trouvee, whereas :attendue was requested.',
+    'depl_verif_absente' => "WARNING: NO agent is detected on :nom. The portal has just recorded this agent in its inventory — the inventory is the one that is wrong.",
+    'depl_verif_impossible' => 'The check could not complete: what is actually installed was not established.',
 ];

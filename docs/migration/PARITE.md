@@ -3601,3 +3601,163 @@ rôle 3 **sans** cette permission (mesuré en base). Le second chemin de la gard
 exercé : un durcissement qui l'aurait cassé serait passé inaperçu. `supervision-onglets` mesure maintenant
 les deux — rôle 1 → **403**, rôle 3 sans permission → **200** — des deux côtés, donc en parité
 (14→16 sur le portage, 11→13 sur le legacy).
+
+---
+
+## E-90 — Le déploiement annonce une réussite sans jamais regarder un code de retour, et inscrit dans l'inventaire un agent qui n'existe pas
+
+**Mesuré le 2026-08-23**, sous-lot V12, sur `Test-Server-Debian` (id 2, DEV). Flux complet d'un
+`POST /supervision/zabbix/deploy`, relevé textuellement :
+
+```
+START_MACHINE::2::Deploiement agent zabbix-agent2 v7.0 sur Test-Server-Debian.
+sh: 1: wget: not found
+Exécution terminée (code 127).
+E: Unable to locate package zabbix-agent2
+Exécution terminée (code 100).
+INFO: Fichier /etc/zabbix/zabbix_agent2.conf mis a jour avec succes.
+sh: 1: systemctl: not found
+Exécution terminée (code 127).
+SUCCESS_MACHINE::2::Deploiement reussi pour Test-Server-Debian.
+```
+
+**Trois étapes en échec, et le marqueur conclut à la réussite.** La cause est la même qu'en E-85 mais
+poussée d'un cran : `zabbix_deploy` et `generic_deploy` écrivent `yield from
+execute_as_root_stream(client, cmd, root_pass)` **sans affecter la valeur rendue**. Depuis v1.37.44 cette
+fonction *rend* son code de sortie ; aucune des deux routes ne le lit.
+
+**ET L'INVENTAIRE HÉRITE DU MENSONGE.** `_upsert_agent(machine_id, 'zabbix', agent_version,
+config_deployed=True)` est appelée inconditionnellement juste avant `SUCCESS_MACHINE::`. Relevé en base
+immédiatement après le flux ci-dessus :
+
+| `supervision_agents` | ce que la machine porte |
+|---|---|
+| `machine 2, zabbix, 7.0, config_deployed = 1` | `dpkg-query: no packages found` — aucun binaire d'agent |
+
+Le portail affirmait donc un agent installé en version 7.0 là où la machine n'en portait aucun.
+
+**LA LIGNE FAUSSE EST TRANSITOIRE, ET CE N'EST PAS LE MÉRITE DU DÉPLOIEMENT.** `zabbix_version` appelle
+`_remove_agent` quand elle ne trouve rien, et les **deux** portails relancent une détection juste après :
+le legacy par `autoDetect` sur les identifiants ayant émis `SUCCESS_MACHINE::`, le portage par la
+vérification écrite pour E-91. Chacun efface donc son propre mensonge sans le savoir. Pour mesurer le
+défaut il faut un déploiement que **aucune** détection ne suit — la suite l'obtient par une **requête
+forgée** depuis la page, même motif qu'en E-86 : `statut 200 · succès annoncé = true · codes relevés
+(127) (100) (127) · inventaire « zabbix 7.0 1 » · agent réellement installé = NON`.
+
+**NON CORRIGÉ CÔTÉ BACKEND** : le backend reste intact faute d'autorisation. Le portage n'en a pas besoin
+pour dire la vérité (E-91), mais un correctif reste souhaitable — c'est le geste le plus coûteux du module,
+et son inventaire est lu par le tableau de parc.
+
+**DEUX ASYMÉTRIES MESURÉES ENTRE LES DEUX ROUTES**, qui interdisent d'énumérer les mêmes effets partout :
+
+| | `zabbix_deploy` | `generic_deploy` |
+|---|---|---|
+| sans configuration globale | **400** en 513 ms, rien n'est envoyé | **installe quand même**, sans écrire de configuration |
+| avant d'installer | **purge** `zabbix-agent` et `zabbix-agent2`, renomme la config en `.old` | ne purge pas, **sauvegarde** la config, horodatée |
+| dépôt externe | `repo.zabbix.com` (un `.deb` tiré par `wget`) | `packages.centreon.com`, `repos.influxdata.com` — **rien pour Prometheus** |
+| `extra_config` | ajouté | ajouté, **jamais pour Telegraf** (`platform != 'telegraf'`) |
+
+**DEUX PARAMÈTRES CALCULÉS PUIS JETÉS.** `_get_install_commands(platform, global_cfg, os_version)` n'utilise
+ni `global_cfg` ni `os_version` : le dépôt Centreon est codé en dur sur `bookworm`. Même famille que
+`agent_type` (E-77). Et l'appelant passe `linux_version` dans le paramètre nommé `os_version` — inoffensif
+tant que le paramètre est ignoré, piège dès qu'il servira.
+
+**LA PRODUCTION N'EST PAS DÉPLOYABLE PAR CETTE ROUTE**, et le message ne le dit pas : `srv-zabbix` porte
+`linux_version = NULL`, donc `generic_deploy` rend `ERROR_MACHINE::1::OS non supporte: ` — **avec une
+chaîne vide**. Constaté en base, sans joindre la machine.
+
+**TROIS MESURES QUI DÉDOUANENT**, à dire aussi clairement que les accusations :
+
+- **`machine_ids` au pluriel n'est PAS un trou de garde.** `require_machine_access` lit `machine_id`,
+  `server_id`, `machine_ids` et `server_ids` depuis le patch A01, et refuse si **un seul** identifiant
+  n'est pas autorisé ;
+- **`agent_version` est une liste FERMÉE côté portage** (`['7.0', '7.2']`), donc l'interpolation de cette
+  valeur dans l'URL passée à `wget` n'est pas atteignable depuis l'écran. La colonne reste un `varchar`
+  libre côté base : le chemin direct, lui, resterait ouvert ;
+- **aucune requête ne sort du banc d'essai.** Ni `wget` ni `curl` n'y existent, et le DNS n'y résout pas :
+  la chaîne s'arrête **avant** l'URL. Sûreté mesurée, pas supposée.
+
+**UNE GARDE SANS EFFET, QUI N'EST PAS UNE FAILLE.** Les deux routes portent `@require_role(2)` **et**
+`@require_machine_access`, mais `check_machine_access` rend `True` dès que `role_id >= 2`. Le second
+décorateur ne peut donc jamais refuser ce que le premier a laissé passer. Ce n'est pas un trou — la garde
+de rôle est plus forte — c'est un décorateur décoratif, et le signaler évite qu'on le croie protecteur.
+
+---
+
+## E-91 — Le déploiement porté : les étapes sont NOMMÉES et rendues par plateforme, et la réussite est VÉRIFIÉE
+
+Sous-lot V12, dernier du module. Base rouge mesurée avant de porter : **14 PASS / 16 FAIL** — les seize
+propriétés que ce portage apporte. Après portage : **31 PASS / 0 FAIL** (legacy : **19 / 0**).
+
+**LE VERDICT VIENT DU FLUX ENTIER**, comme en E-87, et ce que l'écran dit diverge donc franchement :
+
+| | ce que l'écran affiche |
+|---|---|
+| legacy | « Deploiement reussi pour Test-Server-Debian. », en vert |
+| portage | « Le déploiement sur Test-Server-Debian a **ÉCHOUÉ** (code 127, 100, 127). Le portail a malgré tout enregistré l'agent dans son inventaire. » |
+
+`(code N)` est parsé comme **protocole**, jamais la phrase française. Trois issues seulement — *réussi*,
+*échec*, *inachevé* — et **aucune tentative d'attribuer un code à une étape** : le flux n'émet pas de
+marqueur par étape, donc conclure « installé mais non démarré » demanderait de compter les codes dans
+l'ordre et de parier sur le nombre d'étapes réellement jouées, qui varie avec la PSK et l'`extra_config`.
+C'est la **vérification** qui comble ce trou, en disant ce qui est là.
+
+**LA VÉRIFICATION APRÈS COUP, PLUS PARLANTE QU'EN E-89.** En V11 elle faisait constater une absence ; ici
+elle confronte une **présence que l'inventaire vient d'affirmer** :
+
+> ATTENTION : AUCUN agent n'est détecté sur Test-Server-Debian. Le portail vient pourtant d'inscrire cet
+> agent dans son inventaire — c'est l'inventaire qui a tort.
+
+Quatre issues, et la version attendue est **retenue au moment de la décision** plutôt que relue après : une
+bascule de plateforme entre-temps ferait comparer une version détectée à une version jamais demandée.
+
+**LES ÉTAPES SONT ÉNUMÉRÉES, ET RENDUES PAR PLATEFORME.** Neuf pour Zabbix dans l'état mesuré (onze avec
+PSK et `extra_config`), et la liste **est** le décompte : aucune phrase ne cite un nombre, parce qu'un
+nombre écrit vieillit mal — E-87 annonçait trois effets et en avait quatre. Rendre les étapes de Zabbix
+pendant que le sélecteur est sur Telegraf aurait reproduit **E-79 par un autre bout**, le libellé qui ne
+suit pas la clé : la table est donc indexée par la même clé que `routesParPlateforme()`.
+
+**UN DÉFAUT DE MON PROPRE PORTAGE, CORRIGÉ AU PASSAGE.** Le bouton « Reconfigurer » de V10 se désactivait
+d'après la configuration de **Zabbix** quel que soit le sélecteur — la même famille E-79, déplacée du
+chemin vers l'**état**. V12 l'aurait recopiée. L'état bloqué vient maintenant d'une table par plateforme,
+mise à jour à chaque bascule, et **fail-closed** : une table illisible bloque le geste au lieu de l'ouvrir.
+
+**LA PASSERELLE PASSE EN FLUX POUR CES QUATRE CHEMINS SEULEMENT.** Décision prise sur mesure et
+**contraire** à celle de E-87 : la reconfiguration dure 1,4 s et reste bufferisée ; le déploiement a été
+mesuré à **9 270 ms** sur le banc, mais ce chiffre est un **plancher** — le banc n'a ni DNS ni paquet à
+télécharger, donc chaque étape réseau y échoue immédiatement. Un déploiement réel tire un `.deb` puis
+installe un agent et ses greffons : 120 s ne sont pas un majorant crédible, et un dépassement rendrait une
+erreur de passerelle **alors que l'installation continuerait sur la machine** — le pire des verdicts,
+« échec » sur un geste qui a réussi. Les quatre chemins sont donc relayés morceau par morceau (900 s).
+`estUnFlux` est évaluée **après** les trois refus : ce réglage ne change qu'un délai et un mode de relais,
+aucune garde.
+
+**LA 19e CLÉ CASSÉE, ET LA PLUS INSTRUCTIVE DE LA SÉRIE.** `confirm_deploy` n'est pas une traduction
+manquante : elle **existe**, en FR et en EN, correctement rédigée — dans `lang/{fr,en}/supervision.php`,
+donc **hors de l'espace `js.`** que `getJsTranslations('js.')` charge. Elle est écrite, correcte, et
+inaccessible ; la boîte native affiche `confirm_deploy`. Le repli `|| 'Confirmer le deploiement ?'` avait
+bien été anticipé, mais il reste inerte pour la raison mesurée en E-83 : `__()` rend la clé **telle
+quelle**, donc une chaîne non vide. La suite mesure les **deux** faits séparément.
+
+**AUCUNE CASE À COCHER, DONC AUCUNE ACTION DE MASSE.** Le legacy offre trois boutons par ligne, trois cases
+et un « Déployer la sélection » ; le portage offre trois boutons par ligne, zéro case, zéro action de
+masse. Et **ouvrir un panneau n'envoie rien** — propriété mesurée au **réseau**, en comptant les requêtes
+vers `/deploy`, ce qui permet d'ouvrir le panneau sur la ligne de `srv-zabbix` pour lire l'avertissement
+sans jamais joindre la production.
+
+**TROIS DÉFAUTS DE MA SUITE, ET UN PASS QUI PASSAIT POUR UNE MAUVAISE RAISON.** Elle lisait le flux du
+legacy dans `#deploy-logs` alors que `appendDeployLog` écrit dans `#deploy-logs-container` — le verdict
+était donc toujours vide et l'assertion accusait le legacy de ne rien conclure. Elle rendait
+`{porte: false}` sans `items`, et `items.length` levait deux assertions plus loin. Et elle lisait la liste
+des étapes en testant `hidden` sur le `<ul>` au lieu du panneau qui le contient : l'assertion passait alors
+que le bouton était désactivé et que **le panneau n'avait jamais paru**. Elle exige maintenant que le
+panneau soit réellement visible.
+
+**VU À L'IMAGE, CORRIGÉ.** L'énoncé du geste et l'avertissement de PRODUCTION portaient la même classe,
+donc le même fond et la même bordure : sur le geste le plus coûteux du module, rien ne distinguait « voici
+ce qui va se passer » de « ce serveur est en production ». L'énoncé est devenu un encart neutre ; seul
+l'avertissement attire l'œil.
+
+**UNE MÉMORISATION POSÉE AU PASSAGE.** `configurationParPlateforme()` était interrogée **six fois** par
+requête. Reprocher au legacy de jouer la même requête deux fois (E-76) et le faire trois fois plus n'aurait
+aucun sens : elle est mémorisée pour la durée de la requête, et l'écriture invalide la mémoire.

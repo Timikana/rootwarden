@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.45** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.46** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,64 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.46 — module `supervision/`, sous-lot V12 : le deploiement, dernier geste du module
+
+**DERNIER SOUS-LOT DU MODULE.** Le deploiement d'un agent est porte : geste **par ligne**, panneau de
+decision rendu par le serveur qui **enumere les etapes**, verdict tire du **flux entier**, **verification
+apres coup**, journal montre. Base rouge mesuree avant de porter : **14 PASS / 16 FAIL**. Apres :
+**31 PASS / 0 FAIL** (legacy : 19 / 0). Details dans `docs/migration/PARITE.md` **E-90** et **E-91**.
+
+**CE QUE LA MESURE A TROUVE (E-90).** Le backend n'inspecte **aucun** code de retour : `yield from
+execute_as_root_stream(...)` ignore la valeur rendue. Releve sur le banc d'essai, trois etapes en echec
+(codes **127**, **100**, **127** : `wget` absent, paquet hors index, `systemctl` absent) et le flux conclut
+`SUCCESS_MACHINE::... Deploiement reussi`. Pire, `_upsert_agent` inscrit l'agent : la base affirmait
+`zabbix 7.0, config_deployed = 1` la ou `dpkg-query` ne trouvait aucun paquet. La ligne fausse est
+**transitoire** — la detection de version qui suit l'efface, sur les deux portails — donc la suite l'isole
+par une **requete forgee** sans detection apres. **Backend laisse INTACT** faute d'autorisation.
+
+**CE QUE LE PORTAGE AJOUTE (E-91).**
+
+- **les etapes sont NOMMEES, pas comptees, et rendues PAR PLATEFORME** : `zabbix_deploy` purge l'agent en
+  place avant d'installer et tire un `.deb` sur `repo.zabbix.com` ; `generic_deploy` ne purge pas,
+  sauvegarde la configuration, et **Prometheus n'ajoute aucun depot externe**. Aucune phrase ne cite un
+  nombre — la liste EST le decompte ;
+- **le verdict vient du flux entier**, `(code N)` parse comme protocole. Le legacy affiche « Deploiement
+  reussi » en vert ; le portage affiche « a **ECHOUE** (code 127, 100, 127) » ;
+- **la verification confronte l'inventaire** : « AUCUN agent n'est detecte [...] c'est l'inventaire qui a
+  tort ». Plus parlante qu'en V11, qui faisait constater une absence ;
+- **le bouton est desactive avec l'explication** quand le backend refuserait — et seulement la :
+  `zabbix_deploy` rend **400** sans configuration globale, `generic_deploy` **installe quand meme** ;
+- **aucune case a cocher, aucune action de masse**, et **ouvrir un panneau n'envoie rien** — propriete
+  mesuree au RESEAU, ce qui permet de lire l'avertissement sur la ligne de `srv-zabbix` sans la joindre.
+
+**LA 19e CLE CASSEE, ET LA PLUS INSTRUCTIVE.** `confirm_deploy` **existe**, en FR et en EN, correctement
+redigee — dans `lang/{fr,en}/supervision.php`, donc hors de l'espace `js.` que le script charge. Ecrite,
+correcte, **inaccessible** : la boite native affiche `confirm_deploy`.
+
+**DEUX CORRECTIFS DE MON PROPRE PORTAGE.** Le bouton « Reconfigurer » de V10 se desactivait d'apres la
+configuration de **Zabbix** quel que soit le selecteur (famille E-79, deplacee du chemin vers l'etat) :
+l'etat bloque vient desormais d'une table par plateforme, **fail-closed**. Et
+`configurationParPlateforme()` etait interrogee **six fois** par requete : elle est memorisee pour la duree
+de la requete, l'ecriture invalidant la memoire.
+
+**PASSERELLE.** Les quatre chemins `/supervision/<plateforme>/deploy` passent **en flux** (delai 900 s au
+lieu de 120 s). Decision prise sur mesure et contraire a celle de V10 : le deploiement a ete mesure a
+**9 270 ms** sur le banc, mais c'est un **plancher** — le banc n'a ni DNS ni paquet a telecharger. Un
+depassement rendrait une erreur de passerelle alors que l'installation continuerait sur la machine.
+`estUnFlux` etant evaluee **apres** les trois refus, aucune garde n'est touchee.
+
+**VU A L'IMAGE.** L'enonce du geste et l'avertissement de PRODUCTION portaient la meme classe : sur le
+geste le plus couteux du module, rien ne distinguait « voici ce qui va se passer » de « ce serveur est en
+production ». L'enonce est devenu un encart neutre.
+
+**FICHIERS.** `laravel/app/Http/Controllers/SupervisionController.php` (`etapesDuDeploiement()`,
+`boutonsBloques()`, route `deploiement`, libelles), `laravel/app/Services/Supervision.php` (memorisation),
+`laravel/app/Support/RoutesBackend.php` (`EN_FLUX`), `laravel/resources/views/supervision.blade.php`,
+`laravel/public/js/supervision.js` (`verdictDeploiement()`, `verifieDeploiement()`,
+`majBoutonsBloques()`), `laravel/lang/{fr,en}/superv.php` (**264 cles = 264**),
+`tests/e2e/go-page-supervision-deploiement.mjs` (neuf), `scripts/rejouer-lot.sh`,
+`docs/migration/PARITE.md`. **Backend Python inchange.**
 
 ### v1.37.45 — module `supervision/`, sous-lot V11 : la desinstallation, une reussite VERIFIEE et non annoncee
 

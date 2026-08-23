@@ -123,6 +123,33 @@ class RoutesBackend
         '/update',
         '/dry_run_update',
         '/security_updates',
+        /*
+         * SOUS-LOT V12 : LE DEPLOIEMENT INSTALLE, DONC IL TELECHARGE.
+         *
+         * Les autres gestes de `supervision/` restent bufferises, et c'est une
+         * decision prise sur mesure : une reconfiguration d'une machine dure
+         * 1,4 s. Le deploiement, lui, a ete remesure parce qu'il n'est pas de
+         * la meme nature — il ajoute un depot, rafraichit les index apt et
+         * installe des paquets.
+         *
+         * Mesure sur le banc d'essai : 9 270 ms. Cela passe dans les 120 s du
+         * delai ordinaire. Mais ce chiffre est un PLANCHER, pas un plafond :
+         * le banc n'a ni resolution DNS ni paquet a telecharger, donc chaque
+         * etape reseau y echoue immediatement. Un deploiement reel tire un
+         * `.deb` puis installe un agent et ses greffons — 120 s ne sont pas un
+         * majorant credible, et un depassement rendrait une erreur de
+         * passerelle alors que l'installation, elle, continuerait sur la
+         * machine. Le pire des verdicts : « echec » sur un geste qui a reussi.
+         *
+         * Ces quatre chemins sont donc relayes morceau par morceau (delai 900 s).
+         * `estUnFlux` est evaluee APRES les trois refus (liste blanche, reserve
+         * a l'administration, re-authentification) : ce reglage ne change qu'un
+         * delai et un mode de relais, aucune garde.
+         */
+        '/supervision/zabbix/deploy',
+        '/supervision/centreon/deploy',
+        '/supervision/prometheus/deploy',
+        '/supervision/telegraf/deploy',
     ];
 
     /** Le chemin doit-il etre relaye morceau par morceau ? */
