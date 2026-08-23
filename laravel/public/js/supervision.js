@@ -386,6 +386,182 @@
         });
     }
 
+    /* ── La reconfiguration ──────────────────────────────────── sous-lot V10
+     *
+     * LE VERDICT VIENT DE CE QUE LE FLUX A MONTRE, PAS DE SON DERNIER MARQUEUR.
+     * Mesure (PARITE E-85) sur la machine de test, sans `systemctl` :
+     *
+     *     Exécution terminée (code 127).
+     *     SUCCESS_MACHINE::2::Reconfiguration reussie pour Test-Server-Debian.
+     *
+     * Le redemarrage a echoue et le marqueur conclut a la reussite. L'information
+     * est dans le flux DEUX LIGNES plus haut. Un portage qui lirait le marqueur
+     * heriterait du mensonge : on lit donc le flux ENTIER, et on en tire QUATRE
+     * issues distinctes.
+     *
+     * ON PARSE LE NOMBRE, PAS LA PHRASE. « Exécution terminée (code 127). » est
+     * une phrase francaise, susceptible de changer ; `(code N)` est la partie
+     * protocole. Meme raison qu'un jeton de protocole n'est pas un libelle.
+     *
+     * LA PASSERELLE BUFFERISE, ET C'EST ASSUME : `/supervision/` n'est pas dans
+     * `EN_FLUX`. Mesure : une reconfiguration d'UNE machine dure **1,4 s**. Tenir
+     * la connexion pour la rendre « vivante » n'apporterait rien a ce prix-la —
+     * le geste est par ligne, pas sur le parc.
+     */
+    var panneauReconf = document.querySelector('[data-rw="superv-panneau-reconf"]');
+    var messageReconf = document.querySelector('[data-rw="superv-reconf-message"]');
+    var annulerReconf = document.querySelector('[data-rw="superv-reconf-annuler"]');
+    var confirmerReconf = document.querySelector('[data-rw="superv-reconf-confirmer"]');
+    var coutReconf = document.querySelector('[data-rw="superv-reconf-cout"]');
+    var journalReconf = document.querySelector('[data-rw="superv-reconf-journal"]');
+
+    /**
+     * Les QUATRE issues d'un flux de reconfiguration, tirees de son CONTENU.
+     *
+     * `partielle` est celle que le legacy perd : la configuration EST ecrite, une
+     * commande distante a echoue, et le marqueur terminal dit quand meme reussi.
+     */
+    function verdictDuFlux(texte) {
+        var lignes = texte.split('\n');
+        var echecMachine = lignes.some(function (l) { return l.indexOf('ERROR_MACHINE::') === 0; });
+        var succesMachine = lignes.some(function (l) { return l.indexOf('SUCCESS_MACHINE::') === 0; });
+        var erreurEcriture = lignes.some(function (l) { return l.indexOf('ERROR:') === 0; });
+        // `(code N)` : la partie PROTOCOLE de « Exécution terminée (code N). »
+        var codes = [];
+        lignes.forEach(function (l) {
+            var m = l.match(/\(code (\d+)\)/);
+            if (m) { codes.push(Number(m[1])); }
+        });
+        var commandeEchouee = codes.some(function (c) { return c !== 0; });
+        var avertissements = lignes.filter(function (l) { return l.indexOf('WARN:') === 0; });
+
+        if (echecMachine) { return { issue: 'echec', codes: codes, avertissements: avertissements }; }
+        if (! succesMachine) { return { issue: 'inacheve', codes: codes, avertissements: avertissements }; }
+        if (commandeEchouee || erreurEcriture) {
+            return { issue: 'partielle', codes: codes, avertissements: avertissements };
+        }
+
+        return { issue: 'reussite', codes: codes, avertissements: avertissements };
+    }
+
+    function fermeReconf() {
+        if (! panneauReconf) { return; }
+        panneauReconf.hidden = true;
+        panneauReconf.removeAttribute('data-cible');
+        panneauReconf.removeAttribute('data-nom');
+    }
+
+    if (panneauReconf && messageReconf && annulerReconf && confirmerReconf && coutReconf) {
+        [].slice.call(document.querySelectorAll('[data-rw="superv-reconfigurer"]'))
+            .forEach(function (bouton) {
+                bouton.addEventListener('click', function () {
+                    // OUVRIR N'ENVOIE RIEN. Le legacy, lui, part au premier clic.
+                    panneauReconf.setAttribute('data-cible', bouton.dataset.machine || '');
+                    panneauReconf.setAttribute('data-nom', bouton.dataset.nom || '');
+                    coutReconf.textContent = libelles.reconf_cout
+                        .replace('{nom}', bouton.dataset.nom || '')
+                        .replace('{chemin}', cheminCourant());
+                    var ligneFusion = document.querySelector('[data-rw="superv-reconf-effet-fusion"]');
+                    if (ligneFusion) {
+                        ligneFusion.textContent = libelles.reconf_effet_fusion
+                            .replace('{chemin}', cheminCourant());
+                    }
+                    panneauReconf.hidden = false;
+                    messageReconf.className = 'rw-annonce';
+                    messageReconf.textContent = '';
+                    if (journalReconf) { journalReconf.hidden = true; journalReconf.textContent = ''; }
+                    annulerReconf.focus();
+                });
+            });
+
+        annulerReconf.addEventListener('click', function () { fermeReconf(); });
+
+        confirmerReconf.addEventListener('click', function () {
+            var machine = panneauReconf.getAttribute('data-cible') || '';
+            var nom = panneauReconf.getAttribute('data-nom') || '';
+            if (machine === '') { return; }
+            confirmerReconf.disabled = true;
+            annulerReconf.disabled = true;
+            messageReconf.className = 'rw-annonce';
+            messageReconf.textContent = libelles.reconf_en_cours.replace('{nom}', nom);
+
+            var route = routeCourante('reconfiguration');
+            if (! route) {
+                messageReconf.className = 'rw-annonce rw-annonce--echec';
+                messageReconf.textContent = libelles.reconf_echec;
+                confirmerReconf.disabled = false;
+                annulerReconf.disabled = false;
+                fermeReconf();
+
+                return;
+            }
+
+            var jeton = document.querySelector('meta[name="csrf-token"]');
+            fetch(route, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                },
+                /*
+                 * UNE SEULE MACHINE, DANS LA LISTE QUE LA ROUTE ATTEND. Le
+                 * backend lit `machine_ids` en premier ; le portage n'y met
+                 * jamais qu'un element, parce qu'il n'a aucune case a cocher.
+                 */
+                body: JSON.stringify({ machine_ids: [Number(machine)] }),
+            }).then(function (reponse) {
+                // LE STATUT D'ABORD. Un 400 « Aucune configuration globale » n'est
+                // pas un flux : c'est un refus, et il ne se lit pas comme un log.
+                if (! reponse.ok) {
+                    messageReconf.className = 'rw-annonce rw-annonce--echec';
+                    messageReconf.textContent = libelles.reconf_refus
+                        .replace('{statut}', String(reponse.status));
+
+                    return null;
+                }
+
+                return reponse.text();
+            }).then(function (texte) {
+                if (texte === null || texte === undefined) { return; }
+                if (journalReconf) {
+                    journalReconf.textContent = texte;
+                    journalReconf.hidden = false;
+                }
+                var verdict = verdictDuFlux(texte);
+                var codes = verdict.codes.filter(function (c) { return c !== 0; }).join(', ');
+
+                if (verdict.issue === 'reussite') {
+                    messageReconf.className = 'rw-annonce rw-annonce--ok';
+                    messageReconf.textContent = libelles.reconf_reussie.replace('{nom}', nom);
+                } else if (verdict.issue === 'partielle') {
+                    // CE CAS EST TOUT LE SUJET DE V10.
+                    messageReconf.className = 'rw-annonce rw-annonce--attention';
+                    messageReconf.textContent = libelles.reconf_partielle
+                        .replace('{nom}', nom)
+                        .replace('{codes}', codes || '?');
+                } else if (verdict.issue === 'echec') {
+                    messageReconf.className = 'rw-annonce rw-annonce--echec';
+                    messageReconf.textContent = libelles.reconf_echouee.replace('{nom}', nom);
+                } else {
+                    messageReconf.className = 'rw-annonce rw-annonce--echec';
+                    messageReconf.textContent = libelles.reconf_inachevee.replace('{nom}', nom);
+                }
+
+                if (verdict.avertissements.length > 0) {
+                    messageReconf.textContent += ' ' + libelles.reconf_avertissements
+                        .replace('{nombre}', String(verdict.avertissements.length));
+                }
+            }).catch(function () {
+                messageReconf.className = 'rw-annonce rw-annonce--echec';
+                messageReconf.textContent = libelles.reconf_echec;
+            }).finally(function () {
+                fermeReconf();
+                confirmerReconf.disabled = false;
+                annulerReconf.disabled = false;
+            });
+        });
+    }
+
     /* ── L'ecriture du fichier distant ───────────────────────── sous-lot V9
      *
      * TROIS ISSUES, LUES SUR UN BOOLEEN. Le backend distingue « ecrit et

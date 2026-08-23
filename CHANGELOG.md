@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.42** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.43** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,67 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.43 — module `supervision/`, sous-lot V10 : la reconfiguration, et un verdict qui ne recopie pas le marqueur
+
+**Symptome.** Le flux de reconfiguration se termine par `Exécution terminée (code 127).` puis
+`SUCCESS_MACHINE::2::Reconfiguration reussie`. Le legacy recopie le marqueur : il annonce une reussite
+alors que le redemarrage a echoue DEUX LIGNES plus haut. Et il n'a AUCUNE confirmation — `reconfigureSingle`
+part au premier clic, la ou `deploy` et `uninstall` ouvrent au moins un `confirm()`.
+
+**Fix.** Le portage lit le flux ENTIER et en tire QUATRE issues : reussite, **partielle**, echec, inacheve.
+Mesure des deux cotes, meme geste, meme machine sans `systemctl` :
+
+    legacy  : « Reconfiguration reussie pour Test-Server-Debian. »
+    portage : « Configuration poussee sur Test-Server-Debian, mais une commande distante
+                a ECHOUE (code 127). Le fichier est en place et le service ne tourne
+                peut-etre pas : lisez le journal ci-dessous… »
+
+**ON PARSE LE NOMBRE, PAS LA PHRASE.** « Exécution terminée (code N). » est une phrase francaise,
+susceptible de changer ; `(code N)` est la partie protocole. Le verdict s'appuie sur `/\(code (\d+)\)/`,
+sur les prefixes `ERROR:` / `WARN:` et sur les marqueurs — jamais sur un libelle traduisible.
+**LE JOURNAL EST MONTRE**, pas resume : le donner sous le verdict permet de le VERIFIER au lieu de le
+croire.
+
+**QUATRE EFFETS ENUMERES, et le decoupage n'en annoncait que trois** : sauvegarde datee, ecriture cle par
+cle, **ecriture d'une cle PSK** si la configuration globale en porte une, redemarrage. Le quatrieme est
+CONDITIONNEL et sa condition est MESUREE : sans PSK, la ligne est cachee. Annoncer un effet qui n'aura pas
+lieu est aussi faux que d'en taire un.
+
+**L'ECRITURE FUSIONNE, ELLE NE TRONQUE PAS.** `_write_config_stream` purge chaque cle au `sed` puis
+l'ajoute : les lignes que le portail ne gere pas SURVIVENT. La suite pose `Timeout=42` avant le geste et
+verifie qu'elle est toujours la apres. C'est la semantique INVERSE de l'editeur (V9), qui tronque avec
+`>` — deux gestes voisins sur le meme fichier, deux comportements opposes.
+
+**PAR LIGNE, PAS SUR SELECTION** : mesure, le legacy offre 1 geste de masse et 3 cases a cocher ; le
+portage 3 gestes par ligne et 0 case. **UNE REGLE APPLIQUEE PAR LE BACKEND SE REND VISIBLE** :
+`zabbix_reconfigure` rend 400 « Aucune configuration globale » tant que la table est vide — le bouton est
+donc DESACTIVE, avec l'explication en infobulle, et la section l'annonce.
+
+**LA PASSERELLE BUFFERISE, DECISION PRISE SUR MESURE** : `/supervision/` reste hors de `EN_FLUX` parce
+qu'une reconfiguration d'UNE machine dure **1,4 s**. Tenir la connexion ouverte n'apporterait rien a ce
+prix. A remesurer si V11 ou V12 changent cet ordre de grandeur.
+
+**DEUX DEFAUTS DE MA SUITE.** `/Reconfigure/` est un PREFIXE de « Reconfigurer » et passait donc sur la
+page francaise — deuxieme motif trop large en deux sous-lots, apres `override_Hostname` qui contenait
+« name ». Et un detail d'assertion qui disait « journal absent ou vide » sur un PASS : le detail est
+imprime dans les deux cas, il doit dire ce qu'on a TROUVE.
+
+**ET UNE CAPTURE QUI MONTRAIT UN ETAT INATTEIGNABLE.** Le script forcait `disabled = false` sur un bouton
+que le portage desactive : l'image montrait un panneau ouvert a cote de « Aucune configuration globale
+enregistree ». Reprise avec une vraie configuration globale — regarder le rendu ne sert que si le rendu
+est celui qu'un exploitant peut atteindre.
+
+**RESTE DECLARE ET NON CORRIGE**, hors autorisation : `generic_reconfigure` annonce `SUCCESS_MACHINE::`
+sans rien avoir ecrit quand la configuration globale manque, et un echec de dechiffrement du PSK n'est que
+journalise (E-85).
+
+**Tests.** `go-page-supervision-reconf` : base rouge 7 PASS / 7 FAIL, puis **27 PASS sur le portage** et
+**13 sur le legacy**. i18n : 20 cles FR + 20 EN dans le meme commit, **209 = 209**. 329 pytest inchanges
+(aucune modification backend). LOT complet rejoue.
+
+**Reference du LOT** : `go-page-supervision-reconf` entre avec **13 PASS sur le legacy** et **27 sur le
+portage**. Le LOT passe a **80 executions de suite** pour **1110 assertions** (compte au journal du rejeu).
 
 ### v1.37.42 — module `supervision/`, sous-lot V10a : les reglages par machine, avec une liste FERMEE
 

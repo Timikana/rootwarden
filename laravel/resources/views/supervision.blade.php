@@ -424,6 +424,25 @@
                                             <a class="rw-bouton rw-bouton--discret"
                                                data-rw="superv-reglages-lien-{{ $m->id }}"
                                                href="{{ route('supervision', ['reglages' => $m->id]) }}#reglages">{{ __('superv.reglages_lien') }}</a>
+                                            {{-- SOUS-LOT V10 : la reconfiguration, PAR LIGNE.
+                                                 Le legacy l'offre aussi « sur la selection », et
+                                                 SANS AUCUNE confirmation — la ou `deploy` et
+                                                 `uninstall` ouvrent au moins un `confirm()`. Ici
+                                                 pas de case a cocher (V6), donc pas d'action de
+                                                 masse : une ligne, une machine, un panneau. --}}
+                                            {{-- UNE REGLE APPLIQUEE PAR LE BACKEND SE REND
+                                                 VISIBLE. `zabbix_reconfigure` refuse (400) tant
+                                                 qu'aucune configuration globale n'existe. Un
+                                                 bouton cliquable pour se faire refuser fait
+                                                 decider dans le vide : il est DESACTIVE, avec
+                                                 l'explication en infobulle. --}}
+                                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                                    data-rw="superv-reconfigurer"
+                                                    data-machine="{{ $m->id }}"
+                                                    data-nom="{{ $m->name }}"
+                                                    @disabled(($configuration['zabbix'] ?? null) === null)
+                                                    @if (($configuration['zabbix'] ?? null) === null) title="{{ __('superv.reconf_sans_config') }}" @endif
+                                                    >{{ __('superv.reconf_bouton') }}</button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -435,6 +454,65 @@
                          qu'une session SSH en demande le double : le message a
                          disparu avant que son effet soit constatable. --}}
                     <p class="rw-annonce" data-rw="superv-version-message" aria-live="polite"></p>
+
+                    {{-- ══ SOUS-LOT V10 : LA RECONFIGURATION ═════════════════
+                         QUATRE EFFETS, PAS TROIS — et le decoupage n'en annoncait
+                         que trois. La mesure (PARITE E-85) en a trouve un
+                         quatrieme : si la configuration globale porte un PSK, la
+                         route ECRIT UNE CLE SECRETE sur la machine. Les enumerer
+                         est la seule facon de ne pas faire passer « reconfigurer »
+                         pour un geste anodin.
+
+                         ET L'ECRITURE FUSIONNE, ELLE NE REMPLACE PAS : la route
+                         procede CLE PAR CLE (purge au `sed` puis ajout), donc les
+                         lignes qu'elle ne connait pas SURVIVENT — a l'inverse de
+                         l'editeur (V9) qui tronque le fichier. Deux gestes
+                         voisins, deux semantiques opposees : le dire evite de
+                         croire que l'un remplace l'autre. --}}
+                    <section class="rw-note" data-rw="superv-reconf">
+                        <h4 class="rw-sous-titre">{{ __('superv.reconf_titre') }}</h4>
+                        <p class="rw-aide rw-prose">{{ __('superv.reconf_description') }}</p>
+
+                        @php($configZabbix = $configuration['zabbix'] ?? null)
+                        @if ($configZabbix === null)
+                            {{-- UNE REGLE APPLIQUEE PAR LE BACKEND SE REND VISIBLE.
+                                 `zabbix_reconfigure` commence par refuser (400
+                                 « Aucune configuration globale ») quand la table est
+                                 vide. Laisser cliquer pour se faire refuser fait
+                                 decider dans le vide : on le dit AVANT. --}}
+                            <div class="rw-vide" data-rw="superv-reconf-indisponible">
+                                <p class="rw-vide__titre">{{ __('superv.reconf_sans_config') }}</p>
+                                <p class="rw-vide__texte rw-prose">{{ __('superv.reconf_sans_config_aide') }}</p>
+                            </div>
+                        @endif
+
+                        <div class="rw-panneau-decision" data-rw="superv-panneau-reconf" hidden>
+                            <div class="rw-panneau-decision__texte">
+                                <p class="rw-avertissement" data-rw="superv-reconf-cout"></p>
+                                <ul class="rw-aide rw-prose rw-liste-effets" data-rw="superv-reconf-effets">
+                                    <li>{{ __('superv.reconf_effet_sauvegarde') }}</li>
+                                    <li data-rw="superv-reconf-effet-fusion">{{ __('superv.reconf_effet_fusion', ['chemin' => $cheminsConfig['zabbix'] ?? '']) }}</li>
+                                    <li data-rw="superv-reconf-effet-psk" @unless($configZabbix?->psk_pose) hidden @endunless>{{ __('superv.reconf_effet_psk') }}</li>
+                                    <li>{{ __('superv.reconf_effet_redemarrage') }}</li>
+                                </ul>
+                            </div>
+                            <div class="rw-panneau-decision__actions">
+                                <button type="button" class="rw-bouton rw-bouton--discret"
+                                        data-rw="superv-reconf-annuler">{{ __('superv.reconf_annuler') }}</button>
+                                <button type="button" class="rw-bouton rw-bouton--danger"
+                                        data-rw="superv-reconf-confirmer">{{ __('superv.reconf_confirmer') }}</button>
+                            </div>
+                        </div>
+
+                        <p class="rw-annonce" data-rw="superv-reconf-message" aria-live="polite"></p>
+
+                        {{-- LE FLUX EST MONTRE, PAS RESUME. Le verdict du portage
+                             vient de ce que le flux a MONTRE, pas de son dernier
+                             marqueur — qui annonce `SUCCESS_MACHINE::` deux lignes
+                             apres un `code 127`. Donner aussi le journal permet de
+                             verifier ce verdict au lieu de le croire. --}}
+                        <pre class="rw-journal" data-rw="superv-reconf-journal" hidden></pre>
+                    </section>
 
                     {{-- ══ SOUS-LOT V10a : LES REGLAGES PAR MACHINE ══════════
                          POURQUOI CE FORMULAIRE N'A PAS DE CHAMP DE NOM. La table
