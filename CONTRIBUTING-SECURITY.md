@@ -102,3 +102,39 @@ Pas de bug bounty public, mais en interne :
 ---
 
 **En cas de doute** : refuser (fail-closed), logger, demander revue. Une régression sécu coûte plus cher qu'un feature en retard.
+
+---
+
+## Le portage Laravel — ce qui s'y applique en plus
+
+Ces conventions ont été établies au fil des sous-lots de migration et sont **mesurées**, pas
+supposées. Chacune a coûté un défaut réel : voir `docs/migration/PARITE.md`.
+
+- **Comparaison par SEGMENT, jamais par préfixe** dans la passerelle
+  (`App\Support\RoutesBackend`). Vérifié sur les 201 routes réelles du backend. Corollaire
+  général : une assertion « ce chemin mène à X » écrite par **inclusion de chaîne** est
+  satisfaite par tout chemin dont X est un préfixe — y compris celui qu'on vient de supprimer
+  (E-92).
+- **Les droits se lisent EN BASE**, jamais dans la session (`App\Services\Droits`). Le legacy
+  porte lui-même l'avertissement.
+- **Fail-closed partout** : une table de configuration illisible **bloque** le geste au lieu
+  de l'ouvrir.
+- **Aucune entrée libre là où une liste fermée suffit.** Une entrée libre validée se contourne
+  par une requête forgée ; une entrée libre absente, non (E-86).
+- **Un GET ne doit rien écrire.** Le chemin d'enrôlement du legacy enregistre un secret dès
+  l'affichage, sans jeton CSRF — à ne pas reproduire.
+- **Un garde anti-rejeu par SESSION est inerte** : le poser par **compte** et **en base**
+  (E-01).
+- **Aucune boîte native** (`confirm`, `prompt`) : une décision se prend dans la page. Elles
+  recouvrent la ligne, ne se stylent pas, et bloquent le test qui doit mener l'action au bout.
+- **Une règle appliquée par le backend se rend VISIBLE** : si le backend refusera de toute
+  façon, le bouton est désactivé avec l'explication — mais l'état désactivé doit être la
+  **conjonction** « le backend refuserait ET la condition est réunie », pas le seul fait que
+  la route puisse refuser.
+- **Les secrets ne sont jamais SELECTionnés.** On calcule un booléen en SQL
+  (`tls_psk_value IS NOT NULL AND <> ''`) plutôt que de ramener la valeur.
+- **Le statut du backend est propagé tel quel** : un 404 devenu 200 ferait croire au frontend
+  que l'appel a réussi.
+- **Une réussite annoncée n'est pas une réussite vérifiée**, et **un état final correct ne
+  prouve pas que le geste était correct** : un correctif accidentel en aval peut effacer le
+  défaut avant la mesure (E-90).

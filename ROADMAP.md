@@ -1,97 +1,251 @@
-# RootWarden - Roadmap
+# RootWarden — Roadmap
 
-Suivi des chantiers post-audit sécurité (session 2026-06-10).
-Branche de travail : `feat/per-user-sudo-sftp`.
+**Chantier en cours : la migration du frontend vers Laravel.** Branche de travail
+`Migration-Laravel`, cible **v2.0 avec bascule DIRECTE** (pas de coexistence longue).
 
----
-
-## Contexte
-
-Après un **audit OWASP Top 10 de bout en bout** (backend Flask, frontend PHP/JS,
-infra Docker/CI), toutes les vulnérabilités et bugs ont été remédiés (voir
-CHANGELOG v1.23.0 → v1.23.3), puis on a démarré une **roadmap produit** de
-nouvelles features (v1.24.0+).
-
-Décisions cadrage : **pas de SSO/OIDC/LDAP** (volontairement exclu) et **pas de
-HA / multi-nœud** (exclu).
+Dernière mesure : **2026-08-23**, version `1.37.47`. Les chiffres de ce document sont
+**mesurés**, pas reconduits — voir « Comment vérifier » en fin de page.
 
 ---
 
-## ✅ Fait (livré, testé en live, commité)
+## ⛔ URGENT — une vulnérabilité en PRODUCTION, hors périmètre migration
 
-### Sécurité / audit (non poussé)
-| Version | Sujet |
+**Le second facteur est dérivable du premier.** `legacy/auth/enable_2fa.php` ne garde que
+`isset($_SESSION['temp_user'])`, l'état posé **après le mot de passe et avant le second
+facteur**. Conséquence, reproduite le 2026-08-23 (et déjà relevée le 2026-08-20) :
+
+```
+POST /auth/login.php  (mot de passe seul)  -> 302 vers verify_2fa.php   [2FA EN ATTENTE]
+GET  /auth/enable_2fa.php                  -> 200, 17 547 octets
+                                              contient le secret TOTP du compte EN CLAIR
+                                              + son QR code
+```
+
+Le fichier est **identique octet pour octet** à `www/auth/enable_2fa.php` sur `origin/main`
+(`sha256 be0bfda6…`) — donc **la production est concernée**. Quiconque détient un mot de
+passe peut lire le secret TOTP du compte et générer ses codes indéfiniment.
+
+Trois défauts secondaires du même fichier : **aucune limitation de débit** sur la
+vérification (là où `verify_2fa.php` en a deux), **anti-rejeu inerte** (motif E-01), et une
+**écriture en base sur un GET, sans jeton CSRF**.
+
+**Non corrigé.** Un correctif touche le chemin d'authentification en production : il doit
+partir sur une branche `security/…` et n'être fusionné que sur validation verbale explicite.
+Détail complet : `docs/migration/MODULE-AUTH.md` §2.
+
+---
+
+## Où on en est, en un chiffre
+
+| | |
 |---|---|
-| 1.23.0 | Remédiation OWASP complète (48 fichiers) — escalades A01, crypto A02, XSS A03, step-up A04, auth A07, SSRF A10 |
-| (hotfix) | `BCRYPT_COST` manquant dans login.php + 2 scripts de régression e2e |
-| (ux) | Toast feedback création user (anti-clamp silencieux de rôle) |
-| 1.23.1 | Lot #1 : fuites connexions MySQL, bornes SSE, bashrc home, presets sudo durcis, cron HMAC, retrait déchiffreur legacy, hygiène secrets e2e |
-| 1.23.2 | Lot #2 : IDOR iptables, IDOR supervision, exposition colonnes, CSRF iptables, policy↔machine, scheduler home |
-| 1.23.3 | Lot B : DB defaults refusés, utf8mb4, force_password_change, anti-énum forgot, PTY echo, notif broadcast, openapi role, bug server_id port |
+| entrées de menu portées | **14 sur 33** |
+| parties du legacy archivées | **9** (`commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision`) |
+| modules entièrement dépréciés | **2** (`update/`, `supervision/`) |
+| LOT de tests E2E | **84 exécutions, 1111 assertions, 0 échec** |
+| tests backend | **341 pytest** |
+| écarts de parité documentés | **93** (`docs/migration/PARITE.md`, E-01 → E-93) |
+| commits non poussés | **72** (0 de retard sur `origin/Migration-Laravel`) |
 
-### Features produit
-| Version | Feature | Notes |
-|---|---|---|
-| 1.24.0 | **Détection de dérive (drift)** | `/drift/` + table `config_drift` (mig 052) + scan scheduler 1x/h. Compare désiré/réel (sudo, sshd, fail2ban) depuis la BDD, sans SSH. |
-| 1.25.0 | **Centre de tâches async** | `/tasks/` + table `tasks` (mig 053) + helper `task_tracker.py` (context manager). Scheduler instrumenté (CVE/SSH/drift/backup). Lecture seule (retry à venir). |
-| 1.26.0 | **Score de posture conformité (CIS-like)** | Note A-F par serveur dans le rapport conformité (sshd+CVE+fail2ban+drift), incluse aux exports CSV/PDF. Durcissement PDF (purge buffers). |
-| 1.27.0 | **Priorisation EPSS + CISA KEV** | `cve_enrich.py` (EPSS FIRST.org + KEV CISA), score de priorité, `/cve_reprioritize`, badges KEV/EPSS + tri (mig 054). |
-| 1.28.0 | **Groupes dynamiques + actions de masse** | `/groups/` + `machine_groups`/`machine_group_members` (mig 055), filtres env/criticité/réseau/cycle/tags, bulk drift/CVE → centre de tâches. |
-| 1.29.0 | **Fenêtres de maintenance** | `/maintenance/` + `maintenance_windows` (mig 056), enforcement HTTP 423 sur update/reboot, bypass superadmin. |
-| 1.30.0 / 1.31.1 | **Workflow d'approbation 4-eyes** | `/approvals/` + `approval_requests` (mig 057), store-and-replay, règle 4-eyes, **bypass superadmin** (mono-admin). |
-| 1.31.0 | **Journal des commandes (bastion)** | `/commandlog/` + `command_log` (mig 058), instrumentation reboot/delete_user/updates. |
-| 1.32.0 | **ChatOps bidirectionnel** | `/chatops/` + `chatops_users` (mig 059), endpoint entrant (signature Slack / jeton), commandes status/approvals/approve/reject. |
-| 1.33.0 | **Ticketing ITSM** | `/tickets/` + `tickets` (mig 060), adaptateurs Jira/ServiceNow/GLPI/generic, CVE→ticket (bouton + auto-KEV), SSRF guard. |
-| 1.34.0 | **Recherche globale + audit log** | `/search/` (serveurs/users/CVE/tickets/audit), visualiseur audit HMAC exposé au menu. |
-| 1.35.0 | **Restauration de backup** | `/backups/` : verify (test non destructif) + restore (superadmin, sha256 + backup de sécurité auto). |
-| 1.36.0 | **Split Sudo/SFTP + aide en clair** | Pages séparées `/adm/server_user_sudo.php` + `_sftp.php`, chaque option expliquée pour non-experts. |
-| 1.37.0 | **Veille conteneurs Docker** | `/docker/` : inventaire + MAJ image (digest registre) & git (commits + changelog), mig 061. |
-| 1.37.1 | **Audit OWASP des features** | 6 correctifs (A01/A03/A10). |
-| 1.37.2/.3 | **Docs + CI** | README FR/EN, `bandit.yml` recréé, fix `cryptography` 48.0.1 (pip-audit). |
+**La migration n'est pas finie.** 14/33, c'est 42 % des entrées de menu. Le socle, lui,
+est complet : authentification, navigation, passerelle vers le backend, i18n FR/EN.
 
 ---
 
-## ⏳ À faire (prioritisé)
+## Ce qui bloque la v2.0
 
-1. **Rotation automatique des secrets** — rotation planifiée des mots de passe
-   root/SSH des machines, avec audit. Table de planning + job scheduler + UI.
-   *Self-contained, haute valeur DevSecOps. (Seule feature roadmap non démarrée.)*
+Deux capacités seulement, mais elles suffisent à interdire la bascule. Mesuré le
+2026-08-23 : **6 comptes actifs sur 10** sont concernés par chacune.
 
-> Les features 2 à 10 de la roadmap initiale sont **livrées** (v1.27.0 → v1.35.0,
-> voir tableau ci-dessus et CHANGELOG). Chacune : migration idempotente + blueprint
-> backend + page PHP/JS + i18n fr/en + menu + whitelist proxy + doc + test Puppeteer live.
+| blocage | état du portage | conséquence après bascule directe |
+|---|---|---|
+| **enrôlement 2FA** | impasse explicite, dont le seul lien sort vers `enable_2fa.php` du legacy | aucun compte neuf ne peut obtenir un second facteur |
+| **changement de mot de passe requis** | `force_password_change` est **détecté** et annoncé par un bandeau, aucun formulaire n'est offert | les comptes marqués ne peuvent jamais satisfaire l'exigence — **`superadmin` en fait partie** |
 
-### Exclu (décision)
+Aucun chemin d'authentification ne passe sans second facteur : c'est voulu, et c'est
+précisément ce qui rend l'enrôlement bloquant.
+
+Détail et découpage : `docs/migration/MODULE-AUTH.md`.
+
+---
+
+## Ce qui reste à porter
+
+**19 entrées de menu**, par taille de code legacy :
+
+| partie | lignes | entrées de menu |
+|---|---|---|
+| `adm/` | 8421 (37 fichiers) | **6** — comptes, journal d'audit, comptes distants, clés de plateforme, politiques sudo, politiques sftp |
+| `ssh-audit/` | 1118 | 1 |
+| `bashrc/` | 941 | 1 |
+| `fail2ban/` | 872 | 1 |
+| `iptables/` | 870 | 1 |
+| `services/` | 631 | 1 |
+| `wazuh/` | 594 | 1 |
+| `graylog/` | 388 | 1 |
+| `groups/` | 305 | 1 |
+| `maintenance/` | 257 | 1 |
+| `chatops/` | 246 | 1 |
+| `docker/` | 201 | 1 |
+| `documentation.php`, `api/docs.php` | — | 2 |
+
+**Plus `auth/`** : 16 fichiers, 3003 lignes, **aucune entrée de menu** — ce n'est pas un
+module métier mais ce qui empêche d'éteindre le legacy.
+
+**Plus deux sous-lots bloqués** par un arbitrage, dans des modules par ailleurs portés :
+
+- **S7b** (`security/`) — le scan CVE qui aboutit **envoie un vrai courriel**
+  (`send_cve_report` part dès que l'état passe à `done` avec des résultats). Prérequis
+  techniques faits, en attente d'autorisation ;
+- **K4** (`ssh/`) — le déploiement de clés. Bloqué par l'arbitrage du repli
+  `NOPASSWD: ALL`, et un déploiement lancé en l'état **révoquerait** des accès.
+
+---
+
+## Décisions qui attendent l'exploitant
+
+Elles sont toutes documentées avec leur mesure dans `docs/migration/PARITE.md`.
+
+**Effets sortants, à autoriser avant tout test :**
+- **A3** — la réinitialisation de mot de passe envoie un courriel (le legacy embarque
+  `phpmailer`). Même famille que S7b ;
+- **S7b** — un scan CVE réel.
+
+**Correctifs backend mesurés, non appliqués faute d'autorisation :**
+- **E-90** — le déploiement d'agent de supervision n'inspecte **aucun** code de retour et
+  inscrit dans l'inventaire un agent qui n'existe pas. Relevé : trois étapes en échec
+  (codes 127, 100, 127) puis `SUCCESS_MACHINE:: Deploiement reussi`. La ligne fausse est
+  **transitoire** — la détection qui suit l'efface — donc elle ne se voit qu'en isolant le
+  geste ;
+- `generic_reconfigure` annonce un succès sans avoir rien écrit quand la configuration
+  globale manque, et son marqueur ment après un `code 127` ;
+- la clé PSK dont l'échec de déchiffrement n'est que journalisé ;
+- **E-73** — le fuseau du backend : UTC contre CEST, l'**affichage** est faux de deux heures.
+
+**Gardes et surfaces :**
+- quatre routes de profils de supervision sans `@require_role` ;
+- `POST /supervision/overrides/<id>` sans `@require_machine_access` ;
+- la liste blanche `/supervision/` de `legacy/api_proxy.php:134` — **surface morte** depuis
+  l'archivage, et `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES` côté legacy ;
+- huit branches mortes qui armeraient un `@threaded_route` **imbriqué** : supprimer la règle
+  statique en la prenant pour un doublon **bloquerait** le pool ;
+- 21 routes de filtrage sans permission ; la garde de la page `ssh/` ; `can_deploy_keys`
+  côté requête ; la fuite du mot de passe dans `deployment.log` ; OpenCVE TLS désactivée.
+
+**Comptes et exploitation :**
+- **cinq comptes `e2e_test_*` actifs, rôle 1, sans second facteur** — résidus d'exécutions
+  E2E, à supprimer ou non ;
+- **`main` tourne en production à `v1.37.15`** et il lui manque `v1.37.16` et `v1.37.17`,
+  **deux correctifs de sécurité** qui n'existent que sur la branche de migration. Le
+  rétroportage attend une décision ;
+- la branche `security/backend-cve` (6 correctifs backend, 318 pytest verts) attend une
+  **relecture** et n'a jamais été fusionnée ;
+- rotation automatique des secrets — seule feature de l'ancienne roadmap produit non
+  démarrée.
+
+**Ergonomie du legacy, avis donné : ne pas y toucher** (on ne soigne pas ce qu'on démonte) :
+- le legacy ne marque pas ses **11 liens sortants** vers le portage — ni marqueur, ni
+  `target` — alors que le portage marque l'inverse ;
+- le 404 d'un chemin archivé est la page brute d'Apache, sans repère ni retour.
+
+---
+
+## Dette documentaire — constatée le 2026-08-23
+
+Reproche de l'exploitant, et il était fondé. Seul `CHANGELOG.md` suivait le rythme des
+commits ; tout le reste avait décroché, **y compris les documents qui disent ce qui reste**.
+Trois documents ne mentionnaient **pas une seule fois** Laravel ni le port 8444.
+
+| document | version annoncée avant correction | état |
+|---|---|---|
+| `CHANGELOG.md` | 1.37.47 | à jour |
+| `ROADMAP.md` | 1.35.0 | **réécrit** (ce document) |
+| `README.md` / `README.en.md` | 1.37.7 / 1.37.1 | corrigés |
+| `ARCHITECTURE.md` | 1.37.5 | corrigé |
+| `ONBOARDING.md` | 1.37.15 | corrigé |
+| `docs/migration/INVENTAIRE.md` | 1.36.0 | corrigé |
+| `docs/migration/MODULE-AUTH.md` | — | corrigé |
+| `docs/migration/MODULE-SUPERVISION.md` | 1.37.44 | complété (V12 + archivage) |
+| `OPERATIONS.md` | aucune | corrigé (section 0 : deux frontends à exploiter) |
+| `CONTRIBUTING-SECURITY.md` | 1.37.1 | corrigé (conventions du portage) |
+| `docs/API.md` | 1.2.3 | **encore en retard** — décrit le backend, inchangé par la migration, mais ne dit pas qu'il a désormais deux appelants |
+| `docs/SECURITY_AUDIT.md` | 1.37.1 | **volontairement figé** : c'est le compte rendu daté d'un audit, pas un document vivant |
+| `ONBOARDING.md` | 1.37.15 | corrigé, mais **`.gitignore:123` l'exclut** — il se partage par lien, pas par commit |
+
+**Ce que cette dette a coûté**, et c'est la raison de l'inscrire ici plutôt que de la
+corriger en silence : `docs/migration/MODULE-AUTH.md` existait depuis le 2026-08-20 avec un
+inventaire meilleur qu'un relevé refait de zéro le 2026-08-23 — et il **corrigeait** ce
+relevé sur deux points (`confirm_2fa.php` et `reset_totp.php` sont du **code mort**). Ne pas
+lire les documents du chantier a directement produit un plan faux. De même,
+`INVENTAIRE.md` gelé à v1.36.0 est la raison pour laquelle une liste de modules restants en
+oubliait cinq.
+
+---
+
+## Ce qui est exclu (décision)
+
 - ❌ SSO / OIDC / LDAP
 - ❌ HA / multi-nœud
+- ❌ toute migration de schéma côté Laravel : la base appartient au backend Python et
+  évolue par `mysql/migrations/*.sql`
+- ❌ étape de construction côté portage : CSS écrit à la main, jetons et classes `.rw-*`
 
 ---
 
-## 🔧 Opérationnel en attente
+## Dette technique connue, documentée, non bloquante
 
-- **Push** de la branche `feat/per-user-sudo-sftp` (~20 commits locaux non poussés,
-  dont features v1.27 → v1.35).
-- **Merge vers `main`** : nécessite validation verbale explicite (convention
-  patches sécu).
-- **Test boot préprod** avec l'override prod : `docker compose -f docker-compose.yml
-  -f docker-compose.prod.yml up -d` après rebuild `--no-cache` (valider les fixes
-  `user:`/`read_only`/`install.sh`).
-- **Appliquer les migrations** en préprod/prod : `docker exec <php|python> python
-  db_migrate.py` (migrations **052 → 060** : config_drift, tasks, cve_epss_kev,
-  machine_groups, maintenance_windows, approval_requests, command_log,
-  chatops_users, tickets).
-- **Features opt-in à activer** côté `.env` si souhaité : `APPROVAL_ENABLED`,
-  `CHATOPS_ENABLED` (+ secret/jeton), `TICKETING_ENABLED` (+ provider).
+- **CSP** conserve `'unsafe-inline'` (migration vers un nonce à faire avec test navigateur) ;
+- **clé d'hôte SSH** : `AutoAddPolicy`, pas de TOFU/`known_hosts` — décision de conception ;
+- **CI** : actions GitHub à épingler par SHA, images de base par digest ;
+- routes mutantes par machine (`fail2ban`, `services`, `iptables`) gardées par
+  `require_machine_access` seul — à durcir en `require_role(2)` si le rôle 1 doit être
+  lecteur seul (décision de gouvernance) ;
+- centre de tâches : **reprise** et instrumentation des déploiements interactifs à venir ;
+- GeoIP (`fail2ban_manager`) en HTTP (ip-api gratuit est en HTTP seul) ;
+- **3 suites E2E laissent fuir le mot de passe de la base** dans leur sortie ;
+- `/tasks/list?status=` rend un 500 ; injection de formule CSV ; `go-page-backups` ne
+  nettoie pas ce qu'il crée ; `npm audit` non traité.
 
 ---
 
-## 🐛 Dette / limitations connues (documentées, non bloquantes)
+## Comment vérifier ces chiffres
 
-- **CSP** conserve `'unsafe-inline'` (migration nonce à faire avec test navigateur).
-- **Clé d'hôte SSH** : `AutoAddPolicy` (pas de TOFU/known_hosts) — décision design.
-- **CI** : actions GitHub à pinner par SHA, images base par digest.
-- **Routes mutantes par-machine** (fail2ban/services/iptables) gardées par
-  `require_machine_access` seul (role-1 = opérateur de ses machines) — à durcir en
-  `require_role(2)` si role-1 doit être lecteur seul (décision de gouvernance).
-- Centre de tâches : **retry** + instrumentation des déploiements interactifs à venir.
-- GeoIP (`fail2ban_manager`) en HTTP (ip-api free = http only).
+Aucun nombre de ce document ne doit être recopié sans être remesuré — c'est ce qui a
+produit trois erreurs de suivi (69 commits au lieu de 70, deux points d'entrée au lieu de
+quatre, une liste de modules qui en oubliait cinq).
+
+```bash
+# entrees de menu portees / restantes
+grep -c "'route'"  laravel/app/Support/Navigation.php   # portees (moins 2 lignes de commentaire)
+grep -c "'legacy'" laravel/app/Support/Navigation.php   # restantes (moins 2)
+
+# parties archivees
+ls legacy/_deprecated/
+
+# le LOT (~95 min), lance en arriere-plan puis attendu dans un appel SEPARE
+setsid ./scripts/rejouer-lot.sh > /tmp/lot.out 2>&1 < /dev/null &
+until ! pgrep -f "[r]ejouer-lot"; do sleep 20; done; tail -3 /tmp/lot.out
+
+# tests backend (pytest vit DANS le conteneur, il n'y a pas de venv sur l'hote)
+sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
+
+# ecarts de parite
+grep -c "^## E-" docs/migration/PARITE.md
+
+# avance reelle sur l'amont
+git fetch origin && git rev-list --left-right --count @{u}...HEAD
+```
+
+---
+
+## Documents du chantier
+
+| document | ce qu'il contient |
+|---|---|
+| `docs/migration/METHODE-SOUS-LOT.md` | les neuf temps d'un sous-lot — à suivre, pas à improviser |
+| `docs/migration/PARITE.md` | les 93 écarts mesurés entre legacy et portage, avec leur preuve |
+| `docs/migration/INVENTAIRE.md` | ce qui reste, mesuré |
+| `docs/migration/DEPRECIATION.md` | le cycle d'archivage et les neuf parties déjà archivées |
+| `docs/migration/ARCHITECTURE-UI.md` | pourquoi ni Filament ni Tailwind, décidé sur mesure |
+| `docs/migration/MODULE-*.md` | l'inventaire par module (`AUTH`, `SECURITY`, `SSH`, `SUPERVISION`, `UPDATE`, `FILTRAGE`) |
+| `CHANGELOG.md` | l'historique versionné, seul document resté à jour de bout en bout |

@@ -321,3 +321,61 @@ Non couvert par cette passe, a faire avant les vagues concernees :
 `adm/includes/manage_access.php` · `fail2ban/index.php` · `iptables/index.php` ·
 `security/index.php` · `services/index.php` · `ssh-audit/index.php` · `ssh/index.php` ·
 `update/index.php`
+
+---
+
+# Remesure du 2026-08-23 — l'inventaire de 2026-08-17 avait décroché
+
+**Pourquoi cette section existe.** Cet inventaire est resté figé à v1.36.0 pendant que le
+portage avançait de vingt-sept versions. Le 2026-08-23, une liste de « modules restants »
+reconduite de mémoire en **oubliait cinq** — `ssh-audit/`, `wazuh/`, `groups/`,
+`maintenance/`, `chatops/`. La leçon est inscrite plutôt que corrigée en silence : **un
+inventaire ancien n'est pas une mesure.**
+
+## Ce que dit la mesure croisée
+
+Source de vérité pour « qu'est-ce qu'un module portable » : **le menu**, c'est-à-dire
+`laravel/app/Support/Navigation.php`. Une entrée porte `route` (portée) **ou** `legacy` (pas
+encore), jamais les deux.
+
+```bash
+grep -c "'route'"  laravel/app/Support/Navigation.php   # portees  (moins 2 lignes de commentaire)
+grep -c "'legacy'" laravel/app/Support/Navigation.php   # restantes (moins 2)
+```
+
+**33 entrées au total : 14 portées, 19 restantes.**
+
+| partie legacy | lignes PHP+JS | entrées de menu |
+|---|---|---|
+| `adm/` | 8421 (37 fichiers) | **6** — `admin_page.php`, `audit_log.php`, `server_users.php`, `platform_keys.php`, `server_user_sudo.php`, `server_user_sftp.php` |
+| `ssh-audit/` | 1118 | 1 |
+| `bashrc/` | 941 | 1 |
+| `fail2ban/` | 872 | 1 |
+| `iptables/` | 870 | 1 |
+| `services/` | 631 | 1 |
+| `wazuh/` | 594 | 1 |
+| `graylog/` | 388 | 1 |
+| `groups/` | 305 | 1 |
+| `maintenance/` | 257 | 1 |
+| `chatops/` | 246 | 1 |
+| `docker/` | 201 | 1 |
+| `documentation.php` + `api/docs.php` | — | 2 |
+
+## Ce qui n'est PAS une entrée de menu, et qu'il faut compter à part
+
+- **`auth/`** — 16 fichiers, 3003 lignes. Pas un module métier : ce qui empêche d'éteindre le
+  legacy. Voir `MODULE-AUTH.md`. Sur ces 16 fichiers, `verify.php` (332 l.) est le **garde
+  central** inclus par chaque page protégée — l'équivalent du middleware du portage, déjà
+  couvert par le socle — et `migrate_crypto.php` + `migrate_totp.php` (411 l.) sont des
+  scripts **CLI ponctuels** à ne pas porter. Le `.htaccess` du dossier les refuse en HTTP :
+  **403 vérifié en direct** le 2026-08-23, avec `functions.php` et `password_policy.php`.
+- **Infrastructure**, jamais des pages : `includes/` (994), `lang/` (77 fichiers, 5760),
+  `js/` (254), `api/` (52), `assets/`, `img/`, `logs/`, `vendor/` (899 fichiers).
+- **11 fichiers PHP à la racine** de `legacy/` (dont `index.php`, `menu.php`, `head.php`,
+  `documentation.php`, `profile.php`).
+
+## Déjà archivé — `legacy/_deprecated/`
+
+`approvals` · `backups` · `commandlog` · `drift` · `search` · `supervision` · `tasks` ·
+`tickets` · `update` — **neuf parties**, dont **deux modules entiers** (`update/`,
+`supervision/`). Cycle et preuves : `DEPRECIATION.md`.
