@@ -769,3 +769,69 @@ dans les deux ordres de déclaration, donc aucune imbrication. En revanche les *
 délégation sont du code mort qui armerait le piège si l'on supprimait la règle statique · le périmètre de scan Tailwind v4 pour `laravel/public/js/*.js` : si ces
 fichiers ne sont pas scannés, les quatre palettes de badges **disparaissent en production** · le
 nombre exact de canaux `exec_command` par session de déploiement.
+
+---
+
+# Fin du module — V12 puis archivage (2026-08-23)
+
+## V12 — le déploiement (`v1.37.46`, PARITE E-90 et E-91)
+
+Dernier sous-lot. Base rouge **14 PASS / 16 FAIL**, portage **31 / 0** (legacy 19 / 0).
+
+**Le backend n'inspecte AUCUN code de retour.** `yield from execute_as_root_stream(...)`
+ignore la valeur rendue, alors que cette fonction rend son code depuis `v1.37.44`. Relevé sur
+le banc d'essai : `wget` absent (**127**), paquet hors index (**100**), `systemctl` absent
+(**127**) — et le flux conclut `SUCCESS_MACHINE:: Deploiement reussi`. `_upsert_agent` inscrit
+l'agent quoi qu'il arrive : `supervision_agents` portait `zabbix 7.0, config_deployed = 1` là
+où `dpkg-query` ne trouvait aucun paquet. **Backend laissé INTACT, faute d'autorisation.**
+
+**La ligne fausse est TRANSITOIRE**, et c'est ce qui la rend difficile à mesurer :
+`zabbix_version` appelle `_remove_agent` quand elle ne trouve rien, et les **deux** portails
+relancent une détection juste après — le legacy par `autoDetect`, le portage par sa
+vérification. Chacun efface son propre mensonge sans le savoir. La suite l'isole par une
+**requête forgée**, sans enchaînement.
+
+**Les étapes sont NOMMÉES, pas comptées, et rendues PAR PLATEFORME** — parce qu'elles
+diffèrent vraiment : Zabbix **purge** l'agent en place avant d'installer, renomme la config en
+`.old` et tire un `.deb` sur `repo.zabbix.com` ; `generic_deploy` ne purge pas, **sauvegarde**
+la configuration ; Prometheus n'ajoute **aucun** dépôt externe ; Telegraf ne reçoit **jamais**
+l'`extra_config`. Rendre les étapes de Zabbix pendant que le sélecteur est sur Telegraf aurait
+reproduit **E-79 par un autre bout**.
+
+**19e clé i18n cassée, et la plus instructive** : `confirm_deploy` **existe**, en FR et en EN,
+correctement rédigée — dans `lang/{fr,en}/supervision.php`, donc **hors de l'espace `js.`** que
+le script charge. Écrite, correcte, **inaccessible**.
+
+**Deux défauts du portage lui-même, corrigés** : le bouton « Reconfigurer » de V10 se
+désactivait d'après la configuration de **Zabbix** quel que soit le sélecteur (famille E-79,
+déplacée du chemin vers l'**état**), et `configurationParPlateforme()` était interrogée **six
+fois** par requête — le reproche fait au legacy en E-76.
+
+**Passerelle** : les quatre `/supervision/<plateforme>/deploy` passent **en flux** (900 s au
+lieu de 120 s). Décision contraire à celle de V10 et prise sur mesure : le déploiement a été
+mesuré à **9 270 ms** sur le banc, mais c'est un **plancher** — le banc n'a ni DNS ni paquet à
+télécharger. `estUnFlux` étant évaluée **après** les trois refus, aucune garde n'est touchée.
+
+## Archivage (`v1.37.47`, PARITE E-92 et E-93)
+
+`legacy/supervision/` → `legacy/_deprecated/`. **Deuxième module déprécié**, neuvième partie
+archivée. LOT : **84 exécutions, 1111 assertions, 0 échec** — le total baisse de 1208 parce que
+les treize suites legacy jouent désormais le constat d'archivage (**6** assertions, **8** pour
+`onglets`).
+
+**Quatre points d'entrée, pas deux** : barre latérale et tiroir mobile (`menu.php`), raccourci
+du tableau de bord (`index.php`), et la **carte de raccourcis CLAVIER** (`head.php`, `g` puis
+`v`) — un objet JavaScript qu'aucun contrôle sur les `href` ne peut voir.
+
+**Le défaut le plus utile portait sur l'outillage partagé.** `tests/e2e/archive.mjs` filtrait
+les liens par `href.includes(routeportee)` : la route portée est `/supervision`, l'ancien chemin
+`/supervision/` — le second **contient** le premier. L'assertion annonçait une réussite **en
+affichant le chemin archivé**. Ce qui l'a révélée est un `TypeError: Invalid URL` levé deux
+lignes plus bas, pas l'assertion : **si l'ancien lien avait été absolu, le PASS passait
+inaperçu.** Premier des neuf modules où la collision était possible — les huit précédents
+n'avaient aucun recouvrement, donc **aucun ne pouvait échouer**.
+
+**Laissé en place et signalé** : la liste blanche `/supervision/` de `legacy/api_proxy.php:134`
+est désormais une **surface morte** (et `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES`
+côté legacy). La retirer restreindrait ce que le legacy autorise — changement de droits, pas
+conséquence du déplacement de trois fichiers.

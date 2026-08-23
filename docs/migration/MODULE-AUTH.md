@@ -53,6 +53,18 @@ c'est bien le secret réel du compte. **Le second facteur est dérivable du prem
 Le fichier est **identique à l'octet** entre `origin/main` et la branche (empreinte `9f7d1a32`), et
 `main` tourne en production.
 
+**RE-VERIFIE INDEPENDAMMENT le 2026-08-23**, sans relire ce document au prealable — et la
+seconde mesure est tombee sur les **memes 17 547 octets**. Empreinte comparee autrement :
+`sha256(legacy/auth/enable_2fa.php)` et `sha256(origin/main:www/auth/enable_2fa.php)` sont
+egales (`be0bfda6…`). La reproduction a demande un detail : l'attribut `value` du jeton CSRF
+est sur la **ligne suivante** du HTML, donc un `grep` par ligne ne le trouve pas — il faut
+supprimer les retours a la ligne avant de chercher. Un premier essai avait conclu a un 403
+et aurait pu passer pour une disculpation.
+
+**Cette entree est restee trois jours sans etre remontee a l'exploitant**, parce que le
+document n'a pas ete relu avant de replanifier le module. C'est le cout mesure de la dette
+documentaire, inscrit ici pour qu'il serve.
+
 Trois autres défauts du même fichier :
 
 - **aucune limitation de débit** sur la vérification (`:75-117`), là où `verify_2fa.php:60-86` et
