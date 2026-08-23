@@ -702,6 +702,32 @@ absent ou vide » sur un PASS.
 
 **Reste du module** : V11 (désinstallation, DÉTRUIT), V12 (déploiement).
 
+## 7 octodecies. V11 mesuré — la désinstallation ne peut pas échouer (2026-08-23)
+
+Détail en `PARITE.md` E-88. Mesures sur **Test-Server-Debian (id 2, DEV)** ; état relu pour être prouvé.
+
+**LE CODE DE SORTIE EST FABRIQUÉ.** Les quatre étapes de la commande finissent chacune par `|| true` : la
+chaîne ne peut pas sortir autrement qu'en 0, et `2>/dev/null` jette même le message. Puis
+`SUCCESS_MACHINE::` est émis inconditionnellement. **En V10 la vérité était dans le flux ; ici elle n'est
+nulle part.** Mesuré sur une machine où l'agent n'a jamais été installé : `code 0` et
+« Agent Zabbix desinstalle ».
+
+**L'INVENTAIRE OUBLIE QUOI QU'IL ARRIVE** : `_remove_agent` s'exécute hors de toute vérification. Mesuré
+avec une fixture — 1 ligne avant, 0 après, alors que rien n'a été retiré de la machine. Si la purge
+échouait, l'exploitant verrait le même succès vert et le même inventaire vide, l'agent continuant de
+tourner.
+
+**`apt-get autoremove -y` DÉPASSE L'AGENT** — les quatre plateformes le portent. Mesuré sans le payer :
+`apt-get autoremove --dry-run` rend **0 to remove** sur le banc d'essai. C'est le banc qui est exonéré,
+pas la commande : la suite peut donc cliquer sans risque, ce qu'il fallait établir avant de le faire.
+
+**DEUX EXONÉRATIONS** : les quatre gardes sont en place, et le paramètre est `machine_id` au singulier —
+la désinstallation est déjà par machine, et le legacy y met un `confirm()` natif.
+
+**CE QUE LE PORTAGE FERA** : puisque la route ne peut pas rapporter un échec, lui faire confiance serait
+recopier un succès invérifiable. Le portage **vérifiera après coup** en rejouant la détection de version
+(V6, déjà portée) — une réussite mesurée plutôt qu'annoncée, sans route neuve ni modification du backend.
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et
