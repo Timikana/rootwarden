@@ -130,6 +130,15 @@ Consequences pour la conception d'une suite :
   — puis PROUVER l'absence d'effet (aucune ligne creee, aucune trace SMTP) et le
   dire.
 
+## Exercer les DEUX chemins d'une garde « permission OU role »
+
+Une suite qui se connecte toujours avec le compte qui PORTE la permission ne
+mesure qu'un des deux chemins. `rw-test-super` (role 3) n'a PAS
+`can_manage_supervision` : c'est le seul compte qui distingue « la garde laisse
+passer parce que la permission est la » de « parce que le role l'emporte ».
+Verifier en base quels droits portent vraiment les trois comptes avant de
+supposer.
+
 ## Deux connexions dans la meme suite : attendre la fenetre TOTP
 
 Le garde anti-rejeu est par COMPTE et EN BASE : un contexte de navigateur neuf
