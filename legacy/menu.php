@@ -96,7 +96,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
         <?php endif; ?>
 
         <?php if (($perms['can_manage_supervision'] ?? false) || $isSA): ?>
-        <?= $sideLink('/supervision/', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>', t('nav.supervision'), t('nav.tip_supervision')) ?>
+        <?= $sideLink(rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') . '/supervision', '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>', t('nav.supervision'), t('nav.tip_supervision')) ?>
         <?php endif; ?>
 
         <?php if (($perms['can_manage_bashrc'] ?? false) || $isSA): ?>
@@ -237,7 +237,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
             <?php if (($perms['can_manage_fail2ban'] ?? false) || $isSA): ?><a href="/fail2ban/" title="<?= t('nav.tip_fail2ban') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.fail2ban') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_services'] ?? false) || $isSA): ?><a href="/services/" title="<?= t('nav.tip_services') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.services') ?></a><?php endif; ?>
             <?php if (($perms['can_audit_ssh'] ?? false) || $isSA): ?><a href="/ssh-audit/" title="<?= t('nav.tip_ssh_audit') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.ssh_audit') ?></a><?php endif; ?>
-            <?php if (($perms['can_manage_supervision'] ?? false) || $isSA): ?><a href="/supervision/" title="<?= t('nav.tip_supervision') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.supervision') ?></a><?php endif; ?>
+            <?php if (($perms['can_manage_supervision'] ?? false) || $isSA): ?><a href="<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') ?>/supervision" title="<?= t('nav.tip_supervision') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.supervision') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_bashrc'] ?? false) || $isSA): ?><a href="/bashrc/" title="<?= t('nav.tip_bashrc') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.bashrc') ?></a><?php endif; ?>
             <?php if (($perms['can_manage_graylog'] ?? false) || $isSA): ?><a href="/graylog/" title="<?= t('nav.tip_graylog') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.graylog') ?></a><?php endif; ?>
             <?php if (feature_enabled('wazuh') && (($perms['can_manage_wazuh'] ?? false) || $isSA)): ?><a href="/wazuh/" title="<?= t('nav.tip_wazuh') ?>" class="block px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800"><?= t('nav.wazuh') ?></a><?php endif; ?>

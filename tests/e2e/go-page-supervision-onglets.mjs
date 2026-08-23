@@ -43,6 +43,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 import { compteEnBase } from './lib-base.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
@@ -120,6 +121,71 @@ async function connecte(nom, secret) {
 }
 
 try {
+    /*
+     * MODULE ARCHIVE ? Cote legacy, `supervision/` a ete porte en douze
+     * sous-lots (V1 a V12) puis deplace dans `legacy/_deprecated/`. Ses URL
+     * rendent 404 : ce n'est pas un echec, c'est l'aboutissement du portage. Le
+     * test le CONSTATE — et verifie surtout que le menu du legacy mene desormais
+     * au portage, sans quoi on aurait installe soi-meme un 404 dans un menu.
+     *
+     * Le constat vient AVANT toute fixture : rien n'est pose, donc rien n'est a
+     * defaire, et `process.exit()` peut court-circuiter le `finally`.
+     *
+     * Les TROIS fichiers du module sont sondes, pas un echantillon. Et ce sont
+     * les fichiers REELS : sonder un chemin qui n'a jamais existe rend 404 et
+     * fait passer l'assertion pour rien.
+     *
+     * Tant que le module est servi, ce bloc est inerte et la suite se joue.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE,
+            chemin: '/supervision/',
+            fichiers: [
+                '/supervision/index.php',
+                '/supervision/js/main.js',
+                '/supervision/js/profiles.js',
+            ],
+            verifie, constate,
+        });
+        if (archivee) {
+            const { ctx, page } = await connecte('rw-test-admin', SECRET_ADMIN);
+            await verifieMenuLegacy(page, '/supervision', verifie);
+            /*
+             * QUATRE EMPLACEMENTS POINTAIENT VERS CE MODULE, PAS DEUX.
+             * `verifieMenuLegacy` n'en mesure qu'un : la barre laterale. Le
+             * tiroir mobile, le raccourci du tableau de bord et surtout la carte
+             * de raccourcis CLAVIER (`head.php`, un objet JS, pas un `<a>`)
+             * echappent completement a un controle sur les `href`.
+             *
+             * La propriete mesuree ici est NEGATIVE et couvre les quatre : plus
+             * aucune page servie ne cite le chemin archive. Elle se lit sur le
+             * tableau de bord, qui inclut le menu ET la carte de raccourcis.
+             *
+             * Le seul `'/supervision/'` restant dans le legacy vit dans la liste
+             * blanche de `api_proxy.php` : ce n'est pas un lien de page mais une
+             * route de backend, laissee en place a dessein — la retirer
+             * changerait ce que le legacy autorise, ce qui n'est pas du ressort
+             * d'un archivage. Signale a l'exploitant.
+             */
+            await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' });
+            const source = await page.content();
+            const liensArchives = (source.match(/href="\/supervision\//g) || []).length;
+            verifie('plus aucun lien de page ne mene au chemin archive',
+                liensArchives === 0, `${liensArchives} lien(s) href="/supervision/"`);
+            // La carte de raccourcis clavier : `v: '/supervision/'` la ferait
+            // naviguer vers un 404 sans qu'aucun lien ne soit en cause.
+            const raccourcisArchives = (source.match(/: '\/supervision\/'/g) || []).length;
+            verifie('la carte de raccourcis clavier ne mene plus au chemin archive',
+                raccourcisArchives === 0, `${raccourcisArchives} raccourci(s) vers /supervision/`);
+            await ctx.close();
+            console.log(lignes.join('\n'));
+            console.log(`\n${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+            await navigateur.close();
+            process.exit(echecs > 0 ? 1 : 0);
+        }
+    }
+
     constate('cible', `${CIBLE} — ${PAGE}`);
     verifie('un compte de test porte bien can_manage_supervision',
         ADMIN_HABILITE === 1,

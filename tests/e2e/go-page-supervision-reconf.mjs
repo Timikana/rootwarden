@@ -53,6 +53,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 import { execFileSync } from 'child_process';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 
@@ -192,6 +193,44 @@ async function cliqueReconfigurer(page, mid) {
 }
 
 try {
+    /*
+     * MODULE ARCHIVE ? Cote legacy, `supervision/` a ete porte en douze
+     * sous-lots (V1 a V12) puis deplace dans `legacy/_deprecated/`. Ses URL
+     * rendent 404 : ce n'est pas un echec, c'est l'aboutissement du portage. Le
+     * test le CONSTATE — et verifie surtout que le menu du legacy mene desormais
+     * au portage, sans quoi on aurait installe soi-meme un 404 dans un menu.
+     *
+     * Le constat vient AVANT toute fixture : rien n'est pose, donc rien n'est a
+     * defaire, et `process.exit()` peut court-circuiter le `finally`.
+     *
+     * Les TROIS fichiers du module sont sondes, pas un echantillon. Et ce sont
+     * les fichiers REELS : sonder un chemin qui n'a jamais existe rend 404 et
+     * fait passer l'assertion pour rien.
+     *
+     * Tant que le module est servi, ce bloc est inerte et la suite se joue.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE,
+            chemin: '/supervision/',
+            fichiers: [
+                '/supervision/index.php',
+                '/supervision/js/main.js',
+                '/supervision/js/profiles.js',
+            ],
+            verifie, constate,
+        });
+        if (archivee) {
+            const { ctx, page } = await connecte('fr');
+            await verifieMenuLegacy(page, '/supervision', verifie);
+            await ctx.close();
+            console.log(lignes.join('\n'));
+            console.log(`\n${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+            await navigateur.close();
+            process.exit(echecs > 0 ? 1 : 0);
+        }
+    }
+
     constate('cible', `${CIBLE} — ${PAGE}`);
     constate('machine visee', `id ${MACHINE_DEV} (DEV) — srv-zabbix jamais visee`);
     constate('etat a l\'entree', nettoie());
