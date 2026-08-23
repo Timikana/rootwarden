@@ -3378,3 +3378,78 @@ portait donc cinq lignes de capitales sous lui. Corrigé par une règle placée 
 
 **CE QUI RESTE À V10** : la reconfiguration elle-même, qui **écrit** cette configuration sur la machine.
 Son étage le plus fort n'est plus inatteignable.
+
+## E-87 — La reconfiguration portée : le verdict vient de ce que le flux a MONTRÉ, pas de son dernier marqueur
+
+**Module `supervision/`, sous-lot V10 : la reconfiguration d'un agent (flux `text/plain`, MODIFIE la
+machine).** Suite : `tests/e2e/go-page-supervision-reconf.mjs` — **13 PASS sur le legacy, 27 sur le
+portage** (base rouge relevée : **7 PASS / 7 FAIL**). Cible : **Test-Server-Debian (id 2, DEV)** ;
+`srv-zabbix` jamais visée. Fixtures — une ligne `supervision_config` et un fichier — nettoyées à l'entrée
+et dans un `finally`, état **relu pour être prouvé**.
+
+**LA PROPRIÉTÉ CENTRALE : LE MARQUEUR TERMINAL MENT, ET LE PORTAGE NE LE RECOPIE PAS.** Mesuré sur les
+deux cibles, même geste, même machine sans `systemctl` :
+
+```
+flux    : Exécution terminée (code 127).
+          SUCCESS_MACHINE::2::Reconfiguration reussie pour Test-Server-Debian.
+
+legacy  : « Reconfiguration reussie pour Test-Server-Debian. »        ← le marqueur, recopié
+portage : « Configuration poussee sur Test-Server-Debian, mais une commande distante
+            a ECHOUE (code 127). Le fichier est en place et le service ne tourne
+            peut-etre pas : lisez le journal ci-dessous… »
+```
+
+L'information était dans le flux **deux lignes plus haut**. Le portage lit le flux **entier** et en tire
+**quatre issues** : réussite, **partielle** (le cas que le legacy perd), échec, inachevé.
+
+**ON PARSE LE NOMBRE, PAS LA PHRASE.** « Exécution terminée (code 127). » est une phrase française,
+susceptible de changer ; `(code N)` est la partie protocole. Le verdict s'appuie sur `/\(code (\d+)\)/`,
+sur les préfixes `ERROR:` / `WARN:` et sur les marqueurs `SUCCESS_MACHINE::` / `ERROR_MACHINE::` — jamais
+sur un libellé traduisible.
+
+**LE JOURNAL EST MONTRÉ, PAS RÉSUMÉ.** Donner le flux brut sous le verdict permet de **vérifier** ce
+verdict au lieu de le croire. Le legacy a aussi son journal, mais il n'y cherche rien.
+
+**QUATRE EFFETS, ÉNUMÉRÉS — et le découpage n'en annonçait que trois.** Sauvegarde datée, écriture clé par
+clé, **écriture d'une clé PSK** si la configuration globale en porte une, puis redémarrage. Le quatrième
+est **conditionnel, et sa condition est mesurée** : la fixture ne pose aucun PSK, donc la ligne est
+**cachée**. Annoncer un effet qui n'aura pas lieu est aussi faux que d'en taire un.
+
+**L'ÉCRITURE FUSIONNE, ELLE NE TRONQUE PAS — et la suite le mesure.** `_write_config_stream` purge chaque
+clé au `sed` puis l'ajoute : les lignes que le portail ne gère pas **survivent**. La suite pose
+`Timeout=42` dans le fichier avant le geste et vérifie qu'elle est **toujours là après**. C'est la
+sémantique inverse de l'éditeur (V9), qui tronque avec `>`. Deux gestes voisins sur le même fichier, deux
+comportements opposés : le dire évite de croire que l'un remplace l'autre.
+
+**AUCUNE CONFIRMATION CÔTÉ LEGACY, ET C'EST MESURÉ.** `reconfigureSingle` part au premier clic — là où
+`deploy` et `uninstall` ouvrent au moins un `confirm()`. La suite l'établit sans ambiguïté : aucune boîte
+native ne s'est ouverte, **et le fichier a été écrit**. Côté portage, le bouton **ouvre** un panneau, et
+le test assert qu'ouvrir n'émet aucune requête.
+
+**PAR LIGNE, PAS SUR SÉLECTION.** Le legacy offre les deux : mesuré, **1 geste de masse et 3 cases à
+cocher**. Le portage : **3 gestes par ligne, 0 case**. Une action de masse n'y est pas « déconseillée »,
+elle est structurellement absente.
+
+**UNE RÈGLE APPLIQUÉE PAR LE BACKEND SE REND VISIBLE.** `zabbix_reconfigure` rend **400 « Aucune
+configuration globale »** tant que la table est vide — et elle l'est. Le bouton du portage est donc
+**désactivé**, avec l'explication en infobulle, et la section l'annonce. Laisser cliquer pour se faire
+refuser fait décider dans le vide.
+
+**LA PASSERELLE BUFFERISE, ET C'EST ASSUMÉ — décision prise sur mesure.** `/supervision/` n'est pas dans
+`EN_FLUX`. Mesure : une reconfiguration d'**une** machine dure **1,4 s**. Tenir la connexion ouverte pour
+la rendre « vivante » n'apporterait rien à ce prix ; le geste est par ligne, pas sur le parc. Si V11 ou
+V12 changent cet ordre de grandeur, la décision se remesure.
+
+**UN MOTIF TROP LARGE, ENCORE.** Le contrôle de la traduction anglaise cherchait `/Reconfigure/` — qui est
+un **préfixe de « Reconfigurer »** et passait donc sur la page française. Resserré sur des phrases
+anglaises entières. Deuxième fois en deux sous-lots (`override_Hostname` contenait « name »).
+
+**ET UN DÉTAIL D'ASSERTION QUI MENTAIT AU PASS** : « le journal est MONTRÉ — journal absent ou vide ». Le
+détail est imprimé dans les deux cas : il doit dire ce qu'on a **trouvé**. Il imprime maintenant le nombre
+de lignes et la ligne retenue.
+
+**RESTE DÉCLARÉ ET NON CORRIGÉ** (hors autorisation) : `generic_reconfigure` annonce `SUCCESS_MACHINE::`
+**sans rien avoir écrit** quand la configuration globale manque, et un échec de déchiffrement du PSK n'est
+que journalisé — la clé n'est pas écrite, rien ne le dit, et le `.conf` continue de référencer
+`TLSPSKFile` (E-85).

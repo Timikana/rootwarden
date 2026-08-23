@@ -667,6 +667,41 @@ referme l'onglet**, dont l'échec apparaissait deux gestes plus loin.
 
 **Reste du module** : V10 (la reconfiguration elle-même), V11 (désinstallation), V12 (déploiement).
 
+## 7 septdecies. V10 porté — la reconfiguration, et un verdict qui ne recopie pas le marqueur (2026-08-23)
+
+Suite `go-page-supervision-reconf` : base rouge **7 PASS / 7 FAIL**, puis **27 PASS** sur le portage et
+**13** sur le legacy. Détail en `PARITE.md` E-87.
+
+**LA PROPRIÉTÉ CENTRALE.** Le flux se termine par `Exécution terminée (code 127).` puis
+`SUCCESS_MACHINE:: Reconfiguration reussie`. Le legacy recopie le marqueur ; le portage lit le flux
+**entier** et en tire **quatre issues** — réussite, **partielle**, échec, inachevé. Mesuré des deux côtés :
+
+```
+legacy  : « Reconfiguration reussie pour Test-Server-Debian. »
+portage : « … mais une commande distante a ECHOUE (code 127). Le fichier est en place
+            et le service ne tourne peut-etre pas… »
+```
+
+**ON PARSE LE NOMBRE, PAS LA PHRASE** : `(code N)` est la partie protocole, « Exécution terminée » est une
+phrase traduisible. **Le journal est MONTRÉ** sous le verdict, pour le vérifier au lieu de le croire.
+
+**QUATRE EFFETS ÉNUMÉRÉS**, dont le PSK que le découpage ne listait pas — **conditionnel, et sa condition
+est mesurée** : sans PSK en configuration, la ligne est cachée. **L'ÉCRITURE FUSIONNE** : la suite pose
+`Timeout=42` avant le geste et vérifie qu'elle survit — sémantique inverse de l'éditeur (V9), qui tronque.
+
+**AUCUNE CONFIRMATION CÔTÉ LEGACY**, mesuré : aucune boîte native, et le fichier écrit. **Par ligne, pas
+sur sélection** : legacy 1 geste de masse + 3 cases, portage 3 gestes par ligne + 0 case. **Le bouton est
+désactivé** quand le backend refuserait (400 sans configuration globale), avec l'explication en infobulle.
+
+**LA PASSERELLE BUFFERISE, décision prise sur mesure** : une reconfiguration d'une machine dure **1,4 s**,
+donc `/supervision/` reste hors de `EN_FLUX`. À remesurer si V11 ou V12 changent cet ordre de grandeur.
+
+**DEUX DÉFAUTS DE MA SUITE** : `/Reconfigure/` est un préfixe de « Reconfigurer » et passait sur la page
+française (deuxième motif trop large en deux sous-lots) ; et un détail d'assertion qui disait « journal
+absent ou vide » sur un PASS.
+
+**Reste du module** : V11 (désinstallation, DÉTRUIT), V12 (déploiement).
+
 ## 8. Ce qui reste à mesurer
 
 ~~La priorité de routage Werkzeug entre `/supervision/zabbix/deploy` et

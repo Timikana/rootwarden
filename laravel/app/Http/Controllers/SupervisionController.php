@@ -551,8 +551,8 @@ class SupervisionController extends Controller
     /**
      * Les routes de la passerelle, PAR PLATEFORME — correctif de V7, porte en V9.
      *
-     * Quatre gestes par plateforme : lire le fichier, lister les sauvegardes,
-     * ecrire, restaurer. Le backend expose une route statique pour Zabbix et une
+     * Cinq gestes par plateforme : lire le fichier, lister les sauvegardes,
+     * ecrire, restaurer, reconfigurer. Le backend expose une route statique pour Zabbix et une
      * route generique pour les trois autres ; les deux formes rendent le meme
      * verdict, mais il faut viser la bonne — une URL figee sur Zabbix lit le
      * fichier de Zabbix quelle que soit la plateforme affichee.
@@ -569,6 +569,7 @@ class SupervisionController extends Controller
                 'sauvegardes' => url("/api/gateway/supervision/{$plateforme}/backups"),
                 'ecriture' => url("/api/gateway/supervision/{$plateforme}/config/save"),
                 'restauration' => url("/api/gateway/supervision/{$plateforme}/restore"),
+                'reconfiguration' => url("/api/gateway/supervision/{$plateforme}/reconfigure"),
             ];
         }
 
@@ -664,6 +665,25 @@ class SupervisionController extends Controller
             'restaure_sans_redemarrage' => __('superv.restaure_sans_redemarrage', ['nom' => '{nom}']),
             'restaurer_refus' => __('superv.restaurer_refus', ['statut' => '{statut}']),
             'restaurer_echec' => __('superv.restaurer_echec'),
+            // ── Sous-lot V10 : la reconfiguration ──────────────────────────
+            'reconf_cout' => __('superv.reconf_cout', ['nom' => '{nom}', 'chemin' => '{chemin}']),
+            'reconf_effet_fusion' => __('superv.reconf_effet_fusion', ['chemin' => '{chemin}']),
+            'reconf_en_cours' => __('superv.reconf_en_cours', ['nom' => '{nom}']),
+            /*
+             * QUATRE ISSUES, tirees du CONTENU du flux et non de son dernier
+             * marqueur — qui annonce `SUCCESS_MACHINE::` deux lignes apres un
+             * `code 127` (PARITE E-85). `reconf_partielle` est celle que le
+             * legacy perd entierement.
+             */
+            'reconf_reussie' => __('superv.reconf_reussie', ['nom' => '{nom}']),
+            'reconf_partielle' => __('superv.reconf_partielle', [
+                'nom' => '{nom}', 'codes' => '{codes}',
+            ]),
+            'reconf_echouee' => __('superv.reconf_echouee', ['nom' => '{nom}']),
+            'reconf_inachevee' => __('superv.reconf_inachevee', ['nom' => '{nom}']),
+            'reconf_avertissements' => __('superv.reconf_avertissements', ['nombre' => '{nombre}']),
+            'reconf_refus' => __('superv.reconf_refus', ['statut' => '{statut}']),
+            'reconf_echec' => __('superv.reconf_echec'),
         ];
     }
 }
