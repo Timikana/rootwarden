@@ -779,6 +779,58 @@ attendu **dans l'ilot de donnees de la page** (`#<page>-libelles`) : la suite
 mesure alors « la page affiche ce qu'elle declare afficher », qui reste vrai
 apres une relecture de traduction.
 
+## Une reussite ANNONCEE n'est pas une reussite VERIFIEE
+
+La desinstallation peut rendre un code 0 sans avoir rien fait : la commande ne
+purge que ce que `dpkg-query` trouve installe, donc « rien a purger » est un
+succes honnete mais ce n'est pas « desinstalle ». Le portage rejoue donc la
+detection de version APRES le geste, et dit ce qu'elle trouve — dans un
+porte-messages DISTINCT du verdict, parce que « la commande a rendu un succes »
+et « plus aucun agent n'est detecte » ne sont pas la meme affirmation.
+
+**Comment exercer cette branche sur un banc d'essai** : poser un FAUX binaire
+(un script qui n'imprime qu'une version). `dpkg-query` ne le voit pas — ce n'est
+pas un paquet — donc la commande « reussit » ; `command -v` le trouve, donc la
+detection le voit. La commande dit oui, la verification dit non : c'est
+exactement le cas qu'on veut mesurer, et il n'est pas atteignable autrement.
+
+**Effet de bord mesure et conserve** : la route de version fait `_upsert_agent`
+quand elle trouve quelque chose. La verification REPOSE donc la ligne
+d'inventaire que la desinstallation avait effacee — l'inventaire finit juste parce
+que la verification l'a corrige. Cela ne se voit qu'EN BASE.
+
+## Ce que l'ecran affiche n'est pas ce que la commande imprime
+
+La route de version EXTRAIT le numero par `(\d+\.\d+[\.\d]*)` : de
+« zabbix_agent2 (Zabbix) 7.0.99-faux-v11 » elle ne garde que `7.0.99`. Une
+assertion qui compare la chaine BRUTE de la fixture echoue — et c'est la suite
+qui a tort. Asserter ce que la couche AFFICHE, pas ce qu'on a injecte.
+
+## Nommer la production sur le geste qui detruit
+
+`srv-zabbix` et `Test-Server-Debian` se lisent exactement pareil dans une phrase.
+Un exploitant a le droit de desinstaller un agent d'un serveur de production —
+ce n'est pas au portail de le lui interdire — mais le lui DIRE au moment ou il
+decide, oui.
+
+Et la propriete se mesure **dans les deux sens** : l'avertissement doit etre
+CACHE sur une machine DEV et NOMMER la machine sinon. Un avertissement toujours
+affiche ne previent de rien. Le panneau de la production s'OUVRE seulement — on
+ne confirme jamais : ce qu'on mesure est l'avertissement, pas le geste.
+
+## Toutes les suites d'un module peuvent exercer le meme role
+
+Les douze suites de `supervision/` se connectaient TOUTES en `rw-test-admin`, qui
+porte `can_manage_supervision`. Or la regle du projet est qu'une permission vaut
+« cette permission OU superadmin (role 3) », et `rw-test-super` est role 3 SANS
+cette permission : le second chemin de la garde n'etait jamais exerce, et un
+durcissement qui l'aurait casse serait passe inapercu.
+
+Mesurer les DEUX chemins d'une garde « permission OU role » : role 1 -> 403,
+role 3 sans la permission -> 200. Verifier aussi EN BASE quels droits portent
+vraiment les comptes de test — les supposer, c'est croire mesurer un
+cloisonnement qu'on n'exerce pas.
+
 ## Le dernier marqueur d'un flux n'est pas son verdict
 
 `zabbix_reconfigure` rend un flux `text/plain` qui se termine par :
