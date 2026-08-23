@@ -371,7 +371,7 @@ try {
             if (($permissions['can_admin_portal'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/adm/admin_page.php', 'label' => t('dashboard.sc_admin'), 'desc' => t('dashboard.sc_admin_desc')];
             if (($permissions['can_manage_supervision'] ?? false) || $isSA)
-                $shortcuts[] = ['url' => '/supervision/', 'label' => t('dashboard.sc_supervision'), 'desc' => t('dashboard.sc_supervision_desc')];
+                $shortcuts[] = ['url' => rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/') . '/supervision', 'label' => t('dashboard.sc_supervision'), 'desc' => t('dashboard.sc_supervision_desc')];
             if (($permissions['can_manage_bashrc'] ?? false) || $isSA)
                 $shortcuts[] = ['url' => '/bashrc/', 'label' => t('dashboard.sc_bashrc'), 'desc' => t('dashboard.sc_bashrc_desc')];
             if (($permissions['can_manage_graylog'] ?? false) || $isSA)

@@ -3761,3 +3761,104 @@ l'avertissement attire l'œil.
 **UNE MÉMORISATION POSÉE AU PASSAGE.** `configurationParPlateforme()` était interrogée **six fois** par
 requête. Reprocher au legacy de jouer la même requête deux fois (E-76) et le faire trois fois plus n'aurait
 aucun sens : elle est mémorisée pour la durée de la requête, et l'écriture invalide la mémoire.
+
+---
+
+## E-92 — Le constat d'archivage acceptait un lien qui menait au 404 qu'il venait de créer
+
+**Mesuré le 2026-08-23**, à l'archivage de `supervision/`. `tests/e2e/archive.mjs` vérifie qu'après un
+`git mv`, l'entrée de menu du legacy mène au portage. Son filtre était :
+
+```js
+const mene = liens.filter(h => h && h.includes(routeportee));
+```
+
+La route portée est `/supervision`, l'ancien chemin legacy `/supervision/` : **le second contient le
+premier**. Base rouge, anciens liens encore en place :
+
+```
+PASS  l'entree de menu du legacy mene au portage  — /supervision/
+EXCEPTION TypeError: Invalid URL
+```
+
+L'assertion annonçait une réussite **en affichant le chemin archivé**. Ce qui a révélé le défaut n'est pas
+l'assertion mais l'exception levée juste après par `new URL('/supervision/')` — un chemin relatif n'est pas
+une URL. Autrement dit : **si l'ancien lien avait été absolu, le PASS serait passé inaperçu.**
+
+C'est le **premier** des neuf modules archivés où la collision est possible. `/update/` contre
+`/mises-a-jour`, `/tasks/` contre `/taches`, `/drift/` contre `/derive-config` : aucun recouvrement, donc
+huit archivages ont validé un filtre qui ne pouvait pas les trahir.
+
+**CORRIGÉ** : le lien doit être **absolu** et son `pathname` doit **être** la route, pas la contenir. Un
+lien relatif est servi par le legacy, donc par construction il ne peut pas mener au portage — `new URL(h)`
+sans base échoue sur un relatif, ce qui suffit à l'écarter. Et `repond()` rend `0` au lieu de lever, pour
+qu'un href relatif produise un verdict et non une exception au milieu d'une suite. Les huit parties déjà
+archivées restent vertes : mesuré sur `update-u1`, `tickets` et `drift`.
+
+**LEÇON GÉNÉRALE** : une assertion « X mène à Y » écrite par inclusion de chaîne est satisfaite par tout
+chemin dont Y est un préfixe — y compris celui qu'on vient de supprimer. Comparer des **chemins**, pas des
+sous-chaînes ; c'est la même discipline que la comparaison par SEGMENT de la passerelle (E-02).
+
+---
+
+## E-93 — `supervision/` archivé : quatre points d'entrée, dont un que nul contrôle sur les liens ne voit
+
+Le module est porté (V1 à V12) et déplacé dans `legacy/_deprecated/`. Le découpage annonçait « les deux
+rendus du menu » ; la mesure en a trouvé **quatre** :
+
+| fichier | nature |
+|---|---|
+| `legacy/menu.php:99` | barre latérale |
+| `legacy/menu.php:240` | tiroir mobile |
+| `legacy/index.php:374` | raccourci du tableau de bord |
+| `legacy/head.php:211` | **carte de raccourcis CLAVIER** (`g` puis `v`) |
+
+Le quatrième est un objet JavaScript, pas un `<a href>` : aucun contrôle portant sur les liens ne peut le
+voir. Taper `g` puis `v` aurait navigué vers le 404 qu'on venait d'installer, sans qu'un seul `href` soit
+en cause.
+
+**LA PROPRIÉTÉ POSÉE EST NÉGATIVE ET COUVRE LES QUATRE**, lue sur le tableau de bord servi (qui inclut le
+menu et la carte de raccourcis) : plus aucun `href="/supervision/"`, et plus aucun `: '/supervision/'`.
+Base rouge, anciens liens rendus : **3 liens et 1 raccourci** — les quatre emplacements, comptés une
+seconde fois et par un autre moyen. C'est ce qui rend le décompte crédible plutôt que déclaratif.
+
+**DEUX PORTES DÉDOUANÉES**, que le précédent d'`update` avait pourtant signalées :
+
+- `App\Support\Navigation` porte `'route' => 'supervision'` depuis V1 — le menu du **portage** n'a jamais
+  pointé vers le legacy, contrairement à `updates` qui portait encore `'legacy' => '/update/'` après sept
+  sous-lots ;
+- `backend/routes/search.py` n'émet **jamais** `/supervision/` (mesuré : `/security/`,
+  `/tickets/index.php`, `/update/index.php`). L'entrée ajoutée à `LiensLegacy::REMPLACEMENTS` est donc
+  **préventive**, là où celle d'`update` réparait un 404 mesurable.
+
+**CE QUI RESTE, ET QUI N'EST PAS DU RESSORT D'UN ARCHIVAGE.** La seule occurrence de `/supervision/`
+subsistant dans le legacy est la liste blanche de `legacy/api_proxy.php:134` — une route de **backend**,
+pas un lien. Le proxy du legacy continue donc de relayer les routes de supervision alors qu'aucune page ne
+les appelle plus : surface morte, et d'autant plus notable que `/supervision/` est **absent de
+`$ADMIN_ONLY_PREFIXES`** côté legacy. La retirer restreindrait ce que le legacy autorise — un changement
+de droits, pas une conséquence du déplacement de trois fichiers. **Laissée en place, signalée.**
+
+**RÉFÉRENCES LEGACY MESURÉES** : **6** pour douze suites (404 du répertoire, 404 des **trois** fichiers
+réels, lien du menu, et le fait qu'il aboutisse), **8** pour `supervision-onglets`. Le constat est greffé
+**en tête du `try`**, avant toute fixture : rien n'est posé, donc le `process.exit()` peut court-circuiter
+le `finally` sans rien laisser sur la machine de test ni en base.
+
+**VU A L'IMAGE, ET NON CORRIGE — DEUX CONSTATS QUI DEPASSENT CE SOUS-LOT.**
+
+1. **Le legacy ne signale pas ses liens sortants.** `$sideLink` (`legacy/menu.php`) n'ajoute ni marqueur ni
+   `target` : sur la capture, « Supervision » est assis entre « Audit SSH » et « Scan CVE », rendu trait
+   pour trait comme une entree interne, alors qu'il mene a `192.168.0.245:8444` — un autre portail, un
+   autre port, dans le meme onglet. **11 entrees** du menu legacy sont dans ce cas. Le portage, lui, marque
+   l'inverse (`rw-menu__lien--externe`, `target="_blank"`, `rel="noopener"`, fleche `↗` avec `aria-label`),
+   et un test y mesure meme la largeur RENDUE du marqueur. La regle existe donc dans le projet, ecrite pour
+   un seul sens. **Defaut pre-existant** : huit entrees l'etaient deja, celle-ci fait la neuvieme.
+2. **Le 404 d'un chemin archive est la page brute d'Apache** — « Not Found », aucun repere, aucun retour.
+   C'est ce que voit quelqu'un qui avait un marque-page, et c'est vrai pour les **neuf** parties archivees.
+   L'assertion mesure le STATUT, qui est la bonne propriete (le repertoire est bien parti) ; elle ne dit
+   rien de ce qu'on voit.
+
+Ni l'un ni l'autre n'est corrige : le legacy est en cours de depreciation, et soigner l'ergonomie de ce
+qu'on demonte est un mauvais investissement. **Les deux sont signales, l'arbitrage appartient a
+l'exploitant** — s'il veut que ce soit marque tant que les deux portails coexistent, c'est une ligne dans
+`$sideLink` et un `ErrorDocument`.
+

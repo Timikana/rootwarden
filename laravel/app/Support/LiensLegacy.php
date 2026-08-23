@@ -38,6 +38,16 @@ class LiensLegacy
         // (`backend/routes/search.py`) : pour ce module, la table cesse d'etre
         // preventive. Sans cette ligne, la recherche mene a un 404 mesurable.
         '/update/'     => 'mises-a-jour',
+        /*
+         * `supervision/` archive le 2026-08-23. Ici la table redevient
+         * PREVENTIVE : mesure faite, `backend/routes/search.py` n'emet que
+         * `/security/`, `/tickets/index.php` et `/update/index.php` — jamais
+         * `/supervision/`. L'entree ne repare donc aucun 404 constate ; elle
+         * evite d'en fabriquer un le jour ou un resultat de recherche, une
+         * notification ou un rapport citera ce chemin. Tenir cette table a jour
+         * est une etape du cycle d'archivage, pas une reaction a un defaut.
+         */
+        '/supervision/' => 'supervision',
     ];
 
     /**

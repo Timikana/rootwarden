@@ -110,6 +110,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `tickets/` | 2026-08-18 | `tickets` | dedoublonnage par machine, formulaire qui s'epuise |
 | `search/` | 2026-08-18 | `recherche` | liens de resultats traduits (E-13) |
 | `update/` | 2026-08-20 | `mises-a-jour` | premier MODULE archive — 7 sous-lots, 4 points d'entree |
+| `supervision/` | 2026-08-23 | `supervision` | 12 sous-lots, 4 points d'entree, et une aide d'archivage qui mentait |
 
 ### commandlog — la preuve du cycle
 
@@ -397,6 +398,93 @@ répond 404.
 
 Le test de la vague 0 collecte **30 liens internes** au menu du legacy, contre 37 au départ :
 exactement les sept entrées redirigées vers le portage.
+
+### supervision — le module qui a pris le plus de sous-lots, et l'aide d'archivage qui mentait
+
+Douze sous-lots (V1 a V12), treize suites, `PARITE.md` de E-72 a E-91. Trois fichiers seulement dans le
+module (`index.php`, `js/main.js`, `js/profiles.js`) : ils sont **tous** sondes apres le `git mv`, pas un
+echantillon.
+
+#### Quatre points d'entree, alors que le decoupage en annoncait deux
+
+Le brief de ce sous-lot parlait des « deux rendus du menu ». La mesure en a trouve **quatre**, et le
+quatrieme n'est pas un lien :
+
+| fichier | nature | avant | apres |
+|---|---|---|---|
+| `legacy/menu.php:99` | barre laterale | `/supervision/` | `LARAVEL_URL . '/supervision'` |
+| `legacy/menu.php:240` | tiroir mobile | `/supervision/` | idem |
+| `legacy/index.php:374` | raccourci du tableau de bord | `/supervision/` | idem |
+| `legacy/head.php:211` | **carte de raccourcis CLAVIER** (`v:`) | `/supervision/` | idem |
+
+Le raccourci clavier est un objet JavaScript, pas un `<a href>`. Aucun controle portant sur les liens ne
+peut le voir : taper `g` puis `v` aurait navigue vers le 404 qu'on venait d'installer, sans qu'un seul
+`href` soit en cause. Le precedent d'`update` avait deja traite ces quatre emplacements — c'est en le
+relisant qu'on les trouve, pas en lisant la consigne.
+
+#### `verifieMenuLegacy` acceptait l'ANCIEN lien
+
+Defaut le plus utile de cet archivage, et il porte sur l'outillage partage par les **neuf** parties
+archivees. L'aide filtrait les liens par `href.includes(routeportee)`. Or la route portee est
+`/supervision` et l'ancien chemin legacy `/supervision/` : le second **contient** le premier. Mesure de la
+base rouge, anciens liens en place :
+
+```
+PASS  l'entree de menu du legacy mene au portage  — /supervision/
+EXCEPTION TypeError: Invalid URL
+```
+
+L'assertion annoncait une reussite en montrant un chemin qui mene au 404. Seul le `TypeError` — leve
+ensuite par `new URL('/supervision/')`, un chemin relatif — a revele le probleme, et par accident : si
+l'ancien lien avait ete absolu, le PASS serait passe inapercu.
+
+C'est le **premier** module ou la collision est possible. Les huit precedents n'en avaient aucune
+(`/update/` contre `/mises-a-jour`, `/tasks/` contre `/taches`), ce qui a laisse le defaut dormir.
+Correction : le lien doit etre **absolu** et son `pathname` doit **etre** la route, pas la contenir. Un
+lien relatif est servi par le legacy, donc par construction il ne mene pas au portage. Les huit parties
+deja archivees restent vertes, ce qui a ete mesure (`update-u1`, `tickets`, `drift` : conformes).
+
+#### La propriete negative qui couvre les quatre emplacements
+
+`verifieMenuLegacy` n'en mesure qu'un, la barre laterale. `supervision-onglets` porte donc deux assertions
+de plus, lues sur le tableau de bord — qui inclut le menu ET la carte de raccourcis :
+
+- plus aucun `href="/supervision/"` dans la page servie ;
+- plus aucun `: '/supervision/'` dans la carte de raccourcis clavier.
+
+Base rouge, anciens liens rendus : **3 liens et 1 raccourci** — soit exactement les quatre emplacements,
+comptes une seconde fois et par un autre moyen. C'est ce qui rend le decompte credible.
+
+#### Deux portes que le precedent avait signalees, et qui sont propres ici
+
+A dire aussi clairement qu'une accusation :
+
+- **le menu DU PORTAGE ne pointait pas vers le legacy.** Pour `update/`, `App\Support\Navigation`
+  portait encore `'legacy' => '/update/'` apres sept sous-lots. Ici l'entree porte
+  `'route' => 'supervision'` depuis V1 ;
+- **le backend n'ecrit pas ce chemin en dur.** `backend/routes/search.py` emet `/security/`,
+  `/tickets/index.php` et `/update/index.php` — jamais `/supervision/`. L'entree ajoutee a
+  `LiensLegacy::REMPLACEMENTS` est donc **preventive**, contrairement a celle d'`update` qui reparait un
+  404 mesurable.
+
+#### Ce qui reste, et qui n'est pas du ressort d'un archivage
+
+Apres le `git mv`, la **seule** occurrence de `/supervision/` restante dans le legacy vit dans la liste
+blanche de `legacy/api_proxy.php:134`. Ce n'est pas un lien de page mais une route de **backend** : le
+proxy du legacy continue donc de relayer les routes de supervision, alors qu'aucune page du legacy ne les
+appelle plus. Surface morte, et d'autant plus notable que `/supervision/` est aussi **absent de
+`$ADMIN_ONLY_PREFIXES`** cote legacy (defaut connu, en attente d'arbitrage).
+
+La retirer narcirait ce que le legacy autorise. C'est un changement de droits, pas une consequence
+mecanique du deplacement de trois fichiers : **laissee en place, signalee a l'exploitant.**
+
+#### Les treize suites
+
+Le constat d'archivage est greffe **en tete du `try`**, avant toute fixture : rien n'est pose, donc rien
+n'est a defaire, et le `process.exit()` peut court-circuiter le `finally` sans laisser de trace sur la
+machine de test ni en base. References legacy mesurees : **6** pour douze suites (le 404 du repertoire,
+celui des trois fichiers, le lien du menu et le fait qu'il aboutisse), **8** pour `onglets` qui porte en
+plus la propriete negative.
 
 ### update — le premier MODULE, et un menu qui menait nulle part
 

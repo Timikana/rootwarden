@@ -86,13 +86,18 @@ declare -A REF_LEGACY=(
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
   [go-page-cve-planification]=16 [go-page-cve-suivi]=6 [go-page-cve-priorite]=8
   [go-page-cve-scan-refus]=12 [go-page-ssh-parc]=11 [go-page-ssh-preflight]=10 [go-page-ssh-flux]=8
-  [go-page-supervision-onglets]=13 [go-page-supervision-profils]=14
-  [go-page-supervision-config]=15 [go-page-supervision-config-ecriture]=11
-  [go-page-supervision-profils-crud]=16 [go-page-supervision-version]=12 [go-page-supervision-editeur]=12
-  [go-page-supervision-releve]=11 [go-page-supervision-ecriture]=18
-  [go-page-supervision-reglages]=8 [go-page-supervision-reconf]=13
-  [go-page-supervision-desinst]=15
-  [go-page-supervision-deploiement]=19
+  # `supervision/` est ARCHIVE (2026-08-23) : cote legacy les treize suites ne
+  # jouent plus leur caracterisation mais le CONSTAT d'archivage — le 404 du
+  # repertoire, celui de ses TROIS fichiers reels, et le menu qui mene au
+  # portage. Soit 6 assertions ; `onglets` en porte 8, ayant en plus la
+  # propriete negative qui couvre les QUATRE emplacements bascules.
+  [go-page-supervision-onglets]=8 [go-page-supervision-profils]=6
+  [go-page-supervision-config]=6 [go-page-supervision-config-ecriture]=6
+  [go-page-supervision-profils-crud]=6 [go-page-supervision-version]=6 [go-page-supervision-editeur]=6
+  [go-page-supervision-releve]=6 [go-page-supervision-ecriture]=6
+  [go-page-supervision-reglages]=6 [go-page-supervision-reconf]=6
+  [go-page-supervision-desinst]=6
+  [go-page-supervision-deploiement]=6
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth

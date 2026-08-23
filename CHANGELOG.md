@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.46** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.47** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,70 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.47 — `supervision/` ARCHIVE : le deuxieme module deprecie, et une aide d'archivage qui mentait
+
+Le module est porte en entier (V1 a V12, treize suites) : `legacy/supervision/` passe dans
+`legacy/_deprecated/`. **Deuxieme MODULE deprecie**, apres `update/`. Neuf parties archivees au total.
+
+**QUATRE POINTS D'ENTREE, ALORS QUE LE DECOUPAGE EN ANNONCAIT DEUX.** Barre laterale et tiroir mobile
+(`menu.php`), raccourci du tableau de bord (`index.php`), et surtout la **carte de raccourcis CLAVIER**
+(`head.php`, `g` puis `v`) — un objet JavaScript, pas un `<a href>` : aucun controle portant sur les liens
+ne peut le voir. Taper `g v` aurait navigue vers le 404 qu'on venait d'installer.
+
+**LE DEFAUT LE PLUS UTILE PORTE SUR L'OUTILLAGE PARTAGE (E-92).** `tests/e2e/archive.mjs` filtrait les
+liens du menu par `href.includes(routeportee)`. La route portee est `/supervision`, l'ancien chemin legacy
+`/supervision/` : le second **contient** le premier. Base rouge, anciens liens en place :
+
+    PASS  l'entree de menu du legacy mene au portage  — /supervision/
+    EXCEPTION TypeError: Invalid URL
+
+L'assertion annoncait une reussite **en affichant le chemin archive**. Seule l'exception levee ensuite par
+`new URL('/supervision/')` a revele le probleme : si l'ancien lien avait ete absolu, le PASS serait passe
+inapercu. C'est le PREMIER des neuf modules ou la collision est possible — `/update/` contre
+`/mises-a-jour`, `/tasks/` contre `/taches` : aucun recouvrement, donc huit archivages ont valide un filtre
+qui ne pouvait pas les trahir.
+
+Correction : le lien doit etre **absolu** et son `pathname` doit **etre** la route, pas la contenir ; et
+`repond()` rend 0 au lieu de lever, pour qu'un href relatif produise un verdict et non une exception au
+milieu d'une suite. Les huit parties deja archivees restent vertes (mesure : `update-u1`, `tickets`,
+`drift`).
+
+**LA PROPRIETE POSEE EST NEGATIVE ET COUVRE LES QUATRE EMPLACEMENTS**, lue sur le tableau de bord servi :
+plus aucun `href="/supervision/"`, plus aucun `: '/supervision/'`. Base rouge : **3 liens et 1 raccourci** —
+les quatre, comptes une seconde fois et par un autre moyen.
+
+**DEUX PORTES DEDOUANEES**, que le precedent d'`update` avait signalees : `App\Support\Navigation` porte
+`'route' => 'supervision'` depuis V1 (le menu du PORTAGE n'a jamais pointe vers le legacy, contrairement a
+`updates`), et `backend/routes/search.py` n'emet jamais `/supervision/`. L'entree ajoutee a
+`LiensLegacy::REMPLACEMENTS` est donc **preventive**, la ou celle d'`update` reparait un 404 mesurable.
+
+**CE QUI RESTE, ET QUI N'EST PAS DU RESSORT D'UN ARCHIVAGE.** La seule occurrence subsistante de
+`/supervision/` est la liste blanche de `legacy/api_proxy.php:134` — une route de **backend**, pas un lien.
+Le proxy du legacy continue de relayer les routes de supervision alors qu'aucune page ne les appelle plus :
+surface morte, d'autant plus notable que `/supervision/` est **absent de `$ADMIN_ONLY_PREFIXES`** cote
+legacy. La retirer restreindrait ce que le legacy autorise — changement de droits, pas consequence
+mecanique du deplacement. **Laissee en place, signalee a l'exploitant.**
+
+**LES TREIZE SUITES.** Constat d'archivage greffe **en tete du `try`**, avant toute fixture : rien n'est
+pose, donc `process.exit()` peut court-circuiter le `finally` sans rien laisser sur la machine de test ni en
+base. Les **trois** fichiers du module sont sondes, pas un echantillon. References legacy mesurees :
+**6** pour douze suites, **8** pour `onglets`.
+
+**VU A L'IMAGE, ET LAISSE TEL QUEL.** Deux constats qui depassent ce sous-lot, tous deux signales a
+l'exploitant : (1) **le legacy ne signale pas ses liens sortants** — `$sideLink` n'ajoute ni marqueur ni
+`target`, et sur la capture « Supervision » est rendu trait pour trait comme une entree interne alors qu'il
+mene a un autre portail sur un autre port, dans le meme onglet ; **11 entrees** sont dans ce cas, huit
+l'etaient deja. Le portage marque l'inverse et un test y mesure la largeur RENDUE du marqueur : la regle
+existe, ecrite pour un seul sens. (2) **le 404 d'un chemin archive est la page brute d'Apache**, sans
+repere ni retour — vrai pour les neuf parties archivees. Ni l'un ni l'autre n'est corrige : soigner
+l'ergonomie de ce qu'on demonte est un mauvais investissement.
+
+**FICHIERS.** `legacy/supervision/` → `legacy/_deprecated/supervision/` · `legacy/menu.php`,
+`legacy/index.php`, `legacy/head.php` (les quatre points d'entree) ·
+`laravel/app/Support/LiensLegacy.php` · `tests/e2e/archive.mjs` (le correctif partage) · les treize
+`tests/e2e/go-page-supervision-*.mjs` · `scripts/rejouer-lot.sh` · `docs/migration/PARITE.md` (**E-92**,
+**E-93**) · `docs/migration/DEPRECIATION.md`. **Backend Python inchange.**
 
 ### v1.37.46 — module `supervision/`, sous-lot V12 : le deploiement, dernier geste du module
 

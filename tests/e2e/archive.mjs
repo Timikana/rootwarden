@@ -85,7 +85,16 @@ export async function constateArchivage({ base, chemin, fichiers = [], verifie, 
  * etait juste, le lien mort.
  */
 async function repond(url) {
-    const u = new URL(url);
+    let u;
+    try {
+        u = new URL(url);
+    } catch {
+        // Un href relatif n'est pas une URL : le dire plutot que lever. Mesure
+        // du 2026-08-23 : l'ancien lien `/supervision/` faisait remonter un
+        // `TypeError: Invalid URL` au milieu de la suite, la ou un verdict etait
+        // attendu.
+        return 0;
+    }
     const client = u.protocol === 'https:' ? https : http;
     return new Promise((resolve) => {
         const req = client.request(
@@ -102,7 +111,34 @@ async function repond(url) {
 export async function verifieMenuLegacy(page, routeportee, verifie) {
     const liens = await page.evaluate(() =>
         [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
-    const mene = liens.filter(h => h && h.includes(routeportee));
+    /*
+     * LE LIEN DOIT ETRE ABSOLU, ET SON CHEMIN DOIT ETRE LA ROUTE — pas la
+     * contenir.
+     *
+     * Mesure du 2026-08-23, sur `supervision/` : un filtre `h.includes(route)`
+     * acceptait l'ANCIEN lien du legacy, `/supervision/`, qui contient bien
+     * `/supervision`. L'assertion annoncait « l'entree de menu mene au
+     * portage » en montrant un chemin qui mene au 404 qu'on venait d'installer.
+     * C'est le premier module ou la route portee est une sous-chaine du chemin
+     * legacy, donc le premier ou ce filtre pouvait mentir — les huit modules
+     * archives avant lui (`/update/` contre `/mises-a-jour`, etc.) n'avaient
+     * aucune collision, et l'ont donc masquee.
+     *
+     * Un lien RELATIF est servi par le legacy : par construction il ne peut pas
+     * mener au portage. `new URL(h)` sans base echoue sur un relatif, ce qui
+     * suffit a l'ecarter.
+     */
+    const mene = liens.filter((h) => {
+        if (! h) return false;
+        let u;
+        try {
+            u = new URL(h);
+        } catch {
+            return false;
+        }
+
+        return u.pathname === routeportee || u.pathname === `${routeportee}/`;
+    });
     verifie("l'entree de menu du legacy mene au portage",
             mene.length > 0,
             mene.length ? mene[0] : `aucun lien vers « ${routeportee} » parmi ${liens.length} liens`);
