@@ -779,6 +779,44 @@ attendu **dans l'ilot de donnees de la page** (`#<page>-libelles`) : la suite
 mesure alors « la page affiche ce qu'elle declare afficher », qui reste vrai
 apres une relecture de traduction.
 
+## Le dernier marqueur d'un flux n'est pas son verdict
+
+`zabbix_reconfigure` rend un flux `text/plain` qui se termine par :
+
+    Exécution terminée (code 127).
+    SUCCESS_MACHINE::2::Reconfiguration reussie pour Test-Server-Debian.
+
+Le redemarrage a echoue et le marqueur conclut a la reussite. L'information est
+DEUX LIGNES plus haut. Un client qui lit le marqueur herite du mensonge — c'est
+ce que fait le legacy.
+
+Lire le flux ENTIER et en tirer les issues reelles. Pour la reconfiguration il y
+en a QUATRE : reussite, **partielle** (la configuration est ecrite, une commande
+distante a echoue), echec, inacheve. La partielle est celle que le legacy perd.
+
+**Et parser le NOMBRE, pas la phrase** : « Exécution terminée (code N). » est une
+phrase francaise susceptible de changer ; `(code N)` est la partie protocole.
+Meme regle que « un jeton de protocole n'est pas un libelle », vue de l'autre
+cote : ici c'est le libelle qui ne doit pas servir de protocole.
+
+**Montrer le journal sous le verdict** permet de VERIFIER ce verdict au lieu de
+le croire.
+
+## Une capture doit montrer un etat qu'un exploitant peut atteindre
+
+Le script de captures forcait `disabled = false` sur un bouton que le portage
+desactive : l'image montrait un panneau de decision ouvert a cote de « Aucune
+configuration globale enregistree » — un etat impossible. Regarder le rendu ne
+sert que si le rendu est reel : poser la fixture qui rend l'ecran atteignable,
+plutot que forcer le DOM.
+
+## Un motif trop large attrape le francais
+
+Deuxieme fois en deux sous-lots. `/Reconfigure/` est un PREFIXE de
+« Reconfigurer » : le controle de la traduction anglaise passait sur la page
+francaise. Avant, `/nom|name|param/` attrapait `override_Hostname`. Viser des
+phrases entieres, pas des fragments — surtout entre deux langues proches.
+
 ## `ConvertEmptyStringsToNull` rend « vide » indiscernable d'« absent »
 
 Laravel place cet intergiciel dans le groupe `web` : une chaine vide arrive en
