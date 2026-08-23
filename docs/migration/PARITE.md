@@ -3528,3 +3528,76 @@ lui faire confiance serait recopier un succès invérifiable. Le portage **véri
 la détection de version (V6, déjà portée) et dit ce qu'elle trouve — « désinstallé, et plus aucun agent
 n'est détecté » ou « la commande a rendu un succès, mais un agent est TOUJOURS détecté ». Une réussite
 mesurée vaut mieux qu'une réussite annoncée, et cela n'exige ni route neuve ni modification du backend.
+
+## E-89 — La désinstallation portée : une réussite VÉRIFIÉE, pas annoncée
+
+**Module `supervision/`, sous-lot V11 : la désinstallation (flux `text/plain`, DÉTRUIT).** Suite :
+`tests/e2e/go-page-supervision-desinst.mjs` — **15 PASS sur le legacy, 29 sur le portage** (base rouge :
+**8 PASS / 5 FAIL**). Le backend avait été corrigé au préalable (v1.37.44, E-88) : la commande ne purge que
+ce que `dpkg-query` trouve installé, son code de sortie remonte, et l'inventaire n'est vidé que si ce code
+vaut 0.
+
+**LA CLÉ CASSÉE, MESURÉE LÀ OÙ ELLE FAIT LE PLUS DE MAL.** `confirm_uninstall` existe sous
+`supervision.*` et **dans aucun des deux `js.php`** : `__()` la rend telle quelle. Mesuré à l'écran :
+
+```
+boite native ouverte par le legacy : confirm: confirm_uninstall
+```
+
+Le legacy demande donc de confirmer une **destruction** avec un identifiant pour tout message.
+**Dix-huitième** clé de cette famille. Le portage la remplace par un panneau — il ne la déplace pas.
+
+**LA PROPRIÉTÉ CENTRALE : LE PORTAGE VÉRIFIE APRÈS COUP.** Le backend ne peut plus mentir, mais il ne peut
+pas tout garantir — et surtout « il n'y avait rien à purger » n'est pas « désinstallé ». Le portage rejoue
+donc la détection de version (V6) une fois le geste fini, et **dit ce qu'elle trouve**, dans un
+porte-messages **distinct** de celui du verdict : « la commande a rendu un succès » et « plus aucun agent
+n'est détecté » ne sont pas la même affirmation.
+
+**LA FIXTURE QUI REND CETTE PROPRIÉTÉ MESURABLE.** On ne peut pas installer un vrai agent sur le banc
+d'essai. La suite pose donc un **faux binaire** `zabbix_agent2` — un script qui n'imprime qu'une version :
+
+- `dpkg-query` ne le voit pas (ce n'est pas un paquet) → la commande rend `RIEN_A_PURGER` et un code 0 :
+  elle « réussit » ;
+- `command -v` le trouve → la détection de version le voit.
+
+La commande dit donc oui et la vérification dit non. Mesuré :
+
+```
+verdict     : « Aucun agent n'etait installe sur Test-Server-Debian : il n'y avait rien a desinstaller. »
+verification: « ATTENTION : un agent est TOUJOURS detecte sur ce serveur (version 7.0.99). La commande
+                a beau avoir rendu un succes, l'agent est encore la. »
+```
+
+**CINQ ISSUES, tirées du contenu du flux** : purgé, **rien à purger**, échec, inachevé, refus. La
+deuxième est celle que ni le legacy ni le marqueur ne distinguent.
+
+**UN EFFET QUE JE N'AVAIS PAS PRÉVU, mesuré et conservé.** La désinstallation avait vidé l'inventaire — à
+juste titre de son point de vue, puisqu'elle avait rendu 0. La vérification, elle, retrouve l'agent, et la
+route de version **repose la ligne** (`_upsert_agent`). L'inventaire finit donc juste, non parce que la
+désinstallation avait raison, mais parce que la vérification l'a corrigée. C'est un bénéfice de plus à
+vérifier après coup, et il ne se voit **qu'en base** — une assertion le mesure désormais.
+
+**NOMMER LA PRODUCTION, SUR LE GESTE QUI DÉTRUIT.** Vu à l'image : le panneau nommait la machine sans dire
+qu'elle était en production, et `srv-zabbix` se lit exactement comme `Test-Server-Debian` dans une phrase.
+Un exploitant a le droit de désinstaller un agent d'un serveur de production — ce n'est pas au portail de
+le lui interdire — mais le lui **dire au moment où il décide**, oui. La propriété est mesurée **dans les
+deux sens** : l'avertissement est caché sur DEV, et il nomme `srv-zabbix` quand le geste la viserait.
+Ouvrir ce panneau-là n'émet aucune requête, ce que la suite vérifie aussi — la production n'est pas jointe
+pour mesurer qu'on prévient à son sujet.
+
+**LE PÉRIMÈTRE A ÉTÉ MESURÉ AVANT D'ÊTRE PAYÉ.** `apt-get autoremove --dry-run` rend « 0 to remove » sur
+le banc d'essai, et la suite l'inscrit dans son journal à chaque exécution : un chemin destructeur se
+simule avant de se déclencher.
+
+**DEUX DÉFAUTS DE MA SUITE.** Elle assertait la chaîne brute du faux binaire
+(`7.0.99-faux-v11`) alors que la route de version **extrait le numéro** par `(\d+\.\d+[\.\d]*)` et
+n'affiche que `7.0.99` — la suite avait tort, pas le portage. Et un détail d'assertion disait « journal
+absent ou vide » sur un PASS ; il imprime maintenant le nombre de lignes et la ligne retenue.
+
+**UNE LACUNE DE COUVERTURE FERMÉE AU PASSAGE, sur une question de l'exploitant.** Les douze suites du
+module se connectaient **toutes** en `rw-test-admin`, qui porte `can_manage_supervision`. Or la règle du
+projet est qu'une permission vaut « cette permission **OU** superadmin (rôle 3) », et `rw-test-super` est
+rôle 3 **sans** cette permission (mesuré en base). Le second chemin de la garde n'était donc jamais
+exercé : un durcissement qui l'aurait cassé serait passé inaperçu. `supervision-onglets` mesure maintenant
+les deux — rôle 1 → **403**, rôle 3 sans permission → **200** — des deux côtés, donc en parité
+(14→16 sur le portage, 11→13 sur le legacy).

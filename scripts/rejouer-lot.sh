@@ -68,11 +68,12 @@ declare -A REF_LARAVEL=(
   [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
   [go-page-cve-planification]=20 [go-page-cve-suivi]=10 [go-page-cve-priorite]=14
   [go-page-cve-scan-refus]=16 [go-page-ssh-parc]=14 [go-page-ssh-preflight]=15 [go-page-ssh-flux]=10
-  [go-page-supervision-onglets]=14 [go-page-supervision-profils]=18
+  [go-page-supervision-onglets]=16 [go-page-supervision-profils]=18
   [go-page-supervision-config]=17 [go-page-supervision-config-ecriture]=16
   [go-page-supervision-profils-crud]=19 [go-page-supervision-version]=14 [go-page-supervision-editeur]=16
   [go-page-supervision-releve]=28 [go-page-supervision-ecriture]=38
   [go-page-supervision-reglages]=32 [go-page-supervision-reconf]=27
+  [go-page-supervision-desinst]=29
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -84,11 +85,12 @@ declare -A REF_LEGACY=(
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
   [go-page-cve-planification]=16 [go-page-cve-suivi]=6 [go-page-cve-priorite]=8
   [go-page-cve-scan-refus]=12 [go-page-ssh-parc]=11 [go-page-ssh-preflight]=10 [go-page-ssh-flux]=8
-  [go-page-supervision-onglets]=11 [go-page-supervision-profils]=14
+  [go-page-supervision-onglets]=13 [go-page-supervision-profils]=14
   [go-page-supervision-config]=15 [go-page-supervision-config-ecriture]=11
   [go-page-supervision-profils-crud]=16 [go-page-supervision-version]=12 [go-page-supervision-editeur]=12
   [go-page-supervision-releve]=11 [go-page-supervision-ecriture]=18
   [go-page-supervision-reglages]=8 [go-page-supervision-reconf]=13
+  [go-page-supervision-desinst]=15
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -98,7 +100,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
@@ -108,7 +110,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-cve-priorite go-page-cve-scan-refus go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5

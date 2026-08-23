@@ -443,6 +443,26 @@
                                                     @disabled(($configuration['zabbix'] ?? null) === null)
                                                     @if (($configuration['zabbix'] ?? null) === null) title="{{ __('superv.reconf_sans_config') }}" @endif
                                                     >{{ __('superv.reconf_bouton') }}</button>
+                                            {{-- SOUS-LOT V11 : LE GESTE QUI DETRUIT.
+                                                 Par ligne, comme les autres (aucune case a
+                                                 cocher — V6). Cote legacy c'est un `confirm()`
+                                                 natif qui affiche la chaine `confirm_uninstall`,
+                                                 la cle etant absente de `js.php` : on demande
+                                                 donc de confirmer une DESTRUCTION avec un
+                                                 identifiant a l'ecran. Remplace ici par un
+                                                 panneau, pas deplace. --}}
+                                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                                    data-rw="superv-desinstaller"
+                                                    data-machine="{{ $m->id }}"
+                                                    data-nom="{{ $m->name }}"
+                                                    {{-- L'ENVIRONNEMENT VOYAGE AVEC LE GESTE. Vu a
+                                                         l'image : le panneau nommait la machine sans
+                                                         dire qu'elle etait en PRODUCTION. V8 avait
+                                                         etabli qu'on NOMME la production plutot que
+                                                         de la compter ; c'est sur le geste qui
+                                                         DETRUIT que ca compte le plus. --}}
+                                                    data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
+                                                    >{{ __('superv.desinst_bouton') }}</button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -454,6 +474,50 @@
                          qu'une session SSH en demande le double : le message a
                          disparu avant que son effet soit constatable. --}}
                     <p class="rw-annonce" data-rw="superv-version-message" aria-live="polite"></p>
+
+                    {{-- ══ SOUS-LOT V11 : LA DESINSTALLATION ═════════════════
+                         LE SOUS-LOT QUI DETRUIT. Le panneau NOMME ce qui part :
+                         le paquet purge, sa configuration, et la ligne
+                         d'inventaire. « Nommer, pas compter » vaut d'autant plus
+                         ici que rien ne se rattrape.
+
+                         ET LE PORTAGE VERIFIE APRES COUP. Le backend ne peut plus
+                         mentir depuis v1.37.44, mais il ne peut pas tout
+                         garantir : « rien a purger » n'est pas « desinstalle ».
+                         Le portage rejoue donc la detection de version une fois
+                         le geste fini, et dit ce qu'elle TROUVE. Une reussite
+                         mesuree vaut mieux qu'une reussite annoncee. --}}
+                    <section class="rw-note" data-rw="superv-desinst">
+                        <h4 class="rw-sous-titre">{{ __('superv.desinst_titre') }}</h4>
+                        <p class="rw-aide rw-prose">{{ __('superv.desinst_description') }}</p>
+
+                        <div class="rw-panneau-decision" data-rw="superv-panneau-desinst" hidden>
+                            <div class="rw-panneau-decision__texte">
+                                <p class="rw-erreur" data-rw="superv-desinst-cout"></p>
+                                <p class="rw-avertissement" data-rw="superv-desinst-prod" hidden></p>
+                                <ul class="rw-aide rw-prose rw-liste-effets" data-rw="superv-desinst-effets">
+                                    <li>{{ __('superv.desinst_effet_service') }}</li>
+                                    <li>{{ __('superv.desinst_effet_purge') }}</li>
+                                    <li>{{ __('superv.desinst_effet_inventaire') }}</li>
+                                </ul>
+                                <p class="rw-aide rw-prose">{{ __('superv.desinst_aide_verif') }}</p>
+                            </div>
+                            <div class="rw-panneau-decision__actions">
+                                <button type="button" class="rw-bouton rw-bouton--discret"
+                                        data-rw="superv-desinst-annuler">{{ __('superv.desinst_annuler') }}</button>
+                                <button type="button" class="rw-bouton rw-bouton--danger"
+                                        data-rw="superv-desinst-confirmer">{{ __('superv.desinst_confirmer') }}</button>
+                            </div>
+                        </div>
+
+                        <p class="rw-annonce" data-rw="superv-desinst-message" aria-live="polite"></p>
+                        {{-- LA VERIFICATION EST DITE A PART DU VERDICT DE LA COMMANDE :
+                             l'une rapporte ce que la commande a rendu, l'autre ce
+                             qu'on a CONSTATE ensuite. Les confondre ferait croire
+                             que le succes annonce vaut preuve. --}}
+                        <p class="rw-annonce" data-rw="superv-desinst-verif" aria-live="polite"></p>
+                        <pre class="rw-journal" data-rw="superv-desinst-journal" hidden></pre>
+                    </section>
 
                     {{-- ══ SOUS-LOT V10 : LA RECONFIGURATION ═════════════════
                          QUATRE EFFETS, PAS TROIS — et le decoupage n'en annoncait

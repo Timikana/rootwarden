@@ -52,6 +52,7 @@ const PAGE = CIBLE === 'laravel' ? '/supervision' : '/supervision/';
 
 const SECRET_ADMIN = 'KRSXG5BAKBSWY3DPEHPK3PXPKRSXG5BAKBSWY3DPEHPK3PXPKRSX';
 const SECRET_USER = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSW';
+const SECRET_SUPER = 'MZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW';
 
 /** Les quatre onglets, dans l'ordre du legacy. */
 const ONGLETS = ['config', 'profiles', 'deploy', 'editor'];
@@ -131,6 +132,29 @@ try {
     verifie('un role 1 est refuse par un 403 EXACT',
         (refus?.status() ?? 0) === 403, `statut ${refus?.status()}`);
     await u.ctx.close();
+    await dors((resteFenetre() + 1) * 1000);
+
+    /* ── UN ROLE 3 PASSE SANS AVOIR LA PERMISSION ────────────────────────────
+     * La regle du projet est qu'une permission vaut « cette permission OU
+     * superadmin (role 3) ». Elle etait appliquee ici par la garde `perm:` de la
+     * route, mais AUCUNE des douze suites du module ne l'exercait : elles se
+     * connectent toutes en `rw-test-admin`, qui a la permission.
+     *
+     * Or `rw-test-super` est role 3 et n'a PAS `can_manage_supervision` (mesure
+     * en base). C'est donc le seul compte qui puisse distinguer « la garde laisse
+     * passer parce que la permission est la » de « la garde laisse passer parce
+     * que le role l'emporte ». Sans lui, un durcissement qui casserait le second
+     * chemin passerait inapercu.
+     */
+    const sup = await connecte('rw-test-super', SECRET_SUPER);
+    const acces = await sup.page.goto(`${BASE}${PAGE}`, { waitUntil: 'networkidle2' });
+    constate('role 3 SANS can_manage_supervision', `statut ${acces?.status()}`);
+    verifie('un role 3 passe MEME sans la permission : le role l\'emporte',
+        (acces?.status() ?? 0) === 200, `statut ${acces?.status()}`);
+    const pageSuper = await sup.page.evaluate(() =>
+        document.querySelectorAll('[data-rw="panneau-config"], #tab-config').length > 0);
+    verifie('et il obtient bien la PAGE, pas une coquille vide', pageSuper);
+    await sup.ctx.close();
     await dors((resteFenetre() + 1) * 1000);
 
     // ── La page, sous un role 2 habilite ────────────────────────────────────

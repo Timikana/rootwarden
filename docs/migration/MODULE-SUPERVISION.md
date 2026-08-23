@@ -702,6 +702,39 @@ absent ou vide » sur un PASS.
 
 **Reste du module** : V11 (désinstallation, DÉTRUIT), V12 (déploiement).
 
+## 7 novdecies. V11 porté — une réussite VÉRIFIÉE, pas annoncée (2026-08-23)
+
+Suite `go-page-supervision-desinst` : base rouge **8 PASS / 5 FAIL**, puis **29 PASS** sur le portage et
+**15** sur le legacy. Détail en `PARITE.md` E-89. Le backend avait été corrigé au préalable (v1.37.44).
+
+**LA CLÉ CASSÉE, LÀ OÙ ELLE FAIT LE PLUS DE MAL** : mesuré, la boîte native du legacy affiche
+`confirm: confirm_uninstall` — on demande de confirmer une **destruction** avec un identifiant.
+Dix-huitième de la famille. Le portage la remplace par un panneau.
+
+**LE PORTAGE VÉRIFIE APRÈS COUP.** La commande peut réussir sans avoir rien fait : le portage rejoue la
+détection de version et dit ce qu'elle trouve, dans un porte-messages **distinct** du verdict. Fixture
+qui rend la propriété mesurable : un **faux binaire** que `dpkg-query` ne voit pas mais que `command -v`
+trouve — la commande dit oui, la vérification dit non. **Cinq issues**, dont « rien à purger », que ni le
+legacy ni le marqueur ne distinguent.
+
+**UN EFFET NON PRÉVU, mesuré et conservé** : la vérification **repose** la ligne d'inventaire que la
+désinstallation avait effacée. L'inventaire finit juste parce que la vérification l'a corrigé — et cela ne
+se voit qu'en base.
+
+**NOMMER LA PRODUCTION**, vu à l'image : le panneau nommait la machine sans dire qu'elle était en
+production. Mesuré dans les deux sens — caché sur DEV, nommant `srv-zabbix` sinon — et ouvrir ce panneau
+n'émet rien.
+
+**DEUX DÉFAUTS DE MA SUITE** : elle assertait la chaîne brute du faux binaire alors que la route extrait
+le numéro de version ; et un détail qui disait « journal absent » sur un PASS.
+
+**UNE LACUNE DE COUVERTURE FERMÉE**, sur une question de l'exploitant : les douze suites du module se
+connectaient toutes en `rw-test-admin`. `rw-test-super` est rôle 3 **sans** `can_manage_supervision` : le
+chemin « OU superadmin » de la garde n'était jamais exercé. `supervision-onglets` mesure maintenant les
+deux, des deux côtés (rôle 1 → 403, rôle 3 → 200).
+
+**Reste du module** : V12 (déploiement), sur un socle dont le rollback est réarmé.
+
 ## 7 octodecies. V11 mesuré — la désinstallation ne peut pas échouer (2026-08-23)
 
 Détail en `PARITE.md` E-88. Mesures sur **Test-Server-Debian (id 2, DEV)** ; état relu pour être prouvé.

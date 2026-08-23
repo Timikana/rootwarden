@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.44** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.45** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,71 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.45 — module `supervision/`, sous-lot V11 : la desinstallation, une reussite VERIFIEE et non annoncee
+
+**Symptome.** Le legacy demande de confirmer une DESTRUCTION par un `confirm()` natif qui affiche
+`confirm_uninstall` — la cle existe sous `supervision.*` et dans AUCUN des deux `js.php`, donc `__()` la
+rend telle quelle. Mesure a l'ecran : `confirm: confirm_uninstall`. **Dix-huitieme** cle de cette famille,
+et la pire par son emplacement. Et le legacy ne verifie RIEN apres coup.
+
+**Fix.** Un geste PAR LIGNE derriere un panneau de decision qui NOMME ce qui part : le service arrete, le
+paquet purge avec sa configuration, la ligne d'inventaire — en precisant qu'elle ne bouge QUE si la
+commande reussit, contrepartie du correctif v1.37.44.
+
+**LA PROPRIETE CENTRALE : LE PORTAGE VERIFIE APRES COUP.** Le backend ne peut plus mentir, mais il ne peut
+pas tout garantir — et « il n'y avait rien a purger » n'est pas « desinstalle ». Le portage rejoue la
+detection de version (V6) une fois le geste fini, et dit ce qu'elle trouve, dans un porte-messages
+DISTINCT du verdict : « la commande a rendu un succes » et « plus aucun agent n'est detecte » ne sont pas
+la meme affirmation.
+
+**LA FIXTURE QUI REND CETTE PROPRIETE MESURABLE.** On ne peut pas installer un vrai agent sur le banc
+d'essai. La suite pose donc un FAUX binaire `zabbix_agent2` — un script qui n'imprime qu'une version :
+`dpkg-query` ne le voit pas (ce n'est pas un paquet), donc la commande rend `RIEN_A_PURGER` et un code 0 ;
+`command -v` le trouve, donc la detection de version le voit. La commande dit oui, la verification dit
+non :
+
+    verdict      : « Aucun agent n'etait installe sur Test-Server-Debian : il n'y avait rien
+                     a desinstaller. »
+    verification : « ATTENTION : un agent est TOUJOURS detecte sur ce serveur (version 7.0.99).
+                     La commande a beau avoir rendu un succes, l'agent est encore la. »
+
+**CINQ ISSUES** tirees du contenu du flux : purge, RIEN A PURGER, echec, inacheve, refus.
+
+**UN EFFET QUE JE N'AVAIS PAS PREVU, mesure et conserve.** La desinstallation avait vide l'inventaire — a
+juste titre de son point de vue, puisqu'elle avait rendu 0. La verification retrouve l'agent, et la route
+de version REPOSE la ligne (`_upsert_agent`). L'inventaire finit donc juste, non parce que la
+desinstallation avait raison, mais parce que la verification l'a corrigee. Cela ne se voit qu'EN BASE, et
+une assertion le mesure.
+
+**NOMMER LA PRODUCTION, SUR LE GESTE QUI DETRUIT.** Vu a l'image : le panneau nommait la machine sans dire
+qu'elle etait en production, et « srv-zabbix » se lit comme « Test-Server-Debian » dans une phrase. Un
+exploitant a le droit de desinstaller un agent d'un serveur de production — ce n'est pas au portail de le
+lui interdire — mais le lui DIRE au moment ou il decide, oui. Mesure DANS LES DEUX SENS : avertissement
+cache sur DEV, nommant `srv-zabbix` sinon. Et ouvrir ce panneau n'emet aucune requete : la production
+n'est pas jointe pour mesurer qu'on previent a son sujet.
+
+**LE PERIMETRE A ETE MESURE AVANT D'ETRE PAYE** : `apt-get autoremove --dry-run` rend « 0 to remove » sur
+le banc d'essai, et la suite l'inscrit dans son journal a chaque execution.
+
+**DEUX DEFAUTS DE MA SUITE.** Elle assertait la chaine brute du faux binaire (`7.0.99-faux-v11`) alors que
+la route de version EXTRAIT le numero par `(\d+\.\d+[\.\d]*)` et n'affiche que `7.0.99` — la suite avait
+tort, pas le portage. Et un detail d'assertion disait « journal absent ou vide » sur un PASS.
+
+**UNE LACUNE DE COUVERTURE FERMEE, sur une question de l'exploitant.** Les douze suites du module se
+connectaient TOUTES en `rw-test-admin`, qui porte `can_manage_supervision`. Or la regle du projet est
+qu'une permission vaut « cette permission OU superadmin (role 3) », et `rw-test-super` est role 3 SANS
+cette permission (mesure en base). Le second chemin de la garde n'etait donc jamais exerce : un
+durcissement qui l'aurait casse serait passe inapercu. `supervision-onglets` mesure maintenant les deux —
+role 1 → **403**, role 3 sans permission → **200** — DES DEUX COTES, donc en parite. Sa reference passe de
+14 a **16** cote portage et de 11 a **13** cote legacy.
+
+**Tests.** `go-page-supervision-desinst` : base rouge 8 PASS / 5 FAIL, puis **29 PASS sur le portage** et
+**15 sur le legacy**. i18n : 22 cles FR + 22 EN dans le meme commit, **231 = 231**. 341 pytest inchanges
+(aucune modification backend dans ce commit). LOT complet rejoue.
+
+**Reference du LOT** : `go-page-supervision-desinst` entre avec **15 PASS sur le legacy** et **29 sur le
+portage**, et `supervision-onglets` passe a 16/13. Le LOT passe a **82 executions de suite** pour **1158 assertions**.
 
 ### v1.37.44 — securite : la desinstallation ne peut plus annoncer un succes qu'elle n'a pas verifie
 
