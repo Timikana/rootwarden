@@ -233,3 +233,44 @@ cles, avec des valeurs neutres.
 `page.on('request', r => { if (/\/deploy(\?|$)/.test(r.url())) n += 1; })`. C'est
 ce qui permet d'ouvrir le panneau sur la ligne d'une machine de PRODUCTION pour
 lire son avertissement **sans jamais la joindre**.
+
+## Le constat d'archivage (2026-08-23, archivage de `supervision/`)
+
+### Une assertion « X mene a Y » par INCLUSION DE CHAINE accepte le chemin qu'on vient de supprimer
+
+`archive.mjs` filtrait les liens du menu par `href.includes(routeportee)`. La route portee est
+`/supervision`, l'ancien chemin legacy `/supervision/` : **le second contient le premier**. L'assertion
+annoncait « l'entree de menu mene au portage » en affichant `/supervision/` — le 404 qu'on venait
+d'installer.
+
+Comparer des **CHEMINS** (`new URL(h).pathname === route`), jamais des sous-chaines, et **exiger un lien
+ABSOLU** : un lien relatif est servi par le legacy, donc par construction il ne mene pas au portage. Meme
+discipline que la comparaison par SEGMENT de la passerelle.
+
+**Et surtout** : huit archivages avaient valide ce filtre. Aucun ne pouvait echouer — `/update/` contre
+`/mises-a-jour`, `/tasks/` contre `/taches` : zero recouvrement. **N validations precedentes ne prouvent
+rien si aucune ne pouvait echouer.**
+
+### Une aide qui LEVE au lieu de rendre un verdict masque le probleme
+
+Ce qui a revele le defaut n'est pas l'assertion mais un `TypeError: Invalid URL` leve deux lignes plus bas
+par `new URL('/supervision/')`. Si l'ancien lien avait ete absolu, le PASS serait passe inapercu. `repond()`
+rend desormais `0` sur un href non absolu : un verdict, pas une exception au milieu d'une suite.
+
+### Greffer le constat EN TETE du `try`
+
+Avant toute fixture. Le bloc archive appelle `process.exit()`, qui **ne joue pas le `finally`** : place
+plus bas, il laisserait derriere lui la fixture posee (fichier distant, ligne en base, paquet installe).
+Place en tete, il n'y a rien a defaire.
+
+### La reference legacy CHANGE, et se mesure
+
+Une suite archivee ne rend plus ses assertions de caracterisation mais celles du constat :
+`1 (404 du repertoire) + N (fichiers sondes) + 2 (le lien du menu, et le fait qu'il aboutisse)`. Mesurer,
+puis inscrire. Sonder les fichiers **REELS** du module : un chemin qui n'a jamais existe rend 404 et fait
+passer l'assertion pour rien.
+
+### Aucune session pendant un rejeu — captures comprises
+
+Le garde anti-rejeu TOTP est **par compte et EN BASE** : il traverse les contextes de navigateur ET les
+executions. Prendre des captures pendant un LOT rend une suite instable. Attendre la fin.

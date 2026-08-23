@@ -1117,3 +1117,33 @@ version qui suit l'efface (`_remove_agent`), sur les DEUX portails. Lire la base
 apres coup ne montre donc rien. Pour mesurer le defaut il faut un geste que rien
 ne suit : **requete forgee** depuis la page, sans l'enchainement du bouton.
 Corollaire : un etat final correct ne prouve pas que le geste etait correct.
+
+## Archivage d'une partie du legacy (2026-08-23)
+
+### Un point d'entree peut n'etre PAS un lien
+
+`supervision/` en avait **quatre**, pas deux : barre laterale et tiroir mobile (`legacy/menu.php`),
+raccourci du tableau de bord (`legacy/index.php`), et la **carte de raccourcis CLAVIER** de
+`legacy/head.php` — un objet JavaScript (`v: '/supervision/'`). Aucun controle portant sur les `href` ne la
+voit : taper `g` puis `v` aurait navigue vers le 404 qu'on venait d'installer.
+
+Le cycle complet : `git mv` · les **quatre** emplacements · verifier que `App\Support\Navigation` porte
+`route` et non `legacy` pour cette entree · tenir `App\Support\LiensLegacy::REMPLACEMENTS` a jour · greffer
+le constat dans chaque suite · **mesurer** la nouvelle reference legacy · verifier la **non-regression des
+parties deja archivees** si l'on touche `archive.mjs` · prendre et ENVOYER les captures.
+
+### Compter une seconde fois par un AUTRE moyen
+
+La propriete negative posee sur le tableau de bord servi (« plus aucun `href="/supervision/"` », « plus
+aucun `: '/supervision/'` ») a trouve **3 liens et 1 raccourci** en base rouge : les quatre emplacements,
+retrouves independamment de l'inventaire fait a la main. C'est ce qui rend un decompte credible plutot que
+declaratif — le meme tour a vu un « 69 commits » faux d'une unite et un « trois effets » qui en valait
+quatre.
+
+### Ce qu'un archivage ne doit PAS faire
+
+Retirer `/supervision/` de la liste blanche de `legacy/api_proxy.php` restreindrait ce que le legacy
+autorise : c'est un changement de droits, pas une consequence du deplacement de trois fichiers. La surface
+morte est **signalee**, pas fermee en silence. Meme raisonnement pour l'ergonomie du legacy (liens sortants
+non marques, 404 brut d'Apache) : soigner ce qu'on demonte est un mauvais investissement — on le mesure, on
+le dit, on laisse l'exploitant trancher.
