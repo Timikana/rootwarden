@@ -301,4 +301,48 @@ return [
     'desinst_verif_present' => 'ATTENTION : un agent est TOUJOURS detecte sur ce serveur (version :version). La commande a beau avoir rendu un succes, l\'agent est encore la.',
     'desinst_verif_impossible' => "La verification n'a pas pu aboutir : l'etat reel du serveur n'a pas ete constate.",
     'desinst_production' => ':nom est un serveur de PRODUCTION. Sa supervision cessera des que l\'agent sera parti.',
+    /*
+     * ── SOUS-LOT V12 : LE DEPLOIEMENT ────────────────────────────────────
+     *
+     * LES ETAPES SONT NOMMEES, PAS COMPTEES, et elles sont rendues PAR
+     * PLATEFORME. Mesure : `zabbix_deploy` et `generic_deploy` ne font pas le
+     * meme travail. Zabbix commence par PURGER l'agent en place, renomme la
+     * configuration en `.old` et telecharge un `.deb` sur repo.zabbix.com ;
+     * Prometheus n'ajoute aucun depot externe ; Centreon et Telegraf posent une
+     * cle GPG et un `sources.list`. Enumerer les etapes de Zabbix pendant que le
+     * selecteur est sur Telegraf serait le defaut E-79 par un autre bout.
+     */
+    'depl_bouton' => 'Deployer',
+    'depl_titre' => "Deploiement de l'agent",
+    'depl_description' => "Installe l'agent sur un serveur, puis y ecrit la configuration issue de la configuration globale, des reglages de la machine et de son profil. Le geste porte sur UNE machine : celle de la ligne choisie.",
+    'depl_sans_config' => 'Aucune configuration globale : le deploiement serait refuse.',
+    'depl_sans_config_aide' => "Pour Zabbix, le backend rend une erreur 400 tant que l'onglet Configuration n'a pas ete enregistre. Renseignez-la d'abord : le deploiement en tire la version de l'agent, le serveur a joindre et le modele de nom d'hote.",
+    'depl_sans_config_generique' => "Aucune configuration globale pour cette plateforme : l'agent sera installe, mais AUCUNE configuration ne sera ecrite sur la machine. Contrairement a Zabbix, le backend ne refuse pas ce cas.",
+    'depl_cout' => "Deployer l'agent :plateforme sur :nom. Les etapes suivantes vont s'enchainer sur la machine :",
+    'depl_production' => ':nom est un serveur de PRODUCTION. Verifiez les etapes ci-dessous avant de decider : certaines interrompent la supervision en cours.',
+    'depl_effet_purge' => 'Les agents Zabbix deja installes sont PURGES : deployer commence par desinstaller.',
+    'depl_effet_ancienne' => 'La configuration actuelle :chemin est renommee en .old — un second deploiement ecrasera cette copie.',
+    'depl_effet_greffons' => 'Trois greffons deja poses (postgresql, mssql, mongodb) sont supprimes.',
+    'depl_effet_depot_externe' => 'Le depot :hote est ajoute a la machine, qui doit pouvoir le joindre sur Internet.',
+    'depl_effet_index' => 'Les index apt de la machine sont rafraichis.',
+    'depl_effet_installation' => 'Le paquet :paquet est installe.',
+    'depl_effet_psk' => 'Une cle PSK est ecrite sur la machine, dans /etc/zabbix/zabbix_agent2.d/server.key.',
+    'depl_effet_sauvegarde' => 'La configuration existante :chemin est sauvegardee, horodatee.',
+    'depl_effet_configuration' => 'Le fichier :chemin est ecrit.',
+    'depl_effet_extra' => 'La configuration supplementaire est ajoutee en fin de fichier.',
+    'depl_effet_service' => 'Le service :service est redemarre, puis active au demarrage.',
+    'depl_effet_inventaire' => "L'inventaire enregistre l'agent comme deploye — meme si les etapes precedentes ont echoue.",
+    'depl_annuler' => 'Annuler',
+    'depl_confirmer' => 'Deployer maintenant',
+    'depl_en_cours' => 'Deploiement en cours sur :nom...',
+    'depl_reussi' => 'Deploiement termine sur :nom : toutes les etapes ont rendu un succes.',
+    'depl_echouee' => 'Le deploiement sur :nom a ECHOUE (code :codes). Le portail a malgre tout enregistre l\'agent dans son inventaire.',
+    'depl_inachevee' => "Le deploiement sur :nom ne s'est pas acheve : aucune etape ne conclut.",
+    'depl_refus' => "Le deploiement a ete refuse (statut :statut). Rien n'a ete envoye a la machine.",
+    'depl_echec' => "Le deploiement n'a pas pu etre lance.",
+    'depl_verif_en_cours' => 'Verification de ce qui est reellement installe...',
+    'depl_verif_conforme' => 'Verifie : agent detecte en version :version.',
+    'depl_verif_divergente' => 'ATTENTION : la version detectee est :trouvee, alors que :attendue etait demandee.',
+    'depl_verif_absente' => "ATTENTION : AUCUN agent n'est detecte sur :nom. Le portail vient pourtant d'inscrire cet agent dans son inventaire — c'est l'inventaire qui a tort.",
+    'depl_verif_impossible' => "La verification n'a pas pu aboutir : ce qui est reellement installe n'a pas ete constate.",
 ];

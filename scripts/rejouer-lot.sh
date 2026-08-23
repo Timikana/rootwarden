@@ -74,6 +74,7 @@ declare -A REF_LARAVEL=(
   [go-page-supervision-releve]=28 [go-page-supervision-ecriture]=38
   [go-page-supervision-reglages]=32 [go-page-supervision-reconf]=27
   [go-page-supervision-desinst]=29
+  [go-page-supervision-deploiement]=31
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -91,6 +92,7 @@ declare -A REF_LEGACY=(
   [go-page-supervision-releve]=11 [go-page-supervision-ecriture]=18
   [go-page-supervision-reglages]=8 [go-page-supervision-reconf]=13
   [go-page-supervision-desinst]=15
+  [go-page-supervision-deploiement]=19
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -100,7 +102,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
@@ -110,7 +112,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-cve-priorite go-page-cve-scan-refus go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5

@@ -61,7 +61,7 @@
          * ce qu'un sous-lot suivant ajoutera, et le ferait disparaitre sans
          * qu'aucun test ne l'ait demande.
          */
-        var familles = ['config-', 'profils-'];
+        var familles = ['config-', 'profils-', 'depl-', 'depl-etapes-'];
         var blocs = [];
         [].slice.call(choixPlateforme.options).forEach(function (o) {
             familles.forEach(function (prefixe) {
@@ -87,6 +87,43 @@
                     cible.textContent = chemins[choixPlateforme.value];
                 }
             } catch (e) { /* un chemin inchange vaut mieux qu'un chemin invente */ }
+            majBoutonsBloques();
+        });
+    }
+
+    /**
+     * L'ETAT DESACTIVE D'UN BOUTON SUIT LA PLATEFORME — sous-lot V12.
+     *
+     * Le serveur rend l'etat de la plateforme initiale ; a chaque bascule, on le
+     * relit dans la table qu'il a fournie. Sans cela un bouton reste grise (ou
+     * cliquable) pour la mauvaise plateforme : c'est le defaut E-79 deplace du
+     * chemin vers l'ETAT, et c'etait le cas de mon bouton « Reconfigurer » (V10),
+     * fige sur la configuration de Zabbix quel que soit le selecteur.
+     */
+    function majBoutonsBloques() {
+        var plateforme = choixPlateforme ? choixPlateforme.value : 'zabbix';
+        [
+            { data: 'depl_bloque', selecteur: 'superv-deployer', titre: 'depl_sans_config' },
+            { data: 'reconf_bloque', selecteur: 'superv-reconfigurer', titre: 'reconf_sans_config' },
+        ].forEach(function (geste) {
+            var table;
+            try {
+                table = JSON.parse(libelles[geste.data] || '{}');
+            } catch (e) {
+                // FAIL-CLOSED : une table illisible ne doit pas ouvrir un geste.
+                table = {};
+                table[plateforme] = true;
+            }
+            var bloque = table[plateforme] === true;
+            [].slice.call(document.querySelectorAll('[data-rw="' + geste.selecteur + '"]'))
+                .forEach(function (bouton) {
+                    bouton.disabled = bloque;
+                    if (bloque) {
+                        bouton.title = libelles[geste.titre] || '';
+                    } else {
+                        bouton.removeAttribute('title');
+                    }
+                });
         });
     }
 
@@ -1138,6 +1175,270 @@
                 boutonReleve.hidden = false;
                 confirmerReleve.disabled = false;
                 annulerReleve.disabled = false;
+            });
+        });
+    }
+
+    /* == Le deploiement ============================================ sous-lot V12
+     *
+     * LE GESTE QUI INSTALLE, ET LE PLUS MENTEUR DU MODULE. Releve sur le banc
+     * d'essai, flux complet d'un `POST /supervision/zabbix/deploy` :
+     *
+     *     sh: 1: wget: not found
+     *     Execution terminee (code 127).
+     *     E: Unable to locate package zabbix-agent2
+     *     Execution terminee (code 100).
+     *     ... Fichier /etc/zabbix/zabbix_agent2.conf mis a jour avec succes.
+     *     sh: 1: systemctl: not found
+     *     Execution terminee (code 127).
+     *     SUCCESS_MACHINE::2::Deploiement reussi pour Test-Server-Debian.
+     *
+     * Trois etapes en echec, et le marqueur conclut a la reussite. Le backend ne
+     * regarde AUCUN code : `yield from execute_as_root_stream(...)` ignore la
+     * valeur que la fonction rend. Pire, `_upsert_agent` a inscrit l'agent en
+     * base : releve apres coup, `supervision_agents` portait
+     * `machine 2, zabbix, 7.0, config_deployed = 1` alors que `dpkg-query` ne
+     * trouvait aucun paquet et qu'aucun binaire d'agent n'existait.
+     *
+     * ON NE TENTE PAS D'ATTRIBUER UN CODE A UNE ETAPE. Le flux n'emet aucun
+     * marqueur par etape : dire « installe mais non demarre » demanderait de
+     * compter les `(code N)` dans l'ordre et de parier sur le nombre d'etapes
+     * reellement jouees, qui varie avec la PSK et l'extra. Trois issues tirees
+     * du flux, et la VERIFICATION comble le reste : elle dit ce qui est la.
+     */
+    var panneauDepl = document.querySelector('[data-rw="superv-panneau-depl"]');
+    var messageDepl = document.querySelector('[data-rw="superv-depl-message"]');
+    var verifDepl = document.querySelector('[data-rw="superv-depl-verif"]');
+    var annulerDepl = document.querySelector('[data-rw="superv-depl-annuler"]');
+    var confirmerDepl = document.querySelector('[data-rw="superv-depl-confirmer"]');
+    var coutDepl = document.querySelector('[data-rw="superv-depl-cout"]');
+    var journalDepl = document.querySelector('[data-rw="superv-depl-journal"]');
+
+    /**
+     * Les TROIS issues d'un flux de deploiement, tirees de son CONTENU.
+     *
+     * `(code N)` est la partie protocole ; « Execution terminee » est une phrase
+     * francaise, susceptible de changer et deja accentuee differemment selon la
+     * couche qui l'ecrit.
+     */
+    function verdictDeploiement(texte) {
+        var lignes = texte.split('\n');
+        var echec = lignes.some(function (l) { return l.indexOf('ERROR_MACHINE::') === 0; });
+        var succes = lignes.some(function (l) { return l.indexOf('SUCCESS_MACHINE::') === 0; });
+        var codes = [];
+        lignes.forEach(function (l) {
+            var m = l.match(/\(code (\d+)\)/);
+            if (m) { codes.push(Number(m[1])); }
+        });
+        var enEchec = codes.filter(function (c) { return c !== 0; });
+
+        if (echec || enEchec.length > 0) {
+            return { issue: 'echec', codes: enEchec };
+        }
+        if (! succes) { return { issue: 'inacheve', codes: enEchec }; }
+
+        return { issue: 'reussi', codes: enEchec };
+    }
+
+    function fermeDepl() {
+        if (! panneauDepl) { return; }
+        panneauDepl.hidden = true;
+        panneauDepl.removeAttribute('data-cible');
+        panneauDepl.removeAttribute('data-nom');
+    }
+
+    /**
+     * VERIFIE CE QUI EST REELLEMENT INSTALLE, en rejouant la detection de version.
+     *
+     * Plus parlante encore qu'en V11 : la desinstallation faisait constater une
+     * absence, le deploiement fait constater une PRESENCE que l'inventaire vient
+     * d'affirmer. Quand la detection ne trouve rien, ce n'est pas « on ne sait
+     * pas » : c'est que l'inventaire a tort, et on l'ecrit.
+     */
+    function verifieDeploiement(machine, nom) {
+        if (! verifDepl) { return Promise.resolve(); }
+        var route = routeCourante('version');
+        if (! route) {
+            verifDepl.className = 'rw-annonce rw-annonce--attention';
+            verifDepl.textContent = libelles.depl_verif_impossible;
+
+            return Promise.resolve();
+        }
+        verifDepl.className = 'rw-annonce';
+        verifDepl.textContent = libelles.depl_verif_en_cours;
+
+        var jeton = document.querySelector('meta[name="csrf-token"]');
+
+        return fetch(route, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': jeton ? jeton.content : '',
+            },
+            body: JSON.stringify({ machine_id: Number(machine) }),
+        }).then(function (reponse) {
+            if (! reponse.ok) { return null; }
+
+            return reponse.json();
+        }).then(function (donnees) {
+            if (! donnees || donnees.success !== true) {
+                // NE PAS SAVOIR N'EST PAS CONSTATER.
+                verifDepl.className = 'rw-annonce rw-annonce--attention';
+                verifDepl.textContent = libelles.depl_verif_impossible;
+
+                return;
+            }
+            if (! donnees.version) {
+                verifDepl.className = 'rw-annonce rw-annonce--echec';
+                verifDepl.textContent = libelles.depl_verif_absente.replace('{nom}', nom);
+
+                return;
+            }
+            /*
+             * LA VERSION DEMANDEE VIENT DU PANNEAU, PAS DU FLUX. Le panneau
+             * l'affiche parce que le SERVEUR la lui a donnee ; la lire dans le
+             * flux demanderait de decouper une phrase francaise
+             * (« Deploiement agent zabbix-agent2 v7.0 sur ... »).
+             */
+            var attendue = panneauDepl ? (panneauDepl.getAttribute('data-version') || '') : '';
+            if (attendue !== '' && String(donnees.version).indexOf(attendue) !== 0) {
+                verifDepl.className = 'rw-annonce rw-annonce--attention';
+                verifDepl.textContent = libelles.depl_verif_divergente
+                    .replace('{trouvee}', String(donnees.version))
+                    .replace('{attendue}', attendue);
+
+                return;
+            }
+            verifDepl.className = 'rw-annonce rw-annonce--ok';
+            verifDepl.textContent = libelles.depl_verif_conforme
+                .replace('{version}', String(donnees.version));
+        }).catch(function () {
+            verifDepl.className = 'rw-annonce rw-annonce--attention';
+            verifDepl.textContent = libelles.depl_verif_impossible;
+        });
+    }
+
+    if (panneauDepl && messageDepl && annulerDepl && confirmerDepl && coutDepl) {
+        [].slice.call(document.querySelectorAll('[data-rw="superv-deployer"]'))
+            .forEach(function (bouton) {
+                bouton.addEventListener('click', function () {
+                    // OUVRIR N'ENVOIE RIEN.
+                    var plateforme = choixPlateforme ? choixPlateforme.value : 'zabbix';
+                    panneauDepl.setAttribute('data-cible', bouton.dataset.machine || '');
+                    panneauDepl.setAttribute('data-nom', bouton.dataset.nom || '');
+                    /*
+                     * LA VERSION DEMANDEE EST RETENUE AU MOMENT DE LA DECISION.
+                     * La relire apres coup exposerait a une bascule de plateforme
+                     * survenue entre-temps : on comparerait alors une version
+                     * detectee a une version qui n'a jamais ete demandee.
+                     */
+                    var versions = {};
+                    try { versions = JSON.parse(libelles.depl_versions || '{}'); } catch (e) { versions = {}; }
+                    panneauDepl.setAttribute('data-version', versions[plateforme] || '');
+
+                    coutDepl.textContent = libelles.depl_cout
+                        .replace('{plateforme}', plateforme)
+                        .replace('{nom}', bouton.dataset.nom || '');
+                    /*
+                     * NOMMER LA PRODUCTION. Un deploiement n'est pas un geste
+                     * additif : il PURGE l'agent en place avant d'installer, donc
+                     * il interrompt la supervision d'un serveur qui en avait une.
+                     */
+                    var prod = document.querySelector('[data-rw="superv-depl-prod"]');
+                    if (prod) {
+                        var env = bouton.dataset.environnement || '';
+                        prod.hidden = env !== 'PROD';
+                        prod.textContent = env === 'PROD'
+                            ? libelles.depl_production.replace('{nom}', bouton.dataset.nom || '')
+                            : '';
+                    }
+                    panneauDepl.hidden = false;
+                    messageDepl.className = 'rw-annonce';
+                    messageDepl.textContent = '';
+                    if (verifDepl) { verifDepl.className = 'rw-annonce'; verifDepl.textContent = ''; }
+                    if (journalDepl) { journalDepl.hidden = true; journalDepl.textContent = ''; }
+                    annulerDepl.focus();
+                });
+            });
+
+        annulerDepl.addEventListener('click', function () { fermeDepl(); });
+
+        confirmerDepl.addEventListener('click', function () {
+            var machine = panneauDepl.getAttribute('data-cible') || '';
+            var nom = panneauDepl.getAttribute('data-nom') || '';
+            if (machine === '') { return; }
+            confirmerDepl.disabled = true;
+            annulerDepl.disabled = true;
+            messageDepl.className = 'rw-annonce';
+            messageDepl.textContent = libelles.depl_en_cours.replace('{nom}', nom);
+
+            var route = routeCourante('deploiement');
+            if (! route) {
+                messageDepl.className = 'rw-annonce rw-annonce--echec';
+                messageDepl.textContent = libelles.depl_echec;
+                confirmerDepl.disabled = false;
+                annulerDepl.disabled = false;
+                fermeDepl();
+
+                return;
+            }
+
+            var jeton = document.querySelector('meta[name="csrf-token"]');
+            fetch(route, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                },
+                /*
+                 * `machine_id` au SINGULIER, alors que le backend accepte
+                 * `machine_ids`. Le pluriel n'est pas un trou de garde — mesure
+                 * faite, `require_machine_access` lit les deux formes depuis le
+                 * patch A01 — mais le portage n'a aucune case a cocher, donc
+                 * aucune action de masse a envoyer.
+                 */
+                body: JSON.stringify({ machine_id: Number(machine) }),
+            }).then(function (reponse) {
+                if (! reponse.ok) {
+                    messageDepl.className = 'rw-annonce rw-annonce--echec';
+                    messageDepl.textContent = libelles.depl_refus
+                        .replace('{statut}', String(reponse.status));
+
+                    return null;
+                }
+
+                return reponse.text();
+            }).then(function (texte) {
+                if (texte === null || texte === undefined) { return null; }
+                if (journalDepl) {
+                    journalDepl.textContent = texte;
+                    journalDepl.hidden = false;
+                }
+                var verdict = verdictDeploiement(texte);
+
+                if (verdict.issue === 'reussi') {
+                    messageDepl.className = 'rw-annonce rw-annonce--ok';
+                    messageDepl.textContent = libelles.depl_reussi.replace('{nom}', nom);
+                } else if (verdict.issue === 'echec') {
+                    messageDepl.className = 'rw-annonce rw-annonce--echec';
+                    messageDepl.textContent = libelles.depl_echouee
+                        .replace('{nom}', nom)
+                        .replace('{codes}', verdict.codes.join(', ') || '?');
+                } else {
+                    messageDepl.className = 'rw-annonce rw-annonce--echec';
+                    messageDepl.textContent = libelles.depl_inachevee.replace('{nom}', nom);
+                }
+
+                // ON VERIFIE MEME APRES UN ECHEC, et surtout apres un echec :
+                // savoir ce qui a ete laisse sur la machine compte davantage.
+                return verifieDeploiement(machine, nom);
+            }).catch(function () {
+                messageDepl.className = 'rw-annonce rw-annonce--echec';
+                messageDepl.textContent = libelles.depl_echec;
+            }).finally(function () {
+                fermeDepl();
+                confirmerDepl.disabled = false;
+                annulerDepl.disabled = false;
             });
         });
     }

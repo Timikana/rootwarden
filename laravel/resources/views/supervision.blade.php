@@ -369,6 +369,7 @@
              bouton. Une selection multiple appellerait le scan du parc par la
              porte de V6, et surtout « tout cocher » embarquerait srv-zabbix,
              qui est en PRODUCTION. --}}
+        @php($plateformeInitiale = $plateformes[0] ?? 'zabbix')
         <div id="panneau-deploy" data-rw="panneau-deploy" role="tabpanel" hidden>
             <article class="rw-carte rw-carte--pleine">
                 <h3 class="rw-sous-titre">{{ __('superv.deploiement_titre') }}</h3>
@@ -463,6 +464,38 @@
                                                          DETRUIT que ca compte le plus. --}}
                                                     data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
                                                     >{{ __('superv.desinst_bouton') }}</button>
+                                            {{-- SOUS-LOT V12 : LE DEPLOIEMENT.
+                                                 Par ligne, comme tout le reste. Le legacy
+                                                 l'offre AUSSI sur la selection (case a cocher
+                                                 + « Deployer la selection »), derriere un
+                                                 `confirm()` natif qui affiche la chaine
+                                                 `confirm_deploy`. Cette traduction EXISTE
+                                                 pourtant, en FR et en EN — dans
+                                                 `lang/*/supervision.php`, donc hors de
+                                                 l'espace `js.` que `getJsTranslations('js.')`
+                                                 charge. Elle est ecrite, correcte, et
+                                                 inaccessible.
+
+                                                 L'ETAT DESACTIVE SUIT LA PLATEFORME, il n'est
+                                                 pas fige sur Zabbix : `zabbix_deploy` refuse
+                                                 (400) sans configuration globale, mais
+                                                 `generic_deploy` installe quand meme. Un
+                                                 bouton grise pour la mauvaise raison est un
+                                                 mensonge de plus. --}}
+                                            <button type="button" class="rw-bouton rw-bouton--discret"
+                                                    data-rw="superv-deployer"
+                                                    data-machine="{{ $m->id }}"
+                                                    data-nom="{{ $m->name }}"
+                                                    data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
+                                                    {{-- `refuse_sans_config` DECRIT LE BACKEND (Zabbix refuse
+                                                         sans configuration globale) ; il ne dit pas si le bouton
+                                                         doit etre grise ICI. Les confondre desactivait le bouton
+                                                         Zabbix EN PERMANENCE, meme configuration posee. L'etat
+                                                         bloque est la conjonction des deux : le backend refuserait,
+                                                         ET la configuration manque. --}}
+                                                    @disabled($boutonsBloques['deploiement'][$plateformeInitiale] ?? false)
+                                                    @if ($boutonsBloques['deploiement'][$plateformeInitiale] ?? false) title="{{ __('superv.depl_sans_config') }}" @endif
+                                                    >{{ __('superv.depl_bouton') }}</button>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -517,6 +550,100 @@
                              que le succes annonce vaut preuve. --}}
                         <p class="rw-annonce" data-rw="superv-desinst-verif" aria-live="polite"></p>
                         <pre class="rw-journal" data-rw="superv-desinst-journal" hidden></pre>
+                    </section>
+
+                    {{-- ══ SOUS-LOT V12 : LE DEPLOIEMENT ═════════════════════
+                         LE GESTE QUI INSTALLE, ET QUI COMMENCE PAR DETRUIRE.
+                         Mesure du backend : `zabbix_deploy` PURGE les agents en
+                         place avant d'installer, renomme la configuration en
+                         `.old` et telecharge un `.deb` sur repo.zabbix.com. Rien
+                         de tout cela ne se devine du mot « deployer », donc les
+                         etapes sont enumerees — et enumerees PAR PLATEFORME,
+                         parce qu'elles different vraiment.
+
+                         ET LE FLUX MENT. Releve sur le banc d'essai :
+
+                             Exécution terminée (code 127).   <- wget absent
+                             Exécution terminée (code 100).   <- paquet introuvable
+                             Exécution terminée (code 127).   <- systemctl absent
+                             SUCCESS_MACHINE::2::Deploiement reussi ...
+
+                         Trois echecs, et le marqueur conclut a la reussite. Pire
+                         qu'en V10 : `_upsert_agent` a AUSSI inscrit l'agent dans
+                         l'inventaire. Le portail affirmait donc un agent installe
+                         la ou la machine n'en portait aucun.
+
+                         D'OU LA VERIFICATION APRES COUP, qui prend ici tout son
+                         sens : elle rejoue la detection de version et confronte
+                         ce qu'elle trouve a ce que l'inventaire vient d'ecrire.
+                         Quand elle ne trouve rien, elle le dit — et elle dit que
+                         c'est l'inventaire qui a tort. --}}
+                    <section class="rw-note" data-rw="superv-depl">
+                        <h4 class="rw-sous-titre">{{ __('superv.depl_titre') }}</h4>
+                        <p class="rw-aide rw-prose">{{ __('superv.depl_description') }}</p>
+
+                        {{-- UNE REGLE APPLIQUEE PAR LE BACKEND SE REND VISIBLE, et
+                             elle n'est pas la meme partout : Zabbix REFUSE sans
+                             configuration globale (400, mesure a 513 ms), les trois
+                             autres installent quand meme sans rien configurer. Deux
+                             annonces distinctes, une par cas, basculees avec le
+                             selecteur comme les autres blocs par plateforme. --}}
+                        @foreach ($plateformes as $plateforme)
+                            @php($cfg = $configuration[$plateforme] ?? null)
+                            <div id="depl-{{ $plateforme }}" @unless($plateforme === $plateformeInitiale) hidden @endunless>
+                                @if ($cfg === null && ($deploiement[$plateforme]['refuse_sans_config'] ?? false))
+                                    <div class="rw-vide" data-rw="superv-depl-indisponible">
+                                        <p class="rw-vide__titre">{{ __('superv.depl_sans_config') }}</p>
+                                        <p class="rw-vide__texte rw-prose">{{ __('superv.depl_sans_config_aide') }}</p>
+                                    </div>
+                                @elseif ($cfg === null)
+                                    <p class="rw-avertissement" data-rw="superv-depl-sans-config-generique">{{ __('superv.depl_sans_config_generique') }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+
+                        <div class="rw-panneau-decision" data-rw="superv-panneau-depl" hidden>
+                            <div class="rw-panneau-decision__texte">
+                                {{-- DEUX POIDS VISUELS, PAS UN. Vu a l'image : l'enonce
+                                     du geste et l'avertissement de PRODUCTION portaient la
+                                     meme classe, donc le meme fond et la meme bordure. Sur
+                                     le geste le plus dangereux du module, rien ne
+                                     distinguait « voici ce qui va se passer » de « ce
+                                     serveur est en production ». L'enonce devient un encart
+                                     neutre ; seul l'avertissement attire l'oeil. --}}
+                                <p class="rw-encart" data-rw="superv-depl-cout"></p>
+                                <p class="rw-avertissement" data-rw="superv-depl-prod" hidden></p>
+                                {{-- LES ETAPES VIENNENT DU SERVEUR, UNE LISTE PAR
+                                     PLATEFORME. Pas de gabarit cote script : un
+                                     libelle assemble en JS echappe a la parite
+                                     FR/EN, et une liste unique afficherait les
+                                     etapes de Zabbix pour Telegraf. --}}
+                                @foreach ($plateformes as $plateforme)
+                                    <ul id="depl-etapes-{{ $plateforme }}"
+                                        class="rw-aide rw-prose rw-liste-effets"
+                                        data-rw="superv-depl-etapes-{{ $plateforme }}"
+                                        @unless($plateforme === $plateformeInitiale) hidden @endunless>
+                                        @foreach ($deploiement[$plateforme]['etapes'] ?? [] as $etape)
+                                            <li>{{ $etape }}</li>
+                                        @endforeach
+                                    </ul>
+                                @endforeach
+                            </div>
+                            <div class="rw-panneau-decision__actions">
+                                <button type="button" class="rw-bouton rw-bouton--discret"
+                                        data-rw="superv-depl-annuler">{{ __('superv.depl_annuler') }}</button>
+                                <button type="button" class="rw-bouton rw-bouton--danger"
+                                        data-rw="superv-depl-confirmer">{{ __('superv.depl_confirmer') }}</button>
+                            </div>
+                        </div>
+
+                        <p class="rw-annonce" data-rw="superv-depl-message" aria-live="polite"></p>
+                        {{-- DEUX PORTE-MESSAGES DISTINCTS : « la commande a rendu »
+                             et « j'ai constate » ne sont pas la meme affirmation.
+                             Les confondre ferait passer le succes annonce pour une
+                             preuve — c'est precisement ce que fait le legacy. --}}
+                        <p class="rw-annonce" data-rw="superv-depl-verif" aria-live="polite"></p>
+                        <pre class="rw-journal" data-rw="superv-depl-journal" hidden></pre>
                     </section>
 
                     {{-- ══ SOUS-LOT V10 : LA RECONFIGURATION ═════════════════

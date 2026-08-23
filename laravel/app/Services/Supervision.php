@@ -175,6 +175,11 @@ class Supervision
             return;
         }
 
+        // UNE ECRITURE PERIME LA MEMOIRE. Le chemin actuel redirige aussitot,
+        // donc personne ne relit dans la meme requete — mais une memoire qui ne
+        // s'invalide pas est une bombe a retardement pour l'appelant suivant.
+        $this->configurationMemorisee = null;
+
         $chiffre = SecretSupervision::chiffre($pskClair);
         if ($chiffre !== null) {
             $valeurs['tls_psk_value'] = $chiffre;
@@ -224,8 +229,23 @@ class Supervision
      *
      * @return array<string,?object> indexe par plateforme, null si rien d'enregistre
      */
+    /**
+     * MEMORISEE POUR LA DUREE DE LA REQUETE — sous-lot V12.
+     *
+     * La page l'interroge six fois : les chemins, les etapes du deploiement,
+     * l'etat bloque des boutons, la version demandee et deux fois la vue. C'est
+     * exactement le defaut reproche au legacy (E-76 : la bascule de plateforme
+     * joue la MEME requete deux fois) ; le reprocher a l'un et le commettre dans
+     * l'autre n'aurait aucun sens.
+     */
+    private ?array $configurationMemorisee = null;
+
     public function configurationParPlateforme(): array
     {
+        if ($this->configurationMemorisee !== null) {
+            return $this->configurationMemorisee;
+        }
+
         // La ligne la plus recente de CHAQUE plateforme, en une requete.
         $derniers = DB::table('supervision_config')
             ->selectRaw('MAX(id) as id')
@@ -236,7 +256,7 @@ class Supervision
         $configuration = array_fill_keys($this->plateformes(), null);
 
         if ($derniers === []) {
-            return $configuration;
+            return $this->configurationMemorisee = $configuration;
         }
 
         $lignes = DB::table('supervision_config')
@@ -261,7 +281,7 @@ class Supervision
             }
         }
 
-        return $configuration;
+        return $this->configurationMemorisee = $configuration;
     }
 
     /**
