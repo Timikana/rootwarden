@@ -303,3 +303,53 @@ passer l'assertion pour rien.
 
 Le garde anti-rejeu TOTP est **par compte et EN BASE** : il traverse les contextes de navigateur ET les
 executions. Prendre des captures pendant un LOT rend une suite instable. Attendre la fin.
+
+## Lire le bon element, cliquer le bon bouton (sous-lot A2, 2026-08-23)
+
+Trois defauts dans une seule suite, et **les trois etaient des PASS pour une mauvaise
+raison** — la forme la plus couteuse, parce qu'un vert ne se relit pas.
+
+### Ne JAMAIS ancrer la soumission sur « le premier bouton submit »
+
+`legacy/profile.php` porte **CINQ** formulaires, et le premier bouton `submit` de la page
+appartient a celui du **COURRIEL**. Six assertions de refus soumettaient donc le mauvais
+formulaire : elles passaient parce que le message lu (« 0 ») ne ressemblait pas a un succes,
+sans jamais rien mesurer. La regle etait deja ecrite dans `rw-laravel` — la voici ici aussi,
+avec son cout.
+
+**Remonter du CHAMP a son formulaire** :
+
+```js
+const bouton = await page.evaluateHandle(() => {
+    const champ = document.querySelector('input[name="new_password"]');
+    const form = champ ? champ.closest('form') : null;
+    return form ? form.querySelector('button[type="submit"]') : null;
+});
+```
+
+### Un message se lit dans SON porte-messages
+
+`[class*="text-red"]` attrapait un compteur valant « 0 » cote legacy. Puis, cote portage, le
+**bandeau d'exigence** — qui porte la meme classe `.rw-erreur` et vient AVANT dans le DOM. Un
+selecteur par classe attrape le premier venu, pas le bon.
+
+Donner au porte-messages du formulaire son `data-rw`, et le viser en priorite :
+`[data-rw="profil-mdp-message"]`, avec le bloc du legacy en repli.
+
+### Une garde du NAVIGATEUR deplace le refus, elle ne le supprime pas
+
+Le portage pose `minlength` : le navigateur refuse d'emettre la requete, donc **aucun message
+serveur n'apparait**. Une assertion qui exigeait un message faisait echouer une garde agissant
+plus tot. **Mesurer la PROPRIETE** — « pas accepte, etat inchange » — et prouver la
+revalidation SERVEUR par une **requete forgee** depuis la page : `minlength` est une commodite
+qu'un attaquant ne respecte pas. C'est un cas ou les deux cibles refusent **differemment** et
+ou les deux ont raison : ca se declare dans PARITE, ca ne se force pas.
+
+### `DELETE ... JOIN` n'accepte ni `ORDER BY` ni `LIMIT`
+
+MySQL refuse. Et l'exception partait **dans le `finally`** : la suite rendait « 0 PASS /
+0 FAIL » sans dire si la restauration du compte avait abouti — treize suites en dependaient.
+
+Deux regles : **borner un nettoyage par un DELTA** (`id > borneRelevee_a_l_entree`), et
+**isoler chaque etape** du `finally` dans son propre `try`, en transformant l'echec en FAIL
+lisible plutot qu'en exception qui emporte tout.
