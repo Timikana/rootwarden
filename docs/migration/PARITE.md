@@ -3925,3 +3925,73 @@ toujours **aucun écran de ré-enrôlement** pour un compte authentifié. `legac
 propose `/auth/enable_2fa.php` comme action de l'étape « 2FA », mais un compte connecté n'a plus de
 `temp_user` — le lien est mort, et l'étape est simultanément toujours cochée. Le portage devra offrir
 ce chemin.
+
+---
+
+## E-95 — Le changement de mot de passe porté : la politique appliquée, et deux colonnes traitées différemment
+
+Sous-lot **A2**, l'un des **deux blocages de la v2.0**. Mesure : **six comptes actifs sur dix** portent
+`force_password_change = 1`, dont **`superadmin`**. Le portage **détectait** le drapeau
+(`SecondFacteurController` pose `changement_mot_de_passe_requis`) et `/profil` l'annonçait par un
+bandeau — mais **n'offrait aucun formulaire**, et renvoyait vers l'ancien portail. Après une bascule
+directe, ces six comptes n'auraient jamais pu satisfaire l'exigence.
+
+Base rouge : **7 PASS / 1 FAIL** — un seul échec, parce que la suite garde ses vingt autres assertions
+derrière l'existence du formulaire. Après portage : **27 / 0** (legacy **26 / 0**).
+
+**LA POLITIQUE EST CELLE DU LEGACY, À L'IDENTIQUE**, et c'est une obligation, pas un choix de style :
+les deux portails partagent la base, donc une règle plus laxiste d'un côté serait un contournement de
+l'autre. Quinze caractères, quatre classes, les cinq derniers hachés refusés **plus le courant**
+(reprendre son propre mot de passe n'est pas un changement), HIBP en option. Comme le legacy, la
+validation rend **une seule clé** pour les cinq règles de complexité : nommer la règle qui a échoué
+renseigne autant l'attaquant que la personne.
+
+**DEUX COLONNES, DEUX TRAITEMENTS OPPOSÉS — et les deux sont mesurés.**
+
+| colonne | legacy | portage | pourquoi |
+|---|---|---|---|
+| `password_updated_at` | **pas écrite** — il compte sur `ON UPDATE CURRENT_TIMESTAMP` | **écrite explicitement** | la clause se déclenche à **toute** modification réelle de la ligne `users`. Un échec de connexion suivi d'un succès remet `failed_attempts` à 0, la ligne change, et le compteur de jours repart de zéro : la politique d'expiration serait vaincue par une faute de frappe. Elle est désactivée aujourd'hui, donc le défaut est **latent** — mais on ne s'appuie pas sur un effet de bord |
+| `password_expires_at` | calculée et **écrite** | **pas écrite** | **personne ne la lit** : `verify.php:159` calcule l'expiration depuis `password_updated_at`. Mesure : **0 ligne renseignée** dans toute la table. La porter reviendrait à porter une colonne morte |
+
+**LE JOURNAL S'ÉCRIT NU, ET C'EST CORRECT.** `user_logs` porte `prev_hash` et `self_hash`, et
+l'administration offre une « vérification de la chaîne d'audit » — de quoi croire qu'une insertion doit
+calculer la chaîne. Mesure : **3368 lignes, dont 757 sans empreinte**, aucun déclencheur sur la table,
+et la chaîne est posée par un **scellement séparé** (`legacy/adm/api/audit_seal.php`). L'insertion nue de
+`profile.php` est donc la norme, et le portage fait pareil. **Le legacy est dédouané** — en revanche 757
+lignes non scellées laissent un trou dans la vérification, ce qui appartient à `adm/`.
+
+**HIBP EST PORTÉ MAIS INERTE.** Opt-in via `HIBP_ENABLED`, en k-anonymity (seuls les cinq premiers
+caractères de l'empreinte SHA-1 sortent, jamais le mot de passe), et **fail-open assumé** : bloquer un
+changement de mot de passe parce qu'un service tiers est en panne serait pire que le risque couvert.
+Mesure : la variable n'est définie dans **aucun** conteneur, donc **aucune requête ne sort**.
+
+**LE REFUS DU MOT DE PASSE TROP COURT DIVERGE, ET LES DEUX SONT CORRECTS.** Le legacy refuse **côté
+serveur, avec un message**. Le portage pose `minlength` sur ses champs : **le navigateur refuse d'émettre
+la requête**, donc aucun message n'apparaît — et une assertion qui exigeait un message faisait échouer une
+garde qui agit *plus tôt*. La suite mesure donc la **propriété** (« pas accepté, haché inchangé ») et
+prouve la revalidation serveur **par une requête forgée** émise depuis la page : `minlength` est une
+commodité du navigateur, qu'un attaquant ne respecte pas. Mesure : le serveur refuse aussi, haché
+inchangé. Défense en profondeur, vérifiée des deux côtés.
+
+**TROIS DÉFAUTS DE MA SUITE, ET LES TROIS ÉTAIENT DES PASS POUR UNE MAUVAISE RAISON :**
+
+1. **la soumission était ancrée sur « le premier bouton `submit` de la page »**. `profile.php` porte
+   **cinq** formulaires, et le premier appartient à celui du **courriel** : les six refus soumettaient le
+   mauvais formulaire. La skill du projet l'interdit explicitement — on remonte du **champ** à son `form`
+   par `closest('form')`. Vérifié au passage : l'adresse du compte n'a pas bougé ;
+2. **le message se lisait par une classe approchante** (`[class*="text-red"]`), qui attrapait un compteur
+   valant « 0 » sur le legacy — puis, sur le portage, le **bandeau d'exigence**, qui porte la même classe
+   `.rw-erreur` et vient avant dans le DOM. Le portage porte donc un `data-rw` dédié ;
+3. **`DELETE ... JOIN ... ORDER BY ... LIMIT` : MySQL refuse.** L'exception partait **dans le `finally`**
+   et emportait le journal entier — la suite rendait « 0 PASS / 0 FAIL » sans dire si la restauration
+   avait abouti. Le nettoyage borne désormais par identifiant (un **delta**) et **chaque étape est
+   isolée**.
+
+**UN TEXTE DEVENU FAUX, CORRIGÉ.** La tuile « non porté » annonçait « effectuez le changement depuis
+l'ancien portail » alors que le changement venait d'être porté. Elle ne parle plus que des sessions
+ouvertes, et dit explicitement que le mot de passe, lui, se change sur cette page.
+
+**PREMIÈRE FIXTURE QUI CHANGE UN MOT DE PASSE DE COMPTE** : `rw-test-admin`, haché +
+`force_password_change` + borne d'historique sauvegardés, restaurés dans un `finally`, **état relu pour
+être prouvé** — treize suites dépendent de ce compte. Et **la réussite est vérifiée, pas annoncée** : la
+suite se reconnecte avec le **nouveau** mot de passe avant de restaurer.
