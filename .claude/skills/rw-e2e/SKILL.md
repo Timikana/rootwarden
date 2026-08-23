@@ -186,3 +186,50 @@ imprime le code a six chiffres.
 cd tests/e2e
 E2E_TOTP_SECRET='<secret>' node go-<sujet>.mjs
 ```
+
+## Pieges d'attente et de mesure (sous-lot V12, 2026-08-23)
+
+### `pgrep -f` s'attrape lui-meme
+
+`until ! pgrep -f "rejouer-lot.sh --legacy"; do sleep 5; done` ne finit **jamais** :
+le motif apparait dans la ligne de commande du shell qui execute la boucle. Deux
+attentes de plus de 400 s ont ete perdues ainsi, alors que le rejeu etait fini
+depuis dix minutes. Ecrire `pgrep -f "[r]ejouer-lot.sh --legacy"` — la classe de
+caracteres ne se reconnait pas elle-meme.
+
+### Un `&` detache le travail du conteneur de tache
+
+`nohup ... &` lance en arriere-plan **dans** un outil deja en arriere-plan fait
+sortir le wrapper immediatement : la tache se declare « terminee, code 0 » alors
+que le rejeu commence a peine. Utiliser `setsid ... < /dev/null &` puis attendre
+explicitement la disparition du processus, et **ne jamais conclure d'un code de
+sortie** qu'un rejeu est fini — lire le journal.
+
+### Le legacy n'ecrit pas ou l'on croit
+
+`appendDeployLog` cree une fenetre par serveur dans **`#deploy-logs-container`** ;
+`#deploy-logs` reste vide. Une suite qui lit le mauvais conteneur mesure une
+chaine vide et **accuse le legacy de ne rien conclure** alors qu'il conclut
+ailleurs. Lire la fonction d'affichage avant de choisir le selecteur.
+
+### Tester la visibilite du CONTENEUR, pas du descendant
+
+Un `<ul>` sans attribut `hidden` place dans un panneau `hidden` est « non
+cache »... et invisible. Filtrer sur `! u.hidden` faisait passer une assertion
+alors que le bouton etait desactive et que le panneau n'avait jamais paru.
+Mesurer `offsetParent !== null` sur le PANNEAU, et faire de son ouverture une
+assertion a part entiere.
+
+### Une forme de retour CONSTANTE
+
+`page.evaluate` qui rend `{porte: false}` dans un cas et
+`{porte, ouvert, items}` dans l'autre fait lever `items.length` **deux
+assertions plus loin**, la ou l'erreur est illisible. Rendre toujours les memes
+cles, avec des valeurs neutres.
+
+### Compter les requetes plutot que regarder le DOM
+
+« Ouvrir ce panneau n'envoie rien » se mesure au RESEAU :
+`page.on('request', r => { if (/\/deploy(\?|$)/.test(r.url())) n += 1; })`. C'est
+ce qui permet d'ouvrir le panneau sur la ligne d'une machine de PRODUCTION pour
+lire son avertissement **sans jamais la joindre**.

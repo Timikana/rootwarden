@@ -1598,3 +1598,27 @@ Reference consultable sur la branche abandonnee `laravel` (22 vagues, 2 825
 assertions vertes) : `git show laravel:docs/migration/{AUTH,GATEWAY,LAYOUT,DESIGN-SYSTEM,PORTAGE}.md`
 et `git show laravel:laravel/resources/views/components/rw/<nom>.blade.php`
 (7 composants). A consulter, jamais a recopier telle quelle.
+
+## Module `supervision/` — PORTE EN ENTIER (V1 a V12, 2026-08-23)
+
+Douze sous-lots, treize suites. Le dernier — le deploiement — a etabli deux
+regles qui valent pour tout le portage :
+
+**UNE TABLE PAR PLATEFORME, INDEXEE PAR LA MEME CLE.** Les routes, les chemins,
+les etapes annoncees et l'etat bloque des boutons viennent tous d'une table
+serveur indexee par la plateforme. Trois fois le meme defaut a ete evite ou
+corrige de cette facon (E-79 sur le chemin, puis sur la route, puis sur l'etat).
+Des que deux valeurs doivent s'accorder, les faire venir de la MEME table.
+
+**LE PORTAGE PEUT DIRE LA VERITE SANS TOUCHER AU BACKEND.** Le deploiement
+annonce une reussite qu'il n'a pas verifiee et inscrit un agent inexistant dans
+l'inventaire. Aucun correctif backend n'a ete necessaire : l'ecran lit le flux
+ENTIER, en tire un verdict, puis **rejoue une detection** et confronte ce qu'elle
+trouve a ce que l'inventaire vient d'ecrire. Deux porte-messages distincts — « la
+commande a rendu » et « j'ai constate » — parce que les confondre ferait passer
+un succes annonce pour une preuve.
+
+`EN_FLUX` se decide **par route et sur mesure**, pas par module : la
+reconfiguration (1,4 s) reste bufferisee, le deploiement (9,3 s **sur un banc
+sans reseau**, donc un plancher) passe en flux a 900 s. `estUnFlux` etant evaluee
+apres les trois refus, ce reglage ne touche aucune garde.
