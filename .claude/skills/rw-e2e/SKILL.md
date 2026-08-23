@@ -35,8 +35,25 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
 
 ## Regles d'or
 - **Attendre le TOTP** : si `30 - (epoch % 30) < 6`, dormir jusqu'a la fenetre suivante.
-- Preferer `page.evaluate(() => fonctionDeLaPage())` a la simulation de clics fragiles
-  quand on teste la LOGIQUE (les clics restent utiles pour tester le cablage DOM).
+- **CLIQUER LE BOUTON, PAS APPELER LA FONCTION. C'est une CONVENTION du projet**, rappelee
+  par l'exploitant le 2026-08-23. Une suite se pilote par des **clics simules** sur les
+  elements reels (`page.click`, `page.type`), pas par `page.evaluate(() => fonctionDeLaPage())`
+  ni par des requetes HTTP brutes.
+
+  Cette ligne disait l'inverse jusqu'au 2026-08-23 (« preferer `page.evaluate` aux clics
+  fragiles quand on teste la LOGIQUE »), et c'est ce qui a laisse deriver une suite entiere
+  vers `node:https` sans navigateur. **Appeler la fonction ne mesure pas que le bouton
+  l'appelle** : un `onclick` absent, un bouton `disabled`, un ecouteur jamais attache, un
+  formulaire dont l'action a change — rien de tout cela ne se voit.
+
+  Les deux seules exceptions, et elles ont chacune leur raison ecrite :
+  - la **requete FORGEE**, pour exercer ce qu'aucun clic ne peut atteindre (revalidation
+    cote serveur qu'un `<input>` ne peut pas violer, ou geste isole de l'enchainement qui le
+    corrige) — elle s'emet alors **depuis la page**, par `fetch` dans un `page.evaluate`,
+    donc avec la session et les en-tetes reels ;
+  - la **sonde `node:https`** de `archive.mjs`, qui lit un code de statut sur un certificat
+    auto-signe la ou aucune page n'existe plus.
+  Dans les deux cas, le commentaire dit pourquoi le clic ne convenait pas.
 - Pour verifier "sans reload" : poser `window.__marker = 42` avant l'action et
   verifier qu'il survit apres.
 - Operations asynchrones (centre de taches) : poll toutes les 5 s avec garde-fou
@@ -188,6 +205,18 @@ E2E_TOTP_SECRET='<secret>' node go-<sujet>.mjs
 ```
 
 ## Pieges d'attente et de mesure (sous-lot V12, 2026-08-23)
+
+### NE JAMAIS combiner la verification d'un rejeu et son lancement
+
+Troisieme fois que ce piege coute quelque chose (2026-08-23). `pgrep -cf "[r]ejouer-lot"`
+place dans la MEME commande qu'un `setsid ./scripts/rejouer-lot.sh` rend **1** sur une machine
+au repos : la ligne de commande du shell contient le chemin en clair, et la classe de
+caracteres n'y change rien. On croit alors avoir lance un second rejeu concurrent — ou, pire,
+on croit qu'aucun ne tourne alors qu'un tourne.
+
+**Deux appels distincts, toujours.** Et pour compter ce qui vit vraiment :
+`ps -eo pid,etime,cmd | grep "rejouer-lot.sh" | grep -v grep` — un rejeu = **deux** lignes
+(le `timeout` et le `bash`), pas une.
 
 ### `pgrep -f` s'attrape lui-meme
 
