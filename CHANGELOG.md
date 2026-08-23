@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.48** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.49** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,66 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.49 — `auth/` sous-lot A2 : le changement de mot de passe porte
+
+**L'UN DES DEUX BLOCAGES DE LA v2.0 TOMBE.** Mesure : **six comptes actifs sur dix** portent
+`force_password_change = 1`, dont **`superadmin`**. Le portage DETECTAIT le drapeau et l'annoncait
+par un bandeau, mais **n'offrait aucun formulaire** — il renvoyait vers l'ancien portail, qui
+n'existera plus apres la bascule. Details : `docs/migration/PARITE.md` **E-95**.
+
+Base rouge **7 PASS / 1 FAIL** → portage **27 / 0** (legacy **26 / 0**).
+
+**LA POLITIQUE EST CELLE DU LEGACY, A L'IDENTIQUE** — obligation, pas style : les deux portails
+partagent la base, donc une regle plus laxiste d'un cote serait un contournement de l'autre. Quinze
+caracteres, quatre classes, les cinq derniers haches refuses **plus le courant**, HIBP en option, et
+**une seule cle i18n** pour les cinq regles de complexite (nommer la regle qui a echoue renseigne
+autant l'attaquant que la personne).
+
+**DEUX COLONNES, DEUX TRAITEMENTS OPPOSES, tous deux mesures :**
+- **`password_updated_at` est ecrite EXPLICITEMENT.** Le legacy ne l'ecrit pas et compte sur
+  `ON UPDATE CURRENT_TIMESTAMP` — or la clause se declenche a TOUTE modification reelle de la ligne
+  `users` : un echec de connexion suivi d'un succes remet `failed_attempts` a 0, la ligne change, et
+  le compteur de jours d'expiration repart de zero. La politique serait vaincue par une faute de
+  frappe. Elle est desactivee aujourd'hui (`PASSWORD_EXPIRY_DAYS` non definie), donc le defaut est
+  **LATENT** — mais on ne s'appuie pas sur un effet de bord ;
+- **`password_expires_at` n'est PAS ecrite.** Le legacy la calcule et l'enregistre, mais **personne ne
+  la lit** : `verify.php:159` calcule depuis `password_updated_at`. Mesure : **0 ligne renseignee**.
+  La porter reviendrait a porter une colonne morte.
+
+**LE JOURNAL S'ECRIT NU, ET C'EST CORRECT.** `user_logs` porte `prev_hash`/`self_hash` et
+l'administration offre une verification de chaine — de quoi croire qu'il faut la calculer. Mesure :
+**3368 lignes dont 757 sans empreinte**, aucun declencheur, et la chaine est posee par un
+**scellement separe**. Le legacy est **dedouane** ; en revanche 757 lignes non scellees laissent un
+trou dans la verification — affaire d'`adm/`.
+
+**HIBP PORTE MAIS INERTE** : opt-in, k-anonymity (seuls cinq caracteres de l'empreinte SHA-1 sortent,
+jamais le mot de passe), **fail-open assume**. La variable n'est definie dans **aucun** conteneur :
+**aucune requete ne sort**.
+
+**LE REFUS DU MOT DE PASSE TROP COURT DIVERGE, ET LES DEUX SONT CORRECTS.** Le legacy refuse cote
+serveur avec un message ; le portage pose `minlength`, donc **le navigateur refuse d'emettre la
+requete**. Une assertion qui exigeait un message faisait echouer une garde agissant PLUS TOT : la
+suite mesure la **propriete** (pas accepte, hache inchange) et prouve la revalidation SERVEUR **par
+une requete forgee** — `minlength` est une commodite qu'un attaquant ne respecte pas. Defense en
+profondeur verifiee des deux cotes.
+
+**TROIS DEFAUTS DE LA SUITE, TROIS PASS POUR UNE MAUVAISE RAISON :** la soumission etait ancree sur
+« le premier bouton submit » alors que `profile.php` porte CINQ formulaires — le premier etant celui
+du COURRIEL (adresse verifiee intacte apres coup) ; le message se lisait par une classe approchante,
+qui attrapait un compteur valant « 0 » cote legacy puis le BANDEAU d'exigence cote portage ; et
+`DELETE ... JOIN ... ORDER BY ... LIMIT` que **MySQL refuse**, dont l'exception partait dans le
+`finally` et emportait le journal entier.
+
+**UN TEXTE DEVENU FAUX, CORRIGE** : la tuile « non porte » annoncait « effectuez le changement depuis
+l'ancien portail » alors que le changement venait d'etre porte.
+
+**FICHIERS.** `laravel/app/Services/MotDePasse.php` (neuf) · `laravel/config/rootwarden.php` (la
+politique, `env()` n'etant lu que depuis `config/`) · `PortailController::changerMotDePasse()` ·
+`laravel/routes/web.php` · `laravel/resources/views/profil.blade.php` ·
+`laravel/lang/{fr,en}/profil.php` (**21 cles = 21**) · `tests/e2e/go-auth-mot-de-passe.mjs` (neuf,
+pilotee par des CLICS) · `scripts/rejouer-lot.sh` · `docs/migration/PARITE.md` (**E-95**).
+**Backend Python et legacy inchanges.**
 
 ### v1.37.48 — SECURITE : le second facteur n'est plus derivable du premier
 

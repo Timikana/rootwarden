@@ -229,8 +229,27 @@ limitation de débit. **Porter fidèlement serait porter une vulnérabilité.**
 
 ## 8. Ce qui reste à mesurer
 
-1. **`ON UPDATE CURRENT_TIMESTAMP` sur `users.password_updated_at`** — potentiellement une politique
-   d'expiration neutralisée en production. À mesurer avant A2.
+1. ~~**`ON UPDATE CURRENT_TIMESTAMP` sur `users.password_updated_at`**~~ — **MESURÉ le 2026-08-23,
+   sur base réelle. Le défaut est LATENT, pas actif, et l'hypothèse était trop large.**
+
+   | mesure | résultat |
+   |---|---|
+   | la clause est-elle effective ? | **oui** — un `UPDATE` touchant `failed_attempts` a déplacé `password_updated_at` de `17:00:18` à `17:06:53` |
+   | l'expiration se calcule-t-elle dessus ? | **oui** — `verify.php:159` : `(time() - strtotime($pwRow['password_updated_at'])) / 86400` |
+   | un `UPDATE` **sans changement réel** la déplace-t-il ? | **NON** — `failed_attempts = 0, locked_until = NULL` sur une ligne déjà dans cet état laisse la date inchangée. MySQL ne déclenche `ON UPDATE` que si la valeur change |
+   | un **échec suivi d'un succès** la déplace-t-il ? | **OUI** — `failed_attempts` 0→1 puis 1→0 : la date passe de `17:06:53` à `17:08:06` |
+   | la politique est-elle active ? | **NON** — `PASSWORD_EXPIRY_DAYS` est **commentée** dans `srv-docker.env` et `srv-docker.env.example` ; la variable est vide dans le conteneur, donc `$globalExpiryDays = 0`, et **aucun compte n'a d'`override`** |
+
+   **Conséquence.** Rien n'est cassé aujourd'hui : l'expiration est désactivée. Mais le jour où
+   quelqu'un pose `PASSWORD_EXPIRY_DAYS=90`, la politique sera **silencieusement vaincue** pour tout
+   utilisateur qui se trompe une fois avant de réussir — `login.php:155` remet alors
+   `failed_attempts` à 0, la ligne change, et le compteur de jours repart de zéro. Une connexion
+   « propre » ne repousse rien, contrairement à ce que l'hypothèse supposait.
+
+   **Ce que le portage doit faire, et qui est la vraie leçon :** **écrire `password_updated_at`
+   EXPLICITEMENT** lors d'un changement de mot de passe, et ne jamais s'appuyer sur `ON UPDATE`.
+   `profile.php:205` ne l'écrit pas — il compte sur la clause, qui est précisément ce qui rend la
+   date non fiable.
 2. **Le partage de session entre les deux portails** : les clés `_step_up_<action>` ne sont
    probablement pas communes. À confirmer avant A3.
 3. **La proportion de comptes sans `email`** — détermine si A4 est une capacité réelle.

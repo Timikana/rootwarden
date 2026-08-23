@@ -72,4 +72,28 @@ return [
     'fonctionnalites' => [
         'wazuh' => env('FEATURE_WAZUH', true),
     ],
+
+    /*
+     * La politique de mot de passe — sous-lot A2.
+     *
+     * Les MEMES valeurs que `legacy/auth/password_policy.php`, et les memes noms
+     * de variable d'environnement : les deux portails partagent la base, donc ils
+     * doivent partager la politique. Mesure du 2026-08-23 : ni `BCRYPT_COST` ni
+     * `HIBP_ENABLED` ne sont definies dans les conteneurs, donc les defauts
+     * s'appliquent et la verification HIBP est INERTE — aucune requete ne sort.
+     *
+     * `env()` n'est lu QUE depuis `config/` : ailleurs il rend `null` des le
+     * premier `config:cache`.
+     */
+    'mot_de_passe' => [
+        // OWASP 2024 : cout >= 12 sur un processeur moderne (~250 ms par hachage).
+        // Le defaut de PHP est 10 (~60 ms), insuffisant face au forcage sur GPU.
+        'cout' => (int) env('BCRYPT_COST', 12),
+        'longueur_minimale' => 15,
+        // Nombre d'anciens haches conserves ET refuses.
+        'taille_historique' => 5,
+        // Opt-in, en k-anonymity : seuls les cinq premiers caracteres de
+        // l'empreinte SHA-1 quittent le serveur, jamais le mot de passe.
+        'hibp' => filter_var(env('HIBP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    ],
 ];

@@ -53,6 +53,13 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
+    /*
+     * Le changement de mot de passe — sous-lot A2. Pas de garde de role ni de
+     * permission : chacun change SON mot de passe, et l'identifiant du compte
+     * vient de la SESSION, jamais de la requete.
+     */
+    Route::post('/profil/mot-de-passe', [PortailController::class, 'changerMotDePasse'])
+        ->name('profil.mot-de-passe');
 
     /*
      * Pages metier reservees a l'administration.
