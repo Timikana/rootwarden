@@ -1064,3 +1064,56 @@ retirer d'abord le `@threaded_route` d'un des deux etages.
   (referenced-before-assignment).
 - OpenCVE on-prem : pagination cassée (`limit=` ignoré) → kernel/openssl/ssh
   passent par NVD direct ; failsafe = garder la CVE en cas de doute.
+
+## Sous-lot V12 (2026-08-23) — le deploiement
+
+### Un champ qui DECRIT le backend n'est pas un ETAT d'interface
+
+`etapesDuDeploiement()` rend `refuse_sans_config` pour dire « cette route refuse
+sans configuration globale » — un fait sur le BACKEND, vrai en permanence pour
+Zabbix. Utilise tel quel comme condition de `@disabled`, il grisait le bouton
+**pour toujours**, y compris configuration posee. L'etat d'interface est la
+**conjonction** : le backend refuserait ET la condition est reunie.
+
+Meme famille : l'etat bloque doit suivre la PLATEFORME, comme les routes et les
+chemins. Un etat fige sur une plateforme pendant que l'ecran en annonce une
+autre, c'est E-79 deplace du chemin vers l'etat — et c'etait le cas du bouton
+« Reconfigurer » de V10.
+
+### Une traduction peut EXISTER et etre INACCESSIBLE
+
+`confirm_deploy` est ecrite, correcte, en FR et en EN — dans
+`lang/{fr,en}/supervision.php`, donc **hors de l'espace `js.`** que
+`getJsTranslations('js.')` charge. Chercher « la cle existe-t-elle ? » repond
+oui et rate le defaut. Mesurer **dans quel fichier**, et le comparer a l'espace
+que le script charge reellement. Le repli `|| 'texte utile'` reste inerte :
+`__()` rend la cle telle quelle, donc une chaine non vide.
+
+### Le code de sortie derriere un tube n'est pas celui qu'on croit
+
+`apt-get install --dry-run X | tail -5; echo $?` mesure `tail`, qui rend 0. Sans
+le tube, `apt-get` rend **100** pour un paquet hors index. Mesurer le code
+**avant** de rediriger, ou utiliser `PIPESTATUS`.
+
+### Deux niveaux d'alerte, pas un
+
+Sur un panneau de decision, l'ENONCE du geste et l'AVERTISSEMENT de production ne
+peuvent pas porter la meme classe : meme fond, meme bordure, et plus rien ne
+distingue « voici ce qui va se passer » de « ce serveur est en production ».
+L'enonce va en `rw-encart` (neutre), l'avertissement garde `rw-avertissement`.
+
+### Memoriser une lecture repetee — et invalider a l'ecriture
+
+`configurationParPlateforme()` etait interrogee **six fois** par requete (chemins,
+etapes, etat bloque, version demandee, deux fois la vue). Reprocher au legacy de
+jouer la meme requete deux fois (E-76) et le faire trois fois plus n'a aucun sens.
+Memoire pour la duree de la requete, **remise a `null` par toute ecriture** : une
+memoire qui ne s'invalide pas est une bombe a retardement pour l'appelant suivant.
+
+### Une valeur fausse peut etre TRANSITOIRE
+
+Le deploiement inscrit en base un agent qui n'existe pas — puis la detection de
+version qui suit l'efface (`_remove_agent`), sur les DEUX portails. Lire la base
+apres coup ne montre donc rien. Pour mesurer le defaut il faut un geste que rien
+ne suit : **requete forgee** depuis la page, sans l'enchainement du bouton.
+Corollaire : un etat final correct ne prouve pas que le geste etait correct.
