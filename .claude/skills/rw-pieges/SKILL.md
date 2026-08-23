@@ -1147,3 +1147,41 @@ autorise : c'est un changement de droits, pas une consequence du deplacement de 
 morte est **signalee**, pas fermee en silence. Meme raisonnement pour l'ergonomie du legacy (liens sortants
 non marques, 404 brut d'Apache) : soigner ce qu'on demonte est un mauvais investissement — on le mesure, on
 le dit, on laisse l'exploitant trancher.
+
+## `ON UPDATE CURRENT_TIMESTAMP` et les colonnes fantomes (2026-08-23)
+
+### MySQL ne declenche `ON UPDATE` que si la valeur CHANGE
+
+`users.password_updated_at` porte `ON UPDATE CURRENT_TIMESTAMP`, et `verify.php` calcule
+l'expiration du mot de passe dessus. Mesure sur base reelle :
+
+| geste | la date bouge ? |
+|---|---|
+| `UPDATE users SET failed_attempts = 3` (changement reel) | **oui** |
+| `UPDATE users SET failed_attempts = 0, locked_until = NULL` sur une ligne deja dans cet etat | **non** — no-op |
+| `failed_attempts` 0→1 puis 1→0 (un echec suivi d'un succes) | **oui** |
+
+Donc une connexion « propre » ne repousse rien, mais **une faute de frappe suivie de la bonne
+saisie remet le compteur d'expiration a zero**. L'hypothese « toute ecriture repousse la date »
+etait trop LARGE : la resserrer.
+
+La politique etant desactivee (`PASSWORD_EXPIRY_DAYS` commentee, aucun `override`), le defaut
+est **LATENT** — a dire ainsi. **Consequence pour tout portage : ecrire la colonne
+EXPLICITEMENT**, jamais s'appuyer sur la clause.
+
+### Une colonne peut etre ECRITE et lue par PERSONNE
+
+`users.password_expires_at` est calculee et enregistree par `profile.php`, et **0 ligne** est
+renseignee dans toute la table — parce que `verify.php` calcule depuis `password_updated_at`.
+Porter cette ecriture reviendrait a porter une colonne morte. **Avant de porter une ecriture,
+chercher son LECTEUR.**
+
+### Un journal chaine peut s'ecrire NU
+
+`user_logs` porte `prev_hash` et `self_hash`, et l'administration offre une « verification de
+la chaine d'audit » : de quoi croire qu'une insertion doit calculer la chaine. Mesure : **3368
+lignes dont 757 sans empreinte**, **aucun declencheur** sur la table, et la chaine est posee
+par un **scellement separe** (`legacy/adm/api/audit_seal.php`). L'insertion nue est la norme —
+calculer la chaine seul, a l'insertion, la casserait.
+
+Corollaire signale : 757 lignes non scellees laissent un trou dans la verification.
