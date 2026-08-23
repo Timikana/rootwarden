@@ -386,6 +386,245 @@
         });
     }
 
+    /* ── La desinstallation ──────────────────────────────────── sous-lot V11
+     *
+     * LE SOUS-LOT QUI DETRUIT, et le seul ou le portage VERIFIE APRES COUP.
+     *
+     * Le backend ne peut plus mentir depuis v1.37.44 : la commande ne purge que
+     * ce que `dpkg-query` trouve installe, son code de sortie remonte, et
+     * l'inventaire n'est vide que si ce code vaut 0. Mais il ne peut pas TOUT
+     * garantir, et surtout « il n'y avait rien a purger » n'est pas
+     * « desinstalle » — le flux emet `RIEN_A_PURGER` dans ce cas, et c'est une
+     * issue a part entiere.
+     *
+     * Le portage rejoue donc la detection de version (V6) une fois le geste fini,
+     * et DIT ce qu'elle trouve. Une reussite MESUREE vaut mieux qu'une reussite
+     * annoncee — c'est la valeur propre de ce portage, le legacy se contentant du
+     * marqueur.
+     */
+    var panneauDesinst = document.querySelector('[data-rw="superv-panneau-desinst"]');
+    var messageDesinst = document.querySelector('[data-rw="superv-desinst-message"]');
+    var verifDesinst = document.querySelector('[data-rw="superv-desinst-verif"]');
+    var annulerDesinst = document.querySelector('[data-rw="superv-desinst-annuler"]');
+    var confirmerDesinst = document.querySelector('[data-rw="superv-desinst-confirmer"]');
+    var coutDesinst = document.querySelector('[data-rw="superv-desinst-cout"]');
+    var journalDesinst = document.querySelector('[data-rw="superv-desinst-journal"]');
+
+    /**
+     * Les CINQ issues d'un flux de desinstallation, tirees de son CONTENU.
+     *
+     * `rien` est celle que ni le legacy ni le marqueur ne distinguent : la
+     * commande a reussi parce qu'il n'y avait rien a faire.
+     */
+    function verdictDesinstallation(texte) {
+        var lignes = texte.split('\n');
+        var echec = lignes.some(function (l) { return l.indexOf('ERROR_MACHINE::') === 0; });
+        var succes = lignes.some(function (l) { return l.indexOf('SUCCESS_MACHINE::') === 0; });
+        var rien = lignes.some(function (l) { return l.indexOf('RIEN_A_PURGER') !== -1; });
+        var purges = '';
+        lignes.forEach(function (l) {
+            var m = l.match(/PAQUETS_A_PURGER:\s*(.+)$/);
+            if (m) { purges = m[1].trim(); }
+        });
+        var codes = [];
+        lignes.forEach(function (l) {
+            // `(code N)` est la partie PROTOCOLE, pas la phrase francaise.
+            var m = l.match(/\(code (\d+)\)/);
+            if (m) { codes.push(Number(m[1])); }
+        });
+        var enEchec = codes.filter(function (c) { return c !== 0; });
+
+        if (echec || enEchec.length > 0) {
+            return { issue: 'echec', codes: enEchec, purges: purges };
+        }
+        if (! succes) { return { issue: 'inacheve', codes: enEchec, purges: purges }; }
+        if (rien) { return { issue: 'rien', codes: enEchec, purges: purges }; }
+
+        return { issue: 'purge', codes: enEchec, purges: purges };
+    }
+
+    function fermeDesinst() {
+        if (! panneauDesinst) { return; }
+        panneauDesinst.hidden = true;
+        panneauDesinst.removeAttribute('data-cible');
+        panneauDesinst.removeAttribute('data-nom');
+    }
+
+    /**
+     * VERIFIE APRES COUP, en rejouant la detection de version.
+     *
+     * Elle ne remplace pas le verdict de la commande : elle le CONFRONTE. Les
+     * deux vivent dans deux porte-messages distincts, parce que « la commande a
+     * rendu un succes » et « plus aucun agent n'est detecte » ne sont pas la
+     * meme affirmation.
+     */
+    function verifieApresCoup(machine, nom) {
+        if (! verifDesinst) { return Promise.resolve(); }
+        var route = routeCourante('version');
+        if (! route) {
+            verifDesinst.className = 'rw-annonce rw-annonce--attention';
+            verifDesinst.textContent = libelles.desinst_verif_impossible;
+
+            return Promise.resolve();
+        }
+        verifDesinst.className = 'rw-annonce';
+        verifDesinst.textContent = libelles.desinst_verif_en_cours;
+
+        var jeton = document.querySelector('meta[name="csrf-token"]');
+
+        return fetch(route, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': jeton ? jeton.content : '',
+            },
+            body: JSON.stringify({ machine_id: Number(machine) }),
+        }).then(function (reponse) {
+            if (! reponse.ok) { return null; }
+
+            return reponse.json();
+        }).then(function (donnees) {
+            if (! donnees || donnees.success !== true) {
+                // NE PAS SAVOIR N'EST PAS CONSTATER. On le dit plutot que de
+                // laisser le verdict de la commande passer pour une preuve.
+                verifDesinst.className = 'rw-annonce rw-annonce--attention';
+                verifDesinst.textContent = libelles.desinst_verif_impossible;
+
+                return;
+            }
+            if (donnees.version) {
+                verifDesinst.className = 'rw-annonce rw-annonce--echec';
+                verifDesinst.textContent = libelles.desinst_verif_present
+                    .replace('{version}', String(donnees.version));
+
+                return;
+            }
+            verifDesinst.className = 'rw-annonce rw-annonce--ok';
+            verifDesinst.textContent = libelles.desinst_verif_absent;
+        }).catch(function () {
+            verifDesinst.className = 'rw-annonce rw-annonce--attention';
+            verifDesinst.textContent = libelles.desinst_verif_impossible;
+        });
+    }
+
+    if (panneauDesinst && messageDesinst && annulerDesinst && confirmerDesinst && coutDesinst) {
+        [].slice.call(document.querySelectorAll('[data-rw="superv-desinstaller"]'))
+            .forEach(function (bouton) {
+                bouton.addEventListener('click', function () {
+                    // OUVRIR N'ENVOIE RIEN.
+                    panneauDesinst.setAttribute('data-cible', bouton.dataset.machine || '');
+                    panneauDesinst.setAttribute('data-nom', bouton.dataset.nom || '');
+                    coutDesinst.textContent = libelles.desinst_cout
+                        .replace('{nom}', bouton.dataset.nom || '')
+                        .replace('{chemin}', cheminCourant());
+                    /*
+                     * NOMMER LA PRODUCTION. Un exploitant a le droit de
+                     * desinstaller un agent d'un serveur de production — ce n'est
+                     * pas au portail de le lui interdire. Mais le lui DIRE au
+                     * moment ou il decide, oui : c'est le geste qui detruit, et
+                     * « Test-Server-Debian » et « srv-zabbix » se lisent
+                     * exactement pareil dans une phrase.
+                     */
+                    var prod = document.querySelector('[data-rw="superv-desinst-prod"]');
+                    if (prod) {
+                        var env = bouton.dataset.environnement || '';
+                        prod.hidden = env !== 'PROD';
+                        prod.textContent = env === 'PROD'
+                            ? libelles.desinst_production.replace('{nom}', bouton.dataset.nom || '')
+                            : '';
+                    }
+                    panneauDesinst.hidden = false;
+                    messageDesinst.className = 'rw-annonce';
+                    messageDesinst.textContent = '';
+                    if (verifDesinst) { verifDesinst.className = 'rw-annonce'; verifDesinst.textContent = ''; }
+                    if (journalDesinst) { journalDesinst.hidden = true; journalDesinst.textContent = ''; }
+                    annulerDesinst.focus();
+                });
+            });
+
+        annulerDesinst.addEventListener('click', function () { fermeDesinst(); });
+
+        confirmerDesinst.addEventListener('click', function () {
+            var machine = panneauDesinst.getAttribute('data-cible') || '';
+            var nom = panneauDesinst.getAttribute('data-nom') || '';
+            if (machine === '') { return; }
+            confirmerDesinst.disabled = true;
+            annulerDesinst.disabled = true;
+            messageDesinst.className = 'rw-annonce';
+            messageDesinst.textContent = libelles.desinst_en_cours.replace('{nom}', nom);
+
+            var route = routeCourante('desinstallation');
+            if (! route) {
+                messageDesinst.className = 'rw-annonce rw-annonce--echec';
+                messageDesinst.textContent = libelles.desinst_echec;
+                confirmerDesinst.disabled = false;
+                annulerDesinst.disabled = false;
+                fermeDesinst();
+
+                return;
+            }
+
+            var jeton = document.querySelector('meta[name="csrf-token"]');
+            fetch(route, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': jeton ? jeton.content : '',
+                },
+                // `machine_id` au SINGULIER : la route de desinstallation est
+                // deja par machine cote backend, contrairement a la reconfiguration.
+                body: JSON.stringify({ machine_id: Number(machine) }),
+            }).then(function (reponse) {
+                if (! reponse.ok) {
+                    messageDesinst.className = 'rw-annonce rw-annonce--echec';
+                    messageDesinst.textContent = libelles.desinst_refus
+                        .replace('{statut}', String(reponse.status));
+
+                    return null;
+                }
+
+                return reponse.text();
+            }).then(function (texte) {
+                if (texte === null || texte === undefined) { return null; }
+                if (journalDesinst) {
+                    journalDesinst.textContent = texte;
+                    journalDesinst.hidden = false;
+                }
+                var verdict = verdictDesinstallation(texte);
+
+                if (verdict.issue === 'purge') {
+                    messageDesinst.className = 'rw-annonce rw-annonce--ok';
+                    messageDesinst.textContent = libelles.desinst_purge
+                        .replace('{nom}', nom)
+                        .replace('{paquets}', verdict.purges || '?');
+                } else if (verdict.issue === 'rien') {
+                    // « Il n'y avait rien a purger » n'est pas « desinstalle ».
+                    messageDesinst.className = 'rw-annonce rw-annonce--attention';
+                    messageDesinst.textContent = libelles.desinst_rien.replace('{nom}', nom);
+                } else if (verdict.issue === 'echec') {
+                    messageDesinst.className = 'rw-annonce rw-annonce--echec';
+                    messageDesinst.textContent = libelles.desinst_echouee
+                        .replace('{nom}', nom)
+                        .replace('{codes}', verdict.codes.join(', ') || '?');
+                } else {
+                    messageDesinst.className = 'rw-annonce rw-annonce--echec';
+                    messageDesinst.textContent = libelles.desinst_inachevee.replace('{nom}', nom);
+                }
+
+                // ON VERIFIE MEME APRES UN ECHEC : savoir ce qui reste sur la
+                // machine compte davantage encore quand la commande a rate.
+                return verifieApresCoup(machine, nom);
+            }).catch(function () {
+                messageDesinst.className = 'rw-annonce rw-annonce--echec';
+                messageDesinst.textContent = libelles.desinst_echec;
+            }).finally(function () {
+                fermeDesinst();
+                confirmerDesinst.disabled = false;
+                annulerDesinst.disabled = false;
+            });
+        });
+    }
+
     /* ── La reconfiguration ──────────────────────────────────── sous-lot V10
      *
      * LE VERDICT VIENT DE CE QUE LE FLUX A MONTRE, PAS DE SON DERNIER MARQUEUR.

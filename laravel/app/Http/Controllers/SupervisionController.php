@@ -551,8 +551,9 @@ class SupervisionController extends Controller
     /**
      * Les routes de la passerelle, PAR PLATEFORME — correctif de V7, porte en V9.
      *
-     * Cinq gestes par plateforme : lire le fichier, lister les sauvegardes,
-     * ecrire, restaurer, reconfigurer. Le backend expose une route statique pour Zabbix et une
+     * Sept gestes par plateforme : lire le fichier, lister les sauvegardes,
+     * ecrire, restaurer, reconfigurer, desinstaller, et RELIRE LA VERSION —
+     * cette derniere sert a VERIFIER une desinstallation apres coup (V11). Le backend expose une route statique pour Zabbix et une
      * route generique pour les trois autres ; les deux formes rendent le meme
      * verdict, mais il faut viser la bonne — une URL figee sur Zabbix lit le
      * fichier de Zabbix quelle que soit la plateforme affichee.
@@ -570,6 +571,8 @@ class SupervisionController extends Controller
                 'ecriture' => url("/api/gateway/supervision/{$plateforme}/config/save"),
                 'restauration' => url("/api/gateway/supervision/{$plateforme}/restore"),
                 'reconfiguration' => url("/api/gateway/supervision/{$plateforme}/reconfigure"),
+                'desinstallation' => url("/api/gateway/supervision/{$plateforme}/uninstall"),
+                'version' => url("/api/gateway/supervision/{$plateforme}/version"),
             ];
         }
 
@@ -684,6 +687,26 @@ class SupervisionController extends Controller
             'reconf_avertissements' => __('superv.reconf_avertissements', ['nombre' => '{nombre}']),
             'reconf_refus' => __('superv.reconf_refus', ['statut' => '{statut}']),
             'reconf_echec' => __('superv.reconf_echec'),
+            // ── Sous-lot V11 : la desinstallation ──────────────────────────
+            'desinst_cout' => __('superv.desinst_cout', ['nom' => '{nom}', 'chemin' => '{chemin}']),
+            'desinst_production' => __('superv.desinst_production', ['nom' => '{nom}']),
+            'desinst_en_cours' => __('superv.desinst_en_cours', ['nom' => '{nom}']),
+            /*
+             * CINQ ISSUES. Le backend ne peut plus mentir depuis v1.37.44, mais
+             * il ne peut pas non plus tout garantir : « rien a purger » n'est pas
+             * « desinstalle », et un succes annonce n'est pas un succes VERIFIE.
+             * Le portage rejoue donc la detection de version APRES le geste.
+             */
+            'desinst_purge' => __('superv.desinst_purge', ['nom' => '{nom}', 'paquets' => '{paquets}']),
+            'desinst_rien' => __('superv.desinst_rien', ['nom' => '{nom}']),
+            'desinst_echouee' => __('superv.desinst_echouee', ['nom' => '{nom}', 'codes' => '{codes}']),
+            'desinst_inachevee' => __('superv.desinst_inachevee', ['nom' => '{nom}']),
+            'desinst_refus' => __('superv.desinst_refus', ['statut' => '{statut}']),
+            'desinst_echec' => __('superv.desinst_echec'),
+            'desinst_verif_en_cours' => __('superv.desinst_verif_en_cours'),
+            'desinst_verif_absent' => __('superv.desinst_verif_absent'),
+            'desinst_verif_present' => __('superv.desinst_verif_present', ['version' => '{version}']),
+            'desinst_verif_impossible' => __('superv.desinst_verif_impossible'),
         ];
     }
 }
