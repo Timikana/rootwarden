@@ -706,10 +706,17 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
                     break
             code = stdout.channel.recv_exit_status()
             yield f"\nExécution terminée (code {code}).\n"
+
+            # LE CODE DE SORTIE EST RENDU A L'APPELANT, pas seulement affiche.
+            # Ajout ADDITIF : `yield from` sans affectation l'ignore, donc aucun
+            # appelant existant ne change. Il permet aux routes de flux de
+            # decider (desinstallation : ne vider l'inventaire QUE si la commande
+            # a reussi) au lieu d'annoncer un succes inconditionnel.
+            return code
         except Exception as e:
             _log.error("execute_as_root_stream service_account '%s': %s", command[:60], e)
             yield f"ERROR: {e}\n"
-        return
+        return None
 
     # Detecte si sudo est utilisable : envoyer le mot de passe via sudo -S
     # et verifier si stderr contient un message d'erreur connu (sudoers, etc.)
@@ -791,6 +798,9 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
                 client.exec_command(f"rm -f {_tmp}", timeout=5)
             except Exception:
                 pass
+
+        # Voir le commentaire du bloc service_account : le code est RENDU.
+        return code
 
     except Exception as e:
         _log.error("execute_as_root_stream '%s': %s", command[:60], e)

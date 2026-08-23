@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.43** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.44** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,79 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.44 — securite : la desinstallation ne peut plus annoncer un succes qu'elle n'a pas verifie
+
+Deux correctifs sur le chemin DESTRUCTEUR, autorises ensemble avant V11 et V12.
+
+**(1) LE CODE DE SORTIE DE LA DESINSTALLATION ETAIT FABRIQUE.** Les quatre etapes finissaient CHACUNE par
+`|| true` et jetaient leur stderr : la chaine ne pouvait pas sortir autrement qu'en 0. Puis
+`SUCCESS_MACHINE::` etait emis et `_remove_agent` appele INCONDITIONNELLEMENT. Mesure du 2026-08-23 :
+
+    Exécution terminée (code 0).
+    SUCCESS_MACHINE::2::Agent Zabbix desinstalle de Test-Server-Debian.
+    inventaire : 1 ligne avant -> 0 apres
+
+…sur une machine ou l'agent n'avait **jamais** ete installe. Si la purge avait echoue, l'exploitant aurait
+vu le meme succes vert et le meme inventaire vide, l'agent continuant de tourner. Voir PARITE.md E-88.
+
+**POURQUOI UNE GARDE `dpkg-query` PLUTOT QU'UN SIMPLE RETRAIT DU `|| true`.** Mesure :
+`apt-get purge -y zabbix-agent` rend **100** quand le paquet n'est pas dans l'index du DEPOT — pas
+seulement quand il n'est pas installe. Retirer le `|| true` sans plus aurait fait echouer la
+desinstallation sur toute machine ou le depot Zabbix n'est pas configure, c'est-a-dire le cas general. La
+commande demande donc d'abord a `dpkg-query` ce qui est REELLEMENT installe :
+
+    rien d'installe       -> `RIEN_A_PURGER`, code 0 HONNETE (l'agent n'est pas la)
+    paquets installes     -> la purge tourne, et son VRAI code remonte
+
+`systemctl stop` garde son `|| true` : un service deja arrete, ou un systeme sans systemd, n'est pas un
+echec de la desinstallation. La purge, elle, EST l'operation.
+
+**L'INVENTAIRE SUIT DESORMAIS CE QU'ON A PU CONSTATER** (`_conclut_desinstallation`) : code 0 -> la ligne
+est retiree (purge reussie OU rien a purger : dans les deux cas il n'y a plus d'agent) ; code non nul ou
+inconnu -> `ERROR_MACHINE::` et l'inventaire n'est PAS touche. Un inventaire qui oublie un agent encore
+installe est pire qu'un inventaire qui n'a pas su.
+
+**`apt-get autoremove -y` RETIRE DES QUATRE COMMANDES.** Il retire tout paquet que le systeme juge devenu
+inutile — pas seulement les dependances de l'agent. Une desinstallation d'agent n'a pas a decider cela
+pour l'administrateur ; `apt-get purge` suffit a retirer l'agent ET sa configuration. Mesure sans le
+payer : `apt-get autoremove --dry-run` rend « 0 to remove » sur le banc d'essai — ce qui exonere le BANC,
+pas la commande.
+
+**La commande etait DUPLIQUEE** : `zabbix_uninstall` en portait une copie en ligne, a cote de celle du
+registre. Deux exemplaires a corriger, et le second aurait ete oublie. Une seule source desormais.
+
+**(2) LE ROLLBACK ETAIT DESARME AU MOMENT OU IL SERVAIT.** `_backup_agent_config` faisait
+`test -f X && cp X Y || echo 'NO_FILE'`. En shell, `||` se declenche si A OU B a echoue : un `cp` en echec
+empruntait donc la branche « pas de fichier ». Mesure des trois cas :
+
+    fichier absent              -> [NO_FILE]  rc=0     (voulu)
+    fichier present, cp reussi  -> []         rc=0
+    fichier present, cp ECHOUE  -> [NO_FILE]  rc=0     <- INDISCERNABLE du premier
+
+La fonction rendait `None`, et les appelants qui gardent leur repli par `if backup_path:` le desarmaient
+donc precisement quand il servait — le `>` de l'ecriture tronque le fichier avant d'ecrire, laissant une
+configuration tronquee et rien pour la retablir. SIX routes en dependent, dont le deploiement (V12). La
+forme corrigee teste l'existence D'ABORD, et le `cp` n'est tente que dans la branche ou le fichier
+existe : son echec LEVE. Voir PARITE.md E-83.
+
+**`execute_as_root_stream` REND SON CODE DE SORTIE.** Ajout purement ADDITIF : `yield from` sans
+affectation l'ignore, donc aucun appelant existant ne change. Il permet aux routes de flux de DECIDER au
+lieu d'annoncer.
+
+**Verification apres correctif**, meme appel qu'avant :
+
+    START_MACHINE::2::Desinstallation agent Zabbix sur Test-Server-Debian.
+    RIEN_A_PURGER
+    Exécution terminée (code 0).
+    SUCCESS_MACHINE::2::zabbix desinstalle de Test-Server-Debian.
+
+Le flux DIT maintenant qu'il n'y avait rien a purger, et l'inventaire n'est vide que parce que le code
+est 0 — ce qui est vrai.
+
+**Tests.** 12 tests neufs (`test_supervision_uninstall.py`), **341 pytest** au total. Verification ciblee
+des deux suites qui exercent la sauvegarde (`supervision-ecriture` 38, `supervision-reconf` 27) :
+conformes. Le LOT complet accompagne le portage de V11, au commit suivant.
 
 ### v1.37.43 — module `supervision/`, sous-lot V10 : la reconfiguration, et un verdict qui ne recopie pas le marqueur
 
