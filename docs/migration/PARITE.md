@@ -3453,3 +3453,78 @@ de lignes et la ligne retenue.
 **sans rien avoir écrit** quand la configuration globale manque, et un échec de déchiffrement du PSK n'est
 que journalisé — la clé n'est pas écrite, rien ne le dit, et le `.conf` continue de référencer
 `TLSPSKFile` (E-85).
+
+## E-88 — La désinstallation ne peut pas échouer, et l'inventaire oublie de toute façon
+
+**Module `supervision/`, sous-lot V11 : la désinstallation d'un agent (flux `text/plain`, DÉTRUIT).**
+Mesures sur **Test-Server-Debian (id 2, DEV)** ; `srv-zabbix` jamais visée. Fixture — une ligne
+`supervision_agents` — retirée, état **relu pour être prouvé** (0 ligne, `/etc/zabbix/` vide).
+
+**LE DÉFAUT CENTRAL : LE CODE DE SORTIE EST FABRIQUÉ.** La commande de désinstallation enchaîne
+**quatre** étapes, et **chacune se termine par `|| true`** :
+
+```
+export DEBIAN_FRONTEND=noninteractive &&
+systemctl stop zabbix-agent2 2>/dev/null || true &&
+systemctl stop zabbix-agent  2>/dev/null || true &&
+apt-get purge -y zabbix-agent zabbix-agent2 zabbix-agent2-plugin-* 2>/dev/null || true &&
+apt-get autoremove -y 2>/dev/null || true
+```
+
+La chaîne **ne peut pas sortir autrement qu'en 0**. Un verrou apt, un dpkg cassé, un dépôt injoignable :
+tout est avalé, et `2>/dev/null` jette même le message. Puis `SUCCESS_MACHINE::` est émis
+inconditionnellement. **En V10 la vérité était dans le flux, deux lignes au-dessus du marqueur ; ici elle
+n'est nulle part** — `|| true` l'efface avant qu'elle puisse être rapportée.
+
+**MESURÉ, sur une machine où l'agent n'a JAMAIS été installé** (`command -v zabbix_agent2` → non) :
+
+```
+START_MACHINE::2::Desinstallation agent Zabbix sur Test-Server-Debian.
+…
+Exécution terminée (code 0).
+SUCCESS_MACHINE::2::Agent Zabbix desinstalle de Test-Server-Debian.
+```
+
+Le portail annonce avoir désinstallé quelque chose qui n'était pas là.
+
+**ET L'INVENTAIRE OUBLIE, QUOI QU'IL ARRIVE.** `_remove_agent(machine_id, platform)` s'exécute
+**inconditionnellement**, hors de toute vérification. Mesuré avec une ligne d'inventaire en fixture :
+
+```
+inventaire avant : 1 ligne(s)   (« zabbix 7.0-fixture-v11 »)
+inventaire apres : 0 ligne(s)
+```
+
+Rien n'a été retiré de la machine, et le portail a néanmoins effacé la trace de l'agent. **Si la purge
+avait échoué, l'exploitant verrait le même succès vert et le même inventaire vide, pendant que l'agent
+continuerait de tourner et de remonter des mesures.**
+
+**`apt-get autoremove -y` : UN PÉRIMÈTRE QUI DÉPASSE L'AGENT.** La commande retire *tout* paquet que le
+système considère comme devenu inutile — pas seulement les dépendances de Zabbix. Sur une machine où un
+outil a été installé à la main et dont les dépendances ont été marquées « automatiques », elle emporte
+autre chose. Les **quatre** plateformes portent la même ligne.
+
+Mesuré **sans le payer**, par simulation sur la machine de test :
+
+```
+apt-get autoremove --dry-run  ->  0 upgraded, 0 newly installed, 0 to remove
+```
+
+**C'est le banc d'essai qui est exonéré, pas la commande.** Zéro paquet ici ne dit rien de ce qu'une
+machine de production perdrait — et la suite de caractérisation peut donc s'exécuter sans risque, ce qui
+est exactement ce qu'il fallait établir avant de la faire cliquer.
+
+**QUATRE PLATEFORMES, LE MÊME DESSIN.** `generic_uninstall` a la même forme que la route Zabbix :
+`_remove_agent` inconditionnel, `SUCCESS_MACHINE::` inconditionnel, et un `uninstall_cmd` en `|| true`
+avec `autoremove`. Aucune des quatre ne peut rapporter un échec.
+
+**DEUX EXONÉRATIONS.** Les quatre gardes sont en place (`@require_api_key`, `@require_role(2)`,
+`@require_permission('can_manage_supervision')`, `@require_machine_access`). Et le paramètre est
+`machine_id` au **singulier** : contrairement à la reconfiguration, la désinstallation est déjà par
+machine côté backend — le legacy n'offre d'ailleurs qu'un bouton par ligne, avec un `confirm()` natif.
+
+**CE QUE LE PORTAGE PEUT FAIRE SANS TOUCHER AU BACKEND.** Puisque la route ne peut pas rapporter un échec,
+lui faire confiance serait recopier un succès invérifiable. Le portage **vérifie après coup** : il rejoue
+la détection de version (V6, déjà portée) et dit ce qu'elle trouve — « désinstallé, et plus aucun agent
+n'est détecté » ou « la commande a rendu un succès, mais un agent est TOUJOURS détecté ». Une réussite
+mesurée vaut mieux qu'une réussite annoncée, et cela n'exige ni route neuve ni modification du backend.
