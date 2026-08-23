@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.47** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.48** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,70 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.48 — SECURITE : le second facteur n'est plus derivable du premier
+
+**VULNERABILITE PRESENTE EN PRODUCTION.** Trouvee en inventoriant `auth/` pour le porter,
+documentee le 2026-08-20 dans `docs/migration/MODULE-AUTH.md`, **reproduite et corrigee le
+2026-08-23**. Details : `docs/migration/PARITE.md` **E-94**.
+
+**SYMPTOME.** `legacy/auth/enable_2fa.php` ne gardait que `isset($_SESSION['temp_user'])` —
+l'etat pose par `login.php` APRES le mot de passe et AVANT le second facteur. Avec le mot de
+passe seul, aucun code jamais fourni :
+
+    POST /auth/login.php        -> 302 vers verify_2fa.php     [2FA EN ATTENTE]
+    GET  /auth/enable_2fa.php   -> 200, 17 547 octets
+                                   contient le secret TOTP du compte EN CLAIR + son QR
+
+**CAUSE.** `login.php` renvoie vers `verify_2fa.php` quand un secret existe, mais c'est une
+REDIRECTION, pas une garde : rien n'empechait d'appeler la page directement, et `verify.php`
+l'autorise explicitement pendant que la 2FA est en attente.
+
+**PORTEE.** `sha256(legacy/auth/enable_2fa.php)` etait egal a
+`sha256(origin/main:www/auth/enable_2fa.php)` (`be0bfda6...`), et `main` tourne en production.
+Quiconque detenait un mot de passe pouvait lire le secret TOTP du compte et generer ses codes
+indefiniment.
+
+**QUATRE CORRECTIFS**, sur cette branche (l'exploitant a demande que tout s'y fasse) :
+- **un compte deja enrole est renvoye** vers `verify_2fa.php` : ca ferme la divulgation sans
+  retirer aucune capacite — il n'existe de toute facon AUCUN ecran de re-enrolement pour un
+  compte authentifie ;
+- **un GET n'ecrit plus rien** : le secret vit en SESSION jusqu'a la validation du premier
+  code. Il etait ecrit des l'affichage, sans jeton CSRF, avant toute preuve — une visite
+  abandonnee laissait un secret enrole que personne ne detenait ;
+- **la limitation de debit des deux autres portes 2FA est appliquee** : 5 tentatives par
+  session sur 60 s ET 10 par IP sur 10 min (`login_attempts`, etape `'2fa'`). Elle manquait
+  ici seule, la ou `verify_2fa.php` et `confirm_2fa.php` l'avaient ;
+- **l'anti-rejeu devient effectif** : l'empreinte n'etait posee que dans la branche de succes
+  puis supprimee dans la meme requete (motif E-01) ; elle est posee a CHAQUE tentative.
+
+**LE CAS NORMAL EST MESURE AUSSI.** Un correctif evident peut casser le cas normal : refuser la
+page a un compte deja enrole ne doit rien retirer a un compte sans second facteur.
+`tests/e2e/go-auth-enrolement.mjs` (**18 PASS / 0 FAIL**, reference legacy inscrite) deroule
+l'enrolement complet — page servie a 200 avec son QR, RIEN ecrit par l'affichage, secret STABLE
+entre deux affichages, un code valide acheve l'operation, secret ecrit CHIFFRE. La suite ne
+figure pas dans les suites du portage : il n'y a pas encore d'enrolement a y mesurer. La suite est
+**pilotee par des clics Puppeteer** (`page.type` + `page.click`), convention du projet : un
+premier jet passait par `node:https` sans navigateur et mesurait des statuts, pas l'ecran. La
+regle INVERSE figurait dans la skill `rw-e2e` (« preferer `page.evaluate` aux clics fragiles »)
+jusqu'au 2026-08-23 — corrigee dans le meme mouvement.
+
+**PREMIERE FIXTURE QUI MUTE UN SECRET DE COMPTE** : `rw-test-admin`, valeur sauvegardee,
+effacee, restauree dans un `finally`, etat RELU pour etre prouve — treize suites dependent de
+ce compte.
+
+**UN DETAIL QUI A FAILLI DISCULPER A TORT** : l'attribut `value` du jeton CSRF est sur la LIGNE
+SUIVANTE du HTML. Un `grep` par ligne ne le trouve pas, le POST rend 403, et un premier essai
+concluait que la vulnerabilite n'existait pas.
+
+**RESTE OUVERT** : aucun ecran de RE-enrolement pour un compte authentifie.
+`legacy/includes/onboarding.php` propose `/auth/enable_2fa.php` comme action de l'etape « 2FA »,
+mais un compte connecte n'a plus de `temp_user` — le lien est mort et l'etape est toujours
+cochee. Le portage devra offrir ce chemin.
+
+**FICHIERS.** `legacy/auth/enable_2fa.php` · `tests/e2e/go-auth-enrolement.mjs` (neuf) ·
+`scripts/rejouer-lot.sh` · `docs/migration/PARITE.md` (**E-94**) · `legacy/version.txt`.
+Backend Python et portage Laravel **inchanges**.
 
 ### v1.37.47 — `supervision/` ARCHIVE : le deuxieme module deprecie, et une aide d'archivage qui mentait
 

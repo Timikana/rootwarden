@@ -3862,3 +3862,66 @@ qu'on demonte est un mauvais investissement. **Les deux sont signales, l'arbitra
 l'exploitant** — s'il veut que ce soit marque tant que les deux portails coexistent, c'est une ligne dans
 `$sideLink` et un `ErrorDocument`.
 
+
+---
+
+## E-94 — Le second facteur était dérivable du premier, en production. Corrigé.
+
+**Mesuré le 2026-08-20, reproduit et corrigé le 2026-08-23.** Ce n'est pas un écart de parité :
+c'est une vulnérabilité du legacy, présente dans ce qui tourne en production, trouvée en
+inventoriant `auth/` pour le porter.
+
+`legacy/auth/enable_2fa.php` ne gardait que `isset($_SESSION['temp_user'])` — l'état posé par
+`login.php` **après le mot de passe et avant le second facteur**. `login.php` renvoie certes vers
+`verify_2fa.php` quand un secret existe, mais c'est une **redirection**, pas une garde ; rien
+n'empêchait d'appeler la page directement, et `verify.php` l'autorise explicitement pendant que la
+2FA est en attente.
+
+Reproduction, avec le mot de passe seul et aucun code jamais fourni :
+
+```
+POST /auth/login.php        -> 302 vers verify_2fa.php     [2FA EN ATTENTE]
+GET  /auth/enable_2fa.php   -> 200, 17 547 octets
+                               contient le secret TOTP du compte EN CLAIR + son QR
+```
+
+`sha256(legacy/auth/enable_2fa.php)` était **égal** à `sha256(origin/main:www/auth/enable_2fa.php)`
+(`be0bfda6…`), et `main` tourne en production : **quiconque détenait un mot de passe pouvait lire le
+secret TOTP du compte et générer ses codes indéfiniment.**
+
+**QUATRE DÉFAUTS, QUATRE CORRECTIFS**, tous sur `Migration-Laravel` (l'exploitant a demandé que tout
+se fasse sur cette branche) :
+
+| défaut | correctif |
+|---|---|
+| un compte **déjà enrôlé** recevait la page, donc son secret | renvoi vers `verify_2fa.php` — ça ne retire aucune capacité, il n'existe **aucun** écran de ré-enrôlement pour un compte authentifié |
+| **un GET écrivait en base**, sans jeton CSRF, avant toute preuve | le secret vit en **session** jusqu'à la validation du premier code, et n'est écrit qu'alors |
+| **aucune limitation de débit**, là où `verify_2fa.php` et `confirm_2fa.php` en ont deux | même schéma recopié : 5 tentatives par session sur 60 s **et** 10 par IP sur 10 min (`login_attempts`, étape `'2fa'`) |
+| **anti-rejeu inerte** — motif E-01 : l'empreinte n'était posée que dans la branche de succès puis supprimée dans la même requête | posée à **chaque** tentative, avant la vérification |
+
+**LE CAS NORMAL EST MESURÉ AUSSI, ET C'EST LA MOITIÉ QUI COMPTE.** Un correctif évident peut casser
+le cas normal : refuser la page à un compte déjà enrôlé ne doit rien retirer à un compte qui n'a pas
+encore de second facteur. `tests/e2e/go-auth-enrolement.mjs` (**18 PASS / 0 FAIL**) déroule
+l'enrôlement complet — page servie à 200 avec son QR, **rien écrit** par l'affichage, secret
+**stable** entre deux affichages (le régénérer rendrait l'enrôlement impossible), un code valide
+achève l'opération, et le secret finit en base **chiffré**. La suite est **pilotée par des clics
+Puppeteer**, convention du projet : un premier jet passait par `node:https` sans navigateur et
+mesurait des statuts, pas l'écran. Appeler la fonction ne mesure pas que le bouton l'appelle —
+et la règle inverse figurait dans la skill `rw-e2e` jusqu'au 2026-08-23, ce qui explique la
+dérive.
+
+**LA FIXTURE MUTE UN SECRET DE COMPTE**, ce qui n'était jamais arrivé : `rw-test-admin` (arbitrage de
+l'exploitant), valeur sauvegardée, effacée, **restaurée dans un `finally`** et **relue pour être
+prouvée** — treize suites dépendent de ce compte. Ni `rw-test-user` (D-5), ni `opsuser` (compte
+réel), ni les cinq résidus `e2e_test_*`.
+
+**UN DÉTAIL DE REPRODUCTION QUI A FAILLI DISCULPER À TORT** : l'attribut `value` du jeton CSRF est
+sur la **ligne suivante** du HTML. Un `grep` par ligne ne le trouve pas, le POST rend alors **403**,
+et un premier essai concluait que la vulnérabilité n'existait pas. Il faut supprimer les retours à la
+ligne avant de chercher.
+
+**CE QUI RESTE OUVERT SUR CE FICHIER**, et qui appartient au portage, pas au correctif : il n'existe
+toujours **aucun écran de ré-enrôlement** pour un compte authentifié. `legacy/includes/onboarding.php`
+propose `/auth/enable_2fa.php` comme action de l'étape « 2FA », mais un compte connecté n'a plus de
+`temp_user` — le lien est mort, et l'étape est simultanément toujours cochée. Le portage devra offrir
+ce chemin.
