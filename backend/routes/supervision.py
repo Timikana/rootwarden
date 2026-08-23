@@ -68,6 +68,58 @@ _SAFE_VALUE_RE = re.compile(r'^[^\x00-\x1f\x7f]*$')
 _VALID_PLATFORMS = {'zabbix', 'centreon', 'prometheus', 'telegraf'}
 _SAFE_HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9._-]+$')
 
+# CORRECTIF v1.37.44 - LA DESINSTALLATION NE POUVAIT PAS ECHOUER.
+#
+# Les quatre commandes finissaient CHACUNE par `|| true`, et jetaient leur
+# stderr : la chaine ne pouvait pas sortir autrement qu'en 0. Un verrou apt, un
+# dpkg casse, un depot injoignable etaient avales, puis `SUCCESS_MACHINE::`
+# etait emis inconditionnellement — et `_remove_agent` effacait l'inventaire
+# quoi qu'il arrive. Mesure du 2026-08-23 : « Agent Zabbix desinstalle » sur une
+# machine ou il n'avait JAMAIS ete installe, inventaire passe de 1 a 0 ligne.
+# Voir docs/migration/PARITE.md, E-88.
+#
+# CE QUI RESTE TOLERANT, ET POURQUOI. `systemctl stop` garde son `|| true` : un
+# service deja arrete, ou un systeme sans systemd, n'est PAS un echec de la
+# desinstallation. La purge, elle, EST l'operation : son code de sortie et son
+# stderr remontent desormais intacts.
+#
+# POURQUOI UNE GARDE `dpkg-query` PLUTOT QU'UN SIMPLE RETRAIT DU `|| true`.
+# Mesure : `apt-get purge -y zabbix-agent` rend **100** quand le paquet n'est pas
+# dans l'index du depot — pas seulement quand il n'est pas installe. Retirer le
+# `|| true` sans plus ferait donc echouer la desinstallation sur toute machine ou
+# le depot Zabbix n'est pas configure, ce qui est le cas general. On demande donc
+# d'abord a `dpkg-query` ce qui est REELLEMENT installe, et on ne purge que cela :
+#   - rien d'installe        -> `RIEN_A_PURGER`, code 0 HONNETE (l'agent n'est pas la) ;
+#   - des paquets installes  -> la purge tourne, et son vrai code remonte.
+#
+# `apt-get autoremove -y` A ETE RETIRE DES QUATRE COMMANDES. Il retire tout paquet
+# que le systeme juge devenu inutile — pas seulement les dependances de l'agent —
+# et une desinstallation d'agent n'a pas a decider cela pour l'administrateur.
+# `apt-get purge` suffit a retirer l'agent ET sa configuration.
+def _commande_desinstallation(paquets, services):
+    """Construit la commande de desinstallation d'un agent.
+
+    `paquets` peut contenir des motifs `dpkg-query` (`nom-*`). `services` sont
+    arretes de facon tolerante : leur echec n'est pas celui de la purge.
+    """
+    arrets = ''.join(
+        f"systemctl stop {s} 2>/dev/null || true\n" for s in services)
+    liste = ' '.join(f"'{p}'" for p in paquets)
+
+    return (
+        "export DEBIAN_FRONTEND=noninteractive\n"
+        f"{arrets}"
+        f"P=$(dpkg-query -W -f='${{Package}} ${{Status}}\\n' {liste} 2>/dev/null"
+        " | awk '$NF==\"installed\"{print $1}')\n"
+        "if [ -n \"$P\" ]; then\n"
+        "  echo \"PAQUETS_A_PURGER: $P\"\n"
+        "  apt-get purge -y $P\n"
+        "else\n"
+        "  echo 'RIEN_A_PURGER'\n"
+        "fi\n"
+    )
+
+
 # ── Registre des agents : specs par plateforme ───────────────────────────────
 
 AGENT_REGISTRY = {
@@ -75,23 +127,17 @@ AGENT_REGISTRY = {
         'service': 'zabbix-agent2',
         'config_path': '/etc/zabbix/zabbix_agent2.conf',
         'version_cmd': "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 || command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop zabbix-agent2 2>/dev/null || true && "
-            "systemctl stop zabbix-agent 2>/dev/null || true && "
-            "apt-get purge -y zabbix-agent zabbix-agent2 zabbix-agent2-plugin-* 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
+        'uninstall_cmd': _commande_desinstallation(
+            ['zabbix-agent', 'zabbix-agent2', 'zabbix-agent2-plugin-*'],
+            ['zabbix-agent2', 'zabbix-agent'],
         ),
     },
     'centreon': {
         'service': 'centreon-monitoring-agent',
         'config_path': '/etc/centreon-monitoring-agent/centagent.yaml',
         'version_cmd': "command -v centreon-monitoring-agent >/dev/null 2>&1 && centreon-monitoring-agent --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop centreon-monitoring-agent 2>/dev/null || true && "
-            "apt-get purge -y centreon-monitoring-agent 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
+        'uninstall_cmd': _commande_desinstallation(
+            ['centreon-monitoring-agent'], ['centreon-monitoring-agent'],
         ),
     },
     'prometheus': {
@@ -101,23 +147,15 @@ AGENT_REGISTRY = {
         # vérifie d'abord que le binaire existe, sinon `sh: 1: not found` fuit
         # dans la sortie et est interprete comme version.
         'version_cmd': "command -v node_exporter >/dev/null 2>&1 && node_exporter --version 2>&1 | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop prometheus-node-exporter 2>/dev/null || true && "
-            "apt-get purge -y prometheus-node-exporter 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
+        'uninstall_cmd': _commande_desinstallation(
+            ['prometheus-node-exporter'], ['prometheus-node-exporter'],
         ),
     },
     'telegraf': {
         'service': 'telegraf',
         'config_path': '/etc/telegraf/telegraf.conf',
         'version_cmd': "command -v telegraf >/dev/null 2>&1 && telegraf --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop telegraf 2>/dev/null || true && "
-            "apt-get purge -y telegraf 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
-        ),
+        'uninstall_cmd': _commande_desinstallation(['telegraf'], ['telegraf']),
     },
 }
 
@@ -473,17 +511,49 @@ def _get_machine_agents(machine_id=None):
 
 
 def _backup_agent_config(client, root_pass, config_path):
-    """Cree un backup date du fichier de config agent."""
+    """Cree un backup date du fichier de config agent.
+
+    CORRECTIF v1.37.44 - `A && B || C` EFFACAIT LA DIFFERENCE ENTRE « RIEN A
+    SAUVEGARDER » ET « SAUVEGARDE ECHOUEE ».
+
+    La forme precedente etait
+    `test -f X && cp X Y || echo 'NO_FILE'`. En shell, `||` se declenche si A OU
+    B a echoue : un `cp` en echec empruntait donc la branche « pas de fichier ».
+    Mesure du 2026-08-22 sur la machine de test, les trois cas :
+
+        fichier absent              -> [NO_FILE]  rc=0     (voulu)
+        fichier present, cp reussi  -> []         rc=0
+        fichier present, cp ECHOUE  -> [NO_FILE]  rc=0     <- INDISCERNABLE
+
+    La fonction rendait alors `None`, et les appelants qui gardent leur repli par
+    `if backup_path:` **le desarmaient au moment precis ou il servait** : le `>`
+    de l'ecriture tronque le fichier avant d'ecrire, donc un echec a ce stade
+    laissait une configuration tronquee et rien pour la retablir. SIX routes en
+    dependent, dont le deploiement. Voir docs/migration/PARITE.md, E-83.
+
+    LA FORME CORRIGEE separe les deux constats au lieu de les confondre : on
+    teste l'existence d'abord, et le `cp` n'est tente que dans la branche ou le
+    fichier existe. Son echec remonte alors comme un echec.
+    """
     filename = config_path.split('/')[-1]
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     backup_dir = '/'.join(config_path.split('/')[:-1])
     backup_path = f"{backup_dir}/{filename}.bak.{timestamp}"
-    cmd = f"test -f {config_path} && cp {config_path} {backup_path} || echo 'NO_FILE'"
+    cmd = (
+        f"if [ -f {config_path} ]; then\n"
+        f"  cp {config_path} {backup_path}\n"
+        "else\n"
+        "  echo 'NO_FILE'\n"
+        "fi\n"
+    )
     out, stderr, rc = execute_as_root(client, cmd, root_pass, logger=logger)
+    if rc != 0:
+        # Le fichier existait et la copie a echoue : c'est un ECHEC, et il ne
+        # doit plus pouvoir passer pour une absence de fichier.
+        raise RuntimeError(f"Echec backup: {stderr or out}")
     if 'NO_FILE' in out:
         return None
-    if rc != 0:
-        raise RuntimeError(f"Echec backup: {stderr}")
+
     return backup_path
 
 
@@ -819,6 +889,35 @@ def zabbix_version():
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
+def _conclut_desinstallation(machine_id, platform, machine_name, code):
+    """Conclut une desinstallation SELON CE QUI S'EST PASSE — correctif v1.37.44.
+
+    Avant, les deux routes emettaient `SUCCESS_MACHINE::` et appelaient
+    `_remove_agent` **inconditionnellement**. Combine au `|| true` de la commande
+    (qui rendait le code de sortie toujours nul), le portail ne pouvait ni
+    rapporter un echec ni savoir s'il y avait quelque chose a desinstaller :
+    mesure du 2026-08-23, « Agent Zabbix desinstalle » sur une machine ou il
+    n'avait jamais ete installe, et inventaire vide dans la foulee. E-88.
+
+    LA REGLE : l'inventaire suit CE QU'ON A PU CONSTATER.
+      - code 0  -> soit la purge a reussi, soit il n'y avait rien a purger. Dans
+                   les deux cas il n'y a PLUS d'agent : la ligne d'inventaire est
+                   retiree, et c'est vrai ;
+      - code != 0 ou inconnu -> on ne sait pas ce qui reste sur la machine.
+                   L'inventaire n'est PAS touche, et le marqueur dit l'echec. Un
+                   inventaire qui oublie un agent encore installe est pire qu'un
+                   inventaire qui n'a pas su.
+    """
+    if code == 0:
+        _remove_agent(machine_id, platform)
+        yield f"SUCCESS_MACHINE::{machine_id}::{platform} desinstalle de {machine_name}.\n"
+
+        return
+
+    yield (f"ERROR_MACHINE::{machine_id}::Desinstallation {platform} echouee sur "
+           f"{machine_name} (code {code}). L'inventaire n'a pas ete modifie.\n")
+
+
 @bp.route('/supervision/zabbix/uninstall', methods=['POST'])
 @require_api_key
 @require_role(2)
@@ -841,17 +940,14 @@ def zabbix_uninstall():
             yield f"START_MACHINE::{machine_id}::Desinstallation agent Zabbix sur {machine_name}.\n"
             with ssh_session(ip, port, ssh_user, ssh_pass,
                              logger=logger, service_account=svc_account) as client:
-                cmd = (
-                    "export DEBIAN_FRONTEND=noninteractive && "
-                    "systemctl stop zabbix-agent2 2>/dev/null || true && "
-                    "systemctl stop zabbix-agent 2>/dev/null || true && "
-                    "apt-get purge -y zabbix-agent zabbix-agent2 zabbix-agent2-plugin-* 2>/dev/null || true && "
-                    "apt-get autoremove -y 2>/dev/null || true"
-                )
-                yield from execute_as_root_stream(client, cmd, root_pass, logger=logger)
+                # UNE SEULE SOURCE POUR LA COMMANDE. Elle etait dupliquee ici,
+                # a cote de celle du registre : deux exemplaires a corriger, et
+                # le second oublie. Voir `_commande_desinstallation`.
+                code = yield from execute_as_root_stream(
+                    client, AGENT_REGISTRY['zabbix']['uninstall_cmd'],
+                    root_pass, logger=logger)
 
-            _remove_agent(machine_id, 'zabbix')
-            yield f"SUCCESS_MACHINE::{machine_id}::Agent Zabbix desinstalle de {machine_name}.\n"
+            yield from _conclut_desinstallation(machine_id, 'zabbix', machine_name, code)
         except Exception as e:
             yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
@@ -1656,9 +1752,9 @@ def generic_uninstall(platform):
             yield f"START_MACHINE::{machine_id}::Desinstallation {platform} sur {machine_name}.\n"
             with ssh_session(ip, port, ssh_user, ssh_pass,
                              logger=logger, service_account=svc_account) as client:
-                yield from execute_as_root_stream(client, agent_info['uninstall_cmd'], root_pass, logger=logger)
-            _remove_agent(machine_id, platform)
-            yield f"SUCCESS_MACHINE::{machine_id}::{platform} desinstalle de {machine_name}.\n"
+                code = yield from execute_as_root_stream(
+                    client, agent_info['uninstall_cmd'], root_pass, logger=logger)
+            yield from _conclut_desinstallation(machine_id, platform, machine_name, code)
         except Exception as e:
             yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
