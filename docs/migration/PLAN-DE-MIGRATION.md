@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-24**, version `1.37.49`, HEAD `590834a`.
+Dernière mise à jour : **2026-08-24**, version `1.37.50`.
 
 ---
 
@@ -95,10 +95,10 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **14 sur 33** |
 | parties du legacy archivées | **9** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **89 exécutions, 1225 assertions** — dont **16 échecs attendus** : le portage de A5 n'existe pas encore, sa base rouge est dans le LOT par construction |
+| LOT de tests E2E | **89 exécutions, 1244 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **85** — numérotés jusqu'à **E-95** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
-| commits non poussés | **77**, 0 de retard sur `origin/Migration-Laravel` |
+| écarts de parité documentés | **86** — numérotés jusqu'à **E-96** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| commits non poussés | **80**, 0 de retard sur `origin/Migration-Laravel` |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
 Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
@@ -151,7 +151,7 @@ Détail : **`MODULE-AUTH.md`**.
 |---|---|---|
 | correctif de l'enrôlement | **FAIT** `v1.37.48` | le second facteur était dérivable du premier, **en production** |
 | **A2** changement de mot de passe | **FAIT** `v1.37.49` | lève le premier blocage v2.0 |
-| **A5** step-up ponctuel | **caractérisation FAITE** | suite verte sur le legacy **37/0**, base rouge du portage **6/16** ; reste à porter |
+| **A5** step-up ponctuel | **FAIT** `v1.37.50` | legacy **38/0**, base rouge **6/16**, portage **24/0** ; le **panneau en page** est différé à son premier consommateur |
 | enrôlement porté | à faire, **en dernier** | trois raisons cumulées, voir plus bas |
 | **A3** réinitialisation | **bloqué** | **envoie un courriel** — arbitrage requis |
 
@@ -186,12 +186,25 @@ une session neuve est **accepté**. Un second step-up pour une AUTRE action dans
 **refusé** « Code 2FA déjà utilisé » : le défaut refuse un geste légitime. Et la passerelle du portage
 **a déjà hérité de la fusion** — les trois routes root y annoncent elles aussi `policy_action`.
 
-**Ce que le portage doit tenir** (le contrat est déjà écrit dans la suite) : `POST /profil/step-up`,
-un nom d'action **par route** (`policy_sudo_deploy`, `policy_sftp_deploy`, `policy_rollback`),
-anti-rejeu **par compte, en base et par action**, quota **remis à zéro sur succès**, TTL lu dans
-`config('rootwarden.step_up_ttl')` — aujourd'hui lu par personne — et un **panneau de décision en
-page** (`data-rw="step-up-panneau"`, `step-up-code`, `step-up-valider`, `step-up-annuler`) en parité
-FR/EN, là où le legacy pose un modal en français codé en dur qui **tutoie**.
+**PORTÉ le 2026-08-24, `v1.37.50`** — `App\Services\StepUp`, `POST /profil/step-up`,
+`POST /profil/step-up/revoquer`, intégration dans la passerelle. Les quatre défauts sont fermés :
+anti-rejeu **par compte** et **partagé avec la connexion** (un code ne sert qu'une fois, pour quoi que
+ce soit — un code observé à la connexion ne peut plus être retourné en step-up) ; quota **par compte**
+et **remis à zéro sur succès** ; **un nom d'action par route**, dérivé du chemin ; liste d'actions
+**fermée**, vérifiée par aller-retour, fail-closed. `step_up_ttl` est enfin lu, et
+`step_up_tentatives` le rejoint. En prime, une **révocation** que le legacy n'a pas.
+
+**Deux choses ne sont pas portées, et c'est dit.** Le **panneau de décision en page**, parce qu'**aucune
+page du portage n'appelle une route gardée par un step-up** : les pages qui le feront (`ssh/` K4 et
+`adm/`) ne sont pas portées, et une pièce non mesurable posée dans le gabarit met en risque les
+quatorze pages déjà portées — il sera porté **avec son premier consommateur**. Et le modal du legacy
+reste ce qu'il est : en français codé en dur, et il tutoie.
+
+**Deux leçons de ce sous-lot, à ne pas reperdre.** Ma propre caractérisation portait une exigence
+**d'affaiblissement** (« un second step-up pour une autre action doit rester possible dans la même
+fenêtre ») qui aurait autorisé le rejeu d'un code vu à la connexion. Et ma suite **n'était pas
+idempotente** : elle accordait un step-up pour une route root, et l'exécution suivante postait sur
+cette même route — **seul un paramètre absent a empêché un déploiement sudo réel**.
 
 **Mesuré le 2026-08-24 (§8-2 fermée)** : **les deux portails ne partagent PAS la session** — le legacy
 écrit dans `/var/www/sessions` (159 fichiers), le portage dans `storage/framework/sessions` (380). Une
@@ -261,6 +274,9 @@ commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTA
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
 archivage **4/3** · A2 **7/1** · A5 **6/16**.
+
+**Nettoyer à l'entrée ET dans le `finally` vaut aussi pour ce que le TEST accorde**, pas seulement
+pour ce qu'il écrit : une autorisation posée par une exécution survit à cette exécution.
 
 ---
 
@@ -402,6 +418,15 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un correctif évident peut casser le cas normal** : mesurer les **deux** moitiés.
 - **Une réussite annoncée n'est pas une réussite vérifiée** ; **un état final correct ne prouve pas que
   le geste était correct** ; **un statut 200 ne prouve rien si la session n'a pas tenu**.
+- **Une exigence de test peut être un affaiblissement déguisé.** « Le legacy refuse un geste légitime,
+  donc le portage doit l'accepter » — sauf que l'accepter autorisait le rejeu d'un code vu à la
+  connexion. Avant de corriger une gêne, se demander ce que la gêne protégeait.
+- **Une fixture, c'est aussi ce que le test ACCORDE.** La suite A5 posait un step-up sur une route root
+  qui survivait quinze minutes ; l'exécution suivante postait sur cette route. Seul un `machine_id`
+  absent a empêché un déploiement réel — de la chance, pas une précaution.
+- **Un nettoyage neuf ne voit pas l'état ancien.** Le premier passage de la révocation a affiché
+  « 0 marque effacée » alors qu'une marque orpheline vivait encore : elle avait été posée avant que
+  l'index existe. Non lu, ce détail aurait fait accuser le code.
 - **Un pass peut passer PARCE QUE la fonctionnalité est absente.** « Un step-up réussi ne consomme
   pas le quota » passait sur le portage : cinq réponses `404` ne contiennent aucun `429`. Conditionner
   l'assertion à la mesure préalable — ici, qu'un step-up ait effectivement réussi.

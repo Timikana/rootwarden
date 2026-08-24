@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Services\Droits;
 use App\Services\MotDePasse;
+use App\Services\StepUp;
 use App\Support\Navigation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -100,6 +102,73 @@ class PortailController extends Controller
         $requete->session()->regenerate();
 
         return redirect()->route('profil')->with('mdp_message', __(MotDePasse::OK));
+    }
+
+    /**
+     * La re-authentification ponctuelle : verifie un code et pose la marque.
+     *
+     * Rend du JSON, comme le `step_up_verify.php` du legacy : l'appelant est un
+     * script de page, pas une navigation. Le refus ne dit JAMAIS pourquoi il a
+     * echoue au-dela du message — ni si le compte a un second facteur, ni
+     * combien de tentatives restent.
+     *
+     * Aucune garde de role : l'exigence porte sur l'action, et l'identifiant du
+     * compte vient de la SESSION, jamais du corps de la requete. Un compte de
+     * role 1 qui valide un step-up n'obtient rien de plus : la passerelle lui
+     * refusera la route pour une autre raison.
+     */
+    public function verifieStepUp(Request $requete, StepUp $stepUp): JsonResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return response()->json(['success' => false, 'message' => __('step_up.session_absente')], 403);
+        }
+
+        $cle = $stepUp->verifie(
+            $idCompte,
+            (string) ($requete->input('action') ?? ''),
+            (string) ($requete->input('totp_code') ?? $requete->input('code') ?? ''),
+        );
+
+        if ($cle !== StepUp::OK) {
+            /*
+             * 429 POUR LE SEUL DEPASSEMENT DE QUOTA. Les autres refus rendent
+             * 200 avec `success: false`, comme le legacy : un code faux n'est pas
+             * une erreur de protocole, et distinguer les statuts renseignerait
+             * l'attaquant sur la nature du refus.
+             */
+            $statut = $cle === 'step_up.trop_de_tentatives' ? 429 : 200;
+
+            return response()->json(['success' => false, 'message' => __($cle)], $statut);
+        }
+
+        return response()->json([
+            'success'      => true,
+            'message'      => __('step_up.valide'),
+            'action'       => (string) $requete->input('action'),
+            'expire_dans'  => (int) config('rootwarden.step_up_ttl', 900),
+        ]);
+    }
+
+    /**
+     * Rend ses privileges : efface les marques de step-up du compte.
+     *
+     * Sans garde de role : renoncer a une autorisation n'en demande aucune. Le
+     * legacy n'offre aucun equivalent — sa marque vit quinze minutes et rien ne
+     * permet de l'abreger.
+     */
+    public function revoqueStepUp(Request $requete, StepUp $stepUp): JsonResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return response()->json(['success' => false, 'message' => __('step_up.session_absente')], 403);
+        }
+
+        return response()->json([
+            'success'   => true,
+            'message'   => __('step_up.revoque'),
+            'revoquees' => $stepUp->revoque($idCompte),
+        ]);
     }
 
     /** Le menu tel que le compte connecte le voit — meme source que la vue. */

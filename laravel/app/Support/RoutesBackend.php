@@ -84,9 +84,14 @@ class RoutesBackend
      * Routes exigeant une re-authentification ponctuelle. Changer une politique
      * sudoers ou un bloc Match User donne de fait root sur la machine cible.
      *
-     * Le step-up n'est PAS encore porte : la passerelle refuse ces routes au
-     * lieu de les transmettre. Un refus explicite vaut mieux qu'une action
-     * root accordee sans le second controle que le legacy exige.
+     * Le step-up est porte depuis A5 : la passerelle exige une marque fraiche
+     * puis transmet, au lieu de refuser en bloc. Voir `App\Services\StepUp`.
+     *
+     * Le nom de l'action est DERIVE du chemin (`actionStepUp`) et non pris dans
+     * une table : ajouter un motif suffit a doter la route de son propre nom.
+     * Le legacy, lui, fusionne les trois routes root sous `policy_action`, si
+     * bien qu'un step-up consenti pour ANNULER une politique autorise un
+     * DEPLOIEMENT sudo pendant quinze minutes.
      */
     public const MOTIFS_STEP_UP = [
         '#^/policy/(sudo|sftp)/(deploy|remove)$#',
@@ -161,13 +166,46 @@ class RoutesBackend
     /** Le chemin exige-t-il une re-authentification ponctuelle ? */
     public static function exigeStepUp(string $chemin): bool
     {
+        return self::actionStepUp($chemin) !== null;
+    }
+
+    /**
+     * Le nom de l'action exigee par ce chemin, ou `null` s'il n'en exige aucune.
+     *
+     * UN NOM PAR ROUTE : `/policy/sudo/deploy` -> `policy_sudo_deploy`. C'est ce
+     * qui distingue ce portage du legacy, ou les trois routes root partagent
+     * `policy_action`.
+     */
+    public static function actionStepUp(string $chemin): ?string
+    {
         foreach (self::MOTIFS_STEP_UP as $motif) {
             if (preg_match($motif, $chemin) === 1) {
-                return true;
+                return preg_replace('/[^a-z0-9]+/', '_', trim(strtolower($chemin), '/'));
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * Le chemin correspondant a un nom d'action, ou `null` si ce nom n'en
+     * designe aucun. C'est la LISTE FERMEE des actions acceptables.
+     *
+     * La reciproque se calcule, puis elle est **verifiee par aller-retour** :
+     * `policy_sudo_deploy` -> `/policy/sudo/deploy` -> `policy_sudo_deploy`. Si
+     * un chemin garde portait un jour un blanc soulignement, l'aller-retour
+     * echouerait et le nom serait REFUSE — fail-closed, plutot que d'ouvrir une
+     * marque sur un chemin voisin.
+     */
+    public static function cheminStepUp(string $action): ?string
+    {
+        if ($action === '' || preg_match('/^[a-z0-9_]+$/', $action) !== 1) {
+            return null;
+        }
+
+        $chemin = '/' . str_replace('_', '/', $action);
+
+        return self::actionStepUp($chemin) === $action ? $chemin : null;
     }
 
     /**

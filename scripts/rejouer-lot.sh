@@ -80,6 +80,13 @@ declare -A REF_LARAVEL=(
   # que sur le portage, seul a poser `minlength` — donc seul ou le navigateur
   # refuse avant d'emettre la requete.
   [go-auth-mot-de-passe]=27
+  # 24 sur le portage contre 38 sur le legacy. L'ecart est structurel et non un
+  # manque : le legacy porte SIX chemins gardes (trois `adm/api/*` plus les trois
+  # routes root) quand le portage n'en porte que TROIS — `adm/` n'est pas porte —
+  # soit neuf assertions de moins ; et sa partie « panneau » (huit assertions) n'a
+  # pas d'equivalent, aucune page portee n'appelant une route gardee. En echange le
+  # portage gagne les quatre proprietes que le legacy ne tient pas. Voir E-96.
+  [go-auth-step-up]=24
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -110,7 +117,7 @@ declare -A REF_LEGACY=(
   # session, anti-rejeu global et non par action, quota consomme par un succes,
   # trois routes root sous un seul nom d'action) : ils deviendront des PASS le
   # jour ou le portage les corrigera.
-  [go-auth-step-up]=37
+  [go-auth-step-up]=38
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth

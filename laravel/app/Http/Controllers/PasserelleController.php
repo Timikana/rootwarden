@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Droits;
+use App\Services\StepUp;
 use App\Support\RoutesBackend;
 use Illuminate\Http\Request;
 // Type de retour : l'ancetre commun de Response et JsonResponse. Annoncer
@@ -34,8 +35,10 @@ class PasserelleController extends Controller
     /** Methodes qui portent un corps a transmettre. */
     private const AVEC_CORPS = ['POST', 'PUT', 'PATCH'];
 
-    public function __construct(private readonly Droits $droits)
-    {
+    public function __construct(
+        private readonly Droits $droits,
+        private readonly StepUp $stepUp,
+    ) {
     }
 
     public function __invoke(Request $requete, string $chemin = ''): Response
@@ -69,16 +72,25 @@ class PasserelleController extends Controller
             return $this->refus(403, 'passerelle.privileges_insuffisants');
         }
 
-        // 6. Re-authentification ponctuelle. Elle n'est PAS encore portee : on
-        //    refuse plutot que de transmettre. Accorder une action qui donne
-        //    root sans le second controle que le legacy exige serait un recul.
-        if (RoutesBackend::exigeStepUp($chemin)) {
+        /*
+         * 6. Re-authentification ponctuelle.
+         *
+         * Portee par le sous-lot A5. L'action est NOMMEE PAR LA ROUTE : le
+         * legacy fusionne les trois routes root sous `policy_action`, si bien
+         * qu'un step-up consenti pour annuler une politique autorise un
+         * deploiement sudo pendant quinze minutes.
+         *
+         * Le refus porte le nom de l'action pour que l'appelant sache quoi
+         * faire valider — et rien d'autre : ni la duree restante, ni l'etat des
+         * autres actions.
+         */
+        $action = $this->stepUp->actionPour($chemin);
+        if ($action !== null && ! $this->stepUp->valide($idCompte, $action)) {
             return response()->json([
                 'success'          => false,
                 'message'          => __('passerelle.step_up_requis'),
                 'step_up_required' => true,
-                'action'           => 'policy_action',
-                'portage'          => 'non_porte',
+                'action'           => $action,
             ], 403);
         }
 

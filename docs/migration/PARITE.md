@@ -3995,3 +3995,105 @@ ouvertes, et dit explicitement que le mot de passe, lui, se change sur cette pag
 `force_password_change` + borne d'historique sauvegardés, restaurés dans un `finally`, **état relu pour
 être prouvé** — treize suites dépendent de ce compte. Et **la réussite est vérifiée, pas annoncée** : la
 suite se reconnecte avec le **nouveau** mot de passe avant de restaurer.
+
+---
+
+## E-96 — La re-authentification ponctuelle portée : un nom d'action par route, et un code qui ne sert qu'une fois
+
+Sous-lot **A5**. Le legacy exige un second contrôle avant tout geste qui donne root
+(`legacy/auth/step_up.php`), sur **quatre appelants et aucun autre** — `adm/api/delete_user.php`,
+`adm/api/update_permissions.php`, `adm/api/anonymize_user.php` et `api_proxy.php:63`, tous avec le même
+ordre de gardes : rôle → méthode → CSRF → step-up. Le portage, lui, **refusait en bloc** les routes
+concernées (`PasserelleController`, 403 + `portage: non_porte`). Ce refus n'était pas un trou — accorder
+root sans le second contrôle aurait été un recul — mais la capacité manquait : après une bascule directe,
+personne n'aurait plus pu déployer ni annuler une politique sudo depuis le portail.
+
+Caractérisation **38 PASS / 0 FAIL sur le legacy**, base rouge du portage **6 / 16**, portage
+**24 / 0**.
+
+**TOUT EST MESURÉ SUR LE CHEMIN DE REFUS.** Aucun geste root n'est émis par la suite : ni déploiement,
+ni révocation, ni suppression de compte. Les chemins gardés rendent 403 **avant** de lire leur corps. La
+seule cible re-jouée après un step-up accordé — et seulement côté legacy — est
+`adm/api/update_permissions.php` **avec un corps vide** : il sort sur « Données manquantes » avant toute
+écriture, ce qui rend le modal pilotable par de vrais clics sans rien détruire. Vérifié **en lisant le
+fichier avant** de faire cliquer.
+
+**LES QUATRE DÉFAUTS DU LEGACY, ET CE QUE LE PORTAGE FAIT À LA PLACE**
+
+| défaut mesuré | legacy | portage |
+|---|---|---|
+| l'anti-rejeu vit dans `$_SESSION['_step_up_last_totp']` | le même code, rejoué depuis une session **neuve**, est **accepté** (mesuré : `success = true` deux fois) | **refusé** — la garde est le compteur de fenêtre **monotone par compte** de `Totp::verifie`, partagé avec la connexion |
+| la clé d'anti-rejeu est propre au step-up | un code observé **à la connexion** reste utilisable pour obtenir un step-up | impossible : un code ne sert **qu'une fois, pour quoi que ce soit** |
+| le quota est par session et n'est pas remis à zéro | après un succès, la 5ᵉ tentative suivante rend déjà **429** — cinq step-up légitimes en une minute échouent | quota **par compte**, **remis à zéro sur succès** : mesuré `200 200 200 200 200` après un succès |
+| `api_proxy.php:63` fusionne trois routes root sous `policy_action` | un step-up consenti pour **annuler** une politique autorise un **déploiement sudo** pendant quinze minutes (mesuré : les trois refus annoncent le même nom) | **un nom par route** — `policy_sudo_deploy`, `policy_sftp_deploy`, `policy_rollback` — **dérivé du chemin**, pas pris dans une table : ajouter un motif suffit à doter la route de son nom, et l'oubli qui a produit ce défaut n'est plus possible |
+
+**LA LISTE DES ACTIONS EST FERMÉE, ET VÉRIFIÉE PAR ALLER-RETOUR.** Le legacy accepte **n'importe quel**
+nom d'action : il le nettoie au caractère puis pose `_step_up_<ce que le client a envoyé>`. Le portage
+exige que le nom désigne un chemin réellement gardé — `policy_sudo_deploy` → `/policy/sudo/deploy` →
+`policy_sudo_deploy`. Si un chemin gardé portait un jour un blanc soulignement, l'aller-retour échouerait
+et le nom serait **refusé** : fail-closed, plutôt que d'ouvrir une marque sur un chemin voisin.
+
+**UNE EXIGENCE DE MA PROPRE CARACTÉRISATION ÉTAIT DANGEREUSE, ET A ÉTÉ RETIRÉE.** Le premier jet de la
+suite demandait qu'un second step-up pour une **autre** action reste possible dans la même fenêtre de
+30 s, au motif que le refus du legacy gêne un geste légitime. C'était une exigence **d'affaiblissement** :
+elle aurait autorisé le rejeu, pour obtenir un step-up, d'un code observé à la connexion — exactement
+l'escalade que le step-up existe pour empêcher. Le refus est la bonne réponse. Ce qui cloche chez le
+legacy n'est pas qu'il refuse, c'est qu'il refuse **depuis la session**, donc de façon contournable.
+Contrepartie assumée et documentée : deux gestes sensibles dans la même fenêtre de 30 s demandent deux
+codes.
+
+**LE QUOTA EST PAR COMPTE, DONC IL TRAVERSE LES SESSIONS — c'est le but.** Conséquence visible dans le
+journal : la série de statuts du portage n'est pas directement comparable à celle du legacy, dont le
+compteur repartait de zéro à chaque session neuve. Brider le compte et non le navigateur est précisément
+ce qu'on cherche.
+
+**LE STATUT DISTINGUE LE SEUL DÉPASSEMENT DE QUOTA.** 429 pour le quota, 200 avec `success: false` pour
+tout le reste — comme le legacy. Un code faux n'est pas une erreur de protocole, et varier les statuts
+renseignerait sur la nature du refus.
+
+**LA MARQUE VIT DANS LE CACHE, ET LE DÉFAUT EST DU BON CÔTÉ.** Le schéma appartient au backend Python et
+ne reçoit pas de migration depuis le portage ; la marque est donc stockée comme la garde anti-rejeu de
+`Totp`. Une purge du cache **referme** les autorisations en cours au lieu de les ouvrir.
+
+**`step_up_ttl` EST ENFIN LU.** La clé existait dans `config/rootwarden.php` et **personne ne la lisait**
+(vérifié par recherche). Elle borne désormais la durée de la marque. `step_up_tentatives` la rejoint,
+avec sa valeur par défaut de 5 — celle du legacy.
+
+**DEUX CHOSES NE SONT PAS PORTÉES, ET C'EST DIT PLUTÔT QUE TAIT.**
+
+1. **Le panneau de décision en page.** Le legacy pose un modal (`js/utils.js:59-146`) **intégralement en
+   français codé en dur, et qui tutoie** — donc hors parité FR/EN. Le portage ne le porte pas encore,
+   pour une raison mesurée : **aucune page du portage n'appelle une route gardée par un step-up**. Les
+   pages qui le feront — `ssh/` (K4) et `adm/` — ne sont pas portées. Un panneau posé dans le gabarit
+   sans flux pour l'exercer ne pourrait être mesuré par aucun clic, et une pièce non mesurée dans le
+   gabarit met en risque les quatorze pages déjà portées. Il sera porté **avec son premier
+   consommateur** ;
+2. *(levé — voir ci-dessous)* la branche « un step-up accordé laisse passer la requête » **est**
+   mesurée sur le portage, par une cible de rejeu dont l'innocuité a été **vérifiée en lisant le
+   backend**.
+
+**UNE RÉVOCATION, QUE LE LEGACY N'A PAS.** `POST /profil/step-up/revoquer` efface les marques du
+compte. Strictement dé-escaladant, donc sans garde de rôle : renoncer à une autorisation n'en demande
+aucune. Chez le legacy la marque vit quinze minutes et **rien ne permet de l'abréger**, pas même la
+fermeture du panneau. La révocation a une contrepartie technique : le pilote fichier du cache ne sait
+pas effacer par motif, donc les actions marquées sont tenues dans un **index** par compte.
+
+**LA BRANCHE « LA MARQUE LAISSE PASSER » EST MESURÉE SUR LES DEUX CIBLES — et c'est un accident qui l'a
+rendue possible.** Elle était d'abord déclarée non mesurable : la vérifier semblait exiger de laisser la
+passerelle transmettre `/policy/sudo/deploy`, c'est-à-dire exécuter un déploiement sudo réel. Puis une
+exécution de la suite a trouvé sa première sonde **transmise** avec, en réponse,
+`{"message":"machine_id requis."}` — une marque posée par l'exécution précédente avait survécu quinze
+minutes. Lecture du backend faite ensuite, et pas avant de conclure :
+`backend/routes/policies.py:220-225` résout les identifiants SSH **en premier**, et
+`_resolve_ssh_creds` (`:44-47`) rend 400 dès que le corps ne porte pas de `machine_id` — **avant tout
+`ssh_session`**. Un corps vide ne déploie donc rien, et la branche est mesurable sans risque.
+
+**MA SUITE N'ÉTAIT PAS IDEMPOTENTE, ET C'ÉTAIT UN VRAI RISQUE.** Elle accordait un step-up pour une
+route root, et l'exécution suivante postait sur cette même route quinze minutes plus tard. **Seul un
+paramètre absent a empêché un déploiement sudo réel** — de la chance, pas une précaution, et
+exactement ce que la règle du projet interdit : toute fixture se nettoie **à l'entrée et dans un
+`finally`**. La suite rend désormais les privilèges aux deux bouts, et le journal imprime combien de
+marques ont été effacées. La première exécution après le correctif a d'ailleurs montré « 0 marque
+effacée » à l'entrée alors qu'une marque **orpheline** vivait encore : elle avait été posée avant que
+l'index existe. Un `cache:clear` l'a levée — mais le fait que le nettoyage neuf n'ait rien vu de
+l'ancien état est le genre de détail qui, non lu, aurait fait accuser le code.
