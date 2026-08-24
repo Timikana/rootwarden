@@ -98,7 +98,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | LOT de tests E2E | **89 exécutions, 1244 assertions, 0 échec** |
 | tests backend | **341 pytest** |
 | écarts de parité documentés | **86** — numérotés jusqu'à **E-96** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
-| commits non poussés | **80**, 0 de retard sur `origin/Migration-Laravel` |
+| commits non poussés | **82**, 0 de retard sur `origin/Migration-Laravel` |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
 Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
