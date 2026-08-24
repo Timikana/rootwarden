@@ -23,6 +23,31 @@ Dernière mise à jour : **2026-08-24**, version `1.37.49`, HEAD `590834a`.
 > premier « à faire » dans l'ordre donné. Dérouler les neuf temps de §5, respecter les conventions de
 > §3 et la sûreté de §6.
 >
+> **Les tests se pilotent par des CLICS SIMULÉS, en Puppeteer.** On remplit au clavier
+> (`page.type`) et on soumet par un **clic** (`page.click`) : appeler la fonction ne mesure pas que
+> le bouton l'appelle. Jamais `page.evaluate(() => fonctionDeLaPage())`, jamais de requête HTTP brute
+> pour tester une logique qui a une interface. **Jamais « le premier bouton `submit` de la page »** :
+> remonter du CHAMP à son `form` par `closest('form')` — `profile.php` porte cinq formulaires et le
+> premier est celui du courriel. Deux exceptions, chacune devant porter son **motif écrit** dans le
+> fichier : la **requête forgée émise depuis la page**, pour une propriété qu'aucun `<input>` ne peut
+> violer ou qui n'a aucune interface, et la sonde `node:https` d'`archive.mjs`. Les suites se lancent
+> **par le runner**, jamais à la main : `./scripts/rejouer-lot.sh [--laravel|--legacy] <suites…>`.
+>
+> **Les captures se prennent avec le compte de rôle 3** — `rw-test-super`, qui voit les **33** entrées
+> de menu ; `superadmin` lui-même n'est pas utilisable, **son mot de passe ne correspond plus** et on
+> ne demande jamais à l'exploitant d'en coller un. Les comptes à droits réduits (`rw-test-admin`
+> rôle 2, `rw-test-user` rôle 1 — **D-5, ne pas toucher**) ne servent **que** lorsqu'il faut mesurer
+> une **garde** : rôle 1 → 403, rôle 3 sans la permission → 200, les **deux** chemins d'un
+> « permission OU rôle ».
+>
+> **Trois largeurs à chaque sous-lot** : **1920×1080** (c'est là que le gaspillage de largeur se
+> voit), **1400×900**, **390×844** (c'est là que le tiroir et les débordements se voient). Les images
+> vont dans `tests/e2e/screenshots/<module>/`, **jamais** dans le scratchpad — elles y seraient
+> invisibles. Puis **les REGARDER** : une assertion DOM ne voit ni un bouton mal placé, ni un pavé
+> illisible, ni une pastille à 1,06:1 de contraste. Enfin **les ENVOYER** à l'exploitant : un travail
+> qui n'est pas rendu visible n'est pas rendu. Une capture **mal étiquetée est un mensonge**, et elle
+> doit montrer un état **atteignable**.
+>
 > **Faire moins mais complètement.** Un sous-lot fini — mesuré, testé, documenté, capturé, committé —
 > vaut mieux que trois entamés.
 >
