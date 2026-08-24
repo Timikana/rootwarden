@@ -3,7 +3,7 @@
 namespace App\Support;
 
 /**
- * Dechiffrement des secrets TOTP stockes en base.
+ * Chiffrement et dechiffrement des secrets TOTP stockes en base.
  *
  * Portage FIDELE de legacy/includes/totp_crypto.php : le meme secret doit
  * pouvoir etre lu par les deux frontends pendant toute la migration. Toute
@@ -23,6 +23,62 @@ class TotpCrypto
 {
     /** Etiquette HKDF — doit rester identique au legacy, sinon la cle differe. */
     private const HKDF_INFO = 'rootwarden-totp';
+
+    /**
+     * Chiffre un secret TOTP pour la base.
+     *
+     * MIROIR EXACT de `encryptTotpSecret()` (`legacy/includes/totp_crypto.php:18`),
+     * y compris l'ordre des moteurs : sodium d'abord, AES-256-GCM en repli. Un
+     * blob ecrit ici doit rester lisible par l'ancien portail pendant toute la
+     * migration — les deux frontends partagent la base, et un format divergent
+     * d'un octet rendrait le compte inaccessible d'un cote **sans le moindre
+     * message d'erreur**. C'est ce qui rend l'enrolement le sous-lot le plus
+     * risque, et c'est pourquoi l'execution CROISEE est mesuree
+     * (`tests/e2e/go-auth-totp-croise.mjs`).
+     *
+     * FAIL-CLOSED comme le legacy : sans cle, ou si le chiffrement echoue, on
+     * leve. Avant son correctif A02-04, le legacy rendait le secret EN CLAIR
+     * quand `SECRET_KEY` manquait — un secret 2FA lisible par tout acces en
+     * lecture a la base. On ne reintroduit pas ce repli.
+     *
+     * @throws \RuntimeException  si la cle manque ou si le chiffrement echoue
+     */
+    public static function chiffre(string $secret): string
+    {
+        if ($secret === '') {
+            return '';
+        }
+
+        $cleHex = (string) config('rootwarden.secret_key', '');
+        if ($cleHex === '') {
+            throw new \RuntimeException(
+                'SECRET_KEY indisponible : chiffrement TOTP impossible.'
+            );
+        }
+
+        if (function_exists('sodium_crypto_secretbox')) {
+            $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+            $cle   = hash_hkdf(
+                'sha256',
+                self::cleBrute($cleHex, SODIUM_CRYPTO_SECRETBOX_KEYBYTES),
+                32,
+                self::HKDF_INFO,
+            );
+
+            return 'totp:sodium:' . base64_encode($nonce . sodium_crypto_secretbox($secret, $nonce, $cle));
+        }
+
+        $cle     = hash_hkdf('sha256', self::cleBrute($cleHex, 32), 32, self::HKDF_INFO);
+        $iv      = random_bytes(12);
+        $tag     = '';
+        $chiffre = openssl_encrypt($secret, 'AES-256-GCM', $cle, OPENSSL_RAW_DATA, $iv, $tag, '', 16);
+
+        if ($chiffre === false || strlen($tag) !== 16) {
+            throw new \RuntimeException('Chiffrement TOTP echoue (AES-256-GCM).');
+        }
+
+        return 'totp:gcm:' . base64_encode($iv . $tag . $chiffre);
+    }
 
     /**
      * Rend le secret TOTP en clair (base32), ou une chaine vide si le

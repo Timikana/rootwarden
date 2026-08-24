@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.50** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.51** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,42 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.51 — le portage sait ECRIRE un secret TOTP, et l'execution croisee le prouve
+
+**Prerequis de l'enrolement — le dernier blocage de la v2.0.** Le portage savait DECHIFFRER un
+secret TOTP mais pas en ECRIRE un. `App\Support\TotpCrypto::chiffre()` est le miroir exact de
+`encryptTotpSecret()` (`legacy/includes/totp_crypto.php:18`), meme ordre de moteurs — sodium
+d'abord, AES-256-GCM en repli — et meme comportement FAIL-CLOSED : sans cle, ou si le chiffrement
+echoue, on leve. Le repli « rendre le secret en clair » que le legacy portait avant son correctif
+A02-04 n'est PAS reintroduit.
+
+**Pourquoi ce test passe avant tout le reste.** Les deux portails partagent la base : un blob ecrit
+par l'un doit etre lisible par l'autre. Un format divergent d'un octet ne produit **aucun message
+d'erreur** — il rend le compte inaccessible d'un cote, et on ne le decouvre que le jour ou quelqu'un
+n'arrive plus a se connecter. La lecture comparee des deux fichiers avait ete faite ; l'EXECUTION
+croisee, non. Deux implementations qui se ressemblent a la lecture peuvent diverger a l'execution :
+une etiquette HKDF, un ordre de concatenation, un `hex2bin` qui echoue en silence.
+
+**Tests.** `tests/e2e/go-auth-totp-croise.mjs`, **15 PASS / 0 FAIL**. Il fait executer les DEUX
+implementations reelles, chacune dans SON conteneur — pas une reimplementation en JavaScript, qui ne
+prouverait que la comprehension du format. Mesure : les deux choisissent sodium, le portage relit ce
+que le legacy ecrit ET l'inverse, un blob altere d'un octet est refuse **par le vide** des deux
+cotes, un prefixe inconnu est refuse, et un secret historique sans prefixe est rendu tel quel des
+deux cotes.
+
+**Sans navigateur, et c'est le motif.** La convention veut des tests pilotes par des clics ; elle
+porte sur la logique qui a une INTERFACE. Ici la propriete est un format de donnees partage entre
+deux processus PHP : elle n'a aucune surface a cliquer, et la mesurer par l'interface reviendrait a
+enroler un vrai compte pour lire un octet. Aucune ecriture en base, aucun compte touche.
+
+**Mesure au passage** : le conteneur `rootwarden_laravel` a **sodium et openssl** mais **ni gd ni
+imagick** — ce qui confirme qu'il faudra `bacon/bacon-qr-code` en backend SVG pour l'ecran
+d'enrolement. Le legacy, lui, a les quatre.
+
+**Signale** : deux numerotations de sous-lots coexistent. `MODULE-AUTH.md` appelle A3 le step-up et
+A5 l'enrolement ; les commits et le plan appellent A5 le step-up. L'ordre d'execution reel est
+inchange. Un encadre en tete de `MODULE-AUTH.md` §7 le dit desormais.
 
 ### v1.37.50 — `auth/` sous-lot A5 : la re-authentification ponctuelle portee
 

@@ -196,6 +196,13 @@ est le contrôle croisé dans les deux sens.
 
 ## 7. Découpage en sous-lots
 
+> **⚠ DEUX NUMÉROTATIONS COEXISTENT, et il faut le savoir avant de lire ce tableau.**
+> Ce document appelle **A3** le step-up et **A5** l'enrôlement. Les commits, le `CHANGELOG` et
+> `PLAN-DE-MIGRATION.md` appellent **A5** le step-up (`v1.37.50`, `97a1719`). L'ordre d'exécution
+> réel, lui, n'a pas changé : politique → changement de mot de passe → step-up → **enrôlement** →
+> réinitialisation. C'est le tableau ci-dessous qui fait foi pour le CONTENU et le RISQUE ; les
+> étiquettes, elles, ne veulent rien dire hors de leur document.
+
 | Lot | Contenu | Risque |
 |---|---|---|
 | **A0** | le lien manquant + l'archivage du code mort | nul |
