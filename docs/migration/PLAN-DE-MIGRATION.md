@@ -13,6 +13,31 @@ Dernière mise à jour : **2026-08-24**, version `1.37.49`, HEAD `590834a`.
 
 ---
 
+## 0. Le brief
+
+> Migration RootWarden vers Laravel. Dépôt `~/Documents/Gestion_SSH_KEY` sur la VM Debian
+> `192.168.0.245`, compte `utilisateur`, sudo sans mot de passe.
+>
+> **Lire ce document en entier**, puis le `MODULE-*.md` du module en cours. Reprendre le chantier
+> **là où §2 et §4 le laissent** : le prochain geste est celui que §4 marque « en cours », sinon le
+> premier « à faire » dans l'ordre donné. Dérouler les neuf temps de §5, respecter les conventions de
+> §3 et la sûreté de §6.
+>
+> **Faire moins mais complètement.** Un sous-lot fini — mesuré, testé, documenté, capturé, committé —
+> vaut mieux que trois entamés.
+>
+> **En fin de tour** : mettre à jour §2, §4, §7 et §8, committer, **réarmer la boucle**.
+>
+> Contraintes qui ne se négocient pas : aucune trace d'IA ; parité FR/EN dans le **même** commit, jeux
+> de clés comparés ; commits atomiques ; `git add` **ciblé** — jamais `obsidian-rootwarden/` ni
+> `screenshots/`, et `srv-docker.env` / `laravel/.env` jamais commités ; **ne jamais fusionner** sans
+> l'accord de l'exploitant, le `push` reste en attente ; **s'arrêter et demander** si la parité est
+> impossible ou si l'effet est **sortant et irréversible** (courriel, scan réel, déploiement de clés) ;
+> **ne jamais demander à l'exploitant de coller un mot de passe, une clé ou un jeton** ; **ne jamais
+> inventer un secret TOTP** ; **ne jamais afficher une clé d'API**.
+
+---
+
 ## 1. Comment se servir de ce document
 
 | moment | geste |
