@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.49** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.50** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,66 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.50 — `auth/` sous-lot A5 : la re-authentification ponctuelle portee
+
+**Symptome.** Le portage REFUSAIT en bloc les routes qui donnent root (403 +
+`portage: non_porte`). Le refus n'etait pas un trou — accorder root sans le second controle que le
+legacy exige aurait ete un recul — mais la capacite manquait : apres une bascule directe, personne
+n'aurait plus pu deployer ni annuler une politique sudo depuis le portail.
+
+**Cause racine.** Le step-up du legacy (`legacy/auth/step_up.php`, quatre appelants et aucun autre)
+n'avait pas d'equivalent cote portage. `RoutesBackend::MOTIFS_STEP_UP` portait les motifs, et
+`config/rootwarden.php` portait meme `step_up_ttl => 900` que **personne ne lisait**.
+
+**Correctif.** `App\Services\StepUp` + `POST /profil/step-up` + integration dans la passerelle.
+Les QUATRE defauts du legacy sont mesures puis fermes :
+
+- **l'anti-rejeu vivait en session** : le meme code, rejoue depuis une session NEUVE, etait ACCEPTE.
+  La garde est desormais le compteur de fenetre MONOTONE par compte de `Totp::verifie`, PARTAGE avec
+  la connexion — un code ne sert qu'UNE FOIS, pour quoi que ce soit. Un code observe a la connexion ne
+  peut donc plus etre retourne en step-up, ce qui est l'escalade meme que le step-up existe pour
+  empecher ;
+- **le quota etait par session et jamais remis a zero** : apres un succes, la cinquieme tentative
+  suivante rendait deja 429. Il est desormais par COMPTE et **remis a zero sur succes** ;
+- **`api_proxy.php:63` fusionne trois routes root sous `policy_action`**, si bien qu'un step-up
+  consenti pour ANNULER une politique autorisait un DEPLOIEMENT sudo pendant quinze minutes. Le
+  portage nomme l'action PAR ROUTE (`policy_sudo_deploy`, `policy_sftp_deploy`, `policy_rollback`),
+  et le nom est DERIVE du chemin : ajouter un motif suffit a doter la route de son nom ;
+- **la liste des actions est FERMEE**, verifiee par aller-retour et fail-closed. Le legacy accepte
+  n'importe quel nom d'action et pose `_step_up_<ce que le client a envoye>`.
+
+**Deux ajouts que le legacy n'a pas** : `POST /profil/step-up/revoquer` pour rendre ses privileges
+(chez le legacy la marque vit quinze minutes et rien ne permet de l'abreger), et
+`step_up_tentatives` en configuration.
+
+**Une exigence de ma propre caracterisation etait dangereuse et a ete retiree.** Le premier jet
+demandait qu'un second step-up pour une AUTRE action reste possible dans la meme fenetre de 30 s, au
+motif que le refus du legacy gene un geste legitime. C'etait une exigence d'AFFAIBLISSEMENT : elle
+aurait autorise le rejeu d'un code observe a la connexion. Le refus est la bonne reponse ; ce qui
+cloche chez le legacy est qu'il refuse depuis la SESSION, donc de façon contournable.
+
+**Ma suite n'etait pas idempotente, et c'etait un vrai risque.** Elle accordait un step-up pour une
+route root, et l'execution suivante postait sur cette meme route quinze minutes plus tard. Seul un
+`machine_id` absent a empeche un deploiement sudo reel. La suite rend desormais les privileges a
+l'entree ET dans son `finally`. Effet secondaire heureux : la branche « une marque laisse passer la
+requete », d'abord declaree non mesurable sur le portage, l'est devenue — apres LECTURE du backend
+(`backend/routes/policies.py:220-225` et `:44-47` refusent sur `machine_id` manquant AVANT tout
+`ssh_session`).
+
+**Deux choses ne sont pas portees, et c'est dit.** Le panneau de decision en page, parce
+qu'**aucune page du portage n'appelle une route gardee par un step-up** — les pages qui le feront
+(`ssh/` K4 et `adm/`) ne sont pas portees, et une piece non mesurable dans le gabarit met en risque
+les quatorze pages deja portees ; il sera porte avec son premier consommateur. Et le modal du legacy
+reste ce qu'il est : integralement en francais code en dur, et il tutoie.
+
+**Tests.** `tests/e2e/go-auth-step-up.mjs` — legacy **38 PASS / 0 FAIL**, base rouge du portage
+**6 / 16**, portage **24 / 0**. Tout est mesure sur le CHEMIN DE REFUS : aucun geste root n'est emis.
+Voir `docs/migration/PARITE.md` E-96.
+
+**Exploitation.** Nouvelle variable optionnelle `STEP_UP_TENTATIVES` (defaut 5). Aucune migration.
+Les marques vivent dans le cache applicatif : un `cache:clear` REFERME les autorisations en cours au
+lieu de les ouvrir.
 
 ### v1.37.49 — `auth/` sous-lot A2 : le changement de mot de passe porte
 

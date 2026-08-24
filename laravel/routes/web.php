@@ -62,6 +62,19 @@ Route::middleware('session.authentifiee')->group(function () {
         ->name('profil.mot-de-passe');
 
     /*
+     * La re-authentification ponctuelle. AUCUNE garde de role : l'exigence porte
+     * sur l'action visee, pas sur qui la demande, et l'identifiant du compte
+     * vient de la session. Valider un step-up n'accorde par soi-meme aucun
+     * acces — la passerelle applique ses propres controles ensuite.
+     */
+    Route::post('/profil/step-up', [PortailController::class, 'verifieStepUp'])
+        ->name('profil.step-up');
+
+    /* Rendre ses privileges. Strictement de-escaladant, donc sans garde. */
+    Route::post('/profil/step-up/revoquer', [PortailController::class, 'revoqueStepUp'])
+        ->name('profil.step-up.revoquer');
+
+    /*
      * Pages metier reservees a l'administration.
      *
      * La garde est ici et NULLE PART ailleurs : ecrite aussi dans le

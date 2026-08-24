@@ -44,6 +44,12 @@ return [
      * par action. Identique au legacy.
      */
     'step_up_ttl' => 900,
+    /*
+     * Tentatives de re-authentification tolerees par minute et PAR COMPTE. Le
+     * legacy en tolere cinq par SESSION et ne remet pas le compteur a zero sur
+     * succes : cinq step-up legitimes en une minute rendent 429.
+     */
+    'step_up_tentatives' => (int) env('STEP_UP_TENTATIVES', 5),
 
     /*
      * Drapeaux de fonctionnalite, releves du legacy (feature_enabled()).

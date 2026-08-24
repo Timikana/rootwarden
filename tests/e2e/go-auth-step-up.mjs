@@ -35,10 +35,11 @@
  *  1. **l'anti-rejeu est par SESSION** (`$_SESSION['_step_up_last_totp']`) : le
  *     meme code, rejoue depuis une session NEUVE, est accepte. Meme famille que
  *     E-01. Le portage doit le porter **par COMPTE et EN BASE** ;
- *  2. **l'anti-rejeu est GLOBAL, pas par action** : une seule cle pour toutes
- *     les actions, si bien qu'un second step-up legitime dans la meme fenetre de
- *     30 s est refuse « Code 2FA deja utilise » — le defaut refuse un geste
- *     LEGITIME ;
+ *  2. **l'anti-rejeu ne couvre pas la connexion** : la cle du legacy est propre
+ *     au step-up, si bien qu'un code observe a la CONNEXION reste utilisable
+ *     pour obtenir un step-up — l'escalade meme que le step-up existe pour
+ *     empecher. Le portage partage un compteur de fenetre MONOTONE par compte
+ *     entre les deux : un code ne sert qu'UNE FOIS, pour quoi que ce soit ;
  *  3. **le debit n'est pas remis a zero sur succes** : `:53` empile la tentative
  *     avant toute verification et rien ne vide le tableau apres un succes. Cinq
  *     step-up reussis en une minute rendent **429** ;
@@ -88,7 +89,27 @@ const C = CIBLE === 'laravel'
             ['/api/gateway/policy/rollback', 'policy_rollback'],
         ],
         /** Cible de rejeu sure : le portage ne porte pas `adm/`. */
-        rejeu: null,
+        revocation: '/profil/step-up/revoquer',
+        /*
+         * CIBLE DE REJEU SURE, VERIFIEE EN LISANT LE BACKEND.
+         * `backend/routes/policies.py:220-225` : `sudo_deploy` resout d'abord
+         * les identifiants SSH, et `_resolve_ssh_creds` (`:44-47`) rend
+         * « machine_id requis. » en 400 des que le corps n'en porte pas —
+         * AVANT tout `ssh_session`. Un corps vide ne deploie donc rien.
+         */
+        rejeu: '/api/gateway/policy/sudo/deploy',
+        attenduRejeu: /machine_id/i,
+        /*
+         * PAS DE PANNEAU SUR LE PORTAGE, ET C'EST DELIBERE : aucune page portee
+         * n'appelle une route gardee par un step-up. Les pages qui le feront —
+         * `ssh/` (K4) et `adm/` — ne sont pas portees. Un panneau pose dans le
+         * gabarit sans flux pour l'exercer ne serait mesurable par aucun clic, et
+         * une piece non mesuree dans le gabarit met en risque les quatorze pages
+         * deja portees. Voir PARITE.md E-96.
+         */
+        aPanneau: false,
+        action: 'policy_sudo_deploy',
+        action2: 'policy_rollback',
         panneau: '[data-rw="step-up-panneau"]',
         champ: '[data-rw="step-up-code"]',
         valider: '[data-rw="step-up-valider"]',
@@ -104,7 +125,12 @@ const C = CIBLE === 'laravel'
             ['/api_proxy.php/policy/sftp/deploy', 'policy_action'],
             ['/api_proxy.php/policy/rollback', 'policy_action'],
         ],
+        revocation: null,
         rejeu: '/adm/api/update_permissions.php',
+        attenduRejeu: /donn[eé]es manquantes/i,
+        aPanneau: true,
+        action: 'update_permissions',
+        action2: 'delete_user',
         panneau: '#rw-stepup-overlay',
         champ: '#rw-stepup-code',
         valider: '#rw-stepup-ok',
@@ -119,8 +145,16 @@ const lignes = [];
 function note(l) { lignes.push(l); console.log(l); }
 function verifie(l, ok, d) { note(`${ok ? 'PASS' : 'FAIL'}  ${l}${d ? '  — ' + d : ''}`); if (!ok) echecs++; }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
+/**
+ * Une propriete que le PORTAGE doit tenir et que le legacy ne tient pas.
+ *
+ * Sur le portage c'est une assertion. Le detail n'est imprime QUE sur un echec :
+ * il explique le defaut du legacy, et l'imprimer sur un PASS ferait lire au
+ * journal l'inverse de ce qui vient d'etre mesure — un detail est imprime au
+ * PASS comme au FAIL, il doit donc dire ce qu'on a TROUVE.
+ */
 function verifiePortage(l, ok, d) {
-    if (CIBLE === 'laravel') return verifie(l, ok, d);
+    if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, `ecart assume du legacy — ${d}`);
 }
 
@@ -128,6 +162,30 @@ function b32(s){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let b='';for(const c 
 function totp(s){const k=b32(s);const c=Math.floor(Date.now()/1000/30);const buf=Buffer.alloc(8);buf.writeBigUInt64BE(BigInt(c));const h=createHmac('sha1',k).update(buf).digest();const o=h[h.length-1]&0x0f;return((h.readUInt32BE(o)&0x7fffffff)%1000000).toString().padStart(6,'0')}
 function dors(ms){return new Promise(r=>setTimeout(r,ms))}
 function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
+
+/**
+ * UN CODE JAMAIS ENCORE EMPLOYE PAR CE SCRIPT.
+ *
+ * Le portage partage un compteur de fenetre MONOTONE par compte entre la
+ * connexion et le step-up : un code ne sert qu'UNE FOIS, pour quoi que ce soit.
+ * Deux connexions tombant dans la meme fenetre de 30 s emploieraient donc le
+ * meme code, et la seconde serait refusee comme un rejeu — la suite echouerait
+ * sur une propriete qu'elle ne cherchait pas a mesurer.
+ *
+ * Attend aussi qu'il reste assez de fenetre pour que le code survive a l'aller.
+ */
+let derniereFenetre = -1;
+async function codeFrais() {
+    for (;;) {
+        const f = Math.floor(Date.now() / 1000 / 30);
+        if (f > derniereFenetre && resteFenetre() >= 6) {
+            derniereFenetre = f;
+
+            return totp(SECRET);
+        }
+        await dors(1500);
+    }
+}
 
 /** Un code a six chiffres qui n'est PAS le code courant, ni celui d'a cote. */
 function codeFaux() {
@@ -147,6 +205,8 @@ const navigateur = await puppeteer.launch({
     protocolTimeout: 180000,
 });
 const contextes = [];
+/** Une page encore ouverte, pour rendre les privileges dans le `finally`. */
+let pageVivante = null;
 
 /** Connexion complete, AU CLAVIER ET A LA SOURIS. */
 async function connecte() {
@@ -165,13 +225,11 @@ async function connecte() {
     await page.type('input[name="password"]', MDP, { delay: 8 });
     let nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
     await page.click('button[type="submit"]'); try { await nav; } catch {}
-    if (resteFenetre() < 6) await dors((resteFenetre() + 1) * 1000);
     for (let essai = 0; essai < 2; essai += 1) {
         const champ = await page.$('input[name="2fa_code"]');
         if (! champ) break;
-        if (essai > 0) await dors((resteFenetre() + 1) * 1000);
         await champ.click({ clickCount: 3 });
-        await champ.type(totp(SECRET), { delay: 8 });
+        await champ.type(await codeFrais(), { delay: 8 });
         nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
         await page.click('button[type="submit"]'); try { await nav; } catch {}
     }
@@ -181,6 +239,8 @@ async function connecte() {
         if (b) await b.evaluate((x) => x.click());
         try { await nav; } catch {}
     }
+
+    pageVivante = page;
 
     return { ctx, page, erreursJs };
 }
@@ -225,6 +285,25 @@ function message(texte) {
     try { return String(JSON.parse(texte)?.message ?? ''); } catch { return String(texte); }
 }
 
+/**
+ * REND LES PRIVILEGES DU COMPTE.
+ *
+ * Appele a l'ENTREE et dans le `finally`. Sans cela la suite n'etait pas
+ * idempotente, et ce n'etait pas theorique : une marque posee par une execution
+ * survivait quinze minutes et l'execution SUIVANTE trouvait sa premiere sonde
+ * TRANSMISE au backend au lieu d'etre refusee. Seul un `machine_id` absent a
+ * empeche un deploiement sudo reel — de la chance, pas une precaution.
+ *
+ * Le legacy n'offre aucun equivalent : sa marque vit quinze minutes et rien ne
+ * permet de l'abreger. La suite ne peut donc nettoyer que du cote portage.
+ */
+async function rendPrivileges(page) {
+    if (! C.revocation) return null;
+    const r = await forge(page, C.revocation, {});
+
+    return json(r);
+}
+
 /** Un step-up demande par requete forgee. */
 async function demandeStepUp(page, action, code) {
     const r = await forge(page, C.verifier, { action, totp_code: code, code });
@@ -246,16 +325,24 @@ async function etape(titre, fn) {
 try {
     // ══ PARTIE A — le garde refuse, et NOMME l'action ═══════════════════════
     const s1 = await connecte();
+    pageVivante = s1.page;
     constate('cible', `${CIBLE} — ${BASE}`);
     constate('compte', `${COMPTE} (role 3)`);
+    const entree = await rendPrivileges(s1.page);
+    constate('privileges rendus a l\'entree', entree
+        ? `${entree.revoquees} marque(s) effacee(s)` : 'sans objet sur cette cible');
 
     const noms = new Map();
     for (const [chemin, attendu] of C.gardees) {
         await etape(`refus de ${chemin}`, async () => {
             const r = await forge(s1.page, chemin, {});
             const c = json(r);
+            /* LE CORPS SUR ECHEC. Un « HTTP 400 » seul ne dit pas LEQUEL des
+             * refus a parle : la passerelle en rend deux (aucune route, chemin
+             * invalide) avant meme d'arriver au step-up. */
             verifie(`${chemin} est refuse sans step-up`, r.statut === 403,
-                `HTTP ${r.statut}`);
+                r.statut === 403 ? `HTTP ${r.statut}`
+                    : `HTTP ${r.statut} — ${r.texte.slice(0, 200)} — page ${await s1.page.url()}`);
             verifie(`${chemin} annonce step_up_required`, c.step_up_required === true,
                 `step_up_required = ${JSON.stringify(c.step_up_required)}`);
             verifie(`${chemin} nomme l'action « ${attendu} »`, c.action === attendu,
@@ -281,50 +368,65 @@ try {
 
     // ══ PARTIE B — les regles du point de verification ══════════════════════
     await etape('un code mal forme est refuse', async () => {
-        const r = await demandeStepUp(s1.page, 'update_permissions', '12345');
+        const r = await demandeStepUp(s1.page, C.action, '12345');
         verifie('un code de cinq chiffres est refuse', r.corps.success === false,
             `message = ${JSON.stringify(r.corps.message)}`);
     });
 
     await etape('une action absente est refusee', async () => {
-        const r = await demandeStepUp(s1.page, '', totp(SECRET));
+        const r = await demandeStepUp(s1.page, '', codeFaux());
         verifie('une action vide est refusee', r.corps.success === false,
             `message = ${JSON.stringify(r.corps.message)}`);
     });
 
     await etape('un code faux est refuse', async () => {
-        const r = await demandeStepUp(s1.page, 'update_permissions', codeFaux());
+        const r = await demandeStepUp(s1.page, C.action, codeFaux());
         verifie('un code a six chiffres mais faux est refuse', r.corps.success === false,
             `message = ${JSON.stringify(r.corps.message)}`);
     });
 
-    /* Le code de reference de la partie B. Fenetre fraiche : `verify(code, null, 1)`
-     * tolere +/- une fenetre, mais la limite de debit ne tolere rien. */
-    if (resteFenetre() < 10) await dors((resteFenetre() + 1) * 1000);
-    const codeB = totp(SECRET);
+    /* Le code de reference de la partie B, jamais employe avant lui. */
+    const codeB = await codeFrais();
 
     await etape('un code valide accorde le step-up', async () => {
-        const r = await demandeStepUp(s1.page, 'update_permissions', codeB);
+        const r = await demandeStepUp(s1.page, C.action, codeB);
         verifie('un code valide accorde le step-up', r.corps.success === true,
             `message = ${JSON.stringify(r.corps.message)}`);
-        verifie('la reponse annonce une echeance', typeof r.corps.valid_until === 'number'
-            || typeof r.corps.expire_dans === 'number',
-            `valid_until = ${JSON.stringify(r.corps.valid_until)}`);
+        /* Le legacy nomme le champ `valid_until` (un instant), le portage
+         * `expire_dans` (une duree). On accepte les deux et on imprime CELUI
+         * QU'ON A TROUVE : imprimer seulement le nom du legacy faisait lire
+         * « valid_until = undefined » sur un PASS. */
+        const echeance = ['valid_until', 'expire_dans']
+            .filter((n) => typeof r.corps[n] === 'number')
+            .map((n) => `${n} = ${r.corps[n]}`);
+        verifie('la reponse annonce une echeance', echeance.length > 0,
+            echeance.join(', ') || 'aucun champ d\'echeance');
     });
 
     await etape('le meme code ne se rejoue pas dans la meme session', async () => {
-        const r = await demandeStepUp(s1.page, 'update_permissions', codeB);
+        const r = await demandeStepUp(s1.page, C.action, codeB);
         verifie('le meme code est refuse au second usage', r.corps.success === false,
             `message = ${JSON.stringify(r.corps.message)}`);
     });
 
-    await etape('l\'anti-rejeu est-il par ACTION ?', async () => {
-        const r = await demandeStepUp(s1.page, 'delete_user', codeB);
+    /*
+     * UN CODE NE SERT QU'UNE FOIS, MEME POUR UNE AUTRE ACTION.
+     *
+     * Un premier jet de cette suite exigeait l'inverse — qu'un second step-up
+     * pour une AUTRE action reste possible dans la meme fenetre de 30 s — au
+     * motif que le refus du legacy gene un geste legitime. C'etait une exigence
+     * DANGEREUSE : elle aurait autorise le rejeu d'un code observe a la
+     * connexion pour obtenir un step-up, c'est-a-dire exactement l'escalade que
+     * le step-up existe pour empecher. Le refus est la bonne reponse ; ce qui
+     * cloche chez le legacy n'est pas qu'il refuse, c'est qu'il refuse depuis la
+     * SESSION, donc de façon contournable (partie suivante).
+     */
+    await etape('un code ne sert qu\'une fois, meme pour une autre action', async () => {
+        const r = await demandeStepUp(s1.page, C.action2, codeB);
         constate('second step-up, action differente, meme code',
             `success = ${JSON.stringify(r.corps.success)} — ${JSON.stringify(r.corps.message)}`);
-        verifiePortage('un second step-up pour une AUTRE action reste possible dans la fenetre',
-            r.corps.success === true,
-            'l\'anti-rejeu est GLOBAL et non par action : il refuse un geste LEGITIME');
+        verifie('un code deja consomme est refuse meme pour une autre action',
+            r.corps.success === false, JSON.stringify(r.corps.message));
     });
 
     if (C.rejeu) {
@@ -334,13 +436,13 @@ try {
             verifie('le chemin garde n\'est plus refuse pour absence de step-up',
                 c.step_up_required !== true, `step_up_required = ${JSON.stringify(c.step_up_required)}`);
             const m = message(r.texte);
-            verifie('il sort sur « Donnees manquantes », donc AVANT toute ecriture',
-                /donn[eé]es manquantes/i.test(m), m);
+            verifie('le refus porte sur le CORPS, donc le step-up a laisse passer',
+                C.attenduRejeu.test(m), m);
         });
     }
 
     // ══ PARTIE C — le modal, PAR DES CLICS ═════════════════════════════════
-    if (C.rejeu) {
+    if (C.aPanneau) {
         const s2 = await connecte();
 
         await etape('le modal s\'ouvre sur un refus de step-up', async () => {
@@ -419,10 +521,9 @@ try {
          * et l'assertion echouerait pour une mauvaise raison. */
         const a = await connecte();
         const b = await connecte();
-        if (resteFenetre() < 12) await dors((resteFenetre() + 1) * 1000);
-        const code = totp(SECRET);
-        const r1 = await demandeStepUp(a.page, 'anonymize_user', code);
-        const r2 = await demandeStepUp(b.page, 'anonymize_user', code);
+        const code = await codeFrais();
+        const r1 = await demandeStepUp(a.page, C.action, code);
+        const r2 = await demandeStepUp(b.page, C.action, code);
         constate('premier usage du code (session A)', JSON.stringify(r1.corps.success));
         constate('rejeu du MEME code (session B)', `${JSON.stringify(r2.corps.success)} — `
             + JSON.stringify(r2.corps.message));
@@ -438,10 +539,18 @@ try {
         const faux = codeFaux();
         const statuts = [];
         for (let i = 0; i < 6; i += 1) {
-            const r = await demandeStepUp(d.page, 'update_permissions', faux);
+            const r = await demandeStepUp(d.page, C.action, faux);
             statuts.push(r.statut);
         }
-        constate('six tentatives fausses de suite', statuts.join(' '));
+        /*
+         * LE QUOTA DU PORTAGE EST PAR COMPTE, PAS PAR SESSION : il traverse donc
+         * les parties de cette suite, la ou celui du legacy repartait de zero a
+         * chaque session neuve. Les deux series de statuts ne sont pas
+         * directement comparables d'une cible a l'autre, et c'est voulu — le but
+         * est de brider le COMPTE, pas le navigateur.
+         */
+        constate('six tentatives fausses de suite', statuts.join(' ')
+            + (CIBLE === 'laravel' ? ' (quota par COMPTE : il traverse les parties)' : ''));
         verifie('la limite de debit finit par rendre 429', statuts.includes(429),
             statuts.join(' '));
 
@@ -454,12 +563,11 @@ try {
          * pouvoir distinguer. Il faut CINQ tentatives apres le succes : si la
          * derniere rend 429, le succes a bien consomme un jeton. */
         const e = await connecte();
-        if (resteFenetre() < 12) await dors((resteFenetre() + 1) * 1000);
-        const ok = await demandeStepUp(e.page, 'update_permissions', totp(SECRET));
+        const ok = await demandeStepUp(e.page, C.action, await codeFrais());
         constate('succes initial', JSON.stringify(ok.corps.success));
         const apres = [];
         for (let i = 0; i < 5; i += 1) {
-            const r = await demandeStepUp(e.page, 'update_permissions', faux);
+            const r = await demandeStepUp(e.page, C.action, faux);
             apres.push(r.statut);
         }
         constate('cinq tentatives apres le succes', apres.join(' '));
@@ -481,6 +589,18 @@ try {
 } catch (e) {
     verifie('deroulement de la suite', false, String(e).split('\n')[0]);
 } finally {
+    /* LES PRIVILEGES AVANT LES FERMETURES : la revocation a besoin d'une page
+     * vivante et de sa session. */
+    if (pageVivante) {
+        try {
+            const sortie = await rendPrivileges(pageVivante);
+            if (sortie) constate('privileges rendus a la sortie',
+                `${sortie.revoquees} marque(s) effacee(s)`);
+        } catch (e) {
+            note(`FAIL  restitution des privileges  — ${String(e).split('\n')[0]}`);
+            echecs++;
+        }
+    }
     for (const ctx of contextes) {
         try { await ctx.close(); } catch {}
     }

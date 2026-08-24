@@ -89,6 +89,13 @@ et **l'extension PHP `imagick`** (`enable_2fa.php:69`, `ImagickImageBackEnd`) qu
 
 ## 3. La capacité 2 — le step-up
 
+> **PORTÉE le 2026-08-24, `v1.37.50`.** `App\Services\StepUp`, `POST /profil/step-up` et
+> `POST /profil/step-up/revoquer` ; la passerelle exige une marque fraîche puis transmet. Les quatre
+> défauts ci-dessous sont **fermés**, et deux ajouts n'existent pas côté legacy : la **révocation**, et
+> la liste d'actions **fermée**. **Non porté, et dit** : le panneau de décision en page, parce
+> qu'aucune page du portage n'appelle encore une route gardée — il viendra avec son premier
+> consommateur (`ssh/` K4 ou `adm/`). Mesures et détail : `PARITE.md` **E-96**.
+
 `stepUpVerify($action, $maxAge = 900)`, `legacy/auth/step_up.php:34-39`. Clé de session
 `_step_up_<action>`, `[^a-z0-9_]` → `_`. Compagnes : `stepUpMark()` (`:44`), `stepUpRequire()`
 (`:53`, 403 + `{step_up_required:true}` + `exit`).
@@ -113,9 +120,9 @@ Quatre défauts :
 4. `api_proxy.php:63` fusionne trois routes root sous `policy_action` : un step-up validé pour
    `/policy/rollback` autorise `/policy/sudo/deploy` pendant 15 minutes.
 
-Côté portage : `RoutesBackend::MOTIFS_STEP_UP` reprend les deux motifs, et
-`PasserelleController:78` **refuse** au lieu de transmettre. `config/rootwarden.php:46`
-`step_up_ttl => 900` existe et **n'est lu par personne**.
+Côté portage, **avant** A5 : `RoutesBackend::MOTIFS_STEP_UP` reprenait les deux motifs et
+`PasserelleController:78` **refusait** au lieu de transmettre ; `config/rootwarden.php:46`
+`step_up_ttl => 900` existait et **n'était lu par personne**. Les trois points sont levés.
 
 Le modal client (`legacy/js/utils.js:59-146`) est **intégralement en français en dur, et tutoie**.
 
