@@ -1,0 +1,414 @@
+# Plan de migration du legacy vers Laravel — document de travail
+
+**Ce document est la source unique du chantier.** Il se lit **au début de chaque tour** et se met à
+jour **à la fin**. Il remplace le brief recollé à chaque fois : si une information n'est pas ici, elle
+n'existe pas pour le tour suivant.
+
+- **État** mesuré, avec la commande qui le remesure.
+- **Plan** : l'ordre des modules et le découpage en sous-lots.
+- **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
+- **Pièges** accumulés — chacun a coûté quelque chose.
+
+Dernière mise à jour : **2026-08-24**, version `1.37.49`, HEAD `590834a`.
+
+---
+
+## 1. Comment se servir de ce document
+
+| moment | geste |
+|---|---|
+| début de tour | lire ce fichier **en entier**, puis le `MODULE-*.md` du module en cours |
+| pendant | mesurer avant de décider ; ne jamais reconduire un chiffre |
+| fin de tour | mettre à jour §2 (état), §4 (le module traité), §7 (décisions), §8 (pièges neufs) |
+
+**Un chiffre de ce document ne se recopie pas : il se remesure.** Trois erreurs de suivi l'ont montré —
+69 commits annoncés pour 70, deux points d'entrée pour quatre, une liste de modules qui en oubliait cinq.
+
+```bash
+cd /home/utilisateur/Documents/Gestion_SSH_KEY
+# entrees de menu portees / restantes (retirer 2 lignes de commentaire de chaque compte)
+grep -c "'route'"  laravel/app/Support/Navigation.php
+grep -c "'legacy'" laravel/app/Support/Navigation.php
+grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
+ls legacy/_deprecated/                                   # parties archivees
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (85), pas le dernier numero (E-95)
+git fetch origin && git rev-list --left-right --count @{u}...HEAD
+sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
+```
+
+---
+
+## 2. Où on en est
+
+| | |
+|---|---|
+| entrées de menu portées | **14 sur 33** |
+| parties du legacy archivées | **9** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` |
+| modules entièrement dépréciés | **2** — `update/`, `supervision/` |
+| LOT de tests E2E | **87 exécutions, 1182 assertions, 0 échec** |
+| tests backend | **341 pytest** |
+| écarts de parité documentés | **85** — numérotés jusqu'à **E-95** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| commits non poussés | **77**, 0 de retard sur `origin/Migration-Laravel` |
+| `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
+
+Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
+passerelle vers le backend, i18n FR/EN. Le chiffre 14/33 se recoupe par trois voies indépendantes :
+`Navigation.php`, le DOM (66 entrées, car le menu y figure **deux fois** — barre latérale et tiroir), et
+l'accueil du portage qui affiche lui-même « Déjà portés 14 / 33 ».
+
+### Les deux blocages de la v2.0
+
+| blocage | état |
+|---|---|
+| changement de mot de passe requis | **LEVÉ** — sous-lot A2, `v1.37.49`. Six comptes actifs sur dix étaient concernés, dont `superadmin` |
+| **enrôlement 2FA** | **OUVERT** — n'existe que dans le legacy. Sans lui, aucun compte neuf ne peut obtenir de second facteur après la bascule |
+
+---
+
+## 3. Conventions tranchées par l'exploitant
+
+Elles prévalent sur tout le reste.
+
+1. **Tout se fait sur `Migration-Laravel`**, correctifs de sécurité compris. Plus de branche
+   `security/…` séparée : cette branche sera fusionnée dans `main` plus tard.
+2. **Les modifications backend et legacy sont autorisées.** Ne plus bloquer, ne plus demander — dire ce
+   qu'on change et pourquoi, dans le commit.
+3. **Tout le legacy doit migrer.** Aucun module n'est « laissé au legacy ».
+4. **Ne jamais fusionner sans son mot.** Le `push` reste également en attente : il n'a levé que le merge.
+5. **Rendre compte du TOTAL, pas du sous-lot.** « 14 entrées portées sur 33 » dit autre chose que « le
+   LOT est conforme ».
+6. **Lire le `MODULE-*.md` avant de planifier un module.** Ne pas le faire a produit un plan faux et
+   laissé une vulnérabilité de production trois jours sans être remontée.
+7. **Les tests se pilotent par des clics Puppeteer** (`page.type` + `page.click`) — jamais
+   `page.evaluate(() => fonctionDeLaPage())`, jamais de requêtes HTTP brutes. Deux exceptions, chacune
+   devant porter son motif écrit : la **requête forgée** émise *depuis la page*, et la sonde
+   `node:https` d'`archive.mjs`.
+8. **Les captures se prennent avec un compte de rôle 3** (`rw-test-super`), à 1920/1400/390. Les comptes
+   à droits réduits ne servent qu'à mesurer les **gardes**.
+9. **Arrêter et demander** seulement si : parité impossible, ou **effet sortant irréversible**
+   (courriel, scan réel, déploiement de clés).
+
+---
+
+## 4. Le plan, module par module
+
+### 4.1 `auth/` — en cours
+
+Pas une entrée de menu : ce qui empêche d'éteindre le legacy. 16 fichiers, 3003 lignes.
+Détail : **`MODULE-AUTH.md`**.
+
+| sous-lot | état | note |
+|---|---|---|
+| correctif de l'enrôlement | **FAIT** `v1.37.48` | le second facteur était dérivable du premier, **en production** |
+| **A2** changement de mot de passe | **FAIT** `v1.37.49` | lève le premier blocage v2.0 |
+| **A5** step-up ponctuel | **EN COURS** | voir ci-dessous |
+| enrôlement porté | à faire, **en dernier** | trois raisons cumulées, voir plus bas |
+| **A3** réinitialisation | **bloqué** | **envoie un courriel** — arbitrage requis |
+
+**Ne pas porter** : `migrate_crypto.php` (323 l.) et `migrate_totp.php` (88 l.), scripts CLI ponctuels
+refusés en HTTP par le `.htaccess` (403 vérifié). **`verify.php`** (332 l.) n'est pas une page mais le
+garde central inclus par chaque page protégée — l'équivalent du middleware du portage.
+**À archiver comme code mort** : `confirm_2fa.php` (aucun appelant) et `reset_totp.php` (aucun appelant,
+et **plus permissif** que le chemin vivant `adm/includes/manage_roles.php:101-121`, qui porte une garde
+hiérarchique que le fichier mort n'a pas).
+
+**A5 — le step-up.** `stepUpVerify($action, 900)`, clé de session `_step_up_<action>`. Quatre appelants,
+tous avec le même ordre de gardes (rôle → méthode → CSRF → step-up) : `adm/api/delete_user.php`,
+`adm/api/update_permissions.php`, `adm/api/anonymize_user.php`, et `api_proxy.php:63`.
+Quatre défauts mesurés : anti-rejeu **par session** et non par compte ; anti-rejeu **global** et non par
+action ; **débit non remis à zéro sur succès** (cinq step-up légitimes en une minute → 429) ; et
+`api_proxy.php:63` **fusionne trois routes root sous `policy_action`**, si bien qu'un step-up validé
+pour `/policy/rollback` autorise `/policy/sudo/deploy` pendant quinze minutes.
+Côté portage : `RoutesBackend::MOTIFS_STEP_UP` porte les deux motifs et `PasserelleController`
+**REFUSE** au lieu de transmettre (403 + `step_up_required`), ce qui est un choix assumé — accorder root
+sans le second contrôle serait un recul. `config/rootwarden.php` porte `step_up_ttl => 900` que
+**personne ne lit** (vérifié). Le modal du legacy (`js/utils.js:59-146`) est **en français en dur, et
+tutoie**.
+**Mesuré le 2026-08-24 (§8-2 fermée)** : **les deux portails ne partagent PAS la session** — le legacy
+écrit dans `/var/www/sessions` (159 fichiers), le portage dans `storage/framework/sessions` (380). Une
+marque de step-up posée d'un côté est donc invisible de l'autre : le portage doit porter son propre
+mécanisme, il ne peut pas hériter de celui du legacy.
+
+**L'enrôlement vient en dernier, et c'est délibéré** : seul geste qui **écrit** un secret TOTP — un
+format divergent d'un octet rend un compte inaccessible **sans message d'erreur** ; il dépend d'un
+moteur de QR ; et **porter fidèlement serait porter une vulnérabilité**. Premier test à écrire :
+**l'exécution croisée des blobs TOTP** entre les deux implémentations (lecture comparée faite,
+exécution croisée **non faite**). Le conteneur Laravel n'a **ni `imagick` ni `gd`** ; il a
+`spomky-labs/otphp` → ajouter **`bacon/bacon-qr-code`** avec le backend **SVG**. `endroid/qr-code` du
+legacy est une **dépendance morte**. Le portage devra aussi offrir un écran de **ré-enrôlement** : il
+n'en existe aucun, le lien d'onboarding du legacy est **mort** (`includes/onboarding.php:68`) et son
+étape « 2FA » est **toujours cochée** (`:64`).
+
+### 4.2 Les 19 entrées de menu restantes
+
+Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
+
+| ordre | partie | lignes | entrées | note |
+|---|---|---|---|---|
+| 1 | `docker/` | 201 | 1 | le plus petit ; bon rodage du cycle |
+| 2 | `chatops/` | 246 | 1 | |
+| 3 | `maintenance/` | 257 | 1 | fenêtres de maintenance, enforcement HTTP 423 |
+| 4 | `groups/` | 305 | 1 | groupes dynamiques + actions de masse |
+| 5 | `graylog/` | 388 | 1 | |
+| 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
+| 7 | `services/` | 631 | 1 | gestes sur machines |
+| 8 | `iptables/` | 870 | 1 | gestes sur machines, IDOR déjà corrigé |
+| 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
+| 10 | `bashrc/` | 941 | 1 | |
+| 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | le plus gros ; à découper en six sous-lots au moins |
+| 13 | `documentation.php`, `api/docs.php` | — | 2 | |
+
+**`adm/` porte deux défauts sérieux à corriger en le portant** :
+`adm/includes/manage_roles.php:86` hache le mot de passe généré **sans `BCRYPT_COST`** et **sans appeler
+la politique ni enregistrer l'ancien haché** — contournement complet ; et `:93-95` **affiche le mot de
+passe généré en clair dans le HTML**.
+
+### 4.3 Deux sous-lots bloqués dans des modules par ailleurs portés
+
+- **S7b** (`security/`) — le scan CVE qui aboutit **envoie un vrai courriel** (`send_cve_report` part
+  dès que l'état passe à `done` avec des résultats). Prérequis techniques faits.
+- **K4** (`ssh/`) — le déploiement de clés. Bloqué par l'arbitrage du repli `NOPASSWD: ALL`, et un
+  déploiement lancé en l'état **révoquerait** des accès.
+
+### 4.4 Le cycle d'archivage, une fois un module complet
+
+`git mv legacy/<partie> legacy/_deprecated/` · basculer **tous** les points d'entrée — `menu.php`
+(barre latérale **et** tiroir mobile), `index.php` (raccourcis du tableau de bord), **`head.php` (carte
+de raccourcis CLAVIER, un objet JS qu'aucun contrôle sur les `href` ne voit)** · vérifier que
+`Navigation` porte `route` et non `legacy` · tenir `LiensLegacy::REMPLACEMENTS` à jour (**mesurer si le
+backend émet le chemin** : préventif sinon) · greffer `constateArchivage` + `verifieMenuLegacy` **en
+tête du `try`** de chaque suite · **mesurer** la nouvelle référence legacy (`1 + N fichiers réels + 2`)
+· vérifier la **non-régression des parties déjà archivées** si l'on touche `archive.mjs` · captures.
+
+---
+
+## 5. La méthode, neuf temps
+
+`METHODE-SOUS-LOT.md`. Inventaire → **lire le `MODULE-*.md` existant** → caractérisation **verte sur le
+legacy d'abord** → base **rouge** mesurée → portage → même suite verte sur le portage → divergence
+déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **envoyées** → **LOT complet** →
+commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
+
+Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
+archivage **4/3** · A2 **7/1**.
+
+---
+
+## 6. Comment travailler ici
+
+`./scripts/rejouer-lot.sh [--laravel|--legacy] [suites…]` — **ne pas lancer les suites à la main**. Une
+suite sans référence rend « (pas de référence) » : on **mesure** avant d'inscrire, et **on vérifie dans
+quelle table** on inscrit (deux entrées de même clé dans la même table : la seconde écrase la première).
+
+**Le LOT dure ~100 min pour 87 suites.** `setsid … > log 2>&1 < /dev/null &` puis, **dans un appel
+séparé**, l'attente. **Ne jamais combiner la vérification d'un rejeu et son lancement** — la ligne de
+commande contient alors le chemin en clair et `pgrep` s'attrape lui-même (payé trois fois). Pour compter
+ce qui vit : `ps -eo pid,etime,cmd | grep "rejouer-lot.sh" | grep -v grep` — **un rejeu = deux lignes**.
+
+Après modification du backend : `sudo -n docker restart rootwarden_python` + ~17 s. Après une vue :
+`view:clear` puis `view:cache`. Pas plus de 3 suites par commande. Jamais en root. Exécution parallèle
+impossible. Ne pas éditer un fichier servi — ni le runner — pendant un rejeu (docs et skills : sans
+risque).
+
+`docker` demande `sudo -n` depuis mon shell (les suites l'appellent sans). Conteneurs :
+`rootwarden_php`, `rootwarden_python`, `rootwarden_db`, `rootwarden_laravel`, `rootwarden_test_server`,
+`rootwarden_mock_opencve`. `php` n'existe pas sur l'hôte :
+`sudo -n docker exec rootwarden_laravel php -l <fichier>` — **`php -l` ne valide pas un `.blade.php`**.
+`pytest` vit **dans** le conteneur. Mot de passe MySQL :
+`P=$(grep -oP '^MYSQL_ROOT_PASSWORD=\K.*' srv-docker.env)`.
+
+Chemins backend : legacy `/api_proxy.php/<route>`, portage `/api/gateway/<route>`. Gabarits :
+`layouts.portail` (pages), `layouts.socle` (écrans d'authentification).
+
+### Le schéma, ce qu'il faut savoir
+
+`users` : `id name company email password totp_secret ssh_key ssh_key_updated_at active
+failed_attempts locked_until last_failed_login_at sudo role_id encryption_version password_updated_at
+password_expires_at password_expiry_override force_password_change created_at onboarding_dismissed_at`
+— c'est **`active`**, pas `is_active`.
+
+- `password_updated_at` porte **`ON UPDATE CURRENT_TIMESTAMP`**, qui ne se déclenche **que si la valeur
+  change** ; `verify.php:159` calcule l'expiration dessus.
+- `password_expires_at` est **écrite par le legacy et lue par personne** (0 ligne renseignée).
+- `password_history` : `id user_id password_hash changed_at`.
+- `user_logs` : `id user_id action created_at prev_hash self_hash` — la chaîne est posée par un
+  **scellement séparé**, l'insertion est **nue**. 3368 lignes dont **757 sans empreinte**.
+- **Aucune migration Laravel** : le schéma appartient au backend Python (`mysql/migrations/*.sql`).
+
+### Comptes de test
+
+| compte | id | rôle | note |
+|---|---|---|---|
+| `rw-test-user` | 14 | 1, zéro permission | **D-5 : ne pas toucher** |
+| `rw-test-admin` | 15 | 2, `can_manage_supervision` | **treize suites en dépendent** |
+| `rw-test-super` | 16 | 3, `can_admin_portal` | les captures passent par lui |
+
+Mot de passe `RootWarden@2026-Test!`, codes via `node tests/e2e/code-totp.mjs <compte>`.
+**Ne jamais inventer un secret TOTP.** Sans secret TOTP : `opsuser` (id 2, **vrai compte**) et cinq
+résidus `e2e_test_*`. `superadmin` (id 1) : rôle 3, `force_password_change = 1`, et **son mot de passe
+ne correspond plus** à celui de mes notes.
+`Navigation::autorisee()` traite `'sa' => $roleId >= 3` : **un rôle 3 voit les 33 entrées**.
+**Exercer les deux chemins d'une garde « permission OU rôle »** : rôle 1 → 403, rôle 3 sans la
+permission → 200. **Vider `login_attempts` avant chaque suite.**
+
+### Sûreté
+
+Le scheduler tourne dans `rootwarden_python`, **invisible à `ps`**, toutes les 60 s. Toute fixture —
+base, conteneur, fichier distant, paquet, **secret ou mot de passe de compte** — est nettoyée à
+l'entrée et dans un `finally`, **chaque étape isolée dans son `try`**, et **l'état rendu est relu pour
+être prouvé**.
+
+**Avant de faire cliquer un test, lire ce que l'action envoie.** **`srv-zabbix` (id 1) : jamais
+jointe.** **Aucune session de test ni de capture pendant un rejeu** — le garde anti-rejeu TOTP est par
+compte et **en base** ; un compte que le LOT n'utilise pas est libre.
+**Ne jamais demander à l'exploitant de coller un mot de passe, une clé ou un jeton.**
+**`tests/e2e/go-ssh-audit-scanall.mjs` joint la production** — ne pas le lancer.
+
+**Six motifs de test selon le geste** : joint la production par construction → interception +
+avortement · porte sur une cible qu'on choisit → cliquer pour de vrai, nettoyer dans un `finally` ·
+revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la page** · chemin destructeur
+→ **simuler d'abord** · branche inatteignable sur le banc → **fixture qui la rend atteignable** · défaut
+**transitoire** → émettre le geste **seul**.
+
+---
+
+## 7. Décisions qui attendent l'exploitant
+
+**Effets sortants, à autoriser avant tout test**
+- **A3** — la réinitialisation de mot de passe envoie un courriel (`phpmailer`). Réserves déjà mesurées :
+  le jeton **circule dans la query string** (historique, `Referer`, journaux Apache), et **un compte sans
+  `email` n'a aucun chemin**.
+- **S7b** — un scan CVE réel.
+
+**Opérationnel**
+- **pousser la branche** (77 commits locaux) ;
+- **rétroporter vers `main`** : **v1.37.16**, **v1.37.17**, **v1.37.48** — le dernier ferme une
+  vulnérabilité **présente** en production ;
+- **relire `security/backend-cve`** (6 correctifs backend, 318 pytest, jamais fusionnée) ;
+- **réinitialiser `superadmin`** si l'on veut des captures sous ce compte précis. Effet de bord signalé :
+  son `failed_attempts` est passé de 0 à 1 (seuil 5, aucun verrou) ;
+- **supprimer ou non les cinq comptes `e2e_test_*`** : actifs, rôle 1, **sans second facteur** ;
+- **K4** — l'arbitrage `NOPASSWD: ALL` : le repli a **deux** chemins, et aucun compte actif de rôle 1 ne
+  porte `users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable.
+
+**Mesurés, non corrigés**
+- **E-73** — le fuseau du backend : UTC contre CEST, l'**affichage** est faux de deux heures ;
+- **757 lignes de `user_logs` non scellées** laissent un trou dans la vérification de chaîne ;
+- la liste blanche `/supervision/` de `api_proxy.php:134` — **surface morte** depuis l'archivage, et
+  `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES` ;
+- les **11 liens sortants** du legacy non marqués, et le **404 brut d'Apache** des neuf parties
+  archivées — avis donné : **ne pas y toucher**, on ne soigne pas ce qu'on démonte ;
+- le **tiroir mobile du portage** reste à capturer correctement.
+
+**Autorisés, donc à faire — ne plus demander**
+**E-90** (le déploiement backend n'inspecte aucun code de retour et inscrit un agent inexistant) ·
+`generic_reconfigure` qui annonce un succès sans rien avoir écrit · la clé PSK dont l'échec de
+déchiffrement n'est que journalisé · les quatre routes de profils sans `@require_role` ·
+`POST /supervision/overrides/<id>` sans `@require_machine_access` · le `SELECT *` de `list_profiles` ·
+`telegraf_output_token` non masqué · le `POST` sans `WHERE platform` · la lecture via `execute_as_root` ·
+`agent_type` calculé puis jeté · les **huit branches mortes** qui armeraient un `@threaded_route`
+**imbriqué** (le pool se **bloque** si l'on supprime la règle statique en la prenant pour un doublon) ·
+les 21 routes de filtrage sans permission · la garde de la page `ssh/` · `can_deploy_keys` côté requête ·
+la fuite du mot de passe dans `deployment.log` · OpenCVE TLS désactivée · le verrou et la limite de débit
+du scan CVE par processus · **les deux défauts de `manage_roles.php`**.
+
+---
+
+## 8. Principes et pièges
+
+Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel` en portent le détail.
+
+### Mesurer
+
+- **Un inventaire ancien n'est pas une mesure. Un chiffre hérité non plus. Compter une seconde fois par
+  un AUTRE moyen.**
+- **Le dernier numéro d'une série n'est pas son compte.** `PARITE.md` va jusqu'à `E-95` et ne porte que
+  **85** écarts : dix numéros ont sauté. `ROADMAP.md` annonçait « 93 » — le label pris pour un total, et
+  périmé en plus. Ce document s'est fait prendre par sa propre règle dès sa première relecture.
+- **Quand deux sources divergent, mesurer. Quand la mesure dédouane, le dire aussi clairement qu'une
+  accusation. Quand une hypothèse est trop large, la resserrer.**
+- **Avant de porter une écriture, chercher son LECTEUR** — `password_expires_at` était écrite et lue par
+  personne.
+- **Un correctif évident peut casser le cas normal** : mesurer les **deux** moitiés.
+- **Une réussite annoncée n'est pas une réussite vérifiée** ; **un état final correct ne prouve pas que
+  le geste était correct** ; **un statut 200 ne prouve rien si la session n'a pas tenu**.
+- **Un pass dont on ne sait pas pourquoi il passe ne vaut rien** — trois fois dans le seul sous-lot A2,
+  et un vert ne se relit pas. **N validations précédentes ne prouvent rien si aucune ne pouvait
+  échouer.**
+- **Quand une suite échoue, se demander d'abord si c'est ELLE qui a tort** — arrivé **douze** fois.
+
+### Tests
+
+- **Cliquer le bouton, pas appeler la fonction** — et **pas le premier bouton de la page** :
+  `profile.php` porte cinq formulaires et le premier est celui du courriel. Remonter du **champ** à son
+  `form` par `closest('form')`.
+- **Un message se lit dans son porte-messages** (`data-rw` dédié), pas par une classe approchante :
+  `[class*="text-red"]` attrapait un compteur valant « 0 », puis le **bandeau** d'exigence.
+- **Une garde du navigateur déplace le refus, elle ne le supprime pas** (`minlength`) : mesurer la
+  **propriété**, prouver le serveur par une **requête forgée**.
+- **Tester la visibilité du CONTENEUR, pas du descendant** ; **une forme de retour constante dans
+  `page.evaluate`** ; **compter les requêtes plutôt que regarder le DOM** ; **jamais d'attente fixe après
+  un clic d'onglet** ; **une navigation referme l'onglet** ; **l'ordre des gestes compte**.
+- **Un détail d'assertion est imprimé au PASS comme au FAIL** : dire ce qu'on a **trouvé**.
+- **Un nettoyage qui supprime par TYPE en retire plus qu'il n'en a posé** : borner par un **delta**.
+- **Une exception dans le `finally` emporte le journal entier** : isoler chaque étape.
+- **Imprimer le journal au fil de l'eau.** **Sonder un chemin qui n'a jamais existé rend 404** et fait
+  passer l'assertion pour rien.
+- **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+
+### Base et shell
+
+- **MySQL ne déclenche `ON UPDATE CURRENT_TIMESTAMP` que si la valeur change.**
+- **`DELETE … JOIN` n'accepte ni `ORDER BY` ni `LIMIT`.**
+- **Une colonne peut être écrite et lue par personne** ; **un journal chaîné peut s'écrire nu**.
+- **`litEnBase` trime puis filtre : une valeur vide disparaît.**
+- **Le code de sortie derrière un tube est celui du dernier maillon.**
+- **`pgrep -f` s'attrape lui-même** ; **un `&` détache le travail du conteneur de tâche** ; **conclure
+  sur le journal, jamais sur le code de sortie**.
+- **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
+- **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
+
+### Sécurité et interface
+
+- **Un GET ne doit rien écrire** ; **un garde anti-rejeu par session est inerte** (le poser par compte et
+  **en base**) ; **une redirection n'est pas une garde** ; **un garde sans objet ne garde rien**.
+- **Une garde sans effet n'est pas une faille, mais le dire évite qu'on la croie protectrice.**
+- **Ne jamais renvoyer un mot de passe dans la réponse** : pas de `withInput()` sur un formulaire de
+  secret, champs revidés à chaque retour.
+- **L'attribut `value` du jeton CSRF est sur la LIGNE SUIVANTE** du HTML du legacy : un `grep` par ligne
+  ne le trouve pas, le POST rend 403, et on conclut à tort qu'une vulnérabilité n'existe pas.
+- **Une validation qui rend une clé i18n n'est pas un message.**
+- **Une traduction peut exister et être inaccessible** : mesurer dans **quel fichier**.
+- **Ne pas offrir d'entrée libre plutôt que la valider** ; **un champ libre par-dessus un `enum`**.
+- **Un `confirm()` natif se remplace par un panneau de décision** ; **pas de case à cocher = pas
+  d'action de masse** ; **nommer la production sur le geste qui coûte** ; **nommer, pas compter**.
+- **Un champ qui décrit le backend n'est pas un état d'interface** : l'état est la **conjonction**.
+- **Le dernier marqueur d'un flux n'est pas son verdict** ; **ne pas attribuer un code à une étape**.
+- **Deux niveaux d'alerte, pas un** : `rw-encart` pour l'énoncé, `rw-erreur` pour le refus.
+- **Un texte peut devenir faux sans qu'aucun test ne le voie** — la tuile « non porté » annonçait encore
+  l'ancien portail après le portage.
+- **CSS** : à spécificité égale l'**ordre** tranche ; borner l'enfant ne borne pas le parent ; un
+  paragraphe d'aide sans marge **touche** l'étiquette suivante ; une classe utilitaire peut manquer dans
+  le binaire.
+- **`@json` multiligne casse le PHP compilé** ; un **tiret conditionnel invisible** peut se glisser dans
+  un commentaire.
+- **Un rapport d'agent n'est pas une mesure** ; **une page témoin de refus doit être vivante** (`=== 403`).
+- **Une skill peut porter une règle périmée** — et **une règle écrite dans une skill peut être enfreinte
+  quand même** : le « premier bouton submit » y était.
+
+---
+
+## 9. Les autres documents
+
+| document | rôle |
+|---|---|
+| **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
+| `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
+| `PARITE.md` | les 85 écarts mesurés, chacun avec sa preuve |
+| `METHODE-SOUS-LOT.md` | les neuf temps |
+| `INVENTAIRE.md` | ce qui reste, mesuré |
+| `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |
+| `MODULE-*.md` | l'inventaire par module — **à lire avant de planifier** |
+| `ARCHITECTURE-UI.md` | pourquoi ni Filament ni Tailwind |
+| `CHANGELOG.md` | l'historique versionné |
