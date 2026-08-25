@@ -107,6 +107,7 @@ const C = CIBLE === 'laravel'
         corps: '[data-rw="notif-corps"]',
         toutLire: '[data-rw="notif-tout-lire"]',
         lire: (id) => `[data-rw="notif-lire-${id}"]`,
+        pastilleType: (id) => `[data-rw="notif-type-${id}"]`,
         routeCompte: '/notifications/compte',
         routeToutLire: '/notifications/tout-lire',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
@@ -118,6 +119,10 @@ const C = CIBLE === 'laravel'
         corps: 'main',
         toutLire: null,
         lire: (id) => `button[hx-vals*='"id":${id}']`,
+        // Le legacy n'expose aucun crochet : la pastille est le PREMIER `span`
+        // de la ligne. On la vise par la ligne, pas par « le premier span de la
+        // page » — c'est la meme discipline que remonter d'un champ a son form.
+        pastilleType: null,
         routeCompte: '/adm/api/notifications.php?action=count',
         routeToutLire: '/adm/api/notifications.php?action=read_all',
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
@@ -280,16 +285,30 @@ try {
 
     // ══ 2. Quatre vocabulaires, deux qui ne se croisent pas ════════════════
     await etape('le type reel est-il nommable par la page ?', async () => {
-        const etiquette = await page.evaluate((marque) => {
-            const bloc = Array.from(document.querySelectorAll('div, li, tr'))
-                .find((e) => (e.textContent || '').includes(marque + ' non lue'));
-            if (! bloc) return null;
-            const pastilles = Array.from(bloc.querySelectorAll('span'))
-                .map((s) => (s.textContent || '').trim()).filter(Boolean);
+        // LA PASTILLE DE LA LIGNE, pas « les spans du plus proche ancetre » : le
+        // premier jet remontait jusqu'a la barre de navigation et rendait le menu
+        // entier. L'assertion passait alors parce que le mot « Autre » n'est pas
+        // dans le menu — un vert qu'on ne sait pas expliquer ne vaut rien.
+        const etiquette = await page.evaluate((marque, sel) => {
+            if (sel) {
+                const e = document.querySelector(sel);
 
-            return pastilles.join(' | ').slice(0, 120);
-        }, MARQUE);
-        constate(`etiquettes rendues pour le type « ${TYPE_REEL} »`, etiquette || '(aucune)');
+                return e ? (e.textContent || '').trim() : null;
+            }
+            // Legacy : la LIGNE est le div dont un ENFANT DIRECT est la pastille
+            // de type (`notifications.php:118`). Ni le plus lointain ancetre (on
+            // remontait au menu), ni le plus proche (on tombait sur le titre) :
+            // celui qui porte la pastille en enfant direct, et lui seul.
+            const ligne = Array.from(document.querySelectorAll('div'))
+                .find((e) => (e.textContent || '').includes(marque + ' non lue')
+                    && e.querySelector(':scope > span[class*="rounded-full"]'));
+            if (! ligne) return null;
+            const p = ligne.querySelector(':scope > span[class*="rounded-full"]');
+
+            return p ? (p.textContent || '').trim() : null;
+        }, MARQUE, C.pastilleType ? C.pastilleType(fixture.nonLue) : null);
+        constate(`pastille de type rendue pour « ${TYPE_REEL} »`, etiquette || '(aucune)');
+        verifie('la ligne porte une pastille de type', !! etiquette, String(etiquette));
         // Les preferences connaissent 6 types, la page en connait 6 AUTRES :
         // intersection vide, mesuree. Toute notification reellement produite
         // retombe donc sur le repli.

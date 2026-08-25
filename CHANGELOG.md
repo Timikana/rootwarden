@@ -2171,6 +2171,59 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.60 — `adm/` D2 : « Marquer lu » ne marquait rien, et l'ecran l'affirmait
+
+**Notifications portees.** Legacy 16/0, portage 20/0 (`tests/e2e/go-adm-notifications.mjs`). Le
+sous-lot DEBORDE du module : la page vit a la racine du legacy (`notifications.php`), le point d'API
+dans `adm/api/`, et la pastille dans `menu.php` — donc sur toutes les pages. 541 lignes.
+
+**QUATRE DEFAUTS FERMES.**
+
+**E-108 — « Marquer lu » ne marquait rien.** Le bouton du legacy porte
+`onclick="… this.remove();"` : il se retire du DOM PENDANT l'evenement de clic, si bien que htmx —
+charge, verifie — n'emet AUCUNE requete. Le surlignage disparait, le bouton aussi, la base ne bouge
+pas. Trois mesures convergent sur la meme seconde : htmx present / zero POST / bouton disparu. Ni
+erreur, ni journal, ni trace reseau. **Dans le portage, l'ecran ne bouge qu'APRES la reponse du
+serveur**, et le compteur de la pastille vient de cette meme reponse — deux appels peuvent se
+croiser, un seul ne le peut pas.
+
+**E-109 — un GET ecrivait, sans le moindre jeton.** `checkCsrfToken()` n'est appele que sous
+`if (METHOD === 'POST')`, alors que l'action est lue dans `$_GET` en premier :
+`GET ?action=read_all` rendait `200 {"updated":2}`. Chaque geste qui ecrit est desormais un **POST**
+sur sa propre route ; le seul GET est le compteur. Mesure apres portage : **405**.
+
+**E-110 — le correctif A01 ne couvrait qu'une branche sur trois.** Son commentaire nomme pourtant le
+probleme. `delete` scinde sur le role ; `read` et `read_all` gardaient `OR user_id = 0` pour tout le
+monde, alors que la LECTURE filtre — un role 1 ecrivait donc sur des lignes qu'il ne voit pas. Le
+portage calcule la portee **une fois**, dans `Notifications::portee()`, et les quatre gestes s'y
+adossent : il ne peut plus y avoir de branche oubliee, parce qu'il n'y a plus de branche.
+
+**E-111 — quatre vocabulaires pour la colonne `type`.** Le partage n'etait pas arbitraire : il suit
+le CHEMIN D'EMISSION du backend. `notify()` / `notify_admins()` inserent sans consulter les
+preferences (cve_critical, server_offline, perm_granted, perm_expired, password_expiry) ;
+`notify_subscribed()` les consulte (cve_scan, security_alert, ssh_audit). **La page du legacy nomme
+exactement les premiers et affiche « Autre » pour les seconds** — donc precisement pour ceux dont on
+a regle la preference. Mesure sur la meme pastille : legacy « Autre », portage « Scan CVE ». La liste
+du portage porte **les douze**, et un type inconnu sort sous son nom brut, qui se diagnostique.
+
+**Ce que le portage NE corrige PAS, et le dit a l'ecran** : les cinq types du chemin direct restent
+inconfigurables tant que `notify()` ne consulte pas les preferences. La page de reglages porte un
+encart qui les nomme, plutot que de laisser croire qu'elle les gouverne.
+
+**Un defaut de mon propre code, trouve par la mesure et corrige.** En lisant `user_id` la ou la
+session ecrit `utilisateur_id`, la portee d'un role 1 devenait `user_id = 0` — c'est-a-dire
+EXACTEMENT les lignes de diffusion. Un identifiant illisible n'interdisait pas l'acces, il
+l'accordait. `portee()` est desormais fail-closed sur `$userId <= 0`.
+
+**64 cles FR et EN**, jeux compares. La cloche vit dans l'en-tete du gabarit, son compte **rendu par
+le serveur** — un appel de moins par page, et une pastille qui ne peut pas etre en retard sur ce que
+la page affiche.
+
+**Gardes.** Boite de reception : role 1, comme le legacy. Reglages : **role 3 + `can_admin_portal`
+sur la ROUTE**, la ou le legacy ne conditionne que l'affichage de ses cases.
+
+Ecarts : **E-108 a E-111**, les quatre fermes par ce portage.
+
 ### v1.37.59 — `adm/` D1 : le bouton qui devait boucher le trou ne pouvait rien sceller
 
 **18 entrees de menu portees sur 33.** Legacy 32/0, portage 34/0 (`tests/e2e/go-adm-audit.mjs`).

@@ -4628,9 +4628,11 @@ notification reste non lue, la pastille du menu garde son compte, et un simple r
 revenir la ligne en bleu. Le seul chemin qui marque réellement une notification est le bouton
 « Tout marquer comme lu », qui ne porte pas de `onclick` destructeur.
 
-**Au portage** : l'écran ne bouge **qu'après** la réponse du serveur. Un état affiché qui n'a pas été
-confirmé est un mensonge, et celui-ci est indétectable — il ne laisse ni erreur, ni journal, ni trace
-réseau.
+**FERMÉ au portage** (`v1.37.60`) : l'écran ne bouge **qu'après** la réponse du serveur, et le
+compteur de la cloche vient de cette **même** réponse — deux appels peuvent se croiser, un seul ne le
+peut pas. La ligne n'est d'ailleurs pas retirée : la faire disparaître empêcherait de vérifier ce
+qu'on vient de faire. Un état affiché qui n'a pas été confirmé est un mensonge, et celui-ci était
+indétectable — ni erreur, ni journal, ni trace réseau.
 
 ---
 
@@ -4663,8 +4665,9 @@ s'est déjà donnée. Un `<img src>` sur une page tierce suffit à le déclenche
 n'existe pas et `$_POST['id']` non plus, donc `$id` vaut 0 et la route sort sur « id requis » avant
 toute écriture. **C'est un accident de portée de variable qui les protège, pas une décision.**
 
-**Au portage** : les gestes qui écrivent sont des routes `POST` distinctes, et la vérification de
-requête du cadre s'y applique.
+**FERMÉ au portage** (`v1.37.60`) : chaque geste qui écrit est un `POST` sur sa propre route, et la
+vérification de requête du cadre s'y applique. Le seul `GET` est le compteur, et il ne fait que lire.
+Mesuré après portage : le même appel rend **405**.
 
 ---
 
@@ -4699,8 +4702,15 @@ la diffusion est-elle passée lue ? → OUI
 Le trou est réel dans le code et à un `INSERT` d'être exploitable — ce n'est pas la même chose que de
 dire qu'il l'est aujourd'hui. La suite pose sa propre diffusion pour l'exercer, et la retire.
 
-**Au portage** : une seule règle de portée, appliquée à la lecture **et** à l'écriture. Quand un
-commentaire nomme un défaut, chercher la branche jumelle — ici il y en avait deux.
+**FERMÉ au portage** (`v1.37.60`) : `Notifications::portee()` est calculée **une fois** et les quatre
+gestes s'y adossent — il ne peut plus y avoir de branche oubliée parce qu'il n'y a plus de branche.
+Mesuré après portage : le `read_all` d'un rôle 1 ne touche pas la diffusion.
+
+**Et le portage a failli reproduire le défaut sous une autre forme.** En lisant `user_id` là où la
+session écrit `utilisateur_id`, la portée d'un rôle 1 devenait `user_id = 0` — **exactement les
+lignes de diffusion**. Un identifiant illisible n'interdisait pas l'accès : il l'accordait. `portee()`
+est désormais fail-closed sur `$userId <= 0`. Se méfier des valeurs sentinelles qui sont aussi des
+valeurs réelles.
 
 ---
 
@@ -4719,8 +4729,21 @@ et ils ne s'accordent pas :
 **L'intersection des deux premières est VIDE.** Mesurée, pas estimée. Toute notification que le
 système de préférences peut produire retombe donc sur le repli `['Autre', 'bg-gray-100 …']`
 (`notifications.php:113`) — et c'est bien ce que montre la capture : **trois lignes, trois pastilles
-grises « Autre »**. Le système de couleurs et de libellés de la page ne peut colorier que des types
-que rien ne produit.
+grises « Autre »**.
+
+**CORRECTION du 2026-08-26, et elle change la décision de portage.** Ce document a d'abord écrit que
+la page « ne peut colorier que des types que rien ne produit ». **C'est faux** : le backend produit
+les douze, et le partage n'a rien d'arbitraire — il suit le CHEMIN D'ÉMISSION.
+
+| chemin | honore les préférences ? | types émis |
+|---|---|---|
+| `notify()` / `notify_admins()` — `INSERT` direct (`backend/notify.py:26-66`) | **non** | `cve_critical` `server_offline` `perm_granted` `perm_expired` `password_expiry` |
+| `notify_subscribed()` — filtre sur `notification_preferences` (`:109-142`) | **oui** | `cve_scan` `security_alert` `ssh_audit` |
+
+Autrement dit : **la page nomme exactement les types qui arrivent SANS condition, et ne sait pas
+nommer ceux pour lesquels on a réglé une préférence.** Et l'inverse est vrai aussi — cinq types ne
+peuvent **pas** être coupés, puisqu'ils ne passent pas par les préférences ; la page de réglages
+promet donc plus de contrôle qu'il n'en existe.
 
 S'y ajoutent, sur la même page, deux défauts d'internationalisation :
 
@@ -4730,6 +4753,15 @@ S'y ajoutent, sur la même page, deux défauts d'internationalisation :
   `<html lang="<?= getLang() ?>">`. La page est annoncée comme française à toute technologie
   d'assistance, quelle que soit la langue choisie.
 
-**Au portage** : une seule liste de types, partagée par les préférences et par l'affichage, et un
-libellé par type dans les deux langues. Un type inconnu reste possible — il s'affiche alors sous son
-nom brut, ce qui se diagnostique, plutôt que sous « Autre », qui ne dit rien.
+**FERMÉ au portage** (`v1.37.60`), et mesuré sur la **même pastille** des deux côtés : le legacy rend
+**« Autre »**, le portage rend **« Scan CVE »**.
+
+**Une seule liste, et elle porte les DOUZE** — pas les six d'un côté. Un libellé par
+type dans les deux langues, et un type inconnu s'affiche sous son **nom brut**, ce qui se
+diagnostique, plutôt que sous « Autre », qui ne dit rien.
+
+Ce qui ne se corrige PAS ici, et qu'il faut dire : les cinq types du chemin direct restent
+inconfigurables tant que `notify()` ne consulte pas les préférences. Leur faire traverser
+`notify_subscribed()` est une décision de comportement du backend — pas un détour de portage de
+page. Le portage se borne à **ne plus les afficher comme « Autre »** et à ne pas laisser croire que
+la page de réglages les gouverne.

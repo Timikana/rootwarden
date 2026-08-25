@@ -40,6 +40,18 @@
                  cherche. En pied de barre laterale, ils bornaient la liste du
                  menu, qui se coupait en plein libelle. --}}
             <div class="rw-entete__compte">
+                {{-- La cloche vit dans l'EN-TETE, comme celle du legacy — donc sur
+                     toutes les pages. Le compte est rendu PAR LE SERVEUR, pas
+                     recupere par un appel au chargement : un appel de moins par
+                     page, et une pastille qui ne peut pas etre en retard sur ce
+                     que la page affiche. --}}
+                @php($rwNonLues = app(\App\Services\Notifications::class)->nonLues(
+                    (int) session('utilisateur_id', 0), (int) session('role_id', 0)))
+                <a class="rw-lien" href="{{ route('notifications') }}"
+                   title="{{ __('notif.title') }}" data-rw="notif-cloche">🔔
+                    <span class="rw-badge rw-badge--alerte" data-rw="notif-pastille"
+                          @if ($rwNonLues === 0) hidden @endif>{{ $rwNonLues }}</span>
+                </a>
                 @include('composants.langue')
                 <span>{{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong></span>
                 <form class="rw-inline" method="POST" action="{{ route('deconnexion') }}">
