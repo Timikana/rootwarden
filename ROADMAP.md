@@ -3,7 +3,7 @@
 **Chantier en cours : la migration du frontend vers Laravel.** Branche de travail
 `Migration-Laravel`, cible **v2.0 avec bascule DIRECTE** (pas de coexistence longue).
 
-Dernière mesure : **2026-08-24**, version `1.37.52`. Les chiffres de ce document sont
+Dernière mesure : **2026-08-25**, version `1.37.53`. Les chiffres de ce document sont
 **mesurés**, pas reconduits — voir « Comment vérifier » en fin de page.
 
 > **Le plan de travail vit dans [`docs/migration/PLAN-DE-MIGRATION.md`](docs/migration/PLAN-DE-MIGRATION.md)** :
@@ -43,12 +43,12 @@ Détail complet : `docs/migration/MODULE-AUTH.md` §2.
 
 | | |
 |---|---|
-| entrées de menu portées | **14 sur 33** |
+| entrées de menu portées | **15 sur 33** |
 | parties du legacy archivées | **9** (`commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision`) |
 | modules entièrement dépréciés | **2** (`update/`, `supervision/`) |
-| LOT de tests E2E | **91 exécutions, 1277 assertions, 0 échec** |
+| LOT de tests E2E | **93 exécutions, 1312 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **87** (`docs/migration/PARITE.md`, numérotés jusqu'à **E-97** — dix numéros, E-23 à E-32, n'ont jamais été utilisés) |
+| écarts de parité documentés | **88** (`docs/migration/PARITE.md`, numérotés jusqu'à **E-98** — dix numéros, E-23 à E-32, n'ont jamais été utilisés) |
 | commits non poussés | **72** (0 de retard sur `origin/Migration-Laravel`) |
 
 **La migration n'est pas finie.** 14/33, c'est 42 % des entrées de menu. Le socle, lui,
@@ -247,7 +247,7 @@ git fetch origin && git rev-list --left-right --count @{u}...HEAD
 | document | ce qu'il contient |
 |---|---|
 | `docs/migration/METHODE-SOUS-LOT.md` | les neuf temps d'un sous-lot — à suivre, pas à improviser |
-| `docs/migration/PARITE.md` | les 87 écarts mesurés entre legacy et portage, avec leur preuve |
+| `docs/migration/PARITE.md` | les 88 écarts mesurés entre legacy et portage, avec leur preuve |
 | `docs/migration/INVENTAIRE.md` | ce qui reste, mesuré |
 | `docs/migration/DEPRECIATION.md` | le cycle d'archivage et les neuf parties déjà archivées |
 | `docs/migration/ARCHITECTURE-UI.md` | pourquoi ni Filament ni Tailwind, décidé sur mesure |
