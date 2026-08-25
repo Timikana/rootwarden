@@ -81,7 +81,7 @@ grep -c "'route'"  laravel/app/Support/Navigation.php
 grep -c "'legacy'" laravel/app/Support/Navigation.php
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
-grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (85), pas le dernier numero (E-95)
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (93), pas le dernier numero (E-103)
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ```
@@ -635,9 +635,11 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 
 - **Un inventaire ancien n'est pas une mesure. Un chiffre hérité non plus. Compter une seconde fois par
   un AUTRE moyen.**
-- **Le dernier numéro d'une série n'est pas son compte.** `PARITE.md` va jusqu'à `E-95` et ne porte que
-  **85** écarts : dix numéros ont sauté. `ROADMAP.md` annonçait « 93 » — le label pris pour un total, et
-  périmé en plus. Ce document s'est fait prendre par sa propre règle dès sa première relecture.
+- **Le dernier numéro d'une série n'est pas son compte.** Relevé alors que `PARITE.md` allait jusqu'à
+  `E-95` pour **85** écarts : dix numéros avaient sauté. `ROADMAP.md` annonçait « 93 » — le label pris
+  pour un total, et périmé en plus. Ce document s'est fait prendre par sa propre règle dès sa première
+  relecture — et s'y est repris le 2026-08-25, où deux endroits annonçaient encore 85 pour **93**
+  écarts mesurés. Le chiffre vit en §2 ; partout ailleurs, il se remesure.
 - **Quand deux sources divergent, mesurer. Quand la mesure dédouane, le dire aussi clairement qu'une
   accusation. Quand une hypothèse est trop large, la resserrer.**
 - **Avant de porter une écriture, chercher son LECTEUR** — `password_expires_at` était écrite et lue par
@@ -791,7 +793,7 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 |---|---|
 | **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
 | `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
-| `PARITE.md` | les 85 écarts mesurés, chacun avec sa preuve |
+| `PARITE.md` | les 93 écarts mesurés, chacun avec sa preuve |
 | `METHODE-SOUS-LOT.md` | les neuf temps |
 | `INVENTAIRE.md` | ce qui reste, mesuré |
 | `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |
