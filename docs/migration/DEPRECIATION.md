@@ -111,6 +111,7 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `search/` | 2026-08-18 | `recherche` | liens de resultats traduits (E-13) |
 | `update/` | 2026-08-20 | `mises-a-jour` | premier MODULE archive — 7 sous-lots, 4 points d'entree |
 | `supervision/` | 2026-08-23 | `supervision` | 12 sous-lots, 4 points d'entree, et une aide d'archivage qui mentait |
+| `docker/` | 2026-08-25 | `docker` | UN SEUL point d'entree — parce que le tiroir mobile du legacy est incomplet |
 
 ### commandlog — la preuve du cycle
 
@@ -605,3 +606,32 @@ Le test de la vague 0 collecte **29 liens internes** au menu du legacy, contre 3
 est de **un**, alors que quatre points d'entrée ont été redirigés : il ne collecte que la barre
 latérale depuis `/index.php`. La formule des sept pages — « exactement les N entrées redirigées » —
 ne vaut plus pour un module.
+
+
+### docker — un seul point d'entree, et ce que ca revele
+
+Le cycle previent qu'il faut basculer **tous** les points d'entree : barre laterale, tiroir mobile,
+raccourcis du tableau de bord, et la carte de raccourcis CLAVIER de `head.php` qu'aucun controle sur
+les `href` ne voit. Pour `docker/` il n'y en avait **qu'un**, `legacy/menu.php:118`.
+
+La raison est mesuree, et c'est un defaut du legacy : **son tiroir mobile est incomplet**. Il porte
+**22 liens** quand la barre laterale en porte **32**, et `docker` n'y figure pas. Une dizaine
+d'entrees sont donc inaccessibles sur mobile depuis toujours.
+
+C'est exactement la derive que `App\Support\Navigation` rend impossible cote portage : la barre et le
+tiroir incluent le **meme** partiel, et un test verifie qu'ils rendent les memes entrees. Le legacy
+decrit son menu deux fois, et les deux descriptions ont diverge sans que rien ne le signale.
+
+**Non corrige** — on ne soigne pas ce qu'on demonte, et les dix entrees concernees seront portees.
+
+| point d'entree | nature | avant | apres |
+|---|---|---|---|
+| `legacy/menu.php:118` | barre laterale | `/docker/index.php` | `LARAVEL_URL . '/docker'` |
+| tiroir mobile | — | **absent** | rien a basculer |
+| `legacy/index.php` | raccourcis | **absent** | rien a basculer |
+| `legacy/head.php` | raccourcis clavier | **absent** | rien a basculer |
+
+Reference de la suite : **16 -> 5** (1 + 2 fichiers reels + 2). Deux surfaces devenues mortes,
+relevees et non touchees : `api_proxy.php:151` garde `/docker/` dans sa liste blanche, et
+`documentation.php:1052` nomme « la page `/docker/` » dans une balise `<code>` — sans lien cliquable,
+mais le chemin rend desormais 404.

@@ -138,12 +138,9 @@ declare -A REF_LEGACY=(
   # conteneurs a chaque execution — la jouer deux fois mesurerait deux fois la
   # meme chose.
   [go-auth-totp-croise]=15
-  # 16 des DEUX cotes. Les boutons de scan sont INTERCEPTES ET AVORTES :
-  # `scan_all` frappe TOUTES les machines, srv-zabbix comprise, et un scan lance
-  # un `git fetch` sur la machine visee. Aucune machine n'est jointe.
-  # Le seul ecart est une INFO cote legacy : son `fetch` non enveloppe laisse une
-  # erreur non capturee quand le reseau tombe, et le message prevu n'apparait pas.
-  [go-page-docker]=16
+  # 5 depuis l'ARCHIVAGE : 1 (la partie rend 404) + 2 fichiers reels + 2 (le lien
+  # du menu mene au portage, et il aboutit). Avant archivage : 16.
+  [go-page-docker]=5
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth

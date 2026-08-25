@@ -37,6 +37,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -179,6 +180,35 @@ async function attendChargement(page) {
 
 try {
     constate('cible', `${CIBLE} — ${BASE}`);
+
+    /*
+     * LE CONSTAT D'ARCHIVAGE, EN TETE.
+     *
+     * Une partie archivee ne doit pas laisser une suite ROUGE derriere elle :
+     * plus personne ne lit les rouges. Tant que la partie est servie, ce bloc
+     * est inerte et la suite se joue normalement.
+     *
+     * Les noms de fichiers sont ceux qui EXISTENT dans
+     * `legacy/_deprecated/docker/` — sonder un chemin qui n'a jamais existe rend
+     * 404 et ferait passer l'assertion pour rien.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE,
+            chemin: '/docker/',
+            fichiers: ['/docker/index.php', '/docker/js/main.js'],
+            verifie, constate,
+        });
+        if (archivee) {
+            const s = await connecte(COMPTE, SECRET);
+            await verifieMenuLegacy(s.page, '/docker', verifie);
+            note('');
+            note(`${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+            for (const ctx of contextes) { try { await ctx.close(); } catch {} }
+            await navigateur.close();
+            process.exit(echecs > 0 ? 1 : 0);
+        }
+    }
 
     const s = await connecte(COMPTE, SECRET);
 
