@@ -81,7 +81,7 @@ grep -c "'route'"  laravel/app/Support/Navigation.php
 grep -c "'legacy'" laravel/app/Support/Navigation.php
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
-grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (93), pas le dernier numero (E-103)
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (97), pas le dernier numero (E-107)
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ```
@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **93** — numérotés jusqu'à **E-103** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **97** — numérotés jusqu'à **E-107** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ le 2026-08-25 — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ, et D1 CARACTÉRISÉ (32/0, base rouge 1/17) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -458,7 +458,7 @@ déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **en
 commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
-archivage **4/3** · A2 **7/1** · A5 **6/16**.
+archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17**.
 
 **Nettoyer à l'entrée ET dans le `finally` vaut aussi pour ce que le TEST accorde**, pas seulement
 pour ce qu'il écrit : une autorisation posée par une exécution survit à cette exécution.
@@ -606,7 +606,14 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   un, ce qui rend le décalage **visible** ; le corriger à la racine demande de changer le fuseau du
   conteneur `rootwarden_python`, ce qui déplace **tous** ses horodatages, journaux d'audit compris.
   **Décision de flotte, à arbitrer** ;
-- **757 lignes de `user_logs` non scellées** laissent un trou dans la vérification de chaîne ;
+- **le trou de `user_logs` ne se referme pas : il GRANDIT, et le seul remède est inerte.** Le
+  chiffre de 757 lignes non scellées est périmé — mesuré **868** le 2026-08-25, et **+2 pendant la
+  seule heure** du sous-lot D1. La raison est E-104 : `audit_seal.php` et `audit_verify.php` ne
+  parcourent pas la chaîne de la même façon, le premier s'arrête sur une fausse désynchronisation à
+  la ligne 3, et son verrou `stopped_at_tamper` rend le bouton « Sceller les orphelines »
+  **définitivement incapable de sceller quoi que ce soit** — tout en écrivant une alarme
+  `SECURITY … investigation requise` à chaque appel. Le portage de D1 tranche : une seule lecture de
+  la chaîne, celle qui saute les orphelines, parce que c'est celle que la base porte ;
 - la liste blanche `/supervision/` de `api_proxy.php:134` — **surface morte** depuis l'archivage, et
   `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES` ;
 - les **11 liens sortants** du legacy non marqués, et le **404 brut d'Apache** des neuf parties
@@ -745,6 +752,20 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Deux points d'API qui lisent la MÊME donnée peuvent en rendre deux verdicts opposés.** D1 :
+  « Vérifier l'intégrité » annonce une chaîne intacte pendant que « Sceller les orphelines » annonce
+  une désynchronisation, à la même seconde. Ils divergent d'une ligne — l'un saute les lignes non
+  scellées, l'autre les compte dans la chaîne. **Quand deux lectures d'une même règle existent,
+  les faire répondre CÔTE À CÔTE dans la même assertion** : séparément, chacune passe.
+- **Trancher lequel a raison demande une TROISIÈME mesure, d'un autre moyen.** Ici un `LAG()` SQL sur
+  les seules lignes scellées : 3311 maillons, 0 rupture. Sans elle, on n'aurait qu'un désaccord.
+- **Un garde-fou qui se déclenche à tort ne protège plus : il empêche.** `stopped_at_tamper` est une
+  bonne idée — ne rien réécrire quand une ligne semble altérée — mais posée sur une comparaison
+  fausse, elle rend le seul remède au trou **définitivement inerte**, tout en écrivant une alarme
+  `SECURITY` à chaque appel. Chercher, pour chaque fail-closed, ce qu'il bloque quand il se trompe.
+- **Un gabarit de traduction non substitué ne casse rien et se lit dans la page.** « 4 179 `:count`
+  entrees au total » : le nombre attendu **est** présent, donc l'assertion passe, et le mot de trop
+  ne se voit qu'à l'image. Les deux langues étaient touchées.
 
 ### Base et shell
 
@@ -802,7 +823,7 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 |---|---|
 | **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
 | `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
-| `PARITE.md` | les 93 écarts mesurés, chacun avec sa preuve |
+| `PARITE.md` | les 97 écarts mesurés, chacun avec sa preuve |
 | `METHODE-SOUS-LOT.md` | les neuf temps |
 | `INVENTAIRE.md` | ce qui reste, mesuré |
 | `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |

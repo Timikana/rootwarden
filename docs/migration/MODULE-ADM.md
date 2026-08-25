@@ -325,7 +325,7 @@ dernier** — et chaque rang porte son motif.
 
 | # | sous-lot | fichiers | lignes | pourquoi ce rang |
 |---|---|---|---|---|
-| **D1** | **Journal d'audit** | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
+| **D1** ✅ | **Journal d'audit** — *caractérisé, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
 | **D2** | **Notifications** | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** | **Comptes et rôles** | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
@@ -341,6 +341,36 @@ onglets, `:182-190`) ; `audit_log.php` est D1 ; `server_users.php` D8 ; `platfor
 dix routes backend dont `/regenerate_platform_key`, qui **fait tourner la paire de clés de toute la
 flotte** — se rattache à D8 par sa dangerosité et sera traité juste après lui ; `server_user_sudo.php`
 et `server_user_sftp.php` sont D9.
+
+### 5.0 D1 — CARACTÉRISÉ le 2026-08-25, et il portait quatre défauts
+
+`tests/e2e/go-adm-audit.mjs` — **32 PASS / 0 FAIL sur le legacy**, **base rouge 1/17** sur le portage
+(la page n'existe pas ; le seul PASS est « aucune erreur JavaScript », qui passe **parce que** la page
+absente n'a pas de script — un vert qui ne mesure rien, et c'est dit).
+
+La suite exerce les **trois** rôles (rôle 1 → 403, rôle 2 sans `can_admin_portal` → 403, rôle 3 → 200),
+les trois filtres par de vrais clics, le lien d'export, et les deux boutons d'intégrité. Le bouton
+**Vérifier** est cliqué pour de vrai — son point d'API est en lecture seule. Le bouton **Sceller** ne
+l'est pas : le clic est **intercepté et abattu**, et la simulation passe par une **requête forgée
+depuis la page**, avec son motif écrit — `audit_seal.php:42` porte un mode simulation qu'**aucun
+élément de l'interface n'émet**.
+
+Quatre défauts mesurés, tous inscrits en parité :
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-104** | `audit_verify.php` dit **« chaîne intacte »** et `audit_seal.php` dit **« désynchronisation, investigation requise »** — même base, même instant. Le second a tort : un `LAG()` SQL indépendant rend **3311 maillons scellés, 0 rupture**. Conséquence : **le bouton « Sceller » ne peut sceller aucune ligne, jamais**, et le trou grandit seul — 757 annoncées au plan, **868 mesurées**, +2 pendant l'heure de ce sous-lot |
+| **E-105** | la page affiche « 4 179 **`:count`** entrees au total » — le gabarit de la clé `audit.entries_total` n'est jamais substitué, **en FR et en EN**. Vu à l'image, invisible à toute assertion DOM |
+| **E-106** | `.bg-yellow-600` est **absente du binaire CSS** : le bouton « Sceller » rend sans fond, entre deux voisins colorés, et **a l'air désactivé**. Quatrième occurrence du piège Tailwind |
+| **E-107** | les six verdicts écrits par le JavaScript sont en **français codé en dur** dans un fichier par ailleurs bilingue, `confirm()` natif compris |
+
+**Ce que D1 apprend pour la suite du module** : la lecture avait prédit E-104 (§1.3 annonçait deux
+parcours de chaîne divergents) mais pas E-105 ni E-106 — **il a fallu regarder l'image**. Les captures
+ne sont pas un compte rendu, ce sont une mesure.
+
+**Ce qui reste à faire pour finir D1** : le portage lui-même, puis la même suite verte sur le portage.
+La décision de fond — *quelle* lecture de la chaîne le portage retient — est tranchée : celle qui
+**saute** les orphelines, parce que c'est celle que la base porte réellement.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

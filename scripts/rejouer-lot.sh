@@ -175,6 +175,13 @@ declare -A REF_LEGACY=(
   # `/maintenance/check` et `/maintenance/windows` ne sont PAS sondes : ce sont des
   # routes du BACKEND, toujours appelees par le portage.
   [go-page-maintenance]=5
+  # Sous-lot D1 de `adm/` : le journal d'audit. 32 sur le legacy, mesure du
+  # 2026-08-25. La suite CLIQUE « Verifier » (endpoint en lecture seule) mais
+  # n'emet JAMAIS le scellement pour de vrai : le clic est intercepte et abattu,
+  # et la simulation passe par la branche non-POST d'`audit_seal.php`. Motif :
+  # le scellement ne se defait pas, et le compteur d'orphelines est un constat
+  # que l'exploitant suit en §7 du plan.
+  [go-adm-audit]=32
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -195,6 +202,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
+  go-adm-audit
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
