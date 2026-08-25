@@ -17,6 +17,19 @@ return [
      */
     'secret_key' => env('SECRET_KEY', ''),
 
+    /*
+     * Journal d'audit. La chaine de hachage de `user_logs` est signee par
+     * `AUDIT_HMAC_KEY` quand elle existe, et par `secret_key` sinon — l'ordre
+     * exact du legacy (`adm/includes/audit_log.php:44-58`). Mesure du
+     * 2026-08-25 : la variable dediee est ABSENTE de cet environnement, donc les
+     * deux portails signent avec la meme cle et se relisent l'un l'autre.
+     * Separer les deux cles est une decision d'exploitation : la changer ici
+     * rendrait illisibles les milliers de lignes deja scellees.
+     */
+    'audit' => [
+        'cle_hmac' => env('AUDIT_HMAC_KEY', ''),
+    ],
+
     'totp' => [
         /*
          * Tolerance en nombre de periodes de 30 s, de part et d'autre de

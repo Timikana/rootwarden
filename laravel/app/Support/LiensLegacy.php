@@ -72,6 +72,23 @@ class LiensLegacy
          * cesserait de fonctionner sans que personne ne fasse le lien.
          */
         '/maintenance/' => 'maintenance',
+        /*
+         * `adm/audit_log.php` porte le 2026-08-25 (`v1.37.59`). Cette entree
+         * n'est PAS preventive : `backend/routes/search.py:95` ecrit
+         * `'link': '/adm/audit_log.php'` pour CHAQUE resultat d'audit trouve.
+         * Sans elle, une recherche qui remonte une entree du journal renvoie a
+         * l'ancien portail alors que la page est portee — et le lien porte alors
+         * le marqueur « ancien portail », ce qui serait faux.
+         *
+         * La cle est la forme NORMALISEE : `normalise()` n'enleve `/index.php`
+         * que s'il termine le chemin, puis ajoute une barre finale. Un fichier
+         * `.php` nomme autrement devient donc `/adm/audit_log.php/`.
+         *
+         * `adm/` n'est PAS archive : ses cinq autres pages vivent toujours. La
+         * table ne reecrit que ce chemin-la, parce qu'elle compare le chemin
+         * normalise EN ENTIER.
+         */
+        '/adm/audit_log.php/' => 'journal-audit',
     ];
 
     /**
@@ -103,8 +120,11 @@ class LiensLegacy
         }
 
         // Chemin inchange : la page vit encore sur l'ancien portail. On garde
-        // le chemin D'ORIGINE, pas sa forme normalisee — `/adm/audit_log.php`
-        // n'est pas `/adm/audit_log/`.
+        // le chemin D'ORIGINE, pas sa forme normalisee — `/adm/server_users.php`
+        // n'est pas `/adm/server_users/`.
+        // (L'exemple etait `/adm/audit_log.php` jusqu'au 2026-08-25 ; cette
+        // page est portee depuis, et figure donc dans la table ci-dessus. Un
+        // commentaire qui ment est pire que pas de commentaire.)
         $origine = '/' . ltrim(parse_url($chemin, PHP_URL_PATH) ?: '', '/');
 
         return ['url' => rtrim(config('app.url_legacy'), '/') . $origine, 'externe' => true];

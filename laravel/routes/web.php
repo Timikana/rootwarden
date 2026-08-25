@@ -13,6 +13,7 @@ use App\Http\Controllers\TachesController;
 use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
+use App\Http\Controllers\JournalAuditController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ExportCveController;
@@ -398,6 +399,28 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/journal-commandes', JournalCommandesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('journal-commandes');
+
+    /*
+     * Journal d'audit — module `adm/`, sous-lot D1.
+     *
+     * La page et l'export suivent la garde du legacy : role 2 + `can_admin_portal`.
+     * Les DEUX GESTES D'INTEGRITE exigent en plus le ROLE 3, comme les points
+     * d'API du legacy — mais ici la reserve vit sur la ROUTE. Le legacy ne cache
+     * que les boutons de sa page ; aucun de ses seize points d'API `adm/` ne
+     * porte de `checkPermission`, et le role y porte seul la charge.
+     */
+    Route::get('/journal-audit', JournalAuditController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('journal-audit');
+    Route::get('/journal-audit/export', [JournalAuditController::class, 'csv'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('journal-audit.csv');
+    Route::get('/journal-audit/verifier', [JournalAuditController::class, 'verifier'])
+        ->middleware(['role:3', 'perm:can_admin_portal'])
+        ->name('journal-audit.verifier');
+    Route::post('/journal-audit/sceller', [JournalAuditController::class, 'sceller'])
+        ->middleware(['role:3', 'perm:can_admin_portal'])
+        ->name('journal-audit.sceller');
 
     /*
      * Passerelle vers le backend Python. Elle reste dans le groupe `web` : la
