@@ -690,3 +690,60 @@ de disparaitre. Si ChatOps avait ete actif, cet archivage aurait exige de preven
 | Partie | Suite, cible legacy |
 |---|---|
 | `chatops/` | 6 PASS / 0 FAIL — partie archivée |
+
+
+### maintenance — la partie dont le portage a corrige un DEFAUT DE DECISION
+
+Deux fichiers, un seul point d'entree, et un archivage sans surprise. Ce qui n'etait pas sans surprise,
+c'est ce que la lecture du module a revele avant tout clic — voir `PARITE.md` E-101 : la pastille
+« ouverte maintenant » du legacy etait calculee dans le navigateur alors que le blocage s'applique sur
+l'horloge du conteneur, deux heures plus tot.
+
+| point d'entree | nature | avant | apres |
+|---|---|---|---|
+| `legacy/menu.php:129` | barre laterale | `/maintenance/index.php` | `LARAVEL_URL . '/maintenance'` |
+| tiroir mobile | — | **absent** (le tiroir du legacy est incomplet) | rien a basculer |
+| `legacy/index.php` | raccourcis | **absent** | rien a basculer |
+| `legacy/head.php` | raccourcis clavier | **absent** | rien a basculer |
+
+**Etat AVANT le deplacement, mesure le 2026-08-25** : `/maintenance/` **302**, `/maintenance/index.php`
+**302**, `/maintenance/js/main.js` **200**. Aucun ne rendait 404.
+
+Reference de la suite : **24 -> 5** (1 + 2 fichiers reels + 2).
+
+#### Le piege de ce module : deux chemins qui se ressemblent et ne sont pas de meme nature
+
+`/maintenance/check` et `/maintenance/windows` **ne sont pas des pages**. Ce sont des routes du
+**backend Python**, que le portage appelle toujours par la passerelle. Elles ne sont donc :
+
+- **pas sondees** par le constat d'archivage — un constat sur une route vivante echouerait, et pour une
+  raison qui n'aurait rien a voir avec l'archivage ;
+- **pas reecrites** par `LiensLegacy::REMPLACEMENTS` — la table compare le chemin NORMALISE en entier,
+  donc `/maintenance/check` ne vaut pas `/maintenance/`. Verifie et non suppose : `/maintenance/` et
+  `/maintenance/index.php` rendent un lien interne, `/maintenance/check` et `/maintenance/windows`
+  partent toujours vers le backend. **Une table qui comparerait par prefixe les aurait reecrites, et la
+  page de maintenance aurait cesse de fonctionner sans que personne ne fasse le lien.**
+
+L'entree `/maintenance/` est ajoutee a la table, preventivement comme `/docker/`, `/chatops/` et
+`/supervision/` : le backend n'emet que `/update/index.php` et `/tickets/index.php`.
+
+#### `documentation.php` est relevé et NON corrige, cette fois
+
+Sa section « Fenetres de maintenance » nomme « la page `/maintenance/` » dans une balise `<code>` —
+une **mention** perimee, comme pour `docker/`, et non une instruction de configuration exterieure comme
+l'etait l'adresse du webhook ChatOps. Elle cite aussi
+`GET /maintenance/check?machine_id=`, qui reste **exact** : c'est une route de backend. Le reste de la
+section decrit la regle d'inversion et le fail-open, et il est juste.
+
+#### Ce qui devient mort et n'est pas touche
+
+`api_proxy.php` garde `/maintenance/` dans sa liste blanche et `/maintenance/windows` dans sa liste
+reservee a l'administration. Plus aucune page du legacy ne les appelle. Meme raison que pour les dix
+parties precedentes : le proxy du legacy meurt d'un bloc, avec le legacy.
+
+`maintenance_windows` reste en base : la table est lue et ecrite par le portage, et par l'enforcement du
+backend.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `maintenance/` | 5 PASS / 0 FAIL — partie archivée |

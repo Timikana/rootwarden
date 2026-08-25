@@ -93,9 +93,9 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | | |
 |---|---|
 | entrées de menu portées | **17 sur 33** |
-| parties du legacy archivées | **11** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` |
+| parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **95 exécutions, 1330 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `chatops/`. Le total d'assertions **baisse** de 1345 à 1330 sans qu'aucune ne disparaisse pour de mauvaises raisons : `go-page-chatops` passe de 21 à 6 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE désormais son 404 au lieu de la parcourir |
+| LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
 | tests backend | **341 pytest** |
 | écarts de parité documentés | **93** — numérotés jusqu'à **E-103** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
@@ -232,8 +232,8 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 |---|---|---|---|---|
 | ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.53` / `v1.37.54` |
 | ~~2~~ | ~~`chatops/`~~ | 246 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.55` / `v1.37.56`. Premier chemin PUBLIC du portage, et première adresse EXTÉRIEURE que la migration déplace |
-| ~~3~~ | ~~`maintenance/`~~ | 257 | 1 | **PORTÉ** `v1.37.57` — 29/0. Reste à ARCHIVER. **Le défaut le plus grave du chantier y a été trouvé** — voir l'encadré, il reste à lire |
-| **4** | **`groups/`** | 305 | 1 | **SUIVANT** — groupes dynamiques + actions de masse |
+| ~~3~~ | ~~`maintenance/`~~ | 257 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.57` / `v1.37.58`. **Le défaut le plus grave du chantier y a été trouvé** — l'encadré ci-dessous reste à lire, il porte la mesure |
+| **4** | **`groups/`** | 305 | 1 | **SUIVANT** — **⚠ deux boutons y lancent un SCAN RÉEL sur TOUTES les machines d'un groupe, dont un qui ENVOIE UN COURRIEL. Lire l'encadré ci-dessous** |
 | 5 | `graylog/` | 388 | 1 | |
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
 | 7 | `services/` | 631 | 1 | gestes sur machines |
@@ -241,8 +241,41 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | le plus gros ; à découper en six sous-lots au moins |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ le 2026-08-25 — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
+
+**⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
+`backend/routes/groups.py:286-315` et `backend/routes/cve.py:60-90` le 2026-08-25, avant d'écrire un
+clic. La page pose **deux** actions de masse derrière un simple `confirm()`
+(`legacy/groups/js/main.js:57-58`), et `POST /groups/<id>/run` les exécute en tâche de fond :
+
+| action | ce qu'elle fait vraiment | effet sortant |
+|---|---|---|
+| `drift_scan` | `scan_machine(mid)` pour **chaque** membre | session **SSH réelle** par machine |
+| `cve_scan` | tout le pipeline CVE via `_stream_cve_scan` | session **SSH réelle** **+ `send_cve_report`, un VRAI COURRIEL** |
+
+**C'est l'effet même qui bloque S7b, atteint depuis une autre page et appliqué à un groupe entier.** Un
+clic, N machines, N courriels. Le `confirm()` du legacy est la seule barrière, et il ne protège de rien
+dans un test piloté.
+
+**Et le groupe peut être DYNAMIQUE** : `_member_ids` résout alors ses membres **au moment du clic**, par
+filtres (`_resolve_dynamic`). L'ensemble des machines visées n'est donc **pas lisible** dans la ligne du
+groupe, et rien n'empêche `srv-zabbix` (id 1) d'y tomber. État mesuré du parc : `srv-zabbix` (1, **PROD,
+jamais jointe**), `Test-Server-Debian` (2, le banc), `OpenCVE-Test-OnPrem` (3). **Zéro groupe en base**
+aujourd'hui : toute suite devra créer le sien.
+
+**Ce qui est décidé pour le sous-lot :**
+
+1. le CRUD des groupes, la résolution des membres et l'affichage se testent normalement ;
+2. la fixture de groupe est **statique** et ne contient **que la machine 2**. Jamais dynamique : un
+   groupe dont les membres se résolvent au clic est un ensemble qu'on ne contrôle pas ;
+3. le bouton d'action de masse se teste par **interception + avortement** — le premier des six motifs.
+   On mesure que le clic **émet** la requête attendue, et la requête est **abattue avant de partir**.
+   La propriété à mesurer est « il y a eu une requête, et elle portait la bonne action », au **réseau** ;
+4. **un déclenchement RÉEL n'est pas fait et demande l'arbitrage de l'exploitant** — même famille que
+   S7b et A3, pour la même raison : un courriel part.
+
+---
 
 **⚠ `maintenance/` : une fenêtre créée par un test peut EMPOISONNER LE LOT ENTIER.** Relevé en lisant
 `backend/maintenance.py:102-143` avant d'écrire quoi que ce soit. La logique **s'inverse** :
@@ -337,6 +370,31 @@ d'audit compris. C'est une décision de flotte, pas un détour de portage de pag
 bloquante. Avec une fenêtre limitée à `srv-zabbix`, les deux sens du basculement sont sans effet sur le
 reste.
 
+#### ⚠ `adm/health_check.php` MODIFIE `srv-zabbix` au simple chargement de la page
+
+Relevé le 2026-08-25 **en lisant, sans ouvrir la page** — et c'est la conclusion.
+
+`health_check.php:49-50` choisit sa machine de test par `SELECT id FROM machines LIMIT 1`, ce qui rend
+**`id = 1`, `srv-zabbix`**, la machine que §6 interdit de joindre. Le fichier déclare **106 routes**
+(la documentation en annonce **11**), toutes tirées au chargement, dont **36 pointées sur cette
+machine**. Le commentaire `:52-58` affirme que les routes mutantes sont neutralisées par
+`$mutId = 0` : c'est vrai pour la famille `update` / `services` / `ssh-audit` / `reboot`, et **faux
+pour la famille SSH** —
+
+| ligne | route | effet sur `srv-zabbix` |
+|---|---|---|
+| `:78` | `/deploy_platform_key` | **écrit** dans `authorized_keys` |
+| `:80` | `/deploy_service_account` | **crée** le compte Unix et son `sudoers.d` |
+| `:84` | `/sshd_allow_user` | **modifie `sshd_config`** et recharge `sshd` |
+| `:83` | `/server_user_remove_key` | tente une suppression de clé |
+
+Le motif « à moitié corrigé » à son maximum : le défaut est **vu**, **nommé** sur six lignes de
+commentaire, et **une branche sur deux** est protégée.
+
+**`/adm/health_check.php` rejoint donc `go-ssh-audit-scanall.mjs`** : à ne déclencher ni en test, ni
+en capture, ni « pour voir la page ». Une capture de cette page est une modification de production.
+Le sous-lot D10 n'est pas un portage mais une décision, portée en §7.
+
 **`adm/` porte deux défauts sérieux à corriger en le portant** :
 `adm/includes/manage_roles.php:86` hache le mot de passe généré **sans `BCRYPT_COST`** et **sans appeler
 la politique ni enregistrer l'ancien haché** — contournement complet ; et `:93-95` **affiche le mot de
@@ -376,10 +434,19 @@ appelle : personne dans RootWarden ne l'aurait vu casser. Ce qu'il faut alors fa
    avertissement en gras : l'adresse a changé, la reporter avant d'activer.
 
 **Mesure faite le 2026-08-25 sur `LiensLegacy::REMPLACEMENTS`** : le backend n'émet que
-`/update/index.php` et `/tickets/index.php` (`backend/routes/search.py:50,82`) — jamais `/chatops/` ni
-`/docker/`. Les entrées de ces deux parties sont donc **préventives**, comme `/supervision/`. `/docker/`
-**manquait** : l'archivage de `v1.37.54` avait sauté cette étape. Seule `recherche.blade.php` consomme
-cette table, donc seule `go-page-search` a besoin d'être rejouée après l'avoir complétée.
+`/update/index.php` et `/tickets/index.php` (`backend/routes/search.py:50,82`) — jamais `/chatops/`,
+`/docker/` ni `/maintenance/`. Les entrées de ces trois parties sont donc **préventives**, comme
+`/supervision/`. `/docker/` **manquait** : l'archivage de `v1.37.54` avait sauté cette étape. Seule
+`recherche.blade.php` consomme cette table, donc seule `go-page-search` a besoin d'être rejouée après
+l'avoir complétée.
+
+**Et une vigilance que `maintenance/` a rendue concrète : tout `/partie/` n'est pas une page.**
+`/maintenance/check` et `/maintenance/windows` sont des routes du **backend**, toujours appelées par le
+portage. Elles ne doivent être ni sondées par le constat d'archivage — un constat sur une route vivante
+échoue pour une raison sans rapport — ni réécrites par la table. Ce qui les protège est la comparaison
+du chemin **normalisé en entier** : une table qui comparerait par **préfixe** les aurait réécrites, et
+la page de maintenance aurait cessé de fonctionner sans que rien ne le signale. Vérifier, module par
+module, lesquels des chemins qui se ressemblent sont des pages et lesquels sont des routes.
 
 ---
 
@@ -467,6 +534,9 @@ jointe.** **Aucune session de test ni de capture pendant un rejeu** — le garde
 compte et **en base** ; un compte que le LOT n'utilise pas est libre.
 **Ne jamais demander à l'exploitant de coller un mot de passe, une clé ou un jeton.**
 **`tests/e2e/go-ssh-audit-scanall.mjs` joint la production** — ne pas le lancer.
+**`/adm/health_check.php` aussi, et par le seul fait de s'ouvrir** : la page tire 106 routes au
+chargement, dont quatre qui **écrivent** sur `srv-zabbix` (clé de plateforme, compte de service,
+`sshd_config`, retrait de clé). Ni test, ni capture, ni coup d'œil — voir l'encadré de §4.2.
 
 **Six motifs de test selon le geste** : joint la production par construction → interception +
 avortement · porte sur une cible qu'on choisit → cliquer pour de vrai, nettoyer dans un `finally` ·
@@ -483,6 +553,28 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   le jeton **circule dans la query string** (historique, `Referer`, journaux Apache), et **un compte sans
   `email` n'a aucun chemin**.
 - **S7b** — un scan CVE réel.
+- **`groups/` — l'action de masse**, découverte le 2026-08-25 en lisant le module avant d'écrire un clic.
+  `POST /groups/<id>/run` lance un scan **réel** sur **chaque** membre du groupe : `drift_scan` ouvre une
+  session SSH par machine, `cve_scan` ouvre une session SSH **et envoie un courriel** par machine avec
+  des résultats. C'est l'effet de S7b, atteint depuis une autre page et **multiplié par le nombre de
+  membres** — un clic, N machines, N courriels. Le sous-lot testera le bouton par **interception et
+  avortement** ; un déclenchement réel attend votre mot.
+
+**`adm/` — quatre arbitrages ouverts par l'inventaire du 2026-08-25** (`MODULE-ADM.md`)
+- **`health_check.php`** : la page est dangereuse par construction (§4.2). Trois issues — tout pointer
+  sur `machine_id = 0` et ne tester que le contrat HTTP ; ne tirer chaque route que sur un **clic**
+  explicite, avec la machine **choisie** ; ou ne pas la porter. **Aucune n'est un portage fidèle, et la
+  fidélité serait ici le défaut.** Rien ne sera touché sans arbitrage ;
+- **`/regenerate_platform_key`** (`platform_keys.php`) fait tourner la paire de clés de la **flotte
+  entière** : même régime que K4 ;
+- **`/delete_remote_user`** (`server_users.php`) supprime un compte Unix sur une machine réelle ;
+- **quatre fichiers de `adm/` n'appartiennent pas à `adm/`** — `includes/crypto.php` est la
+  bibliothèque de chiffrement du **socle** (`auth/login.php`, `verify_2fa.php`, `enable_2fa.php`,
+  `step_up_verify.php` l'incluent), et `api/notifications.php`, `api/global_search.php`,
+  `api/dismiss_onboarding.php` sont appelés par `menu.php` et `includes/onboarding.php`, donc par
+  **toutes** les pages legacy. **`adm/` ne peut pas être archivé comme une unité** : soit ces quatre
+  fichiers sortent vers `legacy/includes/` avant le `git mv`, soit `adm/` est le **dernier** module
+  archivé. À trancher avant le premier `git mv`, pas le jour même.
 
 **À reporter dans un service externe, le jour où la fonctionnalité sera activée**
 - **l'adresse du webhook ChatOps a changé** avec le portage : elle ne finit plus par `webhook.php`.
@@ -585,6 +677,18 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   et un vert ne se relit pas. **N validations précédentes ne prouvent rien si aucune ne pouvait
   échouer.**
 - **Quand une suite échoue, se demander d'abord si c'est ELLE qui a tort** — arrivé **douze** fois.
+- **Un `grep` sur le mauvais symbole fabrique une contradiction.** Cherchant `stepUpVerify` dans `adm/`,
+  zéro résultat : le plan annonçait quatre appelants, j'ai cru le prendre en défaut. Le helper des
+  points d'API s'appelle `stepUpRequire`. **Lire un fichier avant de contredire une mesure écrite.**
+- **Un `getElementById` sans cible ne se voit qu'en comparant les deux listes.** Douze identifiants lus
+  par le JS de `adm/` n'existent nulle part. Sept étaient dans un **bloc commenté** de 263 lignes
+  (`manage_servers.php:661-923`) — donc inoffensifs, et révélateurs d'un fichier entier mort. Les cinq
+  autres cassent pour de bon le bouton « Déployer » de la page SFTP. **Le même symptôme portait deux
+  diagnostics opposés : chercher les bornes du commentaire AVANT de conclure.**
+- **Le typage du pilote peut être ce qui tient une garde.** `manage_roles.php:80` compare
+  `$user['role_id'] === 3` sans transtyper — le motif exact d'une garde morte. Mesuré dans le
+  conteneur : `ATTR_EMULATE_PREPARES = false` fait rendre `int(3)`, **la garde tient**. Sa jumelle 31
+  lignes plus bas transtype, elle. Ce n'est pas un trou, c'est une **fragilité** : dire les deux.
 
 ### Tests
 
@@ -603,6 +707,11 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Une exception dans le `finally` emporte le journal entier** : isoler chaque étape.
 - **Imprimer le journal au fil de l'eau.** **Sonder un chemin qui n'a jamais existé rend 404** et fait
   passer l'assertion pour rien.
+- **Tout `/partie/` n'est pas une page.** `/maintenance/check` et `/maintenance/windows` sont des routes
+  du **backend** ; sondées comme des pages archivées elles échoueraient, réécrites comme des pages elles
+  casseraient la page. Ce qui les sauve est une comparaison du chemin **normalisé en entier** — la même
+  précaution que E-02 avait imposée à la passerelle. Un filtre par préfixe se trompe toujours dans le
+  sens qui ne se voit pas.
 - **Une règle qui vit en deux langages ne se protège pas en « suivant l'autre pas à pas ».** Le portage
   de `maintenance/` a d'abord recopié `_in_window` en JavaScript avec cette promesse en commentaire. Le
   pas était juste ; c'est l'**horloge** qui différait — navigateur en CEST, conteneur qui applique en
@@ -643,6 +752,14 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un GET ne doit rien écrire** ; **un garde anti-rejeu par session est inerte** (le poser par compte et
   **en base**) ; **une redirection n'est pas une garde** ; **un garde sans objet ne garde rien**.
 - **Une garde sans effet n'est pas une faille, mais le dire évite qu'on la croie protectrice.**
+- **Deux transports, un seul intercepteur.** Le modal de step-up du legacy est une surcouche de
+  `window.fetch` (`js/utils.js:38-49`). htmx 2.0.4 n'emploie que `XMLHttpRequest` : un `hx-post` sur un
+  point d'API gardé par un step-up rend 403, htmx ne remplace rien (`[45].. → swap:false`), aucun
+  écouteur `htmx:responseError` n'existe — **la bascule ne fait rien, sans message**. Vérifier par quel
+  transport chaque appel part avant de croire une garde utilisable.
+- **Une capacité peut être fermée deux fois.** `anonymize_user.php` (RGPD art. 17, annoncé dans la
+  documentation) n'a aucun appelant, **et** sa marque de step-up ne peut être obtenue par aucun geste
+  d'interface. Compter les verrous : un seul levé ne rouvre rien.
 - **Ne jamais renvoyer un mot de passe dans la réponse** : pas de `withInput()` sur un formulaire de
   secret, champs revidés à chaque retour.
 - **L'attribut `value` du jeton CSRF est sur la LIGNE SUIVANTE** du HTML du legacy : un `grep` par ligne

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.57** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.58** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,45 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.58 — `maintenance/` archive : deux chemins qui se ressemblent et ne sont pas de meme nature
+
+Douzieme partie du legacy demontee. Cycle du §4.4 deroule, y compris l'etape ajoutee la veille :
+sonder AVANT le `git mv`. `/maintenance/` **302**, `/maintenance/index.php` **302**,
+`/maintenance/js/main.js` **200** — aucun ne rendait 404, les trois le rendent maintenant.
+Reference legacy **24 -> 5** (1 + 2 fichiers reels + 2).
+
+**LE PIEGE DE CE MODULE : `/maintenance/check` ET `/maintenance/windows` NE SONT PAS DES PAGES.** Ce
+sont des routes du backend Python, que le portage appelle toujours. Elles ne sont donc ni sondees par le
+constat d'archivage — un constat sur une route vivante echouerait, pour une raison sans rapport avec
+l'archivage — ni reecrites par `LiensLegacy::REMPLACEMENTS`.
+
+Ce second point tient a un detail deja paye ailleurs : la table compare le chemin **normalise en
+entier**, donc `/maintenance/check` ne vaut pas `/maintenance/`. Verifie et non suppose —
+`/maintenance/` et `/maintenance/index.php` rendent un lien INTERNE, `/maintenance/check` et
+`/maintenance/windows` partent toujours vers le backend. **Une table qui comparerait par prefixe les
+aurait reecrites, et la page de maintenance aurait cesse de fonctionner sans que personne ne fasse le
+lien** — le refus ne serait apparu ni ici ni dans les journaux du portage.
+
+L'entree `/maintenance/` est ajoutee preventivement, comme `/docker/`, `/chatops/` et `/supervision/` :
+mesure refaite, le backend n'ecrit que `/update/index.php` et `/tickets/index.php`. Seule
+`recherche.blade.php` consomme cette table : `go-page-search` rejouee, **12/0** au portage et **5/0** au
+legacy.
+
+**`documentation.php` est releve et NON corrige, cette fois** — et la distinction est celle posee la
+veille. Sa section nomme « la page `/maintenance/` » dans une balise `<code>` : une MENTION perimee,
+comme pour `docker/`, et non une instruction de configuration exterieure comme l'etait l'adresse du
+webhook ChatOps. Elle cite aussi `GET /maintenance/check?machine_id=`, qui reste EXACT puisque c'est une
+route de backend. Le reste de la section decrit la regle d'inversion et le fail-open, et il est juste.
+
+**Un seul point d'entree de menu** (`legacy/menu.php:129`), pour la meme raison mesuree que pour
+`docker/` et `chatops/` : le tiroir mobile du legacy est incomplet. Ni `legacy/index.php` ni
+`legacy/head.php` ne citaient la page.
+
+**Surfaces devenues mortes, relevees et non touchees** : `api_proxy.php` garde `/maintenance/` dans sa
+liste blanche et `/maintenance/windows` dans sa liste reservee a l'administration. Le proxy du legacy
+meurt d'un bloc, avec le legacy. `maintenance_windows` reste en base : la table est lue et ecrite par le
+portage, et par l'enforcement du backend.
 
 ### v1.37.57 — `maintenance/` porte, et la pastille qui MENTAIT de deux heures
 

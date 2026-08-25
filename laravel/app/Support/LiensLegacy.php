@@ -61,6 +61,17 @@ class LiensLegacy
          */
         '/docker/'      => 'docker',
         '/chatops/'     => 'chatops',
+        /*
+         * `maintenance/` archive le 2026-08-25, preventive elle aussi.
+         *
+         * ATTENTION AU VOISINAGE : `/maintenance/check` et `/maintenance/windows`
+         * sont des routes du BACKEND, toujours appelees par le portage. Elles ne
+         * sont pas touchees ici parce que la table compare le chemin NORMALISE en
+         * entier — `/maintenance/check` ne vaut pas `/maintenance/`. Une table qui
+         * comparerait par prefixe les reecrirait, et la page de maintenance
+         * cesserait de fonctionner sans que personne ne fasse le lien.
+         */
+        '/maintenance/' => 'maintenance',
     ];
 
     /**

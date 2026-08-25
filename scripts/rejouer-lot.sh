@@ -170,7 +170,11 @@ declare -A REF_LEGACY=(
   # `webhook.php` compte, et c'est celui qu'il fallait le plus verifier — c'est
   # une adresse configuree HORS de RootWarden. Avant archivage : 21.
   [go-page-chatops]=6
-  [go-page-maintenance]=24
+  # 5 depuis l'ARCHIVAGE : 1 (la partie rend 404) + 2 fichiers reels + 2 (le lien
+  # du menu mene au portage, et il aboutit). Avant archivage : 24.
+  # `/maintenance/check` et `/maintenance/windows` ne sont PAS sondes : ce sont des
+  # routes du BACKEND, toujours appelees par le portage.
+  [go-page-maintenance]=5
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth

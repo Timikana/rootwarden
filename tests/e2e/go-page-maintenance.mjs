@@ -47,6 +47,7 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { execFileSync } from 'node:child_process';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -336,6 +337,44 @@ function formulaireVisible(page) {
 
         return getComputedStyle(e).display !== 'none' && ! e.hidden;
     }, C.formulaire);
+}
+
+/*
+ * ══ LE CONSTAT D'ARCHIVAGE, AVANT TOUT LE RESTE ═════════════════════════════
+ *
+ * Une partie archivee ne doit pas laisser une suite ROUGE derriere elle : plus
+ * personne ne lit les rouges. Tant que la partie est servie, ce bloc est inerte
+ * et la suite se joue normalement.
+ *
+ * LES TROIS CHEMINS SONDES EXISTENT VRAIMENT — mesure du 2026-08-25, AVANT le
+ * `git mv`, pour que les assertions ne soient pas creuses :
+ *   /maintenance/            302
+ *   /maintenance/index.php   302
+ *   /maintenance/js/main.js  200
+ * Aucun ne rendait 404. Apres archivage, les trois doivent le rendre.
+ *
+ * `/maintenance/check` et `/maintenance/windows` ne sont PAS sondes : ce sont des
+ * routes du BACKEND, que le portage appelle toujours. Les confondre avec des
+ * chemins de page ferait echouer un constat sur des routes bien vivantes.
+ */
+if (CIBLE === 'legacy') {
+    const archivee = await constateArchivage({
+        base: BASE,
+        chemin: '/maintenance/',
+        fichiers: ['/maintenance/index.php', '/maintenance/js/main.js'],
+        verifie, constate,
+    });
+    if (archivee) {
+        litEnBase('DELETE FROM rootwarden.login_attempts');
+        const s = await connecte(COMPTE, SECRET);
+        await verifieMenuLegacy(s.page, '/maintenance', verifie);
+        for (const ctx of contextes) { try { await ctx.close(); } catch {} }
+        try { await navigateur.close(); } catch {}
+        litEnBase('DELETE FROM rootwarden.login_attempts');
+        note('');
+        note(`${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+        process.exit(echecs > 0 ? 1 : 0);
+    }
 }
 
 const auDepart = compteEpreuve();
