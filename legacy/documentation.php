@@ -1129,11 +1129,19 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                 <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-400 mb-3">ChatOps bidirectionnel (v1.32.0+)</h2>
                 <p class="text-sm mb-3">
                     Les webhooks <strong>sortants</strong> (notifications) restent gérés par <code>WEBHOOK_*</code>.
-                    La page <code>/chatops/</code> (admin) ajoute le sens <strong>entrant</strong> : piloter
-                    RootWarden depuis Slack ou Teams.
+                    La page ChatOps (admin) ajoute le sens <strong>entrant</strong> : piloter
+                    RootWarden depuis Slack ou Teams. Elle est <strong>portée sur le nouveau
+                    portail</strong> et l'ancienne adresse <code>/chatops/</code> ne répond plus.
+                </p>
+                <p class="text-sm mb-3 font-semibold text-amber-700 dark:text-amber-400">
+                    ⚠ L'adresse du point d'entrée public a CHANGÉ. Avant d'activer ChatOps, reporter la
+                    nouvelle adresse dans la messagerie (Slack : <em>Slash Commands</em> / <em>Event
+                    Subscriptions</em>) : l'ancienne rend désormais 404, et un webhook mal adressé échoue
+                    sans message côté RootWarden.
                 </p>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
-                    <li>Point d'entrée public <code>/chatops/webhook.php</code> → backend <code>/chatops/command</code>.
+                    <li>Point d'entrée public <code>&lt;portail&gt;/chatops/webhook</code> (anciennement
+                        <code>/chatops/webhook.php</code>) → backend <code>/chatops/command</code>.
                         Auth par <strong>signature Slack</strong> (v0 HMAC + anti-rejeu) ou <strong>jeton partagé</strong>
                         (<code>X-ChatOps-Token</code>, Teams/générique).</li>
                     <li>Mapping <code>chatops_users</code> (identité chat → utilisateur RootWarden) ; sans mapping,

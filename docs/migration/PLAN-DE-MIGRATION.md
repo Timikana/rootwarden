@@ -93,18 +93,20 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | | |
 |---|---|
 | entrées de menu portées | **16 sur 33** |
-| parties du legacy archivées | **10** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` |
+| parties du legacy archivées | **11** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **93 exécutions, 1301 assertions, 0 échec** |
+| LOT de tests E2E | **95 exécutions, 1330 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `chatops/`. Le total d'assertions **baisse** de 1345 à 1330 sans qu'aucune ne disparaisse pour de mauvaises raisons : `go-page-chatops` passe de 21 à 6 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE désormais son 404 au lieu de la parcourir |
 | tests backend | **341 pytest** |
 | écarts de parité documentés | **90** — numérotés jusqu'à **E-100** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
 Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
-passerelle vers le backend, i18n FR/EN. Le chiffre 14/33 se recoupe par trois voies indépendantes :
-`Navigation.php`, le DOM (66 entrées, car le menu y figure **deux fois** — barre latérale et tiroir), et
-l'accueil du portage qui affiche lui-même « Déjà portés 14 / 33 ».
+passerelle vers le backend, i18n FR/EN. Le compte d'entrées portées se recoupe par trois voies
+indépendantes : `Navigation.php`, le DOM (le menu y figure **deux fois** — barre latérale et tiroir), et
+la tuile « Déjà portés » de l'accueil du portage. Cette tuile est **calculée** depuis `Navigation`
+(`$modulesPortes / $modulesAccessibles`), jamais écrite en dur : elle suit d'elle-même, et il n'y a donc
+aucun chiffre à y corriger après un portage.
 
 ### Les deux blocages de la v2.0
 
@@ -229,8 +231,8 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | ordre | partie | lignes | entrées | note |
 |---|---|---|---|---|
 | ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.53` / `v1.37.54` |
-| ~~2~~ | ~~`chatops/`~~ | 246 | 1 | **PORTÉ** `v1.37.55` — 22/0. Reste à ARCHIVER. Premier chemin PUBLIC du portage |
-| 3 | `maintenance/` | 257 | 1 | **⚠ voir l'encadré ci-dessous avant d'écrire le moindre clic** |
+| ~~2~~ | ~~`chatops/`~~ | 246 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.55` / `v1.37.56`. Premier chemin PUBLIC du portage, et première adresse EXTÉRIEURE que la migration déplace |
+| **3** | **`maintenance/`** | 257 | 1 | **EN COURS** — portage écrit, non câblé. **⚠ lire l'encadré ci-dessous avant d'écrire le moindre clic** |
 | 4 | `groups/` | 305 | 1 | groupes dynamiques + actions de masse |
 | 5 | `graylog/` | 388 | 1 | |
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
@@ -269,6 +271,19 @@ interdit** — la fixture rend l'action prohibée encore plus impossible. À pr�
 une ligne d'horaire qui *nomme* `srv-zabbix` n'est pas la **joindre** ; aucune session SSH, aucune
 requête vers elle.
 
+**Relu le 2026-08-25, et la requête le confirme mot pour mot** :
+`WHERE enabled = 1 AND (scope = 'global' OR machine_id = %s)` (`backend/maintenance.py:120-123`). Une
+fenêtre portant `machine_id = 1` n'est **jamais rendue** pour une autre machine : l'arbitrage ne repose
+donc pas sur une intention mais sur un filtre. Deux autres points relevés au passage, **mesurés et non
+corrigés** :
+
+- **`is_allowed` est fail-OPEN sur erreur de base** (`:127-129`, `reason = 'fail-open'`). Assumé et
+  commenté dans le legacy : une fenêtre de maintenance est un contrôle de **disponibilité**, pas
+  d'accès. À reprendre tel quel — un portage n'est pas le lieu où l'on change le sens d'un repli.
+- **Le contournement du rôle 3 est testé AVANT toute lecture de la base** (`:110-111`). Une suite qui
+  n'exercerait que le rôle 3 ne mesurerait donc **rien** de la logique de fenêtre. Le chemin utile est
+  le rôle 2.
+
 **Le `toggle` ne doit JAMAIS activer une fenêtre globale.** Le script du legacy porte un
 `PUT {enabled}` (`js/main.js:84`) : l'exercer sur une fenêtre `global` désactivée la rendrait
 bloquante. Avec une fenêtre limitée à `srv-zabbix`, les deux sens du basculement sont sans effet sur le
@@ -295,6 +310,28 @@ de raccourcis CLAVIER, un objet JS qu'aucun contrôle sur les `href` ne voit)** 
 backend émet le chemin** : préventif sinon) · greffer `constateArchivage` + `verifieMenuLegacy` **en
 tête du `try`** de chaque suite · **mesurer** la nouvelle référence legacy (`1 + N fichiers réels + 2`)
 · vérifier la **non-régression des parties déjà archivées** si l'on touche `archive.mjs` · captures.
+
+**Une étape s'ajoute au cycle depuis `chatops/` : chercher si la partie expose une adresse configurée
+HORS de RootWarden.** Les onze premiers archivages ne déplaçaient que des pages, visitées par un humain
+qui suit un menu — un lien mort se voit. `chatops/webhook.php` était le point d'entrée que **Slack**
+appelle : personne dans RootWarden ne l'aurait vu casser. Ce qu'il faut alors faire, dans l'ordre :
+
+1. **sonder le chemin AVANT le `git mv`** et consigner le statut. Une assertion « rend 404 » sur un
+   chemin qui n'a jamais existé passe en ne mesurant rien ;
+2. **compter ce fichier dans la référence** — `chatops/` fait `1 + 3 + 2`, et le troisième fichier est
+   justement celui qu'il fallait le plus vérifier ;
+3. **corriger ce qui donne l'adresse comme une INSTRUCTION**, et seulement cela. `documentation.php`
+   disait « point d'entrée public `/chatops/webhook.php` » : quelqu'un recopie cette ligne dans Slack.
+   Une simple *mention* périmée dans un `<code>` (le cas de `/docker/`) n'est pas la même chose et se
+   relève sans se corriger ;
+4. **le dire dans `DEPRECIATION.md`** et dans la page portée elle-même. La page ChatOps porte un
+   avertissement en gras : l'adresse a changé, la reporter avant d'activer.
+
+**Mesure faite le 2026-08-25 sur `LiensLegacy::REMPLACEMENTS`** : le backend n'émet que
+`/update/index.php` et `/tickets/index.php` (`backend/routes/search.py:50,82`) — jamais `/chatops/` ni
+`/docker/`. Les entrées de ces deux parties sont donc **préventives**, comme `/supervision/`. `/docker/`
+**manquait** : l'archivage de `v1.37.54` avait sauté cette étape. Seule `recherche.blade.php` consomme
+cette table, donc seule `go-page-search` a besoin d'être rejouée après l'avoir complétée.
 
 ---
 
@@ -406,13 +443,18 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   La page le dit désormais en gras, ce que le legacy ne faisait pas.
 
 **Opérationnel**
-- **pousser la branche** (77 commits locaux) ;
+- **pousser la branche** — le nombre de commits n'est pas stocké ici : il se remesure par
+  `git rev-list --count @{u}..HEAD`, et tout commit qui corrigerait le chiffre le périmerait ;
 - **rétroporter vers `main`** : **v1.37.16**, **v1.37.17**, **v1.37.48** — le dernier ferme une
   vulnérabilité **présente** en production ;
 - **relire `security/backend-cve`** (6 correctifs backend, 318 pytest, jamais fusionnée) ;
 - **réinitialiser `superadmin`** si l'on veut des captures sous ce compte précis. Effet de bord signalé :
   son `failed_attempts` est passé de 0 à 1 (seuil 5, aucun verrou) ;
-- **supprimer ou non les cinq comptes `e2e_test_*`** : actifs, rôle 1, **sans second facteur** ;
+- **supprimer ou non les cinq comptes `e2e_test_*`** : actifs, rôle 1, **sans second facteur**. Vus
+  à l'image le 2026-08-25 : ils sont proposés dans la liste « Compte RootWarden » de la page
+  ChatOps, donc offerts comme **identité** sous laquelle une commande de chat s'exécuterait. La
+  portée reste celle du rôle 1, mais un compte de test sans second facteur n'a pas à figurer dans
+  ce choix ;
 - **K4** — l'arbitrage `NOPASSWD: ALL` : le repli a **deux** chemins, et aucun compte actif de rôle 1 ne
   porte `users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable.
 
@@ -507,6 +549,11 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Une exception dans le `finally` emporte le journal entier** : isoler chaque étape.
 - **Imprimer le journal au fil de l'eau.** **Sonder un chemin qui n'a jamais existé rend 404** et fait
   passer l'assertion pour rien.
+- **Une assertion « rend 404 » ne vaut que si le NON-404 d'avant a été mesuré.** Corollaire du piège
+  ci-dessus, et il porte sur l'ORDRE des gestes : la mesure doit précéder le `git mv`, pas le suivre.
+  Sondé le 2026-08-25 avant d'archiver `chatops/` : `302`, `302`, **`403`**, `200`. Le `403` est le plus
+  instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
+  chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
 
 ### Base et shell

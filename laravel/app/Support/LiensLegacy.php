@@ -48,6 +48,19 @@ class LiensLegacy
          * est une etape du cycle d'archivage, pas une reaction a un defaut.
          */
         '/supervision/' => 'supervision',
+        /*
+         * `docker/` et `chatops/` archives les 2026-08-25. Preventives elles
+         * aussi : mesure refaite ce jour-la, `backend/routes/search.py:50,82`
+         * n'emet que `/update/index.php` et `/tickets/index.php`. Aucun autre
+         * fichier du backend n'ecrit de chemin de page.
+         *
+         * `/docker/` MANQUAIT : l'archivage de la v1.37.54 avait saute cette
+         * etape du cycle. Elle ne reparait aucun 404 constate — c'est justement
+         * ce qui la rend facile a oublier, et ce qui fait qu'on ne s'en apercoit
+         * que le jour ou un resultat de recherche cite le chemin.
+         */
+        '/docker/'      => 'docker',
+        '/chatops/'     => 'chatops',
     ];
 
     /**

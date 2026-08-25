@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.55** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.56** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,62 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.56 — `chatops/` archive : la premiere adresse EXTERIEURE que la migration deplace
+
+Cycle du §4.4 deroule : `git mv legacy/chatops legacy/_deprecated/`, bascule du point d'entree
+(`legacy/menu.php:138`), greffe de `constateArchivage` + `verifieMenuLegacy` en tete de la suite.
+Reference legacy **21 -> 6** : 1 (la partie rend 404) + **3** fichiers reels + 2 (le lien du menu mene
+au portage, et il aboutit). MESUREE.
+
+**TROIS fichiers, et le troisieme n'est pas une page.** `webhook.php` est le point d'entree PUBLIC que
+Slack appelle. Son 404 est VOULU — le portage expose `/chatops/webhook` — mais c'est la premiere fois
+qu'un archivage deplace une adresse configuree **hors de RootWarden**. Les onze archivages precedents
+ne deplacaient que des pages, visitees par un humain qui suit un menu.
+
+**Les quatre chemins ont ete sondes AVANT le deplacement**, precisement pour que les assertions ne
+soient pas creuses : `/chatops/` **302**, `/chatops/index.php` **302**, `/chatops/webhook.php` **403**
+(« ChatOps desactive », le refus du backend), `/chatops/js/main.js` **200**. Aucun ne rendait 404.
+Apres archivage, les quatre le rendent. Une assertion qui passerait parce que le chemin n'a jamais
+existe occupe la place d'une mesure sans en etre une.
+
+**`documentation.php` est CORRIGE ici, alors qu'il ne l'avait pas ete pour `docker/`.** La difference
+est de nature. Pour `docker/`, la page nommait un chemin mort dans une balise `<code>` : une mention
+perimee. Pour ChatOps elle donnait une **instruction de configuration exterieure** — « point d'entree
+public `/chatops/webhook.php` » — que quelqu'un recopie dans Slack. La laisser aurait fait echouer
+l'integration le jour de son activation, sans message et sans trace cote RootWarden. La section porte
+desormais l'adresse du portage et un avertissement en gras. `documentation.php` reste non porte et
+garde ses chaines en dur : ce n'est pas le lieu de le reprendre.
+
+**Un seul point d'entree de menu**, comme pour `docker/`, et pour la meme raison mesuree : le tiroir
+mobile du legacy est incomplet et ne portait pas ChatOps. Ni `legacy/index.php` ni `legacy/head.php`
+ne le citaient.
+
+**Surfaces devenues mortes, relevees et NON touchees** : `api_proxy.php:148` et `:179` gardent
+`/chatops/users` dans leur liste blanche et leur liste reservee a l'administration. Retirer une entree
+d'une liste reservee a l'administration par habitude, au detour d'un commit d'archivage, est exactement
+le geste qu'on ne fait pas. Le proxy du legacy meurt d'un bloc, avec le legacy.
+
+**L'archivage est sans risque parce que la fonctionnalite est DORMANTE** : aucune variable `CHATOPS_*`
+dans `srv-docker.env`, zero correspondance en base, backend fail-closed. Aucun webhook reel ne pointait
+vers l'adresse qui disparait. Si ChatOps avait ete actif, il aurait fallu prevenir AVANT, pas apres —
+et c'est ce que dit `DEPRECIATION.md`.
+
+`chatops_users` (migration 059) reste en base : la table est lue et ecrite par le portage.
+
+**Une etape du cycle sautee a la v1.37.54 est reparee ici.** `LiensLegacy::REMPLACEMENTS` recoit
+`/chatops/` **et** `/docker/` — ce dernier manquait. Mesure refaite : le backend n'ecrit que
+`/update/index.php` et `/tickets/index.php` (`backend/routes/search.py:50,82`), donc les deux entrees
+sont PREVENTIVES et ne reparent aucun 404 constate. C'est exactement ce qui les rend faciles a oublier,
+et ce qui fait qu'on s'en apercoit le jour ou un resultat de recherche cite le chemin. Resolution
+prouvee, pas supposee : `/chatops/index.php` et `/docker/index.php` rendent desormais un lien INTERNE,
+tandis qu'un chemin non porte (`/adm/audit_log.php`) part toujours vers l'ancien portail.
+`recherche.blade.php` est le seul consommateur de cette table : `go-page-search` rejouee, **12/0** au
+portage et **5/0** au legacy.
+
+**LOT complet apres archivage : 95 executions, 1330 assertions, 0 echec, ZERO ecart.** Le total baisse
+de 1345 a 1330, et la baisse s'explique entierement : `go-page-chatops` passe de 21 a 6 sur la cible
+legacy parce que la suite CONSTATE le 404 au lieu de parcourir la page.
 
 ### v1.37.55 — ChatOps porte : le premier chemin PUBLIC du portage
 
