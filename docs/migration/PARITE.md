@@ -4433,3 +4433,122 @@ composite de segments, le clic avait posé le caret sur les **minutes**, les deu
 sont perdus et les deux suivants ont écrasé les minutes seules. La suite accusait la page alors que le
 défaut était dans le geste. Correction : revenir au premier segment par des flèches — un vrai geste de
 clavier, et le seul qui replace le caret d'où qu'il vienne.
+
+---
+
+## E-104 — `adm/` D1 : les deux points d'API de la chaîne d'audit se **contredisent**, et le bouton qui devait boucher le trou ne peut rien sceller
+
+Trouvé en lisant, **mesuré au clic** le 2026-08-25 par `tests/e2e/go-adm-audit.mjs`. La même base, au
+même instant, obtient deux verdicts opposés :
+
+| ce qu'on clique | ce qui répond |
+|---|---|
+| **Vérifier l'intégrité** (`adm/api/audit_verify.php`) | ✅ « Chaîne intacte — 3311 lignes scellées, 868 non scellées » |
+| **Sceller les orphelines** (`adm/api/audit_seal.php`, en simulation) | ❌ « Désynchronisation détectée sur 1 ligne(s). Aucune réécriture effectuée. **Investigation requise** », `tampered_detected: [3]` |
+
+**La cause tient en une ligne**, et c'est un désaccord sur ce qu'est la chaîne. Devant une ligne
+**orpheline** (`self_hash IS NULL`) :
+
+- `audit_verify.php:44-51` la **saute** sans avancer la tête de chaîne ;
+- `audit_seal.php:79-84` **calcule** son hash et **avance** la tête (`$lastHash = $computed`).
+
+Or la chaîne réellement inscrite en base saute les orphelines. Mesuré ligne à ligne :
+
+| id | `prev_hash` | `self_hash` |
+|---|---|---|
+| 1 | `GENESIS` | `d36ccba5…` |
+| 2 | **NULL** | **NULL** |
+| 3 | `d36ccba5…` — *celui de la ligne 1* | `5a070372…` |
+| 4 | **NULL** | **NULL** |
+| 5 | `5a070372…` — *celui de la ligne 3* | `d9ce6fe8…` |
+
+**C'est donc `audit_verify.php` qui a raison**, et une seconde mesure, par un autre moyen, le
+confirme sans passer par lui — un `LAG()` SQL sur les seules lignes scellées rend **3311 maillons,
+0 rupture**, et le premier maillon est bien `GENESIS`.
+
+**Ce que le défaut coûte, et c'est là qu'il devient grave.** `stopped_at_tamper` verrouille le bloc
+d'`UPDATE` (`audit_seal.php:105` : `if (!$dryRun && !$stopAtTamper && …)`). Le parcours s'arrête sur
+la ligne 3 à **chaque** appel, donc :
+
+1. **le bouton « Sceller les orphelines » ne peut sceller AUCUNE ligne, jamais** — et il ne le dit
+   pas : il rend « Scellé : 0 lignes sur 1 orphelines », ce qui se lit comme « il n'y avait presque
+   rien à faire » alors qu'il y en a **868** ;
+2. le trou grandit tout seul. Le plan annonçait **757** orphelines ; mesuré 866, puis 867, puis 868
+   **en une heure** — l'insertion au journal est nue, chaque connexion en ajoute une, et le seul
+   remède est inerte ;
+3. chaque appel écrit une ligne `SECURITY … investigation requise` dans le journal d'erreurs PHP
+   (`audit_seal.php:88-95`) pour une ligne qui n'a **pas** été altérée. **Une alarme de sécurité qui
+   crie au loup use la seule alarme qu'on ait.**
+
+**Au portage** : une seule lecture de la chaîne, partagée par la vérification et le scellement, et
+c'est celle qui saute les orphelines. Le portage doit rendre **un** verdict, pas deux.
+
+---
+
+## E-105 — `audit.entries_total` affiche son gabarit `:count`, en français **et** en anglais
+
+Vu **à l'image**, pas par une assertion : la page annonce « **4 179 :count entrees au total** ».
+
+La clé porte un gabarit de substitution que personne ne substitue :
+
+| catalogue | valeur |
+|---|---|
+| `lang/fr/admin.php:259` | `':count entrees au total'` |
+| `lang/en/admin.php:267` | `':count entries'` |
+
+et `audit_log.php:142` écrit `number_format($total) . ' ' . t('audit.entries_total')` — le nombre est
+déjà là, le gabarit reste. Les **deux** langues sont touchées, et la version anglaise est en plus
+amputée (« entries », sans « au total »).
+
+Aucune assertion DOM ne pouvait le voir : le nombre attendu **est** bien dans la page, la chaîne
+`:count` n'est qu'un mot de plus à côté. **C'est la capture qui l'a montré.**
+
+**Au portage** : la valeur passe par le mécanisme de substitution, ou la clé perd son gabarit. Et la
+parité FR/EN se relit sur le **rendu**, pas sur la présence des clés.
+
+---
+
+## E-106 — Le bouton « Sceller les orphelines » a l'air **désactivé** : `bg-yellow-600` a été purgée
+
+**Quatrième occurrence** du même piège, et la plus ironique : le bouton qui ne peut rien faire (E-104)
+a aussi l'air de ne rien pouvoir faire.
+
+Mesuré dans le binaire CSS servi (`legacy/assets/css/tailwind.css`) :
+
+| classe | présente ? |
+|---|---|
+| `.bg-purple-600` (bouton « Vérifier ») | **oui** |
+| `.bg-green-600` (bouton « Exporter CSV ») | **oui** |
+| `.bg-yellow-600` (bouton « Sceller ») | **non** |
+| `.hover:bg-yellow-700` | **non** |
+
+Le bouton rend donc **sans fond**, en gris, entre deux voisins colorés — la signature visuelle d'un
+contrôle désactivé. Le HTML est juste ; c'est la feuille qui ne porte pas la classe. Aucune assertion
+DOM ne le voit : l'élément est bien présent, bien cliquable, et sa classe est bien dans l'attribut.
+
+**Au portage** : les composants Blade du socle, dont les classes sont écrites une fois et vues par le
+compilateur. Et la règle, une quatrième fois : **mesurer le style CALCULÉ, ou regarder l'image.**
+
+---
+
+## E-107 — Le journal d'audit n'est internationalisé qu'à moitié
+
+Les libellés statiques passent par `t('audit.*')`. Tout ce que le JavaScript écrit est en **français
+codé en dur**, dans un fichier par ailleurs bilingue :
+
+| `adm/audit_log.php` | texte |
+|---|---|
+| `:189` | `'⏳ Verification de la chaine de hash en cours...'` |
+| `:195` | `` `✅ Chaine intacte - ${d.sealed} lignes scellees, …` `` |
+| `:201` | `` `❌ INCOHERENCE DETECTEE - type=… a la ligne …` `` |
+| `:206`, `:229` | `'✗ Erreur : '` |
+| `:213` | `confirm("Sceller les lignes orphelines dans la hash chain ?")` |
+| `:225` | `` `🖋 Scelle : ${d.sealed} lignes sur … orphelines.` `` |
+
+Un exploitant en anglais lit donc l'interface en anglais et **les verdicts en français** — y compris
+celui qui annonce une incohérence de la chaîne d'audit.
+
+S'y ajoute le `confirm()` natif de `:213`, qui recouvre la ligne sur laquelle on décide, ne se style
+pas, et **bloque Puppeteer**. Même traitement que partout ailleurs : un panneau de décision en page.
+
+**Au portage** : FR et EN dans le même commit, verdicts compris.
