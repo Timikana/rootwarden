@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.56** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.57** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,79 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.57 — `maintenance/` porte, et la pastille qui MENTAIT de deux heures
+
+**17 entrees de menu portees sur 33.** Legacy 24/0, portage 29/0.
+
+**LE DEFAUT LE PLUS GRAVE DU CHANTIER, TROUVE EN LISANT AVANT DE CLIQUER.** La pastille « ouverte
+maintenant » du legacy est calculee DANS LE NAVIGATEUR
+(`legacy/maintenance/js/main.js:26-35`), sur l'horloge du navigateur. L'application se fait dans
+`backend/maintenance.py:_in_window`, sur l'horloge du CONTENEUR. Releve du jour : navigateur en
+**CEST 19:09**, `rootwarden_python` en **UTC 17:09**. Deux heures.
+
+La demonstration tient en quatre lignes de journal. La suite cree une fenetre `18:48 -> 19:28` a 19:09
+locale — la plage encadre l'instant du navigateur, pas celui du serveur :
+
+    INFO  horloge du navigateur : 19:09
+    INFO  horloge du conteneur qui applique : 17:09
+    INFO  verdict du backend pour cette fenetre : FERMEE
+    INFO  cellule d'etat de la ligne d'epreuve : « Ouverte »
+
+Le legacy annonce « Ouverte ». Le backend refusera. Et comme l'enforcement vit dans d'AUTRES modules
+(`routes/updates.py:19`, `routes/monitoring.py:229`), le refus n'apparait pas sur cette page :
+l'exploitant lit « Ouverte », lance une mise a jour, recoit un **423** sans rapport visible. Pour une
+fenetre `22:00 -> 06:00` saisie normalement, il y a DEUX bandes de deux heures ou la page et
+l'application se contredisent, dans les deux sens.
+
+**CE N'EST PAS E-73**, qui porte sur un AFFICHAGE faux de deux heures. Ici la valeur fausse est un
+VERDICT sur une regle de blocage, rendu par un code qui n'est pas celui qui decide. E-73 est neanmoins
+elargi : le decalage ne fait pas que mal afficher, il fait mal DECIDER.
+
+**CORRECTIF — le verdict remonte la ou il est applique.** `list_windows` rend desormais, par fenetre, un
+`active_now` calcule par `mw._in_window` — la fonction meme qui bloque — plus `server_time` et
+`server_offset`. Le JavaScript du portage ne recalcule plus rien, il AFFICHE. La regle n'est pas
+deplacee vers le navigateur : elle y est annoncee telle qu'elle sera appliquee. **341 pytest** toujours
+verts apres cette modification backend.
+
+Le premier jet du portage recopiait pourtant le calcul en JavaScript, en promettant de « suivre le
+Python pas a pas ». C'etait la mauvaise reponse : **suivre le pas a pas ne protege de rien quand ce
+n'est pas le pas qui differe, mais l'heure.**
+
+**ET LE VERDICT EST EXPLIQUE.** Une ligne nomme l'horloge du serveur, et seulement quand elle differe de
+celle du navigateur — une mention permanente cesse d'etre lue. Lire « Fermee » sur une plage qui
+contient visiblement l'heure qu'il est passerait sinon pour une panne.
+
+**DEUX AUTRES DEFAUTS, DANS MON PROPRE PORTAGE, TROUVES PAR LA MEME ASSERTION.** La pastille d'ensemble
+comptait les fenetres activees SANS REGARDER LEUR PORTEE et annoncait « Flotte restreinte » des la
+premiere — faux, et faux precisement dans le cas du banc d'essai, ou la fenetre ne vise qu'une machine.
+La requete du backend le dit : `WHERE enabled = 1 AND (scope = 'global' OR machine_id = %s)`. D'ou
+TROIS etats et non deux. Puis, la portee corrigee, la pastille restait « Aucune restriction » apres une
+creation : rendue par le serveur au chargement, jamais rafraichie, alors que la page cree, bascule et
+supprime. Un resume serveur que la page invalide par ses propres gestes vaut moins que pas de resume.
+Sans cette assertion, les deux corrections n'auraient eu **aucun temoin**.
+
+**LA FIXTURE NE POUVAIT PAS EMPOISONNER LE LOT, et c'est mesure et non suppose.** Fenetre activee mais
+de portee `machine` sur `srv-zabbix`, la machine qu'aucune suite ne mute. Le `WHERE` ci-dessus ne la
+rend jamais pour une autre machine : la fixture ne peut bloquer que ce qui est deja interdit. Nommer
+cette machine dans une ligne d'horaire n'est pas la JOINDRE — aucune requete ne part vers elle. La suite
+RELIT `scope` et `machine_id` juste apres la creation et supprime la ligne a l'instant si la portee
+n'est pas celle convenue.
+
+**La boite native disparait** : le legacy supprime derriere un `confirm()`, le portage ouvre un panneau
+de decision en ligne. **Les deux chemins de la garde sont exerces** — `rw-test-admin` (role 2 sans
+`can_admin_portal`) et `rw-test-user` (role 1), 403 des deux cotes.
+
+**UN GESTE DE TEST QUI AVAIT TORT.** Remplir un `input[type=time]` par
+`click({ clickCount: 3 })` puis `type('1847')` a rendu `22:47` : c'est un composite de segments, le clic
+avait pose le caret sur les MINUTES. La suite accusait la page alors que le defaut etait dans le geste.
+
+**MESURE A L'IMAGE, pas seulement au DOM** : contrastes des pastilles neuves a **5,2:1** et **5,03:1**,
+au-dessus du seuil AA — le projet a paye trois fois une pastille invisible dont le HTML etait juste.
+Captures 1920/1400/390 par `tests/e2e/go-captures-maintenance.mjs`, regardees et envoyees.
+
+Tests : `tests/e2e/go-page-maintenance.mjs`, clics simules. Parite i18n maint : 52 cles FR = 52 EN.
+PARITE.md E-101, E-102, E-103.
 
 ### v1.37.56 — `chatops/` archive : la premiere adresse EXTERIEURE que la migration deplace
 

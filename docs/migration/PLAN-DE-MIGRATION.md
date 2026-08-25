@@ -92,12 +92,12 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **16 sur 33** |
+| entrées de menu portées | **17 sur 33** |
 | parties du legacy archivées | **11** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **95 exécutions, 1330 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `chatops/`. Le total d'assertions **baisse** de 1345 à 1330 sans qu'aucune ne disparaisse pour de mauvaises raisons : `go-page-chatops` passe de 21 à 6 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE désormais son 404 au lieu de la parcourir |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **90** — numérotés jusqu'à **E-100** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **93** — numérotés jusqu'à **E-103** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -232,8 +232,8 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 |---|---|---|---|---|
 | ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.53` / `v1.37.54` |
 | ~~2~~ | ~~`chatops/`~~ | 246 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.55` / `v1.37.56`. Premier chemin PUBLIC du portage, et première adresse EXTÉRIEURE que la migration déplace |
-| **3** | **`maintenance/`** | 257 | 1 | **EN COURS** — portage écrit, non câblé. **⚠ lire l'encadré ci-dessous avant d'écrire le moindre clic** |
-| 4 | `groups/` | 305 | 1 | groupes dynamiques + actions de masse |
+| ~~3~~ | ~~`maintenance/`~~ | 257 | 1 | **PORTÉ** `v1.37.57` — 29/0. Reste à ARCHIVER. **Le défaut le plus grave du chantier y a été trouvé** — voir l'encadré, il reste à lire |
+| **4** | **`groups/`** | 305 | 1 | **SUIVANT** — groupes dynamiques + actions de masse |
 | 5 | `graylog/` | 388 | 1 | |
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
 | 7 | `services/` | 631 | 1 | gestes sur machines |
@@ -315,12 +315,17 @@ celle qui a tenté l'action. L'exploitant lit « active maintenant », lance une
 fausse est un **verdict** sur une règle de blocage, et elle est calculée par un code qui n'est pas celui
 qui décide.
 
-**Correctif retenu pour le portage : remonter le verdict là où il est appliqué.** `list_windows`
-(`backend/routes/maintenance.py:37`) rendra, par fenêtre, un `active_now` calculé par `mw._in_window` —
-la fonction même qui bloque — et l'heure du backend. La page portée **affiche ce verdict** et nomme
-l'horloge employée quand elle diffère de celle du navigateur. C'est la convention du portage appliquée
-telle quelle : *la règle n'est jamais déplacée côté navigateur, elle est seulement annoncée plus tôt.*
-Un champ supplémentaire est sans effet sur le legacy, qui ne lit que les clés qu'il connaît.
+**Correctif APPLIQUÉ en `v1.37.57` : le verdict remonte là où il est appliqué.** `list_windows`
+(`backend/routes/maintenance.py`) rend, par fenêtre, un `active_now` calculé par `mw._in_window` — la
+fonction même qui bloque — plus `server_time` et `server_offset`. La page portée **affiche ce verdict**
+et nomme l'horloge employée quand elle diffère de celle du navigateur. C'est la convention du portage
+appliquée telle quelle : *la règle n'est jamais déplacée côté navigateur, elle est seulement annoncée
+plus tôt.* Un champ supplémentaire est sans effet sur le legacy, qui ne lit que les clés qu'il connaît.
+**341 pytest** restent verts.
+
+**Et le premier jet du portage avait fait l'erreur inverse** : il recopiait le calcul en JavaScript en
+promettant de « suivre le Python pas à pas ». Leçon à garder : *suivre le pas à pas ne protège de rien
+quand ce n'est pas le pas qui diffère, mais l'heure.*
 
 **Ce qui n'est PAS fait ici, et pourquoi.** Changer le fuseau du conteneur `rootwarden_python`
 corrigerait le décalage à la racine — et déplacerait **tous** les horodatages du backend, journaux
@@ -598,6 +603,22 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Une exception dans le `finally` emporte le journal entier** : isoler chaque étape.
 - **Imprimer le journal au fil de l'eau.** **Sonder un chemin qui n'a jamais existé rend 404** et fait
   passer l'assertion pour rien.
+- **Une règle qui vit en deux langages ne se protège pas en « suivant l'autre pas à pas ».** Le portage
+  de `maintenance/` a d'abord recopié `_in_window` en JavaScript avec cette promesse en commentaire. Le
+  pas était juste ; c'est l'**horloge** qui différait — navigateur en CEST, conteneur qui applique en
+  UTC. Deux implémentations d'accord sur l'algorithme et en désaccord sur l'entrée donnent deux verdicts
+  opposés. Quand une règle est **appliquée** ailleurs, la remonter de là et l'afficher ; ne jamais la
+  recalculer.
+- **Un résumé rendu par le serveur que la page invalide ensuite vaut moins que pas de résumé.** La
+  pastille d'ensemble de `maintenance/` était comptée au chargement et jamais rafraîchie, alors que la
+  page crée, bascule et supprime. Elle affichait « Aucune restriction » juste après une création.
+- **Compter sans regarder la PORTÉE, c'est compter faux.** La même pastille annonçait « Flotte
+  restreinte » pour une fenêtre limitée à une seule machine. Le `WHERE` du backend disait le contraire
+  depuis toujours : `enabled = 1 AND (scope = 'global' OR machine_id = ?)`. Lire la requête, pas
+  l'intention.
+- **Un `input[type=time]` ne se vide pas au triple-clic** : c'est un composite de segments, et le clic
+  peut poser le caret sur les minutes — `type('1847')` a rendu `22:47`. Revenir au premier segment par
+  des flèches. Et, encore une fois : la suite accusait la page alors que le défaut était dans le geste.
 - **Une assertion « rend 404 » ne vaut que si le NON-404 d'avant a été mesuré.** Corollaire du piège
   ci-dessus, et il porte sur l'ORDRE des gestes : la mesure doit précéder le `git mv`, pas le suivre.
   Sondé le 2026-08-25 avant d'archiver `chatops/` : `302`, `302`, **`403`**, `200`. Le `403` est le plus
