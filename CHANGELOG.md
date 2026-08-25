@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.53** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.54** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,31 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.54 — `docker/` archive : dixieme partie du legacy demontee
+
+Cycle du §4.4 deroule : `git mv legacy/docker legacy/_deprecated/`, bascule du point d'entree,
+greffe de `constateArchivage` + `verifieMenuLegacy` en tete de la suite. Reference legacy
+**16 -> 5** : 1 (la partie rend 404) + 2 fichiers reels + 2 (le lien du menu mene au portage, et il
+aboutit). MESUREE, pas calculee de tete.
+
+**UN SEUL POINT D'ENTREE A BASCULER, ET C'EST UNE MAUVAISE NOUVELLE POUR LE LEGACY.** Le cycle
+previent qu'il faut basculer TOUS les points d'entree — barre laterale, tiroir mobile, raccourcis du
+tableau de bord, carte de raccourcis clavier de `head.php`. Ici il n'y en avait qu'un, et la raison
+est mesuree : **le tiroir mobile du legacy est INCOMPLET** — 22 liens contre 32 dans la barre
+laterale, `docker` absent. Une dizaine d'entrees sont inaccessibles sur mobile depuis toujours.
+
+C'est exactement la derive que `App\Support\Navigation` rend impossible cote portage : la barre et le
+tiroir incluent le MEME partiel, et un test verifie qu'ils rendent les memes entrees. Le legacy decrit
+son menu deux fois, et les deux descriptions ont diverge sans que rien ne le signale. NON CORRIGE : on
+ne soigne pas ce qu'on demonte, et les dix entrees concernees seront portees.
+
+**Deux surfaces devenues mortes**, relevees et non touchees : `api_proxy.php:151` garde `/docker/` dans
+sa liste blanche (comme `/supervision/` avant elle), et `documentation.php:1052` nomme « la page
+`/docker/` » dans une balise `<code>` — sans lien cliquable, mais le chemin rend desormais 404.
+`documentation.php` est lui-meme une entree de menu a porter.
+
+PARITE.md E-99.
 
 ### v1.37.53 — la page Docker portee : la premiere des 19 entrees de menu restantes
 

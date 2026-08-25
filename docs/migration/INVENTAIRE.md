@@ -376,6 +376,10 @@ grep -c "'legacy'" laravel/app/Support/Navigation.php   # restantes (moins 2)
 
 ## Déjà archivé — `legacy/_deprecated/`
 
-`approvals` · `backups` · `commandlog` · `drift` · `search` · `supervision` · `tasks` ·
-`tickets` · `update` — **neuf parties**, dont **deux modules entiers** (`update/`,
+`approvals` · `backups` · `commandlog` · `docker` · `drift` · `search` · `supervision` ·
+`tasks` · `tickets` · `update` — **dix parties**, dont **deux modules entiers** (`update/`,
 `supervision/`). Cycle et preuves : `DEPRECIATION.md`.
+
+Le recensement ci-dessus reste celui du **2026-08-17** et n'est pas remis à jour : c'est un état
+daté, pas un suivi. Ce qui reste à porter, et dans quel ordre, vit dans
+`PLAN-DE-MIGRATION.md` §4.

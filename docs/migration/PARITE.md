@@ -4215,3 +4215,32 @@ signalé dans `INVENTAIRE.md` et n'est pas corrigé au détour d'un portage.
 élément sans style, et le test DOM le voit bien présent. Relevé par comparaison avec la feuille avant
 la première exécution. La grille des tuiles, elle, existait déjà en `rw-grille--compacte` — inutile
 d'en inventer une.
+
+
+---
+
+## E-99 — `docker/` archivé, et le tiroir mobile du legacy s'avère incomplet
+
+Dixième partie archivée. Le cycle du §4.4 déroulé : `git mv legacy/docker legacy/_deprecated/`,
+bascule du point d'entrée, greffe de `constateArchivage` + `verifieMenuLegacy` en tête de la suite.
+Référence legacy **16 → 5** : 1 (la partie rend 404) + 2 fichiers réels + 2 (le lien du menu mène au
+portage, et il aboutit). Mesuré, pas calculé de tête.
+
+**UN SEUL POINT D'ENTRÉE À BASCULER, ET C'EST UNE MAUVAISE NOUVELLE POUR LE LEGACY.** Le cycle prévient
+qu'il faut basculer **tous** les points d'entrée — barre latérale, tiroir mobile, raccourcis du tableau
+de bord, et la carte de raccourcis clavier de `head.php` qu'aucun contrôle sur les `href` ne voit. Ici
+il n'y en avait qu'un. La raison, mesurée : **le tiroir mobile du legacy est incomplet** — 22 liens
+contre 32 dans la barre latérale, et `docker` n'y figure pas. Une dizaine d'entrées sont donc
+inaccessibles sur mobile depuis toujours.
+
+C'est précisément la dérive que `App\Support\Navigation` rend impossible côté portage : la barre et le
+tiroir incluent le **même** partiel, et un test vérifie qu'ils rendent les mêmes entrées. Le legacy,
+lui, décrit son menu deux fois — et les deux descriptions ont divergé sans que rien ne le signale.
+Défaut **non corrigé** : on ne soigne pas ce qu'on démonte, et les dix entrées concernées seront
+portées.
+
+**DEUX SURFACES DEVENUES MORTES, relevées et non touchées** : `legacy/api_proxy.php:151` garde
+`/docker/` dans sa liste blanche — comme `/supervision/` avant elle, plus rien ne l'emprunte ; et
+`legacy/documentation.php:1052` décrit « la page `/docker/` » dans une balise `<code>`, donc sans lien
+cliquable, mais le chemin qu'elle nomme rend désormais 404. `documentation.php` est lui-même une entrée
+de menu à porter.

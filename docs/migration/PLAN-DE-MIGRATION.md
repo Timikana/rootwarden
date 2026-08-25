@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-25**, version `1.37.53`.
+Dernière mise à jour : **2026-08-25**, version `1.37.54`.
 
 ---
 
@@ -93,11 +93,11 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | | |
 |---|---|
 | entrées de menu portées | **15 sur 33** |
-| parties du legacy archivées | **9** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` |
+| parties du legacy archivées | **10** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **93 exécutions, 1312 assertions, 0 échec** |
+| LOT de tests E2E | **93 exécutions, 1301 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **88** — numérotés jusqu'à **E-98** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **89** — numérotés jusqu'à **E-99** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -228,7 +228,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 
 | ordre | partie | lignes | entrées | note |
 |---|---|---|---|---|
-| ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ** `v1.37.53` — 16/0 des deux côtés. Reste à ARCHIVER |
+| ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.53` / `v1.37.54` |
 | 2 | `chatops/` | 246 | 1 | |
 | 3 | `maintenance/` | 257 | 1 | fenêtres de maintenance, enforcement HTTP 423 |
 | 4 | `groups/` | 305 | 1 | groupes dynamiques + actions de masse |
