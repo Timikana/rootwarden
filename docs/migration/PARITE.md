@@ -4304,3 +4304,132 @@ puis relit : une saisie libre y ouvrirait une valeur que rien n'attend.
 **LES DEUX CHEMINS DE LA GARDE SONT EXERCÉS**, ce qui n'était pas gagné : `rw-test-admin` a le **rôle 2
 mais pas** `can_admin_portal` (mesuré en base), donc il mesure le chemin « permission » avec le rôle
 satisfait ; `rw-test-user` mesure le chemin « rôle ». Les deux rendent **403** sur les deux cibles.
+
+---
+
+## E-101 — La pastille « ouverte maintenant » du legacy ment, et de deux heures
+
+**Le défaut le plus grave rencontré depuis le début du chantier**, trouvé en LISANT le module avant
+d'écrire un clic, puis démontré par un test piloté à la souris et au clavier.
+
+`legacy/maintenance/js/main.js:26-35` calcule `isActiveNow` **dans le navigateur**, sur l'horloge du
+navigateur. L'application, elle, se fait dans `backend/maintenance.py:_in_window`, sur l'horloge du
+**conteneur**. Ce ne sont pas les mêmes :
+
+| horloge | relevé du 2026-08-25 |
+|---|---|
+| hôte, navigateur, `rootwarden_php` | **CEST 19:09** |
+| `rootwarden_python` — celui qui applique — et `rootwarden_laravel` | **UTC 17:09** |
+
+**La démonstration tient en une ligne de journal.** La suite crée une fenêtre `18:48 → 19:28`, tous les
+jours, à 19:09 heure locale. La plage encadre donc l'instant présent *du navigateur* et pas celui *du
+serveur* :
+
+```
+INFO  horloge du navigateur : 19:09
+INFO  horloge du conteneur qui applique : 17:09
+INFO  verdict du backend pour cette fenetre : FERMEE
+INFO  cellule d'etat de la ligne d'epreuve : « Ouverte »
+```
+
+Le legacy annonce **« Ouverte »**. Le backend refusera. Et comme l'enforcement vit dans **d'autres
+modules** (`backend/routes/updates.py:19`, `backend/routes/monitoring.py:229`), le refus n'apparaît pas
+sur cette page : l'exploitant lit « Ouverte », lance une mise à jour, et reçoit un **423** sans rapport
+visible avec les fenêtres de maintenance.
+
+En heure locale, pour une fenêtre `22:00 → 06:00` saisie normalement :
+
+| heure locale | ce que la page annonce | ce que le backend fait |
+|---|---|---|
+| 22:00 → 00:00 | **ouverte** | **refuse** |
+| 00:00 → 06:00 | ouverte | autorise |
+| 06:00 → 08:00 | **fermée** | **autorise** |
+
+Deux bandes de deux heures où la page et l'application se contredisent, **dans les deux sens**.
+
+**Ce n'est pas E-73.** E-73 porte sur un *affichage* d'horodatage faux de deux heures. Ici la valeur
+fausse est un **verdict** sur une règle de blocage, rendu par un code qui n'est pas celui qui décide.
+E-73 est néanmoins élargi : le décalage ne fait pas que mal afficher, il fait **mal décider**.
+
+**PORTAGE — le verdict remonte là où il est appliqué.** `list_windows`
+(`backend/routes/maintenance.py`) rend désormais, par fenêtre, un `active_now` calculé par
+`mw._in_window` — *la fonction même qui bloque* — ainsi que `server_time` et `server_offset`. Le
+JavaScript du portage ne recalcule plus rien : il **affiche**. La règle n'est pas déplacée vers le
+navigateur, elle y est annoncée telle qu'elle sera appliquée.
+
+Le premier jet du portage recopiait pourtant le calcul en JavaScript, en promettant de « suivre le
+Python pas à pas ». C'était la mauvaise réponse : **suivre le pas à pas ne protège de rien quand ce
+n'est pas le pas qui diffère, mais l'heure.**
+
+**ET LE VERDICT EST EXPLIQUÉ.** Un verdict juste mais incompréhensible ne vaut qu'à moitié : lire
+« Fermée » sur une plage qui contient visiblement l'heure qu'il est passerait pour une panne. La page
+affiche donc une ligne qui **nomme l'horloge du serveur** — et seulement lorsqu'elle diffère de celle du
+navigateur, une mention permanente cessant d'être lue. Deux assertions la mesurent : elle est visible
+exactement quand les horloges divergent, et elle cite bien l'heure du **serveur**, pas celle du
+navigateur.
+
+**NON CORRIGÉ, ET DÉLIBÉRÉMENT** : le fuseau du conteneur `rootwarden_python`. Le changer corrigerait
+la racine et déplacerait **tous** ses horodatages, journaux d'audit compris. C'est une décision de
+flotte, pas un détour de portage de page — elle attend l'exploitant. Le legacy garde également sa
+pastille calculée côté navigateur : on ne soigne pas ce qu'on démonte.
+
+---
+
+## E-102 — Une fenêtre limitée à une machine n'est pas la flotte, et le portage a d'abord dit le contraire
+
+Le legacy n'affiche **aucun état d'ensemble** : pour savoir si des actions mutantes sont restreintes, il
+faut lire le tableau ligne par ligne et faire le calcul de tête — alors que c'est le seul renseignement
+qui décide.
+
+Le portage ajoute une pastille. **Son premier jet était faux**, et faux précisément dans le cas le plus
+courant du banc d'essai : il comptait les fenêtres activées **sans regarder leur portée** et annonçait
+« Flotte restreinte » dès la première.
+
+La requête du backend dit exactement le contraire (`backend/maintenance.py:120-123`) :
+
+```sql
+WHERE enabled = 1 AND (scope = 'global' OR machine_id = %s)
+```
+
+Pour une machine donnée, les fenêtres applicables sont les **globales** activées **plus** celles
+activées qui la **nomment**. Aucune applicable = aucune restriction. D'où **trois** états et non deux :
+
+| situation | état annoncé |
+|---|---|
+| au moins une fenêtre **globale** activée | toute la flotte est restreinte |
+| sinon, N machines nommées | **ces N machines seulement** |
+| aucune | aucune restriction |
+
+Annoncer « Flotte restreinte » quand une seule machine l'est ferait chercher une panne générale là où il
+n'y en a pas — et c'est une erreur qu'on ne découvre qu'en la cherchant, puisque le refus se produit
+ailleurs.
+
+**UN SECOND DÉFAUT, TROUVÉ PAR LA MÊME ASSERTION.** Une fois la portée corrigée, la pastille restait
+« Aucune restriction » après la création d'une fenêtre : elle est rendue par le **serveur** au
+chargement, et la page crée, bascule et supprime ensuite sans jamais la rafraîchir. Un résumé
+serveur que la page invalide par ses propres gestes vaut moins que pas de résumé. Le script la
+recalcule désormais sur la liste que le backend vient de rendre — deux comptages sur `scope` et
+`enabled`, soit la condition du `WHERE` ci-dessus, et **aucune** règle d'horaire dupliquée.
+
+Sans cette assertion, les deux corrections n'auraient eu **aucun témoin**.
+
+---
+
+## E-103 — `maintenance/` : la boîte native disparaît, et la garde est exercée par ses deux chemins
+
+Le legacy supprime une fenêtre derrière un `confirm()` (`js/main.js:104`). Même motif que partout
+ailleurs dans ce chantier : la boîte recouvre la ligne sur laquelle on décide, ne se style pas — action
+destructrice et annulation au même poids — et **bloque Puppeteer**. Le portage ouvre un panneau de
+décision **en ligne**. La suite mesure les deux : elle accepte explicitement la boîte du legacy et
+vérifie qu'**aucune** n'apparaît côté portage.
+
+**Les deux chemins de la garde sont exercés** : `rw-test-admin` a le **rôle 2 mais pas**
+`can_admin_portal`, donc il mesure le chemin « permission » avec le rôle satisfait ; `rw-test-user`
+mesure le chemin « rôle ». **403** des deux côtés.
+
+**UN GESTE DE TEST QUI AVAIT TORT.** Le premier jet remplissait les champs d'heure par
+`click({ clickCount: 3 })` puis `type('1847')`, et lisait `22:47` : un `input[type=time]` est un
+composite de segments, le clic avait posé le caret sur les **minutes**, les deux premiers chiffres se
+sont perdus et les deux suivants ont écrasé les minutes seules. La suite accusait la page alors que le
+défaut était dans le geste. Correction : revenir au premier segment par des flèches — un vrai geste de
+clavier, et le seul qui replace le caret d'où qu'il vienne.

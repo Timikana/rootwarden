@@ -12,6 +12,7 @@ Securite (OWASP) :
 """
 import logging
 import re
+from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
@@ -40,7 +41,33 @@ def _clean_days(raw):
 @require_permission('can_admin_portal')
 @threaded_route
 def list_windows():
-    """Liste toutes les fenetres (avec nom de machine pour le scope machine)."""
+    """Liste toutes les fenetres (avec nom de machine pour le scope machine).
+
+    Rend aussi, PAR FENETRE, `active_now` : le verdict calcule par `_in_window`,
+    c'est-a-dire par la fonction meme qui bloque les actions mutantes.
+
+    ══ POURQUOI CE CHAMP EXISTE ════════════════════════════════════════════════
+
+    L'ancien portail calculait ce verdict DANS LE NAVIGATEUR
+    (`legacy/maintenance/js/main.js:26-35`), sur l'horloge du navigateur. Or
+    l'enforcement se fait ici, sur l'horloge de CE conteneur. Mesure du
+    2026-08-25 : navigateur en CEST, conteneur en UTC, **deux heures d'ecart**.
+    Une fenetre 22:00 -> 06:00 saisie en heure locale etait donc annoncee
+    « active » de 22:00 a 06:00 locales alors qu'elle n'autorisait reellement que
+    de 00:00 a 08:00 locales. Deux bandes de deux heures ou la page et
+    l'application se contredisaient, dans les deux sens — et le refus se produit
+    sur une AUTRE page, donc rien ne rapprochait les deux.
+
+    Le verdict part desormais d'ici. On ne deplace pas la regle vers le
+    navigateur : on l'y annonce, telle qu'elle sera appliquee.
+
+    `server_time` accompagne la liste pour que la page puisse NOMMER l'horloge
+    employee. Sans elle, un exploitant voyant « fermee » a 07:00 n'a aucun moyen
+    de comprendre pourquoi.
+    """
+    maintenant = datetime.now()
+    jour = maintenant.weekday()
+
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
         cur.execute(
@@ -48,12 +75,28 @@ def list_windows():
             "LEFT JOIN machines m ON w.machine_id = m.id ORDER BY w.scope, w.name")
         rows = cur.fetchall()
         for r in rows:
+            debut = mw._to_time(r.get('start_time'))
+            fin = mw._to_time(r.get('end_time'))
+            # Une fenetre desactivee n'est jamais active : `is_allowed` ne la lit
+            # meme pas (`WHERE enabled = 1`). Le dire ici evite que la page ait a
+            # recombiner deux champs pour retrouver la meme conclusion.
+            r['active_now'] = bool(
+                r.get('enabled') and debut is not None and fin is not None
+                and mw._in_window(maintenant, jour, mw._parse_days(r.get('days')), debut, fin))
             for k in ('start_time', 'end_time'):
                 tv = mw._to_time(r.get(k))
                 r[k] = tv.strftime('%H:%M') if tv else None
             if r.get('created_at') and hasattr(r['created_at'], 'isoformat'):
                 r['created_at'] = r['created_at'].isoformat()
-    return jsonify({'success': True, 'windows': rows})
+    return jsonify({
+        'success': True,
+        'windows': rows,
+        # L'horloge QUI DECIDE, telle quelle. `%Z` est vide sur un conteneur en
+        # UTC sans tzdata configure : on ajoute donc le decalage, qui ne l'est
+        # jamais.
+        'server_time': maintenant.strftime('%H:%M'),
+        'server_offset': maintenant.astimezone().strftime('%z'),
+    })
 
 
 @bp.route('/maintenance/windows', methods=['POST'])

@@ -7,6 +7,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\DockerController;
+use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
 use App\Http\Controllers\MisesAJourController;
@@ -227,6 +228,20 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/chatops', [ChatopsController::class, 'page'])
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('chatops');
+
+    /*
+     * Fenetres de maintenance. `role:2` + `perm:can_admin_portal`, comme le
+     * legacy (`checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` puis
+     * `checkPermission('can_admin_portal')`).
+     *
+     * La page ne MUTE rien par elle-meme, mais ce qu'elle ecrit decide si le
+     * RESTE de la flotte peut muter : une fenetre activee referme toutes les
+     * actions mutantes hors de ses plages, pour les roles < 3. La garde est donc
+     * celle d'une page d'administration, pas celle d'une page de consultation.
+     */
+    Route::get('/maintenance', MaintenanceController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('maintenance');
 
     Route::get('/docker', DockerController::class)
         ->middleware(['role:2'])
