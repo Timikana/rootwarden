@@ -81,7 +81,7 @@ grep -c "'route'"  laravel/app/Support/Navigation.php
 grep -c "'legacy'" laravel/app/Support/Navigation.php
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
-grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (97), pas le dernier numero (E-107)
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (101), pas le dernier numero (E-111)
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ```
@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **97** — numérotés jusqu'à **E-107** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **101** — numérotés jusqu'à **E-111** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 PORTÉ `v1.37.59` (legacy 32/0, portage 34/0) — `MODULE-ADM.md`**, dix sous-lots, neuf restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 PORTÉ `v1.37.59` ; D2 CARACTÉRISÉ (legacy 15/0, base rouge 7/7) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -458,7 +458,9 @@ déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **en
 commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
-archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17**.
+archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** — et sur ces sept passes,
+**quatre passent PARCE QUE la page est absente** : un 404 ne modifie rien et ne porte pas de script.
+Une base rouge se lit passe par passe, pas au compte.
 
 **Nettoyer à l'entrée ET dans le `finally` vaut aussi pour ce que le TEST accorde**, pas seulement
 pour ce qu'il écrit : une autorisation posée par une exécution survit à cette exécution.
@@ -755,6 +757,24 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Une hypothèse tirée d'une bibliothèque MINIFIÉE se conclut au clic, jamais à la lecture.** D2 :
+  la case de préférence n'a pas de `name`, son `hx-vals` ne porte pas `value`, et le point d'API
+  exige `value` — j'en ai conclu que chaque clic échouait. Le corps réellement émis porte
+  `value=1`, et la préférence s'écrit. **La case fonctionne.** Comparer les deux côtés d'un contrat
+  reste juste ; c'est la conclusion qui doit venir de la mesure.
+- **Un `onclick` qui retire l'élément TUE la requête que le même clic devait émettre.** htmx chargé,
+  bouton présent, écran modifié — et **zéro requête**. Le geste paraît fait et rien n'est parti :
+  ni erreur, ni journal, ni trace réseau. **Mesurer ce que l'écran fait ET ce que le réseau émet ET
+  ce que la base porte** : les trois, parce que le legacy les fait diverger.
+- **Quand un commentaire nomme un défaut, chercher TOUTES les branches jumelles, pas une.** Le
+  correctif A01 des notifications scinde `delete` sur le rôle et laisse `read` **et** `read_all`
+  écrire sur les lignes de diffusion — que le rôle 1 ne voit même pas.
+- **Une garde qui ne tient que sur une méthode ne tient pas.** `checkCsrfToken()` sous
+  `if (METHOD === 'POST')`, alors que l'action est lue dans `$_GET` en premier : `GET ?action=…`
+  écrit sans jeton. Chercher par où l'action ARRIVE avant de croire la garde placée.
+- **Deux énumérations de la même colonne finissent par diverger.** Quatre listes de types de
+  notification, et les deux qui décident — celle des préférences et celle de l'affichage — ont une
+  **intersection vide**. Mesurer l'intersection, pas la ressemblance.
 - **Le `[r]` de `[r]ejouer-lot` ne protège pas quand le CHEMIN figure ailleurs dans la même
   commande.** Quatrième forme du même piège : un `grep -c "[r]ejouer-lot.sh"` combiné, dans le même
   appel, avec un heredoc Python dont la source contenait `scripts/rejouer-lot.sh` en clair a rendu
@@ -845,7 +865,7 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 |---|---|
 | **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
 | `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
-| `PARITE.md` | les 97 écarts mesurés, chacun avec sa preuve |
+| `PARITE.md` | les 101 écarts mesurés, chacun avec sa preuve |
 | `METHODE-SOUS-LOT.md` | les neuf temps |
 | `INVENTAIRE.md` | ce qui reste, mesuré |
 | `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |

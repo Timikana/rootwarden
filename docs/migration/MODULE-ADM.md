@@ -326,7 +326,7 @@ dernier** — et chaque rang porte son motif.
 | # | sous-lot | fichiers | lignes | pourquoi ce rang |
 |---|---|---|---|---|
 | **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
-| **D2** | **Notifications** | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
+| **D2** ✅ | **Notifications** — *caractérisé, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** | **Comptes et rôles** | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** | **Permissions et accès** | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
@@ -389,6 +389,38 @@ contrôle **répété côté serveur**.
 legacy**, dont le `t()` est plat. Laravel a rendu chaque identifiant à l'écran — sans une erreur, sans
 un journal. **Seule la capture l'a montré**, et elle l'a montré d'un coup d'œil : trente libellés en
 majuscules à la place des textes.
+
+### 5.0bis D2 — CARACTÉRISÉ le 2026-08-26, et il déborde de `adm/`
+
+`tests/e2e/go-adm-notifications.mjs` — **15 PASS / 0 FAIL sur le legacy**, **base rouge 7/7** sur le
+portage. Et il faut le dire tout de suite : sur les **7 passes de la base rouge, 4 passent PARCE QUE
+la page est absente** — « un GET ne modifie rien » et « un rôle 1 ne touche pas une diffusion »
+passent sur un 404, pas sur une garde. Les trois autres sont de l'intendance (captures, retrait de la
+fixture, restauration de la préférence).
+
+**Le périmètre déborde du module, et c'est le premier sous-lot dans ce cas** : la *page* vit à la
+racine du legacy (`notifications.php`, 165 l.), le *point d'API* dans `adm/api/`, et la *pastille*
+dans `menu.php` — donc sur **toutes** les pages legacy restantes. D2 pèse donc 541 lignes, pas 376.
+
+Cinq constats mesurés, quatre inscrits en parité :
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-108** | **« Marquer lu » ne marque rien.** Le `onclick` fait `this.remove()` **pendant** l'événement ; htmx (chargé, vérifié) n'émet **aucune** requête, le bouton disparaît, la base ne bouge pas. L'écran affirme une lecture qui n'a pas eu lieu |
+| **E-109** | `GET ?action=read_all` rend `200 {"updated":2}` **sans aucun jeton** — la garde CSRF n'est posée que sur `POST` |
+| **E-110** | le correctif A01 de la diffusion ne couvre que `delete` ; `read` et `read_all` gardent `OR user_id = 0` pour **tout le monde**. Mesuré : un rôle 1 **ne voit pas** la diffusion et la marque pourtant lue |
+| **E-111** | **quatre vocabulaires** pour la colonne `type`, et les deux qui comptent ont une **intersection vide** : toute notification réellement produite s'affiche « Autre ». Plus `<html lang="fr">` en dur et six libellés en français fixe |
+
+**Et une hypothèse de lecture INFIRMÉE par le clic, qui vaut d'être gardée.** J'avais conclu, en
+lisant, que la case de préférence n'envoyait jamais son `value` : elle n'a pas d'attribut `name`, son
+`hx-vals` ne porte pas la clé, et le point d'API l'exige. Le corps réellement émis est
+`user_id=16&event_type=backup_status&csrf_token=…&value=1`, et la préférence passe bien de
+(absente) à 1. **La case fonctionne.** Comparer les deux côtés d'un contrat reste la bonne discipline ;
+elle se conclut au **clic**, pas à la lecture d'une bibliothèque minifiée.
+
+**Ce qui reste à faire pour finir D2** : le portage. Trois décisions sont déjà tranchées par la
+mesure — l'écran ne bouge qu'après la réponse du serveur ; une seule règle de portée pour la lecture
+**et** l'écriture ; une seule liste de types, partagée par les préférences et l'affichage.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

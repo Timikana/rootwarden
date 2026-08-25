@@ -4597,3 +4597,139 @@ chaîne écrite en dur dans du JavaScript échappe par nature à la parité.
 Et le `confirm()` disparaît : la décision se prend dans un `rw-panneau-decision`, qui ne recouvre pas
 la ligne sur laquelle on décide, se style, et ne bloque pas Puppeteer — c'est d'ailleurs ce qui rend
 le chemin de refus **testable**, ce qu'une boîte native ne permet pas.
+
+---
+
+## E-108 — `adm/` D2 : « Marquer lu » ne marque rien, et l'écran affirme le contraire
+
+Mesuré au clic le 2026-08-26 par `tests/e2e/go-adm-notifications.mjs`. Trois mesures qui convergent
+sur la même seconde :
+
+| ce qu'on mesure | ce qu'on relève |
+|---|---|
+| htmx est-il chargé sur la page ? | **oui** |
+| requêtes POST émises par le clic | **aucune** |
+| le bouton a-t-il disparu de l'écran ? | **OUI** |
+| la ligne est-elle lue en base ? | **non** |
+
+La cause est dans le balisage, `notifications.php:140-142` :
+
+```html
+<button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read","id":…}' hx-swap="none"
+        onclick="this.closest('div.flex').parentElement.classList.remove('bg-blue-50/50',…); this.remove();">
+```
+
+**Le `onclick` retire le bouton du DOM PENDANT l'événement de clic.** L'élément quitte le document
+avant que htmx n'émette, donc rien ne part — mais le surlignage bleu est effacé et le bouton
+disparaît. L'utilisateur voit exactement ce qu'il verrait si l'action avait abouti.
+
+Ce n'est pas un affichage optimiste mal réconcilié : **il n'y a aucune requête à réconcilier**. La
+notification reste non lue, la pastille du menu garde son compte, et un simple rechargement fait
+revenir la ligne en bleu. Le seul chemin qui marque réellement une notification est le bouton
+« Tout marquer comme lu », qui ne porte pas de `onclick` destructeur.
+
+**Au portage** : l'écran ne bouge **qu'après** la réponse du serveur. Un état affiché qui n'a pas été
+confirmé est un mensonge, et celui-ci est indétectable — il ne laisse ni erreur, ni journal, ni trace
+réseau.
+
+---
+
+## E-109 — Un GET écrit, et sans le moindre jeton
+
+`adm/api/notifications.php:26-27` n'appelle `checkCsrfToken()` que si la méthode est `POST` :
+
+```php
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    checkCsrfToken();
+    …
+}
+```
+
+Or l'action est lue dans `$_GET` **en premier** (`:23`, `$_GET['action'] ?? $_POST['action']`), et
+`case 'read_all'` (`:107-110`) exécute son `UPDATE` sans rien exiger d'autre.
+
+Mesuré depuis la page, avec la session réelle et **sans en-tête CSRF** :
+
+```
+GET /adm/api/notifications.php?action=read_all
+→ 200  {"success":true,"updated":2}      non lues : 2 avant, 0 après
+```
+
+L'impact est modeste — on marque comme lues les notifications de la personne qui suit le lien — mais
+la propriété violée ne l'est pas : **un GET ne doit rien écrire**, et c'est une règle que ce chantier
+s'est déjà donnée. Un `<img src>` sur une page tierce suffit à le déclencher.
+
+`read` et `delete` ne sont pas exploitables par la même voie, et il faut le dire : sur un GET, `$data`
+n'existe pas et `$_POST['id']` non plus, donc `$id` vaut 0 et la route sort sur « id requis » avant
+toute écriture. **C'est un accident de portée de variable qui les protège, pas une décision.**
+
+**Au portage** : les gestes qui écrivent sont des routes `POST` distinctes, et la vérification de
+requête du cadre s'y applique.
+
+---
+
+## E-110 — Le correctif de diffusion ne couvre qu'une branche sur trois
+
+`adm/api/notifications.php:120-124` porte un commentaire qui nomme le défaut avec précision :
+
+> *Patch A01 : un simple utilisateur ne peut supprimer QUE ses propres notifications. Avant, le
+> `OR user_id = 0` lui permettait de supprimer une notification broadcast (partagée par tous) →
+> impact sur les autres.*
+
+et `delete` scinde bien sur `$roleId >= 2`. **Ses deux jumeaux ne le font pas** :
+
+| action | clause d'écriture | scindée sur le rôle ? |
+|---|---|---|
+| `delete` (`:125-130`) | `id = ? AND (user_id = ? OR user_id = 0)` **ou** `user_id = ?` | **oui** |
+| `read` (`:93`) | `id = ? AND (user_id = ? OR user_id = 0)` | non |
+| `read_all` (`:108`) | `(user_id = ? OR user_id = 0) AND read_at IS NULL` | non |
+
+Et la lecture, elle, filtre : `$whereUser` ne rend les lignes `user_id = 0` qu'aux rôles ≥ 2
+(`:33-36`). Un rôle 1 **écrit donc sur des lignes qu'il ne voit pas**.
+
+Mesuré, les deux moitiés dans la même exécution :
+
+```
+rôle 1, page des notifications  → la diffusion d'épreuve n'apparaît PAS
+rôle 1, POST action=read_all    → 200 {"success":true,"updated":1}
+la diffusion est-elle passée lue ? → OUI
+```
+
+**Précondition, et elle compte** : la table ne portait **aucune** ligne `user_id = 0` au 2026-08-26.
+Le trou est réel dans le code et à un `INSERT` d'être exploitable — ce n'est pas la même chose que de
+dire qu'il l'est aujourd'hui. La suite pose sa propre diffusion pour l'exercer, et la retire.
+
+**Au portage** : une seule règle de portée, appliquée à la lecture **et** à l'écriture. Quand un
+commentaire nomme un défaut, chercher la branche jumelle — ici il y en avait deux.
+
+---
+
+## E-111 — Quatre vocabulaires pour la colonne `type`, et les deux qui comptent ne se croisent pas
+
+`notifications.type` est un `varchar(50)` sans contrainte. Quatre endroits en énumèrent les valeurs,
+et ils ne s'accordent pas :
+
+| source | valeurs |
+|---|---|
+| `update_notification_prefs.php:41-44` (`$allowedTypes`) | `cve_scan` `ssh_audit` `compliance_report` `security_alert` `backup_status` `update_status` |
+| `notifications.php:46-53` (`$typeLabels`) | `cve_critical` `server_offline` `perm_granted` `perm_expired` `password_expiry` `info` |
+| `menu.php` (icônes de la cloche) | mêmes six que la page |
+| **les lignes réellement en base** | `cve_scan`, `security_alert` |
+
+**L'intersection des deux premières est VIDE.** Mesurée, pas estimée. Toute notification que le
+système de préférences peut produire retombe donc sur le repli `['Autre', 'bg-gray-100 …']`
+(`notifications.php:113`) — et c'est bien ce que montre la capture : **trois lignes, trois pastilles
+grises « Autre »**. Le système de couleurs et de libellés de la page ne peut colorier que des types
+que rien ne produit.
+
+S'y ajoutent, sur la même page, deux défauts d'internationalisation :
+
+- les six libellés de type sont en **français codé en dur** (`'CVE critique'`, `'Serveur offline'`…),
+  comme le titre « Notifications », « Tout marquer comme lu » et « X non lue(s) sur Y total » ;
+- **`<html lang="fr">` est écrit en dur** (`:57`), là où `adm/audit_log.php:122` écrit
+  `<html lang="<?= getLang() ?>">`. La page est annoncée comme française à toute technologie
+  d'assistance, quelle que soit la langue choisie.
+
+**Au portage** : une seule liste de types, partagée par les préférences et par l'affichage, et un
+libellé par type dans les deux langues. Un type inconnu reste possible — il s'affiche alors sous son
+nom brut, ce qui se diagnostique, plutôt que sous « Autre », qui ne dit rien.
