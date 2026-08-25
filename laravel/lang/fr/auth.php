@@ -31,8 +31,11 @@ return [
     'second_facteur_aide'        => "Le code change toutes les 30 secondes. Un code déjà utilisé est refusé : attendez le suivant.",
 
     // Enrôlement
+    'enrolement_qr_alt' => 'QR code à scanner avec votre application d\'authentification',
+    'enrolement_saisie_manuelle' => 'Vous ne pouvez pas scanner ? Saisissez cette clé manuellement dans votre application :',
+    'enrolement_activer' => 'Activer',
     'enrolement_titre'       => 'Second facteur à configurer',
-    'enrolement_explication' => 'Ce compte n\'a pas encore de second facteur. L\'enrôlement n\'est pas encore disponible sur cette interface : effectuez-le depuis l\'ancien portail, puis revenez ici.',
+    'enrolement_explication' => 'Ce compte n\'a pas encore de second facteur. Scannez ce QR code avec votre application d\'authentification, puis saisissez le code affiché pour l\'activer.',
 
     // Conditions d'utilisation
     'cgu_titre'      => 'Conditions d\'utilisation',

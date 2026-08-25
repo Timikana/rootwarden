@@ -1814,3 +1814,35 @@ a.rw-bouton { display: inline-block; }
 }
 .rw-journal__erreur { color: var(--rw-danger); font-weight: 550; }
 .rw-journal__fin { color: var(--rw-texte-doux); font-style: italic; margin-top: 6px; }
+
+/* ── Enrôlement du second facteur ─────────────────────────────────────────
+   Le QR est un SVG produit par le serveur (le conteneur n'a ni gd ni
+   imagick). On lui impose un fond BLANC quel que soit le thème : les
+   lecteurs de QR lisent des modules sombres sur fond clair, et un SVG posé
+   sur un fond sombre devient illisible — un contraste inversé ne se voit pas
+   dans le DOM, seulement à la caméra. */
+.rw-qr {
+    background: #fff;
+    padding: 12px;
+    border-radius: 10px;
+    width: fit-content;
+    margin: 0 auto 14px;
+    line-height: 0;
+}
+.rw-qr svg { display: block; width: 220px; height: 220px; }
+
+/* La clé en clair, pour qui ne peut pas scanner. Coupée en morceaux lisibles
+   plutôt qu'en une ligne qui déborde à 390 px. */
+.rw-secret {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    word-break: break-all;
+    text-align: center;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 0 18px;
+    color: var(--rw-texte);
+}
