@@ -153,7 +153,11 @@ declare -A REF_LEGACY=(
   # desactive » avant tout examen de signature. Aucune requete ne sort vers Slack.
   # La suite pose puis retire une correspondance d'epreuve, nettoyage BORNE par
   # son identifiant, et sonde le point d'entree PUBLIC pour prouver qu'il refuse.
-  [go-page-chatops]=21
+  # 6 depuis l'ARCHIVAGE : 1 (la partie rend 404) + 3 fichiers reels + 2 (le lien
+  # du menu mene au portage, et il aboutit). TROIS fichiers et non deux :
+  # `webhook.php` compte, et c'est celui qu'il fallait le plus verifier — c'est
+  # une adresse configuree HORS de RootWarden. Avant archivage : 21.
+  [go-page-chatops]=6
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth

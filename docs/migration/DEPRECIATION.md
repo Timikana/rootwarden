@@ -635,3 +635,58 @@ Reference de la suite : **16 -> 5** (1 + 2 fichiers reels + 2). Deux surfaces de
 relevees et non touchees : `api_proxy.php:151` garde `/docker/` dans sa liste blanche, et
 `documentation.php:1052` nomme « la page `/docker/` » dans une balise `<code>` — sans lien cliquable,
 mais le chemin rend desormais 404.
+
+
+### chatops — la premiere partie archivee dont une ADRESSE EXTERIEURE change
+
+Trois fichiers, et l'un des trois n'est pas une page : `webhook.php` est le point d'entree **PUBLIC**
+que Slack appelle. Son 404 est **voulu** — le portage expose `/chatops/webhook` — mais c'est la
+premiere fois qu'un archivage deplace une adresse que quelqu'un a configuree **hors de RootWarden**.
+
+| point d'entree | nature | avant | apres |
+|---|---|---|---|
+| `legacy/menu.php:138` | barre laterale | `/chatops/index.php` | `LARAVEL_URL . '/chatops'` |
+| tiroir mobile | — | **absent** (le tiroir du legacy est incomplet) | rien a basculer |
+| `legacy/index.php` | raccourcis | **absent** | rien a basculer |
+| `legacy/head.php` | raccourcis clavier | **absent** | rien a basculer |
+| `webhook.php` | **entree publique, hors menu** | `/chatops/webhook.php` | `LARAVEL_URL . '/chatops/webhook'` |
+
+**Etat AVANT le deplacement, mesure le 2026-08-25** — pour que les assertions d'archivage ne soient
+pas creuses : `/chatops/` **302**, `/chatops/index.php` **302**, `/chatops/webhook.php` **403**
+(« ChatOps desactive », le refus du backend), `/chatops/js/main.js` **200**. Aucun ne rendait 404.
+
+Reference de la suite : **21 -> 6** (1 + **3** fichiers reels + 2). Trois et non deux : `webhook.php`
+compte, et il est celui qu'il fallait le plus verifier.
+
+#### `documentation.php` est corrige ici, alors qu'il ne l'avait pas ete pour `docker/`
+
+La difference est de nature, pas d'humeur. Pour `docker/`, la page de documentation **nommait** un
+chemin devenu mort dans une balise `<code>` : une mention perimee. Pour ChatOps elle donnait une
+**instruction de configuration exterieure** — « point d'entree public `/chatops/webhook.php` » — que
+quelqu'un recopie dans Slack. La laisser telle quelle aurait fait echouer l'integration le jour de son
+activation, sans message et sans trace cote RootWarden. La section porte desormais l'adresse du
+portage et un avertissement en gras.
+
+`documentation.php` reste **non porte** et garde ses chaines en dur, sans i18n : ce n'est pas le lieu
+de le reprendre.
+
+#### Ce qui devient mort et n'est pas touche
+
+`api_proxy.php:148` et `:179` gardent `/chatops/users` dans leur liste blanche et leur liste
+reservee a l'administration. Plus aucune page du legacy ne l'appelle. C'est vrai aussi de
+`/docker/`, `/tasks/`, `/approvals`, `/command_log`, `/tickets`, `/search` et `/drift/` : le proxy du
+legacy meurt d'un bloc, avec le legacy. **Retirer une entree d'une liste reservee a l'administration
+par habitude, dans un commit d'archivage, est exactement le geste qu'on ne fait pas** — il se releve,
+il ne se bricole pas.
+
+`chatops_users` (migration 059) reste en base : la table est lue et ecrite par le portage.
+
+#### La fonctionnalite est DORMANTE, et c'est ce qui rend cet archivage sans risque
+
+Aucune variable `CHATOPS_*` dans `srv-docker.env`, zero correspondance en base. Le backend refuse
+d'emblee (`backend/routes/chatops.py:34`). Aucun webhook reel ne pointait donc vers l'adresse qui vient
+de disparaitre. Si ChatOps avait ete actif, cet archivage aurait exige de prevenir AVANT, pas apres.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `chatops/` | 6 PASS / 0 FAIL — partie archivée |

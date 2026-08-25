@@ -47,6 +47,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -201,6 +202,49 @@ function texteTableau(page) {
 
         return tb ? (tb.textContent || '').replace(/\s+/g, ' ') : '';
     }, C.corps);
+}
+
+/*
+ * ══ LE CONSTAT D'ARCHIVAGE, AVANT TOUT LE RESTE ═════════════════════════════
+ *
+ * Une partie archivee ne doit pas laisser une suite ROUGE derriere elle : plus
+ * personne ne lit les rouges. Tant que la partie est servie, ce bloc est inerte
+ * et la suite se joue normalement.
+ *
+ * Le bloc vit AVANT le `try` et sort par `process.exit` : le `finally` de la
+ * suite nettoie une fixture qui, ici, n'a jamais ete posee. L'y faire passer
+ * n'ajouterait rien et melerait deux chemins.
+ *
+ * LES QUATRE CHEMINS SONDES EXISTENT VRAIMENT — mesure du 2026-08-25, AVANT le
+ * deplacement, precisement pour que les assertions ne soient pas creuses :
+ *   /chatops/            302     (redirection de connexion)
+ *   /chatops/index.php   302
+ *   /chatops/webhook.php 403     (« ChatOps desactive », le refus du backend)
+ *   /chatops/js/main.js  200
+ * Aucun ne rendait 404. Apres archivage, les quatre doivent le rendre.
+ *
+ * `webhook.php` merite d'etre nomme : c'est le point d'entree PUBLIC que Slack
+ * appelle. Son 404 est VOULU — le portage expose `/chatops/webhook` — mais il
+ * change une adresse exterieure, ce que `DEPRECIATION.md` consigne.
+ */
+if (CIBLE === 'legacy') {
+    const archivee = await constateArchivage({
+        base: BASE,
+        chemin: '/chatops/',
+        fichiers: ['/chatops/index.php', '/chatops/webhook.php', '/chatops/js/main.js'],
+        verifie, constate,
+    });
+    if (archivee) {
+        litEnBase('DELETE FROM rootwarden.login_attempts');
+        const s = await connecte(COMPTE, SECRET);
+        await verifieMenuLegacy(s.page, '/chatops', verifie);
+        for (const ctx of contextes) { try { await ctx.close(); } catch {} }
+        try { await navigateur.close(); } catch {}
+        litEnBase('DELETE FROM rootwarden.login_attempts');
+        note('');
+        note(`${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
+        process.exit(echecs > 0 ? 1 : 0);
+    }
 }
 
 const auDepart = correspondancesEpreuve();
