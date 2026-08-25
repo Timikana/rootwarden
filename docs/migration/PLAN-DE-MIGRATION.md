@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-24**, version `1.37.52`.
+Dernière mise à jour : **2026-08-25**, version `1.37.53`.
 
 ---
 
@@ -92,12 +92,12 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **14 sur 33** |
+| entrées de menu portées | **15 sur 33** |
 | parties du legacy archivées | **9** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **91 exécutions, 1277 assertions, 0 échec** |
+| LOT de tests E2E | **93 exécutions, 1312 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **87** — numérotés jusqu'à **E-97** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **88** — numérotés jusqu'à **E-98** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -125,7 +125,7 @@ Elles prévalent sur tout le reste.
    qu'on change et pourquoi, dans le commit.
 3. **Tout le legacy doit migrer.** Aucun module n'est « laissé au legacy ».
 4. **Ne jamais fusionner sans son mot.** Le `push` reste également en attente : il n'a levé que le merge.
-5. **Rendre compte du TOTAL, pas du sous-lot.** « 14 entrées portées sur 33 » dit autre chose que « le
+5. **Rendre compte du TOTAL, pas du sous-lot.** « 15 entrées portées sur 33 » dit autre chose que « le
    LOT est conforme ».
 6. **Lire le `MODULE-*.md` avant de planifier un module.** Ne pas le faire a produit un plan faux et
    laissé une vulnérabilité de production trois jours sans être remontée.
@@ -228,7 +228,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 
 | ordre | partie | lignes | entrées | note |
 |---|---|---|---|---|
-| 1 | `docker/` | 201 | 1 | le plus petit ; bon rodage du cycle |
+| ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ** `v1.37.53` — 16/0 des deux côtés. Reste à ARCHIVER |
 | 2 | `chatops/` | 246 | 1 | |
 | 3 | `maintenance/` | 257 | 1 | fenêtres de maintenance, enforcement HTTP 423 |
 | 4 | `groups/` | 305 | 1 | groupes dynamiques + actions de masse |
@@ -419,6 +419,19 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un correctif évident peut casser le cas normal** : mesurer les **deux** moitiés.
 - **Une réussite annoncée n'est pas une réussite vérifiée** ; **un état final correct ne prouve pas que
   le geste était correct** ; **un statut 200 ne prouve rien si la session n'a pas tenu**.
+- **Éditer le runner pendant un rejeu ne fait pas qu'être risqué : le verdict devient FAUX.** Les
+  tables de références sont lues **au démarrage**. Une référence corrigée en cours de route est donc
+  ignorée, et le rejeu annonce un écart fantôme sur une suite pourtant juste — vu le 2026-08-25 sur
+  `go-socle-navigation` (48 mesurés, « attendu 46 » affiché). S'ajoute le risque réel de corruption :
+  bash relit un script en cours d'exécution **par décalage d'octets**, et une édition qui change la
+  longueur peut lui faire exécuter n'importe quoi. Figer le runner, puis lancer.
+- **Une classe CSS absente ne lève AUCUNE erreur** — elle rend un élément sans style, que le test DOM
+  voit bien présent. Sept classes inventées d'un coup sur `docker/` (`--succes` au lieu de `--ok`,
+  `__libelle` au lieu de `__texte`, `--petit` au lieu de `--minuscule`). Comparer à la feuille **avant**
+  la première exécution ; et regarder si la classe voulue existe déjà (`rw-grille--compacte` était là).
+- **Mesurer le STATUT, pas le texte de la page.** Un renifleur de « accès refusé » dans le corps
+  comptait un `404 Not Found` comme un **non-refus**. Un 404 dit « cette page n'existe pas », pas
+  « vous n'y avez pas droit ».
 - **Une exigence de test peut être un affaiblissement déguisé.** « Le legacy refuse un geste légitime,
   donc le portage doit l'accepter » — sauf que l'accepter autorisait le rejeu d'un code vu à la
   connexion. Avant de corriger une gêne, se demander ce que la gêne protégeait.

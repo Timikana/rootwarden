@@ -4163,3 +4163,55 @@ devenait plus haut que son voisin — libellé raccourci à « Activer », comme
 « Valider ». Et avant cela, l'écran rendait **entièrement vide** : `$temporaire['name']` n'existe pas,
 la clé de session s'appelle `nom`. Une clé de tableau supposée au lieu d'être lue, et la page tombait
 en 500 — que seule la lecture du journal a révélée, l'assertion disant seulement « pas de QR ».
+
+
+---
+
+## E-98 — La page Docker portée : une panne réseau se voit enfin, et le geste dit ce qu'il coûte
+
+Première des **19 entrées de menu restantes**, et la plus petite : 201 lignes, deux fichiers.
+Même suite sur les deux cibles — **legacy 16 / 0**, **portage 16 / 0**, base rouge **1 / 9**.
+
+**LE SCAN N'EST PAS UNE LECTURE, ET LA PAGE LE DIT MAINTENANT.** Relevé en lisant le backend avant
+d'écrire un seul clic : `backend/docker_monitor.py:116` lance un **`git fetch`** dans le dépôt de
+chaque projet compose de la machine visée — cela écrit dans `.git/` et fait **sortir la machine sur le
+réseau** — et `backend/docker_registry.py` interroge le registre distant. Surtout,
+**`/docker/scan_all` frappe TOUTES les machines**, `srv-zabbix` (production) comprise ; la machine est
+bien dans le sélecteur, mesuré. Le legacy présente ces deux boutons comme des gestes anodins. Le
+portage porte un encart de guidage qui nomme la production sur le geste qui coûte.
+
+**AUCUNE MACHINE N'EST JOINTE PAR LA SUITE.** Les deux boutons sont **interceptés et avortés** : on
+mesure que le clic émet la bonne requête, vers la bonne route, avec la bonne charge — et rien ne part.
+C'est le motif « joint la production par construction → interception + avortement ».
+
+**LE DÉFAUT QUE LE PORTAGE NE REPREND PAS.** `legacy/docker/js/main.js:14` fait `await fetch(...)`
+**sans `try`** dans son `api()`. Quand le backend est injoignable, le rejet remonte hors du
+gestionnaire de clic, la promesse n'est jamais rattrapée, et le message d'erreur pourtant prévu
+(`docker.err_scan`) **n'apparaît jamais** : l'exploitant clique, et il ne se passe rien — ni résultat,
+ni explication. `scanAll`, lui, enveloppe son `fetch` (`:106`) et affiche le message : l'asymétrie est
+un oubli, pas une intention. Mesuré des deux côtés en avortant la requête, ce qui est exactement ce
+qu'un backend éteint produirait. Le portage enveloppe chaque appel et ajoute une clé `err_reseau` que
+le legacy n'a pas.
+
+**LE LEGACY EST DÉDOUANÉ SUR UN POINT OÙ JE L'ACCUSAIS.** J'avais écrit l'écart « le refus rend
+HTTP 200 avec une page habillée, donc un automate lit une réussite ». La mesure dit l'inverse : il rend
+un vrai **403**. L'écart était une accusation sans fondement et il a été **retiré** — quand la mesure
+dédouane, il faut le dire aussi clairement que quand elle accuse. Les deux cibles tiennent la
+propriété, c'est donc une assertion partagée.
+
+**UNE ASSERTION QUI LISAIT LE TEXTE AU LIEU DU CODE.** Le premier jet reniflait le corps de la page à
+la recherche de « accès refusé ». Sur la base rouge, la page n'existait pas encore et rendait
+« 404 Not Found » — que le renifleur comptait comme un **non-refus**. La propriété est le **statut**,
+et il doit valoir 403 : un 404 dit « cette page n'existe pas », ce qui n'est pas « vous n'y avez pas
+droit ».
+
+**LA GARDE EST LE RÔLE, PAS UNE PERMISSION**, et c'est repris tel quel : `role:2` seul, comme
+`checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`. C'est la seule entrée de menu dans ce cas ; le relevé est
+signalé dans `INVENTAIRE.md` et n'est pas corrigé au détour d'un portage.
+
+**SEPT CLASSES CSS INVENTÉES, ET AUCUNE N'AURAIT LEVÉ D'ERREUR.** `rw-pastille--succes`,
+`rw-tuile__libelle`, `rw-bouton--petit`, `rw-cache`, `rw-mono`… n'existent pas ; les vraies sont
+`--ok`, `__texte`, `--minuscule`. Une classe absente ne produit **aucun message** : elle produit un
+élément sans style, et le test DOM le voit bien présent. Relevé par comparaison avec la feuille avant
+la première exécution. La grille des tuiles, elle, existait déjà en `rw-grille--compacte` — inutile
+d'en inventer une.

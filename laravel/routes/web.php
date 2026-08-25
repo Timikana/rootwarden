@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\SecondFacteurController;
 use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\DeriveConfigController;
+use App\Http\Controllers\DockerController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
 use App\Http\Controllers\MisesAJourController;
@@ -210,6 +211,17 @@ Route::middleware('session.authentifiee')->group(function () {
      * Sauvegardes de la base. La RESTAURATION est destructive et le backend la
      * reserve au role 3 : la garde de la page n'est donc pas celle de l'action.
      */
+    /*
+     * Inventaire Docker. Garde `role:2` SEULE, sans permission — reprise telle
+     * quelle du legacy (`checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`). C'est la
+     * seule entree de menu gardee par le ROLE et non par une permission ; le
+     * releve est signale dans INVENTAIRE.md et n'est pas corrige au detour d'un
+     * portage.
+     */
+    Route::get('/docker', DockerController::class)
+        ->middleware(['role:2'])
+        ->name('docker');
+
     Route::get('/sauvegardes', SauvegardesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('sauvegardes');

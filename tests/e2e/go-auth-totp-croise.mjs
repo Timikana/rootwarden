@@ -43,8 +43,16 @@
  */
 import { execFileSync } from 'node:child_process';
 
-/** Le secret d'epreuve. Base32 valide, jamais celui d'un compte reel. */
-const SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSW';
+/**
+ * Le secret d'epreuve. Base32 valide, et il n'appartient a AUCUN compte.
+ *
+ * Le premier jet employait `JBSWY3DPEHPK3PXP...` en le declarant « jamais celui
+ * d'un compte reel » — c'etait FAUX : c'est celui de `rw-test-user`. Le
+ * commentaire affirmait donc l'inverse de ce que faisait le code, et le test
+ * manipulait le secret d'un compte vivant pour rien. Verifie : la valeur
+ * ci-dessous n'apparait dans aucune suite ni dans la base.
+ */
+const SECRET = 'ORSXG5BRGIZTINJWG44DSMBQMFRGGZDFMZTWQ2LKNNWG23TPOAXA';
 
 let echecs = 0;
 const lignes = [];

@@ -44,7 +44,7 @@ class Navigation
             // Garde par ROLE et non par permission : releve tel quel du legacy.
             // L'ecart est signale dans INVENTAIRE.md — a arbitrer, pas a corriger
             // en silence pendant un portage de navigation.
-            ['cle' => 'docker',         'garde' => 'admin',                   'legacy' => '/docker/index.php'],
+            ['cle' => 'docker',         'garde' => 'admin',                   'route'  => 'docker'],
         ],
 
         'admin' => [

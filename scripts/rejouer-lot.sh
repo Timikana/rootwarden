@@ -54,12 +54,14 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 #
 # Mis a jour a chaque sous-lot qui ajoute ou retire une assertion. Un ecart n'est
 # pas forcement une regression — mais il doit toujours etre EXPLIQUE.
-# `go-socle-navigation` a passe de 40 a 42 au portage de S3 : la suite asserte
-# DYNAMIQUEMENT que chaque entree portee du menu resout, donc basculer `cve_scan`
+# `go-socle-navigation` grandit a CHAQUE entree portee : la suite asserte
+# DYNAMIQUEMENT que chaque entree portee du menu resout, donc basculer une entree
 # de `legacy` a `route` ajoute une assertion pour `rw-test-admin` et une pour
-# `rw-test-super`. Ce n'est pas un chiffre ajuste pour faire passer le rejeu.
+# `rw-test-super` — le role 1 ne voit pas ces entrees. 40 -> 42 au portage de S3
+# (`cve_scan`), 46 -> 48 a celui de `docker/`. Ce n'est pas un chiffre ajuste
+# pour faire passer le rejeu.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=46 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=48 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -92,6 +94,13 @@ declare -A REF_LARAVEL=(
   # pas d'equivalent, aucune page portee n'appelant une route gardee. En echange le
   # portage gagne les quatre proprietes que le legacy ne tient pas. Voir E-96.
   [go-auth-step-up]=24
+  # 17 sur le portage contre 16 sur le legacy. L'ecart est UNE assertion : le
+  # portage rend 403 ET porte un message d'administration, si bien que la garde
+  # se mesure en deux temps — « l'acces est refuse » puis « le refus porte le
+  # code ». Chiffre re-mesure APRES avoir scinde l'assertion : le 16 inscrit
+  # d'abord venait d'une execution ANTERIEURE a ma propre modification de la
+  # suite, et seul le legacy avait ete re-mesure.
+  [go-page-docker]=17
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -129,6 +138,12 @@ declare -A REF_LEGACY=(
   # conteneurs a chaque execution — la jouer deux fois mesurerait deux fois la
   # meme chose.
   [go-auth-totp-croise]=15
+  # 16 des DEUX cotes. Les boutons de scan sont INTERCEPTES ET AVORTES :
+  # `scan_all` frappe TOUTES les machines, srv-zabbix comprise, et un scan lance
+  # un `git fetch` sur la machine visee. Aucune machine n'est jointe.
+  # Le seul ecart est une INFO cote legacy : son `fetch` non enveloppe laisse une
+  # erreur non capturee quand le reseau tombe, et le message prevu n'apparait pas.
+  [go-page-docker]=16
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -138,7 +153,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
@@ -148,7 +163,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-cve-priorite go-page-cve-scan-refus go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5

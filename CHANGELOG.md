@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.52** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.53** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.53 — la page Docker portee : la premiere des 19 entrees de menu restantes
+
+**15 entrees de menu portees sur 33.** `docker/` est la plus petite des restantes : 201 lignes, deux
+fichiers. Meme suite sur les deux cibles — legacy 16/0, portage 16/0, base rouge 1/9.
+
+**LE SCAN N'EST PAS UNE LECTURE, ET LA PAGE LE DIT MAINTENANT.** Releve en lisant le backend AVANT
+d'ecrire un seul clic : `docker_monitor.py:116` lance un `git fetch` dans le depot de chaque projet
+compose de la machine visee — ca ecrit dans `.git/` et ca fait sortir la MACHINE sur le reseau — et
+`docker_registry.py` interroge le registre distant. Surtout, `/docker/scan_all` frappe TOUTES les
+machines, srv-zabbix (production) comprise ; la machine est bien dans le selecteur, mesure. Le legacy
+presente ces boutons comme des gestes anodins ; le portage porte un encart qui nomme la production sur
+le geste qui coute.
+
+**AUCUNE MACHINE N'EST JOINTE PAR LA SUITE** : les deux boutons sont INTERCEPTES ET AVORTES. On mesure
+que le clic emet la bonne requete, vers la bonne route, avec la bonne charge — et rien ne part.
+
+**Le defaut que le portage ne reprend pas.** `legacy/docker/js/main.js:14` fait `await fetch(...)`
+SANS `try` : quand le backend est injoignable, le rejet remonte hors du gestionnaire de clic et le
+message d'erreur pourtant prevu n'apparait JAMAIS — l'exploitant clique, rien ne se passe. `scanAll`,
+lui, enveloppe son `fetch` : l'asymetrie est un oubli. Le portage enveloppe chaque appel et ajoute une
+cle `err_reseau` que le legacy n'a pas.
+
+**Le legacy est DEDOUANE sur un point ou je l'accusais.** J'avais ecrit l'ecart « le refus rend
+HTTP 200 avec une page habillee ». La mesure dit l'inverse : il rend un vrai 403. L'ecart etait une
+accusation sans fondement, il a ete RETIRE.
+
+**Une assertion qui lisait le texte au lieu du code.** Le premier jet reniflait le corps a la recherche
+de « acces refuse » ; sur la base rouge la page rendait « 404 Not Found », que le renifleur comptait
+comme un NON-refus. La propriete est le STATUT, et il doit valoir 403.
+
+**Sept classes CSS inventees**, et aucune n'aurait leve d'erreur : une classe absente produit un
+element sans style, que le test DOM voit bien present. Relevees par comparaison avec la feuille avant
+la premiere execution.
+
+Garde `role:2` SEULE, reprise telle quelle : c'est la seule entree de menu gardee par le ROLE et non
+par une permission. Non corrige au detour d'un portage.
+
+Tests : `tests/e2e/go-page-docker.mjs` 16/0 des deux cotes. Captures 1920/1400/390 au compte de
+role 3. PARITE.md E-98.
 
 ### v1.37.52 — l'enrolement du second facteur porte : LE DERNIER BLOCAGE DE LA v2.0 TOMBE
 
