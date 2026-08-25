@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-25**, version `1.37.54`.
+Dernière mise à jour : **2026-08-25**, version `1.37.55`.
 
 ---
 
@@ -92,12 +92,12 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **15 sur 33** |
+| entrées de menu portées | **16 sur 33** |
 | parties du legacy archivées | **10** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **93 exécutions, 1301 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **89** — numérotés jusqu'à **E-99** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **90** — numérotés jusqu'à **E-100** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -229,8 +229,8 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | ordre | partie | lignes | entrées | note |
 |---|---|---|---|---|
 | ~~1~~ | ~~`docker/`~~ | 201 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.53` / `v1.37.54` |
-| 2 | `chatops/` | 246 | 1 | |
-| 3 | `maintenance/` | 257 | 1 | fenêtres de maintenance, enforcement HTTP 423 |
+| ~~2~~ | ~~`chatops/`~~ | 246 | 1 | **PORTÉ** `v1.37.55` — 22/0. Reste à ARCHIVER. Premier chemin PUBLIC du portage |
+| 3 | `maintenance/` | 257 | 1 | **⚠ voir l'encadré ci-dessous avant d'écrire le moindre clic** |
 | 4 | `groups/` | 305 | 1 | groupes dynamiques + actions de masse |
 | 5 | `graylog/` | 388 | 1 | |
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
@@ -241,6 +241,38 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
 | 12 | `adm/` | 8421 (37 fichiers) | **6** | le plus gros ; à découper en six sous-lots au moins |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
+
+**⚠ `maintenance/` : une fenêtre créée par un test peut EMPOISONNER LE LOT ENTIER.** Relevé en lisant
+`backend/maintenance.py:102-143` avant d'écrire quoi que ce soit. La logique **s'inverse** :
+
+| état de la table | effet sur toute action mutante |
+|---|---|
+| **aucune** fenêtre active | tout est **autorisé** (`no-window`) |
+| au moins **une** fenêtre active | autorisé **seulement** si l'instant courant tombe dedans (`outside-window` sinon) |
+
+Créer une fenêtre activée qui ne couvre pas l'instant présent fait donc rendre **423** à toute action
+mutante — pour les rôles **< 3** seulement, le rôle 3 ayant un contournement journalisé. Les suites
+supervision du LOT tournent en **rôle 2** : une fenêtre laissée derrière soi les ferait toutes échouer,
+et l'enforcement vit dans **d'autres modules** (`backend/routes/updates.py:19`,
+`backend/routes/monitoring.py:229`), donc l'échec n'aurait aucun rapport visible avec `maintenance/`.
+
+**La fixture sûre est décidée, et trois options ont été pesées** :
+
+| fixture | exerce le chemin activé | risque de bloquer le LOT |
+|---|---|---|
+| fenêtre **désactivée** | non — la requête ne compte que `enabled = 1` | **nul** |
+| fenêtre **toujours ouverte** (7 jours, 00:00→23:59) | oui | **faible mais réel** : `start <= t <= end` laisse les 59 dernières secondes de chaque jour **hors** fenêtre, donc un 423 possible et inexplicable |
+| fenêtre **activée, limitée à `srv-zabbix`** | **oui** | **nul** : `is_allowed` filtre `scope = 'global' OR machine_id = ?`, et aucune suite ne mute cette machine — la règle permanente l'interdit |
+
+**Retenue : la troisième.** Elle exerce le vrai chemin de code et ne peut bloquer que ce qui est **déjà
+interdit** — la fixture rend l'action prohibée encore plus impossible. À préciser dans la suite : créer
+une ligne d'horaire qui *nomme* `srv-zabbix` n'est pas la **joindre** ; aucune session SSH, aucune
+requête vers elle.
+
+**Le `toggle` ne doit JAMAIS activer une fenêtre globale.** Le script du legacy porte un
+`PUT {enabled}` (`js/main.js:84`) : l'exercer sur une fenêtre `global` désactivée la rendrait
+bloquante. Avec une fenêtre limitée à `srv-zabbix`, les deux sens du basculement sont sans effet sur le
+reste.
 
 **`adm/` porte deux défauts sérieux à corriger en le portant** :
 `adm/includes/manage_roles.php:86` hache le mot de passe généré **sans `BCRYPT_COST`** et **sans appeler
@@ -366,6 +398,12 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   le jeton **circule dans la query string** (historique, `Referer`, journaux Apache), et **un compte sans
   `email` n'a aucun chemin**.
 - **S7b** — un scan CVE réel.
+
+**À reporter dans un service externe, le jour où la fonctionnalité sera activée**
+- **l'adresse du webhook ChatOps a changé** avec le portage : elle ne finit plus par `webhook.php`.
+  Elle doit être reportée dans Slack (ou Teams) **avant** d'activer ChatOps. Aucun geste urgent :
+  mesuré dormant — aucune variable `CHATOPS_*` dans l'environnement, **zéro correspondance** en base.
+  La page le dit désormais en gras, ce que le legacy ne faisait pas.
 
 **Opérationnel**
 - **pousser la branche** (77 commits locaux) ;

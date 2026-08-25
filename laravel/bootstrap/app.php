@@ -36,6 +36,27 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\Langue::class,
         ]);
 
+        /*
+         * LE SEUL CHEMIN PUBLIC QUI ECRIT — et il faut dire pourquoi.
+         *
+         * `/chatops/webhook` est appele par Slack, qui ne peut presenter ni
+         * session ni jeton CSRF. L'authentification reelle est faite par le
+         * backend, sur la SIGNATURE Slack ou un jeton partage, et il refuse
+         * d'emblee si ChatOps est desactive (`backend/routes/chatops.py:34`).
+         *
+         * Ce que l'exclusion N'accorde PAS : la route ne lit rien de la session,
+         * n'accorde aucun privilege, et ne relaie que le corps brut plus QUATRE
+         * en-tetes nommes un par un. Elle ne recopie jamais les en-tetes en
+         * bloc — un `Cookie` ou un `Authorization` transmis au backend
+         * transformerait ce relais en confusion d'identite.
+         *
+         * Exclure ce chemin est la seule facon de le porter : le legacy fait de
+         * meme, par un fichier PHP hors de toute session.
+         */
+        $middleware->validateCsrfTokens(except: [
+            'chatops/webhook',
+        ]);
+
         $middleware->alias([
             // Session COMPLETEMENT authentifiee : mot de passe ET second
             // facteur. Entre les deux, la session ne porte qu'un compte

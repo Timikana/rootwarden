@@ -60,8 +60,12 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # `rw-test-super` — le role 1 ne voit pas ces entrees. 40 -> 42 au portage de S3
 # (`cve_scan`), 46 -> 48 a celui de `docker/`. Ce n'est pas un chiffre ajuste
 # pour faire passer le rejeu.
+# 48 -> 49 au portage de `chatops/` : UNE seule, et non deux. L'entree exige
+# `can_admin_portal`, que `rw-test-admin` n'a PAS (mesure en base) : seul le role 3
+# la voit. Le journal du rejeu ne porte donc qu'une ligne « ChatOps » — verifie,
+# pas suppose.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=48 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=49 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -101,6 +105,7 @@ declare -A REF_LARAVEL=(
   # d'abord venait d'une execution ANTERIEURE a ma propre modification de la
   # suite, et seul le legacy avait ete re-mesure.
   [go-page-docker]=17
+  [go-page-chatops]=22
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -141,6 +146,14 @@ declare -A REF_LEGACY=(
   # 5 depuis l'ARCHIVAGE : 1 (la partie rend 404) + 2 fichiers reels + 2 (le lien
   # du menu mene au portage, et il aboutit). Avant archivage : 16.
   [go-page-docker]=5
+  # 21 sur le legacy contre 22 sur le portage : l'ecart est l'assertion « aucune
+  # boite native », que le legacy ne tient pas (il pose un `confirm()`).
+  # La fonctionnalite ChatOps est DORMANTE : aucune variable CHATOPS_* dans
+  # srv-docker.env, zero correspondance en base, et le backend rend 403 « ChatOps
+  # desactive » avant tout examen de signature. Aucune requete ne sort vers Slack.
+  # La suite pose puis retire une correspondance d'epreuve, nettoyage BORNE par
+  # son identifiant, et sonde le point d'entree PUBLIC pour prouver qu'il refuse.
+  [go-page-chatops]=21
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -150,7 +163,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
@@ -160,7 +173,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-cve-priorite go-page-cve-scan-refus go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5

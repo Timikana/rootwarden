@@ -4244,3 +4244,63 @@ portées.
 `legacy/documentation.php:1052` décrit « la page `/docker/` » dans une balise `<code>`, donc sans lien
 cliquable, mais le chemin qu'elle nomme rend désormais 404. `documentation.php` est lui-même une entrée
 de menu à porter.
+
+
+---
+
+## E-100 — ChatOps porté : le premier chemin PUBLIC du portage, et ce qu'il fallait ne pas faire
+
+Deuxième des 19 entrées de menu restantes. Legacy **21 / 0**, portage **22 / 0**, base rouge
+**4 / 13**. L'écart d'une assertion est celle que le legacy ne tient pas : « aucune boîte native ».
+
+**LE MODULE A DEUX PIÈCES DE NATURE OPPOSÉE, et il fallait les traiter séparément.** La page de
+configuration est ordinaire : elle lit et écrit des correspondances « identifiant chat → compte » par
+trois routes du backend, derrière `role:2` **et** `perm:can_admin_portal`. Le `webhook.php`, lui, est un
+passthrough **public, sans session et sans jeton CSRF**, que Slack appelle. Ce n'est pas une page, il
+n'est pas dans le menu, et c'est **le premier chemin public du portage qui accepte un POST**.
+
+**CE QUE LE RELAIS NE FAIT SURTOUT PAS : recopier les en-têtes en bloc.** Le legacy nomme quatre
+en-têtes un par un (`X-Slack-Signature`, `X-Slack-Request-Timestamp`, `X-ChatOps-Token`,
+`X-ChatOps-Platform`) et le portage fait pareil, avec la liste **fermée** en constante. Recopier
+l'ensemble des en-têtes transmettrait un `Cookie` ou un `Authorization` du client vers le backend et
+transformerait ce relais en **confusion d'identité** : le backend croirait parler à un appelant
+authentifié. La liste fermée n'est pas une élégance, c'est la garde.
+
+**ET LE REFUS EST MESURÉ, PAS SUPPOSÉ.** Une requête forgée depuis la page, sans signature et sans
+jeton CSRF, rend **`403 {"text":"ChatOps desactive."}`** sur les deux cibles. Deux propriétés
+distinctes, et les deux comptent :
+
+| propriété | pourquoi |
+|---|---|
+| le webhook **n'exige pas** de jeton CSRF | Slack n'en présente aucun : un webhook qui l'exigerait ne pourrait pas fonctionner |
+| une commande non signée **est refusée** | sinon la route serait une porte ouverte, publique, vers un exécuteur de commandes |
+
+L'authentification réelle vit dans le backend, sur la signature Slack ou un jeton partagé, et il refuse
+d'emblée si la fonctionnalité est désactivée — fail-closed vérifié en lisant
+`backend/routes/chatops.py:34`, pas en observant une réponse.
+
+**LA FONCTIONNALITÉ EST DORMANTE, ET C'EST CE QUI REND CE PORTAGE SANS RISQUE.** Mesure : aucune
+variable `CHATOPS_*` dans `srv-docker.env` (seul l'exemple en porte, à `false`), et **zéro
+correspondance** dans `chatops_users`. Aucune requête ne part vers Slack, aucun trafic entrant n'est
+simulé.
+
+**L'ADRESSE DU WEBHOOK CHANGE, ET LA PAGE LE DIT.** Elle ne finit plus par `webhook.php`. Le legacy
+affiche l'adresse sans indiquer qu'elle bougera ; le portage ajoute une ligne en gras qui demande de la
+reporter dans la messagerie **avant** d'activer ChatOps. Sans mapping ni secret aujourd'hui, l'impact
+est nul — mais une bascule silencieuse aurait cassé la fonctionnalité le jour de son activation, sans
+message et sans trace.
+
+**LA BOÎTE NATIVE DISPARAÎT.** Le legacy supprime une correspondance derrière un `confirm()`. Cette
+boîte recouvre précisément la ligne sur laquelle on décide, ne se style pas — action destructrice et
+annulation au même poids — et **bloque Puppeteer**, donc aucun test ne peut mener l'action au bout. Le
+portage ouvre un panneau de décision **en ligne**, sous la ligne concernée, avec son bouton de danger
+et son annulation. La suite mesure les deux : elle accepte explicitement la boîte du legacy
+(`page.on('dialog')`) et vérifie qu'**aucune** n'apparaît côté portage.
+
+**LE CHOIX DE PLATEFORME EST UNE LISTE FERMÉE des deux côtés, et c'est mesuré comme tel** — pas
+« un champ existe », mais « c'est un `select` ». Une plateforme est un identifiant que le backend range
+puis relit : une saisie libre y ouvrirait une valeur que rien n'attend.
+
+**LES DEUX CHEMINS DE LA GARDE SONT EXERCÉS**, ce qui n'était pas gagné : `rw-test-admin` a le **rôle 2
+mais pas** `can_admin_portal` (mesuré en base), donc il mesure le chemin « permission » avec le rôle
+satisfait ; `rw-test-user` mesure le chemin « rôle ». Les deux rendent **403** sur les deux cibles.
