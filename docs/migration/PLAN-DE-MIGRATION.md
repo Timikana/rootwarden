@@ -284,6 +284,49 @@ corrigés** :
   n'exercerait que le rôle 3 ne mesurerait donc **rien** de la logique de fenêtre. Le chemin utile est
   le rôle 2.
 
+#### ⚠ La pastille « active maintenant » du legacy MENT, et de deux heures
+
+Le défaut le plus grave du module, trouvé en lisant avant de cliquer, et **mesuré** le 2026-08-25.
+
+`legacy/maintenance/js/main.js:26-35` calcule `isActiveNow` **dans le navigateur**, sur l'horloge du
+navigateur. L'application, elle, se fait dans `backend/maintenance.py:_in_window`, sur l'horloge du
+**conteneur**. Les deux horloges ne sont pas la même :
+
+| horloge | valeur relevée le 2026-08-25 |
+|---|---|
+| hôte et navigateur, `rootwarden_php` | **CEST 17:50** |
+| `rootwarden_python` (celui qui applique), `rootwarden_laravel` | **UTC 15:50** |
+
+Un exploitant qui saisit une fenêtre `22:00 → 06:00` veut dire 22:00 **chez lui**. Le backend
+l'applique en UTC — vérifié en appelant `_in_window` directement dans le conteneur. En heure locale :
+
+| heure locale | ce que la page annonce | ce que le backend fait |
+|---|---|---|
+| 22:00 → 00:00 | **active maintenant** | **REFUSE** |
+| 00:00 → 06:00 | active maintenant | autorise |
+| 06:00 → 08:00 | **fermée** | **autorise** |
+
+Deux bandes de deux heures où la page et l'application se contredisent, **dans les deux sens**. Et
+comme le rappelle l'encadré ci-dessus, le refus **n'apparaît pas sur cette page** : il apparaît sur
+celle qui a tenté l'action. L'exploitant lit « active maintenant », lance une mise à jour, et reçoit un
+423 sans rapport visible avec les fenêtres de maintenance.
+
+**Ce n'est pas E-73.** E-73 porte sur un *affichage* d'horodatage faux de deux heures. Ici la valeur
+fausse est un **verdict** sur une règle de blocage, et elle est calculée par un code qui n'est pas celui
+qui décide.
+
+**Correctif retenu pour le portage : remonter le verdict là où il est appliqué.** `list_windows`
+(`backend/routes/maintenance.py:37`) rendra, par fenêtre, un `active_now` calculé par `mw._in_window` —
+la fonction même qui bloque — et l'heure du backend. La page portée **affiche ce verdict** et nomme
+l'horloge employée quand elle diffère de celle du navigateur. C'est la convention du portage appliquée
+telle quelle : *la règle n'est jamais déplacée côté navigateur, elle est seulement annoncée plus tôt.*
+Un champ supplémentaire est sans effet sur le legacy, qui ne lit que les clés qu'il connaît.
+
+**Ce qui n'est PAS fait ici, et pourquoi.** Changer le fuseau du conteneur `rootwarden_python`
+corrigerait le décalage à la racine — et déplacerait **tous** les horodatages du backend, journaux
+d'audit compris. C'est une décision de flotte, pas un détour de portage de page. Elle rejoint E-73 en
+§7. Le legacy garde aussi sa pastille calculée côté navigateur : on ne soigne pas ce qu'on démonte.
+
 **Le `toggle` ne doit JAMAIS activer une fenêtre globale.** Le script du legacy porte un
 `PUT {enabled}` (`js/main.js:84`) : l'exercer sur une fenêtre `global` désactivée la rendrait
 bloquante. Avec une fenêtre limitée à `srv-zabbix`, les deux sens du basculement sont sans effet sur le
@@ -459,7 +502,13 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   porte `users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable.
 
 **Mesurés, non corrigés**
-- **E-73** — le fuseau du backend : UTC contre CEST, l'**affichage** est faux de deux heures ;
+- **E-73** — le fuseau du backend : UTC contre CEST, l'**affichage** est faux de deux heures. **Élargi le
+  2026-08-25** : le décalage ne fait pas que mal afficher, il fait **mal décider**. Les fenêtres de
+  maintenance sont saisies en heure locale et appliquées en UTC, donc décalées de deux heures — voir
+  l'encadré de §4.2. Le portage de `maintenance/` annonce le verdict du backend au lieu d'en recalculer
+  un, ce qui rend le décalage **visible** ; le corriger à la racine demande de changer le fuseau du
+  conteneur `rootwarden_python`, ce qui déplace **tous** ses horodatages, journaux d'audit compris.
+  **Décision de flotte, à arbitrer** ;
 - **757 lignes de `user_logs` non scellées** laissent un trou dans la vérification de chaîne ;
 - la liste blanche `/supervision/` de `api_proxy.php:134` — **surface morte** depuis l'archivage, et
   `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES` ;
