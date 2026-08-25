@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\SecondFacteurController;
 use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\DeriveConfigController;
+use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\DockerController;
 use App\Http\Controllers\SauvegardesController;
 use App\Http\Controllers\TachesController;
@@ -218,6 +219,15 @@ Route::middleware('session.authentifiee')->group(function () {
      * releve est signale dans INVENTAIRE.md et n'est pas corrige au detour d'un
      * portage.
      */
+    /*
+     * ChatOps. `role:2` + `perm:can_admin_portal`, comme le legacy
+     * (`checkAuth` puis `checkPermission`). Le WEBHOOK, lui, est PUBLIC et vit
+     * hors de ce groupe — voir plus bas.
+     */
+    Route::get('/chatops', [ChatopsController::class, 'page'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('chatops');
+
     Route::get('/docker', DockerController::class)
         ->middleware(['role:2'])
         ->name('docker');
@@ -405,3 +415,18 @@ Route::get('/drift/', fn () => redirect()->route('derive-config'));
 Route::get('/backups/', fn () => redirect()->route('sauvegardes'));
 Route::get('/tasks/', fn () => redirect()->route('taches'));
 Route::get('/search/', fn () => redirect()->route('recherche'));
+
+/*
+ * ══ LE WEBHOOK CHATOPS : LE SEUL CHEMIN PUBLIC QUI ECRIT ════════════════════
+ *
+ * Hors du groupe authentifie, et exclu du controle de falsification
+ * (`bootstrap/app.php`) : Slack ne peut presenter ni session ni jeton. Ce n'est
+ * pas une porte ouverte pour autant — l'authentification reelle est faite par
+ * le backend, sur la SIGNATURE Slack ou un jeton partage, et il refuse d'emblee
+ * si ChatOps est desactive.
+ *
+ * L'adresse DIFFERE de celle du legacy (`/chatops/webhook.php`) : activer
+ * ChatOps apres la bascule demande de la reporter dans Slack. La page le dit.
+ */
+Route::post('/chatops/webhook', [ChatopsController::class, 'webhook'])
+    ->name('chatops.webhook');

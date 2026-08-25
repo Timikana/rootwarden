@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.54** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.55** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,49 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.55 — ChatOps porte : le premier chemin PUBLIC du portage
+
+**16 entrees de menu portees sur 33.** Legacy 21/0, portage 22/0, base rouge 4/13.
+
+**Le module a deux pieces de nature OPPOSEE.** La page de configuration est ordinaire : elle lit et
+ecrit des correspondances « identifiant chat -> compte » par trois routes du backend, derriere
+`role:2` ET `perm:can_admin_portal`. Le `webhook.php`, lui, est un passthrough PUBLIC, sans session et
+sans jeton CSRF, que Slack appelle — le premier chemin public du portage qui accepte un POST.
+
+**Ce que le relais ne fait SURTOUT PAS : recopier les en-tetes en bloc.** Quatre en-tetes sont nommes
+un par un, en constante, liste FERMEE. Recopier l'ensemble transmettrait un `Cookie` ou un
+`Authorization` du client vers le backend et transformerait ce relais en CONFUSION D'IDENTITE : le
+backend croirait parler a un appelant authentifie. La liste fermee n'est pas une elegance, c'est la
+garde.
+
+**Et le refus est MESURE.** Une requete forgee sans signature ni jeton rend
+`403 {"text":"ChatOps desactive."}` sur les deux cibles. Deux proprietes distinctes : le webhook
+n'exige PAS de CSRF (Slack n'en presente aucun, un webhook qui l'exigerait ne fonctionnerait pas) et
+une commande non signee EST refusee (sinon la route serait une porte ouverte, publique, vers un
+executeur de commandes). L'authentification reelle vit dans le backend, sur la signature Slack ou un
+jeton partage — fail-closed verifie en LISANT backend/routes/chatops.py:34.
+
+**La fonctionnalite est DORMANTE, et c'est ce qui rend ce portage sans risque** : aucune variable
+CHATOPS_* dans srv-docker.env, zero correspondance en base. Aucune requete ne part vers Slack.
+
+**⚠ EXPLOITATION : l'adresse du webhook CHANGE.** Elle ne finit plus par `webhook.php`. Le legacy
+affiche l'adresse sans dire qu'elle bougera ; le portage ajoute une ligne en gras qui demande de la
+reporter dans la messagerie AVANT d'activer ChatOps. Sans mapping ni secret aujourd'hui l'impact est
+nul, mais une bascule silencieuse aurait casse la fonctionnalite le jour de son activation, sans
+message et sans trace.
+
+**La boite native disparait.** Le legacy supprime derriere un `confirm()` : cette boite recouvre la
+ligne sur laquelle on decide, ne se style pas, et BLOQUE Puppeteer. Le portage ouvre un panneau de
+decision EN LIGNE. La suite accepte explicitement la boite du legacy et verifie qu'AUCUNE n'apparait
+cote portage.
+
+**Les deux chemins de la garde sont exerces** : `rw-test-admin` a le role 2 mais PAS
+`can_admin_portal` (mesure en base), donc il mesure le chemin « permission » avec le role satisfait ;
+`rw-test-user` mesure le chemin « role ». Les deux rendent 403 des deux cotes.
+
+Tests : `tests/e2e/go-page-chatops.mjs`. Captures 1920/1400/390 au compte de role 3.
+Parite i18n chatops : 35 cles FR = 35 EN. PARITE.md E-100.
 
 ### v1.37.54 — `docker/` archive : dixieme partie du legacy demontee
 
