@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 PORTÉ `v1.37.59` ; D2 CARACTÉRISÉ (legacy 15/0, base rouge 7/7) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 PORTÉ `v1.37.59` ; D2 PORTÉ `v1.37.60` (legacy 16/0, portage 20/0) — `MODULE-ADM.md`**, dix sous-lots, huit restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -757,6 +757,15 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Un garde qui ne trouve pas son objet peut ACCORDER au lieu de refuser.** D2 : en lisant
+  `user_id` là où la session écrit `utilisateur_id`, la portée d'un rôle 1 devenait `user_id = 0` —
+  la valeur des lignes de **diffusion**. Une session illisible recevait donc exactement ce qu'elle ne
+  devait pas voir. **Fail-closed explicite sur l'absence d'identifiant**, et se méfier des valeurs
+  sentinelles qui sont aussi des valeurs réelles.
+- **Lire « les `span` du plus proche ancêtre » remonte jusqu'au menu.** L'assertion « le type n'est
+  pas replié sur *Autre* » passait parce que le mot n'est pas dans la barre de navigation. Viser
+  **l'élément qui porte la donnée** — ici le `span` enfant DIRECT de la ligne — et non un ancêtre
+  choisi par proximité. Même discipline que remonter d'un champ à son `form`.
 - **Une hypothèse tirée d'une bibliothèque MINIFIÉE se conclut au clic, jamais à la lecture.** D2 :
   la case de préférence n'a pas de `name`, son `hx-vals` ne porte pas `value`, et le point d'API
   exige `value` — j'en ai conclu que chaque clic échouait. Le corps réellement émis porte

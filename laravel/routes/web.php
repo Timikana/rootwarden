@@ -13,6 +13,7 @@ use App\Http\Controllers\TachesController;
 use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
+use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\JournalAuditController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\ComparaisonCveController;
@@ -409,6 +410,35 @@ Route::middleware('session.authentifiee')->group(function () {
      * que les boutons de sa page ; aucun de ses seize points d'API `adm/` ne
      * porte de `checkPermission`, et le role y porte seul la charge.
      */
+    /*
+     * Notifications — module `adm/`, sous-lot D2.
+     *
+     * La boite de reception est ouverte a TOUT compte authentifie (role 1), comme
+     * le legacy : `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`. Les
+     * REGLAGES sont reserves au role 3, comme `manage_notifications.php` le fait
+     * pour ses cases — mais ici la reserve vit sur la ROUTE, pas seulement sur
+     * l'affichage du controle.
+     *
+     * CHAQUE GESTE QUI ECRIT EST UN POST. Le legacy lit son action dans `$_GET`
+     * d'abord et ne verifie le jeton que sur `POST` : `GET ?action=read_all`
+     * ecrit sans jeton (E-109). Ici le seul GET est le compteur, et il ne fait
+     * que lire.
+     */
+    Route::get('/notifications', NotificationsController::class)
+        ->middleware('role:1')->name('notifications');
+    Route::get('/notifications/compte', [NotificationsController::class, 'compte'])
+        ->middleware('role:1')->name('notifications.compte');
+    Route::post('/notifications/tout-lire', [NotificationsController::class, 'toutLire'])
+        ->middleware('role:1')->name('notifications.tout-lire');
+    Route::post('/notifications/{id}/lire', [NotificationsController::class, 'lire'])
+        ->whereNumber('id')->middleware('role:1')->name('notifications.lire');
+    Route::delete('/notifications/{id}', [NotificationsController::class, 'supprimer'])
+        ->whereNumber('id')->middleware('role:1')->name('notifications.supprimer');
+    Route::get('/notifications/preferences', [NotificationsController::class, 'reglages'])
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('notifications.reglages');
+    Route::post('/notifications/preferences', [NotificationsController::class, 'definirPreference'])
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('notifications.preferences.poser');
+
     Route::get('/journal-audit', JournalAuditController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('journal-audit');

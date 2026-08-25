@@ -130,6 +130,14 @@ declare -A REF_LARAVEL=(
   # INFO avec leur valeur mesuree, pas en FAIL : un ecart voulu n'est pas une
   # regression.
   [go-adm-audit]=34
+  # Sous-lot D2 de `adm/` : les notifications. 20 sur le portage contre 16 sur le
+  # legacy. Les QUATRE assertions d'ecart sont des `verifiePortage`, une par
+  # defaut ferme : la notification cliquee passe reellement lue (E-108), un GET
+  # ne modifie rien (E-109), un role 1 ne touche pas une diffusion (E-110), et le
+  # type est NOMME au lieu d'etre replie sur « Autre » (E-111). Cote legacy elles
+  # sont rendues en INFO avec leur valeur mesuree — un ecart voulu n'est pas une
+  # regression.
+  [go-adm-notifications]=20
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -201,7 +209,7 @@ declare -A REF_LEGACY=(
   # la moitie non corrigee du correctif A01 ; elle est visible des roles >= 2 le
   # temps de l'execution et retiree dans le `finally`. La preference basculee est
   # relue avant et restauree apres.
-  [go-adm-notifications]=15
+  [go-adm-notifications]=16
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -212,7 +220,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit
+  go-adm-audit go-adm-notifications
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift

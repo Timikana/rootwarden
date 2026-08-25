@@ -326,7 +326,7 @@ dernier** — et chaque rang porte son motif.
 | # | sous-lot | fichiers | lignes | pourquoi ce rang |
 |---|---|---|---|---|
 | **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
-| **D2** ✅ | **Notifications** — *caractérisé, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
+| **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** | **Comptes et rôles** | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** | **Permissions et accès** | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
@@ -390,7 +390,7 @@ legacy**, dont le `t()` est plat. Laravel a rendu chaque identifiant à l'écran
 un journal. **Seule la capture l'a montré**, et elle l'a montré d'un coup d'œil : trente libellés en
 majuscules à la place des textes.
 
-### 5.0bis D2 — CARACTÉRISÉ le 2026-08-26, et il déborde de `adm/`
+### 5.0bis D2 — PORTÉ le 2026-08-26 (`v1.37.60`), et il déborde de `adm/`
 
 `tests/e2e/go-adm-notifications.mjs` — **15 PASS / 0 FAIL sur le legacy**, **base rouge 7/7** sur le
 portage. Et il faut le dire tout de suite : sur les **7 passes de la base rouge, 4 passent PARCE QUE
@@ -418,9 +418,32 @@ lisant, que la case de préférence n'envoyait jamais son `value` : elle n'a pas
 (absente) à 1. **La case fonctionne.** Comparer les deux côtés d'un contrat reste la bonne discipline ;
 elle se conclut au **clic**, pas à la lecture d'une bibliothèque minifiée.
 
-**Ce qui reste à faire pour finir D2** : le portage. Trois décisions sont déjà tranchées par la
-mesure — l'écran ne bouge qu'après la réponse du serveur ; une seule règle de portée pour la lecture
-**et** l'écriture ; une seule liste de types, partagée par les préférences et l'affichage.
+**PORTÉ le 2026-08-26, `v1.37.60`** — `/notifications` et `/notifications/preferences`,
+**20 PASS / 0 FAIL sur le portage**, le legacy passant de 15 à 16 (une assertion ajoutée : la
+pastille de type est désormais **lue sur le bon élément**). Les quatre assertions d'écart sont des
+`verifiePortage`, **une par défaut fermé**.
+
+Ce que le portage tranche, et pourquoi :
+
+- **l'écran ne bouge qu'après la réponse**, et le compteur de la cloche vient de cette **même**
+  réponse — deux appels peuvent se croiser, un seul ne le peut pas ;
+- **une seule règle de portée**, `Notifications::portee()`, appliquée à la lecture **et** aux trois
+  écritures. Il ne peut plus y avoir de branche oubliée parce qu'il n'y a plus de branche ;
+- **la liste des types porte les douze**, et un type inconnu sort sous son **nom brut** ;
+- **ce qui n'est pas corrigé est dit à l'écran** : un encart nomme les cinq types que les préférences
+  ne gouvernent pas, plutôt que de laisser la page le promettre.
+
+**Un défaut de mon propre code, trouvé par la mesure.** En lisant `user_id` là où la session écrit
+`utilisateur_id`, la portée d'un rôle 1 devenait `user_id = 0` — c'est-à-dire **exactement les lignes
+de diffusion**. Un identifiant illisible n'interdisait pas l'accès : il l'accordait. C'est le piège
+« un garde sans objet ne garde rien », reproduit dans le portage même qui le corrigeait. `portee()`
+est désormais fail-closed sur `$userId <= 0`.
+
+**Et une assertion qui passait sans rien mesurer.** Le premier jet lisait « les `span` du plus proche
+ancêtre portant le titre » : il remontait jusqu'à la barre de navigation et rendait le menu entier.
+L'assertion « le type n'est pas replié sur Autre » passait donc **parce que le mot « Autre » n'est
+pas dans le menu**. Corrigée, elle vise l'élément qui porte la pastille — et la mesure devient
+décisive : **legacy « Autre », portage « Scan CVE »**.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
