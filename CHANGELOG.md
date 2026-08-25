@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.51** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.52** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,63 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.52 — l'enrolement du second facteur porte : LE DERNIER BLOCAGE DE LA v2.0 TOMBE
+
+**C'etait la derniere chose qui empechait d'eteindre l'ancien portail.** L'enrolement n'existait que
+cote legacy : un compte neuf n'avait AUCUN chemin vers un second facteur sur le portage. L'ecran
+affichait une impasse explicite renvoyant vers l'ancien portail — honnete, mais redhibitoire pour une
+bascule directe.
+
+**Le portage est celui du legacy CORRIGE, pas du legacy.** `enable_2fa.php` divulguait le secret d'un
+compte deja enrole a qui ne presentait que le mot de passe (corrige en v1.37.48, PARITE E-94). Les
+trois proprietes qui ferment ce trou sont reprises comme des INVARIANTS, chacun mesure :
+
+- un compte qui a DEJA un secret n'atteint jamais l'ecran — verifie DEUX fois, a l'affichage et de
+  nouveau a l'activation : entre les deux, un autre chemin a pu enroler ce compte, et ecraser son
+  secret le rendrait inaccessible ;
+- le secret vit en SESSION et ne touche la base qu'APRES la preuve : un GET n'ecrit rien ;
+- il ne CHANGE PAS d'un affichage a l'autre, sans quoi le QR scanne et le code attendu ne
+  concorderaient jamais.
+
+**Le code d'enrolement passe par le MEME anti-rejeu que la connexion** : le secret de session est
+chiffre a la volee pour etre presente a Totp::verifie, donc au compteur de fenetre monotone par
+compte. Un code employe pour enroler ne peut donc pas etre rejoue pour ouvrir une session.
+
+**Un seul chemin ouvre une session.** La verification et l'enrolement partagent desormais
+ouvreLaSession() : deux copies de ce chemin auraient fini par diverger, et c'est le chemin ou une
+divergence ACCORDE UN ACCES. Le compte y est relu en base a cet instant plutot que repris d'un objet
+charge plus tot.
+
+**Le QR diverge par NATURE, et les deux sont corrects.** Le legacy rend un PNG en base64 via gd ; le
+conteneur du portage n'a ni gd ni imagick (mesure), il rend un SVG en ligne via bacon/bacon-qr-code.
+La suite mesure « un QR est present », pas « une balise <img> est presente » : exiger la forme du
+legacy aurait fait echouer un portage correct.
+
+**Le fond blanc du QR n'est pas une coquetterie** : un lecteur lit des modules sombres sur fond CLAIR.
+Un SVG pose sur le fond sombre du theme serait illisible A LA CAMERA, et le DOM n'en dirait rien. Le
+cadre impose #fff quel que soit le theme, et la capture le MESURE.
+
+**Non porte, et dit** : le re-enrolement (remettre un second facteur a un compte qui en a deja un).
+Il n'existe pas non plus dans le legacy sous forme d'ecran — le seul chemin vivant est
+adm/includes/manage_roles.php:101-121, qui porte une garde HIERARCHIQUE, et reset_totp.php est du code
+mort PLUS PERMISSIF que ce chemin. Le re-enrolement appartient a adm/ et a sa garde.
+
+**Tests.** `tests/e2e/go-auth-enrolement.mjs` — **18 PASS / 0 FAIL des DEUX cotes**. La suite n'etait
+jusque-la jouee que sur le legacy et sortait par « sans objet » sur le portage.
+`tests/e2e/go-captures-enrolement.mjs` — captures a 1920, 1400 et 390, compte de ROLE 3, avec mesure
+de la taille RENDUE du QR et de son fond calcule. La fixture retire le second facteur du compte de
+capture puis le RESTAURE dans un `finally`, etat RELU pour etre prouve : d'autres suites du LOT se
+connectent avec ce compte.
+
+**Deux defauts vus a l'image, pas aux assertions.** Le bouton principal passait sur deux lignes et
+devenait plus haut que son voisin (libelle raccourci a « Activer »). Et avant cela l'ecran rendait
+ENTIEREMENT VIDE : `$temporaire['name']` n'existe pas, la cle de session s'appelle `nom`. Une cle de
+tableau SUPPOSEE au lieu d'etre lue, et la page tombait en 500 — que seule la lecture du journal a
+revelee, l'assertion ne disant que « pas de QR ».
+
+**Exploitation.** Nouvelle dependance `bacon/bacon-qr-code` (backend SVG, aucune extension PHP
+requise). Aucune migration.
 
 ### v1.37.51 — le portage sait ECRIRE un secret TOTP, et l'execution croisee le prouve
 

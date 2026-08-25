@@ -80,6 +80,11 @@ declare -A REF_LARAVEL=(
   # que sur le portage, seul a poser `minlength` — donc seul ou le navigateur
   # refuse avant d'emettre la requete.
   [go-auth-mot-de-passe]=27
+  # 18 des DEUX cotes : le meme test, les memes proprietes. Le QR differe par
+  # NATURE (PNG en base64 cote legacy avec `gd`, SVG en ligne cote portage dont
+  # le conteneur n'a ni `gd` ni `imagick`) — la suite mesure donc « un QR est
+  # present », pas « une balise <img> est presente ».
+  [go-auth-enrolement]=18
   # 24 sur le portage contre 38 sur le legacy. L'ecart est structurel et non un
   # manque : le legacy porte SIX chemins gardes (trois `adm/api/*` plus les trois
   # routes root) quand le portage n'en porte que TROIS — `adm/` n'est pas porte —
@@ -133,7 +138,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-cve-planification go-page-cve-suivi go-page-cve-priorite go-page-cve-scan-refus
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
-  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-mot-de-passe go-auth-step-up
+  go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift

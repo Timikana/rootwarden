@@ -31,8 +31,11 @@ return [
     'second_facteur_aide'        => 'The code changes every 30 seconds. A code already used is refused: wait for the next one.',
 
     // Enrolment
+    'enrolement_qr_alt' => 'QR code to scan with your authenticator app',
+    'enrolement_saisie_manuelle' => 'Cannot scan? Enter this key manually in your app:',
+    'enrolement_activer' => 'Activate',
     'enrolement_titre'       => 'Second factor required',
-    'enrolement_explication' => 'This account has no second factor yet. Enrolment is not available on this interface yet: complete it from the previous portal, then come back here.',
+    'enrolement_explication' => 'This account has no second factor yet. Scan this QR code with your authenticator app, then enter the code it shows to activate it.',
 
     // Terms of use
     'cgu_titre'      => 'Terms of use',

@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-24**, version `1.37.50`.
+Dernière mise à jour : **2026-08-24**, version `1.37.52`.
 
 ---
 
@@ -95,9 +95,9 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **14 sur 33** |
 | parties du legacy archivées | **9** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **89 exécutions, 1244 assertions, 0 échec** |
+| LOT de tests E2E | **91 exécutions, 1277 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **86** — numérotés jusqu'à **E-96** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **87** — numérotés jusqu'à **E-97** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -111,7 +111,7 @@ l'accueil du portage qui affiche lui-même « Déjà portés 14 / 33 ».
 | blocage | état |
 |---|---|
 | changement de mot de passe requis | **LEVÉ** — sous-lot A2, `v1.37.49`. Six comptes actifs sur dix étaient concernés, dont `superadmin` |
-| **enrôlement 2FA** | **OUVERT** — n'existe que dans le legacy. Sans lui, aucun compte neuf ne peut obtenir de second facteur après la bascule |
+| **enrôlement 2FA** | **LEVÉ** — `v1.37.52`. Même suite **18/0 des deux côtés**. Reste hors périmètre, et c'est dit : le **ré-enrôlement**, qui appartient à `adm/` et à sa garde hiérarchique |
 
 ---
 
@@ -152,7 +152,8 @@ Détail : **`MODULE-AUTH.md`**.
 | correctif de l'enrôlement | **FAIT** `v1.37.48` | le second facteur était dérivable du premier, **en production** |
 | **A2** changement de mot de passe | **FAIT** `v1.37.49` | lève le premier blocage v2.0 |
 | **A5** step-up ponctuel | **FAIT** `v1.37.50` | legacy **38/0**, base rouge **6/16**, portage **24/0** ; le **panneau en page** est différé à son premier consommateur |
-| enrôlement porté | à faire, **en dernier** | trois raisons cumulées, voir plus bas |
+| exécution croisée des secrets TOTP | **FAIT** `v1.37.51` | 15/0 ; le portage sait désormais ÉCRIRE un secret que le legacy relit |
+| enrôlement porté | **FAIT** `v1.37.52` | 18/0 des deux côtés ; QR en **SVG** (le conteneur n'a ni gd ni imagick) |
 | **A3** réinitialisation | **bloqué** | **envoie un courriel** — arbitrage requis |
 
 **Ne pas porter** : `migrate_crypto.php` (323 l.) et `migrate_totp.php` (88 l.), scripts CLI ponctuels

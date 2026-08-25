@@ -61,6 +61,34 @@ const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const COMPTE = 'rw-test-admin';
 
+/**
+ * Les chemins et les marqueurs, par cible.
+ *
+ * Le QR differe par NATURE : le legacy rend un PNG en base64 (`gd`), le portage
+ * un SVG en ligne — son conteneur n'a ni `gd` ni `imagick` (mesure). La suite
+ * mesure donc « un QR est present », pas « une balise <img> est presente » :
+ * exiger la forme du legacy ferait echouer un portage correct.
+ */
+const C = CIBLE === 'laravel'
+    ? {
+        connexion: '/connexion?lang=fr',
+        enrolement: '/second-facteur/enrolement',
+        motifEnrolement: /second-facteur\/enrolement/,
+        motifVerification: /second-facteur(?!\/enrolement)/,
+        motifAbouti: /\/cgu|\/profil/,
+        qr: '[data-rw="enrolement-qr"] svg',
+        secret: '[data-rw="enrolement-secret"]',
+    }
+    : {
+        connexion: '/auth/login.php?lang=fr',
+        enrolement: '/auth/enable_2fa.php',
+        motifEnrolement: /enable_2fa\.php/,
+        motifVerification: /verify_2fa\.php/,
+        motifAbouti: /terms\.php|profile\.php/,
+        qr: 'img[src^="data:image/png;base64,"]',
+        secret: '.select-all',
+    };
+
 let echecs = 0;
 const lignes = [];
 function verifie(l, ok, d) { lignes.push(`${ok ? 'PASS' : 'FAIL'}  ${l}${d ? '  — ' + d : ''}`); if (!ok) echecs++; }
@@ -96,7 +124,7 @@ async function etapeMotDePasse() {
     const erreursJs = [];
     page.on('pageerror', (e) => erreursJs.push(String(e).split('\n')[0]));
 
-    await page.goto(`${BASE}/auth/login.php?lang=fr`, { waitUntil: 'networkidle2' });
+    await page.goto(`${BASE}${C.connexion}`, { waitUntil: 'networkidle2' });
     await page.type('input[name="username"]', COMPTE, { delay: 10 });
     await page.type('input[name="password"]', MDP, { delay: 10 });
     const nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
@@ -108,19 +136,20 @@ async function etapeMotDePasse() {
 
 /** Ce que la page d'enrolement montre : son QR et le secret propose. */
 function lisEcranEnrolement(page) {
-    return page.evaluate(() => {
-        const img = document.querySelector('img[src^="data:image/png;base64,"]');
-        const clair = document.querySelector('.select-all');
+    return page.evaluate((selQr, selSecret) => {
+        const qr = document.querySelector(selQr);
+        const clair = document.querySelector(selSecret);
         const champ = document.querySelector('input[name="2fa_code"]');
-        const bouton = document.querySelector('button[type="submit"]');
+        /* LE BOUTON DU FORMULAIRE QUI PORTE LE CHAMP, pas le premier de la page. */
+        const form = champ ? champ.closest('form') : null;
 
         return {
-            qr: !! img,
-            secret: clair ? clair.textContent.trim() : '',
+            qr: !! qr,
+            secret: clair ? clair.textContent.trim().replace(/\s+/g, '') : '',
             champCode: !! champ,
-            bouton: !! bouton,
+            bouton: !! (form && form.querySelector('button[type="submit"], input[type="submit"]')),
         };
-    });
+    }, C.qr, C.secret);
 }
 
 const secretOrigine = secretEnBase();
@@ -128,14 +157,6 @@ let fixturePosee = false;
 
 try {
     constate('cible', CIBLE);
-    if (CIBLE !== 'legacy') {
-        // Le portage n'a pas encore d'enrolement : rien a mesurer ici.
-        constate('portage', 'aucun enrolement porte a ce jour — suite sans objet');
-        console.log(lignes.join('\n'));
-        console.log('\n0 PASS / 0 FAIL — sans objet sur laravel');
-        await navigateur.close();
-        process.exit(0);
-    }
 
     verifie('la fixture part d\'un compte REELLEMENT enrole',
         secretOrigine !== '(ABSENT)',
@@ -147,19 +168,19 @@ try {
         const { ctx, page, erreursJs } = await etapeMotDePasse();
         constate('apres le clic sur « se connecter »', page.url().replace(BASE, ''));
         verifie('le mot de passe seul ne suffit pas : on atterrit sur la verification',
-            /verify_2fa\.php/.test(page.url()), page.url().replace(BASE, ''));
+            C.motifVerification.test(page.url()), page.url().replace(BASE, ''));
 
         /*
          * LE GESTE DE L'ATTAQUANT : taper l'URL d'enrolement alors que la 2FA est
          * encore en attente. C'est une navigation directe, et c'est voulu — c'est
          * exactement ce qui rendait le secret.
          */
-        await page.goto(`${BASE}/auth/enable_2fa.php`, { waitUntil: 'networkidle2' });
+        await page.goto(`${BASE}${C.enrolement}`, { waitUntil: 'networkidle2' });
         const vu = await lisEcranEnrolement(page);
         const corps = await page.content();
-        constate('url apres avoir tape /auth/enable_2fa.php', page.url().replace(BASE, ''));
+        constate(`url apres avoir tape ${C.enrolement}`, page.url().replace(BASE, ''));
         verifie('un compte DEJA enrole est renvoye vers la verification',
-            /verify_2fa\.php/.test(page.url()), page.url().replace(BASE, ''));
+            C.motifVerification.test(page.url()), page.url().replace(BASE, ''));
         verifie('aucun QR code ne lui est montre', vu.qr === false, `qr=${vu.qr}`);
         verifie('le secret TOTP du compte n\'apparait PAS a l\'ecran',
             vu.secret === '' && ! corps.includes(secretOrigine.slice(0, 24)),
@@ -182,7 +203,7 @@ try {
         const { ctx, page, erreursJs } = await etapeMotDePasse();
         constate('apres le clic, compte sans secret', page.url().replace(BASE, ''));
         verifie('un compte SANS second facteur atterrit sur l\'enrolement',
-            /enable_2fa\.php/.test(page.url()), page.url().replace(BASE, ''));
+            C.motifEnrolement.test(page.url()), page.url().replace(BASE, ''));
 
         const ecran = await lisEcranEnrolement(page);
         verifie('l\'ecran montre un QR code', ecran.qr === true, `qr=${ecran.qr}`);
@@ -219,7 +240,7 @@ try {
         try { await nav; } catch { /* l'URL tranche */ }
         constate('apres le clic sur « activer »', page.url().replace(BASE, ''));
         verifie('un premier code valide acheve l\'enrolement',
-            /terms\.php|profile\.php/.test(page.url()), page.url().replace(BASE, ''));
+            C.motifAbouti.test(page.url()), page.url().replace(BASE, ''));
 
         const apres = secretEnBase();
         verifie('le secret est ecrit en base APRES la preuve, et pas avant',

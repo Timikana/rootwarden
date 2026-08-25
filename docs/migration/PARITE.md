@@ -4097,3 +4097,69 @@ marques ont été effacées. La première exécution après le correctif a d'ail
 effacée » à l'entrée alors qu'une marque **orpheline** vivait encore : elle avait été posée avant que
 l'index existe. Un `cache:clear` l'a levée — mais le fait que le nettoyage neuf n'ait rien vu de
 l'ancien état est le genre de détail qui, non lu, aurait fait accuser le code.
+
+
+---
+
+## E-97 — L'enrôlement du second facteur porté : le dernier blocage de la v2.0 tombe
+
+**C'était la dernière chose qui empêchait d'éteindre l'ancien portail.** L'enrôlement n'existait que
+côté legacy : un compte neuf, ou un compte dont on aurait réinitialisé le second facteur, n'avait
+**aucun chemin** vers un second facteur sur le portage. L'écran affichait une impasse explicite
+renvoyant vers l'ancien portail — honnête, mais rédhibitoire pour une bascule directe.
+
+Même suite sur les deux cibles : **18 PASS / 0 FAIL de chaque côté** (`go-auth-enrolement.mjs`, qui
+n'était jusque-là jouée que sur le legacy et sortait par « sans objet » sur le portage).
+
+**LE PORTAGE EST CELUI DU LEGACY CORRIGÉ, PAS DU LEGACY.** `enable_2fa.php` divulguait le secret d'un
+compte **déjà enrôlé** à qui ne présentait que le mot de passe — corrigé en `v1.37.48`, voir **E-94**.
+Les trois propriétés qui ferment ce trou sont reprises ici comme des **invariants**, et chacune est
+mesurée :
+
+| invariant | ce qu'il empêche | mesure |
+|---|---|---|
+| un compte qui a **déjà** un secret n'atteint jamais l'écran | la divulgation de E-94 | `/second-facteur/enrolement` renvoie vers la vérification, aucun QR, aucun secret à l'écran |
+| le secret vit en **session** et ne touche la base qu'**après** la preuve | un `GET` qui écrit | après affichage, le secret en base est **toujours absent** |
+| il ne **change pas** d'un affichage à l'autre | un QR scanné qui ne correspond plus au code attendu | rechargement : secret **identique** |
+
+L'invariant 1 est vérifié **deux fois** : à l'affichage et de nouveau à l'activation. Entre les deux,
+un autre chemin a pu enrôler ce compte — écraser son secret le rendrait inaccessible. Fail-closed.
+
+**LE CODE D'ENRÔLEMENT PASSE PAR LE MÊME ANTI-REJEU QUE LA CONNEXION.** Le secret de session est
+chiffré à la volée pour être présenté à `Totp::verifie`, donc au compteur de fenêtre monotone par
+compte. Conséquence voulue : un code employé pour **enrôler** ne peut pas être rejoué pour **ouvrir
+une session**.
+
+**UN SEUL CHEMIN OUVRE UNE SESSION.** La vérification et l'enrôlement partagent désormais
+`ouvreLaSession()` : deux copies de ce chemin auraient fini par diverger, et c'est le chemin où une
+divergence **accorde un accès**. Le compte y est relu en base à cet instant — rôle et exigences
+comprises — plutôt que repris d'un objet chargé plus tôt.
+
+**LE QR DIVERGE PAR NATURE, ET LES DEUX SONT CORRECTS.** Le legacy rend un **PNG en base64** via `gd`.
+Le conteneur du portage n'a **ni `gd` ni `imagick`** (mesuré) : il rend un **SVG en ligne**, produit
+par `bacon/bacon-qr-code`, qui ne demande aucune extension et reste net à toute taille. La suite mesure
+donc « un QR est présent », pas « une balise `<img>` est présente » — exiger la forme du legacy aurait
+fait échouer un portage correct. `endroid/qr-code`, côté legacy, reste une **dépendance morte**.
+
+**LE FOND BLANC DU QR N'EST PAS UNE COQUETTERIE.** Un lecteur de QR lit des modules sombres sur fond
+**clair**. Un SVG posé sur le fond sombre du thème serait illisible **à la caméra**, et le DOM n'en
+dirait rien : aucune assertion ne voit un contraste inversé. Le cadre impose donc `#fff` quel que soit
+le thème, et la capture le **mesure** (`getComputedStyle`), elle ne le suppose pas.
+
+**CE QUI N'EST PAS PORTÉ, ET POURQUOI.** Le **ré-enrôlement** — remettre un second facteur à un compte
+qui en a déjà un — n'est pas ici. Il n'existe pas non plus dans le legacy sous forme d'écran : le seul
+chemin vivant est `adm/includes/manage_roles.php:101-121`, qui porte une **garde hiérarchique**, et
+`reset_totp.php` est du code mort **plus permissif** que ce chemin. Le ré-enrôlement appartient donc à
+`adm/` et à sa garde, pas à l'écran de connexion. Le dire plutôt que de porter le fichier mort.
+
+**UN ARTEFACT DE CAPTURE, MESURÉ AVANT D'ÊTRE « CORRIGÉ ».** Sur les images pleine page, le sélecteur
+de langue paraît flotter au milieu de la carte. Vérification faite : `.rw-langues-flottant` est en
+`position: fixed`, et un élément fixe se rend à sa position d'**écran** dans une capture pleine page.
+Ce n'est pas un défaut de mise en page. Le script de capture le dit, pour que personne ne corrige ce
+que l'image invente.
+
+**DEUX DÉFAUTS VUS À L'IMAGE, PAS AUX ASSERTIONS.** Le bouton principal passait sur **deux lignes** et
+devenait plus haut que son voisin — libellé raccourci à « Activer », comme l'écran voisin dit
+« Valider ». Et avant cela, l'écran rendait **entièrement vide** : `$temporaire['name']` n'existe pas,
+la clé de session s'appelle `nom`. Une clé de tableau supposée au lieu d'être lue, et la page tombait
+en 500 — que seule la lecture du journal a révélée, l'assertion disant seulement « pas de QR ».

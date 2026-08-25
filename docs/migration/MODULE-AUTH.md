@@ -233,6 +233,14 @@ comme une décision**.
 **A4** : le seul sous-lot qui accorde un accès à quelqu'un **qui ne prouve rien** — ni mot de passe,
 ni second facteur.
 
+> **PORTÉ le 2026-08-24, `v1.37.52`.** Les trois raisons ci-dessous restaient valables — elles ont
+> dicté l'ordre, pas le résultat. L'exécution croisée des secrets a été mesurée EN PREMIER
+> (`go-auth-totp-croise.mjs`, 15/0, `v1.37.51`), puis l'écran porté : même suite **18/0 des deux
+> côtés**. Le QR est en **SVG** (`bacon/bacon-qr-code`), le conteneur du portage n'ayant ni `gd` ni
+> `imagick`. Le **ré-enrôlement** n'est PAS porté et n'a pas d'écran dans le legacy non plus : son
+> seul chemin vivant est `adm/includes/manage_roles.php:101-121`, avec sa garde hiérarchique. Détail :
+> `PARITE.md` **E-97**.
+
 **A5 en dernier**, pour trois raisons cumulées. C'est le seul qui **écrit** un secret TOTP, et un
 format divergent d'un octet rend le compte inaccessible **sans message d'erreur**. Il dépend d'un
 moteur de QR que le legacy résout par une extension PHP absente du portage. Et il faut **corriger** le

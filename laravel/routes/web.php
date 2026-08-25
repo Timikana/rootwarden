@@ -43,6 +43,10 @@ Route::post('/connexion', [ConnexionController::class, 'soumettre'])->name('conn
 Route::get('/second-facteur', [SecondFacteurController::class, 'formulaire'])->name('second-facteur');
 Route::post('/second-facteur', [SecondFacteurController::class, 'soumettre'])->name('second-facteur.soumettre');
 Route::get('/second-facteur/enrolement', [SecondFacteurController::class, 'enrolement'])->name('second-facteur.enrolement');
+/* L'activation ECRIT le secret. Aucune garde de role : le compte n'est pas
+   encore authentifie, il l'est PAR ce geste. La garde est la session temporaire
+   plus la preuve du code. */
+Route::post('/second-facteur/enrolement', [SecondFacteurController::class, 'activer'])->name('second-facteur.activer');
 
 Route::post('/deconnexion', [ConnexionController::class, 'deconnexion'])->name('deconnexion');
 Route::get('/deconnexion', [ConnexionController::class, 'deconnexion']);

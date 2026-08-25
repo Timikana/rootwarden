@@ -4,6 +4,12 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Services\Totp;
+use App\Support\TotpCrypto;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
+use OTPHP\TOTP as OtpHp;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,18 +35,139 @@ class SecondFacteurController extends Controller
     }
 
     /**
-     * Compte sans secret TOTP. L'enrolement complet n'est pas encore porte :
-     * on refuse explicitement plutot que d'ouvrir une porte sans second
-     * facteur. Un ecran qui expliquerait « rendez-vous sur le legacy » vaut
-     * mieux qu'un acces accorde.
+     * L'enrolement du second facteur — le dernier blocage de la v2.0.
+     *
+     * PORTAGE DU LEGACY CORRIGE, PAS DU LEGACY. `enable_2fa.php` divulguait le
+     * secret d'un compte DEJA enrole a qui ne presentait que le mot de passe
+     * (corrige en v1.37.48, PARITE E-94). Les trois proprietes qui ferment ce
+     * trou sont reprises ici comme des invariants, pas comme des precautions :
+     *
+     *   1. un compte qui a DEJA un secret n'atteint jamais cet ecran ;
+     *   2. le secret propose vit en SESSION et ne touche la base qu'APRES la
+     *      preuve — un GET n'ecrit rien ;
+     *   3. il ne change pas d'un affichage a l'autre, sans quoi le QR scanne et
+     *      le code attendu ne concorderaient jamais.
      */
     public function enrolement(Request $requete): View|RedirectResponse
     {
-        if (! $requete->session()->has('compte_temporaire')) {
+        $temporaire = $requete->session()->get('compte_temporaire');
+        if (! $temporaire) {
             return redirect()->route('connexion');
         }
 
-        return view('auth.enrolement');
+        $idCompte = (int) $temporaire['id'];
+
+        /*
+         * INVARIANT 1. Relu EN BASE a cet instant, jamais depuis la session :
+         * c'est exactement la lecture que le legacy omettait.
+         */
+        if (! empty(DB::table('users')->where('id', $idCompte)->value('totp_secret'))) {
+            return redirect()->route('second-facteur');
+        }
+
+        /*
+         * INVARIANT 3. Le secret est genere UNE FOIS par session, et lie au
+         * compte : un enrolement entame puis repris sur un autre compte ne doit
+         * pas herite du secret precedent.
+         */
+        if (! $requete->session()->has('enrolement_secret')
+            || (int) $requete->session()->get('enrolement_compte') !== $idCompte) {
+            $requete->session()->put('enrolement_secret', OtpHp::generate()->getSecret());
+            $requete->session()->put('enrolement_compte', $idCompte);
+        }
+
+        $secret = (string) $requete->session()->get('enrolement_secret');
+
+        return view('auth.enrolement', [
+            'secret' => $secret,
+            'qr'     => $this->qrCode($secret, (string) $temporaire['nom']),
+        ]);
+    }
+
+    /**
+     * Le code d'enrolement. C'est ici, et seulement ici, que le secret est ECRIT.
+     *
+     * Le code est verifie contre le secret de SESSION, chiffre a la volee pour
+     * passer par le meme `Totp::verifie` que la connexion — donc avec le meme
+     * anti-rejeu monotone par compte. Consequence voulue : un code employe pour
+     * enroler ne peut pas etre rejoue pour ouvrir une session.
+     */
+    public function activer(Request $requete): RedirectResponse
+    {
+        $temporaire = $requete->session()->get('compte_temporaire');
+        if (! $temporaire) {
+            return redirect()->route('connexion');
+        }
+
+        $requete->validate(['2fa_code' => ['required', 'string', 'max:10']]);
+
+        $idCompte = (int) $temporaire['id'];
+        $secret   = (string) $requete->session()->get('enrolement_secret', '');
+
+        if ($secret === '' || (int) $requete->session()->get('enrolement_compte') !== $idCompte) {
+            return redirect()->route('second-facteur.enrolement');
+        }
+
+        /* INVARIANT 1, VERIFIE UNE SECONDE FOIS. Entre l'affichage et la preuve,
+         * un autre chemin a pu enroler ce compte : ecraser son secret le rendrait
+         * inaccessible. Fail-closed. */
+        if (! empty(DB::table('users')->where('id', $idCompte)->value('totp_secret'))) {
+            $requete->session()->forget(['enrolement_secret', 'enrolement_compte']);
+
+            return redirect()->route('second-facteur');
+        }
+
+        if ($this->tropDeTentatives($requete) || $this->ipBloquee($requete)) {
+            return back()->withErrors(['2fa_code' => __('auth.erreur_trop_de_tentatives')]);
+        }
+
+        $verdict = $this->totp->verifie($idCompte, TotpCrypto::chiffre($secret), (string) $requete->input('2fa_code'));
+        $this->journalise($requete, (string) $temporaire['nom'], $verdict === 'ok');
+
+        if ($verdict === 'rejeu') {
+            return back()->withErrors(['2fa_code' => __('auth.erreur_code_deja_utilise')]);
+        }
+        if ($verdict !== 'ok') {
+            return back()->withErrors(['2fa_code' => __('auth.erreur_code_invalide')]);
+        }
+
+        /* INVARIANT 2. L'ecriture arrive ICI, apres la preuve, et jamais avant. */
+        DB::table('users')->where('id', $idCompte)->update([
+            'totp_secret' => TotpCrypto::chiffre($secret),
+        ]);
+        $requete->session()->forget(['enrolement_secret', 'enrolement_compte']);
+
+        return $this->ouvreLaSession($requete, $idCompte);
+    }
+
+    /**
+     * Le QR code, en SVG.
+     *
+     * Le conteneur du portage n'a **ni gd ni imagick** (mesure) : le legacy rend
+     * un PNG en base64, ce qui est ici impossible. Le SVG s'inscrit directement
+     * dans la page, ne demande aucune extension, et reste net a toute taille.
+     */
+    private function qrCode(string $secret, string $nom): string
+    {
+        $emetteur = (string) config('app.name', 'RootWarden');
+        $uri = 'otpauth://totp/' . rawurlencode($emetteur . ':' . $nom)
+            . '?secret=' . $secret . '&issuer=' . rawurlencode($emetteur);
+
+        $rendu = new ImageRenderer(new RendererStyle(220, 1), new SvgImageBackEnd());
+
+        return (new Writer($rendu))->writeString($uri);
+    }
+
+    /** Debit par session, 5 tentatives glissantes sur 60 s — comme la connexion. */
+    private function tropDeTentatives(Request $requete): bool
+    {
+        $tentatives = collect($requete->session()->get('tentatives_2fa', []))
+            ->filter(fn ($t) => $t > time() - 60)
+            ->values();
+        $tentatives->push(time());
+        $requete->session()->put('tentatives_2fa', $tentatives->all());
+
+        return $tentatives->count() > (int) config('rootwarden.connexion.max_tentatives_2fa', 5);
     }
 
     public function soumettre(Request $requete): RedirectResponse
@@ -55,13 +182,7 @@ class SecondFacteurController extends Controller
         $requete->validate(['2fa_code' => ['required', 'string', 'max:10']]);
 
         // Limitation de debit par session : 5 tentatives glissantes sur 60 s.
-        $tentatives = collect($requete->session()->get('tentatives_2fa', []))
-            ->filter(fn ($t) => $t > time() - 60)
-            ->values();
-        $tentatives->push(time());
-        $requete->session()->put('tentatives_2fa', $tentatives->all());
-
-        if ($tentatives->count() > (int) config('rootwarden.connexion.max_tentatives_2fa', 5)) {
+        if ($this->tropDeTentatives($requete)) {
             return back()->withErrors(['2fa_code' => __('auth.erreur_trop_de_tentatives')]);
         }
 
@@ -97,8 +218,33 @@ class SecondFacteurController extends Controller
             return back()->withErrors(['2fa_code' => __('auth.erreur_code_invalide')]);
         }
 
-        // Authentification complete. Nouvelle rotation de session, puis on ne
-        // garde que ce qui a ete verifie EN BASE a l'instant present.
+        return $this->ouvreLaSession($requete, (int) $compte->id);
+    }
+
+    /**
+     * Le seul endroit ou une session devient authentifiee.
+     *
+     * Partage par la verification et par l'enrolement : deux copies de ce
+     * chemin auraient fini par diverger, et c'est le chemin ou une divergence
+     * accorde un acces.
+     *
+     * Le compte est RELU en base a cet instant — role et exigences comprises —
+     * plutot que repris d'un objet charge plus tot : entre le mot de passe et
+     * ici, un role a pu changer.
+     */
+    private function ouvreLaSession(Request $requete, int $idCompte): RedirectResponse
+    {
+        $compte = DB::table('users')
+            ->select('id', 'name', 'role_id', 'active', 'force_password_change')
+            ->where('id', $idCompte)
+            ->first();
+
+        if (! $compte || ! $compte->active) {
+            $requete->session()->flush();
+
+            return redirect()->route('connexion');
+        }
+
         $requete->session()->regenerate();
         $requete->session()->forget(['compte_temporaire', 'tentatives_2fa']);
         $requete->session()->put('utilisateur_id', (int) $compte->id);
