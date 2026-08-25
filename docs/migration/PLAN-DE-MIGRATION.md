@@ -709,6 +709,15 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Une exception dans le `finally` emporte le journal entier** : isoler chaque étape.
 - **Imprimer le journal au fil de l'eau.** **Sonder un chemin qui n'a jamais existé rend 404** et fait
   passer l'assertion pour rien.
+- **Un `git add` ciblé ne protège plus rien si une AUTRE session écrit dans le dépôt.** Le 2026-08-25 à
+  22:34, une seconde session a committé `MODULE-ADM.md` seul et laissé ses retouches de **ce fichier**
+  non committées ; le `git add docs/migration/PLAN-DE-MIGRATION.md` du commit d'archivage les a
+  **ramassées**, et `v1.37.58` porte donc une douzaine de lignes sur `adm/` que son message ne
+  mentionne pas. Rien n'est perdu et rien n'est faux — mais le commit n'est plus atomique, et
+  l'historique attribue mal. Deux règles qui en découlent : **`git diff --stat` sur ce qu'on s'apprête à
+  ajouter, pas seulement `git status`** ; et ne **jamais réécrire l'historique** (`--amend`, `rebase`)
+  tant qu'une autre session peut travailler — la gêne d'un message incomplet est bien moindre que celle
+  d'un historique déplacé sous les pieds de quelqu'un.
 - **Tout `/partie/` n'est pas une page.** `/maintenance/check` et `/maintenance/windows` sont des routes
   du **backend** ; sondées comme des pages archivées elles échoueraient, réécrites comme des pages elles
   casseraient la page. Ce qui les sauve est une comparaison du chemin **normalisé en entier** — la même
