@@ -2171,6 +2171,58 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.59 — `adm/` D1 : le bouton qui devait boucher le trou ne pouvait rien sceller
+
+**18 entrees de menu portees sur 33.** Legacy 32/0, portage 34/0 (`tests/e2e/go-adm-audit.mjs`).
+Premier sous-lot du plus gros module restant : le journal d'audit, 711 lignes sur les 8 421 de `adm/`.
+
+**Le defaut, mesure au clic.** Le legacy porte DEUX parcours de la chaine de hachage de `user_logs`,
+et ils ne s'accordent pas devant une ligne non scellee : `audit_verify.php:44` la **saute** sans
+avancer la tete, `audit_seal.php:79` **calcule** son hachage et avance. Sur la meme base, a la meme
+seconde, « Verifier l'integrite » annonce une chaine intacte pendant que « Sceller les orphelines »
+annonce une desynchronisation a la ligne 3 et refuse d'ecrire.
+
+**Qui a raison se lit dans le code qui ECRIT.** `adm/includes/audit_log.php:111-115`, seul chemin
+d'insertion scellee, selectionne `WHERE self_hash IS NOT NULL` : la chaine inscrite saute les
+orphelines **par construction**. Deux mesures independantes le confirment — les donnees ligne a ligne
+(la ligne 3 porte le hachage de la ligne 1) et un `LAG()` SQL sur les seules lignes scellees : **3311
+maillons, 0 rupture**.
+
+**Ce que le defaut coutait.** `stopped_at_tamper` verrouille le bloc d'`UPDATE` : le bouton
+« Sceller les orphelines » ne pouvait sceller **aucune** ligne, jamais, tout en ecrivant une alarme
+`SECURITY … investigation requise` a chaque appel pour une ligne intacte. Le trou grandissait seul —
+**757** lignes non scellees annoncees au plan, **868** mesurees.
+
+**Le portage n'a qu'UNE lecture de la chaine**, `JournalAudit::parcourt()`, partagee par la
+verification et le scellement : elles ne *peuvent* plus diverger. Le scellement redevient possible, et
+comme il est **irreversible**, sa decision se prend dans un panneau en page qui **nomme le nombre de
+lignes** et n'active sa confirmation qu'a la saisie exacte de ce nombre — controle **repete cote
+serveur**. Le garde-fou SQL `WHERE self_hash IS NULL` et le refus de reecrire une ligne deja scellee
+sont repris tels quels.
+
+**Trois defauts d'affichage, dont deux vus SEULEMENT a l'image** :
+- la page annoncait « 4 179 **`:count`** entrees au total » — gabarit jamais substitue, **en FR et en
+  EN** (E-105) ;
+- `.bg-yellow-600` etait **absente du binaire CSS**, donc le bouton « Sceller » rendait sans fond et
+  avait l'air desactive (E-106, **quatrieme** occurrence du piege Tailwind) ;
+- les six verdicts ecrits par le JavaScript etaient en **francais code en dur** dans un fichier par
+  ailleurs bilingue, `confirm()` natif compris (E-107).
+
+**Sur le portage** : 41 cles FR et EN, jeux compares ; les libelles du script poses **en donnees** ;
+plus aucune boite native. L'export CSV est **assemble en memoire puis rendu d'un bloc** — la parade
+posee apres l'incident de `cve_export.php`, ou un avertissement PHP emis au fil de l'ecriture
+s'inserait dans le fichier telecharge.
+
+**Gardes.** La page et l'export : role 2 + `can_admin_portal`. Les deux gestes d'integrite : **role 3
+sur la ROUTE**, la ou le legacy ne cache que les boutons de sa page — aucun de ses seize points d'API
+`adm/` ne porte de `checkPermission`.
+
+**La suite n'emet jamais le scellement pour de vrai** : le clic est intercepte et abattu, et la
+simulation passe par une requete forgee depuis la page, motif ecrit dans le fichier — le legacy porte
+bien un mode simulation, mais **aucun element de son interface ne l'emet**.
+
+Ecarts : **E-104 a E-107**, les quatre fermes par ce portage.
+
 ### v1.37.58 — `maintenance/` archive : deux chemins qui se ressemblent et ne sont pas de meme nature
 
 Douzieme partie du legacy demontee. Cycle du §4.4 deroule, y compris l'etape ajoutee la veille :

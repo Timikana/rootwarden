@@ -43,15 +43,15 @@ Détail complet : `docs/migration/MODULE-AUTH.md` §2.
 
 | | |
 |---|---|
-| entrées de menu portées | **16 sur 33** |
-| parties du legacy archivées | **10** (`commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker`) |
+| entrées de menu portées | **18 sur 33** |
+| parties du legacy archivées | **12** (`commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance`) |
 | modules entièrement dépréciés | **2** (`update/`, `supervision/`) |
 | LOT de tests E2E | **93 exécutions, 1301 assertions, 0 échec** |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **90** (`docs/migration/PARITE.md`, numérotés jusqu'à **E-100** — dix numéros, E-23 à E-32, n'ont jamais été utilisés) |
-| commits non poussés | **72** (0 de retard sur `origin/Migration-Laravel`) |
+| écarts de parité documentés | **97** (`docs/migration/PARITE.md`, numérotés jusqu'à **E-107** — dix numéros, E-23 à E-32, n'ont jamais été utilisés) |
+| commits non poussés | **à remesurer** — `git rev-list --count @{u}..HEAD` (0 de retard sur `origin/Migration-Laravel`). Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait |
 
-**La migration n'est pas finie.** 14/33, c'est 42 % des entrées de menu. Le socle, lui,
+**La migration n'est pas finie.** 18/33, c'est 55 % des entrées de menu. Le socle, lui,
 est complet : authentification, navigation, passerelle vers le backend, i18n FR/EN.
 
 ---
@@ -75,11 +75,11 @@ Détail et découpage : `docs/migration/MODULE-AUTH.md`.
 
 ## Ce qui reste à porter
 
-**19 entrées de menu**, par taille de code legacy :
+**15 entrées de menu**, par taille de code legacy :
 
 | partie | lignes | entrées de menu |
 |---|---|---|
-| `adm/` | 8421 (37 fichiers) | **6** — comptes, journal d'audit, comptes distants, clés de plateforme, politiques sudo, politiques sftp |
+| `adm/` | 8421 (37 fichiers) | **5** — comptes, comptes distants, clés de plateforme, politiques sudo, politiques sftp (le **journal d'audit** est porté depuis `v1.37.59`) |
 | `ssh-audit/` | 1118 | 1 |
 | `bashrc/` | 941 | 1 |
 | `fail2ban/` | 872 | 1 |

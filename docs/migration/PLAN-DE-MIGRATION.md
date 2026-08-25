@@ -92,7 +92,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **17 sur 33** |
+| entrées de menu portées | **18 sur 33** |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ, et D1 CARACTÉRISÉ (32/0, base rouge 1/17) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 PORTÉ `v1.37.59` (legacy 32/0, portage 34/0) — `MODULE-ADM.md`**, dix sous-lots, neuf restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -612,8 +612,11 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   parcourent pas la chaîne de la même façon, le premier s'arrête sur une fausse désynchronisation à
   la ligne 3, et son verrou `stopped_at_tamper` rend le bouton « Sceller les orphelines »
   **définitivement incapable de sceller quoi que ce soit** — tout en écrivant une alarme
-  `SECURITY … investigation requise` à chaque appel. Le portage de D1 tranche : une seule lecture de
-  la chaîne, celle qui saute les orphelines, parce que c'est celle que la base porte ;
+  `SECURITY … investigation requise` à chaque appel. **LEVÉ côté portage** (`v1.37.59`) : une seule
+  lecture de la chaîne, celle du code qui écrit, et la simulation annonce désormais 868 lignes à
+  sceller là où le legacy s'arrêtait. **Le geste lui-même reste à faire, et il vous appartient** — il
+  est irréversible, il se déclenche depuis `/journal-audit`, et le panneau nomme le nombre avant de
+  laisser confirmer ;
 - la liste blanche `/supervision/` de `api_proxy.php:134` — **surface morte** depuis l'archivage, et
   `/supervision/` est absent de `$ADMIN_ONLY_PREFIXES` ;
 - les **11 liens sortants** du legacy non marqués, et le **404 brut d'Apache** des neuf parties
@@ -752,6 +755,25 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Le `[r]` de `[r]ejouer-lot` ne protège pas quand le CHEMIN figure ailleurs dans la même
+  commande.** Quatrième forme du même piège : un `grep -c "[r]ejouer-lot.sh"` combiné, dans le même
+  appel, avec un heredoc Python dont la source contenait `scripts/rejouer-lot.sh` en clair a rendu
+  **2** sur une machine au repos — la classe de caractères ne dédouble que le motif, pas le texte du
+  script. J'ai cru avoir corrompu le rejeu d'une autre session. **Vérifier dans un appel SÉPARÉ, et
+  qui ne cite le chemin nulle part ailleurs.**
+- **Un catalogue de traduction du portage ne se clé pas comme celui du legacy.** `lang/fr/audit.php`
+  veut `'title' => …`, pas `'audit.title' => …` : `__('audit.title')` cherche le groupe `audit` puis
+  la clé `title`. Recopier le format plat du legacy fait rendre **chaque identifiant à l'écran**,
+  sans erreur et sans journal. **Seule la capture l'a montré** — et d'un coup d'œil : trente libellés
+  en majuscules à la place des textes.
+- **Une suite de caractérisation écrite sur le legacy est SHAPÉE par lui.** Sept des huit échecs du
+  premier passage sur le portage venaient de la suite : chemins de points d'API codés en dur, attente
+  d'une classe `hidden` propre au legacy, motif d'interception d'URL, noms de champs JSON. Les mettre
+  dans la table `C` **par cible** — et pour l'attente, viser un signal que les deux cibles partagent :
+  **le bouton réactivé**, pas la première annonce.
+- **La propriété est « la requête porte un jeton », pas « elle le porte à tel endroit ».** Le legacy
+  duplique son jeton CSRF dans l'en-tête ET dans le corps ; le portage s'en tient à l'en-tête, que le
+  cadre lit. Une assertion calquée sur l'implémentation du legacy fait échouer un portage correct.
 - **Deux points d'API qui lisent la MÊME donnée peuvent en rendre deux verdicts opposés.** D1 :
   « Vérifier l'intégrité » annonce une chaîne intacte pendant que « Sceller les orphelines » annonce
   une désynchronisation, à la même seconde. Ils divergent d'une ligne — l'un saute les lignes non

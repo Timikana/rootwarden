@@ -4462,9 +4462,22 @@ Or la chaîne réellement inscrite en base saute les orphelines. Mesuré ligne �
 | 4 | **NULL** | **NULL** |
 | 5 | `5a070372…` — *celui de la ligne 3* | `d9ce6fe8…` |
 
-**C'est donc `audit_verify.php` qui a raison**, et une seconde mesure, par un autre moyen, le
-confirme sans passer par lui — un `LAG()` SQL sur les seules lignes scellées rend **3311 maillons,
-0 rupture**, et le premier maillon est bien `GENESIS`.
+**C'est donc `audit_verify.php` qui a raison**, et deux mesures indépendantes le confirment sans
+passer par lui :
+
+1. un `LAG()` SQL sur les seules lignes scellées rend **3311 maillons, 0 rupture**, et le premier
+   maillon est bien `GENESIS` ;
+2. surtout, **le code qui ÉCRIT tranche** — et c'est lui l'autorité sur ce qu'est la chaîne.
+   `adm/includes/audit_log.php:111-115`, seul chemin d'insertion scellée :
+
+   ```sql
+   SELECT self_hash FROM user_logs
+    WHERE self_hash IS NOT NULL          -- il SAUTE les orphelines
+    ORDER BY id DESC LIMIT 1 FOR UPDATE
+   ```
+
+   La chaîne inscrite saute donc les lignes non scellées **par construction**. `audit_verify.php`
+   lit ce qui est écrit ; `audit_seal.php` lit autre chose.
 
 **Ce que le défaut coûte, et c'est là qu'il devient grave.** `stopped_at_tamper` verrouille le bloc
 d'`UPDATE` (`audit_seal.php:105` : `if (!$dryRun && !$stopAtTamper && …)`). Le parcours s'arrête sur
@@ -4480,8 +4493,23 @@ la ligne 3 à **chaque** appel, donc :
    (`audit_seal.php:88-95`) pour une ligne qui n'a **pas** été altérée. **Une alarme de sécurité qui
    crie au loup use la seule alarme qu'on ait.**
 
-**Au portage** : une seule lecture de la chaîne, partagée par la vérification et le scellement, et
-c'est celle qui saute les orphelines. Le portage doit rendre **un** verdict, pas deux.
+**FERMÉ au portage** (`v1.37.59`) : `App\Services\JournalAudit::parcourt()` est la **seule** lecture
+de la chaîne, et la vérification comme le scellement s'y adossent — ils ne *peuvent* plus diverger.
+La règle retenue est celle du code qui écrit : une ligne non scellée ne fait pas avancer la tête.
+
+Mesuré sur le portage le 2026-08-25, sur la même base et à la même seconde :
+
+| | legacy | portage |
+|---|---|---|
+| « Vérifier » | chaîne saine | chaîne saine |
+| « Sceller », en simulation | **ARRÊT sur incohérence** | **poursuite normale, 868 orphelines** |
+
+Le scellement redevient donc possible. Il reste **irréversible**, et le portage le traite comme tel :
+la décision se prend dans un panneau en page qui **nomme le nombre de lignes** et n'active sa
+confirmation qu'à la saisie exacte de ce nombre — contrôle **répété côté serveur**, une garde du
+navigateur déplaçant le refus sans le supprimer. Le garde-fou SQL `WHERE self_hash IS NULL` et le
+refus de réécrire une ligne déjà scellée sont **repris tels quels** : ce sont les deux bonnes idées
+du fichier d'origine.
 
 ---
 
@@ -4503,8 +4531,13 @@ amputée (« entries », sans « au total »).
 Aucune assertion DOM ne pouvait le voir : le nombre attendu **est** bien dans la page, la chaîne
 `:count` n'est qu'un mot de plus à côté. **C'est la capture qui l'a montré.**
 
-**Au portage** : la valeur passe par le mécanisme de substitution, ou la clé perd son gabarit. Et la
-parité FR/EN se relit sur le **rendu**, pas sur la présence des clés.
+**FERMÉ au portage** (`v1.37.59`) : `__('audit.entries_total', ['nombre' => …])` substitue pour de
+bon, et la page affiche « 4 179 entrées au total ». Le séparateur de milliers suit la langue, et il
+est calculé dans le **contrôleur** — une vue n'a pas à porter cette règle.
+
+Et la leçon de mesure, qui vaut au-delà de cette clé : **la parité FR/EN se relit sur le RENDU**, pas
+sur la présence des clés. Les deux catalogues du legacy sont à parité stricte, et les deux affichent
+un gabarit.
 
 ---
 
@@ -4526,8 +4559,14 @@ Le bouton rend donc **sans fond**, en gris, entre deux voisins colorés — la s
 contrôle désactivé. Le HTML est juste ; c'est la feuille qui ne porte pas la classe. Aucune assertion
 DOM ne le voit : l'élément est bien présent, bien cliquable, et sa classe est bien dans l'attribut.
 
-**Au portage** : les composants Blade du socle, dont les classes sont écrites une fois et vues par le
-compilateur. Et la règle, une quatrième fois : **mesurer le style CALCULÉ, ou regarder l'image.**
+**FERMÉ au portage** (`v1.37.59`) : le bouton prend `.rw-bouton--avertissement`, une classe de la
+feuille écrite à la main — sans étape de construction, il n'y a rien qui purge. Vérifié à l'image :
+le bouton rend en ambre, à côté du bleu de « Vérifier » et du gris d'« Exporter ».
+
+La teinte n'est d'ailleurs pas prise au hasard : **le rouge est réservé à ce qui interrompt un
+service**. Un scellement modifie sans interrompre.
+
+Et la règle, une quatrième fois : **mesurer le style CALCULÉ, ou regarder l'image.**
 
 ---
 
@@ -4551,4 +4590,10 @@ celui qui annonce une incohérence de la chaîne d'audit.
 S'y ajoute le `confirm()` natif de `:213`, qui recouvre la ligne sur laquelle on décide, ne se style
 pas, et **bloque Puppeteer**. Même traitement que partout ailleurs : un panneau de décision en page.
 
-**Au portage** : FR et EN dans le même commit, verdicts compris.
+**FERMÉ au portage** (`v1.37.59`) : **41 clés, FR et EN**, jeux comparés dans le même commit. Les dix
+libellés que le script rend sont posés **en données** dans la page (`@json` sur une ligne) — une
+chaîne écrite en dur dans du JavaScript échappe par nature à la parité.
+
+Et le `confirm()` disparaît : la décision se prend dans un `rw-panneau-decision`, qui ne recouvre pas
+la ligne sur laquelle on décide, se style, et ne bloque pas Puppeteer — c'est d'ailleurs ce qui rend
+le chemin de refus **testable**, ce qu'une boîte native ne permet pas.

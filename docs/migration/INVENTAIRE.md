@@ -343,11 +343,11 @@ grep -c "'route'"  laravel/app/Support/Navigation.php   # portees  (moins 2 lign
 grep -c "'legacy'" laravel/app/Support/Navigation.php   # restantes (moins 2)
 ```
 
-**33 entrées au total : 14 portées, 19 restantes.**
+**33 entrées au total : 18 portées, 15 restantes.** (remesuré le 2026-08-25)
 
 | partie legacy | lignes PHP+JS | entrées de menu |
 |---|---|---|
-| `adm/` | 8421 (37 fichiers) | **6** — `admin_page.php`, `audit_log.php`, `server_users.php`, `platform_keys.php`, `server_user_sudo.php`, `server_user_sftp.php` |
+| `adm/` | 8421 (37 fichiers) | **5** restantes — `admin_page.php`, `server_users.php`, `platform_keys.php`, `server_user_sudo.php`, `server_user_sftp.php` ; `audit_log.php` est **porté** (`v1.37.59`). Inventaire complet : `MODULE-ADM.md` |
 | `ssh-audit/` | 1118 | 1 |
 | `bashrc/` | 941 | 1 |
 | `fail2ban/` | 872 | 1 |

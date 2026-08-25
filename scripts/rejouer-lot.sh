@@ -66,8 +66,12 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # pas suppose.
 # 49 -> 50 au portage de `maintenance/`, pour la MEME raison et verifiee de la meme
 # facon : une seule ligne « Maintenance » dans le journal, celle de `rw-test-super`.
+# 50 -> 51 au portage du journal d'audit (`adm/` D1), TROISIEME fois la meme
+# raison et verifiee de la meme facon : le journal ne porte qu'une ligne
+# « Journal d'audit », celle de `rw-test-super`. `audit_log` exige
+# `can_admin_portal`, que `rw-test-admin` n'a pas.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=50 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=51 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -118,6 +122,14 @@ declare -A REF_LARAVEL=(
   #     n'affiche aucun etat d'ensemble ;
   #   - aucune boite native : la decision se prend en page.
   [go-page-maintenance]=29
+  # Sous-lot D1 de `adm/` : le journal d'audit. 34 sur le portage contre 32 sur
+  # le legacy. Les DEUX assertions d'ecart sont des `verifiePortage` : la
+  # decision de scellement se prend dans un PANNEAU EN PAGE (le legacy pose un
+  # `confirm()` natif), et les deux lectures de la chaine S'ACCORDENT (le legacy
+  # les fait se contredire — PARITE E-104). Cote legacy elles sont rendues en
+  # INFO avec leur valeur mesuree, pas en FAIL : un ecart voulu n'est pas une
+  # regression.
+  [go-adm-audit]=34
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -192,6 +204,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
+  go-adm-audit
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift

@@ -97,6 +97,11 @@ const C = CIBLE === 'laravel'
         boutonSceller: '[data-rw="audit-sceller"]',
         resultat: '[data-rw="audit-resultat"]',
         confirmerEnPage: '[data-rw="audit-confirmer"]',
+        routeVerifier: '/journal-audit/verifier',
+        // Le portage SEPARE la simulation du scellement : `?simulation=1` rend
+        // ce que l'ecriture produirait, sans rien ecrire.
+        routeSimulation: ['/journal-audit/sceller?simulation=1', 'POST'],
+        motifSceller: /\/journal-audit\/sceller/,
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
     }
     : {
@@ -113,6 +118,10 @@ const C = CIBLE === 'laravel'
         boutonSceller: '#btn-seal-audit',
         resultat: '#audit-verify-result',
         confirmerEnPage: null,
+        routeVerifier: '/adm/api/audit_verify.php',
+        // Cote legacy la simulation est la branche NON-POST du meme fichier.
+        routeSimulation: ['/adm/api/audit_seal.php', 'GET'],
+        motifSceller: /audit_seal/,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
     };
 
@@ -374,11 +383,15 @@ try {
     await etape('clic sur « Verifier l\'integrite »', async () => {
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         await page.click(C.boutonVerifier);
-        await page.waitForFunction((s) => {
-            const el = document.querySelector(s);
-            return el && ! el.classList.contains('hidden') && (el.textContent || '').length > 20
-                && ! /en cours/i.test(el.textContent);
-        }, { timeout: 30000 }, C.resultat);
+        // ATTENDRE LE BOUTON, pas la premiere annonce : la region porte d'abord
+        // un message de travail. Les deux cibles reactivent leur bouton dans le
+        // MEME bloc synchrone que l'ecriture du verdict, ce qui rend ce signal
+        // independant de la cible ET de la langue.
+        await page.waitForFunction((sr, sb) => {
+            const el = document.querySelector(sr);
+            const b = document.querySelector(sb);
+            return el && b && ! b.disabled && (el.textContent || '').trim().length > 20;
+        }, { timeout: 30000 }, C.resultat, C.boutonVerifier);
         const rendu = await page.$eval(C.resultat, (e) => (e.textContent || '').replace(/\s+/g, ' ').trim());
         constate('verdict rendu par la page', rendu);
         verifie('le porte-messages rend un verdict', rendu.length > 20, rendu.slice(0, 80));
@@ -413,7 +426,7 @@ try {
         const emises = [];
         await page.setRequestInterception(true);
         const filtre = (r) => {
-            if (/audit_seal/.test(r.url())) {
+            if (C.motifSceller.test(r.url())) {
                 emises.push({
                     methode: r.method(),
                     url: r.url(),
@@ -439,10 +452,17 @@ try {
             `${emises.length} requete(s)`);
         if (emises.length) {
             verifie('elle est emise en POST', emises[0].methode === 'POST', emises[0].methode);
-            verifie('elle porte l\'en-tete CSRF', emises[0].csrf.length > 0,
-                emises[0].csrf ? `${emises[0].csrf.length} caracteres` : '(absent)');
-            verifie('elle porte aussi le jeton dans le corps', /csrf_token/.test(emises[0].corps),
-                emises[0].corps.slice(0, 60));
+            // La propriete est « la requete porte un jeton », pas « elle le porte
+            // a tel endroit ». Le legacy le met dans l'en-tete ET dans le corps ;
+            // le portage s'en tient a l'en-tete, que `PreventRequestForgery`
+            // lit — le dupliquer n'ajouterait rien. On mesure le jeton, et on
+            // CONSTATE par ou il voyage.
+            const dansLeCorps = /csrf_token/.test(emises[0].corps);
+            verifie('elle porte un jeton CSRF', emises[0].csrf.length > 0 || dansLeCorps,
+                emises[0].csrf ? `en-tete, ${emises[0].csrf.length} caracteres`
+                               : (dansLeCorps ? 'dans le corps seulement' : '(aucun)'));
+            constate('ou voyage le jeton',
+                `${emises[0].csrf ? 'en-tete' : '—'}${dansLeCorps ? ' + corps' : ''}`);
         }
         // Le legacy garde son `confirm()` natif ; le portage devra un panneau.
         const boiteVue = boitesNatives.length > boitesAvant;
@@ -463,16 +483,25 @@ try {
     // donc pas de clic capable d'atteindre cette branche. Le `fetch` part DEPUIS
     // la page, donc avec la session et les en-tetes reels.
     await etape('la simulation integree, par requete forgee', async () => {
-        const d = await page.evaluate(async () => {
-            const r = await fetch('/adm/api/audit_seal.php');
+        const d = await page.evaluate(async ([chemin, methode]) => {
+            const options = { credentials: 'same-origin', headers: {} };
+            if (methode !== 'GET') {
+                options.method = methode;
+                const m = document.querySelector('meta[name="csrf-token"]');
+                if (m) options.headers['X-CSRF-TOKEN'] = m.content;
+            }
+            const r = await fetch(chemin, options);
             return { statut: r.status, corps: await r.json() };
-        });
+        }, C.routeSimulation);
         constate('simulation', JSON.stringify(d.corps).slice(0, 260));
         verifie('la simulation repond 200', d.statut === 200, `statut ${d.statut}`);
-        verifie('elle se declare bien en simulation', d.corps.dry_run === true, String(d.corps.dry_run));
-        verifie('elle n\'a rien scelle', d.corps.sealed === 0, String(d.corps.sealed));
+        const enSimulation = CIBLE === 'laravel' ? d.corps.simulation : d.corps.dry_run;
+        const scellees = CIBLE === 'laravel' ? d.corps.scellees : d.corps.sealed;
+        const vues = CIBLE === 'laravel' ? d.corps.total : d.corps.total_rows;
+        verifie('elle se declare bien en simulation', enSimulation === true, String(enSimulation));
+        verifie('elle n\'a rien scelle', scellees === 0, String(scellees));
         verifie('elle voit le meme nombre total de lignes que la base',
-            d.corps.total_rows === totalBase, `annonce ${d.corps.total_rows}, base ${totalBase}`);
+            vues === totalBase, `annonce ${vues}, base ${totalBase}`);
         verifie('la base est intacte apres la simulation',
             compteOrphelines() === orphelinesAvant && compteScellees() === scelleesAvant,
             `${compteOrphelines()} orphelines, ${compteScellees()} scellees`);
@@ -497,18 +526,32 @@ try {
     // ne pourra donc JAMAIS sceller une seule ligne — et pendant ce temps le
     // compteur d'orphelines grossit a chaque connexion.
     await etape('les deux points d\'API rendent-ils le meme verdict ?', async () => {
-        const d = await page.evaluate(async () => {
+        const d = await page.evaluate(async ([routeV, sim]) => {
+            const options = { credentials: 'same-origin', headers: {} };
+            if (sim[1] !== 'GET') {
+                options.method = sim[1];
+                const m = document.querySelector('meta[name="csrf-token"]');
+                if (m) options.headers['X-CSRF-TOKEN'] = m.content;
+            }
             const [v, s] = await Promise.all([
-                fetch('/adm/api/audit_verify.php').then((r) => r.json()),
-                fetch('/adm/api/audit_seal.php').then((r) => r.json()),
+                fetch(routeV, { credentials: 'same-origin' }).then((r) => r.json()),
+                fetch(sim[0], options).then((r) => r.json()),
             ]);
             return { verify: v, seal: s };
-        });
-        constate('verdict de « Verifier »', `${d.verify.integrity} (${d.verify.sealed} scellees)`);
+        }, [C.routeVerifier, C.routeSimulation]);
+
+        // Les deux cibles ne nomment pas leurs champs de la meme facon. On lit
+        // le SENS, pas la cle : « la verification declare-t-elle la chaine
+        // saine ? » et « le scellement s'arrete-t-il sur une incoherence ? »
+        const verifIntegre = CIBLE === 'laravel' ? d.verify.integre === true
+                                                 : d.verify.integrity === 'OK';
+        const sealArrete = CIBLE === 'laravel' ? d.seal.arret_sur_incoherence === true
+                                               : d.seal.stopped_at_tamper === true;
+        const sealScellees = CIBLE === 'laravel' ? d.seal.scellees : d.seal.sealed;
+        constate('verdict de « Verifier »', verifIntegre ? 'chaine saine' : 'chaine rompue');
         constate('verdict de « Sceller » simule',
-            d.seal.stopped_at_tamper
-                ? `ARRET sur desynchronisation, lignes ${JSON.stringify(d.seal.tampered_detected)}`
-                : `poursuite normale, ${d.seal.unsealed_count} orphelines a sceller`);
+            sealArrete ? 'ARRET sur incoherence' : 'poursuite normale');
+        verifie('la simulation n\'a rien scelle', sealScellees === 0, String(sealScellees));
 
         // Deuxieme mesure, par un AUTRE moyen : la sous-chaine des lignes
         // SCELLEES se tient-elle, maillon par maillon ? C'est la question que
@@ -524,10 +567,10 @@ try {
 
         // Le legacy CONTREDIT cette mesure par un de ses deux points d'API. Le
         // portage doit rendre UN verdict, pas deux.
-        const accord = (d.verify.integrity === 'OK') === (d.seal.stopped_at_tamper === false);
+        const accord = verifIntegre === (sealArrete === false);
         verifiePortage('les deux lectures de la chaine s\'accordent', accord,
-            `« Verifier » dit ${d.verify.integrity} et « Sceller » dit `
-            + `${d.seal.stopped_at_tamper ? 'DESYNCHRONISE' : 'coherent'} — `
+            `« Verifier » dit ${verifIntegre ? 'SAINE' : 'ROMPUE'} et « Sceller » dit `
+            + `${sealArrete ? 'INCOHERENTE' : 'coherente'} — `
             + 'le bouton de scellement est donc inerte, et il crie au loup');
         if (! accord) {
             constate('consequence mesuree', 'le bouton « Sceller » ne peut sceller aucune ligne : '

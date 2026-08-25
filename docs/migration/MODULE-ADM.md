@@ -325,7 +325,7 @@ dernier** — et chaque rang porte son motif.
 
 | # | sous-lot | fichiers | lignes | pourquoi ce rang |
 |---|---|---|---|---|
-| **D1** ✅ | **Journal d'audit** — *caractérisé, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
+| **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
 | **D2** | **Notifications** | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** | **Comptes et rôles** | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
@@ -342,7 +342,7 @@ dix routes backend dont `/regenerate_platform_key`, qui **fait tourner la paire 
 flotte** — se rattache à D8 par sa dangerosité et sera traité juste après lui ; `server_user_sudo.php`
 et `server_user_sftp.php` sont D9.
 
-### 5.0 D1 — CARACTÉRISÉ le 2026-08-25, et il portait quatre défauts
+### 5.0 D1 — PORTÉ le 2026-08-25 (`v1.37.59`), et il portait quatre défauts
 
 `tests/e2e/go-adm-audit.mjs` — **32 PASS / 0 FAIL sur le legacy**, **base rouge 1/17** sur le portage
 (la page n'existe pas ; le seul PASS est « aucune erreur JavaScript », qui passe **parce que** la page
@@ -368,9 +368,27 @@ Quatre défauts mesurés, tous inscrits en parité :
 parcours de chaîne divergents) mais pas E-105 ni E-106 — **il a fallu regarder l'image**. Les captures
 ne sont pas un compte rendu, ce sont une mesure.
 
-**Ce qui reste à faire pour finir D1** : le portage lui-même, puis la même suite verte sur le portage.
-La décision de fond — *quelle* lecture de la chaîne le portage retient — est tranchée : celle qui
-**saute** les orphelines, parce que c'est celle que la base porte réellement.
+**PORTÉ le 2026-08-25, `v1.37.59`** — `/journal-audit`, **34 PASS / 0 FAIL sur le portage**, le legacy
+restant à 32/0. Les deux assertions d'écart sont des `verifiePortage` : la décision de scellement se
+prend dans un panneau **en page**, et les deux lectures de la chaîne **s'accordent**.
+
+`App\Services\JournalAudit::parcourt()` est la **seule** lecture de la chaîne ; la vérification et le
+scellement s'y adossent tous deux, donc ils ne *peuvent* plus se contredire. La règle retenue est
+celle du **code qui écrit** (`adm/includes/audit_log.php:111-115`, `WHERE self_hash IS NOT NULL`) :
+une ligne non scellée ne fait pas avancer la tête. Le scellement redevient donc possible — la
+simulation annonce **868 lignes** là où le legacy s'arrêtait sur une fausse désynchronisation.
+
+Ce qui est **repris tel quel**, parce que ce sont les deux bonnes idées du fichier d'origine : le
+refus de réécrire une ligne déjà scellée, et le garde-fou SQL `WHERE self_hash IS NULL` qui
+l'accompagne. Ce qui est **ajouté**, parce que l'écriture est irréversible : un panneau de décision
+qui nomme le nombre de lignes et n'active sa confirmation qu'à la saisie exacte de ce nombre —
+contrôle **répété côté serveur**.
+
+**Une leçon de mesure que ce sous-lot a coûtée.** Les catalogues i18n du portage se nomment
+`'title' => …` dans `lang/fr/audit.php`, pas `'audit.title' => …` : j'ai recopié le format **du
+legacy**, dont le `t()` est plat. Laravel a rendu chaque identifiant à l'écran — sans une erreur, sans
+un journal. **Seule la capture l'a montré**, et elle l'a montré d'un coup d'œil : trente libellés en
+majuscules à la place des textes.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
