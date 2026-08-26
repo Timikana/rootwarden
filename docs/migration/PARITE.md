@@ -5482,6 +5482,20 @@ c'est l'INTENTION du correctif qu'il fallait porter, pas sa forme.
 | IPv4 | `0/8`, `127/8`, `169.254/16`, `224/4` multicast, `240/4` réservé |
 | IPv6 | `::`, `::1`, `fe80::/10`, `ff00::/8` |
 
+**IL Y A TROIS COPIES, PAS DEUX** — la troisième trouvée en inventoriant D6c. `import_csv.php:66-70`
+en porte une quatrième version du même garde, réduite à **cinq** conditions (ni `::`, ni
+`0:0:0:0:0:0:0:0`), et toujours par préfixes. Mesurée au clic, par dépôt d'un fichier :
+`::ffff:169.254.169.254` est importée et la machine créée.
+
+| copie | conditions | tombe sur `::ffff:169.254.169.254` |
+|---|---|---|
+| `manage_servers.php:59-72` | 7 | **oui** |
+| `import_csv.php:66-70` | 5 | **oui** |
+| `server_actions.php:73` | 0 | **oui** (E-127) |
+
+Trois copies d'une règle de sécurité, trois niveaux de complétude, et **aucune** qui tienne. C'est
+l'argument le plus net pour la règle « une seule copie, et elle normalise avant de comparer ».
+
 Dix-huit cas mesurés en PHP, zéro écart ; et la suite `go-adm-serveurs` pose désormais l'adresse
 mappée **dans le formulaire** et vérifie qu'aucune machine n'est créée — un geste réel, sur les deux
 cibles, qui constate le legacy et asserte le portage.
@@ -5489,3 +5503,101 @@ cibles, qui constate le legacy et asserte le portage.
 **NON FERMÉ côté legacy**, et c'est un choix à porter à l'exploitant : les deux copies de
 `validateInput()` restent vulnérables. Le correctif est le même qu'ici — `inet_pton` et comparaison de
 plages — mais il touche un fichier de production non porté.
+
+---
+
+## E-130 — `adm/` D6c : l'import CSV pose `users.sudo` sans la garde de rôle 3 que le geste dédié exige
+
+`users.sudo` n'est pas une colonne comme une autre : c'est la **précondition du repli `NOPASSWD: ALL`**
+du module `ssh/`, le point le plus dangereux du dépôt. Le geste dédié pour la poser,
+`adm/api/toggle_sudo.php`, porte `checkAuth([ROLE_SUPERADMIN])` — **rôle 3 seul**.
+
+`import_csv.php:162` lit `$data['sudo']` et l'écrit directement :
+
+```php
+$sudo = (int)($data['sudo'] ?? 0);
+$stmt = $pdo->prepare("INSERT INTO users (name, email, password, ssh_key, role_id, active, sudo) …");
+```
+
+**Aucun contrôle de rôle.** La garde hiérarchique du fichier (`:155-158`) existe, elle est correcte, et
+elle ne touche que `$roleId` :
+
+```php
+if ($myRole < 3 && $roleId >= $myRole) { $roleId = 1; }
+```
+
+**Mesuré au navigateur** — un fichier déposé dans le formulaire de l'onglet Utilisateurs, ligne
+`epreuve_csv_d6c,,admin,1,1` :
+
+```
+compte importé (role|sudo|courriel) : 2|1|(nul)
+```
+
+Le drapeau est retiré dans la seconde qui suit, sans attendre le nettoyage final.
+
+**CE QUI EST MESURÉ ET CE QUI EST LU, et il faut le dire séparément.** La CAPACITÉ — l'import écrit
+bien `sudo = 1` — est mesurée ici, au clic, au rôle 3. La FRANCHISSABILITÉ au rôle 2 est établie par
+**lecture** : le formulaire vit sur `admin_page.php`, gardée par `checkPermission('can_admin_portal')`
+qui admet le rôle 2, et rien sur le chemin du `sudo` ne consulte le rôle. Aucun compte d'épreuve n'est
+à la fois de rôle 2 et porteur de `can_admin_portal` : il n'y a pas de quoi la mesurer au navigateur.
+
+C'est la même prudence que sur le repli `NOPASSWD: ALL` lui-même — « le trou est à un `UPDATE` d'être
+exploitable, ce n'est pas la même chose que de dire qu'il l'est ». Ici l'import **est** cet `UPDATE`,
+et il est offert un cran plus bas que le geste qui porte le même effet.
+
+**NON FERMÉ** — D6c n'est pas encore porté. Le portage devra exiger le rôle 3 pour la colonne `sudo`,
+ou la refuser à l'import ; la décision revient à l'exploitant, parce que retirer une colonne d'un
+format de fichier documenté change un contrat.
+
+---
+
+## E-131 — Un compte importé reçoit un mot de passe que personne ne connaît, et le seul chemin qui l'aurait envoyé est du code mort
+
+`import_csv.php:149-150` :
+
+```php
+$password = bin2hex(random_bytes(8)); // 16 chars hex
+$hash = password_hash($password, PASSWORD_DEFAULT);
+```
+
+`$password` n'est ensuite **ni affiché, ni stocké, ni envoyé**. La variable meurt à la fin de
+l'itération.
+
+`$sendWelcome` (`:21`) — qui aurait servi à l'envoyer — est **lu une fois et jamais utilisé**, et
+**aucun formulaire n'émet `send_welcome`** : les deux formulaires d'import ne portent que
+`import_type`, `csv_file` et `skip_duplicates` (`admin_page.php:229-266`). Mesuré.
+
+Le compte est donc créé, actif, et **inutilisable**. Reste le chemin de réinitialisation — mais il
+exige un `email`, et la colonne `email` du CSV est **facultative** : `$email ?: null`. Mesuré à
+l'import : `courriel : (nul)`.
+
+**Un compte importé sans courriel n'a donc aucun chemin d'accès, et aucun chemin de récupération.** Il
+occupe un nom, compte dans les listes, et apparaît dans les sélecteurs d'identité — c'est exactement ce
+qui est arrivé aux cinq comptes `e2e_test_*` relevés en §7 du plan.
+
+**NON FERMÉ** — le portage devra soit rendre `email` obligatoire à l'import, soit rendre le mot de
+passe généré **une fois** à l'écran comme le fait déjà la création de compte de D3, soit forcer
+`force_password_change`. Décision à porter.
+
+---
+
+## E-132 — La politique de mot de passe des COMPTES s'applique aux mots de passe de MACHINES, sur un seul des deux chemins
+
+`encryptPassword($password, $validate = true)` applique une politique — longueur, minuscule,
+majuscule, chiffre, caractère spécial — et lève une exception si elle n'est pas respectée.
+
+| chemin | appel | politique |
+|---|---|---|
+| formulaire (`manage_servers.php:115`) | `encryptPassword(trim($_POST['password']), false)` | **désactivée** |
+| import CSV (`import_csv.php:89`) | `encryptPassword($data['password'] ?? '')` | **active** (défaut) |
+
+Mesuré : une ligne CSV portant `motdepasse` comme mot de passe machine ne crée **aucune** machine ; la
+même valeur passe par le formulaire.
+
+Le choix du formulaire est le bon, et son motif est clair : **un mot de passe de machine est imposé par
+la machine, pas choisi ici.** Le refuser rend le parc inadministrable — on ne peut pas déclarer une
+machine dont le mot de passe existant ne plaît pas à la politique du portail. L'import applique donc
+une règle qui n'a pas d'objet, et il le fait en silence : la ligne finit dans le compte d'erreurs sans
+que le motif réel — « votre mot de passe machine n'est pas assez complexe » — soit jamais énoncé.
+
+**NON FERMÉ** — le portage passera `false`, comme le formulaire, et l'écrira.

@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 legacy / 18 portage, 0 échec**). Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **119** — numérotés jusqu'à **E-129** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **122** — numérotés jusqu'à **E-132** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b PORTÉS (`v1.37.59` à `v1.37.67`) — `MODULE-ADM.md`**, treize sous-lots, sixq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b PORTÉS (`v1.37.59` à `v1.37.67`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, treize sous-lots, sixq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -578,8 +578,21 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   membres** — un clic, N machines, N courriels. Le sous-lot testera le bouton par **interception et
   avortement** ; un déclenchement réel attend votre mot.
 
+**Trois décisions avant de porter D6c (import CSV)** — caractérisé le 2026-08-26, non porté
+- **La colonne `sudo` du format CSV** (E-130). L'import l'écrit sans contrôle de rôle, alors que
+  `api/toggle_sudo.php` exige le rôle 3, et `users.sudo` est la précondition du repli `NOPASSWD: ALL`.
+  Trois issues : exiger le rôle 3 pour cette colonne, la refuser à l'import, ou la garder en l'état.
+  **Retirer une colonne d'un format de fichier documenté change un contrat** : ce n'est pas à moi.
+- **Un compte importé est inutilisable** (E-131) : mot de passe aléatoire que personne ne connaît,
+  `$sendWelcome` mort, `email` facultatif donc pas de récupération. Trois issues : rendre `email`
+  obligatoire, afficher le mot de passe généré **une fois** comme le fait déjà D3, ou forcer
+  `force_password_change`.
+- **La politique de mot de passe sur les MACHINES** (E-132). Le portage passera `false` comme le
+  formulaire — un mot de passe de machine est imposé par la machine — mais c'est une divergence
+  assumée avec l'import du legacy, et elle se déclare.
+
 **Un correctif de production à décider — E-129**
-- Les **deux** copies de `validateInput()` du legacy comparent des préfixes de chaîne :
+- Les **trois** copies du garde SSRF du legacy comparent des préfixes de chaîne :
   `::ffff:169.254.169.254` traverse le garde A10-01, y compris par le formulaire « durci ». Mesuré au
   clic. Le correctif est écrit et éprouvé côté portage (`inet_pton` puis comparaison de plages, 18 cas,
   0 écart) mais il touche `legacy/adm/includes/`, non porté et en production. **Rien n'a été modifié
