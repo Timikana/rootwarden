@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) D9a `go-adm-politiques` (**12 / 18**) et D9b `go-adm-sftp` (**12 / 16**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh` — **un LOT complet tournait le 2026-08-26 à 18h** (lancé par l'autre session) ; 19 verdicts conformes au moment de l'écriture, résultat total à relever au tour suivant.
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **138** — numérotés jusqu'à **E-148** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **139** — numérotés jusqu'à **E-149** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -236,7 +236,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | **4** | **`groups/`** | 305 | 1 | **SUIVANT** — **⚠ deux boutons y lancent un SCAN RÉEL sur TOUTES les machines d'un groupe, dont un qui ENVOIE UN COURRIEL. Lire l'encadré ci-dessous** |
 | ~~5~~ | ~~`graylog/`~~ | 388 | 1 | **G1 PORTÉ** `v1.37.77` — 26/0. Reste **G2** : les trois gestes qui MUTENT une machine (`deploy`, `test`, `uninstall`), cible `test-server`, geste de retour `uninstall`. Inventaire : `MODULE-GRAYLOG.md` |
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
-| 7 | `services/` | 631 | 1 | gestes sur machines |
+| 7 | `services/` | 631 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.92` — `MODULE-SERVICES.md`**, trois sous-lots S1 à S3. **E-149 : les huit routes n'ont NI rôle NI permission — seule la page est gardée.** Réel dans le code, non exploitable par aucun compte existant : à un `UPDATE` de l'être |
 | 8 | `iptables/` | 870 | 1 | gestes sur machines, IDOR déjà corrigé |
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. **B1, B2 et B3 PORTÉS** (`v1.37.86`, `v1.37.88`, `v1.37.90`). **B4 CARACTÉRISÉ `v1.37.91` mais son PORTAGE est SUSPENDU** — deux arbitrages, §7. **Quatre** points à arbitrer, aucun n'est une faille. **§6 : trois inconnues sur cinq fermées par la LECTURE le 2026-08-26** — dont `root` proposé au déploiement, et « fusionner » qui n'équivaut pas à ce que son libellé laisse entendre |
@@ -609,6 +609,18 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   comptes, et ils sont visibles à l'écran d'administration. Les supprimer est destructeur et ils ne
   m'appartiennent pas : **rien n'a été touché**. Remesure :
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
+
+**`services/` — un arbitrage de SÉCURITÉ, ouvert le 2026-08-27**
+- **E-149** : les huit routes de `backend/routes/services.py` ne portent **ni `@require_role` ni
+  `@require_permission`**, et `/services/` n'est dans aucune des deux listes « admin » (proxy legacy,
+  passerelle portage). `can_manage_services` ne protège que l'écran. **Réel dans le code, non
+  exploitable par aucun compte existant** — le seul rôle 2 du parc détient la permission — mais trois
+  gestes d'administration ordinaires le rendraient vivant. La correction qui ferme le trou pour les
+  deux portails touche le **backend de production**, et c'est un correctif de sécurité : branche
+  dédiée, jamais fusionné sans accord verbal.
+
+> **Quatre correctifs backend attendent désormais le même arbitrage** — E-142, E-144, E-147, E-149 —
+> et trois sont la même famille : un garde absent, ou un repli qui retombe du côté permissif.
 
 **`bashrc/` — deux arbitrages BLOQUANTS pour B4, ouverts le 2026-08-26**
 

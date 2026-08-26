@@ -6556,3 +6556,49 @@ propre exemple et contre un `.bashrc` ordinaire.
 > `preg_match("/$motif/")` — avec des motifs contenant des `/`. Cinq des huit « ne compilaient pas ».
 > C'était le délimiteur de l'outil qui cassait, pas les motifs. *Quand une vérification échoue en
 > masse, suspecter la vérification.*
+
+---
+
+## E-149 — `services/` : les huit routes n'ont ni rôle ni permission ; seule la PAGE est gardée
+
+**Relevé le 2026-08-27**, sixième occurrence du motif « la garde est sur la page, pas sur la
+requête » — et la première non documentée.
+
+| couche | ce qu'elle exige |
+|---|---|
+| **page** | `checkAuth([USER, ADMIN, SUPERADMIN])` **et** `checkPermission('can_manage_services')` |
+| **proxy legacy** | session authentifiée, n'importe quel rôle. `/services/` **absent** de `$ADMIN_ONLY_PREFIXES` |
+| **passerelle portage** | `/services/` dans `LISTE_BLANCHE`, **absent** d'`ADMIN_SEULEMENT` |
+| **backend, 8 routes** | `@require_api_key`, `@require_machine_access`, `@threaded_route` — **ni rôle, ni permission** |
+
+`check_machine_access()` ouvre par « rôle ≥ 2 : accès à tout ». Pour un rôle 2 ou 3, le seul garde
+restant sur la requête est donc `@require_api_key` — **et c'est le proxy qui fournit cette clé**.
+
+### Lu, puis mesuré — et la mesure change la portée
+
+Le tableau ci-dessus est **lu**. Ce qui suit est **mesuré en base le 2026-08-27** :
+
+```
+comptes de rôle 2 au parc : 1   dont avec la permission : 1
+rw-test-user   rôle 1  permission=0  et AUCUNE machine dans user_machine_access
+rw-test-admin  rôle 2  permission=1
+rw-test-super  rôle 3  permission=0  (le rôle 3 contourne légitimement)
+```
+
+> **Le trou est réel dans le code, et n'est exploitable par aucun compte existant aujourd'hui.**
+
+Le seul compte de rôle 2 détient la permission ; le compte de rôle 1 qui ne l'a pas est arrêté par
+`@require_machine_access`, qui pour lui n'est **pas** inerte. Même situation que le repli
+`NOPASSWD: ALL` de `ssh/` : à un `UPDATE` d'être exploitable.
+
+Trois gestes d'administration **ordinaires** le rendraient vivant : créer un admin au périmètre
+restreint, retirer la permission au compte existant, ou donner un accès machine à un rôle 1.
+
+### Pourquoi ce n'est pas corrigé ici
+
+C'est un correctif de sécurité, et la convention du dépôt les veut sur une branche dédiée, jamais
+fusionnés sans accord verbal. La seule correction qui ferme le trou pour **les deux** portails —
+`@require_permission` sur les huit routes — **touche le backend de production**.
+
+Porté au §7 du plan, avec E-142, E-144 et E-147 : **quatre correctifs backend attendent le même
+arbitrage**, et trois d'entre eux sont la même famille — un garde absent ou un repli permissif.

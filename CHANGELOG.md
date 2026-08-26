@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.91** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.92** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,47 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.92 — `services/` inventorie : E-149, seule la PAGE est gardee
+
+`MODULE-SERVICES.md`, en lecture seule. `bashrc/` B4 et `adm/` etant tous deux bloques sur arbitrage,
+ce tour ouvre le module suivant dans l'ordre du plan.
+
+#### E-149 — sixieme occurrence du motif, et la premiere non documentee
+
+Les **huit** routes de `backend/routes/services.py` portent `@require_api_key`,
+`@require_machine_access` et `@threaded_route` — **ni `@require_role`, ni `@require_permission`**. Et
+`/services/` est absent des deux listes « admin » : `$ADMIN_ONLY_PREFIXES` cote legacy,
+`ADMIN_SEULEMENT` cote portage.
+
+`check_machine_access()` ouvre par « role >= 2 : acces a tout ». Pour un role 2 ou 3, le seul garde
+restant sur la requete est donc `@require_api_key` — et c'est le proxy qui fournit cette cle.
+**`can_manage_services` ne protege que l'ecran.**
+
+#### Lu, puis mesure — et la mesure change la portee
+
+Le constat ci-dessus est LU dans les quatre couches. La base, elle, dit :
+
+    comptes de role 2 au parc : 1   dont avec la permission : 1
+    rw-test-user   role 1  permission=0  et AUCUNE machine dans user_machine_access
+
+**Le trou est reel dans le code et n'est exploitable par aucun compte existant aujourd'hui.** Le seul
+role 2 detient la permission ; le role 1 qui ne l'a pas est arrete par `@require_machine_access`, qui
+pour lui n'est PAS inerte. Meme situation que le repli `NOPASSWD: ALL` de `ssh/` : a un `UPDATE`
+d'etre exploitable. Dire « n'importe qui peut arreter les services » serait faux aujourd'hui ; le
+taire serait pire demain.
+
+#### Ce que la mesure dedouane
+- **Tous les gestes mutants confirment**, et la confirmation NOMME le service ET le serveur.
+- **Le nom de service est valide** par liste blanche avec un plafond de 200 caracteres.
+- **`@require_machine_access` n'est pas decoratif ici** — la page admet le role 1, pour qui le
+  decorateur consulte reellement `user_machine_access`.
+
+#### Rien n'est corrige
+C'est un correctif de securite, et la convention du depot les veut sur une branche dediee, jamais
+fusionnes sans accord verbal. La seule correction qui ferme le trou pour les DEUX portails touche le
+backend de production. **Quatre correctifs backend attendent maintenant le meme arbitrage** —
+E-142, E-144, E-147, E-149 — et trois sont la meme famille.
 
 ### v1.37.91 — `bashrc/` B4 caracterise : les ecritures distantes, toutes avortees
 
