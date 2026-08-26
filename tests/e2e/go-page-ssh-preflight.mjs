@@ -291,8 +291,28 @@ try {
         verifie('le constat rend un rapport lisible, machine par machine',
             Boolean(rendu) && rendu.machines >= 1 && rendu.texte.length > 0,
             rendu ? `${rendu.machines} machine(s)` : 'aucun rapport');
-        verifie('le rapport nomme le prerequis manquant, pas seulement un echec',
-            Boolean(rendu) && /scan|utilisateurs distants/i.test(rendu.texte),
+        /* ══ CETTE ASSERTION PRESUMAIT QU'UN PREREQUIS MANQUE ══════════════
+         *
+         * Elle exigeait le mot « scan » ou « utilisateurs distants » — le nom
+         * du SEUL prerequis qu'elle avait en tete. Or le 2026-08-26 le banc
+         * n'avait aucun prerequis manquant : le portage a ecrit « Aucun
+         * prerequis manquant », ce qui est EXACT, et l'assertion a echoue en
+         * accusant la page.
+         *
+         * LA PROPRIETE N'EST PAS « un prerequis est nomme », c'est « le rapport
+         * est SPECIFIQUE dans les deux sens » : il nomme ce qui manque, ou il
+         * dit que rien ne manque. Un rapport qui se contenterait de « echec »
+         * ou de « OK » serait le vrai defaut, et c'est celui-la qu'on mesure.
+         *
+         * Meme correction que celle deja faite trois lignes plus bas, ou une
+         * version anterieure exigeait le CHIFFRE zero et condamnait le meilleur
+         * rendu des deux. Le defaut se repete parce qu'il est facile : on ecrit
+         * l'assertion en pensant au cas qu'on a sous les yeux. */
+        const nommeCeQuiManque = /scan|utilisateurs distants|cle ssh|clé ssh/i.test(rendu?.texte || '');
+        const ditQueRienNeManque = /aucun prerequis manquant|aucun prérequis manquant|no missing prerequisite/i
+            .test(rendu?.texte || '');
+        verifie('le rapport est SPECIFIQUE : il nomme ce qui manque, ou dit que rien ne manque',
+            Boolean(rendu) && (nommeCeQuiManque || ditQueRienNeManque),
             rendu ? `« ${rendu.texte.slice(0, 100)} »` : 'aucun rapport');
         // ZERO compte porteur d'une cle veut dire qu'un deploiement ne deploierait
         // RIEN : le dire est la moitie utile du constat.

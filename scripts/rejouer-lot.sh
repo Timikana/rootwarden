@@ -93,7 +93,21 @@ declare -A REF_LARAVEL=(
   [go-page-cve-export]=21 [go-page-conformite]=13 [go-page-conformite-csv]=17
   [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
   [go-page-cve-planification]=20 [go-page-cve-suivi]=10 [go-page-cve-priorite]=14
-  [go-page-cve-scan-refus]=16 [go-page-ssh-parc]=14 [go-page-ssh-preflight]=15 [go-page-ssh-flux]=10
+  # `ssh-parc` 14 -> 15 : la suite POSE desormais son propre vocabulaire
+  # d'etiquettes. Elle lisait `machine_tags` tel quel et exigeait que le filtre
+  # le propose exactement ; le 2026-08-26 le parc s'est retrouve sans aucune
+  # etiquette, les deux portails ont cesse — raisonnablement — de rendre le
+  # filtre, et l'assertion a ECHOUE EN ACCUSANT LA PAGE. La fixture rend en
+  # prime inconditionnelles trois assertions qui vivaient dans un `if`.
+  #
+  # `ssh-preflight` 15 -> 13 : BAISSE EXPLIQUEE, et elle ne vient pas de la
+  # correction. Deux assertions vivent dans `if (SCAN_M2 === 'JAMAIS')`, et la
+  # machine 2 porte un inventaire depuis le 2026-08-26 09:07. La suite ANNONCE
+  # le saut (« SAUTEE : la machine 2 porte desormais un scan »), ce qui est le
+  # bon comportement — mais son compte d'assertions depend donc d'un etat
+  # partage et mutable. Je n'ai pas identifie la suite qui a scanne, et je
+  # prefere l'ecrire que de la designer au hasard.
+  [go-page-cve-scan-refus]=16 [go-page-ssh-parc]=15 [go-page-ssh-preflight]=13 [go-page-ssh-flux]=10
   [go-page-supervision-onglets]=16 [go-page-supervision-profils]=18
   [go-page-supervision-config]=17 [go-page-supervision-config-ecriture]=16
   [go-page-supervision-profils-crud]=19 [go-page-supervision-version]=14 [go-page-supervision-editeur]=16
@@ -199,7 +213,9 @@ declare -A REF_LEGACY=(
   [go-page-cve-export]=17 [go-page-conformite]=13 [go-page-conformite-csv]=10
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
   [go-page-cve-planification]=16 [go-page-cve-suivi]=6 [go-page-cve-priorite]=8
-  [go-page-cve-scan-refus]=12 [go-page-ssh-parc]=11 [go-page-ssh-preflight]=10 [go-page-ssh-flux]=8
+  # Memes causes que cote portage : +1 pour la fixture d'etiquette, -2 pour le
+  # bloc `SCAN_M2 === 'JAMAIS'` que la machine 2 ne remplit plus.
+  [go-page-cve-scan-refus]=12 [go-page-ssh-parc]=12 [go-page-ssh-preflight]=8 [go-page-ssh-flux]=8
   # `supervision/` est ARCHIVE (2026-08-23) : cote legacy les treize suites ne
   # jouent plus leur caracterisation mais le CONSTAT d'archivage — le 404 du
   # repertoire, celui de ses TROIS fichiers reels, et le menu qui mene au

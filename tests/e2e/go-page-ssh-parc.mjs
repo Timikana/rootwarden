@@ -82,6 +82,39 @@ const MACHINES_VISIBLES = compteEnBase(
 const NOMS = litEnBase(
     "SELECT name FROM rootwarden.machines "
     + "WHERE lifecycle_status IS NULL OR lifecycle_status <> 'archived' ORDER BY name");
+/**
+ * ══ LA SUITE POSE SON PROPRE VOCABULAIRE D'ETIQUETTES ══════════════════════
+ *
+ * Elle lisait `machine_tags` tel quel, et exigeait que le filtre de la page
+ * propose EXACTEMENT ce vocabulaire. Le 2026-08-26, le parc s'est retrouve sans
+ * aucune etiquette : les deux portails cessent alors — raisonnablement — de
+ * rendre le filtre, la valeur lue vaut `null`, et l'assertion a ECHOUE EN
+ * ACCUSANT LA PAGE. Trois autres assertions ont disparu au passage, vivant dans
+ * un `if (TAGS_DU_PARC.length)`.
+ *
+ * UNE SUITE QUI DEPEND DE DONNEES PARTAGEES PREEXISTANTES QU'ELLE NE CREE PAS
+ * finira par accuser la page pour un etat du banc. Elle ne peut pas distinguer
+ * « la page est fausse » de « le banc est vide », et son message designera la
+ * page.
+ *
+ * La fermeture n'est pas de tolerer le cas vide — la suite ne mesurerait plus
+ * rien du filtre — mais de POSER LA FIXTURE, comme `graylog/` G1 le fait pour
+ * sa configuration de flotte. En prime, les trois assertions conditionnelles
+ * redeviennent inconditionnelles : un `if` autour d'une assertion est un test
+ * qui peut ne pas s'executer.
+ *
+ * La machine 2 est `test-server`. `INSERT IGNORE` : si l'etiquette existe deja,
+ * on ne la double pas, et le retrait la laissera — voir le nettoyage final.
+ */
+const ETIQUETTE_EPREUVE = 'epreuve-parc-ssh';
+const ETIQUETTE_PREEXISTANTE = compteEnBase(
+    `SELECT COUNT(*) FROM rootwarden.machine_tags WHERE tag = '${ETIQUETTE_EPREUVE}'`) > 0;
+if (! ETIQUETTE_PREEXISTANTE) {
+    litEnBase(
+        'INSERT IGNORE INTO rootwarden.machine_tags (machine_id, tag) '
+        + `SELECT id, '${ETIQUETTE_EPREUVE}' FROM rootwarden.machines WHERE id = 2`);
+}
+
 const TAGS_DU_PARC = litEnBase('SELECT DISTINCT tag FROM rootwarden.machine_tags ORDER BY tag');
 const ROLE1_AVEC_DEPLOY = compteEnBase(
     'SELECT COUNT(*) FROM rootwarden.users u JOIN rootwarden.permissions p ON p.user_id = u.id '
@@ -307,6 +340,22 @@ try {
 } catch (e) {
     lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
     echecs++;
+}
+
+/*
+ * ON NE RETIRE QUE CE QU'ON A POSE. Si l'etiquette existait deja a l'entree,
+ * elle appartient au banc et on n'y touche pas — c'est ce que
+ * `ETIQUETTE_PREEXISTANTE` retient.
+ */
+if (! ETIQUETTE_PREEXISTANTE) {
+    try {
+        litEnBase(`DELETE FROM rootwarden.machine_tags WHERE tag = '${ETIQUETTE_EPREUVE}'`);
+        const reste = compteEnBase(
+            `SELECT COUNT(*) FROM rootwarden.machine_tags WHERE tag = '${ETIQUETTE_EPREUVE}'`);
+        verifie('l\'etiquette d\'epreuve est retiree', reste === 0, `${reste} ligne(s)`);
+    } catch (e) {
+        verifie('l\'etiquette d\'epreuve est retiree', false, String(e.message || e).split('\n')[0]);
+    }
 }
 
 console.log(lignes.join('\n'));
