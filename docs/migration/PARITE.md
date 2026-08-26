@@ -4923,11 +4923,28 @@ Deux conclusions de cet écart sont donc à reprendre :
   davantage que les deux autres — et il est `type="submit"` dans un formulaire, donc la
   réinitialisation de mot de passe part elle aussi sans boîte.
 
-**Ce qui est mesuré, et comment.** La troncature au navigateur est établie sur `manage_servers.php`
-(E-121, `getAttribute('onclick')` sur la page réelle). Pour `manage_roles.php`, le tableau ci-dessus
-est une mesure **de la chaîne rendue**, sur un montage identique au caractère près. Une mesure au
-navigateur reste à faire sur cette page — c'est exactement le pas que le premier jet de cet écart
-avait sauté, et il lui a coûté deux conclusions.
+**MESURÉ AU NAVIGATEUR le 2026-08-26**, et le tableau est plus large que prévu.
+`go-adm-permissions` demande désormais au moteur si chaque attribut **s'analyse** — `new Function(code)`
+compile sans exécuter, donc aucune boîte ne s'ouvre et aucun formulaire ne part. Un décompte
+d'apostrophes se laisserait tromper par un `\'` ; le compilateur non.
+
+Sur `/adm/admin_page.php`, **33 boutons portent un `confirm()`, et les 33 échouent à l'analyse** :
+
+| bouton | occurrences | forme | erreur du moteur |
+|---|---|---|---|
+| `change_password` | 10 | `submit`, **dans** un form | `Invalid or unexpected token` |
+| `reset_2fa` | 10 | `submit`, **dans** un form | `Invalid or unexpected token` |
+| suppression de compte | 10 | sans `type`, **hors** form | `missing ) after argument list` |
+| `delete_server` | 3 | `submit`, **dans** un form | `Invalid or unexpected token` |
+
+**23 des 33 sont des `submit` dans un formulaire** : pour ceux-là, le gestionnaire mort ne retient
+rien et le geste part sans qu'aucune boîte n'ait paru. Les dix autres sont inertes.
+
+Le code reçu par le navigateur est coupé exactement là où le guillemet ouvre :
+`return confirm('Reinitialiser le mot de passe de `.
+
+Cette mesure est celle que le premier jet de cet écart avait sautée — et c'est elle qui lui a coûté
+ses deux conclusions.
 
 **La leçon, corrigée** : chercher le délimiteur **le plus extérieur**. On a cherché ce qui cassait le
 littéral JavaScript ; ce qui cassait était l'attribut HTML qui le contient, un niveau au-dessus, et
@@ -5203,7 +5220,10 @@ ligne restante, et une erreur JavaScript relevée sur la page.
 **CETTE MESURE CORRIGE LA PORTÉE D'E-114**, qui attribuait le défaut à l'**apostrophe** et concluait
 « seulement en français ». Les deux catalogues portent le guillemet : **aucune langue n'est
 épargnée**. L'apostrophe est une seconde cause, redondante, sur deux chaînes de `manage_roles.php` —
-pas la cause principale. Voir la note de correction ajoutée à E-114.
+pas la cause principale. Voir la note de correction ajoutée à E-114, **confirmée au navigateur le
+2026-08-26** : sur `/adm/admin_page.php`, 33 boutons portent un `confirm()` et les 33 échouent à
+l'analyse, dont 23 `submit` dans un formulaire. Les trois `delete_server` de cet écart en font
+partie — la page d'administration rend le balisage de ses trois onglets, y compris masqué.
 
 **FERMÉ au portage** (`v1.37.65`) : aucune boîte native. Le premier clic ouvre un panneau qui **nomme
 la machine** et dit ce que le retrait engage — et surtout ce qu'il n'engage pas : la machine

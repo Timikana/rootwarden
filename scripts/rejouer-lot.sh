@@ -161,7 +161,7 @@ declare -A REF_LARAVEL=(
   # legacy. L'ecart tient au PARCOURS : le legacy s'arrete sur un 403 auquel rien
   # ne permet de repondre (E-119), le portage ouvre un panneau, recoit le code et
   # mene la bascule a son terme — mesure en base, `can_scan_cve` passe a 1.
-  [go-adm-permissions]=13
+  [go-adm-permissions]=14
   [go-adm-serveurs]=20
 )
 declare -A REF_LEGACY=(

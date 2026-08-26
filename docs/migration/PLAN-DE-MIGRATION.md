@@ -95,7 +95,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **19 sur 33** |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**). Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
+| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
 | écarts de parité documentés | **114** — numérotés jusqu'à **E-124** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
@@ -584,14 +584,6 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   comptes, et ils sont visibles à l'écran d'administration. Les supprimer est destructeur et ils ne
   m'appartiennent pas : **rien n'a été touché**. Remesure :
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
-
-**Une mesure au navigateur reste à faire sur `manage_roles.php`** — E-114, corrigé le 2026-08-26
-- La troncature de l'attribut `onclick` par le **guillemet** de la traduction est mesurée **au
-  navigateur** sur `manage_servers.php` (E-121). Sur `manage_roles.php`, montage identique, elle n'est
-  pour l'instant établie qu'**au niveau de la chaîne rendue**. Deux conclusions d'E-114 tombent déjà
-  (« seulement en français », « le troisième bouton fonctionne »), mais **c'est précisément le pas
-  sauté qui avait coûté ces deux conclusions** : la confirmation au navigateur est à faire, dans la
-  suite `go-adm-permissions`, avant de considérer E-114 clos.
 
 **`adm/` — quatre arbitrages ouverts par l'inventaire du 2026-08-25** (`MODULE-ADM.md`)
 - **`health_check.php`** : la page est dangereuse par construction (§4.2). Trois issues — tout pointer

@@ -2171,6 +2171,37 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.66 — les 33 confirmations de la page d'administration, mesurees au navigateur
+
+`tests/e2e/go-adm-permissions.mjs` gagne une etape : elle demande au moteur si chaque attribut
+`onclick` portant un `confirm()` **s'analyse**. `new Function(code)` compile **sans executer** — aucune
+boite ne s'ouvre, aucun formulaire ne part — et un `\'` echappe ne peut pas la tromper, la ou un
+decompte d'apostrophes se serait laisse faire.
+
+**Resultat : 33 boutons, 33 non analysables.**
+
+| bouton | occurrences | forme | consequence |
+|---|---|---|---|
+| `change_password` | 10 | `submit`, dans un form | le geste part **sans confirmation** |
+| `reset_2fa` | 10 | `submit`, dans un form | le geste part **sans confirmation** |
+| suppression de compte | 10 | sans `type`, hors form | bouton **inerte** |
+| `delete_server` | 3 | `submit`, dans un form | le geste part **sans confirmation** |
+
+**23 des 33 sont des `submit` dans un formulaire.** Le code recu par le navigateur est coupe la ou le
+guillemet ouvre : `return confirm('Reinitialiser le mot de passe de `.
+
+Cette mesure **ferme la correction d'E-114** ouverte par D6a (`v1.37.65`), et confirme que ses deux
+conclusions etaient fausses : ce n'est pas « seulement en francais » — les deux catalogues portent le
+guillemet — et le troisieme bouton **ne fonctionne pas** davantage que les autres. C'est exactement le
+pas que le premier jet avait saute.
+
+Le portage porte **zero** bouton a `confirm()` : ses confirmations sont des panneaux, ou le texte est
+pose par `textContent`. Reference portage 13 -> **14** ; legacy inchangee a 10, l'ecart y etant
+constate et non asserte.
+
+Le journal de l'etape **regroupe** ses lignes par cas : onze comptes fois trois boutons donnaient 33
+lignes identiques, et un journal qu'on ne relit pas ne sert a rien.
+
 ### v1.37.65 — `adm/` D6a : un fragment mort qui repond, et une confirmation qui ne s'execute pas
 
 **19 entrees de menu portees sur 33** (inchange : D6a ajoute une page sous l'entree « Admin », reliee
