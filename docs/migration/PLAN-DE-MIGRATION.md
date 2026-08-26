@@ -81,7 +81,7 @@ grep -c "'route'"  laravel/app/Support/Navigation.php
 grep -c "'legacy'" laravel/app/Support/Navigation.php
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
-grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (105), pas le dernier numero (E-115)
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (107), pas le dernier numero (E-117)
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ```
@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **105** — numérotés jusqu'à **E-115** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **107** — numérotés jusqu'à **E-117** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1, D2 et D3 PORTÉS (`v1.37.59` à `v1.37.61`) — `MODULE-ADM.md`**, dix sous-lots, sept restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D3 PORTÉS (`v1.37.59` à `v1.37.61`) ; D4 CARACTÉRISÉ (legacy 10/0, base rouge 7/4) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -458,7 +458,7 @@ déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **en
 commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
-archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** — et sur ces sept passes,
+archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** · **D4 7/4** — et sur ces sept passes,
 **quatre passent PARCE QUE la page est absente** : un 404 ne modifie rien et ne porte pas de script.
 Une base rouge se lit passe par passe, pas au compte.
 
@@ -757,6 +757,19 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Un bloc `<details>` fermé, TROISIÈME fois.** Cette fois c'était chaque carte de compte
+  (`manage_users.php:219`). Le symptôme est toujours le même — `page.$()` trouve, le clic dit
+  « not clickable » — et le remède aussi : déplier, puis **asserter que l'élément a une boîte**.
+- **Deux gestionnaires cassés de la même façon ne produisent pas le même effet.** Ce qui décide, c'est
+  ce qui prend le relais quand le gestionnaire meurt : un `type="submit"` dans un formulaire, ou rien.
+  E-114 annonçait deux actions destructrices sans garde ; mesure faite, l'une part vraiment, l'autre
+  est un **bouton inerte**. **Lire la forme de l'élément, pas seulement son gestionnaire.**
+- **Un `ON DELETE CASCADE` peut effacer bien plus que ce que le code croit supprimer.** `delete_user.php`
+  supprime explicitement deux tables filles — déjà parties en cascade — et n'a pas vu que `user_logs`
+  l'était aussi. **Lire `information_schema` avant de raisonner sur une suppression** : le schéma dit
+  ce que le code ignore.
+- **Un défaut irréversible s'ÉTABLIT sans se provoquer.** Rompre la chaîne d'audit pour la démontrer
+  serait la rompre. La mesure de structure suffit à l'établir ; la démonstration demande un arbitrage.
 - **Une caractérisation VERTE peut porter une contradiction que seul le portage révèle.** D3
   assertait, dans le même geste, qu'un mot de passe faible soit **refusé** et que l'historique soit
   **écrit** — or un refus n'écrit rien. Sur le legacy les deux passaient, parce qu'il **acceptait**.
@@ -898,7 +911,7 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 |---|---|
 | **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
 | `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
-| `PARITE.md` | les 105 écarts mesurés, chacun avec sa preuve |
+| `PARITE.md` | les 107 écarts mesurés, chacun avec sa preuve |
 | `METHODE-SOUS-LOT.md` | les neuf temps |
 | `INVENTAIRE.md` | ce qui reste, mesuré |
 | `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |

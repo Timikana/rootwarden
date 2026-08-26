@@ -4870,20 +4870,35 @@ L'apostrophe **ferme le littéral** : l'attribut `onclick` ne s'analyse pas.
 `SyntaxError: Invalid or unexpected token`, **deux fois** — un par chaîne. `addslashes` est appliqué
 au **nom**, jamais à la phrase traduite qui l'entoure.
 
-**Ce que cela coûte, et c'est là que ça devient grave** :
+**Ce que cela coûte — et une moitié de ce constat a été CORRIGÉE le 2026-08-26, après mesure.**
 
-| bouton | ce qui devait se passer | ce qui se passe en français |
+Le premier jet de cet écart annonçait deux actions destructrices partant sans confirmation. La mesure
+des frontières de formulaire en dit autre chose, et il faut le dire aussi nettement que l'accusation :
+
+| bouton | forme réelle | ce qui se passe en français |
 |---|---|---|
-| **Réinitialiser la 2FA** (`type="submit"`) | `return confirm(…)` bloque tant qu'on n'a pas accepté | l'`onclick` est mort, **le formulaire part sans confirmation** |
-| **Supprimer l'utilisateur** (aucun `type`, donc `submit` par défaut dans son `<form>`) | `if(confirm(…))` gouverne l'appel | l'`onclick` est mort, **la soumission part sans confirmation** |
+| **Réinitialiser la 2FA** (`:260`) | `type="submit"`, **dans** le `<form>` ouvert en `:257` | l'`onclick` est mort, **le formulaire part sans confirmation** — le défaut est réel |
+| **Supprimer l'utilisateur** (`:264`) | aucun `type`, et **hors de tout formulaire** — le `<form>` précédent se ferme en `:261` | l'`onclick` est mort, et il n'y a **rien pour prendre le relais** : le bouton est **totalement inerte** |
 
-Deux actions destructrices — verrouiller quelqu'un hors de son compte, supprimer un compte — perdent
-leur garde. **Et seulement en français** : les chaînes anglaises n'ont pas d'apostrophe, donc la
-confirmation fonctionne en anglais. La protection d'une action irréversible dépend de la langue de
-l'interface.
+Le second n'est donc **pas** une action qui échappe à sa garde : c'est un bouton mort. On clique, rien
+ne se passe, et aucun message ne le dit. C'est un défaut d'ergonomie, pas de sécurité.
 
-Le troisième bouton, « Réinitialiser le mot de passe », n'a pas d'apostrophe dans sa chaîne : c'est
-le seul des trois dont la confirmation fonctionne — et c'est celui que la suite a pu cliquer.
+**Et la suppression qui MARCHE est ailleurs, et elle est gardée.** `manage_users.php:286` appelle
+`deleteUser()` de `js/admin.js:28`, qui pose son propre `confirm()` par `__('admin_confirm_delete_user')`
+— une recherche dans un catalogue JavaScript, où l'apostrophe est une **donnée** et non du code.
+Mesuré au clic : la boîte s'affiche bien, avec le nom du compte.
+
+Reste donc **un** défaut de sécurité, et il est net : la réinitialisation du second facteur — qui
+verrouille quelqu'un hors de son compte jusqu'à un nouvel enrôlement — part sans confirmation. **Et
+seulement en français** : les chaînes anglaises n'ont pas d'apostrophe. La protection d'une action
+irréversible dépend de la langue de l'interface.
+
+Le troisième bouton, « Réinitialiser le mot de passe », n'a pas d'apostrophe dans sa chaîne : sa
+confirmation fonctionne — et c'est celui que la suite a pu cliquer.
+
+**La leçon de la correction** : deux `onclick` cassés de la même façon ne produisent pas le même
+effet. Ce qui décide, c'est ce qui prend le relais quand le gestionnaire meurt — un `type="submit"`
+dans un formulaire, ou rien du tout. **Lire la forme de l'élément, pas seulement son gestionnaire.**
 
 **FERMÉ au portage** (`v1.37.61`) : aucune boîte native, donc le problème disparaît **par
 construction** — le texte traduit est posé par `textContent`, où une apostrophe est un caractère et
@@ -4922,3 +4937,73 @@ forme — algorithme dans une **liste fermée**, corps en base64, une seule lign
 passage les préfixes d'options d'`authorized_keys` (`command=`, `from=`, `no-pty`), qui changent le
 sens de la ligne déployée. La valeur est stockée **telle quelle** ; l'échappement appartient au rendu.
 Et chaque écriture journalise, en reprenant la chaîne de hachage que D1 vérifie.
+
+---
+
+## E-116 — `adm/` D4 : supprimer un compte EFFACE son journal d'audit, et rompt la chaîne que D1 vient de rendre vérifiable
+
+Mesuré dans `information_schema` le 2026-08-26 — une mesure de **structure**, qui n'écrit rien et ne
+dépend d'aucune session :
+
+| | |
+|---|---|
+| clés étrangères pointant vers `users` | **34** |
+| dont `ON DELETE CASCADE` | **12** |
+| règle de `user_logs.user_id` | **CASCADE** |
+
+Supprimer un compte efface donc **tout son journal d'audit**. Et le sous-lot D1 vient d'établir que ce
+journal est une **chaîne** : chaque ligne porte le `self_hash` de la précédente dans son `prev_hash`.
+Retirer des lignes du **milieu** de cette chaîne la rompt — les lignes suivantes pointent vers une
+empreinte qui n'existe plus, et « Vérifier l'intégrité » signalera une incohérence sans que rien ne
+dise qu'une suppression l'a causée.
+
+Ce n'est pas théorique : `delete_user.php:102` écrit sa ligne d'audit **avant** le `DELETE`. Cette
+ligne appartient à l'auteur du geste, donc elle survit — et elle se retrouve **après** les lignes de
+la cible qui, elles, disparaissent. Une suppression place donc mécaniquement un trou au milieu.
+
+**Et la cascade manuelle du fichier est du code mort.** `delete_user.php:104-113` supprime `users`,
+puis `user_machine_access`, puis `permissions` — mais les deux dernières sont **déjà** en CASCADE :
+elles sont parties avec la première ligne. Le docblock du fichier s'inquiète pourtant de l'inverse :
+*« la suppression du compte dans `users` peut échouer si des contraintes de clé étrangère sont actives
+sur les tables enfants ; dans ce cas, supprimer d'abord `user_machine_access` et `permissions` »*.
+L'auteur a vu un risque de `RESTRICT` là où le schéma porte `CASCADE`, et a écrit une note au lieu de
+lire la contrainte.
+
+**CE DÉFAUT N'A PAS ÉTÉ PROVOQUÉ, ET C'EST DÉLIBÉRÉ.** Rompre la chaîne d'audit est irréversible sur
+un artefact que l'exploitant suit. La suite le contourne : elle n'agit que sur un compte **fraîchement
+créé**, dont `user_logs` est vide — `audit_log()` écrit toujours avec l'identifiant de l'**auteur**,
+jamais de la cible — et elle **vérifie cette précondition avant de cliquer**, fail-closed. Le défaut
+est établi par le schéma et par la lecture ; sa démonstration demande un arbitrage.
+
+**Au portage** : la suppression d'un compte qui porte un journal doit être **refusée**, et l'interface
+doit orienter vers l'anonymisation — qui existe déjà et préserve le journal (voir E-117). Un compte
+sans journal reste supprimable sans dommage.
+
+---
+
+## E-117 — Le geste RGPD correct existe, il est commenté, il est gardé — et **aucun élément de l'interface ne l'appelle**
+
+`adm/api/anonymize_user.php` (141 lignes) fait exactement ce que E-116 réclame :
+
+- il **efface les données personnelles** par un `UPDATE` (nom, courriel, société, clé SSH) ;
+- il supprime sessions, jetons, préférences, permissions et accès machines ;
+- et il porte, ligne 117, ce commentaire : *« ← Les user_logs et login_history sont CONSERVES pour
+  tracabilite legale »* ;
+- il journalise l'opération sous le préfixe `[rgpd]`.
+
+Il est gardé — rôle 3, méthode POST, jeton CSRF, step-up `anonymize_user` — et protège le dernier
+super-administrateur actif.
+
+**Il n'a aucun appelant.** Mesuré depuis la page elle-même : le mot `anonymize` n'apparaît nulle part
+dans le HTML rendu de `admin_page.php`, alors que `deleteUser` s'y trouve. `documentation.php:890`
+l'annonce pourtant comme le « soft-delete RGPD art. 17 ».
+
+Et le verrou est double, comme pour les autres gestes gardés par un step-up : la marque
+`_step_up_anonymize_user` ne s'obtient que par le modal, que seule une réponse `403 step_up_required`
+à un `fetch` ouvre — et rien n'émet ce `fetch`.
+
+**Le résumé de D4 tient dans une phrase** : le geste sûr, pensé et documenté, est inatteignable ; le
+geste destructeur est à un clic, et il emporte la traçabilité que la plateforme existe pour garantir.
+
+**Au portage** : les deux gestes sont offerts, côte à côte, et c'est **l'anonymisation** qui est
+proposée par défaut pour un compte qui porte un journal.

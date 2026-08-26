@@ -328,7 +328,7 @@ dernier** — et chaque rang porte son motif.
 | **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
 | **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** ✅ | **Comptes et rôles** — *PORTÉ `v1.37.61`, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
-| **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
+| **D4** ✅ | **Suppression et anonymisation** — *caractérisé, voir §5.0quater* | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** | **Permissions et accès** | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6** | **Serveurs** | `includes/manage_servers.php`, `manage_servers_table.php`, `includes/server_actions.php`, `includes/import_csv.php` | 1 746 | Base seulement, mais **manipule les mots de passe SSH et root des machines** (`server_actions.php:164-165`, chiffrés par `crypto.php`). Le plus gros sous-lot ; à redécouper si nécessaire — `S2` l'a été pour 579 lignes |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
@@ -510,6 +510,39 @@ comptes le sont. Un encart nomme les deux autres et offre un lien marqué vers l
 tableau fait défiler et signale. Les lignes visibles n'ont pas d'action (ni verrou, ni second
 facteur), donc rien d'actionnable n'est hors d'atteinte aujourd'hui — mais la règle du chantier veut
 que la colonne actionnable ne cède jamais. À reprendre quand D5 élargira ce tableau.
+
+### 5.0quater D4 — CARACTÉRISÉ le 2026-08-26 : le geste sûr est inatteignable, le destructeur emporte l'audit
+
+`tests/e2e/go-adm-suppression.mjs` — **10 PASS / 0 FAIL sur le legacy**, **base rouge 7/4**. Cette
+base rouge est plus verte que les précédentes, et c'est normal : `/comptes` existe depuis D3, donc la
+création et les contrôles de sûreté y passent déjà. Les quatre échecs sont exactement ce que D4 doit
+livrer — un geste de suppression et un geste d'anonymisation.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-116** | `user_logs.user_id` est en **`ON DELETE CASCADE`** (34 clés vers `users`, 12 en cascade). Supprimer un compte efface **son journal d'audit** et rompt la chaîne que D1 vient de rendre vérifiable. La cascade manuelle du fichier est du **code mort**, et son docblock s'inquiète d'un `RESTRICT` que le schéma ne porte pas |
+| **E-117** | l'anonymisation RGPD fait exactement ce qu'il faut — elle **préserve** `user_logs`, c'est écrit en toutes lettres ligne 117 — et **aucun élément de l'interface ne l'appelle**. Mesuré depuis la page : `deleteUser` y est, `anonymize` n'y est pas |
+
+**Ce que la suite ne fait PAS, et pourquoi.** Elle ne démontre pas la rupture de chaîne : la provoquer
+est irréversible sur un artefact que l'exploitant suit. Elle n'agit que sur un compte **fraîchement
+créé**, dont `user_logs` est vide — `audit_log()` écrit toujours avec l'identifiant de l'**auteur** —
+et elle **vérifie cette précondition avant de cliquer**, fail-closed.
+
+**Le step-up est bien là, et il tient.** Mesuré au clic : `403 {"step_up_required":true,
+"action":"delete_user"}`. D4 est donc le premier consommateur du mécanisme porté en `v1.37.50`, et
+c'est lui qui fera écrire le panneau de décision différé par A5.
+
+**Une correction apportée à E-114 par cette caractérisation.** Le premier jet annonçait *deux* actions
+destructrices partant sans confirmation. La mesure des frontières de formulaire dit autre chose : le
+bouton de suppression de `manage_roles.php:264` est **hors de tout formulaire**, donc son `onclick`
+cassé le rend **inerte** — on clique, rien ne se passe. Ce n'est pas un défaut de sécurité mais
+d'ergonomie. Et la suppression qui **marche** est ailleurs (`manage_users.php:286` → `js/admin.js`),
+où le `confirm()` passe par un catalogue JavaScript : l'apostrophe y est une donnée, et la boîte
+s'affiche bien — mesuré. **Reste un** défaut réel : la réinitialisation du second facteur.
+
+**Ce qui reste à faire pour finir D4** : le portage. Trois décisions sont tranchées — les deux gestes
+sont offerts côte à côte ; l'**anonymisation** est proposée par défaut pour un compte qui porte un
+journal ; et la suppression d'un tel compte est **refusée**, avec l'explication.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
