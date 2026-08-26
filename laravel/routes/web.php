@@ -1,34 +1,35 @@
 <?php
 
-use App\Http\Controllers\Auth\ConnexionController;
-use App\Http\Controllers\Auth\SecondFacteurController;
 use App\Http\Controllers\ApprobationsController;
-use App\Http\Controllers\ClesSshController;
-use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\ChatopsController;
-use App\Http\Controllers\DockerController;
-use App\Http\Controllers\MaintenanceController;
-use App\Http\Controllers\SauvegardesController;
-use App\Http\Controllers\TachesController;
-use App\Http\Controllers\MisesAJourController;
-use App\Http\Controllers\RechercheController;
-use App\Http\Controllers\TicketsController;
-use App\Http\Controllers\NotificationsController;
-use App\Http\Controllers\ComptesController;
-use App\Http\Controllers\PermissionsController;
-use App\Http\Controllers\JournalAuditController;
-use App\Http\Controllers\JournalCommandesController;
+use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
-use App\Http\Controllers\ExportCveController;
-use App\Http\Controllers\RapportConformiteController;
-use App\Http\Controllers\ScanCveController;
-use App\Http\Controllers\SuiviCveController;
-use App\Http\Controllers\SupervisionController;
+use App\Http\Controllers\ComptesController;
+use App\Http\Controllers\DeriveConfigController;
+use App\Http\Controllers\DockerController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
+use App\Http\Controllers\ExportCveController;
+use App\Http\Controllers\JournalAuditController;
+use App\Http\Controllers\JournalCommandesController;
+use App\Http\Controllers\MaintenanceController;
+use App\Http\Controllers\MisesAJourController;
+use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PasserelleController;
+use App\Http\Controllers\PermissionsController;
 use App\Http\Controllers\PlanificationsCveController;
 use App\Http\Controllers\PortailController;
+use App\Http\Controllers\RapportConformiteController;
+use App\Http\Controllers\RechercheController;
+use App\Http\Controllers\SauvegardesController;
+use App\Http\Controllers\ScanCveController;
+use App\Http\Controllers\ServeursController;
+use App\Http\Controllers\SuiviCveController;
+use App\Http\Controllers\SupervisionController;
+use App\Http\Controllers\TachesController;
+use App\Http\Controllers\TicketsController;
+use App\Http\Controllers\Auth\ConnexionController;
+use App\Http\Controllers\Auth\SecondFacteurController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -489,6 +490,29 @@ Route::middleware('session.authentifiee')->group(function () {
      */
     Route::get('/permissions', PermissionsController::class)
         ->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions');
+
+    /*
+     * Le parc de machines — module `adm/`, sous-lot D6a.
+     *
+     * MEME GARDE QUE `/comptes`, et c'est celle de la PAGE HOTE du legacy :
+     * `admin_page.php` exige `checkPermission('can_admin_portal')`. Son include
+     * `manage_servers_table.php` ne l'exige PAS, et reste servi par Apache —
+     * PARITE E-120. Ici il n'y a pas de fragment separe : la page rend son
+     * tableau elle-meme, il n'y a donc rien a garder deux fois.
+     *
+     * TROIS GESTES, TROIS ROUTES. Le legacy les distingue par le `name` du
+     * bouton clique dans un POST unique vers la page ; un `name` oublie sur un
+     * `<button>` y transforme une modification en creation.
+     */
+    Route::get('/serveurs', ServeursController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs');
+    Route::post('/serveurs/ajouter', [ServeursController::class, 'ajouter'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.ajouter');
+    Route::post('/serveurs/{id}/modifier', [ServeursController::class, 'modifier'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.modifier');
+    Route::post('/serveurs/{id}/supprimer', [ServeursController::class, 'supprimer'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.supprimer');
+
     Route::post('/permissions/{id}', [PermissionsController::class, 'definir'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');
     Route::post('/permissions/{id}/acces', [PermissionsController::class, 'acces'])

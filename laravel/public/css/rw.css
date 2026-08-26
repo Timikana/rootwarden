@@ -1846,3 +1846,17 @@ a.rw-bouton { display: inline-block; }
     margin: 0 0 18px;
     color: var(--rw-texte);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Sous-navigation des pages d'administration — sous-lot D6a
+
+   `admin_page.php` porte trois onglets JavaScript sous une seule URL. Le
+   portage en fait trois PAGES, reliees par le composant `.rw-onglets` deja
+   existant : ce sont des onglets, ils s'affichent donc comme des onglets. Seule
+   difference, ce sont des LIENS et non des boutons — d'ou la levee du
+   soulignement, comme pour `a.rw-bouton`.
+
+   L'onglet courant porte `aria-current="page"` EN PLUS de sa classe : un
+   lecteur d'ecran annonce l'attribut, il ne voit pas la couleur de fond.
+   ══════════════════════════════════════════════════════════════════════════ */
+a.rw-onglet { text-decoration: none; display: inline-block; }

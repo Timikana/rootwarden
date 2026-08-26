@@ -4900,6 +4900,39 @@ confirmation fonctionne — et c'est celui que la suite a pu cliquer.
 effet. Ce qui décide, c'est ce qui prend le relais quand le gestionnaire meurt — un `type="submit"`
 dans un formulaire, ou rien du tout. **Lire la forme de l'élément, pas seulement son gestionnaire.**
 
+**CORRECTION DU 2026-08-26 — LA CAUSE PRINCIPALE N'EST PAS L'APOSTROPHE, ET AUCUNE LANGUE N'EST
+ÉPARGNÉE.** Le sous-lot D6a a trouvé le même montage dans `manage_servers.php` et l'a mesuré **au
+navigateur** : l'attribut rendu vaut `return confirm('Supprimer le serveur ` — tronqué au 46e
+caractère sur 99. Ce n'est pas l'apostrophe qui coupe, c'est le **guillemet double** de la
+traduction, qui ferme l'attribut HTML avant que le littéral JavaScript n'entre en jeu.
+
+Or les trois chaînes de `manage_roles.php` en portent deux chacune, **en français comme en anglais** :
+
+| clé | guillemets | apostrophes | attribut coupé au |
+|---|---|---|---|
+| `roles.confirm_reset_password` | 2 | 0 | **58** / 71 |
+| `roles.confirm_reset_2fa` | 2 | 1 | **49** / 117 |
+| `roles.confirm_delete_user` | 2 | 1 | **49** / 93 |
+
+Deux conclusions de cet écart sont donc à reprendre :
+
+- **« seulement en français » est faux.** Les catalogues anglais portent le même guillemet ; la
+  protection ne dépend pas de la langue, elle est absente dans les deux ;
+- **« le troisième bouton fonctionne » est faux.** `confirm_reset_password` n'a pas d'apostrophe,
+  mais ses guillemets coupent son attribut au 58e caractère. Sa confirmation ne s'exécute pas
+  davantage que les deux autres — et il est `type="submit"` dans un formulaire, donc la
+  réinitialisation de mot de passe part elle aussi sans boîte.
+
+**Ce qui est mesuré, et comment.** La troncature au navigateur est établie sur `manage_servers.php`
+(E-121, `getAttribute('onclick')` sur la page réelle). Pour `manage_roles.php`, le tableau ci-dessus
+est une mesure **de la chaîne rendue**, sur un montage identique au caractère près. Une mesure au
+navigateur reste à faire sur cette page — c'est exactement le pas que le premier jet de cet écart
+avait sauté, et il lui a coûté deux conclusions.
+
+**La leçon, corrigée** : chercher le délimiteur **le plus extérieur**. On a cherché ce qui cassait le
+littéral JavaScript ; ce qui cassait était l'attribut HTML qui le contient, un niveau au-dessus, et
+sur un caractère qu'aucune des deux langues n'évitait.
+
 **FERMÉ au portage** (`v1.37.61`) : aucune boîte native, donc le problème disparaît **par
 construction** — le texte traduit est posé par `textContent`, où une apostrophe est un caractère et
 non un délimiteur. Le panneau de décision **nomme** le compte visé et dit ce que le geste engage, ce
@@ -5087,3 +5120,175 @@ chemin pour y répondre qui n'existe pas.
 **en page** écrit pour D4 la rend franchissable. Mesuré : refus annoncé, panneau ouvert, code saisi,
 et `can_scan_cve` passe de `null` à **1**. La case, elle, ne bouge qu'après la réponse — une case
 cochée qui ne l'est pas en base est un mensonge.
+
+---
+
+## E-120 — `adm/` D6a : un fragment MORT, toujours servi, et gardé sans la permission de sa page hôte
+
+`legacy/adm/includes/manage_servers_table.php` (352 lignes) n'a **qu'une** référence dans tout le
+dépôt : le `fetch()` de `manage_servers.php:709`. Et cette référence est **à l'intérieur d'un bloc
+commenté** — `/*` en `:661`, `*/` en `:923`, soit **263 lignes sur 939**. Le fichier est donc mort
+par navigation : aucun clic, aucune page ne l'appelle. Mesuré : `0` requête vers lui au chargement.
+
+Il reste pourtant servi par Apache, et sa garde est conditionnelle :
+
+```php
+if (!function_exists('checkAuth')) {
+    …
+    checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN]);
+}
+```
+
+Le réflexe est bon — inclus depuis la page, la garde du parent suffit ; appelé en direct, il se garde
+lui-même. Mais il appelle `checkAuth` et **PAS** `checkPermission('can_admin_portal')`, que sa page
+hôte `admin_page.php` exige.
+
+**Mesuré au navigateur, avec `rw-test-admin` (rôle 2, sans `can_admin_portal`)** :
+
+| cible | statut |
+|---|---|
+| `/adm/admin_page.php` | **403** |
+| `/adm/includes/manage_servers_table.php` | **200**, tableau complet rendu |
+
+Un compte refusé sur la page obtient donc l'inventaire du parc en visant le fragment : noms,
+adresses, ports, comptes SSH, environnement, criticité. C'est « la garde est sur la PAGE, pas sur la
+REQUÊTE » — sixième occurrence — **sur du code mort qui répond encore**.
+
+**CE QU'IL N'EXPOSE PAS, et il faut le dire aussi nettement que l'accusation.** Les colonnes « Mot de
+Passe » et « Mot de Passe Root » sont des `<input type="password">` **vides**, portant « Laisser vide
+pour ne pas modifier ». Mesure : **6 champs rendus, 0 rempli**. Aucun secret stocké n'est imprimé.
+C'est une divulgation d'inventaire, pas de justificatifs.
+
+**Le chemin d'ÉCRITURE est aussi ouvert.** `server_actions.php` — le point d'entrée des étiquettes,
+notes, cycle de vie et test de connexion — porte `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` en `:29`
+et **zéro** `checkPermission`. Il sera caractérisé en D6b ; il est nommé ici parce qu'il change la
+gravité : ce n'est pas seulement une lecture qui fuit.
+
+**FERMÉ au portage** (`v1.37.65`) : il n'y a **pas de fragment séparé**. `/serveurs` rend son tableau
+elle-même, sous `role:2` + `perm:can_admin_portal` — la garde de la page hôte, appliquée une fois,
+au seul endroit qui répond. Il n'y a plus deux portes à garder, donc plus de porte oubliée.
+
+---
+
+## E-121 — Un GUILLEMET de traduction tronque l'attribut, et le retrait d'une machine part sans confirmation
+
+`manage_servers.php:495` rend le bouton de suppression ainsi :
+
+```php
+onclick="return confirm('<?= t('servers.confirm_delete',
+         ['name' => htmlspecialchars(addslashes($server['name']))]) ?>')"
+```
+
+`addslashes` protège l'apostrophe **du nom**. Rien ne protège les **guillemets doubles** que porte la
+traduction elle-même :
+
+| langue | chaîne | guillemets |
+|---|---|---|
+| fr | `Supprimer le serveur ":name" ? Cette action est irreversible.` | **2** |
+| en | `Delete server ":name"? This action cannot be undone.` | **2** |
+
+Le premier guillemet **ferme l'attribut HTML**. Mesuré au navigateur — `getAttribute('onclick')` sur
+la page réelle :
+
+```
+return confirm('Supprimer le serveur
+```
+
+Une chaîne non terminée : `SyntaxError: Invalid or unexpected token`, le gestionnaire ne s'attache
+pas. Et le bouton est `type="submit"` **dans** le formulaire — donc, suivant la leçon d'E-114, il n'y
+a rien pour prendre le relais du gestionnaire mort : **le formulaire part, et la machine est retirée
+du parc sans qu'aucune boîte n'ait paru.** La suite le mesure : machine créée, puis retirée, `0`
+ligne restante, et une erreur JavaScript relevée sur la page.
+
+**CETTE MESURE CORRIGE LA PORTÉE D'E-114**, qui attribuait le défaut à l'**apostrophe** et concluait
+« seulement en français ». Les deux catalogues portent le guillemet : **aucune langue n'est
+épargnée**. L'apostrophe est une seconde cause, redondante, sur deux chaînes de `manage_roles.php` —
+pas la cause principale. Voir la note de correction ajoutée à E-114.
+
+**FERMÉ au portage** (`v1.37.65`) : aucune boîte native. Le premier clic ouvre un panneau qui **nomme
+la machine** et dit ce que le retrait engage — et surtout ce qu'il n'engage pas : la machine
+elle-même n'est pas touchée, rien n'y est modifié, aucun accès n'y est révoqué. Le texte est posé par
+`textContent`, où guillemet et apostrophe sont des caractères et non des délimiteurs. La suite
+vérifie en plus que **l'ouverture du panneau n'écrit rien** : `1` ligne encore présente après le
+premier clic.
+
+---
+
+## E-122 — 68 lignes de recherche, filtres, tri et pagination : inatteignables, **et** écrasées
+
+`manage_servers.php:218-285` construit une recherche sur trois colonnes, trois filtres, un tri validé
+par liste blanche et une pagination. Ce code est mort **deux fois plutôt qu'une**, et les deux causes
+sont indépendantes :
+
+1. **aucun contrôle de l'interface n'émet ses paramètres.** Mesure du 2026-08-26 : pas un
+   `?search=`, `?environment=`, `?network=`, `?criticality=`, `?sort=` ni `?page=` dans la partie
+   vivante du fichier. Les quatre `name="environment"` et `name="criticality"` relevés appartiennent
+   aux formulaires d'**ajout** et de **modification**, pas à un filtre ;
+2. **et son résultat est écrasé.** `$all_servers` reçoit le jeu paginé en `:285`, puis un second
+   `query()` **sans `WHERE` ni `LIMIT`** le remplace en `:296`. `$totalPages` est affecté une fois et
+   n'est lu nulle part.
+
+Ce qui filtre réellement est un `oninput` côté navigateur, sur les cartes déjà rendues — et il ne
+regarde que le **nom**, là où la recherche morte visait nom, adresse **et** compte SSH.
+
+**Ce n'est donc pas une fonction cassée : c'est du code mort qui ressemble à une fonction.** La
+distinction décide de la conduite à tenir — il n'y a rien à réparer, il y a quelque chose à ne pas
+porter.
+
+**NON PORTÉ, délibérément** (`v1.37.65`). Porter du code mort, ce n'est plus migrer, c'est concevoir.
+`/serveurs` garde le comportement **vivant** — rendre le parc entier, filtrer à l'affichage — avec une
+seule différence, assumée : le filtre porte sur les **trois** champs que la recherche morte visait, et
+qui sont tous les trois affichés dans l'en-tête de la carte. Filtrer sur ce qu'on ne voit pas ferait
+disparaître des lignes sans raison lisible.
+
+---
+
+## E-123 — Le garde SSRF annonce le refus du multicast, et ne le vérifie pas
+
+`manage_servers.php:55-72` porte un commentaire de dix lignes, ajouté par le correctif A10-01, qui
+énumère ce que la validation d'adresse refuse :
+
+> refuse loopback (127/8), link-local (169.254/16 = AWS/Azure metadata), 0.0.0.0/8, **multicast
+> (224/4)** et IPv6 ::1/loopback
+
+Les sept conditions de `$isLoopbackOrReserved` testent `127.`, `169.254.`, `0.`, `::1`, `fe80:`, `::`
+et `0:0:0:0:0:0:0:0`. **Aucune ne teste le multicast.** `224.0.0.1` traverse la validation.
+
+C'est le motif « l'en-tête qui ment » — cinquième occurrence relevée — et la raison pour laquelle il
+dure : une relecture d'en-tête le **confirme**. Le commentaire dit vrai sur cinq points et faux sur
+un ; rien ne distingue les six à l'œil.
+
+**Portée réelle** : faible en pratique — une adresse multicast ne désigne pas une cible SSH, et une
+tentative de connexion n'aboutit pas. Ce qui est relevé, c'est l'écart entre ce qui est **annoncé**
+et ce qui est **appliqué**, sur une validation dont c'est tout le métier.
+
+**FERMÉ au portage** (`v1.37.65`) : `App\Services\Serveurs::valideIp()` applique les **huit**
+conditions — les sept du legacy, plus celle que son commentaire promettait. La comparaison porte sur
+le **premier octet** (224 à 239) et non sur le texte : `« 224. »` ne dirait rien de 225 à 239. IPv6
+`ff00::/8` est couvert par `inet_pton`.
+
+---
+
+## E-124 — La légende des environnements annonce une valeur que le formulaire refuse, et tait celle qu'il offre
+
+Vu **à l'image**, pas dans le code. La légende de l'onglet Serveurs affiche quatre pastilles :
+
+```
+● PROD   ● DEV   ● TEST   ● PREPROD
+```
+
+La liste fermée de `validateInput()` est `['PROD', 'DEV', 'TEST', 'OTHER']`, et les quatre `<option>`
+du formulaire sont les mêmes. Donc :
+
+- **PREPROD est annoncé et impossible** — aucun formulaire ne peut produire cette valeur, et la
+  validation la refuserait ;
+- **OTHER est offert et tu** — c'est la quatrième option réelle du menu déroulant, absente de la
+  légende.
+
+Une légende sert à lire un code couleur. Celle-ci décrit un parc qui ne peut pas exister.
+
+**FERMÉ au portage** (`v1.37.65`) : il n'y a pas de légende séparée à tenir à jour, parce que
+l'environnement est écrit **en toutes lettres** sur chaque machine (`PROD`, `DEV`, `TEST`, `Autre`).
+La liste des valeurs vient de `Serveurs::ENVIRONNEMENTS`, la même constante que le formulaire et que
+la validation : une valeur ajoutée apparaît partout, une valeur retirée disparaît partout. Une
+légende recopiée à la main ne peut pas ne pas diverger — celle-ci a divergé.

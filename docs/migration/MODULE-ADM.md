@@ -330,13 +330,14 @@ dernier** — et chaque rang porte son motif.
 | **D3** ✅ | **Comptes et rôles** — *PORTÉ `v1.37.61`, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** ✅ | **Suppression et anonymisation** — *PORTÉ `v1.37.62`, voir §5.0quater* | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** ✅ | **Permissions et accès** — *PORTÉ `v1.37.63`, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
-| **D6** | **Serveurs** | `includes/manage_servers.php`, `manage_servers_table.php`, `includes/server_actions.php`, `includes/import_csv.php` | 1 746 | Base seulement, mais **manipule les mots de passe SSH et root des machines** (`server_actions.php:164-165`, chiffrés par `crypto.php`). Le plus gros sous-lot ; à redécouper si nécessaire — `S2` l'a été pour 579 lignes |
+| **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
+| **D6b** | **Serveurs — les actions** | `includes/server_actions.php`, `includes/import_csv.php` | 456 | Étiquettes, notes, cycle de vie, test de connexion, import CSV. `server_actions.php` porte `checkAuth([2,3])` et **zéro `checkPermission`** |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
 | **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
 
-Les six entrées de menu se rattachent ainsi : `admin_page.php` est le porteur de D3, D5 et D6 (trois
+Les six entrées de menu se rattachent ainsi : `admin_page.php` est le porteur de D3, D5 et D6a/D6b (trois
 onglets, `:182-190`) ; `audit_log.php` est D1 ; `server_users.php` D8 ; `platform_keys.php` — 471 l.,
 dix routes backend dont `/regenerate_platform_key`, qui **fait tourner la paire de clés de toute la
 flotte** — se rattache à D8 par sa dangerosité et sera traité juste après lui ; `server_user_sudo.php`
@@ -606,6 +607,46 @@ Corrigé en §6 du plan.
 
 **La dette de largeur de D4 n'est PAS résorbée** : elle porte sur `/comptes`, que D5 n'a pas touché.
 Elle reste écrite, et attend le sous-lot qui reprendra ce tableau.
+
+### 5.0sexies D6a — PORTÉ le 2026-08-26 (`v1.37.65`) : un fragment mort qui répond sans permission
+
+**D6 pesait 1 746 lignes et a été redécoupé.** C'est un document de migration, pas une promesse — `S2`
+l'avait déjà été pour 579 lignes. D6a prend la page (`manage_servers.php` 939 l. + son fragment
+352 l.), D6b les actions (`server_actions.php` 267 l. + `import_csv.php` 189 l.).
+
+`tests/e2e/go-adm-serveurs.mjs` — **18 PASS / 0 FAIL sur le legacy**, **20 PASS / 0 FAIL sur le
+portage**, base rouge mesurée à 7/2 avant portage.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-120** | `manage_servers_table.php` est **mort par navigation** (sa seule référence est dans un bloc commenté) et **servi quand même**. Rôle 2 sans `can_admin_portal` : **403** sur la page, **200** sur le fragment, inventaire complet rendu. Mais **0 mot de passe imprimé** sur 6 champs — divulgation d'inventaire, pas de justificatifs |
+| **E-121** | le **guillemet double** de `servers.confirm_delete` ferme l'attribut `onclick` : le navigateur reçoit `return confirm('Supprimer le serveur `, le gestionnaire meurt, et le `type="submit"` retire la machine **sans confirmation**. Dans les **deux** langues |
+| **E-122** | 68 lignes de recherche, filtres, tri et pagination **inatteignables** (aucun contrôle n'émet leurs paramètres) **et écrasées** (un second `query()` sans `WHERE` remplace leur résultat) |
+| **E-123** | le commentaire du correctif A10-01 annonce le refus du **multicast (224/4)** ; aucune des sept conditions ne le teste |
+| **E-124** | la légende affiche **PREPROD**, valeur que la liste fermée refuse, et tait **OTHER**, la seule que le formulaire offre en quatrième. Vu **à l'image** |
+
+**Ce que la mesure a DÉDOUANÉ, et qu'il faut dire aussi nettement.** Le fragment rend bien deux
+colonnes « Mot de Passe » — mais ce sont des `<input type="password">` **vides**. Aucune valeur
+stockée n'est imprimée. La première rédaction de E-120 aurait pu s'arrêter aux en-têtes de colonnes
+et annoncer une fuite de justificatifs ; elle aurait eu tort.
+
+**Ce que D6a a fait corriger AILLEURS.** La mesure de E-121 a montré que la cause n'était pas
+l'apostrophe mais le **guillemet**, un niveau de délimiteur au-dessus. Deux conclusions d'**E-114**
+(sous-lot D3) sont donc fausses : « seulement en français » et « le troisième bouton fonctionne ».
+Une note de correction y a été ajoutée. Chercher le délimiteur le plus **extérieur**.
+
+**Le portage sépare ce que le legacy confondait** : trois gestes, trois routes, au lieu d'un POST
+unique vers la page dont le `name` du bouton cliqué décide de la branche. Un `name` oublié sur un
+`<button>` y transforme une modification en création.
+
+**Un défaut de MA propre suite, vu à l'image et pas au code** : l'étape de captures ne rouvrait pas
+l'onglet « Serveurs » du legacy. Les trois images montraient l'onglet des comptes — 200, du contenu,
+et pas le sujet. Une capture qui montre autre chose que ce qu'on croit est pire qu'une capture
+absente : elle sert de preuve à un examen qui n'a pas eu lieu.
+
+**Reste en base, et ce n'est pas de ce chantier** : **5 comptes `e2e_test_*`** créés entre le
+2026-07-25 et le 2026-08-12, laissés par des suites antérieures. Ils faussent tout comptage de
+comptes. Décision à l'exploitant — ils ne sont pas supprimés ici.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

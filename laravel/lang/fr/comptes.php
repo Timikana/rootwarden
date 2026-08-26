@@ -16,8 +16,8 @@ return [
     'title' => 'Comptes du portail',
     'desc' => "Créer un compte, fixer un mot de passe, déverrouiller un accès, réinitialiser un second facteur.",
 
-    'reste_titre' => "Deux onglets ne sont pas encore portés.",
-    'reste_texte' => "La page d'administration de l'ancien portail porte aussi les serveurs et les accès & permissions. Ils y vivent toujours ; seuls les comptes sont portés ici.",
+    'reste_titre' => "Une capacité de cet onglet n'est pas encore portée.",
+    'reste_texte' => "L'import de comptes par fichier CSV vit toujours sur l'ancien portail. Les trois onglets de la page d'administration, eux, sont portés : ils se rejoignent par les onglets ci-dessus.",
     'reste_lien' => "Ouvrir l'ancien portail",
 
     'col_nom' => 'Nom',

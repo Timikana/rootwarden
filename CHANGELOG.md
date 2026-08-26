@@ -2171,6 +2171,91 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.65 — `adm/` D6a : un fragment mort qui repond, et une confirmation qui ne s'execute pas
+
+**19 entrees de menu portees sur 33** (inchange : D6a ajoute une page sous l'entree « Admin », reliee
+par une sous-navigation, et n'ouvre pas d'entree nouvelle). Legacy **18/0**, portage **20/0**, base
+rouge mesuree a 7/2 avant portage.
+
+**D6 pesait 1 746 lignes et a ete redecoupe.** D6a prend la page (`manage_servers.php` 939 l. et son
+fragment `manage_servers_table.php` 352 l.), D6b prendra les actions (`server_actions.php`,
+`import_csv.php`).
+
+#### Cinq ecarts, tous mesures
+
+- **E-120** — `manage_servers_table.php` est **mort par navigation** : sa seule reference dans tout le
+  depot est le `fetch()` de `manage_servers.php:709`, **a l'interieur d'un bloc commente** de 263
+  lignes. Apache le sert quand meme, et il appelle `checkAuth([2,3])` **sans** le
+  `checkPermission('can_admin_portal')` que sa page hote exige. Mesure au navigateur avec un compte de
+  role 2 sans cette permission : **403** sur la page, **200** sur le fragment, inventaire du parc
+  rendu. Sixieme occurrence de « la garde est sur la PAGE, pas sur la REQUETE » — cette fois sur du
+  code mort qui repond encore.
+- **E-121** — le **guillemet double** de `servers.confirm_delete` ferme l'attribut `onclick`. Le
+  navigateur ne recoit que `return confirm('Supprimer le serveur ` : le gestionnaire ne s'attache pas,
+  et le bouton etant `type="submit"` dans le formulaire, **la machine est retiree du parc sans
+  qu'aucune boite n'ait paru**. Dans les **deux** langues.
+- **E-122** — 68 lignes de recherche, filtres, tri et pagination, mortes **deux fois** : aucun controle
+  n'emet leurs parametres, et un second `query()` sans `WHERE` ecrase leur resultat.
+- **E-123** — le commentaire du correctif A10-01 annonce le refus du **multicast (224/4)** ; aucune des
+  sept conditions ne le teste.
+- **E-124** — la legende affiche **PREPROD**, valeur que la liste fermee refuse, et tait **OTHER**, la
+  seule que le formulaire offre en quatrieme. Vu **a l'image**.
+
+#### Ce que la mesure a DEDOUANE
+
+Le fragment rend bien deux colonnes « Mot de Passe » — mais ce sont des `<input type="password">`
+**vides** : **6 champs, 0 rempli**. Aucun secret stocke n'est imprime. S'arreter aux en-tetes de
+colonnes aurait fait annoncer une fuite de justificatifs ; c'est une divulgation d'inventaire.
+
+#### Ce que D6a a fait corriger AILLEURS
+
+La cause de E-121 n'est pas l'apostrophe mais le **guillemet**, un niveau de delimiteur au-dessus.
+Deux conclusions d'**E-114** (sous-lot D3) sont donc fausses — « seulement en francais » et « le
+troisieme bouton fonctionne » : les trois chaines de `manage_roles.php` portent deux guillemets
+chacune, dans les deux langues, et coupent leur attribut aux 58e, 49e et 49e caracteres. Une note de
+correction est ajoutee a E-114 ; la confirmation **au navigateur** sur cette page reste a faire et est
+inscrite en §7 du plan.
+
+#### Le portage
+
+`/serveurs`, garde par `role:2` + `perm:can_admin_portal` — la garde de la page hote, appliquee **au
+seul endroit qui repond** : il n'y a pas de fragment separe.
+
+- **Trois gestes, trois routes.** Le legacy les distingue par le `name` du bouton clique dans un POST
+  unique vers la page ; un `name` oublie sur un `<button>` y transforme une modification en creation.
+- **Le retrait ouvre un panneau** qui nomme la machine et dit ce que le geste engage — et surtout ce
+  qu'il n'engage pas : la machine elle-meme n'est pas touchee, aucun acces n'y est revoque. Le texte
+  est pose par `textContent`. La suite verifie que l'ouverture du panneau **n'ecrit rien**.
+- **Le garde SSRF est porte ET complete** : les huit conditions, dont celle que le commentaire du
+  legacy promettait. Comparaison sur le premier octet (224 a 239), pas sur le texte.
+- **Les 68 lignes mortes ne sont PAS portees.** Porter du code mort, ce n'est plus migrer, c'est
+  concevoir. Le filtre reste a l'affichage, et porte sur les **trois** champs que la recherche morte
+  visait — tous trois affiches dans l'en-tete de la carte.
+- **Les mots de passe de machines sont chiffres** par `App\Support\SecretExploitation`, schema
+  `sodium:` dont l'aller-retour avec le backend Python a ete mesure. Verifie en base par la suite :
+  `sodium:|sodium:`.
+- **Une sous-navigation relie les trois onglets** d'`admin_page.php`, desormais tous portes. Elle
+  reutilise `.rw-onglets`, et l'onglet des permissions n'apparait qu'au role 3 — sa route l'exige, et
+  un onglet visible menant a un 403 donne a croire a un droit qu'on n'a pas.
+
+#### Trois defauts de rendu, vus a l'image et corriges
+
+`.rw-pastille` est une pastille **de texte** : vide, elle ne rendait qu'un rectangle invisible. L'etat
+porte desormais son libelle (« en ligne », « hors ligne », « etat inconnu ») — une information qui ne
+tient qu'a la couleur n'est pas lue par tout le monde. Le bloc d'ajout a repris l'affordance de
+depliant, et le champ de filtre son gabarit.
+
+#### Un defaut de la suite elle-meme
+
+L'etape de captures ne rouvrait pas l'onglet « Serveurs » du legacy : les trois images montraient
+l'onglet des comptes. Vu **en regardant l'image**. Une capture qui montre autre chose que ce qu'on
+croit sert de preuve a un examen qui n'a pas eu lieu.
+
+#### Reste en base, signale et non touche
+
+**5 comptes `e2e_test_*`** crees entre le 2026-07-25 et le 2026-08-12 par des suites anterieures.
+Destructeur a retirer, et ils n'appartiennent pas a ce chantier : arbitrage inscrit en §7.
+
 ### v1.37.64 — le chiffrement des secrets n'est pas propre a la supervision
 
 `App\Support\SecretSupervision` devient `App\Support\SecretExploitation`. **Aucun changement de

@@ -4,10 +4,12 @@
     <h1 class="rw-titre">{{ __('comptes.title') }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('comptes.desc') }}</p>
 
-    {{-- UNE CAPACITE NON PORTEE N'EST PAS UN SILENCE. `admin_page.php` porte
-         TROIS onglets ; seul celui des comptes est porte (D3). Les deux autres
-         vivent encore sur l'ancien portail, et la page le DIT plutot que de
-         laisser croire qu'ils ont disparu. --}}
+    @include('composants.onglets-adm', ['courant' => 'comptes'])
+
+    {{-- UNE CAPACITE NON PORTEE N'EST PAS UN SILENCE. Les TROIS onglets
+         d'`admin_page.php` sont portes depuis D6a — comptes (D3/D4), serveurs
+         (D6a), acces & permissions (D5) — et se rejoignent par les onglets
+         ci-dessus. Ne reste que l'import CSV, sous-lot D6b. --}}
     <div class="rw-encart" data-rw="comptes-non-porte">
         <p><strong>{{ __('comptes.reste_titre') }}</strong></p>
         <p class="rw-prose">{{ __('comptes.reste_texte') }}</p>
