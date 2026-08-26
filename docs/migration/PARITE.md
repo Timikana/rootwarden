@@ -5010,3 +5010,76 @@ geste destructeur est à un clic, et il emporte la traçabilité que la platefor
 proposée dès que le compte porte un journal. `Comptes::anonymise()` efface les données personnelles,
 retire sessions, jetons, préférences, permissions et accès machines — et **ne touche ni `user_logs`
 ni `login_history`**, ce qui est tout l'objet du geste.
+
+---
+
+## E-118 — `adm/` D5 : trois listes pour les mêmes droits, et deux permissions qu'on ne peut pas reprendre
+
+Mesuré le 2026-08-26 en croisant le schéma, le formulaire de création et la liste blanche du point
+d'API :
+
+| | |
+|---|---|
+| colonnes `can_*` de `permissions` | **18** |
+| posables **à la création** (`manage_users.php:116`) | **14** |
+| basculables **ensuite** (`update_permissions.php:101`) | **16** |
+
+Les écarts ne se compensent pas — ils se croisent :
+
+| permission | créable | basculable | ce que cela donne |
+|---|---|---|---|
+| `can_manage_fail2ban` | **oui** | **non** | on l'accorde, et **on ne peut plus la retirer** par l'interface |
+| `can_manage_bashrc`, `can_manage_graylog`, `can_manage_wazuh` | non | oui | absentes à la création, réglables après — sans conséquence |
+| `can_manage_api_keys` | **non** | **non** | **inatteignable dans les deux sens** |
+
+**Et les deux trous portent sur des droits qui gardent de vraies pages.**
+`can_manage_fail2ban` garde `fail2ban/index.php:11`, son entrée de menu du legacy
+(`menu.php:86,237`) **et** celle du portage (`Navigation.php:36`).
+`can_manage_api_keys` garde `adm/api_keys.php:20` — page dont l'accès n'est donc possible que par le
+rôle 3, qui contourne toute permission. Ce n'est pas une décision : c'est un oubli de liste, et
+`documentation.php:272` présente pourtant `can_manage_fail2ban` comme une permission « si accordée ».
+
+**Ce n'est pas théorique** : mesuré en base, **deux** comptes portent `can_manage_fail2ban` et **un**
+porte `can_manage_api_keys`. Ils les ont reçues à la création ou par import CSV
+(`import_csv.php:168`). Il y a donc bien, aujourd'hui, des droits accordés que l'interface ne sait
+pas reprendre — les retirer demande un `UPDATE` à la main.
+
+**Au portage** : **une seule liste**, dérivée des colonnes réelles, partagée par la création et par la
+bascule. Une permission qui existe se règle dans les deux sens, ou n'existe pas.
+
+---
+
+## E-119 — La bascule de permission émet sa requête, reçoit un refus, et **ne montre rien**
+
+L'inventaire l'avait établi par lecture ; le clic le confirme. Mesuré sur un compte d'épreuve :
+
+```
+clic sur la case  → POST /adm/api/update_permissions.php
+réponse           → 403 {"success":false,"step_up_required":true,"action":"update_permissions", …}
+can_scan_cve      → 0 avant, 0 après
+à l'écran         → rien
+```
+
+Trois pièces, chacune correcte prise isolément, forment ensemble une impasse :
+
+1. `update_permissions.php:60` exige un step-up — c'est **bien** ;
+2. le modal qui permettrait de le fournir est une surcouche de **`window.fetch`**
+   (`js/utils.js:38-49`) ;
+3. la case est déclenchée par **htmx**, qui n'emploie que `XMLHttpRequest` — zéro occurrence de
+   `fetch` dans `js/htmx.min.js`, vérifié.
+
+La surcouche ne voit donc jamais la requête, le modal ne s'ouvre pas, et **aucun geste d'interface ne
+permet d'obtenir la marque `_step_up_update_permissions`**. htmx, de son côté, traite `[45]..` en
+`swap:false, error:true` par défaut, et le legacy n'a aucun écouteur `htmx:responseError` : rien n'est
+remplacé, rien n'est annoncé.
+
+**Résultat : pour un rôle 3, cocher ou décocher une permission ne fait rien du tout, en silence.** La
+seule façon d'attribuer une permission aujourd'hui est de créer le compte avec, ou de passer par un
+import CSV.
+
+C'est la même famille que E-108 — un écran qui n'a pas de raison de bouger et un serveur qui n'a rien
+entendu — mais prise par l'autre bout : ici la requête part **et** le refus est correct ; c'est le
+chemin pour y répondre qui n'existe pas.
+
+**Au portage** : la garde reste, et le panneau de re-authentification **en page** écrit pour D4 la
+rend franchissable. Un refus s'annonce, et le geste repart une fois le second facteur fourni.

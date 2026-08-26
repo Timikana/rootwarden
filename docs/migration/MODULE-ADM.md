@@ -329,7 +329,7 @@ dernier** — et chaque rang porte son motif.
 | **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** ✅ | **Comptes et rôles** — *PORTÉ `v1.37.61`, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** ✅ | **Suppression et anonymisation** — *PORTÉ `v1.37.62`, voir §5.0quater* | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
-| **D5** | **Permissions et accès** | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
+| **D5** ✅ | **Permissions et accès** — *caractérisé, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6** | **Serveurs** | `includes/manage_servers.php`, `manage_servers_table.php`, `includes/server_actions.php`, `includes/import_csv.php` | 1 746 | Base seulement, mais **manipule les mots de passe SSH et root des machines** (`server_actions.php:164-165`, chiffrés par `crypto.php`). Le plus gros sous-lot ; à redécouper si nécessaire — `S2` l'a été pour 579 lignes |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
@@ -563,6 +563,33 @@ au-delà du cadre à 1400 px, « Anonymiser » y est coupé. J'ai essayé de rep
 nom avec `.rw-etroit-seul--inline` — **annulé** : cette classe ne s'affiche que **sous** 720 px, elle
 veut dire autre chose. Une classe qui existe n'est pas une classe qui convient. À reprendre avec D5,
 qui rendra ce tableau à sa largeur.
+
+### 5.0quinquies D5 — CARACTÉRISÉ le 2026-08-26 : la bascule qui ne fait rien, confirmée au clic
+
+`tests/e2e/go-adm-permissions.mjs` — **10 PASS / 0 FAIL sur le legacy**, **base rouge 7/2**.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-118** | **trois listes** pour les mêmes droits : 18 colonnes, 14 posables à la création, 16 basculables ensuite. `can_manage_fail2ban` s'accorde et **ne se reprend pas** ; `can_manage_api_keys` est **inatteignable dans les deux sens**. Et ce n'est pas théorique — 2 comptes portent la première, 1 la seconde |
+| **E-119** | la bascule **émet** son POST, reçoit `403 step_up_required`, et **rien ne se passe** : `can_scan_cve` reste à 0 → 0, aucun modal, aucun message |
+
+**§5.2 de cet inventaire disait « établi par lecture, à confirmer au clic ». C'est confirmé**, et la
+mesure est plus précise que la lecture : le POST **part bien** — htmx fonctionne — et le refus est
+**correct**. Ce qui manque, c'est le chemin pour y répondre : le modal est une surcouche de
+`window.fetch`, htmx n'emploie que `XMLHttpRequest`, et aucun geste d'interface ne permet donc
+d'obtenir la marque. Trois pièces correctes qui forment une impasse.
+
+**Le portage a déjà la réponse** : le panneau de re-authentification **en page** écrit pour D4. D5 n'a
+plus qu'à s'y brancher.
+
+**Un piège pour la quatrième fois, et sous une forme nouvelle** : il fallait ouvrir **deux** couches,
+pas une — l'onglet « Accès & permissions » de `admin_page.php`, masqué tant qu'on ne clique pas
+dessus, **puis** la carte `<details>` du compte. `page.$()` trouve la case dans les deux cas.
+
+**Ce qui reste à faire pour finir D5** : le portage. Trois décisions sont tranchées — une seule liste
+de permissions, dérivée des colonnes réelles et partagée par la création et la bascule ; le panneau de
+step-up de D4 branché sur la bascule ; et le tableau des comptes rendu à sa largeur, ce que D4 avait
+laissé en dette.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

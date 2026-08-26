@@ -81,7 +81,7 @@ grep -c "'route'"  laravel/app/Support/Navigation.php
 grep -c "'legacy'" laravel/app/Support/Navigation.php
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
-grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (107), pas le dernier numero (E-117)
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (109), pas le dernier numero (E-119)
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ```
@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **107** — numérotés jusqu'à **E-117** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **109** — numérotés jusqu'à **E-119** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D4 PORTÉS (`v1.37.59` à `v1.37.62`) — `MODULE-ADM.md`**, dix sous-lots, six restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D4 PORTÉS (`v1.37.59` à `v1.37.62`) ; D5 CARACTÉRISÉ (legacy 10/0, base rouge 7/2) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -458,7 +458,7 @@ déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **en
 commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
-archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** · **D4 7/4** — et sur ces sept passes,
+archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** · **D4 7/4** · **D5 7/2** — et sur ces sept passes,
 **quatre passent PARCE QUE la page est absente** : un 404 ne modifie rien et ne porte pas de script.
 Une base rouge se lit passe par passe, pas au compte.
 
@@ -757,6 +757,15 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Trois pièces correctes peuvent former une impasse.** E-119 : la garde step-up est bonne, le POST
+  part bien, le refus est juste — et pourtant cocher une permission ne fait rien, parce que le modal
+  qui permettrait de répondre n'écoute que `fetch` quand la requête part en `XHR`. **Chercher le
+  CHEMIN COMPLET, pas la correction de chaque pièce.**
+- **Deux couches à ouvrir, pas une.** Quatrième forme du piège du bloc replié : l'onglet masqué de
+  `admin_page.php`, PUIS la carte `<details>` du compte. Un seul `open = true` ne suffisait pas.
+- **Trois énumérations de la même chose divergent dans les deux sens.** 18 colonnes, 14 à la création,
+  16 à la bascule — et les écarts se croisent : une permission s'accorde sans se reprendre, une autre
+  n'existe ni à la création ni à la bascule. **Croiser les listes deux à deux, pas les compter.**
 - **Le piège d'A5 se paie une seconde fois, dans le sous-lot qui consomme le step-up.** La marque vit
   **quinze minutes dans le cache** et survit à l'exécution : la deuxième exécution héritait de la
   première et mesurait un 200 là où elle attendait un 403. **Révoquer à l'entrée ET dans le
@@ -921,7 +930,7 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 |---|---|
 | **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
 | `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
-| `PARITE.md` | les 107 écarts mesurés, chacun avec sa preuve |
+| `PARITE.md` | les 109 écarts mesurés, chacun avec sa preuve |
 | `METHODE-SOUS-LOT.md` | les neuf temps |
 | `INVENTAIRE.md` | ce qui reste, mesuré |
 | `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |

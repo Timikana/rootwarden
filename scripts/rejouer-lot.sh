@@ -245,6 +245,13 @@ declare -A REF_LEGACY=(
   # que D1 rend verifiable, et c'est irreversible. Le defaut est etabli par la
   # mesure du schema ; sa demonstration demande un arbitrage.
   [go-adm-suppression]=10
+  # Sous-lot D5 de `adm/` : permissions fonctionnelles. 10 sur le legacy, mesure
+  # du 2026-08-26. La suite bascule des permissions : le faire sur
+  # `rw-test-admin` changerait ce que TREIZE autres suites mesurent, donc elle
+  # cree son propre compte et le retire — `permissions.user_id` etant en CASCADE,
+  # la ligne part avec lui. Le `finally` RELIT `can_manage_supervision` sur
+  # `rw-test-admin` : c'est la permission dont ces treize suites dependent.
+  [go-adm-permissions]=10
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -266,7 +273,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression
+  go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
