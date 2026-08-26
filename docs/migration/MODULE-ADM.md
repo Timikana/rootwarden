@@ -333,7 +333,7 @@ dernier** — et chaque rang porte son motif.
 | **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
 | **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
 | **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
-| **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **INVENTORIÉ le 2026-08-26, voir §5.0nonies.** Découpage manqué par l'inventaire initial : ces deux capacités de la carte vivent dans le BACKEND. `/server_status` ouvre une connexion TCP et écrit `online_status` ; `/server_lifecycle` porte un **IDOR** et rend un `updated` ambigu |
+| **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **INVENTORIÉ le 2026-08-26, voir §5.0nonies.** `/server_status` ouvre une sonde TCP et écrit `online_status` ; `/server_lifecycle` rend un `updated` **ambigu**. L'asymétrie de décorateurs entre les deux est **cosmétique** — mesuré |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
@@ -748,19 +748,48 @@ Mesuré par relecture croisée puis **vérifié ici** — un rapport d'agent n'e
 **`POST /server_lifecycle`** (`backend/routes/admin.py:93`) — `@require_api_key`, `@require_role(2)`,
 `@threaded_route`. Deux défauts, et le second ferme le premier :
 
-- **IDOR.** Pas de `@require_machine_access`, là où sa voisine `/server_status`
-  (`monitoring.py:57`) porte les trois décorateurs. `machine_id` vient du CORPS et n'est confronté à
-  rien avant le `WHERE id = %s`. Un rôle 2 restreint change donc le cycle de vie de **n'importe
-  quelle** machine, `srv-zabbix` comprise. `/exclude_user` (`admin.py:115`) a exactement la même forme.
+- **Une asymétrie de décorateurs, et elle est COSMÉTIQUE.** `/server_lifecycle` n'a pas
+  `@require_machine_access`, là où sa voisine `/server_status` (`monitoring.py:57`) le porte.
+  **CE N'EST PAS UN IDOR**, et la première rédaction de cette section le disait à tort — voir la
+  correction ci-dessous. `/exclude_user` (`admin.py:115`) a la même forme et le même statut.
 - **`updated` est AMBIGU.** La route rend `{'success': True, 'updated': cur.rowcount > 0}` sans aucun
   `SELECT` préalable. Or `rowcount` vaut **0** aussi bien quand on réécrit la valeur déjà en place que
   quand la machine n'existe pas : `updated: false` recouvre deux situations opposées. Une interface qui
   affiche « échec » mentira dans le premier cas, une qui affiche « fait » mentira dans le second.
 
-**Le correctif est le même pour les deux** : résoudre la machine par un `SELECT` AVANT l'`UPDATE`. Il
-rend 404 si elle n'existe pas — l'ambiguïté tombe — et il donne l'objet sur lequel poser le contrôle
-d'accès. C'est « un garde sans objet ne garde rien » pris par l'autre bout : **contrôler l'objet
-résolu, pas le paramètre reçu.**
+**CORRECTION DU 2026-08-26 (`v1.37.71`) — J'AI VÉRIFIÉ L'ABSENCE DU GARDE, PAS CE QU'IL FAIT.**
+
+`check_machine_access()` (`helpers.py:299-300`) commence par :
+
+```python
+if role_id >= 2:
+    return True
+```
+
+et sa propre docstring le dit : « Admins (role >= 2) ont acces a tout. Users (role = 1) doivent etre
+dans user_machine_access ». Donc sur une route également gardée par `@require_role(2)`, tout appelant
+qui franchit la garde de rôle franchit le contrôle d'accès **sans condition** : le décorateur est
+**redondant**, et l'ajouter à `/server_lifecycle` ne changerait strictement rien.
+
+**Il n'existe pas de « rôle 2 restreint » à un sous-ensemble de machines** — c'est une décision de
+conception du produit, pas un oubli. Mon « IDOR » supposait une catégorie qui n'existe pas.
+
+Mesuré sur tout le dépôt : **114 routes portent `@require_machine_access`, et il est sans effet sur
+57 d'entre elles** — celles déjà gardées au rôle ≥ 2. Il mord sur les 57 autres, atteignables au
+rôle 1 (`updates.py`, `services.py`, `fail2ban.py`, `iptables.py`, `cve.py`…).
+
+Ce n'est donc pas un trou : c'est une **redondance qui se lit comme une protection**. L'uniformiser a
+son intérêt — que le code cesse de suggérer un contrôle qu'il n'apporte pas — mais ce n'est **pas** un
+correctif de sécurité et il ne faut pas le présenter comme tel.
+
+**Ce qui protège réellement `/server_status`, c'est son CORPS** : il refuse un `machine_id` absent
+(`:72-74`), puis **résout l'IP en base** au lieu d'accepter une IP brute — patch A01-02, écrit dans sa
+docstring. C'est ce contrôle-là qui travaille.
+
+**Le correctif de l'ambiguïté reste entier, et il est indépendant** : résoudre la machine par un
+`SELECT` AVANT l'`UPDATE`. Il rend 404 si elle n'existe pas, et `updated` cesse de recouvrir deux
+situations opposées. **Contrôler l'objet résolu, pas le paramètre reçu** — ici pour dire la vérité sur
+le résultat, pas pour restreindre un accès.
 
 Ce qui **tient** : la liste fermée `('active', 'retiring', 'archived')`, testée avant toute requête, et
 le refus d'un `machine_id` falsy au même endroit.

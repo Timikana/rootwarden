@@ -999,9 +999,17 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **`rowcount > 0` ne distingue pas « rien à changer » de « objet absent ».** `/server_lifecycle` rend
   `updated: cur.rowcount > 0` sans `SELECT` préalable : réécrire la valeur déjà en place et viser une
   machine inexistante donnent tous deux **0**. Deux situations opposées sous une seule réponse, et
-  aucune interface ne peut s'en sortir. Le correctif — **résoudre l'objet avant de le muter** — lève
-  l'ambiguïté ET ferme l'IDOR du même geste : c'est « un garde sans objet ne garde rien » pris par
-  l'autre bout, contrôler l'objet RÉSOLU et non le paramètre reçu.
+  aucune interface ne peut s'en sortir. Le correctif est de **résoudre l'objet avant de le muter** —
+  contrôler l'objet RÉSOLU et non le paramètre reçu. *(Cette entrée disait aussi « et ferme l'IDOR du
+  même geste » : c'était faux, il n'y a pas d'IDOR là — voir la règle suivante.)*
+- **Vérifier qu'un garde est ABSENT n'est pas vérifier que son absence COMPTE.** J'ai mesuré que
+  `/server_lifecycle` n'a pas `@require_machine_access` — vrai — et j'en ai conclu un IDOR — faux.
+  `check_machine_access()` commence par `if role_id >= 2: return True`, et sa docstring le dit. Sur
+  une route déjà gardée par `@require_role(2)`, le décorateur est donc **redondant** : l'ajouter ne
+  changerait rien. Mesuré sur tout le dépôt : **114 routes le portent, il est sans effet sur 57**
+  d'entre elles. Ce n'est pas un trou, c'est une **redondance qui se lit comme une protection** — la
+  forme « en-tête qui ment », mais en code. **Lire ce que le garde FAIT avant de conclure de son
+  absence.**
 - **Deux écarts indépendants peuvent être CHAÎNÉS, et l'arbitrage de l'un devient faux.** K4 fondait
   son niveau de risque sur « aucun compte de rôle 1 ne porte `users.sudo = 1`, le trou est à un
   `UPDATE` d'être exploitable ». E-130 **est** cet `UPDATE`, il est atteignable au rôle 2, et sa garde

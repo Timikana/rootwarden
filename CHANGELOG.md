@@ -2171,6 +2171,54 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.71 — correction : verifier qu'un garde est ABSENT n'est pas verifier que son absence COMPTE
+
+`v1.37.69` inscrivait un **IDOR** sur `POST /server_lifecycle`, au motif qu'il n'a pas
+`@require_machine_access` la ou sa voisine `/server_status` le porte. **C'etait faux**, et la
+correction est plus instructive que le constat.
+
+`check_machine_access()` (`helpers.py:299-300`) commence par :
+
+    if role_id >= 2:
+        return True
+
+et sa propre docstring le dit : « Admins (role >= 2) ont acces a tout ». Sur une route egalement
+gardee par `@require_role(2)`, tout appelant qui franchit la garde de role franchit le controle
+d'acces **sans condition**. Le decorateur y est donc **redondant** : l'ajouter a `/server_lifecycle`
+ne changerait strictement rien.
+
+**Il n'existe pas de « role 2 restreint » a un sous-ensemble de machines.** C'est une decision de
+conception du produit, pas un oubli — mon « IDOR » supposait une categorie qui n'existe pas.
+
+#### La mesure, sur tout le depot
+
+**114 routes portent `@require_machine_access`, et il est SANS EFFET sur 57 d'entre elles** — celles
+deja gardees au role >= 2 (`supervision.py`, `wazuh.py`, `policies.py`, `ssh.py`, `bashrc.py`…). Il
+mord sur les 57 autres, atteignables au role 1 (`updates.py`, `services.py`, `fail2ban.py`,
+`iptables.py`, `cve.py`…).
+
+Ce n'est pas un trou : c'est une **redondance qui se lit comme une protection** — la forme « en-tete
+qui ment », mais en code plutot qu'en commentaire. L'uniformiser a son interet, pour que le code cesse
+de suggerer un controle qu'il n'apporte pas, mais **ce n'est pas un correctif de securite**.
+
+#### Ce qui protege reellement `/server_status`
+
+Son CORPS, pas son decorateur : refus d'un `machine_id` absent (`:72-74`), puis **resolution de l'IP
+en base** au lieu d'accepter une IP brute — patch A01-02, ecrit dans sa docstring.
+
+#### Ce qui reste entier
+
+**L'ambiguite de `updated` est un defaut reel et independant.** `{'success': True, 'updated':
+cur.rowcount > 0}` sans `SELECT` prealable : « rien a changer » et « machine absente » rendent tous
+deux 0. Le correctif — resoudre l'objet avant de le muter — vaut pour dire la verite sur le resultat,
+pas pour restreindre un acces.
+
+#### La regle, au §8
+
+**Verifier qu'un garde est ABSENT n'est pas verifier que son absence COMPTE.** J'ai mesure la premiere
+proposition et relaye la seconde sans la mesurer. Lire ce que le garde FAIT avant de conclure de son
+absence.
+
 ### v1.37.70 — E-130 chaine avec l'arbitrage K4, et le releve de niveau
 
 Une relecture croisee a elargi E-130 sur quatre points, tous **verifies ici** avant d'etre inscrits.
