@@ -329,7 +329,7 @@ dernier** — et chaque rang porte son motif.
 | **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
 | **D3** ✅ | **Comptes et rôles** — *PORTÉ `v1.37.61`, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** ✅ | **Suppression et anonymisation** — *PORTÉ `v1.37.62`, voir §5.0quater* | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
-| **D5** ✅ | **Permissions et accès** — *caractérisé, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
+| **D5** ✅ | **Permissions et accès** — *PORTÉ `v1.37.63`, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6** | **Serveurs** | `includes/manage_servers.php`, `manage_servers_table.php`, `includes/server_actions.php`, `includes/import_csv.php` | 1 746 | Base seulement, mais **manipule les mots de passe SSH et root des machines** (`server_actions.php:164-165`, chiffrés par `crypto.php`). Le plus gros sous-lot ; à redécouper si nécessaire — `S2` l'a été pour 579 lignes |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
@@ -564,7 +564,7 @@ nom avec `.rw-etroit-seul--inline` — **annulé** : cette classe ne s'affiche q
 veut dire autre chose. Une classe qui existe n'est pas une classe qui convient. À reprendre avec D5,
 qui rendra ce tableau à sa largeur.
 
-### 5.0quinquies D5 — CARACTÉRISÉ le 2026-08-26 : la bascule qui ne fait rien, confirmée au clic
+### 5.0quinquies D5 — PORTÉ le 2026-08-26 (`v1.37.63`) : la bascule fonctionne enfin
 
 `tests/e2e/go-adm-permissions.mjs` — **10 PASS / 0 FAIL sur le legacy**, **base rouge 7/2**.
 
@@ -586,10 +586,26 @@ plus qu'à s'y brancher.
 pas une — l'onglet « Accès & permissions » de `admin_page.php`, masqué tant qu'on ne clique pas
 dessus, **puis** la carte `<details>` du compte. `page.$()` trouve la case dans les deux cas.
 
-**Ce qui reste à faire pour finir D5** : le portage. Trois décisions sont tranchées — une seule liste
-de permissions, dérivée des colonnes réelles et partagée par la création et la bascule ; le panneau de
-step-up de D4 branché sur la bascule ; et le tableau des comptes rendu à sa largeur, ce que D4 avait
-laissé en dette.
+**PORTÉ le 2026-08-26, `v1.37.63`** — `/permissions`, **13 PASS / 0 FAIL sur le portage**, legacy
+10/0. La liste vient du **schéma** : `Permissions::toutes()` lit `information_schema`, donc une
+colonne ajoutée devient réglable et une colonne retirée disparaît partout à la fois. Il ne peut plus
+y avoir trois listes, parce qu'il n'y en a plus qu'une source.
+
+Le panneau de step-up de D4 est branché : refus annoncé, panneau ouvert, code saisi, et
+`can_scan_cve` passe de `null` à **1** — mesuré en base.
+
+**La mesure a dédouané `update_server_access.php`** : le correctif A01 pose bien
+`if ($currentRoleId < 3)` sur la branche `update_sudo`, la liste de presets est fermée et le `runas`
+validé. Aucun défaut à signaler — et ça se dit aussi nettement qu'une accusation.
+
+**Et le plan se trompait sur ses propres comptes de test.** Il annonçait **une** permission pour
+`rw-test-admin` ; il en porte **neuf**, mesurées colonne par colonne — dont `can_manage_fail2ban`,
+l'une des deux qu'E-118 dit non reprenable. Plusieurs suites mesurent une garde en s'appuyant sur
+« ce compte n'a pas telle permission » : la ligne fausse aurait produit un vert qui ne mesure rien.
+Corrigé en §6 du plan.
+
+**La dette de largeur de D4 n'est PAS résorbée** : elle porte sur `/comptes`, que D5 n'a pas touché.
+Elle reste écrite, et attend le sous-lot qui reprendra ce tableau.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

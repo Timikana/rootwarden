@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D4 PORTÉS (`v1.37.59` à `v1.37.62`) ; D5 CARACTÉRISÉ (legacy 10/0, base rouge 7/2) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D5 PORTÉS (`v1.37.59` à `v1.37.63`) — `MODULE-ADM.md`**, dix sous-lots, cinq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -513,8 +513,24 @@ password_expires_at password_expiry_override force_password_change created_at on
 | compte | id | rôle | note |
 |---|---|---|---|
 | `rw-test-user` | 14 | 1, zéro permission | **D-5 : ne pas toucher** |
-| `rw-test-admin` | 15 | 2, `can_manage_supervision` | **treize suites en dépendent** |
+| `rw-test-admin` | 15 | 2, **NEUF permissions** | **treize suites en dépendent** — remesuré le 2026-08-26 |
 | `rw-test-super` | 16 | 3, `can_admin_portal` | les captures passent par lui |
+
+**Ce document annonçait UNE permission pour `rw-test-admin`. Il en porte NEUF**, mesurées colonne par
+colonne le 2026-08-26 :
+
+`can_deploy_keys` · `can_update_linux` · `can_scan_cve` · `can_view_compliance` ·
+`can_manage_backups` · **`can_manage_fail2ban`** · `can_manage_services` · `can_audit_ssh` ·
+`can_manage_supervision`
+
+`rw-test-super` n'en porte qu'**une** (`can_admin_portal`) — le rôle 3 les contourne toutes de toute
+façon. `rw-test-user` n'en porte **aucune**, ce qui était bien dit.
+
+**Pourquoi le chiffre compte** : plusieurs suites mesurent une garde en s'appuyant sur « `rw-test-admin`
+n'a PAS telle permission ». Concevoir un tel test sur la foi de cette ligne, quand le compte porte
+neuf droits, produirait un vert qui ne mesure rien. Et l'un de ces neuf est
+`can_manage_fail2ban` — l'une des deux permissions que l'interface du legacy ne sait pas reprendre
+(E-118).
 
 Mot de passe `RootWarden@2026-Test!`, codes via `node tests/e2e/code-totp.mjs <compte>`.
 **Ne jamais inventer un secret TOTP.** Sans secret TOTP : `opsuser` (id 2, **vrai compte**) et cinq
@@ -757,6 +773,13 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Ce document s'est trompé sur ses propres comptes de test.** Il annonçait une permission pour
+  `rw-test-admin` ; il en porte neuf. Plusieurs suites mesurent une garde en s'appuyant sur « ce
+  compte n'a PAS telle permission » : la ligne fausse aurait produit un vert qui ne mesure rien.
+  **Remesurer les droits AVANT de concevoir un test de garde**, colonne par colonne.
+- **Une liste écrite à la main vieillit ; le schéma est la vérité.** Le portage des permissions lit
+  `information_schema` plutôt que de recopier une liste blanche : trois listes ne peuvent plus
+  diverger quand il n'y a plus qu'une source.
 - **Trois pièces correctes peuvent former une impasse.** E-119 : la garde step-up est bonne, le POST
   part bien, le refus est juste — et pourtant cocher une permission ne fait rien, parce que le modal
   qui permettrait de répondre n'écoute que `fetch` quand la requête part en `XHR`. **Chercher le

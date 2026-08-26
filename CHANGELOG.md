@@ -2171,6 +2171,50 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.63 — `adm/` D5 : la bascule de permission fonctionne enfin
+
+**19 entrees de menu portees sur 33** (D5 ajoute une page a un module deja porte). Legacy 10/0,
+portage 13/0 (`tests/e2e/go-adm-permissions.mjs`).
+
+**E-119 — trois pieces correctes qui formaient une impasse.** La garde step-up de
+`update_permissions.php:60` est bonne, le POST htmx part bien, et le refus 403 est juste. Mais le
+modal qui permettrait d'y repondre est une surcouche de `window.fetch`, et htmx n'emploie que
+`XMLHttpRequest` : la surcouche ne voit jamais la requete, aucun geste d'interface ne permet
+d'obtenir la marque, et htmx ne remplace rien sur un 4xx. Mesure : le POST part, le 403 revient,
+`can_scan_cve` reste a 0, l'ecran ne bouge pas. **Cocher une permission ne faisait rien, en silence,
+meme pour un role 3.**
+
+Le portage garde la MEME exigence et lui donne un chemin : le panneau de re-authentification EN PAGE
+ecrit pour D4. Mesure apres portage : refus annonce, panneau ouvert, code saisi, et `can_scan_cve`
+passe a 1.
+
+**E-118 — trois listes pour les memes droits, et les ecarts se croisaient.** 18 colonnes, 14 posables
+a la creation, 16 basculables ensuite. `can_manage_fail2ban` s'accordait sans se reprendre ;
+`can_manage_api_keys` etait inatteignable dans les deux sens — alors que toutes deux gardent de
+vraies pages. Le portage LIT LA LISTE DANS LE SCHEMA : une colonne ajoutee devient reglable, une
+colonne retiree disparait partout a la fois. Il ne peut plus y avoir de divergence, parce qu'il n'y a
+plus qu'une source.
+
+L'interpolation du nom de colonne reste inevitable — PDO ne lie pas un nom de colonne — mais elle est
+desormais bornee par le schema lui-meme, ce qui est plus sur qu'une liste blanche recopiee : une
+liste vieillit, le schema est la verite.
+
+**LA MESURE A DEDOUANE `update_server_access.php`**, et c'est dit aussi nettement que le reste : le
+correctif A01 pose bien `if ($currentRoleId < 3)` sur la branche `update_sudo`, la liste de presets
+est fermee et le `runas` valide par une expression reguliere. Aucun defaut a signaler.
+
+**ET LE PLAN SE TROMPAIT SUR SES PROPRES COMPTES DE TEST.** Il annoncait UNE permission pour
+`rw-test-admin` ; il en porte NEUF, mesurees colonne par colonne — dont `can_manage_fail2ban`, l'une
+des deux que le legacy ne sait pas reprendre. Plusieurs suites mesurent une garde en s'appuyant sur
+« ce compte n'a pas telle permission » : concevoir un test sur cette ligne aurait produit un vert qui
+ne mesure rien. Corrige en §6 du plan.
+
+45 cles FR et EN, jeux compares — les DIX-HUIT permissions sont nommees, y compris les deux que le
+legacy laisse hors de son interface. Garde de page : role 3 + `can_admin_portal`. La garde
+hierarchique vit dans le controleur, parce qu'elle depend de la CIBLE.
+
+Ecarts : **E-118 et E-119**, les deux fermes par ce portage.
+
 ### v1.37.62 — `adm/` D4 : le geste sur devient atteignable, et le step-up sort de l'attente
 
 **19 entrees de menu portees sur 33** (inchange : D4 ajoute des gestes a une page deja portee).
