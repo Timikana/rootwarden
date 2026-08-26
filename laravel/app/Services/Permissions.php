@@ -123,6 +123,70 @@ class Permissions
         return true;
     }
 
+    /* ═══ Permissions TEMPORAIRES — sous-lot D5b ═══════════════════════════ */
+
+    /**
+     * Les octrois temporaires encore valides.
+     *
+     * ══ LU EN BASE, ACCORDE PAR LA PASSERELLE ═════════════════════════════
+     *
+     * `GET /admin/temp_permissions` ne fait qu'un `SELECT` avec trois jointures :
+     * il n'y a rien a heriter d'un aller-retour, et la meme lecture se fait ici.
+     *
+     * L'OCTROI, LUI, PASSE PAR LA PASSERELLE — et c'est la seule raison qui
+     * vaille : `POST /admin/temp_permissions` NOTIFIE le compte concerne
+     * (`notify(type='perm_granted')`, `admin.py:196`). Reecrire l'insertion ici
+     * priverait la personne de son avertissement, sans que rien ne le signale.
+     * Un effet de bord qu'on ne sait pas reproduire est une raison de ne PAS
+     * court-circuiter.
+     *
+     * LA REVOCATION, elle, n'a aucun effet de bord : `DELETE` seul. Elle s'ecrit
+     * donc ici, par un formulaire — les quatre gestes de D6b ont montre ce que
+     * coute un `fetch` dont le jeton n'arrive pas.
+     *
+     * `expires_at > NOW()` : la table garde les expires jusqu'a ce que le
+     * planificateur les purge (deux fois, `scheduler.py:400` et `:782`). Les
+     * montrer laisserait croire a des droits qui n'agissent plus.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function temporaires(): array
+    {
+        return DB::table('temporary_permissions as tp')
+            ->join('users as u', 'u.id', '=', 'tp.user_id')
+            ->leftJoin('users as g', 'g.id', '=', 'tp.granted_by')
+            ->leftJoin('machines as m', 'm.id', '=', 'tp.machine_id')
+            ->where('tp.expires_at', '>', now())
+            ->select('tp.id', 'tp.permission', 'tp.reason', 'tp.expires_at', 'tp.created_at',
+                'tp.machine_id', 'u.name as compte', 'u.role_id', 'g.name as accorde_par',
+                'm.name as machine')
+            ->orderBy('tp.expires_at')
+            ->get()->map(static fn ($p) => (array) $p)->all();
+    }
+
+    /**
+     * Revoque un octroi temporaire.
+     *
+     * @return bool false s'il n'existe pas, ou s'il avait deja expire
+     */
+    public function revoqueTemporaire(int $id): bool
+    {
+        return DB::table('temporary_permissions')
+            ->where('id', $id)->where('expires_at', '>', now())
+            ->delete() > 0;
+    }
+
+    /** Le libelle d'un octroi, pour l'annoncer avant de le revoquer. */
+    public function libelleTemporaire(int $id): ?string
+    {
+        $l = DB::table('temporary_permissions as tp')
+            ->join('users as u', 'u.id', '=', 'tp.user_id')
+            ->where('tp.id', $id)
+            ->select('tp.permission', 'u.name')->first();
+
+        return $l === null ? null : $l->permission . ' — ' . $l->name;
+    }
+
     /* ═══ Acces machines ═══════════════════════════════════════════════════ */
 
     /**

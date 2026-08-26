@@ -636,6 +636,18 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::post('/permissions/{id}/acces', [PermissionsController::class, 'acces'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.acces');
 
+    /*
+     * Permissions TEMPORAIRES — sous-lot D5b.
+     *
+     * `manage_permissions.php:184-267` porte un formulaire d'octroi, une liste
+     * et une revocation ; D5 a porte le fichier en laissant cette moitie dehors
+     * (E-134). L'octroi passe par la PASSERELLE parce qu'il notifie le compte
+     * concerne ; la revocation s'ecrit ici, n'ayant aucun effet de bord.
+     */
+    Route::post('/permissions/temporaires/{id}/revoquer', [PermissionsController::class, 'revoquerTemporaire'])
+        ->whereNumber('id')
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.temp.revoquer');
+
     Route::get('/journal-audit', JournalAuditController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('journal-audit');
