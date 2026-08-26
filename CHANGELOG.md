@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.86** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.87** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,44 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.87 — `bashrc/` B2 caracterise : les lectures distantes ABOUTISSENT, et la production reste hors d'atteinte
+
+`go-bashrc-b2.mjs`, **legacy 14 PASS / 0 FAIL**. Le portage reste a faire.
+
+C'est la premiere suite du module qui joint REELLEMENT une machine : elle enumere les comptes de
+`Test-Server-Debian` par SSH (`root`, `testuser`) et lit le `.bashrc` de `root` pour en construire un
+diff — `571 o → 17814 o`. Aucune ecriture.
+
+#### La propriete « jamais la production » se MESURE, elle n'est pas construite
+
+La page propose les TROIS machines du parc, `srv-zabbix` comprise. Le filet ne se contente donc pas
+d'avorter les routes d'ecriture : il **lit le `machine_id` de chaque requete** et avorte tout ce qui
+ne vise pas la machine 2. **Un `machine_id` indetermine est avorte aussi** — sans identifiant on ne
+sait pas ou ca va, donc fail-closed. Le verdict porte sur ce qui a ABOUTI :
+
+    PASS  aucune requete aboutie ne visait une autre machine que la 2
+    PASS  aucune requete aboutie n'ecrivait
+
+#### Trois defauts de MESURE, et les trois etaient dans l'instrument
+
+- **Le filet a bloque la page elle-meme.** `/\/bashrc\//` attrapait `GET /bashrc/` : la suite
+  mourait sur `ERR_BLOCKED_BY_CLIENT` avant de rien mesurer. Le garde vise desormais les NOMS DE
+  ROUTES (`users`, `preview`, …), que la page ne porte pas. **Deuxieme fois sur ce module que le
+  filet produit l'echec qu'il rapporte.**
+- **`on` n'est pas un compte : c'est la case « Tout ».** Un `<input type=checkbox>` sans attribut
+  `value` rend `"on"`. La suite le listait comme un compte — et comme il vient EN PREMIER,
+  `cases[0].click()` cochait « tout selectionner », ce qui retient `root` avec le reste. Sur cette
+  page, c'est exactement le geste dangereux. Le compte est desormais vise PAR SA VALEUR.
+- **`verifie()` imprimait le detail d'echec sur les PASS.** Sixieme correction a la main dans ce
+  depot : `PASS … — aucune requete n'est partie`. La signature l'empeche maintenant — le detail
+  d'echec ne sort que sur un FAIL, et un detail valable dans les deux verdicts passe en quatrieme
+  argument. *Une regle qu'on doit se rappeler est une propriete qu'on n'a pas encore construite.*
+
+#### Deux constats pour le portage
+- **`root` est bien propose** dans la liste des comptes (`_list_users` retient `UID == 0`). Le
+  portage devra decider de le signaler ou non — c'est en §6.4 de `MODULE-BASHRC.md`.
+- La case « Tout » selectionne `root` avec les autres, sans rien dire.
 
 ### v1.37.86 — `bashrc/` B1 porte : la production ne se fond plus dans la liste
 
