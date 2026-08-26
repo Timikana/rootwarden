@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.84** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.86** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,53 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.86 — `bashrc/` B1 porte : la production ne se fond plus dans la liste
+
+`/bashrc`, **legacy 17 PASS / portage 18 PASS, 0 FAIL**. Le module n'a AUCUN defaut de securite
+(`MODULE-BASHRC.md` §3) : les trois corrections sont de PRESENTATION, et toutes trois avaient ete
+vues A L'IMAGE, invisibles a toute assertion DOM.
+
+#### Corrige cote portage
+- **`srv-zabbix` ne se fond plus dans la liste.** Le legacy l'affiche avec la meme case a cocher que
+  les machines d'essai — et `_list_users` propose `root` : la page permettait de cocher production
+  + `root` et de deployer. Le portage la teinte, lui pose un lisere, un badge « Production », et
+  annonce en TETE du tableau qu'une machine de production y figure. La sensibilite se lit sur DEUX
+  colonnes (`environment = PROD` OU `criticality = CRITIQUE`) — une machine peut etre critique sans
+  etre en production, et l'inverse. `OTHER` et une valeur vide comptent comme sensibles : un
+  environnement inconnu ne se range pas du cote sur.
+- **Le compteur s'ENONCE** : « Aucune machine selectionnee — un deploiement ne deploierait rien. »
+  Le legacy affiche « Serveurs cibles 0 », et un `0` se lit comme une donnee, pas comme un etat.
+  Quand la selection contient une machine de production, le compteur le DIT.
+- **Une SIMULATION n'est pas un deploiement.** La seule ligne `[bashrc]` de la base est une
+  simulation du 2026-07-25 sur `srv-zabbix`. Le legacy l'exclut de sa colonne — donc « jamais
+  deploye », ce qui est vrai mais perd l'information. Le portage la rend **sur sa propre ligne** :
+  « simule le … — rien n'a ete ecrit ».
+
+#### Trois defauts attrapes dans le portage, dont un qui rendait la page 500
+- **`@json` avec un litteral de tableau inline casse le PHP compile.** Sa lecture d'arguments
+  decoupe sur les virgules de premier niveau sans suivre les crochets : le compile devenait
+  `json_encode([... )`, sans crochet fermant. **`@json` prend une VARIABLE** — le motif employe en
+  D9a et D9b, oublie ici.
+- **La requete du dernier deploiement attrapait trop large** : tout `[bashrc]` portant un
+  `machine_id`, donc un `restore` se serait affiche comme un deploiement. Alignee sur le motif du
+  legacy, `[bashrc] deploy%`, simulations exclues.
+- **Un commentaire affirmait que `environment` et `criticality` sont du texte libre** — ce sont des
+  `enum`. Corrige : laisser un commentaire qui dit l'inverse du schema serait le defaut meme que ce
+  chantier traque.
+
+#### Deux defauts de MESURE, corriges dans la suite
+- Le controle i18n rapportait `bashrc.blade` et `bashrc.js` comme des cles manquantes : ce sont des
+  **noms de fichiers** dans une pile d'appels. Il lisait la PAGE D'ERREUR. Le motif exclut desormais
+  les extensions, **et la precondition « la page rend » est asserte avant** — « aucun identifiant
+  trouve » sur une page en erreur serait vrai pour la pire des raisons.
+- La simulation etait rendue dans un `<span>`, donc collee a « jamais deploye » : les deux se
+  lisaient comme une seule phrase. Presenter la simulation ACCOLEE au verdict de deploiement est
+  exactement ce que ce bloc existe pour eviter.
+
+#### La regle de navigation, corrigee au tour precedent, fait sa premiere prediction
+Basculer `bashrc` (garde `can_manage_bashrc`, que `rw-test-admin` n'a pas) devait ajouter **une**
+assertion et non deux. Mesure : **59 -> 60**. La formule courte « +2 par entree » aurait predit 61.
 
 ### v1.37.84 — `bashrc/` B1 caracterise : le triple chemin de garde, MESURE
 

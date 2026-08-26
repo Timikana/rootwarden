@@ -7,6 +7,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
+use App\Http\Controllers\BashrcController;
 use App\Http\Controllers\AccesSftpController;
 use App\Http\Controllers\PolitiquesController;
 use App\Http\Controllers\DeriveConfigController;
@@ -649,6 +650,19 @@ Route::middleware('session.authentifiee')->group(function () {
      * garde de page (`checkAuth([ROLE_SUPERADMIN])`, role 2 mesure a 403) et
      * memes `@require_role(3)` cote backend.
      */
+    /*
+     * Deploiement du `.bashrc` standardise — B1. `role:2` + la permission,
+     * repris tel quel du legacy (`checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` +
+     * `checkPermission('can_manage_bashrc')`).
+     *
+     * MESURE sur le legacy, les trois chemins : role 1 -> 403, role 2 SANS la
+     * permission -> 403, role 3 SANS la permission -> 200. Le contournement par
+     * le role 3 vient du middleware `perm`, et il est identique cote backend
+     * (`require_permission`, `helpers.py:280`).
+     */
+    Route::get('/bashrc', BashrcController::class)
+        ->middleware(['role:2', 'perm:can_manage_bashrc'])->name('bashrc');
+
     Route::get('/acces-sftp', AccesSftpController::class)
         ->middleware(['role:3'])->name('acces-sftp');
 
