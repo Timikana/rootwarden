@@ -43,7 +43,50 @@
 # utilisant le meme compte se saboteraient en silence.
 set -u
 
-RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# ══ LE RUNNER S'EXECUTE DEPUIS UNE COPIE, ET C'EST UNE PROPRIETE ════════════
+#
+# POURQUOI. `bash` lit un script INCREMENTALEMENT, en memorisant un decalage en
+# octets : il parse la boucle principale en entier, puis se repositionne a cet
+# offset pour lire la suite — le resume et la comparaison aux references. Une
+# ecriture qui ajoute des octets AVANT la boucle decale donc tout ce qui suit, et
+# le verdict peut etre lu de travers SANS QU'AUCUNE ERREUR N'APPARAISSE.
+#
+# C'est arrive DEUX FOIS le 2026-08-26, a une heure d'intervalle, par les deux
+# sessions qui travaillent ce depot — dont une minute apres que l'une d'elles ait
+# redige la regle qui l'interdit. Les deux fois la fenetre s'est refermee par
+# chance : le rejeu n'avait pas atteint la queue du script.
+#
+#   Une regle qu'on doit se rappeler est une propriete qu'on n'a pas encore
+#   construite.
+#
+# D'ou ceci : le script se recopie et execute la copie. Editer la source pendant
+# un rejeu devient SANS EFFET POSSIBLE, pour soi comme pour l'autre session. Le
+# quatrieme regime de lecture disparait comme probleme au lieu d'etre une regle a
+# retenir.
+#
+# ⚠ LE PIEGE, ET IL N'ETAIT PAS EVIDENT. `RACINE` se deduit de la POSITION du
+# script. Copie dans `/tmp`, il rendrait `/tmp` — et TROIS choses en dependent :
+# `$E2E` (donc `cd "$E2E" && node`), la lecture de `$RACINE/srv-docker.env` pour le
+# mot de passe root, et le `cd "$RACINE" && docker compose` du profil preprod. Le
+# shim `bin/docker`, lui, vit sous `$JOURNAUX` donc en `mktemp` : il SURVIVRAIT, et
+# le diagnostic n'en serait que plus trompeur — `docker` marche pendant que
+# `srv-docker.env` est introuvable.
+#
+# La racine est donc calculee AVANT la copie et transmise par l'environnement ; la
+# copie ne la recalcule pas.
+RACINE="${RW_RACINE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+if [ -z "${RW_DEPUIS_COPIE:-}" ]; then
+  _copie="$(mktemp -t rejouer-lot-XXXXXX.sh)" || {
+    echo "impossible de creer la copie d'execution" >&2; exit 1; }
+  cat "${BASH_SOURCE[0]}" > "$_copie"
+  # La copie se supprime a sa sortie. `$0` s'expanse quand le trap est POSE, donc
+  # le trap devient litteralement `rm -f /tmp/rejouer-lot-XXXXXX.sh`. L'`unlink`
+  # est sans danger meme si `bash` lit encore : le descripteur reste ouvert jusqu'a
+  # la fin du processus.
+  RW_DEPUIS_COPIE=1 RW_RACINE="$RACINE" exec bash -c \
+    'trap "rm -f \"$0\"" EXIT; . "$0"' "$_copie" "$@"
+fi
 E2E="$RACINE/tests/e2e"
 JOURNAUX="${LOT_JOURNAUX:-$(mktemp -d -t rw-lot-XXXXXX)}"
 
