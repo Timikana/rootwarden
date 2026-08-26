@@ -99,7 +99,7 @@ sécurité, et la convention du dépôt les veut sur une branche dédiée, jamai
 
 | sous-lot | contenu | pourquoi ce rang |
 |---|---|---|
-| **S1** | La page, ses gardes, ses filtres, et **le triple chemin de garde** | Rien ne part vers une machine. C'est ici que se mesure ce que §2 n'a pu que lire |
+| **S1** ✅ | La page, ses gardes, ses filtres — *CARACTÉRISÉ `v1.37.93`, legacy **16 PASS / 0 FAIL**, port à faire* | Rien ne part vers une machine. C'est ici que se mesure ce que §2 n'a pu que lire |
 | **S2** | Les lectures : `/services/list`, `/services/status`, `/services/logs` | Ouvrent une session SSH, ne modifient rien |
 | **S3** | Les écritures : `start`, `stop`, `restart`, `enable`, `disable` | **MODIFIENT** l'état de services sur une machine réelle. Interception avec avortement |
 
@@ -107,11 +107,15 @@ sécurité, et la convention du dépôt les veut sur une branche dédiée, jamai
 
 ## 5. Ce dont cet inventaire n'est PAS sûr
 
-1. **Le comportement réel du rôle 1 sur la page.** Déduit : `checkPermission` devrait le refuser
-   faute de `can_manage_services`. À mesurer — c'est le premier geste de S1.
+1. ~~**Le comportement réel du rôle 1 sur la page.**~~ **MESURÉ le 2026-08-27 : 403**, et le refus
+   **laisse une trace en journal**. Les deux comptes admis le sont pour des raisons différentes —
+   `rw-test-admin` par la permission, `rw-test-super` par le contournement de rôle.
 2. **Ce que `/services/list` rend sur une machine joignable.** La machine 2 l'était au 2026-08-26 ;
    à revérifier avant S2.
 3. **Le contenu de `/services/logs`** — un flux ou un JSON ? Un flux ne se porte pas comme un JSON,
    et la question n'a pas été tranchée par la lecture.
 4. **Les références du LOT**, inconnues tant que les suites n'ont pas tourné.
 5. **La catégorisation des services** (`categoryBadge`) — sur quoi repose-t-elle ? Non lu.
+
+**Ajouté par S1** : les trois filtres sont **présents mais invisibles** au chargement, et un panneau
+de journaux **vide** est affiché avant tout geste. Deux constats de présentation pour le portage.
