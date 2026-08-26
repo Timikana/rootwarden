@@ -99,7 +99,7 @@ sécurité, et la convention du dépôt les veut sur une branche dédiée, jamai
 
 | sous-lot | contenu | pourquoi ce rang |
 |---|---|---|
-| **S1** ✅ | La page, ses gardes, ses filtres — *CARACTÉRISÉ `v1.37.93`, legacy **16 PASS / 0 FAIL**, port à faire* | Rien ne part vers une machine. C'est ici que se mesure ce que §2 n'a pu que lire |
+| **S1** ✅ | La page, ses gardes, ses filtres — *PORTÉ `v1.37.94`, `/services`, **16 legacy / 19 portage**, 0 FAIL* | Rien ne part vers une machine. C'est ici que se mesure ce que §2 n'a pu que lire |
 | **S2** | Les lectures : `/services/list`, `/services/status`, `/services/logs` | Ouvrent une session SSH, ne modifient rien |
 | **S3** | Les écritures : `start`, `stop`, `restart`, `enable`, `disable` | **MODIFIENT** l'état de services sur une machine réelle. Interception avec avortement |
 

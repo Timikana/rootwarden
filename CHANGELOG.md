@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.93** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.94** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,44 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.94 — `services/` S1 porte : une assertion revele une regression du portage
+
+`/services`, **legacy 16 PASS / portage 19 PASS, 0 FAIL**.
+
+#### L'assertion « second temoin » a paye des sa premiere execution
+
+S1 asserte que le refus oppose au role 1 **laisse une trace en journal** — un temoin independant du
+statut HTTP. Sur le portage, elle a ECHOUE : `ExigePermission` refusait correctement (403, mesure)
+**sans rien enregistrer**, la ou le legacy ecrit « Permission refusee : <permission> »
+(`auth/verify.php:307-312`).
+
+**Une regression de piste d'audit que seule cette assertion pouvait voir** : le 403 etait juste, la
+garde faisait son travail, et rien ne manquait a l'ecran. Corrigee dans le meme lot.
+
+> Un 403 dit que la page a refuse ; le journal dit que le refus a ete ENREGISTRE. Ce ne sont pas les
+> memes proprietes, et seule la seconde survit a la session.
+
+Le middleware sert **toutes** les routes `perm:` : `go-adm-audit` a ete rejoue apres la correction —
+**34 PASS, conforme**. Le compte d'orphelines de `user_logs` passe de 998 a 1000, mais cette suite
+mesure un DELTA dans sa propre execution, pas une valeur fixe. La ligne part sans empreinte de
+chaine, exactement comme celle du legacy, et la coherence mesuree porte sur la sous-chaine SCELLEE.
+
+**L'echec d'ecriture ne bloque jamais le refus** : le refus est la propriete de securite, sa trace
+une propriete d'audit. Faire dependre la premiere de la seconde transformerait une base indisponible
+en porte ouverte.
+
+#### Deux corrections de presentation, mesurees puis portees
+- **Les filtres sont montres des le depart, desactives, avec la raison.** Le legacy les garde dans le
+  DOM mais MASQUES jusqu'au chargement d'un serveur (`etat=false categorie=false recherche=false`).
+  Une assertion d'existence les declarait bons.
+- **Aucun cadre vide avant le premier geste.** Le legacy affiche un panneau de journaux noir et vide
+  des l'ouverture ; ici un texte dit qu'il n'y a rien.
+
+#### E-149 n'est pas referme, et le code le dit
+Les huit routes backend n'ont toujours ni role ni permission. `App\Services\ServicesSystemd` porte
+le constat en tete, avec la mesure qui en borne la portee : reel dans le code, non exploitable par
+aucun compte existant. **§7 du plan.**
 
 ### v1.37.93 — `services/` S1 caracterise : trois chemins de garde, et deux admis pour des raisons differentes
 

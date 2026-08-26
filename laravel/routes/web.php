@@ -7,6 +7,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
+use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\BashrcController;
 use App\Http\Controllers\AccesSftpController;
 use App\Http\Controllers\PolitiquesController;
@@ -660,6 +661,19 @@ Route::middleware('session.authentifiee')->group(function () {
      * le role 3 vient du middleware `perm`, et il est identique cote backend
      * (`require_permission`, `helpers.py:280`).
      */
+    /*
+     * Services systemd distants — S1. `role:1` + la permission, repris tel quel
+     * du legacy : **la page admet le role 1**, contrairement a `bashrc/`.
+     *
+     * MESURE par S1 : role 1 SANS la permission -> 403, role 2 AVEC -> 200,
+     * role 3 SANS -> 200. Les deux admis le sont pour des raisons DIFFERENTES.
+     *
+     * E-149 : les huit routes backend n'ont ni role ni permission. Le portage ne
+     * le referme pas — voir `App\Services\ServicesSystemd` et §7 du plan.
+     */
+    Route::get('/services', ServicesController::class)
+        ->middleware(['role:1', 'perm:can_manage_services'])->name('services');
+
     Route::get('/bashrc', BashrcController::class)
         ->middleware(['role:2', 'perm:can_manage_bashrc'])->name('bashrc');
 

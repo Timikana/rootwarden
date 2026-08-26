@@ -309,6 +309,13 @@ declare -A REF_LARAVEL=(
   # contenu stocke, l'avertissement ENONCE CE QU'IL NE VERIFIE PAS, et la page
   # ne porte aucune erreur JavaScript.
   [go-bashrc-b3]=19
+  # `services/` sous-lot S1 : la page, ses gardes, ses filtres.
+  # 19 sur le portage contre 16 sur le legacy. Trois assertions d'ecart, toutes
+  # sur ce que le legacy ne fait pas : aucun cadre vide avant le premier geste,
+  # aucune erreur JavaScript, et le refus oppose au role 1 laisse une trace en
+  # journal — cette derniere a REVELE une regression du portage, corrigee dans
+  # le meme lot (`ExigePermission` refusait sans rien enregistrer).
+  [go-services-s1]=19
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
