@@ -167,6 +167,37 @@ C'est la même mécanique que la pastille de `maintenance/` (E-101), avec une di
 là le verdict était recalculé sur une mauvaise horloge, ici il est **écrit en base** et survit à la
 session.
 
+### ⚠ ET `uninstall` EST PIRE — mesuré après coup, ce paragraphe ne parlait d'abord que de `deploy`
+
+`uninstall()` (`graylog.py:419-426`) :
+
+```python
+with ssh_session(…) as client:
+    execute_as_root(client,
+        f"rm -f {_RW_FORWARD_CONF} {_RW_CONF_PREFIX}*.conf && systemctl restart rsyslog",
+        root_pwd, logger=logger, timeout=30)     # ← resultat ENTIEREMENT jete
+_upsert_state(row['id'], forward_deployed=False) # ← inconditionnel
+return jsonify({'success': True})                # ← TOUJOURS vrai
+```
+
+Le code de retour n'est **pas même capturé** : `deploy` calcule au moins son `success` à partir de deux
+vérifications, `uninstall` n'en fait aucune. Un `rm` qui échoue, un `systemctl restart` qui échoue, et
+la route répond **`success: true`** en marquant la machine « non déployée ».
+
+**Et ce sens-là est le plus grave des deux, pour un module de transfert de journaux :**
+
+| geste échoué | ce que l'écran affirme | la réalité |
+|---|---|---|
+| `deploy` | « Transfert actif » | rien ne part — on croit collecter et on ne collecte pas |
+| `uninstall` | « Non déployé », et `success: true` | **le transfert continue** — on croit avoir arrêté d'expédier les journaux hors de la machine, et on ne l'a pas arrêté |
+
+Le second est une affirmation de **confidentialité** : quelqu'un qui retire le transfert pour une raison
+de conformité obtient une confirmation franche d'un geste qui a pu ne rien faire. Le premier fait perdre
+des journaux ; le second fait croire qu'on a cessé d'en envoyer.
+
+G2 mesurera donc **les deux sens**, et le correctif backend porte sur les deux routes : capturer le code
+de retour, et n'écrire l'état qu'en accord avec lui.
+
 ### Comment G2 mesurera cela sans casser le banc
 
 La branche d'échec n'est pas atteignable par un déploiement normal — il faut la rendre atteignable, ce
