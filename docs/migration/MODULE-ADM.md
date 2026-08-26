@@ -327,7 +327,7 @@ dernier** — et chaque rang porte son motif.
 |---|---|---|---|---|
 | **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
 | **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
-| **D3** | **Comptes et rôles** | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
+| **D3** ✅ | **Comptes et rôles** — *caractérisé, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** | **Permissions et accès** | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6** | **Serveurs** | `includes/manage_servers.php`, `manage_servers_table.php`, `includes/server_actions.php`, `includes/import_csv.php` | 1 746 | Base seulement, mais **manipule les mots de passe SSH et root des machines** (`server_actions.php:164-165`, chiffrés par `crypto.php`). Le plus gros sous-lot ; à redécouper si nécessaire — `S2` l'a été pour 579 lignes |
@@ -444,6 +444,44 @@ ancêtre portant le titre » : il remontait jusqu'à la barre de navigation et r
 L'assertion « le type n'est pas replié sur Autre » passait donc **parce que le mot « Autre » n'est
 pas dans le menu**. Corrigée, elle vise l'élément qui porte la pastille — et la mesure devient
 décisive : **legacy « Autre », portage « Scan CVE »**.
+
+### 5.0ter D3 — CARACTÉRISÉ le 2026-08-26, et l'apostrophe qui désarme une confirmation
+
+`tests/e2e/go-adm-comptes.mjs` — **12 PASS / 0 FAIL sur le legacy**, **base rouge 5/6**. Sur les cinq
+passes de la base rouge, **une passe parce que la page est absente** (« aucune erreur JavaScript » :
+un 404 n'a pas de script) ; les quatre autres sont de l'intendance et du contrôle de sûreté.
+
+**La suite ne touche aucun compte existant.** Elle crée le sien par de vrais clics et le retire,
+borné par un delta d'identifiant. Elle ne bascule **jamais** `sudo` : `users.sudo = 1` est la
+précondition du repli `NOPASSWD: ALL` de K4, et le poser même brièvement rendrait ce trou
+exploitable. Le `finally` **prouve** que les trois comptes de test sont intacts — ni `sudo`, ni
+désactivés.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-112** | la politique de mot de passe est contournée **par le seul chemin qui fixe le mot de passe d'autrui**. `password123` est refusé à l'utilisateur pour lui-même et **accepté** à l'administrateur ; `password_history` reste à 0 avant / 0 après |
+| **E-113** | le mot de passe généré est rendu **en clair** dans le HTML — et `strip_tags` l'**ampute** en chemin, parce que l'alphabet contient `<` et `>` : `ab<cd>ef12` s'affiche `abef12`. L'administrateur recopie une chaîne qui n'est pas celle enregistrée |
+| **E-114** | **une apostrophe de traduction désactive DEUX confirmations d'action destructrice — en français seulement.** `L'utilisateur` et `l'utilisateur` ferment le littéral JavaScript de deux `onclick` : réinitialisation de la 2FA et suppression de compte partent **sans confirmation** |
+| **E-115** | **trois** chemins écrivent `users.ssh_key` : deux ne journalisent pas de la même façon (`update_user.php` ne journalise **rien**), et un applique `htmlspecialchars` **à l'écriture** |
+
+**La mesure a dédouané sur un point, et c'est dit aussi nettement que le reste.** `PASSWORD_DEFAULT`
+rend `$2y$12$`, exactement comme `BCRYPT_COST` : le haché de l'administrateur **n'est pas plus faible
+aujourd'hui**. Le défaut est **latent** — `BCRYPT_COST` se lit dans une variable d'environnement, et
+si l'exploitant la relève, ce chemin-là ne suivra pas.
+
+**Comment E-114 a été trouvé, parce que la méthode compte.** La suite assertait « aucune erreur
+JavaScript sur la page » — une assertion d'hygiène, pas une hypothèse. Elle en a relevé **deux**, et
+seulement une fois le compte d'épreuve créé. Trois hypothèses de lecture ont été essayées et
+**écartées par la mesure** (`json_encode` qui échouerait, `strip_tags` qui corromprait l'encodage, un
+`onclick` interpolant le nom) avant de trouver la vraie : deux chaînes de langue sur trois portent
+une apostrophe. **La quatrième hypothèse était la bonne parce que les trois premières ont été
+mesurées, pas parce qu'elle était plus jolie.**
+
+**Ce qui reste à faire pour finir D3** : le portage. Quatre décisions sont déjà tranchées — un seul
+chemin d'écriture de mot de passe, qui applique la politique et écrit l'historique ; le mot de passe
+généré ne transite pas par le HTML de la page ; aucune boîte native, donc le texte traduit est du
+contenu et jamais du code ; un seul chemin d'écriture de la clé SSH, validée en forme, échappée au
+**rendu** et journalisée quelle que soit la porte.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

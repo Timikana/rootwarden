@@ -210,6 +210,14 @@ declare -A REF_LEGACY=(
   # temps de l'execution et retiree dans le `finally`. La preference basculee est
   # relue avant et restauree apres.
   [go-adm-notifications]=16
+  # Sous-lot D3 de `adm/` : comptes, roles, mots de passe. 12 sur le legacy,
+  # mesure du 2026-08-26. La suite CREE son propre compte d'epreuve par de vrais
+  # clics et le retire, borne par un DELTA d'identifiant : treize suites du LOT
+  # dependent de `rw-test-admin`, et changer le mot de passe d'un compte de test
+  # les casserait toutes en silence. `sudo` n'est JAMAIS bascule — `users.sudo=1`
+  # est la precondition du repli `NOPASSWD: ALL` de K4. Le `finally` PROUVE que
+  # les trois comptes de test sont intacts (ni sudo, ni desactives).
+  [go-adm-comptes]=12
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -231,7 +239,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit go-adm-notifications
+  go-adm-audit go-adm-notifications go-adm-comptes
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5

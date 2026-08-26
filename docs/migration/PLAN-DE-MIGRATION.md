@@ -81,7 +81,7 @@ grep -c "'route'"  laravel/app/Support/Navigation.php
 grep -c "'legacy'" laravel/app/Support/Navigation.php
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
-grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (101), pas le dernier numero (E-111)
+grep -c "^## E-" docs/migration/PARITE.md                # ecarts REELS (105), pas le dernier numero (E-115)
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ```
@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **101** — numérotés jusqu'à **E-111** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **105** — numérotés jusqu'à **E-115** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 PORTÉ `v1.37.59` ; D2 PORTÉ `v1.37.60` (legacy 16/0, portage 20/0) — `MODULE-ADM.md`**, dix sous-lots, huit restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 et D2 PORTÉS (`v1.37.59`, `v1.37.60`) ; D3 CARACTÉRISÉ (legacy 12/0, base rouge 5/6) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -458,7 +458,7 @@ déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **en
 commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
-archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** — et sur ces sept passes,
+archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** — et sur ces sept passes,
 **quatre passent PARCE QUE la page est absente** : un 404 ne modifie rien et ne porte pas de script.
 Une base rouge se lit passe par passe, pas au compte.
 
@@ -757,6 +757,23 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Une apostrophe de traduction peut DÉSARMER une garde.** D3 : `L'utilisateur` placé dans un
+  `confirm('…')` ferme le littéral JavaScript, l'`onclick` ne s'analyse pas, et **deux actions
+  destructrices partent sans confirmation** — en français seulement, les chaînes anglaises n'ayant
+  pas d'apostrophe. Une protection qui dépend de la langue de l'interface. Ne jamais placer un texte
+  traduit dans du CODE : c'est du contenu.
+- **Asserter « aucune erreur JavaScript » n'est pas de l'hygiène, c'est un capteur.** C'est cette
+  assertion — et elle seule — qui a révélé E-114. Elle ne cherchait rien de précis, et c'est
+  justement ce qui l'a rendue utile.
+- **Trois hypothèses écartées valent mieux qu'une devinée juste.** Avant de trouver l'apostrophe,
+  trois lectures plausibles ont été mesurées et éliminées. Une hypothèse retenue sans avoir écarté
+  les autres n'est qu'une préférence.
+- **Un bloc `<details>` fermé ne reçoit pas les frappes** — deuxième fois. `page.$()` trouve le
+  champ, `type()` ne lève pas, et rien ne se passe. **Déplier, puis ASSERTER la visibilité et la
+  valeur saisie** avant de soumettre.
+- **`htmlspecialchars` à l'ÉCRITURE n'est pas une protection, c'est une corruption.** Appliqué à une
+  clé SSH destinée à `authorized_keys`, il change la valeur stockée. L'échappement appartient au
+  rendu.
 - **Un garde qui ne trouve pas son objet peut ACCORDER au lieu de refuser.** D2 : en lisant
   `user_id` là où la session écrit `utilisateur_id`, la portée d'un rôle 1 devenait `user_id = 0` —
   la valeur des lignes de **diffusion**. Une session illisible recevait donc exactement ce qu'elle ne
@@ -874,7 +891,7 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 |---|---|
 | **ce fichier** | plan, état, conventions, pièges — **à lire et mettre à jour chaque tour** |
 | `ROADMAP.md` | l'état pour l'exploitant, et ce qui bloque |
-| `PARITE.md` | les 101 écarts mesurés, chacun avec sa preuve |
+| `PARITE.md` | les 105 écarts mesurés, chacun avec sa preuve |
 | `METHODE-SOUS-LOT.md` | les neuf temps |
 | `INVENTAIRE.md` | ce qui reste, mesuré |
 | `DEPRECIATION.md` | le cycle d'archivage et les neuf parties archivées |
