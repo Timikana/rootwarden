@@ -4765,3 +4765,152 @@ inconfigurables tant que `notify()` ne consulte pas les préférences. Leur fair
 `notify_subscribed()` est une décision de comportement du backend — pas un détour de portage de
 page. Le portage se borne à **ne plus les afficher comme « Autre »** et à ne pas laisser croire que
 la page de réglages les gouverne.
+
+---
+
+## E-112 — `adm/` D3 : la politique de mot de passe est contournée par le seul chemin qui fixe le mot de passe **d'autrui**
+
+Mesuré au clic le 2026-08-26 par `tests/e2e/go-adm-comptes.mjs`, sur un compte d'épreuve créé et
+retiré par la suite — jamais sur un compte de test.
+
+| exigence | libre-service (`profile.php:174-184`) | administrateur (`manage_roles.php:65-88`) |
+|---|---|---|
+| longueur minimale | **15** | **8** (`validateInputUsers`, `:48`) |
+| minuscule, majuscule, chiffre, symbole | les quatre | **aucune** |
+| non réutilisé (`password_history`) | oui | **non** |
+| absent de HIBP | oui | **non** |
+| écrit dans `password_history` | oui | **non** |
+
+Tous les autres chemins du dépôt appellent `passwordPolicyValidateAll` — `profile.php`,
+`adm/api/change_password.php`, `auth/reset_password.php`. **Le seul qui ne l'appelle pas est celui
+par lequel un administrateur fixe le mot de passe de quelqu'un d'autre.**
+
+Mesure : `password123` — onze caractères, sans majuscule ni symbole, connu de HIBP — est **refusé à
+l'utilisateur pour lui-même** et **accepté à l'administrateur pour autrui**. Le haché en base change,
+et `password_history` reste à **0 ligne avant, 0 après**.
+
+Le trou d'historique a une conséquence propre : la vérification de non-réutilisation lit
+`password_history`, donc un mot de passe posé par un administrateur peut être **reposé
+immédiatement** par l'utilisateur, la politique n'en ayant aucune trace.
+
+**LA MESURE DÉDOUANE SUR LE COÛT, et cela se dit aussi nettement qu'une accusation.**
+`manage_roles.php:85` emploie `password_hash($p, PASSWORD_DEFAULT)` là où tout le reste emploie
+`PASSWORD_BCRYPT` avec `['cost' => BCRYPT_COST]`. Mesuré sur ce PHP : les deux rendent **`$2y$12$`**.
+Le haché **n'est pas plus faible aujourd'hui**. Ce qui reste vrai : `BCRYPT_COST` se lit dans une
+variable d'environnement (`password_policy.php:28`, défaut 12). Si l'exploitant la relève, tous les
+chemins suivent **sauf celui-là**. Le défaut est latent, et c'est l'exploitant qui l'armerait.
+
+**Au portage** : un seul chemin d'écriture de mot de passe, qui applique la politique et écrit
+l'historique, quel que soit l'auteur du geste.
+
+---
+
+## E-113 — Le mot de passe généré est rendu en clair, et `strip_tags` l'ampute au passage
+
+`manage_roles.php:93` compose le message de succès en y plaçant le mot de passe généré :
+
+```php
+$success = … . t('roles.generated_password') . " : <strong>$new_password</strong>";
+```
+
+Mesuré : après une réinitialisation à champ vide, la page rend une chaîne de **10 caractères**
+mêlant minuscules, majuscules et chiffres dans un `<strong>` — le secret, en clair. Il part dans
+l'historique du navigateur et dans tout cache intermédiaire.
+
+**Et il est corrompu en chemin.** `manage_roles.php:192` réinjecte ce même message dans un script :
+
+```php
+<script>… toast(<?= json_encode(strip_tags($success)) ?>, 'success', 8000);</script>
+```
+
+Or l'alphabet de `generateSecurePassword` (`crypto.php:253`) contient `<` et `>`. `strip_tags`
+supprime alors tout ce qui ressemble à une balise **à l'intérieur du mot de passe**. Mesuré :
+
+| mot de passe généré | ce que la bulle affiche |
+|---|---|
+| `ab<cd>ef12` | `abef12` |
+| `x</script>y` | `xy` |
+| `a<b` | `a` |
+
+L'administrateur recopie donc une chaîne qui **n'est pas** le mot de passe enregistré, et le compte
+devient inaccessible sans qu'aucun message ne le dise. La probabilité n'est pas négligeable : sur
+un alphabet de 90 caractères et une longueur de 10, au moins un `<` apparaît environ une fois sur
+neuf.
+
+**Au portage** : un mot de passe généré ne transite pas par le HTML de la page. S'il faut le montrer,
+il se montre une fois, dans un champ prévu pour cela, et jamais à travers un filtre qui le modifie.
+
+---
+
+## E-114 — Une apostrophe de traduction désactive DEUX confirmations d'action destructrice — en français seulement
+
+Le défaut le plus surprenant de D3, trouvé parce que la suite **assertait l'absence d'erreur
+JavaScript** et en a relevé **deux**.
+
+`manage_roles.php` place des chaînes traduites dans des littéraux JavaScript **entre apostrophes** :
+
+```php
+<button type="submit" name="reset_2fa" onclick="return confirm('<?= t('roles.confirm_reset_2fa', …) ?>')">
+<button                                onclick="if(confirm('<?= t('roles.confirm_delete_user', …) ?>')) …">
+```
+
+Et deux des trois chaînes françaises portent une apostrophe :
+
+| clé | français | anglais |
+|---|---|---|
+| `roles.confirm_reset_password` | `Reinitialiser le mot de passe de ":name" ?` | — |
+| `roles.confirm_reset_2fa` | `… ? **L'**utilisateur devra reconfigurer …` | `… ? The user will need …` |
+| `roles.confirm_delete_user` | `Supprimer **l'**utilisateur ":name" ? …` | `Delete user ":name"? …` |
+
+L'apostrophe **ferme le littéral** : l'attribut `onclick` ne s'analyse pas.
+`SyntaxError: Invalid or unexpected token`, **deux fois** — un par chaîne. `addslashes` est appliqué
+au **nom**, jamais à la phrase traduite qui l'entoure.
+
+**Ce que cela coûte, et c'est là que ça devient grave** :
+
+| bouton | ce qui devait se passer | ce qui se passe en français |
+|---|---|---|
+| **Réinitialiser la 2FA** (`type="submit"`) | `return confirm(…)` bloque tant qu'on n'a pas accepté | l'`onclick` est mort, **le formulaire part sans confirmation** |
+| **Supprimer l'utilisateur** (aucun `type`, donc `submit` par défaut dans son `<form>`) | `if(confirm(…))` gouverne l'appel | l'`onclick` est mort, **la soumission part sans confirmation** |
+
+Deux actions destructrices — verrouiller quelqu'un hors de son compte, supprimer un compte — perdent
+leur garde. **Et seulement en français** : les chaînes anglaises n'ont pas d'apostrophe, donc la
+confirmation fonctionne en anglais. La protection d'une action irréversible dépend de la langue de
+l'interface.
+
+Le troisième bouton, « Réinitialiser le mot de passe », n'a pas d'apostrophe dans sa chaîne : c'est
+le seul des trois dont la confirmation fonctionne — et c'est celui que la suite a pu cliquer.
+
+**Au portage** : aucune boîte native, donc le problème disparaît par construction — la décision se
+prend dans un panneau en page, et le texte y est du **contenu**, jamais du code. C'est un argument de
+la migration, pas seulement une dette à solder.
+
+---
+
+## E-115 — Trois chemins écrivent `users.ssh_key`, et ils s'accordent sur rien
+
+| chemin | valide la clé | journalise | forme stockée |
+|---|---|---|---|
+| `manage_users.php:81` (formulaire de la page) | non — `validateInputSSH` le **dit** : « on ne fait pas de regex stricte ici » | à la création seulement | **échappée en HTML** (`htmlspecialchars`) |
+| `api/update_user_status.php:50` | non | **oui** (`audit_log`) | brute |
+| `api/update_user.php:83` | non | **non** — zéro appel à `audit_log` dans tout le fichier | brute |
+
+Deux conséquences distinctes.
+
+**Un trou dans la piste d'audit qui dépend du point d'entrée.** Remplacer la clé SSH de quelqu'un par
+`update_user_status.php` laisse une ligne dans `user_logs` ; le faire par `update_user.php` n'en
+laisse **aucune**. Le sous-lot D1 vient de rendre cette chaîne d'audit vérifiable : elle vérifiera
+parfaitement un journal auquel il manque des entrées.
+
+**Une clé stockée sous deux formes selon l'écrivain.** `validateInputSSH` applique
+`htmlspecialchars` — un échappement d'AFFICHAGE, appliqué à l'ÉCRITURE. Une clé dont le commentaire
+contient `&`, `<` ou `'` est donc stockée transformée par ce chemin et brute par les deux autres.
+C'est cette colonne que le module `ssh/` déploie dans `authorized_keys` sur les machines.
+
+**Précondition mesurée, et il faut la dire** : au 2026-08-26, **aucun compte ne porte de clé SSH** et
+aucune valeur stockée ne contient d'entité HTML. Le défaut est réel dans le code et sans objet en
+base — il est à une clé collée d'exister.
+
+**Au portage** : un seul chemin d'écriture, une validation de FORME de la clé (préfixe d'algorithme,
+base64, pas de préfixe d'options), l'échappement au RENDU et pas à l'écriture, et une ligne d'audit
+qui ne dépend pas de la porte empruntée.
