@@ -70,8 +70,11 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # raison et verifiee de la meme facon : le journal ne porte qu'une ligne
 # « Journal d'audit », celle de `rw-test-super`. `audit_log` exige
 # `can_admin_portal`, que `rw-test-admin` n'a pas.
+# 51 -> 52 au portage des comptes (`adm/` D3), QUATRIEME fois, et verifiee
+# comme les trois precedentes : une seule ligne « Admin », celle de
+# `rw-test-super`, et elle resout en 200 sur /comptes.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=51 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=52 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -138,6 +141,14 @@ declare -A REF_LARAVEL=(
   # sont rendues en INFO avec leur valeur mesuree — un ecart voulu n'est pas une
   # regression.
   [go-adm-notifications]=20
+  # Sous-lot D3 de `adm/` : comptes, roles, mots de passe. 17 sur le portage
+  # contre 13 sur le legacy. Les QUATRE assertions d'ecart sont des
+  # `verifiePortage`, une par defaut ferme : la politique s'applique aussi a
+  # l'administrateur (E-112), `password_history` est ecrit (E-112), le mot de
+  # passe genere ne survit pas au rechargement (E-113), et la page ne porte
+  # aucune erreur JavaScript — le legacy en porte deux, qui desarment deux
+  # confirmations (E-114).
+  [go-adm-comptes]=17
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -217,7 +228,7 @@ declare -A REF_LEGACY=(
   # les casserait toutes en silence. `sudo` n'est JAMAIS bascule — `users.sudo=1`
   # est la precondition du repli `NOPASSWD: ALL` de K4. Le `finally` PROUVE que
   # les trois comptes de test sont intacts (ni sudo, ni desactives).
-  [go-adm-comptes]=12
+  [go-adm-comptes]=13
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -228,7 +239,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit go-adm-notifications
+  go-adm-audit go-adm-notifications go-adm-comptes
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift

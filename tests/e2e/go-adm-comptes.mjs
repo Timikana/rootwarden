@@ -77,6 +77,13 @@ const EPREUVE = 'epreuve-e2e-d3';
  * accepte (il n'exige que huit caracteres).
  */
 const MDP_REFUSE_PAR_LA_POLITIQUE = 'password123';
+/**
+ * Un mot de passe que la politique ACCEPTE : 16 caracteres, les quatre classes.
+ * Il sert a mesurer l'ecriture de `password_history`, qui ne peut evidemment pas
+ * se mesurer sur le mot de passe refuse — un refus n'ecrit rien. Les deux
+ * proprietes demandent donc DEUX gestes, pas un.
+ */
+const MDP_CONFORME = 'Zx7!kQm2wRt9$Lp4';
 
 const DOSSIER_CAPTURES = new URL('./screenshots/adm', import.meta.url).pathname;
 
@@ -86,6 +93,11 @@ const C = CIBLE === 'laravel'
         page: '/comptes',
         champNom: '[data-rw="compte-nom"]',
         champMdp: '[data-rw="compte-mdp"]',
+        // Le portage n'a pas de formulaire par ligne : le geste est un bouton
+        // nomme, et la generation en est un SECOND — deux gestes distincts, la
+        // ou le legacy devine l'intention au fait que le champ soit vide.
+        boutonMdp: (id) => `[data-rw="compte-mdp-poser-${id}"]`,
+        boutonGenerer: (id) => `[data-rw="compte-mdp-generer-${id}"]`,
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
     }
     : {
@@ -97,6 +109,10 @@ const C = CIBLE === 'laravel'
         // `action=add_user`.
         champNom: 'form:has(input[name="action"][value="add_user"]) input[name="name"]',
         champMdp: 'input[name="new_password"]',
+        // Le legacy n'a qu'un bouton : champ rempli = on pose, champ vide = on
+        // genere. `boutonGenerer` vise donc le meme.
+        boutonMdp: null,
+        boutonGenerer: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
     };
 
@@ -209,6 +225,69 @@ async function soumetDepuis(page, selecteurChamp, nomDuBouton) {
     try { await nav; } catch {}
 }
 
+/**
+ * Le champ de mot de passe DE LA LIGNE du compte donne, et le bouton qui le
+ * soumet. Legacy : le bouton vit dans le meme `form`. Portage : c'est un bouton
+ * nomme, hors formulaire. La propriete visee est la meme — « depuis le champ de
+ * CETTE ligne, atteindre le controle qui l'envoie » — seul le chemin differe.
+ */
+async function champEtBouton(page, nom, id, generer) {
+    const champ = await page.evaluateHandle((n, sel) => {
+        const ligne = Array.from(document.querySelectorAll('tr'))
+            .find((tr) => (tr.textContent || '').includes(n));
+
+        return ligne ? ligne.querySelector(sel) : null;
+    }, nom, C.champMdp);
+    const elChamp = champ.asElement();
+    if (! elChamp) return { champ: null, bouton: null };
+
+    if (CIBLE === 'laravel') {
+        const sel = generer ? C.boutonGenerer(id) : C.boutonMdp(id);
+
+        return { champ: elChamp, bouton: await page.$(sel) };
+    }
+    const b = await elChamp.evaluateHandle((c) => {
+        const form = c.closest('form');
+
+        return form ? form.querySelector('button[name="change_password"], button[type="submit"]') : null;
+    });
+
+    return { champ: elChamp, bouton: b.asElement() };
+}
+
+/**
+ * Un geste de mot de passe, mene a son terme sur les deux cibles. Le legacy
+ * NAVIGUE (formulaire classique), le portage repond en JSON sans navigation :
+ * on attend donc la CONSEQUENCE mesurable — le hachage en base — plutot qu'un
+ * evenement de navigation qui n'existe pas partout.
+ */
+async function poseLeMotDePasse(page, nom, id, valeur, generer) {
+    const { champ, bouton } = await champEtBouton(page, nom, id, generer);
+    if (! champ || ! bouton) return false;
+    await champ.click({ clickCount: 3 });
+    if (valeur !== '') await champ.type(valeur, { delay: 8 });
+    const avant = hachageEpreuve();
+    const nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 8000 }).catch(() => null);
+    await bouton.click();
+    await nav;
+    // Le portage ne navigue pas : on attend que la base bouge, ou que le delai
+    // passe — un refus ne fait bouger ni l'un ni l'autre, et c'est mesurable.
+    await attendChangement(() => hachageEpreuve(), avant, 8000);
+
+    return true;
+}
+
+function attendChangement(mesure, valeurInitiale, limiteMs) {
+    return new Promise((resoudre) => {
+        const fin = Date.now() + limiteMs;
+        const tic = () => {
+            if (mesure() !== valeurInitiale || Date.now() >= fin) return resoudre();
+            setTimeout(tic, 250);
+        };
+        tic();
+    });
+}
+
 const session = {};
 try {
     retireLEpreuve();
@@ -281,78 +360,60 @@ try {
         const avantHisto = historiqueDe(idEpr);
 
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
-        // Le champ de LA LIGNE du compte d'epreuve, pas « le premier de la page » :
-        // la page en porte un par compte.
-        const champ = await page.evaluateHandle((nom, sel) => {
-            const ligne = Array.from(document.querySelectorAll('tr'))
-                .find((tr) => (tr.textContent || '').includes(nom));
-
-            return ligne ? ligne.querySelector(sel) : null;
-        }, EPREUVE, C.champMdp);
-        const el = champ.asElement();
-        verifie('la ligne du compte d\'epreuve porte un champ de mot de passe', !! el);
-        if (! el) return;
-
-        await el.click({ clickCount: 3 });
-        await el.type(MDP_REFUSE_PAR_LA_POLITIQUE, { delay: 8 });
-        const bouton = await el.evaluateHandle((champElem) => {
-            const form = champElem.closest('form');
-
-            return form ? form.querySelector('button[name="change_password"], button[type="submit"]') : null;
-        });
-        const b = bouton.asElement();
-        if (! b) throw new Error('aucun bouton de reinitialisation dans le form');
-        const nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 25000 });
-        await b.click();
-        try { await nav; } catch {}
+        const fait = await poseLeMotDePasse(page, EPREUVE, idEpr, MDP_REFUSE_PAR_LA_POLITIQUE, false);
+        verifie('le geste de mot de passe est atteignable sur la ligne', fait);
+        if (! fait) return;
 
         const apresHash = hachageEpreuve();
         const apresHisto = historiqueDe(idEpr);
         constate('le hachage a-t-il change ?', avantHash === apresHash ? 'non' : 'oui');
-        constate('prefixe du hachage ecrit', apresHash.slice(0, 7) || '(vide)');
         constate('lignes d\'historique avant / apres', `${avantHisto} / ${apresHisto}`);
 
-        // Le legacy ACCEPTE : c'est le defaut. Le portage doit REFUSER.
         verifiePortage('un mot de passe refuse par la politique est refuse a l\'administrateur aussi',
             avantHash === apresHash,
             `« ${MDP_REFUSE_PAR_LA_POLITIQUE} » : 11 caracteres, sans majuscule ni symbole — `
             + 'refuse a l\'utilisateur pour lui-meme, accepte a l\'administrateur pour autrui');
+    });
+
+    // ══ 3bis. Un mot de passe CONFORME : l'historique est-il ecrit ? ═══════
+    // DEUX gestes et non un : un refus n'ecrit rien, donc l'ecriture de
+    // `password_history` ne peut pas se mesurer sur le mot de passe refuse.
+    await etape('reinitialisation avec un mot de passe conforme', async () => {
+        if (idEpr <= 0) throw new Error('pas de compte d\'epreuve');
+        const avantHash = hachageEpreuve();
+        const avantHisto = historiqueDe(idEpr);
+
+        await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        const fait = await poseLeMotDePasse(page, EPREUVE, idEpr, MDP_CONFORME, false);
+        if (! fait) throw new Error('geste de mot de passe inatteignable');
+
+        const apresHash = hachageEpreuve();
+        const apresHisto = historiqueDe(idEpr);
+        constate('lignes d\'historique avant / apres (mot de passe conforme)',
+            `${avantHisto} / ${apresHisto}`);
+        verifie('un mot de passe conforme est accepte', avantHash !== apresHash,
+            avantHash === apresHash ? 'le hachage n\'a pas change' : 'hachage renouvele');
+        // LA MESURE DEDOUANE sur le cout : `PASSWORD_DEFAULT` rend `$2y$12$`,
+        // comme `BCRYPT_COST`. On le CONSTATE, on ne l'accuse pas.
+        verifie('le hachage ecrit est un bcrypt', /^\$2y\$/.test(apresHash), apresHash.slice(0, 7));
         verifiePortage('le changement est inscrit dans password_history',
             apresHisto > avantHisto,
             `${avantHisto} ligne(s) avant, ${apresHisto} apres — l'historique garde un trou, `
             + 'donc le mot de passe pose par un administrateur peut etre repose aussitot');
-        // LA MESURE DEDOUANE sur le cout : `PASSWORD_DEFAULT` rend `$2y$12$`,
-        // comme `BCRYPT_COST`. On le CONSTATE, on ne l'accuse pas.
-        verifie('le hachage ecrit est un bcrypt', /^\$2y\$/.test(apresHash), apresHash.slice(0, 7));
     });
 
     // ══ 4. Le mot de passe GENERE s'affiche-t-il en clair ? ════════════════
     await etape('generation d\'un mot de passe, champ laisse vide', async () => {
         if (idEpr <= 0) throw new Error('pas de compte d\'epreuve');
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
-        const champ = await page.evaluateHandle((nom, sel) => {
-            const ligne = Array.from(document.querySelectorAll('tr'))
-                .find((tr) => (tr.textContent || '').includes(nom));
+        const fait = await poseLeMotDePasse(page, EPREUVE, idEpr, '', true);
+        if (! fait) throw new Error('geste de generation inatteignable');
 
-            return ligne ? ligne.querySelector(sel) : null;
-        }, EPREUVE, C.champMdp);
-        const el = champ.asElement();
-        if (! el) throw new Error('champ de mot de passe introuvable');
-
-        const bouton = await el.evaluateHandle((c) => {
-            const form = c.closest('form');
-
-            return form ? form.querySelector('button[name="change_password"], button[type="submit"]') : null;
-        });
-        const b = bouton.asElement();
-        if (! b) throw new Error('aucun bouton de reinitialisation');
-        const nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 25000 });
-        await b.click();
-        try { await nav; } catch {}
-
-        // Un mot de passe genere qui s'affiche est une chaine longue et melangee
-        // dans le HTML rendu. On mesure la PROPRIETE, pas un libelle : un bloc
-        // `<strong>` dont le contenu ressemble a un secret.
+        // Le legacy rend le secret DANS LE HTML de la page (E-113). Le portage
+        // le rend dans la reponse du geste, et la page l'affiche une fois : on
+        // mesure donc ce qui est present APRES UN RECHARGEMENT — un secret qui
+        // survit au rechargement est un secret que le serveur a mis dans la page.
+        await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         const enClair = await page.evaluate(() => {
             const forts = Array.from(document.querySelectorAll('strong, code'))
                 .map((e) => (e.textContent || '').trim())
@@ -360,8 +421,8 @@ try {
 
             return forts.length ? forts[0] : null;
         });
-        constate('chaine ressemblant a un secret dans le HTML', enClair ? `${enClair.length} caracteres` : '(aucune)');
-        verifiePortage('le mot de passe genere n\'apparait pas dans le HTML', ! enClair,
+        constate('secret encore present apres rechargement', enClair ? `${enClair.length} caracteres` : '(aucun)');
+        verifiePortage('le mot de passe genere ne survit pas au rechargement de la page', ! enClair,
             'le legacy le rend en clair dans la page — il finit dans l\'historique du navigateur '
             + 'et dans tout cache intermediaire');
     });

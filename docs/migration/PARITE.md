@@ -4800,8 +4800,10 @@ Le haché **n'est pas plus faible aujourd'hui**. Ce qui reste vrai : `BCRYPT_COS
 variable d'environnement (`password_policy.php:28`, défaut 12). Si l'exploitant la relève, tous les
 chemins suivent **sauf celui-là**. Le défaut est latent, et c'est l'exploitant qui l'armerait.
 
-**Au portage** : un seul chemin d'écriture de mot de passe, qui applique la politique et écrit
-l'historique, quel que soit l'auteur du geste.
+**FERMÉ au portage** (`v1.37.61`) : `Comptes::definitMotDePasse()` est le seul point d'écriture, et il
+applique la politique **et** écrit l'historique quel que soit l'auteur. Le coût est lu au même endroit
+que le legacy (`config('rootwarden.bcrypt_cost')` ← `BCRYPT_COST`), donc les deux portails restent
+d'accord et un compte reste connectable des deux côtés.
 
 ---
 
@@ -4837,8 +4839,10 @@ devient inaccessible sans qu'aucun message ne le dise. La probabilité n'est pas
 un alphabet de 90 caractères et une longueur de 10, au moins un `<` apparaît environ une fois sur
 neuf.
 
-**Au portage** : un mot de passe généré ne transite pas par le HTML de la page. S'il faut le montrer,
-il se montre une fois, dans un champ prévu pour cela, et jamais à travers un filtre qui le modifie.
+**FERMÉ au portage** (`v1.37.61`) : le mot de passe généré arrive dans la **réponse du geste** qui l'a
+demandé, s'affiche une fois, et la suite mesure qu'il **ne survit pas au rechargement** de la page.
+L'alphabet du générateur exclut les caractères de balisage, et le tirage garantit une occurrence de
+chaque classe — un mot de passe généré ne peut pas être refusé par notre propre politique.
 
 ---
 
@@ -4881,9 +4885,11 @@ l'interface.
 Le troisième bouton, « Réinitialiser le mot de passe », n'a pas d'apostrophe dans sa chaîne : c'est
 le seul des trois dont la confirmation fonctionne — et c'est celui que la suite a pu cliquer.
 
-**Au portage** : aucune boîte native, donc le problème disparaît par construction — la décision se
-prend dans un panneau en page, et le texte y est du **contenu**, jamais du code. C'est un argument de
-la migration, pas seulement une dette à solder.
+**FERMÉ au portage** (`v1.37.61`) : aucune boîte native, donc le problème disparaît **par
+construction** — le texte traduit est posé par `textContent`, où une apostrophe est un caractère et
+non un délimiteur. Le panneau de décision **nomme** le compte visé et dit ce que le geste engage, ce
+qu'un `confirm()` ne peut faire ni l'un ni l'autre. La suite assertait « aucune erreur JavaScript » :
+le legacy en porte deux, le portage aucune.
 
 ---
 
@@ -4911,6 +4917,8 @@ C'est cette colonne que le module `ssh/` déploie dans `authorized_keys` sur les
 aucune valeur stockée ne contient d'entité HTML. Le défaut est réel dans le code et sans objet en
 base — il est à une clé collée d'exister.
 
-**Au portage** : un seul chemin d'écriture, une validation de FORME de la clé (préfixe d'algorithme,
-base64, pas de préfixe d'options), l'échappement au RENDU et pas à l'écriture, et une ligne d'audit
-qui ne dépend pas de la porte empruntée.
+**FERMÉ au portage** (`v1.37.61`) : `Comptes::definitCleSsh()` est le seul écrivain. Il vérifie la
+forme — algorithme dans une **liste fermée**, corps en base64, une seule ligne — ce qui écarte au
+passage les préfixes d'options d'`authorized_keys` (`command=`, `from=`, `no-pty`), qui changent le
+sens de la ligne déployée. La valeur est stockée **telle quelle** ; l'échappement appartient au rendu.
+Et chaque écriture journalise, en reprenant la chaîne de hachage que D1 vérifie.

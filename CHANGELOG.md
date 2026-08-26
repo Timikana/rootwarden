@@ -2171,6 +2171,63 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.61 — `adm/` D3 : la politique de mot de passe s'applique enfin a l'administrateur
+
+**19 entrees de menu portees sur 33.** Legacy 13/0, portage 17/0
+(`tests/e2e/go-adm-comptes.mjs`). `go-socle-navigation` passe de 51 a 52, mesure : une seule ligne
+« Admin », celle de `rw-test-super`, et elle resout en 200 sur `/comptes`.
+
+**QUATRE DEFAUTS FERMES.**
+
+**E-112 — la politique etait contournee par le SEUL chemin qui fixe le mot de passe d'autrui.**
+Libre-service : 15 caracteres, quatre classes, non reutilise, historique ecrit. Administrateur : huit
+caracteres, rien d'autre. `password123` etait refuse a quelqu'un pour lui-meme et accepte a un
+administrateur pour autrui, et `password_history` restait vide — si bien que le mot de passe pose
+pouvait etre repose aussitot. `Comptes::definitMotDePasse()` est desormais le SEUL point d'ecriture :
+il applique la politique et ecrit l'historique, quel que soit l'auteur du geste.
+
+**LA MESURE A DEDOUANE SUR LE COUT, et c'est dit aussi nettement que le reste.** `PASSWORD_DEFAULT`
+rend `$2y$12$`, exactement comme `BCRYPT_COST` : le hache n'etait PAS plus faible. Le defaut etait
+LATENT — `BCRYPT_COST` se lit dans une variable d'environnement, et si l'exploitant la releve, ce
+chemin ne suivrait pas. Le portage lit le cout au meme endroit que le legacy, donc les deux portails
+restent d'accord et un compte reste connectable des deux cotes.
+
+**E-113 — le mot de passe genere ne traverse plus la page.** Le legacy le place dans le HTML, d'ou il
+part dans l'historique du navigateur — et `strip_tags` l'AMPUTE au passage, l'alphabet contenant `<`
+et `>` : `ab<cd>ef12` s'affichait `abef12`, si bien que l'administrateur recopiait une chaine qui
+n'etait pas celle enregistree. Ici il arrive dans la reponse du geste, s'affiche une fois, et ne
+survit pas au rechargement — c'est ce que la suite mesure. L'alphabet du generateur exclut les
+caracteres de balisage, et le tirage garantit une occurrence de chaque classe : un mot de passe
+genere ne peut pas etre refuse par notre propre politique.
+
+**E-114 — l'apostrophe qui desarmait deux confirmations.** Le legacy place ses chaines traduites dans
+des litteraux JavaScript entre apostrophes ; `L'utilisateur` et `l'utilisateur` fermaient le
+litteral, l'`onclick` ne s'analysait pas, et « Reinitialiser la 2FA » comme « Supprimer
+l'utilisateur » partaient SANS confirmation — en francais seulement. Le portage n'a aucune boite
+native : le texte traduit y est du CONTENU, pose par `textContent`, et le probleme ne peut pas
+exister. Le panneau de decision NOMME le compte vise et dit ce que le geste engage.
+
+**E-115 — un seul ecrivain pour la cle SSH, et il valide.** Le legacy en a trois, qui ne s'accordent
+ni sur la validation, ni sur le journal, ni sur la forme stockee — dont un qui applique
+`htmlspecialchars` A L'ECRITURE sur une valeur que `ssh/` deploie dans `authorized_keys`. Ici la
+forme est verifiee (algorithme en liste fermee, corps base64, une seule ligne), la valeur est stockee
+TELLE QUELLE, et l'echappement appartient au rendu.
+
+**CHAQUE ECRITURE EST JOURNALISEE, ET SCELLEE.** Le legacy a un point d'entree qui n'ecrit rien dans
+`user_logs`. Ici chaque geste journalise, et l'insertion reprend la chaine de hachage que le sous-lot
+D1 verifie — une ecriture nue creuserait le trou que D1 vient de mesurer.
+
+**Ce qui n'est PAS porte, et la page le DIT** : `admin_page.php` porte trois onglets ; seuls les
+comptes le sont. La page affiche un encart qui nomme les deux autres et offre un lien marque vers
+l'ancien portail, plutot que de laisser croire qu'ils ont disparu.
+
+51 cles FR et EN, jeux compares. Garde de page : role 2 + `can_admin_portal`, relevee du legacy. La
+garde HIERARCHIQUE — un role 2 ne touche pas un role 3 — vit dans le controleur, parce qu'elle depend
+de la CIBLE et pas seulement de l'auteur. La reinitialisation du second facteur exige le role 3 SUR
+LA ROUTE.
+
+Ecarts : **E-112 a E-115**, les quatre fermes par ce portage.
+
 ### v1.37.60 — `adm/` D2 : « Marquer lu » ne marquait rien, et l'ecran l'affirmait
 
 **Notifications portees.** Legacy 16/0, portage 20/0 (`tests/e2e/go-adm-notifications.mjs`). Le

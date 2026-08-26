@@ -48,7 +48,7 @@ class Navigation
         ],
 
         'admin' => [
-            ['cle' => 'admin',          'garde' => 'can_admin_portal',        'legacy' => '/adm/admin_page.php'],
+            ['cle' => 'admin',          'garde' => 'can_admin_portal',        'route'  => 'comptes'],
             ['cle' => 'tasks',          'garde' => 'can_admin_portal',        'route'  => 'taches'],
             ['cle' => 'groups',         'garde' => 'can_admin_portal',        'legacy' => '/groups/index.php'],
             ['cle' => 'maintenance',    'garde' => 'can_admin_portal',        'route'  => 'maintenance'],
