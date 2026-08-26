@@ -2171,6 +2171,66 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.73 — E-134 : le portage ignorait les permissions TEMPORAIRES
+
+Trouve **en inventoriant D7**, sur une question qui n'avait rien a voir : `adm/api_keys.php` est garde
+par `checkPermission('can_manage_api_keys')`, et lire ce que `checkPermission` fait vraiment a montre
+qu'il consulte **trois** sources, pas une.
+
+| source | ce qu'elle fait |
+|---|---|
+| role | `if ($roleId === 3) return true;` |
+| `permissions` | la table permanente |
+| **`temporary_permissions`** | `WHERE user_id = ? AND permission = ? AND expires_at > NOW()` |
+
+`App\Services\Droits::permissions()` **n'en lisait que la deuxieme**. Un octroi temporaire ouvrait la
+page sur l'ancien portail et rendait **403** ici.
+
+La divergence allait dans le sens RESTRICTIF — elle ne fermait rien qui devait s'ouvrir — mais elle
+cassait la parite, et elle rendait **inoperante** une capacite bien vivante.
+
+#### Ce n'est pas une capacite morte
+
+Trois routes backend (octroi role 3, liste et revocation role 2), le **formulaire complet** dans
+`manage_permissions.php:184-267`, la purge des expirees par le planificateur a deux endroits, la purge
+RGPD dans `privacy.php`, et une migration dediee.
+
+**D5 a donc porte `manage_permissions.php` en laissant dehors la moitie de son interface**, et je ne
+l'avais pas vu. D'ou un sous-lot **D5b** : porter les trois gestes.
+
+#### Ferme pour la LECTURE, mesure sur les DEUX cibles
+
+Assertion de **parite stricte**, pas d'ecart assume :
+
+    sans octroi                  403
+    octroi temporaire de 1 h     200
+    apres revocation             403   — sans reconnexion
+
+La derniere ligne compte autant que les autres : les droits sont relus a chaque requete.
+
+References : `go-adm-permissions` legacy 10 -> **15**, portage 14 -> **19**.
+
+#### Deux constats annexes
+
+**`machine_id` est declare, jamais renseigne, jamais filtre.** La table le porte, la route d'octroi
+l'accepte, `checkPermissionFromDB` ne le filtre pas, et le formulaire n'offre aucun selecteur. Un
+octroi qui se croirait limite a une machine vaudrait partout. Le portage reprend ce comportement tel
+quel et le signale, plutot que de corriger en silence une regle qu'aucune interface n'exerce.
+
+**`can_manage_api_keys` ne garde rien** : consultee a un seul endroit, sur une page deja reservee au
+role 3, qui contourne toute permission. Elle n'est pas seulement inatteignable — elle est **sans
+objet**.
+
+#### Ce que j'ai failli publier de faux
+
+La premiere redaction d'E-134 accusait **E-118** de dire que cette permission « garde
+`adm/api_keys.php` ». **E-118 dit exactement le contraire, et correctement.** Ce qui derivait, c'etait
+le docblock de `Permissions.php` — un resume que j'avais relaye sans relire la source. Corrige avant
+publication ; le docblock aussi.
+
+C'est la **deuxieme fois de la journee** qu'une correction d'un travail anterieur est elle-meme a
+corriger. Regle au §8 : **un resume n'est pas la source, meme quand c'est le sien.**
+
 ### v1.37.72 — `adm/` D6d : cycle de vie et test de connexion portes
 
 **19 entrees de menu portees sur 33** (inchange : D6d enrichit une page deja portee). Legacy

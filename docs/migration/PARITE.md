@@ -5727,3 +5727,81 @@ l'information qui manquait**, et un `SELECT` suffit.
 **c'était faux**, `check_machine_access()` commençant par `if role_id >= 2: return True`. L'écart est
 cosmétique. Voir la règle du §8 : vérifier qu'un garde est absent n'est pas vérifier que son absence
 compte.
+
+---
+
+## E-134 — Le portage ignorait les permissions TEMPORAIRES, et D5 avait laissé toute une capacité derrière lui
+
+Trouvé en inventoriant D7, sur une question qui n'avait rien à voir : `adm/api_keys.php` est gardé par
+`checkPermission('can_manage_api_keys')`, et vérifier ce que fait `checkPermission` a montré qu'il
+consulte **trois** sources, pas une.
+
+`legacy/auth/functions.php:276-302` :
+
+| source | ce qu'elle fait |
+|---|---|
+| rôle | `if ($roleId === 3) return true;` — repli superadministrateur |
+| `permissions` | la table permanente, colonne `can_*` |
+| **`temporary_permissions`** | `WHERE user_id = ? AND permission = ? AND expires_at > NOW()` |
+
+**`App\Services\Droits::permissions()` ne lisait que la deuxième.** Un octroi temporaire ouvrait donc
+la page sur l'ancien portail et rendait **403** sur le portage.
+
+La divergence allait dans le sens **restrictif** — elle n'ouvrait rien, elle fermait. Ce n'est pas une
+faille, c'est une rupture de parité ; et elle rendait **inopérante** une capacité que le backend
+expose par trois routes et que le planificateur purge à deux endroits.
+
+**Ce n'est pas une capacité morte.** Mesuré :
+
+| pièce | état |
+|---|---|
+| `POST /admin/temp_permissions` (rôle **3**) | octroi, durée bornée à 1–720 h |
+| `GET /admin/temp_permissions` (rôle 2) | liste |
+| `DELETE /admin/temp_permissions/<id>` (rôle 2) | révocation |
+| `manage_permissions.php:184-267` | **le formulaire complet** — compte, permission, durée — plus la liste et la révocation |
+| `scheduler.py:400` et `:782` | purge des expirées, deux fois |
+| `privacy.php:51` | purge RGPD à la suppression d'un compte |
+| `mysql/migrations/014_temporary_permissions.sql` | sa migration dédiée |
+
+**D5 a donc porté `manage_permissions.php` en laissant dehors la moitié de son interface**, et je ne
+l'avais pas vu. C'est un sous-lot à part entière — **D5b** — parce qu'il faut porter trois gestes et
+leur passage par la passerelle.
+
+**FERMÉ pour la LECTURE** (`v1.37.73`) : `Droits::permissions()` fusionne désormais les octrois non
+expirés. Mesuré sur **les deux cibles**, et c'est une assertion de parité stricte, pas un écart
+assumé :
+
+```
+sans octroi                  403
+octroi temporaire de 1 h     200
+apres revocation             403   — sans reconnexion
+```
+
+La dernière ligne compte autant que les autres : les droits sont relus **à chaque requête**, donc une
+révocation referme la page tout de suite.
+
+**NON FERMÉ pour l'ÉCRITURE** : aucune interface du portage n'octroie ni ne révoque. C'est D5b.
+
+### Deux constats annexes, tous deux mesurés
+
+**`machine_id` est déclaré, jamais renseigné, jamais filtré.** La table porte une colonne `machine_id`,
+la route d'octroi l'accepte — et `checkPermissionFromDB` ne la filtre **pas** : un octroi qui se croit
+limité à une machine vaut partout. Le formulaire du legacy n'offre d'ailleurs aucun sélecteur de
+machine, donc elle est toujours nulle en pratique. Le portage reprend ce comportement **tel quel**,
+fidèlement, et le signale ici plutôt que de corriger en silence une règle qu'aucune interface
+n'exerce.
+
+**`can_manage_api_keys` ne garde rien, et E-118 le disait déjà — c'est le CODE qui surinterprète.**
+Première rédaction de cet écart : « E-118 le disait à tort ». **Faux, et vérifié avant publication.**
+E-118 écrit noir sur blanc : « page dont l'accès n'est donc possible que par le rôle 3, qui contourne
+toute permission ». C'est exact.
+
+Ce qui surinterprète, c'est le docblock de `App\Services\Permissions` : « inatteignable dans les deux
+sens, **alors qu'elle garde `adm/api_keys.php`** ». Elle ne le garde pas. Mesuré : elle est consultée à
+**un seul endroit** du dépôt, `api_keys.php:20`, sur une page dont la ligne précédente est
+`checkAuth([ROLE_SUPERADMIN])` — rôle 3 seul — et `checkPermissionFromDB` **rend `true` sans condition
+pour le rôle 3**. Elle ne peut jamais décider de rien : elle n'est pas seulement inatteignable, elle
+est **sans objet**. Le docblock est corrigé (`v1.37.73`).
+
+*(Deux fois de suite j'ai failli publier une correction fausse d'un travail antérieur — ici en relayant
+un résumé au lieu de relire la source. Relire E-118 a pris une commande.)*

@@ -334,6 +334,7 @@ dernier** — et chaque rang porte son motif.
 | **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
 | **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
 | **D6d** ✅ | **Serveurs — cycle de vie et test de connexion** — *PORTÉ `v1.37.72`, voir §5.0nonies* | `POST /server_lifecycle`, `POST /server_status` (backend) | — | `/server_status` : sonde TCP, écrit `online_status`, **pas** de session SSH. `/server_lifecycle` rend un `updated` **ambigu** (E-133), fermé au portage en écrivant en base |
+| **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
@@ -871,6 +872,33 @@ son tour un panneau masqué. L'onglet suit désormais le formulaire visé.
 **Trois décisions attendent l'exploitant avant le port** — elles sont en §7 du plan : que faire de la
 colonne `sudo` du format CSV, comment rendre utilisable un compte importé, et le correctif E-129 côté
 legacy.
+
+### 5.0undecies E-134 — la moitié de `manage_permissions.php` était restée dehors
+
+Trouvé le 2026-08-26 **en inventoriant D7**, sur une question qui n'avait rien à voir :
+`adm/api_keys.php` est gardé par `checkPermission('can_manage_api_keys')`, et lire ce que
+`checkPermission` fait vraiment a montré qu'il consulte **trois** sources — le repli
+superadministrateur, la table `permissions`, et **`temporary_permissions` non expirées**.
+
+`App\Services\Droits::permissions()` n'en lisait que la deuxième. Un octroi temporaire ouvrait donc
+la page sur l'ancien portail et rendait **403** sur le portage.
+
+**Et derrière, une capacité entière** : `manage_permissions.php:184-267` porte le formulaire d'octroi
+(compte, permission, durée), la liste, et la révocation ; trois routes backend les servent ; le
+planificateur purge les expirées à deux endroits ; `privacy.php` les purge au titre du RGPD ; une
+migration leur est dédiée. **D5 a porté ce fichier en laissant dehors la moitié de son interface, et
+je ne l'avais pas vu.** D'où **D5b**.
+
+**Fermé pour la lecture** (`v1.37.73`), et mesuré **sur les deux cibles** — parité stricte, pas écart
+assumé : sans octroi **403**, avec un octroi d'une heure **200**, après révocation **403 sans
+reconnexion**. Cette dernière ligne compte autant que les autres : les droits sont relus à chaque
+requête.
+
+**Ce que j'ai failli publier de faux.** La première rédaction d'E-134 accusait E-118 de dire que
+`can_manage_api_keys` « garde `adm/api_keys.php` ». **E-118 dit exactement le contraire**, et
+correctement. Ce qui dérivait, c'était le docblock de `Permissions.php` — un résumé que j'avais relayé
+sans relire la source. Relire E-118 a pris une commande. C'est la deuxième fois de la journée qu'une
+correction d'un travail antérieur est elle-même à corriger avant publication.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

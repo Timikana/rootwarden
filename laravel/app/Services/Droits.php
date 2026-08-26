@@ -43,6 +43,32 @@ class Droits
             }
         }
 
+        // ══ LES PERMISSIONS TEMPORAIRES COMPTENT AUSSI ═════════════════════
+        //
+        // `checkPermissionFromDB()` du legacy (`auth/functions.php:294`)
+        // consulte TROIS sources : le repli superadministrateur, la table
+        // `permissions`, et `temporary_permissions` non expirees. Ce portage
+        // n'en lisait que la deuxieme — un octroi temporaire ouvrait la page sur
+        // l'ancien portail et rendait 403 ici. Releve le 2026-08-26 en
+        // inventoriant D7 ; voir PARITE E-134.
+        //
+        // La divergence allait dans le sens RESTRICTIF, donc elle n'ouvrait
+        // rien — mais elle cassait la parite, et elle rendait inoperante une
+        // capacite que le backend expose par trois routes et que le
+        // planificateur purge deux fois.
+        //
+        // `machine_id` N'EST PAS FILTRE, et c'est fidele : le legacy ne le
+        // filtre pas davantage. La colonne existe, aucune interface ne la
+        // renseigne, et la verification l'ignore — voir E-134.
+        foreach (
+            DB::table('temporary_permissions')
+                ->where('user_id', $idCompte)
+                ->where('expires_at', '>', now())
+                ->pluck('permission') as $accordee
+        ) {
+            $permissions[(string) $accordee] = true;
+        }
+
         return $this->memoire[$idCompte] = $permissions;
     }
 

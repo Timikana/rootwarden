@@ -9,7 +9,11 @@ use Illuminate\Support\Facades\DB;
  *
  * ══ UNE SEULE LISTE, ET ELLE VIENT DES COLONNES ELLES-MEMES ════════════════
  *
- * Le legacy en porte TROIS, mesurees le 2026-08-26 :
+ * Le legacy en porte TROIS, mesurees le 2026-08-26 — et une QUATRIEME source
+ * decide de l'acces sans figurer dans aucune : `temporary_permissions`, que
+ * `checkPermissionFromDB` consulte et que cette page ne montre pas. Voir E-134
+ * et le sous-lot D5b.
+ *
  *
  *   colonnes `can_*` de `permissions`                18
  *   posables A LA CREATION (`manage_users.php:116`)  14
@@ -22,7 +26,16 @@ use Illuminate\Support\Facades\DB;
  *                          `fail2ban/` et son entree de menu SUR LES DEUX
  *                          portails.
  *   `can_manage_api_keys`  ni creable ni basculable : inatteignable dans les
- *                          deux sens, alors qu'elle garde `adm/api_keys.php`.
+ *                          deux sens — et elle ne garde RIEN. Sa seule
+ *                          consultation du depot est `api_keys.php:20`, sur une
+ *                          page dont la ligne precedente est
+ *                          `checkAuth([ROLE_SUPERADMIN])` ; or
+ *                          `checkPermissionFromDB` rend `true` sans condition
+ *                          pour le role 3. Elle ne peut jamais decider de rien.
+ *                          (Ce commentaire disait « alors qu'elle garde
+ *                          `adm/api_keys.php` » : c'etait faux, corrige le
+ *                          2026-08-26 apres mesure. E-118 le disait
+ *                          correctement ; c'est ce resume-ci qui derivait.)
  *
  * Mesure en base : deux comptes portent la premiere, un porte la seconde. Ils
  * les ont recues a la creation ou par import CSV — il y a donc bien des droits
