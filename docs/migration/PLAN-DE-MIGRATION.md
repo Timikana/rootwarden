@@ -239,7 +239,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 7 | `services/` | 631 | 1 | gestes sur machines |
 | 8 | `iptables/` | 870 | 1 | gestes sur machines, IDOR déjà corrigé |
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
-| 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. Trois points modestes à arbitrer, aucun n'est une faille |
+| 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. **Quatre** points à arbitrer, aucun n'est une faille. **§6 : trois inconnues sur cinq fermées par la LECTURE le 2026-08-26** — dont `root` proposé au déploiement, et « fusionner » qui n'équivaut pas à ce que son libellé laisse entendre |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
 | 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7, D8 et D9 CLOS (D9a `v1.37.79`, D9b `v1.37.80`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quinze sous-lots, **trois restants** — D6c, D10, et l'archivage. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
@@ -610,7 +610,7 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   m'appartiennent pas : **rien n'a été touché**. Remesure :
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
 
-**`bashrc/` — trois arbitrages, tous à faible enjeu** (`MODULE-BASHRC.md`, 2026-08-26)
+**`bashrc/` — cinq arbitrages, tous à faible enjeu** (`MODULE-BASHRC.md`, 2026-08-26)
 - **les huit motifs de danger du gabarit n'existent QUE dans le navigateur.** Le backend valide la
   syntaxe (`bash -n`) et la taille, pas le contenu. **Ce n'est pas une faille** — qui atteint la route
   détient déjà `can_manage_bashrc`, c'est-à-dire l'autorisation d'écrire le fichier qui s'exécute à
@@ -618,6 +618,20 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   scan est une barrière ;
 - **`GET /bashrc/backups` n'a aucun appelant** — capacité inatteignable. La porter serait concevoir,
   la laisser serait la laisser à un `fetch` de la réactivation. Faible enjeu : la route ne fait que lire ;
+- **« Fusionner » est le mode PAR DÉFAUT, et son terme-clé n'est défini nulle part.** Le libellé
+  « Fusionner (conserver blocs custom) » est littéralement vrai — il conserve les blocs entre
+  marqueurs `# >>> USER CUSTOM >>>`. Mais ni `USER CUSTOM` ni `.bashrc.local` n'apparaissent dans les
+  74 clés i18n : la lecture naturelle (« garde mes personnalisations ») est fausse, et **sans
+  marqueurs « fusionner » équivaut à « écraser »** — c'est le cas de tout premier déploiement.
+  **Troisième variante du motif** : ni un texte qui dit faux (E-142), ni un texte qui recommande
+  l'inverse de ce qui est livré (E-146), mais un libellé vrai dont le terme porteur n'est défini
+  nulle part. Et l'interface **jette la mesure qui lèverait l'ambiguïté** : le backend calcule
+  `custom_detected` dans sa branche `dry_run`, l'aperçu l'affiche, le tableau de résultat du
+  déploiement ne le montre pas. **Gravité faible** — la sauvegarde est faite dans les deux modes et
+  un échec de sauvegarde avorte le déploiement (fail-closed) : c'est un défaut d'information, pas de
+  destruction ;
+- **`root` est proposé au déploiement.** `_list_users` retient `UID == 0 || UID >= 1000` : la cible la
+  plus conséquente du parc n'est distinguée en rien des autres à l'écran. À trancher : la marquer, ou non ;
 - **aucune fenêtre de maintenance ni approbation à quatre yeux** sur les huit routes, alors que le
   déploiement multi-machines écrit sur plusieurs machines d'un coup. D'autres modules en ont ; rien ne
   dit si l'absence est délibérée. Signalé, non corrigé.

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.81** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.82** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,52 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.82 — `bashrc/` : trois inconnues de l'inventaire fermees PAR LA LECTURE
+
+Le banc etant toujours pris par le LOT complet d'une autre session, ce tour ferme par la lecture
+trois des cinq points que `MODULE-BASHRC.md` §6 declarait non mesures. Les trois restent listes,
+BARRES, avec leur reponse : un inventaire qui efface ses propres questions perd la trace de ce qui
+etait incertain, et de ce qui a leve l'incertitude.
+
+#### Ce que la lecture a trouve, et qui n'etait pas dans le premier tour
+
+**« Fusionner » est le mode PAR DEFAUT, et son terme-cle n'est defini nulle part.** Le libelle
+« Fusionner (conserver blocs custom) » est LITTERALEMENT VRAI : `_extract_custom_blocks()` conserve
+bien les blocs entre marqueurs `# >>> USER CUSTOM >>>`. Mais ni `USER CUSTOM` ni `.bashrc.local`
+n'apparaissent dans les 74 cles i18n du module. La lecture naturelle — « garde mes personnalisations »
+— est donc fausse, et **sans marqueurs « fusionner » equivaut a « ecraser »** : c'est le cas de tout
+premier deploiement.
+
+**Troisieme variante du motif du chantier.** Ni un texte qui dit faux (E-142), ni un texte qui
+recommande l'inverse de ce qui est livre (E-146), mais un libelle vrai dont le terme porteur n'est
+defini nulle part. Il ne se corrige pas en le rendant « plus juste » — il l'est deja — mais en
+DEFINISSANT son terme.
+
+**Et l'interface JETTE la mesure qui leverait l'ambiguite.** Le backend calcule `custom_detected` dans
+sa branche `dry_run` — exactement « est-ce que fusionner va preserver quoi que ce soit pour ce
+compte ? ». L'apercu l'affiche (`bashrc.js:271`) ; le tableau de resultat du deploiement
+(`bashrc.js:313-322`) ne le montre pas. L'information est calculee, elle traverse le reseau, elle est
+jetee au rendu. **Forme inverse des defauts precedents** : pas un texte qui ment, mais une mesure
+vraie que l'interface abandonne.
+
+**Gravite faible, et il faut le dire aussi.** La sauvegarde est faite des que le fichier existe, dans
+les DEUX modes, et un echec de sauvegarde AVORTE le deploiement pour ce compte (fail-closed). C'est un
+defaut d'information, pas de destruction.
+
+#### Les deux autres inconnues fermees
+- **`root` EST propose au deploiement** — `_list_users` retient `UID == 0 || UID >= 1000`. La cible la
+  plus consequente du parc n'est distinguee en rien des autres a l'ecran. A trancher au portage.
+- **`preview` a un cas vide propre** — `_read_remote_bashrc` ouvre par `if [ -f … ]` et rend `""` ;
+  le diff est alors integralement en ajout, sans exception.
+
+Et un troisieme releve du meme genre que ceux du premier tour : `_USERNAME_RE` est **reapplique aux
+lignes venues de la machine**, apres le `awk`. Troisieme endroit ou ce module traite une donnee
+distante comme hostile, apres `_HOME_RE` et la validation des noms recus du client. C'est une
+constante de conception, pas un accident.
+
+#### Ce qui reste non mesure (§6)
+Le **triple chemin de garde** et les references du LOT. Les deux exigent le banc.
 
 ### v1.37.81 — `bashrc/` inventorie : le module le mieux construit du chantier
 
