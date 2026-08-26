@@ -333,7 +333,7 @@ dernier** — et chaque rang porte son motif.
 | **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
 | **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
 | **D6c** | **Serveurs — import CSV** | `includes/import_csv.php` | 189 | DEUX imports : comptes et serveurs. `$sendWelcome` est lu une fois, jamais utilisé, et aucun formulaire ne l'émet |
-| **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **Découpage par FICHIER manqué par l'inventaire** : ces deux capacités de la carte vivent dans le BACKEND. `/server_status` ouvre une connexion TCP vers une machine du parc, écrit `machines.online_status` et peut émettre une notification ; `/server_lifecycle` n'a **pas** de `@require_machine_access` là où `/server_status` en a un |
+| **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **INVENTORIÉ le 2026-08-26, voir §5.0nonies.** Découpage manqué par l'inventaire initial : ces deux capacités de la carte vivent dans le BACKEND. `/server_status` ouvre une connexion TCP et écrit `online_status` ; `/server_lifecycle` porte un **IDOR** et rend un `updated` ambigu |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
@@ -740,6 +740,44 @@ d'audit) — il est désormais DIT dans `web.php`, sinon la relecture suivante l
 **Ce que la relecture n'a pas eu raison sur** : elle donnait `manage_servers.php:770` comme appelant
 vivant de `server_actions.php`. Le bloc commenté va de `:661` à `:923` — la ligne 770 est dedans. Le
 fond ne change pas : le fichier est bien vivant, par ses quatre autres appels.
+
+### 5.0nonies D6d — INVENTORIÉ le 2026-08-26, pas encore porté
+
+Mesuré par relecture croisée puis **vérifié ici** — un rapport d'agent n'est pas une mesure.
+
+**`POST /server_lifecycle`** (`backend/routes/admin.py:93`) — `@require_api_key`, `@require_role(2)`,
+`@threaded_route`. Deux défauts, et le second ferme le premier :
+
+- **IDOR.** Pas de `@require_machine_access`, là où sa voisine `/server_status`
+  (`monitoring.py:57`) porte les trois décorateurs. `machine_id` vient du CORPS et n'est confronté à
+  rien avant le `WHERE id = %s`. Un rôle 2 restreint change donc le cycle de vie de **n'importe
+  quelle** machine, `srv-zabbix` comprise. `/exclude_user` (`admin.py:115`) a exactement la même forme.
+- **`updated` est AMBIGU.** La route rend `{'success': True, 'updated': cur.rowcount > 0}` sans aucun
+  `SELECT` préalable. Or `rowcount` vaut **0** aussi bien quand on réécrit la valeur déjà en place que
+  quand la machine n'existe pas : `updated: false` recouvre deux situations opposées. Une interface qui
+  affiche « échec » mentira dans le premier cas, une qui affiche « fait » mentira dans le second.
+
+**Le correctif est le même pour les deux** : résoudre la machine par un `SELECT` AVANT l'`UPDATE`. Il
+rend 404 si elle n'existe pas — l'ambiguïté tombe — et il donne l'objet sur lequel poser le contrôle
+d'accès. C'est « un garde sans objet ne garde rien » pris par l'autre bout : **contrôler l'objet
+résolu, pas le paramètre reçu.**
+
+Ce qui **tient** : la liste fermée `('active', 'retiring', 'archived')`, testée avant toute requête, et
+le refus d'un `machine_id` falsy au même endroit.
+
+**`POST /server_status`** (`monitoring.py:57`) — les trois décorateurs, `@require_machine_access`
+compris, et le correctif A01-02 y est correctement appliqué : la route résout `machine_id` puis utilise
+l'IP **enregistrée**, refusant une `ip` brute. Ce qu'elle fait : un `socket.connect_ex` avec 5 s de
+délai — une sonde TCP, **pas** une session SSH — puis un `UPDATE machines SET online_status`. Elle peut
+émettre une notification `server_offline`, qui est un `INSERT` en base et **n'envoie aucun courriel**.
+
+Conséquence pour la suite de D6d : le geste est **mesurable au clic**, à condition de ne jamais viser
+`srv-zabbix` (id 1). C'est la machine 2 qui sert de cible, comme partout ailleurs.
+
+**Ce que `@threaded_route` fait vraiment**, parce que j'avais posé la question à l'envers :
+`helpers.py` fait `future = executor.submit(run)` puis `return future.result()`. **Il bloque.** La
+réponse est donc le VERDICT du geste, pas un accusé de réception — l'interface peut s'y fier. Voir la
+règle générale au §8 du plan.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
