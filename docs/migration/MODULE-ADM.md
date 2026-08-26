@@ -335,7 +335,7 @@ dernier** — et chaque rang porte son motif.
 | **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
 | **D6d** ✅ | **Serveurs — cycle de vie et test de connexion** — *PORTÉ `v1.37.72`, voir §5.0nonies* | `POST /server_lifecycle`, `POST /server_status` (backend) | — | `/server_status` : sonde TCP, écrit `online_status`, **pas** de session SSH. `/server_lifecycle` rend un `updated` **ambigu** (E-133), fermé au portage en écrivant en base |
 | **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
-| **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
+| **D7** ⏳ | **Clés d'API** — *CARACTÉRISÉ `v1.37.74`, port à faire, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. **La portée est validée en PCRE et appliquée en Python** (E-135), **elle n'est pas ancrée** (E-136), et **créer une clé enregistre une seconde fois la clé d'environnement** (E-137) |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
 | **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
@@ -899,6 +899,40 @@ requête.
 correctement. Ce qui dérivait, c'était le docblock de `Permissions.php` — un résumé que j'avais relayé
 sans relire la source. Relire E-118 a pris une commande. C'est la deuxième fois de la journée qu'une
 correction d'un travail antérieur est elle-même à corriger avant publication.
+
+### 5.0duodecies D7 — CARACTÉRISÉ le 2026-08-26 (`v1.37.74`) ; le PORT reste à faire
+
+`tests/e2e/go-adm-cles-api.mjs` — **11 PASS / 0 FAIL sur le legacy**. **Non inscrite dans le LOT** :
+`/cles-api` n'existe pas côté portage, la suite y serait rouge.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-135** | la portée est validée en **PCRE** (`preg_match`) et appliquée en **Python** (`re.search`). Six motifs soumis aux deux : PHP les accepte tous, Python en refuse deux. Puis mesuré au clic — le formulaire accepte `(?<zone>/cve_.*)` et crée la clé |
+| **E-136** | `re.search` n'est pas ancré : `/deploy` couvre `/x/deploy_platform_key`, `/cve_scan` couvre `/admin/cve_scan_all`. Une portée se lit plus étroite qu'elle n'est |
+| **E-137** | créer une clé insère un **doublon** de la clé d'environnement : `api_keys.php` protège son `INSERT IGNORE` par le NOM, `bootstrap_api_key.py` par le **hachage**, et les deux noms diffèrent. `key_hash` n'est pas unique. Mesuré : 1 ligne de plus, `COUNT(DISTINCT key_hash) = 1` |
+
+**Ce que E-137 produit vraiment**, et c'est le plus sérieux des trois : `_validate_api_key_from_db`
+fait `WHERE key_hash = %s LIMIT 1` **sans `ORDER BY`**. Avec deux lignes pour un secret, révoquer
+l'une rend l'authentification **non déterministe dans les deux sens** — la clé peut être refusée alors
+qu'un enregistrement actif existe, ou continuer d'ouvrir alors qu'on vient de la révoquer.
+
+**Ce que la mesure a DÉDOUANÉ.** E-135 n'est **pas** une faille : l'exception de `re.search` remonte au
+`except Exception` global, qui rend `(None, None)` — et le correctif **A07-02** n'accorde le repli
+`Config.API_KEY` que si `API_KEY_BOOTSTRAP` est posée, ce qu'elle **n'est pas** (mesuré). C'est donc
+fail-closed. La conséquence est une clé rendue inutilisable et un journal qui accuse la base à la
+place du motif. **Mais avec le drapeau posé, le même chemin serait fail-open** — les deux se disent.
+
+**La page ne conserve pas les clés, et c'est structurel** : la table ne stocke que `key_prefix` et
+`key_hash`. Mesuré : affichée une fois après création, **absente après rechargement**. La suite le
+vérifie sans jamais imprimer la valeur — booléens et longueurs seulement — et prend ses **captures
+après rechargement**, parce qu'une capture prise sur la page de création déposerait un secret vivant
+dans un fichier que personne ne surveille.
+
+**Le piège du `<details>`, sixième occurrence et la plus retorse** : le champ de portée vit dans un
+`<details>` **imbriqué** dans celui du formulaire (« Avancé : éditer les regex manuellement »).
+Déplier un niveau ne suffit pas. Sans la remontée complète, le nom se saisit, la clé se crée, et la
+**portée est perdue en silence** — le geste réussit, l'assertion échoue, et rien ne dit pourquoi. La
+suite relit désormais ce qu'elle vient de saisir avant de soumettre.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
