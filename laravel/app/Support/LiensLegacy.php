@@ -89,6 +89,37 @@ class LiensLegacy
          * normalise EN ENTIER.
          */
         '/adm/audit_log.php/' => 'journal-audit',
+
+        /*
+         * ══ LES LIENS DES NOTIFICATIONS DU BACKEND, ajoutes le 2026-08-26 ═══
+         *
+         * Le docblock de cette classe annonce depuis le debut qu'elle sert aussi
+         * aux notifications — « evite d'en fabriquer un le jour ou un resultat
+         * de recherche, une NOTIFICATION ou un rapport citera ce chemin ».
+         * L'intention etait ecrite, le cablage manquait : la vue des
+         * notifications rendait le chemin TEL QUEL.
+         *
+         * Releve des liens que le backend pose reellement (`link='…'`) :
+         *
+         *   /adm/admin_page.php#permissions   x3   -> ici
+         *   /security/                        x3   -> ici
+         *   /ssh-audit/                       x2   -> non porte, reste externe
+         *   /profile.php                      x1   -> ici
+         *   /approvals/                       x1   -> deja present
+         *   /                                 x1   -> ici, et c'est le plus net
+         *
+         * `/` MERITE UN MOT : sans cette ligne, la notification au lien le plus
+         * generique qui soit envoie hors du portail. C'est une correspondance
+         * EXACTE sur le chemin normalise, pas un prefixe — elle ne capture rien
+         * d'autre.
+         *
+         * `/adm/admin_page.php` mene aux COMPTES : c'est la page qui porte les
+         * trois onglets de l'administration, et les trois sont portes.
+         */
+        '/adm/admin_page.php/' => 'comptes',
+        '/security/'           => 'scan-cve',
+        '/profile.php/'        => 'profil',
+        '/'                    => 'accueil',
     ];
 
     /**
