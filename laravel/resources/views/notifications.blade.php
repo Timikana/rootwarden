@@ -75,13 +75,34 @@
                               data-rw="notif-etat-{{ $n['id'] }}">{{ __('notif.lue') }}</span>
                     @endif
                     @if ($n['link'])
-                        {{-- Le chemin vient de la base : on ne pose que ce qui commence
-                             par une barre, et par `setAttribute` — jamais par
-                             interpolation. Un `javascript:` ne peut pas passer. --}}
-                        @php($cible = preg_match('#^/[A-Za-z0-9_\-./?=&%]*$#', (string) $n['link']) === 1 ? $n['link'] : null)
-                        @if ($cible)
-                            <a class="rw-bouton rw-bouton--discret" href="{{ $cible }}"
-                               data-rw="notif-lien-{{ $n['id'] }}">{{ __('notif.ouvrir') }}</a>
+                        {{-- ══ LE CHEMIN EST VALIDE, PUIS TRADUIT ══════════════
+                             La FORME d'abord : on ne pose que ce qui commence par
+                             une barre, sur une classe fermée de caractères. Un
+                             `javascript:` ne peut pas passer.
+
+                             LA DESTINATION ENSUITE. Le backend ne connaît qu'un
+                             frontend, l'ancien : il écrit `/adm/admin_page.php`,
+                             `/security/`, `/profile.php`, `/` — six chemins
+                             relevés. Rendus tels quels ici, ils résolvent contre
+                             le PORTAGE et mènent à un 404, ou hors du portail.
+
+                             `LiensLegacy` existe pour ça, et son propre docblock
+                             annonce les notifications depuis le début. Le
+                             câblage manquait : ajouté le 2026-08-26.
+
+                             Le FRAGMENT est ce qui rendait le défaut invisible :
+                             `#permissions` échoue à la classe de caractères, donc
+                             aucun lien n'était rendu du tout. Fail-closed, mais
+                             la personne perdait le lien sans savoir pourquoi.
+                             `resoudre()` dépouille le fragment avant de traduire. --}}
+                        @php($valide = preg_match('#^/[A-Za-z0-9_\-./?=&%\#]*$#', (string) $n['link']) === 1)
+                        @if ($valide)
+                            @php($destination = \App\Support\LiensLegacy::resoudre((string) $n['link']))
+                            <a class="rw-bouton rw-bouton--discret" href="{{ $destination['url'] }}"
+                               @if ($destination['externe']) target="_blank" rel="noopener" @endif
+                               data-rw="notif-lien-{{ $n['id'] }}">
+                                {{ __('notif.ouvrir') }}@if ($destination['externe']) ↗ @endif
+                            </a>
                         @endif
                     @endif
                     @if ($n['read_at'] === null)
