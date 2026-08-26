@@ -833,6 +833,25 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
      Sortir la version indexée (`git show :chemin`) et la linter à part. Sans cela on committe un fichier
      qui référence un contrôleur dont l'import est resté sur le disque — et le commit passe, et rien ne
      casse avant le déploiement.
+- **Le backend est lu au DÉMARRAGE du processus, le frontend à CHAQUE requête. Ce sont deux règles,
+  pas une.** Formulé le 2026-08-26 après trois affinages successifs de la convention de banc :
+
+  | ce qu'on touche | quand la cible change |
+  |---|---|
+  | `backend/**.py` | **au redémarrage** du conteneur, jamais à l'écriture |
+  | `laravel/**`, `legacy/**` | **à la requête suivante**, sans aucun redémarrage |
+  | `tests/e2e/**`, `scripts/**` | à l'écriture, pour le rejeu en cours |
+
+  Conséquences pratiques, et elles ne sont pas symétriques : écrire dans `backend/` pendant le rejeu
+  d'une autre session est **inoffensif**, mais `docker restart rootwarden_python` casse sa mesure en
+  plein vol. À l'inverse, un `git checkout` qui ramène `laravel/` ou `legacy/` en arrière **change la
+  cible immédiatement**, sans qu'aucun redémarrage soit nécessaire — c'est le geste le plus discret des
+  trois et le plus difficile à diagnostiquer après coup.
+
+  *La convention a dit d'abord « ne pas éditer le runner », puis « c'est le `git commit` qui compte » —
+  faux, c'est l'écriture —, puis « `backend/` peut partir quand il veut » — vrai de l'écriture, faux du
+  redémarrage. Trois formulations trop étroites avant celle-ci. Une règle qui rassure sans protéger est
+  pire que pas de règle.*
 - **Pendant un rejeu, tout fichier qu'une suite LIT ou EST doit être figé.** La règle notée jusqu'ici —
   « ne jamais éditer le runner pendant un rejeu » — était trop étroite : elle nommait le runner et
   donnait pour raison la lecture des références au démarrage. Le mécanisme est plus large, et une
@@ -899,6 +918,14 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   UTC. Deux implémentations d'accord sur l'algorithme et en désaccord sur l'entrée donnent deux verdicts
   opposés. Quand une règle est **appliquée** ailleurs, la remonter de là et l'afficher ; ne jamais la
   recalculer.
+- **Le cas visible traité, le cas subtil pris à l'envers.** Ce n'est pas de la négligence uniforme, et
+  c'est ce qui le rend difficile à voir : la présence d'un traitement correct **à côté** endort la
+  question. Deux mesures du 2026-08-26, trouvées séparément puis rapprochées :
+  `graylog/deploy` calcule `syntax_ok` et `restart_ok`, les rend dans sa réponse, compose son `success`
+  avec — donc quelqu'un a pensé à l'échec, mais **seulement pour la réponse, pas pour l'état persisté** ;
+  et l'aide du préréglage `all_nopasswd` de `adm/` dit **vrai** (« administrateur TOTAL »), quand celle
+  du préréglage par défaut affirme l'inverse de son propre module. Chercher, à côté de chaque défaut, le
+  cas voisin qui a été traité : il indique ce que l'auteur savait, donc ce qu'il a manqué.
 - **Un résumé rendu par le serveur que la page invalide ensuite vaut moins que pas de résumé.** La
   pastille d'ensemble de `maintenance/` était comptée au chargement et jamais rafraîchie, alors que la
   page crée, bascule et supprime. Elle affichait « Aucune restriction » juste après une création.

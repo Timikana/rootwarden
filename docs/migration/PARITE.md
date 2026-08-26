@@ -6361,3 +6361,66 @@ sur la machine. L'historique du portage affiche donc, pour chaque déploiement r
 
 Le versant SFTP (`server_user_sftp.php`) est **D9b** : même JS, même module backend, mais ses
 politiques n'ont pas de préréglages — et c'est dans sudo que vivait la question de l'équivalence root.
+
+---
+
+## E-145 — `graylog/` : l'état persisté affirmait l'inverse de la réponse, et le pire des deux sens
+
+Relevé en lisant `backend/routes/graylog.py` avant d'écrire un clic du sous-lot G2, corrigé en
+`v1.37.78` avec sept tests unitaires.
+
+| geste échoué | ce que l'écran affirmait | la réalité |
+|---|---|---|
+| `deploy` | « Transfert actif » | rien ne part |
+| `uninstall` | « Non déployé », et `success: true` | **le transfert continue** |
+
+Le premier fait perdre des journaux. **Le second est une affirmation de confidentialité** : quelqu'un
+qui retire le transfert pour une raison de conformité recevait une confirmation franche d'un geste qui
+pouvait n'avoir rien fait. Et le marqueur étant **écrit en base**, il survit à la session — le message
+d'échec disparaît au rechargement, la pastille reste.
+
+C'est la mécanique de E-101 (la pastille de `maintenance/` calculée sur une mauvaise horloge) avec deux
+aggravations : le marqueur est **persisté**, et il existe un sens où l'utilisateur croit avoir **arrêté**
+quelque chose. On peut relire un formulaire ; on ne relit pas un flux qui continue.
+
+### Le cas visible avait été traité, le subtil non
+
+`deploy` calcule `syntax_ok` et `restart_ok`, les rend dans sa réponse, et compose son `success` avec.
+Quelqu'un a donc pensé à l'échec — **mais seulement pour la réponse, pas pour l'état persisté**.
+`uninstall`, lui, n'y pense pas du tout : il jette le code de retour de sa commande.
+
+C'est le même motif que le préréglage `all_nopasswd` de `adm/` (E-142), dont l'aide dit **vrai** quand
+celle du préréglage par défaut affirme l'inverse de son module. **Ce n'est pas une négligence uniforme,
+c'est le cas non évident pris à l'envers** — et la présence d'un traitement correct juste à côté endort
+la question.
+
+### Ce que le correctif pose, et ce qu'il refuse de faire
+
+`forward_deployed` signifie « la configuration RootWarden est **active** sur cette machine » — donc
+`syntax_ok and restart_ok`. Les fichiers sont écrits **avant** ces deux contrôles, leur présence sur le
+disque ne prouve rien. `last_deploy_at` n'est posé qu'en cas de succès : une tentative ratée n'est pas
+un déploiement, et la dater ferait croire que la machine a été servie.
+
+`uninstall` capture son code de retour et, en échec, **ne touche pas** à l'état — écrire `False`
+affirmerait un retrait qui n'a pas eu lieu. Il rend 500 avec un message qui dit ce qui reste possible.
+
+**Et la page le dit dans la langue de la personne** : le message du backend n'est pas traduit, donc le
+portage ajoute `err_retrait_actif` (FR et EN) pour ce cas seul — le seul où l'utilisateur croit avoir
+arrêté quelque chose.
+
+### Les tests peuvent échouer, et c'est vérifié
+
+En remettant l'ancien fichier une minute : **3 failed, 4 passed**. Avec le correctif : **7 passed**. Les
+trois qui basculent sont exactement ceux du défaut.
+
+Ils sont **unitaires et non E2E** parce que la branche d'échec n'est pas atteignable depuis l'interface
+sans casser `rsyslog` sur une machine réelle. La session SSH est factice, `execute_as_root` est
+**scripté** — on choisit quelle commande échoue —, et `_upsert_state` est **intercepté** plutôt que
+dirigé vers la base : cela permet d'asserter non seulement ce qui a été écrit mais **qu'il ne l'a pas
+été**. Un test qui lirait la base ne distinguerait pas « écrit `False` » de « pas écrit ».
+
+Le blueprint `graylog` n'était **pas** enregistré dans l'application de test : aucune de ses routes
+n'était joignable par un test HTTP. Ajouté.
+
+**G2 mesurera les deux gestes au navigateur**, sur `test-server` (machine 2), avec `uninstall` comme
+geste de retour. `srv-zabbix` : jamais.
