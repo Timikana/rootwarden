@@ -203,11 +203,48 @@ Vestige **sciemment** mort et protégé. À ne pas porter, et à ne pas compter 
 
 ---
 
+## 4bis. Ce que les CAPTURES ont montré, et qu'aucune lecture n'aurait donné
+
+**Mesuré le 2026-08-26**, B1 vert sur le legacy (16 PASS / 0 FAIL). Trois défauts qui ne se voient
+qu'à l'image — aucune assertion DOM ne les attrape.
+
+### `srv-zabbix` est une ligne comme les autres
+
+La machine de **production** figure dans le tableau des cibles avec une case à cocher identique à
+celle des deux machines d'essai. Rien ne la distingue : ni couleur, ni marqueur, ni avertissement.
+
+Combiné à ce que la §6.4 a établi — **`root` est proposé au déploiement** (`UID == 0`) — la page
+permet de cocher production + `root` et de déployer, en deux clics et une confirmation générique.
+
+### « Déployer » est le bouton VERT
+
+Cinq boutons sur une rangée, tous de même poids visuel : `Apercu (diff)` bleu, **`Deployer` VERT**,
+`Dry run` gris, **`Deployer multi` violet**, `Dry-run multi` pâle.
+
+> Le vert est la couleur la moins alarmante de la palette, et elle est donnée au geste qui **écrit un
+> `.bashrc` sur toutes les machines cochées**. Le violet, encore moins lisible comme un danger, va au
+> geste **multi-machines**. Les deux gestes sûrs — l'aperçu et les simulations — n'ont pas de code
+> couleur qui les distingue comme sûrs.
+
+Le codage n'est pas seulement arbitraire : il est **inversé** par rapport au risque.
+
+### Un compteur à zéro s'affiche comme un chiffre
+
+« Serveurs cibles **0** ». La convention du chantier veut qu'un compteur à zéro **s'énonce** — « aucun
+serveur sélectionné, un déploiement ne déploierait rien » — plutôt que de s'afficher comme un `0`,
+qui se lit comme une donnée et non comme un état.
+
+### Ce que le portage doit en faire
+
+Le module n'a **aucun** défaut de sécurité (§3) : ces trois points sont de **présentation**, et c'est
+précisément le registre où ce chantier a trouvé ses défauts les plus coûteux. Le portage doit
+distinguer la production, hiérarchiser les cinq gestes par leur effet, et énoncer le compteur.
+
 ## 5. Découpage proposé — lectures d'abord, écritures distantes en dernier
 
 | sous-lot | contenu | pourquoi ce rang |
 |---|---|---|
-| **B1** | La page, les trois onglets, les gardes, l'i18n | Rien ne part vers une machine. Et c'est ici que se mesure le **triple chemin de garde** (§6) |
+| **B1** ✅ | La page, les trois onglets, les gardes, l'i18n — *CARACTÉRISÉ `v1.37.83`, legacy **16 PASS / 0 FAIL**, port à faire* | Rien ne part vers une machine. Et c'est ici que se mesure le **triple chemin de garde** (§6), désormais MESURÉ |
 | **B2** | L'onglet Déploiement en LECTURE : `/bashrc/users`, `/bashrc/preview` | Ouvre une session SSH, mais ne modifie rien. Le diff est la pièce à porter fidèlement |
 | **B3** | L'onglet Gabarit : `GET`/`POST /bashrc/template` | Écrit **en base**, jamais sur une machine. Porte la décision 4.1 |
 | **B4** | Les écritures distantes : `deploy`, `multiDeploy`, `prerequisites`, `restore` | **MODIFIE** le parc. À exercer par interception avec avortement, comme D9a et D9b |
@@ -221,7 +258,20 @@ L'onglet Historique se lit dans `user_logs` : il tombe dans B1 (aucune route dé
 **Rien de ce qui suit n'a été mesuré au navigateur.** Trois des cinq points ont été fermés le 2026-08-26 **par la lecture**, le banc étant toujours pris ; ils restent listés, barrés, avec leur réponse — un inventaire qui efface ses propres questions perd la trace de ce qui était incertain, et de ce qui a levé l'incertitude. Le banc était pris ; ces points sont *déduits du
 code* et doivent être **mesurés** au premier sous-lot.
 
-1. **Le triple chemin de garde.** Déduit, non mesuré. La table `permissions` dit que
+1. ~~**Le triple chemin de garde.**~~ **MESURÉ le 2026-08-26**, et conforme en tout point à la
+   déduction — les trois lignes ci-dessous sont des relevés, pas des attentes :
+
+   ```
+   INFO  comptes d'epreuve detenant `can_manage_bashrc` : (aucun)
+   PASS  rw-test-user  (role 1) est refuse  — statut 403
+   PASS  rw-test-admin (role 2) est refuse  — statut 403      <- le chemin du milieu
+   PASS  rw-test-super (role 3) est admis   — statut 200      <- contournement de role
+   ```
+
+   La précondition est vérifiée **avant** les trois : si un compte d'épreuve venait à recevoir la
+   permission, l'attendu du milieu changerait sans que rien ne le signale.
+
+   *Rédaction d'origine, conservée :* Déduit, non mesuré. La table `permissions` dit que
    **`rw-test-super` (rôle 3) n'a PAS `can_manage_bashrc`** — c'est donc lui qui exercera le
    *contournement par le rôle*, et `rw-test-admin` (rôle 2, sans la permission) qui doit être
    **refusé**. Trois chemins, dont celui du milieu qu'aucune suite du chantier n'exerce d'ordinaire :
@@ -251,8 +301,8 @@ code* et doivent être **mesurés** au premier sous-lot.
      endroit où ce module traite une donnée distante comme hostile, après `_HOME_RE` et la validation
      des noms reçus du client. C'est une constante de conception, pas un accident.
 
-5. **Le nombre d'assertions atteignables**, donc les références du LOT. Inconnues tant que la suite
-   n'a pas tourné.
+5. ~~**Le nombre d'assertions atteignables**~~ **MESURÉ côté legacy : 16.** La référence laravel
+   reste inconnue tant que la page n'est pas portée.
 
 ---
 

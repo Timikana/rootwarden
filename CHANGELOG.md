@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.82** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.84** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.84 — `bashrc/` B1 caracterise : le triple chemin de garde, MESURE
+
+`tests/e2e/go-bashrc-b1.mjs` — **legacy 16 PASS / 0 FAIL**, vert au premier rejeu. Le portage reste
+a faire.
+
+#### Ce que B1 mesure, et qu'aucune autre suite du chantier n'exerce
+
+Le **chemin du milieu** d'une garde « permission OU role ». Les trois lignes sont des releves :
+
+    INFO  comptes d'epreuve detenant `can_manage_bashrc` : (aucun)
+    PASS  rw-test-user  (role 1) est refuse  — statut 403
+    PASS  rw-test-admin (role 2) est refuse  — statut 403      <- le chemin du milieu
+    PASS  rw-test-super (role 3) est admis   — statut 200      <- contournement de role
+
+La precondition est verifiee AVANT les trois : si un compte d'epreuve recevait la permission,
+l'attendu du milieu changerait sans que rien ne le signale. C'est la seule facon de distinguer « la
+garde laisse passer parce que la permission est la » de « parce que le role l'emporte ».
+
+#### Trois defauts vus A L'IMAGE, qu'aucune assertion DOM n'attrape
+- **`srv-zabbix` (PRODUCTION) est une ligne comme les autres** dans le tableau des cibles : meme
+  case a cocher, aucun marqueur. Avec `root` deployable (§6.4), la page permet de cocher production
+  + `root` et de deployer.
+- **« Deployer » est le bouton VERT** — la couleur la moins alarmante de la palette, donnee au geste
+  qui ecrit un `.bashrc` sur toutes les machines cochees. « Deployer multi » est violet. Le codage
+  n'est pas seulement arbitraire : **il est inverse par rapport au risque**.
+- **« Serveurs cibles 0 »** — un compteur a zero affiche comme un chiffre au lieu d'etre enonce.
+
+Le module n'a AUCUN defaut de securite (voir `MODULE-BASHRC.md` §3). Ces trois points sont de
+PRESENTATION — precisement le registre ou ce chantier a trouve ses defauts les plus couteux.
+
+#### Un defaut de MESURE corrige avant de conclure
+
+La premiere execution rapportait `erreurs JavaScript : Failed to fetch`. **C'etait le filet de la
+suite qui la produisait** : il avortait `GET /bashrc/template`, une route qui lit le gabarit EN BASE
+et ne joint aucune machine. L'instrument fabriquait le defaut qu'il rapportait ensuite, et
+l'assertion aurait echoue sur le portage pour une erreur creee par la mesure.
+
+Le filet distingue desormais par METHODE : le `GET` passe, le `POST` (qui ecrit) reste avorte. Et
+l'assertion finale ne vaut plus un `true` constant — elle mesure ce qui a ete avorte.
 
 ### v1.37.82 — `bashrc/` : trois inconnues de l'inventaire fermees PAR LA LECTURE
 
