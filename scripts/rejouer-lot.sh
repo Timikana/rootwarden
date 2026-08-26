@@ -229,6 +229,14 @@ declare -A REF_LEGACY=(
   # est la precondition du repli `NOPASSWD: ALL` de K4. Le `finally` PROUVE que
   # les trois comptes de test sont intacts (ni sudo, ni desactives).
   [go-adm-comptes]=13
+  # Sous-lot D4 de `adm/` : suppression et anonymisation. 10 sur le legacy,
+  # mesure du 2026-08-26. La suite N'AGIT QUE sur un compte fraichement cree,
+  # dont `user_logs` est vide — et elle VERIFIE cette precondition avant de
+  # cliquer, fail-closed. `user_logs.user_id` est en ON DELETE CASCADE : la
+  # suppression d'un compte qui porte un journal romprait la chaine de hachage
+  # que D1 rend verifiable, et c'est irreversible. Le defaut est etabli par la
+  # mesure du schema ; sa demonstration demande un arbitrage.
+  [go-adm-suppression]=10
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -250,7 +258,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit go-adm-notifications go-adm-comptes
+  go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
