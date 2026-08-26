@@ -42,6 +42,8 @@ return [
     'err_charge'     => 'La configuration n\'a pas pu être lue.',
     'err_reseau'     => 'Le serveur n\'a pas répondu. Rien n\'a été modifié.',
 
+    'err_retrait_actif' => '⚠ Le retrait a échoué : le transfert peut être ENCORE ACTIF sur cette machine. Vérifiez avant de considérer que les journaux ne partent plus.',
+
     'machines_titre' => 'Machines',
     'rafraichir'     => 'Rafraîchir',
     'chargement'     => 'Chargement…',

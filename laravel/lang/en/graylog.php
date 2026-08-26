@@ -38,6 +38,8 @@ return [
     'err_charge'     => 'The configuration could not be read.',
     'err_reseau'     => 'The server did not answer. Nothing was changed.',
 
+    'err_retrait_actif' => '⚠ Removal failed: forwarding may STILL BE ACTIVE on this machine. Check before assuming logs are no longer shipped.',
+
     'machines_titre' => 'Machines',
     'rafraichir'     => 'Refresh',
     'chargement'     => 'Loading…',

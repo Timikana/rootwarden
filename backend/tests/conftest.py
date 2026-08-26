@@ -247,13 +247,15 @@ def app():
     from routes.docker import bp as docker_bp
     from routes.drift import bp as drift_bp
     from routes.ssh_audit import bp as ssh_audit_bp
+    from routes.graylog import bp as graylog_bp
 
     test_app = Flask(__name__)
     test_app.config['TESTING'] = True
 
     for _bp in (monitoring_bp, admin_bp, ssh_bp, cve_bp, iptables_bp, updates_bp,
                 supervision_bp, tickets_bp, search_bp, approvals_bp, maintenance_bp,
-                groups_bp, tasks_bp, commandlog_bp, docker_bp, drift_bp, ssh_audit_bp):
+                groups_bp, tasks_bp, commandlog_bp, docker_bp, drift_bp, ssh_audit_bp,
+                graylog_bp):
         test_app.register_blueprint(_bp)
 
     return test_app
