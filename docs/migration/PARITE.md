@@ -6065,3 +6065,76 @@ lignes, et changer ce rangement en portant une page aurait perdu l'historique d�
 lui-même, et c'est délibéré », ce qui devenait faux dès l'ajout de cette lecture. Un commentaire qui
 affirme plus que le code est le motif relevé cinq fois dans ce dépôt ; le laisser dans du code neuf
 aurait été le sixième.
+
+---
+
+## E-141 — Trois suites rouges sans qu'un seul commit ait touché leur module
+
+Constat du **2026-08-26**, à la fin d'un LOT de 117 exécutions et 1727 assertions.
+`go-page-ssh-parc` (les deux cibles) et `go-page-ssh-preflight` (portage) échouent, et
+`go-page-ssh-preflight` sur le legacy rend 8 au lieu de 10.
+
+### Ce n'est pas une régression de code, et c'est daté
+
+| LOT | `ssh-parc` laravel | `ssh-preflight` laravel | `ssh-parc` legacy |
+|---|---|---|---|
+| 2026-08-25 17:46 | 14/0 | 15/0 | 11/0 |
+| 2026-08-25 20:53 | 14/0 | 15/0 | 11/0 |
+| 2026-08-25 22:34 | 14/0 | 15/0 | 11/0 |
+| **2026-08-26 13:18** | **11/1** | **12/1** | **8/1** |
+
+Aucun commit de la journée ne touche `legacy/ssh/`, `cles-ssh.blade.php`, ni
+`backend/routes/ssh*.py`. Vérifié : les seules modifications du legacy sont l'archivage de
+`maintenance/` et `menu.php`. Le backend n'a pas bougé.
+
+**Ce sont les DONNÉES du banc qui ont changé**, mesuré en base :
+
+| table | état |
+|---|---|
+| `machine_tags` | **0 ligne** |
+| `users.ssh_key` sur les 10 comptes actifs | **toutes vides** |
+
+Et **aucune trace au journal d'audit** : ni « Cle SSH effacee », ni action sur une étiquette.
+Les suppressions n'ont donc pas passé par l'interface — ce sont des écritures directes en base,
+donc des fixtures de suites.
+
+### Mais le défaut de fond est dans les SUITES, pas dans la donnée
+
+`go-page-ssh-parc:224-236` lit le vocabulaire d'étiquettes en base au démarrage
+(`TAGS_DU_PARC`), puis exige que le filtre de la page propose exactement ce vocabulaire :
+
+```js
+verifie('le filtre de tags propose exactement le vocabulaire du parc',
+    Array.isArray(filtres.tags) && …)
+```
+
+Quand le parc n'a **aucune** étiquette, les deux portails **n'affichent pas le filtre du
+tout** — ce qui est un comportement raisonnable. `filtres.tags` vaut alors `null`,
+`Array.isArray(null)` est faux, et l'assertion échoue en accusant la page.
+
+Trois assertions supplémentaires disparaissent au passage : elles vivent dans un
+`if (TAGS_DU_PARC.length)`, donc elles ne s'exécutent plus. D'où 14 → 11.
+
+Même mécanisme pour `ssh-preflight` : le rapport dit « aucun compte actif ne porte de clé SSH
+— un déploiement ne déploierait rien », ce qui est **exact**, et la suite attendait de lui qu'il
+nomme un autre prérequis manquant.
+
+**La leçon n'est donc pas « quelqu'un a effacé des données » mais :**
+
+> **Une suite qui dépend de données partagées PRÉEXISTANTES qu'elle ne crée pas finira par
+> accuser la page pour un état du banc.** Elle ne peut pas distinguer « la page est fausse » de
+> « le banc est vide », et son message désignera la page.
+
+Deux façons de fermer cela, et la seconde est la bonne :
+
+1. tolérer le cas vide — `filtres.tags === null` est acceptable quand `TAGS_DU_PARC` est vide.
+   Ça rend la suite verte, mais elle ne mesure alors plus rien du filtre ;
+2. **poser la fixture**. La suite crée son étiquette, mesure le filtre, la retire dans un
+   `finally` — comme `graylog/` G1 le fait pour sa configuration de flotte et son gabarit. Elle
+   devient indépendante de l'état du banc, et elle mesure le filtre **toujours**.
+
+**Non corrigé dans ce commit** : `ssh/` n'est pas le module en cours, et modifier deux suites
+d'un autre module au détour d'un portage `graylog/` mélangerait ce qui doit rester séparé. Le
+constat est daté, le mécanisme établi, et la correction attend son propre sous-lot — avec la
+question ouverte de savoir s'il faut aussi **restaurer** les étiquettes et les clés du banc, ou
+si un banc sans elles est l'état normal qu'il fallait mesurer depuis le début.
