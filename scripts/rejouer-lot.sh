@@ -153,7 +153,7 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # `process.exit()` — lequel NE JOUE PAS le `finally`. La fixture y a fui pour de
 # vrai avant d'etre reprise a cet endroit.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=59 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=60 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=21 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -287,6 +287,17 @@ declare -A REF_LARAVEL=(
   # Meme fixture qu'en D9a, et pour la meme raison : la page ne rend rien sans
   # un compte distant `managed` sur la machine 2.
   [go-adm-sftp]=16
+  # `bashrc/` sous-lot B1 : la page, ses trois onglets, ses gardes.
+  # 18 sur le portage contre 17 sur le legacy. L'ecart d'UNE assertion est
+  # « cliquer un onglet le rend actif » cote portage — le legacy marque son
+  # onglet actif par une classe, le portage par `aria-selected` ET la classe, et
+  # la suite lit les deux.
+  #
+  # B1 mesure le CHEMIN DU MILIEU d'une garde « permission OU role », qu'aucune
+  # autre suite du depot n'exerce : role 1 -> 403, role 2 SANS la permission ->
+  # 403, role 3 SANS la permission -> 200. La precondition (aucun compte
+  # d'epreuve ne detient `can_manage_bashrc`) est verifiee AVANT les trois.
+  [go-bashrc-b1]=18
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -411,6 +422,7 @@ declare -A REF_LEGACY=(
   [go-adm-comptes-distants]=11
   [go-adm-politiques]=12
   [go-adm-sftp]=12
+  [go-bashrc-b1]=17
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
@@ -432,7 +444,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-adm-comptes-distants go-adm-politiques go-adm-sftp
+  go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -446,7 +458,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-adm-comptes-distants go-adm-politiques go-adm-sftp
+  go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

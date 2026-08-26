@@ -244,7 +244,7 @@ distinguer la production, hiérarchiser les cinq gestes par leur effet, et énon
 
 | sous-lot | contenu | pourquoi ce rang |
 |---|---|---|
-| **B1** ✅ | La page, les trois onglets, les gardes, l'i18n — *CARACTÉRISÉ `v1.37.83`, legacy **16 PASS / 0 FAIL**, port à faire* | Rien ne part vers une machine. Et c'est ici que se mesure le **triple chemin de garde** (§6), désormais MESURÉ |
+| **B1** ✅ | La page, les trois onglets, les gardes, l'i18n — *PORTÉ `v1.37.86`, `/bashrc`, **17 legacy / 18 portage**, 0 FAIL* | Rien ne part vers une machine. Et c'est ici que se mesure le **triple chemin de garde** (§6), désormais MESURÉ |
 | **B2** | L'onglet Déploiement en LECTURE : `/bashrc/users`, `/bashrc/preview` | Ouvre une session SSH, mais ne modifie rien. Le diff est la pièce à porter fidèlement |
 | **B3** | L'onglet Gabarit : `GET`/`POST /bashrc/template` | Écrit **en base**, jamais sur une machine. Porte la décision 4.1 |
 | **B4** | Les écritures distantes : `deploy`, `multiDeploy`, `prerequisites`, `restore` | **MODIFIE** le parc. À exercer par interception avec avortement, comme D9a et D9b |

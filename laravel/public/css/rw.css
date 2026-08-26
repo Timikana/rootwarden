@@ -1944,3 +1944,25 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 }
 
 .rw-champ--case > span { display: flex; flex-direction: column; gap: 2px; }
+
+/*
+ * Une ligne de tableau qui porte une machine de PRODUCTION.
+ *
+ * Posee au sous-lot B1 de `bashrc/`. Le legacy affiche `srv-zabbix` avec la
+ * meme case a cocher que les machines d'essai : rien ne la distingue, et la page
+ * permet de la cocher avec `root` puis de deployer. Le defaut ne se voyait qu'a
+ * l'image.
+ *
+ * La teinte porte sur la LIGNE et non sur une cellule : c'est la ligne entiere
+ * qu'on parcourt du regard avant de cocher, et un marqueur dans une seule
+ * colonne se rate quand on vise la case a l'autre bout.
+ *
+ * Le badge `.rw-badge--alerte` reste : la couleur seule ne suffit pas — elle ne
+ * dit rien a qui ne la distingue pas, et rien du tout a un lecteur d'ecran.
+ */
+.rw-ligne-sensible > td {
+    background: color-mix(in srgb, var(--rw-danger) 7%, transparent);
+}
+.rw-ligne-sensible > td:first-child {
+    box-shadow: inset 3px 0 0 var(--rw-danger);
+}

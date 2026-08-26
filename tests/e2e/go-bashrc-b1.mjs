@@ -250,11 +250,25 @@ try {
     });
 
     await etape('aucun identifiant de traduction a l\'ecran', async () => {
-        await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        const rep = await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        // LA PRECONDITION D'ABORD : une page en erreur n'a pas d'identifiants de
+        // traduction a montrer, et « aucun trouve » y serait vrai pour la pire
+        // des raisons. Mesure du 2026-08-26 : la page rendait 500, et le
+        // controle lisait la PAGE D'ERREUR.
+        verifie('la page rend avant qu\'on y cherche des identifiants',
+            rep && rep.status() === 200, `statut ${rep ? rep.status() : 0}`);
+        if (! rep || rep.status() !== 200) return;
+
         const bruts = await page.evaluate(() => {
             const texte = document.body.innerText || '';
+            // Le motif exclut les EXTENSIONS DE FICHIER : sur la page d'erreur,
+            // `bashrc.blade` et `bashrc.js` etaient rapportes comme des cles de
+            // traduction manquantes. Ce sont des noms de fichiers dans une pile
+            // d'appels — l'instrument nommait mal ce qu'il voyait.
+            const trouves = texte.match(/\bbashrc\.[a-z_]+\b/g) || [];
 
-            return [...new Set(texte.match(/\bbashrc\.[a-z_]+\b/g) || [])];
+            return [...new Set(trouves.filter(
+                (c) => ! /\.(blade|js|php|css|json|log|mjs)$/.test(c)))];
         });
         constate('cles brutes visibles', bruts.join(', ') || '(aucune)');
         verifie('aucune cle de traduction n\'apparait en clair', bruts.length === 0, bruts.join(', '));
