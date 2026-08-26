@@ -7,6 +7,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
+use App\Http\Controllers\AccesSftpController;
 use App\Http\Controllers\PolitiquesController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
@@ -643,6 +644,14 @@ Route::middleware('session.authentifiee')->group(function () {
      * Aucune route d'ecriture ici : deployer, auditer et retirer partent par la
      * passerelle, qui les inscrit deja en re-authentification ponctuelle.
      */
+    /*
+     * Acces SFTP/SSH par compte distant — D9b. `role:3` SEUL, comme D9a : meme
+     * garde de page (`checkAuth([ROLE_SUPERADMIN])`, role 2 mesure a 403) et
+     * memes `@require_role(3)` cote backend.
+     */
+    Route::get('/acces-sftp', AccesSftpController::class)
+        ->middleware(['role:3'])->name('acces-sftp');
+
     Route::get('/politiques', PolitiquesController::class)
         ->middleware(['role:3'])->name('politiques');
 

@@ -92,12 +92,12 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **21 sur 33**, et le total se RECONSTITUE — mesuré le 2026-08-26 en faisant lire `Navigation::SECTIONS` **par PHP lui-même** : `21 route + 12 legacy + 0 ni l'un ni l'autre = 33` (D9a a fait basculer `sudo_policies`). Un premier comptage à l'expression régulière avait rendu 32, en manquant `wazuh` — voir §8. Restent en `legacy` : `iptables`, `fail2ban`, `services`, `ssh_audit`, `bashrc`, **`wazuh`**, `groups`, `remote_users`, `platform_key`, `sftp_policies`, `documentation`, `api_docs` |
+| entrées de menu portées | **22 sur 33**, et le total se RECONSTITUE — mesuré le 2026-08-26 en faisant lire `Navigation::SECTIONS` **par PHP lui-même** : `22 route + 11 legacy + 0 ni l'un ni l'autre = 33` (D9a et D9b ont fait basculer `sudo_policies` et `sftp_policies`). Un premier comptage à l'expression régulière avait rendu 32, en manquant `wazuh` — voir §8. Restent en `legacy` : `iptables`, `fail2ban`, `services`, `ssh_audit`, `bashrc`, **`wazuh`**, `groups`, `remote_users`, `platform_key`, `documentation`, `api_docs` |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) et D9a `go-adm-politiques` (**12 / 18**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
+| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) D9a `go-adm-politiques` (**12 / 18**) et D9b `go-adm-sftp` (**12 / 16**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **134** — numérotés jusqu'à **E-144** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **137** — numérotés jusqu'à **E-147** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7, D8 et D9a PORTÉS (`v1.37.79`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quinze sous-lots, **quatre restants** — D6c, D9b, D10, et l'archivage. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7, D8 et D9 CLOS (D9a `v1.37.79`, D9b `v1.37.80`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quinze sous-lots, **trois restants** — D6c, D10, et l'archivage. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -611,6 +611,13 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
 
 **`adm/` — cinq arbitrages** (`MODULE-ADM.md`)
+- **E-147, ouvert par D9b le 2026-08-26** : `backend/sftp_manager.py`, `render_policy()` contredit sa
+  **propre docstring** sur quatre clés (`sftp_only`, `allow_password_auth`, `allow_tcp_forwarding`,
+  `allow_agent_forwarding`), **toutes vers le permissif**. Le portage n'envoie jamais de clé absente,
+  donc il ne rencontre pas ces replis — mais ils restent ouverts pour tout autre appelant. **Même
+  famille qu'E-144** : un repli de backend qui retombe du côté permissif. Les deux se corrigent de la
+  même façon (exiger la clé plutôt que la deviner, fail-closed) et **les deux touchent le backend de
+  production**. À arbitrer ensemble, avec E-142 ;
 - **E-144, ouvert par D9a le 2026-08-26** : `backend/routes/policies.py`, `sudo_deploy()` fait
   `data.get('preset', 'apt_only')`. **Une requête qui omet `preset` obtient le préréglage que son
   propre module documente « ÉQUIVALENT ROOT ».** Le portage envoie toujours `preset`, donc il ne

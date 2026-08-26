@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.79** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.80** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,50 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.80 — `adm/` D9b : l'acces SFTP porte, et les trois cases que l'ecran conseillait de decocher
+
+**D9 est clos.** E-142 etait une aide qui disait FAUX. Celui-ci est plus net, parce que les aides du
+legacy disent **vrai** — et recommandent, chacune, l'inverse de ce qui est livre :
+
+| reglage | ce que l'aide dit | etat livre |
+|---|---|---|
+| connexion par mot de passe | « Decoche : il DOIT utiliser une cle SSH (nettement plus sur, **recommande**). » | **coche** |
+| tunnels reseau | « Si ce n'est pas necessaire, **decoche : c'est plus sur**. » | **coche** |
+| rebond de cle | « Si ce n'est pas necessaire, **decoche**. » | **coche** |
+
+Et `sftp_only` — la restriction qui donne son nom a la page — est livre **decoche**. Ecarts **E-146**
+et **E-147**.
+
+#### Ce que cela produisait
+
+Corps reellement intercepte au premier clic sur « Deployer » (E-143 vaut aussi ici, le JS est partage) :
+`{"sftp_only":false,"allow_password_auth":true,"allow_tcp_forwarding":true,"allow_agent_forwarding":true}`
+— un bloc `Match User` **sans** `ForceCommand internal-sftp`, **sans** `ChrootDirectory`, **sans**
+`PermitTTY no`. Ce n'est pas une restriction SFTP : c'est un shell complet avec tunnels. Et un bloc
+`Match User` **remplace**, pour ce compte, ce que la configuration generale de la machine aurait
+donne : sur une machine durcie, le deployer **elargit** l'acces.
+
+#### Ajoute
+- `laravel/app/Services/AccesSftp.php` — chaque reglage classe `restreint` ou `ouvre`, et l'etat
+  initial en est **derive** : ajouter un reglage ne peut pas faire naitre un defaut permissif par
+  oubli.
+- `AccesSftpController.php`, `resources/views/acces-sftp.blade.php`, `public/js/acces-sftp.js`,
+  `lang/{fr,en}/sftp.php` — 63 cles, parite stricte.
+- Route `GET /acces-sftp` en `role:3` seul. Entree de menu `sftp_policies` basculee.
+- `tests/e2e/go-adm-sftp.mjs` — **12 PASS legacy / 16 PASS portage, 0 FAIL**.
+
+#### Corrige cote portage
+- **La position de depart est la plus fermee** : transfert de fichiers seulement, cle SSH
+  obligatoire, aucun tunnel. Le corps emis est exactement l'exemple que la docstring du module donne.
+- **Deployer et retirer se confirment**, par un panneau qui **enumere ce qui elargit l'acces** plutot
+  que d'annoncer un deploiement en bloc.
+- Chaque reglage qui elargit porte un marqueur **sur sa propre ligne**.
+- L'etat initial **s'explique** a l'ecran : un etat qu'on ne s'explique pas se change au hasard.
+
+#### Porte pour arbitrage
+- **E-147** : `sftp_manager.render_policy()` contredit sa docstring sur quatre cles, toutes vers le
+  permissif. Non corrigeable depuis le portage. A traiter avec E-142 et E-144.
 
 ### v1.37.79 — `adm/` D9a : les droits sudo portés, et le préréglage par défaut qui affirmait l'inverse de son module
 
