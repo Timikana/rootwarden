@@ -200,6 +200,78 @@ try {
         verifie('le role 3 atteint la page des permissions', rep.status() === 200, `statut ${rep.status()}`);
     });
 
+    // ══ 1bis. LES TROIS CONFIRMATIONS D'E-114 S'ANALYSENT-ELLES ? ══════════
+    //
+    // E-114 accusait l'APOSTROPHE de casser le litteral JavaScript de
+    // `onclick="return confirm('…')"`, et concluait « seulement en francais » et
+    // « le troisieme bouton fonctionne ». Le sous-lot D6a a mesure le meme
+    // montage sur `manage_servers.php` : ce qui coupe est le GUILLEMET DOUBLE de
+    // la traduction, qui ferme l'ATTRIBUT HTML — un niveau au-dessus — et il est
+    // present dans les deux catalogues.
+    //
+    // Cette etape fait ce qui manquait a E-114 : la mesure AU NAVIGATEUR sur
+    // cette page-ci. On ne compte pas des caracteres, on demande au moteur si
+    // l'attribut s'ANALYSE — `new Function(code)` compile sans executer. Un
+    // decompte d'apostrophes se laisserait tromper par un `\'` ; le compilateur
+    // non.
+    await etape('les confirmations de manage_roles s\'analysent-elles ?', async () => {
+        await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        const verdicts = await page.evaluate(() => {
+            const sortie = [];
+            document.querySelectorAll('button[onclick]').forEach((b) => {
+                const code = b.getAttribute('onclick') || '';
+                if (! /confirm\(/.test(code)) return;
+                let analyse = true;
+                let erreur = '';
+                try {
+                    // COMPILE, N'EXECUTE PAS : aucune boite ne s'ouvre, aucun
+                    // formulaire ne part. C'est la propriete « ce code est-il
+                    // seulement valide » qu'on mesure, rien d'autre.
+                    new Function(code);
+                } catch (e) {
+                    analyse = false;
+                    erreur = String(e.message || e);
+                }
+
+                return sortie.push({
+                    nom: b.getAttribute('name') || '(sans name)',
+                    type: b.getAttribute('type') || '(sans type)',
+                    dansUnFormulaire: b.closest('form') !== null,
+                    code: code.slice(0, 60),
+                    analyse,
+                    erreur,
+                });
+            });
+
+            return sortie;
+        });
+
+        // ONZE COMPTES x TROIS BOUTONS = 33 LIGNES IDENTIQUES. On regroupe : un
+        // journal qu'on ne relit pas ne sert a rien, et trente-trois repetitions
+        // se relisent moins bien qu'une ligne par CAS.
+        constate('boutons a `confirm()` trouves', String(verdicts.length));
+        const parCas = new Map();
+        for (const v of verdicts) {
+            const cle = `${v.nom} [${v.type}, ${v.dansUnFormulaire ? 'dans un form' : 'hors form'}] `
+                + `${v.analyse ? 'analysable' : `NON ANALYSABLE — ${v.erreur} — « ${v.code} »`}`;
+            parCas.set(cle, (parCas.get(cle) || 0) + 1);
+        }
+        for (const [cas, n] of parCas) constate(`  x${n}`, cas);
+
+        // Le legacy en porte ; le portage n'en porte AUCUN, et c'est la reponse
+        // correcte : ses confirmations sont des panneaux, pas des attributs.
+        const casses = verdicts.filter((v) => ! v.analyse);
+        const dangereux = casses.filter((v) => v.type === 'submit' && v.dansUnFormulaire);
+        constate('confirmations qui ne s\'analysent pas', `${casses.length} sur ${verdicts.length}`);
+        constate('dont un `submit` DANS un formulaire (le geste part quand meme)', String(dangereux.length));
+
+        verifiePortage('toute confirmation presente s\'analyse',
+            casses.length === 0,
+            `${casses.length} attribut(s) tronque(s) — le guillemet double de la traduction ferme `
+            + `l'attribut HTML ; ${dangereux.length} d'entre eux sont des \`submit\` dans un `
+            + 'formulaire, donc le geste part SANS confirmation (E-114 corrige par E-121)');
+    });
+
     // ══ 2. Le compte d'epreuve ═════════════════════════════════════════════
     await etape('creation du compte d\'epreuve', async () => {
         if (! C.champNom) {

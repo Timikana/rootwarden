@@ -608,6 +608,14 @@ Corrigé en §6 du plan.
 **La dette de largeur de D4 n'est PAS résorbée** : elle porte sur `/comptes`, que D5 n'a pas touché.
 Elle reste écrite, et attend le sous-lot qui reprendra ce tableau.
 
+**COMPLÉMENT DU 2026-08-26 (`v1.37.66`) — la suite mesure désormais si les confirmations
+s'ANALYSENT.** `new Function(code)` compile sans exécuter : aucune boîte ne s'ouvre, aucun formulaire
+ne part, et un `\'` échappé ne peut pas tromper la mesure comme le ferait un décompte d'apostrophes.
+Résultat sur `/adm/admin_page.php` : **33 boutons à `confirm()`, 33 non analysables**, dont **23
+`submit` dans un formulaire** — donc 23 gestes qui partent sans confirmation. Le portage en porte
+**zéro** : ses confirmations sont des panneaux. Référence portage 13 → **14**. C'est cette mesure qui
+ferme la correction d'E-114 ouverte par D6a.
+
 ### 5.0sexies D6a — PORTÉ le 2026-08-26 (`v1.37.65`) : un fragment mort qui répond sans permission
 
 **D6 pesait 1 746 lignes et a été redécoupé.** C'est un document de migration, pas une promesse — `S2`
