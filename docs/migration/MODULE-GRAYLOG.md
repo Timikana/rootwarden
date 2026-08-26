@@ -118,3 +118,68 @@ Les neuf temps du §5 du plan. Les deux premiers sont faits par ce document ; le
 réglage de flotte. L'écrire depuis une suite change le comportement de tous les déploiements suivants.
 La fixture devra donc **sauvegarder la ligne existante et la restaurer dans un `finally`**, état relu
 pour être prouvé — comme `go-captures-enrolement.mjs` le fait pour le secret TOTP.
+
+---
+
+## 5. ⚠ Ce que G2 devra mesurer en premier : un déploiement ÉCHOUÉ se marque « transfert actif »
+
+Relevé le **2026-08-26** en lisant `backend/routes/graylog.py:340-364`, avant d'écrire un seul clic de
+G2. C'est la classe *« le marqueur n'est pas le verdict »*, et ici le marqueur est **persisté en base**.
+
+La fin de `deploy()` fait, dans cet ordre :
+
+```python
+_, chk_err, chk_code = execute_as_root(client, "rsyslogd -N1 …")   # validation syntaxique
+syntax_ok  = (chk_code == 0)
+_, rst_err, rst_code = execute_as_root(client, "systemctl restart rsyslog")
+restart_ok = (rst_code == 0)
+
+_upsert_state(row['id'], rsyslog_version=version,
+              forward_deployed=True,          # ← INCONDITIONNEL
+              last_deploy_at=…)
+return jsonify({'success': restart_ok and syntax_ok, …})
+```
+
+**`forward_deployed=True` est écrit sans regarder `syntax_ok` ni `restart_ok`.** La réponse, elle, rend
+`success: false` quand l'un des deux a échoué. Donc :
+
+| ce qui s'est passé sur la machine | ce que la réponse dit | ce que la BASE dit |
+|---|---|---|
+| rsyslog ne redémarre pas | `success: false` | `forward_deployed = 1` |
+| la configuration est syntaxiquement invalide | `success: false` | `forward_deployed = 1` |
+
+Et `_upsert_state` (`:109-123`) écrit bien en base, sans condition ni rollback.
+
+**Conséquence visible** : le tableau affiche la pastille « Transfert actif » pour une machine où
+`rsyslog` est arrêté ou refuse sa configuration. L'écran affirme donc l'inverse de la réalité, et il
+l'affirme **après** que la page a montré l'échec — le message disparaît au rechargement, la pastille
+reste.
+
+C'est la même mécanique que la pastille de `maintenance/` (E-101), avec une différence qui l'aggrave :
+là le verdict était recalculé sur une mauvaise horloge, ici il est **écrit en base** et survit à la
+session.
+
+### Comment G2 mesurera cela sans casser le banc
+
+La branche d'échec n'est pas atteignable par un déploiement normal — il faut la rendre atteignable, ce
+qui est l'un des six motifs. Trois options, par ordre de sûreté :
+
+| approche | ce qu'elle exerce | risque |
+|---|---|---|
+| **lire** l'ordre des instructions et documenter | rien | nul, mais ne prouve rien |
+| gabarit **volontairement invalide**, puis `uninstall` | le vrai chemin d'échec | rsyslog reste cassé sur la machine 2 entre les deux gestes |
+| **forger** la réponse du backend depuis la page | l'affichage seulement | ne prouve pas l'écriture en base |
+
+**Retenue : la deuxième, sur `test-server` (machine 2) uniquement**, et à condition que la suite
+appelle `uninstall` dans un `finally` — ce geste retire les fichiers RootWarden **et** redémarre
+`rsyslog`, donc il remet la machine dans son état. La propriété à mesurer est alors précise :
+
+> après un déploiement dont la réponse porte `success: false`, `graylog_rsyslog.forward_deployed`
+> **ne doit pas** valoir 1.
+
+**Elle échouera sur le legacy comme sur le portage** : le défaut est dans le backend, pas dans la page.
+C'est donc un écart à porter **avec** son correctif backend — la convention 2 l'autorise — et non un
+écart de parité entre les deux portails.
+
+**`srv-zabbix` (id 1) : jamais.** Et le gabarit invalide doit porter le nom d'épreuve, pour que le
+nettoyage reste borné : un `DELETE FROM graylog_templates` emporterait les quatre gabarits réels.
