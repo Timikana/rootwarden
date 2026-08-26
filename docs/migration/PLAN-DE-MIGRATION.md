@@ -95,9 +95,9 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **19 sur 33** |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **97 exécutions, 1365 assertions, 0 échec, ZÉRO écart** — mesuré le 2026-08-25 après l'archivage de `maintenance/`. Deux exécutions de plus (la suite `maintenance` sur les deux cibles) et le total d'assertions **baisse** de 1384 à 1365 : `go-page-maintenance` passe de 24 à 5 sur la cible legacy, parce que la partie est archivée et que la suite CONSTATE son 404 au lieu de la parcourir. Une baisse s'explique ou c'est une régression |
+| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**). Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **109** — numérotés jusqu'à **E-119** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte |
+| écarts de parité documentés | **114** — numérotés jusqu'à **E-124** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D5 PORTÉS (`v1.37.59` à `v1.37.63`) — `MODULE-ADM.md`**, dix sous-lots, cinq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6a PORTÉS (`v1.37.59` à `v1.37.65`) — `MODULE-ADM.md`**, onze sous-lots, cinq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -578,6 +578,21 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   membres** — un clic, N machines, N courriels. Le sous-lot testera le bouton par **interception et
   avortement** ; un déclenchement réel attend votre mot.
 
+**Hygiène de la base d'épreuve — relevé le 2026-08-26, aucune action prise**
+- **5 comptes `e2e_test_*`** subsistent dans `users`, créés entre le **2026-07-25** et le
+  **2026-08-12** par des suites antérieures qui ne les ont pas retirés. Ils faussent tout comptage de
+  comptes, et ils sont visibles à l'écran d'administration. Les supprimer est destructeur et ils ne
+  m'appartiennent pas : **rien n'a été touché**. Remesure :
+  `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
+
+**Une mesure au navigateur reste à faire sur `manage_roles.php`** — E-114, corrigé le 2026-08-26
+- La troncature de l'attribut `onclick` par le **guillemet** de la traduction est mesurée **au
+  navigateur** sur `manage_servers.php` (E-121). Sur `manage_roles.php`, montage identique, elle n'est
+  pour l'instant établie qu'**au niveau de la chaîne rendue**. Deux conclusions d'E-114 tombent déjà
+  (« seulement en français », « le troisième bouton fonctionne »), mais **c'est précisément le pas
+  sauté qui avait coûté ces deux conclusions** : la confirmation au navigateur est à faire, dans la
+  suite `go-adm-permissions`, avant de considérer E-114 clos.
+
 **`adm/` — quatre arbitrages ouverts par l'inventaire du 2026-08-25** (`MODULE-ADM.md`)
 - **`health_check.php`** : la page est dangereuse par construction (§4.2). Trois issues — tout pointer
   sur `machine_id = 0` et ne tester que le contrat HTTP ; ne tirer chaque route que sur un **clic**
@@ -721,6 +736,12 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   lignes plus bas transtype, elle. Ce n'est pas un trou, c'est une **fragilité** : dire les deux.
 
 ### Tests
+
+- **Une capture qui montre autre chose que ce qu'on croit est pire qu'une capture absente** — elle
+  sert de preuve à un examen qui n'a pas eu lieu. Relevé le 2026-08-26 : l'étape de captures de
+  `go-adm-serveurs` ne rouvrait pas l'onglet « Serveurs » du legacy ; les trois images montraient
+  l'onglet des comptes. La page répond 200, rend du contenu, et ce contenu n'est pas le sujet. Vu **en
+  regardant l'image**, jamais en relisant le code.
 
 - **Cliquer le bouton, pas appeler la fonction** — et **pas le premier bouton de la page** :
   `profile.php` porte cinq formulaires et le premier est celui du courriel. Remonter du **champ** à son
@@ -919,6 +940,16 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   point d'API gardé par un step-up rend 403, htmx ne remplace rien (`[45].. → swap:false`), aucun
   écouteur `htmx:responseError` n'existe — **la bascule ne fait rien, sans message**. Vérifier par quel
   transport chaque appel part avant de croire une garde utilisable.
+- **Chercher le délimiteur le plus EXTÉRIEUR.** E-114 avait accusé l'apostrophe de casser un littéral
+  JavaScript dans `onclick="return confirm('…')"`, et conclu « seulement en français ». D6a a mesuré
+  au navigateur : ce qui coupe est le **guillemet double** de la traduction, qui ferme **l'attribut
+  HTML** — un niveau au-dessus — et il est présent dans les **deux** catalogues. Deux conclusions
+  fausses parce qu'on avait regardé la couche du dessous. Quand une valeur traverse plusieurs niveaux
+  d'échappement, remonter au plus externe avant de nommer un coupable.
+- **Une garde conditionnelle sur du code MORT répond quand même.** `manage_servers_table.php` n'a plus
+  qu'une référence, dans un bloc commenté — et Apache le sert toujours, avec `checkAuth` mais sans le
+  `checkPermission` de sa page hôte. Le code mort ne se contente pas d'être à un clic d'être
+  réactivé : **il répond déjà**.
 - **Une capacité peut être fermée deux fois.** `anonymize_user.php` (RGPD art. 17, annoncé dans la
   documentation) n'a aucun appelant, **et** sa marque de step-up ne peut être obtenue par aucun geste
   d'interface. Compter les verrous : un seul levé ne rouvre rien.

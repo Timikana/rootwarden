@@ -15,8 +15,8 @@ return [
     'title' => 'Portal accounts',
     'desc' => 'Create an account, set a password, unlock an access, reset a second factor.',
 
-    'reste_titre' => 'Two tabs are not ported yet.',
-    'reste_texte' => 'The old portal administration page also carries servers and access & permissions. They still live there; only accounts are ported here.',
+    'reste_titre' => 'One capability of this tab is not ported yet.',
+    'reste_texte' => 'Importing accounts from a CSV file still lives on the legacy portal. The three tabs of the administration page are ported: they are reachable through the tabs above.',
     'reste_lien' => 'Open the old portal',
 
     'col_nom' => 'Name',

@@ -4,6 +4,8 @@
     <h1 class="rw-titre">{{ __('perms.title') }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('perms.desc') }}</p>
 
+    @include('composants.onglets-adm', ['courant' => 'permissions'])
+
     {{-- UNE SEULE LISTE, ET ELLE VIENT DU SCHEMA. Le legacy en porte trois — 18
          colonnes, 14 posables a la creation, 16 basculables — et les ecarts se
          croisent : une permission s'accorde sans se reprendre, une autre
