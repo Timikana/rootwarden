@@ -6183,3 +6183,43 @@ Et le motif de mon erreur est celui-là même que le chantier relève partout : 
 au *présent*, et j'ai conclu qu'elles avaient été *vidées*. Un état actuel ne dit rien de l'état
 antérieur — c'est la même faute que « un état final correct ne prouve pas que le geste était correct »,
 prise par l'autre bout.
+
+### E-141 est CLOS — il n'y avait pas de mystère, il y avait une dépendance à une donnée que personne ne possédait
+
+Dernière mesure, faite par la seconde session et **revérifiée ici** le 2026-08-26 :
+
+| contrôle | résultat |
+|---|---|
+| `grep -rn "banc-essai"` sur `tests/`, `scripts/`, `mysql/`, `laravel/`, `legacy/`, `backend/` | **aucune occurrence** |
+| apparition dans les journaux | absente le **2026-08-21 à 16:17**, présente à **16:22** |
+
+L'étiquette `banc-essai` était donc une **fixture posée à la main**, en cours de session, qu'**aucune
+suite ne créait ni ne maintenait**. Sa disparition n'a pas de trace au journal d'audit pour la même
+raison que son apparition n'en a pas : elle n'est jamais passée par l'interface, dans un sens comme
+dans l'autre.
+
+**Il n'y a donc aucun événement à expliquer.** Ce qu'il y avait, c'est une suite qui mesurait une
+propriété réelle — « le filtre propose exactement le vocabulaire du parc » — en s'appuyant sur une
+donnée que **personne ne possédait**. Elle a tenu quatre jours, puis quelqu'un a nettoyé, et la suite a
+accusé la page.
+
+C'est exactement la leçon posée plus haut, et la voici confirmée par son propre cas :
+
+> Une suite qui dépend de données partagées préexistantes qu'elle ne crée pas finira par accuser la
+> page pour un état du banc.
+
+La correction retenue — poser la fixture et la retirer dans un `finally` — ne rend pas seulement la
+suite verte : elle rend la propriété mesurable **toujours**, y compris sur un banc fraîchement remis à
+zéro. Les trois assertions qui vivaient dans un `if (TAGS_DU_PARC.length)` sont redevenues
+inconditionnelles.
+
+### Le corollaire de méthode, qui est le vrai gain de ces deux écarts
+
+> Un total qui change dit **qu'**il s'est passé quelque chose, jamais **quoi**. Le journal du rejeu
+> précédent, lui, le dit — il est en clair dans `/tmp`, à portée d'un `grep`, et **deux sessions ont
+> passé deux jours sans y penser**.
+
+Trois conclusions fausses ont été tirées avant qu'on les lise : que des clés SSH avaient disparu
+(elles n'ont jamais existé), qu'une fixture de suite avait vidé une table (aucune suite ne la
+touchait), et qu'un module avait régressé (deux assertions avaient simplement cessé de s'exécuter).
+Les trois étaient réfutables par un `grep` dans les journaux conservés.
