@@ -5782,6 +5782,35 @@ révocation referme la page tout de suite.
 
 **NON FERMÉ pour l'ÉCRITURE** : aucune interface du portage n'octroie ni ne révoque. C'est D5b.
 
+### Et le legacy porte DEUX notions de permission, qui ne coïncident pas
+
+Relevé par une relecture croisée le 2026-08-26, **vérifié ici**, et il complète l'écart plutôt qu'il
+ne le corrige :
+
+| chemin | ce qui décide | temporaires prises en compte |
+|---|---|---|
+| accès à une PAGE du legacy | `checkPermissionFromDB` | **oui** — rôle 3, `permissions`, `temporary_permissions` |
+| ce que le legacy TRANSMET au backend | `api_proxy.php:89` → `$_SESSION['permissions']` → `getVerifiedPermissions` → `SELECT * FROM permissions` | **non** |
+
+Un octroi temporaire ouvre donc la page du legacy **et ne franchit pas sa passerelle**. Les deux
+notions vivent dans le même portail et ne se rejoignent nulle part.
+
+**Le portage, lui, est cohérent** : `PasserelleController` transmet `Droits::permissions()`, qui
+inclut désormais les octrois temporaires. Ce qui ouvre la page ouvre aussi l'appel.
+
+C'est donc une **divergence de comportement assumée** : sur un octroi temporaire, un appel au backend
+part depuis le portage et ne part pas depuis le legacy. Le portage a raison — refuser au niveau de la
+passerelle ce qu'on vient d'accorder au niveau de la page n'est défendable nulle part — mais la
+différence se déclare plutôt qu'elle ne se découvre.
+
+**Conséquence pour l'arbitrage K4**, et elle est importante : le bouton de déploiement de clés vit
+dans `ssh/index.php`, **non porté**. `POST /deploy` est donc appelé par le chemin où les permissions
+temporaires manquent encore. Poser `@require_permission('can_deploy_keys')` sur cette route
+refuserait un octroi temporaire venu du legacy. **Le verrou documenté sur `/deploy` n'est pas levé
+par ce correctif** ; il le sera le jour où K4 sera porté. Faire lire la base à `api_proxy.php` est
+possible — c'est un fichier du legacy, la convention l'autorise — mais cela touche de la production
+et se mesure avant de se décider.
+
 ### Deux constats annexes, tous deux mesurés
 
 **`machine_id` est déclaré, jamais renseigné, jamais filtré.** La table porte une colonne `machine_id`,
