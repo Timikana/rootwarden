@@ -9,6 +9,7 @@ use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
+use App\Http\Controllers\GraylogController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
 use App\Http\Controllers\ExportCveController;
@@ -249,6 +250,20 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/maintenance', MaintenanceController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('maintenance');
+
+    /*
+     * Transfert des journaux (Graylog). `role:2` + `perm:can_manage_graylog`,
+     * releve du legacy (`graylog/index.php:17-18`).
+     *
+     * La permission n'est PAS `can_admin_portal` : ce module a la sienne, et la
+     * confondre elargirait l'acces a tous les administrateurs du portail. Les
+     * routes du backend exigent la meme (`@require_permission('can_manage_graylog')`),
+     * donc la garde de la page et celle de la requete disent la meme chose — ce
+     * qui n'est pas le cas partout dans ce depot.
+     */
+    Route::get('/graylog', GraylogController::class)
+        ->middleware(['role:2', 'perm:can_manage_graylog'])
+        ->name('graylog');
 
     Route::get('/docker', DockerController::class)
         ->middleware(['role:2'])

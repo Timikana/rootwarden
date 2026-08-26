@@ -66,6 +66,17 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # pas suppose.
 # 49 -> 50 au portage de `maintenance/`, pour la MEME raison et verifiee de la meme
 # facon : une seule ligne « Maintenance » dans le journal, celle de `rw-test-super`.
+# 52 -> 57 le 2026-08-26, et l'ecart de CINQ se decompose :
+#   +1  l'entree « Graylog » portee — meme raison encore, elle exige
+#       `can_manage_graylog` que `rw-test-admin` n'a pas, donc seul le role 3 la
+#       voit. Verifie dans le journal du rejeu ;
+#   +4  les assertions de reconstitution du total, ajoutees par la seconde session
+#       (`f28ce72`) : chaque entree porte `route` OU `legacy`, la somme se
+#       reconstitue, le total vaut celui du plan, et le role 3 voit autant
+#       d'entrees que la constante en declare.
+# Ces quatre-la ont ete ECRITES pendant un rejeu en cours, donc le chiffre du LOT
+# ne les mesurait pas. La suite a ete rejouee SEULE apres coup pour obtenir une
+# reference reproductible : 57 PASS / 0 FAIL.
 # 50 -> 51 au portage du journal d'audit (`adm/` D1), TROISIEME fois la meme
 # raison et verifiee de la meme facon : le journal ne porte qu'une ligne
 # « Journal d'audit », celle de `rw-test-super`. `audit_log` exige
@@ -74,7 +85,7 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # comme les trois precedentes : une seule ligne « Admin », celle de
 # `rw-test-super`, et elle resout en 200 sur /comptes.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=52 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=57 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -166,6 +177,14 @@ declare -A REF_LARAVEL=(
   [go-adm-etiquettes-notes]=18
   [go-adm-cycle-connexion]=14
   [go-adm-cles-api]=15
+  # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
+  # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
+  # c'est « aucune boite native » : le legacy pose un `confirm()` pour supprimer
+  # un gabarit et un `alert()` pour rendre le resultat.
+  # G1 ne clique AUCUN bouton de ligne du tableau des machines : `glTest` (js:100)
+  # n'a pas de `confirm()` et ouvrirait une session SSH sur la machine de la
+  # ligne, et `srv-zabbix` figure dans ce tableau. Les gestes mutants sont G2.
+  [go-page-graylog-g1]=26
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -265,6 +284,11 @@ declare -A REF_LEGACY=(
   [go-adm-etiquettes-notes]=10
   [go-adm-cycle-connexion]=12
   [go-adm-cles-api]=11
+  # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
+  # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
+  # bouton de ligne — `glTest` (js:100) n'a pas de `confirm()` et ouvrirait une
+  # session SSH sur la machine de la ligne, `srv-zabbix` comprise.
+  [go-page-graylog-g1]=25
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -277,6 +301,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
+  go-page-graylog-g1
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
@@ -289,6 +314,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
+  go-page-graylog-g1
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
