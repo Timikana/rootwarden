@@ -237,6 +237,22 @@
             if (corps.templates_pushed) parties.push(corps.templates_pushed.length + ' gabarit(s)');
             if (corps.tag) parties.push('tag ' + corps.tag);
             annonce('graylog-machines-etat', parties.join(' · ') || 'OK', 'ok');
+        } else if (geste === 'uninstall') {
+            /*
+             * UN RETRAIT ECHOUE EST LE SEUL CAS OU L'UTILISATEUR CROIT AVOIR
+             * ARRETE QUELQUE CHOSE.
+             *
+             * Le backend rendait `success: true` quoi qu'il arrive et marquait la
+             * machine « non deployee » : l'ecran affirmait donc un retrait qui
+             * pouvait n'avoir rien fait. Corrige cote backend, mais la page doit
+             * DIRE ce qui reste possible, et le dire dans la langue de la
+             * personne — le message du backend n'est pas traduit.
+             *
+             * Un deploiement rate fait perdre des journaux ; un retrait rate fait
+             * croire qu'on a cesse d'en envoyer. Le second merite son propre
+             * avertissement.
+             */
+            annonce('graylog-machines-etat', L.err_retrait_actif, 'echec');
         } else {
             annonce('graylog-machines-etat', corps.message || corps.stderr || L.err_config, 'echec');
         }
