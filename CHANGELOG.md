@@ -2211,6 +2211,72 @@ contraire. Écarts **E-142**, **E-143** et **E-144**.
 - **E-144** : `sudo_deploy()` fait `data.get('preset', 'apt_only')`. Une requête sans `preset`
   obtient l'équivalence root. Non corrigeable depuis le portage.
 
+### v1.37.78 — `graylog/` : l'etat persiste suit le VERDICT du geste, dans les deux sens
+
+Entree ecrite APRES le commit `d190949`, qui l'avait omise — manquement a la
+checklist releve par la seconde session. Le trou de numerotation entre v1.37.77 et
+v1.37.79 venait de la.
+
+Defaut releve en lisant `backend/routes/graylog.py` avant d'ecrire un clic de G2, et
+corrige avec ses tests. **348 pytest verts** (341 + 7 neufs).
+
+**LES DEUX ROUTES ECRIVAIENT LEUR ETAT SANS REGARDER LE RESULTAT.** `deploy()` posait
+`forward_deployed=True` sans consulter `syntax_ok` ni `restart_ok`, alors que sa
+reponse rendait `success: false`. `uninstall()` allait plus loin : il **jetait** le
+code de retour de sa commande, ecrivait `forward_deployed=False` sans condition, et
+rendait `success: True` quoi qu'il arrive.
+
+| geste echoue | ce que l'ecran affirmait | la realite |
+|---|---|---|
+| `deploy` | « Transfert actif » | rien ne part |
+| `uninstall` | « Non deploye », `success: true` | **le transfert continue** |
+
+Le premier fait perdre des journaux. **Le second est une affirmation de
+confidentialite** : quelqu'un qui retire le transfert pour une raison de conformite
+recevait une confirmation franche d'un geste qui pouvait n'avoir rien fait. Et le
+marqueur etant ECRIT EN BASE, il survit a la session — le message d'echec disparait
+au rechargement, la pastille reste.
+
+**LE CAS VISIBLE AVAIT ETE TRAITE, LE SUBTIL NON**, et c'est la forme du defaut plus
+que le defaut lui-meme. `deploy` calcule bien `syntax_ok` et `restart_ok`, les rend
+dans sa reponse, et compose son `success` avec : quelqu'un a donc pense a l'echec —
+mais seulement pour la REPONSE, pas pour l'ETAT PERSISTE. `uninstall`, lui, ne pense
+pas a l'echec du tout. Le meme motif que le prereglage `all_nopasswd` de D9a, dont
+l'aide disait vrai quand celle du prereglage par defaut disait faux : ce n'est pas une
+negligence uniforme, c'est le cas non evident pris a l'envers.
+
+**CE QUE LE CORRECTIF POSE.** `forward_deployed` signifie « la configuration
+RootWarden est ACTIVE sur cette machine » — donc `syntax_ok and restart_ok`. Les
+fichiers sont ecrits AVANT ces deux controles, leur presence sur le disque ne prouve
+rien. `last_deploy_at` n'est pose qu'en cas de succes : une tentative ratee n'est pas
+un deploiement. `uninstall` capture son code de retour et, en cas d'echec, NE TOUCHE
+PAS a l'etat — ecrire `False` affirmerait un retrait qui n'a pas eu lieu.
+
+**LA PAGE LE DIT DANS LA LANGUE DE LA PERSONNE.** Le message du backend n'est pas
+traduit ; le portage ajoute `err_retrait_actif` (FR et EN) pour ce cas precis, parce
+que c'est le seul ou l'utilisateur croit avoir ARRETE quelque chose. Parite i18n
+graylog : 68 cles FR = 68 EN.
+
+**SEPT TESTS, ET ILS PEUVENT ECHOUER** — verifie plutot que suppose. En remettant
+l'ancien fichier une minute : **3 failed, 4 passed**. Avec le correctif : **7
+passed**. Les trois qui basculent sont exactement ceux du defaut.
+
+Ils sont unitaires et non E2E parce que la branche d'echec n'est pas atteignable
+depuis l'interface sans casser `rsyslog` sur une machine reelle : la session SSH est
+factice, `execute_as_root` est SCRIPTE, et `_upsert_state` est INTERCEPTE plutot que
+dirige vers la base — ce qui permet d'asserter non seulement ce qui a ete ecrit mais
+QU'IL NE L'A PAS ETE. Un test qui lirait la base ne distinguerait pas « ecrit False »
+de « pas ecrit ».
+
+Le blueprint `graylog` n'etait PAS enregistre dans l'application de test : aucune de
+ses routes n'etait joignable par un test HTTP. Ajoute.
+
+**Le conteneur n'a pas ete redemarre** : le Python est lu au demarrage du processus,
+donc ce commit etait inerte jusqu'au redemarrage suivant, et la seconde session tenait
+le banc. Voir §8 du plan.
+
+PARITE.md E-145. Detail dans docs/migration/MODULE-GRAYLOG.md §5.
+
 ### v1.37.77 — `graylog/` G1 porte : « Tester » executait une commande a distance sans rien demander
 
 **18 entrees de menu portees sur 33.** Legacy 25/0, portage 26/0, base rouge 7/12.
