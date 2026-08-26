@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Comptes;
 use App\Services\JournalAudit;
+use App\Services\StepUp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class ComptesController extends Controller
     public function __construct(
         private readonly Comptes $comptes,
         private readonly JournalAudit $journal,
+        private readonly StepUp $stepUp,
     ) {
     }
 
@@ -202,6 +204,117 @@ class ComptesController extends Controller
         $this->journalise($auteur, "Compte #{$id} deverrouille");
 
         return response()->json(['success' => true, 'message' => __('comptes.deverrouille')]);
+    }
+
+    /* ═══ Suppression et anonymisation — sous-lot D4 ═══════════════════════ */
+
+    /**
+     * Ce que la page a besoin de savoir AVANT de proposer un geste : le compte
+     * porte-t-il un journal ? Si oui, la suppression l'emporterait (E-116), et
+     * c'est l'anonymisation qu'il faut proposer.
+     */
+    public function etatSuppression(Request $requete, int $id): JsonResponse
+    {
+        [$auteur, $roleAuteur] = $this->qui($requete);
+        if (! $this->comptes->trouve($id)) {
+            return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
+        }
+        $refus = $this->comptes->refusePourquoi($id, $auteur, $roleAuteur);
+        $journaux = $this->comptes->journauxDe($id);
+
+        return response()->json([
+            'success' => true,
+            'journaux' => $journaux,
+            'supprimable' => $refus === null && $journaux === 0,
+            'anonymisable' => $refus === null,
+            'refus' => $refus === null ? null : __($refus),
+        ]);
+    }
+
+    /**
+     * PREMIER CONSOMMATEUR DU STEP-UP PORTE EN `v1.37.50`.
+     *
+     * Le sous-lot A5 avait explicitement differe le panneau de decision en page,
+     * faute de consommateur : « il sera porte AVEC son premier consommateur ».
+     * Le voici. Tant qu'aucune marque fraiche n'existe pour ce compte et cette
+     * action, la reponse est un 403 qui NOMME l'action — la page ouvre alors son
+     * panneau, demande un code, et rejoue le geste.
+     */
+    private function exigeStepUp(int $auteur, string $action): ?JsonResponse
+    {
+        if ($this->stepUp->valide($auteur, $action)) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'step_up_required' => true,
+            'action' => $action,
+            'message' => __('comptes.err_step_up'),
+        ], 403);
+    }
+
+    public function supprimer(Request $requete, int $id): JsonResponse
+    {
+        [$auteur, $roleAuteur] = $this->qui($requete);
+        if (! $this->comptes->trouve($id)) {
+            return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
+        }
+        if (($refus = $this->comptes->refusePourquoi($id, $auteur, $roleAuteur)) !== null) {
+            return response()->json(['success' => false, 'message' => __($refus)], 403);
+        }
+        // LA GARDE QUI N'EXISTE PAS DANS LE LEGACY : un compte qui porte un
+        // journal ne se supprime pas, parce que la cascade l'emporterait et
+        // romprait la chaine que D1 verifie. On oriente vers l'anonymisation.
+        if (! $this->comptes->supprimableSansPerte($id)) {
+            return response()->json([
+                'success' => false,
+                'journaux' => $this->comptes->journauxDe($id),
+                'anonymiser_plutot' => true,
+                'message' => __('comptes.err_journal_present',
+                    ['nombre' => $this->comptes->journauxDe($id)]),
+            ], 409);
+        }
+        if (($refus = $this->exigeStepUp($auteur, 'compte_supprimer')) !== null) {
+            return $refus;
+        }
+
+        $nom = $this->comptes->trouve($id)['name'] ?? ('#' . $id);
+        // Le journal AVANT la suppression, comme le legacy — mais ici la ligne
+        // ne peut pas creuser de trou : le compte n'a aucun journal a emporter,
+        // c'est la condition qu'on vient de verifier.
+        $this->journalise($auteur, "Suppression du compte '{$nom}' (#{$id})");
+        if (($err = $this->comptes->supprime($id)) !== null) {
+            return response()->json(['success' => false, 'message' => __($err)], 409);
+        }
+
+        return response()->json(['success' => true, 'message' => __('comptes.supprime', ['nom' => $nom])]);
+    }
+
+    public function anonymiser(Request $requete, int $id): JsonResponse
+    {
+        [$auteur, $roleAuteur] = $this->qui($requete);
+        if (! $this->comptes->trouve($id)) {
+            return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
+        }
+        if (($refus = $this->comptes->refusePourquoi($id, $auteur, $roleAuteur)) !== null) {
+            return response()->json(['success' => false, 'message' => __($refus)], 403);
+        }
+        if (($refus = $this->exigeStepUp($auteur, 'compte_anonymiser')) !== null) {
+            return $refus;
+        }
+
+        $nom = $this->comptes->trouve($id)['name'] ?? ('#' . $id);
+        $journaux = $this->comptes->journauxDe($id);
+        $this->comptes->anonymise($id);
+        $this->journalise($auteur,
+            "[rgpd] Anonymisation du compte '{$nom}' (#{$id}) - donnees personnelles effacees, journal conserve");
+
+        return response()->json([
+            'success' => true,
+            'journaux_conserves' => $journaux,
+            'message' => __('comptes.anonymise', ['nom' => $nom, 'nombre' => $journaux]),
+        ]);
     }
 
     public function reinitialiserTotp(Request $requete, int $id): JsonResponse

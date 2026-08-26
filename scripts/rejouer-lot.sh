@@ -149,6 +149,14 @@ declare -A REF_LARAVEL=(
   # aucune erreur JavaScript — le legacy en porte deux, qui desarment deux
   # confirmations (E-114).
   [go-adm-comptes]=17
+  # Sous-lot D4 de `adm/` : suppression et anonymisation. 21 sur le portage
+  # contre 10 sur le legacy. L'ecart est grand parce que le portage exerce un
+  # PARCOURS que le legacy n'a pas : panneau de decision qui NOMME ce que le
+  # geste emporte, confirmation qui n'accepte que le nom exact, refus 403
+  # `step_up_required`, panneau de re-authentification EN PAGE, puis rejeu du
+  # geste. C'est la piece que le sous-lot A5 avait differee « a son premier
+  # consommateur » — et elle est desormais mesuree de bout en bout.
+  [go-adm-suppression]=21
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -247,7 +255,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit go-adm-notifications go-adm-comptes
+  go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift

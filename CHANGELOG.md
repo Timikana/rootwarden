@@ -2171,6 +2171,57 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.62 — `adm/` D4 : le geste sur devient atteignable, et le step-up sort de l'attente
+
+**19 entrees de menu portees sur 33** (inchange : D4 ajoute des gestes a une page deja portee).
+Legacy 10/0, portage **21/0** (`tests/e2e/go-adm-suppression.mjs`). L'ecart de onze assertions n'est
+pas un gonflement : le portage exerce un PARCOURS que le legacy n'a pas.
+
+**LE PANNEAU DE STEP-UP, DIFFERE DEPUIS A5, EST ECRIT — ET MESURE.** Le sous-lot A5 avait porte le
+mecanisme (`v1.37.50`) en differant explicitement son panneau de decision « a son premier
+consommateur, faute de pouvoir le mesurer ». D4 est ce consommateur. Le parcours complet est
+desormais exerce de bout en bout : confirmation qui naît DESACTIVEE, saisie fausse qui la laisse
+inerte, saisie exacte du nom qui l'active, `DELETE 403 {"step_up_required":true,
+"action":"compte_supprimer"}`, panneau de re-authentification EN PAGE, code a six chiffres, et le
+geste qui repart de lui-meme.
+
+`StepUp::ACTIONS_PORTAGE` etend la liste FERMEE aux gestes du portage. `RoutesBackend` ne couvre que
+les chemins transmis au backend — c'est son objet, et l'y elargir aurait brouille son sens.
+
+**E-116 — supprimer un compte EMPORTAIT son journal d'audit.** `information_schema` rend 34 cles
+etrangeres vers `users`, dont douze en CASCADE — et `user_logs.user_id` en fait partie. Comme le
+sous-lot D1 a rendu ce journal VERIFIABLE, en retirer du milieu ROMPT la chaine. Le portage pose la
+garde qui manquait : **un compte qui porte un journal ne se supprime pas**. La page demande l'etat
+AVANT d'ouvrir son panneau, dit combien de lignes seraient emportees, et propose l'anonymisation.
+
+Ce defaut n'a pas ete provoque pour le demontrer : rompre la chaine est irreversible sur un artefact
+que l'exploitant suit. Il est etabli par la mesure du schema, et la suite n'agit que sur un compte
+fraichement cree — dont `user_logs` est vide — en VERIFIANT cette precondition avant de cliquer.
+
+**E-117 — le geste RGPD devient atteignable.** `anonymize_user.php` fait exactement ce qu'il faut, et
+son commentaire ligne 117 le dit : « les user_logs et login_history sont CONSERVES pour tracabilite
+legale ». Il est garde, documente — et aucun element de l'interface du legacy ne l'appelle. Ici les
+deux gestes sont offerts cote a cote, et c'est l'anonymisation qui est proposee des que le compte
+porte un journal.
+
+**UN PIEGE REPRODUIT, ET C'EST LA LECON DU SOUS-LOT.** La premiere version de la suite a echoue a sa
+DEUXIEME execution : la marque de step-up vit dans le cache quinze minutes et SURVIT a l'execution,
+si bien que le `DELETE` rendait 200 au lieu de 403. C'est mot pour mot la lecon d'A5 — « une fixture,
+c'est aussi ce que le test ACCORDE » — payee dans le sous-lot qui consomme le step-up. La suite
+revoque desormais a l'entree et dans son `finally`.
+
+**Vu a l'image et NON RESOLU** : les deux nouveaux boutons portent le tableau au-dela du cadre a
+1400 px, et « Anonymiser » y est coupe. Le cadre defile et le signale, mais la regle du chantier veut
+que la colonne actionnable ne cede jamais. Une tentative de repli du courriel a ete ANNULEE :
+`.rw-etroit-seul--inline` ne s'affiche que SOUS 720 px — une classe qui existe et veut dire autre
+chose. A reprendre avec D5.
+
+70 cles FR et EN, jeux compares. Gardes : role 3 + `can_admin_portal` SUR LA ROUTE pour les deux
+gestes, plus les refus reprris du legacy — soi-meme, rang egal ou superieur, dernier
+super-administrateur actif.
+
+Ecarts : **E-116 et E-117**, les deux fermes par ce portage.
+
 ### v1.37.61 — `adm/` D3 : la politique de mot de passe s'applique enfin a l'administrateur
 
 **19 entrees de menu portees sur 33.** Legacy 13/0, portage 17/0

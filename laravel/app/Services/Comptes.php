@@ -306,6 +306,118 @@ class Comptes
         return $secret !== null && $secret !== '';
     }
 
+    /* ═══ Suppression et anonymisation — sous-lot D4 ═══════════════════════ */
+
+    /**
+     * Combien de lignes de journal ce compte porte-t-il ?
+     *
+     * C'est la question qui decide du geste. `user_logs.user_id` est en
+     * **ON DELETE CASCADE** — mesure du 2026-08-26 dans `information_schema` :
+     * 34 cles etrangeres pointent vers `users`, douze en cascade, et celle-ci en
+     * fait partie. Supprimer un compte efface donc son journal, et comme le
+     * sous-lot D1 a rendu ce journal VERIFIABLE — chaque ligne chainee a la
+     * precedente —, en retirer du milieu ROMPT la chaine.
+     *
+     * Voir PARITE E-116.
+     */
+    public function journauxDe(int $id): int
+    {
+        return (int) DB::table('user_logs')->where('user_id', $id)->count();
+    }
+
+    /**
+     * Un compte est-il supprimable sans dommage ?
+     *
+     * Oui s'il ne porte aucune ligne de journal — un compte fraichement cree est
+     * dans ce cas, `audit_log` ecrivant toujours avec l'identifiant de l'AUTEUR
+     * et jamais de la cible. Sinon, l'anonymisation est le geste juste : elle
+     * efface les donnees personnelles et PRESERVE le journal.
+     */
+    public function supprimableSansPerte(int $id): bool
+    {
+        return $this->journauxDe($id) === 0;
+    }
+
+    /**
+     * Les refus communs aux deux gestes, dans l'ordre du legacy
+     * (`delete_user.php:69-97`) : soi-meme, hierarchie, dernier role 3.
+     *
+     * @return string|null la cle du message de refus, ou null si le geste est permis
+     */
+    public function refusePourquoi(int $id, int $auteur, int $roleAuteur): ?string
+    {
+        if ($id === $auteur) {
+            return 'comptes.err_soi_meme';
+        }
+        $cible = $this->trouve($id);
+        if (! $cible) {
+            return 'comptes.err_inconnu';
+        }
+        // Un role ne touche que des roles STRICTEMENT inferieurs. Repris tel
+        // quel : deux administrateurs compromis pourraient sinon se purger.
+        if ((int) $cible['role_id'] >= $roleAuteur) {
+            return 'comptes.err_rang';
+        }
+        if ((int) $cible['role_id'] === 3 && $this->superadminsActifs() <= 1) {
+            return 'comptes.err_dernier_sa';
+        }
+
+        return null;
+    }
+
+    /**
+     * Supprime un compte. Les cles etrangeres font le reste — et c'est bien le
+     * probleme : la cascade manuelle du legacy (`delete_user.php:104-113`) est du
+     * CODE MORT, les deux tables qu'il supprime explicitement etant deja parties
+     * avec la premiere ligne.
+     *
+     * L'appelant doit avoir verifie `supprimableSansPerte()`. On le REVERIFIE
+     * ici : une garde qui n'existe qu'a l'appel n'est pas une garde.
+     */
+    public function supprime(int $id): ?string
+    {
+        if (! $this->supprimableSansPerte($id)) {
+            return 'comptes.err_journal_present';
+        }
+        DB::table('users')->where('id', $id)->delete();
+
+        return null;
+    }
+
+    /**
+     * Anonymise un compte : les donnees personnelles sont effacees, le JOURNAL
+     * EST CONSERVE. C'est le geste que le legacy porte, commente, garde — et
+     * qu'aucun element de son interface n'appelle (PARITE E-117).
+     *
+     * Ce qui part : sessions, jetons, preferences, permissions, acces machines.
+     * Ce qui reste : `user_logs` et `login_history`, pour la tracabilite.
+     */
+    public function anonymise(int $id): void
+    {
+        $marque = 'compte-anonymise-' . $id;
+        DB::transaction(function () use ($id, $marque): void {
+            DB::table('users')->where('id', $id)->update([
+                'name' => $marque,
+                'email' => null,
+                'company' => null,
+                'ssh_key' => null,
+                'ssh_key_updated_at' => null,
+                'totp_secret' => null,
+                'active' => 0,
+                // Un hache de 64 octets aleatoires : le compte ne peut plus
+                // servir, et aucun clair n'existe pour y entrer.
+                'password' => password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT,
+                    ['cost' => $this->cout()]),
+            ]);
+            foreach (['active_sessions', 'remember_tokens', 'password_history',
+                      'notification_preferences', 'permissions', 'user_machine_access'] as $table) {
+                DB::table($table)->where('user_id', $id)->delete();
+            }
+            // `user_logs` et `login_history` ne sont PAS touches : c'est tout
+            // l'objet de ce geste.
+        });
+    }
+
     /** @return int le nombre de comptes de role 3 encore ACTIFS */
     public function superadminsActifs(): int
     {

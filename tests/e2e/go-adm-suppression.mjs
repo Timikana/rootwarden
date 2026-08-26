@@ -208,8 +208,11 @@ try {
         // On mesure DEPUIS LA PAGE : un bouton d'anonymisation existe-t-il ?
         const s = session.s || (session.s = await connecte(COMPTE, SECRET));
         await s.page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        // On cherche le GESTE, pas un mot : le legacy l'appellerait `anonymize`,
+        // le portage `compte-anonymiser`. La propriete visee est la meme —
+        // « la page offre-t-elle l'anonymisation ? »
         const presence = await s.page.evaluate(() => ({
-            anonymiser: /anonymize/i.test(document.documentElement.innerHTML),
+            anonymiser: /anonymize|compte-anonymiser/i.test(document.documentElement.innerHTML),
             supprimer: /deleteUser|compte-supprimer/i.test(document.documentElement.innerHTML),
         }));
         constate('la page mentionne-t-elle l\'anonymisation ?', presence.anonymiser ? 'oui' : 'NON');
@@ -267,7 +270,9 @@ try {
 
         const reponses = [];
         const ecoute = async (r) => {
-            if (! /delete_user|comptes\/\d+$/.test(r.url())) return;
+            // Legacy : le clic POSTe directement. Portage : il demande d'abord
+            // l'ETAT, puis ouvre un panneau — le geste ne part qu'apres.
+            if (! /delete_user|etat-suppression|comptes\/\d+$/.test(r.url())) return;
             let corps = '';
             try { corps = (await r.text()).slice(0, 160); } catch {}
             reponses.push(`${r.status()} ${corps}`);
@@ -301,12 +306,115 @@ try {
 
         constate('reponses au geste de suppression', reponses.join(' | ') || '(aucune)');
         const refuse = reponses.some((r) => /step_up_required/.test(r));
+        const etat = reponses.some((r) => /supprimable|journaux/.test(r));
         constate('une re-authentification est-elle exigee ?', refuse ? 'OUI' : 'non');
-        verifie('le geste destructeur ne part pas sans garde',
-            refuse || reponses.length > 0, `${reponses.length} reponse(s)`);
+        constate('la page demande-t-elle l\'etat avant d\'agir ?', etat ? 'oui' : 'non');
+        // Sur les deux cibles, la propriete est la meme : le clic ne DETRUIT pas
+        // tout seul. Le legacy s'arrete sur un step-up, le portage sur un
+        // panneau qui demande de recopier le nom.
+        verifie('le geste destructeur ne detruit pas au premier clic',
+            refuse || etat, `${reponses.length} reponse(s)`);
+        verifiePortage('la page s\'informe de ce que la suppression emporterait', etat,
+            'le legacy poste directement, sans demander si le compte porte un journal');
         constate('boites natives presentees', boites.length ? boites.join(' | ').slice(0, 160) : '(aucune)');
         verifiePortage('la decision se prend dans un panneau en page', boites.length === 0,
             'le legacy pose un `confirm()` natif avant d\'appeler');
+    });
+
+    // ══ 5. Le parcours COMPLET du portage : panneau, step-up, suppression ══
+    // Sans cette etape, le panneau de step-up ecrit pour D4 — la piece que le
+    // sous-lot A5 avait differee « a son premier consommateur » — ne serait
+    // exerce par AUCUN test. Un composant neuf que rien ne mesure ne vaut pas
+    // mieux qu'un composant absent.
+    await etape('le parcours complet, jusqu\'a la suppression', async () => {
+        if (CIBLE !== 'laravel') {
+            constate('parcours complet', 'exerce sur le portage seulement — le legacy '
+                + 'poste directement et s\'arrete sur son step-up, deja mesure ci-dessus');
+
+            return;
+        }
+        if (idEpr <= 0 || journauxDe(idEpr) !== 0) throw new Error('precondition non tenue');
+
+        // ON REVOQUE D'ABORD, et ce n'est pas une precaution de style.
+        //
+        // La marque de step-up vit dans le CACHE avec une duree de quinze
+        // minutes : elle SURVIT A L'EXECUTION. Sans cette revocation, la
+        // deuxieme execution de la suite herite de la marque posee par la
+        // premiere, le DELETE rend 200 au lieu de 403, et l'assertion « la
+        // suppression exige une re-authentification » echoue — sur un portage
+        // parfaitement correct. Mesure faite : c'est arrive.
+        //
+        // C'est mot pour mot la lecon du sous-lot A5 : « une fixture, c'est
+        // aussi ce que le test ACCORDE ». Elle se paie ici dans le sous-lot qui
+        // consomme le step-up.
+        await page.evaluate(async () => {
+            const m = document.querySelector('meta[name="csrf-token"]');
+            await fetch('/profil/step-up/revoquer', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-CSRF-TOKEN': m ? m.content : '', 'Content-Type': 'application/json' },
+            }).catch(() => null);
+        });
+
+
+        const vus = [];
+        const ecoute = async (r) => {
+            if (! /comptes\/\d+$|profil\/step-up/.test(r.url())) return;
+            let corps = '';
+            try { corps = (await r.text()).slice(0, 120); } catch {}
+            vus.push(`${r.request().method()} ${r.status()} ${corps}`);
+        };
+        page.on('response', ecoute);
+
+        // Le panneau est deja ouvert par l'etape precedente : on recopie le nom.
+        const saisie = await page.$(C.saisie);
+        verifie('le panneau de suppression porte un champ de confirmation', !! saisie, C.saisie);
+        if (! saisie) { page.off('response', ecoute); return; }
+
+        // ELLE EMPECHE : le bouton naît desactive et ne s'active qu'a l'egalite.
+        const avantSaisie = await page.$eval(C.confirmer, (b) => b.disabled);
+        await saisie.click({ clickCount: 3 });
+        await saisie.type('pas-le-bon-nom', { delay: 8 });
+        const mauvais = await page.$eval(C.confirmer, (b) => b.disabled);
+        await saisie.click({ clickCount: 3 });
+        await saisie.type(EPREUVE, { delay: 8 });
+        const bon = await page.$eval(C.confirmer, (b) => b.disabled);
+        verifie('la confirmation naît desactivee', avantSaisie === true);
+        verifie('une saisie fausse la laisse desactivee', mauvais === true);
+        verifie('la saisie exacte l\'active', bon === false);
+
+        // Premier clic : le step-up doit etre exige.
+        await page.click(C.confirmer);
+        for (let i = 0; i < 20 && vus.length === 0; i += 1) await dors(300);
+        const exige = vus.some((v) => /step_up_required/.test(v));
+        constate('reponse au premier clic de confirmation', vus.join(' | ') || '(aucune)');
+        verifie('la suppression exige une re-authentification', exige,
+            vus.join(' | ') || '(aucune reponse)');
+
+        const panneau = await page.evaluate(() => {
+            const p = document.querySelector('[data-rw="comptes-panneau-stepup"]');
+
+            return p ? p.getClientRects().length > 0 : false;
+        });
+        verifie('le panneau de re-authentification s\'ouvre en page', panneau,
+            panneau ? '' : 'le refus 403 n\'a pas ouvert le panneau');
+        if (! panneau) { page.off('response', ecoute); return; }
+
+        // On attend une fenetre TOTP NEUVE : le code de la connexion vient
+        // d'etre consomme, et le garde anti-rejeu est par compte et en base.
+        await dors((resteFenetre() + 1) * 1000);
+        const code = await page.$('[data-rw="comptes-stepup-code"]');
+        await code.click({ clickCount: 3 });
+        await code.type(totp(SECRET), { delay: 8 });
+        vus.length = 0;
+        await page.click('[data-rw="comptes-stepup-valider"]');
+        // Le geste repart de lui-meme apres un step-up reussi : on attend la
+        // CONSEQUENCE en base, pas un evenement d'interface.
+        for (let i = 0; i < 40 && idEpreuve() !== 0; i += 1) await dors(300);
+
+        constate('reponses apres la re-authentification', vus.join(' | ').slice(0, 200) || '(aucune)');
+        page.off('response', ecoute);
+        verifie('le compte est supprime une fois le second facteur fourni', idEpreuve() === 0,
+            idEpreuve() === 0 ? '' : `le compte #${idEpreuve()} existe toujours`);
     });
 
     await etape('captures', async () => {
@@ -327,6 +435,21 @@ try {
 } catch (e) {
     verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
 } finally {
+    try {
+        // NETTOYER CE QUE LE TEST A ACCORDE, pas seulement ce qu'il a ecrit :
+        // une marque de step-up laissee derriere soi ouvre un geste destructeur
+        // a l'execution suivante.
+        const s = session.s;
+        if (s && s.page) {
+            await s.page.evaluate(async () => {
+                const m = document.querySelector('meta[name="csrf-token"]');
+                await fetch('/profil/step-up/revoquer', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'X-CSRF-TOKEN': m ? m.content : '', 'Content-Type': 'application/json' },
+                }).catch(() => null);
+            }).catch(() => null);
+        }
+    } catch (e) { note(`INFO  revocation du step-up : ${e.message}`); }
     try {
         retireLEpreuve();
         verifie('le compte d\'epreuve est retire',

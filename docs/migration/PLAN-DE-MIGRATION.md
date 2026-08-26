@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D3 PORTÉS (`v1.37.59` à `v1.37.61`) ; D4 CARACTÉRISÉ (legacy 10/0, base rouge 7/4) — `MODULE-ADM.md`**, dix sous-lots. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D4 PORTÉS (`v1.37.59` à `v1.37.62`) — `MODULE-ADM.md`**, dix sous-lots, six restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -757,6 +757,16 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   instructif — `webhook.php` répondait, et son refus (« ChatOps désactivé ») ressemble d'assez près à un
   chemin absent pour qu'on s'en contente sans regarder le code.
 - **Une capture mal étiquetée est un mensonge** ; elle doit montrer un état **atteignable**.
+- **Le piège d'A5 se paie une seconde fois, dans le sous-lot qui consomme le step-up.** La marque vit
+  **quinze minutes dans le cache** et survit à l'exécution : la deuxième exécution héritait de la
+  première et mesurait un 200 là où elle attendait un 403. **Révoquer à l'entrée ET dans le
+  `finally`** — nettoyer ce que le test ACCORDE, pas seulement ce qu'il écrit.
+- **Un écouteur de réponses posé trop tôt attrape le ménage.** La révocation partait après
+  l'attachement, et l'assertion lisait sa réponse au lieu de celle du geste. **Faire le ménage AVANT
+  d'écouter.**
+- **Une classe CSS qui existe n'est pas une classe qui convient** — troisième forme de ce piège.
+  `.rw-etroit-seul--inline` ne s'affiche que **sous** 720 px ; l'employer pour replier une donnée à
+  1400 px la faisait disparaître. Lire ce que la règle FAIT, pas ce que son nom suggère.
 - **Un bloc `<details>` fermé, TROISIÈME fois.** Cette fois c'était chaque carte de compte
   (`manage_users.php:219`). Le symptôme est toujours le même — `page.$()` trouve, le clic dit
   « not clickable » — et le remède aussi : déplier, puis **asserter que l'élément a une boîte**.

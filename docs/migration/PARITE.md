@@ -4975,9 +4975,10 @@ créé**, dont `user_logs` est vide — `audit_log()` écrit toujours avec l'ide
 jamais de la cible — et elle **vérifie cette précondition avant de cliquer**, fail-closed. Le défaut
 est établi par le schéma et par la lecture ; sa démonstration demande un arbitrage.
 
-**Au portage** : la suppression d'un compte qui porte un journal doit être **refusée**, et l'interface
-doit orienter vers l'anonymisation — qui existe déjà et préserve le journal (voir E-117). Un compte
-sans journal reste supprimable sans dommage.
+**FERMÉ au portage** (`v1.37.62`) : la suppression d'un compte qui porte un journal est **refusée**
+(409), et la page demande l'état **avant** d'ouvrir son panneau — elle dit combien de lignes seraient
+emportées et propose l'anonymisation à la place. Un compte sans journal reste supprimable, derrière
+une confirmation qui n'accepte que le **nom exact** et une **re-authentification**.
 
 ---
 
@@ -5005,5 +5006,7 @@ Et le verrou est double, comme pour les autres gestes gardés par un step-up : l
 **Le résumé de D4 tient dans une phrase** : le geste sûr, pensé et documenté, est inatteignable ; le
 geste destructeur est à un clic, et il emporte la traçabilité que la plateforme existe pour garantir.
 
-**Au portage** : les deux gestes sont offerts, côte à côte, et c'est **l'anonymisation** qui est
-proposée par défaut pour un compte qui porte un journal.
+**FERMÉ au portage** (`v1.37.62`) : les deux gestes sont offerts côte à côte, et l'anonymisation est
+proposée dès que le compte porte un journal. `Comptes::anonymise()` efface les données personnelles,
+retire sessions, jetons, préférences, permissions et accès machines — et **ne touche ni `user_logs`
+ni `login_history`**, ce qui est tout l'objet du geste.

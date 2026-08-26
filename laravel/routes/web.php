@@ -457,6 +457,21 @@ Route::middleware('session.authentifiee')->group(function () {
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
     Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
+    /*
+     * Suppression et anonymisation — sous-lot D4. Role 3 sur la ROUTE : le
+     * legacy exige le meme role, mais dans le corps du fichier.
+     *
+     * L'etat est un GET separe : la page a besoin de savoir, AVANT d'ouvrir son
+     * panneau, si le compte porte un journal — auquel cas la suppression
+     * l'emporterait (E-116) et c'est l'anonymisation qu'il faut proposer.
+     */
+    Route::get('/comptes/{id}/etat-suppression', [ComptesController::class, 'etatSuppression'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.etat-suppression');
+    Route::delete('/comptes/{id}', [ComptesController::class, 'supprimer'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.supprimer');
+    Route::post('/comptes/{id}/anonymiser', [ComptesController::class, 'anonymiser'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.anonymiser');
+
     Route::post('/comptes/{id}/second-facteur', [ComptesController::class, 'reinitialiserTotp'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.second-facteur');
 

@@ -120,6 +120,27 @@
                                         data-rw="compte-deverrouiller-{{ $c['id'] }}"
                                         data-id="{{ $c['id'] }}">{{ __('comptes.deverrouiller') }}</button>
                             @endif
+                            {{-- LES DEUX GESTES COTE A COTE. Le legacy n'en offre
+                                 qu'un — le destructeur — alors qu'il PORTE
+                                 l'anonymisation, gardee et commentee, sans aucun
+                                 appelant (E-117).
+                                 DEBORDEMENT MESURE ET NON RESOLU : ces deux
+                                 boutons portent le tableau au-dela du cadre a
+                                 1400 px, et « Anonymiser » y est coupe. Le cadre
+                                 defile et le signale, mais la regle du chantier
+                                 veut que la colonne actionnable ne cede jamais.
+                                 A reprendre avec D5, qui rendra ce tableau a sa
+                                 largeur en sortant les colonnes d'appoint. --}}
+                            @if ($estSuperadmin)
+                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--danger"
+                                        data-rw="compte-supprimer-{{ $c['id'] }}"
+                                        data-id="{{ $c['id'] }}"
+                                        data-nom="{{ $c['name'] }}">{{ __('comptes.supprimer') }}</button>
+                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--avertissement"
+                                        data-rw="compte-anonymiser-{{ $c['id'] }}"
+                                        data-id="{{ $c['id'] }}"
+                                        data-nom="{{ $c['name'] }}">{{ __('comptes.anonymiser') }}</button>
+                            @endif
                             @if ($estSuperadmin && ! empty($c['totp_secret']))
                                 {{-- AUCUNE BOITE NATIVE : la decision se prend en page.
                                      Le legacy pose un `confirm()` dont le texte francais
@@ -150,7 +171,48 @@
         </div>
     </div>
 
-    @php($libelles = ['err_reseau' => __('comptes.err_reseau'), 'totp_question' => __('comptes.totp_question'), 'mdp_vide' => __('comptes.err_mdp_vide')])
+    {{-- Le panneau de decision de la SUPPRESSION. Il dit ce que le geste emporte,
+         et il EMPECHE plutot que de reprocher : la confirmation naît desactivee
+         et ne s'active qu'a la saisie exacte du nom du compte. --}}
+    <div class="rw-panneau-decision" data-rw="comptes-panneau-suppression" hidden>
+        <p class="rw-panneau-decision__texte" data-rw="comptes-suppression-texte"></p>
+        <p class="rw-aide" data-rw="comptes-suppression-detail"></p>
+        <label class="rw-champ">
+            <span class="rw-champ__etiquette" data-rw="comptes-suppression-consigne"></span>
+            <input type="text" class="rw-saisie rw-saisie--compacte"
+                   data-rw="comptes-suppression-saisie" autocomplete="off">
+        </label>
+        <div class="rw-panneau-decision__actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="comptes-suppression-annuler">{{ __('comptes.annuler') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--avertissement"
+                    data-rw="comptes-suppression-anonymiser" hidden>{{ __('comptes.anonymiser_plutot') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--danger"
+                    data-rw="comptes-suppression-confirmer" disabled>{{ __('comptes.supprimer') }}</button>
+        </div>
+    </div>
+
+    {{-- LE PANNEAU DE STEP-UP, differe par le sous-lot A5 « a son premier
+         consommateur ». Le voici : D4 est ce consommateur. Le legacy fait la
+         meme chose dans un modal pose par une surcouche de `window.fetch` — ici
+         c'est un panneau en page, qui ne recouvre pas ce sur quoi on decide. --}}
+    <div class="rw-panneau-decision" data-rw="comptes-panneau-stepup" hidden>
+        <p class="rw-panneau-decision__texte">{{ __('comptes.step_up_titre') }}</p>
+        <p class="rw-aide">{{ __('comptes.step_up_aide') }}</p>
+        <label class="rw-champ">
+            <span class="rw-champ__etiquette">{{ __('comptes.step_up_code') }}</span>
+            <input type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                   class="rw-saisie rw-saisie--code" data-rw="comptes-stepup-code">
+        </label>
+        <div class="rw-panneau-decision__actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="comptes-stepup-annuler">{{ __('comptes.annuler') }}</button>
+            <button type="button" class="rw-bouton"
+                    data-rw="comptes-stepup-valider">{{ __('comptes.step_up_valider') }}</button>
+        </div>
+    </div>
+
+    @php($libelles = ['err_reseau' => __('comptes.err_reseau'), 'totp_question' => __('comptes.totp_question'), 'mdp_vide' => __('comptes.err_mdp_vide'), 'suppr_question' => __('comptes.suppr_question'), 'suppr_sans_journal' => __('comptes.suppr_sans_journal'), 'suppr_avec_journal' => __('comptes.suppr_avec_journal'), 'suppr_consigne' => __('comptes.suppr_consigne'), 'anon_question' => __('comptes.anon_question')])
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="comptes-libelles" type="application/json">@json($libelles)</script>
     <script src="/js/comptes.js?v={{ @filemtime(public_path('js/comptes.js')) ?: '0' }}"></script>
