@@ -1006,10 +1006,17 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   `/server_lifecycle` n'a pas `@require_machine_access` — vrai — et j'en ai conclu un IDOR — faux.
   `check_machine_access()` commence par `if role_id >= 2: return True`, et sa docstring le dit. Sur
   une route déjà gardée par `@require_role(2)`, le décorateur est donc **redondant** : l'ajouter ne
-  changerait rien. Mesuré sur tout le dépôt : **114 routes le portent, il est sans effet sur 57**
-  d'entre elles. Ce n'est pas un trou, c'est une **redondance qui se lit comme une protection** — la
-  forme « en-tête qui ment », mais en code. **Lire ce que le garde FAIT avant de conclure de son
-  absence.**
+  changerait rien. Mesuré sur tout le dépôt, deux fois et indépendamment : **114 routes le portent, il
+  est sans effet sur 57** d'entre elles, et il mord sur les 57 autres. Ce n'est pas un trou, c'est une
+  **redondance qui se lit comme une protection** — la forme « en-tête qui ment », mais en code.
+  **Lire ce que le garde FAIT avant de conclure de son absence.**
+- **ET LE CLIVAGE N'EST PAS LE FICHIER.** Il tient à la présence d'un `@require_role(≥2)` **route par
+  route** : `ssh_audit.py` est à **5 sans effet / 5 qui mordent**, `ssh.py` à 9/2, `monitoring.py` à
+  2/2. Dans un même fichier, le même décorateur travaille sur une route et ne fait rien sur la
+  suivante, **sans aucun signe qui distingue les deux cas**. C'est ce qui rend cette redondance
+  particulièrement coûteuse : « toujours lire les fichiers en entier » — la parade documentée de ce
+  chantier — **ne départage pas**. `policies.py` en donne l'exemple le plus lisible : sept routes
+  gardées au rôle **3** et portant quand même le décorateur.
 - **Deux écarts indépendants peuvent être CHAÎNÉS, et l'arbitrage de l'un devient faux.** K4 fondait
   son niveau de risque sur « aucun compte de rôle 1 ne porte `users.sudo = 1`, le trou est à un
   `UPDATE` d'être exploitable ». E-130 **est** cet `UPDATE`, il est atteignable au rôle 2, et sa garde
