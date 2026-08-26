@@ -224,7 +224,7 @@
                     </div>
 
                     <p class="rw-etiquette">{{ __('serveurs.options_deploiement') }}</p>
-                    <label class="rw-champ">
+                    <label class="rw-champ rw-champ--case">
                         <input type="checkbox" name="cleanup_users" value="1"
                                @if ($m['cleanup_users'] ?? 1) checked @endif
                                data-rw="serveur-edit-nettoyage">
@@ -242,6 +242,93 @@
                         <button type="submit" class="rw-bouton" data-rw="serveur-enregistrer">{{ __('serveurs.btn_enregistrer') }}</button>
                     </div>
                 </form>
+
+                {{-- ═══ Étiquettes ═══════════════════════════════════════════
+                     QUATRE FORMULAIRES, PAS UN `fetch`. Les quatre gestes du
+                     legacy meurent sur un jeton CSRF que son enrobage de
+                     `window.fetch` n'injecte pas pour cette famille d'URL
+                     (E-125) : chaque clic reçoit « Token CSRF invalide ». Un
+                     formulaire n'a pas de plomberie à oublier, et le legacy
+                     rechargeait la page de toute façon.
+
+                     Les formulaires sont FRÈRES de celui d'édition, jamais
+                     imbriqués : un `<form>` dans un `<form>` est ignoré par
+                     l'analyseur, et le geste partirait vers la mauvaise route. --}}
+                <section class="rw-bloc-secondaire" data-rw="serveur-etiquettes">
+                    <p class="rw-etiquette">{{ __('serveurs.etiquettes_titre') }}</p>
+                    <div class="rw-jetons">
+                        @forelse ($etiquettes[$m['id']] ?? [] as $tag)
+                            <span class="rw-badge rw-badge--neutre">
+                                {{ $tag }}
+                                <form method="POST" action="{{ route('serveurs.etiquette.retirer', ['id' => $m['id']]) }}"
+                                      class="rw-jetons__forme">
+                                    @csrf
+                                    <input type="hidden" name="etiquette" value="{{ $tag }}">
+                                    <button type="submit" class="rw-jetons__retrait"
+                                            data-rw="serveur-etiquette-retirer" data-tag="{{ $tag }}"
+                                            title="{{ __('serveurs.etiquette_retirer', ['tag' => $tag]) }}"
+                                            aria-label="{{ __('serveurs.etiquette_retirer', ['tag' => $tag]) }}">&times;</button>
+                                </form>
+                            </span>
+                        @empty
+                            <span class="rw-aide">{{ __('serveurs.etiquettes_vide') }}</span>
+                        @endforelse
+                    </div>
+                    <form method="POST" action="{{ route('serveurs.etiquette.poser', ['id' => $m['id']]) }}"
+                          class="rw-barre-filtres">
+                        @csrf
+                        <label class="rw-champ">
+                            <span class="rw-etiquette">{{ __('serveurs.etiquette_champ') }}</span>
+                            <input type="text" name="etiquette" maxlength="50" required
+                                   class="rw-saisie rw-saisie--compacte" data-rw="serveur-etiquette-saisie"
+                                   placeholder="{{ __('serveurs.etiquette_placeholder') }}">
+                            {{-- LA RÈGLE EST ANNONCÉE, pas appliquée en silence.
+                                 Le legacy ampute la saisie sans rien dire. --}}
+                            <span class="rw-aide">{{ __('serveurs.etiquette_aide') }}</span>
+                        </label>
+                        <button type="submit" class="rw-bouton rw-bouton--discret"
+                                data-rw="serveur-etiquette-ajouter">{{ __('serveurs.etiquette_ajouter') }}</button>
+                    </form>
+                </section>
+
+                {{-- ═══ Notes ════════════════════════════════════════════════ --}}
+                <section class="rw-bloc-secondaire" data-rw="serveur-notes">
+                    <p class="rw-etiquette">{{ __('serveurs.notes_titre') }}</p>
+                    @forelse ($notes[$m['id']] ?? [] as $n)
+                        <div class="rw-ligne-note">
+                            <span class="rw-tableau__discret">{{ \Illuminate\Support\Carbon::parse($n['created_at'])->format('d/m H:i') }}</span>
+                            <strong>{{ $n['author'] }}</strong>
+                            <span>{{ $n['content'] }}</span>
+                            <form method="POST"
+                                  action="{{ route('serveurs.note.supprimer', ['id' => $m['id'], 'note' => $n['id']]) }}"
+                                  class="rw-ligne-note__forme">
+                                @csrf
+                                <button type="submit" class="rw-jetons__retrait" data-rw="serveur-note-supprimer"
+                                        title="{{ __('serveurs.note_supprimer') }}"
+                                        aria-label="{{ __('serveurs.note_supprimer') }}">&times;</button>
+                            </form>
+                        </div>
+                    @empty
+                        <p class="rw-aide">{{ __('serveurs.notes_vide') }}</p>
+                    @endforelse
+                    @if (count($notes[$m['id']] ?? []) >= $borneNotes)
+                        {{-- LA BORNE S'ANNONCE. Le legacy coupe a cinq sans le
+                             dire : on croit voir toutes les notes. --}}
+                        <p class="rw-aide">{{ __('serveurs.notes_borne', ['n' => $borneNotes]) }}</p>
+                    @endif
+                    <form method="POST" action="{{ route('serveurs.note.poser', ['id' => $m['id']]) }}"
+                          class="rw-barre-filtres">
+                        @csrf
+                        <label class="rw-champ">
+                            <span class="rw-etiquette">{{ __('serveurs.note_champ') }}</span>
+                            <input type="text" name="note" maxlength="500" required
+                                   class="rw-saisie rw-saisie--large" data-rw="serveur-note-saisie"
+                                   placeholder="{{ __('serveurs.note_placeholder') }}">
+                        </label>
+                        <button type="submit" class="rw-bouton rw-bouton--discret"
+                                data-rw="serveur-note-ajouter">{{ __('serveurs.note_ajouter') }}</button>
+                    </form>
+                </section>
             </details>
         @empty
             <div class="rw-vide" data-rw="serveurs-vide">

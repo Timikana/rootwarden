@@ -5312,3 +5312,118 @@ l'environnement est écrit **en toutes lettres** sur chaque machine (`PROD`, `DE
 La liste des valeurs vient de `Serveurs::ENVIRONNEMENTS`, la même constante que le formulaire et que
 la validation : une valeur ajoutée apparaît partout, une valeur retirée disparaît partout. Une
 légende recopiée à la main ne peut pas ne pas diverger — celle-ci a divergé.
+
+---
+
+## E-125 — `adm/` D6b : les quatre gestes vivants d'étiquettes et de notes sont INERTES
+
+Quatre pièces, toutes correctes, et une liste incomplète. Le clic part, le serveur répond
+`{"success":false,"message":"Token CSRF invalide"}`, **rien n'est jamais écrit** — et la mesure a été
+faite au navigateur, en écoutant la réponse, parce que « aucune ligne en base » a trois causes
+possibles qui ne se corrigent pas de la même façon.
+
+| pièce | état |
+|---|---|
+| `admin_page.php:103` rend `<meta name="csrf-token">` | correct |
+| `menu.php:267` charge `js/utils.js` | correct |
+| `utils.js:19` enrobe `window.fetch` et pose `X-CSRF-TOKEN` | correct |
+| `utils.js:22` — **mais seulement si l'URL contient `api_proxy.php`, `/adm/api/` ou `/auth/`** | la liste |
+
+Les quatre `fetch` d'étiquettes et de notes visent `/adm/includes/server_actions.php`, qui n'appartient
+à **aucune** des trois familles. Le jeton n'est donc jamais joint, et le point d'action — qui le
+vérifie correctement — **refuse sa propre interface**.
+
+Quatrième occurrence du motif « trois pièces correctes qui forment une impasse » (E-119, E-117, E-114).
+Ici il y en a quatre, et ce qui manque tient dans une entrée de liste.
+
+**ET LE CONTRASTE EST LE VRAI SUJET.** Ce même contrôle CSRF ne fait rien contre une requête forgée
+depuis le portail : n'importe quel compte authentifié lit le jeton dans un champ caché de
+`profile.php`. Mesuré. **Le garde tient dehors l'interface légitime et laisse entrer la requête
+forgée** — ce qui est exactement l'inverse de son objet.
+
+**FERMÉ au portage** (`v1.37.67`) : les quatre gestes sont des **formulaires**, pas des `fetch`.
+`@csrf` pose le champ, le cadre le vérifie, et le geste fonctionne **sans une ligne de JavaScript**. Il
+n'y a plus de liste d'URL à tenir à jour, donc plus d'entrée à y oublier. Le legacy rechargeait la page
+après chaque succès (`location.reload()`) : le rendu est le même, pour une pièce mobile en moins.
+
+---
+
+## E-126 — `server_actions.php` ÉCRIT pour un compte refusé sur la page qui l'héberge
+
+Même défaut qu'E-120, sur le chemin d'ÉCRITURE, et cette fois la conséquence n'est pas une lecture.
+
+`server_actions.php:29` appelle `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` et **zéro
+`checkPermission`**. Sa page hôte `admin_page.php` exige `can_admin_portal`.
+
+**Mesuré au navigateur**, avec `rw-test-admin` (rôle 2, sans la permission) :
+
+| étape | résultat |
+|---|---|
+| `/adm/admin_page.php` | **403** |
+| jeton CSRF lu sur `/profile.php` | obtenu, 64 caractères |
+| `POST` `add_tag` sur `server_actions.php` | **200** `{"success":true,"message":"Tag ajoute"}` |
+| lignes réellement écrites dans `machine_tags` | **1** |
+
+La propriété mesurée est **l'écriture**, pas le statut : un 200 portant `success:false` ne serait pas un
+défaut. Une ligne écrite par un compte refusé sur la page en est un.
+
+**FERMÉ au portage** (`v1.37.67`) : les quatre gestes sont des routes portant `role:2` +
+`perm:can_admin_portal` — la garde de la page, appliquée à chaque geste. Il n'y a pas de point d'action
+séparé à garder à part.
+
+---
+
+## E-127 — Le correctif SSRF A10-01 n'a été appliqué qu'à celui des deux chemins d'écriture qu'un clic emprunte
+
+`manage_servers.php` et `server_actions.php` portent **chacun leur copie** de `validateInput()`. Celle
+de la première porte le correctif A10-01, sur dix lignes de commentaire qui en nomment la cible :
+
+> empêcher un admin compromis d'insérer 169.254.169.254 pour exfiltrer les credentials cloud
+
+Celle de la seconde tient en une ligne :
+
+```php
+case 'ip':
+    return filter_var($data, FILTER_VALIDATE_IP) ? $data : false;
+```
+
+**Aucun garde.** Mesuré au navigateur, par une requête forgée depuis la page — `add_server` de
+`server_actions.php` n'a **aucun appelant vivant**, ses trois `fetch` sont dans le bloc commenté, donc
+aucun clic ne peut l'atteindre :
+
+```
+200 {"success":true,"message":"Serveur ajouté avec succès.","server_id":"12"}
+machine créée, ip = 169.254.169.254
+```
+
+La ligne est retirée dans la seconde qui suit, sans attendre le `finally` : une adresse de métadonnées
+en base est précisément ce que le correctif cherche à empêcher.
+
+**Sixième occurrence du motif « à moitié corrigé »**, et la plus conséquente : il ne s'agit pas d'un
+oubli d'échappement dans une branche jumelle, mais d'un **correctif de sécurité** appliqué à un seul
+des deux chemins — celui qu'on regarde, parce que c'est celui qu'un clic emprunte.
+
+**Préconditions, et il faut les dire** : il faut un compte authentifié de rôle ≥ 2 et un jeton CSRF —
+que `profile.php` donne à tout compte authentifié. Il ne faut **pas** `can_admin_portal` (E-126). Le
+trou est donc atteignable par tout compte d'administration du portail, y compris ceux à qui la page
+des serveurs est refusée.
+
+**FERMÉ au portage** (`v1.37.67`) : il n'y a **qu'un seul chemin d'écriture**,
+`App\Services\Serveurs::valideIp()`, et il porte les huit conditions (E-123). Une copie ne peut pas
+diverger quand il n'y a pas de copie.
+
+---
+
+## E-128 — Une note se supprime par son seul identifiant, sans regarder la machine
+
+`server_actions.php:180` : `DELETE FROM server_notes WHERE id = ?`. Ni la machine, ni l'auteur, ni
+l'accès ne sont vérifiés. L'identifiant seul suffit à supprimer n'importe quelle note du parc, y
+compris sur une machine qu'on ne verrait pas.
+
+Portée réelle : faible — la page d'administration montre déjà tout le parc, et il faut un compte de
+rôle ≥ 2. Ce qui est relevé, c'est que la vérification **manque** là où les trois gestes voisins
+(`add_tag`, `remove_tag`, `add_note`) résolvent tous par `machine_id`.
+
+**FERMÉ au portage** (`v1.37.67`) : `Serveurs::supprimeNote()` résout par le **couple** machine + note.
+Viser la note d'une autre machine ne supprime rien, et la route le dit
+(`serveurs.err_note_introuvable`).

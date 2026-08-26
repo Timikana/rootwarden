@@ -65,6 +65,9 @@ class Serveurs
 
     public const RESEAUX = ['INTERNE', 'EXTERNE'];
 
+    /** Borne reprise du legacy (`manage_servers.php:518`, `LIMIT 5`). */
+    public const NOTES_PAR_MACHINE = 5;
+
     /**
      * Les colonnes rendues. `password` et `root_password` n'y sont PAS, et c'est
      * le choix du legacy lui-meme, commente sur ses deux requetes : un secret
@@ -288,6 +291,141 @@ class Serveurs
         }
 
         return null;
+    }
+
+    /* ═══ Etiquettes et notes — sous-lot D6b ════════════════════════════════ */
+
+    /**
+     * Les etiquettes de TOUTES les machines, en une requete.
+     *
+     * Le legacy en emet une PAR machine, dans sa boucle d'affichage — plus une
+     * pour les notes. Trente machines valent soixante-et-une requetes la ou deux
+     * suffisent. Ce n'est pas un defaut de comportement, donc pas un ecart de
+     * parite ; c'est une raison de ne pas recopier la forme.
+     *
+     * @return array<int, list<string>> machine_id => etiquettes
+     */
+    public function etiquettesParMachine(): array
+    {
+        $sortie = [];
+        foreach (DB::table('machine_tags')->orderBy('tag')->get() as $l) {
+            $sortie[(int) $l->machine_id][] = (string) $l->tag;
+        }
+
+        return $sortie;
+    }
+
+    /**
+     * Les cinq dernieres notes de chaque machine, en une requete.
+     *
+     * Le legacy borne a cinq par machine (`LIMIT 5`) ; on garde cette borne, et
+     * on l'ANNONCE a l'ecran plutot que de laisser croire qu'il n'y en a pas
+     * d'autres.
+     *
+     * @return array<int, list<array<string, mixed>>> machine_id => notes
+     */
+    public function notesParMachine(): array
+    {
+        $sortie = [];
+        $lignes = DB::table('server_notes')
+            ->select('id', 'machine_id', 'author', 'content', 'created_at')
+            ->orderByDesc('created_at')->orderByDesc('id')->get();
+
+        foreach ($lignes as $l) {
+            $mid = (int) $l->machine_id;
+            $sortie[$mid] ??= [];
+            if (count($sortie[$mid]) < self::NOTES_PAR_MACHINE) {
+                $sortie[$mid][] = (array) $l;
+            }
+        }
+
+        return $sortie;
+    }
+
+    /**
+     * Normalise une etiquette, exactement comme le legacy le fait EN JAVASCRIPT
+     * (`manage_servers.php:555`) et **en PHP** (`server_actions.php:113`).
+     *
+     * Les deux existent parce que la premiere ne protege rien : une requete
+     * forgee ne passe pas par le navigateur. Ici il n'y en a qu'UNE, cote
+     * serveur — et la regle est ANNONCEE sous le champ, plutot que d'amputer la
+     * saisie en silence.
+     */
+    public function normaliseEtiquette(string $brut): string
+    {
+        return (string) preg_replace('/[^a-z0-9_-]/', '', mb_strtolower(trim($brut)));
+    }
+
+    /**
+     * Pose une etiquette. `insertOrIgnore` reprend l'`INSERT IGNORE` du legacy :
+     * reposer une etiquette deja presente n'est pas une erreur.
+     *
+     * @return string|null cle i18n de l'erreur, ou null si l'etiquette est posee
+     */
+    public function poseEtiquette(int $machine, string $brut): ?string
+    {
+        $tag = $this->normaliseEtiquette($brut);
+        if ($tag === '') {
+            return 'serveurs.err_etiquette_vide';
+        }
+        if (mb_strlen($tag) > 50) {
+            return 'serveurs.err_etiquette_longue';
+        }
+        if (DB::table('machines')->where('id', $machine)->doesntExist()) {
+            return 'serveurs.err_introuvable';
+        }
+        DB::table('machine_tags')->insertOrIgnore(['machine_id' => $machine, 'tag' => $tag]);
+
+        return null;
+    }
+
+    /** Retire une etiquette d'une machine. */
+    public function retireEtiquette(int $machine, string $brut): void
+    {
+        DB::table('machine_tags')
+            ->where('machine_id', $machine)
+            ->where('tag', $this->normaliseEtiquette($brut))
+            ->delete();
+    }
+
+    /**
+     * Pose une note. L'auteur vient de la SESSION, jamais du formulaire : une
+     * note dont on choisit l'auteur ne vaut rien comme trace.
+     *
+     * @return string|null cle i18n de l'erreur, ou null si la note est posee
+     */
+    public function poseNote(int $machine, string $contenu, string $auteur): ?string
+    {
+        $contenu = trim($contenu);
+        if ($contenu === '') {
+            return 'serveurs.err_note_vide';
+        }
+        if (DB::table('machines')->where('id', $machine)->doesntExist()) {
+            return 'serveurs.err_introuvable';
+        }
+        DB::table('server_notes')->insert([
+            'machine_id' => $machine,
+            'author' => mb_substr($auteur, 0, 100),
+            'content' => $contenu,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Supprime une note — **de CETTE machine**.
+     *
+     * `server_actions.php:180` fait `DELETE FROM server_notes WHERE id = ?`, sans
+     * regarder a quelle machine la note appartient. L'identifiant suffit donc a
+     * supprimer n'importe quelle note du parc. Ici la note est resolue par le
+     * COUPLE : viser la note d'une autre machine ne supprime rien.
+     *
+     * @return bool false si aucune note ne correspond au couple
+     */
+    public function supprimeNote(int $machine, int $note): bool
+    {
+        return DB::table('server_notes')
+            ->where('id', $note)->where('machine_id', $machine)->delete() > 0;
     }
 
     /** Le nom d'une machine, pour l'annoncer avant de la detruire. */

@@ -68,8 +68,8 @@ return [
     'vide_aide' => "Tant qu'aucune machine n'est déclarée, ni les scans de vulnérabilités ni les déploiements de clés n'ont de cible.",
 
     // Ce que D6a ne porte pas encore
-    'reste_titre' => "Cinq capacités de cet onglet ne sont pas encore portées.",
-    'reste_texte' => "Étiquettes, notes, cycle de vie, test de connexion et import par fichier CSV passent par des points d'entrée distincts de l'ancien portail. Ils y fonctionnent toujours.",
+    'reste_titre' => "Trois capacités de cet onglet ne sont pas encore portées.",
+    'reste_texte' => "Cycle de vie, test de connexion et import par fichier CSV passent par des points d'entrée distincts de l'ancien portail. Ils y fonctionnent toujours.",
     'reste_lien' => "Ouvrir l'ancien portail",
 
     // Retours
@@ -85,4 +85,28 @@ return [
     'err_suppression' => "La machine n'a pas pu être retirée.",
     'err_introuvable' => 'Cette machine n\'existe pas.',
     'err_secret' => "Les deux mots de passe sont obligatoires à la création, et le service de chiffrement doit être disponible.",
+
+    // Étiquettes et notes — sous-lot D6b
+    'etiquettes_titre' => 'Étiquettes',
+    'etiquettes_vide' => 'Aucune étiquette.',
+    'etiquette_champ' => 'Nouvelle étiquette',
+    'etiquette_placeholder' => 'production, web…',
+    'etiquette_aide' => 'Minuscules, chiffres, tiret et souligné. Le reste est retiré.',
+    'etiquette_ajouter' => 'Ajouter',
+    'etiquette_retirer' => "Retirer l'étiquette :tag",
+    'etiquette_posee' => "L'étiquette est posée.",
+    'etiquette_retiree' => "L'étiquette est retirée.",
+    'notes_titre' => 'Notes',
+    'notes_vide' => 'Aucune note sur cette machine.',
+    'notes_borne' => 'Seules les :n dernières notes sont affichées.',
+    'note_champ' => 'Nouvelle note',
+    'note_placeholder' => 'ce que la prochaine personne doit savoir…',
+    'note_ajouter' => 'Ajouter',
+    'note_supprimer' => 'Supprimer cette note',
+    'note_posee' => 'La note est ajoutée.',
+    'note_supprimee' => 'La note est supprimée.',
+    'err_etiquette_vide' => 'Une étiquette doit contenir au moins un caractère parmi les minuscules, les chiffres, le tiret et le souligné.',
+    'err_etiquette_longue' => 'Une étiquette ne peut pas dépasser 50 caractères.',
+    'err_note_vide' => 'Une note ne peut pas être vide.',
+    'err_note_introuvable' => "Cette note n'existe pas sur cette machine.",
 ];

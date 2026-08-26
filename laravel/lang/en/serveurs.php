@@ -68,8 +68,8 @@ return [
     'vide_aide' => 'Until a machine is declared, neither vulnerability scans nor key deployments have a target.',
 
     // What D6a does not carry yet
-    'reste_titre' => 'Five capabilities of this tab are not ported yet.',
-    'reste_texte' => 'Tags, notes, lifecycle, connection test and CSV file import go through separate entry points on the legacy portal. They still work there.',
+    'reste_titre' => "Three capabilities of this tab are not ported yet.",
+    'reste_texte' => "Lifecycle, connection test and CSV file import go through separate entry points on the legacy portal. They still work there.",
     'reste_lien' => 'Open the legacy portal',
 
     // Outcomes
@@ -85,4 +85,28 @@ return [
     'err_suppression' => 'The machine could not be removed.',
     'err_introuvable' => 'This machine does not exist.',
     'err_secret' => 'Both passwords are required on creation, and the encryption service must be available.',
+
+    // Tags and notes — sub-lot D6b
+    'etiquettes_titre' => 'Tags',
+    'etiquettes_vide' => 'No tag.',
+    'etiquette_champ' => 'New tag',
+    'etiquette_placeholder' => 'production, web…',
+    'etiquette_aide' => 'Lowercase letters, digits, hyphen and underscore. Anything else is removed.',
+    'etiquette_ajouter' => 'Add',
+    'etiquette_retirer' => 'Remove tag :tag',
+    'etiquette_posee' => 'The tag has been added.',
+    'etiquette_retiree' => 'The tag has been removed.',
+    'notes_titre' => 'Notes',
+    'notes_vide' => 'No note on this machine.',
+    'notes_borne' => 'Only the last :n notes are shown.',
+    'note_champ' => 'New note',
+    'note_placeholder' => 'what the next person needs to know…',
+    'note_ajouter' => 'Add',
+    'note_supprimer' => 'Delete this note',
+    'note_posee' => 'The note has been added.',
+    'note_supprimee' => 'The note has been deleted.',
+    'err_etiquette_vide' => 'A tag must contain at least one lowercase letter, digit, hyphen or underscore.',
+    'err_etiquette_longue' => 'A tag cannot exceed 50 characters.',
+    'err_note_vide' => 'A note cannot be empty.',
+    'err_note_introuvable' => 'This note does not exist on this machine.',
 ];

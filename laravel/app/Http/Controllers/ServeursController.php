@@ -27,6 +27,9 @@ class ServeursController extends Controller
     {
         return view('serveurs', [
             'machines' => $this->serveurs->liste(),
+            'etiquettes' => $this->serveurs->etiquettesParMachine(),
+            'notes' => $this->serveurs->notesParMachine(),
+            'borneNotes' => Serveurs::NOTES_PAR_MACHINE,
             'environnements' => Serveurs::ENVIRONNEMENTS,
             'criticites' => Serveurs::CRITICITES,
             'reseaux' => Serveurs::RESEAUX,
@@ -97,6 +100,59 @@ class ServeursController extends Controller
         }
 
         return back()->with('succes', __('serveurs.supprimee', ['nom' => (string) $nom]));
+    }
+
+    /* ═══ Etiquettes et notes — sous-lot D6b ════════════════════════════════ */
+
+    /*
+     * QUATRE FORMULAIRES, PAS UN `fetch`. Les quatre gestes du legacy passent
+     * par `fetch('/adm/includes/server_actions.php')`, et les quatre sont
+     * INERTES : l'enrobage de `window.fetch` n'injecte le jeton CSRF que pour
+     * trois familles d'URL, dont `/adm/includes/` ne fait pas partie. Chaque
+     * clic recoit « Token CSRF invalide » (PARITE E-125).
+     *
+     * Un formulaire n'a pas ce probleme : `@csrf` pose le champ, le cadre le
+     * verifie, et le geste marche SANS une ligne de JavaScript. Le legacy
+     * rechargeait la page apres chaque succes (`location.reload()`) — le rendu
+     * est donc le meme, pour une piece mobile en moins.
+     */
+
+    public function poserEtiquette(Request $requete, int $id): RedirectResponse
+    {
+        $erreur = $this->serveurs->poseEtiquette($id, (string) $requete->input('etiquette', ''));
+
+        return $erreur !== null
+            ? back()->with('erreur', __($erreur))
+            : back()->with('succes', __('serveurs.etiquette_posee'));
+    }
+
+    public function retirerEtiquette(Request $requete, int $id): RedirectResponse
+    {
+        $this->serveurs->retireEtiquette($id, (string) $requete->input('etiquette', ''));
+
+        return back()->with('succes', __('serveurs.etiquette_retiree'));
+    }
+
+    public function poserNote(Request $requete, int $id): RedirectResponse
+    {
+        // L'AUTEUR VIENT DE LA SESSION. Le legacy fait de meme
+        // (`$_SESSION['username']`), et c'est le seul choix defendable : une
+        // trace dont on choisit la signature ne trace rien.
+        $auteur = (string) $requete->session()->get('utilisateur_nom', '');
+        $erreur = $this->serveurs->poseNote($id, (string) $requete->input('note', ''), $auteur);
+
+        return $erreur !== null
+            ? back()->with('erreur', __($erreur))
+            : back()->with('succes', __('serveurs.note_posee'));
+    }
+
+    public function supprimerNote(int $id, int $note): RedirectResponse
+    {
+        // Resolue par le COUPLE machine + note : viser la note d'une autre
+        // machine ne supprime rien. Le legacy resout par le seul identifiant.
+        return $this->serveurs->supprimeNote($id, $note)
+            ? back()->with('succes', __('serveurs.note_supprimee'))
+            : back()->with('erreur', __('serveurs.err_note_introuvable'));
     }
 
     /** @return array<string, mixed> */
