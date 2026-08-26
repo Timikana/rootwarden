@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.77** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.79** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.79 — `adm/` D9a : les droits sudo portés, et le préréglage par défaut qui affirmait l'inverse de son module
+
+**Deux défauts, et ils se composaient.**
+
+L'écran affichait sous son préréglage **par défaut** : « Il ne peut pas toucher au reste du
+systeme. » Le module qui produit cette règle même, `backend/sudo_manager.py:80-84`, écrit :
+« AVERTISSEMENT : ce preset est EQUIVALENT ROOT. » Et un clic sur « Déployer » partait **sans aucune
+confirmation** — alors que « Supprimer », qui *retire* le droit, en demandait une.
+
+Un seul clic envoyait donc le préréglage équivalent root, pré-sélectionné, dont l'aide affirmait le
+contraire. Écarts **E-142**, **E-143** et **E-144**.
+
+#### Ajouté
+- `laravel/app/Services/Politiques.php` — liste fermée des six préréglages et leur **portée**
+  (`root` / `borné` / `inconnu`), le troisième disant qu'on ne *sait* pas plutôt qu'adoucissant.
+- `laravel/app/Http/Controllers/PolitiquesController.php`, `resources/views/politiques.blade.php`,
+  `public/js/politiques.js`, `lang/{fr,en}/politiques.php` — 71 clés, parité stricte.
+- Route `GET /politiques` en `role:3` seul, comme le legacy et comme les onze routes du backend.
+- `tests/e2e/go-adm-politiques.mjs` — **12 PASS legacy / 18 PASS portage, 0 FAIL**.
+
+#### Corrigé côté portage
+- **Le préréglage retenu par défaut ne donne plus root** : `read_logs` au lieu d'`apt_only`.
+  Divergence assumée — un défaut est ce que la plupart des gens laisseront en place.
+- **Déployer se confirme**, par un panneau qui nomme la machine, le compte et la portée réelle.
+  Retirer aussi. L'audit, qui *lit*, n'en demande pas.
+- **Un préréglage qui donne root l'annonce**, par un marqueur mesuré à **1100 px** de large : un
+  marqueur large de zéro ne prévient personne.
+- L'aide dit ce que le module documente — et **la garantie n'est pas une phrase** : la suite lit
+  `sudo_manager.py` dans le conteneur à chaque exécution, en **dérive** quels préréglages sont
+  signalés équivalents root, et refuse que l'écran les contredise.
+
+#### Non porté, et dit
+- L'**annulation d'un déploiement** réécrit un sudoers sur la machine : l'historique offre un lien
+  marqué `↗` vers l'ancien portail, pas un bouton inerte.
+- Le versant **SFTP** est D9b.
+
+#### Porté pour arbitrage
+- **E-144** : `sudo_deploy()` fait `data.get('preset', 'apt_only')`. Une requête sans `preset`
+  obtient l'équivalence root. Non corrigeable depuis le portage.
 
 ### v1.37.77 — `graylog/` G1 porte : « Tester » executait une commande a distance sans rien demander
 

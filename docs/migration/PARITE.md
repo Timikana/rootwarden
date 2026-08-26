@@ -6223,3 +6223,141 @@ Trois conclusions fausses ont été tirées avant qu'on les lise : que des clés
 (elles n'ont jamais existé), qu'une fixture de suite avait vidé une table (aucune suite ne la
 touchait), et qu'un module avait régressé (deux assertions avaient simplement cessé de s'exécuter).
 Les trois étaient réfutables par un `grep` dans les journaux conservés.
+
+---
+
+## E-142 — `adm/` D9a : l'aide du préréglage PAR DÉFAUT affirme l'inverse de ce que son propre module documente
+
+**Mesuré** le 2026-08-26 par `tests/e2e/go-adm-politiques.mjs`, sur les deux cibles.
+
+`legacy/adm/server_user_sudo.php` affiche, sous le préréglage `apt_only` :
+
+> « L'utilisateur peut installer et mettre a jour des logiciels (commande « apt »).
+> **Il ne peut pas toucher au reste du systeme.** »
+
+`backend/sudo_manager.py:80-84`, dans la fonction qui produit cette règle même :
+
+> « **AVERTISSEMENT : ce preset est EQUIVALENT ROOT.** `apt install/upgrade` execute des scripts de
+> mainteneur (.deb postinst) en root -> un utilisateur avec ce preset peut obtenir un shell root via
+> un paquet construit. Il n'existe pas de moyen sur de "limiter a apt" sans donner root. »
+
+Et `apt_only` est le préréglage **retenu par défaut** (`server_user_sudo.php:32`).
+
+### Pourquoi celui-ci coûte plus cher que les quatre précédents
+
+C'est la cinquième occurrence du motif « l'en-tête qui ment », mais les quatre autres
+(`compliance_report.php`, `ssh/index.php`, `iptables/index.php`, `fail2ban/index.php`) sont des
+**commentaires** : ils trompent une relecture. Celle-ci est une **phrase d'interface**. Elle trompe
+la personne qui décide, au moment où elle décide, sur l'étendue exacte des privilèges qu'elle
+accorde — et elle le fait sur l'option qu'elle n'aura même pas eu à choisir.
+
+### Ce que la mesure a montré en plus, et qui change la lecture
+
+L'aide legacy de `all_nopasswd` dit **vrai** : « L'utilisateur devient administrateur TOTAL (root) et
+peut TOUT faire, sans meme taper de mot de passe. » Ce n'est donc pas une négligence uniforme —
+**c'est précisément l'équivalence root NON ÉVIDENTE que l'interface a prise à l'envers.** Le motif
+« à moitié corrigé », une fois de plus : le cas visible est traité, le cas subtil ne l'est pas.
+
+### Correction, et pourquoi elle ne pouvait pas être une phrase
+
+Réécrire l'aide n'aurait pas suffi : une phrase juste dérive de `sudo_manager.py` exactement comme
+l'autre l'a fait, et l'on aurait reconstruit le défaut avec de meilleurs mots. Recopier les gabarits
+de règles en PHP aurait été pire — deux sources de vérité pour une règle de sécurité.
+
+La garantie est **structurelle** et vit dans la suite : elle lit `sudo_manager.py` **dans le
+conteneur** à chaque exécution, en **dérive** quels préréglages leur propre module signale comme
+équivalents root, et refuse que l'écran les contredise. Rien n'est recopié.
+
+> Le marqueur de dérivation est **étroit à dessein**. Une première rédaction cherchait « shell root »,
+> qui apparaît dans la docstring de `read_logs` — « retrait de `less` (permettait `!sh` = shell
+> root) », c'est-à-dire dans la phrase qui explique un **durcissement**. Elle aurait classé « donne
+> root » le préréglage le plus borné des six.
+
+**Divergence assumée qui en découle** : le portage retient `read_logs` par défaut, le legacy
+`apt_only`. Un préréglage retenu par défaut est celui que la plupart des gens laisseront en place ;
+il ne doit pas accorder root en silence. La propriété sous test n'est pas « le défaut vaut X » mais
+**« le défaut ne figure pas parmi ceux que le module signale comme équivalents root »**.
+
+---
+
+## E-143 — `adm/` D9a : accorder root ne demandait rien ; le retirer demandait confirmation
+
+**Mesuré au réseau**, pas au DOM.
+
+`legacy/adm/js/server_user_policy.js` : `removePolicy()` ouvre par `if (!confirm(T.confirmRemove))
+return;`, `rollbackTo()` de même — **`deployPolicy()` n'a aucune confirmation.**
+
+| geste | ce qu'il fait | confirmation |
+|---|---|---|
+| `deploy` | **écrit** `/etc/sudoers.d/rootwarden-<user>` sur la machine | **aucune** |
+| `remove` | supprime ce fichier | `confirm()` |
+| `rollback` | réécrit une version antérieure | `confirm()` + `prompt()` |
+
+L'asymétrie est à l'envers : **le geste qui DONNE était libre, celui qui REPREND était gardé.** La
+confirmation protège le geste restauratif, pas celui qui accorde.
+
+Mesure du premier clic sur « Déployer », legacy :
+
+```
+requetes d'ecriture au seul clic sur « deployer » : 1
+requete AVORTEE : POST /api_proxy.php/policy/sudo/deploy
+                  {"machine_id":2,"server_user_id":73,"preset":"apt_only","nopasswd":false,"runas":"root"}
+```
+
+Un seul clic envoyait donc le préréglage équivalent root — celui pré-sélectionné, dont l'aide
+affirmait le contraire (E-142). **Les deux défauts se composent.**
+
+### La propriété se mesure au RÉSEAU, et c'est ce qui a sauvé la mesure
+
+Première rédaction : compter les `confirm()`. Elle aurait rendu **0 sur les deux cibles** — le legacy
+n'en pose pas sur `deploy`, et le portage ne confirme pas par une boîte native mais par un
+**panneau**. « Déployer est au moins aussi gardé que retirer » se serait donc vérifié des deux côtés,
+sans rien mesurer.
+
+> Ce qui compte n'est pas la **forme** de la confirmation mais son **effet** : après un clic sur
+> « déployer », et avant tout consentement, rien ne doit être parti vers la machine.
+
+Le portage : `0` au clic, `1` après consentement — et le panneau nomme la machine, le compte et la
+portée réelle du préréglage avant que quoi que ce soit ne parte.
+
+---
+
+## E-144 — Le repli du backend est lui aussi le préréglage équivalent root
+
+`backend/routes/policies.py`, dans `sudo_deploy()` :
+
+```python
+'preset': data.get('preset', 'apt_only'),
+```
+
+Une requête qui **omet** `preset` obtient donc `apt_only`, c'est-à-dire l'équivalence root. Le repli
+dangereux n'est pas seulement à l'écran : il est aussi dans le backend, une couche plus bas, là où
+aucune aide ne s'affiche.
+
+Le portage envoie toujours `preset` — le JS le documente à l'endroit exact où il compose le corps —
+mais **cela ne referme pas l'écart** : il reste ouvert pour tout autre appelant de la route, et il
+n'est pas corrigeable depuis le portage. Il est porté ici pour arbitrage, avec E-142.
+
+---
+
+## Ce que la mesure de D9a DÉDOUANE
+
+Deux constats, et ce module est le seul du chantier à porter les deux.
+
+**Les gardes sont complètes aux TROIS niveaux.** La page porte `checkAuth([ROLE_SUPERADMIN])` —
+mesuré : rôle 2 → **403** —, `api_proxy.php` inscrit `/policy/` dans ses préfixes d'administration,
+et les onze routes de `backend/routes/policies.py` portent toutes `@require_role(3)`. Cinq modules
+indépendants ont laissé passer la requête en gardant la page ; celui-ci non.
+
+**Le geste distant est sûr.** `sudo_manager` valide par `visudo -cf` **avant** tout déplacement,
+borne les chemins à `/etc/sudoers.d/rootwarden-*`, et lève plutôt que d'écrire si la validation
+échoue. Ce n'est pas l'écriture qui était dangereuse ici : **c'était sa présentation.**
+
+## Ce que D9a ne porte PAS, et le dit
+
+`rollbackTo()` — l'annulation d'un déploiement — n'est pas portée : elle réécrit un fichier sudoers
+sur la machine. L'historique du portage affiche donc, pour chaque déploiement restaurable, un lien
+**marqué `↗`** vers l'ancien portail plutôt qu'un bouton inerte.
+
+Le versant SFTP (`server_user_sftp.php`) est **D9b** : même JS, même module backend, mais ses
+politiques n'ont pas de préréglages — et c'est dans sudo que vivait la question de l'équivalence root.

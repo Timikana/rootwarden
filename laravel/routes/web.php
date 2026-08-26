@@ -7,6 +7,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
+use App\Http\Controllers\PolitiquesController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
 use App\Http\Controllers\GraylogController;
@@ -634,6 +635,17 @@ Route::middleware('session.authentifiee')->group(function () {
      * `UPDATE` sans effet distant. Les gestes qui JOIGNENT la machine passent,
      * eux, par la passerelle, et chacun derriere son panneau de decision.
      */
+    /*
+     * Droits sudo par compte distant — D9a. `role:3` SEUL, comme le legacy
+     * (`checkAuth([ROLE_SUPERADMIN])`, mesure : role 2 -> 403) et comme les onze
+     * routes de `backend/routes/policies.py`, toutes en `@require_role(3)`.
+     *
+     * Aucune route d'ecriture ici : deployer, auditer et retirer partent par la
+     * passerelle, qui les inscrit deja en re-authentification ponctuelle.
+     */
+    Route::get('/politiques', PolitiquesController::class)
+        ->middleware(['role:3'])->name('politiques');
+
     Route::get('/comptes-distants', ComptesDistantsController::class)
         ->middleware(['role:2', 'perm:can_manage_remote_users'])->name('comptes-distants');
     Route::post('/comptes-distants/{machine}/classer', [ComptesDistantsController::class, 'classer'])
