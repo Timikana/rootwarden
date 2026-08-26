@@ -231,6 +231,84 @@ try {
 
         await page.screenshot({ path: `${SORTIE}/${format.nom}-graylog-machines.png`, fullPage: true });
         constate(`[${format.nom}] capture`, `${SORTIE}/${format.nom}-graylog-machines.png`);
+
+        /* ── 3. L'AVERTISSEMENT D'UN RETRAIT ECHOUE ────────────────────────
+         *
+         * C'est le produit VISIBLE du correctif de v1.37.78 : avant lui la route
+         * rendait `success: true` et marquait la machine « non deployee », donc
+         * l'ecran affirmait un retrait qui pouvait n'avoir rien fait.
+         *
+         * Le geste est reellement emis, sur la machine 2 uniquement, et il echoue
+         * naturellement — le banc est un conteneur sans `systemctl`. Rien n'est
+         * supprime puisque rien n'etait la : mesure faite avant d'ecrire cette
+         * capture, et le `finally` de `go-page-graylog-g2.mjs` le reverifie.
+         */
+        /*
+         * REFERMER LE PANNEAU DE « TESTER » AVANT D'EN OUVRIR UN AUTRE.
+         *
+         * Defaut mesure le 2026-08-26 : `ouvreConfirmation` refuse d'ouvrir un
+         * second panneau tant que le premier est la
+         * (`if (ligne.nextElementSibling?.dataset.rw === …) return`). Le panneau de
+         * « Tester » etant reste ouvert pour la capture precedente, le clic sur
+         * « Retirer » ne le remplacait pas — et le clic suivant sur « Confirmer »
+         * validait donc LE TEST.
+         *
+         * L'assertion, elle, lisait l'identifiant du bouton « Retirer » et passait :
+         * elle mesurait le bouton CLIQUE et non le panneau CONFIRME. C'est la meme
+         * faute que « jamais le premier bouton de la page », deplacee d'un cran.
+         */
+        const ferme = await page.$('[data-rw="graylog-machine-annuler"]');
+        if (ferme) { await ferme.click(); await dors(400); }
+
+        const vise = await page.evaluate((motif) => {
+            const lignes = Array.from(
+                document.querySelectorAll('[data-rw="graylog-serveurs"] tbody tr'));
+            const ligne = lignes.find((tr) => new RegExp(motif, 'i').test(tr.textContent || ''));
+            if (! ligne) return null;
+            const b = ligne.querySelector('[data-rw="graylog-machine-uninstall"]');
+            if (! b) return null;
+            b.click();
+
+            return b.dataset.machine;
+        }, MACHINE_SURE.source);
+        verifie(`[${format.nom}] le retrait vise la machine du banc`, String(vise) === '2',
+            `vise ${vise}`);
+        if (String(vise) === '2') {
+            await page.waitForSelector('[data-rw="graylog-machine-confirmer"]',
+                { visible: true, timeout: 10000 });
+            /*
+             * ET ON VERIFIE QUE LE PANNEAU EST BIEN CELUI DU RETRAIT avant de le
+             * confirmer. Sans ce controle, un panneau reste ouvert d'un autre geste
+             * ferait executer cet autre geste — c'est exactement ce qui est arrive.
+             * Le titre est le seul element qui distingue les trois panneaux.
+             */
+            const titre = await page.evaluate(() => {
+                const p = document.querySelector('[data-rw="graylog-panneau-machine"] strong');
+
+                return p ? (p.textContent || '').trim() : '';
+            });
+            constate(`[${format.nom}] panneau ouvert`, titre || '(sans titre)');
+            verifie(`[${format.nom}] le panneau confirme est bien celui du RETRAIT`,
+                /retirer|remove/i.test(titre), titre || '(sans titre)');
+            if (! /retirer|remove/i.test(titre)) {
+                await ctx.close();
+                continue;
+            }
+            await page.click('[data-rw="graylog-machine-confirmer"]');
+            await dors(8000);
+            const message = await page.evaluate(() => {
+                const e = document.querySelector('[data-rw="graylog-machines-etat"]');
+
+                return e ? (e.textContent || '').trim() : '';
+            });
+            constate(`[${format.nom}] avertissement rendu`, message.slice(0, 90) || '(vide)');
+            verifie(`[${format.nom}] l'avertissement dit que le transfert peut durer`,
+                /encore actif|still be active/i.test(message), message.slice(0, 90) || '(vide)');
+            await page.screenshot({ path: `${SORTIE}/${format.nom}-graylog-retrait-echoue.png`,
+                                    fullPage: true });
+            constate(`[${format.nom}] capture`, `${SORTIE}/${format.nom}-graylog-retrait-echoue.png`);
+        }
+
         await ctx.close();
     }
 } catch (e) {

@@ -95,11 +95,25 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # 51 -> 52 au portage des comptes (`adm/` D3), QUATRIEME fois, et verifiee
 # comme les trois precedentes : une seule ligne « Admin », celle de
 # `rw-test-super`, et elle resout en 200 sur /comptes.
+# `go-page-update-u1` : 18 -> 21 au portage, 8 -> 9 au legacy, le 2026-08-26. La
+# suite POSE desormais son etiquette au lieu de lire celle du parc.
+#   +1  le filtre par etiquette redevient exerce — il vivait dans un
+#       `if (depart.etiquettes.length)` et avait cesse de s'executer quand
+#       l'etiquette `banc-essai`, posee A LA MAIN et maintenue par personne, a
+#       disparu. 18 -> 17, ZERO FAIL, passe inapercu un rejeu entier ;
+#   +1  le filtre propose bien l'etiquette de la FIXTURE, et non « la premiere du
+#       parc » — dependre de l'ordre des options faisait accuser la page pour un
+#       etat des donnees ;
+#   +2  la reprise est PROUVEE : plus aucune etiquette d'epreuve, et le vocabulaire
+#       du parc est celui de l'entree.
+# Le +1 du legacy est la reprise posee dans la branche d'archivage, qui sort par
+# `process.exit()` — lequel NE JOUE PAS le `finally`. La fixture y a fui pour de
+# vrai avant d'etre reprise a cet endroit.
 declare -A REF_LARAVEL=(
   [go-socle-navigation]=59 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
-  [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
+  [go-page-update-u1]=21 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
   [go-page-update-u5]=18 [go-page-update-u6]=13 [go-page-update-u6b]=20
   [go-page-cve-export]=21 [go-page-conformite]=13 [go-page-conformite-csv]=17
   [go-page-conformite-pdf]=14 [go-page-cve-consultation]=16
@@ -239,12 +253,24 @@ declare -A REF_LARAVEL=(
   # n'a pas de `confirm()` et ouvrirait une session SSH sur la machine de la
   # ligne, et `srv-zabbix` figure dans ce tableau. Les gestes mutants sont G2.
   [go-page-graylog-g1]=26
+  # `graylog/` sous-lot G2 : les trois gestes qui ouvrent une session SSH reelle.
+  # 30 sur le portage contre 21 sur le legacy. L'ecart de NEUF se decompose
+  # entierement, et chaque ligne est une correction :
+  #   3  ouvrir la confirmation n'emet AUCUNE requete (un par geste) — le legacy
+  #      n'a pas de panneau, donc la requete part au clic ;
+  #   3  un panneau de decision s'ouvre EN PAGE (un par geste) ;
+  #   1  la page DIT l'echec du deploiement plutot que de le taire ;
+  #   1  le message AVERTIT que le transfert peut etre encore actif ;
+  #   1  aucune boite native.
+  # Le banc etant un conteneur sans systemd et sans DNS, les deux gestes mutants
+  # echouent AVANT toute ecriture : rien n'est installe, rien n'est supprime.
+  [go-page-graylog-g2]=30
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
   [go-page-commandlog]=5 [go-page-approvals]=5 [go-page-drift]=5 [go-page-backups]=5
   [go-page-tasks]=5 [go-page-tickets]=5 [go-page-search]=5
-  [go-page-update-u1]=8 [go-page-update-u2]=8 [go-page-update-u3]=8 [go-page-update-u4]=8
+  [go-page-update-u1]=9 [go-page-update-u2]=8 [go-page-update-u3]=8 [go-page-update-u4]=8
   [go-page-update-u5]=8 [go-page-update-u6]=8 [go-page-update-u6b]=8
   [go-page-cve-export]=17 [go-page-conformite]=13 [go-page-conformite-csv]=10
   [go-page-conformite-pdf]=13 [go-page-cve-consultation]=13
@@ -348,6 +374,9 @@ declare -A REF_LEGACY=(
   # bouton de ligne — `glTest` (js:100) n'a pas de `confirm()` et ouvrirait une
   # session SSH sur la machine de la ligne, `srv-zabbix` comprise.
   [go-page-graylog-g1]=25
+  # 21 sur le legacy. Il n'a ni panneau de decision ni message en page : ses trois
+  # boutons emettent au clic, `glTest` sans meme un `confirm()`.
+  [go-page-graylog-g2]=21
   [go-vague0-legacy]=0
 )
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
@@ -361,7 +390,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp
-  go-page-graylog-g1
+  go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
@@ -375,7 +404,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp
-  go-page-graylog-g1
+  go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
