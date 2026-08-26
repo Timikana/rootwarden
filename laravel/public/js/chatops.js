@@ -82,7 +82,17 @@
         ligne.dataset.rw = 'chatops-panneau';
         const td = document.createElement('td');
         td.colSpan = 5;
-        td.className = 'rw-panneau-decision';
+        // `.rw-panneau-decision` porte `display: flex`. Pose SUR le `<td>`, il
+        // ecrase `display: table-cell` : la cellule sort du modele de tableau et
+        // son `colspan` est IGNORE — le panneau s'arrete a la largeur de la
+        // premiere colonne, le reste de la ligne restant blanc. Aucune
+        // assertion DOM ne l'attrape : `colSpan` vaut bien 6, c'est le RENDU
+        // qui ment. Vu a l'image sur un portage voisin le 2026-08-26.
+        //
+        // Le conteneur flex va donc DANS la cellule, jamais sur elle.
+        const cadre = document.createElement('div');
+        cadre.className = 'rw-panneau-decision';
+        td.appendChild(cadre);
 
         const bloc = document.createElement('div');
         bloc.className = 'rw-panneau-decision__texte';
@@ -113,7 +123,7 @@
         confirmer.addEventListener('click', () => supprime(correspondance, confirmer, ligne));
 
         actions.append(annuler, confirmer);
-        td.append(bloc, actions);
+        cadre.append(bloc, actions);
         ligne.appendChild(td);
         tr.after(ligne);
     }
