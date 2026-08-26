@@ -1860,3 +1860,87 @@ a.rw-bouton { display: inline-block; }
    lecteur d'ecran annonce l'attribut, il ne voit pas la couleur de fond.
    ══════════════════════════════════════════════════════════════════════════ */
 a.rw-onglet { text-decoration: none; display: inline-block; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Étiquettes et notes d'une machine — sous-lot D6b
+
+   Chaque geste est un FORMULAIRE, pas un `fetch` : les quatre gestes du legacy
+   meurent sur un jeton CSRF que son enrobage n'injecte pas pour cette famille
+   d'URL. Un formulaire n'a pas de plomberie à oublier — mais il faut qu'il ne
+   casse pas la ligne, d'où les `display: inline` ci-dessous.
+   ══════════════════════════════════════════════════════════════════════════ */
+.rw-bloc-secondaire {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rw-bordure);
+}
+
+.rw-jetons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 10px;
+}
+
+.rw-jetons__forme { display: inline; }
+
+.rw-jetons__retrait {
+    margin-left: 4px;
+    padding: 0 2px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+    opacity: .65;
+}
+
+.rw-jetons__retrait:hover { opacity: 1; color: var(--rw-danger); }
+
+.rw-ligne-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--rw-bordure);
+    font-size: 14px;
+}
+
+.rw-ligne-note:last-of-type { border-bottom: 0; }
+
+.rw-ligne-note__forme { margin-left: auto; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Case a cocher et son libelle, sur la MEME ligne — sous-lot D6b
+
+   `.rw-champ` empile ses enfants : sur une case a cocher, cela met le carre
+   AU-DESSUS du texte qu'il gouverne, et la relation entre les deux se perd.
+   Vu a l'image, et seulement a l'image — aucune assertion DOM ne l'aurait
+   releve, le libelle etant bien present et bien associe.
+
+   L'etiquette englobe la case ET le texte : toute la ligne devient cliquable,
+   la ou un carre de 16 px est une cible minuscule au doigt.
+   ══════════════════════════════════════════════════════════════════════════ */
+.rw-champ--case {
+    /* `.rw-champ` n'est qu'une marge : sans `display: flex` ici,
+       `flex-direction` ne gouverne rien, et le libelle — qui est un
+       `.rw-etiquette`, donc `display: block` — passe a la ligne suivante.
+       Premiere correction restee sans effet pour cette raison. */
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.rw-champ--case > input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+}
+
+.rw-champ--case > span { display: flex; flex-direction: column; gap: 2px; }

@@ -2171,6 +2171,68 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.67 — `adm/` D6b : quatre gestes qui ne marchent pas, et un garde qui se trompe deux fois de sens
+
+**19 entrees de menu portees sur 33** (inchange : D6b enrichit une page deja portee). Legacy **10/0**,
+portage **18/0**.
+
+**D6 a ete redecoupe une SECONDE fois, et pour une raison mesuree.** L'inventaire l'avait decoupe par
+FICHIER, or deux capacites de la carte serveur ne vivent dans aucun de ses fichiers : `setLifecycle` et
+`testServerConnection` appellent le BACKEND. D6b garde `server_actions.php` ; l'import CSV devient
+**D6c** ; le cycle de vie et le test de connexion deviennent **D6d**.
+
+#### Quatre ecarts, tous mesures au navigateur
+
+- **E-125** — les **quatre** gestes vivants d'etiquettes et de notes sont **INERTES**. Le clic emet
+  bien sa requete, et le serveur repond `{"success":false,"message":"Token CSRF invalide"}`. Quatre
+  pieces correctes et une liste incomplete : `admin_page.php` rend le meta, `menu.php` charge
+  `utils.js`, `utils.js` enrobe `window.fetch` et pose l'en-tete — **mais seulement si l'URL contient
+  `api_proxy.php`, `/adm/api/` ou `/auth/`**. `/adm/includes/` n'est dans aucune des trois. Le point
+  d'action refuse sa propre interface.
+- **E-126** — un role 2 **refuse en 403** sur `admin_page.php` pose quand meme une etiquette : jeton
+  CSRF lu sur `profile.php`, `200 {"success":true}`, **1 ligne reellement ecrite en base**.
+  `server_actions.php` porte `checkAuth([2,3])` et zero `checkPermission`.
+- **E-127** — le correctif SSRF **A10-01 n'a ete applique qu'a un des deux chemins d'ecriture**. La
+  copie de `validateInput()` de `server_actions.php` tient en une ligne, sans aucun garde : le chemin
+  AJAX accepte **169.254.169.254** — l'adresse que le commentaire du correctif nomme explicitement — et
+  cree la machine. Sixieme occurrence du motif « a moitie corrige », et la plus consequente.
+- **E-128** — `delete_note` supprime par le seul identifiant, sans regarder la machine.
+
+#### Le contraste est le vrai sujet
+
+Le meme controle CSRF **tient dehors l'interface legitime** (E-125) et **laisse entrer la requete
+forgee** (E-126, E-127), puisque le jeton se lit dans un champ cache de `profile.php`, ouvert a tout
+compte authentifie. Un garde qui se trompe de sens dans les deux directions.
+
+#### Comment la cause a ete trouvee
+
+Le premier jet de la suite concluait « le clic n'ecrit pas ». Vrai, et inutilisable : « rien n'a ete
+ecrit » a trois causes — la requete n'est pas partie, elle est partie et a ete refusee, elle a reussi
+et ecrit ailleurs — et elles ne se corrigent pas de la meme facon. La suite ecoute desormais la
+REPONSE du point d'action, et c'est elle qui a nomme le coupable en un mot.
+
+#### Le portage
+
+Etiquettes et notes vivent dans chaque carte de `/serveurs`, sous `role:2` + `perm:can_admin_portal`.
+
+- **Quatre formulaires, zero `fetch`.** Plus de liste d'URL a tenir a jour, donc plus d'entree a y
+  oublier — et les quatre gestes marchent **sans une ligne de JavaScript**. Le legacy rechargeait la
+  page apres chaque succes : le rendu est le meme, pour une piece mobile en moins.
+- **Une note se resout par le COUPLE** machine + note : viser la note d'une autre machine ne supprime
+  rien.
+- **La regle de normalisation est ANNONCEE** sous le champ. Le legacy ampute la saisie en silence, et
+  le fait deux fois — en JavaScript, ou cela ne protege rien, et en PHP.
+- **La borne de cinq notes s'enonce.** Le legacy coupe a cinq sans le dire : on croit voir tout.
+- **Deux requetes au lieu de deux par machine.** Le legacy emet une requete d'etiquettes et une de
+  notes DANS sa boucle d'affichage.
+
+#### Un defaut de rendu que D6a m'avait cache
+
+La case « Nettoyer les comptes obsoletes » s'affichait AU-DESSUS de son libelle : `.rw-champ` n'est
+qu'une marge, et le libelle est un `display: block`. Les captures de D6a ne descendaient pas jusqu'a
+une carte ouverte ; celles de D6b y defilent, et le defaut est apparu a la premiere image. **Deux fois
+de suite, une capture montrait autre chose que son sujet.**
+
 ### v1.37.66 — les 33 confirmations de la page d'administration, mesurees au navigateur
 
 `tests/e2e/go-adm-permissions.mjs` gagne une etape : elle demande au moteur si chaque attribut

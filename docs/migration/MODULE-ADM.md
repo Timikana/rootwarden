@@ -331,7 +331,9 @@ dernier** — et chaque rang porte son motif.
 | **D4** ✅ | **Suppression et anonymisation** — *PORTÉ `v1.37.62`, voir §5.0quater* | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** ✅ | **Permissions et accès** — *PORTÉ `v1.37.63`, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
-| **D6b** | **Serveurs — les actions** | `includes/server_actions.php`, `includes/import_csv.php` | 456 | Étiquettes, notes, cycle de vie, test de connexion, import CSV. `server_actions.php` porte `checkAuth([2,3])` et **zéro `checkPermission`** |
+| **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
+| **D6c** | **Serveurs — import CSV** | `includes/import_csv.php` | 189 | DEUX imports : comptes et serveurs. `$sendWelcome` est lu une fois, jamais utilisé, et aucun formulaire ne l'émet |
+| **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **Découpage par FICHIER manqué par l'inventaire** : ces deux capacités de la carte vivent dans le BACKEND. `/server_status` ouvre une connexion TCP vers une machine du parc, écrit `machines.online_status` et peut émettre une notification ; `/server_lifecycle` n'a **pas** de `@require_machine_access` là où `/server_status` en a un |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
@@ -620,7 +622,8 @@ ferme la correction d'E-114 ouverte par D6a.
 
 **D6 pesait 1 746 lignes et a été redécoupé.** C'est un document de migration, pas une promesse — `S2`
 l'avait déjà été pour 579 lignes. D6a prend la page (`manage_servers.php` 939 l. + son fragment
-352 l.), D6b les actions (`server_actions.php` 267 l. + `import_csv.php` 189 l.).
+352 l.), D6b les actions (`server_actions.php` 267 l.). D6b a ensuite ete redecoupe a son
+tour — voir §5.0septies : l'import CSV devient D6c, le cycle de vie et le test de connexion D6d.
 
 `tests/e2e/go-adm-serveurs.mjs` — **18 PASS / 0 FAIL sur le legacy**, **20 PASS / 0 FAIL sur le
 portage**, base rouge mesurée à 7/2 avant portage.
@@ -655,6 +658,39 @@ absente : elle sert de preuve à un examen qui n'a pas eu lieu.
 **Reste en base, et ce n'est pas de ce chantier** : **5 comptes `e2e_test_*`** créés entre le
 2026-07-25 et le 2026-08-12, laissés par des suites antérieures. Ils faussent tout comptage de
 comptes. Décision à l'exploitant — ils ne sont pas supprimés ici.
+
+### 5.0septies D6b — PORTÉ le 2026-08-26 (`v1.37.67`) : quatre gestes qui ne marchent pas
+
+**D6 a été redécoupé une SECONDE fois, et pour une raison mesurée** : l'inventaire l'avait découpé par
+FICHIER, or deux capacités de la carte serveur ne vivent dans aucun de ses fichiers — elles appellent
+le backend. D6b garde `server_actions.php` ; l'import CSV devient D6c ; le cycle de vie et le test de
+connexion deviennent D6d. **Un document de migration, pas une promesse.**
+
+`tests/e2e/go-adm-etiquettes-notes.mjs` — **10 PASS / 0 FAIL sur le legacy**, **18 PASS / 0 FAIL sur le
+portage**.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-125** | les **quatre** gestes vivants sont **inertes**. Le clic part, le serveur répond « Token CSRF invalide » : l'enrobage de `window.fetch` n'injecte le jeton que pour `api_proxy.php`, `/adm/api/` et `/auth/`, et `/adm/includes/` n'est dans aucune des trois |
+| **E-126** | un rôle 2 refusé (**403**) sur `admin_page.php` pose quand même une étiquette : **1 ligne écrite en base**, jeton CSRF obtenu sur `profile.php` |
+| **E-127** | le correctif SSRF A10-01 n'existe que dans la copie de `manage_servers.php`. Le chemin AJAX accepte **169.254.169.254** et crée la machine |
+| **E-128** | `delete_note` supprime par le seul identifiant, sans regarder la machine |
+
+**LE CONTRASTE EST LE VRAI SUJET DE CE SOUS-LOT.** Le même contrôle CSRF tient dehors l'interface
+légitime (E-125) et laisse entrer la requête forgée (E-126, E-127), puisque le jeton se lit sur une
+page ouverte à tout compte authentifié. Un garde qui se trompe de sens dans les deux directions.
+
+**Comment la cause a été trouvée.** Le premier jet concluait « le clic n'écrit pas » — vrai, et
+inutilisable : « rien n'a été écrit » a trois causes qui ne se corrigent pas de la même façon. La suite
+écoute désormais la RÉPONSE du point d'action, et c'est elle qui a nommé le coupable en un mot.
+
+**Le portage écarte la classe entière** : quatre formulaires, zéro `fetch`. Plus de liste d'URL à tenir
+à jour, donc plus d'entrée à y oublier — et les gestes marchent sans une ligne de JavaScript.
+
+**Un défaut de rendu que D6a m'avait caché** : la case « Nettoyer les comptes obsolètes » s'affichait
+AU-DESSUS de son libellé. Les captures de D6a ne descendaient pas jusqu'à une carte ouverte ; celles de
+D6b y défilent, et le défaut est apparu à la première image. **Deux fois de suite, une capture
+montrait autre chose que son sujet.**
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

@@ -513,6 +513,28 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::post('/serveurs/{id}/supprimer', [ServeursController::class, 'supprimer'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.supprimer');
 
+    /*
+     * Etiquettes et notes — sous-lot D6b.
+     *
+     * MEME GARDE QUE LA PAGE, et c'est tout l'objet : `server_actions.php`
+     * n'exige que `checkAuth([2,3])`, si bien qu'un compte de role 2 refuse sur
+     * `admin_page.php` y ecrit quand meme (PARITE E-126, mesure au navigateur :
+     * une etiquette reellement posee en base).
+     *
+     * Ce sont des POST de FORMULAIRE, pas des `fetch` : les quatre gestes du
+     * legacy meurent sur un jeton CSRF que son enrobage n'injecte pas pour cette
+     * famille d'URL (E-125). Un formulaire n'a pas de plomberie a oublier.
+     */
+    Route::post('/serveurs/{id}/etiquettes', [ServeursController::class, 'poserEtiquette'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.etiquette.poser');
+    Route::post('/serveurs/{id}/etiquettes/retirer', [ServeursController::class, 'retirerEtiquette'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.etiquette.retirer');
+    Route::post('/serveurs/{id}/notes', [ServeursController::class, 'poserNote'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.note.poser');
+    Route::post('/serveurs/{id}/notes/{note}/supprimer', [ServeursController::class, 'supprimerNote'])
+        ->whereNumber('id')->whereNumber('note')
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.note.supprimer');
+
     Route::post('/permissions/{id}', [PermissionsController::class, 'definir'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');
     Route::post('/permissions/{id}/acces', [PermissionsController::class, 'acces'])
