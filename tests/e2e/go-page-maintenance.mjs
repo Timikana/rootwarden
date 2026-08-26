@@ -678,6 +678,38 @@ try {
         } else {
             await s.page.click(C.supprimer);
             await s.page.waitForSelector(C.confirmerEnPage, { visible: true, timeout: 8000 });
+
+            /*
+             * LE PANNEAU OCCUPE-T-IL LA LARGEUR DE LA LIGNE ?
+             *
+             * Temoin du correctif d'E-139, pose ici parce que c'est le seul
+             * moment ou le panneau est ouvert. `.rw-panneau-decision` porte
+             * `display: flex` : pose sur un `<td>`, il ecrasait
+             * `display: table-cell`, sortait la cellule du modele de tableau et
+             * faisait ignorer son `colspan` — le panneau s'arretait au tiers de
+             * la largeur. Aucune assertion DOM ne pouvait le voir, `colSpan`
+             * valant bien 6. On mesure donc la largeur RENDUE.
+             *
+             * Seuil a 92 % : le panneau porte des marges internes et ne peut pas
+             * atteindre 100 % de la largeur du tableau.
+             */
+            const largeurs = await s.page.evaluate((selCorps) => {
+                const table = document.querySelector(selCorps)?.closest('table');
+                const panneau = document.querySelector('[data-rw="maint-panneau"] .rw-panneau-decision');
+                if (! table || ! panneau) return null;
+
+                return {
+                    table: Math.round(table.getBoundingClientRect().width),
+                    panneau: Math.round(panneau.getBoundingClientRect().width),
+                };
+            }, C.corps);
+            constate('largeur panneau / tableau',
+                largeurs ? `${largeurs.panneau} / ${largeurs.table} px` : '(introuvable)');
+            verifie('le panneau de decision occupe la largeur de la ligne',
+                largeurs !== null && largeurs.panneau >= largeurs.table * 0.92,
+                largeurs ? `${largeurs.panneau} px sur ${largeurs.table} px`
+                    : 'panneau ou tableau introuvable');
+
             await s.page.click(C.confirmerEnPage);
         }
         await dors(1600);
