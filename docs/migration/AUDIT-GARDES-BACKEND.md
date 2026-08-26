@@ -347,6 +347,36 @@ inerte** : tous ses appelants le franchissent sans condition. C'est le cas de `/
 porte, comme de `/server_lifecycle`, qui ne le porte pas — **et c'est ce qui invalide le §2**, où
 j'avais lu l'asymétrie comme une vulnérabilité.
 
+#### « Inerte » était trop grossier : il mord sur exactement la MOITIÉ du dépôt
+
+Chiffre proposé par la session qui porte `adm/`, puis **remesuré indépendamment ici** — les deux
+mesures concordent au nombre près :
+
+| routes portant `@require_machine_access` | **114** |
+|---|---|
+| **sans effet** — déjà gardées par `@require_role(≥ 2)` | **57** |
+| **il mord** — atteignables au rôle 1 | **57** |
+
+Le décorateur n'est donc pas décoratif : il est **réel sur la moitié du dépôt** et redondant sur
+l'autre. Ce n'est pas un trou, c'est une **redondance qui se lit comme une protection** — la forme de
+l'« en-tête qui mentait », mais **en code** plutôt qu'en commentaire.
+
+**Et le classement par fichier masque le pire : trois fichiers sont MIXTES.**
+
+| fichier | sans effet | il mord | les routes où il mord |
+|---|---|---|---|
+| `ssh.py` | 9 | **2** | `/test_platform_key`, `/server_user_keys` |
+| `ssh_audit.py` | 5 | **5** | — |
+| `monitoring.py` | 2 | **2** | `/linux_version`, `/last_reboot` |
+
+Dans un même fichier, le même décorateur travaille parfois et jamais l'autre fois, **sans qu'aucun
+signe ne distingue les deux cas**. Un lecteur de `ssh.py` voit le décorateur sur onze routes et ne peut
+pas savoir que sur neuf d'entre elles il ne fait rien. C'est précisément ce qui rend la redondance
+dangereuse : elle est indiscernable de la protection, y compris pour qui lit attentivement.
+
+*(Dans `maintenance.py`, la seule route où il mord est `/maintenance/check`, sans `@require_role` —
+conforme à ce que la docstring du module annonce : « Le /check est ouvert aux utilisateurs ».)*
+
 ### Réponse à D6d
 
 - pour `/server_status`, le décorateur est **redondant** avec `@require_role(2)`, mais la fonction
