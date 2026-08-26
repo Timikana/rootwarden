@@ -194,6 +194,14 @@ declare -A REF_LARAVEL=(
   [go-adm-serveurs]=21
   [go-adm-etiquettes-notes]=18
   [go-adm-cycle-connexion]=14
+  # `adm/` D8 : les comptes distants. Le seul geste qui aboutit est une
+  # ENUMERATION (session SSH en lecture, machine 2). Les trois routes qui
+  # MODIFIENT — `delete_remote_user`, `remove_user_keys`, `sshd_allow_user` —
+  # sont cliquees, mesurees et AVORTEES au navigateur, par un filet pose avant
+  # toute navigation et jamais leve.
+  # 17 contre 11 : le portage separe le geste de sa confirmation, et la suite
+  # asserte qu'ouvrir le panneau n'emet RIEN.
+  [go-adm-comptes-distants]=17
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -303,6 +311,7 @@ declare -A REF_LEGACY=(
   [go-adm-serveurs]=18
   [go-adm-etiquettes-notes]=10
   [go-adm-cycle-connexion]=12
+  [go-adm-comptes-distants]=11
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
@@ -321,6 +330,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
+  go-adm-comptes-distants
   go-page-graylog-g1
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -334,6 +344,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
+  go-adm-comptes-distants
   go-page-graylog-g1
   go-vague0-legacy
   go-page-update-u1
