@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.88** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.89** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,43 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.89 — `bashrc/` B3 caracterise : le premier sous-lot du module qui ECRIT
+
+`go-bashrc-b3.mjs`, **legacy 16 PASS / 0 FAIL**. Le portage reste a faire.
+
+B3 ecrit — en base, jamais sur une machine — mais **ce qui est ecrit est ce que toutes les machines
+recevraient** au prochain deploiement. Trois precautions, dans cet ordre :
+
+1. **le contenu d'epreuve est INERTE** : le gabarit d'origine plus UNE LIGNE DE COMMENTAIRE. Meme si
+   la restauration echouait, les machines recevraient un `.bashrc` fonctionnel. On ne se repose pas
+   sur la restauration pour etre sur ;
+2. **l'original est copie DANS LA TABLE** sous un autre nom, avant toute navigation ;
+3. **la restauration se verifie par un SHA-256**, pas par une longueur.
+
+#### Ce que le legacy fait BIEN, et qui se mesure maintenant
+L'avertissement de danger **nomme le motif reconnu** (« curl|sh ») et **ne se presente pas comme une
+validation**. C'est exactement ce qu'il faut : le backend ne verifie que la syntaxe (`bash -n`) et la
+taille, donc un ecran qui parlerait de « contenu valide » promettrait une barriere inexistante. Le
+portage n'aura qu'a ne pas regresser.
+
+#### Deux defauts de mesure, et le second a laisse une trace
+- **Octets contre caracteres.** `LENGTH()` compte des OCTETS, `CHAR_LENGTH()` des CARACTERES, et la
+  `.value` d'un `<textarea>` est en caracteres. Le gabarit fait **22 412 octets pour 17 814
+  caracteres** : la suite comparait les deux et accusait la page de charger un contenu tronque. Les
+  « 4 598 octets manquants » n'etaient que de l'UTF-8 multi-octets.
+- **Defaire un geste n'est pas restaurer un etat.** La restauration reconstruisait l'original en
+  RETIRANT la ligne posee (`REPLACE()` + `TRIM(TRAILING …)`). Elle a laisse le gabarit dans un
+  TROISIEME etat — ni l'original, ni celui qu'on venait d'ecrire. Il a fallu le remettre a la main
+  depuis le fichier de repli du module, dont l'empreinte se trouvait etre celle d'origine. **C'est
+  la precaution 1 qui a fait que l'incident n'a rien casse** : le contenu laisse en place etait
+  fonctionnel. La sauvegarde est desormais une COPIE, pas une reconstruction.
+
+#### Une correction qui vaut pour toutes les suites
+`verifiePortage()` imprimait « ecart assume du legacy — <detail> » **meme quand la propriete tenait**,
+et le detail se lisait alors comme une contradiction (« affichee 9ee8e473, attendue 9ee8e473 »). Il
+dit desormais laquelle des deux choses il a mesuree. Meme famille que le detail d'echec imprime sur
+un PASS : **une ligne qui affirme toujours la meme chose ne mesure rien.**
 
 ### v1.37.88 — `bashrc/` B2 porte : les lectures distantes, et le signal que le legacy jetait
 
