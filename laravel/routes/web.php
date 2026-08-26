@@ -162,7 +162,7 @@ Route::middleware('session.authentifiee')->group(function () {
      * recente — mesure faite, voir PARITE E-76. Le portage ecrit en base avec
      * `WHERE platform = ?` (decision S3/S4) et n'herite donc pas du defaut.
      *
-     * Le PSK est chiffre par `App\Support\SecretSupervision`, dont
+     * Le PSK est chiffre par `App\Support\SecretExploitation`, dont
      * l'interoperabilite avec `encryption.py` a ete MESUREE par aller-retour, pas
      * supposee.
      */

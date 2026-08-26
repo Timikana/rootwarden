@@ -2171,6 +2171,25 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.64 — le chiffrement des secrets n'est pas propre a la supervision
+
+`App\Support\SecretSupervision` devient `App\Support\SecretExploitation`. **Aucun changement de
+comportement** : meme schema, meme etiquette de derivation, meme sortie.
+
+Le nom datait de son premier appelant, pas de son role. Le sous-lot D6a doit chiffrer les mots de
+passe SSH des machines, et il utilise exactement ce schema — celui de `encryptPassword`
+(`legacy/adm/includes/crypto.php:127`), dont l'aller-retour avec le backend Python a ete **mesure**
+le 2026-08-22. Ecrire `SecretSupervision::chiffre($motDePasseSsh)` aurait installe une fausse piste
+durable : la prochaine relecture aurait cherche un rapport avec Zabbix la ou il n'y en a pas.
+
+La separation qui compte, elle, ne bouge pas : les secrets d'EXPLOITATION (mots de passe de
+machines, secrets partages de supervision) derivent avec `rootwarden-aes`, les secrets TOTP avec
+`rootwarden-totp` dans `App\Support\TotpCrypto`. Melanger les deux rendrait un secret illisible par
+le portail qui ne l'a pas ecrit.
+
+Trois sites de code touches (`Services/Supervision.php`, `routes/web.php`, la classe), zero test
+modifie.
+
 ### v1.37.63 — `adm/` D5 : la bascule de permission fonctionne enfin
 
 **19 entrees de menu portees sur 33** (D5 ajoute une page a un module deja porte). Legacy 10/0,
