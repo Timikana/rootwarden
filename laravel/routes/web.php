@@ -6,6 +6,7 @@ use App\Http\Controllers\ClesApiController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
+use App\Http\Controllers\ComptesDistantsController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
 use App\Http\Controllers\ExportConformiteController;
@@ -599,6 +600,36 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:3', 'perm:can_manage_api_keys'])->name('cles-api.creer');
     Route::post('/cles-api/{id}/revoquer', [ClesApiController::class, 'revoquer'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_manage_api_keys'])->name('cles-api.revoquer');
+
+    /*
+     * Les comptes distants — sous-lot D8.
+     *
+     * `role:2`, LA OU LE LEGACY ADMET LE ROLE 1. `server_users.php:11` fait
+     * `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`, mais SIX de ses
+     * SEPT routes exigent `@require_role(2)` et la page ne distingue aucun role
+     * dans son rendu : un role 1 porteur de la permission verrait tous les
+     * boutons et recevrait 401 sur six d'entre eux. La garde est donc alignee
+     * sur ce que la page peut reellement faire.
+     *
+     * Divergence declaree, et mesuree : aucun compte de role 1 ne porte
+     * `can_manage_remote_users` — un seul compte du parc l'a, `superadmin`.
+     * Rien n'est retire a personne aujourd'hui.
+     *
+     * LE CLASSEMENT S'ECRIT EN BASE : la route du backend ne fait qu'un
+     * `UPDATE` sans effet distant. Les gestes qui JOIGNENT la machine passent,
+     * eux, par la passerelle, et chacun derriere son panneau de decision.
+     */
+    Route::get('/comptes-distants', ComptesDistantsController::class)
+        ->middleware(['role:2', 'perm:can_manage_remote_users'])->name('comptes-distants');
+    Route::post('/comptes-distants/{machine}/classer', [ComptesDistantsController::class, 'classer'])
+        ->whereNumber('machine')
+        ->middleware(['role:2', 'perm:can_manage_remote_users'])->name('comptes-distants.classer');
+    Route::post('/comptes-distants/{machine}/classer-en-attente', [ComptesDistantsController::class, 'classerLesEnAttente'])
+        ->whereNumber('machine')
+        ->middleware(['role:2', 'perm:can_manage_remote_users'])->name('comptes-distants.classer-en-attente');
+    Route::get('/comptes-distants/{machine}/cles/{username}', [ComptesDistantsController::class, 'cles'])
+        ->whereNumber('machine')->where('username', '[A-Za-z0-9._-]{1,64}')
+        ->middleware(['role:2', 'perm:can_manage_remote_users'])->name('comptes-distants.cles');
 
     Route::post('/permissions/{id}', [PermissionsController::class, 'definir'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');
