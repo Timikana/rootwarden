@@ -95,7 +95,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **22 sur 33**, et le total se RECONSTITUE — mesuré le 2026-08-26 en faisant lire `Navigation::SECTIONS` **par PHP lui-même** : `22 route + 11 legacy + 0 ni l'un ni l'autre = 33` (D9a et D9b ont fait basculer `sudo_policies` et `sftp_policies`). Un premier comptage à l'expression régulière avait rendu 32, en manquant `wazuh` — voir §8. Restent en `legacy` : `iptables`, `fail2ban`, `services`, `ssh_audit`, `bashrc`, **`wazuh`**, `groups`, `remote_users`, `platform_key`, `documentation`, `api_docs` |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) D9a `go-adm-politiques` (**12 / 18**) et D9b `go-adm-sftp` (**12 / 16**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
+| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) D9a `go-adm-politiques` (**12 / 18**) et D9b `go-adm-sftp` (**12 / 16**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh` — **un LOT complet tournait le 2026-08-26 à 18h** (lancé par l'autre session) ; 19 verdicts conformes au moment de l'écriture, résultat total à relever au tour suivant.
 | tests backend | **341 pytest** |
 | écarts de parité documentés | **137** — numérotés jusqu'à **E-147** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
@@ -239,7 +239,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 7 | `services/` | 631 | 1 | gestes sur machines |
 | 8 | `iptables/` | 870 | 1 | gestes sur machines, IDOR déjà corrigé |
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
-| 10 | `bashrc/` | 941 | 1 | |
+| 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. Trois points modestes à arbitrer, aucun n'est une faille |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
 | 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7, D8 et D9 CLOS (D9a `v1.37.79`, D9b `v1.37.80`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quinze sous-lots, **trois restants** — D6c, D10, et l'archivage. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
@@ -610,7 +610,24 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   m'appartiennent pas : **rien n'a été touché**. Remesure :
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
 
-**`adm/` — cinq arbitrages** (`MODULE-ADM.md`)
+**`bashrc/` — trois arbitrages, tous à faible enjeu** (`MODULE-BASHRC.md`, 2026-08-26)
+- **les huit motifs de danger du gabarit n'existent QUE dans le navigateur.** Le backend valide la
+  syntaxe (`bash -n`) et la taille, pas le contenu. **Ce n'est pas une faille** — qui atteint la route
+  détient déjà `can_manage_bashrc`, c'est-à-dire l'autorisation d'écrire le fichier qui s'exécute à
+  chaque connexion. La décision est de **présentation** : le portage ne doit pas laisser croire que ce
+  scan est une barrière ;
+- **`GET /bashrc/backups` n'a aucun appelant** — capacité inatteignable. La porter serait concevoir,
+  la laisser serait la laisser à un `fetch` de la réactivation. Faible enjeu : la route ne fait que lire ;
+- **aucune fenêtre de maintenance ni approbation à quatre yeux** sur les huit routes, alors que le
+  déploiement multi-machines écrit sur plusieurs machines d'un coup. D'autres modules en ont ; rien ne
+  dit si l'absence est délibérée. Signalé, non corrigé.
+
+**`adm/` — cinq arbitrages, et le module est BLOQUÉ sur eux** (`MODULE-ADM.md`)
+
+> Les trois éléments restants d'`adm/` attendent tous une décision : D6c (trois décisions), D10 (une
+> décision et non un portage), et l'archivage (bloqué parce que quatre fichiers d'`adm/` appartiennent
+> au socle, `includes/crypto.php` en tête). **Le module a atteint sa frontière d'arbitrage** le
+> 2026-08-26 ; il ne peut plus avancer sans l'exploitant.
 - **E-147, ouvert par D9b le 2026-08-26** : `backend/sftp_manager.py`, `render_policy()` contredit sa
   **propre docstring** sur quatre clés (`sftp_only`, `allow_password_auth`, `allow_tcp_forwarding`,
   `allow_agent_forwarding`), **toutes vers le permissif**. Le portage n'envoie jamais de clé absente,

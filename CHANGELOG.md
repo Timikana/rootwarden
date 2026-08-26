@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.80** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.81** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,49 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.81 — `bashrc/` inventorie : le module le mieux construit du chantier
+
+Inventaire en LECTURE SEULE, mene pendant qu'un LOT complet occupait le banc. Aucune mesure au
+navigateur : `MODULE-BASHRC.md` §6 dit explicitement ce qui reste a mesurer, et pourquoi.
+
+**Il faut le dire aussi nettement qu'on rapporte un defaut : ce module n'en a pas de serieux.**
+Chercher des defauts n'est pas en trouver, et un inventaire qui n'en rapporterait pas sincerement
+serait moins utile qu'un inventaire qui en rapporte.
+
+#### Ce que la mesure dedouane
+- **Les huit routes portent la pile complete** de decorateurs, et le contournement du role 3 est
+  IDENTIQUE des deux cotes (`checkPermissionFromDB` en PHP, `require_permission` en Python). Aucune
+  divergence a porter.
+- **L'en-tete du fichier dit VRAI** — il annonce « admin (2) + superadmin (3) + `can_manage_bashrc` »
+  et c'est ce que le code applique. Quatre autres modules du depot annoncent plus strict qu'ils
+  n'appliquent.
+- **Aucune valeur client ne s'interpole nue** : contenu en base64, nom de compte valide par
+  `^[a-z_][a-z0-9_-]{0,31}$` avant son interpolation dans `chown`, et le **home venu du `/etc/passwd`
+  DISTANT** valide par `^/[A-Za-z0-9._/-]{1,128}$` — avec le vecteur et la parade ecrits a cote. Les
+  TROIS fonctions qui touchent au home refusent un home non conforme : le contraire du
+  « a moitie corrige ».
+- **Tous les gestes destructeurs confirment**, et le deploiement multi-machines ENUMERE les machines
+  par leur nom. C'est exactement ce que D9a et D9b ont du AJOUTER.
+
+#### Trois points a arbitrer, aucun n'est une faille
+- les huit motifs de danger du gabarit n'existent QUE dans le navigateur ; le backend valide la
+  syntaxe et la taille. Qui atteint la route detient deja l'autorisation d'ecrire ce fichier — la
+  decision est de PRESENTATION, pas de securite ;
+- `GET /bashrc/backups` n'a aucun appelant : capacite inatteignable ;
+- aucune fenetre de maintenance ni approbation a quatre yeux sur les huit routes.
+
+#### Un piege de releve, corrige avant d'etre rapporte
+Un `grep` sur `confirm(__('...'))` ne rendait que quatre cles et laissait croire que `deploy` n'en
+avait pas — sa confirmation est construite par gabarit, `confirm(\`${label}…\`)`. **Un motif qui
+suppose une forme d'appel ne mesure que cette forme.** Verifie avant d'etre ecrit ; c'eut ete une
+accusation fausse.
+
+#### Ce qui reste a mesurer (§6)
+Le **triple chemin de garde**, deduit et non mesure. La base dit que `rw-test-super` (role 3) n'a PAS
+`can_manage_bashrc` : c'est donc lui qui exercera le contournement par le ROLE, et `rw-test-admin`
+(role 2, sans la permission) qui doit etre REFUSE. Le chemin du milieu est celui qu'aucune suite du
+chantier n'exerce d'ordinaire.
 
 ### v1.37.80 — `adm/` D9b : l'acces SFTP porte, et les trois cases que l'ecran conseillait de decocher
 
