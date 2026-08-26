@@ -222,3 +222,51 @@ C'est donc un écart à porter **avec** son correctif backend — la convention 
 
 **`srv-zabbix` (id 1) : jamais.** Et le gabarit invalide doit porter le nom d'épreuve, pour que le
 nettoyage reste borné : un `DELETE FROM graylog_templates` emporterait les quatre gabarits réels.
+
+---
+
+## 6. Le banc mesuré AVANT d'écrire G2 — et il rend le gabarit invalide inutile
+
+Relevé le **2026-08-26**, sur `rootwarden_test_server` (machine 2), avant la première ligne de la suite.
+**Le plan du §5 est révisé : aucune fixture destructrice n'est nécessaire.**
+
+| ce que le geste tente | ce que le banc permet |
+|---|---|
+| `command -v rsyslogd` | **absent** |
+| `command -v systemctl` | **ABSENT** — le banc est un conteneur sans systemd |
+| `command -v logger` | présent |
+| `apt-get install -s -y rsyslog` (simulation) | **`E: Unable to locate package rsyslog`** — pas de DNS vers `deb.debian.org` |
+| port 22 depuis `rootwarden_python` | **ouvert** |
+
+### Les deux branches d'échec sont atteignables NATURELLEMENT, et sans rien muter
+
+**`deploy`** échoue à sa **première** commande : `apt-get install -y rsyslog` ne trouve pas le paquet,
+donc la route rend `500 « Installation rsyslog echouee »` **avant d'écrire quoi que ce soit** — ni
+fichier de configuration sur la machine, ni ligne dans `graylog_rsyslog`. Le paquet n'est pas installé,
+le banc n'est pas modifié.
+
+**`uninstall`** exécute `rm -f <confs> && systemctl restart rsyslog`. Le `rm -f` réussit sur des fichiers
+absents, puis `systemctl` **n'existe pas** : la chaîne `&&` échoue. Avec le correctif de `v1.37.78` la
+route rend **500**, ne touche pas à l'état, et la page affiche l'avertissement localisé. **Rien n'est
+supprimé** puisque rien n'était là.
+
+C'est donc l'inverse de ce que le §5 prévoyait : je cherchais comment **rendre** la branche d'échec
+atteignable sans dégât, et ce banc ne permet **que** les branches d'échec. Le gabarit volontairement
+invalide est abandonné — il n'aurait rien ajouté, la route n'atteignant jamais la validation syntaxique.
+
+### Ce qui devient mesurable, et ce qui ne l'est pas
+
+| propriété | où elle se mesure |
+|---|---|
+| ouvrir une confirmation n'émet **aucune** requête (3 gestes) | **au navigateur**, G2 |
+| `deploy` échoué n'écrit **aucun** état | **au navigateur**, G2 — c'est le cas naturel ici |
+| `uninstall` échoué rend 500 et **ne touche pas** l'état | **au navigateur**, G2 — le témoin du correctif |
+| `uninstall` échoué **avertit** que le transfert peut continuer | **au navigateur**, G2 |
+| `test` ouvre une vraie session SSH et exécute `logger` | **au navigateur**, G2 |
+| `deploy` **réussi** marque et date le transfert | **impossible ici** — couvert par le test unitaire |
+| `deploy` avec syntaxe invalide, ou redémarrage échoué | **impossible ici** — couverts par les tests unitaires |
+
+**Et c'est pourquoi les sept tests unitaires de `v1.37.78` ne sont pas redondants avec G2** : ils
+couvrent exactement les branches que ce banc ne peut pas atteindre. Le dire évite qu'une relecture
+future les prenne pour un doublon et les retire.
+
