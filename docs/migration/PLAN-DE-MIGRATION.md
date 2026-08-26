@@ -741,6 +741,12 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 
 ### Tests
 
+- **Une assertion de REFUS ne se place pas après une création du même nom.** Sur `go-adm-serveurs`,
+  l'étape « une adresse mappée est refusée » posée après la création légitime aurait porté le même nom
+  de machine, aurait été refusée pour cause de **doublon**, et serait passée pour une bonne nouvelle.
+  Même famille que « un PASS peut passer PARCE QUE la fonctionnalité est absente » : vérifier que
+  l'assertion échoue pour la raison qu'on croit, et la placer avant ce qui pourrait la faire réussir
+  autrement.
 - **Une capture doit CADRER ce que le sous-lot construit.** Deux fois de suite : D6a capturait
   l'onglet des comptes au lieu de celui des serveurs, D6b le haut de la page au lieu de la carte
   ouverte. La seconde fois, le défilement vers la carte a révélé du premier coup un défaut de rendu
@@ -962,6 +968,18 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   emprunte.** Le patch A10-01 vit dans `manage_servers.php` et manque dans la copie de
   `server_actions.php` — laquelle n'a aucun appelant vivant, donc personne ne la regarde. Quand deux
   fichiers portent chacun leur copie d'une fonction de validation, les comparer **ligne à ligne**.
+- **`@threaded_route` est SYNCHRONE ; un `threading.Thread` dans le CORPS est un accusé de
+  réception.** Le nom du décorateur suggère l'inverse, et c'est là qu'on se trompe. `helpers.py` fait
+  `future = executor.submit(run)` puis `return future.result()` : il **bloque** et rend la vraie valeur
+  de retour. Un `success` venu d'une route `@threaded_route` est donc un **verdict**. Un `success` rendu
+  juste après un `thread.start()` dans le corps de la fonction — `ssh.py:283`, `groups.py:314` — ne dit
+  que « j'ai lancé un fil ». Les deux se ressemblent de loin. **Lire le CORPS, pas le décorateur.**
+- **`rowcount > 0` ne distingue pas « rien à changer » de « objet absent ».** `/server_lifecycle` rend
+  `updated: cur.rowcount > 0` sans `SELECT` préalable : réécrire la valeur déjà en place et viser une
+  machine inexistante donnent tous deux **0**. Deux situations opposées sous une seule réponse, et
+  aucune interface ne peut s'en sortir. Le correctif — **résoudre l'objet avant de le muter** — lève
+  l'ambiguïté ET ferme l'IDOR du même geste : c'est « un garde sans objet ne garde rien » pris par
+  l'autre bout, contrôler l'objet RÉSOLU et non le paramètre reçu.
 - **Porter l'INTENTION d'un correctif, pas sa forme.** `Serveurs::valideIp()` a recopié fidèlement la
   comparaison de préfixes du patch A10-01 — et son angle mort : `::ffff:169.254.169.254` désigne la
   cible que le commentaire nomme et ne commence par aucun préfixe testé. La leçon de `//exemple.com`
