@@ -94,4 +94,5 @@ return [
     'step_up_aide' => 'This gesture is irreversible. Type the six-digit code from your authenticator.',
     'step_up_code' => 'Six-digit code',
     'step_up_valider' => 'Confirm',
+    'lien_cles_api' => 'Manage API keys',
 ];

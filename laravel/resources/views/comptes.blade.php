@@ -6,6 +6,18 @@
 
     @include('composants.onglets-adm', ['courant' => 'comptes'])
 
+    {{-- LE POINT D'ENTREE DES CLES D'API. Le legacy le pose dans l'en-tête de
+         sa page d'administration (`admin_page.php:153`) ; la page n'est dans
+         AUCUN menu, ni le sien ni celui du portage. Sans ce lien, elle ne
+         s'atteindrait qu'en tapant son adresse. Réservée au rôle 3 : l'afficher
+         plus bas mènerait à un 403. --}}
+    @if ((int) session('role_id', 0) >= 3)
+        <p>
+            <a class="rw-bouton rw-bouton--discret" data-rw="comptes-lien-cles-api"
+               href="{{ route('cles-api') }}">{{ __('comptes.lien_cles_api') }}</a>
+        </p>
+    @endif
+
     {{-- UNE CAPACITE NON PORTEE N'EST PAS UN SILENCE. Les TROIS onglets
          d'`admin_page.php` sont portes depuis D6a — comptes (D3/D4), serveurs
          (D6a), acces & permissions (D5) — et se rejoignent par les onglets

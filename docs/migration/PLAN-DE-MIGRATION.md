@@ -95,7 +95,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **19 sur 33** |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**), toutes deux sans échec. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
+| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), toutes sans échec. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
 | écarts de parité documentés | **127** — numérotés jusqu'à **E-137** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D6c et D7 CARACTÉRISÉS — `MODULE-ADM.md`**, quatorze sous-lots, sixq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7 PORTÉ, D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quatorze sous-lots, cinqq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant
@@ -1002,6 +1002,12 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   aucune interface ne peut s'en sortir. Le correctif est de **résoudre l'objet avant de le muter** —
   contrôler l'objet RÉSOLU et non le paramètre reçu. *(Cette entrée disait aussi « et ferme l'IDOR du
   même geste » : c'était faux, il n'y a pas d'IDOR là — voir la règle suivante.)*
+- **Quand on ne peut pas valider comme l'autre valide, ne rien laisser saisir.** Le portage ne compile
+  pas de Python : il ne peut pas garantir qu'un motif accepté ici sera compilable là-bas. Il n'offre
+  donc **aucun champ libre** de portée, seulement une liste fermée dont les motifs sont écrits côté
+  serveur. E-135 et E-136 vivaient tous deux dans l'échappatoire « Avancé » ; les présélections du
+  legacy étaient, elles, correctes. **Fermer par l'absence, et ASSERTER l'absence** — sans quoi un
+  champ libre réapparu passerait inaperçu.
 - **Valider avec un moteur, appliquer avec un autre, c'est ne pas valider.** La portée d'une clé
   d'API est compilée en PCRE côté PHP et en `re` côté Python : `(?<nom>…)` et `(?R)` passent la
   première et cassent la seconde. **La validation doit employer le moteur qui décide** — sinon elle ne

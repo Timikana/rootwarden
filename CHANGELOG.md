@@ -2171,6 +2171,59 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.75 — `adm/` D7 : les cles d'API portees, et deux ecarts fermes PAR L'ABSENCE
+
+**20 entrees de menu portees sur 33** — non : inchange a **19**, `api_keys.php` n'etant dans aucun
+menu. Legacy **11/0**, portage **15/0**, suite inscrite au LOT.
+
+#### Deux ecarts fermes en ne proposant plus rien
+
+E-135 (portee validee en PCRE, appliquee en Python) et E-136 (portee non ancree) vivent tous les deux
+dans l'echappatoire « Avance : editer les regex manuellement ». Les **preselections par module** du
+legacy, elles, sont correctes et **toutes ancrees**.
+
+Le portage les reprend **a l'identique** et n'offre rien d'autre. Ce portage ne compile pas de
+Python : la seule facon de garantir qu'un motif accepte ici sera compilable la-bas est de ne rien
+laisser saisir. Une entree libre validee se contourne par une requete forgee ; une entree libre
+absente, non.
+
+**Et la suite ASSERTE cette absence** — un champ libre reapparu passerait inapercu autrement.
+
+La page **montre les motifs** sous chaque module : une portee qu'on coche sans voir ce qu'elle couvre
+n'est pas une decision. Et une portee **vide** — qui vaut toutes les routes cote backend, `if scope:`
+— est refusee a la creation et signalee en toutes lettres dans la liste.
+
+#### E-137 ferme par le HACHAGE
+
+`ClesApi::assureCleEnvironnement()` interroge le hachage, exactement comme `bootstrap_api_key.py` —
+le seul des deux mecanismes qui fut idempotent. **Mesure au clic : creer une cle produit 0 ligne
+supplementaire cote portage, 1 cote legacy.**
+
+Une ligne **revoquee** compte aussi : si l'exploitant a revoque cette cle, la reposer irait contre sa
+decision. La verification ne filtre donc pas sur `revoked_at`.
+
+#### La cle en clair ne transite par AUCUN stockage
+
+Elle n'est pas passee en message de session : le pilote est `file`, elle atterrirait sur le disque du
+conteneur, la ou le legacy ne l'ecrit nulle part. Le controleur rend donc la vue **directement** en
+reponse au POST. Le prix est connu et assume — recharger repropose le formulaire au navigateur,
+exactement comme le legacy, et la seconde soumission echouerait sur l'unicite du nom.
+
+Mesure : affichee une fois, **absente apres rechargement**. La suite le verifie sans jamais imprimer
+la valeur, et prend ses captures apres rechargement.
+
+#### Un defaut de rendu vu a l'image
+
+Au 390 px, c'est la colonne **Action** qui cedait la place, le prefixe restant — exactement l'inverse
+de la convention. **C'est l'appoint qui s'efface, jamais le geste.** `Prefixe` est passe en
+`.rw-colonne-secondaire` et « Revoquer » est de nouveau atteignable au doigt.
+
+#### Le point d'entree
+
+La page n'est dans **aucun menu**, ni sur le legacy ni sur le portage : elle s'atteint depuis
+l'en-tete de la page d'administration et depuis le tableau de bord. Le portage pose donc un lien
+equivalent sur `/comptes`, **visible au seul role 3** — l'afficher plus bas menerait a un 403.
+
 ### v1.37.74 — `adm/` D7 caracterise : une portee validee par un moteur, appliquee par un autre
 
 `tests/e2e/go-adm-cles-api.mjs` — **11 PASS / 0 FAIL sur le legacy**. **Non inscrite dans le LOT** :
