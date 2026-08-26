@@ -460,6 +460,14 @@ declare -A REF_LEGACY=(
   # passer une requete sur la foi d'un champ de son propre corps reviendrait a
   # faire confiance a ce qu'on mesure.
   [go-bashrc-b4]=15
+  # `services/` sous-lot S1 : la page, ses gardes, ses filtres. 16 sur le legacy.
+  # Le TRIPLE CHEMIN de garde y differe de celui de `bashrc/` : la page admet le
+  # ROLE 1, et les deux comptes admis le sont pour des raisons DIFFERENTES —
+  # `rw-test-admin` par la permission, `rw-test-super` par le contournement de
+  # role. La precondition (qui detient `can_manage_services`) est mesuree AVANT
+  # les trois : si elle changeait de mains, deux attendus deviendraient faux
+  # sans que rien ne le signale.
+  [go-services-s1]=16
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
@@ -482,6 +490,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
+  go-services-s1
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -496,6 +505,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
+  go-services-s1
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

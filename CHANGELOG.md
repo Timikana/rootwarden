@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.92** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.93** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,49 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.93 — `services/` S1 caracterise : trois chemins de garde, et deux admis pour des raisons differentes
+
+`go-services-s1.mjs`, **legacy 16 PASS / 0 FAIL**. Le portage reste a faire.
+
+#### Le triple chemin, MESURE — et il differe de celui de `bashrc/`
+La page admet **le role 1** (`checkAuth([ROLE_USER, ADMIN, SUPERADMIN])`), ce qui rend les trois
+chemins distincts et mesurables :
+
+    rw-test-user   role 1, SANS la permission  -> 403   le role 1 ne contourne pas
+    rw-test-admin  role 2, AVEC la permission  -> 200   par la PERMISSION
+    rw-test-super  role 3, SANS la permission  -> 200   par le CONTOURNEMENT DE ROLE
+
+**Les deux 200 sont obtenus pour des raisons differentes.** C'est la seule facon de distinguer « la
+garde laisse passer parce que la permission est la » de « parce que le role l'emporte ».
+
+La precondition — **qui** detient `can_manage_services` — est mesuree AVANT les trois. Si elle
+changeait de mains, deux attendus deviendraient faux sans que rien ne le signale : la suite passerait
+au vert en mesurant autre chose.
+
+#### Un SECOND temoin de la garde, independant du statut HTTP
+Le refus oppose au role 1 **laisse une trace en journal** (`Permission refusee :
+can_manage_services`). Un 403 dit que la page a refuse ; cette ligne dit que le refus a ete
+enregistre — ce n'est pas la meme propriete, et la suite asserte les deux.
+
+#### Deux constats pour le portage, vus a l'image puis mesures
+- **Les trois filtres sont presents mais INVISIBLES au chargement.** Une assertion d'existence les
+  aurait declares bons ; ils ne paraissent qu'une fois un serveur charge.
+- **Un panneau de journaux VIDE est affiche des le chargement** — un cadre noir qui ne dit rien, la
+  ou la convention du chantier veut qu'un etat vide DISE ce qui manque et pourquoi.
+
+#### Un defaut de mesure, et il accusait la suite elle-meme
+Le controle final cherchait `action LIKE '%service%'` et rapportait **une ligne** — qui etait
+« Permission refusee : can_manage_services », c'est-a-dire **le journal du refus que la suite venait
+de provoquer en mesurant la garde**. Elle s'accusait d'avoir pilote un service. Le module ecrit
+`service_<action>` : le motif est desormais `'service|_%' ESCAPE '|'`, et la ligne de refus est
+devenue une assertion au lieu d'un faux positif.
+
+#### E-149 reste un constat de LECTURE, et c'est dit dans la suite
+Le demontrer au navigateur exigerait un compte de role 2 sans la permission — le seul role 2 du parc
+la detient, et le role 1 qui ne l'a pas est arrete par `@require_machine_access`, qui pour lui n'est
+pas inerte. Le fabriquer modifierait un compte que la convention D-5 protege. **On dit ce qu'on a lu,
+on ne le maquille pas en mesure.**
 
 ### v1.37.92 — `services/` inventorie : E-149, seule la PAGE est gardee
 
