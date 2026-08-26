@@ -161,7 +161,7 @@ declare -A REF_LARAVEL=(
   # legacy. L'ecart tient au PARCOURS : le legacy s'arrete sur un 403 auquel rien
   # ne permet de repondre (E-119), le portage ouvre un panneau, recoit le code et
   # mene la bascule a son terme — mesure en base, `can_scan_cve` passe a 1.
-  [go-adm-permissions]=14
+  [go-adm-permissions]=19
   [go-adm-serveurs]=21
   [go-adm-etiquettes-notes]=18
   [go-adm-cycle-connexion]=14
@@ -259,7 +259,7 @@ declare -A REF_LEGACY=(
   # cree son propre compte et le retire — `permissions.user_id` etant en CASCADE,
   # la ligne part avec lui. Le `finally` RELIT `can_manage_supervision` sur
   # `rw-test-admin` : c'est la permission dont ces treize suites dependent.
-  [go-adm-permissions]=10
+  [go-adm-permissions]=15
   [go-adm-serveurs]=18
   [go-adm-etiquettes-notes]=10
   [go-adm-cycle-connexion]=12

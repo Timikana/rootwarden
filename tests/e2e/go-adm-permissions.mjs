@@ -63,6 +63,11 @@ const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 
 const COMPTE = 'rw-test-super';
 const SECRET = 'MZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW';
+/** Role 2 SANS `can_admin_portal` — le seul compte qui mesure cette garde. */
+const COMPTE_ROLE = 'rw-test-admin';
+const SECRET_ROLE = 'KRSXG5BAKBSWY3DPEHPK3PXPKRSXG5BAKBSWY3DPEHPK3PXPKRSX';
+/** Page gardee par `can_admin_portal` sur les deux portails. */
+const PAGE_GARDEE = CIBLE === 'laravel' ? '/comptes' : '/adm/admin_page.php';
 
 const EPREUVE = 'epreuve-e2e-d5';
 /** Une permission BASCULABLE, pour mesurer le geste nominal. */
@@ -403,6 +408,66 @@ try {
             `${avant} avant, ${final} apres`);
     });
 
+    // ══ LES PERMISSIONS TEMPORAIRES OUVRENT-ELLES LA PAGE ? ═══════════════
+    //
+    // `checkPermissionFromDB()` du legacy consulte TROIS sources : le repli
+    // superadministrateur, la table `permissions`, et `temporary_permissions`
+    // non expirees. Le portage n'en lisait que la deuxieme — un octroi
+    // temporaire ouvrait la page sur l'ancien portail et rendait 403 ici
+    // (PARITE E-134). C'est une assertion de PARITE : elle vaut sur les deux
+    // cibles, aucune n'a le droit d'echouer.
+    //
+    // La fixture est posee EN BASE parce qu'aucune interface du portage n'octroie
+    // encore une permission temporaire — c'est le sous-lot D5b, pas celui-ci.
+    // L'octroi passe cote legacy par `POST /admin/temp_permissions`, dont le
+    // formulaire vit dans `manage_permissions.php` et n'a pas ete porte.
+    await etape('un octroi temporaire ouvre-t-il la page gardee ?', async () => {
+        const idRole = litEnBase(`SELECT id FROM rootwarden.users WHERE name = '${COMPTE_ROLE}'`);
+        if (idRole.length !== 1) { verifie('le compte de role 2 est trouve', false); return; }
+        const uid = parseInt(idRole[0], 10);
+
+        // FAIL-CLOSED : si le compte portait deja la permission en permanent,
+        // la mesure ne prouverait rien — elle passerait sans l'octroi.
+        const permanente = compteEnBase(
+            `SELECT IFNULL(SUM(can_admin_portal), 0) FROM rootwarden.permissions WHERE user_id = ${uid}`);
+        verifie('le compte de role 2 n\'a PAS la permission en permanent', permanente === 0,
+            `can_admin_portal = ${permanente} — l'octroi temporaire ne serait pas mesurable`);
+        if (permanente !== 0) return;
+
+        litEnBase(`DELETE FROM rootwarden.temporary_permissions WHERE user_id = ${uid}`);
+
+        await dors((resteFenetre() + 1) * 1000);
+        const s2 = await connecte(COMPTE_ROLE, SECRET_ROLE);
+        try {
+            const avant = await s2.page.goto(`${BASE}${PAGE_GARDEE}`, { waitUntil: 'networkidle2' });
+            constate('statut sans octroi', String(avant.status()));
+            verifie('sans octroi, la page gardee est refusee', avant.status() === 403,
+                `statut ${avant.status()}`);
+
+            litEnBase(
+                "INSERT INTO rootwarden.temporary_permissions (user_id, permission, granted_by, reason, expires_at) "
+                + `VALUES (${uid}, 'can_admin_portal', 1, 'epreuve E-134', DATE_ADD(NOW(), INTERVAL 1 HOUR))`);
+
+            const apres = await s2.page.goto(`${BASE}${PAGE_GARDEE}`, { waitUntil: 'networkidle2' });
+            constate('statut avec octroi temporaire', String(apres.status()));
+            // PARITE STRICTE : le legacy honore l'octroi, le portage doit
+            // l'honorer aussi. Un `verifie`, pas un `verifiePortage`.
+            verifie('un octroi temporaire non expire ouvre la page', apres.status() === 200,
+                `statut ${apres.status()} — le portage ne lisait que la table \`permissions\``);
+
+            litEnBase(`DELETE FROM rootwarden.temporary_permissions WHERE user_id = ${uid}`);
+            const revoque = await s2.page.goto(`${BASE}${PAGE_GARDEE}`, { waitUntil: 'networkidle2' });
+            constate('statut apres revocation', String(revoque.status()));
+            // LES DROITS SONT RELUS A CHAQUE REQUETE : une revocation doit
+            // refermer la page sans attendre une reconnexion.
+            verifie('la revocation referme la page sans reconnexion', revoque.status() === 403,
+                `statut ${revoque.status()}`);
+        } finally {
+            litEnBase(`DELETE FROM rootwarden.temporary_permissions WHERE user_id = ${uid}`);
+            await s2.ctx.close();
+        }
+    });
+
     await etape('captures', async () => {
         const dossier = `${DOSSIER_CAPTURES}/${CIBLE}`;
         mkdirSync(dossier, { recursive: true });
@@ -437,6 +502,12 @@ try {
             }).catch(() => null);
         }
     } catch (e) { note(`INFO  revocation du step-up : ${e.message}`); }
+    try {
+        litEnBase("DELETE FROM rootwarden.temporary_permissions WHERE reason = 'epreuve E-134'");
+        const restes = compteEnBase(
+            "SELECT COUNT(*) FROM rootwarden.temporary_permissions WHERE reason = 'epreuve E-134'");
+        verifie('aucun octroi temporaire d\'epreuve ne subsiste', restes === 0, `${restes} ligne(s)`);
+    } catch (e) { note(`FAIL  retrait des octrois : ${e.message}`); echecs += 1; }
     try {
         retireLEpreuve();
         verifie('le compte d\'epreuve est retire',
