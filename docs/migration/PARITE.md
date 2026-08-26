@@ -5805,3 +5805,117 @@ est **sans objet**. Le docblock est corrigé (`v1.37.73`).
 
 *(Deux fois de suite j'ai failli publier une correction fausse d'un travail antérieur — ici en relayant
 un résumé au lieu de relire la source. Relire E-118 a pris une commande.)*
+
+---
+
+## E-135 — `adm/` D7 : la portée d'une clé est validée par un moteur d'expressions et appliquée par un autre
+
+`api_keys.php:47` valide chaque motif de portée **en PCRE** :
+
+```php
+if (@preg_match('#' . str_replace('#', '\\#', $p) . '#', '') === false) { $error = "Regex scope invalide : $p"; }
+```
+
+`backend/routes/helpers.py:88` l'applique **en Python** :
+
+```python
+if not any(re.search(p, route_path or '') for p in patterns):
+```
+
+Ce ne sont pas les mêmes grammaires. Mesuré le 2026-08-26, six motifs soumis aux deux moteurs :
+
+| motif | PCRE | Python `re` |
+|---|---|---|
+| `(?<nom>/cve_.*)` | accepté | **refusé** — groupe nommé à la PCRE |
+| `/a(?R)?b` | accepté | **refusé** — récursion, inexistante en Python |
+| `/deploy*+` | accepté | accepté |
+| `(?>/update)` | accepté | accepté |
+| `/x{2,}?y` | accepté | accepté |
+| `(?P<n>/ok)` | accepté | accepté |
+
+Puis mesuré **au clic** : le formulaire accepte `(?<zone>/cve_.*)` et crée la clé. **La validation ne
+prouve rien sur le moteur qui décide.**
+
+**Ce que ça coûte, et il faut être exact.** L'exception de `re.search` est rattrapée par le
+`except Exception` global de `_validate_api_key_from_db`, qui rend `(None, None)`. Or le correctif
+**A07-02** fait que `db_ok is None` n'accorde le repli `Config.API_KEY` **que si `API_KEY_BOOTSTRAP`
+est explicitement posée** — mesuré : elle est **absente** de l'environnement du backend. Le
+comportement est donc **fail-closed**.
+
+La conséquence n'est pas une faille, c'est **une clé rendue entièrement inutilisable** — et un
+diagnostic trompeur : le journal annonce « API key DB lookup failed », donc une panne de base, pour un
+motif que l'exploitant vient de saisir. **Mais si `API_KEY_BOOTSTRAP` était posée** — et son propre
+commentaire la destine au démarrage — le même chemin deviendrait fail-open. Les deux se disent.
+
+**NON FERMÉ** — D7 n'est pas porté. Le portage devra valider avec le moteur qui **applique**, ou
+n'offrir qu'une liste fermée de portées. C'est une décision, pas un détail : la portée est aujourd'hui
+un champ libre.
+
+---
+
+## E-136 — La portée n'est pas ancrée : elle se lit plus étroite qu'elle n'est
+
+`re.search` cherche **n'importe où** dans le chemin. Mesuré :
+
+| motif | chemin | correspond |
+|---|---|---|
+| `/cve_scan` | `/cve_scan` | oui |
+| `/cve_scan` | `/admin/cve_scan_all` | **oui** |
+| `/deploy` | `/x/deploy_platform_key` | **oui** |
+| `^/cve_` | `/admin/cve_scan_all` | non |
+
+Un exploitant qui écrit `/deploy` croit borner la clé à cette route. Il lui accorde **tout chemin
+contenant « deploy »** — dont `/deploy_platform_key`, `/deploy_service_account`. Et `/deploy` est
+précisément la route qui écrit `authorized_keys` en root sans porter la moindre garde de rôle.
+
+C'est la classe d'**E-02**, déjà tranchée pour la passerelle — « comparaison par SEGMENT, jamais par
+préfixe » — sur une autre surface, et dans l'autre sens : ici c'est l'exploitant qui doit penser à
+ancrer, et rien ne le lui dit. Le champ est présenté comme « une regex par ligne » ; les exemples du
+`placeholder` sont bien ancrés (`^/cve_`), le texte d'aide ne l'est pas.
+
+**NON FERMÉ** — le portage devra ancrer d'office, ou dire à l'écran ce que la non-ancrage implique.
+
+---
+
+## E-137 — Créer une clé enregistre une SECONDE fois la clé d'environnement, et la révocation devient un tirage au sort
+
+Deux mécanismes enregistrent le même secret, et ils ne se connaissent pas.
+
+| mécanisme | nom posé | vérification avant insertion |
+|---|---|---|
+| `backend/bootstrap_api_key.py:40` | `proxy-internal-legacy-bootstrap-YYYYMMDD` | **`SELECT COUNT(*) WHERE key_hash = sha256(API_KEY) AND revoked_at IS NULL`** — idempotent |
+| `adm/api_keys.php:86` | `proxy-internal-legacy` | **`INSERT IGNORE`**, qui ne se protège que par l'unicité du NOM |
+
+Les noms diffèrent, et `key_hash` **n'est pas unique** (mesuré : `idx_key_hash` a `NON_UNIQUE = 1`).
+L'`INSERT IGNORE` ne voit donc pas la ligne du bootstrap et insère un doublon.
+
+**Mesuré au clic** : la table contenait 1 ligne avant la création d'une clé quelconque ; après,
+**1 ligne `proxy-internal-legacy` de plus**, et `COUNT(DISTINCT key_hash)` sur les lignes
+`proxy-internal-legacy%` vaut **1** — un seul secret, deux enregistrements actifs. *(La correspondance
+entre le hachage stocké et `API_KEY` a été vérifiée par un booléen en SQL, sans qu'aucune valeur ne
+sorte.)*
+
+**Et voici ce que ça produit.** `_validate_api_key_from_db` fait :
+
+```python
+"SELECT id, name, scope_json, revoked_at FROM api_keys WHERE key_hash = %s LIMIT 1"
+```
+
+**`LIMIT 1` sans `ORDER BY`.** Avec deux lignes pour un même hachage, MySQL en rend une, sans garantie
+de laquelle. Donc après avoir révoqué l'une des deux :
+
+- si la requête rend la ligne révoquée → `return False` → **401**, alors qu'un enregistrement actif
+  existe ;
+- si elle rend l'autre → **la clé fonctionne**, alors que l'exploitant vient de la révoquer.
+
+**La révocation devient non déterministe, dans les deux sens.** Un exploitant qui fait tourner
+`API_KEY` puis révoque `proxy-internal-legacy` croit avoir fermé la porte ; l'ancienne clé peut
+continuer d'ouvrir.
+
+Le commentaire d'`api_keys.php:71-79` explique longuement pourquoi l'auto-enregistrement existe — et
+il a raison sur le besoin. Ce qu'il ne fait pas, c'est vérifier que le secret n'est **pas déjà
+enregistré sous un autre nom**, ce que le script Python fait, lui, correctement.
+
+**NON FERMÉ** — le portage devra vérifier par le **hachage** et non par le nom, comme
+`bootstrap_api_key.py`. Le nettoyage des doublons éventuellement déjà présents est une décision
+d'exploitant : supprimer une ligne d'`api_keys` peut couper un consommateur.

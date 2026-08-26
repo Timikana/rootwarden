@@ -2171,6 +2171,59 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.74 — `adm/` D7 caracterise : une portee validee par un moteur, appliquee par un autre
+
+`tests/e2e/go-adm-cles-api.mjs` — **11 PASS / 0 FAIL sur le legacy**. **Non inscrite dans le LOT** :
+`/cles-api` n'existe pas cote portage, la suite y serait rouge. Elle s'inscrira avec le port.
+
+**Cette suite n'imprime jamais une cle.** La table ne stocke que `key_prefix` et `key_hash` ; la cle
+n'existe en clair qu'une fois, dans la reponse de sa creation. Tout se mesure donc en BOOLEENS et en
+LONGUEURS, et les captures sont prises APRES rechargement — une capture prise sur la page de creation
+deposerait un secret vivant dans un fichier que personne ne surveille.
+
+#### E-135 — validee en PCRE, appliquee en Python
+
+`api_keys.php:47` compile chaque motif de portee avec `preg_match` ; `helpers.py:88` l'applique avec
+`re.search`. Six motifs soumis aux deux moteurs : PHP les accepte **tous**, Python en refuse **deux** —
+`(?<nom>…)` (groupe nomme a la PCRE) et `(?R)` (recursion). Puis mesure au clic : le formulaire accepte
+`(?<zone>/cve_.*)` et cree la cle.
+
+**Ce que la mesure DEDOUANE** : ce n'est pas une faille. L'exception remonte au `except Exception`
+global, qui rend `(None, None)`, et le correctif **A07-02** n'accorde le repli `Config.API_KEY` que si
+`API_KEY_BOOTSTRAP` est posee — **elle ne l'est pas** (mesure). Fail-closed. La consequence est une cle
+rendue inutilisable et un journal qui accuse la base (« API key DB lookup failed ») pour un motif que
+l'exploitant vient de saisir. **Avec le drapeau pose, le meme chemin serait fail-open.**
+
+#### E-136 — la portee n'est pas ancree
+
+`re.search` cherche n'importe ou : `/deploy` couvre `/x/deploy_platform_key`, `/cve_scan` couvre
+`/admin/cve_scan_all`. Un exploitant qui borne une cle a `/deploy` lui accorde **tout chemin contenant
+« deploy »** — dont `/deploy_platform_key`. Meme classe qu'E-02, deja tranchee pour la passerelle, sur
+une autre surface.
+
+#### E-137 — creer une cle enregistre une SECONDE fois la cle d'environnement
+
+| mecanisme | nom pose | verification |
+|---|---|---|
+| `bootstrap_api_key.py:40` | `proxy-internal-legacy-bootstrap-YYYYMMDD` | **par le HACHAGE** — idempotent |
+| `api_keys.php:86` | `proxy-internal-legacy` | **`INSERT IGNORE` sur le NOM** |
+
+Les noms different, `key_hash` n'est pas unique : le doublon passe. Mesure au clic — 1 ligne de plus,
+et `COUNT(DISTINCT key_hash)` sur les lignes `proxy-internal-legacy%` vaut **1**. Un secret, deux
+enregistrements actifs.
+
+**Et voici ce que ca produit** : `_validate_api_key_from_db` fait `WHERE key_hash = %s LIMIT 1`
+**sans `ORDER BY`**. Apres avoir revoque l'une des deux, MySQL peut rendre l'une ou l'autre — la cle
+est refusee alors qu'un enregistrement actif existe, ou continue d'ouvrir alors qu'on vient de la
+revoquer. **La revocation devient non deterministe dans les deux sens.**
+
+#### Le piege du `<details>`, sixieme occurrence et la plus retorse
+
+Le champ de portee vit dans un `<details>` **imbrique** dans celui du formulaire. Deplier un niveau ne
+suffit pas : sans la remontee complete, le nom se saisit, la cle se cree, et la **portee est perdue en
+silence**. Le geste reussit, l'assertion echoue, et rien ne dit pourquoi. La suite relit desormais ce
+qu'elle vient de saisir avant de soumettre.
+
 ### v1.37.73 — E-134 : le portage ignorait les permissions TEMPORAIRES
 
 Trouve **en inventoriant D7**, sur une question qui n'avait rien a voir : `adm/api_keys.php` est garde
