@@ -73,7 +73,12 @@ const C = CIBLE === 'laravel'
         page: '/cles-api',
         form: '[data-rw="cle-api-form"]',
         champNom: '[data-rw="cle-api-nom"]',
-        champPortee: '[data-rw="cle-api-portee"]',
+        // LE PORTAGE N'A PAS DE CHAMP LIBRE : la portee se coche dans une liste
+        // FERMEE. C'est la decision du sous-lot, prise sur E-135 et E-136 — ce
+        // qui est valide ici doit etre compilable la-bas, et ce portage ne
+        // compile pas du Python.
+        champPortee: null,
+        modulePortee: '[data-rw="cle-api-module"][data-module="cve"]',
         valeur: '[data-rw="cle-api-valeur"]',
         revoquer: '[data-rw="cle-api-revoquer"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
@@ -84,6 +89,7 @@ const C = CIBLE === 'laravel'
         form: '#apikey-form',
         champNom: '#ak-name',
         champPortee: '#ak-scope',
+        modulePortee: null,
         valeur: '#new-key-value',
         revoquer: 'form:has(input[name="action"][value="revoke"]) button[type="submit"]',
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
@@ -182,7 +188,7 @@ async function creeParLeFormulaire(page, nom, portee) {
         }
 
         return etat;
-    }, { nom: C.champNom, portee: C.champPortee });
+    }, { nom: C.champNom, portee: C.champPortee || C.modulePortee });
     constate('etat des champs apres depliage', JSON.stringify(deplie));
 
     const form = await page.$(C.form);
@@ -194,19 +200,31 @@ async function creeParLeFormulaire(page, nom, portee) {
     await champNom.type(nom, { delay: 8 });
 
     if (portee !== null) {
-        const champPortee = await form.$(C.champPortee) || await page.$(C.champPortee);
-        if (champPortee) {
-            await champPortee.click({ clickCount: 3 });
-            await champPortee.type(portee, { delay: 6 });
+        if (C.champPortee) {
+            const champPortee = await form.$(C.champPortee) || await page.$(C.champPortee);
+            if (champPortee) {
+                await champPortee.click({ clickCount: 3 });
+                await champPortee.type(portee, { delay: 6 });
+            }
+        } else if (C.modulePortee) {
+            // Sur le portage, la portee est une CASE. On la coche par un vrai
+            // clic sur son etiquette, qui englobe la case et son texte.
+            const module = await page.$(C.modulePortee);
+            if (module) await module.click();
         }
     }
 
     // ON RELIT CE QU'ON VIENT DE SAISIR. Une frappe qui n'atterrit pas ne leve
     // rien : c'est la seule facon de le savoir avant de soumettre.
-    const saisi = await page.evaluate((sels) => ({
-        nom: (document.querySelector(sels.nom) || {}).value || '',
-        portee: (document.querySelector(sels.portee) || {}).value || '',
-    }), { nom: C.champNom, portee: C.champPortee });
+    const saisi = await page.evaluate((sels) => {
+        const e = sels.portee ? document.querySelector(sels.portee) : null;
+
+        return {
+            nom: (document.querySelector(sels.nom) || {}).value || '',
+            portee: e === null ? '(sans champ libre)'
+                : (e.type === 'checkbox' ? (e.checked ? 'module coche' : 'module NON coche') : (e.value || '')),
+        };
+    }, { nom: C.champNom, portee: C.champPortee || C.modulePortee });
     constate('valeurs relues avant soumission', `nom=${saisi.nom} portee=${saisi.portee || '(vide)'}`);
 
     const bouton = await form.$('button[type="submit"]');
@@ -323,7 +341,7 @@ try {
         // LA PROPRIETE CENTRALE DE CETTE PAGE. La table ne stocke qu'un hachage :
         // si la cle reparaissait, c'est qu'elle serait conservee ailleurs.
         verifie('la cle n\'est plus affichee apres rechargement', ! vue.present,
-            `longueur ${vue.longueur} — la cle serait conservee quelque part`);
+            vue.present ? `longueur ${vue.longueur} — la cle serait conservee quelque part` : '');
     });
 
     // ══ 4. LE DOUBLON D'ENREGISTREMENT DE LA CLE D'ENVIRONNEMENT ═══════════
@@ -351,6 +369,16 @@ try {
 
     // ══ 5. UN MOTIF VALIDE EN PCRE, INCOMPILABLE EN PYTHON ═════════════════
     await etape('un motif de portee PCRE-seul est-il accepte ?', async () => {
+        if (! C.champPortee) {
+            // LA PROPRIETE EST L'ABSENCE. Elle s'asserte : un champ libre
+            // reapparu passerait inapercu autrement.
+            const libre = await page.$('textarea[name="scope"], [data-rw="cle-api-portee"]');
+            constate('champ libre de portee', libre === null ? 'absent' : 'PRESENT');
+            verifie('le portage n\'offre aucun champ libre de portee', libre === null,
+                libre === null ? '' : 'un champ libre est reapparu — E-135 et E-136 redeviendraient atteignables');
+
+            return;
+        }
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         const r = await creeParLeFormulaire(page, CLE_PCRE, MOTIF_PCRE_SEUL);
         if (! r.emis) { constate('creation avec motif PCRE', `non soumise (${r.motif})`); return; }

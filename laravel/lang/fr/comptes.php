@@ -95,4 +95,5 @@ return [
     'step_up_aide' => "Ce geste est irréversible. Saisissez le code à six chiffres de votre authentificateur.",
     'step_up_code' => 'Code à six chiffres',
     'step_up_valider' => 'Confirmer',
+    'lien_cles_api' => "Gérer les clés d'API",
 ];

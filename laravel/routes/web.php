@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\ChatopsController;
+use App\Http\Controllers\ClesApiController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
@@ -577,6 +578,27 @@ Route::middleware('session.authentifiee')->group(function () {
      */
     Route::post('/serveurs/{id}/cycle', [ServeursController::class, 'cycle'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.cycle');
+
+    /*
+     * Les cles d'API — sous-lot D7.
+     *
+     * `role:3` + `perm:can_manage_api_keys`, releve fidele d'`api_keys.php:19-20`.
+     * La permission ne DECIDE de rien — sur une page deja reservee au role 3,
+     * `ExigePermission` passe par son repli superadministrateur, comme
+     * `checkPermissionFromDB` le fait cote legacy (E-134). Elle est portee
+     * quand meme : si la page s'ouvrait un jour au role 2, la garde serait deja
+     * a sa place, et l'ecart se verrait au diff plutot qu'a l'incident.
+     *
+     * LA CREATION REND UNE VUE, PAS UNE REDIRECTION : la cle en clair n'existe
+     * qu'une fois et ne doit pas transiter par la session, dont le pilote est
+     * `file`.
+     */
+    Route::get('/cles-api', ClesApiController::class)
+        ->middleware(['role:3', 'perm:can_manage_api_keys'])->name('cles-api');
+    Route::post('/cles-api', [ClesApiController::class, 'creer'])
+        ->middleware(['role:3', 'perm:can_manage_api_keys'])->name('cles-api.creer');
+    Route::post('/cles-api/{id}/revoquer', [ClesApiController::class, 'revoquer'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_manage_api_keys'])->name('cles-api.revoquer');
 
     Route::post('/permissions/{id}', [PermissionsController::class, 'definir'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');

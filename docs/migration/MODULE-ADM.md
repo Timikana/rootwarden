@@ -335,7 +335,7 @@ dernier** — et chaque rang porte son motif.
 | **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
 | **D6d** ✅ | **Serveurs — cycle de vie et test de connexion** — *PORTÉ `v1.37.72`, voir §5.0nonies* | `POST /server_lifecycle`, `POST /server_status` (backend) | — | `/server_status` : sonde TCP, écrit `online_status`, **pas** de session SSH. `/server_lifecycle` rend un `updated` **ambigu** (E-133), fermé au portage en écrivant en base |
 | **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
-| **D7** ⏳ | **Clés d'API** — *CARACTÉRISÉ `v1.37.74`, port à faire, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. **La portée est validée en PCRE et appliquée en Python** (E-135), **elle n'est pas ancrée** (E-136), et **créer une clé enregistre une seconde fois la clé d'environnement** (E-137) |
+| **D7** ✅ | **Clés d'API** — *PORTÉ `v1.37.75`, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. Les trois écarts (E-135, E-136, E-137) sont **fermés au portage** : liste de portées fermée et ancrée, et reconnaissance de la clé d'environnement par son **hachage** |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
 | **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
@@ -900,10 +900,10 @@ correctement. Ce qui dérivait, c'était le docblock de `Permissions.php` — un
 sans relire la source. Relire E-118 a pris une commande. C'est la deuxième fois de la journée qu'une
 correction d'un travail antérieur est elle-même à corriger avant publication.
 
-### 5.0duodecies D7 — CARACTÉRISÉ le 2026-08-26 (`v1.37.74`) ; le PORT reste à faire
+### 5.0duodecies D7 — PORTÉ le 2026-08-26 (`v1.37.75`)
 
-`tests/e2e/go-adm-cles-api.mjs` — **11 PASS / 0 FAIL sur le legacy**. **Non inscrite dans le LOT** :
-`/cles-api` n'existe pas côté portage, la suite y serait rouge.
+`tests/e2e/go-adm-cles-api.mjs` — **11 PASS / 0 FAIL sur le legacy**, **15 PASS / 0 FAIL sur le
+portage**, inscrite au LOT.
 
 | écart | ce qui a été mesuré |
 |---|---|
@@ -933,6 +933,34 @@ dans un fichier que personne ne surveille.
 Déplier un niveau ne suffit pas. Sans la remontée complète, le nom se saisit, la clé se crée, et la
 **portée est perdue en silence** — le geste réussit, l'assertion échoue, et rien ne dit pourquoi. La
 suite relit désormais ce qu'elle vient de saisir avant de soumettre.
+
+**LE PORTAGE FERME LES TROIS ÉCARTS, ET DEUX D'ENTRE EUX PAR L'ABSENCE.**
+
+- **Pas de champ libre de portée.** E-135 et E-136 vivent tous les deux dans l'échappatoire « Avancé :
+  éditer les regex manuellement ». Les présélections par module du legacy, elles, sont **correctes et
+  toutes ancrées** — le portage les reprend à l'identique et n'offre rien d'autre. Ce portage ne peut
+  pas compiler du Python : la seule façon de garantir que ce qu'il valide sera compilable là-bas est
+  de ne rien laisser saisir. La suite **asserte cette absence**, sans quoi un champ libre réapparu
+  passerait inaperçu.
+- **La clé d'environnement est reconnue par son HACHAGE.** Mesuré au clic : créer une clé produit
+  **0** ligne supplémentaire côté portage, **1** côté legacy.
+- **La clé en clair ne transite par aucun stockage.** Elle n'est pas passée en message de session —
+  le pilote est `file`, elle atterrirait sur le disque du conteneur. Le contrôleur rend donc la vue
+  **directement** en réponse au POST. Le prix est connu et assumé : recharger reproposera le
+  formulaire au navigateur, exactement comme le legacy.
+- **Une portée vide est refusée à la création**, et signalée « toutes les routes » dans la liste. Côté
+  backend, `if scope:` fait qu'une portée vide vaut le parc entier ; l'accorder doit être un geste,
+  pas un oubli.
+
+**Deux défauts de rendu vus à l'image.** Le préfixe wrappait au 1400 — mineur, laissé. Mais au 390,
+c'est la colonne **Action** qui cédait la place, le préfixe restant : exactement l'inverse de la
+convention. C'est l'appoint qui s'efface, jamais le geste. `Préfixe` est passé en
+`.rw-colonne-secondaire`, et « Révoquer » est de nouveau atteignable au doigt.
+
+**La page n'est dans AUCUN menu**, ni sur le legacy ni sur le portage — elle s'atteint depuis
+l'en-tête de la page d'administration (`admin_page.php:153`) et depuis le tableau de bord. Le portage
+pose donc un lien équivalent sur `/comptes`, **visible au seul rôle 3** : l'afficher plus bas mènerait
+à un 403.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

@@ -5847,9 +5847,13 @@ diagnostic trompeur : le journal annonce « API key DB lookup failed », donc un
 motif que l'exploitant vient de saisir. **Mais si `API_KEY_BOOTSTRAP` était posée** — et son propre
 commentaire la destine au démarrage — le même chemin deviendrait fail-open. Les deux se disent.
 
-**NON FERMÉ** — D7 n'est pas porté. Le portage devra valider avec le moteur qui **applique**, ou
-n'offrir qu'une liste fermée de portées. C'est une décision, pas un détail : la portée est aujourd'hui
-un champ libre.
+**FERMÉ au portage** (`v1.37.75`), **par l'absence** : `/cles-api` n'offre **aucun champ libre**. La
+portée se coche dans une liste fermée dont les motifs sont écrits côté serveur — repris à l'identique
+des présélections du legacy, qui sont toutes correctes. Ce portage ne peut pas compiler du Python : la
+seule façon de garantir que ce qu'il valide sera compilable là-bas est de ne rien laisser saisir. Une
+entrée libre validée se contourne par une requête forgée ; une entrée libre absente, non.
+
+La suite **asserte cette absence** — un champ libre réapparu passerait inaperçu autrement.
 
 ---
 
@@ -5873,7 +5877,12 @@ préfixe » — sur une autre surface, et dans l'autre sens : ici c'est l'exploi
 ancrer, et rien ne le lui dit. Le champ est présenté comme « une regex par ligne » ; les exemples du
 `placeholder` sont bien ancrés (`^/cve_`), le texte d'aide ne l'est pas.
 
-**NON FERMÉ** — le portage devra ancrer d'office, ou dire à l'écran ce que la non-ancrage implique.
+**FERMÉ au portage** (`v1.37.75`) : les motifs ne sont plus saisis mais **choisis**, et ceux de la
+liste fermée sont tous ancrés par `^`. Il n'y a plus de chemin pour produire un motif non ancré.
+
+Et la page **montre les motifs** sous chaque module : une portée qu'on coche sans voir ce qu'elle
+couvre n'est pas une décision. Une portée vide — qui vaut **toutes les routes** côté backend — est
+refusée à la création et signalée en toutes lettres dans la liste.
 
 ---
 
@@ -5916,6 +5925,12 @@ Le commentaire d'`api_keys.php:71-79` explique longuement pourquoi l'auto-enregi
 il a raison sur le besoin. Ce qu'il ne fait pas, c'est vérifier que le secret n'est **pas déjà
 enregistré sous un autre nom**, ce que le script Python fait, lui, correctement.
 
-**NON FERMÉ** — le portage devra vérifier par le **hachage** et non par le nom, comme
-`bootstrap_api_key.py`. Le nettoyage des doublons éventuellement déjà présents est une décision
+**FERMÉ au portage** (`v1.37.75`) : `ClesApi::assureCleEnvironnement()` interroge le **hachage**,
+exactement comme `bootstrap_api_key.py` — le seul des deux mécanismes qui fût idempotent. Mesuré au
+clic : créer une clé sur le portage produit **0** ligne supplémentaire, là où le legacy en produit 1.
+
+Une ligne **révoquée** compte aussi : si l'exploitant a révoqué cette clé, la reposer irait contre sa
+décision. C'est pourquoi la vérification ne filtre pas sur `revoked_at`.
+
+**NON FERMÉ côté legacy**, et le nettoyage des doublons déjà présents reste une décision
 d'exploitant : supprimer une ligne d'`api_keys` peut couper un consommateur.
