@@ -6138,3 +6138,48 @@ d'un autre module au détour d'un portage `graylog/` mélangerait ce qui doit re
 constat est daté, le mécanisme établi, et la correction attend son propre sous-lot — avec la
 question ouverte de savoir s'il faut aussi **restaurer** les étiquettes et les clés du banc, ou
 si un banc sans elles est l'état normal qu'il fallait mesurer depuis le début.
+
+### ⚠ CORRECTION de E-141 — les clés SSH n'ont JAMAIS existé, et l'écart n'accusait qu'à moitié juste
+
+Écrit le 2026-08-26, quelques heures après E-141, sur une mesure que je n'avais pas faite : **la
+lecture des journaux des LOT antérieurs**, qui existent tous dans `/tmp`.
+
+E-141 affirmait que « les données du banc ont changé », en citant deux tables. **Une seule des deux
+est vraie.**
+
+| ce qu'E-141 disait | ce que les journaux montrent |
+|---|---|
+| `machine_tags` vidée | **VRAI** — le tag `banc-essai` est présent dans les **six** LOT du 2026-08-25 (09:13 → 21:22) et absent le 2026-08-26 à 11:42 |
+| `users.ssh_key` vidée | **FAUX** — « 0 compte(s) actif(s) avec une cle SSH » dans **tous** les journaux du 25, à toute heure |
+
+Le rapport de préflight disait déjà, le 25 : *« ATTENTION : aucun compte actif ne porte de cle SSH —
+un deploiement ne deploierait rien »*. Il le disait alors que la suite était **verte**. Aucune clé n'a
+donc disparu : il n'y en a jamais eu.
+
+**Ce qui a réellement fait tomber `ssh-preflight` est double, et n'a rien à voir avec les clés** :
+
+1. une assertion qui **présumait qu'un prérequis manque toujours**. Le portage répondait « Aucun
+   prerequis manquant », ce qui était **exact**, et l'assertion l'a condamné pour avoir raison ;
+2. l'état de scan de la machine 2, passé de `JAMAIS` au 25 à `2026-08-26 09:09:37`. Deux assertions
+   vivent dans un `if (SCAN_M2 === 'JAMAIS')` et ont donc cessé de s'exécuter — d'où 15 → 13.
+
+**Il ne reste qu'UN fait inexpliqué, et il est bien plus étroit qu'annoncé** : la disparition d'un
+**seul tag**, `banc-essai`, entre le 25 à 21:22 et le 26 à 11:42, sans trace au journal d'audit. Les
+clés sortent du dossier ; la question « faut-il restaurer les clés du banc ? » posée en E-141 **n'a pas
+lieu d'être**.
+
+### Ce que cette correction apprend, et c'est le vrai apport
+
+**J'avais les journaux antérieurs sous la main et je ne les ai pas lus.** J'ai daté la régression sur
+les *totaux* des LOT — `14/0` hier, `11/1` aujourd'hui — ce qui est une mesure juste, puis j'en ai
+déduit un mécanisme au lieu d'aller le lire. Les journaux par suite portaient la réponse en clair,
+ligne `INFO`, dans six exécutions successives.
+
+> **Un total qui change dit QU'il s'est passé quelque chose, jamais QUOI. La ligne `INFO` du journal
+> précédent le dit, elle.** Comparer les totaux date l'événement ; seule la lecture du détail
+> l'identifie.
+
+Et le motif de mon erreur est celui-là même que le chantier relève partout : j'ai vu deux tables vides
+au *présent*, et j'ai conclu qu'elles avaient été *vidées*. Un état actuel ne dit rien de l'état
+antérieur — c'est la même faute que « un état final correct ne prouve pas que le geste était correct »,
+prise par l'autre bout.
