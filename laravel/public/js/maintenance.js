@@ -123,7 +123,20 @@
         ligne.dataset.rw = 'maint-panneau';
         const td = document.createElement('td');
         td.colSpan = 6;
-        td.className = 'rw-panneau-decision';
+        /*
+         * LE CONTENEUR FLEX VA *DANS* LA CELLULE, JAMAIS SUR ELLE.
+         *
+         * `.rw-panneau-decision` porte `display: flex`. Pose sur un `<td>`, il
+         * ecrase `display: table-cell` : la cellule SORT du modele de tableau et
+         * son `colspan` est ignore — le panneau s'arretait au tiers de la largeur
+         * sur un ecran large, le reste de la ligne restant blanc. Aucune
+         * assertion DOM ne pouvait le voir, `colSpan` valant bien 6.
+         *
+         * Defaut vu a l'image sur `graylog/` le 2026-08-26, puis retrouve ici et
+         * dans trois autres fichiers du portage. Voir PARITE E-139.
+         */
+        const cadre = document.createElement('div');
+        cadre.className = 'rw-panneau-decision';
 
         const bloc = document.createElement('div');
         bloc.className = 'rw-panneau-decision__texte';
@@ -152,7 +165,8 @@
         confirmer.addEventListener('click', () => supprime(f, confirmer, ligne));
 
         actions.append(annuler, confirmer);
-        td.append(bloc, actions);
+        cadre.append(bloc, actions);
+        td.appendChild(cadre);
         ligne.appendChild(td);
         tr.after(ligne);
     }

@@ -135,7 +135,11 @@ declare -A REF_LARAVEL=(
   #   - la pastille d'ensemble dit « machines » et non « flotte » — le legacy
   #     n'affiche aucun etat d'ensemble ;
   #   - aucune boite native : la decision se prend en page.
-  [go-page-maintenance]=29
+  # 30 depuis le 2026-08-26 : une assertion ajoutee, le TEMOIN du correctif
+  # d'E-139 — la largeur RENDUE du panneau de decision contre celle du tableau.
+  # Elle ne vaut que sur le portage : le legacy pose une boite native, il n'a pas
+  # de panneau a mesurer.
+  [go-page-maintenance]=30
   # Sous-lot D1 de `adm/` : le journal d'audit. 34 sur le portage contre 32 sur
   # le legacy. Les DEUX assertions d'ecart sont des `verifiePortage` : la
   # decision de scellement se prend dans un PANNEAU EN PAGE (le legacy pose un
