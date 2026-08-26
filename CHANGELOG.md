@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.90** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.91** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.91 — `bashrc/` B4 caracterise : les ecritures distantes, toutes avortees
+
+`go-bashrc-b4.mjs`, **legacy 15 PASS / 0 FAIL**. **Le portage est SUSPENDU** — voir §7 du plan.
+
+Corps reellement intercepte au clic sur « Deployer » :
+
+    {"machine_id":2,"users":["root"],"mode":"merge","dry_run":false}
+
+`root`, en mode « fusionner » — qui, sans blocs marques `USER CUSTOM`, equivaut a « ecraser »
+(§4.5). Quatre ecritures avortees sur l'execution, aucun journal `[bashrc]` produit.
+
+#### Ce que le legacy fait BIEN, et qui est desormais mesure
+- **Le deploiement confirme, et NOMME les comptes** : « Confirmez le deploiement du .bashrc pour ces
+  utilisateurs ? root ».
+- **Le multi-deploiement ENUMERE les machines** par leur nom dans sa boite.
+
+Contrairement a D9a et D9b, ou `deploy` partait au premier clic, ce module-ci garde ses gestes.
+
+#### Ce que la mesure etablit
+- **Une requete part PAR MACHINE COCHEE** : deux machines cochees, deux requetes. Le
+  multi-deploiement n'est pas une route, c'est une boucle cote client.
+- **La simulation emprunte la MEME route que le deploiement reel.** Sa sureté ne tient qu'au champ
+  `dry_run` du corps. Le backend l'honore (`if dry_run: … continue` avant toute ecriture), mais sur
+  le reseau une simulation et un deploiement sont la meme requete a un champ pres.
+
+#### Ce qui n'est PAS mesure au navigateur, et pourquoi
+La propriete qui compte le plus — **une machine de PRODUCTION cochee serait-elle deployee ?** —
+exigerait de cocher `srv-zabbix`. Le filet l'avorterait, mais un trou du cote « laisse passer »
+ferait partir un deploiement reel sur la production, et **deux filets de cette session ont eu des
+trous**. La reponse est donc LUE : `_bashrcSelectedMachines()` n'a aucun filtre, et la boucle envoie
+un `/bashrc/deploy` par entree. Cocher `srv-zabbix` enverrait `machine_id: 1`.
+
+La suite mesure le MECANISME sur les machines 2 et 3, et asserte qu'aucune requete n'a vise la 1.
+
+#### Un defaut de mesure declare plutot que corrige
+Les deux `Failed to fetch` releves viennent **du filet**, pas de la page : avorter produit une erreur
+reseau indiscernable d'un defaut. En B1 c'etait evitable — la route avortee a tort etait une lecture.
+**Ici non** : ce sont precisement les ecritures qu'il faut avorter. L'assertion porte donc sur
+« aucune erreur ETRANGERE a l'avortement », et le compte est rapporte tel quel.
 
 ### v1.37.90 — `bashrc/` B3 porte : la reconnaissance dit enfin ce qu'elle NE verifie PAS
 
