@@ -95,9 +95,9 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **19 sur 33** |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 legacy / 18 portage, 0 échec**). Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
+| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**), toutes deux sans échec. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **122** — numérotés jusqu'à **E-132** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **123** — numérotés jusqu'à **E-133** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -241,7 +241,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 | 1 | |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
-| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b PORTÉS (`v1.37.59` à `v1.37.67`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, treize sous-lots, sixq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
+| 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, treize sous-lots, cinqq restants. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
 
 **⚠ `groups/` : deux boutons lancent un SCAN RÉEL sur TOUTES les machines du groupe.** Relevé en lisant

@@ -65,6 +65,9 @@ class Serveurs
 
     public const RESEAUX = ['INTERNE', 'EXTERNE'];
 
+    /** Liste fermee du backend (`admin.py:103`), reprise telle quelle. */
+    public const CYCLES = ['active', 'retiring', 'archived'];
+
     /** Borne reprise du legacy (`manage_servers.php:518`, `LIMIT 5`). */
     public const NOTES_PAR_MACHINE = 5;
 
@@ -488,6 +491,78 @@ class Serveurs
     {
         return DB::table('server_notes')
             ->where('id', $note)->where('machine_id', $machine)->delete() > 0;
+    }
+
+    /* ═══ Cycle de vie — sous-lot D6d ═══════════════════════════════════════ */
+
+    /**
+     * Change le cycle de vie d'une machine, EN BASE.
+     *
+     * ══ POURQUOI PAS LA ROUTE DU BACKEND ══════════════════════════════════
+     *
+     * `POST /server_lifecycle` (`admin.py:97`) ne fait rien d'autre qu'un
+     * `UPDATE machines SET lifecycle_status, retire_date WHERE id` suivi d'un
+     * `commit`. Aucun effet distant, aucune session SSH, aucun courriel. Il n'y
+     * a donc rien a heriter d'un aller-retour — sauf son defaut.
+     *
+     * Ce defaut, c'est sa reponse : `{'success': True, 'updated': cur.rowcount > 0}`
+     * SANS `SELECT` prealable. Or `rowcount` vaut 0 aussi bien quand on reecrit
+     * la valeur deja en place que quand la machine n'existe pas. `updated: false`
+     * recouvre donc DEUX SITUATIONS OPPOSEES, et aucune interface ne peut s'en
+     * sortir : afficher « echec » ment dans le premier cas, « fait » dans le
+     * second. Mesure du 2026-08-26, par requete forgee — aucun clic ne peut
+     * produire ce cas, l'interface n'offrant jamais le bouton de l'etat courant.
+     * Voir PARITE E-133.
+     *
+     * Ecrire ici resout l'ambiguite a la racine : on RESOUT la machine d'abord,
+     * donc on sait laquelle des deux situations on a. Meme decision que V4 pour
+     * `supervision_config`, et pour la meme raison — ne pas heriter d'un defaut
+     * qu'on ne peut pas corriger a distance.
+     *
+     * @return string 'introuvable' | 'inchange' | 'fait'
+     */
+    public function definitCycle(int $id, string $etat, ?string $date = null): string
+    {
+        if (! in_array($etat, self::CYCLES, true)) {
+            return 'introuvable';
+        }
+
+        // LA MACHINE EST RESOLUE AVANT D'ETRE MUTEE. C'est ce `SELECT` qui rend
+        // les trois issues distinguables ; sans lui, il n'y en aurait que deux
+        // et l'une des deux serait un mensonge.
+        $courant = DB::table('machines')->where('id', $id)
+            ->select('lifecycle_status')->first();
+        if ($courant === null) {
+            return 'introuvable';
+        }
+        if ((string) ($courant->lifecycle_status ?? 'active') === $etat) {
+            return 'inchange';
+        }
+
+        DB::table('machines')->where('id', $id)->update([
+            'lifecycle_status' => $etat,
+            // `retire_date` suit le legacy : posee au retrait, effacee au retour.
+            'retire_date' => $etat === 'retiring' ? ($date ?: now()->toDateString()) : null,
+        ]);
+
+        return 'fait';
+    }
+
+    /**
+     * Les etats qu'on peut PROPOSER pour une machine, l'etat courant exclu.
+     *
+     * Reprise d'une bonne propriete du legacy, mesuree : il n'offre jamais le
+     * bouton de l'etat courant. C'est ce qui rend « reposer la valeur en place »
+     * inatteignable au clic — et donc le defaut de `updated` latent plutot
+     * qu'ordinaire. On la garde.
+     *
+     * @return list<string>
+     */
+    public function cyclesProposables(?string $courant): array
+    {
+        $courant = in_array((string) $courant, self::CYCLES, true) ? (string) $courant : 'active';
+
+        return array_values(array_filter(self::CYCLES, static fn ($e) => $e !== $courant));
     }
 
     /** Le nom d'une machine, pour l'annoncer avant de la detruire. */

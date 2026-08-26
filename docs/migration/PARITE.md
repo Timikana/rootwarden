@@ -5664,3 +5664,66 @@ une règle qui n'a pas d'objet, et il le fait en silence : la ligne finit dans l
 que le motif réel — « votre mot de passe machine n'est pas assez complexe » — soit jamais énoncé.
 
 **NON FERMÉ** — le portage passera `false`, comme le formulaire, et l'écrira.
+
+---
+
+## E-133 — `adm/` D6d : `updated` recouvre deux situations opposées, et aucune interface ne peut s'en sortir
+
+`POST /server_lifecycle` (`backend/routes/admin.py:110`) rend :
+
+```python
+cur.execute("UPDATE machines SET lifecycle_status = %s, retire_date = %s WHERE id = %s", …)
+conn.commit()
+return jsonify({'success': True, 'updated': cur.rowcount > 0})
+```
+
+**Aucun `SELECT` préalable.** Or `rowcount` vaut **0** dans deux cas opposés :
+
+| situation | `rowcount` | ce que ça veut dire |
+|---|---|---|
+| on réécrit la valeur déjà en place | 0 | il n'y avait rien à faire — **succès** |
+| la machine n'existe pas | 0 | la cible est fausse — **échec** |
+
+`updated: false` ne dit donc pas laquelle. Une interface qui affiche « échec » ment dans le premier
+cas ; une qui affiche « fait » ment dans le second. Il n'y a pas de troisième option : l'information
+n'est pas dans la réponse.
+
+**Mesuré au navigateur** — `200 {"success":true,"updated":false}` sur une réécriture sans effet.
+
+**PAR UNE REQUÊTE FORGÉE, ET C'EST LE POINT INTÉRESSANT.** Aucun clic ne peut produire ce cas, parce
+que **l'interface n'offre jamais le bouton de l'état courant** : machine `active` → bouton
+« retirer » ; machine `retiring` → boutons « archiver » et « réactiver ». C'est une bonne propriété du
+legacy, et elle est asserte par la suite. Le défaut est donc **latent** par l'interface et atteignable
+par une requête forgée — ce qui abaisse sa gravité sans changer sa nature.
+
+*(Le premier jet de cette étape cherchait le bouton de l'état courant, ne le trouvait pas, ne
+déclenchait aucune requête — et son assertion passait sur une **chaîne vide**. Un test qui ne peut pas
+échouer, révélé par le seul `(aucune)` du journal. La suite exige désormais d'avoir mesuré quelque
+chose avant de conclure.)*
+
+**FERMÉ au portage** (`v1.37.72`), et par la structure plutôt que par un message mieux tourné : le
+cycle de vie s'écrit **en base**, sans passer par la route du backend. Celle-ci ne fait qu'un `UPDATE`
+sur `machines` — aucun effet distant, aucune session SSH, aucun courriel — il n'y a donc rien à
+hériter d'un aller-retour, sauf son défaut. Même décision que V4 pour `supervision_config`.
+
+`Serveurs::definitCycle()` **résout la machine avant de la muter**, et rend donc trois issues au lieu
+de deux :
+
+| issue | message |
+|---|---|
+| `introuvable` | « Cette machine n'existe pas. » |
+| `inchange` | « La machine était déjà dans cet état : rien n'a changé. » |
+| `fait` | « La machine est mise en retrait. » |
+
+Mesuré sur le portage, même requête forgée : « La machine était déjà dans cet état : rien n'a
+changé. » L'ambiguïté ne se corrige pas au niveau du libellé — elle se corrige en **allant chercher
+l'information qui manquait**, et un `SELECT` suffit.
+
+**NON FERMÉ côté backend** : `/server_lifecycle` garde son `updated` ambigu, et `/exclude_user`
+(`admin.py:115`) a la même forme. Le portage ne les appelle plus, mais le legacy si.
+
+**Ce qui n'est PAS un défaut, et il faut le dire** : `/server_lifecycle` n'a pas
+`@require_machine_access` là où `/server_status` le porte. Une première rédaction y a vu un IDOR —
+**c'était faux**, `check_machine_access()` commençant par `if role_id >= 2: return True`. L'écart est
+cosmétique. Voir la règle du §8 : vérifier qu'un garde est absent n'est pas vérifier que son absence
+compte.

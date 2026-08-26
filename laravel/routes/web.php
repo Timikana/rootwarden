@@ -563,6 +563,21 @@ Route::middleware('session.authentifiee')->group(function () {
         ->whereNumber('id')->whereNumber('note')
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.note.supprimer');
 
+    /*
+     * Cycle de vie — sous-lot D6d.
+     *
+     * ECRIT EN BASE, sans passer par `POST /server_lifecycle`. Cette route du
+     * backend ne fait qu'un `UPDATE` sur `machines` — aucun effet distant — et
+     * rend un `updated` qui recouvre deux situations opposees (E-133). On ne
+     * traverse pas la passerelle pour heriter d'un defaut qu'on ne peut pas
+     * corriger a distance ; meme decision que V4 pour `supervision_config`.
+     *
+     * Le TEST DE CONNEXION, lui, passe bien par la passerelle : sa sonde TCP
+     * appartient au backend, et `/server_status` est deja en liste blanche.
+     */
+    Route::post('/serveurs/{id}/cycle', [ServeursController::class, 'cycle'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.cycle');
+
     Route::post('/permissions/{id}', [PermissionsController::class, 'definir'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');
     Route::post('/permissions/{id}/acces', [PermissionsController::class, 'acces'])

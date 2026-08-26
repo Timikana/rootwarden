@@ -109,4 +109,19 @@ return [
     'err_etiquette_longue' => 'A tag cannot exceed 50 characters.',
     'err_note_vide' => 'A note cannot be empty.',
     'err_note_introuvable' => 'This note does not exist on this machine.',
+
+    // Lifecycle and connection — sub-lot D6d
+    'exploitation_titre' => 'Lifecycle and connection',
+    'cycle_active' => 'Reactivate',
+    'cycle_retiring' => 'Retire',
+    'cycle_archived' => 'Archive',
+    'cycle_active_fait' => 'The machine has been reactivated.',
+    'cycle_retiring_fait' => 'The machine has been retired.',
+    'cycle_archived_fait' => 'The machine has been archived.',
+    'cycle_inchange' => 'The machine was already in that state: nothing changed.',
+    'btn_tester' => 'Test connection',
+    'test_en_cours' => 'Testing…',
+    'test_en_ligne' => 'The machine answers on :ip.',
+    'test_hors_ligne' => 'The machine does not answer on :ip.',
+    'test_echec' => 'The test could not be run.',
 ];

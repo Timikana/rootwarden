@@ -109,4 +109,19 @@ return [
     'err_etiquette_longue' => 'Une étiquette ne peut pas dépasser 50 caractères.',
     'err_note_vide' => 'Une note ne peut pas être vide.',
     'err_note_introuvable' => "Cette note n'existe pas sur cette machine.",
+
+    // Cycle de vie et connexion — sous-lot D6d
+    'exploitation_titre' => 'Cycle de vie et connexion',
+    'cycle_active' => 'Réactiver',
+    'cycle_retiring' => 'Mettre en retrait',
+    'cycle_archived' => 'Archiver',
+    'cycle_active_fait' => 'La machine est réactivée.',
+    'cycle_retiring_fait' => 'La machine est mise en retrait.',
+    'cycle_archived_fait' => 'La machine est archivée.',
+    'cycle_inchange' => "La machine était déjà dans cet état : rien n'a changé.",
+    'btn_tester' => 'Tester la connexion',
+    'test_en_cours' => 'Test en cours…',
+    'test_en_ligne' => 'La machine répond sur :ip.',
+    'test_hors_ligne' => 'La machine ne répond pas sur :ip.',
+    'test_echec' => "Le test n'a pas pu être mené.",
 ];

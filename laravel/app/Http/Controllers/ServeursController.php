@@ -30,6 +30,7 @@ class ServeursController extends Controller
             'etiquettes' => $this->serveurs->etiquettesParMachine(),
             'notes' => $this->serveurs->notesParMachine(),
             'borneNotes' => Serveurs::NOTES_PAR_MACHINE,
+            'serveurs' => $this->serveurs,
             'environnements' => Serveurs::ENVIRONNEMENTS,
             'criticites' => Serveurs::CRITICITES,
             'reseaux' => Serveurs::RESEAUX,
@@ -39,6 +40,10 @@ class ServeursController extends Controller
             'libelles' => [
                 'suppr_titre' => __('serveurs.suppr_titre', ['nom' => '__NOM__']),
                 'filtre_resultat' => __('serveurs.filtre_resultat', ['n' => '__N__']),
+                'test_en_cours' => __('serveurs.test_en_cours'),
+                'test_en_ligne' => __('serveurs.test_en_ligne', ['ip' => '__IP__']),
+                'test_hors_ligne' => __('serveurs.test_hors_ligne', ['ip' => '__IP__']),
+                'test_echec' => __('serveurs.test_echec'),
             ],
         ]);
     }
@@ -153,6 +158,25 @@ class ServeursController extends Controller
         return $this->serveurs->supprimeNote($id, $note)
             ? back()->with('succes', __('serveurs.note_supprimee'))
             : back()->with('erreur', __('serveurs.err_note_introuvable'));
+    }
+
+    /* ═══ Cycle de vie — sous-lot D6d ═══════════════════════════════════════ */
+
+    /**
+     * TROIS ISSUES, TROIS MESSAGES. Le backend n'en distingue que deux, et l'une
+     * des deux est un mensonge : son `updated: false` recouvre « rien a changer »
+     * et « machine absente » (PARITE E-133). Ici la machine est resolue avant
+     * d'etre mutee, donc on sait laquelle des trois on a.
+     */
+    public function cycle(Request $requete, int $id): RedirectResponse
+    {
+        $etat = (string) $requete->input('etat', '');
+
+        return match ($this->serveurs->definitCycle($id, $etat)) {
+            'introuvable' => back()->with('erreur', __('serveurs.err_introuvable')),
+            'inchange' => back()->with('succes', __('serveurs.cycle_inchange')),
+            default => back()->with('succes', __('serveurs.cycle_' . $etat . '_fait')),
+        };
     }
 
     /** @return array<string, mixed> */
