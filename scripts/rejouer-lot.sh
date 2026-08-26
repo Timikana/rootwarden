@@ -114,7 +114,7 @@ declare -A REF_LARAVEL=(
   # d'abord venait d'une execution ANTERIEURE a ma propre modification de la
   # suite, et seul le legacy avait ete re-mesure.
   [go-page-docker]=17
-  [go-page-chatops]=22
+  [go-page-chatops]=23
   # 29 sur le portage contre 24 sur le legacy. L'ecart est de CINQ assertions, et
   # chacune porte une correction que le legacy ne tient pas :
   #   - l'etat affiche est celui que le backend APPLIQUERA (le legacy le calcule
