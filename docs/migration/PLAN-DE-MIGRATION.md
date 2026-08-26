@@ -729,6 +729,11 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 
 ### Tests
 
+- **Une capture doit CADRER ce que le sous-lot construit.** Deux fois de suite : D6a capturait
+  l'onglet des comptes au lieu de celui des serveurs, D6b le haut de la page au lieu de la carte
+  ouverte. La seconde fois, le défilement vers la carte a révélé du premier coup un défaut de rendu
+  que D6a avait laissé passer — une case à cocher au-dessus de son libellé. Ouvrir, défiler, PUIS
+  déclencher.
 - **Une capture qui montre autre chose que ce qu'on croit est pire qu'une capture absente** — elle
   sert de preuve à un examen qui n'a pas eu lieu. Relevé le 2026-08-26 : l'étape de captures de
   `go-adm-serveurs` ne rouvrait pas l'onglet « Serveurs » du legacy ; les trois images montraient
@@ -932,6 +937,19 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   point d'API gardé par un step-up rend 403, htmx ne remplace rien (`[45].. → swap:false`), aucun
   écouteur `htmx:responseError` n'existe — **la bascule ne fait rien, sans message**. Vérifier par quel
   transport chaque appel part avant de croire une garde utilisable.
+- **« Rien n'a été écrit » a TROIS causes, et elles ne se corrigent pas pareil** : la requête n'est
+  pas partie, elle est partie et a été refusée, elle a réussi et écrit ailleurs. Mesurer l'absence de
+  ligne en base ne les distingue pas. **Écouter la RÉPONSE** (`page.on('response')`) : sur D6b, un
+  seul message — « Token CSRF invalide » — a nommé le coupable là où le comptage en base avait
+  seulement dit « ça ne marche pas ».
+- **Un garde peut se tromper de sens dans les DEUX directions.** Le contrôle CSRF de
+  `server_actions.php` tient dehors sa propre interface (le jeton n'est jamais joint, E-125) et
+  laisse entrer une requête forgée depuis le portail (le jeton se lit sur `profile.php`, E-126). Un
+  contrôle qui refuse tout n'est pas pour autant un contrôle qui protège : vérifier les deux sens.
+- **Un correctif de sécurité se cherche sur TOUS les chemins d'écriture, pas sur celui qu'un clic
+  emprunte.** Le patch A10-01 vit dans `manage_servers.php` et manque dans la copie de
+  `server_actions.php` — laquelle n'a aucun appelant vivant, donc personne ne la regarde. Quand deux
+  fichiers portent chacun leur copie d'une fonction de validation, les comparer **ligne à ligne**.
 - **Chercher le délimiteur le plus EXTÉRIEUR.** E-114 avait accusé l'apostrophe de casser un littéral
   JavaScript dans `onclick="return confirm('…')"`, et conclu « seulement en français ». D6a a mesuré
   au navigateur : ce qui coupe est le **guillemet double** de la traduction, qui ferme **l'attribut
