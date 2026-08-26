@@ -2171,6 +2171,55 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.76 — `adm/` D8 inventorie : la page est plus permissive que tout ce qu'elle offre
+
+Inventaire mene **en lecture seule**, sans un seul clic — le banc etait prete a la seconde session,
+qui porte `graylog/`. C'est exactement la fenetre ou deux sessions avancent sans se gener.
+
+**Le sous-lot le plus dangereux d'`adm/`** : sept routes, dont un `userdel` distant irreversible.
+
+#### La page admet le role 1, six de ses sept routes exigent le role 2
+
+`server_users.php:11` : `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`. La ligne 12 exige en
+plus `can_manage_remote_users`.
+
+| route | role exige | ce qu'elle fait |
+|---|---|---|
+| `/server_user_keys` (GET) | **aucun** | liste les cles d'un compte distant |
+| `/scan_server_users` | 2 | enumere les comptes d'une machine |
+| `/sshd_allow_user` | 2 | modifie `sshd_config` |
+| `/remove_user_keys` | 2 | efface les `authorized_keys` |
+| `/delete_remote_user` | 2 | **`userdel` distant, irreversible** |
+| `/admin/user_inventory/classify` | 2 | classe un compte |
+| `/admin/user_inventory/classify_bulk` | 2 | classe en masse |
+
+Et la page **ne distingue aucun role dans son rendu** — mesure : `ROLE_` n'apparait qu'a la ligne 11.
+Un role 1 porteur de la permission verrait donc tous les boutons et recevrait 401 sur six d'entre eux,
+sans que rien ne le previenne avant le clic.
+
+**C'est le miroir du defaut habituel du depot.** D'ordinaire la garde est sur la PAGE et pas sur la
+REQUETE ; ici la page est plus LARGE que ses requetes. Ce n'est pas une faille — le backend refuse —
+mais une interface qui propose des gestes qu'elle sait impossibles.
+
+#### Etat vivant
+
+`can_manage_remote_users` est une colonne reelle, **creable et basculable**, et **un seul compte la
+porte : `superadmin`, role 3**. L'admission du role 1 est donc **latente** — meme formulation que K4 :
+le trou est reel et a une attribution de permission d'etre atteignable.
+
+#### Le seul `@require_machine_access` du module qui fasse quelque chose
+
+`/server_user_keys` n'a **aucune garde de role** : un role 1 l'atteint, et le decorateur le borne
+alors a ses propres machines. C'est le cas ou il MORD, au sens de la mesure des 57 sur 114. Les deux
+passerelles s'accordent pour la laisser hors de leur liste « administration seulement » — coherent, et
+delibere.
+
+#### Trois decisions pour le port
+
+Aligner la garde de la page sur ses actions **ou** rendre visible ce qu'un role 1 peut reellement
+faire ; separer VERIFIER d'AGIR comme pour `ssh/` ; et **ne jamais declencher `/delete_remote_user`
+depuis une suite** — interception avec avortement, on clique le vrai bouton et rien n'aboutit.
+
 ### v1.37.75 — `adm/` D7 : les cles d'API portees, et deux ecarts fermes PAR L'ABSENCE
 
 **20 entrees de menu portees sur 33** — non : inchange a **19**, `api_keys.php` n'etant dans aucun

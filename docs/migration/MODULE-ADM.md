@@ -336,7 +336,7 @@ dernier** — et chaque rang porte son motif.
 | **D6d** ✅ | **Serveurs — cycle de vie et test de connexion** — *PORTÉ `v1.37.72`, voir §5.0nonies* | `POST /server_lifecycle`, `POST /server_status` (backend) | — | `/server_status` : sonde TCP, écrit `online_status`, **pas** de session SSH. `/server_lifecycle` rend un `updated` **ambigu** (E-133), fermé au portage en écrivant en base |
 | **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
 | **D7** ✅ | **Clés d'API** — *PORTÉ `v1.37.75`, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. Les trois écarts (E-135, E-136, E-137) sont **fermés au portage** : liste de portées fermée et ancrée, et reconnaissance de la clé d'environnement par son **hachage** |
-| **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
+| **D8** ⏳ | **Comptes distants** — *INVENTORIÉ `v1.37.76`, voir §5.0terdecies* | `server_users.php` | 387 | **Première écriture distante d'`adm/`.** Sept routes, dont `/delete_remote_user` (`userdel` irréversible). **La page admet le rôle 1 ; six de ses sept routes exigent le rôle 2** — et elle ne distingue aucun rôle dans son rendu |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
 | **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
 
@@ -961,6 +961,57 @@ convention. C'est l'appoint qui s'efface, jamais le geste. `Préfixe` est passé
 l'en-tête de la page d'administration (`admin_page.php:153`) et depuis le tableau de bord. Le portage
 pose donc un lien équivalent sur `/comptes`, **visible au seul rôle 3** : l'afficher plus bas mènerait
 à un 403.
+
+### 5.0terdecies D8 — INVENTORIÉ le 2026-08-26 (`v1.37.76`), pas encore caractérisé
+
+**Le sous-lot le plus dangereux d'`adm/`** : sept routes, dont un `userdel` distant irréversible.
+Inventaire mené **en lecture seule**, sans un seul clic — le banc était prêté à la seconde session.
+
+#### Les sept routes, et leurs gardes réelles
+
+| route | rôle exigé | `@require_machine_access` | ce qu'elle fait |
+|---|---|---|---|
+| `/server_user_keys` (GET) | **aucun** | oui — **et il MORD ici** | liste les clés d'un compte distant |
+| `/scan_server_users` | 2 | oui (inerte au rôle ≥ 2) | énumère les comptes d'une machine |
+| `/sshd_allow_user` | 2 | oui (inerte) | modifie `sshd_config` |
+| `/remove_user_keys` | 2 | oui (inerte) | efface les `authorized_keys` d'un compte |
+| `/delete_remote_user` | 2 | oui (inerte) | **`userdel` distant, irréversible** |
+| `/admin/user_inventory/classify` | 2 | non | classe un compte |
+| `/admin/user_inventory/classify_bulk` | 2 | non | classe en masse |
+
+`/server_user_keys` est le seul cas du module où `@require_machine_access` **fait quelque chose** :
+sans garde de rôle au-dessus, un compte de rôle 1 l'atteint, et le décorateur le borne alors à ses
+propres machines. Les deux passerelles s'accordent pour la laisser hors de leur liste
+« administration seulement » — c'est cohérent, et délibéré.
+
+#### LA PAGE EST PLUS PERMISSIVE QUE TOUT CE QU'ELLE OFFRE
+
+`server_users.php:11` : `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])` — **le rôle 1 entre**.
+`:12` exige en plus `can_manage_remote_users`.
+
+Or **six des sept routes exigent le rôle 2**. Et la page **ne distingue aucun rôle dans son rendu** :
+mesuré, `ROLE_` n'apparaît qu'à la ligne 11. Un compte de rôle 1 porteur de la permission verrait donc
+tous les boutons, et obtiendrait 401 sur six d'entre eux — sans que rien ne le lui dise avant le clic.
+
+C'est le miroir du défaut habituel du dépôt : d'ordinaire la garde est sur la page et pas sur la
+requête ; ici **la page est plus large que ses requêtes**. Le résultat n'est pas une faille — le
+backend refuse — mais une interface qui propose des gestes qu'elle sait impossibles.
+
+**ÉTAT VIVANT, et il faut le dire** : `can_manage_remote_users` est une colonne réelle, **créable et
+basculable** (contrairement à `can_manage_api_keys`), et **un seul compte la porte : `superadmin`,
+rôle 3**. L'admission du rôle 1 est donc **latente** — même formulation que K4 : le trou est réel et à
+une attribution de permission d'être atteignable.
+
+#### Ce que le portage devra trancher
+
+- **Aligner la garde de la page sur ses actions** (rôle 2), ou **rendre visible** ce qu'un rôle 1 peut
+  réellement faire — c'est-à-dire consulter les clés de ses propres machines, et rien d'autre. La
+  seconde voie est plus fidèle et plus utile ; la première est plus simple.
+- **Séparer VÉRIFIER d'AGIR**, comme pour `ssh/` : l'énumération des comptes et leur suppression ne
+  doivent pas partager une chaîne d'appels.
+- **`/delete_remote_user` ne sera pas déclenché par une suite.** `userdel` distant est irréversible.
+  La convention éprouvée est l'interception avec avortement : cliquer le vrai bouton, mesurer la
+  requête émise, et n'en laisser aboutir aucune.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
