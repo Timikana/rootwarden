@@ -5282,10 +5282,16 @@ un ; rien ne distingue les six à l'œil.
 tentative de connexion n'aboutit pas. Ce qui est relevé, c'est l'écart entre ce qui est **annoncé**
 et ce qui est **appliqué**, sur une validation dont c'est tout le métier.
 
-**FERMÉ au portage** (`v1.37.65`) : `App\Services\Serveurs::valideIp()` applique les **huit**
-conditions — les sept du legacy, plus celle que son commentaire promettait. La comparaison porte sur
-le **premier octet** (224 à 239) et non sur le texte : `« 224. »` ne dirait rien de 225 à 239. IPv6
-`ff00::/8` est couvert par `inet_pton`.
+**FERMÉ au portage** (`v1.37.65`), puis **REFAIT** (`v1.37.68`) — et la deuxième version est la bonne.
+
+Le premier jet appliquait bien les huit conditions, mais **sur des préfixes de chaîne**, comme le
+legacy. Il en héritait donc l'angle mort, mesuré après relecture croisée : `::ffff:224.0.0.1` passait.
+Voir E-129, qui est la suite de cet écart et vaut pour les deux portails.
+
+`App\Services\Serveurs::valideIp()` réduit désormais l'adresse à sa forme **binaire** par
+`inet_pton`, ramène les notations mappée (`::ffff:a.b.c.d`) et compatible (`::a.b.c.d`) à leur IPv4,
+puis compare des **octets**. Une notation nouvelle ne peut plus contourner la règle, parce que la
+règle ne regarde plus la notation. Dix-huit cas mesurés, zéro écart.
 
 ---
 
@@ -5408,9 +5414,13 @@ que `profile.php` donne à tout compte authentifié. Il ne faut **pas** `can_adm
 trou est donc atteignable par tout compte d'administration du portail, y compris ceux à qui la page
 des serveurs est refusée.
 
-**FERMÉ au portage** (`v1.37.67`) : il n'y a **qu'un seul chemin d'écriture**,
-`App\Services\Serveurs::valideIp()`, et il porte les huit conditions (E-123). Une copie ne peut pas
-diverger quand il n'y a pas de copie.
+**ET LA COPIE « DURCIE » NE TIENT PAS NON PLUS** — relecture croisée du 2026-08-26, puis mesure au
+clic. Le correctif n'est pas seulement absent d'un fichier : il est **contournable en changeant de
+notation**, sur les DEUX copies. Voir E-129.
+
+**FERMÉ au portage** (`v1.37.67`, garde corrigée en `v1.37.68`) : il n'y a **qu'un seul chemin
+d'écriture**, `App\Services\Serveurs::valideIp()`. Une copie ne peut pas diverger quand il n'y a pas
+de copie — encore fallait-il que la copie unique soit juste, et elle ne l'était pas d'abord.
 
 ---
 
@@ -5427,3 +5437,55 @@ rôle ≥ 2. Ce qui est relevé, c'est que la vérification **manque** là où l
 **FERMÉ au portage** (`v1.37.67`) : `Serveurs::supprimeNote()` résout par le **couple** machine + note.
 Viser la note d'une autre machine ne supprime rien, et la route le dit
 (`serveurs.err_note_introuvable`).
+
+---
+
+## E-129 — Le garde SSRF compare des PRÉFIXES DE CHAÎNE : la même adresse passe sous une autre notation
+
+Trouvé par une **relecture croisée** — pas par la suite qui venait pourtant d'écrire E-123 et E-127 —
+puis mesuré au clic sur les deux portails.
+
+Le correctif A10-01 teste des préfixes :
+
+```php
+strpos($data, '127.') === 0 || strpos($data, '169.254.') === 0 || strpos($data, '0.') === 0
+```
+
+`::ffff:169.254.169.254` désigne **exactement** le point de métadonnées que le commentaire du
+correctif nomme, et ne commence par aucun de ces préfixes. Mesuré dans le conteneur PHP :
+
+| adresse | IP valide | bloquée par A10-01 |
+|---|---|---|
+| `169.254.169.254` | oui | **oui** |
+| `::ffff:169.254.169.254` | oui | **non** |
+| `::ffff:a9fe:a9fe` | oui | **non** |
+| `::ffff:127.0.0.1` | oui | **non** |
+
+Puis mesuré **au clic**, par le formulaire d'ajout de `manage_servers.php` — donc par la copie
+« durcie », celle qui porte le correctif : la machine est créée avec `::ffff:169.254.169.254`.
+
+**Ce n'est donc pas E-127 sous un autre angle.** E-127 dit qu'une des deux copies n'a pas le garde ;
+E-129 dit que **le garde lui-même ne tient pas**, y compris là où il est présent. Corriger E-127 seul —
+en donnant à `server_actions.php` la copie durcie — n'aurait rien fermé.
+
+**LA LEÇON ÉTAIT DÉJÀ ÉCRITE, ET LE PORTAGE L'A QUAND MÊME RATÉE.** « Valider la FORME avant le
+contenu, et ne jamais recopier une règle de sécurité » — la leçon de `//exemple.com`. Le premier jet de
+`Serveurs::valideIp()` (`v1.37.65`) a recopié fidèlement la règle du legacy, angle mort compris, et
+l'a même étendue au multicast **en gardant la comparaison de chaîne**. Fidélité au mauvais niveau :
+c'est l'INTENTION du correctif qu'il fallait porter, pas sa forme.
+
+**FERMÉ au portage** (`v1.37.68`) : `inet_pton` d'abord, réduction des notations mappée et compatible
+à leur IPv4, puis comparaison sur les **octets**.
+
+| famille | refusé |
+|---|---|
+| IPv4 | `0/8`, `127/8`, `169.254/16`, `224/4` multicast, `240/4` réservé |
+| IPv6 | `::`, `::1`, `fe80::/10`, `ff00::/8` |
+
+Dix-huit cas mesurés en PHP, zéro écart ; et la suite `go-adm-serveurs` pose désormais l'adresse
+mappée **dans le formulaire** et vérifie qu'aucune machine n'est créée — un geste réel, sur les deux
+cibles, qui constate le legacy et asserte le portage.
+
+**NON FERMÉ côté legacy**, et c'est un choix à porter à l'exploitant : les deux copies de
+`validateInput()` restent vulnérables. Le correctif est le même qu'ici — `inet_pton` et comparaison de
+plages — mais il touche un fichier de production non porté.

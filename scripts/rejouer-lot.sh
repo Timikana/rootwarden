@@ -148,7 +148,7 @@ declare -A REF_LARAVEL=(
   # passe genere ne survit pas au rechargement (E-113), et la page ne porte
   # aucune erreur JavaScript — le legacy en porte deux, qui desarment deux
   # confirmations (E-114).
-  [go-adm-comptes]=17
+  [go-adm-comptes]=18
   # Sous-lot D4 de `adm/` : suppression et anonymisation. 21 sur le portage
   # contre 10 sur le legacy. L'ecart est grand parce que le portage exerce un
   # PARCOURS que le legacy n'a pas : panneau de decision qui NOMME ce que le
@@ -162,7 +162,7 @@ declare -A REF_LARAVEL=(
   # ne permet de repondre (E-119), le portage ouvre un panneau, recoit le code et
   # mene la bascule a son terme — mesure en base, `can_scan_cve` passe a 1.
   [go-adm-permissions]=14
-  [go-adm-serveurs]=20
+  [go-adm-serveurs]=21
   [go-adm-etiquettes-notes]=18
 )
 declare -A REF_LEGACY=(
@@ -243,7 +243,7 @@ declare -A REF_LEGACY=(
   # les casserait toutes en silence. `sudo` n'est JAMAIS bascule — `users.sudo=1`
   # est la precondition du repli `NOPASSWD: ALL` de K4. Le `finally` PROUVE que
   # les trois comptes de test sont intacts (ni sudo, ni desactives).
-  [go-adm-comptes]=13
+  [go-adm-comptes]=14
   # Sous-lot D4 de `adm/` : suppression et anonymisation. 10 sur le legacy,
   # mesure du 2026-08-26. La suite N'AGIT QUE sur un compte fraichement cree,
   # dont `user_logs` est vide — et elle VERIFIE cette precondition avant de
