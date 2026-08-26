@@ -1002,6 +1002,18 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   aucune interface ne peut s'en sortir. Le correctif est de **résoudre l'objet avant de le muter** —
   contrôler l'objet RÉSOLU et non le paramètre reçu. *(Cette entrée disait aussi « et ferme l'IDOR du
   même geste » : c'était faux, il n'y a pas d'IDOR là — voir la règle suivante.)*
+- **UNE GARDE PRÉSENTE N'EST PAS UNE GARDE QUI GARDE.** C'est la formule qui réunit trois constats du
+  chantier : `@require_machine_access` est inerte sur **57 routes sur 114** (celles déjà gardées au
+  rôle ≥ 2) ; `checkPermission('can_manage_api_keys')` ne peut jamais décider de rien, la ligne
+  au-dessus réservant déjà la page au rôle 3 ; et cinq en-têtes annoncent un accès plus strict que
+  leur code. Le premier est un décorateur, le deuxième un appel, le troisième un commentaire — même
+  effet : **la relecture confirme une protection qui n'agit pas.** Lire ce que le garde FAIT, et ce
+  que la ligne précédente a déjà décidé.
+- **Une colonne peut être écrite par une API et lue par personne.** `temporary_permissions.machine_id`
+  fait trois avec `password_expires_at` et la table de whitelist : déclarée au schéma, acceptée par
+  une route, renseignée par **aucune** interface, consultée par **aucune** décision. Trois
+  occurrences, c'est un motif. Chercher séparément qui la RENSEIGNE et qui la CONSULTE — une colonne
+  peut avoir un écrivain sans lecteur, ou un lecteur qui l'ignore.
 - **Quand on ne peut pas valider comme l'autre valide, ne rien laisser saisir.** Le portage ne compile
   pas de Python : il ne peut pas garantir qu'un motif accepté ici sera compilable là-bas. Il n'offre
   donc **aucun champ libre** de portée, seulement une liste fermée dont les motifs sont écrits côté
