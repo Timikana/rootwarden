@@ -5963,3 +5963,105 @@ décision. C'est pourquoi la vérification ne filtre pas sur `revoked_at`.
 
 **NON FERMÉ côté legacy**, et le nettoyage des doublons déjà présents reste une décision
 d'exploitant : supprimer une ligne d'`api_keys` peut couper un consommateur.
+
+---
+
+## E-138 — `graylog/` G1 : « Tester » exécutait une commande à distance sur un seul clic, sans rien demander
+
+Le module pose trois boutons par ligne dans l'onglet Machines, et chacun ouvre une **session SSH
+réelle** qui exécute **en root** sur la machine de la ligne :
+
+| bouton | ce qu'il fait | confirmation dans le legacy |
+|---|---|---|
+| Déployer | `apt-get install -y rsyslog` puis écriture dans `/etc/rsyslog.d/` | **oui** (`glDeploy`, js:90) |
+| **Tester** | `logger -t <tag> <message>` | **AUCUNE** (`glTest`, js:100) |
+| Retirer | `rm -f` des confs RootWarden puis `systemctl restart rsyslog` | **oui** (`glUninstall`, js:107) |
+
+Et le tableau liste **toutes les machines non archivées** — la requête
+(`backend/routes/graylog.py:245-263`) exclut seulement `lifecycle_status = 'archived'`. `srv-zabbix`
+(id 1, production) y figure donc, avec ses trois boutons, et **rien dans le legacy ne distingue sa
+ligne** de celle du banc d'essai.
+
+L'asymétrie n'est pas une opinion : deux gestes sur trois demandent confirmation, le troisième non, et
+c'est celui dont le nom — « Tester » — suggère le moins qu'il touche la machine.
+
+**PORTAGE** : les **trois** gestes ouvrent une confirmation **en page**, et elle **nomme la machine et
+son adresse**. Trois boutons par ligne et plusieurs lignes : un libellé générique ne dirait pas
+laquelle. Le libellé dit aussi ce qui va se passer — « Une connexion SSH sera ouverte et la commande
+exécutée en root ».
+
+**Et la page le dit AVANT le clic**, pas seulement dans la confirmation : un encart de quatre lignes
+décrit ce que chaque bouton fait vraiment, et signale que le tableau contient les machines de
+production. Le legacy ne l'écrit nulle part.
+
+### Ce que la suite ne clique pas, et pourquoi c'est écrit dans le fichier
+
+`go-page-graylog-g1.mjs` ouvre l'onglet Machines et **lit** le tableau. Elle ne clique **aucun** bouton
+de ligne. Cliquer « Tester » pour « voir ce qu'il fait » aurait joint une machine pour de vrai, et sur
+la ligne de `srv-zabbix` cela aurait joint la production. Les gestes mutants sont le sous-lot **G2**,
+qui viendra avec sa cible (`test-server`, machine 2) et son geste de retour (`uninstall`).
+
+Le script de captures, lui, **ouvre** la confirmation de « Tester » — `ouvreConfirmation` ne fait que
+rendre du DOM, aucune requête n'est émise — et il choisit la ligne du banc, jamais celle de la
+production. Même quand un geste est inerte, viser la production pour une image serait prendre
+l'habitude inverse de celle qu'on veut.
+
+**Références** : legacy **25**, portage **26**. L'écart d'une assertion est « aucune boîte native » : le
+legacy pose un `confirm()` pour supprimer un gabarit et un `alert()` pour rendre le résultat.
+
+---
+
+## E-139 — Un conteneur `flex` posé SUR un `<td>` fait ignorer son `colspan`
+
+Défaut de **mon propre portage**, vu **à l'image** et invisible au DOM.
+
+`.rw-panneau-decision` porte `display: flex` dans la feuille de style. Posé sur un `<td>`, il écrase
+`display: table-cell` : **la cellule sort du modèle de tableau**, et son `colspan` n'a plus d'effet. Le
+panneau de confirmation s'arrêtait à **745 px** sur un écran de 1920, le reste de la ligne restant
+blanc.
+
+Aucune assertion DOM ne pouvait l'attraper : l'attribut `colSpan` valait bien **6**. C'est la même
+famille que la pastille à 1,06:1 — *le HTML était juste, le rendu ne l'était pas*.
+
+**Correctif** : le conteneur flex va **dans** la cellule, jamais sur elle.
+
+```
+td (nu, colspan=6)
+  └ div.rw-panneau-decision   (le flex vit ici)
+```
+
+Mesuré après correction, largeur rendue du panneau sur celle du tableau : **1590/1618**, **1070/1098**,
+**907/923 px**. Une assertion a été ajoutée au script de captures — sans elle, la correction n'aurait
+aucun témoin.
+
+**⚠ `maintenance.js` a exactement le même défaut** (`td.className = 'rw-panneau-decision'`, sous-lot
+porté en `v1.37.57`). Il n'avait pas été vu parce que la capture de ce module n'ouvrait pas le panneau.
+À corriger dans son propre commit, avec sa suite rejouée — pas au détour de celui-ci.
+
+### Et un second défaut de la même image
+
+« Retirer » portait `rw-bouton--avertissement`, ce qui en faisait l'élément **le plus voyant du
+tableau**, plus que « Déployer ». Attirer l'œil sur le geste destructeur est l'inverse de ce qu'on veut.
+Les trois boutons de ligne sont désormais discrets ; le poids visuel appartient au panneau de
+confirmation, où l'action porte `rw-bouton--danger` et l'annulation reste discrète.
+
+---
+
+## E-140 — Il n'existe aucune route `/graylog/history` : le legacy rend cet onglet côté serveur
+
+Trois des quatre onglets du module viennent du backend. Le quatrième, l'historique, est rendu **en
+PHP** depuis `user_logs` (`legacy/graylog/index.php:20-27`), avec un filtre sur le préfixe de chaîne
+`[graylog]%`.
+
+Le premier jet du portage appelait `/graylog/history` par la passerelle. **Cette route n'existe pas** —
+vérifié avant d'exécuter quoi que ce soit, ce qui a évité un onglet qui aurait affiché « impossible de
+lire » sans que rien n'explique pourquoi.
+
+Le portage rend donc cet onglet côté serveur, avec la même requête et le même filtre. Le préfixe
+`[graylog]` est un **marqueur de chaîne et non une colonne** : c'est ainsi que le legacy range ces
+lignes, et changer ce rangement en portant une page aurait perdu l'historique déjà écrit.
+
+**Le commentaire d'en-tête du contrôleur a dû être réécrit** : il annonçait « ce contrôleur ne lit rien
+lui-même, et c'est délibéré », ce qui devenait faux dès l'ajout de cette lecture. Un commentaire qui
+affirme plus que le code est le motif relevé cinq fois dans ce dépôt ; le laisser dans du code neuf
+aurait été le sixième.

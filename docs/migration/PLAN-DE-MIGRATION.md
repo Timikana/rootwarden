@@ -92,7 +92,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **19 sur 33** |
+| entrées de menu portées | **20 sur 33**, et le total se RECONSTITUE — mesuré le 2026-08-26 en faisant lire `Navigation::SECTIONS` **par PHP lui-même** : `20 route + 13 legacy + 0 ni l'un ni l'autre = 33`. Un premier comptage à l'expression régulière avait rendu 32, en manquant `wazuh` — voir §8. Restent en `legacy` : `iptables`, `fail2ban`, `services`, `ssh_audit`, `bashrc`, **`wazuh`**, `groups`, `remote_users`, `platform_key`, `sudo_policies`, `sftp_policies`, `documentation`, `api_docs` |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), toutes sans échec. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
@@ -234,7 +234,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | ~~2~~ | ~~`chatops/`~~ | 246 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.55` / `v1.37.56`. Premier chemin PUBLIC du portage, et première adresse EXTÉRIEURE que la migration déplace |
 | ~~3~~ | ~~`maintenance/`~~ | 257 | 1 | **PORTÉ ET ARCHIVÉ** `v1.37.57` / `v1.37.58`. **Le défaut le plus grave du chantier y a été trouvé** — l'encadré ci-dessous reste à lire, il porte la mesure |
 | **4** | **`groups/`** | 305 | 1 | **SUIVANT** — **⚠ deux boutons y lancent un SCAN RÉEL sur TOUTES les machines d'un groupe, dont un qui ENVOIE UN COURRIEL. Lire l'encadré ci-dessous** |
-| 5 | `graylog/` | 388 | 1 | |
+| ~~5~~ | ~~`graylog/`~~ | 388 | 1 | **G1 PORTÉ** `v1.37.77` — 26/0. Reste **G2** : les trois gestes qui MUTENT une machine (`deploy`, `test`, `uninstall`), cible `test-server`, geste de retour `uninstall`. Inventaire : `MODULE-GRAYLOG.md` |
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
 | 7 | `services/` | 631 | 1 | gestes sur machines |
 | 8 | `iptables/` | 870 | 1 | gestes sur machines, IDOR déjà corrigé |
@@ -804,6 +804,83 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   ajouter, pas seulement `git status`** ; et ne **jamais réécrire l'historique** (`--amend`, `rebase`)
   tant qu'une autre session peut travailler — la gêne d'un message incomplet est bien moindre que celle
   d'un historique déplacé sous les pieds de quelqu'un.
+- **Avant tout `git add <fichier>`, regarder si ce fichier était DÉJÀ modifié.** Troisième occurrence
+  en deux jours, et à chaque fois le même mécanisme : deux sessions écrivent dans un fichier **partagé**,
+  la première à committer emporte le travail de la seconde. `PLAN-DE-MIGRATION.md` d'abord
+  (`v1.37.58` porte une douzaine de lignes sur `adm/` que son message ne mentionne pas), puis
+  `scripts/rejouer-lot.sh`, puis `laravel/routes/web.php` — où deux modules déclarent leurs routes au
+  même endroit. Le coût du contrôle est un `git status` ; le coût de l'oubli est un `reset --soft` avec
+  découpage de patch.
+
+  **Notre convention de banc ne protège pas de ça, et il faut le dire** : « `laravel/`, `backend/` et
+  `docs/` peuvent partir quand ils veulent » est vrai pour le **rejeu** et faux pour l'**atomicité**.
+  `web.php` est un fichier partagé au même titre que le runner.
+
+  **Découper un patch : deux précautions apprises à la dure.**
+
+  1. un bloc `@@` peut être **MIXTE**. Le 2026-08-26 sur `web.php`, le bloc des `use` portait un import
+     de chaque session, à deux lignes l'un de l'autre : il a fallu retirer une ligne **et recompter
+     l'en-tête du bloc** (`@@ -6,8 +6,10 @@` → `@@ -6,7 +6,8 @@`). `git apply --cached --check` refuse
+     un compte faux, donc l'erreur ne passe pas en silence — mais ne pas le faire sans sauvegarde ;
+  2. **`php -l` sur le fichier ne prouve RIEN de ce qu'on committe** : il lit le **disque**, pas l'index.
+     Sortir la version indexée (`git show :chemin`) et la linter à part. Sans cela on committe un fichier
+     qui référence un contrôleur dont l'import est resté sur le disque — et le commit passe, et rien ne
+     casse avant le déploiement.
+- **Pendant un rejeu, tout fichier qu'une suite LIT ou EST doit être figé.** La règle notée jusqu'ici —
+  « ne jamais éditer le runner pendant un rejeu » — était trop étroite : elle nommait le runner et
+  donnait pour raison la lecture des références au démarrage. Le mécanisme est plus large, et une
+  seconde session l'a montré le 2026-08-26 :
+
+  | 11:19:29 | `go-socle-navigation` joue dans le LOT → **53** |
+  |---|---|
+  | **11:23:28** | **ÉCRITURE** de 4 assertions dans cette suite |
+  | 11:24:48 | le commit, 80 s plus tard |
+  | | la suite qui a produit le 53 n'existe plus sur le disque |
+
+  Éditer le **runner** fausse le verdict par une référence périmée. Éditer une **suite** le fausse
+  autrement : le nombre mesuré devient **irreproductible** et ne peut plus servir de référence. Les
+  autres suites gardent leur validité — elles ont tourné avec leurs propres fichiers.
+
+  **⚠ LE GESTE EN CAUSE EST L'ÉCRITURE, PAS LE `git commit`.** Ce document a d'abord dit l'inverse, et
+  c'était une erreur qui *donnait une fausse protection* : elle aurait autorisé à écrire une suite
+  pendant un rejeu du moment qu'on retarde le commit, et le défaut se serait reproduit à l'identique en
+  laissant croire qu'on s'en était prémuni. Mesuré : un `git commit` ne change **aucun octet** du
+  fichier — il écrit dans `.git`, et un rejeu lit le **disque**, pas l'index. C'est l'écriture de
+  11:23:28 qui a rendu le 53 irreproductible, pas le commit de 11:24:48.
+
+  D'où la convention, sous la seule forme qui protège : *pendant qu'une session tient le banc, l'autre
+  n'**écrit** pas dans `tests/e2e/` ni `scripts/`. Elle écrit et committe librement dans `laravel/`,
+  `backend/` et `docs/` — rien de tout cela n'est lu par un rejeu en cours.* **Retarder le commit ne
+  protège de rien.**
+- **Compter une structure de données, c'est la faire lire par son propre langage.** Un comptage des
+  entrées de menu à l'expression régulière a rendu **32 sur 33** le 2026-08-26 : le motif exigeait la
+  forme sur une seule ligne et manquait `wazuh`, écrit autrement. La même constante lue par un
+  `require` puis un `foreach` en PHP rend **33**, sans angle mort possible — même leçon que pour la
+  parité i18n, où analyser du PHP à l'expression régulière revient à réécrire un interpréteur et où une
+  entrée mal lue est déclarée absente à tort.
+- **Et l'assertion qui manquait est celle du TOTAL** : `route + legacy + ni-l-un-ni-l-autre == 33`.
+  Aucune suite ne vérifiait que le décompte se reconstitue, donc il pouvait dériver sans que rien ne le
+  dise — ce qui vient d'arriver, dans le sens inoffensif. **Un total qu'on ne sait pas reconstituer
+  n'est pas un total.**
+- **Un conteneur `flex` posé SUR un `<td>` fait ignorer son `colspan`.** `display: flex` écrase
+  `display: table-cell` : la cellule sort du modèle de tableau. Le panneau de décision de `graylog/`
+  s'arrêtait au tiers de la ligne sur un écran de 1920, et l'attribut `colSpan` valait bien 6 — aucune
+  assertion DOM ne pouvait le voir. Le conteneur flex va **dans** la cellule. `maintenance.js` a le même
+  défaut, non vu parce que sa capture n'ouvrait pas le panneau.
+- **Le poids visuel appartient à la confirmation, pas à la ligne.** Donner à « Retirer » un bouton
+  d'avertissement en faisait l'élément le plus voyant du tableau, plus que « Déployer » : attirer l'œil
+  sur le geste destructeur est l'inverse de ce qu'on veut.
+- **La détention du banc se REND, elle ne se déduit pas du silence.** Le 2026-08-26, deux sessions ont
+  lancé des suites dans la même minute parce que l'une avait conclu du `ps` vide que le banc était
+  libre. Rien n'a échoué — mais le garde anti-rejeu TOTP étant par compte et en base, deux connexions
+  du même compte dans la même fenêtre de 30 s se seraient sabotées, et le journal aurait accusé le
+  code. Un `ps` vide dit « aucun rejeu à cette seconde », pas « personne n'est sur le point d'en
+  lancer un ».
+- **Un secret TOTP inventé ne fait pas échouer la suite là où elle mesure** : il la fait échouer à la
+  CONNEXION, ce qui ressemble à un compte verrouillé, à une fenêtre TOTP ratée ou à un `login_attempts`
+  saturé — trois diagnostics plausibles pour une cause qui n'a rien à voir. Relever le secret dans une
+  suite existante, et le **compter** : les trois secrets de `graylog/` apparaissent dans 35, 54 et 32
+  fichiers.
 - **Tout `/partie/` n'est pas une page.** `/maintenance/check` et `/maintenance/windows` sont des routes
   du **backend** ; sondées comme des pages archivées elles échoueraient, réécrites comme des pages elles
   casseraient la page. Ce qui les sauve est une comparaison du chemin **normalisé en entier** — la même

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.58** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.77** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,73 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.77 — `graylog/` G1 porte : « Tester » executait une commande a distance sans rien demander
+
+**18 entrees de menu portees sur 33.** Legacy 25/0, portage 26/0, base rouge 7/12.
+
+**LE MODULE A DEUX SURFACES DE NATURE DIFFERENTE, ET G1 S'ARRETE A LA PREMIERE.** La configuration et
+les gabarits lisent et ecrivent en base, sans joindre aucune machine. `deploy`, `test` et `uninstall`
+ouvrent chacun une session SSH REELLE et executent en root : `apt-get install -y rsyslog`, ecriture
+dans `/etc/rsyslog.d/`, `logger`, `systemctl restart rsyslog`. Les melanger ferait d'une suite de
+lecture une suite qui installe des paquets. G1 mesure entierement la premiere surface et ne touche pas
+la seconde ; G2 viendra avec sa cible (`test-server`, machine 2) et son geste de retour.
+
+**LE DEFAUT PRINCIPAL : deux gestes sur trois demandent confirmation, le troisieme non.** `glDeploy`
+(js:90) et `glUninstall` (js:107) posent un `confirm()`. **`glTest` (js:100) n'en a AUCUN** : un seul
+clic ouvre une session SSH sur la machine de la ligne. Et c'est celui dont le nom suggere le moins
+qu'il touche la machine.
+
+Le tableau liste **toutes** les machines non archivees — la requete n'exclut que
+`lifecycle_status = 'archived'` — donc `srv-zabbix` (production) y figure avec ses trois boutons, et
+rien dans le legacy ne distingue sa ligne de celle du banc.
+
+**PORTAGE** : les trois gestes ouvrent une confirmation EN PAGE qui NOMME la machine et son adresse, et
+qui dit ce qui va se passer. Un encart de quatre lignes le dit AVANT le clic, et signale que le tableau
+contient les machines de production — le legacy ne l'ecrit nulle part.
+
+**CE QUE LA SUITE NE CLIQUE PAS, ET C'EST ECRIT DANS LE FICHIER.** Elle ouvre l'onglet Machines et LIT
+le tableau ; elle ne clique aucun bouton de ligne. Cliquer « Tester » pour voir ce qu'il fait aurait
+joint une machine pour de vrai, et sur la ligne de `srv-zabbix` cela aurait joint la production.
+
+**DEUX DEFAUTS DE MON PROPRE PORTAGE, VUS A L'IMAGE ET INVISIBLES AU DOM.**
+
+`.rw-panneau-decision` porte `display: flex`. Pose SUR un `<td>`, il ecrase `display: table-cell` : la
+cellule SORT du modele de tableau et son `colspan` est ignore. Le panneau s'arretait a 745 px sur un
+ecran de 1920, le reste de la ligne restant blanc — et l'attribut `colSpan` valait bien 6, donc aucune
+assertion DOM ne pouvait le voir. Correctif : le conteneur flex va DANS la cellule. Mesure apres
+correction : 1590/1618, 1070/1098, 907/923 px. Une assertion a ete ajoutee, sans quoi la correction
+n'aurait aucun temoin. **`maintenance.js` a le meme defaut** (v1.37.57) : a corriger dans son propre
+commit, avec sa suite rejouee.
+
+Second defaut de la meme image : « Retirer » portait `rw-bouton--avertissement`, ce qui en faisait
+l'element le plus voyant du tableau, plus que « Deployer ». Attirer l'oeil sur le geste destructeur est
+l'inverse de ce qu'on veut.
+
+**IL N'EXISTE AUCUNE ROUTE `/graylog/history`.** Le premier jet du portage l'appelait quand meme ;
+verifie avant d'executer. Le legacy rend cet onglet en PHP depuis `user_logs`, filtre sur le prefixe de
+chaine `[graylog]%` — un marqueur, pas une colonne. Le portage fait pareil. **Le commentaire d'en-tete
+du controleur a du etre reecrit** : il annoncait « ce controleur ne lit rien lui-meme », ce qui devenait
+faux ; le laisser aurait fait la sixieme occurrence du motif « le commentaire affirme plus que le code ».
+
+**AUCUNE DONNEE NE SORT, ET C'EST MESURE** : `graylog_config` pointe sur `graylog.test`, et
+`getent hosts graylog.test` depuis `rootwarden_python` NE RESOUT PAS. Un deploiement configurerait
+rsyslog pour transferer vers un neant. C'est ce qui distingue ce module de `groups/`.
+
+**La fixture de configuration est un reglage de FLOTTE** : la ligne existante est sauvegardee, modifiee,
+puis restauree dans un `finally`, etat relu pour etre prouve. Le gabarit d'epreuve est borne par son
+nom — un `DELETE FROM graylog_templates` emporterait les quatre gabarits reels.
+
+**Les deux chemins de la garde sont exerces sans toucher a aucun droit** : `rw-test-super` (role 3)
+atteint la page parce que le role 3 contourne `checkPermission` ; `rw-test-admin` (role 2 sans
+`can_manage_graylog`) mesure le chemin « permission » ; `rw-test-user` le chemin « role ». 403 des deux
+cotes. La garde de la route porte `perm:can_manage_graylog` et NON `can_admin_portal` : les confondre
+elargirait l'acces a tous les administrateurs du portail.
+
+Contrastes mesures aux trois largeurs : onglet actif 16,4:1, pastille 5,2:1, encart 5,44:1.
+Tests : `tests/e2e/go-page-graylog-g1.mjs`, `tests/e2e/go-captures-graylog.mjs`.
+Parite i18n graylog : 67 cles FR = 67 EN. PARITE.md E-138, E-139, E-140.
+Inventaire prealable : `docs/migration/MODULE-GRAYLOG.md`.
 
 ### v1.37.76 — `adm/` D8 inventorie : la page est plus permissive que tout ce qu'elle offre
 
