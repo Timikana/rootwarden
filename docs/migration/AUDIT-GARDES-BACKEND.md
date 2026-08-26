@@ -194,3 +194,79 @@ Résoudre la machine **avant** l'`UPDATE` :
 
 C'est la leçon « un garde sans objet ne garde rien » prise par l'autre bout : contrôler l'objet
 **résolu**, pas le paramètre reçu. Un seul geste, deux défauts.
+
+---
+
+## 6. L'import CSV fournit la précondition que l'arbitrage de K4 suppose manquante
+
+Vérification demandée par la session qui porte `adm/`, pour faire passer son écart **E-130** de
+« établi par lecture » à « établi ». La numérotation E-130 lui appartient ; ce qui suit est la
+vérification, plus trois constats qu'elle n'avait pas demandés.
+
+### Ce n'est pas une question d'atteindre le formulaire
+
+`legacy/adm/admin_page.php:44` :
+
+```php
+require_once __DIR__ . '/includes/import_csv.php';
+```
+
+**Inconditionnel, en tête de fichier, avant toute logique d'onglet.** Le traitement de l'import tourne
+donc sur *chaque* requête qui passe les gardes du fichier — formulaire affiché ou non, onglet actif ou
+non. La visibilité du bloc `:229` n'est pas la garde : il n'y en a pas.
+
+Les gardes en question, `admin_page.php:40-41` : `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` puis
+`checkPermission('can_admin_portal')`. Un **rôle 2** porteur de la permission passe les deux. Le
+panneau `#panel-users` est `class="tab-panel active"`, sans condition PHP, et aucun `if` de rôle
+n'enveloppe le bloc d'import entre `:215` et `:240`.
+
+`import_csv.php` **n'a aucune garde propre** — ni `checkAuth`, ni `checkPermission`. Il dépend
+entièrement de qui l'inclut. Aujourd'hui il n'y a qu'un incluant ; le jour où une autre page l'inclut,
+elle hérite de l'exposition sans que rien ne le signale. Même forme que `server_actions.php` : une
+capacité dans un fichier dont la garde est ailleurs.
+
+### Troisième occurrence de « le commentaire affirme plus strict que le code »
+
+`admin_page.php:14-16` :
+
+```
+* Accès requis : rôle superadmin (role_name = 'superadmin', role_id = 3).
+*                Un premier filtre rapide est assuré par checkAuth([2, 3]) ;
+*                une seconde vérification stricte via la BDD n'autorise que le superadmin.
+```
+
+**Cette seconde vérification stricte n'existe pas.** La ligne 41 est
+`checkPermission('can_admin_portal')`, qui admet le rôle 2. C'est très probablement ainsi que le trou a
+survécu : quiconque a lu l'en-tête a cru le fichier réservé au rôle 3. Un commentaire qui promet une
+garde plus stricte que le code est pire qu'un commentaire absent — il fait passer la vérification pour
+déjà faite.
+
+### État vivant : personne n'occupe la position, et elle est à une permission près
+
+| mesure du 2026-08-26 | résultat |
+|---|---|
+| comptes de rôle 2 | `rw-test-admin` (id 15) — `can_admin_portal` = **0**, `sudo` = 0 |
+| comptes avec `sudo = 1` | `superadmin` (id 1, rôle 3) **uniquement** |
+
+Aucun compte n'occupe donc la position aujourd'hui. **Accorder `can_admin_portal` à un compte de
+rôle 2 l'ouvre** — un geste d'administration ordinaire, pas une manipulation en base.
+
+### ⚠ CE QUI CHANGE LE NIVEAU DE K4
+
+Le plan justifie le niveau de risque de **K4** ainsi : *« aucun compte actif de rôle 1 ne porte
+`users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable »*.
+
+**L'import CSV EST cet `UPDATE`.** Il lit `$data['sudo']` et l'écrit (`import_csv.php:162,166`) **sans
+aucun contrôle de rôle** — sa garde hiérarchique (`:155`) est correcte mais ne porte que sur
+`role_id`. Et il est atteignable au **rôle 2**, pas au rôle 3.
+
+La précondition que l'arbitrage de K4 suppose manquante est donc fournie par un chemin que cet
+arbitrage n'examine pas, et **depuis un niveau de privilège inférieur à celui qu'il suppose**. Les deux
+écarts se lisaient comme indépendants : ils sont **chaînés**.
+
+Le geste dédié, `legacy/adm/api/toggle_sudo.php:23`, porte `checkAuth([ROLE_SUPERADMIN])`. L'intention
+du produit est donc claire — `users.sudo` est une décision de superadministrateur — et l'import la
+contourne.
+
+**Conséquence pour l'exploitant : l'arbitrage `NOPASSWD: ALL` de K4 ne peut plus être décidé sur la
+seule lecture de `users.sudo`.** Il faut d'abord décider qui peut écrire ce drapeau.
