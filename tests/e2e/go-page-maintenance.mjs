@@ -562,15 +562,38 @@ try {
 
             return;
         }
-        const ditActive = MOT_ACTIF.test(lu.etat);
-        const ditFermee = MOT_FERME.test(lu.etat);
-        constate('cellule d\'etat de la ligne d\'epreuve', `« ${lu.etat} »`);
+        /*
+         * ON LIT LA LIGNE ENTIERE, PAS UNE CELLULE PAR SON INDEX.
+         *
+         * La version precedente lisait `cellules[4]`, l'etat etant la cinquieme
+         * colonne — verifie sur les deux cibles a l'epoque. Mais un index EST une
+         * hypothese de structure : si l'ordre des colonnes change d'un cote, la
+         * suite lit silencieusement la mauvaise cellule et conclut de travers.
+         *
+         * Leçon payee le 2026-08-26 par la seconde session sur `adm/` : une
+         * extraction qui suppose une structure suppose la structure d'UNE des
+         * deux cibles. La son soustraction de texte marchait sur le legacy et
+         * vidait l'aide sur le portage — le PASS ne mesurait rien.
+         *
+         * Le texte de la LIGNE est independant du balisage, et il reste borne a
+         * la bonne fenetre. Verifie qu'aucun autre libelle de la ligne ne
+         * collisionne : les etats sont « Ouverte maintenant », « Fermée
+         * maintenant » et « Désactivée » ; les boutons « Désactiver » et
+         * « Supprimer » ne contiennent ni `ouvert` ni `ferm`. Et si un jour une
+         * colonne en contenait, les deux motifs seraient vrais a la fois et
+         * l'assertion echouerait BRUYAMMENT — ce qu'un mauvais index ne fait pas.
+         */
+        const ditActive = MOT_ACTIF.test(lu.ligne);
+        const ditFermee = MOT_FERME.test(lu.ligne);
+        constate('ligne d\'epreuve', `« ${lu.ligne.slice(0, 110)} »`);
+        constate('cellule d\'etat (releve, non assertee)', `« ${lu.etat} »`);
 
         /* Les deux cibles doivent au moins DIRE quelque chose de lisible, et un
          * SEUL des deux etats : « ouverte » et « fermee » a la fois signalerait
          * une cellule mal lue plutot qu'un etat. */
         verifie('la ligne annonce un etat lisible, et un seul',
-            ditActive !== ditFermee, `« ${lu.etat} » — actif=${ditActive} ferme=${ditFermee}`);
+            ditActive !== ditFermee,
+            `actif=${ditActive} ferme=${ditFermee} — ligne « ${lu.ligne.slice(0, 90)} »`);
 
         /*
          * ET VOICI L'ECART. Quand les deux horloges divergent, le legacy annonce
