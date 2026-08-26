@@ -28,6 +28,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
+import { litEnBase, compteEnBase } from './lib-base.mjs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
@@ -157,6 +158,41 @@ function renseignee(valeur) {
     return v !== '' && !/^N\/A$/i.test(v) && !/non v[ée]rifi|not check/i.test(v);
 }
 
+/*
+ * ══ LA FIXTURE D'ETIQUETTE, ET POURQUOI ELLE EST DEVENUE NECESSAIRE ═════════
+ *
+ * Cette suite lisait le vocabulaire d'etiquettes DU PARC et n'exercait le filtre
+ * que s'il en trouvait un. Le fichier le disait et le CONSTATAIT au lieu
+ * d'echouer — honnete, mais sa reference encodait alors un etat du banc.
+ *
+ * Le 2026-08-26 l'etiquette `banc-essai`, posee A LA MAIN des mois plus tot et
+ * maintenue par aucune suite, a disparu. TROIS suites en dependaient sans le
+ * savoir : `go-page-ssh-parc` a echoue en accusant la page, `ssh-preflight` a
+ * perdu deux assertions, et celle-ci en a perdu UNE en silence — 18 -> 17, zero
+ * FAIL. Un ecart a zero FAIL est justement le motif « une assertion a cesse de
+ * s'executer », et il est passe inapercu un rejeu entier.
+ *
+ * La suite pose donc son etiquette elle-meme et la reprend dans un `finally` : le
+ * filtre est mesure TOUJOURS, y compris sur un banc remis a zero.
+ *
+ * Bornee par son NOM — un `DELETE FROM machine_tags` emporterait les etiquettes
+ * reelles. Posee sur la machine 2 : nommer une machine dans une table n'est pas
+ * la joindre, aucune requete ne part vers elle.
+ */
+const ETIQUETTE_EPREUVE = 'epreuve-u1';
+const MACHINE_EPREUVE = 2;
+
+const compteEtiquetteEpreuve = () => compteEnBase(
+    `SELECT COUNT(*) FROM rootwarden.machine_tags WHERE tag = '${ETIQUETTE_EPREUVE}'`);
+const compteEtiquettes = () => compteEnBase('SELECT COUNT(*) FROM rootwarden.machine_tags');
+const retireEtiquetteEpreuve = () => litEnBase(
+    `DELETE FROM rootwarden.machine_tags WHERE tag = '${ETIQUETTE_EPREUVE}'`);
+
+const etiquettesAuDepart = compteEtiquettes();
+retireEtiquetteEpreuve();
+litEnBase('INSERT INTO rootwarden.machine_tags (machine_id, tag) VALUES '
+    + `(${MACHINE_EPREUVE}, '${ETIQUETTE_EPREUVE}')`);
+
 try {
     /*
      * MODULE ARCHIVE ? Cote legacy, `update/` a ete porte en sept sous-lots puis
@@ -184,6 +220,30 @@ try {
             const { ctx, page } = await connecte('rw-test-admin');
             await verifieMenuLegacy(page, '/mises-a-jour', verifie);
             await ctx.close();
+            /*
+             * ⚠ REPRENDRE LA FIXTURE ICI, PARCE QUE `process.exit()` NE JOUE PAS
+             * LE `finally`.
+             *
+             * Cette branche sort par `process.exit()` quelques lignes plus bas.
+             * Une fixture reprise seulement dans le `finally` FUIRAIT donc a
+             * chaque passage sur le versant legacy — et une etiquette restee au
+             * parc fausse ensuite toutes les suites qui en comptent, dont
+             * `go-adm-etiquettes-notes` et `go-page-ssh-parc`.
+             *
+             * Mesure du 2026-08-26 : la fuite a eu lieu pour de vrai, `epreuve-u1`
+             * s'est retrouvee en base apres une execution interrompue. Le `DELETE`
+             * est idempotent, donc le repeter ici est sans risque.
+             *
+             * C'est la regle du §8 sur l'archivage prise EN SENS INVERSE : le
+             * constat se greffe en tete du `try` parce que `process.exit()` ignore
+             * le `finally` ; pour la meme raison, une fixture posee avant le `try`
+             * a besoin d'une reprise avant CHAQUE sortie.
+             */
+            try { retireEtiquetteEpreuve(); } catch { /* rien */ }
+            const resteArchive = compteEtiquetteEpreuve();
+            lignes.push(`${resteArchive === 0 ? 'PASS' : 'FAIL'}`
+                + `  aucune etiquette d'epreuve ne subsiste  — ${resteArchive}`);
+            if (resteArchive !== 0) echecs++;
             console.log(lignes.join('\n'));
             console.log(`\ncible=${CIBLE} : ${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
             await navigateur.close();
@@ -289,8 +349,19 @@ try {
     verifie('le filtre par etiquette est present', depart.filtres.etiquette);
     constate('etiquettes proposees', depart.etiquettes.join(', ') || 'aucune');
 
-    if (depart.etiquettes.length) {
-        const etiquette = depart.etiquettes[0];
+    /*
+     * L'ETIQUETTE VISEE EST CELLE DE LA FIXTURE, pas « la premiere du parc ».
+     * Prendre `depart.etiquettes[0]` faisait dependre l'assertion de l'ordre des
+     * options et du contenu du banc : une etiquette reelle posee sur plusieurs
+     * machines aurait rendu le filtre non discriminant, et l'assertion aurait
+     * accuse la page pour un etat des donnees.
+     */
+    verifie('le filtre propose l\'etiquette de la fixture',
+            depart.etiquettes.includes(ETIQUETTE_EPREUVE),
+            depart.etiquettes.join(', ') || 'aucune');
+
+    if (depart.etiquettes.includes(ETIQUETTE_EPREUVE)) {
+        const etiquette = ETIQUETTE_EPREUVE;
 
         /*
          * REMETTRE LES AUTRES FILTRES A ZERO D'ABORD.
@@ -486,6 +557,21 @@ try {
 } catch (e) {
     lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
     echecs++;
+} finally {
+    /*
+     * NETTOYAGE BORNE PAR LE NOM, PUIS RELECTURE POUR PREUVE. Une etiquette qui
+     * survivrait changerait le vocabulaire du parc pour les suites suivantes — et
+     * c'est exactement le mecanisme qui a fait tomber trois suites ce jour-la.
+     */
+    try { retireEtiquetteEpreuve(); } catch { /* rien */ }
+    const reste = compteEtiquetteEpreuve();
+    lignes.push(`${reste === 0 ? 'PASS' : 'FAIL'}  aucune etiquette d'epreuve ne subsiste  — ${reste}`);
+    if (reste !== 0) echecs++;
+    const total = compteEtiquettes();
+    lignes.push(`${total === etiquettesAuDepart ? 'PASS' : 'FAIL'}`
+        + `  le vocabulaire d'etiquettes est celui de l'entree`
+        + `  — ${etiquettesAuDepart} a l'entree, ${total} a la sortie`);
+    if (total !== etiquettesAuDepart) echecs++;
 }
 
 console.log(lignes.join('\n'));
