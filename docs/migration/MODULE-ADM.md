@@ -337,7 +337,7 @@ dernier** — et chaque rang porte son motif.
 | **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
 | **D7** ✅ | **Clés d'API** — *PORTÉ `v1.37.75`, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. Les trois écarts (E-135, E-136, E-137) sont **fermés au portage** : liste de portées fermée et ancrée, et reconnaissance de la clé d'environnement par son **hachage** |
 | **D8** ⏳ | **Comptes distants** — *INVENTORIÉ `v1.37.76`, voir §5.0terdecies* | `server_users.php` | 387 | **Première écriture distante d'`adm/`.** Sept routes, dont `/delete_remote_user` (`userdel` irréversible). **La page admet le rôle 1 ; six de ses sept routes exigent le rôle 2** — et elle ne distingue aucun rôle dans son rendu |
-| **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
+| **D9** ⏳ | **Politiques sudo et SFTP** — *INVENTORIÉ `v1.37.78`, voir §5.0quaterdecies* | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. **L'aide du préréglage par défaut affirme l'inverse de ce que son propre module documente** |
 | **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
 
 Les six entrées de menu se rattachent ainsi : `admin_page.php` est le porteur de D3, D5 et D6a/D6b (trois
@@ -1012,6 +1012,73 @@ une attribution de permission d'être atteignable.
 - **`/delete_remote_user` ne sera pas déclenché par une suite.** `userdel` distant est irréversible.
   La convention éprouvée est l'interception avec avortement : cliquer le vrai bouton, mesurer la
   requête émise, et n'en laisser aboutir aucune.
+
+### 5.0quaterdecies D9 — INVENTORIÉ le 2026-08-26 (`v1.37.78`), pas encore caractérisé
+
+Inventaire mené **en lecture seule**, le banc étant prêté à la seconde session.
+
+#### Ce que le sous-lot contient réellement
+
+| fichier | lignes | rôle |
+|---|---|---|
+| `server_user_sudo.php` | 167 | la page sudo — `checkAuth([ROLE_SUPERADMIN])`, **aucune permission** |
+| `server_user_sftp.php` | 148 | la page SFTP — même garde |
+| `js/server_user_policy.js` | 128 | les gestes, communs aux deux pages |
+| `server_user_policies.php` | 16 | **un aiguillage déprécié** (v1.36.0) vers la page sudo |
+
+Sept routes backend, toutes `@require_role(3)` : `deploy`, `audit`, `remove` pour sudo et pour SFTP,
+plus `/policy/rollback`.
+
+#### LE DÉFAUT : L'AIDE DU PRÉRÉGLAGE PAR DÉFAUT DIT L'INVERSE DE SON PROPRE MODULE
+
+`backend/sudo_manager.py:80-84`, dans la fonction qui produit la règle :
+
+> **AVERTISSEMENT : ce preset est ÉQUIVALENT ROOT.** `apt install/upgrade` exécute des scripts de
+> mainteneur (`.deb postinst`) en root → un utilisateur avec ce preset peut obtenir un shell root via
+> un paquet construit. **Il n'existe pas de moyen sûr de « limiter à apt » sans donner root.** À
+> n'accorder qu'à des opérateurs déjà de confiance.
+
+`legacy/lang/fr` et `legacy/lang/en`, dans l'aide que la personne lit **au moment de choisir** :
+
+> « L'utilisateur peut installer et mettre à jour des logiciels (commande « apt »). **Il ne peut pas
+> toucher au reste du système.** »
+>
+> « The user can install and update software (the "apt" command). **They cannot touch the rest of the
+> system.** »
+
+**Et `apt_only` est le préréglage par DÉFAUT** (`server_user_sudo.php:32`).
+
+C'est le motif « l'en-tête qui ment » sous sa forme la plus coûteuse. Les cinq occurrences relevées
+jusqu'ici étaient des **commentaires de code** : elles trompaient une relecture. Celle-ci est une
+**phrase d'interface**, dans les deux langues, sur l'option retenue par défaut — elle trompe la
+personne qui décide, au moment où elle décide. Le code, lui, dit vrai ; c'est l'écran qui ment.
+
+Pour comparaison, l'aide de `all_nopasswd` est **honnête** : « administrateur TOTAL (root) … sans même
+taper de mot de passe. À réserver… ». La franchise existe donc dans le même fichier, à deux lignes.
+
+#### Ce que le portage devra faire, et ce n'est pas une correction de traduction
+
+Réécrire la phrase ne suffit pas : le classement des préréglages du plus au moins puissant est faux,
+puisque `apt_only` est **au même niveau** que `all_nopasswd` quant au résultat atteignable. La page
+doit soit dire que les deux sont équivalents root, soit cesser de proposer `apt_only` comme défaut
+sûr. C'est une décision, pas un libellé — elle est portée à §7.
+
+#### Ce que la mesure a DÉDOUANÉ
+
+`sudo_manager` est **bien construit** par ailleurs, et il faut le dire : `visudo -cf` valide le fichier
+temporaire **avant** tout déplacement, les chemins sont bornés à `/etc/sudoers.d/rootwarden-*`, et un
+échec de validation lève plutôt que d'écrire. Le geste distant est sûr ; c'est sa présentation qui ne
+l'est pas.
+
+`server_user_policies.php` n'a **aucune garde** — et c'est correct : seize lignes qui redirigent, avec
+un `(int)` sur les deux paramètres, exactement comme la page cible les lit. Rien à corriger.
+
+#### Un lien contextuel perdu par le portage de D5
+
+`manage_access.php:139,210` pointe vers ces pages **avec `?server=X&user=Y`**. `/permissions`, qui
+porte ce fichier depuis D5, ne porte aucun de ces liens — mesuré, **0**. Les pages restent
+atteignables par leurs deux entrées de menu, mais sans leur contexte : il faut re-choisir la machine
+et le compte. À reprendre au portage de D9.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
