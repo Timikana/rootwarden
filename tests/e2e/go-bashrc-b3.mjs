@@ -324,11 +324,22 @@ try {
         // « attention » ne permet pas de juger ; celui-ci doit citer le motif.
         verifie('l\'avertissement nomme le motif reconnu',
             /curl/i.test(alerte.texte), alerte.texte.slice(0, 90));
-        // ET IL NE SE PRESENTE PAS COMME UNE VALIDATION. Le backend ne verifie
-        // que la syntaxe : un ecran qui parlerait de « contenu valide » ou
-        // « verifie » promettrait une barriere qui n'existe pas.
-        verifiePortage('l\'avertissement ne se presente pas comme une validation',
-            ! /valid|verifi|conforme|autoris/i.test(alerte.texte), alerte.texte.slice(0, 90));
+        // ET IL ENONCE SA PORTEE — c'est-a-dire CE QU'IL NE VERIFIE PAS.
+        //
+        // Premiere redaction : « le texte ne contient pas valid|verifi|conforme ».
+        // Elle a echoue sur le portage, dont l'encart dit « Elle NE verifie NI ce
+        // que fait le reste du fichier… » — un DESAVEU de validation, que le
+        // motif attrapait comme une revendication. **Un test par mot-cle ne
+        // distingue pas une affirmation de sa negation.**
+        //
+        // La propriete utile n'est pas l'absence d'un mot : c'est la presence
+        // d'une limite. Le backend ne controle que la syntaxe ; un lecteur qui
+        // ignore ce que la reconnaissance ne couvre pas lui pretera une portee
+        // qu'elle n'a pas.
+        verifiePortage('l\'avertissement enonce ce qu\'il ne verifie PAS',
+            /\bne (verifie|controle|couvre|garantit)\b|\bdoes not (check|cover|guarantee)\b/i
+                .test(alerte.texte),
+            `aucune limite enoncee — « ${alerte.texte.slice(0, 80)} »`);
     });
 
     // ══ 3. ENREGISTRER ECRIT VRAIMENT, ET SEULEMENT EN BASE ═══════════════

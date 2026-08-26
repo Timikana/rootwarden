@@ -1997,3 +1997,23 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-diff__ligne--ajout   { background: color-mix(in srgb, var(--rw-succes) 14%, transparent); }
 .rw-diff__ligne--retrait { background: color-mix(in srgb, var(--rw-danger) 12%, transparent); }
 .rw-diff__ligne--entete  { color: var(--rw-texte-doux); font-weight: 650; }
+
+/*
+ * Une zone de saisie qui contient du CODE. Posee au sous-lot B3 de `bashrc/`.
+ *
+ * `.rw-saisie` herite de la police du document — proportionnelle. Le gabarit
+ * `.bashrc` est du shell, et il s'appuie sur des bannieres `# =====` alignees :
+ * en proportionnel, l'alignement se perd et l'indentation cesse de se lire.
+ * Vu a l'image.
+ *
+ * `tab-size: 4` pour que les tabulations du fichier ne s'affichent pas comme
+ * huit colonnes, ce qui deplacerait tout ce qui suit.
+ */
+.rw-saisie--code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+}

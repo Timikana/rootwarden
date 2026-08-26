@@ -49,7 +49,61 @@ use Illuminate\Support\Facades\DB;
 class Bashrc
 {
     /**
-     * Les machines proposables comme cibles.
+     * Les motifs que l'editeur de gabarit RECONNAIT — et rien de plus.
+     *
+     * ══ CE QUE CECI EST, ET CE QUE CE N'EST PAS ══════════════════════════
+     *
+     * **Ce n'est pas un controle.** Le backend ne valide que la SYNTAXE du
+     * gabarit (`bash -n`) et sa TAILLE (512 Ko) : une requete forgee vers
+     * `POST /bashrc/template` ne voit aucun de ces motifs. Et ce n'est pas une
+     * faille — quiconque atteint cette route detient deja `can_manage_bashrc`,
+     * c'est-a-dire l'autorisation explicite d'ecrire le fichier qui s'execute a
+     * chaque connexion sur le parc.
+     *
+     * C'est un **garde-fou pour la personne qui edite** : huit formes connues,
+     * reconnues au vol, nommees. Rien d'autre.
+     *
+     * L'ecran ne doit donc jamais parler de « contenu valide » ou « verifie » :
+     * ce serait promettre une barriere qui n'existe pas. `go-bashrc-b3.mjs`
+     * l'asserte — et le legacy, mesure, le fait deja correctement.
+     *
+     * ══ POURQUOI ICI ET PAS DANS LE JS ═══════════════════════════════════
+     *
+     * Une seule source pour le portage. Le legacy garde la sienne dans
+     * `js/bashrc.js` : deux portails, deux listes, c'est inevitable pendant la
+     * migration — mais chaque portail n'en a qu'une.
+     */
+    public const MOTIFS_DANGEREUX = [
+        'rm -rf /'              => '\\brm\\s+-[rRf]+\\s+/(\\s|$)',
+        'dd vers un disque'     => '\\bdd\\s+if=.*of=/dev/[sh]d[a-z]',
+        'bombe a fourche'       => ':\\(\\)\\s*\\{[^}]*\\|\\s*:\\s*&[^}]*\\};\\s*:',
+        'mkfs'                  => '\\bmkfs\\.\\w+\\s+/dev/',
+        // PAS de `\b` devant le `>`. Le legacy en met un — et `\b` exige un
+        // caractere de MOT juste avant. Dans `cat x > /dev/sda`, la forme
+        // normale, il y a un espace : pas de frontiere, donc pas de detection.
+        // Seul `x> /dev/sda`, colle, declenche. **Un des huit motifs du legacy
+        // est ainsi largement inerte** (E-148).
+        'redirection sur disque' => '>\\s*/dev/[sh]d[a-z]',
+        'chmod 777 /'           => '\\bchmod\\s+-R\\s+0*777\\s+/',
+        'curl | sh'             => '\\bcurl[^|]*\\|\\s*(sudo\\s+)?(ba)?sh\\b',
+        'wget | sh'             => '\\bwget[^|]*\\|\\s*(sudo\\s+)?(ba)?sh\\b',
+    ];
+
+    /**
+     * Le gabarit en vigueur, lu EN BASE.
+     *
+     * Repli sur le fichier du backend si la table est vide — c'est ce que fait
+     * `_load_template` cote Python, et la table est amorcee a partir de lui.
+     * Rendre une chaine vide ferait croire a un gabarit vide, ce qui est faux.
+     */
+    public function gabarit(string $nom = 'default'): ?string
+    {
+        $lignes = DB::select('SELECT content FROM bashrc_templates WHERE name = ?', [$nom]);
+
+        return $lignes[0]->content ?? null;
+    }
+
+    /** Les machines proposables comme cibles.
      *
      * `criticality` est retenue avec le reste : c'est elle qui permet a l'ecran
      * de DISTINGUER la production au lieu de la noyer. Le legacy la lit aussi —

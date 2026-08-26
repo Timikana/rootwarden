@@ -284,4 +284,135 @@
     }
 
     chargeComptes();
+
+    /* ═══ B3 : L'ONGLET GABARIT ═══════════════════════════════════════════ */
+
+    var editeur = document.querySelector('[data-rw="bashrc-gabarit-editeur"]');
+    var metaLignes = document.querySelector('[data-rw="bashrc-gabarit-lignes"]');
+    var metaOctets = document.querySelector('[data-rw="bashrc-gabarit-octets"]');
+    var metaSha = document.querySelector('[data-rw="bashrc-gabarit-sha"]');
+    var encartDanger = document.querySelector('[data-rw="bashrc-gabarit-danger"]');
+    var listeDanger = document.querySelector('[data-rw="bashrc-gabarit-danger-liste"]');
+    var etatGabarit = document.querySelector('[data-rw="bashrc-gabarit-etat"]');
+    var enregistrer = document.querySelector('[data-rw="bashrc-gabarit-enregistrer"]');
+    var annuler = document.querySelector('[data-rw="bashrc-gabarit-annuler"]');
+    if (! editeur) { return; }
+
+    var gabaritOrigine = null;
+
+    /**
+     * Les formes reconnues, compilees depuis les motifs du SERVICE.
+     *
+     * Jamais recopiees ici : `Bashrc::MOTIFS_DANGEREUX` est la seule source du
+     * portage. Un motif illisible est ignore plutot que de faire tomber tout le
+     * scan — mais il n'est alors reconnu par rien, ce qui vaut mieux qu'une page
+     * qui ne charge pas.
+     */
+    var formes = [];
+    Object.keys(textes.motifs || {}).forEach(function (nom) {
+        try { formes.push({ nom: nom, re: new RegExp(textes.motifs[nom]) }); } catch (e) { /* ignore */ }
+    });
+
+    function reconnait(contenu) {
+        return formes.filter(function (f) { return f.re.test(contenu); }).map(function (f) { return f.nom; });
+    }
+
+    function majMeta(contenu) {
+        if (metaLignes) { metaLignes.textContent = String(contenu.split('\n').length); }
+        if (metaOctets) {
+            // En OCTETS, comme le stockage. `length` compte des caracteres, et
+            // le gabarit fait 22 412 octets pour 17 814 caracteres : afficher
+            // l'un sous le nom de l'autre ferait croire a un contenu tronque.
+            metaOctets.textContent = String(new TextEncoder().encode(contenu).length);
+        }
+    }
+
+    function majDanger(contenu) {
+        var trouves = reconnait(contenu);
+        if (! encartDanger || ! listeDanger) { return trouves; }
+        if (trouves.length === 0) { encartDanger.hidden = true; return trouves; }
+        // NOMMER CE QUI EST RECONNU. « Attention » sans le motif ne permet pas
+        // de juger : c'est la difference entre un avertissement et une alarme.
+        listeDanger.textContent = ' ' + (textes.d_reconnu || '') + ' ' + trouves.join(', ') + '. ';
+        encartDanger.hidden = false;
+
+        return trouves;
+    }
+
+    function majModifie() {
+        var change = (gabaritOrigine !== null && editeur.value !== gabaritOrigine);
+        if (enregistrer) { enregistrer.disabled = ! change; }
+        if (annuler) { annuler.disabled = ! change; }
+        if (etatGabarit) { etatGabarit.textContent = change ? (textes.g_modifie || '') : ''; }
+        majMeta(editeur.value);
+        majDanger(editeur.value);
+    }
+
+    function chargeGabarit() {
+        etatGabarit.textContent = textes.g_chargement || '';
+        lit('/bashrc/template').then(function (d) {
+            if (! d || typeof d.content !== 'string') {
+                etatGabarit.textContent = textes.g_echec || '';
+
+                return;
+            }
+            gabaritOrigine = d.content;
+            editeur.value = d.content;
+            if (metaSha && d.sha8) { metaSha.textContent = d.sha8; }
+            etatGabarit.textContent = '';
+            majMeta(d.content);
+            majDanger(d.content);
+            majModifie();
+        });
+    }
+
+    editeur.addEventListener('input', majModifie);
+    if (annuler) {
+        annuler.addEventListener('click', function () {
+            if (gabaritOrigine === null) { return; }
+            editeur.value = gabaritOrigine;
+            majModifie();
+        });
+    }
+
+    if (enregistrer) {
+        enregistrer.addEventListener('click', function () {
+            var trouves = majDanger(editeur.value);
+            // DEUX CONFIRMATIONS DISTINCTES : celle qui NOMME ce qui a ete
+            // reconnu, et celle qui rappelle simplement la portee du geste. Une
+            // seule phrase pour les deux cas dirait moins dans le cas grave.
+            var question = trouves.length
+                ? (textes.d_confirmer || '') + '\n\n• ' + trouves.join('\n• ')
+                : (textes.g_confirmer || '');
+            if (! window.confirm(question)) { return; }
+
+            enregistrer.disabled = true;
+            etatGabarit.textContent = textes.g_encours || '';
+            lit('/bashrc/template', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: editeur.value }),
+            }).then(function (d) {
+                if (! d) {
+                    etatGabarit.textContent = textes.g_erreur || '';
+                    enregistrer.disabled = false;
+
+                    return;
+                }
+                gabaritOrigine = editeur.value;
+                if (metaSha && d.sha8) { metaSha.textContent = d.sha8; }
+                etatGabarit.textContent = textes.g_enregistre || '';
+                majModifie();
+            });
+        });
+    }
+
+    // Le gabarit se charge a l'ouverture de SON onglet, pas au chargement de la
+    // page : il fait 22 Ko et n'interesse pas qui vient deployer.
+    var ongletGabarit = document.querySelector('[data-rw="bashrc-onglet-gabarit"]');
+    if (ongletGabarit) {
+        ongletGabarit.addEventListener('click', function () {
+            if (gabaritOrigine === null) { chargeGabarit(); }
+        });
+    }
 }());

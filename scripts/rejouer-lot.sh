@@ -303,6 +303,12 @@ declare -A REF_LARAVEL=(
   # « la case du compte « root » est atteignable » — elle existe des deux cotes,
   # mais le legacy ne rend pas la ligne de la meme facon.
   [go-bashrc-b2]=15
+  # `bashrc/` sous-lot B3 : l'onglet Gabarit, porte.
+  # 19 sur le portage contre 16 sur le legacy. Trois assertions d'ecart, toutes
+  # sur ce que le legacy ne fait pas : l'empreinte affichee correspond au
+  # contenu stocke, l'avertissement ENONCE CE QU'IL NE VERIFIE PAS, et la page
+  # ne porte aucune erreur JavaScript.
+  [go-bashrc-b3]=19
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et

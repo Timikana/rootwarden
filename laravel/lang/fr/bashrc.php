@@ -75,6 +75,25 @@ return [
     'perso' => 'personnalise',
     'perso_aide' => 'Ce compte a des blocs marques « USER CUSTOM » dans son fichier. En mode « fusionner », ce sont les SEULS qui seront conserves ; tout le reste sera remplace.',
 
+    'gabarit_titre' => 'Le gabarit deploye',
+    'gabarit_intro' => 'Ce fichier est celui que toutes les machines recevront au prochain deploiement. Il s\'execute a chaque connexion des comptes concernes.',
+    'gabarit_lignes' => 'Lignes',
+    'gabarit_octets' => 'Octets',
+    'gabarit_sha' => 'Empreinte',
+    'gabarit_chargement' => 'Lecture du gabarit…',
+    'gabarit_echec' => 'Le gabarit n\'a pas pu etre lu.',
+    'gabarit_modifie' => 'Modifications non enregistrees.',
+    'gabarit_enregistrer' => 'Enregistrer',
+    'gabarit_annuler' => 'Annuler les modifications',
+    'gabarit_enregistre' => 'Gabarit enregistre.',
+    'gabarit_erreur' => 'L\'enregistrement a echoue.',
+    'gabarit_encours' => 'Enregistrement…',
+    'gabarit_confirmer' => 'Enregistrer ce gabarit ? Toutes les machines le recevront au prochain deploiement.',
+    'danger_titre' => 'Formes reconnues comme destructrices',
+    'danger_reconnu' => 'Reconnu :',
+    'danger_portee' => 'Cette reconnaissance porte sur huit formes connues. Elle ne verifie ni ce que fait le reste du fichier, ni ce que fera celui-ci une fois deploye — seule sa syntaxe sera controlee a l\'enregistrement.',
+    'danger_confirmer' => 'Ce gabarit contient des formes reconnues comme destructrices. L\'enregistrer quand meme ?',
+
     'non_porte_titre' => 'Les gestes de deploiement ne sont pas encore portes',
     'non_porte_texte' => 'Choisir les comptes, previsualiser le fichier et le deployer se font pour '
                          . 'l\'instant depuis l\'ancien portail. Cette page porte l\'inventaire et '

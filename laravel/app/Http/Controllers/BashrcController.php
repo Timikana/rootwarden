@@ -79,6 +79,20 @@ class BashrcController extends Controller
             'apercu_chargement' => __('bashrc.apercu_chargement'),
             'apercu_echec'      => __('bashrc.apercu_echec'),
             'taille'            => __('bashrc.apercu_taille'),
+
+            // B3 — l'onglet Gabarit.
+            'g_chargement'  => __('bashrc.gabarit_chargement'),
+            'g_echec'       => __('bashrc.gabarit_echec'),
+            'g_modifie'     => __('bashrc.gabarit_modifie'),
+            'g_enregistre'  => __('bashrc.gabarit_enregistre'),
+            'g_erreur'      => __('bashrc.gabarit_erreur'),
+            'g_encours'     => __('bashrc.gabarit_encours'),
+            'g_confirmer'   => __('bashrc.gabarit_confirmer'),
+            'd_reconnu'     => __('bashrc.danger_reconnu'),
+            'd_confirmer'   => __('bashrc.danger_confirmer'),
+            // Les MOTIFS partent avec les libelles : une seule source cote
+            // portage (`Bashrc::MOTIFS_DANGEREUX`), jamais recopies dans le JS.
+            'motifs'        => Bashrc::MOTIFS_DANGEREUX,
         ];
 
         return view('bashrc', [
