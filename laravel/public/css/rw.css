@@ -1966,3 +1966,34 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-ligne-sensible > td:first-child {
     box-shadow: inset 3px 0 0 var(--rw-danger);
 }
+
+/*
+ * Un DIFF unifie. Pose au sous-lot B2 de `bashrc/`.
+ *
+ * `.rw-code--fichier` avait ete detourne pour ca : il porte `white-space:
+ * nowrap` parce qu'il est fait pour UN NOM DE FICHIER. Le diff s'affichait donc
+ * sur une seule ligne — or c'est sa structure ligne a ligne qui fait toute son
+ * utilite. Un diff a plat ne se lit pas, il se devine.
+ *
+ * Les lignes ajoutees et retirees se distinguent par une COULEUR *et* par leur
+ * signe `+`/`-`, qui vient du format lui-meme : la couleur seule ne dit rien a
+ * qui ne la distingue pas.
+ */
+.rw-diff {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    background: var(--rw-surface-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 420px;
+    overflow-y: auto;
+}
+.rw-diff__ligne { display: block; }
+.rw-diff__ligne--ajout   { background: color-mix(in srgb, var(--rw-succes) 14%, transparent); }
+.rw-diff__ligne--retrait { background: color-mix(in srgb, var(--rw-danger) 12%, transparent); }
+.rw-diff__ligne--entete  { color: var(--rw-texte-doux); font-weight: 650; }

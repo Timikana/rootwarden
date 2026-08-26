@@ -298,6 +298,11 @@ declare -A REF_LARAVEL=(
   # 403, role 3 SANS la permission -> 200. La precondition (aucun compte
   # d'epreuve ne detient `can_manage_bashrc`) est verifiee AVANT les trois.
   [go-bashrc-b1]=18
+  # `bashrc/` sous-lot B2 : les deux lectures distantes, portees.
+  # 15 sur le portage contre 14 sur le legacy. L'ecart d'UNE assertion est
+  # « la case du compte « root » est atteignable » — elle existe des deux cotes,
+  # mais le legacy ne rend pas la ligne de la meme facon.
+  [go-bashrc-b2]=15
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et

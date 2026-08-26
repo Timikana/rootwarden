@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.87** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.88** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,39 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.88 — `bashrc/` B2 porte : les lectures distantes, et le signal que le legacy jetait
+
+`/bashrc`, **legacy 14 PASS / portage 15 PASS, 0 FAIL**. Les deux routes de lecture passent par la
+passerelle, joignent reellement `Test-Server-Debian` et n'ecrivent rien.
+
+#### Ce que le portage montre et que le legacy ne montre pas
+- **`has_custom`, par compte, AVANT le choix.** La route `/bashrc/users` rend ce champ pour chaque
+  compte ; le legacy le jette dans sa liste. C'est pourtant le seul signal qui dit si « fusionner »
+  preservera quoi que ce soit — et il arrive au moment ou l'on choisit, pas apres. Voir
+  `MODULE-BASHRC.md` §4.5 : sans blocs marques `USER CUSTOM`, « fusionner » equivaut a « ecraser ».
+- **`root` se signale** — badge « administrateur » et ligne teintee. Son `.bashrc` s'execute a chaque
+  connexion administrateur ; le legacy l'affiche comme les autres.
+- **« Tout cocher » annonce qu'il retient `root`.** Le comportement est porte a l'identique — c'est
+  un changement de comportement, il appartient a l'exploitant — mais il ne se fait plus en silence.
+
+#### Trois defauts de rendu, tous vus A L'IMAGE
+- **Le diff s'affichait sur UNE SEULE LIGNE.** `.rw-code--fichier` porte `white-space: nowrap` parce
+  qu'il est fait pour UN NOM DE FICHIER : la classe avait ete detournee. Un diff a plat ne se lit
+  pas, il se devine. Nouvelle classe `.rw-diff`, rendu ligne a ligne, ajouts et retraits distingues
+  par une couleur **et** par leur signe `+`/`-` — la couleur seule ne dit rien a qui ne la distingue
+  pas. Meme travers que le `.rw-inline` de D9a : **une classe existante employee pour ce qu'elle ne
+  fait pas.**
+- **Le badge de `root` repetait son nom** : la ligne affichait « root root ». Il nomme desormais le
+  ROLE.
+- **Une cle i18n reutilisee pour deux sens.** `plusieurs` valait « :nb machines selectionnees » pour
+  le compteur et « plusieurs machines sont cochees » pour les comptes : le second aurait ecrase le
+  premier a l'ecran. Renommee `plusieurs_cochees`.
+
+#### Un choix de perimetre, ecrit dans le code
+L'apercu envoie `mode: 'merge'` en dur — le defaut du legacy. Le selecteur de mode appartient au
+DEPLOIEMENT (B4). **A relier au selecteur des qu'il existe** : un apercu qui montre un autre mode que
+celui qui sera deploye est pire que pas d'apercu.
 
 ### v1.37.87 — `bashrc/` B2 caracterise : les lectures distantes ABOUTISSENT, et la production reste hors d'atteinte
 

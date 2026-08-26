@@ -72,4 +72,216 @@
 
     cases.forEach(function (c) { c.addEventListener('change', annonce); });
     annonce();
+
+    /* ═══ B2 : LES DEUX LECTURES DISTANTES ════════════════════════════════ */
+
+    var PASSERELLE = '/api/gateway';
+
+    var etatComptes = document.querySelector('[data-rw="bashrc-comptes-etat"]');
+    var blocComptes = document.querySelector('[data-rw="bashrc-comptes"]');
+    var corpsComptes = document.querySelector('[data-rw="bashrc-comptes-corps"]');
+    var toutCocher = document.querySelector('[data-rw="bashrc-comptes-tout"]');
+    var boutonApercu = document.querySelector('[data-rw="bashrc-apercu"]');
+    var panneauApercu = document.querySelector('[data-rw="bashrc-apercu-panneau"]');
+    var contenuApercu = document.querySelector('[data-rw="bashrc-apercu-contenu"]');
+    if (! etatComptes || ! blocComptes) { return; }
+
+    /** La machine cochee, s'il n'y en a QU'UNE. Sinon `null`. */
+    function machineUnique() {
+        var choisies = cases.filter(function (c) { return c.checked; });
+
+        return choisies.length === 1 ? parseInt(choisies[0].value, 10) : null;
+    }
+
+    /**
+     * Appelle la passerelle. FAIL-CLOSED : sans `success === true` on annonce un
+     * echec plutot qu'un tableau vide, qui se lirait comme « cette machine n'a
+     * aucun compte » — un mensonge sur ce qu'on a pu observer.
+     */
+    function lit(chemin, options) {
+        return fetch(PASSERELLE + chemin, options || {})
+            .then(function (r) { return r.json().catch(function () { return null; }); })
+            .then(function (d) { return (d && d.success === true) ? d : null; })
+            .catch(function () { return null; });
+    }
+
+    function videComptes(message) {
+        blocComptes.hidden = true;
+        corpsComptes.innerHTML = '';
+        panneauApercu.hidden = true;
+        etatComptes.textContent = message;
+    }
+
+    function ligneCompte(u) {
+        var tr = document.createElement('tr');
+        var estRoot = (u.name === 'root');
+
+        var tdCase = document.createElement('td');
+        var etiquette = document.createElement('label');
+        etiquette.className = 'rw-champ rw-champ--case';
+        var boite = document.createElement('input');
+        boite.type = 'checkbox';
+        boite.className = 'rw-case';
+        boite.value = u.name;
+        boite.setAttribute('data-rw', 'bashrc-compte-' + u.name);
+        var cache = document.createElement('span');
+        cache.className = 'rw-visuellement-cache';
+        cache.textContent = u.name;
+        etiquette.appendChild(boite);
+        etiquette.appendChild(cache);
+        tdCase.appendChild(etiquette);
+
+        var tdNom = document.createElement('td');
+        var fort = document.createElement('span');
+        fort.className = 'rw-tableau__fort';
+        fort.textContent = u.name;
+        tdNom.appendChild(fort);
+        // `root` SE SIGNALE. Le legacy l'affiche comme les autres alors que son
+        // `.bashrc` s'execute a chaque connexion administrateur.
+        if (estRoot) {
+            var marque = document.createElement('span');
+            marque.className = 'rw-badge rw-badge--alerte';
+            marque.setAttribute('data-rw', 'bashrc-marque-root');
+            marque.title = textes.root_aide || '';
+            // Le badge NOMME LE ROLE, il ne repete pas le nom du compte : la
+            // ligne affichait « root root ».
+            marque.textContent = textes.root || '';
+            tdNom.appendChild(marque);
+        }
+
+        var tdUid = document.createElement('td');
+        tdUid.textContent = String(u.uid);
+        var tdHome = document.createElement('td');
+        var codeHome = document.createElement('code');
+        codeHome.className = 'rw-code';
+        codeHome.textContent = u.home || '';
+        tdHome.appendChild(codeHome);
+        var tdFichier = document.createElement('td');
+        tdFichier.textContent = u.exists ? ((u.size || 0) + ' o') : (textes.absent || '');
+        // `has_custom` EST RENDU PAR LA ROUTE, ET LE LEGACY LE JETTE ICI.
+        //
+        // C'est le seul signal qui dit si « fusionner » preservera quoi que ce
+        // soit pour ce compte — et il arrive AVANT le choix, pas apres. Sans
+        // blocs marques `USER CUSTOM`, « fusionner » equivaut a « ecraser »
+        // (voir MODULE-BASHRC.md §4.5).
+        if (u.has_custom) {
+            var perso = document.createElement('span');
+            perso.className = 'rw-badge rw-badge--note';
+            perso.setAttribute('data-rw', 'bashrc-perso-' + u.name);
+            perso.title = textes.perso_aide || '';
+            perso.textContent = textes.perso || '';
+            tdFichier.appendChild(document.createTextNode(' '));
+            tdFichier.appendChild(perso);
+        }
+
+        [tdCase, tdNom, tdUid, tdHome, tdFichier].forEach(function (t) { tr.appendChild(t); });
+        if (estRoot) { tr.className = 'rw-ligne-sensible'; }
+
+        return tr;
+    }
+
+    function chargeComptes() {
+        var mid = machineUnique();
+        var choisies = cases.filter(function (c) { return c.checked; }).length;
+        if (choisies === 0) { videComptes(textes.choisir || ''); return; }
+        if (mid === null) { videComptes(textes.plusieurs_cochees || ''); return; }
+
+        etatComptes.textContent = textes.chargement || '';
+        blocComptes.hidden = true;
+        panneauApercu.hidden = true;
+
+        lit('/bashrc/users?machine_id=' + mid).then(function (d) {
+            if (! d || ! Array.isArray(d.users)) { videComptes(textes.echec || ''); return; }
+            if (d.users.length === 0) { videComptes(textes.aucun || ''); return; }
+            corpsComptes.innerHTML = '';
+            d.users.forEach(function (u) { corpsComptes.appendChild(ligneCompte(u)); });
+            etatComptes.textContent = '';
+            blocComptes.hidden = false;
+            if (toutCocher) { toutCocher.checked = false; }
+        });
+    }
+
+    cases.forEach(function (c) { c.addEventListener('change', chargeComptes); });
+
+    if (toutCocher) {
+        toutCocher.addEventListener('change', function () {
+            corpsComptes.querySelectorAll('input[type="checkbox"]').forEach(function (b) {
+                b.checked = toutCocher.checked;
+            });
+        });
+    }
+
+    if (boutonApercu) {
+        boutonApercu.addEventListener('click', function () {
+            var mid = machineUnique();
+            var comptes = [].slice.call(corpsComptes.querySelectorAll('input[type="checkbox"]'))
+                .filter(function (b) { return b.checked; })
+                .map(function (b) { return b.value; });
+
+            panneauApercu.hidden = false;
+            if (mid === null || comptes.length === 0) {
+                contenuApercu.textContent = textes.apercu_vide || '';
+
+                return;
+            }
+            contenuApercu.textContent = textes.apercu_chargement || '';
+            boutonApercu.disabled = true;
+
+            // `mode` PART TOUJOURS, et vaut `merge` — le defaut du legacy.
+            // Le selecteur de mode appartient au DEPLOIEMENT (B4) ; tant qu'il
+            // n'est pas porte, l'apercu montre ce que montrerait le legacy sans
+            // qu'on ait touche a son selecteur. A relier au selecteur des qu'il
+            // existe, sans quoi l'apercu montrerait un autre mode que celui qui
+            // sera deploye — et un apercu qui ne correspond pas au geste est
+            // pire que pas d'apercu.
+            lit('/bashrc/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machine_id: mid, users: comptes, mode: 'merge' }),
+            }).then(function (d) {
+                boutonApercu.disabled = false;
+                if (! d || ! Array.isArray(d.results)) {
+                    contenuApercu.textContent = textes.apercu_echec || '';
+
+                    return;
+                }
+                contenuApercu.innerHTML = '';
+                d.results.forEach(function (r) {
+                    var bloc = document.createElement('div');
+                    var titre = document.createElement('p');
+                    titre.className = 'rw-sous-titre-fort';
+                    titre.textContent = r.user + ' — '
+                        + (textes.taille || '').replace(':avant', String(r.current_bytes || 0))
+                            .replace(':apres', String(r.new_bytes || 0));
+                    // LE DIFF SE REND LIGNE A LIGNE.
+                    //
+                    // Une premiere redaction employait `.rw-code--fichier`, qui
+                    // porte `white-space: nowrap` parce qu'il est fait pour UN
+                    // NOM DE FICHIER : tout le diff s'affichait sur une seule
+                    // ligne. Un diff a plat ne se lit pas, il se devine.
+                    //
+                    // Chaque ligne devient un element pour porter sa couleur.
+                    // `textContent` partout : le diff vient d'un fichier de la
+                    // machine, donc d'une source qu'on ne controle pas.
+                    var diff = document.createElement('pre');
+                    diff.className = 'rw-diff';
+                    (r.diff || '').split('\n').forEach(function (l) {
+                        var ligne = document.createElement('span');
+                        var classe = 'rw-diff__ligne';
+                        if (/^\+\+\+|^---|^@@/.test(l)) { classe += ' rw-diff__ligne--entete'; }
+                        else if (l.charAt(0) === '+') { classe += ' rw-diff__ligne--ajout'; }
+                        else if (l.charAt(0) === '-') { classe += ' rw-diff__ligne--retrait'; }
+                        ligne.className = classe;
+                        ligne.textContent = l || ' ';
+                        diff.appendChild(ligne);
+                    });
+                    bloc.appendChild(titre);
+                    bloc.appendChild(diff);
+                    contenuApercu.appendChild(bloc);
+                });
+            });
+        });
+    }
+
+    chargeComptes();
 }());

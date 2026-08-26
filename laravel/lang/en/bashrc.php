@@ -48,6 +48,32 @@ return [
                      . 'deploying anything.',
     'vide_action' => 'Open servers',
 
+    'comptes_titre' => 'Machine accounts',
+    'comptes_choisir' => 'Tick one machine above to read its accounts.',
+    'comptes_plusieurs' => 'Several machines are ticked. Accounts are read one machine at a time: tick only one.',
+    'comptes_chargement' => 'Reading accounts on the machine…',
+    'comptes_echec' => 'The accounts could not be read. Is the machine reachable?',
+    'comptes_aucun' => 'This machine exposes no eligible account (UID 0 or >= 1000, with a shell).',
+    'col_compte' => 'Account',
+    'col_uid' => 'UID',
+    'col_home' => 'Home directory',
+    'col_bashrc' => 'Current file',
+    'bashrc_absent' => 'absent',
+    'tout' => 'Tick all',
+    'tout_avec_root' => '"Tick all" also selects root.',
+    'compte_root' => 'administrator',
+    'compte_root_aide' => 'The machine\'s administrator account. Deploying to root replaces the file that runs on every administrator login.',
+    'apercu' => 'Preview (diff)',
+    'apercu_aide' => 'Reads the file present on the machine and shows what would change. Writes nothing.',
+    'apercu_titre' => 'What would change',
+    'apercu_chargement' => 'Reading the remote file…',
+    'apercu_echec' => 'The preview could not be built.',
+    'apercu_vide' => 'Tick at least one account to see what would change.',
+    'apercu_taille' => ':avant o → :apres o',
+
+    'perso' => 'customised',
+    'perso_aide' => 'This account has blocks marked "USER CUSTOM" in its file. In "merge" mode those are the ONLY parts kept; everything else is replaced.',
+
     'non_porte_titre' => 'The deployment gestures are not ported yet',
     'non_porte_texte' => 'Choosing accounts, previewing the file and deploying it are done from the '
                          . 'legacy portal for now. This page carries the inventory and the access '
