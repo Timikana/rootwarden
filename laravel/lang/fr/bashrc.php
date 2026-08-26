@@ -49,6 +49,32 @@ return [
                      . 'l\'administration des serveurs avant de deployer quoi que ce soit.',
     'vide_action' => 'Ouvrir les serveurs',
 
+    'comptes_titre' => 'Comptes de la machine',
+    'comptes_choisir' => 'Cochez une machine ci-dessus pour lire ses comptes.',
+    'comptes_plusieurs' => 'Plusieurs machines sont cochees. Les comptes se lisent machine par machine : n\'en cochez qu\'une.',
+    'comptes_chargement' => 'Lecture des comptes sur la machine…',
+    'comptes_echec' => 'Les comptes n\'ont pas pu etre lus. La machine est-elle joignable ?',
+    'comptes_aucun' => 'Cette machine n\'expose aucun compte eligible (UID 0 ou >= 1000, avec un interpreteur).',
+    'col_compte' => 'Compte',
+    'col_uid' => 'UID',
+    'col_home' => 'Dossier personnel',
+    'col_bashrc' => 'Fichier actuel',
+    'bashrc_absent' => 'absent',
+    'tout' => 'Tout cocher',
+    'tout_avec_root' => '« Tout cocher » retient aussi root.',
+    'compte_root' => 'administrateur',
+    'compte_root_aide' => 'Le compte administrateur de la machine. Deployer sur root remplace le fichier qui s\'execute a chaque connexion administrateur.',
+    'apercu' => 'Apercu (diff)',
+    'apercu_aide' => 'Lit le fichier present sur la machine et montre ce qui changerait. N\'ecrit rien.',
+    'apercu_titre' => 'Ce qui changerait',
+    'apercu_chargement' => 'Lecture du fichier distant…',
+    'apercu_echec' => 'L\'apercu n\'a pas pu etre construit.',
+    'apercu_vide' => 'Cochez au moins un compte pour voir ce qui changerait.',
+    'apercu_taille' => ':avant o → :apres o',
+
+    'perso' => 'personnalise',
+    'perso_aide' => 'Ce compte a des blocs marques « USER CUSTOM » dans son fichier. En mode « fusionner », ce sont les SEULS qui seront conserves ; tout le reste sera remplace.',
+
     'non_porte_titre' => 'Les gestes de deploiement ne sont pas encore portes',
     'non_porte_texte' => 'Choisir les comptes, previsualiser le fichier et le deployer se font pour '
                          . 'l\'instant depuis l\'ancien portail. Cette page porte l\'inventaire et '

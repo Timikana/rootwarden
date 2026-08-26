@@ -59,6 +59,26 @@ class BashrcController extends Controller
             'une'       => __('bashrc.selection_une'),
             'plusieurs' => __('bashrc.selection_n'),
             'avec_prod' => __('bashrc.selection_prod'),
+
+            // B2. **Prefixes distincts, et ce n'est pas cosmetique** : une
+            // premiere redaction reutilisait `plusieurs` — qui vaut
+            // « :nb machines selectionnees » pour le compteur et « plusieurs
+            // machines sont cochees » pour les comptes. Deux sens, une cle : le
+            // second aurait ecrase le premier a l'ecran.
+            'choisir'           => __('bashrc.comptes_choisir'),
+            'plusieurs_cochees' => __('bashrc.comptes_plusieurs'),
+            'chargement'        => __('bashrc.comptes_chargement'),
+            'echec'             => __('bashrc.comptes_echec'),
+            'aucun'             => __('bashrc.comptes_aucun'),
+            'absent'            => __('bashrc.bashrc_absent'),
+            'root'              => __('bashrc.compte_root'),
+            'root_aide'         => __('bashrc.compte_root_aide'),
+            'perso'             => __('bashrc.perso'),
+            'perso_aide'        => __('bashrc.perso_aide'),
+            'apercu_vide'       => __('bashrc.apercu_vide'),
+            'apercu_chargement' => __('bashrc.apercu_chargement'),
+            'apercu_echec'      => __('bashrc.apercu_echec'),
+            'taille'            => __('bashrc.apercu_taille'),
         ];
 
         return view('bashrc', [

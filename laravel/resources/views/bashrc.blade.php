@@ -131,9 +131,74 @@
     </div>
 
     {{--
+        ── LES COMPTES DE LA MACHINE (B2) ──────────────────────────────────
+
+        Rempli par `/bashrc/users` a travers la passerelle, quand UNE SEULE
+        machine est cochee. Le legacy fait de meme (`_currentMachineId` n'est
+        pose que dans ce cas) ; ici on le DIT au lieu de ne rien faire.
+
+        La route ouvre une session SSH et lance un `awk` sur `/etc/passwd` :
+        c'est une LECTURE, elle n'ecrit rien.
+    --}}
+    <h2 class="rw-section__entete">{{ __('bashrc.comptes_titre') }}</h2>
+    <p class="rw-aide" role="status" aria-live="polite"
+       data-rw="bashrc-comptes-etat">{{ __('bashrc.comptes_choisir') }}</p>
+
+    <div data-rw="bashrc-comptes" hidden>
+        <label class="rw-champ rw-champ--case">
+            <input type="checkbox" class="rw-case" data-rw="bashrc-comptes-tout">
+            <span>
+                <span>{{ __('bashrc.tout') }}</span>
+                {{--
+                    « TOUT COCHER » RETIENT AUSSI `root`, ET ON LE DIT.
+
+                    Le legacy le fait en silence. `_list_users` retient
+                    `UID == 0`, donc `root` est dans la liste — et c'est le
+                    compte dont le `.bashrc` s'execute a chaque connexion
+                    administrateur. Le comportement est porte a l'identique ;
+                    ce qui change, c'est qu'il s'annonce.
+                --}}
+                <span class="rw-aide">{{ __('bashrc.tout_avec_root') }}</span>
+            </span>
+        </label>
+
+        <div class="rw-tableau-cadre">
+            <table class="rw-tableau">
+                <thead>
+                    <tr>
+                        <th><span class="rw-visuellement-cache">{{ __('bashrc.col_compte') }}</span></th>
+                        <th>{{ __('bashrc.col_compte') }}</th>
+                        <th>{{ __('bashrc.col_uid') }}</th>
+                        <th>{{ __('bashrc.col_home') }}</th>
+                        <th>{{ __('bashrc.col_bashrc') }}</th>
+                    </tr>
+                </thead>
+                <tbody data-rw="bashrc-comptes-corps"></tbody>
+            </table>
+        </div>
+
+        <div class="rw-actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="bashrc-apercu"
+                    title="{{ __('bashrc.apercu_aide') }}">{{ __('bashrc.apercu') }}</button>
+        </div>
+    </div>
+
+    {{--
+        ── L'APERCU ────────────────────────────────────────────────────────
+        `/bashrc/preview` lit le fichier distant et construit le diff cote
+        serveur. Lecture, elle aussi.
+    --}}
+    <section class="rw-section" data-rw="bashrc-apercu-panneau" hidden>
+        <h2 class="rw-section__entete">{{ __('bashrc.apercu_titre') }}</h2>
+        <div data-rw="bashrc-apercu-contenu"></div>
+    </section>
+
+    {{--
         Une capacite non portee n'est pas un bouton inerte : le panneau dit ce
         que le geste engage, et son action principale est un lien MARQUE vers
-        l'ancien portail.
+        l'ancien portail. Le DEPLOIEMENT lui-meme est B4 — B2 ne porte que les
+        deux lectures.
     --}}
     <div class="rw-encart" data-rw="bashrc-non-porte">
         <p class="rw-sous-titre-fort">{{ __('bashrc.non_porte_titre') }}</p>
