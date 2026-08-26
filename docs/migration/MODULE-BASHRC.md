@@ -143,7 +143,55 @@ Zéro occurrence sur les huit routes. Le déploiement multi-machines écrit donc
 d'un coup, hors de toute fenêtre, sans second regard. **À signaler à l'exploitant, sans le corriger en
 silence** : d'autres modules du dépôt en ont, celui-ci pas, et rien ne dit si c'est délibéré.
 
-### 4.5 `machine-select` : un vestige, et il est gardé
+### 4.5 « Fusionner » est le mode PAR DÉFAUT, et son terme-clé n'est défini nulle part
+
+**Mesuré le 2026-08-26**, au second tour de lecture, en fermant les inconnues de la §6.
+
+Le libellé est « Fusionner (conserver blocs custom) », et il est **`selected`** dans le `<select>`
+(`index.php:109`). Il est **littéralement vrai** : `_extract_custom_blocks()` conserve bien les blocs.
+Mais « bloc custom » a un sens technique précis —
+
+```
+# >>> USER CUSTOM >>>
+…
+# <<< USER CUSTOM <<<
+```
+
+— qui **n'apparaît dans aucune des 74 clés i18n du module**. Ni `USER CUSTOM`, ni `.bashrc.local` ne
+sont mentionnés à l'écran. La lecture naturelle du libellé (« garde mes personnalisations ») est donc
+fausse pour tout `.bashrc` que RootWarden n'a jamais géré : **sans marqueurs, « fusionner » se comporte
+exactement comme « écraser »**, et c'est le cas de tout premier déploiement.
+
+> Ce n'est ni E-142 (un texte qui dit faux) ni E-146 (un texte qui recommande l'inverse de ce qui est
+> livré). C'est une **troisième variante** : un libellé vrai dont le terme porteur n'est défini nulle
+> part. Il ne se corrige pas en le rendant « plus juste » — il l'est déjà — mais en **définissant son
+> terme**.
+
+#### Et l'interface JETTE la mesure qui lèverait l'ambiguïté
+
+C'est la partie qui vaut d'être portée. Le backend calcule, dans la branche `dry_run` :
+
+```python
+'would_backup': bool(current),
+'custom_detected': bool(custom),
+```
+
+`custom_detected` répond exactement à « est-ce que "fusionner" va préserver quoi que ce soit pour ce
+compte ? ». Il est affiché dans l'**aperçu** (`bashrc.js:271`, clé `bashrc.has_custom`) — et **absent
+du tableau de résultat du déploiement** (`bashrc.js:313-322`), qui rend User / OK / Backup / Syntaxe /
+Détail. L'information est calculée, elle traverse le réseau, et elle est jetée au rendu.
+
+**Forme inverse des défauts précédents** : pas un texte qui ment, mais une **mesure vraie que
+l'interface abandonne**.
+
+#### Gravité : faible, et il faut le dire aussi
+
+Rien n'est perdu irrémédiablement. La sauvegarde est faite **dès que le fichier existe, dans les deux
+modes**, et un échec de sauvegarde **avorte le déploiement pour ce compte** (`continue`) — fail-closed.
+C'est un défaut d'**information**, pas de destruction. Le portage doit montrer `custom_detected` dans
+le résultat et définir « bloc custom » ; il n'a pas à réécrire le geste.
+
+### 4.6 `machine-select` : un vestige, et il est gardé
 
 `bashrc.js:103` cherche `getElementById('machine-select')`, absent de la page. Le code le sait :
 
@@ -170,7 +218,7 @@ L'onglet Historique se lit dans `user_logs` : il tombe dans B1 (aucune route dé
 
 ## 6. Ce dont cet inventaire n'est PAS sûr — la section la plus utile
 
-**Rien de ce qui suit n'a été mesuré au navigateur.** Le banc était pris ; ces points sont *déduits du
+**Rien de ce qui suit n'a été mesuré au navigateur.** Trois des cinq points ont été fermés le 2026-08-26 **par la lecture**, le banc étant toujours pris ; ils restent listés, barrés, avec leur réponse — un inventaire qui efface ses propres questions perd la trace de ce qui était incertain, et de ce qui a levé l'incertitude. Le banc était pris ; ces points sont *déduits du
 code* et doivent être **mesurés** au premier sous-lot.
 
 1. **Le triple chemin de garde.** Déduit, non mesuré. La table `permissions` dit que
@@ -187,13 +235,21 @@ code* et doivent être **mesurés** au premier sous-lot.
    C'est la mesure la plus intéressante du module, et la seule qui distingue « la garde laisse passer
    parce que la permission est là » de « parce que le rôle l'emporte ».
 
-2. **Le comportement réel de `mode=merge`.** `_extract_custom_blocks()` et `.bashrc.local` existent ;
-   ce que « fusionner » préserve exactement n'a pas été lu ligne à ligne.
+2. ~~**Le comportement réel de `mode=merge`.**~~ **FERMÉ le 2026-08-26** — voir §4.5. Il ne préserve
+   que les blocs entre marqueurs `USER CUSTOM` ; sans marqueurs, il équivaut à « écraser ». Les blocs
+   extraits sont **ajoutés** à `~/.bashrc.local`, précédés d'un commentaire daté.
 
-3. **Ce que `preview` rend quand le compte n'a pas de `.bashrc`.** Le diff a-t-il un cas vide propre ?
+3. ~~**Ce que `preview` rend quand le compte n'a pas de `.bashrc`.**~~ **FERMÉ** — `_read_remote_bashrc`
+   ouvre par `if [ -f '{home}/.bashrc' ]` et rend `""` sinon. Le diff est alors intégralement en
+   ajout. Cas vide propre, aucune exception.
 
-4. **La liste des comptes exclus.** `_list_users` filtre-t-il les comptes système ? Non vérifié —
-   et cela décide si l'écran propose de déployer sur `root` ou `daemon`.
+4. ~~**La liste des comptes exclus.**~~ **FERMÉ, et il en sort deux choses.** `_list_users` retient
+   `UID == 0 || UID >= 1000`, en excluant les shells `nologin|false|sync|halt|shutdown`. Donc :
+   - **`root` EST proposé au déploiement** (UID 0). C'est la cible la plus conséquente du parc, et
+     l'écran ne la distingue en rien des autres. À trancher au portage : la marquer, ou non ;
+   - `_USERNAME_RE` est **réappliqué aux lignes venues de la machine**, après le `awk`. Troisième
+     endroit où ce module traite une donnée distante comme hostile, après `_HOME_RE` et la validation
+     des noms reçus du client. C'est une constante de conception, pas un accident.
 
 5. **Le nombre d'assertions atteignables**, donc les références du LOT. Inconnues tant que la suite
    n'a pas tourné.
