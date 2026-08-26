@@ -82,6 +82,13 @@ const C = CIBLE === 'laravel'
         conteneur: '[data-rw="distants-liste"]',
         supprimer: '[data-rw="distant-supprimer"]',
         retirerCles: '[data-rw="distant-retirer-cles"]',
+        // LE PORTAGE SEPARE LE GESTE DE SA CONFIRMATION : le bouton n'envoie
+        // rien, il ouvre un panneau qui NOMME la consequence. Le compte doit
+        // d'abord etre designe — le legacy, lui, pose ces trois gestes en
+        // boutons minuscules au bout de chaque ligne du tableau.
+        choixCompte: '[data-rw="distants-geste-compte"]',
+        confirmer: '[data-rw="distant-confirmer"]',
+        panneau: '[data-rw="distant-panneau"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
     }
     : {
@@ -91,6 +98,9 @@ const C = CIBLE === 'laravel'
         conteneur: '#users-container',
         supprimer: 'button[data-user][onclick^="deleteUser"]',
         retirerCles: 'button[data-user][onclick^="removeKeys"]',
+        choixCompte: null,
+        confirmer: null,
+        panneau: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
     };
 
@@ -264,6 +274,26 @@ try {
     await etape('les gestes destructeurs partent-ils, et sont-ils avortes ?', async () => {
         const avant = interdites.length;
 
+        // ══ SUR LE PORTAGE, IL FAUT D'ABORD DESIGNER LE COMPTE ════════════
+        //
+        // Et l'ouverture du panneau doit n'emettre RIEN : c'est une propriete a
+        // part entiere, et elle s'asserte. Le legacy n'a pas ce temps — ses
+        // boutons partent au premier clic.
+        if (C.choixCompte) {
+            const choisi = await page.evaluate((sel) => {
+                const s2 = document.querySelector(sel);
+                if (! s2) return '';
+                const opt = [...s2.options].find((o) => o.value);
+                if (! opt) return '';
+                s2.value = opt.value;
+                s2.dispatchEvent(new Event('change', { bubbles: true }));
+
+                return opt.value;
+            }, C.choixCompte);
+            constate('compte designe pour les gestes', choisi || '(aucun)');
+            verifie('un compte peut etre designe dans la liste', choisi !== '', '(liste vide)');
+        }
+
         for (const [nom, selecteur] of [['retrait des cles', C.retirerCles], ['suppression du compte', C.supprimer]]) {
             const b = await boutonDe(page, selecteur);
             if (! b) {
@@ -275,8 +305,32 @@ try {
                 constate(`bouton « ${nom} »`, 'absent — rendu seulement si le compte porte des cles');
                 continue;
             }
+            // COMPTE RELEVE JUSTE AVANT CE CLIC, pas au debut de l'etape : le
+            // geste precedent a pu emettre, et une borne perimee ferait dire
+            // n'importe quoi a la difference.
+            const avantCeClic = interdites.length;
             await b.click();
-            await dors(1500);
+            await dors(800);
+
+            if (C.confirmer) {
+                // LE PREMIER CLIC N'ENVOIE RIEN. On le PROUVE avant de
+                // confirmer : un panneau qui aurait deja agi ne serait pas un
+                // panneau de decision.
+                verifie(`ouvrir le panneau « ${nom} » n'emet aucune requete`,
+                    interdites.length === avantCeClic,
+                    `${interdites.length - avantCeClic} requete(s) emise(s) a l'ouverture`);
+
+                const ouvert = await page.evaluate((sel) => {
+                    const e = document.querySelector(sel);
+
+                    return Boolean(e) && ! e.hidden;
+                }, C.panneau);
+                verifie(`le panneau « ${nom} » s'ouvre`, ouvert);
+                if (ouvert) {
+                    await page.click(C.confirmer);
+                    await dors(1500);
+                }
+            }
         }
 
         const vues = interdites.slice(avant);
