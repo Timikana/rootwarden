@@ -893,7 +893,19 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   moi-même dans la minute suivante**, pour y corriger un commentaire — même erreur, même régime, même
   chance que la fenêtre se referme (47 suites sur 117).
 
-  **Et c'est la leçon utile : écrire une règle ne protège pas de l'enfreindre.** Le paragraphe existait,
+  **✅ CE RÉGIME N'EXISTE PLUS — la propriété a été construite** (`v1.37.85`). `rejouer-lot.sh` se
+  recopie dans `/tmp` et exécute la copie ; éditer la source pendant un rejeu est désormais **sans effet
+  possible**, pour soi comme pour l'autre session. Le piège non évident était que `RACINE` se déduisait
+  de la **position** du script : elle est calculée avant la copie et transmise par l'environnement.
+
+  **Et la propriété a été PROUVÉE, pas affirmée.** Un rejeu a tourné pendant que sa source prenait
+  **960 octets** : il s'est terminé normalement, résumé complet, verdict juste. Puis le mécanisme
+  inverse a été démontré sur un script d'épreuve — après le décalage, `bash` reprend à l'offset mémorisé
+  et **exécute le milieu d'une ligne** (`XXXXX… : commande introuvable`). Là c'était visible ; un
+  décalage tombant sur une ligne d'apparence valide aurait produit un verdict faux **en silence**.
+
+  **La leçon reste, parce qu'elle explique pourquoi il a fallu construire la propriété : écrire une règle
+  ne protège pas de l'enfreindre.** Le paragraphe existait,
   je venais de le rédiger, et il n'a rien empêché. Ce qui a permis de le dire n'est pas la confiance mais
   la vérification — références intactes, `bash -n` propre, avancement relevé — et ce qui protégerait
   vraiment n'est pas un document : **le runner devrait se recopier dans un fichier temporaire et exécuter
@@ -1366,6 +1378,41 @@ C'est la même famille que « N validations précédentes ne prouvent rien si au
 échouer » (§8, archivage de `supervision/`). Ici : **deux exemples confirmaient une formule, et aucun
 des deux ne pouvait la réfuter.** Une formule courte doit être éprouvée sur un cas où elle pourrait
 être fausse — sinon on n'a pas mesuré la formule, on a mesuré son domaine de validité.
+
+### Un symptôme dit qu'il y a un problème, jamais lequel (2026-08-26)
+
+**Trois fois dans la même journée**, entre les deux sessions, une conclusion a été tirée d'un
+**artefact du diagnostic** plutôt que de la chose elle-même. Les trois étaient fausses, et les trois
+étaient réfutables en une commande.
+
+| ce qu'on a lu | ce qu'on en a conclu | ce qu'il fallait lire |
+|---|---|---|
+| un total d'assertions qui baisse | « des clés SSH ont disparu » | le journal du rejeu précédent, en clair dans `/tmp` |
+| un `ps` vide | « le banc est libre » | le `mtime` du fichier que l'autre session écrivait |
+| `SyntaxError: 'X' has already been declared` | « nos deux éditions se sont télescopées » | le fichier — les deux déclarations venaient d'une seule session |
+
+La troisième est la plus nette parce que la source était à un `grep` de distance, et parce qu'elle a
+été commise **par la session qui venait de reprocher le même travers à l'autre**, deux messages plus
+tôt, à propos d'un motif de `grep` trop étroit.
+
+> Aucun des trois n'a lu la chose. Tous les trois ont lu **ce que l'outil de diagnostic en disait** —
+> un compteur, une absence de processus, un message d'erreur. Ce sont des projections, et une
+> projection perd toujours de l'information.
+
+**La règle actionnable n'est pas « ne pas conclure trop vite ».** Personne ne se croit pressé sur le
+moment. C'est :
+
+> Avant de nommer une cause, se demander **quel fichier ou quelle ligne** on va citer à l'appui. Si
+> la réponse est « le message d'erreur » ou « le chiffre », on n'a pas encore de cause — on a un
+> symptôme reformulé.
+
+Un message d'erreur nomme l'endroit où le programme a renoncé, pas l'endroit où la faute a été
+commise. Un compteur qui change dit qu'il s'est passé quelque chose, jamais quoi. Un `ps` vide dit
+qu'aucun processus ne porte ce nom **à cet instant**, pas que le travail est fini.
+
+Corollaire déjà écrit ailleurs, et qui prend ici son sens général : **quand une assertion échoue sur
+la cible corrigée, se demander d'abord si c'est LA MESURE qui vise à côté.** C'est le même geste —
+suspecter l'instrument avant l'objet.
 
 ## 9. Les autres documents
 
