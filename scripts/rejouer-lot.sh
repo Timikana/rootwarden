@@ -157,6 +157,11 @@ declare -A REF_LARAVEL=(
   # geste. C'est la piece que le sous-lot A5 avait differee « a son premier
   # consommateur » — et elle est desormais mesuree de bout en bout.
   [go-adm-suppression]=21
+  # Sous-lot D5 de `adm/` : permissions. 13 sur le portage contre 10 sur le
+  # legacy. L'ecart tient au PARCOURS : le legacy s'arrete sur un 403 auquel rien
+  # ne permet de repondre (E-119), le portage ouvre un panneau, recoit le code et
+  # mene la bascule a son terme — mesure en base, `can_scan_cve` passe a 1.
+  [go-adm-permissions]=13
 )
 declare -A REF_LEGACY=(
   [go-socle-auth]=13
@@ -262,7 +267,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-ssh-parc go-page-ssh-preflight go-page-ssh-flux go-page-supervision-onglets go-page-supervision-profils go-page-supervision-config
   go-page-supervision-config-ecriture go-page-supervision-profils-crud
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
-  go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression
+  go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
 SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift

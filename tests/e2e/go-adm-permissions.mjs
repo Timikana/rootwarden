@@ -295,9 +295,40 @@ try {
         verifie('le clic emet bien une requete', emises.length >= 1, `${emises.length}`);
         // LA QUESTION DU SOUS-LOT : le clic aboutit-il ? La lecture concluait
         // que non — modal sur `window.fetch`, case declenchee par htmx (XHR).
-        verifiePortage('la bascule change bien la permission en base', avant !== apres,
-            `${avant} avant, ${apres} apres — le refus de step-up n'ouvre aucun modal, `
-            + 'htmx n\'emploie que XMLHttpRequest et la surcouche ne voit que `fetch`');
+        // Sur le legacy le geste s'arrete ici, faute de chemin pour repondre au
+        // refus. Sur le portage, un panneau s'ouvre : on le suit jusqu'au bout,
+        // sans quoi la piece ecrite pour lever E-119 ne serait mesuree par rien.
+        if (CIBLE !== 'laravel') {
+            constate('la bascule change-t-elle la permission ?',
+                avant !== apres ? 'oui' : 'NON — le refus n\'ouvre aucun modal, '
+                + 'htmx n\'emploie que XMLHttpRequest et la surcouche ne voit que `fetch`');
+
+            return;
+        }
+
+        const panneau = await page.evaluate(() => {
+            const p = document.querySelector('[data-rw="perms-panneau-stepup"]');
+
+            return p ? p.getClientRects().length > 0 : false;
+        });
+        verifie('le panneau de re-authentification s\'ouvre en page', panneau,
+            panneau ? '' : 'le refus 403 n\'a pas ouvert le panneau');
+        if (! panneau) return;
+
+        // Fenetre TOTP NEUVE : le code de la connexion vient d'etre consomme,
+        // et le garde anti-rejeu est par compte et en base.
+        await dors((resteFenetre() + 1) * 1000);
+        const code = await page.$('[data-rw="perms-stepup-code"]');
+        await code.click({ clickCount: 3 });
+        await code.type(totp(SECRET), { delay: 8 });
+        await page.click('[data-rw="perms-stepup-valider"]');
+        // On attend la CONSEQUENCE en base, pas un evenement d'interface.
+        for (let i = 0; i < 40 && permEnBase(idEpr, PERM) === avant; i += 1) await dors(250);
+
+        const final = permEnBase(idEpr, PERM);
+        constate(`${PERM} apres re-authentification`, String(final));
+        verifie('la bascule aboutit une fois le second facteur fourni', final !== avant,
+            `${avant} avant, ${final} apres`);
     });
 
     await etape('captures', async () => {
@@ -318,6 +349,22 @@ try {
 } catch (e) {
     verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
 } finally {
+    try {
+        // NETTOYER CE QUE LE TEST A ACCORDE. La marque de step-up vit quinze
+        // minutes dans le cache et SURVIT a l'execution : sans cette revocation,
+        // l'execution suivante herite de la marque et mesure un 200 la ou elle
+        // attend un 403. Paye en D4, pas deux fois.
+        const s = session.s;
+        if (s && s.page) {
+            await s.page.evaluate(async () => {
+                const m = document.querySelector('meta[name="csrf-token"]');
+                await fetch('/profil/step-up/revoquer', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'X-CSRF-TOKEN': m ? m.content : '', 'Content-Type': 'application/json' },
+                }).catch(() => null);
+            }).catch(() => null);
+        }
+    } catch (e) { note(`INFO  revocation du step-up : ${e.message}`); }
     try {
         retireLEpreuve();
         verifie('le compte d\'epreuve est retire',

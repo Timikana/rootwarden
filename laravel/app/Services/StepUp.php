@@ -74,6 +74,10 @@ class StepUp
         'compte_supprimer',
         // Efface les donnees personnelles d'un compte en PRESERVANT son journal.
         'compte_anonymiser',
+        // Accorde ou retire un droit fonctionnel. Le legacy garde deja ce geste
+        // par un step-up ; ce que le portage ajoute, c'est un chemin pour y
+        // repondre (PARITE E-119).
+        'permission_definir',
     ];
 
     /**

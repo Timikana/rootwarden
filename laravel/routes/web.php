@@ -15,6 +15,7 @@ use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\ComptesController;
+use App\Http\Controllers\PermissionsController;
 use App\Http\Controllers\JournalAuditController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\ComparaisonCveController;
@@ -474,6 +475,24 @@ Route::middleware('session.authentifiee')->group(function () {
 
     Route::post('/comptes/{id}/second-facteur', [ComptesController::class, 'reinitialiserTotp'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.second-facteur');
+
+    /*
+     * Permissions et acces machines — module `adm/`, sous-lot D5.
+     *
+     * Garde de page : role 3 + `can_admin_portal`, relevee du legacy
+     * (`update_permissions.php:47` exige le superadmin). La garde HIERARCHIQUE —
+     * on ne modifie ni ses propres droits ni ceux d'un rang egal ou superieur —
+     * vit dans le controleur, parce qu'elle depend de la CIBLE.
+     *
+     * Le geste porte en plus un STEP-UP, comme le legacy. La difference est
+     * qu'ici il existe un chemin pour y repondre : le panneau ecrit pour D4.
+     */
+    Route::get('/permissions', PermissionsController::class)
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions');
+    Route::post('/permissions/{id}', [PermissionsController::class, 'definir'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');
+    Route::post('/permissions/{id}/acces', [PermissionsController::class, 'acces'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.acces');
 
     Route::get('/journal-audit', JournalAuditController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])

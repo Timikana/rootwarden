@@ -5044,8 +5044,10 @@ porte `can_manage_api_keys`. Ils les ont reçues à la création ou par import C
 (`import_csv.php:168`). Il y a donc bien, aujourd'hui, des droits accordés que l'interface ne sait
 pas reprendre — les retirer demande un `UPDATE` à la main.
 
-**Au portage** : **une seule liste**, dérivée des colonnes réelles, partagée par la création et par la
-bascule. Une permission qui existe se règle dans les deux sens, ou n'existe pas.
+**FERMÉ au portage** (`v1.37.63`) : `Permissions::toutes()` lit la liste dans `information_schema`.
+Une colonne ajoutée devient réglable, une colonne retirée disparaît partout à la fois — il ne peut
+plus y avoir trois listes, parce qu'il n'y en a plus qu'une source. Les dix-huit permissions sont
+nommées en FR et en EN, y compris les deux que le legacy laissait dehors.
 
 ---
 
@@ -5081,5 +5083,7 @@ C'est la même famille que E-108 — un écran qui n'a pas de raison de bouger e
 entendu — mais prise par l'autre bout : ici la requête part **et** le refus est correct ; c'est le
 chemin pour y répondre qui n'existe pas.
 
-**Au portage** : la garde reste, et le panneau de re-authentification **en page** écrit pour D4 la
-rend franchissable. Un refus s'annonce, et le geste repart une fois le second facteur fourni.
+**FERMÉ au portage** (`v1.37.63`) : la garde est la **même**, et le panneau de re-authentification
+**en page** écrit pour D4 la rend franchissable. Mesuré : refus annoncé, panneau ouvert, code saisi,
+et `can_scan_cve` passe de `null` à **1**. La case, elle, ne bouge qu'après la réponse — une case
+cochée qui ne l'est pas en base est un mensonge.
