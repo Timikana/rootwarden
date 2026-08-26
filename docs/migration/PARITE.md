@@ -6424,3 +6424,93 @@ n'était joignable par un test HTTP. Ajouté.
 
 **G2 mesurera les deux gestes au navigateur**, sur `test-server` (machine 2), avec `uninstall` comme
 geste de retour. `srv-zabbix` : jamais.
+
+---
+
+## E-146 — `adm/` D9b : l'écran conseille explicitement de décocher trois cases, et les livre cochées
+
+**Mesuré** le 2026-08-26 par `tests/e2e/go-adm-sftp.mjs`, sur les deux cibles.
+
+E-142 était une aide qui **disait faux**. Celui-ci est plus net, parce que les aides du legacy disent
+**vrai** — et recommandent, chacune, l'inverse de ce qui est livré :
+
+| réglage | ce que l'aide dit | état livré |
+|---|---|---|
+| `allow_password_auth` | « Décoche : il DOIT utiliser une clé SSH (nettement plus sûr, **recommandé**). » | **coché** |
+| `allow_tcp_forwarding` | « Si ce n'est pas nécessaire, **décoche : c'est plus sûr**. » | **coché** |
+| `allow_agent_forwarding` | « Si ce n'est pas nécessaire, **décoche**. » | **coché** |
+
+`server_user_sftp.php:97-99`, tous trois en `?? true`. Et `sftp_only` — la restriction qui donne son
+nom à la page — est livré **décoché**.
+
+### La mesure : apparier chaque case à SON aide, sans rien recopier
+
+La propriété ne peut pas être « la case X doit être décochée » : ce serait recopier une liste, donc
+reproduire le défaut dans l'outil qui le mesure. La suite remonte de **chaque case à son bloc**, y lit
+le texte qui l'accompagne, et refuse qu'une aide disant que l'état sûr est l'état inactif accompagne
+une case active. Rien n'est recopié — ni la liste des cases, ni le texte des aides.
+
+Mesure legacy : **5 cases lues, 3 fautives.** Portage : **5 cases lues, 0 fautive.**
+
+## E-147 — `sftp_manager.render_policy()` contredit sa propre docstring sur quatre clés, toutes vers le permissif
+
+Dans la **même fonction**, à six lignes d'intervalle. La docstring donne l'exemple de référence, le
+code prend les valeurs par défaut :
+
+| clé | docstring | code |
+|---|---|---|
+| `sftp_only` | `True` | `False` |
+| `allow_password_auth` | `False` | `True` |
+| `allow_tcp_forwarding` | `False` | `True` |
+| `allow_agent_forwarding` | `False` | `True` |
+| `x11_forwarding` | `False` | `False` ✓ |
+
+**Quatre écarts sur cinq, tous du côté permissif** — et le cinquième concorde, ce qui montre que la
+comparaison ne signale pas tout indistinctement. La suite dérive cette table du fichier lui-même à
+chaque exécution ; elle n'en recopie aucune valeur.
+
+### Ce que cela produit, et pourquoi ce n'est pas qu'un réglage mou
+
+Corps réellement intercepté au premier clic sur « Déployer », legacy :
+
+```json
+{"sftp_only":false,"chroot_dir":null,"working_dir":null,
+ "allow_password_auth":true,"allow_tcp_forwarding":true,
+ "allow_agent_forwarding":true,"x11_forwarding":false}
+```
+
+`render_policy` en tire un bloc **sans** `ForceCommand internal-sftp`, **sans** `ChrootDirectory`,
+**sans** `PermitTTY no` — ceux-là ne sont ajoutés que si `sftp_only`. Ce n'est pas une restriction
+SFTP : c'est un shell complet avec tunnels, sur une page intitulée « Accès SFTP ».
+
+> Et un bloc `Match User` **fixe** ces directives pour ce compte, à la place de ce que la configuration
+> générale de la machine aurait donné. Sur une machine durcie, déployer ce bloc **élargit** l'accès du
+> compte au lieu de le restreindre — le contraire de ce que la page laisse attendre.
+
+**Divergence assumée du portage** : l'état d'une politique neuve est **dérivé**, pas écrit à la main.
+`AccesSftp::REGLAGES` classe chaque réglage `restreint` ou `ouvre`, et `initial()` active ce qui
+restreint. Ajouter un réglage ne peut donc pas faire naître un défaut permissif par oubli. Le corps
+émis par le portage est exactement l'exemple de la docstring :
+
+```json
+{"sftp_only":true,"allow_password_auth":false,
+ "allow_tcp_forwarding":false,"allow_agent_forwarding":false,"x11_forwarding":false}
+```
+
+**E-143 vaut aussi pour SFTP** : le JS est partagé (`server_user_policy.js`, aiguillé par `TYPE`), donc
+`deploy` partait au premier clic sans confirmation ici aussi — mesuré, 1 requête. Le portage confirme.
+
+## Ce que la mesure de D9b DÉDOUANE
+
+Mêmes deux constats qu'en D9a, et pour les mêmes raisons : **gardes complètes aux trois niveaux**
+(rôle 2 → 403 mesuré) et **geste distant sûr** — `sftp_manager` écrit un temporaire, lance `sshd -t`
+pour valider la configuration **complète**, et ne déplace qu'ensuite. Un bloc syntaxiquement invalide
+ne peut donc pas fermer l'accès SSH à la machine. `chroot_dir` et `working_dir` passent par
+`_validate_path` (absolu, sans traversée), **au backend** — une requête forgée ne le contourne pas.
+
+## Ce que D9b ne porte PAS, et le dit
+
+`rollbackTo()`, comme en D9a : lien marqué `↗` vers l'ancien portail dans l'historique, pas un bouton
+inerte. **D9 est clos** — `server_user_policies.php` est une redirection 302 de 16 lignes vers la page
+sudo, sans `checkAuth` mais sans rien à divulguer non plus (paramètres castés en entier, cible locale
+fixe : pas de redirection ouverte). Elle disparaîtra avec l'archivage.
