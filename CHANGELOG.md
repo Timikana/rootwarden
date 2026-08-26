@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.89** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.90** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,49 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.90 — `bashrc/` B3 porte : la reconnaissance dit enfin ce qu'elle NE verifie PAS
+
+`/bashrc`, onglet Gabarit. **legacy 16 PASS / portage 19 PASS, 0 FAIL.**
+
+#### E-148 — un des huit motifs de danger du legacy est largement inerte
+
+`bashrcTemplateScanDanger()` teste `\b>\s*\/dev\/[sh]d[a-z]` pour la redirection vers un disque.
+**`\b` exige un caractere de MOT juste avant le `>`** — or dans `cat x > /dev/sda`, la forme
+normale, il y a un espace. Mesure :
+
+    NON DETECTE : cat x > /dev/sda      <- la forme courante
+    NON DETECTE : cat x >/dev/sda
+    NON DETECTE : echo y >> /dev/sdb    <- l'ajout
+    detecte     : x> /dev/sda           <- la seule forme reconnue
+
+Le motif ne reconnait que la forme collee, que personne n'ecrit. Le portage retire le `\b` : les
+quatre formes sont reconnues, sans faux positif sur un gabarit sain (verifie sur les huit motifs).
+
+#### Ce que le portage ajoute
+- **L'avertissement ENONCE SA PORTEE.** Il nomme le motif reconnu — le legacy le fait aussi — puis
+  dit ce qu'il ne verifie pas : « ni ce que fait le reste du fichier, ni ce que fera celui-ci une
+  fois deploye ». Le backend ne controle que la syntaxe ; un lecteur qui ignore la limite pretera a
+  la reconnaissance une portee qu'elle n'a pas.
+- **Deux confirmations distinctes** : celle qui NOMME ce qui a ete reconnu, et celle qui rappelle la
+  portee du geste. Une phrase unique dirait moins dans le cas grave.
+- **Les motifs vivent dans `Bashrc::MOTIFS_DANGEREUX`**, une seule source cote portage, jamais
+  recopies dans le JS.
+
+#### Deux defauts de mesure, tous deux dans l'instrument
+- **Un test par mot-cle ne distingue pas une affirmation de sa negation.** L'assertion « l'ecran ne
+  se presente pas comme une validation » cherchait `valid|verifi|conforme` — et elle a echoue sur le
+  portage, dont l'encart dit « Elle NE verifie NI… », un DESAVEU. La propriete utile n'est pas
+  l'absence d'un mot mais la presence d'une limite : elle cherche desormais un enonce de portee.
+  **Sur le legacy elle est FAUSSE**, ce qui est plus informatif que l'ancienne, toujours vraie.
+- **Ma verification des motifs cassait sur son propre delimiteur.** `preg_match("/$motif/")` avec des
+  motifs contenant `/` : cinq des huit « ne compilaient pas ». C'est l'outil qui echouait, pas la
+  chose verifiee.
+
+#### Un defaut de rendu, vu a l'image
+L'editeur heritait de la police proportionnelle du document. Le gabarit est du shell et s'appuie sur
+des bannieres `# =====` alignees : l'alignement se perdait et l'indentation cessait de se lire.
+Nouvelle classe `.rw-saisie--code`.
 
 ### v1.37.89 — `bashrc/` B3 caracterise : le premier sous-lot du module qui ECRIT
 

@@ -6514,3 +6514,45 @@ ne peut donc pas fermer l'accès SSH à la machine. `chroot_dir` et `working_dir
 inerte. **D9 est clos** — `server_user_policies.php` est une redirection 302 de 16 lignes vers la page
 sudo, sans `checkAuth` mais sans rien à divulguer non plus (paramètres castés en entier, cible locale
 fixe : pas de redirection ouverte). Elle disparaîtra avec l'archivage.
+
+---
+
+## E-148 — `bashrc/` : un des huit motifs de danger du gabarit est largement inerte
+
+**Mesuré** le 2026-08-26, sous-lot B3.
+
+`legacy/bashrc/js/bashrc.js`, `_TPL_DANGER_PATTERNS`, motif « redirect vers disque » :
+
+```js
+{ re: /\b>\s*\/dev\/[sh]d[a-z]/, name: 'redirect vers disque' }
+```
+
+**`\b` exige un caractère de MOT immédiatement avant le `>`.** Or un espace et `>` sont tous deux des
+non-mots : il n'y a pas de frontière entre eux. La forme normale n'est donc pas reconnue.
+
+| écrit dans le gabarit | reconnu ? |
+|---|---|
+| `cat x > /dev/sda` — la forme courante | **non** |
+| `cat x >/dev/sda` | **non** |
+| `echo y >> /dev/sdb` — l'ajout | **non** |
+| `x> /dev/sda` — collé | oui |
+
+Le motif ne reconnaît que la forme que personne n'écrit.
+
+### Ce que cela coûte, et ce que cela ne coûte pas
+
+**Ce n'est pas une faille**, pour la même raison qu'en §4.1 de `MODULE-BASHRC.md` : la reconnaissance
+n'est pas un contrôle d'accès, et quiconque atteint cet écran détient déjà l'autorisation d'écrire le
+fichier. Mais un garde-fou qui rate sept formes sur huit d'un même geste est **pire qu'absent** : il
+donne l'impression d'avoir été vérifié.
+
+### Correction du portage
+
+`App\Services\Bashrc::MOTIFS_DANGEREUX` retire le `\b`. Les quatre formes ci-dessus sont reconnues,
+et **aucun des huit motifs ne mord sur un gabarit sain** — vérifié motif par motif, chacun contre son
+propre exemple et contre un `.bashrc` ordinaire.
+
+> **Piège de vérification, payé au passage.** La première vérification employait
+> `preg_match("/$motif/")` — avec des motifs contenant des `/`. Cinq des huit « ne compilaient pas ».
+> C'était le délimiteur de l'outil qui cassait, pas les motifs. *Quand une vérification échoue en
+> masse, suspecter la vérification.*

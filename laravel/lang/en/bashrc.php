@@ -74,6 +74,25 @@ return [
     'perso' => 'customised',
     'perso_aide' => 'This account has blocks marked "USER CUSTOM" in its file. In "merge" mode those are the ONLY parts kept; everything else is replaced.',
 
+    'gabarit_titre' => 'The deployed template',
+    'gabarit_intro' => 'This file is the one every machine will receive at the next deployment. It runs on every login of the accounts concerned.',
+    'gabarit_lignes' => 'Lines',
+    'gabarit_octets' => 'Bytes',
+    'gabarit_sha' => 'Fingerprint',
+    'gabarit_chargement' => 'Reading the template…',
+    'gabarit_echec' => 'The template could not be read.',
+    'gabarit_modifie' => 'Unsaved changes.',
+    'gabarit_enregistrer' => 'Save',
+    'gabarit_annuler' => 'Discard changes',
+    'gabarit_enregistre' => 'Template saved.',
+    'gabarit_erreur' => 'Saving failed.',
+    'gabarit_encours' => 'Saving…',
+    'gabarit_confirmer' => 'Save this template? Every machine will receive it at the next deployment.',
+    'danger_titre' => 'Forms recognised as destructive',
+    'danger_reconnu' => 'Recognised:',
+    'danger_portee' => 'This recognition covers eight known forms. It checks neither what the rest of the file does, nor what this one will do once deployed — only its syntax is checked on saving.',
+    'danger_confirmer' => 'This template contains forms recognised as destructive. Save it anyway?',
+
     'non_porte_titre' => 'The deployment gestures are not ported yet',
     'non_porte_texte' => 'Choosing accounts, previewing the file and deploying it are done from the '
                          . 'legacy portal for now. This page carries the inventory and the access '

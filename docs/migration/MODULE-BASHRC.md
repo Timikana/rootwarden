@@ -246,7 +246,7 @@ distinguer la production, hiérarchiser les cinq gestes par leur effet, et énon
 |---|---|---|
 | **B1** ✅ | La page, les trois onglets, les gardes, l'i18n — *PORTÉ `v1.37.86`, `/bashrc`, **17 legacy / 18 portage**, 0 FAIL* | Rien ne part vers une machine. Et c'est ici que se mesure le **triple chemin de garde** (§6), désormais MESURÉ |
 | **B2** ✅ | L'onglet Déploiement en LECTURE — *PORTÉ `v1.37.88`, **14 legacy / 15 portage**, 0 FAIL* | Ouvre une session SSH, mais ne modifie rien. Le diff est la pièce à porter fidèlement |
-| **B3** ✅ | L'onglet Gabarit — *CARACTÉRISÉ `v1.37.89`, legacy **16 PASS / 0 FAIL**, port à faire* | Écrit **en base**, jamais sur une machine. Porte la décision 4.1 |
+| **B3** ✅ | L'onglet Gabarit — *PORTÉ `v1.37.90`, **16 legacy / 19 portage**, 0 FAIL* | Écrit **en base**, jamais sur une machine. Porte la décision 4.1 |
 | **B4** | Les écritures distantes : `deploy`, `multiDeploy`, `prerequisites`, `restore` | **MODIFIE** le parc. À exercer par interception avec avortement, comme D9a et D9b |
 
 L'onglet Historique se lit dans `user_logs` : il tombe dans B1 (aucune route dédiée).

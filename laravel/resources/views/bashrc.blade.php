@@ -215,10 +215,52 @@
 </section>
 
 <section class="rw-section" data-rw="bashrc-panneau-gabarit" hidden>
-    <h2 class="rw-section__entete">{{ __('bashrc.onglet_gabarit') }}</h2>
-    <p class="rw-prose">{{ __('bashrc.non_porte_texte') }}</p>
-    <a class="rw-lien" href="{{ rtrim(config('app.url_legacy'), '/') }}/bashrc/"
-       target="_blank" rel="noopener">{{ __('bashrc.non_porte_lien') }} ↗</a>
+    <h2 class="rw-section__entete">{{ __('bashrc.gabarit_titre') }}</h2>
+    <p class="rw-prose">{{ __('bashrc.gabarit_intro') }}</p>
+
+    <p class="rw-aide" data-rw="bashrc-gabarit-meta">
+        {{ __('bashrc.gabarit_lignes') }} <span data-rw="bashrc-gabarit-lignes">—</span>
+        · {{ __('bashrc.gabarit_octets') }} <span data-rw="bashrc-gabarit-octets">—</span>
+        · {{ __('bashrc.gabarit_sha') }} <code class="rw-code" data-rw="bashrc-gabarit-sha">—</code>
+    </p>
+
+    <label class="rw-champ">
+        <span class="rw-visuellement-cache">{{ __('bashrc.gabarit_titre') }}</span>
+        <textarea class="rw-saisie rw-saisie--code" rows="24" spellcheck="false"
+                  data-rw="bashrc-gabarit-editeur"
+                  placeholder="{{ __('bashrc.gabarit_chargement') }}"></textarea>
+    </label>
+
+    {{--
+        ── CE QUE LA RECONNAISSANCE EST, ET CE QU'ELLE N'EST PAS ───────────
+
+        Huit formes connues, reconnues au vol et NOMMEES. Le backend ne valide
+        que la syntaxe (`bash -n`) et la taille : une requete forgee ne voit
+        aucun de ces motifs.
+
+        L'encart dit donc explicitement sa PORTEE. Un ecran qui parlerait de
+        « contenu valide » promettrait une barriere qui n'existe pas — et le
+        legacy, mesure, ne le fait pas non plus. Le portage ne regresse pas
+        la-dessus, il precise.
+    --}}
+    <div class="rw-avertissement" data-rw="bashrc-gabarit-danger" hidden>
+        <strong>{{ __('bashrc.danger_titre') }}</strong>
+        <span data-rw="bashrc-gabarit-danger-liste"></span>
+        <span class="rw-aide">{{ __('bashrc.danger_portee') }}</span>
+    </div>
+
+    <p class="rw-aide" role="status" aria-live="polite" data-rw="bashrc-gabarit-etat"></p>
+
+    <div class="rw-actions">
+        <div class="rw-actions__gauche">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="bashrc-gabarit-annuler"
+                    disabled>{{ __('bashrc.gabarit_annuler') }}</button>
+        </div>
+        <button type="button" class="rw-bouton"
+                data-rw="bashrc-gabarit-enregistrer"
+                disabled>{{ __('bashrc.gabarit_enregistrer') }}</button>
+    </div>
 </section>
 @endif
 
