@@ -82,21 +82,35 @@ migration, et une raison de ne pas empiler des décorateurs qui s'appuient sur c
 Balayage de `backend/routes/*.py` : **85** routes qui manipulent un `machine_id` portent le
 décorateur, **44** ne le portent pas, dont **21 qui mutent**.
 
-Les chiffres bruts ne sont pas des défauts : beaucoup de ces routes agissent sur *toutes* les machines
-par construction, ou ne désignent pas une machine précise. **Deux seulement ont été vérifiées ligne à
-ligne**, et les deux sont des IDOR réels :
+### ⚠ RETRACTATION — ce paragraphe accusait à tort, et la mesure du §7 le dément
 
-| route | ce qu'elle écrit | garde |
-|---|---|---|
-| `POST /server_lifecycle` (`admin.py:93`) | `UPDATE machines SET lifecycle_status, retire_date WHERE id = <machine_id du corps>` | `@require_role(2)` seul |
-| `POST /exclude_user` (`admin.py:115`) | `INSERT INTO user_exclusions (machine_id, …)` | `@require_role(2)` seul |
+**La première version de cette section qualifiait `POST /server_lifecycle` et `POST /exclude_user`
+d'IDOR réels. C'est FAUX, et voici pourquoi.**
 
-Dans les deux cas le `machine_id` vient du **corps de la requête** et n'est confronté à rien. Un
-rôle 2 restreint à certaines machines agit donc sur **n'importe laquelle**, `srv-zabbix` (id 1,
-production) comprise.
+Les deux routes portent `@require_role(2)`, soit rôle **≥ 2** (`helpers.py:241-247`). Or
+`check_machine_access` — sur lequel repose `@require_machine_access` — commence par
+`if role_id >= 2: return True` (`helpers.py:299-300`). **Tout appelant qui franchit `@require_role(2)`
+franchit donc `check_machine_access` sans condition.** Ajouter le décorateur manquant à ces deux routes
+ne changerait strictement rien.
 
-Sa voisine `POST /server_status` (`monitoring.py:57-60`) porte, elle, les trois décorateurs. La
-différence n'est pas motivée dans le code.
+`@require_machine_access` ne contraint que le **rôle 1**. Sur une route également gardée par
+`@require_role(2)`, il est fonctionnellement **inerte** — y compris sur `POST /server_status`, qui le
+porte.
+
+Ce que la section peut légitimement dire, et rien de plus : **l'asymétrie entre les deux routes n'est
+pas motivée dans le code**, et elle induit en erreur — c'est elle qui m'a fait écrire « IDOR ». Elle
+mérite d'être uniformisée pour que le code cesse de suggérer une protection qu'il n'apporte pas ; ce
+n'est pas un correctif de sécurité.
+
+**Le balayage lui-même perd donc l'essentiel de son sens** pour les routes gardées par
+`@require_role(2)` : l'absence du décorateur y est sans conséquence. Il ne garde sa valeur que sur les
+routes atteignables par un rôle 1 — et la seule qui compte alors est `/deploy` (§1), justement parce
+qu'elle ne porte **aucune** garde de rôle. Le contrôle en corps qu'elle applique
+(`check_machine_access(mid)`, `ssh.py:262`) est donc le vrai et le seul contrôle utile de la route.
+
+*Leçon : un balayage par motif se trompe toujours dans le sens qui rassure — mais il peut aussi se
+tromper dans le sens qui alarme, et j'y suis tombé. « 21 routes mutantes sans le décorateur » comptait
+des routes où le décorateur n'aurait rien fait.*
 
 **Deux absences sont en revanche DÉLIBÉRÉES et documentées** — les citer évite qu'on les « corrige » :
 
@@ -270,3 +284,77 @@ contourne.
 
 **Conséquence pour l'exploitant : l'arbitrage `NOPASSWD: ALL` de K4 ne peut plus être décidé sur la
 seule lecture de `users.sudo`.** Il faut d'abord décider qui peut écrire ce drapeau.
+
+---
+
+## 7. Ce que `@require_machine_access` vérifie réellement — et ce qu'il ne vérifie pas
+
+Question posée par la session qui porte `adm/`, avant de décider si son portage de D6d peut s'appuyer
+sur ce décorateur ou doit poser son propre contrôle. La réponse tient en trois points, et le troisième
+dément le §2 de ce document.
+
+### Il résout et confronte — mais seulement ce qu'il trouve
+
+`backend/routes/helpers.py:319-348` :
+
+```python
+data = request.get_json(silent=True) or {}
+ids = []
+single = (data.get('machine_id') or request.args.get('machine_id')
+          or data.get('server_id') or request.args.get('server_id'))
+if single: ids.append(single)
+for key in ('machine_ids', 'server_ids'):
+    val = data.get(key)
+    if isinstance(val, list): ids.extend(val)
+denied = [mid for mid in ids if not check_machine_access(mid)]
+if denied: return 403
+return func(*args, **kwargs)
+```
+
+**Si `ids` est vide, `denied` est vide, et la fonction est appelée.** C'est la classe « un garde sans
+objet ne garde rien », et le décorateur porte lui-même la trace d'une première occurrence, dans sa
+propre docstring :
+
+> *Patch A01 : avant, seul machine_id/server_id (singulier) etait lu. Les routes a parametre pluriel
+> (deploy_platform_key, deploy_service_account, ...) voyaient donc machine_id=None -> le decorateur
+> etait un no-op et n'imposait aucun controle.*
+
+Le correctif a traité **le cas** — les listes — pas **la forme**. Trois angles morts subsistent :
+
+| ce qui n'est pas lu | conséquence |
+|---|---|
+| les **paramètres de chemin** Flask (`kwargs`) | une route `/x/<int:machine_id>` verrait le décorateur en no-op |
+| `machine_ids` / `server_ids` passés en **query string** | seul le corps JSON est lu pour les listes |
+| tout identifiant sous un **autre nom** | no-op silencieux |
+
+**Mesuré : aucune route du dépôt ne combine aujourd'hui le décorateur avec un identifiant de chemin.**
+Les trois routes en `<int:machine_id>` (`/supervision/overrides/<id>` ×2, `/supervision/agents/<id>`)
+ne le portent pas du tout. Il n'y a donc pas de no-op vivant de cette cause — mais c'est un piège posé
+pour toute route neuve, **et c'est directement le cas de D6d** : une route portée qui mettrait
+`machine_id` dans son chemin et compterait sur le décorateur n'aurait aucun contrôle.
+
+### Il ne contraint QUE le rôle 1
+
+`check_machine_access` (`helpers.py:294-300`) commence par :
+
+```python
+if role_id >= 2:
+    return True
+```
+
+Donc sur toute route également gardée par `@require_role(2)`, le décorateur est **fonctionnellement
+inerte** : tous ses appelants le franchissent sans condition. C'est le cas de `/server_status`, qui le
+porte, comme de `/server_lifecycle`, qui ne le porte pas — **et c'est ce qui invalide le §2**, où
+j'avais lu l'asymétrie comme une vulnérabilité.
+
+### Réponse à D6d
+
+- pour `/server_status`, le décorateur est **redondant** avec `@require_role(2)`, mais la fonction
+  revalide elle-même `machine_id is None → 400` (`monitoring.py:72-74`) puis résout l'IP en base plutôt
+  que d'accepter une IP brute (patch A01-02, écrit dans sa docstring). **C'est ce contrôle en corps qui
+  travaille**, pas le décorateur ;
+- un portage ne doit donc **pas** s'appuyer sur `@require_machine_access` pour restreindre un rôle 2 :
+  il ne le fait pas et n'a jamais prétendu le faire ;
+- s'il faut restreindre un rôle 2 à un sous-ensemble de machines, c'est un contrôle à écrire, sur
+  **l'objet résolu** — un `SELECT` sur `machines WHERE id = ?` d'abord, puis la décision. Ce qui est
+  exactement le correctif déjà identifié au §5 pour lever l'ambiguïté de `updated`.
