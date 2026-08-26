@@ -475,6 +475,15 @@ declare -A REF_LEGACY=(
   # les trois : si elle changeait de mains, deux attendus deviendraient faux
   # sans que rien ne le signale.
   [go-services-s1]=16
+  # `services/` sous-lot S2 : les trois LECTURES distantes. 12 sur le legacy.
+  # (13 avait ete inscrit par erreur : `verifiePortage` rend un INFO cote
+  # legacy, pas un PASS — un ecart assume ne compte pas dans le total.)
+  # La suite joint reellement la machine 2 — mais c'est un CONTENEUR SANS
+  # systemd : `systemctl list-units` n'y rend rien et la page annonce « 0
+  # services charges ». Un appel REUSSI qui rend une liste vide, pas un echec.
+  # Ce qui est mesure : que le geste part, qu'il vise la bonne machine, qu'aucune
+  # ecriture ne l'accompagne, et que la page DIT ce qu'elle a obtenu.
+  [go-services-s2]=12
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
@@ -497,7 +506,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1
+  go-services-s1 go-services-s2
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -512,7 +521,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1
+  go-services-s1 go-services-s2
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

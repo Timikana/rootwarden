@@ -6602,3 +6602,64 @@ fusionnés sans accord verbal. La seule correction qui ferme le trou pour **les 
 
 Porté au §7 du plan, avec E-142, E-144 et E-147 : **quatre correctifs backend attendent le même
 arbitrage**, et trois d'entre eux sont la même famille — un garde absent ou un repli permissif.
+
+---
+
+## E-150 — `services/` : la liste des services protégés ne connaît que la forme `.service`
+
+**Calculé le 2026-08-27** — le vrai calcul de `base`, exécuté contre la vraie liste du module.
+
+`backend/routes/services.py`, aux **cinq** routes mutantes :
+
+```python
+base = service.replace('.service', '')
+if base in PROTECTED_SERVICES:      # ['sshd','ssh','systemd-journald','systemd-logind','dbus','dbus-broker']
+    return jsonify({'success': False, 'message': f'Service protege : {base}'}), 403
+```
+
+La liste ne contient que des noms **de service**. systemd, lui, pilote le même démon par plusieurs
+types d'unités :
+
+| unité demandée | `base` calculé | protégé ? |
+|---|---|---|
+| `ssh` · `sshd` · `ssh.service` · `sshd.service` | `ssh` / `sshd` | **oui** |
+| **`ssh.socket`** | `ssh.socket` | **non** |
+| **`sshd.socket`** | `sshd.socket` | **non** |
+| **`ssh@.service`** | `ssh@` | **non** |
+| **`systemd-journald.socket`** | `systemd-journald.socket` | **non** |
+
+`_SAFE_SERVICE_RE` (`^[a-zA-Z0-9@._:-]+$`) laisse passer toutes ces formes.
+
+### Ce que cela coûte
+
+Sur un hôte à **activation par socket** — le défaut sur les Debian récentes —, `systemctl stop
+ssh.socket` empêche toute nouvelle connexion SSH. **Y compris celle par laquelle RootWarden pilote la
+machine.** Le module se couperait de sa propre cible, et la protection qui existe précisément pour
+l'empêcher ne s'y opposerait pas.
+
+### Ce qui est établi, et ce qui ne l'est pas
+
+- **Établi par calcul** : les formes ci-dessus ne sont pas protégées. Ce n'est pas une lecture — le
+  calcul a été exécuté contre le module réel.
+- **Non établi** : que `ssh.socket` soit présent et actif sur les machines du parc. La vérification
+  distante n'a pas abouti faute d'identifiant, et **on n'en fabrique pas**. La gravité réelle dépend
+  donc d'un fait non mesuré.
+
+C'est la même discipline qu'E-149 et que le repli `NOPASSWD: ALL` de `ssh/` : dire ce qui est prouvé,
+et dire ce qui ne l'est pas.
+
+### Ce que ce module fait BIEN, et qui rend ce défaut d'autant plus notable
+
+**La protection est appliquée sur la REQUÊTE, aux cinq routes mutantes — pas seulement à l'écran.**
+Le JS désactive aussi les boutons (`svc.protected ? 'disabled …'`). **Les deux couches gardent**, ce
+qui est la première fois dans tout ce chantier. Le défaut n'est pas l'absence de garde : c'est que la
+garde compare des noms là où systemd raisonne en unités.
+
+### Correction
+
+Normaliser vers l'unité, pas vers le nom : comparer sur le radical **avant le premier point**
+(`ssh.socket` → `ssh`), ou étendre la liste aux types d'unités. La première ferme la famille entière ;
+la seconde n'en ferme que ce qu'on a pensé à écrire.
+
+**Touche le backend de production.** Porté au §7 avec E-142, E-144, E-147 et E-149 : **cinq
+correctifs backend attendent le même arbitrage.**
