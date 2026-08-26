@@ -2171,6 +2171,85 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.69 — `adm/` D6c caracterise : l'import CSV contourne une garde de role 3
+
+`tests/e2e/go-adm-import-csv.mjs` — **7 PASS / 0 FAIL sur le legacy**. La suite **n'est pas encore
+inscrite dans le LOT** : cote portage l'import n'existe pas, elle y serait rouge, et une reference
+rouge rendrait le LOT rouge. Elle s'inscrira avec le port.
+
+#### E-130 — `users.sudo` s'ecrit par un fichier, sans la garde de role 3 du geste dedie
+
+`users.sudo` est la **precondition du repli `NOPASSWD: ALL`** du module `ssh/`, le point le plus
+dangereux du depot. Le geste dedie pour la poser, `adm/api/toggle_sudo.php`, porte
+`checkAuth([ROLE_SUPERADMIN])` — role 3 SEUL.
+
+`import_csv.php:162` lit `$data['sudo']` et l'ecrit directement. **Aucun controle de role.** La garde
+hierarchique du fichier existe, elle est correcte, et elle ne touche que `$roleId`.
+
+Mesure au navigateur, un fichier depose dans le formulaire :
+
+    compte importe (role|sudo|courriel) : 2|1|(nul)
+
+Le drapeau est retire dans la seconde qui suit.
+
+**CE QUI EST MESURE ET CE QUI EST LU, dit separement** : la CAPACITE d'ecrire `sudo = 1` est mesuree
+au clic, au role 3. La FRANCHISSABILITE au role 2 est etablie par LECTURE — le formulaire vit sur
+`admin_page.php`, gardee par `can_admin_portal` qui admet le role 2, et rien sur le chemin du `sudo`
+ne consulte le role. Aucun compte d'epreuve n'est a la fois role 2 et porteur de la permission : il
+n'y a pas de quoi la mesurer au navigateur. Meme prudence que sur le repli lui-meme.
+
+#### E-131 — un compte importe est inutilisable, et irrecuperable
+
+Le mot de passe genere (`bin2hex(random_bytes(8))`) n'est **ni affiche, ni stocke, ni envoye** :
+la variable meurt a la fin de l'iteration. `$sendWelcome`, qui l'aurait envoye, est **du code mort** —
+lu une fois, jamais utilise, et **aucun formulaire n'emet `send_welcome`**. Reste la reinitialisation,
+qui exige un `email` — colonne **facultative** du CSV. Mesure : `courriel : (nul)`.
+
+Le compte est donc cree, actif, sans acces et sans recuperation. Il occupe un nom, compte dans les
+listes, et apparait dans les selecteurs d'identite — c'est exactement ce qui est arrive aux cinq
+comptes `e2e_test_*` du §7.
+
+#### E-132 — la politique de mot de passe des COMPTES s'applique aux MACHINES, sur un seul chemin
+
+`import_csv.php:89` appelle `encryptPassword($data['password'])` **sans son second argument**, donc
+avec `$validate = true` ; `manage_servers.php:115` passe `false`. Mesure : une ligne CSV portant
+`motdepasse` ne cree aucune machine, la meme valeur passe par le formulaire.
+
+Le choix du formulaire est le bon : **un mot de passe de machine est impose par la machine**, pas
+choisi ici. L'import applique donc une regle sans objet, et en silence.
+
+#### E-129 s'etend : il y a TROIS copies du garde SSRF, pas deux
+
+`import_csv.php:66-70` en porte une version a **cinq** conditions au lieu de sept, toujours par
+prefixes. Mesuree au clic, par depot de fichier : `::ffff:169.254.169.254` est importee.
+
+| copie | conditions | tombe |
+|---|---|---|
+| `manage_servers.php` | 7 | oui |
+| `import_csv.php` | 5 | oui |
+| `server_actions.php` | 0 | oui |
+
+Trois copies, trois niveaux de completude, **aucune qui tienne**.
+
+#### Ce qui marche, et qu'il faut dire aussi
+
+L'import de serveurs cree bien la machine, chiffre les deux secrets en `sodium:`, et pose les
+etiquettes de la colonne `tags`. La garde hierarchique sur `role_id` est correcte : un role 2 qui
+importe `role=admin` obtient un role 1. **C'est uniquement `sudo` qui echappe au controle.**
+
+#### Le piege de mesure, repaye une cinquieme fois — puis une sixieme
+
+Le formulaire d'import de serveurs vit dans un PANNEAU D'ONGLET masque, pas dans un `<details>` : le
+deplier ne suffit pas. Puis la correction a **deplace** le probleme — ouvrir l'onglet des serveurs
+FERME celui des comptes, et l'etape suivante mesurait a son tour un panneau masque. L'onglet suit
+desormais le formulaire vise.
+
+#### Trois decisions avant le port
+
+Que faire de la colonne `sudo` du format CSV, comment rendre utilisable un compte importe, et le
+correctif E-129 cote legacy. Toutes trois en §7 du plan. **Le port de D6c attend ces reponses** :
+retirer une colonne d'un format de fichier documente change un contrat.
+
 ### v1.37.68 — deux defauts du PORTAGE, trouves par relecture croisee
 
 Une seconde session a relu D1 -> D6b en lecture seule et a trouve **deux defauts que mes suites n'ont

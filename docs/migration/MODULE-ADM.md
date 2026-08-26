@@ -332,7 +332,7 @@ dernier** — et chaque rang porte son motif.
 | **D5** ✅ | **Permissions et accès** — *PORTÉ `v1.37.63`, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
 | **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
-| **D6c** | **Serveurs — import CSV** | `includes/import_csv.php` | 189 | DEUX imports : comptes et serveurs. `$sendWelcome` est lu une fois, jamais utilisé, et aucun formulaire ne l'émet |
+| **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
 | **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **INVENTORIÉ le 2026-08-26, voir §5.0nonies.** Découpage manqué par l'inventaire initial : ces deux capacités de la carte vivent dans le BACKEND. `/server_status` ouvre une connexion TCP et écrit `online_status` ; `/server_lifecycle` porte un **IDOR** et rend un `updated` ambigu |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
@@ -778,6 +778,38 @@ Conséquence pour la suite de D6d : le geste est **mesurable au clic**, à condi
 `helpers.py` fait `future = executor.submit(run)` puis `return future.result()`. **Il bloque.** La
 réponse est donc le VERDICT du geste, pas un accusé de réception — l'interface peut s'y fier. Voir la
 règle générale au §8 du plan.
+
+### 5.0decies D6c — CARACTÉRISÉ le 2026-08-26 (`v1.37.69`) ; le PORT reste à faire
+
+`tests/e2e/go-adm-import-csv.mjs` — **7 PASS / 0 FAIL sur le legacy**. La suite **n'est pas encore
+inscrite dans le LOT** : côté portage l'import n'existe pas, elle y serait rouge, et une référence
+rouge rendrait le LOT rouge. Elle s'inscrira avec le port.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-130** | l'import écrit `users.sudo = 1` **sans aucun contrôle de rôle**, alors que le geste dédié `api/toggle_sudo.php` exige `checkAuth([ROLE_SUPERADMIN])`. Or `users.sudo` est la précondition du repli `NOPASSWD: ALL` de `ssh/` |
+| **E-131** | un compte importé reçoit un mot de passe aléatoire que **personne** ne connaît ; `$sendWelcome` est du code mort et aucun formulaire ne l'émet ; `email` est facultatif, donc il n'y a **ni accès ni récupération** |
+| **E-132** | la politique de mot de passe des COMPTES s'applique aux mots de passe de MACHINES — `encryptPassword()` appelé sans son second argument — là où le formulaire la désactive |
+| **E-129** | une **TROISIÈME** copie du garde SSRF, en cinq conditions au lieu de sept, et elle tombe comme les deux autres |
+
+**Ce qui marche, et qu'il faut dire aussi** : l'import de serveurs crée bien la machine, chiffre les
+deux secrets en `sodium:`, et pose les étiquettes de la colonne `tags`. La garde hiérarchique sur
+`role_id` (`:155-158`) est correcte — un rôle 2 qui importe `role=admin` obtient un rôle 1. **C'est
+uniquement `sudo` qui échappe au contrôle.**
+
+**Ce qui est mesuré et ce qui est lu.** La capacité d'écrire `sudo = 1` est mesurée au clic, au rôle 3.
+La franchissabilité au rôle 2 est établie par **lecture** : aucun compte d'épreuve n'est à la fois de
+rôle 2 et porteur de `can_admin_portal`. Les deux se disent séparément — c'est la même prudence que sur
+le repli `NOPASSWD: ALL` lui-même.
+
+**Le piège de mesure, repayé une cinquième fois** : le formulaire d'import de serveurs vit dans un
+PANNEAU D'ONGLET masqué, pas dans un `<details>`. Le déplier ne suffit pas. Puis la correction a déplacé
+le problème — ouvrir l'onglet des serveurs **ferme** celui des comptes, et l'étape suivante mesurait à
+son tour un panneau masqué. L'onglet suit désormais le formulaire visé.
+
+**Trois décisions attendent l'exploitant avant le port** — elles sont en §7 du plan : que faire de la
+colonne `sudo` du format CSV, comment rendre utilisable un compte importé, et le correctif E-129 côté
+legacy.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
