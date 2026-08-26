@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Support\SecretSupervision;
+use App\Support\SecretExploitation;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -180,7 +180,7 @@ class Supervision
         // s'invalide pas est une bombe a retardement pour l'appelant suivant.
         $this->configurationMemorisee = null;
 
-        $chiffre = SecretSupervision::chiffre($pskClair);
+        $chiffre = SecretExploitation::chiffre($pskClair);
         if ($chiffre !== null) {
             $valeurs['tls_psk_value'] = $chiffre;
         }
