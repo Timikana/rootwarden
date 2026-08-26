@@ -82,4 +82,57 @@
     if (annuler && panneau) {
         annuler.addEventListener('click', function () { panneau.hidden = true; });
     }
+
+    /* ═══ Test de connexion — sous-lot D6d ════════════════════════════════
+     *
+     * SEUL APPEL RESEAU DE CETTE PAGE, et il ne part QUE sur un clic. Une page
+     * qui joint le parc en s'ouvrant, c'est `health_check.php` — qui ECRIT sur
+     * `srv-zabbix` au simple chargement. Ici, rien ne part tant que personne ne
+     * l'a demande, machine par machine.
+     *
+     * La sonde appartient au backend : elle passe par la passerelle, qui porte
+     * les controles dans l'ordre et propage le statut tel quel.
+     */
+    var PASSERELLE = '/api/gateway';
+
+    function resultatDe(id) {
+        return document.querySelector('[data-rw="serveur-test-resultat"][data-id="' + id + '"]');
+    }
+
+    document.querySelectorAll('[data-rw="serveur-tester"]').forEach(function (bouton) {
+        bouton.addEventListener('click', function () {
+            var id = bouton.dataset.id;
+            var sortie = resultatDe(id);
+            if (! sortie) { return; }
+
+            // LE BOUTON SE DESACTIVE PENDANT LA SONDE. Elle dure jusqu'a 5 s
+            // cote backend ; sans cela, on clique trois fois en croyant que
+            // rien ne se passe, et trois sondes partent.
+            bouton.disabled = true;
+            sortie.textContent = libelles.test_en_cours || '';
+
+            fetch(PASSERELLE + '/server_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machine_id: parseInt(id, 10) }),
+            }).then(function (r) {
+                return r.json().catch(function () { return null; });
+            }).then(function (d) {
+                // FAIL-CLOSED SUR LA FORME DE LA REPONSE : sans `success`, on
+                // annonce un echec de test, jamais un etat de machine. Un
+                // `undefined` affiche comme « hors ligne » serait un mensonge.
+                if (! d || d.success !== true) {
+                    sortie.textContent = libelles.test_echec || '';
+
+                    return;
+                }
+                var gabarit = d.status === 'online' ? libelles.test_en_ligne : libelles.test_hors_ligne;
+                sortie.textContent = (gabarit || '').replace('__IP__', d.ip || '');
+            }).catch(function () {
+                sortie.textContent = libelles.test_echec || '';
+            }).then(function () {
+                bouton.disabled = false;
+            });
+        });
+    });
 }());

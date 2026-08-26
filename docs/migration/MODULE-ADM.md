@@ -333,7 +333,7 @@ dernier** — et chaque rang porte son motif.
 | **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
 | **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
 | **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
-| **D6d** | **Serveurs — cycle de vie et test de connexion** | `POST /server_lifecycle`, `POST /server_status` (backend) | — | **INVENTORIÉ le 2026-08-26, voir §5.0nonies.** `/server_status` ouvre une sonde TCP et écrit `online_status` ; `/server_lifecycle` rend un `updated` **ambigu**. L'asymétrie de décorateurs entre les deux est **cosmétique** — mesuré |
+| **D6d** ✅ | **Serveurs — cycle de vie et test de connexion** — *PORTÉ `v1.37.72`, voir §5.0nonies* | `POST /server_lifecycle`, `POST /server_status` (backend) | — | `/server_status` : sonde TCP, écrit `online_status`, **pas** de session SSH. `/server_lifecycle` rend un `updated` **ambigu** (E-133), fermé au portage en écrivant en base |
 | **D7** | **Clés d'API** | `api_keys.php` | 535 | **Aucun appel backend** : c'est du CRUD en base. Mais il affiche et crée des clés, et la contrainte permanente « ne jamais afficher une clé d'API » s'applique au portage comme aux captures |
 | **D8** | **Comptes distants** | `server_users.php` | 387 | **Première écriture distante.** Huit routes backend, dont `/delete_remote_user`, `/remove_user_keys`, `/server_user_remove_key`, `/sshd_allow_user` : ce sous-lot **détruit des comptes Unix** sur des machines réelles |
 | **D9** | **Politiques sudo et SFTP** | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. Porte le défaut de §4.1 (cinq cases absentes) et la fusion `policy_action` de §5.2 |
@@ -741,7 +741,7 @@ d'audit) — il est désormais DIT dans `web.php`, sinon la relecture suivante l
 vivant de `server_actions.php`. Le bloc commenté va de `:661` à `:923` — la ligne 770 est dedans. Le
 fond ne change pas : le fichier est bien vivant, par ses quatre autres appels.
 
-### 5.0nonies D6d — INVENTORIÉ le 2026-08-26, pas encore porté
+### 5.0nonies D6d — PORTÉ le 2026-08-26 (`v1.37.72`)
 
 Mesuré par relecture croisée puis **vérifié ici** — un rapport d'agent n'est pas une mesure.
 
@@ -807,6 +807,38 @@ Conséquence pour la suite de D6d : le geste est **mesurable au clic**, à condi
 `helpers.py` fait `future = executor.submit(run)` puis `return future.result()`. **Il bloque.** La
 réponse est donc le VERDICT du geste, pas un accusé de réception — l'interface peut s'y fier. Voir la
 règle générale au §8 du plan.
+
+**PORTÉ le 2026-08-26 (`v1.37.72`).** `tests/e2e/go-adm-cycle-connexion.mjs` — **12 PASS / 0 FAIL sur
+le legacy**, **14 PASS / 0 FAIL sur le portage**.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-133** | `updated: cur.rowcount > 0` sans `SELECT` préalable : « rien à changer » et « machine absente » rendent tous deux **0**. Mesuré : `200 {"success":true,"updated":false}` sur une réécriture sans effet |
+
+**Le portage ferme l'écart par la STRUCTURE, pas par un libellé mieux tourné.** Le cycle de vie
+s'écrit **en base** — la route du backend ne fait qu'un `UPDATE` sur `machines`, sans effet distant :
+il n'y a rien à hériter d'un aller-retour sauf son défaut. Même décision que V4 pour
+`supervision_config`. `Serveurs::definitCycle()` résout la machine **avant** de la muter, et rend
+donc trois issues au lieu de deux : `introuvable`, `inchange`, `fait`.
+
+Le **test de connexion** passe, lui, par la passerelle : sa sonde TCP appartient au backend, et
+`/server_status` est déjà en liste blanche. Il ne part **que sur un clic** — `health_check.php` a
+montré ce que coûte une page qui joint le parc en s'ouvrant — et le bouton se désactive pendant les
+5 s de la sonde, sans quoi on clique trois fois en croyant que rien ne se passe.
+
+**Une bonne propriété du legacy, reprise et assertée** : l'interface n'offre **jamais** le bouton de
+l'état courant. C'est elle qui rend « reposer la valeur en place » inatteignable au clic, donc E-133
+latent plutôt qu'ordinaire.
+
+**Un test qui ne pouvait pas échouer, attrapé par un `(aucune)` dans le journal.** Le premier jet de
+l'étape cherchait le bouton de l'état courant, ne le trouvait pas, ne déclenchait aucune requête — et
+son assertion passait sur une **chaîne vide**. La suite exige désormais d'avoir mesuré quelque chose
+avant de conclure, et la mesure se fait par une **requête forgée**, avec son motif écrit.
+
+**Deux défauts de rendu vus à l'image** : les boutons de cycle ne se poussaient pas à gauche
+(`.rw-jetons` écrase le `margin-right: auto` de `.rw-actions__gauche`), et « Archiver » portait le
+rouge danger — le même que « Retirer du parc », alors que l'un est réversible et l'autre non. **Deux
+rouges côte à côte pour deux niveaux de conséquence ne signalent plus rien.**
 
 ### 5.0decies D6c — CARACTÉRISÉ le 2026-08-26 (`v1.37.69`) ; le PORT reste à faire
 

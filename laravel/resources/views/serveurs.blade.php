@@ -243,6 +243,51 @@
                     </div>
                 </form>
 
+                {{-- ═══ Cycle de vie et test de connexion — sous-lot D6d ══════
+                     LES BOUTONS DE CYCLE SONT DES FORMULAIRES, et l'état
+                     COURANT n'est jamais proposé — bonne propriété reprise du
+                     legacy, et mesurée : c'est elle qui rend « reposer la
+                     valeur en place » inatteignable au clic.
+
+                     Le test de connexion, lui, passe par la passerelle : sa
+                     sonde TCP appartient au backend. Il n'est JAMAIS déclenché
+                     au chargement — `health_check.php` a montré ce que coûte
+                     une page qui joint le parc en s'ouvrant. --}}
+                <section class="rw-bloc-secondaire" data-rw="serveur-exploitation">
+                    <p class="rw-etiquette">{{ __('serveurs.exploitation_titre') }}</p>
+                    <div class="rw-actions">
+                        {{-- PAS `.rw-jetons` ICI : sa `margin: 6px 0 10px` écrase le
+                             `margin-right: auto` de `.rw-actions__gauche`, et le bloc
+                             ne se pousse plus à gauche. Vu à l'image. Les formulaires
+                             sont déjà `display: inline`, ils s'alignent d'eux-mêmes. --}}
+                        <div class="rw-actions__gauche">
+                            @foreach ($serveurs->cyclesProposables($cycle) as $etat)
+                                <form method="POST" action="{{ route('serveurs.cycle', ['id' => $m['id']]) }}"
+                                      class="rw-jetons__forme">
+                                    @csrf
+                                    <input type="hidden" name="etat" value="{{ $etat }}">
+                                    {{-- AUCUN DE CES TROIS GESTES N'EST DESTRUCTEUR : ils
+                                         sont tous réversibles par leur voisin. Le rouge
+                                         danger reste donc réservé à « Retirer du parc »,
+                                         qui, lui, ne se défait pas. Deux rouges côte à
+                                         côte pour deux niveaux de conséquence différents
+                                         ne signalent plus rien. --}}
+                                    <button type="submit" class="rw-bouton rw-bouton--discret"
+                                            data-rw="serveur-cycle" data-etat="{{ $etat }}">
+                                        {{ __('serveurs.cycle_' . $etat) }}
+                                    </button>
+                                </form>
+                            @endforeach
+                        </div>
+                        <button type="button" class="rw-bouton rw-bouton--discret"
+                                data-rw="serveur-tester" data-id="{{ $m['id'] }}">
+                            {{ __('serveurs.btn_tester') }}
+                        </button>
+                    </div>
+                    <p class="rw-aide" data-rw="serveur-test-resultat" data-id="{{ $m['id'] }}"
+                       role="status" aria-live="polite"></p>
+                </section>
+
                 {{-- ═══ Étiquettes ═══════════════════════════════════════════
                      QUATRE FORMULAIRES, PAS UN `fetch`. Les quatre gestes du
                      legacy meurent sur un jeton CSRF que son enrobage de

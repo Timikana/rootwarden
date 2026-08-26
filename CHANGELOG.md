@@ -2171,6 +2171,61 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.72 — `adm/` D6d : cycle de vie et test de connexion portes
+
+**19 entrees de menu portees sur 33** (inchange : D6d enrichit une page deja portee). Legacy
+**12/0**, portage **14/0**.
+
+#### E-133 — `updated` recouvre deux situations opposees
+
+`POST /server_lifecycle` rend `{'success': True, 'updated': cur.rowcount > 0}` **sans `SELECT`
+prealable**. Or `rowcount` vaut 0 aussi bien quand on reecrit la valeur deja en place que quand la
+machine n'existe pas :
+
+| situation | rowcount | ce que ca veut dire |
+|---|---|---|
+| reecriture de la valeur en place | 0 | rien a faire — **succes** |
+| machine inexistante | 0 | cible fausse — **echec** |
+
+Une interface qui affiche « echec » ment dans le premier cas, une qui affiche « fait » ment dans le
+second. **L'information n'est pas dans la reponse.** Mesure : `200 {"success":true,"updated":false}`.
+
+**Par une requete FORGEE, et c'est le point interessant** : aucun clic ne peut produire ce cas, parce
+que l'interface n'offre **jamais** le bouton de l'etat courant. Bonne propriete du legacy, reprise et
+assertee. Le defaut est donc **latent** par l'interface — ce qui abaisse sa gravite sans changer sa
+nature.
+
+#### Le portage ferme l'ecart par la STRUCTURE
+
+Le cycle de vie s'ecrit **en base**, sans passer par la route du backend : celle-ci ne fait qu'un
+`UPDATE` sur `machines` — aucun effet distant, aucune session SSH, aucun courriel — il n'y a donc rien
+a heriter d'un aller-retour, sauf son defaut. Meme decision que V4 pour `supervision_config`.
+
+`Serveurs::definitCycle()` **resout la machine avant de la muter** et rend trois issues au lieu de
+deux : `introuvable`, `inchange`, `fait`. L'ambiguite ne se corrige pas au niveau du libelle — elle se
+corrige en **allant chercher l'information qui manquait**, et un `SELECT` suffit.
+
+Le **test de connexion** passe par la passerelle : sa sonde TCP appartient au backend et
+`/server_status` est deja en liste blanche. Il ne part **que sur un clic** — `health_check.php` a
+montre ce que coute une page qui joint le parc en s'ouvrant — et le bouton se desactive pendant les
+5 s de la sonde, sans quoi on clique trois fois en croyant que rien ne se passe. La lecture de la
+reponse est fail-closed : sans `success`, on annonce un **echec de test**, jamais un etat de machine.
+
+#### Un test qui ne pouvait pas echouer, attrape par un `(aucune)`
+
+Le premier jet de l'etape cherchait le bouton de l'etat courant sur une machine deja dans cet etat,
+ne le trouvait pas, ne declenchait aucune requete — et son assertion passait sur une **chaine vide**.
+Seule la ligne `reponse a une reecriture sans effet : (aucune)` l'a revele. La suite exige desormais
+d'avoir mesure quelque chose avant de conclure.
+
+#### Deux defauts de rendu vus a l'image
+
+Les boutons de cycle ne se poussaient pas a gauche : `.rw-jetons` porte `margin: 6px 0 10px`, qui
+ecrase le `margin-right: auto` de `.rw-actions__gauche`. Et « Archiver » portait le rouge danger — le
+meme que « Retirer du parc », alors que l'un est reversible et l'autre non. **Deux rouges cote a cote
+pour deux niveaux de consequence ne signalent plus rien** : le rouge reste au seul geste qui ne se
+defait pas.
+
 ### v1.37.71 — correction : verifier qu'un garde est ABSENT n'est pas verifier que son absence COMPTE
 
 `v1.37.69` inscrivait un **IDOR** sur `POST /server_lifecycle`, au motif qu'il n'a pas
