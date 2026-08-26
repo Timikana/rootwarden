@@ -390,7 +390,56 @@ try {
         void texte;
     });
 
-    // ══ 5. AJOUTER une machine, PAR LE FORMULAIRE ══════════════════════════
+    // ══ 5. UNE ADRESSE MAPPEE EST-ELLE REFUSEE ? ══════════════════════════
+    //
+    // Le garde A10-01 du legacy compare des PREFIXES DE CHAINE
+    // (`strpos($ip, '169.254.') === 0`). `::ffff:169.254.169.254` designe la
+    // MEME adresse — le point de metadonnees des nuages publics, nomme par le
+    // commentaire du correctif — et ne commence par aucun des prefixes testes.
+    //
+    // Le premier jet du portage avait recopie cette regle, angle mort compris.
+    // Releve par une relecture croisee le 2026-08-26, pas par cette suite :
+    // d'ou cette etape. Le portage compare desormais sur la forme BINAIRE.
+    //
+    // CETTE ETAPE VIENT AVANT LA CREATION LEGITIME, et ce n'est pas un detail :
+    // posee apres, elle porterait le MEME nom qu'une machine deja creee, serait
+    // refusee pour cause de DOUBLON, et passerait pour une bonne nouvelle. Une
+    // assertion qui reussit pour la mauvaise raison ne se relit jamais.
+    //
+    // GESTE REEL : on tape l'adresse dans le formulaire et on clique. Pas de
+    // requete forgee — le formulaire d'ajout existe sur les deux cibles, et
+    // c'est justement le chemin « durci » qu'on veut mettre a l'epreuve.
+    await etape('une adresse mappee IPv4-en-IPv6 est-elle refusee ?', async () => {
+        await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        await ouvreOnglet(page);
+        await deplie(page, C.ajout.nom);
+
+        await saisis(page, C.ajout.nom, EPREUVE);
+        await saisis(page, C.ajout.ip, '::ffff:169.254.169.254');
+        await saisis(page, C.ajout.port, '22');
+        await saisis(page, C.ajout.user, 'epreuve');
+        await saisis(page, C.ajout.mdp, 'epreuve-sans-valeur-1!');
+        await saisis(page, C.ajout.mdpRoot, 'epreuve-sans-valeur-2!');
+
+        const nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+        await page.click(C.ajout.valide);
+        try { await nav; } catch { /* redirection */ }
+        await dors(600);
+
+        const creee = litEnBase(`SELECT ip FROM rootwarden.machines WHERE name = '${EPREUVE}'`);
+        constate('machine creee avec une adresse mappee', creee[0] || '(aucune)');
+        // RETIREE TOUT DE SUITE, sans attendre le `finally` : une adresse de
+        // metadonnees en base est exactement ce que le correctif empeche.
+        retireLEpreuve();
+
+        verifiePortage('une adresse de metadonnees ecrite en IPv6 mappe est refusee',
+            creee.length === 0,
+            `${creee[0]} acceptee — le garde compare des PREFIXES DE CHAINE, et `
+            + '`::ffff:169.254.169.254` ne commence par aucun d\'eux. La copie « durcie » '
+            + 'de `manage_servers.php` tombe donc aussi, pas seulement celle de `server_actions.php`');
+    });
+
+    // ══ 6. AJOUTER une machine, PAR LE FORMULAIRE ══════════════════════════
     await etape('ajouter une machine par le formulaire', async () => {
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         await ouvreOnglet(page);
@@ -430,7 +479,7 @@ try {
             secrets[0] || '(absent)');
     });
 
-    // ══ 6. MODIFIER la machine, PAR LE FORMULAIRE ══════════════════════════
+    // ══ 7. MODIFIER la machine, PAR LE FORMULAIRE ══════════════════════════
     await etape('modifier la machine par le formulaire', async () => {
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         await ouvreOnglet(page);
@@ -467,7 +516,7 @@ try {
             apres[0] || '(absente)');
     });
 
-    // ══ 7. RETIRER la machine, PAR LE FORMULAIRE ═══════════════════════════
+    // ══ 8. RETIRER la machine, PAR LE FORMULAIRE ═══════════════════════════
     await etape('retirer la machine par le formulaire', async () => {
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         await ouvreOnglet(page);

@@ -451,14 +451,42 @@ Route::middleware('session.authentifiee')->group(function () {
      */
     Route::get('/comptes', ComptesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes');
+
+    /*
+     * ══ LES GARDES DE `comptes` NE SONT PAS TOUTES AU MEME NIVEAU ══════════
+     *
+     * Elles viennent de fichiers DIFFERENTS du legacy, et il faut les relire un
+     * par un — l'intuition ne les devine pas. Releve par une relecture croisee
+     * le 2026-08-26, apres qu'un premier jet eut mis `cle-ssh` et
+     * `deverrouiller` au role 2 :
+     *
+     *   `manage_roles.php:31`      role 2 et 3   -> mot de passe, second facteur
+     *                              + garde HIERARCHIQUE `:80` (un role < 3 ne
+     *                                touche pas un role >= 3)
+     *   `api/unlock_user.php:23`   role 3 SEUL   -> deverrouillage
+     *   `api/update_user.php:31`   role 3 SEUL   -> pose de la cle SSH
+     *   `api/delete_user.php`      role 2 et 3   -> suppression
+     *
+     * DEUX ETAIENT AFFAIBLIES PAR LE PORTAGE, et c'est le pire resultat
+     * possible : un role 2 pouvait poser la cle SSH sur le compte d'un role 3 —
+     * donc, une fois la cle deployee, obtenir un acces machine sous une
+     * identite qui n'est pas la sienne. Le legacy l'interdisait par le ROLE, et
+     * n'avait donc pas besoin d'une garde hierarchique ici.
+     *
+     * UNE EST RENFORCEE, ET C'EST DELIBERE : la suppression passe de « role 2
+     * et 3 » a `role:3`. Motif ecrit en PARITE E-116 — supprimer un compte
+     * EFFACE son journal d'audit et rompt la chaine que D1 vient de rendre
+     * verifiable. Une divergence voulue se declare, sinon la relecture suivante
+     * la lit comme une erreur.
+     */
     Route::post('/comptes', [ComptesController::class, 'creer'])
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.creer');
     Route::post('/comptes/{id}/mot-de-passe', [ComptesController::class, 'motDePasse'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.mot-de-passe');
     Route::post('/comptes/{id}/cle-ssh', [ComptesController::class, 'cleSsh'])
-        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
     Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])
-        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
     /*
      * Suppression et anonymisation — sous-lot D4. Role 3 sur la ROUTE : le
      * legacy exige le meme role, mais dans le corps du fichier.

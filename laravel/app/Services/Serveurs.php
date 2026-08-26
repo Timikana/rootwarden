@@ -108,12 +108,41 @@ class Serveurs
     }
 
     /**
-     * L'adresse d'une machine — le garde SSRF, complete.
+     * L'adresse d'une machine — le garde SSRF, sur la forme BINAIRE.
      *
-     * Les adresses privees RFC1918 restent AUTORISEES : un reseau d'entreprise
-     * est la cible normale de RootWarden. Ce qui est refuse, c'est ce qui ne
-     * designe pas une machine joignable en SSH et sert a faire parler le serveur
-     * a lui-meme ou a un point de metadonnees.
+     * ══ POURQUOI PAS `strpos` ═════════════════════════════════════════════
+     *
+     * Le legacy compare des PREFIXES DE CHAINE : `strpos($ip, '169.254.') === 0`.
+     * Le premier jet de ce portage a recopie cette regle — et son angle mort
+     * avec. Mesure du 2026-08-26, apres relecture croisee :
+     *
+     *   169.254.169.254           refusee
+     *   ::ffff:169.254.169.254    ACCEPTEE   <- la MEME adresse
+     *   ::ffff:a9fe:a9fe          ACCEPTEE   <- la meme encore, en hexadecimal
+     *   ::ffff:127.0.0.1          ACCEPTEE
+     *   ::ffff:224.0.0.1          ACCEPTEE
+     *
+     * La notation IPv4-mappee-IPv6 designe exactement la meme machine et ne
+     * commence par aucun des prefixes testes. Le commentaire du correctif
+     * A10-01 NOMME sa cible — « empecher un admin compromis d'inserer
+     * 169.254.169.254 » — et la cible passait, sous un autre nom.
+     *
+     * C'est la lecon deja payee sur `//exemple.com` : **valider la FORME avant
+     * le contenu, et ne jamais recopier une regle de securite**. Ici l'adresse
+     * est d'abord reduite a sa forme BINAIRE par `inet_pton`, les formes
+     * mappees et compatibles sont ramenees a leur IPv4, et la comparaison porte
+     * sur des OCTETS. Une notation nouvelle ne peut plus contourner la regle,
+     * parce que la regle ne regarde plus la notation.
+     *
+     * ══ CE QUI EST REFUSE ═════════════════════════════════════════════════
+     *
+     *   IPv4   0/8   127/8   169.254/16   224/4 (multicast)   240/4 (reserve)
+     *   IPv6   ::    ::1     fe80::/10    ff00::/8
+     *
+     * 240/4 va au-dela de ce que le legacy annoncait : c'est de l'espace
+     * reserve, jamais joignable en SSH, et `255.255.255.255` en fait partie.
+     * Les adresses privees RFC1918 restent AUTORISEES — un reseau d'entreprise
+     * est la cible normale de RootWarden.
      */
     public function valideIp(string $ip): bool
     {
@@ -121,35 +150,68 @@ class Serveurs
             return false;
         }
 
-        $reserve = str_starts_with($ip, '127.')          // bouclage 127/8
-            || str_starts_with($ip, '169.254.')          // lien-local 169.254/16
-            || str_starts_with($ip, '0.')                // 0.0.0.0/8
-            || $ip === '::1'                             // bouclage IPv6
-            || stripos($ip, 'fe80:') === 0               // lien-local IPv6
-            || $ip === '::' || $ip === '0:0:0:0:0:0:0:0' // non specifiee
-            || $this->estMulticast($ip);                 // 224/4 — ABSENT du legacy
+        $brut = @inet_pton($ip);
+        if ($brut === false) {
+            return false;
+        }
 
-        return ! $reserve;
+        $brut = $this->reduitEnIpv4($brut);
+
+        return strlen($brut) === 4 ? $this->ipv4Utilisable($brut) : $this->ipv6Utilisable($brut);
     }
 
     /**
-     * Multicast IPv4 (224.0.0.0/4) et IPv6 (ff00::/8).
+     * Ramene `::ffff:a.b.c.d` et `::a.b.c.d` a leurs quatre octets IPv4.
      *
-     * La condition que le commentaire du legacy annonce et que son code n'a
-     * jamais portee. Comparaison sur le premier octet, pas sur le texte : « 224. »
-     * ne dirait rien de 225 a 239.
+     * Les deux notations designent une machine IPv4 ; les laisser en seize
+     * octets ferait passer les controles IPv4 a cote de leur objet.
      */
-    private function estMulticast(string $ip): bool
+    private function reduitEnIpv4(string $brut): string
     {
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-            $premier = (int) explode('.', $ip)[0];
-
-            return $premier >= 224 && $premier <= 239;
+        if (strlen($brut) !== 16) {
+            return $brut;
+        }
+        if (str_starts_with($brut, str_repeat("\0", 10) . "\xff\xff")) {
+            return substr($brut, 12);
+        }
+        // `::a.b.c.d` (IPv4-compatible, obsolete mais toujours resolue). `::`
+        // et `::1` en sont exclus : ils ne designent pas une machine IPv4 et
+        // sont traites par la regle IPv6.
+        $queue = substr($brut, 12);
+        if (str_starts_with($brut, str_repeat("\0", 12))
+            && $queue !== "\0\0\0\0" && $queue !== "\0\0\0\1") {
+            return $queue;
         }
 
-        $brut = @inet_pton($ip);
+        return $brut;
+    }
 
-        return $brut !== false && strlen($brut) === 16 && ord($brut[0]) === 0xFF;
+    /** @param  string  $brut  quatre octets */
+    private function ipv4Utilisable(string $brut): bool
+    {
+        /** @var array<int, int> $o */
+        $o = array_values(unpack('C4', $brut));
+
+        return ! (
+            $o[0] === 0                          // 0.0.0.0/8
+            || $o[0] === 127                     // bouclage 127/8
+            || ($o[0] === 169 && $o[1] === 254)  // lien-local 169.254/16
+            || $o[0] >= 224                      // multicast 224/4 et reserve 240/4
+        );
+    }
+
+    /** @param  string  $brut  seize octets */
+    private function ipv6Utilisable(string $brut): bool
+    {
+        /** @var array<int, int> $o */
+        $o = array_values(unpack('C16', $brut));
+
+        return ! (
+            $brut === str_repeat("\0", 16)                // non specifiee ::
+            || $brut === str_repeat("\0", 15) . "\1"       // bouclage ::1
+            || ($o[0] === 0xFE && ($o[1] & 0xC0) === 0x80) // lien-local fe80::/10
+            || $o[0] === 0xFF                             // multicast ff00::/8
+        );
     }
 
     /**

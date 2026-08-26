@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 legacy / 18 portage, 0 échec**). Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Remesure : `./scripts/rejouer-lot.sh`
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **118** — numérotés jusqu'à **E-128** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **119** — numérotés jusqu'à **E-129** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -578,9 +578,21 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   membres** — un clic, N machines, N courriels. Le sous-lot testera le bouton par **interception et
   avortement** ; un déclenchement réel attend votre mot.
 
+**Un correctif de production à décider — E-129**
+- Les **deux** copies de `validateInput()` du legacy comparent des préfixes de chaîne :
+  `::ffff:169.254.169.254` traverse le garde A10-01, y compris par le formulaire « durci ». Mesuré au
+  clic. Le correctif est écrit et éprouvé côté portage (`inet_pton` puis comparaison de plages, 18 cas,
+  0 écart) mais il touche `legacy/adm/includes/`, non porté et en production. **Rien n'a été modifié
+  côté legacy.**
+
 **Hygiène de la base d'épreuve — relevé le 2026-08-26, aucune action prise**
 - **5 comptes `e2e_test_*`** subsistent dans `users`, créés entre le **2026-07-25** et le
-  **2026-08-12** par des suites antérieures qui ne les ont pas retirés. Ils faussent tout comptage de
+  **2026-08-12** par `tests/e2e/02-admin-users.test.mjs:14`, qui nomme son compte
+  `` e2e_test_${Date.now()} `` et **ne nettoie pas dans un `finally`** : le retrait est une ÉTAPE de
+  test (`:93`), et le fichier anticipe lui-même son échec en commentaire (`:115`). Chaque exécution
+  interrompue laisse donc une ligne DISTINCTE que rien ne réclamera. Cette suite n'est pas dans le LOT.
+  Ils sont proposés dans la liste « Compte RootWarden » de la page ChatOps portée — donc offerts comme
+  IDENTITÉ d'exécution, alors qu'aucun ne porte de second facteur. Ils faussent tout comptage de
   comptes, et ils sont visibles à l'écran d'administration. Les supprimer est destructeur et ils ne
   m'appartiennent pas : **rien n'a été touché**. Remesure :
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
@@ -950,6 +962,19 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   emprunte.** Le patch A10-01 vit dans `manage_servers.php` et manque dans la copie de
   `server_actions.php` — laquelle n'a aucun appelant vivant, donc personne ne la regarde. Quand deux
   fichiers portent chacun leur copie d'une fonction de validation, les comparer **ligne à ligne**.
+- **Porter l'INTENTION d'un correctif, pas sa forme.** `Serveurs::valideIp()` a recopié fidèlement la
+  comparaison de préfixes du patch A10-01 — et son angle mort : `::ffff:169.254.169.254` désigne la
+  cible que le commentaire nomme et ne commence par aucun préfixe testé. La leçon de `//exemple.com`
+  était déjà ici et n'a pas empêché de la refaire. Sur une règle de sécurité : **normaliser d'abord**
+  (`inet_pton`, `new URL`, `realpath`), comparer ensuite, jamais sur le texte reçu.
+- **Les gardes d'un module ne sont pas toutes au même niveau, et l'intuition ne les devine pas.** Les
+  cinq gestes de `comptes` viennent de QUATRE fichiers du legacy : `manage_roles.php` en rôle 2/3,
+  `api/unlock_user.php` et `api/update_user.php` en rôle **3 seul**, `api/delete_user.php` en 2/3. Une
+  lecture globale donne une réponse moyenne, et elle est fausse. **Relever fichier par fichier**, et
+  garder le relevé à côté du code.
+- **Une divergence VOULUE se déclare.** Le portage renforce la suppression d'un compte (rôles 2 et 3 →
+  rôle 3 seul) parce qu'elle efface un journal d'audit. Non dit, un renforcement se relit comme une
+  erreur — et se « corrige » à l'envers.
 - **Chercher le délimiteur le plus EXTÉRIEUR.** E-114 avait accusé l'apostrophe de casser un littéral
   JavaScript dans `onclick="return confirm('…')"`, et conclu « seulement en français ». D6a a mesuré
   au navigateur : ce qui coupe est le **guillemet double** de la traduction, qui ferme **l'attribut

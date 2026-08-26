@@ -2171,6 +2171,78 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.68 — deux defauts du PORTAGE, trouves par relecture croisee
+
+Une seconde session a relu D1 -> D6b en lecture seule et a trouve **deux defauts que mes suites n'ont
+pas vus** — tous deux dans du code que je venais d'ecrire. Verifies ici avant d'etre relayes, puis
+corriges, puis munis d'un garde-fou dont on a PROUVE qu'il peut echouer.
+
+#### 1. Le garde SSRF que je venais de « completer » ne tenait pas — E-129
+
+Le correctif A10-01 compare des PREFIXES DE CHAINE (`strpos($ip, '169.254.') === 0`). J'avais porte
+cette regle fidelement, et j'y avais meme AJOUTE le multicast en gardant cette forme. Or :
+
+    169.254.169.254           refusee
+    ::ffff:169.254.169.254    ACCEPTEE   <- la MEME adresse
+    ::ffff:a9fe:a9fe          ACCEPTEE   <- la meme, en hexadecimal
+    ::ffff:127.0.0.1          ACCEPTEE
+    ::ffff:224.0.0.1          ACCEPTEE
+
+Mesure au clic : le formulaire d'ajout du legacy — **la copie « durcie », celle qui porte le
+correctif** — cree la machine avec `::ffff:169.254.169.254`. Ce n'est donc pas E-127 sous un autre
+angle : E-127 dit qu'une des deux copies n'a pas le garde, E-129 dit que **le garde lui-meme ne tient
+pas**. Donner la copie durcie a `server_actions.php` n'aurait rien ferme.
+
+C'est de la fidelite AU MAUVAIS NIVEAU : ce qu'il fallait porter, c'est l'INTENTION du correctif. La
+lecon (« valider la FORME avant le contenu, ne jamais recopier une regle de securite ») etait au plan
+depuis `//exemple.com`, et je l'ai ratee quand meme.
+
+`Serveurs::valideIp()` reduit desormais l'adresse par `inet_pton`, ramene les notations mappee et
+compatible a leur IPv4, puis compare des OCTETS : 0/8, 127/8, 169.254/16, 224/4, 240/4 cote IPv4 ;
+`::`, `::1`, `fe80::/10`, `ff00::/8` cote IPv6. **18 cas mesures, 0 ecart.**
+
+**Le legacy reste vulnerable** : le correctif touche un fichier de production non porte. Rien n'y a ete
+modifie ; la decision est en §7 du plan.
+
+#### 2. Deux gardes AFFAIBLIES par le portage
+
+Le pire resultat possible pour une migration.
+
+| geste | legacy | portage (avant) | portage (apres) |
+|---|---|---|---|
+| poser la cle SSH d'un compte | `api/update_user.php:31` **role 3 seul** | `role:2` | **`role:3`** |
+| deverrouiller un compte | `api/unlock_user.php:23` **role 3 seul** | `role:2` | **`role:3`** |
+| supprimer un compte | `api/delete_user.php` roles 2 et 3 | `role:3` | `role:3`, renforcement DELIBERE |
+
+Un role 2 pouvait poser la cle SSH sur le compte d'un role 3 — donc, la cle une fois deployee, obtenir
+un acces machine sous une identite qui n'est pas la sienne. Le legacy l'interdisait par le ROLE ; le
+portage avait descendu le niveau **et** omis la garde hierarchique que `motDePasse` et
+`reinitialiserTotp` portent.
+
+La cause : les cinq gestes de `comptes` viennent de **quatre fichiers differents** du legacy et ne sont
+pas au meme niveau. Une lecture globale du module donne une reponse moyenne, et la moyenne est fausse.
+
+Le renforcement sur la suppression (E-116 : supprimer un compte efface son journal d'audit) est
+desormais DIT dans `web.php` — non declare, un renforcement se relit comme une erreur.
+
+#### Deux garde-fous, tous deux prouves capables d'echouer
+
+- `go-adm-comptes` lit les gardes **reellement enregistrees** par le routeur et les compare a un
+  tableau releve fichier par fichier. Le motif de ne pas passer par un clic est ecrit : aucun compte
+  disponible ne distingue `role:2 + perm` de `role:3`, un role 2 sans la permission recevant 403 dans
+  les deux cas. Verifie : **0** ecart avec l'attente juste, **2** avec celle d'avant le correctif,
+  **1** sur une route absente. Reference legacy 13 -> 14, portage 17 -> 18 ;
+- `go-adm-serveurs` tape `::ffff:169.254.169.254` **dans le formulaire** et verifie qu'aucune machine
+  n'est creee. L'etape est placee AVANT la creation legitime : posee apres, elle aurait porte le meme
+  nom, aurait ete refusee pour cause de DOUBLON, et serait passee pour une bonne nouvelle. Reference
+  portage 20 -> 21, legacy inchangee a 18 (l'ecart y est constate).
+
+#### Ce sur quoi la relecture s'est trompee
+
+Elle donnait `manage_servers.php:770` comme appelant vivant de `server_actions.php`. Le bloc commente
+va de `:661` a `:923` : la ligne 770 est dedans. Le fond ne change pas — le fichier est bien vivant,
+par ses quatre autres appels.
+
 ### v1.37.67 — `adm/` D6b : quatre gestes qui ne marchent pas, et un garde qui se trompe deux fois de sens
 
 **19 entrees de menu portees sur 33** (inchange : D6b enrichit une page deja portee). Legacy **10/0**,

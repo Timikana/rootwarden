@@ -692,6 +692,55 @@ AU-DESSUS de son libellé. Les captures de D6a ne descendaient pas jusqu'à une 
 D6b y défilent, et le défaut est apparu à la première image. **Deux fois de suite, une capture
 montrait autre chose que son sujet.**
 
+### 5.0octies Correction du 2026-08-26 (`v1.37.68`) — deux défauts du PORTAGE, trouvés par relecture croisée
+
+Une seconde session a relu D1 → D6b en lecture seule. Elle a trouvé **deux défauts que mes suites
+n'ont pas vus**, et les deux sont dans du code que je venais d'écrire. Vérifiés ici avant d'être
+relayés — un rapport d'agent n'est pas une mesure — puis corrigés.
+
+**1. Le garde SSRF que je venais de « compléter » ne tenait pas** (E-129). J'avais porté fidèlement la
+règle du legacy — comparaison de préfixes de chaîne — et j'y avais même **ajouté** le multicast en
+gardant cette forme. `::ffff:169.254.169.254` passait donc, sur les deux portails. Mesuré au clic :
+le formulaire d'ajout du legacy crée la machine avec cette adresse.
+
+C'est de la fidélité **au mauvais niveau** : ce qu'il fallait porter, c'est l'INTENTION du correctif
+A10-01, pas sa forme. La leçon (« valider la FORME avant le contenu, ne jamais recopier une règle de
+sécurité ») était déjà écrite au plan depuis `//exemple.com`, et je l'ai ratée quand même.
+
+**2. Deux gardes AFFAIBLIES par le portage**, et c'est le pire résultat possible pour une migration :
+
+| geste | legacy | portage (avant) | portage (après) |
+|---|---|---|---|
+| poser la clé SSH d'un compte | `api/update_user.php:31` **rôle 3 seul** | `role:2` | `role:3` |
+| déverrouiller un compte | `api/unlock_user.php:23` **rôle 3 seul** | `role:2` | `role:3` |
+| supprimer un compte | `api/delete_user.php` rôles 2 et 3 | `role:3` | `role:3`, **renforcement délibéré** |
+
+Un rôle 2 pouvait donc poser la clé SSH sur le compte d'un rôle 3 — et, la clé une fois déployée,
+obtenir un accès machine sous une identité qui n'est pas la sienne. Le legacy l'interdisait par le
+RÔLE, et n'avait pas besoin d'une garde hiérarchique à cet endroit ; le portage avait descendu le
+niveau **et** omis la garde hiérarchique que `motDePasse` et `reinitialiserTotp` portent.
+
+La cause est identifiable : les gardes de `comptes` viennent de **quatre fichiers différents** du
+legacy et ne sont pas au même niveau. `manage_roles.php` est en rôle 2/3, les deux `api/` en rôle 3
+seul. Une lecture globale du module donne une réponse moyenne, et la moyenne est fausse.
+
+**Le renforcement sur la suppression est délibéré** (E-116 : supprimer un compte efface son journal
+d'audit) — il est désormais DIT dans `web.php`, sinon la relecture suivante le lirait comme une erreur.
+
+**Deux garde-fous ajoutés, et tous deux prouvés capables d'échouer** :
+
+- `go-adm-comptes` lit les gardes **réellement enregistrées** par le routeur et les compare à un
+  tableau relevé fichier par fichier. Ce n'est pas un clic, et le motif est écrit : aucun compte
+  disponible ne distingue `role:2 + perm` de `role:3` — un rôle 2 sans la permission reçoit 403 dans
+  les deux cas, l'assertion passerait quoi qu'il arrive. Vérifié : 0 écart avec l'attente juste, **2**
+  avec l'attente d'avant le correctif, **1** sur une route absente ;
+- `go-adm-serveurs` tape `::ffff:169.254.169.254` **dans le formulaire** et vérifie qu'aucune machine
+  n'est créée. Geste réel, sur les deux cibles.
+
+**Ce que la relecture n'a pas eu raison sur** : elle donnait `manage_servers.php:770` comme appelant
+vivant de `server_actions.php`. Le bloc commenté va de `:661` à `:923` — la ligne 770 est dedans. Le
+fond ne change pas : le fichier est bien vivant, par ses quatre autres appels.
+
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 
 Le plan les porte en §7 sous « autorisés, donc à faire ». Vérifiés :

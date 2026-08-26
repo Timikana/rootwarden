@@ -56,6 +56,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { execFileSync } from 'child_process';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
@@ -295,6 +296,70 @@ try {
     constate('borne d\'identifiant avant l\'epreuve', String(borne));
 
     // ══ 1. La garde, aux trois roles ═══════════════════════════════════════
+    // ══ LES GARDES ENREGISTREES, COMPAREES AU LEGACY ══════════════════════
+    //
+    // POURQUOI CE N'EST PAS UN CLIC. La propriete a mesurer est « quel role
+    // cette route exige », et aucun compte disponible ne la distingue : les
+    // trois comptes d'epreuve sont role 3, role 2 SANS `can_admin_portal`, et
+    // role 1. Un role 2 sans la permission recoit 403 que la route demande
+    // `role:2 + perm` ou `role:3` — l'assertion passerait dans les deux cas.
+    // C'est un test qui ne peut pas echouer, le piege releve sur
+    // `go-cve-schedules.mjs`.
+    //
+    // On lit donc la garde REELLEMENT ENREGISTREE par le routeur, et on la
+    // compare a un tableau releve fichier par fichier dans le legacy. Ce n'est
+    // pas une logique de page : c'est une configuration, et elle se mesure la
+    // ou elle vit.
+    //
+    // MOTIF : un premier jet de D3 avait mis `cle-ssh` et `deverrouiller` au
+    // role 2 alors que `api/update_user.php:31` et `api/unlock_user.php:23`
+    // portent `checkAuth([ROLE_SUPERADMIN])`. Un role 2 pouvait donc poser la
+    // cle SSH sur le compte d'un role 3. Releve par relecture croisee, pas par
+    // cette suite — d'ou cette etape.
+    await etape('les gardes enregistrees correspondent-elles au legacy ?', async () => {
+        if (CIBLE !== 'laravel') {
+            constate('gardes du routeur', 'sans objet : le legacy n\'a pas de table de routes');
+            verifie('le legacy garde ses points d\'entree fichier par fichier', true);
+
+            return;
+        }
+
+        /** Releve dans le legacy, fichier par fichier. Voir le bloc de `web.php`. */
+        const ATTENDU = {
+            'comptes.mot-de-passe': 'role:2',   // manage_roles.php:31 + garde hierarchique :80
+            'comptes.second-facteur': 'role:3', // idem, mais renforce : voir web.php
+            'comptes.cle-ssh': 'role:3',        // api/update_user.php:31 checkAuth([ROLE_SUPERADMIN])
+            'comptes.deverrouiller': 'role:3',  // api/unlock_user.php:23 checkAuth([ROLE_SUPERADMIN])
+            'comptes.supprimer': 'role:3',      // RENFORCE volontairement — E-116
+        };
+
+        let routes = [];
+        try {
+            const brut = execFileSync('docker', [
+                'exec', 'rootwarden_laravel', 'php', 'artisan', 'route:list', '--json',
+            ], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+            routes = JSON.parse(brut);
+        } catch (e) {
+            verifie('la table des routes est lisible', false, String(e.message || e).split('\n')[0]);
+
+            return;
+        }
+
+        const parNom = new Map(routes.filter((r) => r.name).map((r) => [r.name, r.middleware || '']));
+        let ecarts = 0;
+        for (const [nom, garde] of Object.entries(ATTENDU)) {
+            const vue = parNom.has(nom) ? String(parNom.get(nom)) : '(route absente)';
+            const tient = vue.includes(garde);
+            if (! tient) {
+                ecarts += 1;
+                constate(`  ${nom}`, `attendu ${garde}, vu « ${vue.replace(/\s+/g, ' ')} »`);
+            }
+        }
+        constate('gardes verifiees', `${Object.keys(ATTENDU).length}, ${ecarts} ecart(s)`);
+        verifie('aucune garde n\'est plus faible que celle du legacy', ecarts === 0,
+            `${ecarts} route(s) hors du niveau releve dans le legacy`);
+    });
+
     await etape('garde role 1', async () => {
         const s = await connecte(COMPTE_BAS, SECRET_BAS);
         const rep = await s.page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
