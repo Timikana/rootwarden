@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.94** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.95** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,58 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.95 — `services/` S2 caracterise, et E-150 : la protection ne connait que la forme `.service`
+
+`go-services-s2.mjs`, **legacy 12 PASS / 0 FAIL**. Le portage reste a faire.
+
+#### E-150 — la liste des services proteges est contournee par les unites `.socket`
+
+Calcul EXECUTE contre le module reel, pas une lecture :
+
+    ssh.service   -> base=ssh          protege
+    ssh.socket    -> base=ssh.socket   NON protege
+    sshd.socket   -> base=sshd.socket  NON protege
+    ssh@.service  -> base=ssh@         NON protege
+
+`base = service.replace('.service','')` ne connait que la forme service ; systemd pilote le meme
+demon par plusieurs types d'unites. Sur un hote a activation par socket — le defaut sur Debian
+recente — arreter `ssh.socket` couperait l'acces SSH, **y compris celui de RootWarden**.
+
+**Etabli** : ces formes ne sont pas protegees. **Non etabli** : que ces unites soient presentes au
+parc — la verification distante n'a pas abouti faute d'identifiant, et **on n'en fabrique pas**.
+
+> **Ce module est le seul du chantier dont une protection soit appliquee sur la REQUETE — aux cinq
+> routes mutantes — ET reflethee a l'ecran.** Le defaut n'est pas l'absence de garde : c'est qu'elle
+> compare des noms la ou systemd raisonne en unites.
+
+Cinquieme correctif backend en attente d'arbitrage : E-142, E-144, E-147, E-149, E-150.
+
+#### Une question de l'inventaire, fermee
+`/services/logs` rend du **JSON** (`jsonify({'success': True, 'logs': logs})`), et `lines` est borne
+a `[10, 500]`. Aucun relais en flux n'est necessaire.
+
+#### Trois defauts de mesure, et les trois etaient dans l'instrument
+- **Le bouton de chargement du legacy n'a pas d'identifiant** — seulement `onclick="loadServices()"`.
+  Une premiere redaction croyait que la page chargeait au `change` et visait le mauvais element :
+  zero requete, deux FAIL.
+- **Les valeurs d'option du legacy sont des OBJETS JSON** (`getServer()` fait `JSON.parse`). Un
+  `page.select(sel, '2')` ne trouvait aucune option : rien n'etait selectionne, `getServer()` sortait
+  en silence, et la suite accusait la page. On choisit desormais l'option **dans les donnees
+  rendues**, quelle que soit la forme de sa valeur.
+- **La page n'ecrit pas dans le tableau** : `appendLog` ajoute ses messages a `#logs-container`. La
+  suite lisait `#services-tbody` et declarait la page MUETTE alors qu'elle explique, ailleurs.
+  *« Le legacy n'ecrit pas ou l'on croit. »*
+
+#### Ce que le banc borne, et c'est ecrit dans la suite
+`Test-Server-Debian` est un **conteneur sans systemd** : `systemctl list-units` n'y rend rien, et la
+page annonce « 0 services charges » — un appel REUSSI qui rend une liste vide, pas un echec. S2 ne
+peut donc pas mesurer le rendu d'un tableau peuple sur ce banc, et les assertions qui en dependent le
+CONSTATENT au lieu de passer en silence.
+
+Il en sort une propriete pour le portage : **un zero s'enonce**. « 0 services charges » est exact
+mais ne distingue pas « cette machine n'a pas systemd » de « l'enumeration a echoue » — et sur un
+module dont c'est tout l'objet, la difference decide du geste suivant.
 
 ### v1.37.94 — `services/` S1 porte : une assertion revele une regression du portage
 
