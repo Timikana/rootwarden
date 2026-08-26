@@ -239,7 +239,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 7 | `services/` | 631 | 1 | gestes sur machines |
 | 8 | `iptables/` | 870 | 1 | gestes sur machines, IDOR déjà corrigé |
 | 9 | `fail2ban/` | 872 | 1 | GeoIP en HTTP (ip-api gratuit) |
-| 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. **B1, B2 et B3 PORTÉS** (`v1.37.86`, `v1.37.88`, `v1.37.90`) — reste **B4 seul** (les écritures distantes). **Quatre** points à arbitrer, aucun n'est une faille. **§6 : trois inconnues sur cinq fermées par la LECTURE le 2026-08-26** — dont `root` proposé au déploiement, et « fusionner » qui n'équivaut pas à ce que son libellé laisse entendre |
+| 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. **B1, B2 et B3 PORTÉS** (`v1.37.86`, `v1.37.88`, `v1.37.90`). **B4 CARACTÉRISÉ `v1.37.91` mais son PORTAGE est SUSPENDU** — deux arbitrages, §7. **Quatre** points à arbitrer, aucun n'est une faille. **§6 : trois inconnues sur cinq fermées par la LECTURE le 2026-08-26** — dont `root` proposé au déploiement, et « fusionner » qui n'équivaut pas à ce que son libellé laisse entendre |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
 | 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7, D8 et D9 CLOS (D9a `v1.37.79`, D9b `v1.37.80`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quinze sous-lots, **trois restants** — D6c, D10, et l'archivage. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
 | 13 | `documentation.php`, `api/docs.php` | — | 2 | |
@@ -610,7 +610,22 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   m'appartiennent pas : **rien n'a été touché**. Remesure :
   `SELECT COUNT(*) FROM users WHERE name LIKE 'e2e\_test\_%'`.
 
-**`bashrc/` — cinq arbitrages, tous à faible enjeu** (`MODULE-BASHRC.md`, 2026-08-26)
+**`bashrc/` — deux arbitrages BLOQUANTS pour B4, ouverts le 2026-08-26**
+
+> Jusqu'ici, « signaler » suffisait : B1 à B3 n'écrivent sur aucune machine. **B4 remplace un fichier
+> exécuté à chaque connexion sur les machines cochées.** Signaler et empêcher n'y protègent plus de la
+> même façon, et un portage fige un comportement — d'où la suspension.
+
+- **« Tout cocher » doit-il continuer à retenir `root` ?** `_list_users` retient `UID == 0`, donc
+  `root` est dans la liste des comptes, et « Tout cocher » le sélectionne. Le portage de B2 l'a
+  reproduit **en l'annonçant** ; l'exclure et exiger une coche explicite serait un changement de
+  comportement.
+- **`srv-zabbix` doit-elle rester dans les cibles proposées ?** Mesuré par lecture :
+  `_bashrcSelectedMachines()` n'a **aucun filtre**, et le multi-déploiement envoie un
+  `/bashrc/deploy` par machine cochée. B1 l'a signalée visuellement ; la retirer de la liste serait
+  un changement de comportement.
+
+**`bashrc/` — trois arbitrages à faible enjeu** (`MODULE-BASHRC.md`, 2026-08-26)
 - **les huit motifs de danger du gabarit n'existent QUE dans le navigateur.** Le backend valide la
   syntaxe (`bash -n`) et la taille, pas le contenu. **Ce n'est pas une faille** — qui atteint la route
   détient déjà `can_manage_bashrc`, c'est-à-dire l'autorisation d'écrire le fichier qui s'exécute à
