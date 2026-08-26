@@ -225,6 +225,72 @@ try {
         verifie('le superadmin voit toutes les entrees declarees',
                 s === TOTAL_ENTREES, `${s} sur ${TOTAL_ENTREES}`);
 
+        /* ══ LE TOTAL SE RECONSTITUE-T-IL ? ═══════════════════════════════
+         *
+         * Personne ne le verifiait, et le decompte a derive : un relevé du
+         * 2026-08-26 ne retrouvait que 32 entrees sur 33 — son motif de lecture
+         * exigeait la forme sur une seule ligne, et `wazuh`, ecrit autrement,
+         * lui echappait. La derive etait inoffensive ; rien ne l'aurait dit.
+         *
+         * ON NE COMPTE PAS A L'EXPRESSION REGULIERE. La constante est lue PAR
+         * PHP, dans le conteneur : un tableau PHP lu par PHP n'a aucun angle
+         * mort, la ou tout motif en a un. Meme raison que pour la parite i18n —
+         * analyser du PHP a la regex revient a reecrire un interpreteur, et une
+         * entree mal lue est declaree absente a tort.
+         *
+         * ET ON ASSERTE LE ZERO, PAS SEULEMENT LA SOMME. `route + legacy == 33`
+         * passerait encore si une entree perdait ses deux cles pendant qu'une
+         * autre en gagnait deux. C'est `niLunNiLautre === 0` qui ferme le cas,
+         * et c'est l'invariant du projet : chaque entree porte `route` OU
+         * `legacy`, jamais les deux, jamais aucun.
+         */
+        let compte = null;
+        try {
+            const brut = execFileSync('docker', ['exec', 'rootwarden_laravel', 'php', '-r',
+                'require "/var/www/html/vendor/autoload.php";'
+                + '$app = require "/var/www/html/bootstrap/app.php";'
+                + '$t=0;$r=0;$l=0;$n=0;'
+                + 'foreach (App\\Support\\Navigation::SECTIONS as $es) { foreach ($es as $e) {'
+                + '$t++; if (isset($e["route"])) $r++; elseif (isset($e["legacy"])) $l++; else $n++; } }'
+                + 'echo json_encode(["total"=>$t,"route"=>$r,"legacy"=>$l,"ni"=>$n]);',
+            ], { encoding: 'utf8' });
+            compte = JSON.parse(brut.trim());
+        } catch (e) {
+            verifie('la constante Navigation::SECTIONS est lisible', false,
+                String(e.message || e).split('\n')[0]);
+        }
+
+        if (compte !== null) {
+            constate('entrees declarees', `total=${compte.total} route=${compte.route} `
+                + `legacy=${compte.legacy} ni-l-un-ni-l-autre=${compte.ni}`);
+
+            verifie('chaque entree porte `route` OU `legacy`, jamais aucun des deux',
+                compte.ni === 0,
+                `${compte.ni} entree(s) sans route ni legacy — l'etat du portage ne se lit `
+                + 'plus d\'un coup d\'oeil, et le total ne veut plus rien dire');
+
+            verifie('le total se reconstitue : route + legacy = total',
+                compte.route + compte.legacy === compte.total,
+                `${compte.route} + ${compte.legacy} = ${compte.route + compte.legacy}, `
+                + `attendu ${compte.total}`);
+
+            /* LE 33 EST UN CHIFFRE DE FLOTTE, PAS UNE CONSTANTE DE TEST. Le jour
+             * ou une entree de menu est ajoutee, cette assertion DOIT echouer —
+             * c'est ce qu'on veut. Le message le dit, sinon quelqu'un ajustera
+             * le nombre sans se demander pourquoi il a bouge. */
+            verifie('le nombre d\'entrees declarees vaut celui du plan',
+                compte.total === TOTAL_ENTREES,
+                `${compte.total} declarees contre ${TOTAL_ENTREES} attendues — si une entree a `
+                + 'ete AJOUTEE ou RETIREE, c\'est normal : mettre a jour `TOTAL_ENTREES` ICI **et** '
+                + 'le tableau d\'etat du §2 du plan. Ne pas ajuster l\'un sans l\'autre');
+
+            /* Le rendu au role 3 doit egaler la declaration : une entree
+             * declaree mais jamais rendue serait invisible a toute autre
+             * mesure de cette suite. */
+            verifie('le superadmin voit AUTANT d\'entrees que la constante en declare',
+                s === compte.total, `${s} rendues, ${compte.total} declarees`);
+        }
+
         // Un role sans permission ne doit voir AUCUNE entree d'administration.
         const sectionsRole1 = vus[0].menu.sections.map(x => x.toLowerCase());
         verifie('un role sans permission ne voit pas la section administration',
