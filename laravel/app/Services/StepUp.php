@@ -56,6 +56,27 @@ class StepUp
     public const OK = 'ok';
 
     /**
+     * Les gestes DU PORTAGE qui exigent une re-authentification.
+     *
+     * `RoutesBackend::MOTIFS_STEP_UP` ne couvre que les chemins transmis au
+     * backend Python — c'est son objet, et l'y elargir brouillerait son sens.
+     * Le portage a desormais ses propres gestes destructeurs, qui ne passent par
+     * aucune passerelle : le sous-lot D4 est le premier a en porter.
+     *
+     * La liste reste FERMEE, pour la meme raison qu'elle l'est cote backend :
+     * le legacy accepte n'importe quel nom d'action, le nettoie au caractere
+     * puis pose `_step_up_<ce que le client a envoye>` — on peut donc y poser
+     * une marque qui n'ouvre rien aujourd'hui, et quelque chose demain.
+     */
+    public const ACTIONS_PORTAGE = [
+        // Supprime un compte, et avec lui tout ce que les cles etrangeres
+        // emportent en cascade — son journal d'audit compris (PARITE E-116).
+        'compte_supprimer',
+        // Efface les donnees personnelles d'un compte en PRESERVANT son journal.
+        'compte_anonymiser',
+    ];
+
+    /**
      * L'action que ce chemin exige, ou `null` s'il n'exige rien.
      *
      * Le nom est DERIVE du chemin, et non pris dans une table : une route
@@ -68,10 +89,21 @@ class StepUp
         return RoutesBackend::actionStepUp($chemin);
     }
 
+    /**
+     * L'action est-elle l'une de celles qu'on garde ? Soit un chemin REELLEMENT
+     * garde cote backend, soit un geste destructeur du portage. Dans les deux
+     * cas la liste est fermee : une marque ne se pose jamais sur un nom libre.
+     */
+    private function actionConnue(string $action): bool
+    {
+        return RoutesBackend::cheminStepUp($action) !== null
+            || in_array($action, self::ACTIONS_PORTAGE, true);
+    }
+
     /** Une marque fraiche existe-t-elle pour ce compte et cette action ? */
     public function valide(int $idCompte, string $action): bool
     {
-        if (RoutesBackend::cheminStepUp($action) === null) {
+        if (! $this->actionConnue($action)) {
             return false;
         }
 
@@ -94,7 +126,7 @@ class StepUp
          * poserait une marque qui n'ouvre rien — ou qui ouvrira quelque chose
          * plus tard, quand un motif changera.
          */
-        if (RoutesBackend::cheminStepUp($action) === null) {
+        if (! $this->actionConnue($action)) {
             return 'step_up.action_inconnue';
         }
 

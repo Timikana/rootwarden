@@ -41,17 +41,17 @@
     }
 
     /** TOUT echec rend un objet, jamais une exception : un bouton doit revenir. */
-    async function appelle(chemin, corps) {
+    async function appelle(chemin, corps, methode) {
         try {
             const r = await fetch(chemin, {
-                method: 'POST',
+                method: methode || 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': jetonCsrf(),
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(corps || {}),
+                body: (methode || 'POST') === 'GET' ? undefined : JSON.stringify(corps || {}),
             });
             let json = null;
             try { json = await r.json(); } catch (e) { /* reponse non JSON */ }
@@ -138,11 +138,155 @@
         if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
     }
 
+    /* ── Suppression / anonymisation, et le step-up qui les garde ────────── */
+
+    const panneauSuppr = document.querySelector('[data-rw="comptes-panneau-suppression"]');
+    const panneauStepUp = document.querySelector('[data-rw="comptes-panneau-stepup"]');
+    /** Le geste en attente, remis en jeu apres un step-up reussi. */
+    let enAttente = null;
+
+    function fermeLesPanneaux() {
+        if (panneauSuppr) panneauSuppr.hidden = true;
+        if (panneauStepUp) panneauStepUp.hidden = true;
+    }
+
+    /**
+     * Un 403 qui NOMME son action ouvre le panneau de step-up et met le geste en
+     * attente. C'est la piece que le sous-lot A5 avait differee « a son premier
+     * consommateur » : D4 est ce consommateur.
+     */
+    function demandeStepUp(action, rejouer) {
+        enAttente = { action, rejouer };
+        const champ = panneauStepUp.querySelector('[data-rw="comptes-stepup-code"]');
+        champ.value = '';
+        panneauSuppr.hidden = true;
+        panneauStepUp.hidden = false;
+        champ.focus();
+    }
+
+    async function valideStepUp() {
+        if (! enAttente) return;
+        const champ = panneauStepUp.querySelector('[data-rw="comptes-stepup-code"]');
+        const bouton = panneauStepUp.querySelector('[data-rw="comptes-stepup-valider"]');
+        bouton.disabled = true;
+        const r = await appelle('/profil/step-up',
+            { action: enAttente.action, code: champ.value.trim() });
+        bouton.disabled = false;
+
+        if (! r.corps || ! r.ok || ! r.corps.success) {
+            dis((r.corps && r.corps.message) || garnis(L.err_reseau, { statut: r.statut }), 'echec');
+
+            return;
+        }
+        panneauStepUp.hidden = true;
+        const rejouer = enAttente.rejouer;
+        enAttente = null;
+        // Le geste repart de lui-meme : sans cela, l'operateur devrait
+        // recommencer, et une re-authentification qui ne sert a rien se
+        // transforme en gene qu'on cherche a contourner.
+        await rejouer();
+    }
+
+    /** Ouvre le panneau de suppression APRES avoir demande l'etat au serveur. */
+    async function ouvreSuppression(bouton) {
+        const id = bouton.dataset.id;
+        const nom = bouton.dataset.nom || '';
+        bouton.disabled = true;
+        const r = await appelle(`/comptes/${id}/etat-suppression`, null, 'GET');
+        bouton.disabled = false;
+        if (! r.ok || ! r.corps || ! r.corps.success) {
+            dis((r.corps && r.corps.message) || garnis(L.err_reseau, { statut: r.statut }), 'echec');
+
+            return;
+        }
+        if (r.corps.refus) { dis(r.corps.refus, 'echec'); return; }
+
+        const journaux = r.corps.journaux;
+        panneauSuppr.querySelector('[data-rw="comptes-suppression-texte"]').textContent =
+            garnis(L.suppr_question, { nom });
+        panneauSuppr.querySelector('[data-rw="comptes-suppression-detail"]').textContent =
+            journaux === 0
+                ? L.suppr_sans_journal
+                : garnis(L.suppr_avec_journal, { nombre: journaux });
+        panneauSuppr.querySelector('[data-rw="comptes-suppression-consigne"]').textContent =
+            garnis(L.suppr_consigne, { nom });
+        const saisie = panneauSuppr.querySelector('[data-rw="comptes-suppression-saisie"]');
+        saisie.value = '';
+        saisie.dataset.nom = nom;
+        saisie.dataset.id = id;
+        const confirmer = panneauSuppr.querySelector('[data-rw="comptes-suppression-confirmer"]');
+        // La suppression n'est meme pas PROPOSEE quand le compte porte un
+        // journal : c'est l'anonymisation qui l'est. Le legacy, lui, ne propose
+        // que la suppression — et elle emporte le journal (E-116).
+        confirmer.hidden = journaux !== 0;
+        confirmer.disabled = true;
+        const anon = panneauSuppr.querySelector('[data-rw="comptes-suppression-anonymiser"]');
+        anon.hidden = false;
+        anon.dataset.id = id;
+        anon.dataset.nom = nom;
+        panneauStepUp.hidden = true;
+        panneauSuppr.hidden = false;
+    }
+
+    async function supprime(id, nom) {
+        const r = await appelle(`/comptes/${id}`, null, 'DELETE');
+        if (r.corps && r.corps.step_up_required) {
+            return demandeStepUp(r.corps.action, () => supprime(id, nom));
+        }
+        fermeLesPanneaux();
+        if (! r.corps) { dis(garnis(L.err_reseau, { statut: r.statut }), 'echec'); return; }
+        dis(r.corps.message, r.ok && r.corps.success ? 'ok' : 'echec');
+        if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
+    }
+
+    async function anonymise(id, nom) {
+        const r = await appelle(`/comptes/${id}/anonymiser`, {});
+        if (r.corps && r.corps.step_up_required) {
+            return demandeStepUp(r.corps.action, () => anonymise(id, nom));
+        }
+        fermeLesPanneaux();
+        if (! r.corps) { dis(garnis(L.err_reseau, { statut: r.statut }), 'echec'); return; }
+        dis(r.corps.message, r.ok && r.corps.success ? 'ok' : 'echec');
+        if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
+    }
+
+    if (panneauSuppr) {
+        const saisie = panneauSuppr.querySelector('[data-rw="comptes-suppression-saisie"]');
+        const confirmer = panneauSuppr.querySelector('[data-rw="comptes-suppression-confirmer"]');
+        // Elle EMPECHE : le bouton ne s'active qu'a l'egalite exacte du nom.
+        saisie.addEventListener('input', () => {
+            confirmer.disabled = saisie.value.trim() !== (saisie.dataset.nom || '');
+        });
+    }
+
     document.addEventListener('click', (ev) => {
         const el = ev.target;
         if (! (el instanceof HTMLElement)) return;
         const rw = el.dataset.rw || '';
 
+        if (rw.startsWith('compte-supprimer-')) return ouvreSuppression(el);
+        if (rw.startsWith('compte-anonymiser-')) {
+            panneauStepUp.hidden = true;
+            panneauSuppr.querySelector('[data-rw="comptes-suppression-texte"]').textContent =
+                garnis(L.anon_question, { nom: el.dataset.nom || '' });
+            panneauSuppr.querySelector('[data-rw="comptes-suppression-detail"]').textContent = '';
+            panneauSuppr.querySelector('[data-rw="comptes-suppression-consigne"]').textContent = '';
+            panneauSuppr.querySelector('[data-rw="comptes-suppression-confirmer"]').hidden = true;
+            const a = panneauSuppr.querySelector('[data-rw="comptes-suppression-anonymiser"]');
+            a.hidden = false; a.dataset.id = el.dataset.id; a.dataset.nom = el.dataset.nom || '';
+            panneauSuppr.hidden = false;
+
+            return;
+        }
+        if (rw === 'comptes-suppression-annuler') { fermeLesPanneaux(); return; }
+        if (rw === 'comptes-suppression-confirmer') {
+            const s = panneauSuppr.querySelector('[data-rw="comptes-suppression-saisie"]');
+
+            return supprime(s.dataset.id, s.dataset.nom);
+        }
+        if (rw === 'comptes-suppression-anonymiser') return anonymise(el.dataset.id, el.dataset.nom);
+        if (rw === 'comptes-stepup-annuler') { fermeLesPanneaux(); enAttente = null; return; }
+        if (rw === 'comptes-stepup-valider') return valideStepUp();
         if (rw.startsWith('compte-mdp-poser-')) return poseMotDePasse(el, false);
         if (rw.startsWith('compte-mdp-generer-')) return poseMotDePasse(el, true);
         if (rw.startsWith('compte-deverrouiller-')) return deverrouille(el);
