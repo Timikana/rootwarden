@@ -327,7 +327,7 @@ dernier** — et chaque rang porte son motif.
 |---|---|---|---|---|
 | **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
 | **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
-| **D3** ✅ | **Comptes et rôles** — *caractérisé, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
+| **D3** ✅ | **Comptes et rôles** — *PORTÉ `v1.37.61`, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
 | **D4** | **Suppression et anonymisation** | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
 | **D5** | **Permissions et accès** | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
 | **D6** | **Serveurs** | `includes/manage_servers.php`, `manage_servers_table.php`, `includes/server_actions.php`, `includes/import_csv.php` | 1 746 | Base seulement, mais **manipule les mots de passe SSH et root des machines** (`server_actions.php:164-165`, chiffrés par `crypto.php`). Le plus gros sous-lot ; à redécouper si nécessaire — `S2` l'a été pour 579 lignes |
@@ -445,7 +445,7 @@ L'assertion « le type n'est pas replié sur Autre » passait donc **parce que l
 pas dans le menu**. Corrigée, elle vise l'élément qui porte la pastille — et la mesure devient
 décisive : **legacy « Autre », portage « Scan CVE »**.
 
-### 5.0ter D3 — CARACTÉRISÉ le 2026-08-26, et l'apostrophe qui désarme une confirmation
+### 5.0ter D3 — PORTÉ le 2026-08-26 (`v1.37.61`), et l'apostrophe qui désarmait une confirmation
 
 `tests/e2e/go-adm-comptes.mjs` — **12 PASS / 0 FAIL sur le legacy**, **base rouge 5/6**. Sur les cinq
 passes de la base rouge, **une passe parce que la page est absente** (« aucune erreur JavaScript » :
@@ -477,11 +477,39 @@ seulement une fois le compte d'épreuve créé. Trois hypothèses de lecture ont
 une apostrophe. **La quatrième hypothèse était la bonne parce que les trois premières ont été
 mesurées, pas parce qu'elle était plus jolie.**
 
-**Ce qui reste à faire pour finir D3** : le portage. Quatre décisions sont déjà tranchées — un seul
-chemin d'écriture de mot de passe, qui applique la politique et écrit l'historique ; le mot de passe
-généré ne transite pas par le HTML de la page ; aucune boîte native, donc le texte traduit est du
-contenu et jamais du code ; un seul chemin d'écriture de la clé SSH, validée en forme, échappée au
-**rendu** et journalisée quelle que soit la porte.
+**PORTÉ le 2026-08-26, `v1.37.61`** — `/comptes`, **17 PASS / 0 FAIL sur le portage**, le legacy
+passant de 12 à 13 (une assertion ajoutée : le mot de passe **conforme**, sans quoi l'écriture de
+`password_history` ne se mesurait pas — un refus n'écrit rien, donc les deux propriétés demandent
+deux gestes). `go-socle-navigation` passe de 51 à 52, **mesuré** : une seule ligne « Admin », celle
+de `rw-test-super`.
+
+Les quatre décisions, toutes tenues :
+
+- **un seul point d'écriture du mot de passe**, `Comptes::definitMotDePasse()`, qui applique la
+  politique et écrit l'historique quel que soit l'auteur ;
+- **le mot de passe généré ne transite pas par la page** : il arrive dans la réponse du geste, et la
+  suite mesure qu'il **ne survit pas au rechargement** ;
+- **aucune boîte native**, donc le texte traduit est du contenu ;
+- **un seul écrivain pour la clé SSH**, qui valide la forme et stocke la valeur telle quelle.
+
+**Une contradiction dans ma propre caractérisation, trouvée au portage.** La suite asserttait, dans
+le même geste, que le mot de passe faible soit **refusé** et que `password_history` soit **écrit** —
+or un refus n'écrit rien. Les deux assertions ne pouvaient pas tenir ensemble sur le portage. Elles
+sont désormais deux étapes : un mot de passe refusé, puis un mot de passe conforme. **Une
+caractérisation verte sur le legacy peut porter une contradiction que seul le portage révèle** —
+parce que le legacy, lui, acceptait les deux.
+
+**Et un piège de schéma, payé une fois.** `users.password` est `NOT NULL` sans défaut : la création
+échouait en 500 silencieux. Le legacy pose un haché de 64 octets aléatoires dont personne ne connaît
+le clair (`manage_users.php:97`) ; le portage reprend l'idée, avec le coût partagé.
+
+**Ce qui n'est pas porté, et la page le dit** : `admin_page.php` porte trois onglets, seuls les
+comptes le sont. Un encart nomme les deux autres et offre un lien marqué vers l'ancien portail.
+
+**Vu à l'image, et non corrigé ce tour** : à 1400 px la colonne « Actions » sort du cadre, que le
+tableau fait défiler et signale. Les lignes visibles n'ont pas d'action (ni verrou, ni second
+facteur), donc rien d'actionnable n'est hors d'atteinte aujourd'hui — mais la règle du chantier veut
+que la colonne actionnable ne cède jamais. À reprendre quand D5 élargira ce tableau.
 
 ### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
 

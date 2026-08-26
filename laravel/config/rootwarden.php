@@ -26,6 +26,14 @@ return [
      * Separer les deux cles est une decision d'exploitation : la changer ici
      * rendrait illisibles les milliers de lignes deja scellees.
      */
+    /*
+     * Cout bcrypt, lu la ou le legacy le lit (`auth/password_policy.php:28`) :
+     * la variable d'environnement `BCRYPT_COST`, defaut 12. Les deux portails
+     * doivent rester d'accord — un compte dont le mot de passe est pose ici doit
+     * pouvoir se connecter la-bas, et reciproquement.
+     */
+    'bcrypt_cost' => (int) env('BCRYPT_COST', 12),
+
     'audit' => [
         'cle_hmac' => env('AUDIT_HMAC_KEY', ''),
     ],

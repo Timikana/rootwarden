@@ -14,6 +14,7 @@ use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\RechercheController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\NotificationsController;
+use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\JournalAuditController;
 use App\Http\Controllers\JournalCommandesController;
 use App\Http\Controllers\ComparaisonCveController;
@@ -438,6 +439,26 @@ Route::middleware('session.authentifiee')->group(function () {
         ->middleware(['role:3', 'perm:can_admin_portal'])->name('notifications.reglages');
     Route::post('/notifications/preferences', [NotificationsController::class, 'definirPreference'])
         ->middleware(['role:3', 'perm:can_admin_portal'])->name('notifications.preferences.poser');
+
+    /*
+     * Comptes du portail — module `adm/`, sous-lot D3.
+     *
+     * Garde relevee du legacy : role 2 + `can_admin_portal` (`admin_page.php:40-41`).
+     * La GARDE HIERARCHIQUE — un role 2 ne touche pas un role 3 — vit dans le
+     * controleur, parce qu'elle depend de la CIBLE et pas seulement de l'auteur.
+     */
+    Route::get('/comptes', ComptesController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes');
+    Route::post('/comptes', [ComptesController::class, 'creer'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.creer');
+    Route::post('/comptes/{id}/mot-de-passe', [ComptesController::class, 'motDePasse'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.mot-de-passe');
+    Route::post('/comptes/{id}/cle-ssh', [ComptesController::class, 'cleSsh'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
+    Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
+    Route::post('/comptes/{id}/second-facteur', [ComptesController::class, 'reinitialiserTotp'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.second-facteur');
 
     Route::get('/journal-audit', JournalAuditController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
