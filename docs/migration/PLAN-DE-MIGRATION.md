@@ -902,6 +902,17 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   n'**écrit** pas dans `tests/e2e/` ni `scripts/`. Elle écrit et committe librement dans `laravel/`,
   `backend/` et `docs/` — rien de tout cela n'est lu par un rejeu en cours.* **Retarder le commit ne
   protège de rien.**
+- **Un motif qui suppose une forme d'appel ne mesure que cette forme.** Corollaire du précédent,
+  appliqué au JavaScript. Relevé le 2026-08-26 sur `bashrc/` : un `grep` sur `confirm(__('…'))` rendait
+  quatre clés et laissait conclure qu'un cinquième geste n'avait pas de confirmation — alors que la
+  sienne est construite par gabarit, ``confirm(`${label}…`)``. **La fausse accusation a été évitée de
+  justesse**, et elle aurait été publiée comme un défaut.
+
+  La parade n'est pas un motif plus large — il aura son propre angle mort — mais de **mesurer le
+  comportement** : `page.on('dialog')` compte les boîtes réellement ouvertes, quelle que soit la forme
+  de l'appel qui les produit. C'est ce qui a établi, pour `graylog/`, que `glTest` n'a **pas** de
+  confirmation : le journal du rejeu montre la séquence `confirm` (déployer) → `alert: ✓ Logger envoyé`
+  (tester, **sans confirm**) → `confirm` (retirer). Un `grep` l'avait suggéré ; le navigateur l'a prouvé.
 - **Compter une structure de données, c'est la faire lire par son propre langage.** Un comptage des
   entrées de menu à l'expression régulière a rendu **32 sur 33** le 2026-08-26 : le motif exigeait la
   forme sur une seule ligne et manquait `wazuh`, écrit autrement. La même constante lue par un
