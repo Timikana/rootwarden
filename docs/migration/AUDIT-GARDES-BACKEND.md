@@ -125,3 +125,72 @@ Rien n'est corrigé ici. Trois raisons, dans l'ordre :
 
 Le §1 touche `/deploy`, donc **K4**, le sous-lot déjà bloqué par l'arbitrage `NOPASSWD: ALL`. Les deux
 décisions se prennent ensemble.
+
+---
+
+## 4. `@threaded_route` est SYNCHRONE — le nom dit le contraire de ce que fait le code
+
+Mesuré le 2026-08-26, sur une question posée par la session qui porte `adm/` : la réponse d'une route
+décorée est-elle le **verdict** du geste, ou l'**accusé de réception** d'un fil ?
+
+`backend/routes/helpers.py:159-168` :
+
+```python
+future = executor.submit(run)
+return future.result()
+```
+
+`future.result()` **bloque** jusqu'à la fin de la fonction et rend sa valeur de retour réelle. Le
+décorateur ne rend donc pas la route asynchrone : il déplace l'exécution dans un fil du pool et
+attend. **La réponse est le verdict.**
+
+**L'accusé de réception est une autre forme, et elle ne se lit pas dans les décorateurs mais dans le
+CORPS** de la fonction :
+
+| forme | exemple | ce que `success: true` veut dire |
+|---|---|---|
+| `@threaded_route` seul | `POST /server_lifecycle` | le geste **est fait** |
+| `threading.Thread(...).start()` puis `return` | `ssh.py:283-284` (`/deploy`), `groups.py:314-315` (`/groups/<id>/run`) | **un fil a été lancé**, rien de plus |
+
+La règle utilisable : **`@threaded_route` = synchrone ; un `threading.Thread` dans le corps = accusé.**
+Les deux se ressemblent de loin. C'est « le marqueur n'est pas le verdict » appliqué au décorateur au
+lieu de la sortie — et la conséquence est directe sur l'interface : une page qui affiche « fait » sur la
+réponse de `/deploy` annonce une réussite que personne n'a vérifiée.
+
+**À déplacer en §8 du plan** une fois que la session qui porte `adm/` aura fini d'y écrire.
+
+---
+
+## 5. `POST /server_lifecycle` : `updated` recouvre deux situations OPPOSÉES
+
+La route rend :
+
+```python
+return jsonify({'success': True, 'updated': cur.rowcount > 0})
+```
+
+Mesuré dans le conteneur Python sur la machine 1, **avec `rollback()` — rien n'a été écrit** :
+
+| geste | `rowcount` |
+|---|---|
+| réécrire la **même** valeur de `lifecycle_status` | **0** |
+| viser une machine **inexistante** | **0** |
+
+`success: true, updated: false` signifie donc soit « le cycle de vie était déjà celui-là, il n'y avait
+rien à faire », soit « la machine désignée n'existe pas ». Une interface qui affiche « échec » sur
+`updated: false` mentira dans le premier cas ; une qui affiche « fait » mentira dans le second.
+
+C'est la même mécanique que la leçon déjà au plan — MySQL ne compte une ligne modifiée que si la valeur
+**change** — mais employée ici comme **verdict rendu au frontend**, ce qui la rend visible par
+l'utilisateur au lieu de rester un détail d'horodatage.
+
+### Le correctif ferme les deux défauts du même geste
+
+Résoudre la machine **avant** l'`UPDATE` :
+
+1. un `SELECT` sur `machines WHERE id = ?` rend **404** si elle n'existe pas — l'ambiguïté disparaît,
+   `updated: false` ne veut plus dire qu'une chose ;
+2. et il donne **l'objet** sur lequel poser le contrôle d'accès — ce qui ferme l'IDOR du §2.
+
+C'est la leçon « un garde sans objet ne garde rien » prise par l'autre bout : contrôler l'objet
+**résolu**, pas le paramètre reçu. Un seul geste, deux défauts.
