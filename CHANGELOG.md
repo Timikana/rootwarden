@@ -2171,6 +2171,63 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.37.70 — E-130 chaine avec l'arbitrage K4, et le releve de niveau
+
+Une relecture croisee a elargi E-130 sur quatre points, tous **verifies ici** avant d'etre inscrits.
+Le quatrieme change le niveau d'un arbitrage deja ouvert.
+
+#### La visibilite du formulaire n'est pas la garde — il n'y en a pas
+
+`admin_page.php:44` fait `require_once includes/import_csv.php` **inconditionnellement, avant toute
+logique d'onglet**. Le traitement s'execute des qu'un POST porte `import_type`, **que le formulaire
+ait ete rendu ou non** : un POST forge vers `admin_page.php` suffit, l'onglet n'a jamais besoin d'etre
+ouvert.
+
+Et `import_csv.php` n'a **aucune garde propre** — zero `checkAuth`, zero `checkPermission`. Il depend
+entierement de qui l'inclut. Il n'y a qu'un incluant aujourd'hui ; le jour ou une autre page l'inclut,
+elle herite de l'exposition sans que rien ne le signale.
+
+#### CINQUIEME en-tete qui ment
+
+`admin_page.php:14-16` annonce « une seconde verification stricte via la BDD n'autorise que le
+superadmin ». **Elle n'existe pas** : la ligne 41 est `checkPermission('can_admin_portal')`, qui admet
+le role 2. C'est tres probablement ainsi que le trou a survecu — quiconque a relu l'en-tete a cru le
+fichier reserve au role 3. Apres `compliance_report.php`, `ssh/index.php`, `iptables/index.php` et
+`fail2ban/index.php`.
+
+#### E-130 CHAINE avec K4, et c'est le vrai sujet
+
+L'arbitrage K4 justifie son niveau ainsi : « aucun compte actif de role 1 ne porte `users.sudo = 1`,
+donc le trou est reel et **a un `UPDATE` d'etre exploitable** ».
+
+**L'import CSV EST cet `UPDATE`**, et il est atteignable un cran plus bas — role 2 porteur de
+`can_admin_portal`, la ou `api/toggle_sudo.php` exige le role 3.
+
+Pire, et il faut le lire deux fois : la garde hierarchique de l'import **fabrique exactement la forme
+de compte que K4 attend**. Pour un importeur de role 2, `role=admin` est degrade a **role 1** — la
+garde faisant correctement son travail — tandis que `sudo` reste a **1**, jamais touche. Soit : role 1
+avec `sudo = 1`, la precondition du repli `NOPASSWD: ALL`, obtenue au role 2, au moyen d'un fichier.
+
+Les deux ecarts se lisaient comme independants. **Ils sont chaines.**
+
+#### Etat vivant
+
+| | |
+|---|---|
+| comptes de role 2 | `rw-test-admin` (id 15) — `can_admin_portal = 0`, `sudo = 0` |
+| comptes portant `sudo = 1` | `superadmin` (id 1, role 3) **seul** |
+
+**Personne n'occupe la position aujourd'hui.** Mais l'ouvrir n'est plus un `UPDATE` en base : c'est
+**une attribution de permission**, geste d'administration ordinaire.
+
+#### Deux regles au §8
+
+- **deux ecarts independants peuvent etre CHAINES, et l'arbitrage de l'un devient faux.** Quand un
+  arbitrage repose sur une precondition ABSENTE, chercher qui peut la fournir — la reponse est rarement
+  dans le meme module ;
+- **un `require_once` inconditionnel place la garde AILLEURS que la ou on la lit.** Chercher l'incluant,
+  et se demander ce qui arrive le jour ou il y en a deux.
+
 ### v1.37.69 — `adm/` D6c caracterise : l'import CSV contourne une garde de role 3
 
 `tests/e2e/go-adm-import-csv.mjs` — **7 PASS / 0 FAIL sur le legacy**. La suite **n'est pas encore

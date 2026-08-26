@@ -647,6 +647,15 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   ce choix ;
 - **K4** — l'arbitrage `NOPASSWD: ALL` : le repli a **deux** chemins, et aucun compte actif de rôle 1 ne
   porte `users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable.
+  **RELEVÉ DE NIVEAU LE 2026-08-26 — cet `UPDATE` existe, et il est plus bas que supposé.** L'import
+  CSV (E-130) écrit `users.sudo` **sans contrôle de rôle**, depuis une page atteignable au **rôle 2**
+  porteur de `can_admin_portal`, alors que le geste dédié `api/toggle_sudo.php` exige le rôle 3. Et sa
+  garde hiérarchique, en dégradant `role_id` à **1** pour un importeur de rôle 2, fabrique
+  **exactement** la forme de compte que ce repli attend : rôle 1, `sudo = 1`. Les deux écarts se
+  lisaient comme indépendants ; **ils sont chaînés**. Aucun compte n'occupe la position aujourd'hui —
+  `rw-test-admin` est le seul rôle 2 et n'a pas `can_admin_portal` — mais l'ouvrir n'est plus un
+  `UPDATE` en base, c'est **une attribution de permission**, geste d'administration ordinaire.
+  La décision sur la colonne `sudo` du format CSV (ci-dessus) conditionne donc aussi celui-ci.
 
 **Mesurés, non corrigés**
 - **E-73** — le fuseau du backend : UTC contre CEST, l'**affichage** est faux de deux heures. **Élargi le
@@ -993,6 +1002,17 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   aucune interface ne peut s'en sortir. Le correctif — **résoudre l'objet avant de le muter** — lève
   l'ambiguïté ET ferme l'IDOR du même geste : c'est « un garde sans objet ne garde rien » pris par
   l'autre bout, contrôler l'objet RÉSOLU et non le paramètre reçu.
+- **Deux écarts indépendants peuvent être CHAÎNÉS, et l'arbitrage de l'un devient faux.** K4 fondait
+  son niveau de risque sur « aucun compte de rôle 1 ne porte `users.sudo = 1`, le trou est à un
+  `UPDATE` d'être exploitable ». E-130 **est** cet `UPDATE`, il est atteignable au rôle 2, et sa garde
+  hiérarchique — en faisant correctement son travail sur `role_id` — fabrique précisément le compte
+  rôle 1 + `sudo = 1` que K4 attend. Quand un arbitrage repose sur une précondition **absente**,
+  chercher qui peut la fournir : la réponse est rarement dans le même module.
+- **Un `require_once` inconditionnel place la garde AILLEURS que là où on la lit.** `import_csv.php`
+  n'a ni `checkAuth` ni `checkPermission` ; il est inclus en tête d'`admin_page.php`, avant toute
+  logique d'onglet. La visibilité du formulaire n'est donc pas sa garde, et un POST forgé vers la page
+  hôte déclenche l'import sans que l'onglet ait jamais été ouvert. **Chercher l'incluant, et se
+  demander ce qui arrive le jour où il y en a deux.**
 - **Porter l'INTENTION d'un correctif, pas sa forme.** `Serveurs::valideIp()` a recopié fidèlement la
   comparaison de préfixes du patch A10-01 — et son angle mort : `::ffff:169.254.169.254` désigne la
   cible que le commentaire nomme et ne commence par aucun préfixe testé. La leçon de `//exemple.com`

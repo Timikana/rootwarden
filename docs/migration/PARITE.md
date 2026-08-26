@@ -5545,9 +5545,72 @@ C'est la même prudence que sur le repli `NOPASSWD: ALL` lui-même — « le tro
 exploitable, ce n'est pas la même chose que de dire qu'il l'est ». Ici l'import **est** cet `UPDATE`,
 et il est offert un cran plus bas que le geste qui porte le même effet.
 
+**COMPLÉTÉ LE 2026-08-26 PAR UNE RELECTURE CROISÉE, ET VÉRIFIÉ ICI.** L'écart est plus large que
+« un rôle 2 atteint le formulaire », sur quatre points.
+
+**a. La visibilité du formulaire n'est pas la garde — il n'y en a pas.** `admin_page.php:44` fait
+`require_once __DIR__ . '/includes/import_csv.php'`, **inconditionnellement, avant toute logique
+d'onglet**. Le fichier est donc chargé sur chaque requête qui passe les lignes 40-41
+(`checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` puis `checkPermission('can_admin_portal')`), et son
+traitement s'exécute dès qu'un POST porte `import_type` — **que le formulaire ait été rendu ou non**.
+Un POST forgé vers `admin_page.php` suffit ; l'onglet n'a jamais besoin d'être ouvert.
+
+**b. `import_csv.php` n'a AUCUNE garde propre.** Zéro `checkAuth`, zéro `checkPermission` : sa seule
+condition d'entrée est `REQUEST_METHOD === 'POST' && isset($_POST['import_type'])`. Il dépend
+entièrement de qui l'inclut. Il n'y a qu'un incluant aujourd'hui ; le jour où une autre page l'inclut,
+elle hérite de l'exposition sans que rien ne le signale. Même forme que `server_actions.php`.
+
+**c. L'en-tête d'`admin_page.php` promet une garde qui n'existe pas.** Lignes 14-16 :
+
+> Accès requis : rôle superadmin (`role_name = 'superadmin'`, `role_id = 3`). Un premier filtre rapide
+> est assuré par `checkAuth([2, 3])` ; **une seconde vérification stricte via la BDD n'autorise que le
+> superadmin.**
+
+Cette seconde vérification **n'existe pas**. La ligne 41 est `checkPermission('can_admin_portal')`, qui
+admet le rôle 2. C'est très probablement ainsi que le trou a survécu : quiconque a relu l'en-tête a cru
+le fichier réservé au rôle 3. **Cinquième occurrence du motif « l'en-tête qui ment »** dans le dépôt,
+après `compliance_report.php`, `ssh/index.php`, `iptables/index.php` et `fail2ban/index.php`.
+
+**d. Personne n'occupe la position aujourd'hui, et elle est à UNE permission près.** Mesuré en base :
+
+| | |
+|---|---|
+| comptes de rôle 2 | `rw-test-admin` (id 15) — `can_admin_portal = 0`, `sudo = 0` |
+| comptes portant `sudo = 1` | `superadmin` (id 1, rôle 3) **seul** |
+
+Accorder `can_admin_portal` à un compte de rôle 2 ouvre le chemin. Le geste n'est plus un `UPDATE` en
+base mais **une attribution de permission** — c'est-à-dire un geste d'administration ordinaire.
+
+### E-130 CHAÎNE avec l'arbitrage K4, et c'est ce qui compte
+
+L'arbitrage K4 du plan justifie son niveau de risque ainsi :
+
+> aucun compte actif de rôle 1 ne porte `users.sudo = 1`, donc le trou est réel et **à un `UPDATE`
+> d'être exploitable**
+
+**L'import CSV EST cet `UPDATE`**, et il est atteignable un cran plus bas que K4 ne le suppose.
+
+Pire — et c'est la partie qu'il faut lire deux fois : la garde hiérarchique de l'import **produit
+exactement la forme de compte que K4 attend**. Pour un importeur de rôle 2 :
+
+```php
+$roleId = 2;                                  // la ligne CSV dit `role=admin`
+if ($myRole < 3 && $roleId >= $myRole) { $roleId = 1; }   // 2 >= 2  ->  rôle 1
+$sudo = (int)($data['sudo'] ?? 0);            // reste à 1, jamais touché
+```
+
+Le compte créé est **rôle 1 avec `sudo = 1`** : la précondition du repli `NOPASSWD: ALL`, obtenue par
+un compte de rôle 2, au moyen d'un fichier. La garde qui fait correctement son travail sur `role_id`
+fabrique la cible que l'autre garde était censée protéger.
+
+Les deux écarts se lisaient comme indépendants. **Ils sont chaînés** : la précondition que l'arbitrage
+de K4 suppose manquante est fournie par un chemin que l'arbitrage de K4 n'examine pas. Que
+`toggle_sudo.php` soit réservé au rôle 3 montre l'intention du produit — et l'import la contourne.
+
 **NON FERMÉ** — D6c n'est pas encore porté. Le portage devra exiger le rôle 3 pour la colonne `sudo`,
 ou la refuser à l'import ; la décision revient à l'exploitant, parce que retirer une colonne d'un
-format de fichier documenté change un contrat.
+format de fichier documenté change un contrat. **Et elle ne concerne plus seulement D6c** : elle
+conditionne aussi le niveau de l'arbitrage K4.
 
 ---
 
