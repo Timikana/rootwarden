@@ -874,11 +874,32 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Le backend est lu au DÉMARRAGE du processus, le frontend à CHAQUE requête. Ce sont deux règles,
   pas une.** Formulé le 2026-08-26 après trois affinages successifs de la convention de banc :
 
-  | ce qu'on touche | quand la cible change |
-  |---|---|
-  | `backend/**.py` | **au redémarrage** du conteneur, jamais à l'écriture |
-  | `laravel/**`, `legacy/**` | **à la requête suivante**, sans aucun redémarrage |
-  | `tests/e2e/**`, `scripts/**` | à l'écriture, pour le rejeu en cours |
+  | ce qu'on touche | quand c'est lu | effet d'une écriture pendant un rejeu |
+  |---|---|---|
+  | `backend/**.py` | au **démarrage du processus** | **inerte** — c'est le `docker restart` qui mord |
+  | `laravel/**`, `legacy/**` | à **chaque requête** | change la cible **en plein vol** |
+  | `tests/e2e/**.mjs` | au lancement de la suite | le nombre mesuré devient irreproductible |
+  | **`scripts/*.sh` en cours d'exécution** | **incrémentalement, par décalage d'octets** | **peut corrompre la suite du script** |
+
+  **Le quatrième régime est le pire, parce qu'il ne casse pas franchement : il décale.** `bash` parse la
+  boucle principale en entier avant de l'exécuter, mais quand elle se termine il se repositionne à
+  l'**offset en octets** qu'il avait mémorisé pour lire la suite. Une écriture qui ajoute des octets
+  **avant** la boucle décale donc tout ce qui suit — le résumé, la comparaison aux références —, et le
+  verdict peut être lu de travers sans qu'aucune erreur n'apparaisse.
+
+  Vécu **deux fois le 2026-08-26, à une minute d'intervalle, par les deux sessions**. La première a
+  ajouté 502 octets avant la boucle puis a annulé ; le rejeu était à 46 suites sur 117, donc bash
+  n'avait pas encore atteint la queue du script. **Puis j'ai écrit ce paragraphe et j'ai édité le runner
+  moi-même dans la minute suivante**, pour y corriger un commentaire — même erreur, même régime, même
+  chance que la fenêtre se referme (47 suites sur 117).
+
+  **Et c'est la leçon utile : écrire une règle ne protège pas de l'enfreindre.** Le paragraphe existait,
+  je venais de le rédiger, et il n'a rien empêché. Ce qui a permis de le dire n'est pas la confiance mais
+  la vérification — références intactes, `bash -n` propre, avancement relevé — et ce qui protégerait
+  vraiment n'est pas un document : **le runner devrait se recopier dans un fichier temporaire et exécuter
+  la copie.** Une édition de la source deviendrait alors sans effet possible sur un rejeu en cours, et le
+  quatrième régime disparaîtrait comme problème au lieu d'être une règle à retenir. *Une règle qu'on doit
+  se rappeler est une propriété qu'on n'a pas encore construite.*
 
   Conséquences pratiques, et elles ne sont pas symétriques : écrire dans `backend/` pendant le rejeu
   d'une autre session est **inoffensif**, mais `docker restart rootwarden_python` casse sa mesure en
