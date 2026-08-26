@@ -202,6 +202,15 @@ declare -A REF_LARAVEL=(
   # 17 contre 11 : le portage separe le geste de sa confirmation, et la suite
   # asserte qu'ouvrir le panneau n'emet RIEN.
   [go-adm-comptes-distants]=17
+  # `adm/` sous-lot D9a : droits sudo par compte distant.
+  # 18 sur le portage contre 12 sur le legacy, et les six d'ecart portent tous
+  # sur les deux defauts corriges : le prereglage par defaut qui ne donne plus
+  # root, le marqueur de portee VISIBLE (mesure a 1100 px), la confirmation
+  # avant deploiement, et le fait que le consentement aboutisse.
+  # La suite POSE SON PROPRE COMPTE DISTANT : les 20 comptes de la machine 2
+  # sont `excluded`, et la page ne rend son formulaire que pour un compte
+  # `managed`/`pending_review`. Sans fixture : 3 FAIL « bouton introuvable ».
+  [go-adm-politiques]=18
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -312,6 +321,7 @@ declare -A REF_LEGACY=(
   [go-adm-etiquettes-notes]=10
   [go-adm-cycle-connexion]=12
   [go-adm-comptes-distants]=11
+  [go-adm-politiques]=12
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
@@ -330,7 +340,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-adm-comptes-distants
+  go-adm-comptes-distants go-adm-politiques
   go-page-graylog-g1
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -344,7 +354,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-adm-comptes-distants
+  go-adm-comptes-distants go-adm-politiques
   go-page-graylog-g1
   go-vague0-legacy
   go-page-update-u1

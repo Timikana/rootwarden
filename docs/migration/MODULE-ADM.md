@@ -337,7 +337,9 @@ dernier** — et chaque rang porte son motif.
 | **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
 | **D7** ✅ | **Clés d'API** — *PORTÉ `v1.37.75`, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. Les trois écarts (E-135, E-136, E-137) sont **fermés au portage** : liste de portées fermée et ancrée, et reconnaissance de la clé d'environnement par son **hachage** |
 | **D8** ⏳ | **Comptes distants** — *INVENTORIÉ `v1.37.76`, voir §5.0terdecies* | `server_users.php` | 387 | **Première écriture distante d'`adm/`.** Sept routes, dont `/delete_remote_user` (`userdel` irréversible). **La page admet le rôle 1 ; six de ses sept routes exigent le rôle 2** — et elle ne distingue aucun rôle dans son rendu |
-| **D9** ⏳ | **Politiques sudo et SFTP** — *INVENTORIÉ `v1.37.78`, voir §5.0quaterdecies* | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. **L'aide du préréglage par défaut affirme l'inverse de ce que son propre module documente** |
+| **D9a** ✅ | **Politiques sudo** — *PORTÉ `v1.37.79`, `/politiques`, 12 legacy / 18 portage* | `server_user_sudo.php`, `js/server_user_policy.js` | 295 | E-142 l'aide du préréglage par défaut affirmait l'inverse de son module ; E-143 accorder root ne demandait rien ; E-144 le repli du backend est lui aussi `apt_only` |
+| **D9b** ⏳ | **Politiques SFTP** — reste seul de D9 | `server_user_sftp.php`, `server_user_policies.php` | 164 | Même JS, même module backend ; ses politiques n'ont pas de préréglages. Écrit `sshd_config` |
+| ~~**D9**~~ | *scindé en D9a / D9b le 2026-08-26 — l'équivalence root vit dans sudo* | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. **L'aide du préréglage par défaut affirme l'inverse de ce que son propre module documente** |
 | **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
 
 Les six entrées de menu se rattachent ainsi : `admin_page.php` est le porteur de D3, D5 et D6a/D6b (trois
@@ -1013,7 +1015,30 @@ une attribution de permission d'être atteignable.
   La convention éprouvée est l'interception avec avortement : cliquer le vrai bouton, mesurer la
   requête émise, et n'en laisser aboutir aucune.
 
-### 5.0quaterdecies D9 — INVENTORIÉ le 2026-08-26 (`v1.37.78`), pas encore caractérisé
+### 5.0quaterdecies D9 — INVENTORIÉ `v1.37.78`, **D9a PORTÉ `v1.37.79`**, D9b reste
+
+> **Ce que la caractérisation a ajouté à l'inventaire.** L'inventaire avait relevé E-142 (l'aide
+> du préréglage par défaut). La suite en a mesuré deux de plus, et le second n'était pas visible
+> à la lecture d'un seul fichier :
+>
+> - **E-143** — `deployPolicy()` n'a aucune confirmation là où `removePolicy()` et `rollbackTo()`
+>   en ont une. Le geste qui **donne** était libre, celui qui **reprend** était gardé.
+> - **E-144** — `sudo_deploy()` fait `data.get('preset', 'apt_only')` : le repli du **backend** est
+>   lui aussi le préréglage équivalent root.
+>
+> Et une nuance qui change la lecture d'E-142 : l'aide legacy d'`all_nopasswd` dit **vrai**. Ce
+> n'est donc pas une négligence uniforme — c'est l'équivalence root **non évidente** qui a été prise
+> à l'envers. Motif « à moitié corrigé », cinquième famille.
+>
+> **Deux constats dédouanent ce module**, et il est le seul du chantier à porter les deux : les
+> gardes sont complètes aux **trois** niveaux (page, proxy, backend — rôle 2 mesuré à 403), et le
+> geste distant est sûr (`visudo -cf` avant tout déplacement, chemins bornés). Ce n'était pas
+> l'écriture qui était dangereuse : **c'était sa présentation.**
+>
+> **Piège de banc payé ici** : les 20 comptes de la machine 2 sont `excluded`, et la page ne rend
+> son formulaire que pour un compte `managed`/`pending_review`. Première exécution : 200, page
+> vide, 3 FAIL « bouton introuvable ». La suite pose désormais **son propre** compte distant et le
+> reprend — même correction que `ssh-parc` et `ssh-preflight`.
 
 Inventaire mené **en lecture seule**, le banc étant prêté à la seconde session.
 
