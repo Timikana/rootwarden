@@ -56,10 +56,21 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # pas forcement une regression — mais il doit toujours etre EXPLIQUE.
 # `go-socle-navigation` grandit a CHAQUE entree portee : la suite asserte
 # DYNAMIQUEMENT que chaque entree portee du menu resout, donc basculer une entree
-# de `legacy` a `route` ajoute une assertion pour `rw-test-admin` et une pour
-# `rw-test-super` — le role 1 ne voit pas ces entrees. 40 -> 42 au portage de S3
-# (`cve_scan`), 46 -> 48 a celui de `docker/`. Ce n'est pas un chiffre ajuste
-# pour faire passer le rejeu.
+# de `legacy` a `route` ajoute une assertion PAR ROLE QUI VOIT L'ENTREE.
+#
+# **La regle n'est PAS « +2 par entree ».** Ses deux exemples historiques
+# (40 -> 42 au portage de S3 `cve_scan`, 46 -> 48 a celui de `docker/`) sont
+# visibles du role 2 ET du role 3, donc ils valent bien +2 — et AUCUN des deux
+# ne pouvait refuter la formule courte. Le LOT complet du 2026-08-26 l'a fait :
+# D9a et D9b ont bascule DEUX entrees et la suite est passee de 57 a **59**, pas
+# a 61. `sudo_policies` et `sftp_policies` portent `'garde' => 'sa'` — le role 2
+# ne les voit pas, donc **une** assertion chacune. La suite boucle sur les
+# entrees QUE LE COMPTE VOIT (`go-socle-navigation.mjs:205`).
+#
+# En suivant la formule courte on lit « 59 au lieu de 61 » et on conclut a une
+# regression de deux assertions, sur un rejeu qui affiche pourtant FAIL=0.
+#
+# Ce n'est pas un chiffre ajuste pour faire passer le rejeu.
 # 48 -> 49 au portage de `chatops/` : UNE seule, et non deux. L'entree exige
 # `can_admin_portal`, que `rw-test-admin` n'a PAS (mesure en base) : seul le role 3
 # la voit. Le journal du rejeu ne porte donc qu'une ligne « ChatOps » — verifie,
@@ -85,7 +96,7 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # comme les trois precedentes : une seule ligne « Admin », celle de
 # `rw-test-super`, et elle resout en 200 sur /comptes.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=57 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=59 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=18 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
