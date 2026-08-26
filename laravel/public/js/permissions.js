@@ -131,4 +131,66 @@
         if (rw === 'perms-stepup-annuler') { panneau.hidden = true; enAttente = null; }
         if (rw === 'perms-stepup-valider') valideStepUp();
     });
+
+    /* ═══ Permissions temporaires — sous-lot D5b ══════════════════════════
+     *
+     * L'OCTROI PASSE PAR LA PASSERELLE, et c'est la seule raison qui vaille :
+     * `POST /admin/temp_permissions` NOTIFIE le compte concerne
+     * (`admin.py:196`). Reecrire l'insertion cote portage priverait la personne
+     * de son avertissement, sans que rien ne le signale.
+     *
+     * La REVOCATION, elle, est un formulaire : elle n'a aucun effet de bord, et
+     * un formulaire n'a pas de plomberie a oublier. C'est la lecon de D6b, ou
+     * QUATRE gestes mouraient sur un jeton que l'enrobage n'injectait pas.
+     */
+    const boutonTemp = document.querySelector('[data-rw="temp-accorder"]');
+    if (boutonTemp) {
+        const etatTemp = document.querySelector('[data-rw="temp-etat"]');
+        const ditTemp = (t) => { if (etatTemp) etatTemp.textContent = t || ''; };
+        const lisTemp = (sel) => {
+            const e = document.querySelector(sel);
+
+            return e ? e.value : '';
+        };
+
+        boutonTemp.addEventListener('click', async () => {
+            const compte = parseInt(lisTemp('[data-rw="temp-compte"]'), 10);
+            const permission = lisTemp('[data-rw="temp-permission"]');
+            if (! compte || ! permission) return;
+
+            boutonTemp.disabled = true;
+            ditTemp(L.temp_en_cours);
+
+            try {
+                const r = await fetch('/api/gateway/admin/temp_permissions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: compte,
+                        permission,
+                        hours: parseInt(lisTemp('[data-rw="temp-duree"]'), 10),
+                        reason: lisTemp('[data-rw="temp-raison"]'),
+                    }),
+                });
+                const d = await r.json().catch(() => null);
+                /* FAIL-CLOSED : sans `success === true`, on annonce un echec.
+                 * Un `undefined` affiche comme « accorde » ferait croire a un
+                 * droit qui n'existe pas. */
+                if (d && d.success === true) {
+                    ditTemp(L.temp_accorde);
+                    /* LA LISTE SE RELIT DU SERVEUR. La reconstruire ici
+                     * dupliquerait la regle « non expire », qui vit dans le
+                     * service — et deux versions d'une regle finissent par
+                     * diverger. */
+                    window.location.reload();
+
+                    return;
+                }
+                ditTemp(L.temp_echec);
+            } catch (e) {
+                ditTemp(L.temp_echec);
+            }
+            boutonTemp.disabled = false;
+        });
+    }
 })();
