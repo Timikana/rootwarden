@@ -102,22 +102,30 @@ agents sur cette machine.
 Les neuf temps du §5 du plan. Les deux premiers sont faits par ce document ; le troisième demande le
 **banc d'essai**, qui ne peut pas être partagé — le garde anti-rejeu TOTP est par compte et en base.
 
-| temps | état |
-|---|---|
-| 1. inventaire | **fait** (ce document) |
-| 2. lire le module avant de planifier | **fait** — c'est ce document, il n'existait pas de `MODULE-GRAYLOG.md` |
-| 3. caractérisation **verte sur le legacy** | à faire — demande le banc |
-| 4. base rouge sur le portage | à faire |
-| 5. portage | à faire |
-| 6. même suite verte sur le portage | à faire |
-| 7. PARITÉ + CHANGELOG | à faire |
-| 8. captures 1920/1400/390, regardées **et** envoyées | à faire |
-| 9. LOT complet + commit atomique | à faire |
+**G1 est terminé (`v1.37.77`, commit `30a672d`).** Les neuf temps, pour chacun des deux sous-lots :
 
-**Un point à trancher au moment du portage** : la configuration globale (`POST /graylog/config`) est un
+| temps | G1 — config, gabarits, onglets, gardes | G2 — les trois gestes qui mutent |
+|---|---|---|
+| 1. inventaire | **fait** | **fait** — §3 et §5 de ce document |
+| 2. lire le module d'abord | **fait** | **fait** — le défaut du §5 vient de là |
+| 3. caractérisation verte sur le legacy | **fait** — 25/0 | à faire, demande le banc |
+| 4. base rouge sur le portage | **fait** — 7/12 | — |
+| 5. portage | **fait** | à faire, **avec** son correctif backend |
+| 6. même suite verte sur le portage | **fait** — 26/0 | à faire |
+| 7. PARITÉ + CHANGELOG | **fait** — E-138, E-139, E-140 | à faire |
+| 8. captures 1920/1400/390, regardées et envoyées | **fait** | à faire |
+| 9. LOT complet + commit atomique | **fait** — 117 exéc. | à faire |
+
+**Le point tranché au portage de G1** : la configuration globale (`POST /graylog/config`) est un
 réglage de flotte. L'écrire depuis une suite change le comportement de tous les déploiements suivants.
-La fixture devra donc **sauvegarder la ligne existante et la restaurer dans un `finally`**, état relu
-pour être prouvé — comme `go-captures-enrolement.mjs` le fait pour le secret TOTP.
+La fixture **sauvegarde la ligne existante et la restaure dans un `finally`**, état relu pour être
+prouvé — comme `go-captures-enrolement.mjs` le fait pour le secret TOTP. C'est fait, et le gabarit
+d'épreuve est borné par son nom pour la même raison.
+
+**Ce que G1 a mesuré et qui vaut d'être rappelé avant G2** : la suite de G1 ouvre l'onglet Machines et
+**lit** le tableau, sans cliquer aucun bouton de ligne — `glTest` n'a pas de `confirm()` côté legacy et
+ouvrirait une session SSH sur la machine de la ligne, `srv-zabbix` comprise. G2 est précisément le
+sous-lot qui lèvera cette réserve, et il ne peut le faire qu'en nommant sa cible.
 
 ---
 
