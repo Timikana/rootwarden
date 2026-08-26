@@ -1337,6 +1337,36 @@ Le marqueur de dérivation doit être **étroit**. Une première rédaction cher
 présent dans la docstring de `read_logs`, dans la phrase qui explique un **durcissement**. Elle
 aurait classé « donne root » le préréglage le plus borné des six.
 
+### Une formule COURTE se vérifie sur un cas où elle pourrait être fausse (2026-08-26)
+
+`scripts/rejouer-lot.sh` porte, depuis des mois, cette règle :
+
+> « `go-socle-navigation` grandit à chaque entrée portée : basculer une entrée de `legacy` à `route`
+> ajoute une assertion pour `rw-test-admin` et une pour `rw-test-super` — le rôle 1 ne voit pas ces
+> entrées. 40 → 42 au portage de S3, 46 → 48 à celui de `docker/`. »
+
+Elle se lit « **+2 par entrée** ». D9a et D9b ont basculé **deux** entrées : elle prédit donc **61**.
+Le LOT complet du 2026-08-26 a mesuré **59**, avec **0 FAIL**.
+
+**La règle est fausse, et ses deux exemples ne pouvaient pas le montrer.** `cve_scan` et `docker` sont
+visibles du rôle 2 *et* du rôle 3 : +2 chacun, la formule courte marche. `sudo_policies` et
+`sftp_policies` portent `'garde' => 'sa'` — **le rôle 2 ne les voit pas.** La suite boucle
+`for (const e of internes)` sur les entrées *que le compte courant voit* (`go-socle-navigation.mjs:205`),
+donc elles valent **une** assertion chacune.
+
+> La règle exacte est **« +1 par rôle qui voit l'entrée »**. La formule courte en est un cas
+> particulier — celui où l'entrée est visible des deux rôles.
+
+**Le coût de ne pas l'avoir vu :** en suivant la formule, on lit « 59 au lieu de 61 » et on conclut à
+une **régression de deux assertions** — sur un rejeu qui affiche pourtant `FAIL=0`. C'est la signature
+exacte du piège déjà écrit plus haut : *un écart n'est pas forcément une régression, mais il doit
+toujours être expliqué* — sauf que l'explication disponible était fausse.
+
+C'est la même famille que « N validations précédentes ne prouvent rien si aucune ne pouvait
+échouer » (§8, archivage de `supervision/`). Ici : **deux exemples confirmaient une formule, et aucun
+des deux ne pouvait la réfuter.** Une formule courte doit être éprouvée sur un cas où elle pourrait
+être fausse — sinon on n'a pas mesuré la formule, on a mesuré son domaine de validité.
+
 ## 9. Les autres documents
 
 | document | rôle |
