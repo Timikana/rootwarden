@@ -361,6 +361,45 @@ try {
              * lui qu'on clique. Une boite native bloquerait Puppeteer et
              * recouvrirait la ligne sur laquelle on decide. */
             await s.page.waitForSelector(C.confirmerEnPage, { visible: true, timeout: 8000 });
+
+            /* ══ LE PANNEAU OCCUPE-T-IL BIEN TOUTE LA LIGNE ? ═══════════════
+             *
+             * `.rw-panneau-decision` porte `display: flex`. Posee SUR le `<td>`,
+             * elle ecrase `display: table-cell` : la cellule sort du modele de
+             * tableau et son `colspan` est IGNORE. Le panneau s'arrete alors a
+             * la largeur de la premiere colonne, le reste de la ligne restant
+             * blanc — sur un ecran de 1920, 745 px utilises sur 1600.
+             *
+             * AUCUNE ASSERTION DOM NE L'ATTRAPE : `colSpan` vaut bien la bonne
+             * valeur, c'est le RENDU qui ment. Il faut mesurer la LARGEUR
+             * CALCULEE, et la comparer a celle de la ligne. Defaut releve a
+             * l'image sur un portage voisin le 2026-08-26, present ici aussi.
+             */
+            const largeurs = await s.page.evaluate((sel) => {
+                const b = document.querySelector(sel);
+                if (! b) return null;
+                const panneau = b.closest('.rw-panneau-decision');
+                const ligne = b.closest('tr');
+                if (! panneau || ! ligne) return null;
+
+                return {
+                    panneau: Math.round(panneau.getBoundingClientRect().width),
+                    ligne: Math.round(ligne.getBoundingClientRect().width),
+                };
+            }, C.confirmerEnPage);
+            if (largeurs === null) {
+                constate('largeur du panneau', 'non mesurable (hors tableau)');
+            } else {
+                constate('largeur panneau / ligne', `${largeurs.panneau} / ${largeurs.ligne} px`);
+                /* 92 % : le panneau porte des marges internes, il ne peut pas
+                 * atteindre 100 %. En dessous, c'est le `colspan` qui est perdu. */
+                const tient = largeurs.panneau >= largeurs.ligne * 0.92;
+                verifie('le panneau de decision occupe la ligne entiere', tient,
+                    tient ? `${largeurs.panneau} px sur ${largeurs.ligne}`
+                        : `${largeurs.panneau} px sur ${largeurs.ligne} — le colspan est perdu, `
+                          + '`display: flex` ayant ecrase `table-cell` sur la cellule');
+            }
+
             await s.page.click(C.confirmerEnPage);
         }
         await dors(1500);
