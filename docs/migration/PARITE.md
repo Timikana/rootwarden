@@ -7271,3 +7271,68 @@ configuration » à « j'exécute du root au prochain passage de RootWarden ».
 
 **Le portage ne peut pas refermer celui-ci** : la composition vit dans le backend. Porté au §7 avec
 les autres correctifs backend.
+
+---
+
+## E-172 — La portée d'un geste de parc est décidée par un CACHE, et « jamais relevée » y compte comme « fail2ban absent »
+
+`install_all` (`backend/routes/fail2ban.py:653`) choisit ses cibles ainsi :
+
+```sql
+FROM machines m
+LEFT JOIN fail2ban_status f ON m.id = f.server_id
+WHERE f.installed IS NULL OR f.installed = 0
+```
+
+Une machine **jamais relevée** n'a pas de ligne dans `fail2ban_status`. Le `LEFT JOIN` rend donc
+`NULL` — et `NULL` passe le `WHERE`. **Ne l'avoir jamais regardée suffit à la faire installer.**
+
+Mesuré le 2026-08-27, avec le SQL exact de la route :
+
+> « installer sur tout le parc » toucherait : **`srv-zabbix` (PROD)** · `OpenCVE-Test-OnPrem` (DEV)
+
+`srv-zabbix` est la machine de production que toutes les suites de ce chantier ont pour consigne de
+ne jamais joindre. Elle est dans la portée **parce qu'elle n'a jamais été relevée**.
+
+`ban_all_servers` (`:531`) fait l'inverse — `INNER JOIN … WHERE f.running = 1` — donc les machines
+que le cache dit **actives**. Mesuré : `(aucune)`, le cache datant du **2026-08-12**, quinze jours
+plus tôt. Une machine dont fail2ban est tombé depuis serait quand même visée ; une machine installée
+depuis serait ignorée.
+
+**Le parc atteint par un geste irréversible est décidé par un relevé qui peut avoir des semaines**, et
+l'écran ne le dit pas.
+
+---
+
+## E-173 — Les confirmations des gestes de parc ne nomment ni l'adresse, ni le nombre, ni les machines
+
+Mesuré, boîte native par boîte native :
+
+| geste | corps réellement envoyé | ce que la confirmation dit |
+|---|---|---|
+| bannir sur tout le parc | `{"ip":"203.0.113.7","jail":"sshd"}` | « Bannir cette IP sur TOUS les serveurs ? » |
+| installer sur tout le parc | `{}` | « Installer Fail2ban sur tous les serveurs sans Fail2ban ? » |
+
+`banIpAllServers` (`main.js:495`) passe pourtant `{ip, jail}` à la traduction, et le catalogue les
+ignore **tous les deux** — **cinquième occurrence** du motif d'E-163, et celle dont l'enjeu est le
+plus grand : on accepte de bannir sur **tout le parc** sans savoir quelle adresse.
+
+Pour l'installation de masse, le corps est **vide** : la portée est décidée entièrement côté serveur,
+par la requête d'E-172. L'opérateur ne peut donc pas la connaître, même en principe — et la
+confirmation ne lui en dit rien.
+
+**Un geste irréversible sur tout un parc se confirme en sachant sur quoi il porte.**
+
+---
+
+*Note sur E-165* — **quatrième occurrence trouvée et corrigée le 2026-08-27 (`v1.38.9`).**
+`ban_all_servers` ne **nommait même pas** `rc` : `success: True` par machine ne disait que « la
+session SSH s'est ouverte et la commande est partie », et le résumé « banni sur 3/3 serveurs » se
+calculait là-dessus. Les trois premières occurrences avaient été corrigées le même jour, celle-ci
+oubliée — **c'est exactement le motif « à moitié corrigé » reproché six fois à ce module, et cette
+fois le correctif partiel était le nôtre.** Le `success` global n'est désormais vrai que si TOUTES
+les machines ont abouti : un « 0/3 » rendu avec `success: True` se lit comme une réussite.
+
+*Note sur E-164* — **même chose sur `/fail2ban/stats`**, corrigé au même lot : `days = min(int(...))`
+était hors de tout `try`. Chercher la branche jumelle est une règle de ce chantier, pas une
+précaution.
