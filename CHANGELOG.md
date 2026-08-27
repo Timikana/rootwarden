@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.41** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.42** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,83 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.42 — E-220 un privilege orphelin sans nom, E-221 une elevation de privilege atteignable, et deux regles de methode
+
+#### E-220 — `NOPASSWD: ALL` pour un compte qui n'existe plus, et le fichier est protege du nettoyage PAR CONCEPTION
+
+**Trouve par la session 5 en relisant le correctif d'E-218** — donc dans la relecture d'un correctif qui
+venait lui-meme de fermer un piege. Le `exit 2` laisse `/etc/sudoers.d/rootwarden` en place avec
+`service_account_deployed` a **1** (bon choix : il garde le rejeu ouvert), et ce choix cree l'etat.
+
+**Inerte tant que rien ne recree ce nom.** Le chemin de RootWarden l'ecrase (`>` en `ssh.py:813`, `:1127`) ;
+**tout autre chemin — gestion de configuration, `useradd` manuel, un paquet — accorde root en silence.**
+
+**⚠ Amplificateur trouve par le Lead** :
+
+    configure_servers.py:332   return  # ne jamais toucher /etc/sudoers.d/rootwarden (compte de service)
+    configure_servers.py:457   protege par _purge_legacy_sudoers
+
+**Le seul mecanisme du produit qui purge des fichiers sudoers a une exception explicite pour celui-la.** Juste
+tant que le compte existe — et **elle rend l'orphelin durable** : aucun geste du produit ne le retirera jamais.
+*Une exception de surete fondee sur « ce compte existe » survit a la disparition du compte, parce qu'elle ne la
+teste pas.*
+
+**Et l'absence de nom se PROPAGE, c'est le point qui decide** : `ssh.py:1275`, `remove_ssh_password` refuse si
+le drapeau vaut 0 ; sur `code == 2` il vaut **1**, donc elle **accepterait** et viderait les deux mots de passe
+d'une machine dont le compte de service n'existe plus. Pas un verrouillage (la cle reste sur le nominal et sur
+root, E-219) — **mais la precondition ne mesure plus ce qu'elle croit mesurer.**
+
+> *Un etat qui n'a pas de nom ne peut etre pris en compte par aucune autre route* (session 5). **Le drapeau est
+> binaire pour une realite devenue ternaire** — deploye / absent / sudoers orphelin — et **toute route qui le
+> lit herite de l'imprecision.**
+
+Correction : **`sudoers_orphelin: true`**, pas un `incomplet` abstrait — *un nom porte la raison, un booleen
+porte une couleur.*
+
+#### E-221 — « avoir acces a une machine » et « avoir le droit de la mettre a jour » sont deux questions, et une seule est posee
+
+Sur les 28 routes sans autorisation au-dela de la cle d'API : **19 joignent une machine**, dont **4 installent
+des paquets en root tout de suite** et **3 posent une tache planifiee qui tournera en root**.
+
+**Ces routes portent `@require_machine_access` et il MORD** : le perimetre machine **est** verifie. Ce
+qu'aucune ne demande, c'est un **role** ou une **permission**.
+
+> **Un compte de role 1 ayant une seule machine dans son perimetre peut y lancer `apt-get full-upgrade -y` et
+> y installer une tache planifiee qui tourne en root.** (`apt_update` execute bien `full-upgrade`, verifie.)
+
+**La categorie la plus lourde ne se voit pas dans un decompte « ecrit / lit »** : les trois routes de
+planification n'ecrivent **qu'un fichier**, mais c'est un `/etc/cron.d/*` qui s'executera **en root
+indefiniment**. Un balayage par nombre d'ecritures les rangerait avec `cve_reprioritize`, un simple `UPDATE`.
+*Un geste ponctuel se rejoue ; un geste planifie se repete sans que personne ne le redemande* — **le nombre
+d'ecritures ne classe pas un risque, la duree de vie de l'effet le classe.**
+
+**⚠ Le correctif n'est PAS ecrit, deliberement.** Ecrire douze routes gardees ne protege rien — `backend/**.py`
+est lu au demarrage, l'ecriture est inerte — **et ca aggrave le seul risque reel du lot** : vingt-sept
+correctifs non mesures prenant effet ensemble. *Un correctif inerte n'est pas un correctif en attente, c'est un
+correctif dont le comportement n'a jamais ete observe.* **Ce qui monte a l'exploitant est donc la PRIORITE du
+redemarrage**, cet ecart etant le premier du lot a decrire une elevation de privilege atteignable par un compte
+existant.
+
+#### Deux regles de methode, etablies le meme soir sur le meme ecart
+
+**1. Une mesure TROUVE, une lecture GENERALISE.** Sur E-219 la session 5 a mesure les empreintes (une cle,
+trois comptes, dont root) ; la session 3 a etabli la meme chose **par le code**. Sa propre formule : *« la
+mienne etablissait un fait sur ce parc, la sienne etablit une propriete du code »* — et la seconde a ete
+obtenue **sans joindre la production**. C'est l'exact envers du motif sur lequel la journee a bute : *une
+propriete qui tient par l'etat du parc n'est pas une propriete.*
+
+**2. La pre-relecture avant commit trouve ce que ni l'auteur ni le relecteur ne voient seuls.** *« Ce n'est pas
+la relecture d'un code suspect, c'est le croisement de deux lectures d'un code correct. »* **Cinq des vingt
+derniers ecarts** ont ete trouves par une session qui lisait une route **pour une raison sans rapport** avec le
+defaut qu'elle y a vu. **Le poste le plus rentable du dispositif, et il ne vient pas de la suspicion.**
+
+**Corollaire, et il est inconfortable** : la session 4 a failli ne pas rouvrir les corps **parce qu'elle venait
+d'ecrire qu'il fallait le faire** — et sa sonde avait classe `apt_update`, la route la plus mutante des 28, en
+**lecture seule**, en lisant le NOM de la variable `command` au lieu de sa valeur. **Seule fois de la journee ou
+une sonde s'est trompee dans le sens RASSURANT** — exactement le cas dont le §8 disait le matin que *personne
+ne le verrait.* Trouve sans filet, uniquement en refaisant le travail. *Ecrire une regle donne le sentiment de
+l'avoir appliquee.*
+
 ### v1.38.41 — ⚠⚠ E-219 : le « kill-switch » documente pour une COMPROMISSION DE CLE laisse la meme cle autorisee sur root
 
 **Trouve par la session 5 en relisant l'interface de revocation que la session 3 venait d'ecrire — donc dans
@@ -3664,7 +3741,8 @@ correspondance reelle :**
 | v1.38.38 | (session 5) | la reserve d'E-218 est levee pour la revocation, elle TIENT pour la reprise |
 | v1.38.39 | `77fac52` | le correctif du Lead etait faux trois fois — dont une qui armait un piege |
 | v1.38.40 | `94f08e6` | la reserve d'E-218 reecrite : levee pour la revocation, elle TIENT pour la reprise |
-| **v1.38.41** | (ce commit) | **E-219 : le kill-switch laisse la meme cle sur root** ; le pathspec et les deux fichiers partages |
+| **v1.38.41** | `8a6ff5e` | **E-219 : le kill-switch laisse la meme cle sur root** ; le pathspec et les deux fichiers partages |
+| **v1.38.42** | (ce commit) | **E-220 privilege orphelin sans nom** ; **E-221 elevation atteignable** ; deux regles de methode |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

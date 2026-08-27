@@ -9782,3 +9782,131 @@ comme un échec dont le message dit « à rejouer ».
 n'est pas un état, c'est une coïncidence de rédaction* — et une traduction, une reformulation ou un
 changement de casse le supprime sans bruit. **Correction : un champ `partiel` dans la réponse.** Route
 backend, session 4.
+
+---
+
+## E-220 — ⚠⚠ Un PRIVILÈGE ORPHELIN sans nom : `NOPASSWD: ALL` pour un compte qui n'existe plus, et il n'a pas de nom dans le code
+
+**Trouvé par la session 5 en relisant le correctif d'E-218 — donc dans la relecture d'un correctif qui venait
+lui-même de fermer un piège. Le Lead a vérifié et trouvé un amplificateur que la session 5 n'avait pas.**
+
+### L'état
+
+Le correctif d'E-218 a introduit `exit 2` : **compte supprimé, fichier sudoers subsistant**. Sur `code == 2`,
+`service_account_deployed` reste à **1** pour garder le rejeu ouvert — **bon choix**, et c'est ce choix qui
+crée l'état.
+
+    /etc/sudoers.d/rootwarden   contient  'rootwarden ALL=(ALL:ALL) NOPASSWD: ALL'
+                                et AUCUN compte de ce nom n'existe
+
+**Inerte aujourd'hui** : pas d'utilisateur, pas d'élévation. **Il redevient vivant à l'instant où quoi que ce
+soit recrée un compte de ce nom** — gestion de configuration, `useradd` manuel, un paquet. **Root est alors
+accordé en silence, sans que personne n'ait écrit de règle sudo.**
+
+**Sur le chemin de RootWarden c'est sans conséquence** : `deploy_service_account` écrit le fichier avec `>`
+(`ssh.py:813`, `:1127`), donc il l'écrase. **Sur tout autre chemin, non.**
+
+### ⚠ L'amplificateur : le fichier est protégé du nettoyage PAR CONCEPTION
+
+    configure_servers.py:332   return  # ne jamais toucher /etc/sudoers.d/rootwarden (compte de service)
+    configure_servers.py:457   (/etc/sudoers.d/rootwarden) est protege par _purge_legacy_sudoers
+
+**Le seul mécanisme du produit qui purge des fichiers sudoers a une exception explicite pour celui-là** — et
+elle est juste, tant que le compte existe : purger le sudoers du compte de service couperait l'accès de
+RootWarden. **Mais elle rend l'orphelin durable** : aucun geste du produit ne le retirera jamais.
+
+*Une exception de sûreté fondée sur « ce compte existe » survit à la disparition du compte, parce qu'elle ne
+la teste pas.*
+
+### Le vrai défaut est que l'état n'a PAS DE NOM
+
+`exit 2` n'arrive à l'écran que dans le **texte** de `r['message']`. **La route connaît l'état ; l'écran ne le
+voit pas.** La session 3 a refusé de comparer des chaînes pour le distinguer — *un état que seule une phrase
+distingue est une coïncidence de rédaction*, qu'une traduction ou une reformulation supprime sans bruit.
+
+**Et l'absence de nom se propage à une AUTRE route, ce qui est le point qui décide :**
+
+    ssh.py:1275   remove_ssh_password :  if not m.get('service_account_deployed'):  -> refus
+
+Sur `code == 2` le drapeau vaut **1**. Donc `remove_ssh_password` **accepterait**, et viderait les deux mots
+de passe d'une machine **dont le compte de service n'existe plus**.
+
+**Ce n'est pas un verrouillage** — la clé de plateforme reste sur le compte nominal et sur `root` (E-219),
+donc `connect_ssh` retombe sur sa première tentative. **Mais la précondition ne mesure plus ce qu'elle croit
+mesurer.**
+
+> **Un état qui n'a pas de nom ne peut être pris en compte par aucune autre route.** Formulation de la
+> session 5, et c'est la généralisation qui compte : le drapeau `service_account_deployed` est **binaire** pour
+> une réalité devenue **ternaire** — déployé / absent / **sudoers orphelin**. Toute route qui lit ce drapeau
+> hérite de l'imprécision.
+
+### La correction
+
+**Un champ nommé dans la réponse : `sudoers_orphelin: true`**, et non un `incomplet` abstrait —
+recommandation de la session 5, retenue pour sa raison : *un nom porte la raison, un booléen porte une
+couleur.* Puis les routes qui lisent `service_account_deployed` comme une précondition doivent savoir
+distinguer les trois états.
+
+**Route backend, session 4.** Et *qui écrit le code ne valide pas seul son correctif* : c'est le deuxième
+correctif consécutif sur cette route, et le premier avait armé un piège que sa propre relecture n'avait pas vu.
+
+---
+
+## E-221 — ⚠⚠ « Avoir accès à une machine » et « avoir le droit de la mettre à jour » sont deux questions, et une seule est posée
+
+**Mesuré par la session 4 sur les 28 routes sans autorisation au-delà de la clé d'API. Le verdict est net :
+c'est un risque, pas un inventaire.**
+
+### Le classement
+
+    28  routes sans role ni permission
+        19  joignent une machine
+             4  INSTALLENT des paquets en root, tout de suite
+                apt_update · update_server · apply_security_updates · custom_update
+             3  POSENT UNE TACHE PLANIFIEE qui mettra a jour plus tard, EN ROOT
+                schedule_update · schedule_advanced_update · schedule_advanced_security_update
+             3  modifient l'etat sans installer
+                dpkg_repair (killall -9 + dpkg --configure -a) · dry_run_update · pending_packages
+             9  lecture distante seule
+         9  ne joignent pas de machine
+             7  lectures en base · 1 ecriture (`cve_reprioritize`) · `update_zabbix` (307, dedouanee)
+
+### Ce qui manque n'est pas le périmètre, c'est la CAPACITÉ
+
+**Ces routes portent `@require_machine_access` et il MORD** — elles sont dans les 54. Le périmètre machine
+**est** vérifié. Ce qu'aucune ne demande, c'est un **rôle** ou une **permission**.
+
+> **Un compte de rôle 1 ayant une seule machine dans son périmètre peut y lancer `apt-get full-upgrade -y` et
+> y installer une tâche planifiée qui tourne en root.**
+
+Vérifié : `apt_update` exécute bien `full-upgrade`. *« Avoir accès à une machine » et « avoir le droit de la
+mettre à jour » sont deux questions, et une seule est posée.*
+
+### La catégorie la plus lourde ne se voit PAS dans un décompte « écrit / lit »
+
+Les trois routes de planification n'écrivent **qu'un fichier**. Mais c'est un `/etc/cron.d/*` qui
+**s'exécutera en root indéfiniment**. Un balayage qui compte les écritures les rangerait avec
+`cve_reprioritize`, un simple `UPDATE` en base.
+
+> *Un geste ponctuel se rejoue ; un geste planifié se répète sans que personne ne le redemande.* **Le nombre
+> d'écritures ne classe pas un risque : la durée de vie de l'effet le classe.**
+
+### Le remède est connu et il a un précédent dans ce dépôt
+
+Une **permission de mise à jour**, comme `can_manage_fail2ban` l'a fait pour les quinze routes de `fail2ban`
+via **E-152**. **`updates/` est le seul module du parc où douze routes n'en portent aucune.**
+
+### ⚠ Décision : NE PAS l'écrire maintenant
+
+Douze routes de plus dans une file de **quinze correctifs déjà inertes**. **Le Lead confirme le choix de la
+session 4 d'attendre le redémarrage**, et la raison n'est pas la prudence :
+
+- **écrire le correctif maintenant ne protège rien** — `backend/**.py` est lu au démarrage du processus,
+  l'écriture est inerte, seul le redémarrage mord ;
+- **et ça aggrave le seul risque réel du lot** : un lot de 27 correctifs non mesurés qui prennent effet
+  ensemble. *Un correctif inerte n'est pas un correctif en attente, c'est un correctif dont le comportement
+  n'a jamais été observé.*
+
+**Ce qui doit monter à l'exploitant n'est donc pas le correctif : c'est la PRIORITÉ du redémarrage.** Cet
+écart est le premier du lot qui décrive une **élévation de privilège atteignable par un compte existant** — et
+non un texte faux, un compteur trompeur ou un état dérivé du code.
