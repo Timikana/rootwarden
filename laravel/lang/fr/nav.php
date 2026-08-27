@@ -9,11 +9,17 @@
  */
 return [
     // Sections
-    'section_navigation' => 'NAVIGATION',
-    'section_admin'      => 'ADMINISTRATION',
-    'section_other'      => 'AUTRE',
 
     // Navigation
+    // NAV-001 : cinq sections, dans l'ordre de la sequence operationnelle.
+    // `section_navigation` et `section_other` sont RETIREES — mesure faite,
+    // zero consommateur hors de ce catalogue apres le reordonnancement.
+    'section_parc' => "PARC & ACCÈS",
+    'section_exploitation' => "EXPLOITATION",
+    'section_securite' => "SÉCURITÉ",
+    'section_admin' => "ADMINISTRATION",
+    'section_autre' => "AUTRE",
+
     'dashboard'   => 'Dashboard',
     'ssh_keys'    => 'Cles SSH',
     'updates'     => 'Mises a jour',
