@@ -66,7 +66,45 @@ if (isset($_SESSION['user_id']) && !empty($_SESSION['2fa_required']) === false) 
             "SELECT 1 FROM active_sessions WHERE session_id = ? AND user_id = ? LIMIT 1"
         );
         $_sessChk->execute([session_id(), (int)$_SESSION['user_id']]);
-        if (!$_sessChk->fetchColumn()) {
+        $_sessVivante = (bool)$_sessChk->fetchColumn();
+
+        // ══ `last_activity` PORTE SON NOM DEPUIS CE CORRECTIF ════════════════
+        //
+        // La colonne n'etait JAMAIS mise a jour. Mesure du 2026-08-27 : 3 930
+        // lignes, 3 930 ou `last_activity = created_at`, ZERO mise a jour. Elle
+        // porte pourtant `ON UPDATE CURRENT_TIMESTAMP` — mais rien ne l'ecrivait :
+        // la ligne est posee une fois a la connexion, et ce bloc la LIT a chaque
+        // requete sans jamais la toucher.
+        //
+        // Deux consequences, et la seconde est la grave :
+        //   - `profile.php` affiche a l'utilisateur une colonne « derniere
+        //     activite » qui est en fait son heure de CONNEXION ;
+        //   - la purge du planificateur dit
+        //     `WHERE last_activity < NOW() - 7 JOURS`, ce qui se lit « inactive
+        //     depuis 7 jours » et signifiait en realite « CREEE il y a plus de
+        //     7 jours ». Une session utilisee tous les jours aurait ete revoquee
+        //     au septieme — le jour ou quelqu'un active `LOG_RETENTION_DAYS`.
+        //
+        // L'ECRITURE EST BORNEE A UNE PAR MINUTE ET PAR SESSION. Ce bloc tourne
+        // a CHAQUE requete protegee : une mise a jour inconditionnelle ecrirait
+        // la ligne et ses deux index a chaque page. Le `AND last_activity <
+        // (NOW() - INTERVAL 60 SECOND)` fait que MySQL ne touche rien quand il
+        // n'y a rien a changer. Une minute de precision est trois ordres de
+        // grandeur plus fine que le seuil de sept jours qui la consomme.
+        //
+        // La colonne est ecrite EXPLICITEMENT et non laissee a la clause
+        // `ON UPDATE` : celle-ci ne se declenche que si une AUTRE valeur change,
+        // ce qui n'est pas le cas ici.
+        if ($_sessVivante) {
+            $_sessTouch = $pdo->prepare(
+                "UPDATE active_sessions SET last_activity = NOW() "
+                . "WHERE session_id = ? AND user_id = ? "
+                . "AND last_activity < (NOW() - INTERVAL 60 SECOND)"
+            );
+            $_sessTouch->execute([session_id(), (int)$_SESSION['user_id']]);
+        }
+
+        if (!$_sessVivante) {
             // Session n'est plus enregistree → revoquee (UI profile) ou jamais
             // instanciee (edge case : restoration de cookie remember_me sans
             // active_sessions row). Dans les deux cas, on force un re-login.
