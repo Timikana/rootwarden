@@ -924,7 +924,18 @@ et chacune bloque une session. Je ne les tranche pas.
   ChatOps, donc offerts comme **identité** sous laquelle une commande de chat s'exécuterait. La
   portée reste celle du rôle 1, mais un compte de test sans second facteur n'a pas à figurer dans
   ce choix ;
-- **K4** — l'arbitrage `NOPASSWD: ALL` : le repli a **deux** chemins, et aucun compte actif de rôle 1 ne
+- **K4** — l'arbitrage `NOPASSWD: ALL`.
+  **⚠ UNE DE SES PRÉMISSES ÉTAIT INCOMPLÈTE, corrigée le 2026-08-27 — E-183.** Ce document fondait le
+  risque sur « un déploiement lancé en l'état **RÉVOQUERAIT** les accès », donc sur la fiabilité de
+  `server_user_inventory`. Or `scan_server_users` ne lisait **aucun** code de sortie
+  (`recv_exit_status` : **zéro occurrence** dans tout `routes/ssh.py`), et un incident SSH passager
+  faisait **trois** choses d'un coup : vider l'inventaire (72 lignes), vider la table des clés (20), et
+  **poser `users_scanned_at`** — qui est la précondition du préflight de déploiement (`ssh.py:381`,
+  « Bloquer si le serveur n'a jamais été scanné »). **Le même chemin détruisait donc la donnée ET
+  ouvrait la porte qui la garde**, en se journalisant comme un nettoyage réussi. **Corrigé en
+  `v1.38.16`** — mais l'arbitrage doit être relu en le sachant : ce n'était pas « une donnée à laquelle
+  on ne peut pas se fier », c'était **un préflight qui avait cessé de bloquer**.
+  Sur le repli lui-même : il a **deux** chemins, et aucun compte actif de rôle 1 ne
   porte `users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable.
   **RELEVÉ DE NIVEAU LE 2026-08-26 — cet `UPDATE` existe, et il est plus bas que supposé.** L'import
   CSV (E-130) écrit `users.sudo` **sans contrôle de rôle**, depuis une page atteignable au **rôle 2**
@@ -1460,6 +1471,29 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   sur le journal, jamais sur le code de sortie**.
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
+
+### `scrollIntoView({block:'nearest'})` retombe dans le piège de l'en-tête collant (F6, 2026-08-27)
+
+Le plan notait ce piège pour `'start'`. **`'nearest'` y retombe dès que l'élément est AU-DESSUS du champ
+visible** : il fait le défilement *minimum*, c'est-à-dire qu'il aligne l'élément **en haut** — là où
+l'en-tête collant le recouvre.
+
+Mesuré à l'image sur le panneau de décision de `fail2ban/`, qui vit au niveau de la **page** alors que le
+geste part du **bas** de page. À 1400 px on lisait « critiques, et 2 n'ont jamais été relevées… » ; à
+1920 px seulement « machines à la fois… ». **Le titre — « Installer Fail2ban sur 2 machine(s) du parc ? »
+— était recouvert.** On confirmait donc une installation sur **tout un parc** sans voir sur quoi elle
+portait. À 390 px le panneau était entier : le défaut n'existait qu'aux deux grandes largeurs.
+
+**Aucune assertion ne pouvait le voir** — `innerText` rend le texte recouvert comme le reste, et c'est
+précisément pourquoi les trois assertions de confirmation étaient **vertes**. Corrigé en
+`block: 'center'`, et **sur les deux panneaux du fichier** : celui de décision et la fenêtre de réglages,
+qui portait le même défaut par la même mécanique — *chercher la branche jumelle* vaut aussi pour une
+règle de défilement.
+
+**Troisième fois sur ce chantier qu'un panneau de décision est illisible pour une raison que le DOM ne
+voit pas** : après le conteneur `flex` posé sur un `<td>` qui fait ignorer son `colspan`, et le panneau
+placé dans un parent caché. À chaque fois le geste destructeur partait avec une confirmation que
+personne n'avait pu lire.
 
 ### Un repli permissif ressemble à de la robustesse (2026-08-27)
 
