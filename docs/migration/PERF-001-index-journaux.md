@@ -173,6 +173,60 @@ pas un détour de performance.** Trois issues, dans l'ordre de ce que je recomma
 
 L'issue 2 touche une chaîne d'audit. Je ne la déclenche pas.
 
+### ⚠ CORRECTION DU 2026-08-27 — les deux défauts se MASQUAIENT, et ma recommandation était incomplète
+
+Mesuré après coup, en vérifiant le coût d'écriture que mes propres index ajoutent :
+
+> **`active_sessions.last_activity` n'est JAMAIS mise à jour.**
+> `3 930` lignes, `3 930` où `last_activity = created_at`, **zéro** mise à jour.
+
+La colonne porte pourtant `ON UPDATE CURRENT_TIMESTAMP` — mais rien ne l'écrit
+jamais. La ligne est posée une fois, à la connexion
+(`legacy/auth/functions.php:81` et `login.php:212`, `REPLACE INTO
+active_sessions (session_id, user_id, ip_address, user_agent)`), et
+`verify.php:66` la **lit** à chaque requête sans jamais la toucher.
+
+Trois conséquences, dont une qui change l'arbitrage demandé ci-dessus.
+
+**1. La purge ne fait pas ce que son nom dit.**
+`DELETE … WHERE last_activity < NOW() - 7 DAY` se lit « inactive depuis 7 jours ».
+Elle signifie en réalité **« créée il y a plus de 7 jours »**. Une session
+utilisée tous les jours serait révoquée au septième.
+
+**2. Les deux défauts se masquent mutuellement, et c'est ce qui rend l'arbitrage
+délicat.** La purge ne tourne pas (`LOG_RETENTION_DAYS = 0`), donc personne n'a
+jamais été déconnecté à tort. **Activer la rétention ne ferait donc pas
+qu'appliquer une politique de conservation de journaux : elle commencerait à
+déconnecter les exploitants tous les sept jours, en pleine session.** Ce n'est
+pas ce que l'issue 1 ou 2 de la section ci-dessus laissait entendre, et je ne
+l'avais pas vu en les écrivant.
+
+> **L'ordre correct est donc : réparer `last_activity` AVANT d'activer quoi que
+> ce soit.** Soit en la mettant à jour là où `verify.php` lit déjà la ligne —
+> une écriture par requête, à peser — soit en renommant le prédicat de purge
+> pour qu'il dise ce qu'il fait (`created_at`), soit en sortant ce nettoyage de
+> la porte `LOG_RETENTION_DAYS` avec un seuil qui lui soit propre.
+
+**3. `profile.php:374` affiche à l'utilisateur une colonne « dernière
+activité » qui est en fait l'heure de connexion.** Les deux valeurs sont
+égales sur les 3 930 lignes.
+
+**Et cette mesure DÉDOUANE mes propres index.** J'avais soupçonné que
+`idx_sessions_activity` et `idx_sessions_user_activity` coûteraient une écriture
+d'index par requête sur le chemin le plus chaud du portail, `last_activity`
+portant `ON UPDATE CURRENT_TIMESTAMP`. **C'est faux** : la colonne ne change
+jamais après l'insertion, donc les deux index ne sont touchés qu'à la connexion,
+une fois par session. Le coût est nul sur le chemin chaud — mesuré, pas supposé,
+et je le dis parce que le soupçon portait sur mon propre travail.
+
+Remesure :
+
+```bash
+sudo -n docker exec -e MYSQL_PWD="$P" rootwarden_db mysql -uroot rootwarden -e "
+SELECT COUNT(*) lignes, SUM(last_activity = created_at) jamais_bougee,
+       SUM(last_activity > created_at) mise_a_jour FROM active_sessions"
+```
+
 ---
 
 ## 6. Ce que je n'ai pas mesuré
