@@ -1614,6 +1614,61 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### UN DISCRIMINANT DOIT ÊTRE UN SEUIL, PAS UNE INÉGALITÉ (BUG-201, 2026-08-27)
+
+**Quatrième instrument pris pour un résultat en une journée, et le seul qui soit trop SENSIBLE au lieu de
+trop grossier.**
+
+Une mesure avait conclu qu'une ligne était « repliée **à toutes les largeurs, 1920 comprise** ». Contredite
+par une seconde mesure, au style calculé, en comparant les ordonnées de deux boîtes :
+
+    1920 px   dy=0  dy=0  dy= 2    aligne · aligne · **aligne**
+    1400 px   dy=0  dy=0  dy= 2    aligne · aligne · **aligne**
+     390 px   dy=0  dy=0  dy=32    aligne · aligne · REPLIE
+
+**Le `dy = 2 px` n'est pas un repli : c'est un décalage de ligne de base.** La date est en 12 px, le nom en
+poids 650, et `align-items: center` les centre sur des hauteurs de ligne différentes. **Un repli vaut
+32 px** — la hauteur d'une ligne.
+
+> Le premier instrument testait `a.top !== b.top`, qui classe « replié » un décalage de **2 px**.
+> `Math.abs(a.top - b.top) > 4` ne le fait pas. **Un discriminant doit être un SEUIL, pas une
+> inégalité** — et les deux fautes se corrigent en **nommant la propriété** : « les deux boîtes sont-elles
+> sur la MÊME LIGNE », et non « ont-elles la même ordonnée ».
+
+Conclusion : le repli **n'a lieu qu'à 390 px, et il est VOULU** — 18 caractères de nom plus une date ne
+tiennent pas sur 324 px, ce qui est précisément l'objet du `flex-wrap`. Le `dx = -43` en est la
+**signature**, pas un chevauchement. **Rien à corriger**, et la question ouverte est close.
+
+### « UN SEUL RENDU NE DÉDOUANE PAS UNE RÈGLE » — la réserve a MORDU (BUG-201, 2026-08-27)
+
+Une mesure avait retiré l'hypothèse du « double cadre » sur une page, **en gardant la réserve** : *un seul
+rendu ne dédouane pas une règle, il dédouane un rendu.* **Elle a mordu, et pas là où on cherchait.**
+
+La double définition de la même classe CSS produisait, sur la `<section>` enveloppante :
+
+| | avant | après correction |
+|---|---|---|
+| police de la section | `ui-monospace` | `system-ui` |
+| police du `<h2>` | `ui-monospace`, **héritée** | `system-ui`, 17 px |
+| `white-space` | `pre-wrap` — **les retours du GABARIT devenaient des retours rendus** | `normal` |
+| `max-height` / `overflow` | 380 px / `auto` | `none` / `visible` |
+| marge en tête | 10 px, celle du `<pre>` | **28 px**, celle qui était voulue |
+
+**Ni `.rw-sous-titre-fort` ni `.rw-sous-titre` ne posent de `font-family`** : c'est ainsi que le titre
+d'une section se rendait en chasse fixe.
+
+**Et le « une seule boîte bornée » de la première mesure s'explique** : `overflow: auto` ne défile **que si
+le contenu dépasse**, et le journal était **vide** à cet instant. **Le défilement imbriqué était donc réel
+mais CONDITIONNÉ à un état que la mesure n'avait pas atteint.** La réserve n'était pas de la prudence,
+c'était la bonne lecture — et c'est la forme générale : *une règle conditionnelle ne se dédouane pas en
+mesurant une seule condition.*
+
+**Et le correctif a renommé la règle qui a UN appelant, pas celle qui en a sept** — trois `<pre>` de
+`supervision/`, `services/`, `cles-ssh`, un `<p>` de `chatops`, un `pre` de `docker.js`. Vérifié **avant**
+de renommer qu'aucune suite ne vise la classe, l'ancre `data-rw` restant inchangée : **le contrat DOM est
+identique**. Mesure : `go-page-update-u2` **13 / 8, conformes** — et les six autres suites d'`update/`
+**n'ont pas été rejouées**, ce qui est dit plutôt que laissé croire à une couverture complète.
+
 ### RENDRE VISIBLE UN OBJET INVALIDE MAIS PRÉSENT — trois conditions (2026-08-27)
 
 Tranché sur E-197 : un compte nommé `..` découvert dans un `/etc/passwd` distant doit-il être **refusé à
