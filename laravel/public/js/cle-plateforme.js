@@ -591,6 +591,121 @@ window.RW_CLE_PLATEFORME = true;
         });
     }
 
+    /* ═══════════════════════════════════════════════════════════════════
+     * E-219 — DEMANDER AU SEUL QUI PUISSE REPONDRE
+     * ═══════════════════════════════════════════════════════════════════
+     *
+     * Le tableau et les compteurs rendus par le serveur reposent sur
+     * `(password <> '')`. Ce test compte des OCTETS dans une colonne chiffree,
+     * pas la presence d'un secret : PHP chiffre la chaine vide en `sodium:…`,
+     * Python rend `''`. Un mot de passe REELLEMENT vide saisi depuis l'ancien
+     * portail rend donc la colonne NON VIDE, et le compteur surestime.
+     *
+     * Le portage ne recalcule rien : il DEMANDE. `GET /machines/credential-status`
+     * rend trois etats — vide, non vide, et `null` INDETERMINE quand le
+     * dechiffrement a echoue. Ce troisieme etat est le plus important : sans lui
+     * « je n'ai pas su lire » se deguiserait en « c'est vide ».
+     *
+     * CE QUE CETTE REPONSE NE COUVRE PAS : le predicat ne porte que sur
+     * `password`. `root_password` n'y figure pas, et c'est pourtant la colonne
+     * sans chemin de reecriture depuis cette page. Son etat affiche reste donc
+     * calcule sur la colonne, avec la meme approximation — dit a l'ecran plutot
+     * que laisse a supposer.
+     *
+     * UN ECHEC DE CETTE REQUETE NE VALIDE RIEN. L'encart annonce alors que les
+     * compteurs restent approximatifs. Le silence aurait laisse croire a un
+     * accord.
+     */
+    var credEncart = document.querySelector('[data-rw="cle-credential"]');
+    var credVerdict = document.querySelector('[data-rw="cle-credential-verdict"]');
+
+    function annonceCredential(texte, classe) {
+        if (! credEncart || ! credVerdict) { return; }
+        credVerdict.textContent = texte;
+        credVerdict.className = 'rw-prose' + (classe ? ' ' + classe : '');
+        credEncart.hidden = false;
+    }
+
+    /* Pose un badge dans la cellule « Mot de passe » d'une ligne. Le badge
+     * s'AJOUTE au texte du serveur, il ne le remplace pas : l'ecran montre les
+     * deux reponses et dit laquelle vient d'ou. Effacer le texte serveur
+     * cacherait la divergence au lieu de la nommer. */
+    function badgeMotDePasse(id, cle, classe) {
+        var cellule = document.querySelector('[data-rw="cle-mdp-' + id + '"]');
+        if (! cellule) { return; }
+        var badge = document.createElement('span');
+        badge.className = 'rw-badge ' + classe;
+        badge.setAttribute('data-rw', 'cle-mdp-badge-' + id);
+        badge.textContent = textes[cle] || '';
+        cellule.appendChild(badge);
+    }
+
+    if (credEncart) {
+        fetch(PASSERELLE + '/machines/credential-status', {
+            headers: { Accept: 'application/json' },
+        }).then(function (r) {
+            return r.json().catch(function () { return null; });
+        }).then(function (d) {
+            if (! d || d.success !== true || ! Array.isArray(d.machines)) {
+                annonceCredential(textes.credential_echec || '', 'rw-annonce--attention');
+
+                return;
+            }
+
+            var divergentes = [];
+            var indeterminees = [];
+
+            d.machines.forEach(function (m) {
+                var id = m.machine_id;
+                var ligne = document.querySelector('[data-rw="cle-ligne-' + id + '"]');
+                // Le serveur n'a pas rendu cette ligne (filtre d'acces cote
+                // backend, ou machine ajoutee depuis le rendu) : rien a annoter,
+                // et surtout rien a compter comme un ecart.
+                if (! ligne) { return; }
+
+                var vuServeur = ligne.dataset.mdp || '';
+                // Le serveur a-t-il annonce un mot de passe UTILISATEUR ?
+                // `root` seul ne concerne pas ce predicat, qui ne lit que
+                // `password` — l'y inclure inventerait une divergence.
+                var serveurDitMdp = vuServeur === 'les_deux' || vuServeur === 'utilisateur';
+
+                if (m.mot_de_passe_vide === null || m.dechiffrable === false) {
+                    indeterminees.push(String(m.nom || id));
+                    badgeMotDePasse(id, 'badge_mdp_illisible', 'rw-badge--attention');
+
+                    return;
+                }
+                if (m.mot_de_passe_vide === true && serveurDitMdp) {
+                    divergentes.push(String(m.nom || id));
+                    badgeMotDePasse(id, 'badge_mdp_vide_reel', 'rw-badge--alerte');
+                }
+            });
+
+            // LES DEUX SONT DITS, ET SEPAREMENT. Les fondre en un nombre
+            // reunirait « la colonne se trompe » et « je n'ai pas su lire »,
+            // qui n'appellent pas le meme geste.
+            var lignes = [];
+            if (divergentes.length > 0) {
+                lignes.push(remplit('credential_divergence', {
+                    n: divergentes.length, noms: divergentes.join(', '),
+                }));
+            }
+            if (indeterminees.length > 0) {
+                lignes.push(remplit('credential_indetermine', {
+                    n: indeterminees.length, noms: indeterminees.join(', '),
+                }));
+            }
+            if (lignes.length === 0) {
+                annonceCredential(textes.credential_accord || '', 'rw-annonce--ok');
+
+                return;
+            }
+            annonceCredential(lignes.join(' '), 'rw-annonce--attention');
+        }).catch(function () {
+            annonceCredential(textes.credential_echec || '', 'rw-annonce--attention');
+        });
+    }
+
     if (copier) {
         copier.addEventListener('click', function () {
             var texte = valeur.textContent || '';

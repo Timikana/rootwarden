@@ -198,8 +198,13 @@
             <tbody>
                 @foreach ($lignes as $l)
                     @php $m = $l['machine']; @endphp
+                    {{-- `data-mdp` porte CE QUE LE SERVEUR A CALCULE sur les
+                         colonnes. Le script le compare a la reponse du detenteur
+                         de la cle : sans cette valeur il ne pourrait pas dire
+                         qu'il y a DIVERGENCE, seulement afficher un etat de plus
+                         sans dire lequel des deux se trompe. --}}
                     <tr @class(['rw-ligne-sensible' => $l['sensible']])
-                        data-rw="cle-ligne-{{ $m->id }}">
+                        data-rw="cle-ligne-{{ $m->id }}" data-mdp="{{ $l['mots_de_passe'] }}">
                         <td>
                             <span class="rw-tableau__fort">{{ $m->name }}</span>
                             @if ($l['sensible'])
@@ -459,6 +464,31 @@
     <div class="rw-actions">
         <button type="button" class="rw-bouton rw-bouton--discret"
                 data-rw="cle-recharger" hidden>{{ __('plateforme.recharger') }}</button>
+    </div>
+
+    {{--
+        ═══ E-219 — CE QUE SEUL LE DETENTEUR DE LA CLE PEUT DIRE ═══════════
+
+        Les compteurs de cette page et la colonne « Mot de passe » se calculent
+        sur `(password <> '')`. Ce test est FAUX comme predicat de « cette
+        machine a un mot de passe » : PHP chiffre la chaine vide en `sodium:…`
+        (63 octets mesures) la ou Python rend `''`. La colonne est donc NON VIDE
+        pour un mot de passe REELLEMENT vide.
+
+        Le portage ne peut pas trancher, et ne DOIT pas : recopier le
+        dechiffrement ici serait recopier une regle de securite. Il interroge
+        donc `GET /machines/credential-status`, qui rend TROIS etats — vide,
+        non vide, et INDETERMINE quand le dechiffrement a echoue.
+
+        L'encart nait `hidden` : il n'a rien a dire avant la reponse, et une
+        boite vide inviterait au clic. En cas d'echec de la requete il DIT que
+        les compteurs restent approximatifs — il ne les declare pas justes.
+    --}}
+    <div class="rw-encart" data-rw="cle-credential" hidden>
+        <p class="rw-sous-titre-fort">{{ __('plateforme.credential_titre') }}</p>
+        <p class="rw-prose">{{ __('plateforme.credential_aide') }}</p>
+        <p class="rw-prose" data-rw="cle-credential-verdict" role="status" aria-live="polite"></p>
+        <p class="rw-aide rw-prose">{{ __('plateforme.credential_borne_root') }}</p>
     </div>
 
     {{-- ── L'ASYMETRIE DE ROLE, DITE A CEUX QU'ELLE CONCERNE ──────────────
