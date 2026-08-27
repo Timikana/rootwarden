@@ -193,9 +193,30 @@ declare -A REF_LARAVEL=(
   # rouge est la signature d'un compte qui n'entre pas, pas d'une page cassee.
   # TRANSITOIRE : 63/0 au repos. Deuxieme fois de la journee qu'un rejeu au repos
   # separe un artefact d'un defaut, apres `go-fail2ban-f2`.
-  [go-socle-navigation]=63 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  #
+  # 63 -> 64 le 2026-08-27 : bascule de `platform_key`, `legacy` -> `route`.
+  # Repartition 24+8 -> 25+7, total 32 INCHANGE. +1 POUR LE SEUL ROLE 3 : la
+  # garde `can_manage_platform_key` n'est detenue par AUCUN compte d'epreuve, et
+  # `rw-test-super` ne la voit que par le contournement du role 3. Quatrieme fois
+  # que « +1 par ROLE qui voit l'entree » tranche juste.
+  #
+  # ⚠ ET DEUX PREDICTIONS DE 65 ETAIENT FAUSSES, POUR LA MEME RAISON : l'archivage
+  # de `services/` n'a RIEN change au menu. `services` portait `'route' => 'services'`
+  # AVANT comme APRES `c166c0b` — il etait porte depuis `v1.37.98`. LA BASCULE D'UNE
+  # ENTREE SE FAIT AU PORTAGE, PAS A L'ARCHIVAGE : deux gestes separes de plusieurs
+  # jours, et l'effet du premier a ete attribue au second. Ne jamais predire un
+  # mouvement de cette reference depuis un archivage.
+  [go-socle-navigation]=64 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
-  [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
+  # `go-page-search` 12 -> 13 le 2026-08-27 : +1 pour la propriete `LiensLegacy`.
+  # Elle DERIVE la liste attendue de `legacy/_deprecated/*` et la compare a la table
+  # — elle ne recopie rien. Verte a 13/18/0, et ELLE AURAIT ROUGI UNE HEURE PLUS TOT
+  # (13 contre 16 : `/services/` et `/search/` manquaient, cette derniere depuis le
+  # 18 aout — E-206). Eprouvee sur un cas ou elle echoue, donc.
+  # Le chemin est resolu depuis NODE, SUR L'HOTE : le meme `glob` lance depuis le
+  # conteneur Laravel rend le VIDE (il ne monte que `laravel/`) et la propriete
+  # passerait au vert sans avoir rien compare.
+  [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=13
   [go-page-update-u1]=21 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
   [go-page-update-u5]=18 [go-page-update-u6]=13 [go-page-update-u6b]=20
   [go-page-cve-export]=21 [go-page-conformite]=13 [go-page-conformite-csv]=17
@@ -637,7 +658,16 @@ declare -A REF_LEGACY=(
   # role. La precondition (qui detient `can_manage_services`) est mesuree AVANT
   # les trois : si elle changeait de mains, deux attendus deviendraient faux
   # sans que rien ne le signale.
-  [go-services-s1]=16
+  # ⚠ 16 -> 5 le 2026-08-27 : `services/` est ARCHIVEE (`c166c0b`). La suite
+  # ne mesure plus la page legacy mais son ABSENCE — `constateArchivage` +
+  # `verifieMenuLegacy`, greffes EN TETE du `try` parce que le bloc sort par
+  # `process.exit()`, qui ne joue pas le `finally`. Reference `1 + 2 + 2 = 5`,
+  # verifiee dans `archive.mjs` (:63, :67, :142, :150) et NON deduite de la formule.
+  # La premiere mesure a rendu 10 : `note()` imprime deja au fil de l'eau dans ces
+  # suites, et reimprimer le tampon DOUBLAIT chaque ligne — le runner comptant
+  # `grep -c '^PASS'`. Un compte double est un compte faux, et il ne se voit PAS
+  # dans un « 0 FAIL » : c'est l'ECART AVEC LA PREDICTION 5 qui l'a revele.
+  [go-services-s1]=5
   # `services/` sous-lot S2 : les trois LECTURES distantes. 12 sur le legacy.
   # (13 avait ete inscrit par erreur : `verifiePortage` rend un INFO cote
   # legacy, pas un PASS — un ecart assume ne compte pas dans le total.)
@@ -646,7 +676,16 @@ declare -A REF_LEGACY=(
   # services charges ». Un appel REUSSI qui rend une liste vide, pas un echec.
   # Ce qui est mesure : que le geste part, qu'il vise la bonne machine, qu'aucune
   # ecriture ne l'accompagne, et que la page DIT ce qu'elle a obtenu.
-  [go-services-s2]=12
+  # ⚠ 12 -> 5 le 2026-08-27 : `services/` est ARCHIVEE (`c166c0b`). La suite
+  # ne mesure plus la page legacy mais son ABSENCE — `constateArchivage` +
+  # `verifieMenuLegacy`, greffes EN TETE du `try` parce que le bloc sort par
+  # `process.exit()`, qui ne joue pas le `finally`. Reference `1 + 2 + 2 = 5`,
+  # verifiee dans `archive.mjs` (:63, :67, :142, :150) et NON deduite de la formule.
+  # La premiere mesure a rendu 10 : `note()` imprime deja au fil de l'eau dans ces
+  # suites, et reimprimer le tampon DOUBLAIT chaque ligne — le runner comptant
+  # `grep -c '^PASS'`. Un compte double est un compte faux, et il ne se voit PAS
+  # dans un « 0 FAIL » : c'est l'ECART AVEC LA PREDICTION 5 qui l'a revele.
+  [go-services-s2]=5
   # `services/` sous-lot S3 : les cinq ECRITURES distantes. 12 sur le legacy.
   # ELLE FORGE UNE REQUETE, et le motif est ecrit dans le fichier : le banc etant
   # un conteneur sans systemd, le tableau est vide et AUCUN bouton d'action n'est
@@ -658,7 +697,16 @@ declare -A REF_LEGACY=(
   # Elle ne forge JAMAIS `stop ssh.socket` — le coeur d'E-150 : cette forme
   # n'est pas protegee, la requete aboutirait, et couperait potentiellement
   # l'acces SSH. Demontrer le defaut reviendrait a le commettre.
-  [go-services-s3]=13
+  # ⚠ 13 -> 5 le 2026-08-27 : `services/` est ARCHIVEE (`c166c0b`). La suite
+  # ne mesure plus la page legacy mais son ABSENCE — `constateArchivage` +
+  # `verifieMenuLegacy`, greffes EN TETE du `try` parce que le bloc sort par
+  # `process.exit()`, qui ne joue pas le `finally`. Reference `1 + 2 + 2 = 5`,
+  # verifiee dans `archive.mjs` (:63, :67, :142, :150) et NON deduite de la formule.
+  # La premiere mesure a rendu 10 : `note()` imprime deja au fil de l'eau dans ces
+  # suites, et reimprimer le tampon DOUBLAIT chaque ligne — le runner comptant
+  # `grep -c '^PASS'`. Un compte double est un compte faux, et il ne se voit PAS
+  # dans un « 0 FAIL » : c'est l'ECART AVEC LA PREDICTION 5 qui l'a revele.
+  [go-services-s3]=5
   # `fail2ban/` sous-lot F1 : statut et jails. 18 sur le legacy.
   # F1 N'EST PAS UN LOT EN LECTURE SEULE : `/fail2ban/status` ecrit le cache
   # `fail2ban_status`. La suite en prend une copie a l'entree et la remet a la

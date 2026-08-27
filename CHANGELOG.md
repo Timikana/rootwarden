@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.24** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.25** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2342,6 +2342,40 @@ des comptes systeme, refus de l'utilisateur de connexion **et** du compte de ser
 appelee, **et le piege `userdel` traite** : apres le `userdel`, la route execute `id <username>` et **c'est
 ce verdict qui fait autorite**, pas le code de sortie.
 
+#### Six references inscrites, et la plus instructive est celle qui etait FAUSSE sans etre rouge
+
+    REF_LARAVEL[go-socle-navigation]  63 -> **64**
+    REF_LARAVEL[go-page-search]       12 -> **13**   (la propriete `LiensLegacy`)
+    REF_LEGACY [go-services-s1]       16 -> **5**    (partie archivee)
+    REF_LEGACY [go-services-s2]       12 -> **5**
+    REF_LEGACY [go-services-s3]       13 -> **5**
+    REF_LEGACY [go-page-search]       inchangee
+
+**Le greffage a d'abord rendu 10 au lieu de 5** : `note()` imprime deja au fil de l'eau dans ces suites,
+et reimprimer le tampon **doublait chaque ligne** — le runner comptant `grep -c '^PASS'`. **Il n'y avait
+aucun rouge : `0 FAIL`, tout conforme.** Un compte double est un compte faux, et un verdict « 0 FAIL » ne
+le voit pas. Inscrit, il devenait une reference **stable** — donc jamais remise en cause, et toute vraie
+perte d'assertion aurait ensuite ete absorbee par la marge.
+
+> **Ce document repete depuis le matin qu'une prediction n'est pas une reference et qu'il faut mesurer.
+> C'est vrai, et l'autre moitie manquait : LA PREDICTION NE REMPLACE PAS LA MESURE — ELLE SERT A LA
+> CONTREDIRE QUAND C'EST LA MESURE QUI EST FAUSSE.** Les deux fautes du jour tirent en sens opposes :
+> `tickets` ou la formule avait tort et la mesure a tranche, ce greffage ou la mesure avait tort et la
+> prediction a tranche. **Ecrire l'attente AVANT de mesurer est ce qui rend l'ecart lisible.**
+
+**Et deux predictions de 65 etaient fausses, de la meme facon** — le Lead ayant relaye sans questionner.
+`services` portait `'route' => 'services'` **avant comme apres** l'archivage : il etait porte depuis
+`v1.37.98`. **La bascule d'une entree se fait au PORTAGE, pas a l'ARCHIVAGE**, deux gestes separes de
+plusieurs jours, et l'effet du premier a ete attribue au second. Le seul mouvement reel venait de la
+bascule de `platform_key` : **+1 pour le seul role 3**, sa garde n'etant detenue par **aucun** compte
+d'epreuve. Total du menu **32 inchange**, repartition 24+8 -> 25+7. *« +1 par role qui voit l'entree »
+tient une quatrieme fois ; c'etait l'hypothese de depart qui etait fausse.*
+
+**`node --check` ne voit pas un symbole absent** — deuxieme fois du jour apres `compteEnBase`. Le greffage
+visait `COMPTE` et `SECRET` dans une suite qui n'a ni l'un ni l'autre mais une table de comptes. Exact
+pendant de `py_compile` sur un nom jamais importe : la faute se decouvre **au lancement**, hors de toute
+mesure.
+
 ### v1.38.23 — six modules etaient PORTES avec leur dossier legacy vivant, et le portage serialisait derriere un verrou de fichier
 
 Deux constats du 2026-08-27, tous deux nes d'une remarque de l'exploitant — *« y a encore beaucoup trop
@@ -2462,7 +2496,8 @@ correspondance reelle :**
 | v1.38.21 | `304ee68` | la convention de numerotation, et la correspondance ci-dessus |
 | **v1.38.22** | `2b382c4` | **INF-002** — la garde sur 81 fichiers, et les 12 que le chiffre du Lead aurait laisses |
 | v1.38.23 | `0b5ccc7` | les 5 545 lignes de legacy deja porte, et la parallelisation du portage |
-| v1.38.24 | (ce commit) | l'ordre d'archivage devient un graphe ; INF-003 ; E-207 et E-208 |
+| v1.38.24 | `90a6ac5` | l'ordre d'archivage devient un graphe ; INF-003 ; E-207 et E-208 — **contenu du Lead, emporte par le commit `graylog` d'une autre session : l'index est PARTAGE, seconde occurrence** |
+| v1.38.25 | (ce commit) | six references mesurees, et une prediction qui a rattrape une MESURE fausse |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

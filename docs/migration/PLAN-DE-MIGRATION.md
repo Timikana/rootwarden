@@ -2287,6 +2287,69 @@ soupçonne. **Et l'énumération se fait depuis le côté du montage qui voit le
   entrees au total » : le nombre attendu **est** présent, donc l'assertion passe, et le mot de trop
   ne se voit qu'à l'image. Les deux langues étaient touchées.
 
+### UNE MESURE SANS ATTENTE PRÉALABLE NE SE CONTRÔLE PAS ELLE-MÊME (2026-08-27)
+
+Ce document répète depuis le matin qu'*une prédiction n'est pas une référence* et qu'il faut mesurer.
+C'est vrai. **La session 7 a nommé l'autre moitié, et elle manquait :**
+
+> **La prédiction ne remplace pas la mesure — elle sert à la contredire quand c'est la MESURE qui est
+> fausse.**
+
+**Le cas.** Le greffage du constat d'archivage dans les trois suites `services` a rendu **10** là où la
+référence prédite était `1 + 2 + 2 = 5`. Cause : `note()` imprime **déjà** au fil de l'eau dans ces
+suites, et réimprimer le tampon **doublait chaque ligne** — le runner comptant `grep -c '^PASS'`.
+
+**Il n'y avait aucun rouge.** `0 FAIL`, tout conforme. **Un compte doublé est un compte faux, et un
+verdict « 0 FAIL » ne le voit pas.** Inscrit, il devenait une **référence stable** — donc jamais remise en
+cause, et toute vraie perte d'assertion aurait ensuite été absorbée par la marge.
+
+**Ce qui l'a révélé est l'écart avec la prédiction, et rien d'autre.** Sans attente préalable, 10 aurait
+été inscrit sans y penser.
+
+**Les deux fautes du jour tirent en sens opposés, et c'est le cœur de la règle :**
+
+| cas | qui avait tort | ce qui a tranché |
+|---|---|---|
+| `tickets`, `-1` et non `-2` | **la formule** | la mesure |
+| greffage `services`, `10` et non `5` | **la mesure** | la prédiction |
+
+*On ne peut donc pas se ranger d'un côté.* Une référence se pose quand la mesure **et** l'attente
+concordent ; quand elles divergent, le travail commence — et rien dans l'écart ne dit laquelle des deux
+est en cause. **Écrire l'attente AVANT de mesurer est ce qui rend l'écart lisible** ; l'écrire après, c'est
+la déduire du résultat.
+
+#### Corollaire : la bascule d'une entrée se fait au PORTAGE, pas à l'ARCHIVAGE
+
+Deux sessions ont prédit `65` pour `go-socle-navigation` après l'archivage de `services/`, **de la même
+façon et pour la même raison** — et le Lead a relayé la prédiction sans la questionner. Mesure : **64**.
+
+    `services` AVANT `c166c0b` : 'route' => 'services'
+    `services` APRES           : 'route' => 'services'    — INCHANGE
+
+`services` était porté depuis `v1.37.98`. **L'archivage retire le dossier legacy ; il ne bascule rien dans
+le menu.** Les deux gestes sont séparés de plusieurs jours, et *l'effet du premier a été attribué au
+second*. Le seul mouvement réel venait d'ailleurs : la bascule de `platform_key`, `legacy` → `route`,
+**+1 pour le seul rôle 3** — sa garde `can_manage_platform_key` n'est détenue par **aucun** compte
+d'épreuve, et `rw-test-super` ne la voit que par le contournement du rôle 3. Répartition 24+8 → 25+7,
+total **32** inchangé.
+
+**« +1 par rôle qui voit l'entrée » tient pour la quatrième fois. C'était l'hypothèse de départ qui était
+fausse, pas la formule** — et c'est exactement le genre d'erreur qu'une prédiction partagée par trois
+personnes rend plus difficile à voir, non plus facile.
+
+### `node --check` NE VOIT PAS UN SYMBOLE ABSENT (2026-08-27)
+
+Deuxième occurrence du jour, après `compteEnBase` : le greffage visait `COMPTE` et `SECRET` dans
+`go-services-s1`, qui n'a **ni l'un ni l'autre** mais une **table de comptes**. `node --check` passe — il
+vérifie la syntaxe, pas la résolution des noms.
+
+**Les deux fois, c'est le contrôle explicite des symboles qui a tranché, jamais la vérification
+syntaxique.** Exact pendant de `py_compile` qui passe sur un nom jamais importé, et le coût est le même :
+la faute se découvre **au lancement**, c'est-à-dire hors de toute mesure — l'endroit le plus cher.
+
+*Avant de greffer un appel dans un fichier qu'on n'a pas écrit, vérifier que chaque symbole employé y
+existe* — et se méfier particulièrement des noms qui « devraient » être là parce qu'ils le sont ailleurs.
+
 ### Base et shell
 
 - **MySQL ne déclenche `ON UPDATE CURRENT_TIMESTAMP` que si la valeur change.**
