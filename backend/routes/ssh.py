@@ -219,24 +219,51 @@ def _validate_username(username: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 log_dir = os.getenv('LOG_DIR', '/app/logs')
 deployment_log_file = os.path.join(log_dir, "deployment.log")
-MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 Mo
-
-
-def _rotate_log(log_path):
-    """Rotation simple : renomme le fichier s il depasse MAX_LOG_SIZE."""
-    try:
-        if os.path.exists(log_path) and os.path.getsize(log_path) > MAX_LOG_SIZE:
-            rotated = log_path + ".1"
-            if os.path.exists(rotated):
-                os.remove(rotated)
-            os.rename(log_path, rotated)
-    except Exception as e:
-        logging.warning("Rotation log echouee pour %s: %s", log_path, e)
-
-
 def rotate_logs_deployment():
-    """Effectue la rotation du fichier deployment.log si necessaire."""
-    _rotate_log(deployment_log_file)
+    """Archive le journal du deploiement PRECEDENT, puis laisse la place au suivant.
+
+    ══ E-196 : DEUX MECANISMES POUR UNE MEME NOTION, DONT UN INATTEIGNABLE ═══
+
+    Ce fichier etait traite par deux regles qui ne se connaissaient pas :
+
+      - cette rotation, PAR TAILLE — `si > 5 Mo, renommer en .1` ;
+      - `open(deployment_log_file, "w")` dans `/deploy`, qui TRONQUE sans
+        aucune condition, a chaque deploiement.
+
+    La seconde rendait la premiere INATTEIGNABLE. Le fichier ne portant jamais
+    qu'un seul deploiement, il n'atteignait pas 5 Mo, donc la rotation ne
+    pouvait pas se declencher. Mesure du 2026-08-27 dans le conteneur :
+    `deployment.log` = **0 octet**, et **aucun `deployment.log.1` n'a jamais
+    existe**. Le seuil n'etait pas mal choisi : il etait hors d'atteinte.
+
+    Consequence, et c'est ce qui compte : un deploiement qui meurt ne laissait
+    AUCUNE trace apres le suivant — le verdict d'E-193 compris, alors qu'il est
+    ecrit precisement pour dire ce qui a echoue.
+
+    ══ UNE SEULE REGLE, ET ELLE NE DEPEND PLUS D'UNE TAILLE ══════════════════
+
+    Le journal du deploiement precedent devient `.1`, et le suivant repart d'un
+    fichier neuf. Deux generations au plus : l'espace reste borne sans qu'aucun
+    seuil n'ait a etre choisi, et le seuil etait justement la piece qui ne
+    servait a rien.
+
+    Le `"w"` de `/deploy` cesse d'etre une SECONDE troncature : le fichier
+    n'existe plus quand il s'execute, il ne fait plus que le creer.
+
+    Et le flux SSE garde son sens : il envoie « d'abord le contenu existant »,
+    et ce contenu reste celui du deploiement COURANT — pas un historique cumule
+    qu'un exploitant relirait en croyant regarder son deploiement.
+    """
+    try:
+        if os.path.exists(deployment_log_file) and os.path.getsize(deployment_log_file) > 0:
+            precedent = deployment_log_file + ".1"
+            if os.path.exists(precedent):
+                os.remove(precedent)
+            os.rename(deployment_log_file, precedent)
+    except Exception as e:
+        # Un archivage rate ne doit pas empecher le deploiement : au pire le
+        # journal precedent est perdu, ce qui est l'etat d'avant ce correctif.
+        logging.warning("Archivage du journal de deploiement echoue : %s", e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
