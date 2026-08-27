@@ -13,8 +13,10 @@ s'authentifie auprès de **toutes** les machines du parc. Il porte aussi la migr
 >    et **détruisait l'ancienne sans copie** : §4. **CORRIGÉ le 2026-08-27**, voir l'encadré ci-dessous.
 > 2. **Le garde à quatre yeux était ACTIVÉ sur cette installation et nommait cette action — et la
 >    route ne le lui demandait jamais.** §5. **CORRIGÉ le même jour.**
-> 3. **Une machine du parc est déjà dans la position sans retour, et c'est la production.** §4.4 —
->    **toujours vrai**, et c'est ce qui reste à surveiller.
+> 3. ~~**Une machine du parc est déjà dans la position sans retour, et c'est la production.**~~ §4.4 —
+>    **PÉRIMÉ le 2026-08-27 au soir** : l'exploitant a ressaisi les deux mots de passe de `srv-zabbix`,
+>    remesuré par déchiffrement (13/13 caractères). **Les trois constats de ce document sont donc
+>    refermés ou périmés** ; ce qui reste ouvert est listé au §9.
 
 > ### ✅ Deux des trois sont refermés — mis à jour le 2026-08-27, après le commit `01c04b2`
 >
@@ -31,7 +33,7 @@ s'authentifie auprès de **toutes** les machines du parc. Il porte aussi la migr
 > |---|---|
 > | `regenerate` détruisait la clé par `unlink()`, sans copie | **CORRIGÉ** — `_archive_platform_key()` **déplace** la paire dans `platform_ssh/archive/`, horodatée, `0700`/`0600`. `purge_platform_key_archives()` la détruit après `PLATFORM_KEY_ARCHIVE_DAYS` (défaut **30**) |
 > | `gate()` n'était jamais appelé pour ces DEUX actions | **CORRIGÉ pour les deux** — `ssh.py:1294` (`regenerate_platform_key`) et `ssh.py:934` (`revoke_service_account`), avec un cas `AucunApprobateur` qui **refuse** au lieu de retomber du côté permissif |
-> | une machine de production sans mot de passe, dépendante de la seule clé | **INCHANGÉ** — voir §4.4 |
+> | une machine de production sans mot de passe, dépendante de la seule clé | **PÉRIMÉ** — mots de passe ressaisis, remesuré au déchiffrement. Voir l'encadré du §4.4 |
 > | le retour incomplet de `reenter_ssh_password` (`root_password` jamais réécrit) | **INCHANGÉ** — §4.2, décision 5 du §9 |
 > | `/revoke_service_account` sans appelant | **INCHANGÉ** — §6.2 |
 >
