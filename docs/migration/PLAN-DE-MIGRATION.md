@@ -1560,6 +1560,43 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
 
+### UN OBSERVABLE NE DIT JAMAIS PAR QUEL CHEMIN IL A ÉTÉ PRODUIT (2026-08-27)
+
+**La règle du jour, et elle réunit QUATRE incidents distincts** relevés par trois sessions différentes.
+C'est la forme générale du piège que le §8 énonçait déjà en trois versions trop étroites — « un symptôme
+dit qu'il y a un problème, jamais lequel », « vérifier l'instrument avant de conclure de son silence »,
+« un faux PASS vient d'une mesure plus large que la propriété ».
+
+| l'observable | ce qu'on en a conclu | ce qu'il mesurait vraiment |
+|---|---|---|
+| `abouties` non vide | « les lectures ont **abouti** » | les **départs** — peuplé dans `page.on('request')` |
+| `abouties.every(quoi === 'base')` | « seules des lectures ont abouti » | rien : `quoi` n'a qu'**une** valeur possible, **et** `[].every()` rend `true` |
+| 85 journaux sans tampon | « 85 suites muettes » | un motif qui ignorait **trois** formes de tampon |
+| `rw-test-super` obtient **200** | « le rôle l'emporte sur l'absence de permission » | **il n'y a aucune garde** |
+| `stat -c %y /proc/1` | « le processus a démarré à 10:19:01 » | le dernier changement du **répertoire**, donc « il y a quelques secondes » |
+
+**Le quatrième est le plus coûteux** parce qu'il portait sur une garde : cinq suites resteraient vertes
+**si le correctif n'était jamais appliqué, ET si on l'appliquait de travers**. Elles ne mesurent pas la
+garde. Et il a été commis par le Lead puis relayé par la session qui possède les suites — donc **écrit
+deux fois avant d'être mesuré une**.
+
+Le cinquième donne la formule la plus utilisable :
+
+> **Une valeur qui suit l'horloge n'est pas une mesure du passé.** `stat -c %y /proc/1` valait 10:19:01
+> pendant qu'il était 10:19:44. Le juste est `btime` de `/proc/stat` + `starttime` de `/proc/1/stat`, et
+> une **troisième** source l'a corroboré à la seconde (`docker inspect -f '{{.State.StartedAt}}'`). Sans
+> le second moyen, la conclusion aurait été **inversée** pour l'un des trois fichiers.
+
+**La parade n'est pas « se méfier ».** C'est : avant de conclure d'un observable, se demander **quels
+chemins distincts produisent la même valeur**. S'il y en a plus d'un, l'observable ne tranche pas — il
+faut une seconde mesure d'un **autre moyen**, et c'est exactement ce que le §8 exigeait déjà de la
+troisième mesure qui départage deux verdicts contradictoires.
+
+**Et une propriété gagnée au passage** : `use_reloader = False` dans `hypercorn_config.py`, mesuré dans
+le conteneur, avec `workers = 4` tous enfants du maître. **« Le backend est lu au démarrage du processus »
+n'est donc plus une convention de ce document : c'est une propriété du service.** Troisième règle de ce
+chantier à devenir une propriété, après la recopie du runner dans `/tmp` et `git commit -- <chemins>`.
+
 ### ⚠ UN REDÉMARRAGE PUBLIE L'ARBRE DE TRAVAIL, PAS L'HISTORIQUE (2026-08-27)
 
 **Trou dans la consigne de ce document, trouvé par la session qui exécutait la consigne.** Elle est plus
