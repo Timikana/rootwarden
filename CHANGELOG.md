@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.5** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.6** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,79 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.6 — `fail2ban/` F4 porte : une reussite verifiee, et une confirmation qui nomme sa cible
+
+`go-fail2ban-f4` entre au LOT avec **21 PASS sur le portage** contre **14 sur le legacy**, 0 FAIL des
+deux cotes. **Quatre sous-lots sur six sont portes**, et F4 est le premier qui ECRIT vraiment — F1,
+F2 et F3 etaient annonces mutants par le decoupage et se sont reveles etre des lectures.
+
+#### E-165 — corrige DANS LE BACKEND, et les deux portails en profitent
+
+`fail2ban_ban`, `/unban` et `/unban_all` recevaient `rc` et ne le testaient jamais, alors que leurs
+deux voisines `/install` et `/restart` le testaient. Elles le testent desormais :
+
+```python
+out, stderr, rc = ban_ip(client, root_pass, jail, target_ip)
+if rc != 0:
+    return jsonify({'success': False, 'message': f'{target_ip} n\'a PAS ete banni ...',
+                    'output': (out or '') + (stderr or ''), 'exit_code': rc})
+_log_ban_action(...)          # seulement si le geste a abouti
+```
+
+**La ligne d'audit n'est ecrite que si le geste a abouti.** Un echec n'en laisse aucune — c'est
+correct, rien n'a eu lieu. Le statut HTTP reste 200 : l'appel d'API a fonctionne, c'est la commande
+distante qui a echoue, et le corps le dit.
+
+Re-mesure apres coup, sur le legacy : la page dit « 203.0.113.7 **n'a PAS ete banni** dans sshd », et
+`fail2ban_history` reste a **0 ligne**. Elle en creait une avant.
+
+#### E-167 — une confirmation qui ne nommait rien
+
+`banIp` passe `{ip, jail, server}` a la traduction, et les catalogues ignorent **les trois** : la
+boite dit « Bannir cette IP ? ». Quatrieme occurrence du motif d'E-163, et la seule qui ne soit pas
+cosmetique — on confirme un geste destructeur sans savoir sur quelle adresse ni sur quelle machine,
+alors qu'E-162 vient de montrer que la machine peut differer de celle qu'affiche le selecteur.
+
+Le portage ouvre un panneau EN PAGE, qui dit ce que le geste ENGAGE :
+
+> « Bannir 203.0.113.7 sur Test-Server-Debian ? L'adresse 203.0.113.7 sera bannie dans la jail sshd,
+> sur Test-Server-Debian **et sur elle seule**. Toute connexion venant de cette adresse sera refusee
+> jusqu'a expiration du ban. »
+
+Une boite native tient en une ligne et s'accepte au reflexe. Un panneau peut montrer.
+
+#### E-166 — les couleurs viennent des jetons, et le geste de parc n'est pas rendu
+
+Le legacy aligne trois boutons destructeurs alimentes par le meme champ, et les deux plus dangereux
+sont les SEULS a avoir perdu leur couleur — `bg-red-800` et `bg-orange-600` sont purgees. Le portage
+n'en rend que deux (le ban de parc appartient a F6), et leurs couleurs viennent des jetons du socle.
+Mesure : plus aucun bouton destructeur sans fond peint.
+
+#### Deux gardes de plus, non demandees par la caracterisation
+**L'adresse est validee avant tout envoi** : une saisie qui n'est pas une adresse ne part pas. Le
+backend valide aussi — c'est lui qui fait autorite ; celle du navigateur evite un aller-retour.
+**Un second temoin apres chaque geste** : la page relit le detail de la jail quel que soit le verdict
+annonce, donc une reussite qui ne se retrouve pas dans la liste se voit.
+
+#### Deux mesures corrigees, meme famille que les sept precedentes
+
+- **Un motif qui trouve la NEGATION de ce qu'il cherche.** L'assertion cherchait « <adresse> …
+  banni » ; une fois le backend corrige, la page dit « n'a PAS ete banni » — et le motif y trouvait
+  « banni ». Elle repondait « la page annonce un ban reussi : OUI » sur un message d'ECHEC. Meme
+  faute que « ban » dans « fail2ban ».
+- **Deux assertions taillees sur la forme du legacy.** « Le geste destructeur a demande
+  confirmation » ne comptait que les boites natives, et « le geste de parc se distingue » exigeait
+  qu'il EXISTE. Les deux sont desormais satisfaites par une forme differente — un panneau en page,
+  une absence — et **on dit laquelle on observe**.
+
+**Fichiers** : `backend/routes/fail2ban.py`, `laravel/app/Http/Controllers/Fail2banController.php`,
+`laravel/resources/views/fail2ban.blade.php`, `laravel/public/js/fail2ban.js`,
+`laravel/lang/{fr,en}/fail2ban.php` (**114 cles chacune, parite stricte**),
+`laravel/public/css/rw.css`, `tests/e2e/go-fail2ban-f4.mjs`, `scripts/rejouer-lot.sh`.
+
+**Reste `fail2ban/` F5 et F6** — jails, liste blanche, et les gestes sur tout le parc. Puis
+`iptables/` I1 a I5.
 
 ### v1.38.5 — `fail2ban/` F4 caracterise : la table d'audit enregistre un ban qui n'a pas eu lieu
 

@@ -88,6 +88,8 @@ const C = CIBLE === 'laravel'
         toutDebannir: '[data-rw="f2b-tout-debannir"]',
         listeBannies: '[data-rw="f2b-bannies-corps"]',
         journal: '[data-rw="f2b-journal"]',
+        confirmation: '[data-rw="f2b-confirmation"]',
+        confirmer: '[data-rw="f2b-confirmer"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
     }
     : {
@@ -101,6 +103,8 @@ const C = CIBLE === 'laravel'
         toutDebannir: 'button[onclick="unbanAllIps()"]',
         listeBannies: '#banned-ips-table',
         journal: '#logs-container',
+        // Le legacy n'a pas de panneau de decision : il ouvre un `confirm()`.
+        confirmation: null, confirmer: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
     };
 
@@ -353,6 +357,19 @@ try {
         constate('bannir (cette machine)', vu.bannir ? `« ${vu.bannir.texte} » ${vu.bannir.fond}` : '(absent)');
         constate('bannir (TOUT LE PARC)', vu.parc ? `« ${vu.parc.texte} » ${vu.parc.fond}` : '(absent)');
         constate('tout debannir', vu.tout ? `« ${vu.tout.texte} » ${vu.tout.fond}` : '(absent)');
+        /*
+         * UN GESTE QUI N'EST PAS OFFERT NE PEUT PAS ETRE CLIQUE PAR ERREUR.
+         *
+         * Le portage ne rend pas le ban de parc : il appartient a F6, et le
+         * panneau « pas encore porte » le dit. Son absence satisfait donc la
+         * propriete tout autant que sa separation — mais il faut le DIRE, sans
+         * quoi l'assertion passerait en silence.
+         */
+        if (! vu.parc) {
+            verifiePortage('le geste qui atteint TOUT LE PARC se distingue du geste local',
+                true, '');
+            constate('le ban de parc est-il offert sur cette page ?', 'non — il n\'est pas rendu');
+        }
         if (vu.bannir && vu.parc) {
             const ecart = Math.abs(vu.parc.x - (vu.bannir.x + vu.bannir.l));
             constate('espace entre « bannir » et « bannir tout le parc »', `${ecart}px`);
@@ -410,15 +427,70 @@ try {
         await page.type(C.champIp, ADRESSE, { delay: 10 });
         const avantBoites = boites.length;
 
+        /*
+         * DEUX FAÇONS DE CONFIRMER, ET LE PROJET EN PREFERE UNE.
+         *
+         * Le legacy ouvre un `confirm()` natif. La convention du portage veut un
+         * PANNEAU EN PAGE, qui dit ce que l'action engage — un `confirm()` tient
+         * en une ligne, s'accepte au reflexe, et ne peut rien montrer.
+         *
+         * La propriete est « le geste destructeur demande une confirmation qui
+         * NOMME sa cible ». Les deux formes la satisfont ; on mesure laquelle.
+         */
         accepteLaBoite = true;
-        await cliqueEtAttend(page, C.bannir, 3000);
+        await cliqueEtAttend(page, C.bannir, 2500);
         accepteLaBoite = false;
 
         const nouvelles = boites.slice(avantBoites);
         constate('boites natives ouvertes', nouvelles.length
             ? nouvelles.map((b) => `${b.type} « ${b.message} »`).join(' | ') : '(aucune)');
-        verifie('le geste destructeur a demande confirmation', nouvelles.length > 0,
-            'aucune confirmation n\'a ete ouverte');
+
+        const panneau = C.confirmation ? await page.evaluate((sels) => {
+            const p = document.querySelector(sels.confirmation);
+            if (! p) return null;
+
+            return {
+                ouvert: p.offsetParent !== null && ! p.hidden,
+                texte: (p.innerText || '').replace(/\s+/g, ' ').trim(),
+            };
+        }, C) : null;
+        if (panneau) {
+            constate('panneau de decision en page', panneau.ouvert
+                ? `« ${panneau.texte.slice(0, 130)} »` : '(ferme)');
+        }
+
+        const texteConfirmation = nouvelles.map((b) => b.message).join(' ')
+            + ' ' + (panneau && panneau.ouvert ? panneau.texte : '');
+        verifie('le geste destructeur a demande confirmation',
+            nouvelles.length > 0 || (panneau && panneau.ouvert),
+            'ni boite native ni panneau de decision');
+        /*
+         * UNE CONFIRMATION QUI NE NOMME PAS SA CIBLE NE CONFIRME RIEN.
+         *
+         * `banIp` passe pourtant `{ip, jail, server: _currentServer.name}` a la
+         * traduction — et le catalogue les ignore tous les trois : la boite dit
+         * « Bannir cette IP ? ». Quatrieme occurrence du motif d'E-163, et ici
+         * elle n'est pas cosmetique : on confirme un geste destructeur sans
+         * savoir sur QUELLE adresse ni sur QUELLE machine — alors que F4 vient
+         * de montrer que la machine peut differer de celle qu'affiche le
+         * selecteur (E-162).
+         */
+        constate('ce que la confirmation nomme', texteConfirmation.replace(/\s+/g, ' ').trim().slice(0, 140) || '(vide)');
+        verifiePortage('la confirmation NOMME l\'adresse et la machine',
+            texteConfirmation.includes(ADRESSE)
+            && /Test-Server|essai|10\.10\.10\.10/i.test(texteConfirmation),
+            `elle dit « ${texteConfirmation.replace(/\s+/g, ' ').trim().slice(0, 60)} » — `
+            + 'ni l\'adresse, ni la jail, ni la machine, alors que les trois lui sont passees');
+        // La convention du portage : pas de boite native.
+        verifiePortage('la confirmation se fait EN PAGE, pas par une boite native',
+            nouvelles.length === 0,
+            `${nouvelles.length} boite(s) native(s) — un \`confirm()\` tient en une ligne, `
+            + 's\'accepte au reflexe, et ne peut pas montrer ce que l\'action engage');
+
+        // Sur le portage, le geste ne part qu'apres le second clic.
+        if (panneau && panneau.ouvert && C.confirmer) {
+            await cliqueEtAttend(page, C.confirmer, 3000);
+        }
 
         verifie('le ban est parti vers la machine d\'essai',
             abouties.some((a) => /\/ban(\?|$)/.test(a.route) && a.machine === MACHINE_ID),
@@ -440,8 +512,22 @@ try {
         constate('ce que le journal de la page dit', vu.journal.slice(-140) || '(vide)');
         constate('l\'adresse figure-t-elle dans la liste des bannies ?', vu.presente ? 'OUI' : 'non');
 
-        const annonceSucces = new RegExp(ADRESSE.replace(/\./g, '\\.') + '[^|]*(banni|banned)', 'i')
-            .test(vu.journal);
+        /*
+         * UN MOTIF QUI TROUVE LA NEGATION DE CE QU'IL CHERCHE.
+         *
+         * Une premiere redaction cherchait « <adresse> ... banni ». Une fois le
+         * backend corrige, la page dit « 203.0.113.7 n'a PAS ete banni » — et le
+         * motif y trouvait « banni ». Elle repondait donc « la page annonce un
+         * ban reussi : OUI » sur un message d'ECHEC. Meme faute que « ban » dans
+         * « fail2ban » : un motif plus large que la propriete.
+         *
+         * Une annonce de reussite, c'est le message SANS marque d'echec.
+         */
+        const phrases = vu.journal.split(/(?=Erreur|Error|\u2022|\|)/);
+        const annonceSucces = phrases.some((ligne) =>
+            ligne.includes(ADRESSE)
+            && /banni|banned/i.test(ligne)
+            && ! /erreur|error|n'a pas|n\u2019a pas|not been|echec|\u00e9chec|fail/i.test(ligne));
         constate('la page annonce-t-elle un ban reussi ?', annonceSucces ? 'OUI' : 'non');
 
         /*

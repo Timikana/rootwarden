@@ -2262,3 +2262,35 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     flex-wrap: wrap;
     margin-left: auto;
 }
+
+/* En-tete de section portant une action a droite — fermer un panneau, par
+   exemple. Pose au sous-lot F4 de `fail2ban/`. */
+.rw-section__tete {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+/*
+ * UNE LISTE DE FAITS : un intitule, une valeur. Ni tableau — il n'y a qu'une
+ * colonne utile — ni prose, qui noierait les nombres.
+ */
+.rw-faits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    margin: 10px 0 18px;
+}
+.rw-faits__bloc { display: flex; flex-direction: column; gap: 2px; }
+.rw-faits dt {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+.rw-faits dd { margin: 0; font-size: 15px; font-weight: 650; }
+
+.rw-champ--espace { margin-top: 14px; }
+.rw-titre--espace { margin-top: 16px; }

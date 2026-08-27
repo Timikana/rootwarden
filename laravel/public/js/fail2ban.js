@@ -56,6 +56,25 @@ window.RW_FAIL2BAN = true;
     var messageServices = document.querySelector('[data-rw="f2b-services-message"]');
     var listeServices = document.querySelector('[data-rw="f2b-services"]');
 
+    var detailJail = document.querySelector('[data-rw="f2b-jail-detail"]');
+    var nomJail = document.querySelector('[data-rw="f2b-jail-nom"]');
+    var configJail = document.querySelector('[data-rw="f2b-jail-config"]');
+    var fermerJail = document.querySelector('[data-rw="f2b-jail-fermer"]');
+    var messageBannies = document.querySelector('[data-rw="f2b-bannies-message"]');
+    var cadreBannies = document.querySelector('[data-rw="f2b-bannies-cadre"]');
+    var corpsBannies = document.querySelector('[data-rw="f2b-bannies-corps"]');
+    var champBan = document.querySelector('[data-rw="f2b-ban-ip"]');
+    var boutonBannir = document.querySelector('[data-rw="f2b-bannir"]');
+    var boutonTout = document.querySelector('[data-rw="f2b-tout-debannir"]');
+    var confirmation = document.querySelector('[data-rw="f2b-confirmation"]');
+    var confTitre = document.querySelector('[data-rw="f2b-confirmation-titre"]');
+    var confTexte = document.querySelector('[data-rw="f2b-confirmation-texte"]');
+    var confirmer = document.querySelector('[data-rw="f2b-confirmer"]');
+    var annuler = document.querySelector('[data-rw="f2b-annuler"]');
+    var journalGestes = document.querySelector('[data-rw="f2b-journal"]');
+
+    var jailCourante = null;
+
     var choix = document.querySelector('[data-rw="f2b-serveur"]');
     var relever = document.querySelector('[data-rw="f2b-relever"]');
     var message = document.querySelector('[data-rw="f2b-etat-message"]');
@@ -109,6 +128,10 @@ window.RW_FAIL2BAN = true;
         if (sectionConfig) { sectionConfig.hidden = true; }
         if (sectionLogs) { sectionLogs.hidden = true; }
         if (sectionServices) { sectionServices.hidden = true; }
+        // Le detail d'une jail appartient a UNE machine : il se referme avec elle.
+        if (detailJail) { detailJail.hidden = true; }
+        jailCourante = null;
+        if (confirmation) { confirmation.hidden = true; }
     });
     majChoix();
 
@@ -193,6 +216,14 @@ window.RW_FAIL2BAN = true;
                 j.currently_banned || 0);
             carte.appendChild(titre);
             carte.appendChild(compte);
+            // OUVRIR LE DETAIL EST UNE LECTURE : la carte est un bouton, pas une
+            // `div` cliquable — un lecteur d'ecran doit savoir qu'elle agit.
+            carte.setAttribute('role', 'button');
+            carte.setAttribute('tabindex', '0');
+            carte.addEventListener('click', function () { ouvreJail(j.name || ''); });
+            carte.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvreJail(j.name || ''); }
+            });
             grilleJails.appendChild(carte);
         });
 
@@ -659,6 +690,228 @@ window.RW_FAIL2BAN = true;
                 rendServices(d.services || []);
             });
     }
+
+    /* ══ F4 : LE DETAIL D'UNE JAIL, ET LES DEUX GESTES QUI ECRIVENT ══════ */
+
+    function journalise(texte, enErreur) {
+        if (! journalGestes) { return; }
+        var p = document.createElement('p');
+        p.textContent = texte;
+        if (enErreur) { p.className = 'rw-non-resolu'; }
+        journalGestes.appendChild(p);
+        journalGestes.scrollTop = journalGestes.scrollHeight;
+    }
+
+    function remplit(modele, valeurs) {
+        var t = textes[modele] || '';
+        Object.keys(valeurs).forEach(function (c) {
+            t = t.split(':' + c).join(String(valeurs[c]));
+        });
+
+        return t;
+    }
+
+    function rendConfigJail(cfg) {
+        configJail.innerHTML = '';
+        [
+            ['jail_maxretry', cfg && cfg.maxretry],
+            ['jail_bantime', cfg && cfg.bantime],
+            ['jail_findtime', cfg && cfg.findtime],
+        ].forEach(function (paire) {
+            var bloc = document.createElement('div');
+            bloc.className = 'rw-faits__bloc';
+            var dt = document.createElement('dt');
+            dt.textContent = textes[paire[0]] || '';
+            var dd = document.createElement('dd');
+            // UNE VALEUR NON LUE SE DIT. Un tiret laisserait croire a un zero.
+            dd.textContent = (paire[1] === null || paire[1] === undefined || paire[1] === '')
+                ? (textes.jail_inconnu || '')
+                : (paire[0] === 'jail_maxretry'
+                    ? String(paire[1])
+                    : remplit('jail_secondes', { nb: paire[1] }));
+            bloc.appendChild(dt);
+            bloc.appendChild(dd);
+            configJail.appendChild(bloc);
+        });
+    }
+
+    function rendBannies(liste) {
+        corpsBannies.innerHTML = '';
+        messageBannies.innerHTML = '';
+        if (! liste || ! liste.length) {
+            cadreBannies.hidden = true;
+            poseMessage(messageBannies, 'bannies_vide_titre', 'bannies_vide', false);
+
+            return;
+        }
+        cadreBannies.hidden = false;
+        liste.forEach(function (adresse) {
+            var tr = document.createElement('tr');
+            tr.setAttribute('data-rw', 'f2b-bannie-' + adresse);
+            var tdIp = document.createElement('td');
+            tdIp.className = 'rw-tableau__mono';
+            tdIp.textContent = adresse;
+            tr.appendChild(tdIp);
+            var tdAction = document.createElement('td');
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule';
+            b.setAttribute('data-rw', 'f2b-debannir-' + adresse);
+            b.textContent = textes.debannir || '';
+            b.addEventListener('click', function () { demandeDebannir(adresse); });
+            tdAction.appendChild(b);
+            tr.appendChild(tdAction);
+            corpsBannies.appendChild(tr);
+        });
+    }
+
+    function ouvreJail(nom) {
+        var o = machineChoisie();
+        if (! o) { return; }
+        jailCourante = nom;
+        detailJail.hidden = false;
+        confirmation.hidden = true;
+        nomJail.textContent = remplit('jail_detail_titre', { jail: nom });
+        configJail.innerHTML = '';
+        corpsBannies.innerHTML = '';
+        messageBannies.innerHTML = '';
+        cadreBannies.hidden = true;
+
+        litDistant('/fail2ban/jail', { machine_id: parseInt(o.value, 10), jail: nom })
+            .then(function (d) {
+                if (! d) {
+                    poseMessage(messageBannies, 'lecture_echec_titre', 'lecture_echec', true);
+                    rendConfigJail(null);
+
+                    return;
+                }
+                rendConfigJail(d.config || null);
+                rendBannies(d.banned_ips || d.banned || []);
+            });
+    }
+
+    /*
+     * ══ LE PANNEAU DE DECISION NOMME SA CIBLE ═════════════════════════════
+     *
+     * Le legacy ouvre `confirm(__('f2b_confirm_ban', {ip, jail, server}))` — et
+     * son catalogue ignore les trois parametres : la boite dit « Bannir cette
+     * IP ? ». On confirme un geste destructeur sans savoir sur quelle adresse ni
+     * sur quelle machine (E-167), alors que la machine peut differer de celle
+     * qu'affiche le selecteur (E-162).
+     *
+     * Ici le panneau dit l'adresse, la jail, LA MACHINE, et ce que le geste
+     * ENGAGE — pas seulement ce qu'il fait.
+     */
+    var gestEnAttente = null;
+
+    function demande(cleTitre, cleTexte, valeurs, geste) {
+        gestEnAttente = geste;
+        confTitre.textContent = remplit(cleTitre, valeurs);
+        confTexte.textContent = remplit(cleTexte, valeurs);
+        confirmation.hidden = false;
+        confirmer.focus();
+    }
+
+    function ferme() {
+        confirmation.hidden = true;
+        gestEnAttente = null;
+    }
+
+    /** Validee AVANT tout envoi : rien ne part sur une saisie qui n'est pas une adresse. */
+    function adresseValide(v) {
+        return /^(\d{1,3}\.){3}\d{1,3}$/.test(v)
+            ? v.split('.').every(function (n) { return Number(n) <= 255; })
+            : /^[0-9a-f:]+$/i.test(v) && v.indexOf(':') !== -1;
+    }
+
+    function demandeBannir() {
+        var o = machineChoisie();
+        if (! o || ! jailCourante) { return; }
+        var adresse = (champBan.value || '').trim();
+        if (! adresseValide(adresse)) {
+            journalise(textes.ban_invalide || '', true);
+
+            return;
+        }
+        demande('conf_titre_ban', 'conf_texte_ban',
+            { ip: adresse, jail: jailCourante, machine: nomMachineChoisie() },
+            function () {
+                agit('/fail2ban/ban',
+                    { machine_id: parseInt(o.value, 10), jail: jailCourante, ip: adresse });
+            });
+    }
+
+    function demandeDebannir(adresse) {
+        var o = machineChoisie();
+        if (! o || ! jailCourante) { return; }
+        demande('conf_titre_debannir', 'conf_texte_debannir',
+            { ip: adresse, jail: jailCourante, machine: nomMachineChoisie() },
+            function () {
+                agit('/fail2ban/unban',
+                    { machine_id: parseInt(o.value, 10), jail: jailCourante, ip: adresse });
+            });
+    }
+
+    function demandeToutDebannir() {
+        var o = machineChoisie();
+        if (! o || ! jailCourante) { return; }
+        demande('conf_titre_tout', 'conf_texte_tout',
+            { jail: jailCourante, machine: nomMachineChoisie(),
+              nb: corpsBannies.querySelectorAll('tr').length },
+            function () {
+                agit('/fail2ban/unban_all',
+                    { machine_id: parseInt(o.value, 10), jail: jailCourante });
+            });
+    }
+
+    /**
+     * UNE REUSSITE SE VERIFIE, ELLE NE S'ANNONCE PAS.
+     *
+     * Le backend teste desormais le code de retour (E-165 corrige au meme lot).
+     * La page ne fait donc que RELAYER ce qu'il dit — et elle recharge le detail
+     * de la jail apres, ce qui donne un second temoin : la liste des adresses
+     * bannies doit refleter le geste.
+     */
+    function agit(chemin, envoi) {
+        ferme();
+        var nom = jailCourante;
+        fetch(PASSERELLE + chemin, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(envoi),
+        }).then(function (r) { return r.json().catch(function () { return null; }); })
+          .then(function (d) {
+              if (! d) {
+                  journalise(remplit('geste_echoue', { message: textes.lecture_echec || '' }), true);
+
+                  return;
+              }
+              if (d.success === true) {
+                  journalise(remplit('geste_reussi', { message: d.message || '' }), false);
+                  champBan.value = '';
+              } else {
+                  journalise(remplit('geste_echoue', { message: d.message || '' }), true);
+              }
+              // Second temoin : on relit, quel que soit le verdict annonce.
+              if (nom) { ouvreJail(nom); }
+          })
+          .catch(function () {
+              journalise(remplit('geste_echoue', { message: textes.lecture_echec || '' }), true);
+          });
+    }
+
+    if (boutonBannir) { boutonBannir.addEventListener('click', demandeBannir); }
+    if (boutonTout) { boutonTout.addEventListener('click', demandeToutDebannir); }
+    if (confirmer) { confirmer.addEventListener('click', function () {
+        var g = gestEnAttente;
+        if (g) { g(); }
+    }); }
+    if (annuler) { annuler.addEventListener('click', ferme); }
+    if (fermerJail) { fermerJail.addEventListener('click', function () {
+        detailJail.hidden = true;
+        jailCourante = null;
+        ferme();
+    }); }
 
     if (voirConfig) { voirConfig.addEventListener('click', litConfig); }
     if (voirLogs) { voirLogs.addEventListener('click', litLogs); }

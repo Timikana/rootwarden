@@ -210,6 +210,29 @@ def fail2ban_ban():
     try:
         with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
             out, stderr, rc = ban_ip(client, root_pass, jail, target_ip)
+            # ══ UNE REUSSITE SE VERIFIE, ELLE NE S'ANNONCE PAS ═══════════
+            #
+            # `rc` etait recu et jamais teste : sur une machine sans fail2ban la
+            # commande echouait, la route rendait `success: True` avec un message
+            # affirmatif, et `_log_ban_action` inscrivait la ligne d'audit AVANT
+            # tout controle. La table d'audit enregistrait donc un fait qui ne
+            # s'etait pas produit — et un journal d'audit ne se relit pas, on lui
+            # fait confiance (E-165, mesure le 2026-08-27).
+            #
+            # Les deux routes voisines, `/install` et `/restart`, testaient deja
+            # `rc` : l'incoherence etait interne a ce fichier.
+            #
+            # La ligne d'audit n'est ecrite QUE si le geste a abouti. Un echec
+            # n'en laisse aucune : c'est correct, rien n'a eu lieu. Le statut HTTP
+            # reste 200 — l'appel d'API, lui, a fonctionne ; c'est la commande
+            # distante qui a echoue, et le corps le dit.
+            if rc != 0:
+                return jsonify({
+                    'success': False,
+                    'message': f'{target_ip} n\'a PAS ete banni dans {jail}',
+                    'output': (out or '') + (stderr or ''),
+                    'exit_code': rc,
+                })
             _log_ban_action(mid, jail, target_ip, 'ban',
                             request.headers.get('X-User-ID', 'admin'))
             return jsonify({'success': True, 'message': f'{target_ip} banni dans {jail}', 'output': out})
@@ -239,6 +262,14 @@ def fail2ban_unban():
     try:
         with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
             out, stderr, rc = unban_ip(client, root_pass, jail, target_ip)
+            # Meme regle qu'au ban : voir la note de `/fail2ban/ban` (E-165).
+            if rc != 0:
+                return jsonify({
+                    'success': False,
+                    'message': f'{target_ip} n\'a PAS ete debanni de {jail}',
+                    'output': (out or '') + (stderr or ''),
+                    'exit_code': rc,
+                })
             _log_ban_action(mid, jail, target_ip, 'unban',
                             request.headers.get('X-User-ID', 'admin'))
             return jsonify({'success': True, 'message': f'{target_ip} debanni de {jail}', 'output': out})
@@ -452,7 +483,16 @@ def fail2ban_unban_all():
 
     try:
         with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
-            out, _, _ = unban_all(client, root_pass, jail)
+            # `rc` n'etait meme pas nomme ici : `out, _, _`. Voir la note de
+            # `/fail2ban/ban` (E-165).
+            out, stderr, rc = unban_all(client, root_pass, jail)
+            if rc != 0:
+                return jsonify({
+                    'success': False,
+                    'message': f'Les IPs de {jail} n\'ont PAS ete debannies',
+                    'output': (out or '') + (stderr or ''),
+                    'exit_code': rc,
+                })
             _log_ban_action(mid, jail, '*', 'unban',
                             request.headers.get('X-User-ID', 'admin'))
             return jsonify({'success': True, 'message': f'Toutes les IPs debannies de {jail}', 'output': out})
