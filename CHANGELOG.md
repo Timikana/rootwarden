@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.96** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.97** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,40 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.97 — `services/` S3 caracterise : la garde des services proteges vit sur la REQUETE
+
+`go-services-s3.mjs`, **legacy 12 PASS / 0 FAIL**. Le portage reste a faire.
+
+#### La mesure decisive
+
+    reponse a « stop sshd » : 403 — Service protege : sshd
+
+**La protection est appliquee sur la requete, pas seulement a l'ecran.** Prouve par une requete
+FORGEE, pas deduit. Le backend refuse **avant** `_resolve_ssh_creds` : aucune session SSH ouverte,
+aucune commande lancee, aucune ligne journalisee.
+
+C'est le seul module du chantier dont une protection garde les deux couches — le JS desactive aussi
+les boutons — et c'est desormais mesure des deux cotes.
+
+#### Pourquoi cette suite forge, et ce qu'elle refuse de forger
+Le banc est un conteneur **sans systemd** : le tableau est vide et **aucun bouton d'action n'est
+rendu**, sur aucune des deux cibles. C'est l'exception prevue — la requete forgee, emise **depuis la
+page**, pour exercer ce qu'aucun clic ne peut atteindre. Et la suite MESURE cette absence de boutons
+au lieu de la supposer : si le banc changeait, l'assertion echouerait et exigerait de repasser au
+clic.
+
+**Elle ne forge jamais `stop ssh.socket`** — le cœur d'E-150. Cette forme n'est pas dans
+`PROTECTED_SERVICES` : la requete aboutirait, et sur un hote a activation par socket elle couperait
+l'acces SSH, y compris celui par lequel RootWarden pilote la machine.
+
+> **Demontrer le defaut reviendrait a le commettre.** E-150 reste un constat CALCULE, et la suite
+> l'ecrit — puis asserte qu'**aucune requete de cette forme n'a ete emise**. Une suite qui nomme un
+> defaut doit prouver qu'elle ne l'a pas declenche.
+
+#### Ce qui reste non mesure
+Le rendu des boutons d'action et leur confirmation : il n'y a aucun service a piloter sur ce banc.
+Comme pour le tableau de S2, **ce module gagnerait a etre mesure sur une machine avec systemd.**
 
 ### v1.37.96 — `services/` S2 porte : un zero qui dit d'ou il vient
 

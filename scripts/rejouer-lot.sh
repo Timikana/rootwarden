@@ -493,6 +493,18 @@ declare -A REF_LEGACY=(
   # Ce qui est mesure : que le geste part, qu'il vise la bonne machine, qu'aucune
   # ecriture ne l'accompagne, et que la page DIT ce qu'elle a obtenu.
   [go-services-s2]=12
+  # `services/` sous-lot S3 : les cinq ECRITURES distantes. 12 sur le legacy.
+  # ELLE FORGE UNE REQUETE, et le motif est ecrit dans le fichier : le banc etant
+  # un conteneur sans systemd, le tableau est vide et AUCUN bouton d'action n'est
+  # rendu — sur aucune des deux cibles. La requete est emise DEPUIS LA PAGE et
+  # vise un service PROTEGE (`sshd`), que le backend refuse par 403 AVANT toute
+  # session SSH. Elle prouve que la garde vit sur la REQUETE, et ne peut rien
+  # casser.
+  #
+  # Elle ne forge JAMAIS `stop ssh.socket` — le coeur d'E-150 : cette forme
+  # n'est pas protegee, la requete aboutirait, et couperait potentiellement
+  # l'acces SSH. Demontrer le defaut reviendrait a le commettre.
+  [go-services-s3]=12
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
@@ -515,7 +527,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2
+  go-services-s1 go-services-s2 go-services-s3
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -530,7 +542,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2
+  go-services-s1 go-services-s2 go-services-s3
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1
