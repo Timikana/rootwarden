@@ -308,3 +308,131 @@ invalide est abandonné — il n'aurait rien ajouté, la route n'atteignant jama
 couvrent exactement les branches que ce banc ne peut pas atteindre. Le dire évite qu'une relecture
 future les prenne pour un doublon et les retire.
 
+
+---
+
+## 7. L'archivage préparé — mesuré le 2026-08-27, à dérouler le jour où G2 tombe
+
+Préparé **en lecture seule**, pendant que G2 attend. Le jour venu, l'archivage doit être une écriture
+de dix minutes, pas une demi-journée : tout ce qui suit est mesuré, il ne restera qu'à écrire.
+
+### 7.1 Étape 1 — le sondage AVANT, relevé et daté
+
+Il **doit** précéder le `git mv` : une assertion « rend 404 » sur un chemin qui n'a jamais existé passe
+en ne mesurant rien.
+
+| chemin | avant (2026-08-27) | attendu après |
+|---|---|---|
+| `/graylog/` | **302** | 404 |
+| `/graylog/index.php` | **302** | 404 |
+| `/graylog/js/graylog.js` | **200** | 404 |
+| `/graylog/config` | **404 déjà** | 404 — Apache ne sert **pas** les routes backend |
+| `/api_proxy.php/graylog/config` | **302** | **302 — doit rester inchangé** |
+
+Le `200` sur le JS est le comportement normal d'Apache pour un statique. Il est relevé parce qu'il rend
+l'assertion **mesurante** : 200 → 404, au lieu de valider du vide.
+
+La dernière ligne est celle qui compte : **les dix routes `/graylog/*` du backend restent vivantes** et
+la page portée les appelle. *Tout `/partie/` n'est pas une page.*
+
+### 7.2 ⚠ Étape 3 — les points d'entrée : `graylog/` est le MIROIR de `services/`
+
+| # | point d'entrée | `services/` | **`graylog/`** |
+|---|---|---|---|
+| 1 | `menu.php` barre latérale | présent | **présent** — `:107` |
+| 2 | `menu.php` tiroir mobile | présent | **présent** — `:242` |
+| 3 | `head.php` raccourci clavier | présent (`g s`) | **ABSENT** — mesuré, 0 occurrence |
+| 4 | `index.php` tuile du tableau de bord | **absent** | **PRÉSENT** — `:378` |
+
+> **Aucun des deux modules n'exerce les quatre emplacements, et ils ne se recouvrent pas.**
+> `services/` avait le raccourci clavier et pas la tuile ; `graylog/` a la tuile et pas le raccourci.
+>
+> C'est exactement pourquoi l'étape 4 a pu être oubliée sur `docker/` : **chaque archivage n'éprouve
+> qu'un sous-ensemble différent des quatre emplacements**, et onze archivages ont pu valider le cycle
+> sans qu'aucun ne l'exerce en entier. *Une étape de cycle éprouvée seulement sur des cas où elle n'a
+> rien à trouver n'est pas éprouvée.*
+>
+> **Pour `graylog/`, l'étape 4 MORD.** `legacy/index.php:378` pose une tuile
+> `['url' => '/graylog/', 'label' => t('dashboard.sc_graylog'), …]` qui deviendrait un 404. C'est le
+> point à ne pas manquer, et c'est celui que `services/` ne permettait pas de vérifier.
+
+### 7.3 Étape 4 — `Navigation` : **déjà conforme**
+
+`Navigation.php:92` porte `'route' => 'graylog'`. Aucune écriture.
+
+### 7.4 Étape 5 — `LiensLegacy` : entrée **PRÉVENTIVE**, et elle appartient à la session 3
+
+Ligne à poser : `'/graylog/' => 'graylog'`.
+
+**Mesuré** : le backend n'émet **jamais** `/graylog/` comme lien de page — aucun `link` ne le porte.
+Même régime que `/supervision/`, `/docker/`, `/chatops/`, `/maintenance/`, `/services/`. L'entrée ne
+répare aucun 404 constaté ; elle évite d'en fabriquer un.
+
+**Le voisinage est sûr** : `normalise('/graylog/config')` rend `/graylog/config/`, et `resoudre()`
+compare le chemin normalisé **en entier**. Les dix routes du backend ne peuvent pas être réécrites.
+
+### 7.5 Étape 6 — adresse configurée hors de RootWarden : **il y en a une, et elle est d'une autre nature**
+
+C'est le seul module archivé jusqu'ici où la réponse n'est pas « non ».
+
+`graylog_config` porte `server_host`, un port et un protocole (§3 : `graylog.test`, 1514, `tcp`), et le
+déploiement **écrit cette adresse dans `/etc/rsyslog.d/` sur chaque machine**. Mais ce n'est **pas** le
+cas de `chatops/` :
+
+| | `chatops/` | `graylog/` |
+|---|---|---|
+| nature | une adresse **entrante** — le chemin que **Slack appelait** | une adresse **sortante** — celle où les machines **envoient** |
+| ce que l'archivage casse | le point d'entrée public disparaît, Slack tombe en silence | **rien** — l'adresse vit en base et dans `rsyslog.d`, pas dans le dossier archivé |
+
+**L'archivage de `graylog/` ne déplace aucune adresse** : il retire une page, pas un point d'entrée.
+L'étape 6 est donc **satisfaite**, mais elle méritait d'être posée — et la distinction
+entrant/sortant est ce qui la tranche, pas le fait qu'il y ait « une adresse ».
+
+### 7.6 Étape 7 — la référence : `1 + 2 + 2 = 5`
+
+Deux fichiers réels (`index.php`, `js/graylog.js`). Chemins à sonder : `/graylog/`,
+`/graylog/index.php`, `/graylog/js/graylog.js`. **À mesurer par la session 7, pas à inscrire** — la
+formule est vérifiée dans `archive.mjs` (`:63`, `:67`, `:142`, `:150`), mais une référence se remesure.
+
+### 7.7 ⚠ Étape 8 (neuve) — la passe des liens ENTRANTS
+
+Ajoutée au cycle le 2026-08-27, après le lien de déblocage trouvé sur `remote_users`. Balayée ici sur
+**quatre natures** : `href` de gabarit, chaîne injectée en JS, catalogue de traduction, et déclaration
+de portée.
+
+| trouvé | nature | effet de l'archivage |
+|---|---|---|
+| `menu.php:107`, `:242` · `index.php:378` | points d'entrée | **à basculer** — §7.2 |
+| `api_proxy.php:135` `'/graylog/'` | liste blanche du **proxy** | devient **surface morte**, comme `/supervision/` et `/services/`. **Laisser** — on ne soigne pas ce qu'on démonte |
+| `adm/api_keys.php:372` `'^/graylog/'` | portée de clé d'API | **reste valide** — désigne les routes backend, pas la page |
+| `adm/health_check.php:146-148` | trois routes backend | **restent valides**. *(Page par ailleurs interdite : elle écrit sur `srv-zabbix` au chargement.)* |
+| `adm/includes/import_csv.php:64` | **commentaire** citant `/graylog/test` | mention périmée — **se relève, ne se corrige pas**, comme le `/docker/` en `<code>` |
+
+**Aucun lien de déblocage, aucun chemin injecté par `innerHTML`.** `graylog/` n'est donc **pas
+contraint** dans l'ordre d'archivage, contrairement à `remote_users`.
+
+### 7.8 Ce que la passe a trouvé EN PLUS, et qui n'est pas un lien
+
+**Huit clés de conseil orphelines à l'archivage** : `tip.graylog_title` et `tip.graylog_step1..4`,
+en **FR et EN** (`legacy/lang/{fr,en}/tips.php`), consommées par `howto_tip.php` depuis
+`legacy/graylog/index.php`. Plus `dashboard.sc_graylog` et `sc_graylog_desc`, qui étiquettent la tuile
+du §7.2 et **restent utiles** une fois l'URL basculée.
+
+**Et le portage ne les a pas reprises** : `laravel/lang/fr/graylog.php` existe et ne porte **aucune**
+clé de conseil (mesuré). Les quatre étapes du legacy — configurer le serveur et le jeton, éditer les
+collecteurs, sélectionner et installer, lire l'onglet Sidecars — **nomment la séquence dans le bon
+ordre et sont déjà traduites**.
+
+> C'est la même chose que ce que la passe sur `remote_users` a révélé avec `tip.ssh_step2` : **le
+> legacy porte, dans ses catalogues, une réponse contextuelle que le portage n'a pas reprise.** Ce sont
+> un **acquis à reprendre**, pas un doublon à écarter. À signaler à la session 3 **avant** l'archivage —
+> une fois le dossier déplacé, plus personne n'ira les chercher dans `lang/`.
+
+### 7.9 Ce qui reste bloquant, et ce qui ne l'est pas
+
+**Bloquant** : **G2**. Les trois gestes qui mutent (`deploy`, `test`, `uninstall`) ne sont pas portés,
+et le §5 de ce document porte le correctif backend qu'ils exigent — `forward_deployed = True` écrit
+sans regarder le verdict, et `uninstall` qui répond `success: true` en jetant le code de retour.
+
+**Non bloquant, et mesuré** : tout le reste. Les huit étapes sont prêtes, `Navigation` est déjà
+conforme, le backend n'émet pas le chemin, aucune adresse entrante, aucun lien de déblocage.
