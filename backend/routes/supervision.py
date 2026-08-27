@@ -375,6 +375,26 @@ def _write_config_stream(client, root_password, file_path, config_lines):
             yield f"INFO: Cle '{key}' purgee.\n"
 
             line = f"{key}={value}\n"
+            # ══ CE `base64` EST UNE PROTECTION, PAS UNE COMMODITE ═════════════
+            #
+            # `line` porte une valeur d'override, donc une valeur venue du
+            # CLIENT. Ce qui est interpole dans la commande n'est jamais cette
+            # valeur : c'est son ENCODAGE, dont l'alphabet est [A-Za-z0-9+/=].
+            # Aucun caractere de la valeur n'atteint donc le shell distant, quel
+            # qu'il soit.
+            #
+            # C'est la MOITIE de ce qui ferme E-85, et c'est la moitie qu'on ne
+            # voit pas. `_SAFE_VALUE_RE` (`:67`) refuse les caracteres de
+            # controle, mais son ancre `$` admet en Python UN saut de ligne en
+            # toute fin de chaine. Ce residu est inoffensif — il produit une
+            # ligne vide, pas une directive — et ce qui le rend inoffensif
+            # jusqu'au bout n'est pas la regex : c'est cet encodage.
+            #
+            # Donc : remplacer ce `printf | base64 -d` par un `printf` direct
+            # « pour la lisibilite » ROUVRIRAIT le trou, et AUCUN test ne
+            # bougerait. Mesure de la session 5, 2026-08-27 : la protection est
+            # double et independante, et cette moitie-ci n'etait ecrite nulle
+            # part.
             encoded = base64.b64encode(line.encode('utf-8')).decode('ascii')
             _, _, rc_ecrit = execute_as_root(client,
                 f"printf '%s' '{encoded}' | base64 -d >> {file_path}", root_password)
@@ -1826,6 +1846,10 @@ def generic_deploy(platform):
                             _, _, rc_dir = execute_as_root(client, f"mkdir -p {config_dir}", root_pass)
                             echecs += _echec("creation du repertoire de configuration", rc_dir)
                             _backup_agent_config(client, root_pass, config_path)
+                            # Le contenu passe par `base64` : c'est ce qui empeche une
+                            # valeur d'override d'atteindre le shell distant. Voir la note
+                            # longue sur `_write_config_stream`. Ne pas remplacer par un
+                            # `printf` direct.
                             b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
                             _, _, rc_cfg = execute_as_root(client,
                                 f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
@@ -2016,6 +2040,10 @@ def generic_reconfigure(platform):
                                f"ete modifie.\n")
                         continue
 
+                    # Le contenu passe par `base64` : c'est ce qui empeche une
+                    # valeur d'override d'atteindre le shell distant. Voir la note
+                    # longue sur `_write_config_stream`. Ne pas remplacer par un
+                    # `printf` direct.
                     b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
                     _, _, rc_cfg = execute_as_root(client,
                         f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
