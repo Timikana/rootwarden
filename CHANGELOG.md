@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.95** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.96** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,47 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.96 — `services/` S2 porte : un zero qui dit d'ou il vient
+
+`/services`, **legacy 12 PASS / portage 14 PASS, 0 FAIL**.
+
+#### Ce que le portage dit et que le legacy ne dit pas
+Le legacy annonce « 0 services charges » : exact, mais indistinguable d'une enumeration en echec. Or
+l'appel a **reussi** — c'est la machine qui n'expose rien. Le portage :
+
+> « Cette machine n'a rendu aucun service. Elle n'expose peut-etre pas systemd — **ce n'est pas la
+> meme chose qu'une enumeration en echec**, qui l'aurait dit. »
+
+Sur un module dont systemd est tout l'objet, la difference decide du geste suivant.
+
+Le portage ajoute aussi : un `data-rw` sur le bouton de chargement (celui du legacy n'a **aucun**
+identifiant), les filtres remplis **depuis les donnees rendues** — jamais depuis une liste ecrite dans
+le JS, les categories vivant dans `services_manager.SERVICE_CATEGORIES` —, et un marqueur
+« protege » qui dit que **le backend refuse le geste**, pas que l'ecran le masque.
+
+#### Deux defauts de presentation attrapes a l'image
+- **La meme phrase paraissait DEUX FOIS** — sous le bouton et dans le journal. Le travers du
+  « Connecte en tant que » affiche deux fois. Le journal CONSIGNE ce qui s'est passe, l'etat EXPLIQUE
+  ce qu'on voit : deux roles, deux textes.
+- Une variable `tous` en masquait une autre dans le JS. Sans consequence aujourd'hui ; renommee.
+
+#### Une assertion sur-specifiee, et la lecon qui en sort
+L'assertion « un resultat vide dit d'ou il vient » lisait **un seul conteneur**. Quand le portage a
+deplace l'explication vers la ligne d'etat — precisement pour supprimer la repetition ci-dessus —
+elle a echoue sur une page qui disait pourtant la bonne chose.
+
+> **La propriete porte sur la PAGE.** C'est ce que la personne lit qui compte, pas le `div` ou c'est
+> ecrit. L'assertion concatene desormais les porte-messages.
+
+C'est la troisieme fois de la session qu'une assertion vise le mauvais conteneur — apres
+`#services-tbody` au lieu de `#logs-container`, et le tableau de `bashrc/`.
+
+#### Ce qui reste NON MESURE, et c'est ecrit dans le LOT
+`Test-Server-Debian` est un conteneur **sans systemd** : le rendu d'un **tableau peuple** n'est
+mesure sur AUCUNE des deux cibles. Ce qui est mesure : que le geste part, qu'il vise la bonne
+machine, qu'aucune ecriture ne l'accompagne, et ce que la page dit d'un resultat vide. **Ce module
+gagnerait a etre mesure sur une machine avec systemd.**
 
 ### v1.37.95 — `services/` S2 caracterise, et E-150 : la protection ne connait que la forme `.service`
 

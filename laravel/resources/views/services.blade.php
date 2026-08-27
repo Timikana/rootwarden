@@ -44,6 +44,12 @@
     </label>
 
     <div class="rw-actions">
+        {{--
+            LE BOUTON PORTE UN `data-rw`. Celui du legacy n'a **aucun**
+            identifiant — seulement `onclick="loadServices()"` — et la suite a du
+            l'ancrer sur cet attribut. Un element pilote par un test porte un
+            ancrage stable.
+        --}}
         <button type="button" class="rw-bouton" data-rw="services-charger"
                 disabled>{{ __('services.charger') }}</button>
     </div>
@@ -77,6 +83,24 @@
             <input type="search" class="rw-saisie rw-saisie--compacte"
                    data-rw="services-recherche" disabled>
         </label>
+    </div>
+</div>
+
+<div class="rw-section" data-rw="services-bloc-tableau" hidden>
+    <p class="rw-aide" role="status" aria-live="polite" data-rw="services-compte"></p>
+    <div class="rw-tableau-cadre">
+        <table class="rw-tableau">
+            <thead>
+                <tr>
+                    <th>{{ __('services.col_service') }}</th>
+                    <th>{{ __('services.col_etat') }}</th>
+                    <th>{{ __('services.col_active') }}</th>
+                    <th>{{ __('services.col_categorie') }}</th>
+                    <th>{{ __('services.col_description') }}</th>
+                </tr>
+            </thead>
+            <tbody data-rw="services-tableau"></tbody>
+        </table>
     </div>
 </div>
 

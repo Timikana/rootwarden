@@ -72,7 +72,7 @@ const C = CIBLE === 'laravel'
         tableau: '[data-rw="services-tableau"]',
         ligne: '[data-rw^="services-ligne-"]',
         recherche: '[data-rw="services-recherche"]',
-        journaux: '[data-rw="services-journaux"]',
+        journaux: '[data-rw="services-journaux"], [data-rw="services-etat"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
     }
     : {
@@ -275,11 +275,21 @@ try {
         constate('services listes', `${vu.nombre} — ${vu.noms.join(', ') || '(aucun)'}`);
         constate('ce que le tableau affiche', vu.texte || '(vide)');
 
-        // CE QUE LA PAGE DIT, LU DANS SON PORTE-MESSAGES — pas dans le tableau.
+        // CE QUE LA PAGE DIT, LU DANS TOUS SES PORTE-MESSAGES.
+        //
+        // Pas dans le tableau — la page n'y ecrit pas — mais pas non plus dans
+        // UN SEUL conteneur. Une premiere redaction lisait le seul journal ;
+        // quand le portage a deplace l'explication vers la ligne d'etat pour
+        // supprimer une repetition, l'assertion a echoue sur une page qui disait
+        // pourtant la bonne chose.
+        //
+        // **La propriete porte sur la PAGE** : c'est ce que la personne lit qui
+        // compte, pas le `div` ou c'est ecrit. On concatene donc les
+        // porte-messages, et le selecteur en liste plusieurs.
         const message = await page.evaluate((sel) => {
-            const c = document.querySelector(sel);
-
-            return c ? (c.textContent || '').replace(/\s+/g, ' ').trim() : '';
+            return [...document.querySelectorAll(sel)]
+                .map((c) => (c.textContent || '')).join(' ')
+                .replace(/\s+/g, ' ').trim();
         }, C.journaux);
         constate('ce que la page dit du chargement', message.slice(0, 180) || '(rien)');
 
