@@ -46,6 +46,7 @@ return [
     'th_compte_service' => "Compte d'administration",
     'th_mot_de_passe' => "Mots de passe connus",
     'th_depuis' => "Clé déployée le",
+    'th_actions' => "Test",
     'etat_cle_seule' => "clé seule",
     'etat_cle_et_mot_de_passe' => "clé et mot de passe",
     'etat_mot_de_passe_seul' => "mot de passe seul",
@@ -64,4 +65,19 @@ return [
     'non_porte_titre' => "Les gestes de cette page ne sont pas encore portés",
     'non_porte_texte' => "Déployer la clé, déployer le compte d'administration, tester une connexion, relever les comptes, effacer ou ressaisir un mot de passe, et faire tourner la clé se font encore depuis l'ancien portail. Cette page porte l'état, ses compteurs et ses gardes.",
     'non_porte_lien' => "Ouvrir la clé de plateforme dans l'ancien portail",
+
+    // ── Sous-lot P2 : le test de connexion ───────────────────────────────
+    // QUATRE situations, et le legacy les replie sur un rouge unique. « Cle non
+    // deployee » est un ETAT, pas un echec ; et le backend ne distingue pas
+    // « refusee » d'« injoignable » — les deux rendent `auth_method: password`.
+    // L'ecran ne pretend donc pas savoir laquelle, il dit les deux.
+    'tester' => "Tester la connexion",
+    'tester_aide' => "Ouvre une session SSH vers la machine avec la clé, et la referme. Rien n'est écrit, ni sur la machine ni en base.",
+    'test_en_cours' => "Connexion en cours vers :machine…",
+    'test_ok' => "La clé fonctionne sur :machine.",
+    'test_rien_a_tester' => "Rien à tester sur :machine : la clé n'y est pas déployée. Ce n'est pas un échec — c'est l'étape d'avant.",
+    'test_echec' => "La clé n'a pas fonctionné sur :machine. Deux causes possibles que le backend ne distingue pas : elle est refusée par la machine, ou la machine est injoignable. Ce que le serveur rapporte : :message",
+    'test_indecis' => "Le test n'a pas rendu de verdict sur :machine. Ce n'est ni une réussite ni un échec de la clé : la réponse n'a pas pu être lue.",
+    'test_journal' => "Journal des tests",
+    'test_journal_vide' => "Aucun test n'a encore été lancé sur cette page.",
 ];
