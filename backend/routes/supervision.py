@@ -126,7 +126,22 @@ AGENT_REGISTRY = {
     'zabbix': {
         'service': 'zabbix-agent2',
         'config_path': '/etc/zabbix/zabbix_agent2.conf',
-        'version_cmd': "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 || command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
+        # E-186. La forme precedente etait une chaine `A && B || C && D || E`
+        # SANS parentheses. `sh` evalue `&&` et `||` a EGALE precedence, de
+        # gauche a droite : la sonde d'agentd partait donc AUSSI quand celle
+        # d'agent2 avait reussi. Mesure du 2026-08-27 avec deux faux binaires —
+        # agent2 seul : 1 ligne · agentd seul : 1 ligne · aucun : 1 ligne ·
+        # LES DEUX INSTALLES : **2 lignes**.
+        #
+        # Un `if/elif/else` plutot que des parentheses : la precedence cesse
+        # d'etre une chose a savoir, et l'intention se lit.
+        'version_cmd': (
+            "if command -v zabbix_agent2 >/dev/null 2>&1; then "
+            "zabbix_agent2 -V 2>/dev/null | head -1; "
+            "elif command -v zabbix_agentd >/dev/null 2>&1; then "
+            "zabbix_agentd -V 2>/dev/null | head -1; "
+            "else echo 'NOT_INSTALLED'; fi"
+        ),
         'uninstall_cmd': _commande_desinstallation(
             ['zabbix-agent', 'zabbix-agent2', 'zabbix-agent2-plugin-*'],
             ['zabbix-agent2', 'zabbix-agent'],
@@ -906,10 +921,16 @@ def zabbix_version():
                          logger=logger, service_account=svc_account) as client:
             # Essayer zabbix_agent2 d'abord, fallback zabbix_agentd.
             # command -v evite "sh: not found" qui polluerait la sortie si absent.
+            #
+            # UNE SEULE SOURCE POUR LA COMMANDE — meme correctif que celui deja
+            # applique a `uninstall_cmd`. Cette commande etait ecrite DEUX fois,
+            # ici et dans le registre, et les deux copies sont VIVANTES : la
+            # seconde sert `POST /supervision/scan-all` (`:1572`). E-186 vivait
+            # donc en deux exemplaires, dont un qu'un correctif inattentif
+            # aurait laisse. C'est le motif « a moitie corrige » que ce module a
+            # deja paye cinq fois.
             out, _, rc = execute_as_root(client,
-                "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 "
-                "|| command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 "
-                "|| echo 'NOT_INSTALLED'",
+                AGENT_REGISTRY['zabbix']['version_cmd'],
                 root_pass, timeout=15)
             out = out.strip()
 
