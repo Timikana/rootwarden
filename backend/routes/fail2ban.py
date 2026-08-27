@@ -333,6 +333,21 @@ def fail2ban_history():
     if not server_id:
         return jsonify({'success': False, 'message': 'server_id requis'}), 400
 
+    # E-164, LA MOITIE QUI RESTAIT — et le correctif partiel etait le notre.
+    #
+    # Le cast vivait A L'INTERIEUR du `try` ci-dessous : un `server_id` non
+    # numerique levait une `ValueError` que le `except Exception` attrapait, et
+    # la route rendait « Erreur interne » en **500**. La premiere moitie d'E-164
+    # est bien fermee — c'est du JSON, l'appelant peut le lire — mais la faute
+    # est dans la REQUETE, et un 500 dit qu'elle est dans le serveur.
+    #
+    # Caste ICI, donc hors du `try` : la faute se refuse en 400, et le `try`
+    # retrouve son role, qui est de couvrir la BASE et rien d'autre.
+    try:
+        server_id = int(server_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'server_id doit etre un nombre'}), 400
+
     try:
         conn = get_db_connection()
         cur = conn.cursor(dictionary=True)
@@ -342,7 +357,7 @@ def fail2ban_history():
             WHERE server_id = %s
             ORDER BY created_at DESC
             LIMIT 50
-        """, (int(server_id),))
+        """, (server_id,))
         history = cur.fetchall()
         conn.close()
 
@@ -645,6 +660,14 @@ def fail2ban_stats():
     if not server_id:
         return jsonify({'success': False, 'message': 'server_id requis'}), 400
 
+    # E-164, la moitie qui restait — meme faute que sur `/history`, meme remede.
+    # `days` etait deja caste hors du `try` juste au-dessus : le cas visible
+    # etait traite et le cas voisin pris a l'envers, dans la MEME fonction.
+    try:
+        server_id = int(server_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'server_id doit etre un nombre'}), 400
+
     try:
         conn = get_db_connection()
         cur = conn.cursor(dictionary=True)
@@ -654,7 +677,7 @@ def fail2ban_stats():
             WHERE server_id = %s AND created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
             GROUP BY DATE(created_at), action
             ORDER BY day
-        """, (int(server_id), days))
+        """, (server_id, days))
         rows = cur.fetchall()
         conn.close()
 
