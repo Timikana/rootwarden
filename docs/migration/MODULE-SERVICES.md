@@ -89,13 +89,91 @@ sécurité, et la convention du dépôt les veut sur une branche dédiée, jamai
   serveur : `__('svc_confirm_stop', { name, server })`. Mieux que D9a et D9b, où `deploy` partait au
   premier clic.
 - **Le nom de service est validé** par `_SAFE_SERVICE_RE` avec un plafond de 200 caractères, avant
-  tout usage. Aucune valeur client ne part nue vers un `systemctl`.
+  tout usage.
+
+  > **Corrigé le 2026-08-27, à la suite d'E-174.** Cette ligne se terminait par *« Aucune valeur
+  > client ne part nue vers un `systemctl` »*. **C'est faux au pied de la lettre** : la valeur part
+  > bien **nue**, dans un f-string, à six endroits (`services_manager.py:135, 161, 170, 179, 188, 197`
+  > — `f'systemctl start {service}'`). Ce qui la contraint est une **classe de caractères**, pas une
+  > citation.
+  >
+  > Mesuré : `_SERVICE_RE = ^[a-zA-Z0-9@._:-]+$` refuse `a;id`, `a b`, `a'`, `a$(id)`, `a\nid`.
+  > **Aucun métacaractère de shell ne passe** — la conclusion « pas d'injection de commande » tient.
+  >
+  > **Mais `-` est dans la classe, y compris en tête** : `--now` est **ACCEPTÉ**, mesuré. Et
+  > `_check_protected` ne l'arrête pas non plus, puisqu'il compare à une liste de **noms**. Une valeur
+  > peut donc atteindre `systemctl` comme **OPTION** au lieu d'un nom d'unité.
+  >
+  > **QUALIFIÉ le 2026-08-27 par la session 5, et remesuré ici : SANS EFFET UTILE.** Le raisonnement
+  > décisif tient en deux temps, et le premier change la question. **Le privilège n'est pas en jeu** :
+  > les six fonctions passent par `execute_as_root`, donc qui atteint la route est **déjà root** sur
+  > cette machine — une option acceptée ne franchit aucune frontière. La seule chose qu'elle pourrait
+  > apporter est de **contourner `_check_protected`**, et elle ne le peut pas : un seul jeton par
+  > commande, et la classe exclut `=` et l'espace, donc impossible de fournir **à la fois** une option
+  > et un nom d'unité. Or agir sur `sshd` exige de le **nommer**.
+  >
+  > **Le contournement réel de `_check_protected` n'a donc besoin d'aucune injection d'argument :
+  > c'est E-150**, ci-dessous. Priorité à celui-là.
+  >
+  > **⚠ Une valeur non tranchée, et qu'il ne faut PAS tester** : `-.mount` — le nom de l'unité systemd
+  > du système de fichiers **racine** — passe la classe **et** `_check_protected` (mesuré). On ignore
+  > si `systemctl` la reçoit comme un nom d'unité ou comme des options courtes invalides ; la
+  > convention documentée est `systemctl status -- -.mount`, ce qui **suggère** que non. **Trancher
+  > demanderait un `systemctl stop` sur la racine d'une machine réelle** : le banc n'a pas systemd, et
+  > un défaut irréversible s'établit sans se provoquer. La mesure non destructrice est `show` au lieu
+  > de `stop`, sur une machine jetable, et elle appartient à l'exploitant.
+  >
+  > **Le correctif rend la question sans objet et ferme aussi l'injection d'argument** — interdire le
+  > tiret **en tête** : `^[a-zA-Z0-9@._:][a-zA-Z0-9@._:-]*$`. Aucune unité ordinaire ne commence par
+  > un tiret ; cela ne casse rien.
+  >
+  > C'est la **troisième occurrence** du même défaut documentaire : conclure d'après ce pour quoi un
+  > validateur est *nommé* (« systemd unit names », dit son commentaire) plutôt que d'après ce qu'il
+  > *accepte*. Relevé complet au **§8 de `MODULE-FILTRAGE.md`**.
 - **`@require_machine_access` n'est pas décoratif ici**, contrairement à `bashrc/` : la page admet le
   rôle 1, pour qui le décorateur consulte réellement `user_machine_access`.
 - **La liste des services protégés est appliquée sur la REQUÊTE**, aux cinq routes mutantes, *et*
   reflétée à l'écran (boutons désactivés). **Première fois du chantier qu'une protection garde les
   deux couches.** Son défaut est ailleurs — voir E-150 : elle compare des noms là où systemd raisonne
   en unités, et `ssh.socket` passe au travers.
+
+### ⚠ E-149 chaîné à E-150 — la portée réelle, mesurée le 2026-08-27
+
+E-149 dit que les huit routes n'ont **ni rôle ni permission**, et E-150 que `ssh.socket` traverse la
+liste des services protégés. Chaînés, ils décrivent un compte de rôle 1 qui arrête `ssh.socket` sur
+une machine — c'est-à-dire qui **coupe l'accès SSH**, y compris celui de RootWarden. Voici ce que la
+mesure ajoute, **dans les deux sens**.
+
+**Ce qui borne — le garde qui manque n'est pas le seul garde.** Relevé route par route (`:107` à
+`:337`), les huit portent `@require_api_key` + **`@require_machine_access`** + `@threaded_route`. Et
+`@require_machine_access` **MORD ici**, justement parce qu'aucune de ces routes ne porte
+`@require_role(≥2)` : `check_machine_access` ne sort pas par son `if role_id >= 2: return True` et
+consulte réellement `user_machine_access`. **C'est le seul module inventorié où l'absence d'un garde
+révèle l'action d'un autre** — et c'est l'inverse de la lecture habituelle du chantier, où la présence
+d'un garde masque son inertie.
+
+**Ce qui borne, et ce qui aggrave — la population est d'exactement un compte, et c'est la production.**
+
+| compte de rôle 1 | actif | second facteur | machines détenues |
+|---|---|---|---|
+| **`opsuser`** (id 2) | oui | **NON** | **`srv-zabbix` — PRODUCTION** |
+| `e2e_test_*` ×5 (3, 4, 5, 10, 12) | oui | non | **aucune** |
+| `rw-test-user` (14) | oui | oui | aucune |
+
+Remesure :
+`SELECT u.id,u.name,u.role_id,(u.totp_secret IS NOT NULL AND u.totp_secret<>'') FROM users u WHERE u.role_id=1;`
+puis `SELECT user_id, machine_id FROM user_machine_access;`
+
+- **`opsuser` est le seul compte de rôle 1 du parc à détenir une machine, et c'est la production.**
+  C'est ce qui rend la chaîne sérieuse ;
+- **il n'a pas de secret TOTP.** Le second facteur étant obligatoire, il ne se connecte pas en l'état :
+  il devrait d'abord s'enrôler. **Ce n'est pas une barrière, c'est une marche** — l'enrôlement est un
+  écran offert, pas un geste d'administrateur ;
+- les cinq comptes résiduels `e2e_test_*` n'ont **aucun** accès machine, donc n'atteignent rien par ce
+  chemin. Mesuré, et cela **réduit** leur gravité par rapport à ce que le §7 du plan en dit.
+
+La qualification complète des validateurs de ce module — dont `-.mount` et pourquoi il ne faut pas le
+tester — est au **§8 de `MODULE-FILTRAGE.md`**.
 
 ---
 

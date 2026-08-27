@@ -68,6 +68,30 @@ puis écrit `/etc/rsyslog.d/` par `printf '%s' '<b64>' | base64 -d` — le motif
 il est respecté. Il fait ensuite `rm -f <prefixe>*.conf` avant de pousser les gabarits activés :
 **suppression bornée par le préfixe RootWarden**, elle n'emporte pas les confs d'autrui.
 
+> **Cette borne a été REMESURÉE le 2026-08-27, à la suite d'E-174** — parce qu'elle reposait sur une
+> conclusion et non sur une mesure, ce qui est exactement ce qui a laissé passer E-174 dans
+> `MODULE-FILTRAGE.md`. **Elle tient**, et voici pourquoi elle tient :
+>
+> le chemin poussé est `f"{_RW_CONF_PREFIX}{tpl['name']}.conf"` (`graylog.py:334`) — une
+> **interpolation brute** d'un nom de gabarit venu de la base, donc d'un formulaire. Ce qui la borne
+> est `_NAME_RE = ^[a-zA-Z0-9_-]{1,100}$`, testée juste avant (`:332`) **et** à la création (`:499`).
+> Mesuré valeur par valeur dans `rootwarden_python` :
+>
+> | nom de gabarit soumis | verdict |
+> |---|---|
+> | `syslog` · `a-b_c` | accepte |
+> | **`../../etc/cron.d/x`** · `a/b` | **refuse** — aucune évasion de répertoire |
+> | `a;id` · `a b` · `a'` · `a.conf` | refuse |
+> | `a\n` | **accepte** (voir la réserve ci-dessous) |
+>
+> Le `/` étant refusé, un gabarit **ne peut pas sortir** de `/etc/rsyslog.d/50-rootwarden-`, donc le
+> `rm -f {préfixe}*.conf` couvre bien tout ce que le module a écrit, et rien d'autre.
+>
+> **La réserve, dite parce qu'elle est réelle** : `_NAME_RE` est employée avec `.match()`, et `$`
+> accepte un saut de ligne final. Non exploitable ici — rien ne peut suivre ce saut de ligne — mais
+> c'est l'un des **33** validateurs du dépôt dans ce cas, et `.fullmatch()` n'est employé nulle part.
+> Relevé complet au **§8 de `MODULE-FILTRAGE.md`**.
+
 `POST /graylog/uninstall` retire ces mêmes fichiers et redémarre `rsyslog`. **Le geste est donc
 réversible**, et c'est ce qui rend le sous-lot exerçable.
 
@@ -86,8 +110,22 @@ pour transférer vers un néant, et **aucun journal ne quitte le réseau**. C'es
 module de `groups/` — pas de courriel, pas de destination vivante.
 
 `POST /graylog/test` exécute `logger -t <tag> <message>` à distance : une entrée de journal **locale**,
-qui ne partirait que si le transfert était vivant. `shlex.quote` est appliqué au nom de la machine
-(patch A04-03), ce qui est correct.
+qui ne partirait que si le transfert était vivant.
+
+**Sur `shlex.quote`, la ligne précise, remesurée le 2026-08-27** — la version précédente disait
+« appliqué au nom de la machine (patch A04-03), ce qui est correct », ce qui décrivait l'intention
+plutôt que le code. Le relevé exact (`graylog.py:409-410`) :
+
+```python
+msg   = shlex.quote(f"ping depuis RootWarden {row['name']}")
+tag_q = shlex.quote(tag)
+```
+
+La citation porte sur le **message entier qui contient** `row['name']`, et séparément sur le tag —
+donc **les deux** valeurs qui composent la commande. C'est la citation **intérieure**, celle qui sait
+que la valeur est une donnée ; c'est précisément celle qui manquait à `ban_ip` avant E-174, où
+`execute_as_root` ne protégeait que le shell **extérieur**. **La conclusion est juste, et cette fois
+elle porte ce qui l'établit.**
 
 ### La cible
 
