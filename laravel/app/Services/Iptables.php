@@ -130,4 +130,122 @@ class Iptables
 
         return $ports;
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  SOUS-LOT I2 — LA COPIE EN BASE
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * La borne de taille des deux colonnes.
+     *
+     * `rules_v4` et `rules_v6` sont des `TEXT` MySQL — 65 535 octets. Au-dela,
+     * MySQL tronque en mode permissif et leve en mode strict : dans les deux cas
+     * l'ecran annoncerait un enregistrement qui n'est pas celui qu'on a demande.
+     * On refuse AVANT d'ecrire, et on dit la borne.
+     */
+    public const OCTETS_MAX = 65535;
+
+    /**
+     * Resout une machine ET controle l'acces, en une fois.
+     *
+     * ══ CONTROLER L'OBJET RESOLU, PAS LE PARAMETRE RECU ══════════════════
+     *
+     * Le legacy revalide l'acces dans ses handlers (`index.php:74-84`, patch
+     * A01) parce que le `<select>` filtre n'est PAS une garde : un `server_id`
+     * forge atteignait les regles de n'importe quelle machine. Le controle est
+     * repris ici, et il porte sur la machine RETROUVEE EN BASE.
+     *
+     * Rendre `null` couvre les deux cas — machine inexistante et machine
+     * interdite — DELIBEREMENT : distinguer les deux apprendrait a un appelant
+     * qu'une machine existe derriere l'identifiant qu'il a essaye.
+     */
+    public function machineAccessible(int $idCompte, int $roleId, int $machineId): ?object
+    {
+        if ($roleId >= 2) {
+            $lignes = DB::select(
+                'SELECT id, name, ip, port FROM machines WHERE id = ? '
+                . "AND (lifecycle_status IS NULL OR lifecycle_status != 'archived')",
+                [$machineId]
+            );
+
+            return $lignes[0] ?? null;
+        }
+
+        $lignes = DB::select(
+            'SELECT m.id, m.name, m.ip, m.port FROM machines m '
+            . 'INNER JOIN user_machine_access uma ON uma.machine_id = m.id '
+            . 'WHERE m.id = ? AND uma.user_id = ? '
+            . "AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')",
+            [$machineId, $idCompte]
+        );
+
+        return $lignes[0] ?? null;
+    }
+
+    /**
+     * La copie en base des regles d'une machine, ou `null` s'il n'y en a pas.
+     *
+     * ══ `ORDER BY id DESC LIMIT 1` N'EST PAS DECORATIF ═══════════════════
+     *
+     * `iptables_rules` n'a AUCUNE contrainte d'unicite sur `server_id` — mesure
+     * du schema : une simple `KEY server_id`, pas d'`UNIQUE`. Plusieurs lignes
+     * par machine sont donc possibles.
+     *
+     * Le legacy fait `SELECT … WHERE server_id = ?` puis `fetch()`, SANS
+     * `ORDER BY` : si deux lignes existaient, celle qui est lue ne serait pas
+     * determinee. Meme defaut que le `LIMIT 1` sans `ORDER BY` deja releve sur
+     * la revocation des cles d'API, ou il rendait la revocation non deterministe.
+     *
+     * La table est VIDE aujourd'hui (mesure) : aucun porteur. On lit quand meme
+     * la plus recente — une lecture deterministe ne coute rien, et « personne
+     * n'exerce ce chemin » n'est pas une propriete.
+     */
+    public function reglesEnBase(int $machineId): ?object
+    {
+        $lignes = DB::select(
+            'SELECT id, rules_v4, rules_v6, updated_at FROM iptables_rules '
+            . 'WHERE server_id = ? ORDER BY id DESC LIMIT 1',
+            [$machineId]
+        );
+
+        return $lignes[0] ?? null;
+    }
+
+    /** Combien de lignes cette machine porte-t-elle ? Sert a DIRE l'anomalie. */
+    public function compteLignesEnBase(int $machineId): int
+    {
+        $lignes = DB::select(
+            'SELECT COUNT(*) AS n FROM iptables_rules WHERE server_id = ?',
+            [$machineId]
+        );
+
+        return (int) ($lignes[0]->n ?? 0);
+    }
+
+    /**
+     * Remplace la copie en base.
+     *
+     * `DELETE` puis `INSERT`, DANS UNE TRANSACTION, et non un `UPDATE` : sans
+     * contrainte d'unicite, un `UPDATE` laisserait vivre d'eventuels doublons
+     * anterieurs. Le legacy fait le meme couple, HORS transaction : une panne
+     * entre les deux y laisserait la machine SANS AUCUNE copie, apres en avoir
+     * eu une. Ici les deux gestes tiennent ou tombent ensemble.
+     *
+     * ══ CECI N'EST PAS UNE VALIDATION ════════════════════════════════════
+     *
+     * Enregistrer un jeu de regles ne dit rien de sa validite ni de son
+     * innocuite : la verification a blanc est I4, l'application I5. Ce que I2
+     * ecrit est une COPIE, et l'ecran doit le dire — sans quoi « enregistre »
+     * se lirait « approuve ».
+     */
+    public function enregistreRegles(int $machineId, string $reglesV4, string $reglesV6): void
+    {
+        DB::transaction(function () use ($machineId, $reglesV4, $reglesV6) {
+            DB::delete('DELETE FROM iptables_rules WHERE server_id = ?', [$machineId]);
+            DB::insert(
+                'INSERT INTO iptables_rules (server_id, rules_v4, rules_v6) VALUES (?, ?, ?)',
+                [$machineId, $reglesV4, $reglesV6]
+            );
+        });
+    }
 }

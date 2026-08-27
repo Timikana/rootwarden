@@ -93,6 +93,37 @@
 --}}
 <div class="rw-grille" data-rw="ipt-blocs" hidden></div>
 
+{{--
+    ══ I2 : LA COPIE EN BASE ════════════════════════════════════════════════
+
+    Ces deux gestes ne joignent AUCUNE machine : ils lisent et ecrivent la base
+    du portail, comme les handlers PDO locaux du legacy. Ils vivent donc dans
+    une section a part, apres le releve, et leur intitule dit ce qu'ils NE font
+    pas — « enregistre » ne doit pas se lire « approuve ».
+--}}
+<div class="rw-section" data-rw="ipt-copie" hidden>
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.copie_titre') }}</p>
+    <p class="rw-aide rw-prose">{{ __('pare-feu.copie_intro') }}</p>
+
+    <div class="rw-actions">
+        {{--
+            LA LECTURE EST L'ACTION SECONDAIRE, a gauche. L'enregistrement naît
+            DESACTIVE : sans releve prealable il n'y a rien a enregistrer, et la
+            regle se lit AVANT le geste plutot que dans un refus apres le clic.
+        --}}
+        <div class="rw-actions__gauche">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="ipt-copie-charger">{{ __('pare-feu.copie_charger') }}</button>
+        </div>
+        <button type="button" class="rw-bouton" data-rw="ipt-copie-enregistrer" disabled>
+            {{ __('pare-feu.copie_enregistrer') }}
+        </button>
+    </div>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-copie-annonce"></p>
+    <div class="rw-grille" data-rw="ipt-copie-blocs" hidden></div>
+</div>
+
 <div class="rw-encart" data-rw="ipt-non-porte">
     <p class="rw-sous-titre-fort">{{ __('pare-feu.suite_titre') }}</p>
     <p class="rw-prose">{{ __('pare-feu.suite') }}</p>
