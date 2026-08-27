@@ -80,4 +80,17 @@ return [
     'test_indecis' => "Le test n'a pas rendu de verdict sur :machine. Ce n'est ni une réussite ni un échec de la clé : la réponse n'a pas pu être lue.",
     'test_journal' => "Journal des tests",
     'test_journal_vide' => "Aucun test n'a encore été lancé sur cette page.",
+
+    // ── Le guide de procedure, PORTE et CORRIGE ──────────────────────────
+    // Le legacy affiche un guide en quatre etapes (`howto_tip.php`, page :50).
+    // Mon premier jet de P1 l'avait LAISSE TOMBER — un acquis du legacy perdu
+    // sans que rien ne le signale, parce que personne n'ouvre `lang/`. Il est
+    // porte ici, et DEUX de ses quatre etapes sont corrigees : elles disaient
+    // faux, et l'une des deux dans le sens rassurant.
+    'guide_titre' => "Comment la clé de plateforme fonctionne, dans l'ordre",
+    'guide_etape1' => "La paire de clés Ed25519 est générée automatiquement et conservée côté serveur. Il en existe UNE pour tout le parc et pour les deux comptes — pas une par machine.",
+    'guide_etape2' => "« Déployer la paire » installe la clé publique sur les machines choisies — ET crée le compte d'administration « rootwarden » avec NOPASSWD: ALL. Les deux gestes n'en font qu'un, et le libellé de l'ancien portail ne le dit pas.",
+    'guide_etape3' => "Une fois déployée, RootWarden se connecte sans mot de passe. Le bouton « Tester » le vérifie sans rien écrire.",
+    'guide_etape4' => "« Effacer les mots de passe » n'agit PAS sur la machine : il efface la copie que RootWarden en garde. Le compte Unix garde son mot de passe, et qui le connaît entre encore. Ce que RootWarden perd, c'est son propre recours si la clé cesse de fonctionner.",
+    'guide_corrige' => "Deux de ces quatre étapes corrigent le guide de l'ancien portail, mesure en main. Il annonçait que « Déployer keypair installe la clé publique » sans mentionner le compte NOPASSWD: ALL ; et que « Supprimer le password désactive l'authentification par mot de passe SUR LE SERVEUR (plus sécurisé) », ce qui est faux dans les deux langues — la route ne touche pas la machine.",
 ];

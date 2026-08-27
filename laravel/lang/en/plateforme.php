@@ -80,4 +80,17 @@ return [
     'test_indecis' => "The test returned no verdict on :machine. This is neither a success nor a key failure: the answer could not be read.",
     'test_journal' => "Test log",
     'test_journal_vide' => "No test has been run on this page yet.",
+
+    // ── Le guide de procedure, PORTE et CORRIGE ──────────────────────────
+    // Le legacy affiche un guide en quatre etapes (`howto_tip.php`, page :50).
+    // Mon premier jet de P1 l'avait LAISSE TOMBER — un acquis du legacy perdu
+    // sans que rien ne le signale, parce que personne n'ouvre `lang/`. Il est
+    // porte ici, et DEUX de ses quatre etapes sont corrigees : elles disaient
+    // faux, et l'une des deux dans le sens rassurant.
+    'guide_titre' => "How the platform key works, in order",
+    'guide_etape1' => "The Ed25519 key pair is generated automatically and kept on the server side. There is ONE for the whole fleet and for both accounts — not one per machine.",
+    'guide_etape2' => "« Deploy the pair » installs the public key on the chosen machines — AND creates the « rootwarden » administration account with NOPASSWD: ALL. The two actions are one, and the legacy portal's label does not say so.",
+    'guide_etape3' => "Once deployed, RootWarden connects without a password. The « Test » button checks it without writing anything.",
+    'guide_etape4' => "« Erase the passwords » does NOT act on the machine: it erases the copy RootWarden keeps. The Unix account keeps its password, and whoever knows it still gets in. What RootWarden loses is its own fallback if the key stops working.",
+    'guide_corrige' => "Two of these four steps correct the legacy portal's guide, measurement in hand. It claimed that « Deploy keypair installs the public key » without mentioning the NOPASSWD: ALL account; and that « Remove password disables password authentication ON THE SERVER (more secure) », which is false in both languages — the route does not touch the machine.",
 ];
