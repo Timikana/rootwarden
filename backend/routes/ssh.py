@@ -42,7 +42,6 @@ bp = Blueprint('ssh', __name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # Securite : validation des noms d'utilisateur (anti-injection OS command)
 # ─────────────────────────────────────────────────────────────────────────────
-_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
 
 # ── Helpers SSH keys parsing (v1.18.x) ──────────────────────────────────
 _SSH_KEY_TYPE_RE = re.compile(r'^(ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-[a-z0-9-]+|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)$')
