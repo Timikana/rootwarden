@@ -7656,3 +7656,127 @@ machine peut donc arrêter des services sur elle, dont `ssh.socket`. **`opsuser`
 seule machine est `srv-zabbix`.** C'est la **troisième** fois que ce compte tombe dans un écart, après
 E-174 et `cve_reprioritize` — à ce stade ce n'est plus une coïncidence, c'est une **propriété de sa
 configuration** : rôle 1, une seule machine, et cette machine est la production.
+
+*Amendement à E-182 et à E-149, mesuré le 2026-08-27 — deux bornes que la qualification n'avait pas.*
+
+**(a) Le garde qui manque n'est pas le seul garde, et son absence RÉVÈLE l'autre.** Relevé route par
+route : les huit routes de `services.py` portent `@require_api_key` + **`@require_machine_access`** +
+`@threaded_route`. E-149 reste exact — ni rôle ni permission — mais **`@require_machine_access` MORD
+ici**, et précisément **parce qu'**aucune de ces routes ne porte `@require_role(≥2)` :
+`check_machine_access` ne sort donc pas par son court-circuit `if role_id >= 2: return True` et consulte
+réellement `user_machine_access`.
+
+> **C'est le seul module du chantier où l'ABSENCE d'un garde révèle l'action d'un autre** — l'inverse
+> exact de la règle du §8, où la *présence* du décorateur masque son inertie sur 57 routes.
+
+Cela ne dédouane pas E-149 : cela dit que l'exposition est **bornée aux détenteurs de la machine
+visée**, et non ouverte à tout compte authentifié. La correction reste souhaitable ; sa portée est plus
+petite qu'annoncé.
+
+**(b) La population est d'exactement UN, et il a une marche à franchir.**
+
+| compte rôle 1 | actif | second facteur | machines |
+|---|---|---|---|
+| **`opsuser`** (2) | oui | **NON** | **`srv-zabbix` — PRODUCTION** |
+| `e2e_test_*` × 5 | oui | non | **aucune** |
+| `rw-test-user` (14) | oui | oui | aucune |
+
+Remesure :
+`SELECT u.id,u.name,u.role_id,(u.totp_secret IS NOT NULL AND u.totp_secret<>'') FROM users u WHERE u.role_id=1;`
+puis `SELECT user_id,machine_id FROM user_machine_access;`
+
+`opsuser` est le **seul** rôle 1 à détenir une machine, et c'est la production — c'est ce qui rend la
+chaîne sérieuse. **Mais il n'a pas de secret TOTP** : il devrait s'enrôler d'abord. **Ce n'est pas une
+barrière, c'est une marche**, et elle laisse une trace. Dit dans les deux sens plutôt que présenté comme
+un verrou.
+
+**Et les cinq `e2e_test_*` n'ont AUCUN accès machine** : ils n'atteignent rien par ce chemin. Ce que le
+§7 leur reproche — être offerts comme identité d'exécution ChatOps sans second facteur — reste vrai ;
+**ce chemin-ci, non.** Leur gravité s'en trouve réduite, et une mesure qui dédouane se dit aussi
+clairement qu'une qui accuse.
+
+**Deux vérifications qui dédouanent au passage** : `.replace('.service','')` est **global**, donc
+`ssh.service.service` est bien **bloqué** ; et `SSH.service` passe le contrôle, mais les noms d'unité
+systemd sont **sensibles à la casse**.
+
+---
+
+## E-183 — `scan_server_users` : une LECTURE ratée EFFACE l'inventaire, et se journalise comme un succès
+
+**La classe « une réussite annoncée n'est pas vérifiée » dans sa forme DESTRUCTRICE.** Pas « écrit un
+état faux » — **« efface un état vrai ».** Trouvée le 2026-08-27 par balayage puis lecture, vérifiée
+indépendamment avant d'être inscrite.
+
+`backend/routes/ssh.py:1088`. Le mécanisme, ligne à ligne :
+
+```python
+stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
+passwd_output = stdout.read().decode('utf-8', errors='replace')
+#   le code de sortie n'est JAMAIS lu
+
+scanned_users = []
+for line in passwd_output.strip().split('\n'):
+    if not line.strip(): continue          # une sortie VIDE -> liste VIDE
+...
+ghost_usernames = [u for u in existing.keys() if u not in scanned_usernames]   # :1280
+if ghost_usernames:
+    cur.execute(f"DELETE FROM server_user_inventory WHERE machine_id = %s AND username IN (...)")
+```
+
+**Si la lecture ne rend rien, `scanned_users` est vide, donc TOUTES les lignes d'inventaire de la
+machine deviennent des « fantômes » — et elles sont supprimées.** Idem pour `server_user_ssh_keys`
+trente lignes plus bas. **`recv_exit_status` n'apparaît pas UNE SEULE FOIS dans tout le fichier** —
+mesuré, `grep -c` rend 0. Et il n'existe aucun garde `if not scanned_users` : les deux seules
+occurrences de ce symbole sont des boucles `for u in scanned_users`.
+
+### Quatre raisons qui la mettent au-dessus des quatre autres de la même famille
+
+1. **elle DÉTRUIT.** E-90 écrivait un agent qui n'existe pas — faux, mais réparable par le geste
+   suivant. Ici la donnée est **perdue** ;
+2. **elle se journalise comme un succès** : `logger.info("%d fantome(s) purge(s)")`. Un opérateur qui
+   relit le journal voit un **nettoyage**, pas un incident. Le commentaire au-dessus explique même
+   pourquoi la purge est une bonne idée — « sans ça, un compte comme `cleopatre` reste visible à vie ».
+   **Elle l'est, sur un scan qui a abouti.** C'est le motif « le cas visible traité, le cas subtil pris
+   à l'envers » : la présence d'un raisonnement correct **à côté** endort la question ;
+3. **le volume est réel** : `server_user_inventory` porte **72** lignes, `server_user_ssh_keys` **20** —
+   mesuré. Remesure : `SELECT COUNT(*) FROM server_user_inventory;`
+4. **c'est l'inventaire qui alimente K4.** Le §7 dit d'un déploiement de clés lancé en l'état qu'il
+   « **RÉVOQUERAIT** les accès, il ne ferait pas rien ». **Un inventaire vidé à tort est exactement
+   l'entrée qui rend ce raisonnement faux** — et l'arbitrage K4 reposerait alors sur une donnée à
+   laquelle on ne peut pas se fier.
+
+**Et le décorateur d'accès y est inerte** : la route porte `@require_role(2)` **et**
+`@require_machine_access`, donc `check_machine_access` sort par son court-circuit `if role_id >= 2`.
+Tout compte de rôle 2 l'atteint sur n'importe quelle machine — même si le déclencheur de la destruction
+n'est pas l'appelant mais **un échec SSH passager**.
+
+### Correctif — et il change le SENS d'un repli, ce qui est dit
+
+Lire `recv_exit_status()`, et **refuser la purge quand le scan n'a rien rendu**. Aujourd'hui « je n'ai
+rien vu » signifie « il n'y a plus rien » ; après, cela signifiera « **je ne sais pas** ».
+
+**L'asymétrie décide, et elle est à sens unique** : le pire cas du correctif est qu'un compte mort reste
+visible dans l'inventaire — un défaut d'**affichage**, celui-là même que le commentaire d'origine
+voulait éviter. Le pire cas actuel est que **72 lignes disparaissent sur un incident réseau**. C'est un
+arbitrage entre « un compte mort reste visible » et « l'inventaire est vidé », et il ne se tranche pas
+dans le sens destructeur.
+
+## E-184 — Une sonde qui échoue efface ce qu'elle n'a pas pu regarder
+
+Un seul défaut sous **deux** formes, dans deux modules, et il se corrige d'une ligne chacune.
+
+| route | ce qui se passe sur une lecture ratée |
+|---|---|
+| `monitoring.py:124 check_linux_version` | le code de sortie n'est pas lu ; `parse_os_release('')` rend **`'Inconnue'`** (mesuré) et l'`UPDATE` **écrase une valeur connue-bonne** |
+| `supervision.py zabbix_version` / `generic_version` | miroir : quand la sonde ne rend rien, `version_str` est faux → **`_remove_agent`**. Une sonde qui échoue **efface l'agent de l'inventaire** |
+
+**Gravité moindre qu'E-183, et pour une raison précise** : dans le premier cas la valeur écrite est
+**honnête** (`Inconnue` est vrai : on ne sait pas) et sa conséquence est **fail-closed** —
+`generic_deploy` refuse un OS non reconnu. Mais un incident SSH passager efface tout de même
+l'inventaire d'OS.
+
+Pour la seconde, **l'effet est documenté comme VOULU** au §7 du plan, pour vérifier une désinstallation
+— **et il l'est.** Ce qui ne l'est pas : elle **ne distingue pas « l'agent est absent » de « je n'ai pas
+pu regarder »**. C'est la même phrase que pour E-183, et c'est la formule de la classe entière :
+
+> *Une sonde qui échoue n'efface pas ce qu'elle n'a pas pu regarder.*
