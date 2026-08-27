@@ -8315,3 +8315,27 @@ bien faire.
 `remove_from_sudoers` n'a pas été vérifié sur son code de retour ; et **`/deploy` lui-même
 (`ssh.py:246`) n'a pas été relu — la question portait sur la chaîne de DÉCISION. Le geste n'est pas
 dédouané, il n'est pas mesuré.**
+
+*Amendement à E-190 — pourquoi le verdict affiché est la SEULE barrière.* Vérifié le 2026-08-27 :
+`cles-ssh.js:87-89` active `deploy-btn` **et** `verifier-btn` sur la seule condition `n === 0`, où `n` est
+le **compte de la sélection**.
+
+```js
+for (const id of ['deploy-btn', 'verifier-btn']) {
+    const b = document.getElementById(id);
+    if (b) b.disabled = n === 0;
+}
+```
+
+**Le bouton de déploiement n'est donc PAS conditionné au verdict de la vérification.** Le panneau
+s'ouvre quel que soit le résultat du constat — ce qui est **cohérent** avec la convention du portage
+(« séparer vérifier et agir », et ne pas faire d'un constat une autorisation), mais qui a une
+conséquence directe :
+
+> **Le verdict affiché est la seule chose entre l'exploitant et sa décision.** Il n'y a aucun garde
+> mécanique en aval qui rattraperait un verdict faux. C'est ce qui fait passer E-190 d'un défaut de
+> libellé à un défaut de **décision**, et ce qui justifie de le corriger avant tout le reste.
+
+**Portée d'aujourd'hui, et elle borne l'urgence** : K4 n'étant pas porté, **aucun déploiement ne part de
+cette page**. L'écran est celui qu'on lit **avant** d'aller déclencher le geste ailleurs — donc le
+mensonge porte sur l'information qui prépare la décision, pas sur le geste lui-même.
