@@ -68,6 +68,23 @@ return [
 
     // ── What I1 does not do, said on screen rather than silently absent ──
     'suite_titre' => 'This page changes nothing',
-    'suite' => 'Reading is a read. Saving to the database, dry-run validation and applying rules are not ported yet: they remain on the old portal.',
+    'suite' => 'Reading and storing a copy touch no machine. Dry-run validation and applying rules are not ported yet: they remain on the old portal.',
     'suite_lien' => 'Open the firewall on the old portal',
+
+    // ── I2: the database copy ───────────────────────────────────────────
+    'copie_titre' => 'Copy stored in the database',
+    'copie_intro' => 'The portal can keep a copy of a machine\'s rules, to find them again later. Storing a copy does NOT validate it and does NOT apply it.',
+    'copie_charger' => 'Load the copy',
+    'copie_enregistrer' => 'Store these rules',
+    'copie_absente' => 'No copy stored for this machine.',
+    'copie_le' => 'Copy stored on :date',
+    'copie_enregistree' => 'Copy stored for :machine. It has been neither validated nor applied.',
+    'copie_rien_a_enregistrer' => 'Read the rules first: there is nothing to store.',
+    'copie_v4_vide' => 'The IPv4 rules are empty. An empty copy would be refused when restoring it, so it is not stored.',
+    'copie_trop_grande' => 'The rules exceed what the column can hold (:max bytes). Nothing was stored.',
+    'champs_manquants' => 'Incomplete request: both rule sets are expected, even when empty.',
+    'machine_refusee' => 'Unknown machine, or outside your scope.',
+    'copie_lignes_multiples' => 'Warning: :nb copies exist for this machine. The most recent one is shown.',
+    'copie_bloc_v4' => 'IPv4 copy',
+    'copie_bloc_v6' => 'IPv6 copy',
 ];

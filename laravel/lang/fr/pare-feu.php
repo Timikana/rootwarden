@@ -66,6 +66,23 @@ return [
 
     // ── Ce que I1 ne fait pas, dit à l'écran plutôt qu'absent en silence ──
     'suite_titre' => 'Cette page ne modifie rien',
-    'suite' => 'Le relevé est une lecture. La copie en base, la validation à blanc et l\'application des règles ne sont pas encore portées : elles restent sur l\'ancien portail.',
+    'suite' => 'Le relevé et la copie en base ne touchent aucune machine. La validation à blanc et l\'application des règles ne sont pas encore portées : elles restent sur l\'ancien portail.',
     'suite_lien' => 'Ouvrir le pare-feu sur l\'ancien portail',
+
+    // ── I2 : la copie en base ───────────────────────────────────────────
+    'copie_titre' => 'Copie enregistrée en base',
+    'copie_intro' => 'Le portail peut garder une copie des règles d\'une machine, pour les retrouver plus tard. Enregistrer une copie NE la valide pas et NE l\'applique pas.',
+    'copie_charger' => 'Charger la copie',
+    'copie_enregistrer' => 'Enregistrer ces règles',
+    'copie_absente' => 'Aucune copie enregistrée pour cette machine.',
+    'copie_le' => 'Copie enregistrée le :date',
+    'copie_enregistree' => 'Copie enregistrée pour :machine. Elle n\'a été ni validée, ni appliquée.',
+    'copie_rien_a_enregistrer' => 'Relevez d\'abord les règles : il n\'y a rien à enregistrer.',
+    'copie_v4_vide' => 'Les règles IPv4 sont vides. Une copie vide serait refusée au moment de la restaurer : elle n\'est donc pas enregistrée.',
+    'copie_trop_grande' => 'Les règles dépassent la taille que la colonne peut contenir (:max octets). Rien n\'a été enregistré.',
+    'champs_manquants' => 'Requête incomplète : les deux jeux de règles sont attendus, même vides.',
+    'machine_refusee' => 'Machine inconnue ou hors de votre périmètre.',
+    'copie_lignes_multiples' => 'Attention : :nb copies existent pour cette machine. La plus récente est affichée.',
+    'copie_bloc_v4' => 'Copie IPv4',
+    'copie_bloc_v6' => 'Copie IPv6',
 ];
