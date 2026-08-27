@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\ClePlateforme;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -30,7 +31,7 @@ class ClePlateformeController extends Controller
     {
     }
 
-    public function __invoke(): View
+    public function __invoke(Request $requete): View
     {
         $machines = $this->cles->machines();
         $compteurs = $this->cles->compteurs($machines);
@@ -63,20 +64,38 @@ class ClePlateformeController extends Controller
             'geste_ligne_ok', 'geste_ligne_echec', 'geste_bilan',
             'ressaisie_mdp_vide', 'effacement_bilan',
             'effacement_interrompu', 'confirmer_saisie_manquante',
+            // La reprise du compte de service, et ses DEUX issues de porte
+            'motif_vide', 'geste_approbation_attente', 'geste_approbation_absente',
         ] as $cle) {
             $textes[$cle] = __('plateforme.' . $cle);
         }
+
+        // Le role vient de la session, comme partout ailleurs dans ce portage
+        // (`SauvegardesController:30`, `ClesSshController:40`). Ce n'est PAS la
+        // garde : la passerelle porte `/revoke_service_account` dans
+        // `ADMIN_SEULEMENT` et le backend l'exige par `@require_role(3)`. Ici on
+        // decide seulement s'il faut RENDRE un bouton — promettre un geste qui
+        // finira en 403 est une garde sur la page, pas sur la requete.
+        $estSuperadmin = (int) $requete->session()->get('role_id', 0) >= 3;
 
         $portees = [
             'deployer'       => $this->cles->porteeDeploiement($machines),
             'compte_service' => $this->cles->porteeCompteService($machines),
             'effacer'        => $this->cles->porteeEffacement($machines),
         ];
+        if ($estSuperadmin) {
+            $portees['revoquer'] = $this->cles->porteeRevocation($machines);
+        }
 
         // Les panneaux de decision sont des tableaux imbriques (titre, texte,
         // liste d'effets). `__()` les rend tels quels ; les aplatir ici ferait
         // deriver la structure du catalogue et celle du script.
         $textes['panneaux'] = __('plateforme.panneaux');
+        // Les bornes sont une carte PAR GESTE, pas un texte unique : deux
+        // gestes butent sur la meme cause et ne la rencontrent pas au meme
+        // endroit. Un texte partage aurait dit « la reprise » a qui clique
+        // « redeployer ».
+        $textes['bornes'] = __('plateforme.bornes');
         foreach (['panneau_cible_une', 'panneau_cible_n', 'panneau_prod'] as $cle) {
             $textes[$cle] = __('plateforme.' . $cle);
         }
@@ -98,6 +117,12 @@ class ClePlateformeController extends Controller
             // annoncee dans le panneau differerait de la liste envoyee.
             'portees'            => $portees,
             'effacementRefusees' => $this->cles->porteeEffacementRefusees($machines),
+            'estSuperadmin'      => $estSuperadmin,
+            // Y a-t-il, dans le parc, au moins une machine dont le compte de
+            // service pourrait etre reprise ? Sert a dire l'asymetrie de role
+            // aux comptes qui NE peuvent PAS reprendre — leur cacher le fait
+            // reviendrait a leur laisser croire que l'octroi est reversible.
+            'revocationPossible' => count($this->cles->porteeRevocation($machines)['ids']) > 0,
         ]);
     }
 

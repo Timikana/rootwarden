@@ -183,6 +183,20 @@ class ClePlateforme
             // Les machines de PRODUCTION de la portee, nommees a part : le
             // panneau de decision doit pouvoir les dire, et non les noyer dans
             // un nombre. Le legacy ne distingue rien.
+            //
+            // ══ CE N'EST PAS UNE GARDE, ET IL FAUT LE DIRE ════════════════
+            //
+            // Aucun geste de parc ne viserait `srv-zabbix` aujourd'hui — la
+            // machine a sa cle, son compte de service, et son drapeau la sort
+            // de la portee d'effacement. Mais cela tient a L'ETAT DU PARC, pas
+            // a une regle : il suffit qu'une colonne change pour que la
+            // production entre dans une portee. **Une propriete qui tient par
+            // l'etat du parc n'est pas une propriete.**
+            //
+            // Ce qui est porte ici est donc un AVERTISSEMENT nomme, pas un
+            // refus. Refuser retirerait a un administrateur une capacite qu'il
+            // a aujourd'hui : c'est l'arbitrage de l'exploitant, et il lui est
+            // remonte plutot que tranche ici.
             'sensibles' => array_values(array_map(
                 fn ($m) => (string) $m->name,
                 array_filter($retenues, fn ($m) => $this->estSensible($m))
@@ -245,6 +259,81 @@ class ClePlateforme
         return $this->portee($machines, fn ($m) => ((int) $m->platform_key_deployed)
             && ((int) $m->service_account_deployed)
             && (((int) $m->a_mot_de_passe) || ((int) $m->a_mot_de_passe_root)));
+    }
+
+    /**
+     * Les machines qui portent le compte de service — la portee de sa REPRISE.
+     *
+     * ══ POURQUOI CE GESTE EXISTE ICI ALORS QUE LE LEGACY NE L'OFFRE PAS ══
+     *
+     * `revoke_service_account` existe dans le backend depuis le correctif
+     * A04-INSEC-N5 et **n'a aucun appelant** : ni le legacy ni le portage ne
+     * l'atteignaient. Or P3 rend l'OCTROI de `NOPASSWD: ALL` disponible en un
+     * clic. Livrer l'octroi sans la reprise, c'est livrer une porte sans
+     * poignee interieure. Ce n'est donc pas une idee ajoutee au portage : c'est
+     * la contrepartie de ce que P3 expedie.
+     *
+     * ══ DEUX BORNES MESUREES, ET LA SECONDE EST UN DEFAUT DU BACKEND ═════
+     *
+     * 1. LA ROUTE EST RESERVEE AU ROLE 3 (`ssh.py:896`, `@require_role(3)`),
+     *    alors que cette page se garde par `perm:can_manage_platform_key` a
+     *    partir du role 1. Un compte role 1 ou 2 porteur de la permission peut
+     *    donc ACCORDER `NOPASSWD: ALL` et **ne peut pas le reprendre**. Le
+     *    bouton n'est rendu qu'au role 3 — sans quoi il promettrait un geste
+     *    qui finirait en 403. L'asymetrie elle-meme est DITE a l'ecran : elle
+     *    n'est pas de mon fait et je ne la corrige pas en silence.
+     *
+     * 2. LE GESTE PEUT ECHOUER EXACTEMENT SUR LES MACHINES QU'IL EXISTE POUR
+     *    PROTEGER — et les deux conditions ne sont pas independantes, elles
+     *    sont CAUSALEMENT LIEES.
+     *
+     *    `revoke_service_account` ouvre `ssh_session(...)` **sans**
+     *    `service_account=` (`ssh.py:970`) : la connexion se fait par la cle du
+     *    compte NOMINAL, `_rootwarden_auth_method` vaut `keypair`, et
+     *    `execute_as_root` perd son court-circuit `NOPASSWD`
+     *    (`ssh_utils.py:537`) — il envoie `root_password`.
+     *
+     *    Or `remove_ssh_password` REFUSE de vider les mots de passe tant que
+     *    `service_account_deployed` est faux (`ssh.py:1235`). **Le seul etat ou
+     *    `root_password` est vide est donc exactement l'etat ou le compte de
+     *    service existe.** Ce n'est pas une conjonction malheureuse, c'est une
+     *    implication.
+     *
+     *    CE N'EST PAS UN DEFAUT DE SURETE, C'EST UN DEFAUT DE DISPONIBILITE
+     *    sur un controle de securite. La commande part en UN SEUL
+     *    `execute_as_root` avec `set -e` : si l'elevation echoue, rien ne
+     *    s'execute — ni le retrait du sudoers, ni le `userdel`. Pas d'etat
+     *    partiel, `code != 0`, aucune ecriture en base, et l'ecran l'annonce.
+     *    Il echoue FERME et VISIBLEMENT.
+     *
+     *    Sur neuf appels a `ssh_session` dans ce fichier, sept passent
+     *    `service_account=`, un force deliberement le mot de passe (`:738`, le
+     *    premier deploiement) et **deux l'omettent : `:970` et `:1061`**.
+     *    `:1061` est `deploy_service_account`, que cette page propose aussi.
+     *
+     *    Et « passer `service_account=True` » n'est PAS le correctif evident
+     *    qu'il parait pour `:970` : on se connecterait par le compte qu'on
+     *    s'apprete a supprimer. Ce qui manque est plutot un REFUS QUI NOMME SA
+     *    CAUSE quand aucune elevation utilisable n'existe. Hors de mon
+     *    perimetre ; remonte, et la borne est dite dans le panneau.
+     *
+     * 3. LE GESTE RETIRE UNE PORTE SUR TROIS, ET SON NOM NE DOIT PAS LE TAIRE.
+     *    `deploy_platform_key` ecrit la MEME cle publique dans
+     *    `~/.ssh/authorized_keys` du compte nominal (`:745`) ET dans
+     *    `/root/.ssh/authorized_keys` (`:755`) ; le compte de service en recoit
+     *    une troisieme copie (`:808`, `:1081`). La revocation ne supprime que
+     *    le compte `rootwarden` et son sudoers : **la cle reste autorisee sur
+     *    root et sur le compte nominal.**
+     *
+     *    Sa docstring nomme pourtant « compromission suspectee de la cle » — ce
+     *    que le geste ne traite pas. Le libelle porte donc ce que le geste FAIT
+     *    (« supprimer le compte d'administration ») et non la capacite qu'il
+     *    n'a pas, et le panneau dit ce qui reste en place. Le seul remede a une
+     *    cle compromise est la rotation, qui n'est pas portee.
+     */
+    public function porteeRevocation(array $machines): array
+    {
+        return $this->portee($machines, fn ($m) => (int) $m->service_account_deployed);
     }
 
     /**

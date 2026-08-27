@@ -287,6 +287,21 @@
                                 </button>
                             @endif
 
+                            @if ($estSuperadmin && (int) $m->service_account_deployed)
+                                {{-- LA CONTREPARTIE DE L'OCTROI. Rendue au role 3
+                                     seulement : `ssh.py:896` exige `@require_role(3)`
+                                     alors que cette page s'ouvre des le role 1 avec
+                                     la permission. Rendre le bouton plus largement
+                                     promettrait un geste qui finirait en 403. --}}
+                                <button type="button" class="rw-bouton rw-bouton--danger rw-bouton--minuscule"
+                                        data-rw="cle-revoquer-{{ $m->id }}"
+                                        data-geste="revoquer"
+                                        data-machine="{{ $m->id }}" data-nom="{{ $m->name }}"
+                                        data-sensible="{{ $l['sensible'] ? '1' : '0' }}">
+                                    {{ __('plateforme.btn_revoquer') }}
+                                </button>
+                            @endif
+
                             @if ((int) $m->platform_key_deployed && $l['mots_de_passe'] !== 'les_deux')
                                 {{-- « RESSAISIR » EST OFFERT DES QU'UN MOT DE PASSE
                                      MANQUE, et non seulement quand le drapeau dit
@@ -337,8 +352,8 @@
     <p class="rw-aide rw-prose">{{ __('plateforme.parc_aide') }}</p>
 
     <div class="rw-actions" data-rw="cle-parc">
-        @foreach (['deployer' => 'rw-bouton', 'compte_service' => 'rw-bouton rw-bouton--discret', 'effacer' => 'rw-bouton rw-bouton--danger'] as $geste => $classe)
-            @if (count($portees[$geste]['ids']) > 0)
+        @foreach (['deployer' => 'rw-bouton', 'compte_service' => 'rw-bouton rw-bouton--discret', 'effacer' => 'rw-bouton rw-bouton--danger', 'revoquer' => 'rw-bouton rw-bouton--danger'] as $geste => $classe)
+            @if (count($portees[$geste]['ids'] ?? []) > 0)
                 <button type="button" class="{{ $classe }}"
                         data-rw="cle-parc-{{ $geste }}"
                         data-geste="{{ $geste }}" data-portee="parc">
@@ -349,7 +364,7 @@
     </div>
 
     @if (count($portees['deployer']['ids']) === 0 && count($portees['compte_service']['ids']) === 0
-         && count($portees['effacer']['ids']) === 0)
+         && count($portees['effacer']['ids']) === 0 && count($portees['revoquer']['ids'] ?? []) === 0)
         <p class="rw-aide" data-rw="cle-parc-rien">{{ __('plateforme.parc_rien') }}</p>
     @endif
 
@@ -396,6 +411,22 @@
         {{-- Le champ n'existe que pour la ressaisie : il est devoile par le
              script, jamais rendu conditionnellement — un panneau unique reste un
              seul contrat DOM pour les suites. --}}
+        {{-- Le motif : obligatoire, et journalise avec le nom de la machine.
+             Le legacy demandait ses motifs par `prompt()` ailleurs dans ce
+             module ; ici c'est un champ, comme le mot de passe. --}}
+        <label class="rw-champ" data-rw="cle-panneau-motif" hidden>
+            <span class="rw-etiquette">{{ __('plateforme.champ_motif') }}</span>
+            <input type="text" class="rw-saisie" data-rw="cle-panneau-motif-valeur"
+                   maxlength="200" autocomplete="off" spellcheck="false">
+            <span class="rw-aide">{{ __('plateforme.champ_motif_aide') }}</span>
+        </label>
+
+        {{-- Le texte vient du script, depuis la carte `bornes` : deux gestes
+             butent sur la meme cause backend, et le paragraphe reste vide (et
+             `hidden`) pour ceux qui n'en ont pas. Le figer ici aurait dit « la
+             reprise » a qui clique « redeployer ». --}}
+        <p class="rw-aide rw-prose" data-rw="cle-panneau-borne" hidden></p>
+
         <label class="rw-champ" data-rw="cle-panneau-champ" hidden>
             <span class="rw-etiquette">{{ __('plateforme.champ_mdp') }}</span>
             <input type="password" class="rw-saisie" data-rw="cle-panneau-mdp"
@@ -429,6 +460,19 @@
         <button type="button" class="rw-bouton rw-bouton--discret"
                 data-rw="cle-recharger" hidden>{{ __('plateforme.recharger') }}</button>
     </div>
+
+    {{-- ── L'ASYMETRIE DE ROLE, DITE A CEUX QU'ELLE CONCERNE ──────────────
+
+         Un compte role 1 ou 2 porteur de `can_manage_platform_key` peut
+         ACCORDER `NOPASSWD: ALL` et ne peut pas le reprendre. Le lui cacher
+         lui laisserait croire que l'octroi est reversible depuis cette page.
+         L'encart n'apparait donc QUE pour ces comptes, et seulement s'il y a
+         au moins une machine concernee — sinon il parlerait dans le vide. --}}
+    @if (! $estSuperadmin && $revocationPossible)
+        <div class="rw-encart" data-rw="cle-revoquer-asymetrie">
+            <p class="rw-prose">{{ __('plateforme.revoquer_asymetrie') }}</p>
+        </div>
+    @endif
 
     {{-- CE QUE LE COMPTE D'ADMINISTRATION ACCORDE, DIT UNE FOIS SOUS LE
          TABLEAU plutot que cache dans une infobulle : « NOPASSWD: ALL ». --}}
