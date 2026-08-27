@@ -964,7 +964,15 @@ l'en-tête de la page d'administration (`admin_page.php:153`) et depuis le table
 pose donc un lien équivalent sur `/comptes`, **visible au seul rôle 3** : l'afficher plus bas mènerait
 à un 403.
 
-### 5.0terdecies D8 — INVENTORIÉ le 2026-08-26 (`v1.37.76`), pas encore caractérisé
+### 5.0terdecies D8 — INVENTORIÉ le 2026-08-26 (`v1.37.76`)
+
+> **⚠ MISE À JOUR du 2026-08-27 — cette section disait « pas encore caractérisé ». C'est périmé.**
+> Le module est **caractérisé ET à moitié porté** : `ComptesDistantsController` (4 capacités),
+> 4 routes (`web.php:739-749`, garde **`role:2`**), une vue, un service, et la suite
+> `go-adm-comptes-distants` **au LOT** (18 laravel / 12 legacy). Les **trois** routes sans effet
+> distant sont portées ; les **cinq** qui touchent une machine ne le sont pas — ce qui est la coupure
+> voulue, et ce qui explique que `Navigation` porte encore `legacy`.
+> Inventaire complet et découpage restant : **`MODULE-REMOTE-USERS.md`**.
 
 **Le sous-lot le plus dangereux d'`adm/`** : sept routes, dont un `userdel` distant irréversible.
 Inventaire mené **en lecture seule**, sans un seul clic — le banc était prêté à la seconde session.
