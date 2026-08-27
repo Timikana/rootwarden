@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **199** — numérotés jusqu'à **E-212** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **202** — numérotés jusqu'à **E-215** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -633,7 +633,12 @@ Quatre dossiers suivront `services/` par le même chemin ; `security/` et `ssh/`
 - **S7b** (`security/`) — le scan CVE qui aboutit **envoie un vrai courriel** (`send_cve_report` part
   dès que l'état passe à `done` avec des résultats). Prérequis techniques faits.
 - **K4** (`ssh/`) — le déploiement de clés. Bloqué par l'arbitrage du repli `NOPASSWD: ALL`, et un
-  déploiement lancé en l'état **révoquerait** des accès.
+  déploiement lancé en l'état **révoquerait** des accès. **⚠ Et depuis E-213 le blocage est PROTECTEUR** :
+  la décision de suppression ne lit que `user_exclusions`, jamais `server_user_inventory.status`, donc un
+  déploiement exécuterait **`userdel -r`** — le compte **et son `$HOME`** — sur tout compte qu'un
+  exploitant croit protégé par le statut `excluded`. Le blocage sur `NOPASSWD` couvre incidemment
+  celui-là. **Le portage de C4 devra lire les DEUX magasins, ou aucun geste de classement ne devra
+  prétendre protéger.**
 - **B4** (`bashrc/`) — suspendu sur deux arbitrages.
 - **F7** (`fail2ban/`) — quatre capacités non portées.
 - **G2** (`graylog/`) — trois gestes qui mutent.
@@ -2518,6 +2523,96 @@ classait les 3 « présentes » et se trompait dans le sens rassurant.
 périmètre dans son corps ; `POST /update_zabbix` est une redirection **307** vers une route gardée, et le 307
 **préserve méthode et corps**, donc les gardes s'appliquent à l'arrivée. *Un relevé qui ne dédouane pas se lit
 comme un réquisitoire, et on cesse de le croire.*
+
+### ✅ CORRECTION D'UNE FORME QUE LE LEAD A DISTRIBUÉE À TOUTE L'ÉQUIPE (2026-08-27)
+
+`git commit -F - -- <chemins>` a été donnée à quatre sessions comme la parade au défaut d'index. **Elle
+est juste, et elle ne marche pas sur une CRÉATION.**
+
+    git commit -F - -- docs/migration/MODULE-NEUF.md
+    -> « le specificateur de chemin ne correspond a aucun fichier connu de git »
+
+Un pathspec ne désigne que des fichiers **suivis**. Pour un fichier neuf : `git add <chemin>` **puis** le
+commit borné — l'`add` le fait connaître, et **le pathspec borne quand même la publication**, ce qui est la
+propriété qu'on cherchait.
+
+**L'erreur est BLOQUANTE et non silencieuse**, donc rien de faux n'est parti. C'est ce qui la rend
+supportable — mais la forme n'était pas utilisable telle quelle, et je l'avais distribuée sans l'éprouver
+sur une création. *Une parade se teste sur le cas qu'elle doit couvrir, pas seulement sur celui qui l'a
+motivée* — le défaut d'index était survenu sur des fichiers **existants**, donc j'ai vérifié la forme sur
+des fichiers existants.
+
+### UNE ROUTE SANS PARAMÈTRE DE PORTÉE NE SE BORNE PAS PAR UNE FIXTURE (2026-08-27)
+
+`/ssh-audit/scan-all` est la deuxième route du chantier dont l'interdit a **une cause de construction** et
+non de prudence :
+
+    ssh_audit.py:288
+    SELECT id, name, ip FROM machines
+     WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'
+
+**Aucun `machine_id`, aucun filtre, aucune portée par utilisateur.** Puis `_run_scan_all_background` ouvre
+`ssh_session(...)` **par machine**. Parc mesuré : trois machines, toutes `active` → la requête rend **1, 2,
+3**, dont **`srv-zabbix`** — qui porte `platform_key_deployed = 1` **et** `service_account_deployed = 1` :
+**la session aboutirait.**
+
+> **Il n'y a pas de paramètre à restreindre.** Une fixture borne un *argument* ; elle ne borne pas une route
+> dont la portée est « tout le parc ». Même forme que `/regenerate_platform_key`. **La seule sortie
+> technique serait de passer `srv-zabbix` en `lifecycle_status='archived'` — c'est-à-dire modifier l'état
+> d'une machine de production : pire que le problème.**
+
+**Et le geste est une LECTURE** (`sshd_config` + version). Ce n'est pas ce qui l'interdit : la règle du
+chantier ne distingue pas lecture et écriture sur la production. *À écrire explicitement, sinon quelqu'un
+se dira « ce n'est qu'un read ».*
+
+**Ce qui est récupérable de la suite interdite** : son assertion utile — « réponse immédiate < 8 s avec le
+message d'arrière-plan », qui mesure le correctif `v1.37.13` — **est portable sur `/ssh-audit/scan` UNE
+machine**, sans toucher au parc. *Une suite interdite peut contenir une propriété autorisée ; l'interdit
+porte sur la cible, pas sur la question.*
+
+### ⚠ CE QUI REFERME DOIT ÊTRE DOCUMENTÉ LÀ OÙ IL REFERME (2026-08-27)
+
+**Le garde vide, mesuré dans `helpers.py:339`** — et c'est le mécanisme exact :
+
+    ids = []                                    # ni machine_id, ni server_id, ni les formes plurielles
+    denied = [mid for mid in ids if not check_machine_access(mid)]
+    if denied: return 403
+    return func(...)                            # ids vide -> denied vide -> LE GARDE PASSE
+
+**Sur les cinq routes de `ssh_audit` qui portent `@require_machine_access` sans `@require_role`, la session 2
+a mesuré le CORPS de chacune** — et c'est le résultat qui compte, pas le décompte :
+
+| route | appel sans `machine_id` | ce qui la ferme |
+|---|---|---|
+| `/scan` | **400** | `_resolve_ssh_creds` |
+| `/results` | **400** | un test explicite |
+| `/config` | **400** | `_resolve_ssh_creds` |
+| `/backups` | **400** | `_resolve_ssh_creds` |
+| **`/policies` GET** | **répond, branche globale** | **rien** — E-211 |
+
+> **E-211 n'est donc pas « une route mal gardée parmi cinq bien gardées » : c'est la SEULE des cinq dont le
+> corps ne rattrape pas le garde. Et les quatre autres sont fermées par un CONTRÔLE DE VALIDITÉ D'ENTRÉE,
+> pas par un contrôle d'accès.**
+
+**Le risque que ça nomme est le vrai enjeu** : ce qui protège `/scan`, `/config` et `/backups` est la ligne
+`if not machine_id` de **`_resolve_ssh_creds`**, un helper **partagé** où **rien ne dit que c'est une
+protection**. Un repli permissif introduit là — famille E-144/E-147, dont ce dépôt a déjà payé plusieurs
+occurrences — **ouvrirait d'un coup trois routes qui ouvrent une session SSH, et aucun test ne bougerait.**
+
+*Une protection qui vit dans un contrôle de validité est une protection dont personne ne sait qu'il la
+tient.* La parade n'est pas de la déplacer : c'est de **l'annoter là où elle est**, pour que le prochain qui
+adoucit ce repli sache ce qu'il ouvre.
+
+#### ⚠ Et l'ampleur n'est PAS mesurée — le chiffre qui compte manque
+
+La session 2 a écrit « cinq routes » en parlant de **son module**. Balayage du Lead sur **tout** le
+backend : **58 routes** portent `@require_machine_access` **sans** `@require_role` — `cve/` 5, `docker/` 2,
+`fail2ban/` 16, `iptables/` 5, `services/` 8, `updates/` 12, `ssh_audit/` 5, et 5 ailleurs.
+
+Le relevé de la session 4 en a lu les corps et n'en a trouvé que **3 sans objet** : les 55 autres sont donc
+**fermées par autre chose que leur décorateur.** *Combien le sont par un contrôle de validité dans un helper
+PARTAGÉ ?* **Ce nombre n'est pas mesuré, et c'est lui qui donne la portée du risque ci-dessus** — trois
+routes ou trente. À mesurer sur le relevé, qui a déjà les corps.
 
 ### Base et shell
 
