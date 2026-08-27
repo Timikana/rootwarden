@@ -584,3 +584,125 @@ toujours tourner la clé de tout le parc. Réversible n'est pas anodin.
 **§2.2 reste entier** : `/delete_remote_user` compare `machines.user` là où `connect_ssh` se connecte
 en `rootwarden` **en dur**, et `rootwarden` n'est dans aucune liste protégée. Le filet des mots de
 passe rend l'incident récupérable ; il ne rend pas la protection correcte.
+
+---
+
+# 9. RELECTURE DE P4 — la rotation, AVANT commit
+
+Faite le **2026-08-27**. **Le code relu n'est PAS commité** : il vit dans l'arbre de travail
+(`ClePlateformeController.php`, `ClePlateforme.php`, `cle-plateforme.js`, `plateforme.php`, la vue,
+`RoutesBackend.php`). La session qui l'écrivait a disparu avant de commiter ; ce qui suit est donc
+adressé à **qui reprendra P4**, et il reste entièrement actionnable.
+
+**Verdict : six points sur huit tiennent. DEUX changements sont demandés avant commit**, et le second
+porte sur une phrase qui rassure à tort — sur l'écran qu'on lit pendant un incident.
+
+## 9.1 La propriété centrale tient — vérifiée sur les quatre points d'appel
+
+« Le clic n'émet rien avant consentement. » Tracé :
+
+```
+envoie() appelé en :512, :582, :598, :607
+  :512 est dans effaceEnSerie(), appelée UNIQUEMENT en :603
+  :582, :598, :603, :607 sont tous DANS le gestionnaire `pConfirmer` (:541)
+enCours posé en :346 (ouvre) et nulle part ailleurs
+le gestionnaire sort immédiatement si `!enCours`
+```
+
+**Aucune écriture n'est atteignable hors du chemin de consentement.** Les cinq appels sortants du
+fichier sont `/platform_key`, `/test_platform_key`, `/settings/announceable`,
+`/machines/credential-status` et le `envoie()` générique — les quatre premiers sont des lectures.
+
+## 9.2 ⚠ CHANGEMENT 1 — la rotation est le seul geste des six à n'exiger RIEN
+
+Relevé de la table `GESTES` :
+
+| geste | ce qu'il exige avant de partir |
+|---|---|
+| `revoquer` | `motif: true` — il faut **écrire une raison** |
+| `ressaisir` | `mdp: true` — il faut **saisir un mot de passe** |
+| **`rotation`** | `liste: false, sansCible: true` — **et rien d'autre** |
+
+`pConfirmer` n'est désactivé que **pendant** la requête (`:574`), puis réactivé (`:629`). Il ne naît
+pas désactivé, et **aucun champ de recopie n'existe dans le panneau** (vérifié : zéro `data-rw` de
+saisie).
+
+> **Le geste le plus large du portail — aucune cible, toute la flotte, destruction de la clé en
+> cours — est le seul des six à ne demander qu'un clic.** Et le legacy en demandait **deux**
+> (`platform_keys.php:314-315`, deux `confirm()` d'affilée).
+
+Le portage a pris la **première moitié** de la leçon du chantier — remplacer deux `confirm()`
+identiques par un panneau, parce que *« deux OK d'affilée sont un réflexe, pas deux décisions »*. La
+**seconde moitié** manque, et elle est déjà écrite :
+
+> *Une confirmation EMPÊCHE quand elle demande un geste DIFFÉRENT de l'acquiescement : recopier le
+> nombre de machines, recopier un nom de fichier. Le bouton naît DÉSACTIVÉ et ne s'active qu'à
+> l'égalité exacte.*
+
+Cette règle a été écrite pour la **restauration d'une sauvegarde**. La rotation est strictement plus
+conséquente : aucune cible, toute la flotte, et une réversibilité **bornée en durée** *et*
+conditionnée à la survie d'un volume non sauvegardé (§8.2).
+
+**Le remède est déjà dans le panneau** : il affiche le total du parc. Le faire recopier n'invente
+rien — c'est le précédent que le chantier a déjà écrit, appliqué au cas qui le justifie le plus.
+
+## 9.3 ⚠ CHANGEMENT 2 — « la rotation répond à une clé compromise » est FAUX
+
+Le panneau, tel qu'écrit, dit que **la rotation est le seul geste qui réponde à une clé compromise**.
+La phrase vient d'une trouvaille juste — la suppression du compte de service, elle, n'y répond pas
+(§7.2). **Mais elle est fausse dans le sens qui rassure.** Mesuré :
+
+```
+ssh.py:745   printf … >> ~/.ssh/authorized_keys           (compte nominal)   APPEND
+ssh.py:755   printf … >> /root/.ssh/authorized_keys       (root)             APPEND
+ssh.py:808   printf … >  /home/<sa>/.ssh/authorized_keys  (compte de service) écrase
+```
+
+**La rotation génère une nouvelle paire. Elle ne retire l'ancienne clé publique d'aucun
+`authorized_keys`.** Après rotation puis redéploiement, le compte de service est nettoyé (`>`), mais
+**`root` et le compte nominal portent les DEUX clés** — la nouvelle a été *ajoutée*, l'ancienne
+jamais retirée.
+
+> **Celui qui détient la clé privée compromise garde un accès root sur chaque machine, après la
+> rotation.** Elle empêche RootWarden d'**utiliser** l'ancienne clé. Elle ne la **révoque** pas.
+
+C'est exactement la forme trouvée sur la suppression du compte de service : un geste présenté comme
+la réponse à une compromission, qui laisse la clé autorisée ailleurs. **Corriger le premier libellé
+en en fabriquant un second ne corrige rien.**
+
+Ce que le panneau doit dire, et qui est vrai :
+
+1. la rotation **arrête l'usage** de la clé compromise par RootWarden et force un redéploiement ;
+2. elle **ne retire pas** l'ancienne clé des `authorized_keys` du parc ;
+3. l'en retirer demande de réécrire ces fichiers, **compte par compte et machine par machine** —
+   `server_user_remove_key` le fait (`ssh.py:2211`), et ce n'est pas un geste de flotte.
+
+> **Il n'existe AUCUN geste unique qui réponde à une clé compromise.** C'est désagréable à écrire, et
+> c'est ce qu'il faut écrire.
+
+## 9.4 Les six points qui tiennent
+
+- **corps vide, délibérément** — et l'argument est plus fort que la lisibilité : envoyer un
+  `machine_ids` que la route **ignore** serait « le commentaire affirme plus que le code », sous forme
+  de charge utile. Un lecteur y verrait une borne que le backend n'applique pas ;
+- **pas de `@require_machine_access`** — correct. Le corps n'a aucun identifiant ; un décorateur qui
+  n'en trouve pas **laisse tout passer**. `@require_role(3)` + la porte à quatre yeux est la paire
+  juste. **Deuxième route de ce module dont l'absence de garde est justifiée** (la première est
+  `preflight_check`) : à écrire, sinon quelqu'un « corrigera » ;
+- **`/settings/announceable` hors d'`ADMIN_SEULEMENT`** — correct. `_ANNONCABLES` est une vraie liste
+  fermée de douze entrées, chacune lue par un `lambda` nommé : la route **ne peut pas** être amenée à
+  lire un réglage arbitraire. Durées, bornes, drapeaux. *Nuance sans blocage* : `approval_enabled` est
+  la seule des douze à porter un contenu adverse — savoir que la porte à quatre yeux est fermée dit
+  qu'un geste destructeur ne sera pas retenu. Ça n'accorde rien, et l'interface en a besoin pour dire
+  vrai ;
+- **les deux bornes** — correct, et la seconde est celle mesurée au §8.2 ;
+- **le zéro qui s'énonce** — c'est ce qui évite la propriété qui se vérifie sur du vide ;
+- **deux lectures de plus au chargement** — pas de surface. `/machines/credential-status` est bornée
+  **ligne par ligne** par `check_machine_access(row['id'])`, sur l'objet résolu. Rappel : ce bornage
+  **ne mord qu'au rôle 1**.
+
+## 9.5 Ce qui n'a pas été mesuré
+
+**Le geste n'a jamais été exécuté et ne doit pas l'être** : il n'existe qu'une clé, dans un seul
+fichier, et aucun réglage ne la déplace. Il n'y a aucune manière de l'exercer sans agir sur le parc
+réel. Tout ce qui précède est établi **par lecture du code et des réglages effectifs**.
