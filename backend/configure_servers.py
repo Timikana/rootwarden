@@ -56,6 +56,44 @@ from ssh_utils import (
 _USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
 
 
+# Motifs de refus d'un nom de compte. CE SONT DES CODES, pas des phrases :
+# l'ecran les affiche et doit pouvoir SEPARER les causes. « pas de bouton parce
+# que le nom est invalide » et « pas de bouton parce que je n'ai pas la
+# permission » sont deux causes pour un meme vide, et un texte libre ne se
+# distingue pas par programme.
+MOTIF_NOM_VIDE = 'vide'
+MOTIF_NOM_TROP_LONG = 'trop_long'
+MOTIF_NOM_COMPOSANT_DE_CHEMIN = 'composant_de_chemin'
+MOTIF_NOM_CARACTERES_INTERDITS = 'caracteres_interdits'
+
+
+def _motif_nom_invalide(username):
+    """Rend le CODE du motif de refus, ou None si le nom est valide.
+
+    UNE SEULE REGLE, DEUX FORMES. `_valid_username` en derive plutot que de
+    porter sa propre copie : une regle recopiee finit par diverger de celle qui
+    decide, et ce chantier en compte deja trois occurrences (E-195, E-196,
+    E-197). Ici la question « valide ? » et la question « pourquoi pas ? » ont
+    la meme source, par construction.
+
+    L'ordre des tests porte le sens, il n'est pas arbitraire : un nom vide
+    passerait `strip('.') == ''` et serait annonce « composant de chemin », ce
+    qui serait faux. Le motif le plus PRECIS gagne.
+    """
+    nom = str(username or '')
+    if not nom:
+        return MOTIF_NOM_VIDE
+    if len(nom) > 32:
+        return MOTIF_NOM_TROP_LONG
+    if nom.strip('.') == '':
+        # `.`, `..`, `...` — E-197. Total pour la classe, la ou tester deux
+        # valeurs a la main laisserait passer la troisieme.
+        return MOTIF_NOM_COMPOSANT_DE_CHEMIN
+    if not _USERNAME_RE.match(nom):
+        return MOTIF_NOM_CARACTERES_INTERDITS
+    return None
+
+
 def _valid_username(username) -> bool:
     """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32).
 
@@ -92,14 +130,7 @@ def _valid_username(username) -> bool:
     Le correctif est donc etroit : la classe de caracteres reste, et ce qui est
     refuse est ce qui n'est fait que de points.
     """
-    nom = str(username or '')
-    if not _USERNAME_RE.match(nom):
-        return False
-    # `.`, `..`, `...` — total pour la classe, la ou tester deux valeurs
-    # laisserait passer la troisieme.
-    if nom.strip('.') == '':
-        return False
-    return True
+    return _motif_nom_invalide(username) is None
 
 # ===================================================
 # Classe CustomFormatter pour Gérer l'Absence du Champ 'machine'
