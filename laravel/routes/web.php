@@ -25,6 +25,7 @@ use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\MisesAJourController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PasserelleController;
+use App\Http\Controllers\PareFeuController;
 use App\Http\Controllers\PermissionsController;
 use App\Http\Controllers\PlanificationsCveController;
 use App\Http\Controllers\PortailController;
@@ -701,6 +702,27 @@ Route::middleware('session.authentifiee')->group(function () {
      */
     Route::get('/cle-plateforme', ClePlateformeController::class)
         ->middleware(['role:1', 'perm:can_manage_platform_key'])->name('cle-plateforme');
+
+    /*
+     * Pare-feu iptables — I1, DECLARATION POSEE POUR LA SESSION 5.
+     *
+     * `role:1` + la permission, repris tel quel du legacy — dont l'en-tete
+     * annonce « superadmin uniquement » DEUX fois alors que sa garde admet
+     * ROLE_USER (motif E-36, quatrieme occurrence).
+     *
+     * I1 est une LECTURE : le controleur n'ouvre aucune session SSH et la page
+     * n'offre aucun geste qui ecrit. Les sous-lots d'ecriture I2 a I5 s'y
+     * brancheront.
+     *
+     * ⚠ L'ENTREE DE MENU NE BASCULE PAS, ET C'EST DELIBERE. `Navigation.php`
+     * garde `'legacy' => '/iptables/'` jusqu'a I5 : la page portee ne rend que
+     * la consultation, et basculer maintenant RETIRERAIT l'acces aux quatre
+     * capacites d'ecriture. *Une entree qui bascule trop tot ne degrade pas
+     * l'interface, elle retire une capacite.* La page porte un encart nommant
+     * ce qui reste sur l'ancien portail, avec le lien marque.
+     */
+    Route::get('/pare-feu', PareFeuController::class)
+        ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu');
 
     Route::get('/fail2ban', Fail2banController::class)
         ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
