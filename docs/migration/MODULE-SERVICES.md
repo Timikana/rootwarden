@@ -105,7 +105,7 @@ sécurité, et la convention du dépôt les veut sur une branche dédiée, jamai
 |---|---|---|
 | **S1** ✅ | La page, ses gardes, ses filtres — *PORTÉ `v1.37.94`, `/services`, **16 legacy / 19 portage**, 0 FAIL* | Rien ne part vers une machine. C'est ici que se mesure ce que §2 n'a pu que lire |
 | **S2** ✅ | Les lectures — *PORTÉ `v1.37.96`, **12 legacy / 14 portage**, 0 FAIL* | Ouvrent une session SSH, ne modifient rien |
-| **S3** | Les écritures : `start`, `stop`, `restart`, `enable`, `disable` | **MODIFIENT** l'état de services sur une machine réelle. Interception avec avortement |
+| **S3** ✅ | Les écritures — *CARACTÉRISÉ `v1.37.97`, legacy **12 PASS / 0 FAIL**, port à faire* | **MODIFIENT** l'état de services sur une machine réelle. Interception avec avortement |
 
 ---
 
