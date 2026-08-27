@@ -9242,3 +9242,71 @@ n'affirme **pas** que l'information est absente des écrans portés — une page
 un texte d'aide en ligne. Les 23 clés hors motif ne sont pas ventilées par module, et le **rendu effectif**
 des 15 pages vivantes n'est pas vérifié (le composant est un `<details>` : une page peut l'inclure et le
 rendre replié).
+
+---
+
+## E-211 — `GET /ssh-audit/policies` sans `machine_id` rend les politiques GLOBALES, sans rôle ni permission — quatrième occurrence de « un garde sans objet ne garde rien »
+
+**Trouvée par la session 4 dans le relevé des 229 routes. La portée annoncée était plus large que la
+portée réelle, et la mesure la corrige — mais l'écart subsiste et il appartient à un motif connu.**
+
+### Le code
+
+    backend/routes/ssh_audit.py:478
+    @require_api_key
+    @require_machine_access          <- sans objet si `machine_id` est absent
+    @threaded_route
+    def ssh_audit_policies_get():
+        machine_id = request.args.get('machine_id')      # OPTIONNEL
+        if machine_id:
+            ... WHERE machine_id = %s OR machine_id IS NULL
+        else:
+            ... WHERE machine_id IS NULL                 # les politiques GLOBALES
+
+**Aucun `@require_role`, aucun `@require_permission`.**
+
+### ⚠ Ce que la session 4 a annoncé, et ce que la mesure dit
+
+Le compte rendu disait : *« un appelant de rôle 1 qui omet le paramètre lit les politiques d'audit SSH
+**au-delà de son périmètre** »*. **Faux sur ce point** : quand `machine_id` est absent, la requête ne rend
+**que** `WHERE machine_id IS NULL` — les politiques **globales du portail**, pas celles des machines
+d'autrui. Il n'y a pas de lecture transverse du parc.
+
+**L'écart réel, plus étroit et toujours réel** : les politiques **globales** — `directive`, `policy`,
+`reason`, `updated_by`, `updated_at` — sont lisibles par **tout porteur de la clé d'API**, quel que soit son
+rôle, **sans détenir `can_audit_ssh`**. La page legacy, elle, exige `can_audit_ssh` (`ssh-audit/index.php:13`)
+et **son seul appelant passe toujours `machine_id`** (`js/main.js:321`) : **le chemin sans paramètre n'est
+exercé par aucune interface.**
+
+*Une correction qui rétrécit un écart le rend plus utile, pas moins* — annoncé large, il aurait fait chercher
+une fuite de parc qui n'existe pas.
+
+### Pourquoi il compte quand même : le motif, et c'est la QUATRIÈME fois
+
+**`@require_machine_access` ne trouve aucun identifiant dans la requête, donc il ne refuse rien.** C'est
+exactement *« un garde sans objet ne garde rien »* — le décorateur est **présent**, et il ne garde **rien**
+sur ce chemin. Occurrences connues :
+
+1. le décorateur inerte dès `role_id >= 2` — **59 routes** sur 116 ;
+2. le décorateur sans identifiant dans le corps — relevé cette semaine ;
+3. `POST /deploy` portant `@require_api_key` **seule** (E-191) ;
+4. **celle-ci** — sans identifiant dans les **paramètres d'URL**, et le repli rend des données globales au
+   lieu de refuser.
+
+**Et le quatrième est le pire de la famille, parce que le repli est SILENCIEUX et UTILE** : au lieu de rendre
+une erreur, la route rend un jeu de données parfaitement cohérent. *Un repli permissif ressemble à de la
+robustesse* — le chemin non gardé est celui qui a l'air de bien se comporter.
+
+### La correction
+
+`machine_id` **obligatoire**, ou bien `@require_permission('can_audit_ssh')` sur la route pour aligner
+l'accès sur celui de la page. La seconde est la plus fidèle : la page legacy garde par la permission, pas par
+le paramètre. **Route backend, donc session 4** — et *qui écrit le code ne valide pas seul son correctif* :
+la session 6 écrit le test.
+
+### Le contexte qui en fait un écart de parité et pas seulement un défaut
+
+**C'est la même famille qu'E-208** : le legacy est incohérent avec lui-même sur le bornage au périmètre du
+compte, donc **il n'existe aucune règle du produit à reprendre**. Et la conséquence pour `api_docs` est celle
+que la session 4 nomme : **une page de documentation lisserait cette incohérence sans le vouloir**, en
+présentant comme une règle ce qui n'est qu'une collection de décisions dont certaines ont divergé.

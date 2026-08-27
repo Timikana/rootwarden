@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **197** — numérotés jusqu'à **E-210** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **198** — numérotés jusqu'à **E-211** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -2427,6 +2427,68 @@ la faute se découvre **au lancement**, c'est-à-dire hors de toute mesure — l
 *Avant de greffer un appel dans un fichier qu'on n'a pas écrit, vérifier que chaque symbole employé y
 existe* — et se méfier particulièrement des noms qui « devraient » être là parce qu'ils le sont ailleurs.
 
+### UN BALAYAGE NE CONVERGE QU'EN LISANT — ET UNE SONDE ÉCRITE POUR ACCUSER SE TROMPE DU CÔTÉ QUI ALARME (2026-08-27)
+
+Le relevé des 229 routes backend a produit **quatre** chiffres successifs pour la même question — combien de
+`@require_machine_access` sont **sans objet** :
+
+    24   le corps de la route seul
+    17   + les helpers du MEME fichier (`_resolve_ssh_creds`)
+     3   + les helpers d'AUTRES modules (`validate_machine_id`)
+     1   apres les avoir lues une par une
+
+**La session 4 a failli publier « vingt-quatre gardes qui ne gardent rien ».** Chaque niveau d'appel suivi
+divisait le chiffre. *Un balayage ne converge qu'en lisant* — un balayage qui s'arrête au premier niveau
+mesure la **forme** de la route, pas son **effet**, et c'est la même faute qu'il prétend dénoncer.
+
+**Et ce qui l'a arrêtée n'est pas une relecture : c'est que 24 sur 116 était trop gros pour être vrai.** La
+même chose que le contrôle creux rattrapé parce que « le chiffre était trop propre », et que le greffage
+rattrapé par l'écart avec sa prédiction. **Trois fois dans la journée, l'alerte est venue de la
+VRAISEMBLANCE d'un nombre et non d'une assertion.** C'est mince comme garde-fou, et c'est pour ça qu'il faut
+écrire l'attente avant de mesurer : *une intuition sur l'ordre de grandeur est le dernier filet, pas le
+premier.*
+
+> **Une sonde écrite pour accuser se trompe du côté qui alarme.** C'est structurel : on l'écrit en cherchant
+> un défaut, donc ses faux positifs sont des accusations et ses faux négatifs des silences. **Le jour où
+> l'une se trompera dans l'autre sens, personne ne le verra** — un « 0 défaut » ne déclenche aucune
+> vérification. La parade est celle du §8 : *une sonde qui rend « aucun défaut » doit être éprouvée sur un cas
+> où elle devrait en trouver un.*
+
+**Deux occurrences le même jour, dans deux sessions, à deux heures d'intervalle** : celle-ci, et le balayage
+du Lead qui cherchait `href="…"` là où les tuiles s'écrivent `'url' => '…'` — « aucun lien entrant » annoncé
+pour cinq parties, **faux pour quatre**. Le Lead accusait par excès de confiance, la session 4 par excès de
+zèle ; *les deux formes se corrigent en lisant, et aucune ne se corrige en relançant le motif.*
+
+#### Le chiffre du chantier, remesuré et confirmé par un second moyen
+
+    116  routes portent `@require_machine_access`   (= les 114 connues + 2 posees le 2026-08-27)
+     59  redondantes (inertes des `role_id >= 2`)   (= les 57 connues + ces deux-la)
+     54  qui MORDENT reellement
+      3  SANS OBJET  (la requete ne porte aucun identifiant de machine)
+
+**Le recoupement avec l'audit tombe juste sur les trois lignes** — première fois de la journée qu'un chiffre
+du chantier est confirmé par un moyen indépendant **sans qu'un écart apparaisse**. Le tableau à **trois
+états** — la garde mord · elle est redondante · elle est sans objet — remplace le décompte à deux états, qui
+classait les 3 « présentes » et se trompait dans le sens rassurant.
+
+#### Ce qu'un relevé de gardes doit dire de LUI-MÊME
+
+`RELEVE-GARDES-BACKEND.md` porte en tête, et c'est ce qui le rend utilisable :
+
+- **il décrit l'arbre de travail, pas le service** — treize correctifs sont inertes ;
+- **les cinq routes dont l'état diffère sont listées avec LEURS DEUX ÉTATS.** `POST /deploy` y figure en
+  clair : `role(2) + machine_access` dans l'arbre, **`@require_api_key` seule en service.** Sans cette
+  distinction, « garde réelle » se lirait « garde en vigueur » — dans le document que la session 3 va lire
+  pour écrire une page qui **affirme des autorisations** ;
+- **deux chiffres y sont marqués NON VÉRIFIÉS** — 69 routes qui écrivent, 98 qui joignent une machine — parce
+  qu'ils viennent d'une recherche de motifs et non d'une lecture. *Après la leçon du 24, un chiffre non lu se
+  déclare non lu.*
+
+**Et les dédouanements y sont écrits au même titre que les accusations** : `/docker/results` borne au
+périmètre dans son corps ; `POST /update_zabbix` est une redirection **307** vers une route gardée, et le 307
+**préserve méthode et corps**, donc les gardes s'appliquent à l'arrivée. *Un relevé qui ne dédouane pas se lit
+comme un réquisitoire, et on cesse de le croire.*
+
 ### Base et shell
 
 - **MySQL ne déclenche `ON UPDATE CURRENT_TIMESTAMP` que si la valeur change.**
@@ -3297,7 +3359,7 @@ corrigent pas pareil.
   contrôler l'objet RÉSOLU et non le paramètre reçu. *(Cette entrée disait aussi « et ferme l'IDOR du
   même geste » : c'était faux, il n'y a pas d'IDOR là — voir la règle suivante.)*
 - **UNE GARDE PRÉSENTE N'EST PAS UNE GARDE QUI GARDE.** C'est la formule qui réunit trois constats du
-  chantier : `@require_machine_access` est inerte sur **57 routes sur 114** (celles déjà gardées au
+  chantier : `@require_machine_access` est inerte sur **59 routes sur 116** — remesuré le 2026-08-27, et il se scinde en **54 qui mordent + 3 SANS OBJET** (celles déjà gardées au
   rôle ≥ 2) ; `checkPermission('can_manage_api_keys')` ne peut jamais décider de rien, la ligne
   au-dessus réservant déjà la page au rôle 3 ; et cinq en-têtes annoncent un accès plus strict que
   leur code. Le premier est un décorateur, le deuxième un appel, le troisième un commentaire — même
