@@ -286,11 +286,60 @@ def _journalise_verdict_deploiement(texte: str) -> None:
 
 @bp.route('/deploy', methods=['POST'])
 @require_api_key
+@require_role(2)             # E-191
+@require_machine_access      # E-191
 @threaded_route
 def deploy():
-    """
-    Lance le script de deploiement (configure_servers.py) en arriere-plan.
-    La route n'est pas decoree car elle utilise deja un thread dedie pour le deploiement.
+    """Lance le script de deploiement (configure_servers.py) en arriere-plan.
+
+    ══ E-191 : CETTE ROUTE N'AVAIT QUE `@require_api_key` ════════════════════
+
+    Elle ECRIT des cles SSH en root sur toutes les machines transmises, et elle
+    en REVOQUE. Elle etait la moins gardee des trois gestes comparables :
+
+        POST /deploy               flotte transmise, ecrit ET revoque   api_key SEUL
+        POST /deploy_platform_key  UNE machine                          api_key + role(2) + machine_access
+        POST /reboot_server        redemarre                            api_key + role(2) + machine_access
+
+    `deploy_platform_key` est dans CE fichier, 270 lignes plus bas, avec un
+    commentaire de patch explicite. Quelqu'un a durci le deploiement d'une cle
+    sur une machine et laisse ouvert celui du parc entier : « le cas visible
+    traite, le cas subtil pris a l'envers », a son maximum — le geste durci est
+    le MOINS dangereux des deux.
+
+    L'ancien commentaire disait : « La route n'est pas decoree car elle utilise
+    deja un thread dedie pour le deploiement. » Executer dans un thread n'a
+    AUCUN rapport avec l'autorisation. Un commentaire qui justifie une absence
+    par une raison sans rapport est plus couteux qu'un silence : il decourage la
+    question. Il est retire.
+
+    ══ POURQUOI `role(2)` ET PAS `@require_permission('can_deploy_keys')` ═══
+
+    La permission serait le miroir exact de la page — et elle CASSERAIT un
+    chemin legitime. La page accepte les permissions TEMPORAIRES
+    (`checkPermissionFromDB` interroge `temporary_permissions`), tandis que le
+    backend lit `X-User-Permissions`, que la passerelle remplit depuis la
+    session, c'est-a-dire les PERMANENTES seules. Un compte dont la permission
+    est temporaire passerait la page et serait refuse ici.
+
+    `role(2)` ferme l'ecart mesure sans rencontrer ce probleme.
+
+    ══ CE QUE CELA RETIRE : RIEN, ET C'EST MESURE ═══════════════════════════
+
+    Mesure du 2026-08-27 : **aucun compte actif de role 1 ne porte
+    `can_deploy_keys`**, ni en permanent ni en temporaire (0 octroi non expire).
+    `opsuser` — le compte que l'audit nommait comme tombant dans l'ecart — a
+    `can_deploy_keys = 0` : la page le refusait deja, seul le chemin de requete
+    l'acceptait. C'est exactement ce que ce correctif ferme.
+
+    POSER LA GARDE N'EST PAS DECLENCHER LE GESTE. Le deploiement de cles reste
+    interdit par l'exploitant (K4) — et c'est precisement pour cela que poser la
+    garde ne coute rien.
+
+    `@require_machine_access` est inerte au role 2 ; le controle qui travaille
+    reste `check_machine_access(mid)` dans le corps, machine par machine. Il est
+    pose pour aligner cette route sur sa voisine et pour qu'un abaissement futur
+    du role ne soit pas silencieusement une ouverture.
     """
     try:
         data = request.json
