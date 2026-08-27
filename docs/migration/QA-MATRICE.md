@@ -425,6 +425,49 @@ Le point 1 est celui que je recommande de trancher en premier.
 
 ---
 
+## 6 bis. Un incident de coordination, et la règle qu'il donne
+
+**Le 2026-08-27, mes trois fichiers — le job CI `test-php`, `QA-MATRICE.md` et le
+relevé des gardes — ont été emportés par le commit `d00d466` d'une autre session**,
+dont le message ne parle que du portage de F6. Rien n'est perdu, rien n'est faux : le
+contenu est celui que j'ai écrit, et la suite le confirme (232 passed). Mais
+l'historique attribue mal, et **personne cherchant « quand la CI a-t-elle gagné une
+porte bloquante PHP » n'ira la chercher dans un commit de portage `fail2ban`.**
+
+Le mécanisme, et il ne se corrige pas par de l'attention :
+
+| instant | geste |
+|---|---|
+| T | je fais `git add` de mes trois fichiers |
+| T+ε | je lance `git diff --cached --stat` pour vérifier ce que j'ajoute |
+| T+δ | **l'autre session lance `git commit`** — qui commite **tout l'index**, donc mes trois fichiers |
+
+> **La règle déjà écrite au plan — « `git add` ciblé » — ne protège de rien.** Ce
+> qu'elle protège est le contenu de MON commit ; ce qui manque est la protection de mon
+> INDEX, qui est partagé avec toutes les sessions du dépôt. Entre le `add` et le
+> `commit`, l'index est un bien commun, et n'importe qui peut le publier.
+
+La parade est structurelle, pas disciplinaire — comme le runner qui se recopie dans
+`/tmp` :
+
+> **Ne jamais laisser un fichier indexé entre deux appels d'outil.** Soit `git add` et
+> `git commit` dans la **même** commande, soit — mieux — `git commit -- <chemins>`, qui
+> compose le commit à partir de l'arbre de travail et **ignore l'index**, donc ne peut
+> ni emporter le travail d'autrui ni être emporté par lui.
+
+*Troisième forme du même incident sur ce chantier, après `PLAN-DE-MIGRATION.md` et
+`scripts/rejouer-lot.sh`. Les deux premières allaient dans l'autre sens — une session
+emportait le travail d'une autre. Celle-ci est la version subie, et elle montre que la
+règle ne peut pas vivre du côté de celui qui committe : elle doit vivre du côté de
+celui qui indexe.*
+
+**Rien n'est réécrit.** `--amend` et `rebase` sont interdits tant qu'une autre session
+peut travailler : la gêne d'un message incomplet est bien moindre que celle d'un
+historique déplacé sous les pieds de quelqu'un. L'incident est déclaré ici, et c'est
+la seule réparation qui ne coûte rien à personne.
+
+---
+
 ## 7. Journal des mesures
 
 | date | ce qui a été mesuré | résultat |
