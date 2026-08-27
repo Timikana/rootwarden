@@ -133,13 +133,20 @@ function consulte(noeud, nom) {
  */
 function rendLeCorps(fonction) {
     // 1. les noms lies au corps analyse
+    //
+    // LA BRANCHE JUMELLE, et elle a ete oubliee au premier passage. `litUnFlux`
+    // venait d'apprendre a reconnaitre `JSON.parse` ; celle-ci ne le savait pas,
+    // si bien que `pare-feu.js` passait de « flux » a « ignore » — d'un faux
+    // dedouanement a une fausse accusation, sans jamais etre juste.
+    // *Chercher la branche jumelle est une regle de ce chantier.*
     const noms = new Set();
     parcours(fonction, (n) => {
         const estJson = (e) => {
             let vu = false;
             parcours(e, (m) => {
-                if (m.type === 'CallExpression' && m.callee?.type === 'MemberExpression'
-                    && m.callee.property?.name === 'json') vu = true;
+                if (m.type !== 'CallExpression' || m.callee?.type !== 'MemberExpression') return;
+                if (m.callee.property?.name === 'json') vu = true;
+                if (m.callee.object?.name === 'JSON' && m.callee.property?.name === 'parse') vu = true;
             });
             return vu;
         };
@@ -154,8 +161,10 @@ function rendLeCorps(fonction) {
     parcours(fonction, (n) => {
         if (vu || n.type !== 'ReturnStatement' || !n.argument) return;
         parcours(n.argument, (m) => {
-            if (m.type === 'CallExpression' && m.callee?.type === 'MemberExpression'
-                && m.callee.property?.name === 'json') vu = true;
+            if (m.type === 'CallExpression' && m.callee?.type === 'MemberExpression') {
+                if (m.callee.property?.name === 'json') vu = true;
+                if (m.callee.object?.name === 'JSON' && m.callee.property?.name === 'parse') vu = true;
+            }
             if (m.type === 'Identifier' && noms.has(m.name)) vu = true;
         });
     });
@@ -194,17 +203,35 @@ function rendLeCorps(fonction) {
  * (un 423 hors fenetre de maintenance, par exemple). Ni « du texte et jamais de
  * JSON » ni « du JSON » ne les classait juste.
  *
+ * ── ET UNE QUATRIEME FORME, TROUVEE LE 2026-08-27 PAR LE DECLENCHEUR ────────
+ *
+ * `pare-feu.js` lit `r.text()` puis `JSON.parse(brut)` — deliberement, pour
+ * distinguer « la reponse n'est pas du JSON » de « elle l'est ». Ce n'est PAS un
+ * flux : c'est une lecture JSON par un autre chemin. La regle « du texte et
+ * jamais de `.json()` » le classait donc `flux`, c'est-a-dire DEDOUANE.
+ *
+ * **Deuxieme faux NEGATIF de cette fonction, et le plus instructif** : il n'est
+ * pas venu d'une relecture mais du declencheur, qui a signale un fichier neuf et
+ * m'a fait regarder. Un instrument se corrige par ce qu'il rencontre, pas par ce
+ * qu'on imagine.
+ *
  * Regle finale, et elle se lit dans cet ordre :
- *   1. un `getReader()`  -> c'est un flux, quoi que fasse la branche d'erreur ;
- *   2. sinon, du texte et JAMAIS de JSON -> c'est un flux ;
- *   3. sinon -> ce n'est pas un flux.
+ *   1. un `getReader()`               -> c'est un flux, quoi que fasse la branche d'erreur ;
+ *   2. sinon, un `.json()` OU un `JSON.parse` -> ce n'est PAS un flux ;
+ *   3. sinon, du texte -> c'est un flux ;
+ *   4. sinon -> ce n'est pas un flux.
  */
 function litUnFlux(fonction) {
     let texte = false;
     let json = false;
     let lecteur = false;
     parcours(fonction, (n) => {
-        if (n.type !== 'CallExpression' || n.callee?.type !== 'MemberExpression') return;
+        if (n.type !== 'CallExpression') return;
+        // `JSON.parse(...)` : une lecture JSON qui ne passe pas par `.json()`.
+        if (n.callee?.type === 'MemberExpression'
+            && n.callee.object?.name === 'JSON'
+            && n.callee.property?.name === 'parse') json = true;
+        if (n.callee?.type !== 'MemberExpression') return;
         const nom = n.callee.property?.name;
         if (nom === 'text') texte = true;
         if (nom === 'json') json = true;

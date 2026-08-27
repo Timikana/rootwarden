@@ -67,23 +67,57 @@ def approbation_inactive():
 
 
 class _Curseur:
-    """Curseur d'approbation : aucune demande existante, l'insertion rend l'id 7."""
+    """Curseur d'approbation, PILOTABLE par test.
+
+    Il repond selon la requete recue, et non par une valeur unique : `gate()` en
+    pose desormais TROIS sortes — la recherche d'une approbation valide, celle
+    d'une demande en attente, et depuis E-205 le COMPTAGE DES APPROBATEURS
+    ELIGIBLES. Un curseur qui rend la meme chose aux trois melange des reponses
+    qui ne se ressemblent pas.
+
+    C'est ce qui a fait rougir ce fichier a son premier rejeu : il avait ete
+    ecrit contre une version de `gate()` qui ne comptait pas encore. La suite a
+    fait exactement ce qu'on lui demande — signaler qu'un contrat a bouge.
+    """
 
     lastrowid = 7
 
-    def execute(self, *a, **k):
-        pass
+    def __init__(self, approbateurs=1, en_attente=None, approuvee=None):
+        self.approbateurs = approbateurs
+        self.en_attente = en_attente
+        self.approuvee = approuvee
+        self.requetes = []
+        self._derniere = ''
+        self._params = ()
+
+    def execute(self, sql, params=None):
+        self.requetes.append((' '.join(sql.split()), params))
+        self._derniere = ' '.join(sql.split()).lower()
+        self._params = params or ()
 
     def fetchone(self):
-        return None       # ni approbation valide, ni demande en attente
+        if 'count(*) as n' in self._derniere:
+            return {'n': self.approbateurs}
+        if 'from approval_requests' in self._derniere:
+            # `find_request` passe le statut cherche en DERNIER parametre.
+            statut = self._params[-1] if self._params else None
+            return {'approved': self.approuvee, 'pending': self.en_attente}.get(statut)
+        return None
 
     def close(self):
         pass
 
+    @property
+    def insertions(self):
+        return [r for r in self.requetes if r[0].lower().startswith('insert into approval_requests')]
+
 
 class _Connexion:
+    def __init__(self, curseur):
+        self._curseur = curseur
+
     def cursor(self, dictionary=False):
-        return _Curseur()
+        return self._curseur
 
     def commit(self):
         pass
@@ -93,9 +127,15 @@ class _Connexion:
 
 
 @pytest.fixture
-def base_disponible():
-    with patch.object(approvals, '_conn', return_value=_Connexion()):
-        yield
+def curseur():
+    """Le curseur du test, accessible pour asserter ce qui a ete ECRIT."""
+    return _Curseur()
+
+
+@pytest.fixture
+def base_disponible(curseur):
+    with patch.object(approvals, '_conn', return_value=_Connexion(curseur)):
+        yield curseur
 
 
 @pytest.fixture
@@ -156,9 +196,19 @@ class TestRepliSurErreurDeBase:
     def test_les_gestes_de_flotte_LEVENT(self, action, approbation_active, base_indisponible):
         """Fail-closed. Une porte qui echoue REFUSE : la rotation de la paire de
         cles de la flotte entiere ne doit pas passer parce qu'une base est
-        tombee."""
-        with pytest.raises(Exception):
+        tombee.
+
+        `pytest.raises(Exception)` serait TROP LARGE depuis E-205 : `AucunApprobateur`
+        en herite, et un test qui l'accepterait ici passerait sur un refus motive
+        au lieu d'une erreur de base. Ce sont deux causes differentes, et elles se
+        corrigent differemment — on exige donc que ce ne soit PAS celle-la.
+        """
+        with pytest.raises(Exception) as leve:
             approvals.gate(action, 0, 'flotte', {}, requested_by=1, role=3)
+
+        assert not isinstance(leve.value, approvals.AucunApprobateur), (
+            "une base indisponible ne doit pas se presenter comme un manque "
+            "d'approbateur : le diagnostic serait envoye au mauvais endroit")
 
     @pytest.mark.parametrize('action', UNITAIRES)
     def test_les_gestes_unitaires_restent_fail_OPEN(self, action, approbation_active,
@@ -258,3 +308,146 @@ class TestLaRouteNAvalePasLaLevee:
         assert reponse.status_code == 200
         assert reponse.get_json()['success'] is True
         rotation.assert_called_once()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 5. E-205 — un fail-closed qui masque son motif est un fail-closed qu'on croit
+#    casse
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestAucunApprobateurEligible:
+    """Compter les approbateurs AVANT de creer la demande.
+
+    Sans ce comptage, `gate()` cree une demande que PERSONNE ne peut approuver :
+    l'action reste bloquee, aucune interface ne dit pourquoi, et le mecanisme
+    finit par passer pour cassé — puis par etre desactive.
+
+    C'est la meme famille que `stopped_at_tamper` sur la chaine d'audit : une
+    bonne idee posee sur une precondition invisible rend le seul remede
+    definitivement inerte, tout en ecrivant une alarme a chaque appel.
+    """
+
+    @pytest.mark.parametrize('action', FLOTTE)
+    def test_zero_approbateur_leve_un_refus_MOTIVE(self, action, approbation_active,
+                                                   base_disponible):
+        base_disponible.approbateurs = 0
+
+        with pytest.raises(approvals.AucunApprobateur) as leve:
+            approvals.gate(action, 0, 'flotte', {}, requested_by=1, role=3)
+
+        # Le motif doit dire QUOI FAIRE. Un refus qui ne nomme que lui-meme
+        # laisse l'exploitant devant un blocage sans issue.
+        assert 'second' in str(leve.value).lower() or 'administrateur' in str(leve.value).lower()
+
+    @pytest.mark.parametrize('action', FLOTTE)
+    def test_zero_approbateur_ne_cree_AUCUNE_demande(self, action, approbation_active,
+                                                     base_disponible):
+        """LA PROPRIETE QUI COMPTE. Le refus doit arriver AVANT l'insertion :
+        une demande orpheline resterait en attente pour toujours, et polluerait
+        l'ecran d'approbation d'une ligne que personne ne peut lever."""
+        base_disponible.approbateurs = 0
+
+        with pytest.raises(approvals.AucunApprobateur):
+            approvals.gate(action, 0, 'flotte', {}, requested_by=1, role=3)
+
+        assert base_disponible.insertions == [], (
+            f'une demande a ete creee alors que personne ne peut l\'approuver : '
+            f'{base_disponible.insertions}')
+
+    @pytest.mark.parametrize('action', FLOTTE)
+    def test_un_approbateur_suffit(self, action, approbation_active, base_disponible):
+        """L'AUTRE MOITIE. Un comptage trop strict bloquerait les deux gestes de
+        flotte pour toujours — et le blocage serait indiscernable du defaut qu'on
+        vient de corriger."""
+        base_disponible.approbateurs = 1
+
+        verdict = approvals.gate(action, 0, 'flotte', {}, requested_by=1, role=3)
+
+        assert verdict == {'status': 'created', 'id': 7}
+        assert len(base_disponible.insertions) == 1
+
+    @pytest.mark.parametrize('action', UNITAIRES)
+    def test_le_comptage_ne_s_applique_PAS_ailleurs(self, action, approbation_active,
+                                                    base_disponible):
+        """Ailleurs, une demande en attente reste utile : un approbateur cree plus
+        tard pourra la valider. Etendre le refus a ces actions serait un
+        durcissement que personne n'a demande."""
+        base_disponible.approbateurs = 0
+
+        verdict = approvals.gate(action, 2, 'cible', {}, requested_by=1, role=2)
+
+        assert verdict == {'status': 'created', 'id': 7}
+        assert len(base_disponible.insertions) == 1
+
+    def test_le_demandeur_ne_se_compte_PAS_lui_meme(self, approbation_active, base_disponible):
+        """La regle des quatre yeux est appliquee a la DECISION
+        (`approved_by != requested_by`). Si le comptage ne la refletait pas, un
+        administrateur SEUL se compterait lui-meme, la demande serait creee, et le
+        blocage redeviendrait muet — exactement le defaut qu'E-205 ferme.
+
+        ── POURQUOI CE TEST EXECUTE LA REQUETE ─────────────────────────────────
+
+        Sa premiere version assertait que l'identifiant du demandeur figurait
+        parmi les PARAMETRES de la requete. Une mutation l'a mise en defaut :
+        retirer `u.id <> %s` du `WHERE` en gardant le parametre laisse
+        l'assertion VERTE. Elle mesurait la FORME de l'appel, pas son EFFET —
+        le travers que ce chantier reproche a ses propres gardes.
+
+        La requete est donc EXECUTEE, sur un jeu de donnees connu et un moteur
+        reel (SQLite en memoire). Et elle n'est pas recopiee : elle est RELEVEE
+        sur le curseur, donc c'est bien celle du code qui est mesuree.
+        """
+        approvals.gate('regenerate_platform_key', 0, 'flotte', {}, requested_by=42, role=3)
+
+        comptages = [r for r in base_disponible.requetes if 'COUNT(*) AS n' in r[0]]
+        assert comptages, 'le comptage des approbateurs doit avoir lieu'
+        sql, params = comptages[0]
+
+        import sqlite3
+        base = sqlite3.connect(':memory:')
+        base.execute('CREATE TABLE users (id INT, active INT, role_id INT)')
+        base.execute('CREATE TABLE permissions (user_id INT, can_admin_portal INT)')
+        # Le demandeur, superadministrateur — et un SECOND, sans qui la regle des
+        # quatre yeux ne peut pas etre satisfaite.
+        base.executemany('INSERT INTO users VALUES (?,?,?)',
+                         [(42, 1, 3), (43, 1, 3), (44, 0, 3)])   # 44 : inactif
+        base.executemany('INSERT INTO permissions VALUES (?,?)', [(42, 1), (43, 1)])
+
+        n = base.execute(sql.replace('%s', '?'), params).fetchone()[0]
+
+        assert n == 1, (
+            f'le comptage doit rendre 1 (le compte 43, ni le demandeur 42 ni '
+            f"l'inactif 44) ; il rend {n}. Un administrateur seul se compterait "
+            'lui-meme et le blocage redeviendrait muet.')
+
+
+class TestUneDemandeDejaEnAttenteNEstPasDupliquee:
+    """Une re-tentative doit retrouver sa demande, pas en creer une seconde.
+
+    Deux demandes pour un meme geste, c'est deux lignes a approuver pour un seul
+    acte — et la seconde survit a l'execution de la premiere.
+    """
+
+    def test_la_demande_existante_est_rendue_sans_insertion(self, approbation_active,
+                                                            base_disponible):
+        base_disponible.en_attente = {'id': 3}
+
+        verdict = approvals.gate('regenerate_platform_key', 0, 'flotte', {},
+                                 requested_by=1, role=3)
+
+        assert verdict == {'status': 'pending', 'id': 3}
+        assert base_disponible.insertions == []
+
+    def test_une_approbation_valide_ouvre_et_se_consomme(self, approbation_active,
+                                                         base_disponible):
+        """`None` veut dire « passe » : c'est le seul chemin par lequel un geste
+        de flotte s'execute, et il exige qu'un second administrateur ait valide."""
+        base_disponible.approuvee = {'id': 5}
+
+        verdict = approvals.gate('regenerate_platform_key', 0, 'flotte', {},
+                                 requested_by=1, role=3)
+
+        assert verdict is None
+        consommations = [r for r in base_disponible.requetes
+                         if "status='executed'" in r[0]]
+        assert consommations, "une approbation utilisee doit etre MARQUEE, sinon elle resservirait"
