@@ -5,6 +5,7 @@ Fonctions pures qui prennent un client Paramiko + root_password et executent
 des commandes fail2ban-client via execute_as_root().
 """
 import re
+import shlex
 import ipaddress
 import logging
 
@@ -24,10 +25,60 @@ def _validate_jail(jail: str) -> str:
 
 
 def _validate_ip(ip: str) -> str:
-    """Valide une adresse IP (v4 ou v6)."""
+    """Valide une adresse IP (v4 ou v6) et rend sa forme NORMALISEE.
+
+    E-174. L'ancienne version appelait `ipaddress.ip_address(ip)` pour son seul
+    effet de bord, jetait l'objet, et rendait la chaine RECUE. Or l'identifiant
+    de portee IPv6 — la partie qui suit un `%` — n'est soumis a aucune
+    contrainte : mesure du 2026-08-27 dans `rootwarden_python`, sont acceptes
+    `fe80::1%;id;`, `fe80::1%$(id)`, ``fe80::1%`id` ``, `fe80::1%'`, et
+    `str()` les rend **verbatim**.
+
+    La valeur repartait ensuite dans un f-string vers `fail2ban-client`, puis
+    dans `sudo -S -p '' sh -c <commande entiere>` : `shlex.quote` y protege le
+    shell EXTERIEUR et livre la commande intacte, en un seul argument, a un
+    `sh -c` distant dont le travail est de l'interpreter. Execution de commande
+    arbitraire en root, mesuree : `uid=0`.
+
+    DEUX RAISONS DE REFUSER LE `%` PLUTOT QUE DE NORMALISER :
+
+    1. **normaliser ne ferme rien ici.** La parade habituelle de ce chantier —
+       « normaliser d'abord, comparer ensuite » (E-129, `//exemple.com`) — vaut
+       quand la valeur sert a COMPARER. Ici elle sert a COMPOSER, et la forme
+       normalisee conserve l'identifiant de portee tel quel ;
+    2. **aucun appelant legitime n'en envoie.** Une adresse de lien-local avec
+       sa portee n'a pas de sens comme cible de bannissement : fail2ban bannit
+       ce qu'il a vu se connecter, et ce que les deux portails emettent est une
+       adresse publique. Refuser est donc un durcissement, pas une perte de
+       capacite — NON MESURE au navigateur, c'est a la suite E2E de l'etablir.
+    """
     ip = ip.strip()
-    ipaddress.ip_address(ip)
-    return ip
+    if '%' in ip:
+        raise ValueError(
+            f"Adresse IP invalide : {ip!r} (identifiant de portee refuse)")
+    return str(ipaddress.ip_address(ip))
+
+
+def _entree_whitelist_sure(valeur: str) -> bool:
+    """Vrai si `valeur` est une adresse OU un reseau, sans identifiant de portee.
+
+    La liste blanche ne vient pas que du client : elle est RELUE dans
+    `/etc/fail2ban/jail.local` puis recomposee. Une charge ecrite avant ce
+    correctif, ou posee a la main dans le fichier, reviendrait donc par la
+    relecture. C'est la lecon de V10a : valider aux DEUX bouts, l'ecriture ET
+    la relecture.
+
+    Accepte le format CIDR, que `_validate_ip` refuse : les deux entrees par
+    defaut du module sont `127.0.0.1/8` et `::1`.
+    """
+    valeur = (valeur or '').strip()
+    if not valeur or '%' in valeur:
+        return False
+    try:
+        ipaddress.ip_network(valeur, strict=False)
+        return True
+    except ValueError:
+        return False
 
 
 # ── Detection / Installation ────────────────────────────────────────────────
@@ -106,7 +157,7 @@ def get_jail_status(client, root_password: str, jail: str) -> dict:
     """
     jail = _validate_jail(jail)
     out, _, _ = execute_as_root(
-        client, f'fail2ban-client status {jail} 2>/dev/null',
+        client, f'fail2ban-client status {shlex.quote(jail)} 2>/dev/null',
         root_password, timeout=10)
 
     result = {
@@ -143,7 +194,7 @@ def get_jail_config(client, root_password: str, jail: str) -> dict:
     config = {}
     for key in ('maxretry', 'bantime', 'findtime'):
         out, _, _ = execute_as_root(
-            client, f'fail2ban-client get {jail} {key} 2>/dev/null',
+            client, f'fail2ban-client get {shlex.quote(jail)} {key} 2>/dev/null',
             root_password, timeout=10)
         val = out.strip()
         try:
@@ -159,8 +210,15 @@ def ban_ip(client, root_password: str, jail: str, ip: str) -> tuple[str, str, in
     """Ban une IP dans un jail."""
     jail = _validate_jail(jail)
     ip = _validate_ip(ip)
+    # CEINTURE. Les validateurs ci-dessus ferment le vecteur connu ; ce
+    # `shlex.quote` ferme la CLASSE. `execute_as_root` protege le shell qui
+    # recoit la commande, pas les valeurs qui la composent : ce qui manquait
+    # etait une citation A L'INTERIEUR de la commande, la seule qui sache que
+    # `{ip}` est une donnee et non du code. E-174, et ce que
+    # MODULE-FILTRAGE.md §5.6 reclamait — « un f-string sur une valeur venue
+    # du client doit devenir impossible a ecrire par accident ».
     return execute_as_root(
-        client, f'fail2ban-client set {jail} banip {ip}',
+        client, f'fail2ban-client set {shlex.quote(jail)} banip {shlex.quote(ip)}',
         root_password, timeout=10)
 
 
@@ -169,7 +227,7 @@ def unban_ip(client, root_password: str, jail: str, ip: str) -> tuple[str, str, 
     jail = _validate_jail(jail)
     ip = _validate_ip(ip)
     return execute_as_root(
-        client, f'fail2ban-client set {jail} unbanip {ip}',
+        client, f'fail2ban-client set {shlex.quote(jail)} unbanip {shlex.quote(ip)}',
         root_password, timeout=10)
 
 
@@ -232,8 +290,34 @@ def manage_whitelist(client, root_password: str, action: str, ip: str = '') -> d
         ip = _validate_ip(ip)
         current_ips = [x for x in current_ips if x != ip]
 
+    # ══ E-174, LA BRANCHE JUMELLE ════════════════════════════════════════
+    #
+    # `ban_ip` n'etait pas le seul vecteur, et celui-ci est PIRE : la ligne
+    # composee ci-dessous part dans un `sed -i '/\[DEFAULT\]/a\<ligne>'`, ou
+    # une apostrophe FERME l'argument de sed. Mesure du 2026-08-27, charge
+    # `fe80::1%';echo … $(id -u);'` : le `sed` meurt sur « no input files » et
+    # la commande injectee s'execute — `uid=0`.
+    #
+    # Deux verrous, et il en faut DEUX parce que la liste n'a pas qu'une
+    # source : ce que le client envoie passe par `_validate_ip`, mais le reste
+    # est RELU dans le fichier distant. Une charge posee avant ce correctif, ou
+    # a la main, reviendrait par la relecture. Valider aux deux bouts (V10a).
+    ecartees = [x for x in current_ips if not _entree_whitelist_sure(x)]
+    if ecartees:
+        _log.warning(
+            "Whitelist : %d entree(s) illisible(s) ecartee(s) de jail.local sur %s",
+            len(ecartees), 'la machine visee')
+    current_ips = [x for x in current_ips if _entree_whitelist_sure(x)]
+
     # Ecrire la nouvelle ligne ignoreip
     new_line = 'ignoreip = ' + ' '.join(current_ips)
+
+    # Garde FAIL-CLOSED, et elle n'est pas decorative : elle rend la propriete
+    # verifiable au lieu d'etre deduite des deux filtres ci-dessus. Si un jour
+    # un troisieme chemin alimente `current_ips`, c'est ici que ca s'arrete.
+    if not re.fullmatch(r'ignoreip = [0-9a-fA-F:./ ]*', new_line):
+        raise ValueError(
+            "Composition de la liste blanche refusee : caractere inattendu")
 
     import base64
     # Supprimer l'ancienne ligne ignoreip et ajouter la nouvelle dans [DEFAULT]
@@ -258,7 +342,7 @@ def unban_all(client, root_password: str, jail: str) -> tuple[str, str, int]:
     """Debannit toutes les IPs d'un jail."""
     jail = _validate_jail(jail)
     return execute_as_root(
-        client, f'fail2ban-client set {jail} unbanip --all 2>&1',
+        client, f'fail2ban-client set {shlex.quote(jail)} unbanip --all 2>&1',
         root_password, timeout=10)
 
 
