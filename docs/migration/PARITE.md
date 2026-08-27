@@ -8747,3 +8747,133 @@ de 2 à 3 machines sans qu'aucune inférence côté navigateur n'ait à suivre.
 Le nombre fait autorité par `invalides_count`, les noms par la liste. **Si les deux se contredisent, c'est
 le TOTAL DU SERVEUR qui gagne** : il compte tout, la liste ne porte que ce qui a voyagé. Sans cette règle,
 une liste tronquée aurait fait afficher un nombre **plus petit que la réalité** — la direction dangereuse.
+
+---
+
+## E-201 — La porte à QUATRE YEUX est activée, nomme les deux gestes les plus larges, et ne leur est jamais demandée
+
+**Forme neuve, et pire que les précédentes : ce n'est ni un décorateur inerte ni un commentaire trompeur,
+c'est la CONFIGURATION D'EXPLOITATION qui affirme une protection que le code ne consulte pas.**
+
+Mesuré le 2026-08-27, et vérifié indépendamment :
+
+```
+srv-docker.env:68   APPROVAL_ENABLED=true
+srv-docker.env:69   APPROVAL_ACTIONS=reboot_server,delete_remote_user,
+                                     regenerate_platform_key,revoke_service_account
+```
+
+**Quatre actions configurées. Deux appels de `gate()` dans tout le backend :**
+
+| appel réel | action |
+|---|---|
+| `monitoring.py:270` | `reboot_server` |
+| `ssh.py:2166` | `delete_remote_user` |
+
+> **`regenerate_platform_key` et `revoke_service_account` ne demandent JAMAIS l'approbation** — et ce
+> sont **les deux plus larges** : la rotation de la clé de toute la flotte, et le `userdel -r -f` du
+> compte de service.
+
+**Pourquoi c'est la forme la plus coûteuse de la famille** : un exploitant qui relit son
+`srv-docker.env` y lit `regenerate_platform_key` et en conclut, **raisonnablement**, que le geste est
+gardé. Aucune lecture de code ne le détrompe, parce que l'absence d'appel ne se voit pas — *il n'y a rien
+à lire là où la garde manque.*
+
+**Deux aggravations mesurées** : là où la porte **est** appelée, elle est **fail-open** (`try/except` +
+`logger.debug("… skipped")` — et `debug` n'est pas journalisé en exploitation) ; et `approvals.gate` est
+**fail-open sur erreur de base** (`approvals.py:116`). **Ce qui borne** : `regenerate_platform_key` exige
+le rôle 3.
+
+**Trois issues, et « ne rien faire » est la seule qui laisse croire à un garde inexistant** : brancher
+`gate()` sur les deux routes ; ou **retirer les deux noms de la configuration** ; ou l'assumer par écrit.
+
+## E-202 — ⚠ DEUX CHEMINS VERROUILLENT ROOTWARDEN HORS DE LA PRODUCTION, EN UN APPEL, SANS RETOUR
+
+**Le plus grave du chantier.** Aucun des deux n'est un défaut d'**accès** : les deux sont des gestes
+**légitimes** dont la cible peut être l'accès de RootWarden lui-même. Trouvés par pré-relecture avant
+portage, vérifiés en base.
+
+### L'état mesuré du parc — c'est lui qui rend les deux mortels
+
+| id | nom | `user` | mot de passe | mdp root | clé plateforme | compte de service |
+|---|---|---|---|---|---|---|
+| **1** | **`srv-zabbix`** | `user` | **non** | **non** | **oui** | **oui** |
+| 2 | `Test-Server-Debian` | `testuser` | oui | oui | non | non |
+| 3 | `OpenCVE-Test-OnPrem` | `utilisateur` | oui | oui | non | non |
+
+**`srv-zabbix` — la production — n'a plus AUCUN mot de passe connu de RootWarden.** Sa seule voie est la
+clé. Les machines 2 et 3 en ont un ; elle, non. **Ce n'est pas une hypothèse sur un parc futur, c'est
+l'état d'aujourd'hui.**
+
+### Chemin 1 — `regenerate_platform_key` (rôle 3)
+
+`ssh_key_manager.py:117-126` fait `PRIVATE_KEY_PATH.unlink()` — **une suppression, pas un renommage** —
+puis régénère. Et **les trois tentatives d'authentification de `connect_ssh` emploient la même clé
+privée**. Après le geste : ancienne clé publique sur chaque machine, nouvelle clé privée qui ne
+correspond à rien, ancienne **détruite**. Il ne reste que le mot de passe — que `srv-zabbix` n'a pas.
+
+**Et l'`UPDATE machines SET platform_key_deployed = FALSE` est sans `WHERE`.** Il est *honnête*, mais ces
+colonnes étaient **le seul enregistrement de quelles machines avaient la clé** :
+
+> **Après le geste, on ne peut plus lister ce qu'on vient de rendre injoignable.**
+
+La seule trace survivante est `server_user_ssh_keys WHERE is_platform_key = 1` — **et c'est précisément
+la table qu'E-192/E-197 ont montré purgeable à tort.** *La seule trace dépend d'un défaut.*
+
+### Chemin 2 — `delete_remote_user` visant `rootwarden` (RÔLE 2)
+
+Trois mesures qui se composent :
+
+```
+ssh.py:2142   protected = {'root','nobody','daemon','bin','sys','www-data'}   <- pas `rootwarden`
+ssh.py:2159   if username == m['user']                                        <- vaut 'user' pour la machine 1
+ssh_utils.py:241   username='rootwarden'                                      <- EN DUR, compte de service
+```
+
+**Le compte de connexion réel de `srv-zabbix` est `rootwarden`. La liste protégée ne le connaît pas, et la
+comparaison porte sur `machines.user` = `'user'`.** Et il **existe** en inventaire (machines 1 et 3,
+uid 999 et 988).
+
+> `POST /delete_remote_user {machine_id: 1, username: "rootwarden"}` supprime par `userdel` le compte par
+> lequel RootWarden s'authentifie sur la production. **Même verrouillage, au RÔLE 2 — donc plus bas que
+> le chemin 1.**
+
+La porte à quatre yeux **est** appelée ici (`:2166`), donc elle **ralentit** — elle exige un second
+administrateur, **pas qu'il comprenne ce que `rootwarden` est**. Même forme qu'E-150 : **la protection
+énumère des NOMS au lieu de résoudre une FONCTION.**
+
+**Une réserve à lever avant de conclure** : `rootwarden` porte le statut `excluded` en inventaire. Reste
+à mesurer si l'écran l'offre malgré ce statut — deux sessions l'affirment indépendamment, mais **la
+mesure n'a pas été faite au clic.**
+
+### Ce que la page INVITE à faire, et qui fabrique cet état
+
+`remove_ssh_password` n'efface pas le mot de passe **sur la machine** : il efface la copie de RootWarden.
+Et **toute la page de la clé pousse à cet effacement** — barre de progression, `platform.migration_done`
+atteint quand tous les mots de passe sont partis, bouton de masse, pastille verte réservée aux machines
+sans mot de passe.
+
+> **La fin de la migration telle que la page la dessine EST l'état où la régénération est sans retour.**
+
+**Et le retour offert est à moitié** : `reenter_ssh_password` écrit `password` — **jamais
+`root_password`**. Mesuré : dans tout le backend, **une seule** écriture de `root_password`, celle qui
+l'efface. Le seul remplisseur est une **autre page**. Le bouton « Ressaisir » *paraît* annuler
+« Supprimer » ; **il en annule la moitié.**
+
+### La contrainte de test la plus inhabituelle du chantier
+
+> **La réussite de ce geste ne doit JAMAIS être mesurée. Il n'existe aucune cible sûre** — il n'est pas
+> paramétré par une machine, il porte sur la flotte. Le mesurer une fois verrouille la production.
+
+Le portage doit donc être conçu pour que **la seule chose mesurable soit le refus**, et **cela doit être
+écrit dans le fichier de suite** — sinon quelqu'un comblera un jour le trou apparent.
+
+### Et un kill-switch qui n'a aucune interface
+
+`/revoke_service_account` — documenté « kill-switch », rôle 3, `userdel -r -f` — **n'a aucun appelant**.
+C'est **le seul moyen de défaire un `NOPASSWD: ALL`**, et il n'est offert nulle part. Triplement fermé :
+pas d'interface, pas de porte à quatre yeux (E-201), et **`deploy_platform_key` l'accorde par un bouton
+qui n'en parle pas** — il enchaîne `useradd`, dépôt de clé et
+`echo 'rootwarden ALL=(ALL:ALL) NOPASSWD: ALL'` « dans la foulée ».
+
+> **Accorder root tient en un clic ; le reprendre n'a pas de clic.**
