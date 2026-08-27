@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.29** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.30** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,41 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.30 — E-211 : rendre le parametre obligatoire aurait ete le reflexe, et il aurait ete FAUX
+
+**Symptome.** `GET /ssh-audit/policies` porte `@require_machine_access`, mais son `machine_id` est un
+parametre d'URL **optionnel**. Le decorateur n'y trouve aucun identifiant, donc **il ne refuse rien** :
+tout porteur de la cle d'API lit les politiques d'audit **globales** — `directive`, `policy`, `reason`,
+`updated_by` — sans detenir `can_audit_ssh`, que la page legacy exige pourtant
+(`ssh-audit/index.php:13`).
+
+**Portee — et le releve accusait TROP LARGE.** Il affirmait une lecture « au-dela du perimetre ».
+**C'est faux** : sans `machine_id`, la requete est `WHERE machine_id IS NULL`, soit les politiques
+globales **seulement**. Aucune lecture transverse du parc. Corrige en `9815112`. L'ecart subsiste, plus
+etroit — *une correction qui retrecit un ecart le rend plus utile, pas moins : elle dit ou regarder au
+lieu d'envoyer chercher une fuite ailleurs.*
+
+**Cause racine.** Quatrieme occurrence de « un garde sans objet ne garde rien », et **la pire de la
+famille** : le repli rend un jeu de donnees **parfaitement coherent** au lieu d'une erreur. *Un repli
+permissif ressemble a de la robustesse — le chemin non garde est celui qui a l'air de bien se
+comporter.*
+
+**Correctif, et le reflexe ecarte.** `@require_permission('can_audit_ssh')`. Rendre `machine_id`
+obligatoire aurait supprime un usage legitime — les politiques globales sont justement celles qu'on
+consulte sans machine — **tout en laissant l'autorisation non verifiee**. La page garde par la
+permission, pas par le parametre : on reprend la garde de la page qu'on porte au lieu d'en inventer
+une. Meme lecon qu'E-204.
+
+**Le piege E-149, evite.** `require_permission` n'etait pas importe dans ce fichier ; ajoute au meme
+commit. Controle par un **import reel** du module, pas par `py_compile` — qui avait deja laisse passer
+huit decorateurs sans leur import.
+
+**Exploitation.** Aucune interface n'exerce le chemin sans parametre (`js/main.js:321` passe toujours
+`machine_id`) : aucun usage existant ne change. **Inerte jusqu'au redemarrage de `rootwarden_python`**
+— quatorzieme correctif backend en attente.
+
+**Tests.** Ecrits par la session 6 : qui ecrit le code ne valide pas seul son correctif.
+
 ### v1.38.29 — ⚠ EN PRODUCTION : tout ce que le portail dit de Graylog decrit un produit qu'il n'installe pas, et le backend le SAIT
 
 **Trouve par la session 2 en mesurant si la SEQUENCE etait dite. La question s'est retournee : il n'y avait
@@ -2841,6 +2876,7 @@ correspondance reelle :**
 | v1.38.26 | `a1cd400` | « aucun lien entrant » etait faux ; les 4 emplacements comptes |
 | **v1.38.27** | `5c2e599` | **E-209, en production : un guide qui enseigne un durcissement inexistant** ; E-210 |
 | v1.38.28 | `29aafb1` | un balayage ne converge qu'en lisant ; 116/59/54+3 confirme ; E-211 |
+| v1.38.30 | — | E-211 corrige ; le releve accusait trop large, retreci ; `/exclude_user` lu |
 | **v1.38.29** | (ce commit) | **E-212, en production : le portail decrit un produit qu'il n'installe pas** ; FEAT-001 raffine |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un

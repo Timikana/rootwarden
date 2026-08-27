@@ -18,7 +18,8 @@ import threading
 from flask import Blueprint, jsonify, request
 
 from routes.helpers import (
-    require_api_key, require_role, require_machine_access, threaded_route, get_db_connection,
+    require_api_key, require_role, require_permission, require_machine_access,
+    threaded_route, get_db_connection,
     server_decrypt_password, get_current_user, logger,
 )
 from ssh_utils import ssh_session
@@ -477,10 +478,37 @@ def ssh_audit_fix():
 
 @bp.route('/ssh-audit/policies', methods=['GET'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_policies_get():
-    """Liste les policies d'audit pour une machine (ou globales)."""
+    """Liste les policies d'audit pour une machine (ou globales).
+
+    ══ E-211 : POURQUOI UNE PERMISSION, ET PAS UN PARAMETRE OBLIGATOIRE ═════
+
+    `@require_machine_access` ne garde RIEN ici : `machine_id` est un parametre
+    d'URL OPTIONNEL, le decorateur n'en trouve aucun, et il ne refuse donc rien.
+    Quatrieme occurrence de « un garde sans objet ne garde rien » — et la pire
+    de la famille, parce que le repli rend un jeu de donnees PARFAITEMENT
+    COHERENT au lieu d'une erreur. Un repli permissif ressemble a de la
+    robustesse : le chemin non garde est celui qui a l'air de bien se comporter.
+
+    LA PORTEE EST ETROITE, ET IL FAUT LE DIRE. Sans `machine_id`, la requete ne
+    rend QUE les politiques globales (`WHERE machine_id IS NULL`) : il n'y a
+    AUCUNE lecture transverse du parc. La premiere redaction du releve des
+    gardes affirmait le contraire — elle a ete corrigee.
+
+    RENDRE `machine_id` OBLIGATOIRE aurait ete le reflexe, et il aurait ete
+    FAUX : la page legacy garde par la PERMISSION (`ssh-audit/index.php:13`),
+    pas par le parametre, et les politiques globales sont justement celles
+    qu'on consulte sans machine. Exiger le parametre aurait supprime un usage
+    legitime tout en laissant l'autorisation non verifiee.
+
+    On reprend donc la garde de la page qu'on porte, plutot que d'en inventer
+    une : c'est la meme lecon que les quatre implementations de
+    `_validate_username` (E-204) — une regle de securite se DERIVE de sa
+    source, elle ne se recopie pas.
+    """
     machine_id = request.args.get('machine_id')
 
     try:
