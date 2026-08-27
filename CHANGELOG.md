@@ -2272,6 +2272,65 @@ les sections allaient a v1.38.33 : recalee ici.
 par identite d'objet** a `helpers.resolve_ssh_creds` ; arite de tous les `return` mesuree a 8 ; ruff
 vert sur les six fichiers. **Inerte jusqu'au redemarrage.**
 
+### v1.38.34 — ⚠⚠ E-218 : le coupe-circuit d'un `NOPASSWD: ALL` ne fonctionne peut-etre pas dans l'etat exact vers lequel la page pousse
+
+**Trouve par la session 3 en ecrivant l'interface de `revoke_service_account` que le Lead venait d'autoriser
+— donc en lisant une route qu'elle allait rendre cliquable. Le Lead a verifie la chaine entiere et trouve un
+SECOND porteur.**
+
+    1. ssh.py:970    revoke_service_account : ssh_session(...) SANS `service_account=`  -> defaut False
+    2. ssh_utils.py:278   `_rootwarden_auth_method` = 'keypair', jamais 'service_account'
+    3. ssh_utils.py:537   le court-circuit `sudo sh -c` SANS mot de passe s'applique
+                          UNIQUEMENT si == 'service_account'  -> sinon `sudo -S -p ''` + root_password
+    4. remove_ssh_password   sur une machine migree : root_password = ''
+
+**`sudo -S` recoit donc un mot de passe vide.** Il ne reussit que si le compte **nominal** dispose d'un sudo
+sans mot de passe — **ce que rien ne garantit.**
+
+> **`revoke_service_account` est le SEUL moyen de reprendre un `NOPASSWD: ALL` accorde en un clic. S'il
+> echoue sur les machines migrees, l'octroi y est de fait definitif.** Formulation de la session 3 :
+> *le coupe-circuit est sur tant qu'on n'en a pas besoin, et douteux dans l'etat exact vers lequel toute la
+> page pousse.*
+
+**⚠ Le second porteur** : `ssh.py:1061`, `deploy_service_account`, omet le parametre **aussi**, puis enchaine
+trois `execute_as_root`. **Sur neuf appels du fichier, sept passent
+`service_account=m.get('service_account_deployed', False)` — seules `:970` et `:1061` l'omettent.** Pour un
+**premier** deploiement l'omission se defend (le compte n'existe pas encore) ; **un RE-deploiement sur une
+machine migree tombe dans la meme impasse**, et c'est un geste de parc propose en masse. *Fermer un defaut
+sans chercher ses autres implementations, c'est le fermer a moitie* — la session 3 avait nomme une route, il
+y en a deux.
+
+**Ce qui n'est PAS mesure, et ce qui borne l'ecart** : rien n'a ete exerce, l'ecart est **derive du code** —
+quatre maillons lus, aucun geste emis. Le maillon final est un etat de machine : **le compte nominal PEUT
+avoir un sudo sans mot de passe** (`/etc/sudoers.d/rootwarden-<user>` existe dans ce depot), auquel cas les
+deux routes fonctionnent aujourd'hui. **C'est ce qui en fait un ecart et non une panne** — et pourquoi une
+mesure « ca marche » ne prouverait rien : elle mesurerait l'etat du parc, pas la propriete. **Quatrieme
+occurrence du jour de *une propriete qui tient par l'etat du parc n'est pas une propriete*.**
+
+La borne est **DITE dans le panneau de decision**, pas dans un journal : *un avertissement qui arrive apres le
+clic n'a pas averti*, et *sinon on livre une poignee interieure qui ne tourne pas* (session 3).
+
+#### Trois decisions de conception sur l'interface de revocation, les trois retenues
+
+- **le bouton rendu au role 3 seul, le test de session decidant du RENDU et jamais de l'acces** — les gardes
+  restent `ADMIN_SEULEMENT` et `@require_role(3)`. *Un rendu conditionnel est de l'ergonomie ; une garde est
+  ailleurs* ;
+- **l'asymetrie de role DITE aux comptes 1 et 2** : *leur cacher que l'octroi est irreversible pour eux, c'est
+  leur laisser croire l'inverse.* **Un silence sur une irreversibilite se lit comme une reversibilite** ;
+- **202 / 409 de la porte a quatre yeux traites comme des etats DEFINIS**, avant tout verdict d'ecriture,
+  annoncant « rien n'a encore ete retire ». *Les ranger dans « absence de verdict » aurait fait dire « je ne
+  sais pas » a un serveur qui venait d'expliquer precisement pourquoi rien n'avait ete fait.* **Exacte
+  contrepartie de la decision (a) : la il fallait avouer l'ignorance, ici il ne faut pas la simuler.**
+
+#### Le message de non-verdict, avec ses trois elements
+
+> « Aucun verdict : la requete n'est pas revenue. Le geste peut etre EN COURS cote serveur. **NE RELANCE
+> PAS** — une seconde tentative accorderait de nouveaux acces root pendant que la premiere finit peut-etre.
+> Recharge la page, puis utilise « Tester » sur la machine pour savoir ou elle en est. »
+
+**Et le geste de verification n'a rien a inventer** : « Tester » est P2, `/test_platform_key`, une lecture
+deja portee, sur la meme page. *Une instruction n'est suivable que si ce qu'elle demande existe deja.*
+
 ### v1.38.33 — une regle du Lead RETIREE : ce qu'il croyait etre une protection dans un helper n'en etait pas
 
 **La session 4 a refuse une instruction du Lead avec une mesure, et elle avait raison. La regle est retiree du
@@ -3289,7 +3348,8 @@ correspondance reelle :**
 | v1.38.30 | `2ca5bcb` | E-211 corrige — `@require_permission('can_audit_ssh')`, et l'import qui manquait |
 | **v1.38.31** | `2db5718` | **E-213 : un statut nomme `excluded` n'exclut pas** ; E-214 ; E-215 |
 | v1.38.32 | `d5b3b57` | `platform_key` P3 porte |
-| v1.38.33 | (ce commit) | **une regle du Lead RETIREE** ; E-211 corrige sur sa cause ; E-216 ; E-217 |
+| v1.38.33 | `c00ca44` | **une regle du Lead RETIREE** ; E-211 corrige sur sa cause ; E-216 ; E-217 |
+| **v1.38.34** | (ce commit) | **E-218 : le coupe-circuit d'un `NOPASSWD: ALL`, et son second porteur** |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
