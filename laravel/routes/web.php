@@ -3,6 +3,7 @@
 use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\ClesApiController;
+use App\Http\Controllers\ClePlateformeController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
@@ -681,6 +682,26 @@ Route::middleware('session.authentifiee')->group(function () {
      * ne l'est pas, c'est E-152 : sur 23 routes des deux modules de filtrage,
      * DEUX portent une permission. Le portage ne le referme pas — §7 du plan.
      */
+    /*
+     * Cle de plateforme — P1. `role:1` + `perm:can_manage_platform_key`, reprise
+     * telle quelle du legacy : `platform_keys.php:11` admet les TROIS roles et
+     * c'est `checkPermission` qui decide. Son en-tete annonce pourtant « acces :
+     * superadmin uniquement » — cinquieme occurrence du motif E-36, et la plus
+     * mal placee, puisqu'elle decrit la page qui manipule la cle de la flotte.
+     *
+     * CONSEQUENCE POUR TOUTE MESURE : il n'existe AUCUN chemin de refus par le
+     * ROLE sur cette page. Role 1 comme role 2 sont refuses par la PERMISSION.
+     * Une suite qui croirait mesurer « le role 1 est refuse » mesurerait la
+     * permission — une mesure plus large que la propriete.
+     *
+     * Et le chemin NOMINAL n'est pas exercable sur ce banc : un seul compte
+     * porte `can_manage_platform_key` (`superadmin`, inutilisable), et
+     * `rw-test-super` atteint la page par le contournement du role 3, donc SANS
+     * la permission. Dit plutot que corrige en deplacant un droit.
+     */
+    Route::get('/cle-plateforme', ClePlateformeController::class)
+        ->middleware(['role:1', 'perm:can_manage_platform_key'])->name('cle-plateforme');
+
     Route::get('/fail2ban', Fail2banController::class)
         ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
 
