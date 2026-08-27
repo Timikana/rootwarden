@@ -2171,6 +2171,59 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.21 — la correspondance version -> commit, et pourquoi elle devient necessaire
+
+**Trois commits de trois sessions ont revendique `v1.38.19` en 2 minutes 6 secondes.** Mesure :
+`git log --format='%s' -14 | grep -oE 'v1\.38\.[0-9]+' | sort | uniq -c` rend `3 v1.38.19`. Aucun
+contenu n'est faux ; trois messages portent une etiquette fausse, et `legacy/version.txt` ne departageait
+rien. **Les messages ne sont PAS reecrits** — `--amend` reste interdit tant qu'une session peut
+travailler, y compris quand le Lead est en cause. **C'est donc ce fichier qui departage, et voici la
+correspondance reelle :**
+
+| version | commit | contenu |
+|---|---|---|
+| v1.38.18 | `508b6f3` | E-186 — la sonde d'`agentd` partait aussi quand celle d'`agent2` avait reussi |
+| **v1.38.19** | `4686671` | **E-187** — un drapeau par LECTURE, et le verdict qu'E-183 avait laisse |
+| **v1.38.20** | `a0c80b0` | **le contrat d'E-184 cassait un affichage du portage** — voir ci-dessous |
+| v1.38.21 | (ce commit) | la convention de numerotation, et la correspondance ci-dessus |
+
+**La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
+DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
+employe. **La convention change donc** — une session ne met plus de numero dans son message et ne m'en
+demande plus ; elle nomme le defaut, qui ne se perime pas. Le Lead attribue les versions ici, depuis
+l'ordre reel des commits, et pose `legacy/version.txt` une fois par lot. Le tag CI etant deja calcule
+depuis ce fichier, le numero n'avait jamais besoin de voyager par message. **Il n'y a plus de numero a
+perimer.**
+
+### v1.38.20 — le contrat d'E-184 rendait FAUX un message du portage
+
+E-184 a fait que les trois routes de version peuvent rendre `success: false` avec un champ `concluante`
+neuf. **Les trois consommateurs du portage ont ete regardes UN PAR UN** — et c'est ce qui a paye : deux
+testaient `success` (les verifications d'apres-geste de V9 et V12, qui portaient deja le commentaire
+« NE PAS SAVOIR N'EST PAS CONSTATER » et etaient donc justes avant l'heure), **un ne le testait pas** — le
+bouton « Detecter la version » de V6.
+
+Une sonde non concluante arrive avec un statut **200**, donc `reponse.ok` est vrai et `version` est nulle.
+L'ecran affichait alors : « Aucun agent installe sur X. **Le releve precedent a ete efface.** »
+**Les deux affirmations etaient fausses** : on ne sait pas si un agent est la, et E-184 fait precisement
+que l'inventaire **n'est plus** efface dans ce cas — le texte annoncait donc une ecriture qui n'a pas eu
+lieu. **Un correctif applique dans le backend a rendu faux un texte du portage** : c'est la premiere fois
+sur ce chantier, et aucun test ne pouvait le voir.
+
+La troisieme issue est desormais nommee **avant** le test de version, en `--attention` et non `--echec` :
+*ne pas savoir n'est pas un echec du geste, c'est une absence de verdict*, et les deux niveaux d'alerte
+existent pour cela. Cle neuve dans les deux catalogues (`superv` **265 = 265**, jeux compares par PHP).
+
+**Mesure** : `go-page-supervision-version` **14 laravel / 6 legacy, 0 FAIL**. Et le journal dit POURQUOI
+le chemin normal n'a pas bouge plutot que de le laisser supposer : la sonde du banc rend `NOT_INSTALLED`
+avec un code nul, donc **concluante**, donc la branche neuve ne se declenche pas et l'ancien message
+s'affiche — **et il est vrai**, la ligne d'agent passant bien de 1 a 0 en base. **Cette suite mesure donc,
+sans avoir ete ecrite pour cela, la moitie d'E-184 qui compte le plus : que l'effacement VOULU survit au
+correctif.**
+
+**Le chemin non concluant reste declare NON EXERCABLE** : il demande une machine injoignable, et une
+fixture qui la fabriquerait deplacerait ce qu'elle mesure.
+
 ### v1.38.19 — E-187 : un drapeau par LECTURE, et le verdict qu'E-183 avait laisse
 
 `backend/routes/ssh.py`. La moitie que le correctif d'E-183 n'avait pas fermee, trouvee par **relecture
