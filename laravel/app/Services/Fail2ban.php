@@ -51,14 +51,53 @@ class Fail2ban
      */
     public const ETATS = ['absent', 'arrete', 'actif'];
 
-    /** Les machines proposables — les archivees sont hors du choix. */
-    public function machines(): array
+    /**
+     * Les machines proposables — archivees exclues, ET BORNEES PAR LE ROLE.
+     *
+     * ══ E-205 : LE PORTAGE AVAIT PERDU LA REGLE DE ROLE ══════════════════
+     *
+     * `legacy/fail2ban/index.php:14-20` charge le parc EN DEUX BRANCHES : tout
+     * le parc des le role 2, et une jointure sur `user_machine_access` en
+     * dessous. `legacy/iptables/index.php:52-58` fait exactement la meme chose.
+     * Les deux pages portaient la regle ; ce portage avait repris la page et
+     * perdu la regle — un role 1 porteur de la permission voyait TOUT le parc.
+     *
+     * **Ce n'est pas son effet actuel qui le classe.** Aucun compte de role 1 ne
+     * detient `can_manage_fail2ban` : l'ecart etait donc reel et SANS PORTEUR. Il
+     * s'armait a la premiere attribution de cette permission — un geste
+     * d'administration ordinaire, depuis `/comptes`, par quelqu'un qui n'a
+     * aucune raison de savoir ce qu'il ouvre. *Une propriete qui tient parce que
+     * personne n'exerce le chemin n'est pas une propriete : c'est un accident de
+     * configuration.*
+     *
+     * La signature est celle d'`App\Services\Iptables::machines()` — meme
+     * regle, meme forme, ecrite deux fois a l'identique pour que personne ne
+     * recopie le mauvais des deux precedents. Trouve par la session 5 en portant
+     * `iptables`, dans un module qui n'est pas le sien.
+     *
+     * Le troisieme porteur possible est `groups/`, dont le portage reste a
+     * faire : sa page legacy, elle, ne filtre PAS (mesure du 2026-08-27,
+     * `groups/index.php:22`), et la reprendre fidelement sera donc juste.
+     */
+    public function machines(int $idCompte, int $roleId): array
     {
+        if ($roleId >= 2) {
+            return DB::select(
+                'SELECT id, name, ip, port, environment, criticality '
+                . 'FROM machines '
+                . "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
+                . 'ORDER BY name'
+            );
+        }
+
         return DB::select(
-            'SELECT id, name, ip, port, environment, criticality '
-            . 'FROM machines '
-            . "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
-            . 'ORDER BY name'
+            'SELECT m.id, m.name, m.ip, m.port, m.environment, m.criticality '
+            . 'FROM machines m '
+            . 'INNER JOIN user_machine_access uma ON uma.machine_id = m.id '
+            . 'WHERE uma.user_id = ? '
+            . "AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived') "
+            . 'ORDER BY m.name',
+            [$idCompte]
         );
     }
 
