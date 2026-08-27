@@ -1178,6 +1178,113 @@ def regenerate_platform_key_route():
     return jsonify({'success': True, 'message': 'Keypair regeneree - re-deploiement requis', 'public_key': get_platform_public_key()})
 
 
+@bp.route('/server_users_inventory', methods=['GET'])
+@require_api_key
+@require_role(2)  # aligne sur la page portee, qui exige role:2 (voir ComptesDistantsController)
+@require_machine_access
+@threaded_route
+def server_users_inventory():
+    """Rend l'inventaire des comptes distants d'une machine, AVEC ses drapeaux.
+
+    ══ POURQUOI UNE ROUTE, ET PAS UNE COLONNE ═══════════════════════════════
+
+    E-200. `nom_valide` et `motif_invalide` sont CALCULES (E-199), pas stockes :
+    `server_user_inventory` porte quinze colonnes et aucune ne les nomme. Ils
+    n'existaient donc qu'au RETOUR d'un scan — et la page rend son inventaire
+    depuis la base, au chargement.
+
+    Consequence : un compte nomme `..` restait invisible tant que personne
+    n'avait relance un scan, c'est-a-dire precisement dans l'etat ou l'on en a
+    le plus besoin.
+
+    Persister le verdict aurait demande une migration, et surtout l'aurait rendu
+    PERIMABLE : la colonne aurait garde le verdict du scan qui l'a posee, pendant
+    que la regle, elle, peut changer. C'est la classe qu'E-195, E-196 et E-197
+    ont coutee ce jour — une regle recopiee finit par diverger de celle qui
+    decide. Ici la regle est appliquee A LA LECTURE, donc elle ne peut pas
+    diverger d'elle-meme.
+
+    ══ CETTE ROUTE NE JOINT AUCUNE MACHINE ══════════════════════════════════
+
+    Elle lit la base et applique `_motif_nom_invalide`. Rien d'autre. C'est ce
+    qui la distingue de `/scan_server_users`, qui ouvre une session SSH et reste
+    un GESTE. Une page qui joint le parc en s'ouvrant a deja coute assez cher au
+    chantier (`health_check.php`).
+
+    ══ LE TOTAL VIENT DU SERVEUR, PAS DE LA LONGUEUR DE LA LISTE ════════════
+
+    `total` est un `COUNT(*)`, jamais `len(comptes)`. La regle d'ecran est que
+    le TOTAL gagne quand il contredit la liste : il compte tout, la liste ne
+    porte que ce qui a voyage. Rendre `len()` ferait afficher un nombre PLUS
+    PETIT que la realite le jour ou une borne apparaitrait — la direction
+    dangereuse. Aucune borne n'existe aujourd'hui ; l'invariant tient d'avance.
+
+    ══ `@require_machine_access` EST INERTE ICI, ET C'EST DIT ═══════════════
+
+    `check_machine_access` rend `True` sans condition des le role 2
+    (`helpers.py:299`), donc ce decorateur ne contraint rien sur une route
+    gardee `@require_role(2)`. Il est conserve DELIBEREMENT, et pour une seule
+    raison : le jour ou quelqu'un abaisserait le role pour ouvrir cette lecture
+    plus largement, il deviendrait porteur — et cette route enumere des noms de
+    comptes. Il n'est pas la pour proteger aujourd'hui ; il est la pour que
+    l'abaissement du role ne soit pas silencieusement une divulgation.
+    """
+    machine_id = request.args.get('machine_id')
+    if not machine_id:
+        return jsonify({'success': False, 'message': 'machine_id requis'}), 400
+    # Le cast vit HORS du `try` : une faute de la requete se refuse en 400,
+    # elle ne casse pas en 500 (E-164).
+    try:
+        machine_id = int(machine_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'machine_id doit etre un nombre'}), 400
+
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT COUNT(*) AS n FROM server_user_inventory WHERE machine_id = %s",
+                        (machine_id,))
+            total = int((cur.fetchone() or {}).get('n', 0))
+
+            cur.execute("""
+                SELECT id, username, uid, home_dir, shell, status, managed_by,
+                       keys_count, has_platform_key, first_seen_at, last_seen_at,
+                       reviewed_by, reviewed_at, notes
+                FROM server_user_inventory
+                WHERE machine_id = %s
+                ORDER BY username
+            """, (machine_id,))
+            comptes = cur.fetchall()
+
+        for c in comptes:
+            for k in ('first_seen_at', 'last_seen_at', 'reviewed_at'):
+                if c.get(k) and hasattr(c[k], 'isoformat'):
+                    c[k] = c[k].isoformat()
+            # E-199 : le drapeau est RENSEIGNE, jamais omis — un champ absent se
+            # rend comme une liste vide et ne se distingue pas de « rien a dire ».
+            motif = _motif_nom_invalide(c.get('username'))
+            c['nom_valide'] = motif is None
+            c['motif_invalide'] = motif
+
+        # E-199, condition 3 : `en_attente` appelle un TRAVAIL, donc une ligne
+        # qui ne peut recevoir aucun geste n'y entre pas. `invalides_count` est
+        # rendu a cote plutot que soustrait — les deux nombres ne demandent pas
+        # le meme geste.
+        return jsonify({
+            'success': True,
+            'machine_id': machine_id,
+            'total': total,
+            'comptes': comptes,
+            'en_attente': sum(1 for c in comptes
+                              if c['status'] == 'pending_review' and c['nom_valide']),
+            # Toujours present, meme a zero.
+            'invalides_count': sum(1 for c in comptes if not c['nom_valide']),
+        })
+    except Exception as e:
+        logger.error("server_users_inventory(%s): %s", machine_id, e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
 @bp.route('/scan_server_users', methods=['POST'])
 @require_api_key
 @require_role(2)  # Patch A01 : enumeration des comptes distants reservee admin
