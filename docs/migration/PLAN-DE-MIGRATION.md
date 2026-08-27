@@ -787,10 +787,61 @@ Même famille que le témoin de `go-page-conformite` pour `groups/`, **mais d'un
     grep -rn '<partie>' legacy/lang/
 
 **Résultat mesuré le 2026-08-27** : sur les dossiers legacy vivants, **un seul** lien inter-modules est
-injecté en JS — celui de `remote_users` — et **aucun** lien entrant n'existe vers `security/`, `bashrc/`,
-`fail2ban/`, `graylog/` ni `ssh/`, ni dans les `.php`, ni dans les catalogues. **Les cinq archivages qui
-restent ne sont donc pas contraints.** La passe est bon marché et elle vient d'être payée une fois ; elle
-entre au cycle pour que la prochaine partie ne dépende pas de qui a lu quoi.
+injecté en JS — celui de `remote_users`. **Les cinq archivages qui restent ne sont donc pas contraints
+dans leur ORDRE.**
+
+> **⚠ Et le Lead a d'abord écrit « aucun lien entrant » pour les cinq, ce qui était FAUX pour quatre.**
+> Le motif de la passe cherchait `href="…"` ; **les tuiles du tableau de bord s'écrivent `'url' => '…'`**,
+> et `legacy/index.php:378` porte bien celle de `graylog/`. Relevé par la session 2, qui a nommé la
+> distinction que le Lead avait écrasée : **un lien ENTRANT depuis une autre partie (étape 8) et un POINT
+> D'ENTRÉE du legacy vers la partie (étape 3) ne sont pas la même chose**, même si leur effet après
+> archivage est identique — un 404. *Une passe qui répond « rien » ne dit rien tant qu'on n'a pas montré
+> qu'elle peut répondre « quelque chose ».*
+
+#### Les quatre emplacements, comptés — y compris les zéros
+
+    partie          laterale  tiroir  raccourci  tuile
+    security            1       3         1        1
+    bashrc              1       1         0        1
+    fail2ban            1       1         0        0
+    graylog             1       1         0        1
+    ssh                 1       1         1        1
+    iptables            1       1         1        1
+    ssh-audit           1       1         1        1
+    wazuh               1       1         0        1
+    groups              1       0         0        0
+
+**Ce tableau explique comment l'étape 4 a pu être oubliée onze fois, et c'est le constat de la session 2 :
+`graylog/` est le MIROIR de `services/`** — `services/` avait le raccourci clavier et **pas** la tuile,
+`graylog/` a la tuile et **pas** le raccourci. **Aucun des deux n'exerce les quatre emplacements, et ils
+ne se recouvrent pas.**
+
+> **Chaque archivage n'éprouve qu'un sous-ensemble DIFFÉRENT, donc onze archivages ont pu valider le cycle
+> sans qu'aucun ne l'exerce en entier.** Et c'est **pire** qu'une étape éprouvée sur des cas où elle n'a
+> rien à trouver : là, la vérification **a l'air** d'avoir été faite à chaque fois. Un sous-ensemble
+> tournant est indiscernable d'une couverture complète quand on ne regarde qu'un archivage.
+
+**La parade est celle de la session 2, elle coûte une ligne** : les quatre emplacements se comptent par
+quatre `grep`, et **le compte s'écrit dans le compte rendu, y compris quand il vaut zéro.** *Un zéro écrit
+est une mesure ; un zéro non écrit est une étape sautée, et rien ne les distingue après coup.*
+
+Deux irrégularités que le comptage révèle et qu'il faut connaître avant d'archiver : **`security/` porte
+TROIS occurrences dans le tiroir mobile** (donc trois bascules, pas une), et **`groups/` n'est ni dans le
+tiroir ni en tuile** — 1/0/0/0, la couverture la plus faible du parc.
+
+#### Et la question de l'étape 6 n'est pas « y a-t-il une adresse » mais « DANS QUEL SENS »
+
+`graylog/` est la **première** partie dont la réponse à l'étape 6 n'est pas « aucune adresse » — elle
+configure `server_host` et l'écrit dans `/etc/rsyslog.d/` sur chaque machine. **Et l'étape est pourtant
+satisfaite**, parce que la distinction qui tranche est le sens :
+
+| | `chatops/` | `graylog/` |
+|---|---|---|
+| nature | **ENTRANTE** — le chemin que Slack **appelait** | **SORTANTE** — celle où les machines **envoient** |
+| ce que l'archivage casse | le point d'entrée public disparaît, Slack tombe en silence | **rien** — l'adresse vit en base et dans `rsyslog.d`, pas dans le dossier archivé |
+
+La passe est bon marché et elle vient d'être payée deux fois ; elle entre au cycle pour que la prochaine
+partie ne dépende pas de qui a lu quoi.
 
 #### Et une chose que ces liens disent du produit, pas du chantier
 
