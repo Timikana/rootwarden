@@ -1614,6 +1614,33 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### AVANT D'UNIFIER DEUX COPIES, VÉRIFIER QU'ELLES VALIDENT LA MÊME CHOSE (2026-08-27)
+
+**Deux fois dans la même journée, une instruction du Lead « n'en garde qu'une » était fausse**, et les
+deux fois la mesure l'a refusée avant écriture. C'est assez pour en faire une règle.
+
+| cas | ce que j'avais demandé | pourquoi c'était faux |
+|---|---|---|
+| la règle de révocation (E-195) | fusionner les deux ensembles « autorisés » | ils désignent « qui **gardera** l'accès » et « qui a été **traité** » — fusionner aurait fait **sous-annoncer** |
+| l'expression de nom (E-197) | reprendre la version stricte | elle refuse `Debian-exim`, `Debian-snmp`, `Timikana` — **trois comptes réels**, rendus irrévocables en silence |
+
+> La règle « *n'en garder qu'une plutôt qu'aligner deux copies* » est juste, et **son objet ne l'est pas
+> toujours** : deux implémentations qui se **ressemblent** ne valident pas forcément la **même chose**.
+> **Avant d'unifier, nommer le DOMAINE de chacune.** Trois implémentations peuvent porter deux notions —
+> ici, les noms que RootWarden **gère** (règle `useradd`) et les noms **découverts** dans un
+> `/etc/passwd` réel, **où les majuscules existent**.
+
+Et le corollaire, qui est E-198 : dire « deux notions » ne suffit pas, **il faut dire laquelle s'applique
+où** — sinon le croisement se produit sans que personne ne l'ait décidé, et c'est déjà le cas.
+
+**Un chiffre qui rassure mérite qu'on vérifie qu'il porte sur quelque chose.** La sonde qui a établi ces
+trois comptes avait d'abord rendu **« 0 compte cassé »** : un `UNION` entre deux colonnes de collations
+différentes, MySQL rendant `ERROR 1271`, et le `grep` **comptant le message d'erreur comme un nom**. Un
+zéro parfaitement rassurant, mesuré sur rien. Ce qui l'a rattrapé n'est pas une relecture mais **un
+listing brut, deux commandes plus haut, qui montrait déjà `Debian-exim` à l'écran** — deux sources se
+contredisaient et c'est la moins commode qui a été regardée. Le remède est mécanique : deux requêtes
+séparées, **et** vérifier qu'aucune ligne ne contient « error » avant de compter.
+
 ### UNE PROPRIÉTÉ QUI TIENT PAR ACCIDENT N'EST PAS UNE PROPRIÉTÉ (2026-08-27)
 
 Formulée en affinant un dédouanement que j'avais écrit trop mollement. J'avais dit du décalage entre les

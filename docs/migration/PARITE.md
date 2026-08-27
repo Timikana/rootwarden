@@ -8606,3 +8606,60 @@ nommer.** Un fail-closed qui masque son motif est un fail-closed qu'on finit par
 d'insérer** un nom invalide plutôt que de laisser l'inventaire porter des lignes qu'aucun geste ne pourra
 honorer. C'est *valider aux deux bouts* — mais c'est un autre défaut, et il change ce que l'écran
 d'inventaire affiche.
+
+---
+
+*Rétractation sur E-197 — mon instruction « reprends l'expression stricte » était FAUSSE, et elle aurait
+rouvert le trou que E-192 à E-195 venaient de fermer.*
+
+J'avais écrit : « n'écris pas une quatrième expression, reprends celle qui existe, aligne la plus
+dangereuse sur les deux autres ». **Mesuré sur les 41 noms réels du parc, la stricte en refuse trois** —
+et ma propre contre-mesure en trouve un quatrième :
+
+| nom | laxe | **stricte** | correctif étroit |
+|---|---|---|---|
+| `Debian-exim` — compte système Debian, sur **toute** machine | accepté | **REFUSÉ** | accepté |
+| `Debian-snmp` — idem | accepté | **REFUSÉ** | accepté |
+| `Timikana` — **un compte réel** | accepté | **REFUSÉ** | accepté |
+| `a.b` | accepté | **REFUSÉ** | accepté |
+| `.` `..` `...` `....` | accepté | refusé | **REFUSÉ** |
+
+La cause est la **majuscule**, que `^[a-z_][a-z0-9_-]{0,31}$` interdit en première position.
+
+> **Et la conséquence est aggravée par E-192 lui-même** : un nom invalide y vaut désormais « RÉVOCATION
+> REFUSÉE, aucun geste émis ». Aligner aurait donc rendu ces trois comptes **impossibles à révoquer, en
+> silence** — c'est-à-dire **exactement le trou que la série E-192 → E-195 vient de fermer**, rouvert par
+> mon instruction.
+
+### La différence entre les trois implémentations est un DOMAINE, pas une sévérité
+
+C'est ce que je n'avais pas vu, et c'est le fond :
+
+- `sudo_manager` et `sftp_manager` valident des noms que RootWarden **gère** — la règle de `useradd` y
+  est la bonne ;
+- `configure_servers` valide des noms **découverts** dans le `/etc/passwd` d'une machine réelle, **où les
+  majuscules existent**.
+
+**Trois implémentations, mais DEUX notions.** Les fondre aurait été E-195 à nouveau — *plusieurs
+implémentations d'une même notion* — appliqué à des notions qui n'en font pas une. **Ma règle était la
+bonne, son objet ne l'était pas** : avant d'unifier deux copies, vérifier qu'elles valident la même
+chose, et pas seulement qu'elles se ressemblent.
+
+**Le correctif retenu est étroit et TOTAL pour la classe** : la classe de caractères reste, et est refusé
+ce qui n'est fait **que de points** — `nom.strip('.') == ''`. Tester `.` et `..` à la main aurait laissé
+passer `...` : mesuré, les quatre formes sont refusées, et `a b`, `a;id`, `a/b`, le vide et 33 caractères
+restent refusés par la classe. **0 refus sur les 41 noms réels.** `pytest` : **509 passed**.
+
+## E-198 — `Timikana` ne peut pas recevoir de politique sudo, à cause d'une majuscule
+
+Relevé le 2026-08-27, **comportement pré-existant**, et c'est la **preuve vivante** que les deux domaines
+d'E-197 se croisent déjà.
+
+`policies.py` résout le nom depuis `server_user_inventory` — donc un nom **découvert**, où les majuscules
+existent — puis le passe à l'expression **stricte** de `sudo_manager`, celle des noms **gérés**. Un compte
+réel du parc est donc refusé par une règle écrite pour un autre domaine.
+
+**Ce n'est pas un trou de sécurité : c'est une capacité inatteignable pour une classe de comptes**, et
+elle est silencieuse. Elle confirme qu'il ne suffit pas de dire « deux notions » : **il faut dire laquelle
+s'applique où**, sinon le croisement se produit sans que personne ne l'ait décidé — ce qui est déjà le
+cas ici.
