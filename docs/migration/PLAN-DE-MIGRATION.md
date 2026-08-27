@@ -663,6 +663,22 @@ base, conteneur, fichier distant, paquet, **secret ou mot de passe de compte** �
 l'entrée et dans un `finally`, **chaque étape isolée dans son `try`**, et **l'état rendu est relu pour
 être prouvé**.
 
+**⚠ `from server import app` DÉMARRE UN SCHEDULER. Ce n'est jamais une commodité de test.**
+Mesuré le 2026-08-27 : `backend/server.py:242-244` appelle `start_scheduler()` **au niveau module**, sans
+aucune garde `if __name__` — donc **un simple `import server` lance un second scheduler**, qui interroge la
+base toutes les 60 s et prend toute ligne `enabled = 1 AND next_run <= now`. La sortie de la sonde l'a dit
+elle-même : « Scheduler demarre (CVE + SSH Audit + purge, intervalle: 60s) ».
+
+**Aucun dommage cette fois, et c'est vérifié, pas supposé** : aucun processus survivant, **0 tâche créée**,
+`cve_scans` inchangé, **0 planification active** — il est mort avec le processus `exec` et il n'y avait
+rien à prendre. **Mais si une planification avait existé et que la sonde avait vécu une minute de plus,
+elle aurait déclenché un vrai scan SSH.**
+
+Le §6 disait déjà que le scheduler est **invisible à `ps`** et qu'une planification de test peut
+déclencher un vrai scan. Il manquait ceci : **le déclencheur s'arme par un IMPORT, pas seulement par une
+écriture en base.** Une sonde qui veut un client de test déballe les décorateurs sur une `Flask` **nue** et
+n'importe que le module de routes.
+
 **Avant de faire cliquer un test, lire ce que l'action envoie.** **`srv-zabbix` (id 1) : jamais
 jointe.** **Aucune session de test ni de capture pendant un rejeu** — le garde anti-rejeu TOTP est par
 compte et **en base** ; un compte que le LOT n'utilise pas est libre.
