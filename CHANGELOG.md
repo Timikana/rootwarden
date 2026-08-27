@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.98** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.99** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,43 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.99 — `fail2ban/` F1 caracterise, et E-152 : sur 23 routes, DEUX portent une permission
+
+`go-fail2ban-f1.mjs`, **legacy 18 PASS / 0 FAIL**. Le portage reste a faire.
+
+#### E-152 — septieme occurrence du motif, et la plus large
+`MODULE-FILTRAGE.md` §1 le relevait ; il n'avait **jamais recu d'entree de parite**. Sur les 23
+routes d'`iptables/` et `fail2ban/`, **deux** portent un `@require_permission`, et le proxy ne garde
+ni `/iptables` ni `/fail2ban/`.
+
+> **La protection la plus forte est posee sur les deux actions les plus faibles.** `/fail2ban/geoip`
+> est une lecture sans SSH, et c'est la seule route fail2ban gardee ; `/fail2ban/ban`, `/enable_jail`
+> et `/whitelist` — qui ecrivent ET redemarrent le service — n'ont ni role ni permission.
+
+Le ROLE, lui, est un choix assume (`CHANGELOG.md:3078-3085`). C'est la PERMISSION qui n'existe qu'a
+l'affichage.
+
+#### L'en-tete ment, et le journal le prouve
+`fail2ban/index.php:5` annonce « admin (2), superadmin (3) » ; `:10` admet `ROLE_USER`. Aucun compte
+d'epreuve ne permet de le montrer par un clic. La suite le prouve **indirectement** : le refus oppose
+au role 1 est journalise « Permission refusee », or un refus par ROLE ne passe jamais par
+`checkPermission`. Cette ligne etablit donc que `checkAuth` a laisse passer le role 1 — celui que
+l'en-tete dit exclu. La mesure est nommee comme indirecte dans la suite.
+
+#### F1 ECRIT, et la suite s'en acquitte
+`/fail2ban/status` rafraichit le cache `fail2ban_status`. La suite en prend une copie a l'entree et
+la remet a la sortie : un test ne change pas un etat partage, meme un cache.
+
+#### Un vert pour la mauvaise raison, attrape a temps
+Le filet s'ecrivait `/\/fail2ban\/[a-z_]+/` : il avortait **`/fail2ban/js/main.js`**, le script de
+la page. Celle-ci rendait son HTML statique — les selecteurs se trouvaient — mais **rien ne
+s'executait**. La suite passait au vert en mesurant une page morte, sans qu'une seule assertion le
+dise.
+
+**Quatrieme fois de la session qu'un filet vise trop large.** Le motif liste desormais les routes
+reelles, et **une assertion verifie que le script de la page a tourne** — sans quoi tout le reste ne
+mesure rien.
 
 ### v1.37.98 — `services/` S3 porte, `services/` est CLOS — et le banc vide cachait deux defauts
 
