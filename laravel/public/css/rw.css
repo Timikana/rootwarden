@@ -953,6 +953,23 @@ a.rw-bouton { display: inline-block; }
 
 .rw-etiquette-champ .rw-saisie { text-transform: none; letter-spacing: normal; font-weight: 400; }
 
+/*
+ * UN CHAMP QUI ATTEND DEUX CARACTERES NE FAIT PAS 1 339 PIXELS.
+ *
+ * `.rw-etiquette-champ` est en `flex: 1` parce que d'autres panneaux y font
+ * saisir un nom de fichier ou un nom de machine — on ne la touche pas. Mesure du
+ * 2026-08-27 sur le champ de recopie du panneau de decision de `fail2ban/` :
+ * 1 339 px a 1920, 819 px a 1400, 323 px a 390. Un champ de 1 339 px pour y
+ * taper le NOMBRE de machines touchees, dans le panneau qui garde le geste le
+ * plus dangereux du module : il n'invite pas a la precision au moment precis ou
+ * l'on en veut.
+ *
+ * Modificateur ADDITIF, applique dans la vue qui en a besoin : aucun autre
+ * panneau n'est traverse. Et il ne mord pas a 390 px, ou 14ch depasse la place
+ * disponible.
+ */
+.rw-saisie--court { max-width: 14ch; }
+
 /* MEME RAISON QUE LA LIGNE AU-DESSUS, POUR L'AIDE. `.rw-etiquette-champ` met
    TOUTE l'etiquette en capitales gras : juste pour un intitule de champ,
    illisible pour une phrase. Seule `.rw-saisie` etait remise a plat — vu a
@@ -2239,6 +2256,30 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     gap: 6px;
     margin-top: 10px;
 }
+/*
+ * LA LIGNE EST BORNEE, ET C'EST LE `margin-left: auto` QUI L'IMPOSE.
+ *
+ * `__jails` pousse ses marques a droite (`margin-left: auto`), ce qui ALIGNE les
+ * marques en colonne d'une ligne a l'autre — une affordance reelle : c'est ce qui
+ * permet de balayer la liste des services de `services/` et celle de la liste
+ * blanche. Mais sur une section pleine largeur, ce meme `auto` envoie la donnee
+ * a l'autre bout de l'ecran.
+ *
+ * Mesure du 2026-08-27, ecart entre un nom et la date qui le QUALIFIE :
+ *
+ *     1920 px   1281 / 1289 / 1219 px      <- les deux bouts de l'ecran
+ *     1400 px    761 /  769 /  699 px
+ *      390 px     19 /   27 /  -43 px      <- repli sur deux lignes, correct
+ *
+ * Le defaut est donc une DISTANCE, pas la structure : on la borne plutot que de
+ * retirer `auto`, ce qui echangerait une affordance contre la correction d'un
+ * symptome. Le cout assume est une incoherence visuelle — des cadres plus
+ * etroits que le reste de la section.
+ *
+ * `max-width` en `ch` et non en `px` : la borne suit la taille du texte, comme
+ * `.rw-prose` (68ch). Et elle ne mord PAS sous 78ch, donc le repli mobile
+ * mesure a 19-27 px est inchange — c'etait le critere de recette.
+ */
 .rw-liste-etats__ligne {
     display: flex;
     align-items: center;
@@ -2248,6 +2289,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     background: var(--rw-surface);
+    max-width: 78ch;
 }
 /* Un service absent s'efface SANS disparaitre : le contraste du texte reste
    au-dessus du seuil, seule la surface recule. */

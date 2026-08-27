@@ -100,7 +100,7 @@
     --}}
     <label class="rw-etiquette-champ" data-rw="f2b-recopie-bloc" hidden>
         <span>{{ __('fail2ban.recopie_etiquette') }}</span>
-        <input type="text" class="rw-saisie" data-rw="f2b-recopie"
+        <input type="text" class="rw-saisie rw-saisie--court" data-rw="f2b-recopie"
                inputmode="numeric" autocomplete="off" spellcheck="false">
         <span class="rw-aide">{{ __('fail2ban.recopie_aide') }}</span>
         <span class="rw-erreur" data-rw="f2b-recopie-message" hidden>{{ __('fail2ban.recopie_faux') }}</span>
