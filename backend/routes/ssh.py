@@ -1068,8 +1068,26 @@ def revoke_service_account():
                     # ══ CE QUI EN DECOULE, ET QUI EST PIRE QUE « INCOMPLET » ══
                     #
                     # Sur une machine migree, AUCUN chemin du produit ne retire
-                    # ce fichier : `_purge_legacy_sudoers` l'exclut par exception
-                    # explicite, le rejeu ne peut pas elever, et le seul geste
+                    # ce fichier. La raison a d'abord ete mal ecrite ici, et la
+                    # vraie est plus simple et plus large :
+                    #
+                    #   AUCUNE routine du produit ne balaie `/etc/sudoers.d/` a
+                    #   la recherche de fichiers sans compte correspondant.
+                    #
+                    # L'explication precedente accusait l'exception
+                    # `if username == _RESERVED_SA_USER` de
+                    # `_purge_legacy_sudoers`. Mesure : cette fonction n'est
+                    # appelee que depuis `add_to_sudoers` et
+                    # `remove_from_sudoers`, TOUJOURS avec le nom d'un
+                    # utilisateur GERE par le portail. Elle ne regarde donc
+                    # jamais `/etc/sudoers.d/rootwarden`, et son exception est un
+                    # garde-fou de COLLISION DE NOMS — le cas ou un utilisateur
+                    # du portail s'appellerait `rootwarden`. Elle ne protege pas
+                    # l'orphelin : elle ne le croise pas.
+                    #
+                    # Le fichier survit parce que PERSONNE NE LE CHERCHE, pas
+                    # parce qu'une regle le protege. Les deux autres maillons
+                    # tiennent : le rejeu ne peut pas elever, et le seul geste
                     # qui l'ecrase — `deploy_service_account` — le REMPLACE en
                     # recreant le compte, il ne le retire pas.
                     # L'etat n'est ni transitoire ni auto-reparant : IL EST
