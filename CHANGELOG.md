@@ -2171,6 +2171,48 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.19 — E-187 : un drapeau par LECTURE, et le verdict qu'E-183 avait laisse
+
+`backend/routes/ssh.py`. La moitie que le correctif d'E-183 n'avait pas fermee, trouvee par **relecture
+croisee du code deja applique**.
+
+`scan_concluant` mesurait la lecture de `/etc/passwd` et gardait pourtant **trois** ecritures, dont deux
+qui dependent de lectures **entierement differentes** — les deux dumps `authorized_keys`. Le code de
+sortie du dump root etait **capture puis jamais lu** (`_code`, seule occurrence de ce nom) ; celui du
+dump simple-utilisateur n'etait **pas obtenu**. **La valeur qui fermait le defaut etait deja dans le
+code, a portee d'un `if`.**
+
+Desormais **un drapeau par lecture** : `dump_root_ok`, `dump_user_ok`,
+`cles_lues = dump_root_ok or dump_user_ok`. La purge des cles suit `scan_concluant ET cles_lues` ;
+`keys_count` et `has_platform_key` ne s'ecrivent plus quand aucune lecture de cles n'a abouti, tandis que
+les colonnes d'identite continuent de l'etre puisqu'elles viennent de `/etc/passwd`, deja garde.
+
+**Le cas « code nul, dump vide » est DELIBEREMENT laisse de cote, avec la raison ecrite dans le code** :
+une machine sans aucune cle rend legitimement un dump vide avec un code nul, et trancher sans la mesure
+reproduirait E-183 **dans l'autre sens**. La mesure appartient au banc, sur `Test-Server-Debian` — qui
+porte justement **zero** cle, donc exactement le cas ambigu.
+
+**Et le VERDICT est ferme, ce qu'E-183 avait laisse** : `success` suit le scan, et un champ `lectures`
+nomme **chaque source separement** — `comptes`, `cles_root`, `cles_utilisateur`. Un seul booleen ne
+permettrait a aucune interface de dire *laquelle* a manque, et « je n'ai pas lu les comptes » ne se
+corrige pas comme « j'ai lu les comptes mais pas les cles ».
+
+**L'asymetrie delicate du patch a ete assertee par une autre session, contre la specification, et verte
+du premier coup** : quand les comptes sont lus mais pas les cles, **les comptes fantomes doivent QUAND
+MEME etre purges** — sinon la sur-correction rendrait E-183 inoperant sur son propre cas.
+`ghost_usernames` est garde par `scan_concluant` **seul**, `stale` par `scan_concluant ET cles_lues`.
+`pytest` : **483 passed, 1 xfailed**.
+
+**Changement de contrat pour le portage** : `POST /scan_server_users` rend desormais `success: false` sur
+un scan non concluant. Toute page qui teste `if (data.success)` verra un echec la ou elle voyait un
+succes muet.
+
+### v1.38.18 — E-186 : la sonde d'`agentd` partait AUSSI quand celle d'`agent2` avait reussi
+
+La commande de `zabbix_version` chainait `A && B || C && D || E` **sans parentheses**. `sh` evalue de
+gauche a droite : quand `zabbix_agent2 -V` reussissait, **`zabbix_agentd -V` etait lance quand meme**, et
+la sortie pouvait porter deux lignes. Remplace par un `if/elif/else` explicite.
+
 ### v1.38.17 — E-184 : une sonde qui echoue n'efface pas ce qu'elle n'a pas pu regarder
 
 Trois sondes, un seul commit, parce que c'est un seul defaut sous trois formes.
