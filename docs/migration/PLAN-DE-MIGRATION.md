@@ -1731,6 +1731,21 @@ comptes à l'écran.
 C'est la forme générale de « **N validations précédentes ne prouvent rien si aucune ne pouvait échouer** »,
 appliquée non plus aux assertions d'une suite mais **aux instruments de mesure eux-mêmes**.
 
+**Et la forme ACTIONNABLE n'est pas celle que je viens d'écrire.** « Éprouver sur un cas où l'instrument
+devrait trouver un défaut » est **souvent impossible** — les six branches non mesurées du portage en
+témoignent, chacune demandant un état que le banc ne peut pas produire. La reformulation qui s'applique
+toujours :
+
+> **Un « aucun défaut » n'est éprouvable que si l'instrument peut NOMMER LA RAISON DE SON SILENCE.**
+> « L'encart est caché » ne l'est pas. « L'encart est caché **et** le corps dit `invalides_count = 0` »
+> l'est. **Exiger que le silence soit MOTIVÉ**, plutôt que d'exiger un cas positif qu'on ne peut pas
+> toujours fabriquer.
+
+Mesuré le jour même : l'encart et un `fetch` échoué **rendent le même écran**, donc « caché » ne prouvait
+rien à lui seul — c'est le **corps** qui tranche. Et le même raisonnement a fait mesurer que le sélecteur
+gardait ses **21 options** : *un code qui retire des options doit être mesuré sur le cas où il ne doit RIEN
+retirer.*
+
 ### UN DISCRIMINANT DOIT ÊTRE UN SEUIL, PAS UNE INÉGALITÉ (BUG-201, 2026-08-27)
 
 **Quatrième instrument pris pour un résultat en une journée, et le seul qui soit trop SENSIBLE au lieu de
@@ -1818,6 +1833,20 @@ comme vérifiée).
 > 3. **l'objet sort des COMPTAGES qui appellent une décision** — « N comptes attendent un examen », les
 >    listes de gestes de masse, le sélecteur. **Une ligne visible qui ne peut recevoir aucun geste ne doit
 >    pas gonfler un nombre sur lequel on décide**, et ne doit jamais être présélectionnée.
+
+**⚠⚠ ET SON PENDANT EXACT, mesuré deux heures plus tard : UNE COMMANDE QUI DÉBLOQUE NE SE RETIRE PAS.**
+La consigne « aucun geste offert sur ces lignes » aurait **produit un défaut**. La seule commande par
+ligne de cette page n'est pas un geste distant : c'est le **CLASSEMENT**, un `UPDATE` en base qui aboutit
+parfaitement sur un nom illisible. **Et c'est le seul geste qui DÉBLOQUE**, puisque le compteur du
+préflight compte ces lignes délibérément. La retirer aurait **strandé l'opérateur** : le préflight lui dit
+« classez-les dans Utilisateurs distants », et la page ne lui aurait offert **aucun moyen de le faire**.
+Ce qui sort du choix est donc le **sélecteur des trois gestes distants** que le backend refuse — pas le
+classement.
+
+> **Avant de retirer une commande, demander ce qu'elle PERMET, pas seulement ce qu'elle risque.** C'est le
+> pendant exact de la règle ci-dessous : *un nombre qui interdit un travail ne se filtre pas* d'un côté,
+> *une commande qui débloque ne se retire pas* de l'autre. **Même erreur possible, deux endroits** — et
+> les deux fois, appliquer la consigne de sûreté au pied de la lettre aurait fermé la porte de sortie.
 
 **⚠ La condition 3 ne s'applique QU'AUX nombres qui promettent un travail — pas à ceux qui en
 interdisent un.** Refus mesuré le 2026-08-27 : le préflight compte aussi les lignes en attente, et ce
