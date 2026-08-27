@@ -131,11 +131,40 @@
         bloc.className = 'rw-preflight__machine';
         bloc.dataset.rw = 'preflight-machine-' + r.machine_id;
 
+        /*
+         * ══ E-190 : TROIS ETATS PAR MACHINE, PAS DEUX ════════════════════
+         *
+         * `user_impact`, `users_to_create` et `users_revoked` sont poses dans un
+         * `try` IMBRIQUE de `preflight_check` (`ssh.py:448-487`) dont l'`except`
+         * journalise **sans rien ajouter a `result['errors']`** — et `ssh_ok`
+         * vaut deja `True` a ce moment-la. Un audit d'inventaire qui leve rend
+         * donc une machine SANS ces trois cles, sans erreur, badge OK.
+         *
+         * Cote ecran, `listeNommee` sort en silence sur un champ absent : la
+         * liste « Acces qui seront REVOQUES » ne s'affichait pas, exactement
+         * comme si elle etait VIDE. **Une machine dont l'inventaire n'a pas pu
+         * etre lu se presentait donc comme verifiee et sans revocation a
+         * prevoir** — juste avant le geste qui revoque.
+         *
+         * Le discriminant est la PRESENCE de la cle, pas sa longueur : `[]` veut
+         * dire « audite, rien a revoquer », absent veut dire « pas audite ». Les
+         * confondre est la faute meme d'E-183, deplacee vers l'ecran.
+         *
+         * Et les trois libelles du badge passent en i18n : `'OK'` et `'FAIL'`
+         * etaient ecrits EN DUR dans ce script, donc hors parite FR/EN.
+         */
+        const inventaireLu = Object.prototype.hasOwnProperty.call(r, 'users_revoked');
+        const partiel = r.ssh_ok && ! inventaireLu;
+
         const enTete = document.createElement('p');
         enTete.className = 'rw-preflight__entete';
         const etat = document.createElement('span');
-        etat.className = 'rw-badge ' + (r.ssh_ok ? 'rw-badge--ok' : 'rw-badge--alerte');
-        etat.textContent = r.ssh_ok ? 'OK' : 'FAIL';
+        etat.className = 'rw-badge ' + (! r.ssh_ok
+            ? 'rw-badge--alerte'
+            : (partiel ? 'rw-badge--attention' : 'rw-badge--ok'));
+        etat.textContent = ! r.ssh_ok
+            ? (L.badge_echec || 'FAIL')
+            : (partiel ? (L.badge_partiel || '') : (L.badge_ok || 'OK'));
         const nom = document.createElement('strong');
         nom.textContent = `${r.name || ''} (${r.ip || ''})`;
         enTete.append(etat, nom);
@@ -162,6 +191,12 @@
         if (Array.isArray(r.user_impact) && r.user_impact.length) {
             texte(bloc, 'rw-aide', (L.inventaire || '{nombre}')
                 .replace('{nombre}', String(r.user_impact.length)));
+        }
+        // UNE ABSENCE DE LISTE N'EST PAS UNE LISTE VIDE : on le dit, et on le dit
+        // AVANT les listes, pour que leur absence soit deja expliquee quand on y
+        // arrive.
+        if (partiel) {
+            texte(bloc, 'rw-annonce rw-annonce--attention', L.inventaire_non_lu || '');
         }
         listeNommee(bloc, L.a_creer || '', r.users_to_create, 'rw-preflight__liste');
         // CE QUI VA ETRE REVOQUE EST LA LIGNE LA PLUS IMPORTANTE DU MODULE : elle
@@ -204,6 +239,40 @@
                 return;
             }
             const d = await rep.json();
+            /*
+             * ══ E-189 : UN STATUT 200 N'EST PAS UN VERDICT ═══════════════════
+             *
+             * Ce bloc lisait `d.results` apres le seul controle de `rep.ok`. Ce
+             * n'est pas un defaut aujourd'hui, et c'est verifie plutot que
+             * suppose : `preflight_check` n'a que TROIS retours — 400 « aucune
+             * machine », 403 « acces refuse », et le chemin 200 qui rend
+             * `success: True` **inconditionnellement** (`ssh.py:494`). Les deux
+             * controles coincident donc.
+             *
+             * **Mais c'est la coincidence qui tient, et trois routes voisines
+             * viennent de la rompre** : E-184 sur les sondes de version, E-186,
+             * E-187 sur le scan des comptes distants. Chacune rendait toujours
+             * `success: True` et peut desormais rendre `false` avec un statut
+             * 200. Le jour ou celle-ci suit, cet ecran presenterait des
+             * resultats PARTIELS comme une verification reussie — juste avant le
+             * geste qui revoque des acces, et sur un ecran ou le bouton de
+             * deploiement ne depend PAS du verdict de la verification.
+             *
+             * On ne rend donc rien du tout dans ce cas : un rapport a moitie
+             * peuple se lit comme un rapport. Et on relaie le `message` du
+             * serveur s'il en porte un — c'est lui qui sait ce qui a manque.
+             *
+             * `--attention` et non `--echec` : ne pas savoir n'est pas un echec
+             * de la verification, c'est une absence de verdict.
+             */
+            if (! d || d.success !== true) {
+                if (cles) {
+                    cles.textContent = String(d && d.message ? d.message : (L.verif_non_concluante || ''));
+                    cles.className = 'rw-annonce rw-annonce--attention';
+                }
+
+                return;
+            }
             const resultats = d.results || [];
             for (const r of resultats) machines?.appendChild(rendUneMachine(r));
 
@@ -212,17 +281,50 @@
             // pour tout le parc — pas machine par machine.
             const n = Number(d.users_with_keys ?? 0);
             const bloquantes = resultats.filter((r) => (r.errors || []).length > 0).length;
+            /*
+             * CE QUI SERA REVOQUE ENTRE DANS LA SYNTHESE.
+             *
+             * L'ecran calculait deja ces noms, machine par machine, et ne les
+             * mettait pas dans la seule phrase d'ensemble qu'il met en avant —
+             * celle qui est jointe par un tiret a « Aucun prerequis manquant ».
+             * Un operateur qui lit les deux ensemble conclut qu'il ne risque
+             * rien. Ils sont dedoublonnes : un meme compte peut etre revoque sur
+             * plusieurs machines, et le compter deux fois exagererait.
+             */
+            const revoques = [...new Set(
+                resultats.flatMap((r) => Array.isArray(r.users_revoked) ? r.users_revoked : []),
+            )].sort();
+            /*
+             * UNE MACHINE SANS RESULTAT N'EST NI BLOQUANTE NI PRETE.
+             * `resultats.length` n'etait jamais compare a ce qu'on avait coche :
+             * une machine absente de la reponse disparaissait du constat sans que
+             * rien ne le dise.
+             */
+            const sansResultat = cibles.length - resultats.length;
             if (cles) {
                 const morceaux = [
                     n === 0 ? (L.cles_aucune || '')
                         : (L.cles_nombre || '{nombre}').replace('{nombre}', String(n)),
+                    revoques.length > 0
+                        ? (L.revoques_synthese || '')
+                            .replace('{nombre}', String(revoques.length))
+                            .replace('{noms}', revoques.join(', '))
+                        : '',
+                    sansResultat > 0
+                        ? (L.machines_sans_resultat || '').replace('{nombre}', String(sansResultat))
+                        : '',
                     bloquantes > 0
                         ? (L.verif_bloque || '{nombre}').replace('{nombre}', String(bloquantes))
                         : (L.verif_pret || ''),
                 ].filter(Boolean);
                 cles.textContent = morceaux.join(' — ');
+                // Un parc ou quelque chose sera REVOQUE, ou dont une machine
+                // n'a pas repondu, ne se peint pas en vert.
                 cles.className = (n === 0 || bloquantes > 0)
-                    ? 'rw-annonce rw-annonce--echec' : 'rw-annonce rw-annonce--ok';
+                    ? 'rw-annonce rw-annonce--echec'
+                    : ((revoques.length > 0 || sansResultat > 0)
+                        ? 'rw-annonce rw-annonce--attention'
+                        : 'rw-annonce rw-annonce--ok');
             }
         } catch (e) {
             if (cles) {
