@@ -38,7 +38,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
-import { litEnBase } from './lib-base.mjs';
+import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
@@ -70,6 +70,25 @@ const DETAIL_JAIL = /\/fail2ban\/jail(\?|$)/;
 const BLANCHE = /\/fail2ban\/whitelist(\?|$)/;
 const BASE_SEULE = /\/fail2ban\/(history|stats)(\?|$)/;
 const ROUTES_MODULE = /\/fail2ban\/(status|jail|services|history|stats|config|logs|ban|unban|ban_all_servers|unban_all|install|install_all|restart|enable_jail|disable_jail|whitelist|geoip)(\?|$)/;
+/*
+ * LES DEUX GESTES DE F6, POUR RECONNAITRE UN GESTE DE PARC QUI PASSERAIT AILLEURS.
+ *
+ * `PARC` (plus haut) les capte deja sur leur chemin attendu et les avorte : ce
+ * motif-ci ne sert QU'A qualifier une requete qui aurait echappe a
+ * `ROUTES_MODULE` — donc a nommer le pire cas plutot qu'a le compter avec le
+ * reste.
+ *
+ * MA PREMIERE REDACTION AVAIT SUR-DIAGNOSTIQUE, ET IL FAUT LE DIRE : j'avais
+ * ecrit « aucun `quoi` du fichier ne vaut jamais parc ». Faux — `avortees` en
+ * porte deux depuis toujours (`bannir-tout-le-parc`, `installer-tout-le-parc`).
+ * Ce qui etait vrai, et qui suffisait : `abouties` ne peut contenir que `base`,
+ * donc les deux assertions posees sur LUI ne pouvaient pas echouer. J'avais
+ * ajoute une seconde branche d'avortement : elle etait INATTEIGNABLE, `PARC`
+ * mordant trente lignes plus haut. Retiree.
+ */
+const GESTES_PARC = /\/fail2ban\/(ban_all_servers|install_all)(\?|$)/;
+/* Ce qui vise le BACKEND, quel que soit le portail : passerelle ou proxy. */
+const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
 
 const DOSSIER_CAPTURES = new URL('./screenshots/fail2ban', import.meta.url).pathname;
 
@@ -108,7 +127,32 @@ function verifie(l, ok, d, toujours) {
     if (! ok) echecs += 1;
 }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
-function verifiePortage(l, ok, d) {
+function verifiePortage(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
 }
@@ -185,7 +229,28 @@ async function connecte(nom, secret) {
 
             return;
         }
-        if (! ROUTES_MODULE.test(url)) { r.continue().catch(() => {}); return; }
+        if (! ROUTES_MODULE.test(url)) {
+            /*
+             * LE TROU QUE CE FILET AVAIT.
+             *
+             * Tout ce que `ROUTES_MODULE` ne reconnait pas passait ici SANS etre
+             * enregistre. Une route du backend nommee autrement — un renommage,
+             * un alias, une casse differente — partait donc pour de vrai, et
+             * aucune assertion ne pouvait le voir. On laisse toujours passer les
+             * ressources de la page (feuilles, scripts, images), mais tout ce qui
+             * vise le BACKEND est desormais compte, avec la nature qu'on lui
+             * reconnait — pour que « seules des lectures ont abouti » puisse
+             * enfin etre FAUSSE.
+             */
+            if (VERS_BACKEND.test(url)) {
+                abouties.push({ route: chemin, methode: r.method(),
+                    quoi: GESTES_PARC.test(url) ? 'parc-NON-RECONNU' : 'backend-non-reconnu' });
+            }
+            r.continue().catch(() => {});
+
+            return;
+        }
+
 
         if (STATUT.test(url)) {
             servies.push({ route: chemin, quoi: 'statut' });
@@ -216,7 +281,7 @@ async function connecte(nom, secret) {
             return;
         }
         if (BASE_SEULE.test(url)) {
-            abouties.push({ route: chemin, quoi: 'base' });
+            abouties.push({ route: chemin, methode: r.method(), quoi: 'base' });
             r.continue().catch(() => {});
 
             return;
@@ -332,7 +397,23 @@ try {
          * — donc les machines que le CACHE dit actives. Le parc atteint est
          * decide par un releve qui peut avoir des semaines.
          */
-        verifie('la portee a pu etre calculee', Array.isArray(installables), '');
+        /*
+         * `Array.isArray(litEnBase(...))` est TOUJOURS vrai : la propriete ne
+         * pouvait pas echouer. Ce qui peut l'etre, et qui compte ici, c'est que
+         * la portee LUE soit la portee ENTIERE : `litEnBase` trime puis filtre,
+         * donc une machine au nom vide DISPARAIT de la liste — et la portee
+         * annoncee serait plus petite que celle que le backend joindrait.
+         * On recompte par un autre moyen, sur le meme predicat.
+         */
+        const porteeComptee = compteEnBase(
+            'SELECT COUNT(*) FROM rootwarden.machines m '
+            + 'LEFT JOIN rootwarden.fail2ban_status f ON m.id = f.server_id '
+            + 'WHERE f.installed IS NULL OR f.installed = 0');
+        verifie('la portee lue est la portee ENTIERE',
+            installables.length === porteeComptee,
+            `${installables.length} nom(s) lus pour ${porteeComptee} machine(s) comptees — `
+            + 'une ligne a disparu de la lecture, la portee annoncee serait trop petite',
+            `${installables.length} = ${porteeComptee}`);
         const production = installables.filter((n) => /PROD|prod/.test(n));
         constate('machines de PRODUCTION dans la portee d\'une installation de masse',
             production.join(' · ') || '(aucune)');
@@ -473,13 +554,47 @@ try {
         gestesParc.forEach((a) => constate(`corps de « ${a.quoi} »`, a.corps || '(vide)'));
         constate('requetes SERVIES', servies.map((s) => s.quoi).join(' ') || '(aucune)');
         constate('requetes abouties', abouties.map((a) => a.quoi).join(' ') || '(aucune)');
+        // Une route non reconnue se CORRIGE par son chemin, pas par son etiquette.
+        abouties.filter((a) => a.quoi !== 'base')
+            .forEach((a) => constate('  route LAISSEE PASSER, non reconnue', a.route));
 
         /* LA PROPRIETE DE SURETE DE CE LOT, ET LA SEULE QUI COMPTE. */
         verifie('AUCUN geste de parc n\'a abouti',
             ! abouties.some((a) => /parc/.test(a.quoi)), 'un geste de parc est parti');
-        verifie('seules des lectures en base ont abouti',
-            abouties.every((a) => a.quoi === 'base'),
-            abouties.map((a) => a.quoi).join(' '));
+        /*
+         * MA PREMIERE REDACTION ETAIT TROP LARGE, et le banc l'a montre du
+         * premier coup : elle exigeait `quoi === 'base'` de TOUTE requete
+         * laissee passer, alors que « base » ne nomme que les lectures de
+         * fail2ban. La page legacy tire aussi `/api_proxy.php/cve_trends` — une
+         * lecture d'un AUTRE module, parfaitement inoffensive — et l'assertion
+         * la comptait comme un manquement a la surete. Un FAIL qui accuse une
+         * page saine vaut a peine mieux qu'un PASS creux.
+         *
+         * Ce qui compte n'est pas « rien d'etranger n'est passe » mais « rien de
+         * ce qui est passe ne peut MUTER ». On juge donc sur la METHODE, et on
+         * garde le module a part.
+         */
+        const duModule = abouties.filter((a) => a.quoi !== 'backend-non-reconnu');
+        verifie('seules des lectures en base ont abouti, cote fail2ban',
+            duModule.length > 0 && duModule.every((a) => a.quoi === 'base'),
+            duModule.length === 0
+                ? 'AUCUNE lecture du module laissee passer — `[].every()` rend `true`, '
+                  + 'donc cette propriete se serait verifiee sur rien'
+                : duModule.map((a) => `${a.quoi} ${a.route}`).join(' | '),
+            `${duModule.length} lecture(s) du module`);
+
+        /*
+         * LE TROU QUE LE FILET AVAIT, ET QU'AUCUNE ASSERTION NE VOYAIT : une
+         * route du backend que `ROUTES_MODULE` ne reconnait pas part POUR DE
+         * VRAI. Inoffensif tant qu'elle ne fait que lire ; un `POST` ou un
+         * `DELETE` laisse passer serait, lui, un geste non mesure.
+         */
+        const mutantes = abouties.filter((a) => a.quoi === 'parc-NON-RECONNU'
+            || (a.quoi === 'backend-non-reconnu' && a.methode !== 'GET'));
+        verifie('aucune requete laissee passer ne peut MUTER',
+            mutantes.length === 0,
+            mutantes.map((a) => `${a.methode} ${a.route}`).join(' | '),
+            `${abouties.filter((a) => a.quoi === 'backend-non-reconnu').length} etrangere(s), toutes en lecture`);
         verifie('aucune erreur JavaScript', session.erreursJs.length === 0,
             session.erreursJs.join(' | '));
     });

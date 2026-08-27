@@ -100,7 +100,32 @@ function verifie(l, ok, d, toujours) {
     if (! ok) echecs += 1;
 }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
-function verifiePortage(l, ok, d) {
+function verifiePortage(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
 }
@@ -196,6 +221,23 @@ async function coche(page, id) {
 
     return c !== null;
 }
+
+/*
+ * LA BORNE D'ENTREE — une FENETRE attrape ce que les autres font, un DELTA non.
+ *
+ * Cette suite comptait les journaux `[bashrc]` des « quinze dernieres minutes ».
+ * Jouee SEULE elle est verte ; jouee dans le LOT elle ECHOUE — parce que
+ * `go-bashrc-b3` la precede immediatement dans `SUITES_LEGACY` et enregistre un
+ * gabarit (`save_template`) une minute avant. **L'assertion accusait donc b4 du
+ * geste legitime de sa suite soeur**, et le referait a CHAQUE lot complet.
+ *
+ * Ce qui a tranche n'est pas le libelle mais l'HORODATAGE : la ligne portait
+ * `user_id = 16` et une heure ANTERIEURE au demarrage de b4. Meme famille que
+ * « un nettoyage qui supprime par TYPE en retire plus qu'il n'en a pose » : on
+ * borne par ce qu'on a soi-meme produit, jamais par une duree.
+ */
+const JOURNAUX_A_L_ENTREE = compteEnBase(
+    "SELECT COUNT(*) FROM rootwarden.user_logs WHERE action LIKE '[bashrc]%'");
 
 try {
     const s = await connecte(COMPTE, SECRET);
@@ -348,10 +390,14 @@ try {
             avortees.filter((r) => r.machine === MACHINE_PRODUCTION).map((r) => r.route).join(' · '));
     } catch (e) { note(`FAIL  controle des requetes : ${e.message}`); echecs += 1; }
     try {
-        const journaux = compteEnBase("SELECT COUNT(*) FROM rootwarden.user_logs "
-            + "WHERE action LIKE '[bashrc]%' AND created_at > NOW() - INTERVAL 15 MINUTE");
-        constate('journaux `[bashrc]` des quinze dernieres minutes', String(journaux));
-        verifie('la suite n\'a produit aucun geste journalise', journaux === 0, `${journaux} ligne(s)`);
+        const journauxFin = compteEnBase(
+            "SELECT COUNT(*) FROM rootwarden.user_logs WHERE action LIKE '[bashrc]%'");
+        const produits = journauxFin - JOURNAUX_A_L_ENTREE;
+        constate('journaux `[bashrc]` produits PAR CETTE SUITE',
+            `${produits} (entree ${JOURNAUX_A_L_ENTREE}, sortie ${journauxFin})`);
+        verifie('la suite n\'a produit aucun geste journalise', produits === 0,
+            `${produits} ligne(s) ecrite(s) pendant cette suite`,
+            `${produits} ligne(s)`);
     } catch (e) { note(`FAIL  controle du journal : ${e.message}`); echecs += 1; }
     try {
         const zabbix = litEnBase("SELECT CONCAT(name,'|',ip) FROM rootwarden.machines WHERE id = 1");

@@ -60,7 +60,16 @@ const COMPTES = [
 ];
 
 /** Nombre total d'entrees declarees dans App\Support\Navigation. */
-const TOTAL_ENTREES = 33;
+/*
+ * 33 -> 32 le 2026-08-27 : la refonte du menu retire `tickets` et regroupe les
+ * entrees en cinq sections (PARC & ACCES, EXPLOITATION, SECURITE,
+ * ADMINISTRATION, AUTRE). Mesure : `Navigation::SECTIONS` lue par PHP lui-meme
+ * rend `total=32 route=24 legacy=8 ni-l-un-ni-l-autre=0`.
+ *
+ * Le §2 du plan porte le meme total et se met a jour AVEC celui-ci : l'assertion
+ * qui echoue le dit dans son propre detail, « ne pas ajuster l'un sans l'autre ».
+ */
+const TOTAL_ENTREES = 32;
 
 function b32(s){const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let b='';for(const c of s.toUpperCase().replace(/=+$/,'')){const v=a.indexOf(c);if(v===-1)continue;b+=v.toString(2).padStart(5,'0')}const r=[];for(let i=0;i+8<=b.length;i+=8)r.push(parseInt(b.slice(i,i+8),2));return Buffer.from(r)}
 function totp(s){const k=b32(s);const c=Math.floor(Date.now()/1000/30);const buf=Buffer.alloc(8);buf.writeBigUInt64BE(BigInt(c));const h=createHmac('sha1',k).update(buf).digest();const o=h[h.length-1]&0x0f;return((h.readUInt32BE(o)&0x7fffffff)%1000000).toString().padStart(6,'0')}
@@ -69,7 +78,32 @@ function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
 
 let echecs = 0;
 const lignes = [];
-function verifie(libelle, ok, detail) {
+function verifie(libelle, ok, detail, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     lignes.push(`${ok ? 'PASS' : 'FAIL'}  ${libelle}${detail ? '  — ' + detail : ''}`);
     if (!ok) echecs++;
 }
