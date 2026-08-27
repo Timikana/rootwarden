@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.2** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.3** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,84 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.3 — `fail2ban/` F3 caracterise : douze gestes sur treize visent la machine du DERNIER RELEVE
+
+`go-fail2ban-f3.mjs`, **legacy 13 PASS / 0 FAIL**, base rouge **6 PASS / 7 FAIL**. Le portage reste a
+faire.
+
+#### F3 NE MUTE RIEN NON PLUS
+
+Troisieme sous-lot d'affilee dont le decoupage annonçait qu'il mutait. `POST /fail2ban/config`,
+`/logs` et `/services` sont en POST — elles portent des identifiants SSH — mais leurs commandes
+distantes ne modifient rien :
+
+```
+cat /etc/fail2ban/jail.local 2>/dev/null || echo "[FICHIER ABSENT]"
+tail -n <n> /var/log/fail2ban.log 2>/dev/null || echo "[LOG ABSENT]"
+fail2ban-client status 2>/dev/null   puis un `check_cmd` par service
+```
+
+Aucune valeur du client n'y est interpolee : `check_cmd` vient d'une table du serveur.
+
+#### E-162 — le plus lourd du module, et il touche F4, F5 et F6
+
+`loadConfig` lit `getServer()`, la machine **du selecteur**. **Douze autres gestes** lisent
+`_currentServer`, pose au dernier releve REUSSI : detail d'une jail, bannir, debannir, services
+detectes, activer et desactiver une jail, liste blanche (lire, ajouter, retirer), tout debannir, voir
+les journaux. **Un appel contre douze.**
+
+Relever sur A, changer le selecteur pour B, et **tout agit sur A pendant que l'ecran montre B**.
+
+Mesure du 2026-08-27, dans le sens SUR — releve sur la machine d'essai, selecteur bascule sur
+`srv-zabbix` :
+
+> le selecteur affiche « srv-zabbix (192.168.0.244:22) » et la requete part vers la machine **2**
+
+Le sens inverse enverrait bannir, desactiver une jail et vider la liste blanche **vers la
+production** alors que l'ecran montrerait la machine d'essai. Il n'a pas ete exerce.
+
+Les `confirm()` nomment `_currentServer.name` : **la confirmation dit vrai, c'est le selecteur qui
+ment**. Mais on lit le selecteur, et une confirmation se lit vite.
+
+#### Trois autres ecarts
+
+| | |
+|---|---|
+| **E-161** | un fichier ABSENT s'affiche comme le CONTENU du fichier : « [FICHIER ABSENT] » est pose dans le meme `<pre>` vert sur noir qu'une vraie configuration. **Le marqueur du shell devient le contenu** |
+| **E-163** | `:count` n'est JAMAIS substitue, **dans les deux langues** : les catalogues ecrivent `:count`, le script passe `{jails, ips}` et `{installed, enabled}`. Quatre valeurs calculees pour etre jetees, et « :count jail(s) trouves » s'affiche tel quel |
+| **E-164** | un `lines` non numerique rend un **500 HTML**, pas meme du JSON : `int(data.get('lines', 50))` est HORS du `try` de la route. La borne existe pourtant deja dans le manager — la route double une validation qu'elle fait moins bien, et c'est sa copie qui casse |
+
+E-163 a ete vu **a l'image** avant d'etre assertionne. Une assertion cherche desormais tout `:mot`
+isole dans le texte rendu — motif ecrit pour ne prendre ni une URL, ni une heure, ni un `cle: valeur`.
+
+E-164 a ete mesure par une **requete forgee**, et son motif est ecrit : `loadF2bLogs` envoie
+`lines: 100` en dur, aucune interface ne peut produire une valeur non numerique. Elle ne joint
+AUCUNE machine — le cast echoue avant `_resolve_ssh_creds`, donc avant toute session SSH.
+
+#### Le statut est SERVI — sans lui, aucun bouton n'existe
+
+`loadStatus` ne devoile `btn-config` et `btn-logs` que si fail2ban est INSTALLE, et n'appelle
+`loadServices` que dans ce cas. Le banc etant un conteneur sans fail2ban, **aucun des trois gestes de
+F3 n'est atteignable par un clic**. Le filet repond donc au seul statut, avec `installed: true`, et
+**laisse partir les trois lectures pour de vrai** vers la machine 2 : c'est ce que la page fait d'un
+« [FICHIER ABSENT] » qu'on mesure. Le cache `fail2ban_status` n'est pas ecrit — prouve avant et apres.
+
+#### Un sixieme faux PASS, et une famille de plus
+
+`[...abouties, ...avortees].slice(n)` avec `n = abouties.length + avortees.length` ne rend **jamais**
+les entrees neuves : une ligne ajoutee au premier tableau se retrouve **au milieu** de la
+concatenation, pas apres la borne. La mesure rendait une liste vide, la machine visee valait `null`,
+et l'assertion « le bouton vise la machine affichee » passait **faute d'objet** — sur le defaut le
+plus lourd du module. Chaque tableau se decoupe par SA borne, et une propriete sans objet se dit
+desormais par un FAIL explicite.
+
+#### La base rouge, lue passe par passe
+6 PASS / 7 FAIL, **et deux des six passes sont creuses** : « aucun geste de F4, F5 ou F6 n'a abouti »
+et « aucune requete n'a joint la production » passent parce qu'aucun des trois gestes n'existe encore
+cote portage.
+
+**Reference du LOT** : `go-fail2ban-f3` entre avec **13 PASS sur le legacy**.
 
 ### v1.38.2 — `fail2ban/` F2 porte : sept ecarts refermes, un ouvert et assume
 

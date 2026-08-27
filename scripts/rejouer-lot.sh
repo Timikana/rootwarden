@@ -575,6 +575,28 @@ declare -A REF_LEGACY=(
   # appartiennent a F4 et bannissent sur une machine reelle. Nettoyage borne par
   # un DELTA d'`id`, jamais par un `DELETE` large.
   [go-fail2ban-f2]=14
+  # `fail2ban/` sous-lot F3 : configuration, journaux et services. 13 sur le legacy.
+  #
+  # LES TROIS SONT DES LECTURES. Elles sont en POST — elles portent des
+  # identifiants SSH — mais leurs commandes distantes ne modifient rien, et
+  # aucune valeur du client n'y est interpolee.
+  #
+  # LE STATUT EST SERVI, avec `installed: true`. Sans lui, `loadStatus` laisse
+  # `btn-config` et `btn-logs` CACHES et n'appelle pas `loadServices` : le banc
+  # n'ayant pas fail2ban, aucun des trois gestes n'est atteignable par un clic.
+  # Les trois lectures, elles, PARTENT POUR DE VRAI vers la machine 2 — c'est ce
+  # que la page fait d'un « [FICHIER ABSENT] » qu'on mesure.
+  #
+  # UNE REQUETE EST FORGEE, et son motif est ecrit : `loadF2bLogs` envoie
+  # `lines: 100` en dur, aucune interface ne peut produire une valeur non
+  # numerique. Elle ne joint AUCUNE machine — le cast echoue avant
+  # `_resolve_ssh_creds`, donc avant toute session SSH.
+  #
+  # LE SENS DE LA MESURE D'E-162 EST CHOISI POUR NE RIEN RISQUER : releve sur la
+  # machine d'essai, puis selecteur bascule sur la production. Le defaut envoie
+  # alors la requete vers la machine d'ESSAI. Le sens inverse joindrait
+  # `srv-zabbix`, et il n'est pas exerce.
+  [go-fail2ban-f3]=13
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -620,7 +642,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

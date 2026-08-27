@@ -6935,3 +6935,115 @@ cette suite en un tour**, tous nés d'une mesure contournée : élargir maintena
 écrire un sixième.
 
 À reprendre avec F3, où la frise sera de toute façon retouchée.
+
+---
+
+## E-161 — Un fichier ABSENT s'affiche comme le contenu du fichier
+
+Les deux commandes distantes de F3 se terminent par un repli du shell :
+
+```sh
+cat /etc/fail2ban/jail.local 2>/dev/null || echo "[FICHIER ABSENT]"
+tail -n <n> /var/log/fail2ban.log 2>/dev/null || echo "[LOG ABSENT]"
+```
+
+`loadConfig` (`main.js:274`) et `loadF2bLogs` (`:531`) posent ce retour dans le **même `<pre>` vert
+sur noir** qu'une vraie configuration ou de vraies lignes de journal. À l'écran, sous un titre
+`/etc/fail2ban/jail.local`, on lit :
+
+```
+[FICHIER ABSENT]
+```
+
+**Le marqueur du shell devient le contenu du fichier.** Rien ne distingue « voici la configuration »
+de « il n'y en a pas », et un opérateur qui ne connaît pas ce marqueur peut le prendre pour une
+directive. Mesuré le 2026-08-27 sur la machine d'essai, qui n'a pas fail2ban : les deux marqueurs
+sont rendus tels quels.
+
+**Le portage doit distinguer l'absence du contenu**, et le dire dans la langue de l'interface plutôt
+qu'avec une chaîne fabriquée par un `echo` distant.
+
+---
+
+## E-162 — Deux notions de « la machine » dans la même page : douze gestes sur treize visent celle du DERNIER RELEVÉ
+
+`loadConfig` (`main.js:266`) lit `getServer()` — la machine **du sélecteur**. Tous les autres gestes
+du module lisent `_currentServer`, posé au dernier relevé **réussi** (`:60`) :
+
+| lit `getServer()` | lisent `_currentServer` |
+|---|---|
+| voir `jail.local` | détail d'une jail · bannir · débannir · services détectés · activer une jail · désactiver une jail · liste blanche (lire, ajouter, retirer) · tout débannir · voir les journaux |
+| **1 appel** | **12 appels** (`:139 :235 :252 :319 :396 :417 :433 :457 :467 :479 :525`) |
+
+Relever sur A, changer le sélecteur pour B, et **tout agit sur A pendant que l'écran montre B**.
+
+Mesuré le 2026-08-27, dans le sens **sûr** — relevé sur la machine d'essai, sélecteur basculé sur
+`srv-zabbix` :
+
+> le sélecteur affiche « srv-zabbix (192.168.0.244:22) » et la requête part vers la machine **2**
+
+Le sens inverse — relever sur la production puis sélectionner la machine d'essai — enverrait
+**bannir, désactiver une jail et vider la liste blanche vers la production** alors que l'écran
+montrerait la machine d'essai. Il n'a pas été exercé, et ne doit pas l'être.
+
+Les `confirm()` nomment `_currentServer.name`, donc **la confirmation dit vrai** : c'est le sélecteur
+qui ment. Mais un opérateur lit le sélecteur, et une confirmation se lit vite.
+
+**Le portage n'a qu'une seule notion de « la machine » : celle que le sélecteur affiche.**
+
+---
+
+## E-163 — `:count` n'est jamais substitué, dans les deux langues
+
+`legacy/lang/fr/js.php:53` et `:61`, `legacy/lang/en/js.php:56` et `:72` :
+
+```php
+'js.f2b_jails_found'       => ':count jail(s) trouves',
+'js.f2b_services_detected' => ':count service(s) detecte(s)',
+```
+
+et les appels, `main.js:117` et `:372` :
+
+```js
+__('f2b_jails_found',       {jails: d.jails.length, ips: ...})
+__('f2b_services_detected', {installed, enabled})
+```
+
+**Le nom `:count` ne correspond à aucun paramètre passé.** La substitution n'a donc jamais lieu, et
+l'écran affiche littéralement `:count jail(s) trouves`. Quatre valeurs sont calculées — le nombre de
+jails, le total d'IP bannies, le nombre de services installés, le nombre activés — **pour être
+jetées**.
+
+Vu à l'image, puis mesuré : une assertion cherche désormais tout `:mot` isolé dans le texte rendu.
+Présent en **FR et en EN** : une relecture de l'un des deux catalogues n'aurait rien montré, puisque
+les deux portent la même faute.
+
+---
+
+## E-164 — Un `lines` non numérique rend un 500 HTML, pas un refus
+
+`backend/routes/fail2ban.py:537` :
+
+```python
+data = request.get_json(silent=True) or {}
+lines = int(data.get('lines', 50))     # <-- hors du `try`
+ip, port, ... = _resolve_ssh_creds(data)
+```
+
+Le cast est **avant** le `try` de la route. Une valeur non numérique y lève une `ValueError` que rien
+n'attrape : Flask rend une page **HTML** « 500 Internal Server Error » — pas même du JSON, donc le
+frontend échoue aussi à la lire.
+
+Mesuré le 2026-08-27 par une requête forgée depuis la page (`lines: "beaucoup"`) : **statut 500**,
+corps `<!doctype html> … <title>500 Internal Server Error</title>`.
+
+Deux remarques :
+
+- **rien n'est joint** : le cast échoue avant `_resolve_ssh_creds`, donc avant toute session SSH.
+  L'effet se limite au statut rendu ;
+- **la borne existe déjà**, mais ailleurs : `get_fail2ban_logs` fait
+  `max(10, min(500, int(lines)))` (`fail2ban_manager.py:253`). La route double donc une validation
+  qu'elle fait moins bien que le manager — et c'est sa copie qui casse.
+
+Une faute de la requête est rendue comme un défaut du serveur. **Touche le backend de production** :
+porté au §7 du plan avec les six autres correctifs backend en attente d'arbitrage.
