@@ -2171,6 +2171,50 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.15 — E-164 : le residu, et un correctif valide par un test ecrit AVANT lui
+
+`backend/routes/fail2ban.py`. `int(server_id)` vivait **a l'interieur** du `try` qui rend « Erreur
+interne » — `/stats:657` et `/history:345`. Une valeur non numerique rendait donc **500** la ou la faute
+est dans la requete. La moitie « l'appelant ne peut meme pas lire la reponse » etait fermee au lot
+precedent (le 500 etait du JSON, pas une page HTML) ; celle-ci ferme l'autre : **le statut dit enfin ou
+est la faute.** Troisieme occurrence du motif « a moitie corrige » sur ce module, et **deuxieme fois que
+le correctif partiel etait le notre.**
+
+**Ce qui rend ce commit different des autres : il a ete valide par un test qu'il ne pouvait pas
+influencer.** La session QA avait ecrit deux `xfail(strict=True)` decrivant le comportement attendu —
+ils ne rougissaient pas, et ils sont passes en `XPASS(strict)` des le correctif applique, mettant la
+suite en `2 failed, 375 passed`. **Un echec voulu, qui oblige a retirer le marqueur au lieu d'oublier
+l'ecart.** Verrouiller le 500 aurait fige le defaut ; decrire l'attendu en `xfail` l'a rendu impossible
+a oublier. Apres retrait des marqueurs : **377 passed, 0 xfailed**.
+
+### v1.38.14 — BUG-003 : la base affirmait un groupe que l'agent n'avait pas
+
+`backend/routes/wazuh.py:738 set_group()`. `execute_as_root("systemctl restart wazuh-agent")` jete, puis
+`_upsert_agent(group_name=group)` et `success: True` **inconditionnels**. Or le groupe ne prend effet
+qu'a la re-inscription au redemarrage : **si le redemarrage echoue, la base affirme un groupe que l'agent
+n'a pas.**
+
+Trouve par un **balayage AST** de tout `backend/` — fonctions qui executent a distance PUIS ecrivent en
+base sans qu'un code de retour soit compare entre les deux : **22 candidates**, deux qualifiees par
+lecture. Celle-ci est reelle. **Et `monitoring.py:196 reboot_server()` est DEDOUANEE** : sa docstring
+explique l'absence — « la connexion SSH est coupee par le serveur des l'execution, donc on ne peut pas
+attendre un retour shell ». Absence documentee et justifiee ; le balayage l'accusait, la lecture
+l'innocente. **Les 19 autres ne sont pas verifiees et ne sont pas traitees comme des defauts** : un
+balayage par motif se trompe dans les deux sens.
+
+### v1.38.13 — E-165, CINQUIEME occurrence : le detail dit vrai, le resume mente
+
+`backend/routes/fail2ban.py:713`, `install_all` rendait `'success': True` **ecrit en dur** :
+« Fail2ban installe sur **0/2** serveurs » arrivait en succes annonce.
+
+**Ce qui la rend instructive n'est pas l'oubli, c'est ou il se situe.** Les `results[i].success` de la
+boucle sont **honnetes** — le backend y teste `rc` et reconnait meme « is already the newest version ».
+Quelqu'un a donc pense a l'echec **machine par machine**, et l'a perdu **a l'agregation**. Le detail dit
+vrai, le resume mente, **et c'est le resume que l'interface lit en premier.** Les deux champs de
+comptage de `ban_all_servers` sont conserves pour que les deux routes se lisent pareil. Le retour
+anticipe « tous les serveurs ont deja Fail2ban » garde son `success: true` — succes honnete sur liste
+vide, il ne passe pas par la ligne corrigee.
+
 ### v1.38.12 — E-174 : une execution de commande en root, et un second vecteur PIRE que le premier
 
 `backend/fail2ban_manager.py`. **Le defaut le plus grave du chantier**, trouve par relecture hors du

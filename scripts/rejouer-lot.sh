@@ -113,6 +113,33 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # En suivant la formule courte on lit « 59 au lieu de 61 » et on conclut a une
 # regression de deux assertions, sur un rejeu qui affiche pourtant FAIL=0.
 #
+# 60 -> 64 le 2026-08-27, et l'ecart de +4 s'explique COMMIT PAR COMMIT — c'est ce
+# qui autorise a l'inscrire. Mesure : 64 PASS / 0 FAIL, suite NON modifiee (dernier
+# mtime 2026-08-26 11:23:28). Diff des assertions contre le LOT du 26 : +5, toutes
+# de la meme famille — « Fail2ban resout » et « Services resout » pour les DEUX
+# roles, « Bashrc resout » pour le role 3 seul.
+#
+#   LOT du 26, 18:03  ->  59   (bashrc pas encore porte)
+#   B1 porte, 20:47   ->  +1   -> 60 inscrit. CORRECT.
+#   S1 porte, 01:14   ->  +2   -> aurait du etre 62.  NON FAIT
+#   F1 porte, 05:16   ->  +2   -> aurait du etre 64.  NON FAIT
+#
+# 1 + 2 + 2 et non 2 + 2 + 2, parce que `rw-test-admin` porte `can_manage_services`
+# et `can_manage_fail2ban` mais PAS `can_manage_bashrc` — mesure en base, colonne
+# par colonne. La reference etait donc perimee depuis DIX HEURES.
+#
+# LE TROU DE PROCEDE COMPTE PLUS QUE LE CHIFFRE. Deux sous-lots ont manque la mise
+# a jour de suite, et rien ne pouvait le dire : les rejeux CIBLES de S1 et F1 ne
+# jouaient pas `go-socle-navigation`, et aucun LOT complet n'a tourne depuis.
+# **Toute bascule d'entree de menu touche une suite que le sous-lot ne joue pas.**
+# Regle ajoutee au cycle de portage : si l'entree bascule, rejouer
+# `go-socle-navigation` et reinscrire sa reference DANS LE MEME COMMIT.
+#
+# Et le SENS POSITIF d'un ecart demande la meme discipline que le negatif. La regle
+# ecrite — « un ecart a zero FAIL veut dire qu'une assertion a cesse de s'executer »
+# — ne couvrait que le sens negatif. Ici quatre assertions se sont AJOUTEES
+# legitimement ; un ecart de +4 s'explique ou ne s'inscrit pas.
+#
 # Ce n'est pas un chiffre ajuste pour faire passer le rejeu.
 # 48 -> 49 au portage de `chatops/` : UNE seule, et non deux. L'entree exige
 # `can_admin_portal`, que `rw-test-admin` n'a PAS (mesure en base) : seul le role 3
@@ -153,7 +180,7 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # `process.exit()` — lequel NE JOUE PAS le `finally`. La fixture y a fui pour de
 # vrai avant d'etre reprise a cet endroit.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=60 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=64 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=21 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14
@@ -707,6 +734,34 @@ declare -A REF_LEGACY=(
 # sont exactement ces trois boutons. Un LOT complet affichait donc un ECHEC
 # qui ne dit rien — une absence VOULUE lue comme un defaut. La suite y
 # revient le jour ou B4 est porte, avec sa reference mesuree.
+#
+# `go-adm-import-csv` N'EST NI DANS CETTE LISTE NI DANS `SUITES_LEGACY`, ET
+# RIEN NE LE DISAIT — c'est corrige ici le 2026-08-27.
+# C'est la suite de caracterisation DOUBLE CIBLE du sous-lot D6c (425 lignes,
+# commit du 2026-08-26). Contrairement a `go-bashrc-b4`, retire deliberement,
+# celle-ci n'a JAMAIS ete inscrite : son versant LEGACY, qui n'attend aucun
+# portage, n'etait donc joue par personne, et aucun commentaire ne le signalait.
+# Une suite absente sans raison ecrite est indiscernable d'un oubli.
+#
+# POURQUOI ELLE RESTE DEHORS AUJOURD'HUI, et ce n'est pas la raison qu'on croit.
+# Son nettoyage est SAIN — par NOM EXACT (trois constantes litterales), a
+# l'entree ET dans un `finally`, chaque etape dans son propre `try`, avec une
+# assertion de sortie et un controle que `srv-zabbix` est intacte, nom ET adresse.
+# Elle n'est PAS de la famille de `02-admin-users.test.mjs`, et la difference est
+# STRUCTURELLE : ce dernier nomme son compte `e2e_test_${Date.now()}`, donc un nom
+# NEUF a chaque execution, qu'aucun nettoyage d'entree ne peut rattraper — d'ou
+# cinq lignes distinctes en base depuis juillet. **C'est le NOM, pas le `finally`,
+# qui decide si un nettoyage peut rattraper le passe.**
+#
+# Ce qui la retient est son etape 5 (`:339-372`) : elle soumet
+# `epreuve_csv_d6c,,admin,1,1`, donc elle ECRIT `users.sudo = 1`, lit la ligne,
+# puis la supprime immediatement sans attendre le `finally`. C'est court, borne et
+# delibere — et c'est quand meme E-130, dont le §7 du plan etablit qu'il est
+# CHAINE avec K4 : la garde hierarchique, en degradant `role_id` a 1 pour un
+# importeur de role 2, fabrique exactement la forme de compte que le repli
+# `NOPASSWD: ALL` attend. La colonne `sudo` du format CSV est l'une des trois
+# decisions dont D6c est bloque.
+# Elle s'inscrit le jour ou l'exploitant tranche, avec sa reference mesuree.
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
   go-page-commandlog go-page-approvals go-page-drift go-page-backups go-page-tasks
   go-page-tickets go-page-search go-page-cve-export go-page-conformite
