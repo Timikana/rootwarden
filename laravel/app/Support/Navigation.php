@@ -33,7 +33,7 @@ class Navigation
             ['cle' => 'ssh_keys',       'garde' => 'can_deploy_keys',         'route' => 'cles-ssh'],
             ['cle' => 'updates',        'garde' => 'can_update_linux',        'route'  => 'mises-a-jour'],
             ['cle' => 'iptables',       'garde' => 'can_manage_iptables',     'legacy' => '/iptables/'],
-            ['cle' => 'fail2ban',       'garde' => 'can_manage_fail2ban',     'legacy' => '/fail2ban/'],
+            ['cle' => 'fail2ban',       'garde' => 'can_manage_fail2ban',     'route' => 'fail2ban'],
             ['cle' => 'services',       'garde' => 'can_manage_services',     'route' => 'services'],
             ['cle' => 'ssh_audit',      'garde' => 'can_audit_ssh',           'legacy' => '/ssh-audit/'],
             ['cle' => 'supervision',    'garde' => 'can_manage_supervision',  'route' => 'supervision'],

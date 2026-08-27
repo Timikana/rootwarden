@@ -38,6 +38,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { execFileSync } from 'child_process';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
@@ -254,10 +255,48 @@ try {
         verifie('le refus oppose au role 1 vient de la PERMISSION, pas du role',
             refusApres > refusAvant,
             'aucun refus de permission journalise : le role aurait donc refuse en amont');
-        verifiePortage('l\'en-tete du fichier n\'annonce pas un acces plus strict que le code',
-            false,
-            '`index.php:5` annonce « admin (2), superadmin (3) », `:10` admet ROLE_USER '
-            + '— troisieme occurrence du motif E-36');
+        // LA PROPRIETE SE MESURE, ELLE NE SE POSTULE PAS.
+        //
+        // Une premiere redaction ecrivait `false` en dur : INFO cote legacy,
+        // mais ECHEC cote portage — sur une page dont la documentation dit
+        // pourtant vrai. **Une assertion codee en dur ne mesure rien** ; elle
+        // affirme ce que son auteur croyait au moment de l'ecrire.
+        //
+        // Ce qui se mesure : est-ce que la SOURCE annonce un acces plus strict
+        // que ce que la garde applique ? Le legacy dit « admin (2), superadmin
+        // (3) » et admet le role 1. Le portage doit dire le role 1.
+        // ON NE LIT QUE LES COMMENTAIRES, JAMAIS LE CODE.
+        //
+        // Une premiere redaction lisait les vingt premieres lignes du fichier —
+        // donc l'en-tete ET le `checkAuth([ROLE_USER, ...])` de la ligne 10. Elle
+        // concluait « la source cite le role 1 » a partir du CODE, et dedouanait
+        // ainsi un fichier qui ment. **Un faux PASS, c'est-a-dire le sens le
+        // plus couteux** : une accusation fausse se corrige, une exoneration
+        // fausse se propage.
+        //
+        // La propriete porte sur ce que la source ANNONCE. On ne retient donc
+        // que les lignes de commentaire.
+        const brut = CIBLE === 'laravel'
+            ? execFileSync('docker', ['exec', 'rootwarden_laravel', 'sh', '-c',
+                'cat /var/www/html/app/Services/Fail2ban.php '
+                + '/var/www/html/app/Http/Controllers/Fail2banController.php'],
+                { encoding: 'utf8' })
+            : execFileSync('sh', ['-c', 'cat legacy/fail2ban/index.php'],
+                { encoding: 'utf8', cwd: new URL('../..', import.meta.url).pathname });
+        const source = brut.split('\n')
+            .filter((l) => /^\s*(\/\*|\*|\/\/)/.test(l))
+            .join('\n');
+
+        // Une annonce est « plus stricte » si elle enumere les roles admis SANS
+        // citer le role 1, alors que la garde l'admet.
+        const annonceRoles = /Permissions?\s*:.*admin\s*\(2\)/i.test(source);
+        const citeRole1 = /role\s*1|ROLE_USER|role:1/i.test(source);
+        constate('la source enumere-t-elle les roles admis ?', annonceRoles ? 'OUI' : 'non');
+        constate('cite-t-elle le role 1 ?', citeRole1 ? 'OUI' : 'non');
+        verifiePortage('la source n\'annonce pas un acces plus strict que la garde appliquee',
+            ! annonceRoles || citeRole1,
+            'l\'en-tete enumere « admin (2), superadmin (3) » sans citer le role 1, '
+            + 'que la garde admet — troisieme occurrence du motif E-36');
     });
 
     const s = await connecte(COMPTE_CAPTURES, COMPTES[2].secret);
