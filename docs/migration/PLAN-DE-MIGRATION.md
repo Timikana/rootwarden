@@ -785,6 +785,33 @@ et chacune bloque une session. Je ne les tranche pas.
 > **Six correctifs backend attendent désormais le même arbitrage** — E-142, E-144, E-147, E-149, E-150, E-152 —
 > et trois sont la même famille : un garde absent, ou un repli qui retombe du côté permissif.
 
+**⚠ E-152 serait INMESURABLE au banc, et mon propre raisonnement était à l'envers.** J'avais écrit que les
+cinq suites `go-fail2ban-f2` à `f6`, qui tournent en `rw-test-super` (rôle 3, **sans** la permission),
+exerçaient « le second chemin de la garde — le rôle l'emporte sur l'absence de permission », et que les
+deux chemins étaient donc couverts. **C'est faux, et l'inverse est instructif** :
+
+> Aujourd'hui `rw-test-super` obtient **200 parce qu'il n'y a AUCUNE garde**, pas parce que le rôle
+> l'emporte. Après le patch il obtiendra 200 parce que `role >= 3` contourne. **Même observable, cause
+> différente — et les suites ne peuvent pas distinguer les deux.**
+
+Ces cinq suites resteraient donc vertes **si le patch n'était jamais appliqué, ET si on l'appliquait de
+travers**. Elles ne mesurent pas la garde. C'est « N validations précédentes ne prouvent rien si aucune ne
+pouvait échouer », sur cinq suites d'un coup.
+
+Le seul chemin qui **discrimine** est **un rôle 2 SANS la permission → 403**. Or `rw-test-admin` est le
+seul rôle 2 du parc et **il détient** `can_manage_fail2ban` (`go-fail2ban-f1` l'asserte lui-même,
+`:218-220`) ; et `rw-test-user` est déjà refusé par `require_machine_access` faute de machine, donc son
+403 viendrait d'un **autre** garde — un PASS qui passerait pour la mauvaise raison.
+
+**Préalable à E-152, qui n'avait été vu par personne** : une fixture de rôle 2 **sans**
+`can_manage_fail2ban` — un quatrième compte, ou une révocation temporaire restaurée dans le `finally`,
+avec la règle du chantier qui s'applique : *nettoyer ce que le test ACCORDE.*
+
+**Et la contrainte de forme que je réclamais est déjà satisfaite** : `require_permission` de
+`helpers.py` porte `if role_id >= 3: return func(...)` et sa docstring le dit. Le décorateur **EST**
+« cette permission OU rôle ≥ 3 » — **la forme « permission seule » que je craignais n'existe pas dans ce
+dépôt.**
+
 **`bashrc/` — deux arbitrages BLOQUANTS pour B4, ouverts le 2026-08-26**
 
 > Jusqu'ici, « signaler » suffisait : B1 à B3 n'écrivent sur aucune machine. **B4 remplace un fichier
@@ -948,6 +975,54 @@ et chacune bloque une session. Je ne les tranche pas.
   ouvrait la porte qui la garde**, en se journalisant comme un nettoyage réussi. **Corrigé en
   `v1.38.16`** — mais l'arbitrage doit être relu en le sachant : ce n'était pas « une donnée à laquelle
   on ne peut pas se fier », c'était **un préflight qui avait cessé de bloquer**.
+  **⚠⚠ ET CE DOCUMENT NE DISAIT JAMAIS *QUI* SERAIT RÉVOQUÉ. Mesuré le 2026-08-27 — ce sont DEUX
+  comptes nommés, sur la PRODUCTION, et l'un est le vôtre.**
+
+  « Un déploiement lancé en l'état RÉVOQUERAIT les accès » est resté une phrase abstraite pendant tout
+  le chantier. `backend/configure_servers.py:755` fait `revoked = managed_users - authorized_names`.
+  Relevé en base, machine par machine :
+
+  | machine | `managed` par rootwarden | serait révoqué |
+  |---|---|---|
+  | **1 `srv-zabbix` — PRODUCTION** | `claude-agent`, **`Timikana`** | **les deux** |
+  | 2 `Test-Server-Debian` | aucun | rien |
+  | 3 `OpenCVE-Test-OnPrem` | aucun | rien |
+
+  **Seule la production a quelque chose à révoquer, et ce sont exactement ces deux comptes.**
+  `Timikana` est le nom sous lequel tout ce dépôt est committé.
+
+  **Ils ne peuvent PAS être épargnés, et ce n'est pas un état à corriger avant K4 : c'est le
+  comportement permanent du script.** `authorized_names` est bâti **uniquement** depuis les utilisateurs
+  **du portail** (`:735-737`, `for user in self.all_users`). Or **ni `claude-agent` ni `Timikana`
+  n'existe dans `users`** — vérifié, 10 comptes de portail, aucun des deux. Ils ne peuvent donc **jamais**
+  entrer dans `authorized_names` : ils seront dans `revoked` à **chaque** déploiement, par construction.
+
+  **Et ce qui serait détruit est plus large que ce que RootWarden a posé.** Les deux lignes portent
+  `has_platform_key = 0` et leurs clés `is_platform_key = 0` — `claude-agent` en `ssh-ed25519`,
+  `Timikana` en `ssh-rsa`. **Ce sont des clés personnelles préexistantes que RootWarden a ADOPTÉES comme
+  « managed », pas des clés qu'il a déployées.** Et la révocation est
+  `rm -f /home/<user>/.ssh/authorized_keys` (`:759`) — **le FICHIER ENTIER**, pas un retrait de ligne
+  ciblé : elle efface aussi les clés que RootWarden n'a jamais vues, et **il ne peut pas les rétablir**.
+
+  **Le module sait pourtant faire du ciblé** : `remove_user_keys` fait un `sed -i '/rootwarden/d'`
+  (`ssh.py:1779-1784`). **Les deux gestes coexistent dans le même module, et le plus destructeur est
+  celui qui part en masse.**
+
+  > **Un déploiement K4 sur `srv-zabbix` supprimerait l'`authorized_keys` du compte de l'exploitant sur
+  > sa machine de production, et celui de `claude-agent`. Aucun des deux n'a de clé de plateforme :
+  > RootWarden ne pourrait pas les rétablir.**
+
+  **Non mesuré, et il faut le dire** : que ces deux comptes existent **réellement** sur `srv-zabbix`.
+  C'est l'**inventaire** qui est lu, pas la machine — et E-187 établit précisément que cet inventaire
+  peut être faux. `last_seen_at` vaut `2026-08-18 10:40:58` pour les deux, soit le dernier scan de cette
+  machine : **la donnée est cohérente, elle n'est pas confirmée.** La confirmer demanderait de joindre la
+  production.
+
+  **Un geste recommandé, qui transformerait le piège en décision** : faire dire au préflight **ce qu'il
+  va révoquer, nommément, avant de le faire**. Le motif existe déjà dans le dépôt — F4 a fait dire à la
+  confirmation `fail2ban` « sur `Test-Server-Debian` **et sur elle seule** ». Un déploiement qui annonce
+  « 2 accès seront révoqués : `claude-agent`, `Timikana` » ne se lance pas par inadvertance.
+
   Sur le repli lui-même : il a **deux** chemins, et aucun compte actif de rôle 1 ne
   porte `users.sudo = 1`, donc le trou est réel et à un `UPDATE` d'être exploitable.
   **RELEVÉ DE NIVEAU LE 2026-08-26 — cet `UPDATE` existe, et il est plus bas que supposé.** L'import
