@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.42** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.44** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,63 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.44 — E-220 : un privilege dormant qu'aucun chemin du produit ne peut retirer
+
+**L'etat.** Quand la revocation du compte de service se termine sur `exit 2`, le compte est supprime
+mais `/etc/sudoers.d/rootwarden` **subsiste** : un `NOPASSWD: ALL` sans compte porteur. Trouve par la
+session 5 dans le correctif de la veille.
+
+**Ce que le correctif pose.** `sudoers_orphelin`, **toujours present dans le resultat, meme a `False`**
+— un champ absent se lit « rien a dire », et ici il y a quelque chose a dire. Le nom porte la raison ;
+un `incomplet` abstrait n'aurait porte qu'une couleur. Le marqueur `SUDOERS_ORPHELIN` est ajoute a
+l'entree d'audit, et un avertissement nomme la machine.
+
+**Et il corrige une affirmation FAUSSE du correctif precedent.** Celui-ci laissait
+`service_account_deployed` a 1 « pour qu'un rejeu termine ». Le compte n'existe plus a ce point — on
+n'atteint `exit 2` qu'apres avoir passe `if id rootwarden`. Le drapeau a 1 faisait donc **accepter**
+`remove_ssh_password` (`:1275`), qui n'exige que lui : les deux mots de passe d'une machine sans compte
+de service auraient ete vides. **Le drapeau passe a 0.**
+
+**⚠ Et ma justification de ce passage a 0 etait fausse elle aussi — relevee par la session 5, verifiee
+ici.** J'ecrivais que le rejeu « passerait par le compte nominal, le seul qui puisse encore retirer le
+fichier ». Il y passe, mais **il ne peut pas terminer** :
+
+- meme drapeau a 1, **la connexion aboutit** : `connect_ssh` attrape `AuthenticationException` sur sa
+  tentative 0 et se replie sur la cle de plateforme du compte nominal (`ssh_utils.py:250`) ;
+- ce qui echoue n'est pas l'authentification mais **l'elevation** : `_rootwarden_auth_method` vaut
+  alors `'keypair'`, le court-circuit NOPASSWD ne s'applique pas, et `root_password` est envoye —
+  **vide** sur une machine dont la migration est achevee.
+
+**Le rejeu est ferme a 0 comme a 1.** Le drapeau reste a 0 pour les deux premieres raisons, qui
+suffisent. *Une correction qui retire une justification fausse renforce la conclusion : elle montre
+que celle-ci ne reposait pas dessus.*
+
+> **CE QUI EN DECOULE, ET QUI EST PIRE QU'« INCOMPLET ».** Sur une machine migree, **aucun chemin du
+> produit ne retire ce fichier** : `_purge_legacy_sudoers` l'exclut par exception explicite — ecrite
+> pour proteger un compte vivant, et qui **survit a sa disparition parce qu'elle ne la teste pas** — le
+> rejeu ne peut pas elever, et le seul geste qui l'ecrase, `deploy_service_account`, le **remplace** en
+> recreant le compte au lieu de le retirer. **L'etat n'est ni transitoire ni auto-reparant : il est
+> permanent.** Sur une machine non migree, le rejeu aboutit : le blocage est propre a l'etat vers
+> lequel toute la page pousse.
+
+**Un changement de comportement sur K4, nomme plutot que decouvert.** `configure_servers.py:758` :
+`if not use_sa: ensure_sudo_installed(...)`. Le drapeau a 0 fait donc **executer** cette etape au
+deploiement suivant. Sans effet la ou `sudo` est present, et fail-closed sinon — mais c'est un
+comportement qui change.
+
+**⚠ CE QUI N'EST PAS FAIT, ET QUI MONTE A L'EXPLOITANT.** L'etat orphelin **n'a aucun porteur en
+base**. Les trois canaux poses sont ephemeres : la reponse HTTP se ferme, le journal n'est pas relu,
+`user_logs` porte un marqueur que rien n'interroge. **Le lendemain, plus aucune requete ne peut
+apprendre que cette machine porte un privilege dormant.** *Un etat transitoire se signale par un
+message ; un etat permanent et invisible doit etre persiste, sinon il n'existe pour personne.* Le vrai
+porteur serait une **colonne sur `machines`** — table de production, donc **arbitrage exploitant et non
+effet de bord d'un correctif**. Et il n'y a pas de demi-mesure honnete : aucune route de lecture ne peut
+deviner cet etat sans joindre la machine.
+
+**Relu par la session 5 AVANT commit**, a la demande du Lead — c'etait le deuxieme correctif consecutif
+sur cette route, et le premier avait arme un piege que ma propre relecture n'avait pas vu. **Inerte
+jusqu'au redemarrage.**
 
 ### v1.38.43 — le portage cesse de calculer ce qu'il ne peut pas savoir : il DEMANDE au détenteur de la clé
 
