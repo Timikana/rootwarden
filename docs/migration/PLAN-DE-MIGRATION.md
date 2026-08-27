@@ -784,6 +784,50 @@ depuis l'ouverture du chantier.**
 | `srv-zabbix` sans seconde voie | **il remet les mots de passe lui-même** | le gel reste tant que ce n'est pas confirmé ; **pas** de refus fail-closed |
 | `tickets` | **la route reste** | le menu seul est retiré ; rien d'autre à décider |
 
+#### Deux décisions de plus, après qu'une session ait REFUSÉ d'écrire
+
+**Ma première question était incomplète, et c'est un refus mesuré qui l'a montré.** J'avais demandé
+« brancher la porte ou retirer les noms ? ». Il manquait un terme :
+
+    approvals.py:74   if role is not None and int(role) >= ROLE_SUPERADMIN: return None
+
+**Les deux routes exigent le rôle 3 — exactement celui que la porte contourne.** Brancher sans lever le
+contournement aurait écrit **une ligne qui ne peut jamais rien faire** : « la garde présente qui ne garde
+pas », sur les deux gestes les plus larges du produit.
+
+**Et le contournement est DÉLIBÉRÉ** — sa docstring le dit : sans lui, une condition sur un geste réservé
+au rôle 3 « ne pourrait jamais être satisfaite et bloquerait toute action ». **Brancher la porte sur ces
+routes reproduit donc exactement le cas pour lequel le contournement a été écrit.** Ce n'était pas un
+oubli à corriger, c'était une conception à trancher.
+
+| décision | réponse |
+|---|---|
+| le contournement du rôle 3 sur ces deux actions | **LEVÉ**, et **un second compte d'administration réel est créé** |
+| l'ancienne clé à la rotation | **ARCHIVÉE**, avec une purge prévue |
+
+#### ✅ La bonne nouvelle que la mesure donne : l'approbateur n'a PAS besoin du rôle 3
+
+`routes/approvals.py:28-29` exige `@require_role(2)` **+** `@require_permission('can_admin_portal')`, et
+la règle est `approved_by != requested_by`.
+
+> **Un compte de RÔLE 2 porteur de `can_admin_portal` peut donc approuver une action de rôle 3.** C'est
+> une séparation des tâches **sans escalade** — l'approbateur n'a pas besoin de pouvoir faire le geste
+> qu'il approuve.
+
+Et aujourd'hui **aucun** compte de rôle 2 ne porte cette permission (`rw-test-admin` ne l'a pas), donc les
+seuls approbateurs possibles sont les deux comptes de **rôle 3** : `superadmin` — dont le mot de passe ne
+correspond plus — et `rw-test-super`, **un compte d'épreuve dont les identifiants sont dans le dépôt.**
+**L'approbation d'une rotation de clé de flotte reposerait donc sur un compte de test.** C'est ce qui rend
+le second compte nécessaire, et c'est pourquoi il doit être **rôle 2 + `can_admin_portal`**, pas rôle 3.
+
+#### La contrainte impérative de l'archivage
+
+> **L'archive doit vivre HORS de ce que `get_platform_private_key()` peut rendre.** Sinon l'ancienne clé
+> reste utilisable par `ssh_utils.py:236-244`, et **la rotation devient du théâtre.**
+
+Plus une purge, dont le délai reste à fixer — un secret archivé sans date de destruction est un secret
+permanent qui a seulement changé de nom.
+
 #### ⚠ « Non sauvegardé » change la gravité, pas seulement l'urgence
 
 La question décidait si la rotation était *irréversible* ou *seulement pénible*. **La réponse est
