@@ -916,6 +916,30 @@ def revoke_service_account():
     if not machine_ids:
         return jsonify({'success': False, 'message': 'machine_ids requis'}), 400
 
+    from approvals import gate
+    # ══ E-201 : LA PORTE A QUATRE YEUX EST ENFIN INTERROGEE ═════════════════
+    #
+    # `Config.APPROVAL_ACTIONS` nommait cette action depuis toujours, et
+    # `gate()` n'etait JAMAIS appele : l'approbation existait en configuration
+    # seulement. Une garde declaree et jamais interrogee.
+    #
+    # ELLE N'EST PAS ENVELOPPEE D'UN `try/except` QUI AVALE. Sur les deux
+    # actions de `ACTIONS_SANS_REPLI`, `gate()` LEVE quand la base est
+    # indisponible : la porte qui echoue REFUSE. Attraper ici et continuer
+    # rendrait la levee inutile — c'est exactement le defaut des deux appels
+    # existants, dont le `logger.debug` n'est meme pas journalise en
+    # exploitation.
+    _uid, _role = get_current_user()
+    _ap = gate('revoke_service_account', int(machine_ids[0]), 'compte de service',
+               {'machine_ids': machine_ids, 'reason': reason}, _uid, role=_role)
+    if _ap is not None:
+        return jsonify({
+            'success': False, 'pending_approval': True, 'request_id': _ap['id'],
+            'message': ("Demande d'approbation creee : un 2e administrateur doit valider "
+                        "avant execution." if _ap['status'] == 'created'
+                        else "Action deja en attente d'approbation par un 2e administrateur."),
+        }), 202
+
     user_id, _ = get_current_user()
     conn = get_db_connection()
     try:
@@ -1245,6 +1269,30 @@ def reenter_ssh_password():
 @threaded_route
 def regenerate_platform_key_route():
     """Regenere la keypair plateforme. ATTENTION : necessite re-deploiement."""
+    from approvals import gate
+    # ══ E-201 : LA PORTE A QUATRE YEUX EST ENFIN INTERROGEE ═════════════════
+    #
+    # `Config.APPROVAL_ACTIONS` nommait cette action depuis toujours, et
+    # `gate()` n'etait JAMAIS appele : l'approbation existait en configuration
+    # seulement. Une garde declaree et jamais interrogee.
+    #
+    # ELLE N'EST PAS ENVELOPPEE D'UN `try/except` QUI AVALE. Sur les deux
+    # actions de `ACTIONS_SANS_REPLI`, `gate()` LEVE quand la base est
+    # indisponible : la porte qui echoue REFUSE. Attraper ici et continuer
+    # rendrait la levee inutile — c'est exactement le defaut des deux appels
+    # existants, dont le `logger.debug` n'est meme pas journalise en
+    # exploitation.
+    _uid, _role = get_current_user()
+    _ap = gate('regenerate_platform_key', 0, 'flotte',
+               {'portee': 'flotte entiere'}, _uid, role=_role)
+    if _ap is not None:
+        return jsonify({
+            'success': False, 'pending_approval': True, 'request_id': _ap['id'],
+            'message': ("Demande d'approbation creee : un 2e administrateur doit valider "
+                        "avant execution." if _ap['status'] == 'created'
+                        else "Action deja en attente d'approbation par un 2e administrateur."),
+        }), 202
+
     from ssh_key_manager import regenerate_platform_key
     regenerate_platform_key()
     # Marquer tous les serveurs comme non-deployes
@@ -2301,7 +2349,10 @@ def delete_remote_user():
             return jsonify({'success': False, 'pending_approval': True,
                             'request_id': _ap['id'], 'message': msg}), 202
     except Exception as _e:
-        logger.debug("approval gate (delete_remote_user) skipped: %s", _e)
+        # Une porte a quatre yeux qui s'ouvre doit laisser une TRACE : `debug`
+        # n'est pas journalise en exploitation, donc la porte s'ouvrait et
+        # personne ne le savait. Un repli silencieux n'est pas un repli.
+        logger.error("approval gate (delete_remote_user) OUVERTE sur erreur : %s", _e)
 
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m['root_password'])
