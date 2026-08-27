@@ -2619,6 +2619,22 @@ def machines_credential_status():
     VIDE saisi la-bas est donc stocke comme un cryptogramme NON VIDE, et
     `(password <> '')` rend VRAI pour une machine qui n'a pas de mot de passe.
 
+    ══ L'ASYMETRIE VAUT POUR LES DEUX COLONNES CHIFFREES ════════════════════
+
+    Elle ne tient a rien de propre a `password` : c'est le chiffrement de la
+    chaine vide qui differe. **`root_password` est donc dans le meme cas**, et
+    cette route rend les memes trois etats pour elle (`root_*`).
+
+    C'est meme la colonne la plus consequente des deux : c'est celle dont depend
+    l'ELEVATION, donc E-218 et E-219, et **c'est la seule que la page de cle de
+    plateforme ne peut pas reecrire**. Un seul calcul les sert toutes les deux
+    (`_trois_etats`) : deux copies divergeraient, et c'est le motif referme le
+    meme jour sur les cinq `_resolve_ssh_creds`.
+
+    Corollaire pour `indetermines` : ses entrees nomment **la colonne** et pas
+    seulement la machine — « je n'ai pas su lire un secret » sans dire lequel
+    n'apprend rien a un ecran qui en affiche deux.
+
     Le portage a REFUSE de reimplementer le dechiffrement pour trancher — et il
     a eu raison : *ne jamais recopier une regle de crypto.* Il n'existait
     qu'une issue honnete : que le backend, seul detenteur de la cle, expose le
@@ -2669,8 +2685,9 @@ def machines_credential_status():
     try:
         conn = get_db_connection()
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, name, password, service_account_deployed, "
-                    "platform_key_deployed FROM machines ORDER BY name")
+        cur.execute("SELECT id, name, password, root_password, "
+                    "service_account_deployed, platform_key_deployed "
+                    "FROM machines ORDER BY name")
         lignes = cur.fetchall()
         conn.close()
     except Exception as e:
@@ -2678,23 +2695,34 @@ def machines_credential_status():
         return jsonify({'success': False, 'message': 'Erreur BDD'}), 500
 
     machines, indetermines = [], []
+
+    def _trois_etats(secret, machine_id, colonne):
+        """Les trois etats d'UNE colonne chiffree. Rend (vide, dechiffrable).
+
+        Un seul calcul pour `password` et `root_password` : la meme asymetrie
+        Python/PHP vaut pour les deux, et deux copies divergeraient — c'est le
+        motif qu'on vient de refermer sur les cinq `_resolve_ssh_creds`.
+        """
+        if not secret:
+            return True, True
+        try:
+            return (encryption.decrypt_password(secret) == ''), True
+        except Exception:
+            # On ne journalise NI le secret NI l'exception telle quelle : un
+            # message d'erreur de crypto peut porter des octets du cryptogramme.
+            # Seuls l'identifiant de la machine et le nom de colonne sont traces.
+            logger.warning("machines/credential-status : dechiffrement impossible "
+                           "pour machine_id=%s colonne=%s", machine_id, colonne)
+            indetermines.append({'machine_id': machine_id, 'colonne': colonne})
+            return None, False
+
     for row in lignes:
         if not check_machine_access(row['id']):
             continue
         secret = row.get('password') or ''
-        if not secret:
-            vide, dechiffrable = True, True
-        else:
-            try:
-                vide, dechiffrable = (encryption.decrypt_password(secret) == ''), True
-            except Exception:
-                # On ne journalise NI le secret NI l'exception telle quelle :
-                # un message d'erreur de crypto peut porter des octets du
-                # cryptogramme. Seul l'identifiant de la machine est trace.
-                logger.warning("machines/credential-status : dechiffrement "
-                               "impossible pour machine_id=%s", row['id'])
-                vide, dechiffrable = None, False
-                indetermines.append(row['id'])
+        root_secret = row.get('root_password') or ''
+        vide, dechiffrable = _trois_etats(secret, row['id'], 'password')
+        root_vide, root_dechiffrable = _trois_etats(root_secret, row['id'], 'root_password')
 
         keypair = bool(row.get('service_account_deployed')
                        or row.get('platform_key_deployed'))
@@ -2707,6 +2735,11 @@ def machines_credential_status():
             'secret_stocke': bool(secret),
             'mot_de_passe_vide': vide,
             'dechiffrable': dechiffrable,
+            # `root_password` : meme prédicat, colonne distincte. C'est celle
+            # dont depend l'ELEVATION, donc E-218 et E-219.
+            'root_secret_stocke': bool(root_secret),
+            'root_password_vide': root_vide,
+            'root_dechiffrable': root_dechiffrable,
             'keypair_deploye': keypair,
             'joignable_selon_le_backend': bool(mdp_effectif) or keypair,
         })
