@@ -365,6 +365,19 @@ declare -A REF_LARAVEL=(
   #   1  l'attribut `lang` suit la langue de l'interface ;
   #   1  la date suit la langue de l'interface.
   [go-fail2ban-f2]=24
+  # `fail2ban/` sous-lot F3 : configuration, journaux et services, portes.
+  # 21 sur le portage contre 15 sur le legacy. L'ecart de SIX se decompose
+  # entierement — six `verifiePortage`, INFO cote legacy, PASS cote portage :
+  #   1  une configuration ABSENTE est annoncee, pas affichee comme un contenu ;
+  #   1  un journal ABSENT, de meme ;
+  #   1  aucun geste ne peut viser une machine que l'ecran n'affiche pas ;
+  #   1  aucun parametre de traduction n'apparait a l'ecran ;
+  #   1  un service absent se distingue VISUELLEMENT d'un service installe ;
+  #   1  une valeur invalide est REFUSEE plutot que de provoquer une erreur
+  #      interne — celui-ci a ete referme DANS LE BACKEND (E-164), donc le
+  #      legacy en profite aussi : son INFO dit desormais « verifie sur le
+  #      legacy aussi ».
+  [go-fail2ban-f3]=22
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -596,7 +609,7 @@ declare -A REF_LEGACY=(
   # machine d'essai, puis selecteur bascule sur la production. Le defaut envoie
   # alors la requete vers la machine d'ESSAI. Le sens inverse joindrait
   # `srv-zabbix`, et il n'est pas exerce.
-  [go-fail2ban-f3]=13
+  [go-fail2ban-f3]=16
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -627,7 +640,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)

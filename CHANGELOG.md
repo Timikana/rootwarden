@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.3** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.4** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,94 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.4 — `fail2ban/` F3 porte : une seule notion de « la machine », et E-164 corrige dans le backend
+
+`go-fail2ban-f3` entre au LOT avec **22 PASS sur le portage** contre **16 sur le legacy**, 0 FAIL des
+deux cotes. L'ecart de SIX se decompose entierement — six `verifiePortage`, un par ecart referme.
+
+#### E-162 — le portage n'a AUCUNE variable de machine courante
+
+Le legacy en a deux : `loadConfig` lit `getServer()`, le SELECTEUR, et douze autres gestes lisent
+`_currentServer`, pose au dernier releve reussi. Relever sur A, changer le selecteur pour B, et tout
+agit sur A pendant que l'ecran montre B.
+
+Ici tout part de `machineChoisie()` — de ce que l'ecran affiche. **Un geste ne peut donc pas viser
+une machine que l'operateur ne regarde pas.** Et changer de machine EFFACE ce qui appartenait a la
+precedente : sections et boutons de lecture se recachent, et ne se rouvrent qu'apres un releve qui
+dit que fail2ban est installe sur cette machine-la. Sans cela, la configuration de A resterait a
+l'ecran sous le nom de B — la meme confusion, par un autre chemin.
+
+#### E-161 — trois issues, pas deux, a la lecture d'un fichier distant
+
+Les deux commandes se terminent par `|| echo "[FICHIER ABSENT]"`. Le legacy pose la reponse dans un
+`<pre>` : le marqueur fabrique par le shell devient le CONTENU du fichier. Le portage distingue :
+
+|  | ce qui s'affiche |
+|---|---|
+| la lecture echoue | « La lecture a echoue » — et ce n'est pas « fichier vide » |
+| le fichier est absent | « Ce fichier n'existe pas sur la machine », dans la langue de l'interface |
+| le fichier existe | son contenu, tel quel |
+
+`.rw-fichier` n'est PAS vert sur noir. Ce costume de terminal fait passer pour un flux vivant ce qui
+est un fichier lu une fois — et c'est lui qui a fait lire « [FICHIER ABSENT] » comme une directive de
+configuration. Une surface de page, une bordure, et le fait que ce soit du code se dit par la chasse.
+Il ne se replie pas non plus : replier une ligne de configuration en change la lecture.
+
+#### E-163 — l'etat d'un service s'ecrit en MOT
+
+Le legacy distingue installe et absent par `opacity-50`. Elle n'est pas purgee aujourd'hui — mesure :
+1 et 0.5 — mais **une distinction qui ne tient qu'a une classe utilitaire est a un purge pres de
+disparaitre**, et elle ne dit rien a un lecteur d'ecran. Trois defauts de ce chantier viennent de la.
+Chaque ligne porte donc « Installe » ou « Non installe », et le fond ne fait que confirmer.
+
+Meme lot : aucun parametre de traduction n'apparait plus a l'ecran. Le legacy affiche `:count jail(s)
+trouves` parce que ses catalogues ecrivent `:count` et que le script passe `{jails, ips}`.
+
+#### E-164 — corrige DANS LE BACKEND
+
+`int(data.get('lines', 50))` etait hors du `try` de la route : une valeur non numerique y levait une
+`ValueError` que rien n'attrapait, et Flask rendait une page **HTML** « 500 Internal Server Error » —
+pas meme du JSON. La faute etait dans la requete, le statut disait qu'elle etait dans le serveur.
+
+Le cast passe dans un `try` et rend **400** avec un message JSON. **§3.2 du plan l'autorise
+explicitement** — « les modifications backend et legacy sont autorisees, ne plus bloquer, ne plus
+demander ». Ce correctif n'est pas de la nature des six qui attendent un arbitrage : ceux-la sont des
+gardes d'acces manquantes, celui-ci une validation d'entree. **Les deux portails en profitent** :
+l'assertion est passee de « ecart assume du legacy » a « verifie sur le legacy aussi ».
+
+#### Trois fautes de mesure, et une nouvelle famille
+
+- **Une mesure taillee sur la cible defectueuse ne peut pas juger la cible corrigee.** Deux
+  assertions cherchaient le marqueur `[FICHIER ABSENT]` DANS le bloc de contenu, puis ne
+  s'assertionnaient que s'il s'y trouvait. Sur le portage il ne s'y trouve pas — **precisement parce
+  que le portage l'a traite** — et la branche `else` declarait la mesure impossible. La propriete
+  tient pourtant dans les deux cas : le marqueur du shell ne s'affiche jamais comme contenu.
+- **Un geste RETIRE satisfait la propriete autant qu'un geste juste.** Le portage recache ses boutons
+  de lecture quand on change de machine ; la suite cliquait sans regarder et l'etape entiere echouait
+  sur une cible qui a RAISON. On mesure desormais si le geste est offert, et **on dit lequel des deux
+  cas on observe** — jamais un PASS muet.
+- **Une capture doit montrer l'etat du SOUS-LOT.** L'etape de captures se contentait de re-choisir la
+  machine, ce qui recachait justement les sections de F3 : les images ne montraient rien de ce que F3
+  produit. Elle refait maintenant le parcours complet, et une assertion verifie que les lectures
+  etaient offertes au moment de la photo.
+
+#### Un defaut de MON portage, vu a l'image
+
+« 1 jail · **1 adresse bannie** » alors que la carte dessous disait « 0 bannie ». Les formes
+singulieres `jails_une` et `adresses_une`, posees en F2, codaient le « 1 » en dur — et elles servent
+aussi pour ZERO, puisqu'en francais zero prend le singulier. Le nombre est desormais substitue meme
+au singulier.
+
+**Fichiers** : `backend/routes/fail2ban.py`, `laravel/app/Http/Controllers/Fail2banController.php`,
+`laravel/resources/views/fail2ban.blade.php`, `laravel/public/js/fail2ban.js`,
+`laravel/lang/{fr,en}/fail2ban.php` (**83 cles chacune, parite stricte**),
+`laravel/public/css/rw.css`, `tests/e2e/go-fail2ban-f3.mjs`, `scripts/rejouer-lot.sh`.
+
+F1, F2 et F3 rejoues sur le portage apres coup : **20/0, 24/0, 22/0**, tous conformes.
+
+**Reste `fail2ban/` F4 a F6** — ce sont enfin les gestes qui MUTENT : bannir, debannir, jails, liste
+blanche, installation. Puis `iptables/` I1 a I5.
 
 ### v1.38.3 — `fail2ban/` F3 caracterise : douze gestes sur treize visent la machine du DERNIER RELEVE
 

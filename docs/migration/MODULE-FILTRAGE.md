@@ -129,8 +129,8 @@ service `Machines`, et cet inventaire vient de la mesurer cinq fois.
 inventoriés (zéro élément DOM absent, zéro fonction sans appelant, zéro désaccord de clés), et son
 pire dégât est **réversible**.
 
-`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails, **F2 PORTÉ `v1.38.2`** historique et frise (⚠️ écrit déjà `fail2ban_status` : ce n'est pas
-un lot lecture seule) · **F3** conf, journaux, services · **F4** bans
+`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails, **F2 PORTÉ `v1.38.2`** historique et frise, **F3 PORTÉ `v1.38.4`** configuration, journaux et services (⚠️ écrit déjà `fail2ban_status` : ce n'est pas
+un lot lecture seule) · **F4** bans
 par machine · **F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
 `127.0.0.1/8` qui échoue toujours, l'édition qui **redémarre le service** sans le dire) · **F6**
 actions parc entier.
@@ -199,6 +199,31 @@ Quatre décisions de portage :
 
 **E-160 est ouvert et NON corrigé, décision assumée** : la frise annonce 30 jours et ne dessine que
 les jours actifs, des deux côtés — l'axe horizontal ne mesure pas le temps. À reprendre avec F3.
+
+### F3, porté le 2026-08-27 — quatre écarts refermés, dont un dans le backend
+
+Suite `go-fail2ban-f3` à **22 laravel / 16 legacy, 0 FAIL**. Les trois routes sont des **lectures
+distantes** : F3 ne mute rien, contrairement à ce que le découpage annonçait.
+
+Quatre décisions de portage :
+
+1. **Une seule notion de « la machine ».** Le portage n'a **aucune** variable de machine courante :
+   tout part de `machineChoisie()`, c'est-à-dire de ce que l'écran affiche. Et changer de machine
+   **efface** ce qui appartenait à la précédente — sections et boutons de lecture se recachent, et ne
+   se rouvrent qu'après un relevé qui dit que fail2ban est installé sur cette machine-là (E-162).
+2. **Trois issues, pas deux, à la lecture d'un fichier distant** : la lecture échoue, le fichier est
+   absent, le fichier existe. Le legacy n'en distingue qu'une — il pose la réponse dans un `<pre>`,
+   et le marqueur `[FICHIER ABSENT]` fabriqué par un `|| echo` du shell y devient le contenu du
+   fichier (E-161).
+3. **L'état d'un service s'écrit en MOT**, pas en `opacity-50`. La classe n'est pas purgée
+   aujourd'hui — mesuré, 1 et 0.5 — mais une distinction qui ne tient qu'à une classe utilitaire est
+   à un purge près de disparaître, et elle ne dit rien à un lecteur d'écran.
+4. **E-164 est corrigé dans le backend**, ce que §3.2 du plan autorise explicitement : le cast de
+   `lines` passe dans un `try` et une valeur non numérique rend **400** avec un message JSON, au lieu
+   d'une page HTML « 500 Internal Server Error ». Les deux portails en profitent.
+
+`.rw-fichier` n'est pas « vert sur noir » : ce costume de terminal fait passer pour un flux vivant ce
+qui est un fichier lu une fois, et c'est lui qui a fait lire « [FICHIER ABSENT] » comme une directive.
 
 ## 7. Ce qui reste à mesurer
 

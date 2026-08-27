@@ -2188,3 +2188,77 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     font-style: italic;
     color: var(--rw-texte-doux);
 }
+
+/*
+ * ══ UN FICHIER DISTANT, TEL QU'IL EST ═══════════════════════════════════════
+ *
+ * Pose au sous-lot F3 de `fail2ban/`. Le contenu d'un fichier de configuration
+ * ou d'un journal se lit en chasse fixe : l'indentation y porte du sens, et une
+ * ligne de journal s'aligne colonne par colonne avec la suivante.
+ *
+ * Il ne se replie PAS : replier une ligne de configuration en change la lecture
+ * — une ligne repliee ressemble a deux directives. Le bloc defile donc
+ * lateralement, et l'ombre de bord le dit.
+ *
+ * Il n'est pas « vert sur noir ». Ce costume de terminal fait passer pour un
+ * flux vivant ce qui est un fichier lu une fois, et il a fait lire
+ * « [FICHIER ABSENT] » comme une directive de configuration (E-161). Une
+ * surface de page, une bordure, et le fait que ce soit du code se dit par la
+ * chasse.
+ */
+.rw-fichier {
+    margin: 8px 0 0;
+    padding: 12px 14px;
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface-2);
+    color: var(--rw-texte);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre;
+    tab-size: 4;
+}
+
+/*
+ * ══ UNE LISTE D'ETATS ═══════════════════════════════════════════════════════
+ *
+ * Chaque ligne est un CONSTAT — ce service est installe, celui-la non — et non
+ * une decision : ce n'est donc ni une liste a cocher, ni un tableau, dont les
+ * colonnes n'auraient qu'une valeur utile.
+ *
+ * L'etat s'ecrit en MOT. Le legacy le rend par `opacity-50`, une classe
+ * utilitaire : la distinction tient a un purge pres, et elle ne dit rien a un
+ * lecteur d'ecran.
+ */
+.rw-liste-etats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+.rw-liste-etats__ligne {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 9px 12px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+}
+/* Un service absent s'efface SANS disparaitre : le contraste du texte reste
+   au-dessus du seuil, seule la surface recule. */
+.rw-liste-etats__ligne--absent {
+    background: var(--rw-surface-2);
+    border-style: dashed;
+}
+.rw-liste-etats__nom { font-weight: 650; min-width: 8ch; }
+.rw-liste-etats__jails {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}

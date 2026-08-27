@@ -36,9 +36,12 @@ return [
     // LE PLURIEL SE COMPOSE, IL NE SE PARENTHESE PAS. « 1 bannies » etait
     // rendu a l'ecran : vu a l'image, invisible a toute assertion. Et en
     // francais zero prend le SINGULIER — « 0 bannie ».
-    'jails_une' => '1 jail',
+    // LE NOMBRE EST TOUJOURS SUBSTITUE, MEME AU SINGULIER : cette forme sert
+    // aussi pour ZERO (en francais, zero prend le singulier), et un « 1 »
+    // ecrit en dur y affichait « 1 adresse bannie » pour zero adresse.
+    'jails_une' => ':nb jail',
     'jails_plusieurs' => ':nb jails',
-    'adresses_une' => '1 adresse bannie',
+    'adresses_une' => ':nb adresse bannie',
     'adresses_plusieurs' => ':nb adresses bannies',
     'bannies' => 'bannies',
     'compte_bannies_une' => ':nb bannie',
@@ -82,4 +85,25 @@ return [
     'frise_jour' => ':date — :bans banni(s), :unbans débanni(s)',
     'frise_legende_ban' => 'bans',
     'frise_legende_unban' => 'débans',
+
+    // ── Sous-lot F3 : configuration, journaux, services ──────────────────
+    'voir_config' => 'Voir jail.local',
+    'voir_logs' => 'Voir les journaux',
+    'config_titre' => 'Configuration — /etc/fail2ban/jail.local',
+    'logs_titre' => 'Journal — /var/log/fail2ban.log',
+    'lu_a_l_instant' => 'Lu à l\'instant sur :machine.',
+    'fichier_absent_titre' => 'Ce fichier n\'existe pas sur la machine',
+    'fichier_absent' => 'La machine a répondu qu\'aucun fichier de configuration n\'est présent. Ce n\'est pas une configuration vide : il n\'y en a aucune.',
+    'journal_absent_titre' => 'Ce journal n\'existe pas sur la machine',
+    'journal_absent' => 'La machine a répondu qu\'aucun fichier de journal n\'est présent. Fail2ban n\'y a donc encore rien écrit — ou n\'y tourne pas.',
+    'lecture_echec_titre' => 'La lecture a échoué',
+    'lecture_echec' => 'La machine n\'a pas répondu, ou a refusé la lecture. Ce n\'est pas la même chose qu\'un fichier absent.',
+    'services_titre' => 'Services détectés et jails disponibles',
+    'services_aide' => 'Ce que la machine a répondu à la détection. Un service absent ne peut pas être surveillé : sa jail n\'aurait rien à lire.',
+    'services_installe' => 'Installé',
+    'services_absent' => 'Non installé',
+    'services_jails' => 'Jails :',
+    'services_jail_active' => 'active',
+    'services_vide_titre' => 'Aucun service détecté',
+    'services_vide' => 'La détection n\'a rapporté aucun service. Fail2ban n\'a donc rien à surveiller sur cette machine.',
 ];
