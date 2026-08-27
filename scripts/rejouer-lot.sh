@@ -971,6 +971,34 @@ for cible in "${CIBLES[@]}"; do
     suites=("${SUITES_LARAVEL[@]}")
   fi
   for suite in "${suites[@]}"; do
+    # ── Garde : une suite NOMMEE n'est pas jouee sur une cible ou elle n'a pas de
+    # reference. Posee le 2026-08-27 apres qu'un rejeu ait joue
+    # `go-socle-navigation` sur les DEUX cibles : elle ne vise que le portage,
+    # elle n'est pas dans `SUITES_LEGACY` et n'a aucune reference legacy — cote
+    # legacy elle est MORTE au chargement, sur la page de connexion.
+    #
+    #     legacy-go-socle-navigation : 0 PASS / 1 FAIL
+    #     EXCEPTION Error: No element found for selector: input[name="username"]
+    #
+    # NOMMER UNE SUITE SANS NOMMER SA CIBLE LA JOUE SUR LES DEUX, y compris la ou
+    # elle n'a aucun sens — et le verdict rendu est « 0 PASS » avec une exception,
+    # c'est-a-dire la signature d'une suite CASSEE. Le runner disait
+    # « (pas de reference) » puis jouait quand meme : il annoncait le probleme et
+    # le commettait ensuite.
+    #
+    # Ceci ne s'applique QU'AUX suites nommees : les deux listes ne contiennent,
+    # par construction, que des suites qui visent leur cible. Et l'ignore ne
+    # consomme pas de fenetre TOTP — donc pas d'attente de 30 s pour rien.
+    if [ ${#NOMMEES[@]} -gt 0 ]; then
+      if [ "$cible" = legacy ] && [ -z "${REF_LEGACY[$suite]+x}" ]; then
+        echo "  IGNOREE   legacy/$suite - aucune reference legacy : cette suite ne vise pas cette cible."
+        continue
+      fi
+      if [ "$cible" = laravel ] && [ -z "${REF_LARAVEL[$suite]+x}" ]; then
+        echo "  IGNOREE   laravel/$suite - aucune reference laravel : cette suite ne vise pas cette cible."
+        continue
+      fi
+    fi
     [ "$premiere" = 0 ] && attendLaFenetreTotp
     premiere=0
     joue "$cible" "$suite" || ecarts=$((ecarts + 1))
