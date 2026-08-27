@@ -1245,7 +1245,33 @@ a.rw-bouton { display: inline-block; }
    Journal d'execution (module update/, sous-lot U2)
    ══════════════════════════════════════════════════════════════════════════ */
 
-.rw-journal { margin-top: 28px; }
+/*
+ * BUG-201 — `.rw-journal` ETAIT DEFINIE DEUX FOIS, ET LA SECONDE GAGNAIT.
+ *
+ * Cette regle-ci ne portait qu'une marge : c'est l'enveloppe de SECTION du
+ * journal d'execution. Mille lignes plus bas, une seconde `.rw-journal`
+ * definissait le cadre complet d'un `<pre>` de fichier — bordure, fond, chasse
+ * fixe, `white-space: pre-wrap`, `max-height: 380px`, `overflow: auto`. A
+ * specificite egale l'ORDRE tranche : la seconde l'emportait, et la `<section>`
+ * de `mises-a-jour.blade.php` en heritait de tout.
+ *
+ * Quatre consequences, etablies en lisant les regles plutot qu'un rendu :
+ *   — son `<h2>` et son `<p>` passaient en CHASSE FIXE. Ni `.rw-sous-titre-fort`
+ *     ni `.rw-sous-titre` ne posent de `font-family` : ils heritaient ;
+ *   — `white-space: pre-wrap` etait herite par ces paragraphes, donc les retours
+ *     a la ligne du GABARIT devenaient des retours a la ligne rendus ;
+ *   — la section devenait une boite bornee a 380 px qui defile, et ce
+ *     defilement s'IMBRIQUE avec celui de `.rw-journal__general` (190 px) des
+ *     que celui-ci porte du contenu — ce qui explique qu'une mesure prise
+ *     journal VIDE n'ait vu qu'une seule boite ;
+ *   — la marge voulue (28 px en tete) etait remplacee par `10px 0`.
+ *
+ * Septieme occurrence de la famille `.rw-etiquette`, et la parade du projet est
+ * de RENOMMER, jamais de surcharger. On renomme celle qui a UN seul appelant :
+ * l'autre en a sept (`services/`, `cles-ssh`, `chatops`, trois de
+ * `supervision/`, et `docker.js`), et son nom decrit bien ce qu'elle fait.
+ */
+.rw-journal-section { margin-top: 28px; }
 
 .rw-sous-titre-fort {
     margin: 0;
