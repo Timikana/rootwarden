@@ -166,7 +166,16 @@ def render_policy(policy: dict) -> str:
     Retourne le contenu complet du fichier sudoers.d, header + 1 ligne(s).
     """
     username = _validate_username(policy['username'])
-    preset = policy.get('preset', 'apt_only')
+    # ══ E-144, SECONDE OCCURRENCE — celle que le plan ne nommait pas ══════
+    #
+    # Corriger la seule route aurait laisse ce repli ARME pour tout autre
+    # appelant de `render_policy`. Ici comme la-bas : `apt_only` porte
+    # « AVERTISSEMENT : ce preset est EQUIVALENT ROOT » dans sa propre
+    # docstring (`:80`), et un prereglage de privileges ne se devine pas.
+    preset = policy.get('preset')
+    if not preset:
+        raise ValueError(
+            "preset requis : aucun prereglage sudo n'est applique par defaut")
     nopasswd = bool(policy.get('nopasswd', False))
     runas = policy.get('runas', 'root')
 
