@@ -20,6 +20,9 @@ return [
     'section_admin' => "ADMINISTRATION",
     'section_autre' => "AUTRE",
 
+    'version' => "Version :numero",
+    'version_inconnue' => "Version inconnue",
+
     'dashboard'   => 'Dashboard',
     'ssh_keys'    => 'Cles SSH',
     'updates'     => 'Mises a jour',
