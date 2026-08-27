@@ -2171,6 +2171,133 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.33 — une regle du Lead RETIREE : ce qu'il croyait etre une protection dans un helper n'en etait pas
+
+**La session 4 a refuse une instruction du Lead avec une mesure, et elle avait raison. La regle est retiree du
+§8 — pas amendee : retiree, avec sa premisse fausse ecrite en clair, parce qu'une regle dont la premisse est
+fausse et qui reste au catalogue sera reappliquee.**
+
+Constatant que quatre des cinq routes `ssh_audit` sont fermees par le `if not machine_id` de
+`_resolve_ssh_creds`, le Lead avait ecrit que **la protection vivait dans un helper partage ou rien ne dit
+qu'elle en est une**, et demande d'annoter ces helpers. Mesure :
+
+> **Aucun des cinq `_resolve_ssh_creds` n'autorise quoi que ce soit.** Les cinq font
+> `SELECT … FROM machines WHERE id = %s`. **Aucun `check_machine_access`, aucun bornage au compte.**
+> `validate_machine_id` non plus : c'est un controle de **type et de signe**.
+
+Donc un repli permissif y livrerait des identifiants SSH **sur une machine DEJA AUTORISEE par le
+decorateur** : il ne contournerait aucun controle d'acces. **Le risque annonce — « trois routes SSH ouvertes
+d'un coup » — n'existe pas.**
+
+**Et l'argument decisif est celui que le Lead n'avait pas vu** : annoter ces helpers « garde » aurait ecrit
+**une quatrieme fois le defaut que ce chantier corrige** — un texte qui affirme une protection que le code
+n'exerce pas, apres les cinq en-tetes d'acces, le commentaire de `/deploy` et celui d'`APPROVAL_ENABLED`.
+**L'instruction du Lead aurait fabrique l'objet de sa propre regle.**
+
+Ce que font ces resolveurs est reel mais indirect : **en refusant de travailler sans `machine_id`, ils rendent
+VRAIE la premisse du decorateur.** C'est une **precondition**, pas une garde — et *nommer une precondition
+« garde » est exactement l'erreur de categorie qui produit les commentaires faux.*
+
+#### L'INVARIANT qui la remplace, et il attrape la classe entiere
+
+> **Sur une route portant `@require_machine_access`, `machine_id` doit etre OBLIGATOIRE. S'il est facultatif,
+> la route porte une AUTORISATION PROPRE.**
+
+Se teste sur les **116** routes, ne depend d'aucun helper, et n'aurait pas cree un quatrieme commentaire faux
+— la ou l'annotation demandee n'aurait documente que trois cas. Session 6 l'ecrit.
+
+#### E-211 corrige une SECONDE fois — sur sa cause, cette fois, et le Lead avait inscrit la formule fausse
+
+Il etait ecrit que le decorateur « ne trouve aucun identifiant dans les **parametres d'URL** ». **Faux** :
+
+    single = (data.get('machine_id') or request.args.get('machine_id')
+              or data.get('server_id') or request.args.get('server_id'))
+
+**Il lit la query-string explicitement.** Ce qui le neutralise n'est pas la **provenance** du parametre, c'est
+son caractere **FACULTATIF** : absent, la liste reste vide, et une liste vide ne refuse rien.
+
+**L'ecart et le correctif sont inchanges — mais l'explication comptait** : *« le decorateur ne lit pas la
+query-string » aurait envoye corriger le decorateur, qui n'a rien a corriger, au lieu de la route.*
+
+> **Deuxieme rectification de la meme trouvaille en un jour : la premiere retrecissait sa PORTEE, celle-ci
+> corrige sa CAUSE.** *Une trouvaille juste peut etre expliquee faux — et l'explication est ce qu'on
+> reutilise.* Corollaire : **une trouvaille verifiee n'a pas son explication verifiee**, et ce sont deux
+> relectures distinctes. Le Lead avait verifie la portee et pas le mecanisme : il a donc relu la moitie du
+> travail en croyant l'avoir relu.
+
+#### Le chiffre : 57 et non 58, et « sans `require_role` » n'est PAS « sans autorisation »
+
+    57  sans `@require_role`     (le Lead avait annonce 58)
+    29  portent `@require_permission`
+    28  AUCUNE autorisation au-dela de la cle d'API      <- LE CHIFFRE A ANNONCER
+        updates 12 · cve 5 · ssh_audit 4 · docker 2 · monitoring 2 · ssh 2 · maintenance 1
+
+**Les 15 de `fail2ban` sont TOUTES autorisees par `can_manage_fail2ban`** — c'est E-152 qui les y a mises.
+**Annoncer 57 aurait ete un chiffre vrai et trompeur : la moitie decrit des routes saines.**
+
+**Et l'ecart de comptage etait une ADDITION.** Recoupement : neuf modules sur dix tombaient juste, l'ecart
+etait `fail2ban`, 15 contre 16. Recompte par analyseur : **15**. *Le balayage du Lead etait juste, son addition
+etait fausse — et une erreur d'arithmetique sur un releve correct est indiscernable d'une erreur de releve,
+et coute le meme recoupement.* La session 4 avait liste ses 15 pour que la seizieme soit **identifiee plutot
+que devinee** ; il n'y en avait pas.
+
+#### Cinq copies de `_resolve_ssh_creds` attendent leur E-204
+
+**Cinq implementations, cinq empreintes**, comparees ligne a ligne : **`iptables` rend un 7-uplet, les quatre
+autres un 8-uplet** — seule divergence de fond ; `policies` ne differe que par le nom de ses variables
+locales ; `ssh_audit`, `services` et `fail2ban` que par leur chaine de journal. **C'est E-204 avant
+l'incident** — *elles etaient d'accord aussi, jusqu'a ce qu'une bouge.*
+
+#### E-216 — un changement d'identifiant sur une machine de PRODUCTION ne laisse aucune trace
+
+Seul chemin qui ecrit `password` / `root_password` d'une machine : `manage_servers.php:136,182` — **il ne
+journalise rien**, et `user_logs` ne porte **aucune** entree de modification d'identifiants machine.
+
+Revele en remesurant `srv-zabbix` pour P4 : la session 3 a relance la requete verbatim et dechiffre **en ne
+faisant rendre que les LONGUEURS, jamais les valeurs** — `13 / 13` caracteres, deux mots de passe reels, avec
+`ssh_password_required = 0`. **L'exploitant les avait ressaisis et l'avait dit** : l'ecart n'est pas le
+changement, **c'est qu'aucune trace ne permettrait de le savoir si personne ne l'avait dit.**
+
+**La phrase « RootWarden ne peut plus administrer `srv-zabbix` » sort du vocabulaire.** L'interdiction de P4
+tient sur ses autres fondements — `UPDATE` sans `WHERE`, volume non sauvegarde, destruction sans copie — et
+c'est pourquoi il fallait retirer celui-la : *un interdit qui repose sur quatre fondements dont un est faux se
+fait demolir sur le faux.*
+
+#### E-217 — les deux implementations ne s'accordent pas sur ce qu'est « pas de mot de passe »
+
+    Python  encrypt_password('')        -> ''            colonne vraiment vide
+    PHP     encryptPassword('', false)  -> 'sodium:…'     colonne NON vide
+
+Trouve par la session 3 **dans son propre correctif P1**, quelques heures apres l'avoir ecrit : son test
+`(password <> '')` rend **VRAI** pour un mot de passe reellement vide ecrit par le formulaire legacy.
+*Corriger « le drapeau au lieu du fait » ne suffit pas si les deux implementations ne s'accordent pas sur ce
+qu'est le fait.*
+
+Atteignable : `required` est **du HTML**, et `$invalidFields` (`:122-130`) n'inclut **ni** `password` **ni**
+`root_password` — **troisieme « la garde est sur la PAGE, pas sur la REQUETE »**. Sans porteur aujourd'hui
+(13 / 20 / 8 caracteres).
+
+**Et elle a refuse de reimplementer le dechiffrement en PHP pour trancher** : *ne jamais recopier une regle de
+crypto* passe devant l'exactitude d'un compteur. **Tranche : le backend expose un booleen calcule** — meme
+precedent qu'E-168 et qu'INF-003.
+
+#### Trois decisions rendues sur `platform_key`
+
+- **`EN_FLUX` ne change pas** pour `deploy_platform_key` / `deploy_service_account`. *Un changement de
+  transport non mesure sur un geste privilegie est un pari, pas un correctif* — et le banc ne permet pas de
+  l'exercer. **Mais le danger reel n'est pas l'expiration, c'est la RELANCE** : relancer, c'est un second
+  deploiement, donc de nouveaux `NOPASSWD: ALL` accordes. Le message doit dire trois choses — pas d'echec
+  affirme, **l'interdiction explicite de relancer**, et le geste de verification a faire. *Un ecran qui dit
+  « je ne sais pas » sans dire « n'insiste pas » laisse l'utilisateur choisir la pire option.* Question du
+  transport **differee avec sa raison**, pas classee ;
+- **geste mutant sur la production : fidele + production nommee** tient, un refus dur etant un retrait de
+  capacite — arbitrage de l'exploitant. Et *une propriete qui tient par l'etat du parc n'est pas une
+  propriete* : aucun geste ne viserait `srv-zabbix` aujourd'hui, mais c'est un accident d'etat ;
+- **`revoke_service_account` recoit une interface — AUTORISE.** *Livrer un octroi de privilege en un clic sans
+  revocation en un clic est pire que ne pas livrer l'octroi.* La route existe et n'avait aucun appelant. Deux
+  bornes : la confirmation **nomme machine et compte** (E-167) et le resultat se **verifie par effet** — E-214
+  et E-215 viennent de montrer deux gestes de ce module qui attestent sans verifier.
+
 ### v1.38.32 — P3 porte les quatre gestes qui ECRIVENT, et la portee de chaque bouton est celle sur laquelle il agit
 
 **Portage** de `legacy/adm/platform_keys.php` — sous-lot P3, la migration mot de passe → clé :
@@ -3059,7 +3186,9 @@ correspondance reelle :**
 | v1.38.30 | — | E-211 corrige ; le releve accusait trop large, retreci ; `/exclude_user` lu |
 | **v1.38.29** | `c107935` | **E-212, en production : le portail decrit un produit qu'il n'installe pas** ; FEAT-001 raffine |
 | v1.38.30 | `2ca5bcb` | E-211 corrige — `@require_permission('can_audit_ssh')`, et l'import qui manquait |
-| **v1.38.31** | (ce commit) | **E-213 : un statut nomme `excluded` n'exclut pas, et `userdel -r` ne lit que l'autre magasin** ; E-214 ; E-215 |
+| **v1.38.31** | `2db5718` | **E-213 : un statut nomme `excluded` n'exclut pas** ; E-214 ; E-215 |
+| v1.38.32 | `d5b3b57` | `platform_key` P3 porte |
+| v1.38.33 | (ce commit) | **une regle du Lead RETIREE** ; E-211 corrige sur sa cause ; E-216 ; E-217 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **202** — numérotés jusqu'à **E-215** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **204** — numérotés jusqu'à **E-217** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -2570,49 +2570,87 @@ message d'arrière-plan », qui mesure le correctif `v1.37.13` — **est portabl
 machine**, sans toucher au parc. *Une suite interdite peut contenir une propriété autorisée ; l'interdit
 porte sur la cible, pas sur la question.*
 
-### ⚠ CE QUI REFERME DOIT ÊTRE DOCUMENTÉ LÀ OÙ IL REFERME (2026-08-27)
+### ⚠ CE QUE JE CROYAIS ÊTRE UNE PROTECTION DANS UN HELPER N'EN ÉTAIT PAS — RÈGLE RETIRÉE, ET REMPLACÉE PAR UN INVARIANT (2026-08-27)
 
-**Le garde vide, mesuré dans `helpers.py:339`** — et c'est le mécanisme exact :
+**Ce paragraphe portait une règle du Lead intitulée « ce qui referme doit être documenté là où il referme »,
+et sa prémisse était fausse. Elle est retirée. Ce qui suit est ce que la mesure a établi.**
 
-    ids = []                                    # ni machine_id, ni server_id, ni les formes plurielles
+#### Le garde vide, qui reste exact
+
+    helpers.py:339
+    ids = []
+    single = (data.get('machine_id') or request.args.get('machine_id')
+              or data.get('server_id') or request.args.get('server_id'))
+    ...
     denied = [mid for mid in ids if not check_machine_access(mid)]
     if denied: return 403
-    return func(...)                            # ids vide -> denied vide -> LE GARDE PASSE
+    return func(...)                     # ids vide -> denied vide -> LE GARDE PASSE
 
-**Sur les cinq routes de `ssh_audit` qui portent `@require_machine_access` sans `@require_role`, la session 2
-a mesuré le CORPS de chacune** — et c'est le résultat qui compte, pas le décompte :
+**Et le décorateur LIT la query-string explicitement.** Ce qui le neutralise sur E-211 n'est pas la
+*provenance* du paramètre — c'est son caractère **FACULTATIF**. Le Lead avait inscrit « il ne trouve aucun
+identifiant dans les paramètres d'URL » : **faux**, et cette explication-là *aurait envoyé corriger le
+décorateur, qui n'a rien à corriger, au lieu de la route.*
 
-| route | appel sans `machine_id` | ce qui la ferme |
-|---|---|---|
-| `/scan` | **400** | `_resolve_ssh_creds` |
-| `/results` | **400** | un test explicite |
-| `/config` | **400** | `_resolve_ssh_creds` |
-| `/backups` | **400** | `_resolve_ssh_creds` |
-| **`/policies` GET** | **répond, branche globale** | **rien** — E-211 |
+#### Ce que le Lead avait conclu, et pourquoi c'était faux
 
-> **E-211 n'est donc pas « une route mal gardée parmi cinq bien gardées » : c'est la SEULE des cinq dont le
-> corps ne rattrape pas le garde. Et les quatre autres sont fermées par un CONTRÔLE DE VALIDITÉ D'ENTRÉE,
-> pas par un contrôle d'accès.**
+Constatant que quatre des cinq routes `ssh_audit` sont fermées par le `if not machine_id` de
+`_resolve_ssh_creds`, le Lead a écrit que **la protection vivait dans un helper partagé où rien ne dit
+qu'elle en est une**, et a demandé d'annoter ces helpers. **Mesure de la session 4, qui refuse
+l'instruction :**
 
-**Le risque que ça nomme est le vrai enjeu** : ce qui protège `/scan`, `/config` et `/backups` est la ligne
-`if not machine_id` de **`_resolve_ssh_creds`**, un helper **partagé** où **rien ne dit que c'est une
-protection**. Un repli permissif introduit là — famille E-144/E-147, dont ce dépôt a déjà payé plusieurs
-occurrences — **ouvrirait d'un coup trois routes qui ouvrent une session SSH, et aucun test ne bougerait.**
+> **Aucun des cinq `_resolve_ssh_creds` n'autorise quoi que ce soit.** Les cinq font
+> `SELECT … FROM machines WHERE id = %s`. **Aucun `check_machine_access`, aucun bornage au compte.**
+> `validate_machine_id` non plus : c'est un contrôle de **type et de signe**.
 
-*Une protection qui vit dans un contrôle de validité est une protection dont personne ne sait qu'il la
-tient.* La parade n'est pas de la déplacer : c'est de **l'annoter là où elle est**, pour que le prochain qui
-adoucit ce repli sache ce qu'il ouvre.
+Donc **un repli permissif dans `_resolve_ssh_creds` livrerait des identifiants SSH sur une machine DÉJÀ
+AUTORISÉE par le décorateur. Il ne contournerait aucun contrôle d'accès.** Le risque annoncé — « trois routes
+SSH ouvertes d'un coup » — n'existe pas.
 
-#### ⚠ Et l'ampleur n'est PAS mesurée — le chiffre qui compte manque
+**Et annoter ces helpers « garde » aurait écrit une QUATRIÈME fois le défaut que ce chantier corrige** : un
+texte qui affirme une protection que le code n'exerce pas, après les cinq en-têtes d'accès, le commentaire de
+`/deploy` et celui d'`APPROVAL_ENABLED`. *L'instruction du Lead aurait fabriqué l'objet de sa propre règle.*
 
-La session 2 a écrit « cinq routes » en parlant de **son module**. Balayage du Lead sur **tout** le
-backend : **58 routes** portent `@require_machine_access` **sans** `@require_role` — `cve/` 5, `docker/` 2,
-`fail2ban/` 16, `iptables/` 5, `services/` 8, `updates/` 12, `ssh_audit/` 5, et 5 ailleurs.
+Ce que les résolveurs font est réel mais indirect : **en refusant de travailler sans `machine_id`, ils rendent
+VRAIE la prémisse du décorateur.** Ce n'est pas une garde, c'est une précondition — et *nommer une précondition
+« garde » est exactement l'erreur de catégorie qui produit les commentaires faux.*
 
-Le relevé de la session 4 en a lu les corps et n'en a trouvé que **3 sans objet** : les 55 autres sont donc
-**fermées par autre chose que leur décorateur.** *Combien le sont par un contrôle de validité dans un helper
-PARTAGÉ ?* **Ce nombre n'est pas mesuré, et c'est lui qui donne la portée du risque ci-dessus** — trois
-routes ou trente. À mesurer sur le relevé, qui a déjà les corps.
+#### L'INVARIANT qui remplace la règle, et il attrape la classe entière
+
+> **Sur une route portant `@require_machine_access`, `machine_id` doit être OBLIGATOIRE. S'il est facultatif,
+> la route porte une AUTORISATION PROPRE.**
+
+Formulation de la session 4. **Il se teste sur les 116 routes, il ne dépend d'aucun helper, et il attrape la
+classe entière** — là où l'annotation demandée par le Lead n'aurait documenté que trois cas et en aurait créé
+un quatrième. **À faire tester par la session 6.**
+
+#### Le chiffre, recoupé — et « sans `require_role` » n'est PAS « sans autorisation »
+
+    57  routes portent `@require_machine_access` SANS `@require_role`
+         updates 12 · services 8 · cve 5 · iptables 5 · ssh_audit 5 · docker 2
+         monitoring 2 · ssh 2 · maintenance 1 · fail2ban 15
+
+    29  portent `@require_permission`
+    28  ne portent AUCUNE autorisation au-dela de la cle d'API      <- LE CHIFFRE A ANNONCER
+         updates 12 · cve 5 · ssh_audit 4 · docker 2 · monitoring 2 · ssh 2 · maintenance 1
+
+**Les 15 de `fail2ban` sont TOUTES dans la première colonne** (`can_manage_fail2ban`) — c'est E-152 qui les y
+a mises. *Le sous-ensemble à annoncer est donc 28, pas 57 : la moitié du chiffre décrit des routes
+correctement autorisées.*
+
+**Et le Lead avait annoncé 58.** Recoupement : neuf modules sur dix tombaient exactement juste, l'écart était
+`fail2ban` — 15 contre 16. **Vérifié : 15. Le balayage du Lead était juste, son ADDITION était fausse.** *Une
+erreur d'arithmétique sur un relevé correct est indiscernable d'une erreur de relevé, et coûte le même
+recoupement* — la session 4 avait listé ses 15 pour que la 16e soit **identifiée** plutôt que devinée ; il n'y
+en avait pas.
+
+#### Et cinq copies de `_resolve_ssh_creds` attendent leur E-204
+
+**Cinq implémentations, cinq empreintes distinctes**, comparées ligne à ligne : **`iptables` rend un
+7-uplet, les quatre autres un 8-uplet** — seule divergence de fond ; `policies` ne diffère que par le nom de
+ses variables locales ; `ssh_audit`, `services` et `fail2ban` que par leur chaîne de journal.
+
+**C'est E-204 avant l'incident** — quatre `_validate_username` dont une avait pris du retard. *Elles étaient
+d'accord aussi, jusqu'à ce qu'une bouge.*
 
 ### Base et shell
 

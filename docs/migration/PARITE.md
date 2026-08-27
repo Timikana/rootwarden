@@ -9290,8 +9290,27 @@ sur ce chemin. Occurrences connues :
 1. le décorateur inerte dès `role_id >= 2` — **59 routes** sur 116 ;
 2. le décorateur sans identifiant dans le corps — relevé cette semaine ;
 3. `POST /deploy` portant `@require_api_key` **seule** (E-191) ;
-4. **celle-ci** — sans identifiant dans les **paramètres d'URL**, et le repli rend des données globales au
-   lieu de refuser.
+4. **celle-ci** — le paramètre est **FACULTATIF**, et le repli rend des données globales au lieu de refuser.
+
+> **⚠ CORRECTION DU MÉCANISME, 2026-08-27 — la première explication de cet écart était FAUSSE, et le Lead
+> l'avait inscrite.** Il était écrit que le décorateur « ne trouve aucun identifiant dans les **paramètres
+> d'URL** ». Non :
+>
+>     helpers.py
+>     single = (data.get('machine_id') or request.args.get('machine_id')
+>               or data.get('server_id') or request.args.get('server_id'))
+>
+> **Il lit la query-string explicitement.** Avec `?machine_id=5` il trouve l'identifiant et vérifie l'accès.
+> **Ce qui le neutralise n'est pas la PROVENANCE du paramètre, c'est son caractère FACULTATIF** : absent, la
+> liste reste vide, et une liste vide ne refuse rien.
+>
+> **L'écart et le correctif sont inchangés — mais l'explication comptait** : *« le décorateur ne lit pas la
+> query-string » aurait envoyé corriger le décorateur, qui n'a rien à corriger, au lieu de la route.*
+>
+> **Deuxième rectification de la même trouvaille en un jour** : la première rétrécissait sa **portée**, celle-ci
+> corrige sa **cause**. *Une trouvaille juste peut être expliquée faux — et l'explication est ce qu'on
+> réutilise.* Corollaire pour ce document : **une trouvaille vérifiée n'a pas son explication vérifiée**, et
+> ce sont deux relectures distinctes.
 
 **Et le quatrième est le pire de la famille, parce que le repli est SILENCIEUX et UTILE** : au lieu de rendre
 une erreur, la route rend un jeu de données parfaitement cohérent. *Un repli permissif ressemble à de la
@@ -9508,3 +9527,98 @@ d'E-174 rend NON pour les trois** : `shlex.quote` partout, et `_validate_usernam
 
 **Non corrigés** : ce sont des gestes distants dont le correctif change ce qui s'écrit sur des machines
 réelles. À qualifier par la session 5 avant écriture.
+
+---
+
+## E-216 — Un changement d'identifiant sur une machine de production ne laisse AUCUNE trace
+
+**Trouvé par la session 3 en remesurant `srv-zabbix` pour P4, et c'est la trouvaille collatérale qui compte
+plus que la mesure demandée.**
+
+    seul chemin qui ecrit `password` / `root_password` d'une machine :
+      legacy/adm/includes/manage_servers.php:136,182      -> ne journalise RIEN
+
+    `user_logs` : aucune entree de modification d'identifiants MACHINE.
+    Les « Mise a jour du mot de passe » qu'elle porte concernent des COMPTES UTILISATEURS.
+
+**Donc l'identifiant d'accès root d'une machine de production peut changer sans qu'aucun journal ne le
+dise** — ni qui, ni quand, ni depuis où.
+
+### Ce qui l'a révélé, et pourquoi c'est instructif
+
+`MODULE-PLATFORM-KEY.md` §4.4 affirmait « ni mot de passe ni mot de passe root » sur `srv-zabbix` et
+concluait : *« son unique voie d'accès est la clé de plateforme. »* La session 3 a relancé la requête verbatim
+et **déchiffré — en ne faisant rendre que les LONGUEURS, jamais les valeurs** :
+
+    id 1  srv-zabbix  PROD   len(chiffre)=79 / 79    dechiffre : 13 / 13 caracteres
+                             ssh_password_required = 0
+
+**Ce ne sont pas des chiffrés de chaîne vide : deux mots de passe réels.** La mesure d'origine n'était pas
+fausse — **l'état a changé depuis**, et le seul moyen de le savoir a été de remesurer. *Une conclusion écrite
+sur un état mutable se périme sans prévenir, et rien dans le document ne le signale.*
+
+**L'exploitant avait bien ressaisi ces mots de passe et l'avait dit** — donc l'écart n'est pas « un
+changement inexpliqué ». **L'écart est qu'aucune trace ne permettrait de le savoir si personne ne l'avait
+dit.**
+
+### Ce que ça corrige dans le vocabulaire du chantier
+
+**La phrase « RootWarden ne peut plus administrer `srv-zabbix` » sort du vocabulaire.** Il existe aujourd'hui
+un repli par mot de passe. **L'interdiction de P4 tient sur ses AUTRES fondements** — `UPDATE` sans `WHERE` à
+l'échelle du parc, volume non sauvegardé, destruction sans copie — et c'est précisément pourquoi il fallait
+retirer celui-ci : *un interdit qui repose sur quatre fondements dont un est faux se fait démolir sur le
+faux.*
+
+### Et un état que la page ne peut pas produire
+
+`srv-zabbix` porte **les deux mots de passe présents ET `ssh_password_required = 0`** — combinaison
+qu'**aucun geste de la page de clé de plateforme ne peut produire** (E-207 : la page Serveurs réécrit les
+colonnes sans toucher le drapeau). Le legacy lui peint donc la pastille verte « keypair », c'est-à-dire
+« migration terminée, plus de mot de passe ». Le portage P1 **rend la divergence** au lieu de choisir une
+source.
+
+### La correction
+
+Journaliser dans `user_logs` toute écriture de `password` / `root_password` d'une machine : qui, quand,
+quelle machine, **et jamais la valeur ni sa longueur**. Chemin unique connu — `manage_servers.php:136,182` —
+donc un seul point à instrumenter. **Le legacy est en production** : arbitrage de l'exploitant, au même titre
+qu'E-209 et E-212.
+
+---
+
+## E-217 — Les deux implémentations ne s'accordent pas sur ce qu'est « pas de mot de passe » : `encryptPassword('')` rend une colonne NON vide
+
+**Trouvé par la session 3 dans son PROPRE correctif P1, quelques heures après l'avoir écrit.**
+
+    Python  encrypt_password('')        -> ''             colonne vraiment vide
+    PHP     encryptPassword('', false)  -> 'sodium:…'      colonne NON vide
+
+P1 corrigeait E-207 — « lire le drapeau au lieu du fait » — en testant les colonnes :
+`(password IS NOT NULL AND password <> '')`. **Or ce test rend VRAI pour un mot de passe réellement vide**,
+dès que la ligne a été écrite par le formulaire d'ajout du legacy avec le champ laissé blanc.
+
+> **Le correctif échange une réponse fausse contre une autre sur ce cas.** *Corriger « le drapeau au lieu du
+> fait » ne suffit pas si les deux implémentations ne s'accordent pas sur ce qu'est le fait.*
+
+### Atteignable, et par le motif qu'on connaît
+
+`manage_servers.php:352` pose `required` — **mais c'est du HTML.** Le contrôle serveur `$invalidFields`
+(`:122-130`) n'inclut **ni `password` ni `root_password`** : une requête forgée passe. **Troisième occurrence
+de « la garde est sur la PAGE, pas sur la REQUÊTE ».**
+
+**Absent du parc aujourd'hui** — les trois lignes déchiffrent en 13 / 20 / 8 caractères — donc l'écart est
+**réel et sans porteur**, comme E-205. Il s'ouvre à la première machine ajoutée par ce formulaire avec le
+champ vide.
+
+### Ce que la session 3 a refusé de faire, et elle a eu raison
+
+**Elle n'a pas réimplémenté le déchiffrement en PHP** pour trancher. Le seul test fidèle est « déchiffrer et
+regarder si c'est vide », et il vit dans le backend : *ne jamais recopier une règle de crypto* est une règle
+du dépôt, et elle passe devant l'exactitude d'un compteur. Elle n'a **rien affirmé à l'écran que le code ne
+tienne**.
+
+### La correction, tranchée
+
+**Le backend expose un booléen calculé** — « ce mot de passe déchiffre-t-il en vide ? » — et le portage le
+consomme. Même précédent qu'**E-168**, où le portage aurait dû *supposer* faute d'un drapeau `lue`, et
+qu'**INF-003**. Session 4 l'écrit, session 3 le consomme.
