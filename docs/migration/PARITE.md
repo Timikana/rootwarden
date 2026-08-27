@@ -7580,3 +7580,79 @@ existaient. **Un correctif validé par un test qu'il ne pouvait pas influencer, 
 session, et impossible à ajuster après coup.** Verrouiller le 500 aurait figé le défaut ; décrire
 l'attendu en `xfail` l'a rendu impossible à oublier. `pytest` : **389 passed, 0 xfailed** après retrait
 des marqueurs.
+
+---
+
+## E-182 — `_SERVICE_RE` accepte un nom d'unité commençant par un TIRET, et `-.mount` franchit aussi `_check_protected`
+
+**Effet NON ÉTABLI. À ne pas mesurer par le geste.** Relevé le 2026-08-27 en recopiant
+`_check_protected` à l'identique pour le mesurer — pas en lisant le code, en l'exécutant sur des valeurs.
+
+`_SERVICE_RE = ^[a-zA-Z0-9@._:-]+$` place le tiret dans la classe **y compris en tête**. Deux valeurs
+en sortent, que personne n'avait vues :
+
+| valeur | classe | `_check_protected` |
+|---|---|---|
+| `-.mount` | franchit | **franchit** |
+| `-.slice` | franchit | **franchit** |
+
+**`-.mount` est le nom de l'unité du système de fichiers RACINE dans systemd.** Son nom commence
+littéralement par un tiret, et tous ses caractères sont dans la classe. `PROTECTED_SERVICES` ne connaît
+que six noms de services : ni l'un ni l'autre n'y figure. La valeur part **nue** dans
+`f'systemctl {verbe} {service}'`, six fois (`services_manager.py:135,161,170,179,188,197`).
+
+### Pourquoi ce n'est pas tranché, et pourquoi c'est la bonne décision
+
+La question est : `systemctl` reçoit-il `-.mount` comme un **nom d'unité** ou comme une suite d'options
+courtes invalides ? La convention documentée est `systemctl status -- -.mount`, **avec** séparateur, ce
+qui *suggère* que sans lui l'unité n'est pas atteinte. Mais **le banc est un conteneur sans systemd**,
+les seules machines qui pourraient trancher sont réelles, et **le geste à tester serait un
+`systemctl stop` sur la racine**. Si l'hypothèse est fausse, il ne se passe rien ; si elle est juste, on
+démonte le `/` d'une machine de production.
+
+> **CONSIGNE PERMANENTE : personne ne teste ceci sur une machine réelle.** Ni sur le banc, ni a fortiori
+> sur `srv-zabbix`. *Un défaut irréversible s'établit sans se provoquer.*
+
+Si l'exploitant veut trancher : machine **jetable** dotée de systemd, et **`show` à la place de
+`stop`** — `show` ne fait rien mais dit si l'unité est **résolue**. Même mesure, sans le geste.
+
+### Le correctif rend la question sans objet, ce qui vaut mieux que d'y répondre
+
+```python
+_SERVICE_RE = re.compile(r'^[a-zA-Z0-9@._:][a-zA-Z0-9@._:-]*$')
+```
+
+Interdire le tiret **en tête** ferme du même coup **toute** l'injection d'argument. Aucune unité systemd
+ordinaire ne commence par un tiret : ce que le correctif casserait est **rien**. Il se pose avec E-150 —
+même fichier, même famille, et il serait absurde de toucher `services_manager.py` deux fois.
+
+### Deux non-failles établies au même passage, dites aussi nettement que l'accusation
+
+- **`_SAFE_VALUE_RE` (supervision) : NON exploitable.** C'était le bon candidat — le seul des 33
+  validateurs ancrés `^…$` dont la valeur atterrit dans un fichier **multiligne**, et le contexte exact
+  de V10a (une valeur qui devient une ligne de conf, donc un `UserParameter` Zabbix, donc une exécution
+  de commande). **Deux propriétés indépendantes le referment** : `$` n'admet qu'**un** saut de ligne, en
+  toute fin, rien après — une valeur acceptée finissant par `\n` produit une **ligne vide**, pas une
+  directive ; et le rendu passe par **base64** (`supervision.py:363-366`), donc aucun caractère de la
+  valeur n'atteint le shell. Le **commentaire**, lui, ment — il promet « refuse tout caractère de
+  contrôle, saut de ligne compris » : **septième occurrence** du motif. Correctif cosmétique
+  (`.fullmatch()` + corriger le commentaire), et **le second geste vaut plus que le premier** ;
+- **`_SERVICE_RE` : pas d'injection d'argument utile**, et la raison n'est pas celle qu'on croit. Les six
+  fonctions passent par `execute_as_root` — **qui atteint la route est déjà root sur la machine**. Une
+  option `systemctl` acceptée ne franchit donc **aucune** frontière de privilège ; la seule chose qu'elle
+  pourrait apporter est de contourner `_check_protected`, et elle ne le peut pas : un seul jeton, pas de
+  `=`, pas d'espace, donc impossible de fournir à la fois une option **et** un nom d'unité. Agir sur
+  `sshd` exige de le **nommer**, ce que le contrôle regarde.
+
+**Conséquence pour l'arbitrage : E-150 est le seul contournement ÉTABLI de `_check_protected`, et il n'a
+besoin d'aucune injection d'argument** — `ssh.socket`, `sshd.socket`, `ssh@.service` passent, mesuré en
+recopiant le contrôle à l'identique. L'injection d'argument est une **imprécision à refermer au
+passage**, pas un motif de correctif à elle seule.
+
+### Et E-149 + E-150 sont CHAÎNÉS
+
+Vérifié : les huit routes de `services.py` n'ont **ni rôle ni permission**. Un rôle 1 disposant d'une
+machine peut donc arrêter des services sur elle, dont `ssh.socket`. **`opsuser` est ce compte, et sa
+seule machine est `srv-zabbix`.** C'est la **troisième** fois que ce compte tombe dans un écart, après
+E-174 et `cve_reprioritize` — à ce stade ce n'est plus une coïncidence, c'est une **propriété de sa
+configuration** : rôle 1, une seule machine, et cette machine est la production.
