@@ -2209,6 +2209,53 @@ occurrence du jour de *une propriete qui tient par l'etat du parc n'est pas une 
 La borne est **DITE dans le panneau de decision**, pas dans un journal : *un avertissement qui arrive apres le
 clic n'a pas averti*, et *sinon on livre une poignee interieure qui ne tourne pas* (session 3).
 
+#### Ce qui a ete POSE dans le backend, et pourquoi ce n'est pas deux lignes
+
+**⚠ Le correctif tel que decrit ci-dessus aurait ete PROUVABLEMENT INERTE.** Les deux routes
+selectionnaient `SELECT id, name, ip, port, user, password, root_password FROM machines` — **sans la
+colonne `service_account_deployed`**. `m.get('service_account_deployed', False)` aurait donc rendu
+`False` a chaque fois, sur les deux routes, et le drapeau n'aurait jamais change de valeur.
+
+> C'est la lecon **« une cle non transmise rend du VIDE, pas son identifiant »** : le nom existait dans
+> les deux catalogues — la colonne en base, le `.get()` dans le code — **et il ne voyageait pas**.
+> Comme alors, le defaut est invisible parce que la valeur de repli est celle qu'on observe d'ordinaire.
+
+**Trois parties, donc :**
+
+1. **la colonne ajoutee aux deux `SELECT`** — sans quoi le reste ne fait rien ;
+2. **le drapeau passe** sur `:970` et `:1061`. Recomptage : sur les neuf appels du fichier, **six**
+   passent `service_account=`, **un** passe `force_password=True` deliberement (`:738`, domaine
+   distinct), **deux** l'omettaient. Six plus un plus deux, et non sept plus deux ;
+3. **l'ordre de la commande de revocation, rendu NECESSAIRE par (2)**.
+
+**Sur le domaine de `:1061`, qui devait etre nomme avant d'aligner.** Le geste **est** idempotent en
+mode compte de service : `id … || useradd` est un non-geste, la keypair reecrite est la **meme**, et le
+fichier sudoers est reecrit a l'identique en conservant son mode. Au **premier** deploiement le drapeau
+vaut `False` et rien ne change. **Le domaine est le meme ; l'alignement est donc juste** — mais il a ete
+cherche avant d'etre conclu.
+
+**Sur `:970`, le domaine differe, et c'est la que le correctif appelait un second geste.** La route se
+connecte desormais **par** le compte de service, et `execute_as_root` eleve alors via `sudo sh -c` — donc
+en s'appuyant sur le fichier sudoers que **la premiere commande supprimait**. L'elevation vaut pour toute
+l'invocation, donc la chaine se terminait malgre tout ; mais **un arret en cours de route** — les 30 s
+expirees sur un `userdel -r` d'un gros repertoire, une coupure — laissait la machine dans un etat **dont
+on ne pouvait plus sortir** : sudoers supprime, compte encore present, `service_account_deployed` a 1,
+et la tentative suivante se reconnectant par un compte de service qui ne peut plus eleverer — sur une
+machine migree, `root_password` vaut `''`, il n'y a aucun repli.
+
+**Le retrait du sudoers passe donc EN DERNIER.** Un echec partiel laisse au pire un fichier orphelin —
+inerte, puisqu'aucun compte ne porte plus ce nom — et **la revocation reste rejouable**. *Un correctif
+qui rend un chemin possible doit regarder ce qu'il rend IRREVERSIBLE sur ce meme chemin.*
+
+**Et le verdict verifie desormais les DEUX effets.** L'ancien ne controlait que l'absence du **compte** :
+il aurait annonce une reussite en laissant le fichier sudoers en place, ou un `rootwarden` recree a la
+main aurait retrouve un `NOPASSWD: ALL` que personne n'a accorde. Le code `2` nomme precisement cet etat
+— « compte supprime, sudoers subsiste, revocation incomplete, a rejouer » — et **laisse
+`service_account_deployed` a 1** pour qu'un rejeu la termine.
+
+**Rien n'a ete exerce**, conformement a la consigne : l'ecart reste derive du code. **Inerte jusqu'au
+redemarrage.**
+
 #### Trois decisions de conception sur l'interface de revocation, les trois retenues
 
 - **le bouton rendu au role 3 seul, le test de session decidant du RENDU et jamais de l'acces** — les gardes
