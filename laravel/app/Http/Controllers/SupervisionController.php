@@ -735,6 +735,7 @@ class SupervisionController extends Controller
                 'version' => '{version}', 'nom' => '{nom}',
             ]),
             'version_absente' => __('superv.version_absente', ['nom' => '{nom}']),
+            'version_non_concluante' => __('superv.version_non_concluante', ['nom' => '{nom}']),
             'version_refus' => __('superv.version_refus', ['statut' => '{statut}']),
             'version_echec' => __('superv.version_echec'),
             // ── Sous-lot V7 : la lecture du fichier distant ────────────────

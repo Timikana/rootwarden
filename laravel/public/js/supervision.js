@@ -187,6 +187,36 @@
                     return reponse.json();
                 }).then(function (donnees) {
                     if (! donnees) { return; }
+                    /*
+                     * ══ TROIS ISSUES, PAS DEUX — E-184 ═══════════════════
+                     *
+                     * Ce bloc n'en distinguait que deux : une version, ou
+                     * « aucun agent installe ». Or `version` est absente dans
+                     * DEUX situations opposees — l'agent n'est pas la, ce qui
+                     * est un verdict, ou la sonde n'a rien pu lire, ce qui
+                     * n'en est pas un.
+                     *
+                     * Le backend le dit desormais (`success: false`,
+                     * `concluante: false`) et **n'efface plus l'inventaire**
+                     * dans ce cas : le message « aucun agent installe, le
+                     * releve precedent a ete efface » y devenait donc faux sur
+                     * ses DEUX affirmations, et il l'affirmait avec un statut
+                     * 200. Contrat signale par la session 4 le 2026-08-27.
+                     *
+                     * Les deux verifications d'apres-geste (V9, V12) testaient
+                     * deja `success` : elles etaient justes avant l'heure. Ce
+                     * bouton-ci ne le faisait pas.
+                     *
+                     * `--attention` et non `--echec` : ne pas savoir n'est pas
+                     * un echec du geste, c'est une absence de verdict.
+                     */
+                    if (donnees.success !== true || donnees.concluante === false) {
+                        messageVersion.className = 'rw-annonce rw-annonce--attention';
+                        messageVersion.textContent = libelles.version_non_concluante
+                            .replace('{nom}', nom);
+
+                        return;
+                    }
                     if (donnees.version) {
                         messageVersion.className = 'rw-annonce rw-annonce--ok';
                         messageVersion.textContent = libelles.version_trouvee
