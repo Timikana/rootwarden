@@ -2157,6 +2157,48 @@ le conteneur, avec `workers = 4` tous enfants du maître. **« Le backend est lu
 n'est donc plus une convention de ce document : c'est une propriété du service.** Troisième règle de ce
 chantier à devenir une propriété, après la recopie du runner dans `/tmp` et `git commit -- <chemins>`.
 
+### UNE VALEUR QUI GARDE UN COMPORTEMENT NE DOIT PAS VIVRE DANS UN MODULE QU'ON REMPLACE POUR TESTER (2026-08-27)
+
+**Règle neuve, et elle a été trouvée par un rouge qu'aucun contrôle d'auteur n'aurait donné.**
+
+Le nom du compte de service devait devenir une constante partagée. Premier jet : dans `ssh_utils`,
+l'ancêtre commun des trois modules — le choix évident. **Deux tests rouges.**
+
+`backend/tests/conftest.py:74` remplace `ssh_utils` par un `MagicMock`. **La constante devenait donc un
+Mock sous test, et les deux gardes qui la comparent cessaient de protéger — sans que rien ne le dise.**
+Dont la sonde de révocation d'E-192, celle qui vérifie qu'un accès annoncé révoqué l'a bien été.
+
+> **Une valeur qui garde un comportement ne doit pas vivre dans un module qu'on remplace pour tester.**
+> Elle vit dans la **configuration**, qui n'est pas mockée — et un nom de compte de service *est* de la
+> configuration.
+
+**Ce qui l'a attrapé** : les tests d'une **autre** session. Ni `py_compile`, ni un import, ni la relecture
+de l'auteur. **Quatrième fois dans la journée qu'un contrôle d'auteur laisse passer ce qu'un contrôle
+d'autrui attrape** — et c'est l'argument le plus concret pour la séparation des rôles de ce chantier :
+*qui écrit le code ne valide pas seul son propre correctif* n'est pas une précaution de principe, c'est ce
+qui a évité qu'un garde devienne muet.
+
+### FERMER UN DÉFAUT SANS CHERCHER SES AUTRES IMPLÉMENTATIONS, C'EST LE FERMER À MOITIÉ (E-204, 2026-08-27)
+
+`routes/ssh.py` portait `^[a-zA-Z0-9._-]{1,32}$` — **exactement l'expression de `configure_servers` AVANT
+E-197.** Le défaut a été corrigé le matin **dans un fichier**, et l'autre implémentation n'a pas été
+cherchée. **C'est par ce trou-là qu'une sonde a atteint la production quelques heures plus tard.**
+
+> **Le motif « à moitié corrigé » que ce module se voit reprocher depuis le matin s'est appliqué au
+> correctif lui-même.** Fermer une occurrence n'est pas fermer un défaut : il faut compter les
+> implémentations **avant** d'annoncer une fermeture.
+
+**Et ma consigne de transposition était fausse — cinquième refus mesuré de la journée.** J'avais demandé
+d'appliquer ici la retenue d'E-198, où le point restait refusé parce que `sudo` ignore les fichiers de
+`/etc/sudoers.d` qui en contiennent. Mesuré route par route : **aucune des quatre routes concernées ne
+compose de nom de fichier `sudoers.d`** — elles font `userdel` et manipulent `authorized_keys`.
+
+> **La retenue était juste là-bas ; l'appliquer ici aurait été du MIMÉTISME**, et aurait refusé `john.doe`
+> pour une raison qui n'existe pas dans ce contexte.
+
+C'est **ma propre règle retournée contre moi** : *avant d'unifier, nommer le domaine de chacune.* J'ai
+transposé une contrainte de domaine sans vérifier le domaine — la faute exacte que la règle décrit.
+
 ### UNE MESURE BORNÉE PAR UN DELTA A ÉTÉ ÉPROUVÉE PAR ACCIDENT (2026-08-27)
 
 **La robustesse d'une suite ne se voit que le jour où le banc bouge sous elle.** Et c'est arrivé.
