@@ -1608,6 +1608,34 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### UNE PROPRIÉTÉ QUI TIENT PAR ACCIDENT N'EST PAS UNE PROPRIÉTÉ (2026-08-27)
+
+Formulée en affinant un dédouanement que j'avais écrit trop mollement. J'avais dit du décalage entre les
+deux implémentations de la règle de révocation : « **le sens dédouane pour l'instant, mais c'est
+accidentel** ». La reformulation qui rend la chose actionnable :
+
+> `autorisés_preflight ⊆ autorisés_déploiement` **n'est écrit nulle part, personne ne l'a choisi, et rien
+> ne le maintient.** Que la direction soit la bonne aujourd'hui rend le défaut **plus difficile à
+> trouver, pas moins grave.**
+
+C'est le pendant de la règle jumelle établie le même jour — *ce qui referme doit être documenté là où il
+referme* — et les deux se rencontrent souvent ensemble : une protection non écrite et une inclusion non
+choisie se ressemblent, en ce qu'un relecteur les prend toutes deux pour des intentions.
+
+**Les occurrences du jour, qui font la classe :**
+
+| ce qui tient | par quoi | écrit quelque part ? |
+|---|---|---|
+| `_SAFE_VALUE_RE` ne fuit pas | le rendu en **base64**, en aval | **non** |
+| `_SERVICE_RE` n'ouvre pas d'injection d'argument | « un seul jeton, sans `=` ni espace » | **non** |
+| le préflight ne sous-annonce pas ce qu'il va détruire | une **inclusion d'ensembles** non choisie | **non** |
+| les appelants du portage ne mentent pas sur un refus | tout refus porte aujourd'hui un **statut non-200** | **non** |
+
+**Quatre propriétés de sûreté, aucune écrite, toutes vraies aujourd'hui.** Le correctif n'est donc pas
+toujours du code : c'est parfois **une phrase à l'endroit exact où la propriété tient**. Et quand elle
+peut être supprimée — n'en garder **qu'une** implémentation plutôt que d'aligner deux copies — c'est
+mieux qu'une phrase.
+
 ### UN OBSERVABLE NE DIT JAMAIS PAR QUEL CHEMIN IL A ÉTÉ PRODUIT (2026-08-27)
 
 **La règle du jour, et elle réunit QUATRE incidents distincts** relevés par trois sessions différentes.
