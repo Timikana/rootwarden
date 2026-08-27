@@ -10,10 +10,39 @@ s'authentifie auprès de **toutes** les machines du parc. Il porte aussi la migr
 
 > **Trois choses à lire avant de planifier quoi que ce soit.**
 > 1. **Une seule clé sert tout le parc et les deux comptes.** `/regenerate_platform_key` la remplace
->    et **détruit l'ancienne sans copie** : §4.
-> 2. **Le garde à quatre yeux est ACTIVÉ sur cette installation et nomme cette action — et la route
->    ne le lui demande jamais.** §5. C'est une protection configurée qui n'existe pas.
-> 3. **Une machine du parc est déjà dans la position sans retour, et c'est la production.** §4.3.
+>    et **détruisait l'ancienne sans copie** : §4. **CORRIGÉ le 2026-08-27**, voir l'encadré ci-dessous.
+> 2. **Le garde à quatre yeux était ACTIVÉ sur cette installation et nommait cette action — et la
+>    route ne le lui demandait jamais.** §5. **CORRIGÉ le même jour.**
+> 3. **Une machine du parc est déjà dans la position sans retour, et c'est la production.** §4.4 —
+>    **toujours vrai**, et c'est ce qui reste à surveiller.
+
+> ### ✅ Deux des trois sont refermés — mis à jour le 2026-08-27, après le commit `01c04b2`
+>
+> **Les constats des §4 et §5 ont provoqué un correctif backend, et le document doit le dire** :
+> un inventaire qui décrit un défaut réparé ment au lecteur suivant, exactement comme l'en-tête qui
+> ment dont ce fichier relève la cinquième occurrence.
+>
+> **Et l'exploitant a répondu à la question du §9.1, par la négative** : le volume `platform_ssh`
+> **n'est sauvegardé nulle part** — ni par l'infrastructure, ni par RootWarden. C'est la réponse
+> défavorable, et c'est elle qui a rendu le correctif nécessaire : le geste détruisait un secret
+> **non reproductible**.
+>
+> | ce que ce document a relevé | état au 2026-08-27 |
+> |---|---|
+> | `regenerate` détruisait la clé par `unlink()`, sans copie | **CORRIGÉ** — `_archive_platform_key()` **déplace** la paire dans `platform_ssh/archive/`, horodatée, `0700`/`0600`. `purge_platform_key_archives()` la détruit après `PLATFORM_KEY_ARCHIVE_DAYS` (défaut **30**) |
+> | `gate()` n'était jamais appelé pour ces DEUX actions | **CORRIGÉ pour les deux** — `ssh.py:1294` (`regenerate_platform_key`) et `ssh.py:934` (`revoke_service_account`), avec un cas `AucunApprobateur` qui **refuse** au lieu de retomber du côté permissif |
+> | une machine de production sans mot de passe, dépendante de la seule clé | **INCHANGÉ** — voir §4.4 |
+> | le retour incomplet de `reenter_ssh_password` (`root_password` jamais réécrit) | **INCHANGÉ** — §4.2, décision 5 du §9 |
+> | `/revoke_service_account` sans appelant | **INCHANGÉ** — §6.2 |
+>
+> Deux détails du correctif qui méritent d'être retenus, parce qu'ils répondent à des pièges déjà
+> payés ailleurs sur ce chantier : la rétention de l'archive **ne dépend pas de `LOG_RETENTION_DAYS`**
+> (qui vaut 0 par défaut et éteindrait la purge sans que personne ne le voie), et
+> `_archive_platform_key` **déplace au lieu de copier** — laisser la clé en place l'aurait gardée
+> utilisable, ce qui aurait vidé la rotation de son sens.
+>
+> **Le reste de ce document décrit l'état d'AVANT le correctif**, et il est conservé tel quel : c'est
+> la mesure qui a motivé le geste, et un constat effacé ne s'apprend pas.
 
 ---
 
@@ -36,7 +65,7 @@ périmètre à faire d'emblée :
 | `POST /test_platform_key` | `routes/ssh.py` | `:1043` | session SSH réelle, ne modifie rien |
 | `POST /remove_ssh_password` | `routes/ssh.py` | `:1103` | **écrit en base** — efface les deux mots de passe. **Ne touche pas la machine** |
 | `POST /reenter_ssh_password` | `routes/ssh.py` | `:1136` | écrit en base — restaure **un seul** des deux (§4.2) |
-| `POST /regenerate_platform_key` | `routes/ssh.py` | `:1161` | **DÉTRUIT la clé privée du parc entier** |
+| `POST /regenerate_platform_key` | `routes/ssh.py` | `:1161` | fait tourner la clé du parc entier — **détruisait** l'ancienne, l'**archive** depuis `01c04b2` |
 | `POST /deploy_service_account` | `routes/ssh.py` | `:908` | **MUTE** — crée un compte Unix `NOPASSWD: ALL` |
 | `POST /scan_server_users` | `routes/ssh.py` | `:1288` | session SSH réelle, lecture |
 | `POST /exclude_user` | `routes/admin.py` | `:115` | écrit en base |
@@ -290,7 +319,14 @@ ailleurs, je ne le sais pas, et c'est **la première question à lui poser**.
 
 ---
 
-## 5. ⚠ Le garde à quatre yeux est ACTIVÉ, nomme cette action, et la route ne le lui demande jamais
+## 5. ⚠ Le garde à quatre yeux était ACTIVÉ, nommait cette action, et la route ne le lui demandait jamais
+
+> **CORRIGÉ le 2026-08-27** (`01c04b2`) : `ssh.py:1294` appelle désormais
+> `gate('regenerate_platform_key', 0, 'flotte', …)`, et le cas « aucun approbateur disponible »
+> **refuse** au lieu de retomber du côté permissif. La section est conservée parce qu'elle porte la
+> mesure qui a motivé le geste. **`revoke_service_account` a été branché au même commit** —
+> remesuré : `ssh.py:934` appelle `gate('revoke_service_account', …)`, même traitement du cas
+> « aucun approbateur ». **Les quatre actions configurées interrogent désormais la porte.**
 
 C'est le défaut le plus net du module, et il n'est pas dans le code de la page.
 
@@ -534,12 +570,18 @@ compte root permanent sur le banc. *Une fixture, c'est aussi ce que le test ACCO
 
 **À décider avant P3 et P4**
 
-1. **La sauvegarde de la clé de plateforme.** RootWarden n'en fait **aucune** (mesuré). Le volume
-   `platform_ssh` est-il sauvegardé par ailleurs ? **C'est la question qui décide si `regenerate` est
-   irréversible ou seulement pénible**, et je ne peux pas y répondre depuis le dépôt.
+1. ~~**La sauvegarde de la clé de plateforme.**~~ **RÉPONDU le 2026-08-27, et par la négative** : le
+   volume `platform_ssh` n'est sauvegardé **ni par l'infrastructure ni par RootWarden**. Le geste
+   détruisait donc un secret **non reproductible** — c'est la réponse défavorable, et elle a
+   déclenché le correctif `01c04b2` (archivage horodaté, purge à 30 jours). **La question est close ;
+   la vigilance ne l'est pas** : l'archive vit dans le **même volume** que la clé courante, donc une
+   perte du volume emporte toujours les deux. Sauvegarder ce volume reste une décision
+   d'infrastructure que le produit ne peut pas prendre à la place de l'exploitant.
 2. **Le déclenchement réel de `/regenerate_platform_key`** — jamais sans son mot, et **jamais sur ce
    banc** tant que `srv-zabbix` est dans l'état du §4.4.
-3. **Le garde à quatre yeux (§5).** `APPROVAL_ENABLED=true` et la liste nomme deux actions que le code
+3. ~~**Le garde à quatre yeux (§5).**~~ **FAIT, et pour les DEUX routes** (`01c04b2`) — remesuré :
+   `ssh.py:1294` et `ssh.py:934`. Les quatre actions configurées interrogent la porte. Énoncé
+   d'origine : `APPROVAL_ENABLED=true` et la liste nomme deux actions que le code
    n'interroge jamais. Deux issues : brancher `gate()` sur les deux routes — **correctif backend de
    production**, même régime qu'E-144/147/149/150 — ou retirer les deux noms de la configuration pour
    qu'elle cesse d'affirmer une protection absente. **Ne rien faire est la seule issue qui laisse un
@@ -565,9 +607,9 @@ compte root permanent sur le banc. *Une fixture, c'est aussi ce que le test ACCO
 
 ## 10. Ce dont je ne suis PAS sûr
 
-- **Aucune sauvegarde du volume `platform_ssh` hors RootWarden** : je mesure que le produit n'en fait
-  pas. Ce que l'infrastructure fait, **je l'ignore** — c'est la question 1 du §9, et elle change la
-  gravité du §4.
+- ~~**Aucune sauvegarde du volume `platform_ssh` hors RootWarden**~~ — **tranché le 2026-08-27** :
+  l'exploitant a mesuré qu'il n'y en a **aucune**, ni côté infrastructure ni côté produit. Ce point
+  n'est plus une incertitude ; il est devenu la justification du correctif `01c04b2`.
 - **La voie XSS par le message du backend** (§6.6) : les messages de succès sont des littéraux, donc
   sûrs ; les branches d'erreur propagent un `str(e)` de paramiko que **je n'ai pas tracé jusqu'au
   bout**. Non prouvé, non écarté. Le portage échappe de toute façon.
