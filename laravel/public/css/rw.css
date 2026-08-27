@@ -21,7 +21,9 @@
     --rw-danger: #b91c1c;
     --rw-danger-fond: #fef2f2;
     --rw-succes: #15803d;
+    --rw-succes-fond: #f0fdf4;
     --rw-avertissement: #a16207;
+    --rw-avert-fond: #fefce8;
     --rw-rayon: 10px;
     --rw-espace: 16px;
     --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
@@ -42,7 +44,9 @@
         --rw-danger: #fca5a5;
         --rw-danger-fond: #2a1618;
         --rw-succes: #6ee7a8;
+        --rw-succes-fond: #16281f;
         --rw-avertissement: #fcd34d;
+        --rw-avert-fond: #2a2410;
         --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
     }
 }
@@ -244,7 +248,7 @@ body {
     padding: 11px 13px;
     border: 1px solid var(--rw-succes);
     border-radius: 8px;
-    background: color-mix(in srgb, var(--rw-succes) 12%, transparent);
+    background: var(--rw-succes-fond);
     color: var(--rw-succes);
     font-size: 14px;
 }
@@ -261,7 +265,7 @@ body {
     padding: 11px 13px;
     border: 1px solid var(--rw-avertissement);
     border-radius: 8px;
-    background: color-mix(in srgb, var(--rw-avertissement) 12%, transparent);
+    background: var(--rw-avert-fond);
     color: var(--rw-avertissement);
     font-size: 14px;
 }
@@ -767,7 +771,32 @@ body {
     white-space: nowrap;
 }
 
-.rw-pastille--ok      { background: color-mix(in srgb, var(--rw-succes) 18%, transparent); color: var(--rw-succes); }
+/*
+ * ══ POURQUOI UN JETON DE FOND, ET NON UNE TEINTE DE LA COULEUR DU TEXTE ═════
+ *
+ * `color-mix(in srgb, <couleur> X%, transparent)` sur une surface presque
+ * blanche produit un fond de DEMI-TON, et poser la MEME couleur en texte
+ * dessus ne peut structurellement pas atteindre 4,5:1 : la teinte rapproche le
+ * fond du texte. Les CINQ regles construites ainsi echouaient le seuil AA en
+ * theme clair — 3,60 a 3,96:1 — et les cinq passaient en theme sombre, ou la
+ * teinte s'ECARTE au contraire d'un texte clair. Un defaut qui ne se voit que
+ * dans un theme sur deux.
+ *
+ * Mesure du 2026-08-27, sous-lot F1, sur les couleurs COMPOSEES et non
+ * declarees : le fond etant translucide, sa valeur nominale ne dit rien de ce
+ * que l'oeil voit. Quatrieme occurrence dans ce projet d'une pastille juste
+ * en HTML et illisible a l'ecran.
+ *
+ * `--rw-danger` ne figurait pas dans le lot : il avait deja son
+ * `--rw-danger-fond` PALE (#fef2f2, 5,91:1). C'est ce modele qui est etendu ici
+ * a `--rw-succes` et `--rw-avertissement`.
+ *
+ * Les fonds de LIGNE (`.rw-diff__ligne--*`, `.rw-ligne-sensible`) gardent leur
+ * `color-mix` : ils portent le texte ORDINAIRE, sombre sur clair, mesure entre
+ * 13,4 et 14,6:1. Ce n'est pas le meme defaut, et les aligner par symetrie
+ * aurait efface une distinction reelle.
+ */
+.rw-pastille--ok      { background: var(--rw-succes-fond); color: var(--rw-succes); }
 .rw-pastille--echec   { background: var(--rw-danger-fond); color: var(--rw-danger); }
 .rw-pastille--attente { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }
 
@@ -1360,8 +1389,8 @@ a.rw-bouton { display: inline-block; }
 
 /* La note de posture : trois teintes, parce qu'un F rendu comme un A ne
    signale rien. Le rouge est reserve a ce qui exige une action — D et F. */
-.rw-badge--ok        { background: color-mix(in srgb, var(--rw-succes) 16%, transparent);       color: var(--rw-succes); }
-.rw-badge--attention { background: color-mix(in srgb, var(--rw-avertissement) 18%, transparent); color: var(--rw-avertissement); }
+.rw-badge--ok        { background: var(--rw-succes-fond);   color: var(--rw-succes); }
+.rw-badge--attention { background: var(--rw-avert-fond);    color: var(--rw-avertissement); }
 .rw-badge--alerte    { background: var(--rw-danger-fond);                                        color: var(--rw-danger); }
 .rw-badge--note      { min-width: 2.1em; text-align: center; font-size: 13px; font-weight: 700; }
 

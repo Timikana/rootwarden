@@ -129,10 +129,38 @@ service `Machines`, et cet inventaire vient de la mesurer cinq fois.
 inventoriés (zéro élément DOM absent, zéro fonction sans appelant, zéro désaccord de clés), et son
 pire dégât est **réversible**.
 
-`fail2ban/` — **F1** statut et jails (⚠️ écrit déjà `fail2ban_status` : ce n'est pas un lot lecture
-seule) · **F2** historique + timeline · **F3** conf, journaux, services · **F4** bans par machine ·
-**F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de `127.0.0.1/8` qui
-échoue toujours, l'édition qui **redémarre le service** sans le dire) · **F6** actions parc entier.
+`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails (⚠️ écrit déjà `fail2ban_status` : ce n'est pas
+un lot lecture seule) · **F2** historique + timeline · **F3** conf, journaux, services · **F4** bans
+par machine · **F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
+`127.0.0.1/8` qui échoue toujours, l'édition qui **redémarre le service** sans le dire) · **F6**
+actions parc entier.
+
+### F1, porté le 2026-08-27 — ce que le portage a changé
+
+Route `/fail2ban`, garde `role:1` + `perm:can_manage_fail2ban`, suite `go-fail2ban-f1` à **20 laravel
+/ 18 legacy, 0 FAIL**. L'écart de deux tient à deux `verifiePortage` : l'en-tête qui ment (E-36,
+troisième occurrence) et l'absence d'erreur JavaScript.
+
+Quatre décisions de portage, chacune payée par une mesure :
+
+1. **L'état a TROIS valeurs, pas deux.** « Pas installé », « installé mais arrêté » et « actif »
+   appellent des gestes différents ; les replier sur un booléen ferait perdre celui qui compte. Un
+   état qui n'est pas « actif » **dit ce qu'il implique** — « arrêté » seul ne dit pas qu'aucune
+   adresse n'est bannie pendant ce temps.
+2. **Le dernier relevé connu est rendu AVEC sa date**, et l'encart dit qu'il vient du cache et non de
+   la machine : ouvrir la page ne doit joindre aucune machine en SSH, mais *un état sans sa date se
+   prend pour un état courant*.
+3. **La machine de production s'annonce au moment du CHOIX**, avant le bouton — pas après. Le message
+   était rendu SOUS l'action jusqu'à ce qu'une capture le montre : on lisait « cette machine est en
+   production » **après** avoir décidé d'agir dessus. Aucune assertion ne pouvait le voir, la
+   propriété testée étant « le message existe ».
+4. **Un écran ne porte pas deux vérités sur le même objet.** Le relevé met à jour la ligne du tableau
+   du cache, sinon la même machine y figurait « installé, mais arrêté » pendant que la zone d'état
+   annonçait « actif », à dix centimètres d'écart.
+
+**Le banc est un conteneur sans systemd** : il ne peut rendre que « absent ». Les captures **servent**
+les réponses au réseau au lieu de les transmettre — tout le chemin de rendu s'exécute pour de vrai,
+aucune machine n'est jointe, et le cache n'est pas écrit (prouvé en base, avant et après).
 
 `iptables/` — **I1** consultation (et **la correction du conteneur de notifications**, sans quoi tous
 les lots suivants héritent d'une UI muette) · **I2** copie en base (PDO local pur) · **I3** historique

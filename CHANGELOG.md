@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.99** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.0** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,99 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.0 — `fail2ban/` F1 porte, et cinq regles du socle qui n'etaient lisibles que dans un theme
+
+Route `/fail2ban`, garde `role:1` + `perm:can_manage_fail2ban`, entree de menu basculee de `legacy`
+vers `route`. **Menu remesure par PHP lui-meme : `25 route + 8 legacy + 0 ni l'un ni l'autre = 33`.**
+
+**Reference du LOT** : `go-fail2ban-f1` entre avec **20 PASS sur le portage** contre **18 sur le
+legacy**. L'ecart de deux se decompose entierement — deux `verifiePortage`, donc INFO cote legacy et
+PASS cote portage : l'en-tete qui annonce un acces plus strict que la garde appliquee (E-36,
+troisieme occurrence) et l'absence d'erreur JavaScript.
+
+#### L'etat a TROIS valeurs, et un etat qui n'est pas « actif » dit ce qu'il implique
+« Pas installe », « installe mais arrete » et « actif » ne se reparent pas de la meme facon : les
+replier sur un booleen ferait perdre celui qui compte. Et « arrete » seul ne dit pas qu'**aucune
+adresse n'est bannie pendant ce temps** — l'aide le dit.
+
+Le tableau du dernier releve connu est rendu **avec sa date**, et l'encart precise qu'il vient du
+cache et non de la machine : ouvrir la page ne joint aucune machine en SSH, mais un etat sans sa date
+se prend pour un etat courant.
+
+#### Trois defauts vus a l'image, et invisibles a toute assertion
+
+1. **La pastille « actif » etait a 3,63:1** pour du texte de 11 px — le seuil AA est 4,5:1.
+2. **L'avertissement « machine de production » s'affichait SOUS le bouton** qui agit dessus : on
+   lisait le risque apres avoir decide. La propriete testee, « le message existe », etait verte dans
+   les deux dispositions.
+3. **Le tableau annoncait « installe, mais arrete » pendant que la zone d'etat disait « actif »** —
+   la meme machine, deux verites, dix centimetres d'ecart. Le releve met desormais la ligne a jour.
+
+Et un quatrieme, de langue : **« 1 bannies »**. Le pluriel se compose au lieu de se parentheser, avec
+le seuil a `n > 1` — en francais **zero prend le singulier** (« 0 bannie »).
+
+#### Cinq regles CSS du socle corrigees — le defaut n'existait que dans un theme
+`color-mix(in srgb, <couleur> X%, transparent)` sur une surface presque blanche produit un fond de
+**demi-ton** ; poser la MEME couleur en texte dessus ne peut structurellement pas atteindre 4,5:1,
+la teinte rapprochant le fond du texte. Mesure des cinq regles construites ainsi :
+
+| regle | theme clair | theme sombre |
+|---|---|---|
+| `.rw-confirmation` | **3,96:1** | 8,05:1 |
+| `.rw-avertissement` | **3,90:1** | 8,61:1 |
+| `.rw-pastille--ok` | **3,66:1** | 6,84:1 |
+| `.rw-badge--ok` | **3,75:1** | 7,22:1 |
+| `.rw-badge--attention` | **3,60:1** | 7,28:1 |
+
+Les cinq echouaient en clair, les cinq passaient en sombre : sur une surface foncee la teinte
+**ecarte** au contraire le fond d'un texte clair. `--rw-danger` ne figurait pas au lot — il avait deja
+son `--rw-danger-fond` PALE (`#fef2f2`, 5,91:1). C'est ce modele qui est etendu : deux jetons neufs,
+`--rw-succes-fond` (`#f0fdf4` clair / `#16281f` sombre) et `--rw-avert-fond` (`#fefce8` / `#2a2410`).
+La pastille « actif » passe a **4,79:1**.
+
+Les fonds de LIGNE (`.rw-diff__ligne--*`, `.rw-ligne-sensible`) gardent leur `color-mix` : ils portent
+le texte ORDINAIRE, sombre sur clair, mesure entre **13,4 et 14,6:1**. Les aligner par symetrie aurait
+efface une distinction reelle.
+
+#### Le contraste se COMPOSE, et une couleur ne se lit pas a l'expression reguliere
+L'assertion qui a trouve tout cela rendait d'abord un **PASS a 793 790 048:1** — pour un maximum
+theorique de 21. Deux fautes dans une ligne :
+
+- `color-mix()` se **calcule** en `color(srgb 0.0823529 0.501961 0.239216 / 0.18)`, ou une lecture par
+  `/\d+/g` voit « 823529 » et le passe a une formule de luminance ;
+- le fond etant **translucide**, sa valeur nominale ne dit rien de ce que l'oeil voit.
+
+Les couches se composent desormais sur un canevas de 1 px, par le navigateur — il connait toutes les
+notations qu'il calcule. Avec un controle : une couleur qu'il **refuse** laisse `fillStyle` inchange,
+donc rendrait silencieusement la precedente ; deux sentinelles differentes le detectent sans qu'un
+noir legitime passe pour une erreur.
+
+#### La sonde de l'en-tete ne lit QUE les commentaires
+Meme suite, meme tour, sens inverse : une premiere redaction lisait les **vingt premieres lignes** du
+fichier legacy — donc l'en-tete ET le `checkAuth([ROLE_USER, ...])` de la ligne 10. Elle concluait
+« la source cite le role 1 » a partir du CODE, et **dedouanait un fichier qui ment**. Un faux PASS,
+c'est-a-dire le sens le plus couteux : une accusation fausse se corrige, une exoneration fausse se
+propage.
+
+#### Captures : les reponses sont SERVIES, pas transmises
+Le banc est un **conteneur sans systemd** : la seule reponse qu'il puisse rendre est « fail2ban
+absent ». `go-captures-fail2ban.mjs` **repond** a `/api/gateway/fail2ban/status` au lieu de la laisser
+partir — tout le chemin de rendu s'execute pour de vrai (le clic, le `fetch`, `rendStatut`,
+`rendJails`), aucune machine n'est jointe, et le cache `fail2ban_status` n'est pas ecrit : prouve en
+base, avant et apres. Le meme procede, en S3, avait revele deux defauts vivants du portage.
+
+L'etat « machine sensible » se photographie **sans filet** : il nait d'un `change` sur la liste
+deroulante, qui n'emet aucune requete. Un compteur de requetes l'atteste.
+
+**Fichiers** : `laravel/app/Services/Fail2ban.php`, `laravel/app/Http/Controllers/Fail2banController.php`,
+`laravel/resources/views/fail2ban.blade.php`, `laravel/public/js/fail2ban.js`,
+`laravel/lang/{fr,en}/fail2ban.php` (**38 cles chacune, parite stricte, aucune morte**),
+`laravel/routes/web.php`, `laravel/app/Support/Navigation.php`, `laravel/public/css/rw.css`,
+`tests/e2e/go-captures-fail2ban.mjs`, `tests/e2e/go-fail2ban-f1.mjs`, `scripts/rejouer-lot.sh`.
+
+**Reste `fail2ban/` F2 a F6** — tous MUTENT : bannir, debannir, editer une jail, la liste blanche,
+installer. Puis `iptables/` I1 a I5.
 
 ### v1.37.99 — `fail2ban/` F1 caracterise, et E-152 : sur 23 routes, DEUX portent une permission
 

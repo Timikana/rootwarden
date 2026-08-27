@@ -334,6 +334,22 @@ declare -A REF_LARAVEL=(
   # qu'aucune machine soit jointe. C'est ce qui a revele E-151 — et DEUX defauts
   # du portage qui avaient vecu tout S2 dans un tableau toujours vide.
   [go-services-s3]=18
+  # `fail2ban/` sous-lot F1 : statut et jails, portes.
+  # 20 sur le portage contre 18 sur le legacy. L'ecart de DEUX se decompose
+  # entierement, et ce sont deux `verifiePortage` — donc INFO cote legacy,
+  # PASS cote portage :
+  #   1  la source n'annonce pas un acces plus strict que la garde appliquee.
+  #      Le legacy annonce « admin (2), superadmin (3) » en tete de fichier et
+  #      admet le role 1 dix lignes plus bas : troisieme occurrence d'E-36. La
+  #      sonde ne lit QUE les lignes de commentaire — une premiere redaction
+  #      lisait les vingt premieres lignes du fichier, donc le `checkAuth` du
+  #      code, et DEDOUANAIT le legacy. Un faux PASS, le sens le plus couteux.
+  #   1  aucune erreur JavaScript etrangere a l'avortement.
+  #
+  # F1 N'EST PAS EN LECTURE SEULE cote portage non plus : la copie du cache
+  # `fail2ban_status` est prise a l'entree et remise a la sortie, sur les deux
+  # cibles.
+  [go-fail2ban-f1]=20
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et

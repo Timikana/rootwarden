@@ -7,6 +7,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
+use App\Http\Controllers\Fail2banController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\BashrcController;
 use App\Http\Controllers\AccesSftpController;
@@ -671,6 +672,18 @@ Route::middleware('session.authentifiee')->group(function () {
      * E-149 : les huit routes backend n'ont ni role ni permission. Le portage ne
      * le referme pas — voir `App\Services\ServicesSystemd` et §7 du plan.
      */
+    /*
+     * Fail2ban — F1. `role:1` + la permission, repris tel quel du legacy — dont
+     * l'en-tete annonce pourtant « admin (2), superadmin (3) » alors que sa
+     * garde admet ROLE_USER (motif E-36).
+     *
+     * Le role 1 est un choix assume du projet (`CHANGELOG.md:3078-3085`). Ce qui
+     * ne l'est pas, c'est E-152 : sur 23 routes des deux modules de filtrage,
+     * DEUX portent une permission. Le portage ne le referme pas — §7 du plan.
+     */
+    Route::get('/fail2ban', Fail2banController::class)
+        ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
+
     Route::get('/services', ServicesController::class)
         ->middleware(['role:1', 'perm:can_manage_services'])->name('services');
 
