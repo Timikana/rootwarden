@@ -7548,3 +7548,35 @@ sont `active` aujourd'hui. Remesure :
 
 Le portage la **MARQUE** (« retirée du parc », avec la raison) au lieu de la taire ; **il ne peut pas la
 refermer**, le filtre vit dans le backend.
+
+---
+
+*Note sur E-164 — **REFERMÉ le 2026-08-27** (`v1.38.15`).* Le cast `int(server_id)` vivait **à
+l'intérieur** du `try` qui rend « Erreur interne » : une faute de la **requête** obtenait un **500** sur
+`/fail2ban/stats` et `/fail2ban/history`. La première moitié de l'écart — corps HTML illisible par
+l'appelant — était déjà fermée ; celle-ci — « la faute est dans la requête, le statut dit qu'elle est
+dans le serveur » — ne l'était pas. **Troisième occurrence du motif « à moitié corrigé » sur ce module,
+et deuxième fois que le correctif partiel était le nôtre.**
+
+Verrouillé par `backend/tests/test_fail2ban.py::TestIdentifiantDeServeurNonNumerique` (12 cas, 4
+propriétés). **Mutation fidèle du correctif : 8 FAIL**, fichier restauré, empreinte SHA-256 identique.
+
+Deux choses que la validation a établies **au-delà de la demande** :
+
+- **l'ORDRE des contrôles.** Le test de présence reste **avant** le cast sur les deux routes, donc
+  `server_id requis` et `server_id doit être un nombre` demeurent **deux messages distincts**. Un
+  correctif qui aurait casté d'abord aurait fermé E-164 **en confondant les deux fautes** — c'est
+  désormais une assertion permanente ;
+- **les quatre propriétés ne protègent pas également, et c'est dit.** La quatrième — « la requête
+  refusée ne touche pas la table d'historique » — reste **verte sur le code défectueux** : la
+  `ValueError` était levée en évaluant les paramètres, donc **avant** le `execute()`. Elle est réelle,
+  elle tenait déjà, et elle **ne distingue pas les deux états**. Une propriété vraie des deux côtés
+  n'est pas une propriété qui verrouille.
+
+Le mécanisme qui a rendu ce correctif vérifiable mérite d'être gardé : les deux propriétés attendues
+avaient été écrites **avant** le correctif, en `xfail(strict=True)`. Elles ne rougissaient pas, et le
+correctif les a fait passer en `XPASS(strict)`, donc **en FAILED** — le signal pour lequel elles
+existaient. **Un correctif validé par un test qu'il ne pouvait pas influencer, écrit par une autre
+session, et impossible à ajuster après coup.** Verrouiller le 500 aurait figé le défaut ; décrire
+l'attendu en `xfail` l'a rendu impossible à oublier. `pytest` : **389 passed, 0 xfailed** après retrait
+des marqueurs.
