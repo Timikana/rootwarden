@@ -29,7 +29,7 @@ return [
     'mdp_nouveau' => 'Nouveau mot de passe',
     'mdp_confirmation' => 'Confirmer le nouveau mot de passe',
     'mdp_enregistrer' => 'Changer le mot de passe',
-    'mdp_effet_sessions' => 'Vos autres sessions ouvertes seront fermees, et les connexions memorisees oubliees. Celle-ci reste ouverte.',
+    'mdp_effet_sessions' => "Vos autres sessions sur l'ANCIEN portail seront fermées — il vérifie à chaque requête — et les connexions mémorisées oubliées. ⚠ Sur CE portail, aucune autre session ne sera fermée : il ne consulte pas encore la table des sessions.",
     'mdp_ok' => 'Mot de passe modifie avec succes.',
     'mdp_erreur_actuel' => 'Mot de passe actuel incorrect.',
     'mdp_erreur_correspondance' => 'Les mots de passe ne correspondent pas.',
