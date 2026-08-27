@@ -8221,3 +8221,97 @@ Elle réunit ce site, les passes creuses de F6 et l'assertion aveugle de `go-adm
 **dans une boucle, sur chaque machine visée** (`:342-345`). C'est le bon motif — un décorateur ne sait
 contrôler qu'**un** identifiant, et cette route en reçoit une liste. **Une garde absente qui n'est pas un
 trou**, et c'est la première de cette forme sur le chantier.
+
+---
+
+## E-190 — « Un déploiement ne déploierait rien » : la moitié rassurante d'un constat dont l'autre moitié DÉTRUIT
+
+**Cette phrase s'affiche MAINTENANT, sur l'écran qui décide de K4.** Trouvée le 2026-08-27 par relecture
+croisée d'E-189, vérifiée sur les trois points.
+
+`laravel/lang/fr/ssh.php:44` et `en/ssh.php:44` :
+
+> « **ATTENTION : aucun compte actif ne porte de clé SSH — un déploiement ne déploierait rien** »
+> « WARNING: no active account carries an SSH key — a deployment would deploy nothing »
+
+**Mesure en base :** `SELECT COUNT(*) FROM users WHERE active = 1 AND ssh_key <> ''` rend **0**. La
+condition d'affichage est donc remplie **aujourd'hui**.
+
+### Elle est vraie du DÉPLOIEMENT et fausse du GESTE
+
+`configure_users` fait **deux** choses, et la seconde ne dépend d'**aucune** clé :
+
+1. la boucle de déploiement ne pose rien si personne n'a de clé — **la phrase est exacte pour elle** ;
+2. `revoked = managed_users - authorized_names` (`configure_servers.py:755`) s'exécute **quoi qu'il
+   arrive**, et fait `rm -f /home/<user>/.ssh/authorized_keys`.
+
+> **« Ne déploierait rien » se lit « ne ferait rien ».** Un déploiement lancé aujourd'hui, avec zéro
+> compte porteur de clé, ne déploierait effectivement rien — **et supprimerait quand même les
+> `authorized_keys` de `claude-agent` et de `Timikana` sur `srv-zabbix`** (E-174 §K4, deux comptes
+> mesurés, sans clé de plateforme, donc non rétablissables).
+
+C'est la **seule** phrase de synthèse que l'écran met en avant, et elle est jointe par un tiret à
+« Aucun prérequis manquant ». Un opérateur qui lit les deux ensemble conclut qu'il ne risque rien.
+
+### Et la ligne juste AU-DESSUS porte le bon raisonnement
+
+`ssh.php:41`, deux lignes plus haut dans le même fichier :
+
+> « La vérification n'est pas concluante : le serveur n'a pas rendu de verdict. **Rien n'est affiché
+> ci-dessous, parce qu'un résultat partiel se lirait comme une vérification réussie.** »
+
+**L'auteur de cette ligne avait donc compris la classe exactement**, et la ligne suivante la commet.
+C'est le motif « le cas visible traité, le cas subtil pris à l'envers » — **dans deux lignes adjacentes
+du même fichier.** La présence d'un raisonnement correct *à côté* est ce qui endort la question.
+
+### Correctif : quatre mots, et il ne peut rien casser
+
+Dire que le déploiement ne **poserait** rien **et** qu'il **révoquerait quand même**. Parité FR/EN dans
+le même commit. **Vérifié : `cles_aucune` n'apparaît dans AUCUN fichier de `tests/e2e/`** — aucune
+assertion n'attend ce texte.
+
+### Quatre autres constantes sur le même écran, de la même famille
+
+- **la forme d'E-183, déplacée de la base vers l'écran de décision.** `users_revoked`,
+  `users_to_create` et `user_impact` ne sont posés que dans un `try` **imbriqué** dans celui de la
+  session SSH. Si l'audit d'inventaire lève, l'`except` **journalise sans rien ajouter à
+  `result['errors']`** — et `ssh_ok` vaut déjà `True`. Côté écran, `listeNommee` sort **en silence** sur
+  un champ absent. Résultat composite : badge **OK**, aucune erreur, **aucune liste « Accès qui seront
+  RÉVOQUÉS »**, synthèse « Aucun prérequis manquant ». **Une machine dont l'inventaire n'a pas pu être
+  lu est présentée comme vérifiée et sans révocation à prévoir** ;
+- **deux implémentations de la même règle de révocation**, et elles ne filtrent pas pareil :
+  `preflight` (`ssh.py:459-464`) filtre `u.active = 1` ; `configure_servers:735-737` **ne filtre pas** ;
+  et `cleanup_users:658-661`, **dans le même fichier**, filtre. Aucun commentaire ne le dit.
+  **Le sens dédouane pour l'instant** — `autorisés_preflight ⊆ autorisés_déploiement`, donc le préflight
+  **sur-annonce** et ne sous-annonce jamais — **mais c'est accidentel** : un filtre ajouté au préflight
+  que le déploiement n'a pas inverserait l'inclusion, et l'écran **sous-annoncerait ce qui va être
+  détruit**. Mesuré : **0 compte inactif** dans le parc, donc aucun porteur. *Le correctif juste n'est
+  pas d'aligner les deux copies mais de n'en garder qu'une* — la leçon de `maintenance/` ;
+- `d.results` absent → `resultats = []` → `bloquantes = 0` → **« Aucun prérequis manquant » avec zéro
+  machine affichée**. Lire `d.success` (E-189) ferme celle-ci en même temps ;
+- une machine absente de `results` n'est comptée **ni** bloquante **ni** prête : `resultats.length`
+  n'est jamais comparé à `cibles.length`. Faible portée, les cibles venant de cases réelles.
+
+### Les cinq sont la même faute
+
+> **Un ensemble ou un constat PARTIEL lu comme COMPLET.** Zéro clé lu comme zéro effet ; champ absent lu
+> comme liste vide ; deux opérandes supposés égaux ; `success` supposé constant ; `results` supposé
+> exhaustif.
+
+Sur cet écran, la conséquence n'est pas un affichage faux — c'est **un arbitrage pris sur une
+information qu'on croit avoir.**
+
+### Le point positif d'E-189 est CONFIRMÉ, et il est plus fort qu'annoncé
+
+`preflight_check` sans décorateur d'accès machine n'est pas un trou — il boucle
+`check_machine_access(mid)` et refuse en 403 au premier. **Et il y a une raison de plus de ne pas le
+« corriger » : cette route reçoit sa liste sous le nom `machines`** — un **troisième** nom, qu'aucune
+version du décorateur ne lit (il connaît `machine_id`, `server_id`, `machine_ids`, `server_ids`).
+**Ajouter le décorateur serait inerte ET donnerait l'apparence d'une protection que le corps assure
+seul.** À écrire tel quel dans `AUDIT-GARDES-BACKEND.md`, sinon le prochain lecteur l'ajoutera en croyant
+bien faire.
+
+**Non mesuré, et dit** : le préflight n'a pas été exécuté (il ouvre des sessions SSH réelles) ;
+`remove_from_sudoers` n'a pas été vérifié sur son code de retour ; et **`/deploy` lui-même
+(`ssh.py:246`) n'a pas été relu — la question portait sur la chaîne de DÉCISION. Le geste n'est pas
+dédouané, il n'est pas mesuré.**
