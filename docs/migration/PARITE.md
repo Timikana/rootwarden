@@ -7336,3 +7336,215 @@ les machines ont abouti : un « 0/3 » rendu avec `success: True` se lit comme u
 *Note sur E-164* — **même chose sur `/fail2ban/stats`**, corrigé au même lot : `days = min(int(...))`
 était hors de tout `try`. Chercher la branche jumelle est une règle de ce chantier, pas une
 précaution.
+
+---
+
+## E-174 — `_validate_ip` valide et rend la chaîne REÇUE : exécution de commande arbitraire en root
+
+**Le défaut le plus grave du chantier.** Trouvé par relecture le 2026-08-27, **hors du sous-lot en
+cours**, et **occupé aujourd'hui par un compte actif**. Vérifié ligne par ligne et mesuré dans le
+conteneur avant d'être écrit ici — trois lignes, chacune correcte en apparence.
+
+### La chaîne
+
+```python
+# backend/fail2ban_manager.py:26-30
+def _validate_ip(ip: str) -> str:
+    """Valide une adresse IP (v4 ou v6)."""
+    ip = ip.strip()
+    ipaddress.ip_address(ip)   # appelée pour son EFFET DE BORD ; le résultat est jeté
+    return ip                  # ... et c'est la chaîne REÇUE qui est rendue
+```
+
+```python
+# backend/fail2ban_manager.py:163
+return execute_as_root(client, f'fail2ban-client set {jail} banip {ip}', ...)
+```
+
+```python
+# backend/ssh_utils.py:554
+sudo_cmd = f"sudo -S -p '' sh -c {shlex.quote(command)}"
+```
+
+`shlex.quote` protège le shell **extérieur** — celui qui reçoit `sudo`. Il enveloppe la commande
+**entière** en un seul argument, qui arrive intact au `sh -c` distant, **dont le travail est
+précisément de l'interpréter**. Le `;` s'exécute donc, sous `sudo`, **en root**.
+
+### Ce que `ipaddress.ip_address` accepte réellement — mesuré, pas supposé
+
+Un identifiant de portée IPv6 (`%…`) peut contenir n'importe quoi. Relevé dans `rootwarden_python` :
+
+| valeur soumise | verdict de `ip_address` | `str()` de l'objet rendu |
+|---|---|---|
+| `fe80::1%;id;` | **ACCEPTÉE** | `'fe80::1%;id;'` |
+| `fe80::1%$(id)` | **ACCEPTÉE** | `'fe80::1%$(id)'` |
+| <code>fe80::1%&#124;id</code> | **ACCEPTÉE** | <code>'fe80::1%&#124;id'</code> |
+
+**Et c'est la mesure qui compte le plus** : `str()` **conserve l'identifiant de portée verbatim**. La
+parade habituelle de ce chantier — « normalise d'abord, compare ensuite » — **n'aurait rien fermé
+ici**, parce que la valeur ne sert pas à *comparer* mais à *composer*. Le correctif doit **refuser le
+`%`**, pas normaliser.
+
+### Établi sans joindre aucune machine
+
+La commande réellement émise a été recomposée, `fail2ban-client` remplacé par un `echo` et `sudo`
+retiré. `sh -c` scinde bien au `;` et exécute la seconde commande :
+
+```
+$ sh -c 'echo FAKE-CLIENT set sshd banip fe80::1%;echo MARQUEUR uid=$(id -u);'
+FAKE-CLIENT set sshd banip fe80::1%
+MARQUEUR uid=0
+```
+
+**C'est l'INTERPRÉTATION qui est mesurée, jamais le geste distant.** Aucune session SSH n'a été
+ouverte, aucune machine du parc n'a été touchée — et la règle du chantier « un défaut irréversible
+s'ÉTABLIT sans se provoquer » est respectée.
+
+### Qui l'occupe, mesuré en base
+
+| compte | rôle | ce qui l'ouvre | portée |
+|---|---|---|---|
+| `rw-test-admin` (15) | 2, actif, **second facteur fonctionnel** | `check_machine_access` rend `True` dès `role_id >= 2` | **les trois machines**, `srv-zabbix` comprise |
+| `rw-test-super` (16) | 3, **sans** `can_manage_fail2ban` | la **page** le refuse, la **requête** l'accepte | idem |
+| `opsuser` (2) | 1, actif, zéro permission | le chemin de requête l'accepte | **`srv-zabbix` seule** — sa seule ligne dans `user_machine_access` est la **production** |
+
+Réserve dite aussi nettement que l'accusation : `opsuser` n'a pas de `totp_secret`, donc
+`login.php:223-226` l'envoie vers `enable_2fa.php`, **un enrôlement libre**. Ce n'est pas une
+barrière, c'est une étape — et elle laisse une trace.
+
+**Et le pire vecteur n'est aucun de ceux-là** : `POST /fail2ban/ban_all_servers` porte
+`@require_role(2)` et **aucun contrôle d'accès machine**. Un seul appel d'un rôle 2 exécute la
+commande injectée sur **chaque machine à fail2ban actif** — parc entier, production comprise.
+
+### Ce qui est DÉDOUANÉ, et il faut le dire aussi clairement
+
+- les cinq comptes `e2e_test_*` n'ont **aucune** ligne dans `user_machine_access` : le décorateur les
+  arrête. Ils n'occupent pas cette faille ;
+- `rootwarden_python` publie `5000/tcp` **sans correspondance d'hôte** ; seuls 8443 et 8444 sont
+  publiés. L'hypothèse « forger `X-User-Role: 3` en joignant le backend directement » est **écartée** ;
+- `iptables/` n'interpole **aucune** valeur utilisateur brute — base64 et chemins littéraux.
+  `MODULE-FILTRAGE.md` §3 a raison **sur ce point** ;
+- `temporary_permissions` est **vide** : un correctif de garde posé maintenant ne casserait aucun
+  chemin vivant.
+
+### E-152 est amendé : son correctif NE FERME PAS celui-ci
+
+E-152 disait « sur 23 routes, deux portent une permission ». C'est vrai et **insuffisant**.
+`/fail2ban/ban` n'est pas « une écriture sans permission » : c'est un **shell root**. La garde absente
+n'est donc pas le défaut principal, c'est son **amplificateur**. Poser `@require_permission` sur les
+21 routes laisserait à tout porteur légitime de `can_manage_fail2ban` — `superadmin`,
+`rw-test-admin` — l'exécution root intacte. **La permission est censée autoriser à bannir une
+adresse ; elle confère root sur chaque machine à portée.** C'est une élévation par rapport à
+l'**intention documentée du produit**, et pas seulement par rapport à une garde manquante.
+
+### Correctif — les deux ENSEMBLE, pas l'un ou l'autre
+
+1. `_validate_ip` : **refuser `'%' in ip`**, puis rendre `str(ipaddress.ip_address(ip))` ;
+2. ceinture : `shlex.quote()` sur `jail` **et** `ip` **à l'intérieur** de la commande composée — ce que
+   `MODULE-FILTRAGE.md` §5.6 réclamait déjà (« un f-string sur une valeur venue du client doit devenir
+   impossible à écrire par accident »).
+
+Ce que le correctif casserait : **rien de mesurable**. Aucun appelant légitime n'envoie
+d'identifiant de portée — le portage valide en JavaScript avant d'émettre, le legacy aussi. C'est une
+propriété qui se mesure, et elle est inscrite au banc.
+
+### Pourquoi un module par ailleurs minutieusement audité l'a laissé passer
+
+`MODULE-FILTRAGE.md` §3 classe `ban_ip` / `unban_ip` dans « liste blanche / parseur dédié — **SÛR :
+oui** », **en citant nommément `ipaddress.ip_address()`**. L'inventaire a donc **dédouané le validateur
+sans mesurer ce qu'il accepte**. C'est la mécanique de l'« en-tête qui mente », transposée dans un
+document d'inventaire — et c'est la plus coûteuse des quatre formes rencontrées, parce qu'un
+dédouanement écrit fait renoncer le lecteur suivant à mesurer. **Une ligne d'inventaire qui conclut
+« sûr » doit porter la mesure qui l'établit, ou ne pas conclure.**
+
+---
+
+## E-175 — `/fail2ban/history` et `/iptables-history` lisent `server_id` là où le garde retient `machine_id`
+
+**Écart mineur, dit comme tel.** Le décorateur d'accès résout `machine_id` en premier ; ces deux
+routes lisent `server_id`. La divergence est réelle, donc le contrôle porte sur un identifiant que la
+route n'emploie pas — la forme exacte d'« un garde sans objet ne garde rien ».
+
+**Ce qu'il fuit aujourd'hui : rien.** Les **deux** tables sont vides — 0 ligne. Le défaut est réel et
+sans porteur, et c'est précisément la distinction que ce chantier a payée : *vérifier qu'un garde est
+ABSENT n'est pas vérifier que son absence COMPTE.* À corriger avec E-152, dont il partage le
+périmètre ; à ne pas présenter comme une faille.
+
+---
+
+## E-176 — `queued: N` peut vouloir dire ZÉRO tâche lancée, et la page annonce déjà un suivi
+
+`groups.py:311-315` rend `success` / `queued` juste après `t.start()` — accusé de réception, pas
+verdict. Mais **le fil peut ne RIEN faire** : `_run_bulk` commence par
+`if not _scan_lock.acquire(blocking=False): logger.info(...); return` (`:270-272`), donc **avant tout
+`track()`**. Aucune tâche n'est créée. Or la page a déjà affiché « :n serveur(s) en file — **suivi dans
+le centre de tâches** ». L'exploitant y va, il n'y a rien.
+
+**Et le module voisin refuse franchement dans le même cas** : `security/` rend un **429**
+(`cve.py:164-166`). Même situation, deux réponses opposées dans deux modules — c'est le genre
+d'incohérence qu'aucune lecture d'un seul module ne peut voir. Aligner sur le `429` touche le backend
+de production : porté au §7 du plan, même régime qu'E-144, E-147, E-149 et E-150.
+
+## E-177 — Une tâche CVE échouée est marquée `success`
+
+`track()` marque `success` à la sortie **normale** du bloc. Le bloc draine `_stream_cve_scan`, qui
+**avale ses propres exceptions** (`cve.py:56-60`, `:108-111`) et les rend comme des **lignes
+d'événement** que la boucle jette (`pass`). Machine injoignable, SSH refusé, aucun identifiant : le
+générateur se termine normalement, **la tâche est verte**.
+
+Même mécanique que le `forward_deployed = True` de `graylog/`, mais **persistée en base**.
+**Défaut backend : il échouera des deux côtés** — ce n'est pas un écart de parité entre portails, et il
+se corrige avec le portage.
+
+## E-178 — Supprimer un groupe inexistant annonce « Groupe supprimé »
+
+`delete_group` (`groups.py:218-225`) rend `deleted: cur.rowcount > 0` **sans résoudre l'objet** ;
+`main.js:112` ne lit que `success`. Famille `/server_lifecycle` : `rowcount` ne distingue pas « rien à
+changer » de « objet absent ». Le champ qui porterait l'information **existe et n'est lu par personne**.
+
+## E-179 — Le panneau d'onboarding contredit le bouton qu'il décrit, dans les DEUX langues
+
+`tip.groups_step3` : « Le bouton **Membres** permet d'**ajouter ou retirer** des serveurs du groupe » /
+« lets you **add or remove** ». `showMembers()` (`main.js:77-91`) affiche une liste **en lecture seule**,
+point. Et l'infobulle du **même bouton**, trois lignes plus loin, dit la vérité
+(`js.groups.tip_members` = « Afficher les serveurs résolus »).
+
+**Troisième variante du motif « l'en-tête qui mente »** : ni un commentaire de fichier (E-142), ni un
+libellé au terme porteur non défini (le « fusionner » de `bashrc/`), mais un panneau d'**onboarding**
+qui promet un geste **absent**. Le geste existe côté backend et n'a aucun appelant :
+`PUT /groups/<id>` (`groups.py:170-210`) sait remplacer intégralement les membres statiques, et trois
+traces montrent une fonctionnalité conçue et jamais branchée (`main.js:13` `editingId` jamais lu,
+`save()` qui poste toujours sur `/groups`, et ce texte). **La brancher n'est plus migrer, c'est
+concevoir** — porté au §7. Le portage corrige le TEXTE : *un texte faux se corrige, une capacité
+absente s'arbitre.*
+
+## E-180 — La purge du planificateur ne tourne pas, et trois nettoyages d'hygiène sont éteints par une variable de RÉTENTION DE JOURNAUX
+
+`LOG_RETENTION_DAYS` est **commentée** dans `srv-docker.env`, donc vaut 0, donc `_purge_old_logs()`
+sort immédiatement. **Rien n'a jamais été purgé** depuis la remise à zéro du 2026-05-26. Et la même
+variable éteint **trois nettoyages qui ne sont pas des politiques de rétention** : sessions inactives,
+permissions temporaires expirées, jetons de réinitialisation.
+
+Mesuré : **2 132** sessions en base pour `rw-test-super`, 1 094 pour `rw-test-user`, 619 pour
+`superadmin`. Et `verify.php:66` lit cette table à **chaque page protégée** — c'est la **liste de
+révocation côté serveur**, et elle ne vieillit jamais.
+
+**Activer la variable n'est pas la bonne réponse seule** : `user_logs` porte une chaîne scellée, et
+purger par la tête **romprait la vérification d'intégrité**. Défaut commun aux deux portails, donc pas
+un écart de parité au sens strict — inscrit ici parce que c'est le registre des mesures, et porté au §7
+comme décision d'exploitation.
+
+## E-181 — La portée d'un geste de parc ignore `lifecycle_status` : une machine retirée du parc reste une cible
+
+Relevé le 2026-08-27 **en portant F6**, par lecture des deux requêtes. Les deux gestes de parc de
+`fail2ban/` font `FROM machines m` **sans aucun filtre de cycle de vie**, alors que le sélecteur de la
+page **écarte** les archivées (`Fail2ban::machines()`). Une machine retirée du parc reste donc une
+cible des deux gestes **sans figurer nulle part à l'écran**.
+
+C'est mot pour mot le défaut « **deux sources pour la même table** » qui a laissé une machine archivée
+recevoir un `apt full-upgrade` dans `update/`. **Branche réelle et non exercée** : les trois machines
+sont `active` aujourd'hui. Remesure :
+`SELECT lifecycle_status, COUNT(*) FROM machines GROUP BY 1`.
+
+Le portage la **MARQUE** (« retirée du parc », avec la raison) au lieu de la taire ; **il ne peut pas la
+refermer**, le filtre vit dans le backend.
