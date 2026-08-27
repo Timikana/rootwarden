@@ -2171,6 +2171,54 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.17 — E-184 : une sonde qui echoue n'efface pas ce qu'elle n'a pas pu regarder
+
+Trois sondes, un seul commit, parce que c'est un seul defaut sous trois formes.
+`_sonde_concluante(rc, sortie)` : `rc == 0` **et** sortie non blanche.
+
+**La distinction est corrigee, pas l'effet.** La commande porte son propre marqueur d'absence
+(`|| echo NOT_INSTALLED`) qui sort avec un code **nul** : l'absence reste donc concluante, et l'inventaire
+est toujours purge quand l'agent est **vraiment** absent — ce que le §7 documente comme VOULU. **C'est la
+troisieme issue qui est neuve, et elle n'existait pas : « je ne sais pas ».** Verifie sur six cas, dont
+les deux qui decident : `rc=0, 'NOT_INSTALLED'` -> concluante (l'effacement voulu SURVIT) ;
+`rc=127, 'command not found'` -> NON concluante, une sortie non vide ne valant pas un verdict quand le
+code n'est pas nul.
+
+**Une septieme attente etait fausse, et c'etait la mienne, pas celle du code.** Elle voulait `rc=127` avec
+sortie concluante ; le code disait non, et le code avait raison. La mesure a ete corrigee, pas le code —
+*quand une assertion echoue sur la cible corrigee, la premiere question est si c'est l'instrument qui vise
+a cote.*
+
+**Changement de contrat pour le portage, signale et non decide seul** : les trois routes peuvent desormais
+rendre `success: false` la ou elles rendaient **toujours** `true`, avec un champ `concluante` neuf. Une
+page qui affichait « aucun agent » sur une sonde ratee affichera un echec.
+
+**Releve, NON corrige, un commit un defaut** : la commande de `zabbix_version` chaine
+`A && B || C && D || E` **sans parentheses**. `sh` evalue de gauche a droite, donc quand
+`zabbix_agent2 -V` reussit, **`zabbix_agentd -V` est lance quand meme** et la sortie peut porter deux
+lignes. Sans effet sur E-184.
+
+### v1.38.16 — E-183 : une lecture ratee effacait l'inventaire ET levait le garde du preflight
+
+Le chemin le plus destructeur trouve a ce jour, et **il avait TROIS faces** — la troisieme decouverte **en
+ecrivant le correctif**, pas en le concevant.
+
+Deux ecritures effacent : `server_user_inventory` (72 lignes) et `server_user_ssh_keys` (20). La
+troisieme, `UPDATE machines SET users_scanned_at = NOW()`, **n'efface rien — elle OUVRE**. C'est la
+precondition du prefight de deploiement (`ssh.py:381`, « Bloquer si le serveur n'a jamais ete scanne »),
+et l'ancienne version la posait **apres un scan qui n'avait rien lu**. **Un incident SSH passager ne
+vidait donc pas seulement l'inventaire : il levait dans le meme geste le garde qui empeche de deployer
+sur un serveur non scanne.**
+
+Le §7 fondait le risque de K4 sur « un deploiement lance en l'etat REVOQUERAIT les acces ». Il fallait
+dire plus : **le meme chemin detruisait la donnee ET ouvrait la porte qui la garde.**
+
+Les trois ecritures sont gardees par un predicat unique, le repli est **nomme** dans le journal (« scan
+NON CONCLUANT, purge ABANDONNEE, l'inventaire (N ligne(s)) est conserve tel quel »), et le changement de
+sens est ecrit dans le code : « je n'ai rien vu » ne signifie plus « il n'y a plus rien » mais **« je ne
+sais pas »**. `recv_exit_status` n'apparaissait **pas une seule fois** dans `ssh.py` ; il y figure
+maintenant, **exactement la ou un code de retour decide d'une suppression**.
+
 ### v1.38.15 — E-164 : le residu, et un correctif valide par un test ecrit AVANT lui
 
 `backend/routes/fail2ban.py`. `int(server_id)` vivait **a l'interieur** du `try` qui rend « Erreur

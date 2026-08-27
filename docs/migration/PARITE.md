@@ -7875,3 +7875,37 @@ raisonnement pour `/fail2ban/`.**
 **Ordre imposé entre E-174 et E-152** : E-174 d'abord, E-152 **ensuite**, comme défense en profondeur.
 L'inverse donnerait le sentiment d'avoir traité le sujet — un porteur légitime de `can_manage_fail2ban`
 conserverait l'exécution root.
+
+*Amendement à E-183 — **il avait TROIS faces, et la troisième change l'arbitrage K4.*** Trouvée le
+2026-08-27 **en écrivant le correctif**, pas en le concevant. Vérifiée indépendamment.
+
+Les deux premières écritures effacent (`server_user_inventory`, `server_user_ssh_keys`). La troisième
+n'efface rien :
+
+```sql
+UPDATE machines SET users_scanned_at = NOW()
+```
+
+**Ce n'est pas un horodatage d'affichage.** `backend/routes/ssh.py:381` :
+
+```python
+# Bloquer si le serveur n'a jamais ete scanne
+if not m.get('users_scanned_at'):
+    result['errors'].append("Scan utilisateurs requis avant le premier deploiement. …")
+    result['scan_required'] = True
+```
+
+**C'est la précondition du préflight de déploiement**, et l'ancienne version la posait **après un scan
+qui n'avait rien lu**. Donc un incident SSH passager ne se contentait pas de vider l'inventaire : il
+**levait, dans le même geste, le garde de sûreté qui empêche de déployer sur un serveur non scanné**.
+
+> Le §7 disait de K4 qu'un déploiement lancé en l'état « **RÉVOQUERAIT** les accès ». Ce raisonnement
+> repose sur l'inventaire. Il fallait dire : **le même chemin détruisait la donnée ET ouvrait la porte
+> qui la garde.** Un inventaire vidé n'est pas seulement une donnée à laquelle on ne peut pas se fier —
+> c'est un préflight qui a cessé de bloquer.
+
+Les trois écritures sont désormais gardées par un **prédicat unique**, le repli est **nommé** dans le
+journal (« scan NON CONCLUANT, purge ABANDONNÉE, l'inventaire (N ligne(s)) est conservé tel quel ») et le
+changement de sens est **écrit dans le code**. Et `recv_exit_status`, qui n'apparaissait **pas une seule
+fois** dans `ssh.py`, y figure maintenant — **exactement là où un code de retour décide d'une
+suppression**. Remesure : `grep -c recv_exit_status backend/routes/ssh.py`.
