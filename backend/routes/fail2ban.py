@@ -709,9 +709,17 @@ def fail2ban_install_all():
             results.append({'server': m['name'], 'success': False, 'error': str(e)[:100]})
 
     ok = sum(1 for r in results if r['success'])
+    # E-165, CINQUIEME occurrence sur ce module, et branche jumelle exacte de
+    # `ban_all_servers` juste au-dessus. `success` etait ECRIT EN DUR : le
+    # message pouvait dire « installe sur 0/2 serveurs » avec un succes annonce.
+    # Les `results[i].success` etaient honnetes, eux — la boucle teste bien `rc`.
+    # C'est le drapeau GLOBAL qui mentait, et c'est celui que l'interface lit en
+    # premier.
     return jsonify({
-        'success': True,
+        'success': ok == len(results) and len(results) > 0,
         'message': f'Fail2ban installe sur {ok}/{len(results)} serveurs',
+        'total': len(results),
+        'reussis': ok,
         'results': results,
     })
 
