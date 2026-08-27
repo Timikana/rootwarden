@@ -93,6 +93,9 @@ const C = CIBLE === 'laravel'
         sectionHisto: '[data-rw="f2b-historique"]', corpsHisto: '[data-rw="f2b-historique-corps"]',
         sectionFrise: '[data-rw="f2b-frise"]', frise: '[data-rw="f2b-frise-barres"]',
         barre: '[data-rw^="f2b-barre-"]',
+        // LE CORPS DE LA BARRE, pas son conteneur : celui du portage englobe
+        // l'etiquette du nombre, ce qui ajoutait 14 px a chaque mesure.
+        corpsBarre: '.rw-frise__corps',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]',
         valeurOption: (o) => o.value,
     }
@@ -102,6 +105,7 @@ const C = CIBLE === 'laravel'
         sectionHisto: '#history-section', corpsHisto: '#history-table',
         sectionFrise: '#stats-section', frise: '#stats-chart',
         barre: '#stats-chart > div',
+        corpsBarre: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]',
         // Le legacy met un OBJET JSON dans la valeur de chaque `<option>` :
         // `getServer()` fait `JSON.parse(sel.value)`. Un `page.select(sel, '2')`
@@ -450,8 +454,11 @@ try {
                 cadreHautPx: Math.round(cadre ? cadre.getBoundingClientRect().height : -1),
                 barres: barres.map((b) => ({
                     hauteur: b.style.height || getComputedStyle(b).height,
-                    hautPx: Math.round(b.getBoundingClientRect().height),
+                    hautPx: Math.round(((sels.corpsBarre && b.querySelector(sels.corpsBarre)) || b)
+                        .getBoundingClientRect().height),
                     largePx: Math.round(b.getBoundingClientRect().width),
+                    fondRendu: getComputedStyle(((sels.corpsBarre && b.querySelector(sels.corpsBarre)) || b))
+                        .backgroundColor,
                     fond: b.style.background || getComputedStyle(b).backgroundColor,
                     titre: b.title || b.getAttribute('aria-label') || '',
                     texte: (b.textContent || '').trim(),
@@ -462,7 +469,7 @@ try {
         verifie('la frise est visible', vu.visible);
         constate('barres rendues', `${vu.nb} pour ${JOURS.length} jours en base`);
         vu.barres.forEach((b, i) => constate(`barre ${i + 1}`,
-            `declaree=${b.hauteur} rendue=${b.hautPx}x${b.largePx}px fond=${b.fond} `
+            `declaree=${b.hauteur} rendue=${b.hautPx}x${b.largePx}px fond=${b.fondRendu} `
             + `intitule="${b.titre || b.texte}"`));
         constate('hauteur RENDUE du cadre de la frise', `${vu.cadreHautPx}px`);
         verifie('une barre par jour', vu.nb === JOURS.length, `${vu.nb} / ${JOURS.length}`);
@@ -489,7 +496,22 @@ try {
          * charge doit etre la plus haute. J-3 (6 unbans) et J-1 (14 evenements)
          * doivent donc depasser le plancher.
          */
-        const pc = vu.barres.map((b) => parseFloat(b.hauteur) || 0);
+        /*
+         * ON NORMALISE AVANT DE COMPARER — pixels et pourcentages ne se
+         * soustraient pas.
+         *
+         * Le legacy declare ses hauteurs en POURCENTAGE, le portage en PIXELS.
+         * Une premiere redaction comparait `parseFloat('34px')` a « 15 % » et
+         * annonçait 44 points d'ecart sur une frise juste. Meme faute que
+         * comparer `LENGTH` a `CHAR_LENGTH` : deux nombres de la meme forme dans
+         * deux unites differentes.
+         *
+         * On ramene donc chaque serie a sa propre plus haute barre. C'est
+         * exactement ce que la propriete demande : une PROPORTION.
+         */
+        const brutes = vu.barres.map((b) => b.hautPx || 0);
+        const maxBrute = Math.max(1, ...brutes);
+        const pc = brutes.map((v) => (v / maxBrute) * 100);
         const attendus = JOURS.map((j) => j.bans + j.unbans);
         /*
          * ON MESURE UNE PROPORTION, PAS UN CLASSEMENT.
@@ -508,7 +530,7 @@ try {
         const ecarts = pc.map((v, i) => Math.abs(v - attendusPc[i]));
         const pire = Math.round(Math.max(...ecarts) * 10) / 10;
         constate('evenements par jour, en base', attendus.join(' \u00b7 '));
-        constate('hauteurs rendues', pc.map((v) => v + '%').join(' \u00b7 '));
+        constate('hauteurs rendues, normalisees', pc.map((v) => Math.round(v * 10) / 10 + '%').join(' \u00b7 '));
         constate('hauteurs attendues', attendusPc.map((v) => Math.round(v * 10) / 10 + '%').join(' \u00b7 '));
         constate('pire ecart', `${pire} points`);
         verifiePortage('la hauteur d\'une barre est PROPORTIONNELLE aux evenements du jour',
@@ -519,10 +541,9 @@ try {
 
         // Un jour de 6 unbans et 0 ban tombe au plancher, en VERT : il se lit
         // comme un jour ou il ne s'est rien passe.
-        const jourSansBan = vu.barres[0];
         verifiePortage('un jour sans ban mais avec des unbans se distingue d\'un jour vide',
-            (parseFloat(jourSansBan?.hauteur) || 0) > 4,
-            `la premiere barre est a ${jourSansBan?.hauteur} — le plancher — `
+            pc[0] > 5,
+            `la premiere barre est a ${Math.round(pc[0] * 10) / 10} % de la plus haute — le plancher — `
             + 'alors que 6 evenements y sont enregistres');
 
         // Une frise sans repere de date ne se lit pas : les dates ne vivent que

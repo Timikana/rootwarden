@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.1** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.2** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,80 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.2 — `fail2ban/` F2 porte : sept ecarts refermes, un ouvert et assume
+
+`go-fail2ban-f2` entre au LOT avec **24 PASS sur le portage** contre **14 sur le legacy**, 0 FAIL des
+deux cotes. L'ecart de DIX se decompose entierement — dix `verifiePortage`, un par ecart referme.
+
+#### Quatre decisions de portage
+
+**L'historique se charge au CHOIX de la machine, pas au releve** — et le releve le rafraichit quoi
+qu'il arrive a la machine. Le legacy le charge a la fin du succes de `loadStatus` : une machine
+injoignable y masque son propre historique de bans, alors que celui-ci est EN BASE (E-156).
+
+**Un etat vide dit ce qui manque ET pourquoi**, et « rien a montrer » ne ressemble pas a « la lecture
+a echoue » (E-153). Le legacy sort par `return` dans les deux cas, laissant la section cachee — les
+deux situations produisent exactement le meme ecran, et les deux fonctions finissent par
+`catch (_) {}`. Classe `.rw-vide--erreur` posee au socle : elle garde la FORME de l'etat vide et
+change son signal, plutot que d'emprunter le bandeau d'erreur d'un formulaire, qui annoncerait une
+saisie fautive.
+
+**Le total voyage avec la page.** `GET /fail2ban/history` rend 50 lignes au plus sans annoncer de
+total : le legacy affiche donc les cinquante dernieres en ayant l'air exhaustif (E-154). Le
+controleur lit un `COUNT(*)` groupe, et l'ecran dit « les 50 plus recentes sur 60 ». Meme mecanisme
+pour la colonne « Par » : une carte identifiant → nom (E-157), et **ce qui ne se resout pas se DIT**
+plutot que de s'afficher en numero brut. Le repli `'admin'` du backend n'est pas un identifiant —
+rien ne le distingue d'un compte reellement nomme `admin` — et l'ecran l'annonce « non attribue ».
+
+**La frise est dessinee en PIXELS, dans un cadre dont la hauteur vient du CSS du socle.** Le legacy
+exprime des hauteurs en POURCENTAGE d'un parent dont la hauteur vient de `h-32`, une classe purgee :
+le cadre mesure 0 px et ses trois barres, declarant 4 %, 100 % et 12,5 %, sont rendues a **0 px**
+(E-159). Trois corrections dans la meme frise :
+
+| | legacy | portage |
+|---|---|---|
+| hauteur du cadre | `h-32`, purgee → **0 px** | `.rw-frise__barres`, **148 px** |
+| hauteur d'une barre | `(ban / (ban+unban)) * 100` **%** | `(total / max) * hauteur` **px** |
+| jour de 6 debans | 4 % (le plancher), **en vert** | 15,4 %, en vert — sa vraie part |
+| dates | dans `title`, au survol | **axe visible**, en locale |
+
+Mesure des hauteurs normalisees : portage **15,4 % · 100 % · 35,4 %** pour **15 · 100 · 35**
+attendus — **0,4 point** d'ecart. Legacy : **0 % · 0 % · 0 %**.
+
+**Et les dates suivent la langue** (E-158) : `<html lang>` du gabarit vaut `app()->getLocale()`, le
+script le lit, et `toLocaleString` s'en sert — tableau comme axe. Le legacy ecrit `<html lang="fr">`
+et `toLocaleString('fr-FR')` en dur.
+
+#### Deux fautes de mesure de plus, et la meme famille
+
+Le premier passage du portage rendait **2 FAIL**, tous deux dans la SUITE :
+
+- elle comparait `parseFloat('34px')` a « 15 % » et annonçait **44 points** d'ecart sur une frise
+  juste. Le legacy declare en pourcentage, le portage en pixels : **deux nombres de la meme forme
+  dans deux unites differentes**, la faute d'`LENGTH` contre `CHAR_LENGTH`. Les series se normalisent
+  desormais sur leur propre plus haute barre — ce que la propriete demandait depuis le debut ;
+- elle mesurait le CONTENEUR de la barre, qui englobe l'etiquette du nombre : 14 px de trop par
+  mesure. Elle mesure maintenant le corps.
+
+#### E-160 — ouvert, et NON corrige
+
+La frise annonce 30 jours et ne dessine que les jours ACTIFS : trois jours actifs sur trente
+produisent trois barres occupant chacune un tiers de la largeur. **L'axe vertical mesure une
+quantite, l'axe horizontal ne mesure rien** — et trois journees consecutives donnent la meme image
+que trois journees espacees de dix jours. Present des DEUX cotes ; vu a l'image pendant le portage.
+
+Non corrige, et c'est une decision : le corriger casse l'assertion « une barre par jour » de la
+suite, et la reformuler proprement demandait une mesure contournee. **Cinq faux PASS ont ete ecrits
+dans cette suite en un tour, tous nes d'une mesure contournee.** A reprendre avec F3, ou la frise
+sera de toute façon retouchee.
+
+**Fichiers** : `laravel/app/Services/Fail2ban.php`, `laravel/app/Http/Controllers/Fail2banController.php`,
+`laravel/resources/views/fail2ban.blade.php`, `laravel/public/js/fail2ban.js`,
+`laravel/lang/{fr,en}/fail2ban.php` (**64 cles chacune, parite stricte**),
+`laravel/public/css/rw.css`, `tests/e2e/go-fail2ban-f2.mjs`, `scripts/rejouer-lot.sh`.
+
+**Reste `fail2ban/` F3 a F6** — tous MUTENT. Puis `iptables/` I1 a I5.
 
 ### v1.38.1 — `fail2ban/` F2 caracterise : sept ecarts, et cinq faux PASS dans la suite qui les cherchait
 

@@ -89,6 +89,56 @@ class Fail2ban
     }
 
     /**
+     * Combien de lignes d'historique chaque machine porte VRAIMENT.
+     *
+     * `GET /fail2ban/history` rend **50 lignes au plus** (`LIMIT 50`,
+     * `fail2ban.py:313`) et n'annonce aucun total : le legacy affiche donc les
+     * cinquante dernieres en ayant l'air exhaustif (E-154). Sur une machine
+     * active, un historique de bans depasse cinquante en quelques heures.
+     *
+     * Ce compte permet a l'ecran de dire « 50 des 312 » plutot que « 50 ». Il
+     * coute un `COUNT(*)` groupe, pas une ligne de plus transmise.
+     */
+    public function totauxHistorique(): array
+    {
+        $lignes = DB::select(
+            'SELECT server_id, COUNT(*) AS n FROM fail2ban_history GROUP BY server_id'
+        );
+        $parMachine = [];
+        foreach ($lignes as $l) {
+            $parMachine[(int) $l->server_id] = (int) $l->n;
+        }
+
+        return $parMachine;
+    }
+
+    /**
+     * Les noms des comptes, pour resoudre la colonne « Par ».
+     *
+     * `_log_ban_action` (`fail2ban.py:106`) enregistre
+     * `request.headers.get('X-User-ID', 'admin')` : `performed_by` contient donc
+     * un **identifiant numerique**, ou la chaine litterale `'admin'` en repli.
+     * Le legacy l'affiche tel quel — la colonne montre « 16 », « 7 », « 3 »
+     * (E-157). Le meme defaut a ete corrige dans `iptables/`, avec un
+     * commentaire de huit lignes qui l'explique, et laisse ici : **sixieme
+     * occurrence du motif « a moitie corrige »**.
+     *
+     * On resout donc l'identifiant en nom. Ce qui ne se resout pas ne se DEVINE
+     * pas : un identifiant absent de la table s'affiche tel quel, dit comme non
+     * resolu. Et le repli `'admin'` n'est pas un identifiant — rien ne le
+     * distingue d'un compte reellement nomme `admin`, et l'ecran le dit.
+     */
+    public function nomsUtilisateurs(): array
+    {
+        $noms = [];
+        foreach (DB::select('SELECT id, name FROM users') as $u) {
+            $noms[(string) $u->id] = (string) $u->name;
+        }
+
+        return $noms;
+    }
+
+    /**
      * Le dernier statut connu d'une machine, LU dans le cache.
      *
      * On le lit sans le rafraichir : rafraichir ouvre une session SSH, et

@@ -6910,3 +6910,28 @@ montré la carte vide.** Une suite mesure désormais `getBoundingClientRect().he
 
 **Le portage n'exprime pas une hauteur en pourcentage d'un parent dont la hauteur vient d'une classe
 utilitaire.**
+
+---
+
+## E-160 — La frise annonce 30 jours et n'en dessine que les jours actifs : l'axe horizontal ne mesure pas le temps
+
+`GET /fail2ban/stats` groupe par jour (`GROUP BY DATE(created_at)`) : **les jours sans événement ne
+sont pas rendus**. Le frontend dessine donc une barre par ligne reçue, réparties à largeur égale.
+
+Conséquence : avec trois jours actifs sur trente, la frise affiche **trois barres occupant chacune un
+tiers de la largeur**, sous un titre qui annonce « 30 jours ». Trois journées consécutives et trois
+journées espacées de dix jours produisent **la même image**. L'axe vertical mesure une quantité,
+l'axe horizontal ne mesure rien.
+
+Présent **des deux côtés** — le portage a hérité de la forme du legacy. Relevé le 2026-08-27, à
+l'image, pendant le portage de F2.
+
+**Non corrigé, et c'est une décision assumée.** F2 s'était donné sept écarts (E-153 à E-159), tous
+refermés et mesurés verts sur les deux cibles. Corriger celui-ci demande de construire la plage de
+trente jours côté client et de rendre les jours vides — ce qui casse l'assertion « une barre par
+jour » de `go-fail2ban-f2`, et la reformuler proprement (« une barre par jour ACTIF », lisible de la
+même façon sur les deux cibles) demandait une mesure contournée. **Cinq faux PASS ont été écrits dans
+cette suite en un tour**, tous nés d'une mesure contournée : élargir maintenant reviendrait à en
+écrire un sixième.
+
+À reprendre avec F3, où la frise sera de toute façon retouchée.

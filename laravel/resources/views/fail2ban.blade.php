@@ -31,6 +31,7 @@
             @foreach ($lignes as $l)
                 <option value="{{ $l['machine']->id }}"
                         data-sensible="{{ $l['sensible'] ? '1' : '0' }}"
+                        data-histo="{{ $l['histo'] }}"
                         data-nom="{{ $l['machine']->name }}">
                     {{ $l['machine']->name }} ({{ $l['machine']->ip }}){{ $l['sensible'] ? ' — ' . __('fail2ban.sensible') : '' }}
                 </option>
@@ -123,6 +124,62 @@
     <div class="rw-grille" data-rw="f2b-jails"></div>
 </div>
 
+{{--
+    ── LA FRISE, ET L'HISTORIQUE ───────────────────────────────────────────
+
+    Les deux sections sont VISIBLES des qu'une machine est choisie — elles ne
+    dependent pas du releve de statut. Le legacy les charge a la fin du succes
+    de `loadStatus` : une machine injoignable y masque donc son propre
+    historique de bans, alors que celui-ci est EN BASE (E-156).
+
+    Et elles s'affichent meme VIDES, en disant pourquoi : « aucun ban
+    enregistre » et « la lecture a echoue » produisaient le meme ecran — rien
+    du tout (E-153).
+--}}
+<div class="rw-section" data-rw="f2b-frise" hidden>
+    <h2 class="rw-section__entete">{{ __('fail2ban.frise_titre') }}</h2>
+    <p class="rw-aide">{{ __('fail2ban.frise_aide') }}</p>
+    <div class="rw-frise" data-rw="f2b-frise-cadre">
+        {{--
+            LA HAUTEUR DU CADRE VIENT DU CSS DU SOCLE, ET C'EST TOUT LE POINT.
+
+            Le legacy ecrit `class="... h-32"` et donne a ses barres une hauteur
+            en POURCENTAGE. `h-32` etant purgee du CSS compile, le cadre mesure
+            0 px — et 100 % de zero fait zero : la carte s'affiche VIDE (E-159).
+            Ici la hauteur est posee par `.rw-frise`, et les barres recoivent
+            une hauteur en PIXELS calculee par le script.
+        --}}
+        <div class="rw-frise__barres" data-rw="f2b-frise-barres"></div>
+        <div class="rw-frise__axe" data-rw="f2b-frise-axe"></div>
+    </div>
+    <p class="rw-frise__legende">
+        <span class="rw-frise__cle rw-frise__cle--ban"></span>{{ __('fail2ban.frise_legende_ban') }}
+        <span class="rw-frise__cle rw-frise__cle--unban"></span>{{ __('fail2ban.frise_legende_unban') }}
+    </p>
+    <div data-rw="f2b-frise-message"></div>
+</div>
+
+<div class="rw-section" data-rw="f2b-historique" hidden>
+    <h2 class="rw-section__entete">{{ __('fail2ban.histo_titre') }}</h2>
+    <p class="rw-aide">{{ __('fail2ban.histo_aide') }}</p>
+    <p class="rw-aide" data-rw="f2b-historique-compte"></p>
+    <div data-rw="f2b-historique-message"></div>
+    <div class="rw-tableau-cadre" data-rw="f2b-historique-cadre" hidden>
+        <table class="rw-tableau">
+            <thead>
+                <tr>
+                    <th>{{ __('fail2ban.histo_th_date') }}</th>
+                    <th>{{ __('fail2ban.histo_th_jail') }}</th>
+                    <th>{{ __('fail2ban.histo_th_ip') }}</th>
+                    <th>{{ __('fail2ban.histo_th_action') }}</th>
+                    <th>{{ __('fail2ban.histo_th_par') }}</th>
+                </tr>
+            </thead>
+            <tbody data-rw="f2b-historique-corps"></tbody>
+        </table>
+    </div>
+</div>
+
 <div class="rw-encart" data-rw="f2b-non-porte">
     <p class="rw-sous-titre-fort">{{ __('fail2ban.non_porte_titre') }}</p>
     <p class="rw-prose">{{ __('fail2ban.non_porte_texte') }}</p>
@@ -133,5 +190,7 @@
 @endif
 
     <script id="f2b-textes" type="application/json">@json($textes)</script>
+    {{-- Les noms de comptes, pour resoudre la colonne « Par » (E-157). --}}
+    <script id="f2b-noms" type="application/json">@json($noms)</script>
     <script src="/js/fail2ban.js?v={{ @filemtime(public_path('js/fail2ban.js')) ?: '0' }}"></script>
 @endsection

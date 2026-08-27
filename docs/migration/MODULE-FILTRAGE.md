@@ -129,8 +129,8 @@ service `Machines`, et cet inventaire vient de la mesurer cinq fois.
 inventoriés (zéro élément DOM absent, zéro fonction sans appelant, zéro désaccord de clés), et son
 pire dégât est **réversible**.
 
-`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails (⚠️ écrit déjà `fail2ban_status` : ce n'est pas
-un lot lecture seule) · **F2** historique + timeline · **F3** conf, journaux, services · **F4** bans
+`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails, **F2 PORTÉ `v1.38.2`** historique et frise (⚠️ écrit déjà `fail2ban_status` : ce n'est pas
+un lot lecture seule) · **F3** conf, journaux, services · **F4** bans
 par machine · **F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
 `127.0.0.1/8` qui échoue toujours, l'édition qui **redémarre le service** sans le dire) · **F6**
 actions parc entier.
@@ -171,6 +171,34 @@ que la décision sur le port SSH soit tranchée**.
 `/app/logs/iptables.log` est créé vide au démarrage et aucun writer n'existe. L'utilisateur voit un
 flux qui n'émet que des pings pendant dix minutes. Ne pas le porter, ou le brancher sur ce qui écrit
 réellement.
+
+### F2, porté le 2026-08-27 — sept écarts refermés, un ouvert et assumé
+
+Suite `go-fail2ban-f2` à **24 laravel / 14 legacy, 0 FAIL**. Les deux routes sont des `SELECT` sur
+`fail2ban_history` : **F2 ne joint aucune machine**, contrairement à ce que le découpage annonçait.
+
+Quatre décisions de portage :
+
+1. **L'historique se charge au CHOIX de la machine, pas au relevé** — et le relevé le rafraîchit
+   quoi qu'il arrive à la machine. Le legacy le charge à la fin du succès de `loadStatus` : une
+   machine injoignable y masque son propre historique de bans, alors que celui-ci est en base
+   (E-156).
+2. **Un état vide dit ce qui manque ET pourquoi**, et « rien à montrer » ne ressemble pas à « la
+   lecture a échoué » (E-153). Le legacy sort par `return` dans les deux cas et finit par
+   `catch (_) {}`.
+3. **Le total voyage avec la page.** La route rend 50 lignes au plus sans annoncer de total : le
+   contrôleur lit un `COUNT(*)` groupé, et l'écran dit « les 50 plus récentes sur 60 » (E-154).
+   Même mécanisme pour la colonne « Par » : une carte identifiant → nom, et ce qui ne se résout pas
+   se **dit** plutôt que de s'afficher en numéro brut (E-157).
+4. **La frise est dessinée en PIXELS, dans un cadre dont la hauteur vient du CSS du socle.** Le
+   legacy exprime des hauteurs en pourcentage d'un parent dont la hauteur vient de `h-32`, une
+   classe purgée : le cadre mesure 0 px, et ses trois barres déclarant 4 %, 100 % et 12,5 % sont
+   rendues à **0 px** (E-159). La hauteur compte désormais **tous** les événements du jour, pas les
+   seuls bans (E-155), la couleur dit lesquels dominent, et l'axe des dates est **visible** au lieu
+   de vivre dans un `title`.
+
+**E-160 est ouvert et NON corrigé, décision assumée** : la frise annonce 30 jours et ne dessine que
+les jours actifs, des deux côtés — l'axe horizontal ne mesure pas le temps. À reprendre avec F3.
 
 ## 7. Ce qui reste à mesurer
 
