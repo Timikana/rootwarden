@@ -507,3 +507,80 @@ production → verrouillage total.
 **P4 reste la contrainte la plus importante** : la réussite du geste de `platform_key` ne doit jamais
 être mesurée, il n'existe aucune cible sûre. Et **P7 reste vrai** : la classification est la seule
 porte de sortie d'un préflight bloqué.
+
+---
+
+# 8. SECONDE RÉVISION — trois faits de ce dossier ont changé, mesurés le 2026-08-27
+
+## 8.1 Le verrouillage n'a plus de porteur — l'ensemble de P1 est VIDE
+
+`srv-zabbix` porte de nouveau **un mot de passe ET un mot de passe root** (mesuré).
+Les trois machines du parc en ont. La requête de P1 rend donc :
+
+```
+ensemble des VERROUILLABLES : (VIDE)
+```
+
+**Ce ne sont plus des verrouillages définitifs, ce sont des incidents.** Le §1.3 et le §2.2 gardent
+leur valeur de description ; ils perdent leur qualification d'occupation.
+
+### Et cela crée le défaut que ce dossier avait lui-même nommé
+
+Une assertion « la liste nomme les machines menacées » **se vérifierait aujourd'hui sur une liste
+vide**. C'est exactement D9a : *une propriété qui peut se vérifier sur l'absence de son objet ne
+mesure rien.*
+
+**P1 se reformule en ÉGALITÉ de deux ensembles dérivés** — la liste affichée contre le résultat de
+la requête, lue en base au moment du test. Elle garde du sens à vide (l'écran n'invente rien) mais
+**elle ne peut pas attraper « l'écran a oublié de lister »**. La branche non vide est donc
+**inexercée sur ce parc**, et cela doit être **écrit dans `PARITE.md`** plutôt que contourné en
+modifiant une machine pour se satisfaire.
+
+## 8.2 La rotation ARCHIVE — et le mot « archive » confond trois propriétés
+
+`_archive_platform_key()` remplace `unlink()`. **Ma proposition (a), retirée au §7.1, a donc été
+appliquée sous une forme que ma réserve ne couvrait pas** : l'archive est **déplacée**, pas copiée —
+la clé courante cesse d'être à sa place, donc elle cesse d'être utilisable. **Mon objection « garder
+l'ancienne utilisable annule la raison du geste » ne tient pas contre cette forme-là.** Je le dis
+parce que j'avais retiré la proposition, et que la version livrée est meilleure que celle que
+j'avais écrite.
+
+| propriété | vrai ? | pourquoi |
+|---|---|---|
+| réversible contre une **erreur d'opérateur** | **oui** | la paire précédente est récupérable |
+| survivable à une **perte de volume** | **non** | `ARCHIVE_DIR = PLATFORM_SSH_DIR / 'archive'` — **même montage** (`/dev/sda2`), volume non sauvegardé |
+| réversible **indéfiniment** | **non** | `purge_platform_key_archives()`, `ARCHIVE_RETENTION_DAYS`, défaut **30 jours** |
+
+> **La troisième n'avait été nommée par personne.** La réversibilité est **bornée dans le temps** :
+> une machine injoignable au moment de la rotation, qui ne revient qu'après 30 jours, n'est plus
+> rattrapable par l'archive.
+
+**Conséquence d'écran** : le panneau ne doit pas écrire « réversible ». Il doit écrire « réversible
+pendant N jours, et seulement si le volume survit » — **et N se lit dans
+`PLATFORM_KEY_ARCHIVE_DAYS`, jamais en dur.**
+
+## 8.3 `gate()` est branché ET le contournement rôle 3 est fermé
+
+`approvals.py:68` définit `ACTIONS_SANS_REPLI = {'regenerate_platform_key',
+'revoke_service_account'}`, et `:156-157` exclut ces deux actions du contournement
+superadministrateur.
+
+**C'est la réponse juste à l'objection du §7.2**, et elle est meilleure que ce que je demandais :
+brancher `gate()` seul aurait ajouté une ligne **inerte**, puisque le seul rôle qui peut appeler ces
+routes était précisément celui que la porte contournait. Le correctif ferme les deux moitiés, **par
+liste fermée** — ailleurs, rien ne change, et `delete_remote_user` comme `reboot_server` gardent leur
+repli.
+
+**Vérifié aussi que la règle est satisfiable** : cinq comptes actifs de rôle ≥ 2, dont trois de
+rôle 3. Un second approbateur existe. *(Sur un déploiement à un seul administrateur, la rotation
+deviendrait impossible — c'est la contrepartie assumée, et elle vaut mieux qu'un contournement.)*
+
+## 8.4 Ce qui NE change pas
+
+**P4 reste la contrainte la plus importante, et l'archivage ne l'assouplit pas.** Le geste porte
+toujours sur la flotte entière, il n'a toujours aucune cible sûre, et le mesurer une fois ferait
+toujours tourner la clé de tout le parc. Réversible n'est pas anodin.
+
+**§2.2 reste entier** : `/delete_remote_user` compare `machines.user` là où `connect_ssh` se connecte
+en `rootwarden` **en dur**, et `rootwarden` n'est dans aucune liste protégée. Le filet des mots de
+passe rend l'incident récupérable ; il ne rend pas la protection correcte.
