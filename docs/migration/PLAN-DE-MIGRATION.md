@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) D9a `go-adm-politiques` (**12 / 18**) et D9b `go-adm-sftp` (**12 / 16**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Depuis, **quatre suites de plus** portent leurs deux références : `go-bashrc-b1` à `b3`, `go-services-s1` à `s3`, et `go-fail2ban-f1` (**18 legacy / 20 portage**, inscrite le 2026-08-27) ; `go-bashrc-b4` reste **legacy seul**, son portage étant suspendu (§7) — il figurait pourtant dans `SUITES_LARAVEL` : **mesuré le 2026-08-27, il y rendait 9 PASS / 3 FAIL**, et les trois FAIL étaient exactement les trois boutons dont l'absence est VOULUE. Un LOT complet affichait donc un ÉCHEC qui ne disait rien. Retiré de la liste, il y revient le jour où B4 est porté. Remesure : `./scripts/rejouer-lot.sh` — **un LOT complet tournait le 2026-08-26 à 18h** (lancé par l'autre session) ; 19 verdicts conformes au moment de l'écriture, résultat total à relever au tour suivant.
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **142** — numérotés jusqu'à **E-152** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **149** — numérotés jusqu'à **E-159** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -238,7 +238,7 @@ Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
 | 6 | `wazuh/` | 594 | 1 | derrière un drapeau `FEATURE_WAZUH` |
 | 7 | `services/` | 631 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.92` — `MODULE-SERVICES.md`**, trois sous-lots S1 à S3, **MODULE ENTIÈREMENT PORTÉ** — S1 `v1.37.94`, S2 `v1.37.96`, S3 `v1.37.98`. **E-149 et E-150 restent ouverts** (§7). **Le banc est un conteneur SANS systemd** : le rendu d'un tableau peuplé n'est mesuré sur aucune cible. **E-149 : les huit routes n'ont NI rôle NI permission — seule la page est gardée.** Réel dans le code, non exploitable par aucun compte existant : à un `UPDATE` de l'être |
 | 8 | `iptables/` | 870 | 1 | **INVENTORIÉ — `MODULE-FILTRAGE.md`**, cinq sous-lots I1 à I5. `fail2ban/` se porte AVANT — **F1 y est porté depuis `v1.38.0`, F2 à F6 restent**. **E-152** ; gestes sur machines, IDOR déjà corrigé |
-| 9 | `fail2ban/` | 872 (2 fichiers) | 1 | **INVENTORIÉ — `MODULE-FILTRAGE.md`**, six sous-lots F1 à F6. **F1 PORTÉ `v1.38.0`** — 20 laravel / 18 legacy, 0 FAIL ; route `/fail2ban`, garde `role:1` + `perm:can_manage_fail2ban`. **Reste F2 à F6**, tous MUTENT (bannir, débannir, jails, liste blanche, installation). **E-152 : sur 23 routes des deux modules, DEUX portent une permission.** **F1 a fait corriger CINQ règles CSS du socle** : `color-mix(couleur X%, transparent)` avec la MÊME couleur en texte ne peut pas atteindre 4,5:1 sur une surface claire — 3,60 à 3,96:1 mesurés, et les cinq passaient en thème sombre (§8). GeoIP en HTTP (ip-api gratuit) |
+| 9 | `fail2ban/` | 872 (2 fichiers) | 1 | **INVENTORIÉ — `MODULE-FILTRAGE.md`**, six sous-lots F1 à F6. **F1 PORTÉ `v1.38.0`** — 20 laravel / 18 legacy, 0 FAIL ; route `/fail2ban`, garde `role:1` + `perm:can_manage_fail2ban`. **F2 CARACTÉRISÉ `v1.38.1`** — 14 legacy, 0 FAIL, base rouge **12/11** ; **F2 NE MUTE RIEN** : ses deux routes sont des `SELECT` sur `fail2ban_history`, aucun SSH — le découpage annonçait l'inverse, c'est la lecture du code qui a tranché. **Sept écarts neufs, E-153 à E-159** — dont **E-159, trouvé A L'IMAGE et non par une assertion** : la frise ne s'affiche pas du tout, `h-32` est purgée et 100 % de zéro fait zéro. **Reste F3 à F6**, qui MUTENT (bannir, débannir, jails, liste blanche, installation). **E-152 : sur 23 routes des deux modules, DEUX portent une permission.** **F1 a fait corriger CINQ règles CSS du socle** : `color-mix(couleur X%, transparent)` avec la MÊME couleur en texte ne peut pas atteindre 4,5:1 sur une surface claire — 3,60 à 3,96:1 mesurés, et les cinq passaient en thème sombre (§8). GeoIP en HTTP (ip-api gratuit) |
 | 10 | `bashrc/` | 941 (2 fichiers) | 1 | **INVENTORIÉ `v1.37.81` — `MODULE-BASHRC.md`**, quatre sous-lots B1 à B4. **Le module le mieux construit rencontré jusqu'ici** : gardes complètes sur les 8 routes, contournement rôle 3 cohérent entre PHP et Python, contenu en base64, `_HOME_RE` valide une valeur venant de la MACHINE, tous les gestes destructeurs confirment. **B1, B2 et B3 PORTÉS** (`v1.37.86`, `v1.37.88`, `v1.37.90`). **B4 CARACTÉRISÉ `v1.37.91` mais son PORTAGE est SUSPENDU** — deux arbitrages, §7. **Quatre** points à arbitrer, aucun n'est une faille. **§6 : trois inconnues sur cinq fermées par la LECTURE le 2026-08-26** — dont `root` proposé au déploiement, et « fusionner » qui n'équivaut pas à ce que son libellé laisse entendre |
 | 11 | `ssh-audit/` | 1118 | 1 | **`go-ssh-audit-scanall.mjs` joint la PRODUCTION** — ne pas le lancer |
 | 12 | `adm/` | 8421 (37 fichiers) | **6** | **INVENTORIÉ ; D1 à D6b et D6d PORTÉS (`v1.37.59` à `v1.37.72`), D7, D8 et D9 CLOS (D9a `v1.37.79`, D9b `v1.37.80`), D6c CARACTÉRISÉ — `MODULE-ADM.md`**, quinze sous-lots, **trois restants** — D6c, D10, et l'archivage. **⚠ `/adm/health_check.php` ÉCRIT sur `srv-zabbix` au simple chargement. Lire l'encadré ci-dessous** |
@@ -458,9 +458,13 @@ déclarée dans `PARITE.md` + `CHANGELOG.md` → captures **regardées** et **en
 commit atomique. `rw-pre-commit` avant chaque commit, **`ROADMAP.md` et `INVENTAIRE.md` compris**.
 
 Bases rouges déjà mesurées : V8 3/4 · V9 5/4 · V10a 5/8 · V10 7/7 · V11 8/5 · V12 **14/16** ·
-archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** · **D4 7/4** · **D5 7/2** — et sur ces sept passes,
+archivage **4/3** · A2 **7/1** · A5 **6/16** · **D1 1/17** · **D2 7/7** · **D3 5/6** · **D4 7/4** · **D5 7/2** ·
+**F2 12/11** — et sur ces sept passes de D5,
 **quatre passent PARCE QUE la page est absente** : un 404 ne modifie rien et ne porte pas de script.
-Une base rouge se lit passe par passe, pas au compte.
+Une base rouge se lit passe par passe, pas au compte. F2 le redit : sur ses **douze** passes,
+**deux sont creuses** — « la colonne Par nomme une personne » passe faute de la moindre ligne à lire,
+et « la hauteur est proportionnelle » se calcule sur un ensemble VIDE (`Math.max(...[])` rend
+`-Infinity`, qui est bien `<= 5`). Une assertion sans objet n'est pas une assertion satisfaite.
 
 **Nettoyer à l'entrée ET dans le `finally` vaut aussi pour ce que le TEST accorde**, pas seulement
 pour ce qu'il écrit : une autorisation posée par une exécution survit à cette exécution.
@@ -795,6 +799,31 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Avant de porter une écriture, chercher son LECTEUR** — `password_expires_at` était écrite et lue par
   personne.
 - **Un correctif évident peut casser le cas normal** : mesurer les **deux** moitiés.
+- **Un faux PASS vient toujours d'une mesure plus LARGE ou plus GROSSIÈRE que la propriété.** F2,
+  2026-08-27 : quatre assertions vertes pour une raison étrangère à ce qu'elles mesuraient, dans une
+  seule suite, et chacune d'une des deux familles.
+  **Trop large** : chercher le nombre `60` *n'importe où dans la page* pour savoir si une troncature
+  est annoncée — il était dans l'adresse `203.0.113.60` de la première ligne ; et chercher
+  `(ban|unban|…)` *n'importe où dans l'URL* pour interdire un geste — « ban » est **dans**
+  « fail2ban », donc `/fail2ban/history` était accusé. Même faute que le filtre d'archivage qui
+  acceptait `/supervision/` parce qu'il contient `/supervision` : **on compare des SEGMENTS**.
+  **Trop grossière** : comparer l'ORDRE des barres d'une frise au lieu de leur PROPORTION — les deux
+  classements coïncidaient (4 % / 100 % / 12,5 % contre 6 / 40 / 14 événements), et l'assertion
+  passait au vert **sur le défaut qu'elle était écrite pour trouver**. C'est la proportion qui
+  diverge : 22,5 points d'écart.
+- **Une hauteur DÉCLARÉE n'est pas une hauteur RENDUE.** F2 : trois barres déclarant `4%`, `100%` et
+  `12.5%`, toutes rendues à **0 px** — le cadre `h-32` est une classe Tailwind purgée, et un
+  pourcentage se résout contre un parent de hauteur nulle. La suite lisait `style.height` et
+  concluait que la barre était haute ; **c'est la capture qui a montré la carte vide**. Quatrième
+  occurrence de la famille « classe purgée », et la deuxième fois qu'elle piège la mesure autant que
+  la page. `getBoundingClientRect()`, toujours.
+- **Vérifier l'INSTRUMENT avant de conclure de son silence.** La quatrième : lire
+  `document.documentElement.lang` pour savoir en quelle langue est une page, alors que
+  `legacy/fail2ban/index.php:24` écrit `<html lang="fr">` **en dur**. L'attribut disait « fr » quelle
+  que soit la langue réelle, et l'assertion sur le format de date passait **faute d'objet**. La
+  parade est structurelle : **mesurer d'abord que la bascule a pris** — en comparant un libellé
+  traduit à celui relevé dans l'autre langue — et ne juger la propriété qu'ensuite ; sinon, un FAIL
+  explicite qui dit que la mesure n'a pas eu lieu. Un `else` qui ne fait rien est un PASS déguisé.
 - **Une couleur ne se lit pas à l'expression régulière, et un contraste se COMPOSE.** F1, 2026-08-27 :
   une assertion « la pastille est lisible (≥ 4,5:1) » rendait un PASS en annonçant **793 790 048:1** —
   pour un maximum théorique de 21. Deux fautes dans une ligne. `color-mix()` se *calcule* en

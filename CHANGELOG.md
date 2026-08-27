@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.0** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.1** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,101 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.1 — `fail2ban/` F2 caracterise : sept ecarts, et cinq faux PASS dans la suite qui les cherchait
+
+`go-fail2ban-f2.mjs`, **legacy 14 PASS / 0 FAIL**, base rouge **12 PASS / 11 FAIL**. Le portage reste
+a faire.
+
+#### F2 NE MUTE RIEN — le decoupage annonçait l'inverse
+`GET /fail2ban/history` (fail2ban.py:296) et `GET /fail2ban/stats` (:554) sont des `SELECT` sur
+`fail2ban_history` : **aucun SSH, aucune commande distante**. C'est la lecture du code qui l'a
+tranche, pas le plan. F2 est donc un sous-lot sur ; ce sont F3 a F6 qui mutent.
+
+Verifie aussi, et dit aussi clairement qu'un trou : **`@require_machine_access` tient sur un GET**.
+La presomption etait qu'un decorateur cherchant son identifiant dans le CORPS laisserait passer une
+requete dont le `server_id` vit dans la chaine de requete — `helpers.py:330` lit bien
+`request.args.get('server_id')`.
+
+#### Sept ecarts neufs
+
+| | |
+|---|---|
+| **E-153** | un historique VIDE se cache au lieu de s'annoncer, et « aucun ban » produit le meme ecran que « la lecture a echoue » — les deux fonctions finissent par `catch (_) {}` |
+| **E-154** | le tableau tronque a **50** lignes sans le dire : 60 en base, 50 rendues, aucun mot de troncature |
+| **E-155** | la frise : **l'echelle compte les bans ET les debans, la hauteur seulement les bans**. Pire ecart mesure **22,5 points**. Un jour de 6 debans tombe au plancher de 4 %, **en vert**, comme un jour vide. Et aucun repere de date n'est VISIBLE — ils ne vivent que dans `title` |
+| **E-156** | l'historique est EN BASE, et un releve de statut en echec le masque : `loadStatus` sort par `return` avant `loadHistory`. Une machine injoignable cache son propre historique de bans |
+| **E-157** | la colonne « Par » affiche un NUMERO (`16`), ou la chaine litterale `admin`. **Corrige dans `iptables`, pas ici** — sixieme occurrence du motif « a moitie corrige » |
+| **E-159** | la frise ne s'affiche PAS : `h-32` purgee, cadre a **0 px**, et 100 % de zero fait zero |
+| **E-158** | `<html lang="fr">` en dur (**deuxieme occurrence** d'E-111) et `toLocaleString('fr-FR')` en dur : la bascule de langue fonctionne, ces deux valeurs ne la suivent pas |
+
+#### E-159 — la frise ne s'affiche PAS DU TOUT, et c'est la capture qui l'a dit
+
+E-155 decrit ce que la frise **dirait** si elle s'affichait. Elle ne s'affiche pas. Le cadre
+`#stats-chart` tire sa hauteur de `h-32`, une classe Tailwind **absente du CSS compile** : il mesure
+**0 px**, et les barres, exprimees en POURCENTAGE, se resolvent contre zero.
+
+| | declare | rendu |
+|---|---|---|
+| cadre | `h-32` | **0 px** |
+| barre J-3 | `4%` | **0 x 360 px** |
+| barre J-2 | `100%` | **0 x 360 px** |
+| barre J-1 | `12.5%` | **0 x 360 px** |
+
+**Quatrieme occurrence** de la famille « classe purgee » — apres la pastille KEV a 1,06:1. Le HTML
+est juste, la classe est juste, PurgeCSS ne garde que ce qu'il a vu, et aucune assertion sur le DOM
+ne peut le voir.
+
+Il a piege la mesure autant que la page : la suite lisait `b.style.height`, donc « 100% », et
+concluait que la barre etait haute. **C'est l'image qui a montre la carte vide.** Cinquieme faux PASS,
+et le seul qu'aucune relecture n'aurait attrape — une hauteur DECLAREE n'est pas une hauteur RENDUE.
+
+#### Quatre faux PASS dans la suite meme qui cherchait ces defauts
+
+Tous les quatre relevaient d'une mesure **plus large** ou **plus grossiere** que la propriete.
+
+- **Trop large.** Chercher le nombre `60` n'importe ou dans la page pour savoir si une troncature est
+  annoncee : il etait dans l'adresse `203.0.113.60` de la premiere ligne, et le legacy etait declare
+  conforme. Et chercher `(ban|unban|...)` n'importe ou dans l'URL pour interdire un geste : « ban »
+  est **dans** « fail2ban », donc `/fail2ban/history` etait accuse d'appartenir a F4. Meme faute que
+  le filtre d'archivage qui acceptait `/supervision/` parce qu'il contient `/supervision` : **on
+  compare des SEGMENTS**.
+- **Trop grossiere.** Comparer l'ORDRE des barres au lieu de leur PROPORTION. Les deux classements
+  coincident — 4 % / 100 % / 12,5 % contre 6 / 40 / 14 evenements — et l'assertion passait au vert
+  **sur le defaut qu'elle etait ecrite pour trouver**.
+- **L'instrument.** Lire `document.documentElement.lang` pour savoir en quelle langue est la page,
+  alors que cet attribut est ecrit **en dur**. Il disait « fr » quelle que soit la langue reelle, et
+  l'assertion sur la date passait **faute d'objet**. La suite mesure desormais d'abord **que la
+  bascule a pris**, en comparant un libelle traduit a celui releve en francais, et ne juge la date
+  qu'ensuite — sinon un FAIL explicite qui dit que la mesure n'a pas eu lieu.
+
+#### La donnee d'epreuve, et pourquoi elle s'ecrit en base
+`fail2ban_history` etait **vide** (0 ligne). Sans donnee, les deux sections restent cachees et tout le
+chemin de rendu est invisible — le banc vide de `services/` S2, qui avait cache deux defauts vivants
+pendant un sous-lot entier. Les gestes qui peuplent cette table (`/fail2ban/ban`) appartiennent a F4
+et bannissent une adresse sur une machine reelle : ecrire les lignes directement est le seul moyen de
+caracteriser la LECTURE sans commettre l'ECRITURE. **Seules les deux routes de F2 lisent cette
+table** — verifie par recherche exhaustive, contrairement a `iptables_history` que le rapport de
+conformite lit deja. Nettoyage borne par un DELTA d'`id`.
+
+Trois jours, chacun choisi pour ce qu'il revele : J-3 (0 ban, 6 debans) expose le plancher vert,
+J-2 (40 bans) fixe l'echelle, J-1 (5 bans, 9 debans) expose la disproportion. 60 lignes pour 50 que
+la route rend.
+
+#### Le statut est SERVI, pas transmis
+Le releve de statut est une precondition dependant de la MACHINE, alors que ce qu'on mesure n'en
+depend pas. Le filet y repond et laisse passer `/history` et `/stats` : ce qui est mesure traverse le
+vrai chemin, jusqu'a la base. Le cache `fail2ban_status` n'est donc pas ecrit — prouve avant et
+apres. Et cette servitude devient elle-meme une mesure : une etape sert un ECHEC de statut, pour
+montrer E-156.
+
+#### La base rouge se lit passe par passe
+12 PASS / 11 FAIL, **et deux des douze passes sont creuses** : « la colonne Par nomme une personne »
+passe faute de la moindre ligne a lire, et « la hauteur est proportionnelle » se calcule sur un
+ensemble VIDE — `Math.max(...[])` rend `-Infinity`, qui est bien `<= 5`. Une assertion sans objet
+n'est pas une assertion satisfaite.
+
+**Reference du LOT** : `go-fail2ban-f2` entre avec **14 PASS sur le legacy**.
 
 ### v1.38.0 — `fail2ban/` F1 porte, et cinq regles du socle qui n'etaient lisibles que dans un theme
 
