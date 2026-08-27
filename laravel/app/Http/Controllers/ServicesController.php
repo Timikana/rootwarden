@@ -44,6 +44,12 @@ class ServicesController extends Controller
             'etat_actif', 'etat_arrete', 'etat_echoue', 'active_oui', 'active_non',
             'protege', 'protege_aide', 'charges', 'aucun_systemd', 'filtres_actifs',
             'filtre_tous', 'aucun_resultat', 'resultat_compte', 'journal_lu',
+            // S3 — les etats au demarrage et les cinq gestes.
+            'boot_enabled', 'boot_disabled', 'boot_static', 'boot_masked', 'boot_unknown',
+            'boot_static_aide', 'boot_masked_aide',
+            'act_demarrer', 'act_arreter', 'act_redemarrer', 'act_activer', 'act_desactiver',
+            'confirmer_arreter', 'confirmer_redemarrer', 'confirmer_demarrer',
+            'confirmer_activer', 'confirmer_desactiver', 'geste_fait', 'geste_echec',
         ] as $cle) {
             $textes[$cle] = __('services.' . $cle);
         }

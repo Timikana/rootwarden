@@ -325,6 +325,15 @@ declare -A REF_LARAVEL=(
   # PEUPLE n'est mesure sur aucune des deux cibles — seulement le chemin, la
   # cible, l'absence d'ecriture, et ce que la page dit d'un resultat vide.
   [go-services-s2]=14
+  # `services/` sous-lot S3 : les cinq ecritures, portees.
+  # 18 sur le portage contre 13 sur le legacy.
+  #
+  # Le banc n'ayant PAS de systemd, l'etape « tableau peuple » SERT une
+  # enumeration synthetique au lieu de la transmettre : le filet repond a
+  # `/services/list`, et tout le chemin de rendu s'execute pour de vrai sans
+  # qu'aucune machine soit jointe. C'est ce qui a revele E-151 — et DEUX defauts
+  # du portage qui avaient vecu tout S2 dans un tableau toujours vide.
+  [go-services-s3]=18
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -504,7 +513,8 @@ declare -A REF_LEGACY=(
   # Elle ne forge JAMAIS `stop ssh.socket` — le coeur d'E-150 : cette forme
   # n'est pas protegee, la requete aboutirait, et couperait potentiellement
   # l'acces SSH. Demontrer le defaut reviendrait a le commettre.
-  [go-services-s3]=12
+  [go-services-s3]=13
+  # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun

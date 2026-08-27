@@ -99,27 +99,66 @@
           .catch(function () { return null; });
     }
 
+    /**
+     * Normalise une entree rendue par le backend.
+     *
+     * **DEUX DEFAUTS DE S2 CORRIGES ICI**, et le banc les avait masques : sans
+     * systemd sur la machine d'essai, le tableau est toujours vide, donc rien de
+     * faux ne s'affichait.
+     *
+     * 1. **Le backend envoie `unit_file_state`, pas `enabled`.** La premiere
+     *    redaction lisait `svc.enabled` — toujours `undefined` — et affichait
+     *    donc « non » pour TOUS les services, y compris ceux qui demarrent au
+     *    boot.
+     * 2. **C'est une CHAINE, pas un booleen** : `enabled`, `disabled`, `static`,
+     *    `masked`, `unknown`. Un `svc.enabled ? oui : non` aurait rendu « oui »
+     *    pour `disabled`, `static` ET `masked` — trois etats sur cinq affiches a
+     *    l'envers. On rend donc L'ETAT REEL, qui ne peut pas mentir, plutot
+     *    qu'un oui/non qui ne sait pas dire « statique ».
+     * 3. Le nom perd son suffixe `.service`, comme dans le legacy.
+     */
+    function normalise(svc) {
+        return {
+            nom: (svc.name || '').replace(/\.service$/, ''),
+            actif: svc.active,
+            sous: svc.sub,
+            boot: svc.unit_file_state || svc.enabled || 'unknown',
+            categorie: svc.category || '',
+            description: svc.description || '',
+            protege: !! svc.protected,
+        };
+    }
+
+    /** Le libelle d'un etat au demarrage — jamais un oui/non. */
+    function libelleBoot(etat) {
+        var cle = 'boot_' + etat;
+
+        return textes[cle] || textes.boot_unknown || etat;
+    }
+
     function libelleEtat(svc) {
         if (svc.active === 'failed' || svc.sub === 'failed') { return textes.etat_echoue || ''; }
 
         return svc.active === 'active' ? (textes.etat_actif || '') : (textes.etat_arrete || '');
     }
 
-    function ligne(svc) {
+    function ligne(brut) {
+        var svc = normalise(brut);
         var tr = document.createElement('tr');
 
         var tdNom = document.createElement('td');
         var fort = document.createElement('span');
         fort.className = 'rw-tableau__fort';
-        fort.textContent = svc.name;
+        fort.textContent = svc.nom;
         tdNom.appendChild(fort);
         // UN SERVICE PROTEGE SE DIT, ET DIT PAR QUI. La protection est appliquee
-        // au BACKEND, aux cinq routes mutantes — pas seulement ici. Le marquer
-        // sans le dire laisserait croire a un simple masquage d'ecran.
-        if (svc.protected) {
+        // au BACKEND, aux cinq routes mutantes — mesure par S3 : `stop sshd`
+        // rend 403 « Service protege » avant toute session SSH. Le marquer sans
+        // le dire laisserait croire a un simple masquage d'ecran.
+        if (svc.protege) {
             var marque = document.createElement('span');
             marque.className = 'rw-badge rw-badge--alerte';
-            marque.setAttribute('data-rw', 'services-protege-' + svc.name);
+            marque.setAttribute('data-rw', 'services-protege-' + svc.nom);
             marque.title = textes.protege_aide || '';
             marque.textContent = textes.protege || '';
             tdNom.appendChild(document.createTextNode(' '));
@@ -128,26 +167,112 @@
 
         var tdEtat = document.createElement('td');
         var pastille = document.createElement('span');
-        var classe = (svc.active === 'active') ? 'ok'
-            : ((svc.active === 'failed' || svc.sub === 'failed') ? 'echec' : 'neutre');
+        var classe = (svc.actif === 'active') ? 'ok'
+            : ((svc.actif === 'failed' || svc.sous === 'failed') ? 'echec' : 'neutre');
         pastille.className = 'rw-pastille rw-pastille--' + classe;
-        pastille.textContent = libelleEtat(svc);
+        pastille.textContent = libelleEtat({ active: svc.actif, sub: svc.sous });
         tdEtat.appendChild(pastille);
 
-        var tdActive = document.createElement('td');
-        tdActive.textContent = svc.enabled ? (textes.active_oui || '') : (textes.active_non || '');
-        var tdCategorie = document.createElement('td');
-        tdCategorie.textContent = svc.category || '';
-        var tdDescription = document.createElement('td');
-        tdDescription.textContent = svc.description || '';
+        // L'ETAT AU DEMARRAGE, TEL QUEL. `static` et `masked` ne sont ni « oui »
+        // ni « non » : les y ramener perdrait ce qui compte pour decider.
+        var tdBoot = document.createElement('td');
+        tdBoot.textContent = libelleBoot(svc.boot);
+        if (svc.boot === 'static' || svc.boot === 'masked') {
+            tdBoot.title = textes['boot_' + svc.boot + '_aide'] || '';
+        }
 
-        [tdNom, tdEtat, tdActive, tdCategorie, tdDescription].forEach(function (t) { tr.appendChild(t); });
-        tr.setAttribute('data-rw', 'services-ligne-' + svc.name);
-        tr.dataset.nom = (svc.name || '').toLowerCase();
+        var tdCategorie = document.createElement('td');
+        tdCategorie.textContent = svc.categorie;
+        var tdDescription = document.createElement('td');
+        tdDescription.textContent = svc.description;
+        var tdActions = document.createElement('td');
+        tdActions.className = 'rw-tableau__actions';
+        actions(svc).forEach(function (b) { tdActions.appendChild(b); });
+
+        [tdNom, tdEtat, tdBoot, tdCategorie, tdDescription, tdActions]
+            .forEach(function (t) { tr.appendChild(t); });
+        tr.setAttribute('data-rw', 'services-ligne-' + svc.nom);
+        tr.dataset.nom = svc.nom.toLowerCase();
         tr.dataset.etat = classe;
-        tr.dataset.categorie = svc.category || '';
+        tr.dataset.categorie = svc.categorie;
 
         return tr;
+    }
+
+    /**
+     * Les gestes offerts pour un service — S3.
+     *
+     * Memes regles que le legacy : arreter/redemarrer si actif, demarrer sinon ;
+     * activer/desactiver selon l'etat au demarrage, et **rien** pour `static` ou
+     * `masked`, qui n'ont pas d'interrupteur.
+     *
+     * Un service PROTEGE recoit des boutons DESACTIVES — et le titre dit que
+     * c'est le backend qui refuse, pas l'ecran qui masque.
+     */
+    function actions(svc) {
+        var liste = [];
+        var boutons = [];
+        if (svc.actif === 'active') {
+            boutons.push(['stop', textes.act_arreter, 'rw-bouton--danger', textes.confirmer_arreter]);
+            boutons.push(['restart', textes.act_redemarrer, 'rw-bouton--avertissement', textes.confirmer_redemarrer]);
+        } else {
+            boutons.push(['start', textes.act_demarrer, 'rw-bouton--succes', textes.confirmer_demarrer]);
+        }
+        if (svc.boot === 'enabled') {
+            boutons.push(['disable', textes.act_desactiver, 'rw-bouton--discret', textes.confirmer_desactiver]);
+        } else if (svc.boot !== 'static' && svc.boot !== 'masked') {
+            boutons.push(['enable', textes.act_activer, 'rw-bouton--discret', textes.confirmer_activer]);
+        }
+
+        boutons.forEach(function (b) {
+            var el = document.createElement('button');
+            el.type = 'button';
+            el.className = 'rw-bouton rw-bouton--minuscule ' + b[2];
+            el.textContent = b[1] || b[0];
+            el.setAttribute('data-rw', 'services-action-' + b[0] + '-' + svc.nom);
+            if (svc.protege) {
+                el.disabled = true;
+                el.title = textes.protege_aide || '';
+            } else {
+                el.addEventListener('click', function () { pilote(b[0], svc.nom, b[3] || ''); });
+            }
+            liste.push(el);
+        });
+
+        return liste;
+    }
+
+    /**
+     * Pilote un service. **Confirme d'abord, et la question NOMME le service ET
+     * la machine** — le legacy le fait aussi, c'est de la parite.
+     *
+     * Une confirmation qui ne dit pas sur quoi elle porte ne fait que ralentir
+     * le clic.
+     */
+    function pilote(geste, nom, question) {
+        var o = machineChoisie();
+        if (! o) { return; }
+        var texte = (question || '').replace(':service', nom)
+            .replace(':machine', o.dataset.nom || '');
+        if (! window.confirm(texte)) { return; }
+
+        journalise(texte);
+        lit('/services/' + geste, {
+            machine_id: parseInt(o.value, 10),
+            service: nom,
+        }).then(function (d) {
+            if (! d) {
+                journalise((textes.geste_echec || '').replace(':service', nom)
+                    .replace(':message', ''));
+
+                return;
+            }
+            journalise((textes.geste_fait || '').replace(':service', nom)
+                .replace(':message', d.message || ''));
+            // L'ETAT A CHANGE : on le relit plutot que de le deviner. Deviner
+            // afficherait le resultat qu'on ESPERE, pas celui qu'on a obtenu.
+            if (charger) { charger.click(); }
+        });
     }
 
     function remplitFiltre(select, valeurs) {
@@ -242,11 +367,17 @@
             // `services_manager.SERVICE_CATEGORIES`, cote backend.
             var etats = [];
             var categories = [];
-            tous.forEach(function (svc) {
-                var cl = (svc.active === 'active') ? 'ok'
-                    : ((svc.active === 'failed' || svc.sub === 'failed') ? 'echec' : 'neutre');
+            // ON RECLASSE DEPUIS L'ENTREE NORMALISEE, pas depuis la forme brute :
+            // dupliquer la classification ici, c'est se donner deux copies qui
+            // finiront par diverger — et c'est exactement par la que le defaut
+            // `unit_file_state` etait entre.
+            tous.map(normalise).forEach(function (svc) {
+                var cl = (svc.actif === 'active') ? 'ok'
+                    : ((svc.actif === 'failed' || svc.sous === 'failed') ? 'echec' : 'neutre');
                 if (etats.indexOf(cl) === -1) { etats.push(cl); }
-                if (svc.category && categories.indexOf(svc.category) === -1) { categories.push(svc.category); }
+                if (svc.categorie && categories.indexOf(svc.categorie) === -1) {
+                    categories.push(svc.categorie);
+                }
             });
             remplitFiltre(filtreEtat, etats.sort());
             remplitFiltre(filtreCategorie, categories.sort());

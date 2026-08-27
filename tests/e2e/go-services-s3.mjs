@@ -57,6 +57,50 @@ const MACHINE_PRODUCTION = 1;
 /** Le service PROTEGE que la requete forgee vise. Refuse avant tout SSH. */
 const SERVICE_PROTEGE = 'sshd';
 
+/**
+ * UNE ENUMERATION SYNTHETIQUE, servie a la place de la vraie.
+ *
+ * ══ POURQUOI, ET POURQUOI CE N'EST PAS UN CONTOURNEMENT ══════════════════
+ *
+ * Le banc n'a pas de systemd : la vraie enumeration rend une liste VIDE, donc
+ * aucune ligne, aucun bouton, et **tout le chemin de rendu reste non mesure**.
+ * Deux defauts du portage y ont d'ailleurs vecu sans etre vus — le champ lu
+ * s'appelle `unit_file_state` et non `enabled`, et c'est une CHAINE a cinq
+ * valeurs, pas un booleen.
+ *
+ * On ne contourne pas la mesure : **on FOURNIT l'entree que la machine ne peut
+ * pas produire**, et on laisse tourner le vrai chemin — le `fetch` de la page,
+ * son analyse, son rendu, ses boutons. Rien n'est appele a la main.
+ *
+ * Aucune machine n'est jointe : la reponse ne sort pas du navigateur.
+ *
+ * Les cinq entrees couvrent ce qui differencie les branches du rendu :
+ * un service actif et active au boot, un arrete et desactive, un STATIC, un
+ * MASKED, et un PROTEGE. Les formes viennent de `services_manager.py` — nom
+ * suffixe `.service`, `unit_file_state`, `protected`.
+ */
+const ENUMERATION_SYNTHETIQUE = {
+    success: true,
+    total: 5,
+    services: [
+        { name: 'nginx.service', active: 'active', sub: 'running',
+          unit_file_state: 'enabled', category: 'web', protected: false,
+          description: 'A high performance web server' },
+        { name: 'postfix.service', active: 'inactive', sub: 'dead',
+          unit_file_state: 'disabled', category: 'mail', protected: false,
+          description: 'Postfix Mail Transport Agent' },
+        { name: 'dbus.service', active: 'active', sub: 'running',
+          unit_file_state: 'static', category: 'system', protected: true,
+          description: 'D-Bus System Message Bus' },
+        { name: 'telnet.service', active: 'inactive', sub: 'dead',
+          unit_file_state: 'masked', category: '', protected: false,
+          description: 'Masked unit' },
+        { name: 'fail2ban.service', active: 'failed', sub: 'failed',
+          unit_file_state: 'enabled', category: 'security', protected: false,
+          description: 'Fail2Ban Service' },
+    ],
+};
+
 const ECRITURES = /\/services\/(start|stop|restart|enable|disable)(\?|$)/;
 const ROUTES_MODULE = /\/services\/(list|status|logs|start|stop|restart|enable|disable)(\?|$)/;
 
@@ -127,6 +171,8 @@ const navigateur = await puppeteer.launch({
     protocolTimeout: 180000,
 });
 const contextes = [];
+/** Quand vrai, l'enumeration est SERVIE au lieu d'etre transmise. */
+let synthetique = false;
 const abouties = [];
 const avortees = [];
 
@@ -147,6 +193,20 @@ async function connecte(nom, secret) {
 
         const cible = machineVisee(r);
         const bonneMachine = (cible === MACHINE_ID);
+
+        // L'ENUMERATION EST SERVIE, PAS TRANSMISE. La machine n'est jamais
+        // jointe — et le rendu, lui, s'execute pour de vrai.
+        if (/\/services\/list/.test(url) && bonneMachine && synthetique) {
+            abouties.push({ route: url.replace(/^https?:\/\/[^/]+/, ''), machine: cible,
+                            ecriture: false, servie: true });
+            r.respond({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(ENUMERATION_SYNTHETIQUE),
+            }).catch(() => {});
+
+            return;
+        }
         // UNE SEULE ECRITURE PASSE : celle qui vise le service PROTEGE, sur la
         // machine d'essai. Le backend la refuse AVANT toute session SSH.
         const forgeeAutorisee = ECRITURES.test(url) && bonneMachine && viseLeProtege(r);
@@ -270,6 +330,129 @@ try {
             /prote/i.test(verdict.message), verdict.message || '(sans message)');
         verifie('la reponse ne se declare pas reussie', verdict.succes !== true,
             `success=${verdict.succes}`);
+    });
+
+    // ══ 2b. LE RENDU D'UN TABLEAU PEUPLE, SUR UNE ENUMERATION SERVIE ════
+    //
+    // C'est l'etape qui aurait attrape les DEUX defauts du portage de S2 : le
+    // champ `unit_file_state` lu sous le nom `enabled`, et son traitement comme
+    // un booleen alors qu'il porte cinq valeurs.
+    await etape('un tableau peuple se rend correctement', async () => {
+        synthetique = true;
+        await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+        const valeur = await page.$$eval(`${C.serveur} option`, (options, id) => {
+            const c = options.find((o) => {
+                if (! o.value) return false;
+                if (o.value === String(id)) return true;
+                try { return JSON.parse(o.value).id === id; } catch { return false; }
+            });
+
+            return c ? c.value : '';
+        }, MACHINE_ID);
+        if (valeur !== '') { await page.select(C.serveur, valeur); await dors(1000); }
+        const bouton = await page.$(C.charger);
+        if (bouton) { await bouton.click(); await dors(3000); }
+
+        // ── REPERAGE PAR LE CONTENU ET PAR L'EN-TETE, PAS PAR UN ANCRAGE ──
+        //
+        // Une premiere redaction identifiait les lignes par `data-rw` et lisait
+        // la colonne par son INDEX. Le legacy n'a **aucun** `data-rw` sur ses
+        // `<tr>` et n'a pas le meme ordre de colonnes : les quatre proprietes
+        // ont donc rendu « ecart assume du legacy » — **quatre accusations
+        // fausses**, alors qu'il retire bien le suffixe et desactive bien les
+        // boutons proteges (lu dans `actionButtons`).
+        //
+        // On repere donc la ligne par son CONTENU et la colonne par son
+        // EN-TETE : le seul reperage qui vise la meme chose sur deux balisages
+        // differents.
+        const rendu = await page.evaluate((sel, motsEtat) => {
+            const tableau = document.querySelector(sel) ? document.querySelector(sel).closest('table') : null;
+            // ACCENTS NORMALISES AVANT COMPARAISON. Le legacy titre « au boot »,
+            // le portage « activé au démarrage » : chercher `demarrage` sans
+            // accent ne trouvait rien, et la colonne rendait -1 — deux
+            // assertions en echec sur un libelle parfaitement correct.
+            const sansAccent = (t) => (t || '').normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+            const entetes = tableau
+                ? [...tableau.querySelectorAll('thead th')].map((t) => sansAccent(t.textContent))
+                : [];
+            // La colonne de l'etat au demarrage, trouvee par son intitule.
+            let colonneBoot = entetes.findIndex((t) => motsEtat.some((m) => t.includes(m)));
+
+            return {
+                entetes,
+                colonneBoot,
+                lignes: [...document.querySelectorAll(sel)].map((tr) => ({
+                    // LE TEXTE SE COMPOSE DES CELLULES, SEPAREES. `textContent`
+                    // sur un `<tr>` colle les cellules bout a bout : la ligne
+                    // rendait « nginxen marcheactive… », et `\bnginx\b` n'y
+                    // trouvait aucune frontiere de mot. Trois lignes sur quatre
+                    // etaient introuvables, et deux assertions echouaient sur un
+                    // rendu parfaitement correct.
+                    texte: [...tr.children].map((c) => (c.textContent || '').trim())
+                        .join(' | ').replace(/\s+/g, ' ').trim(),
+                    cellules: [...tr.children].map((c) => (c.textContent || '').trim()),
+                    boot: colonneBoot >= 0 && tr.children[colonneBoot]
+                        ? (tr.children[colonneBoot].textContent || '').trim() : '',
+                    actions: [...tr.querySelectorAll('button')].map((b) => ({
+                        libelle: (b.textContent || '').trim(),
+                        desactive: b.disabled,
+                        // UN BOUTON DE LECTURE N'EST PAS UN GESTE. « Detail » et
+                        // « Journaux » consultent : ils restent actifs meme sur
+                        // un service protege, et c'est correct. Une premiere
+                        // redaction exigeait que TOUS les boutons soient
+                        // desactives, et accusait donc le legacy a tort.
+                        lecture: /detail|logs?|journ/i.test(b.textContent || ''),
+                    })),
+                })),
+            };
+        }, C.ligne, ['demarrage', 'boot', 'active', 'enabled']);
+
+        constate('en-tetes du tableau', rendu.entetes.join(' | ') || '(aucun)');
+        constate('colonne de l\'etat au demarrage', String(rendu.colonneBoot));
+        for (const l of rendu.lignes) {
+            constate('  ligne', `${l.texte.slice(0, 70)} · boot=« ${l.boot} » · ${l.actions.length} action(s)`
+                + `${l.actions.some((a) => a.desactive) ? ' (desactivees)' : ''}`);
+        }
+        verifie('les cinq services sont rendus', rendu.lignes.length === 5, `${rendu.lignes.length} ligne(s)`);
+        if (rendu.lignes.length !== 5) { synthetique = false; return; }
+
+        /** La ligne qui PARLE de ce service — par son contenu, jamais par un index. */
+        const pour = (nom) => rendu.lignes.find((l) => new RegExp(`\\b${nom}\\b`).test(l.texte));
+
+        // 1. LE SUFFIXE `.service` EST RETIRE. Les deux cibles le font.
+        verifiePortage('le suffixe `.service` est retire des noms',
+            rendu.lignes.every((l) => ! /\.service\b/.test(l.texte)),
+            'un nom garde son suffixe');
+
+        // 2. L'ETAT AU DEMARRAGE DISTINGUE LES VALEURS DE systemd. Un booleen
+        //    ne sait dire ni `static` ni `masked` ; un champ lu sous le mauvais
+        //    nom rend la meme chose pour tous.
+        const boots = ['nginx', 'postfix', 'dbus', 'telnet'].map((n) => (pour(n) || {}).boot || '');
+        constate('etat au demarrage, service par service',
+            ['nginx', 'postfix', 'dbus', 'telnet'].map((n, i) => `${n}=${boots[i] || '?'}`).join(' · '));
+        verifiePortage('l\'etat au demarrage distingue les valeurs de systemd',
+            new Set(boots.filter(Boolean)).size === 4,
+            `${new Set(boots).size} valeur(s) distincte(s) pour quatre etats differents`);
+
+        // 3. UN SERVICE PROTEGE A SES GESTES DESACTIVES.
+        const protege = pour('dbus');
+        const gestesProteges = protege ? protege.actions.filter((a) => ! a.lecture) : [];
+        constate('gestes offerts sur le service protege',
+            gestesProteges.map((a) => `${a.libelle}${a.desactive ? ' (desactive)' : ' (ACTIF)'}`)
+                .join(' · ') || '(aucun)');
+        verifiePortage('les gestes d\'un service protege sont desactives',
+            gestesProteges.length > 0 && gestesProteges.every((a) => a.desactive),
+            'un service protege offre un geste actif');
+
+        // 4. UNE UNITE MASQUEE N'OFFRE PAS D'INTERRUPTEUR AU DEMARRAGE.
+        const masque = pour('telnet');
+        verifiePortage('un service masque n\'offre ni activer ni desactiver',
+            masque !== undefined
+                && ! masque.actions.some((a) => ! a.lecture && /activ|enable|disable/i.test(a.libelle)),
+            'un interrupteur au demarrage est offert sur une unite masquee');
+
+        synthetique = false;
     });
 
     // ══ 3. E-150 : CE QUI N'EST PAS EXERCE, ET POURQUOI ═════════════════

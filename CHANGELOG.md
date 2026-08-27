@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.97** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.37.98** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.37.98 — `services/` S3 porte, `services/` est CLOS — et le banc vide cachait deux defauts
+
+`/services`, **legacy 13 PASS / portage 18 PASS, 0 FAIL**. Le module est entierement porte.
+
+#### Deux defauts de MON portage, vivants depuis S2
+
+Le banc n'a pas de systemd : le tableau est toujours vide, donc **rien de faux ne s'affichait**.
+
+- **Le backend envoie `unit_file_state`, pas `enabled`.** Le portage lisait `svc.enabled` — toujours
+  `undefined` — et aurait affiche « non » pour TOUS les services.
+- **C'est une CHAINE a cinq valeurs, pas un booleen.** Un `svc.enabled ? oui : non` aurait rendu
+  « oui » pour `disabled`, `static` ET `masked` : trois etats sur cinq a l'envers.
+
+> **Un portage mesure uniquement sur un tableau vide est un portage largement non mesure.**
+
+#### Ce qui a permis de les voir : SERVIR l'enumeration au lieu de la transmettre
+Le filet repond a `/services/list` avec une charge synthetique — cinq services couvrant les branches
+du rendu — et **tout le chemin s'execute pour de vrai** : le `fetch` de la page, son analyse, ses
+lignes, ses boutons. Aucune machine n'est jointe : la reponse ne sort pas du navigateur. Ce n'est pas
+contourner la mesure, c'est **fournir l'entree que la machine ne peut pas produire**.
+
+#### E-151 — l'etat au demarrage replie quatre valeurs sur deux
+Le legacy affiche « Desactive » pour `disabled`, `static` ET `masked`. Or une unite `static` n'a pas
+d'interrupteur, et une unite `masked` est activement bloquee : les dire « desactivees » laisse croire
+qu'un « Demarrer » suffirait. Le portage distingue les quatre.
+
+#### Quatre fausses accusations evitees en regardant
+Les assertions de l'etape de rendu ont d'abord rapporte quatre ecarts du legacy. **Aucun n'etait
+reel** :
+- les `<tr>` du legacy n'ont pas de `data-rw` — le reperage se fait desormais par le CONTENU, et la
+  colonne par son EN-TETE ;
+- « demarrage » cherche sans accent ne trouvait pas « activé au démarrage » — **du portage
+  lui-meme** ;
+- `every(bouton → desactive)` echouait parce que « Detail » et « Journaux » sont des LECTURES et
+  restent actives, ce qui est correct ;
+- `textContent` sur un `<tr>` colle les cellules : « nginxen marcheactive… », et `\bnginx\b` n'y
+  trouvait aucune frontiere.
+
+Quatre fois, l'instrument visait a cote. Quatre fois, la page avait raison.
 
 ### v1.37.97 — `services/` S3 caracterise : la garde des services proteges vit sur la REQUETE
 
