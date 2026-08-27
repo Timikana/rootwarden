@@ -7999,3 +7999,53 @@ différence.** Les compter ensemble aurait produit un « 25 appels sans contrôl
   non concluant comme un échec. C'est le comportement voulu, mais il change l'écran ;
 - **les trois autres fichiers de `ssh/`** — `configure_servers.py`, `ssh_key_manager.py`, `ssh_utils.py`.
   La question portait sur `ssh.py`. **Ils ne sont pas dédouanés : ils ne sont pas mesurés.**
+
+*Amendement à E-152 — mesuré route par route le 2026-08-27, et l'attribution est exactement à l'ENVERS
+de la dangerosité.* Relevé de `backend/routes/fail2ban.py`, vérifié par deux comptages indépendants :
+
+| | |
+|---|---|
+| routes | **19** |
+| portant `@require_role(2)` | **3** — `ban_all_servers`, `install_all`, `geoip` |
+| portant la **permission** | **1** — `geoip`, et lui seul |
+| portant `@require_machine_access` | 15 |
+| ne portant **ni** rôle **ni** permission | **16** |
+
+> **La seule route que `can_manage_fail2ban` protège aujourd'hui est `/fail2ban/geoip` — un lookup
+> d'adresse.** Les deux gestes qui touchent **tout le parc**, `srv-zabbix` comprise —
+> `ban_all_servers` et `install_all`, ceux d'E-174 — ne portent que `require_role(2)`, **et pas même
+> `require_machine_access`.**
+
+E-152 ne se lit donc pas « deux routes sur 23 sont gardées ». Il se lit : **la garde est posée là où elle
+coûte le moins.** Et le détail achève le motif : sur `geoip`, l'ordre est `require_role(2)` **puis**
+`require_permission` — un rôle 1 y est donc refusé par le **rôle**, jamais par la permission. **La seule
+route qui porte la permission est celle où le rôle 1 ne peut rien en mesurer.**
+
+### Et la FIXTURE que ce correctif semblait exiger peut être évitée — par la POSITION du décorateur
+
+Les deux gardes rendent des messages **distincts** (`helpers.py:288` et `:346`) :
+`require_permission` → « Permission insuffisante » ; `require_machine_access` → « Accès refusé à cette
+machine ». **Le motif d'un 403 est donc lisible**, et l'exécution des décorateurs va de haut en bas :
+
+| ordre dans le patch | ce qu'un rôle 1 obtient | fixture nécessaire |
+|---|---|---|
+| `@require_permission` **AVANT** `@require_machine_access` | « **Permission insuffisante** » | **aucune** — `rw-test-user` suffit |
+| `@require_permission` **APRÈS** | « Accès refusé à cette machine » | un **rôle 2 sans la permission** |
+
+**L'ordre « permission d'abord » est aussi le plus juste indépendamment du test** : refuser pour absence
+de droit fonctionnel **avant** de parler de machines ne divulgue pas quelles machines existent. C'est un
+choix de correctif de sécurité, donc il appartient à la relecture, pas à la suite qui le mesure.
+
+**Si l'ordre inverse est retenu, la fixture est un QUATRIÈME COMPTE et non une révocation temporaire**,
+pour trois raisons mesurées : une révocation échoue **du mauvais côté** — l'état dégradé est une
+**absence** de droit, sans symptôme, et si la suite meurt avant son `finally` **treize** suites tombent
+pour une raison sans rapport avec ce qu'elles mesurent (le §8 a déjà payé cela deux fois avec la marque
+de step-up qui survivait quinze minutes) ; le trou « rôle 2 sans permission » n'est **pas propre à ce
+module** — `supervision/` et `services/` (E-149) posent la même question, donc un compte se documente une
+fois là où une fixture serait recréée partout ; et il ne touche **à rien d'existant**, `rw-test-admin`
+gardant ses neuf permissions.
+**Deux réserves qui conditionnent sa création** : il exige un **secret TOTP** — et on n'en invente
+jamais — et **un compte de plus est une identité de plus dans le parc**, visible aux écrans
+d'administration et susceptible d'être proposée dans des listes. C'est exactement le reproche fait aux
+cinq `e2e_test_*` offerts comme identité ChatOps. Il devra donc porter un second facteur **et** être
+documenté au §6, pas seulement créé.
