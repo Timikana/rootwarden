@@ -910,13 +910,26 @@ et chacune bloque une session. Je ne les tranche pas.
   réinitialisation). 2 132 sessions en base pour un seul compte, lues à **chaque page protégée**.
   **L'activer n'est pas la bonne réponse seule** : `user_logs` porte une chaîne scellée et purger par la
   tête romprait la vérification d'intégrité. Décision d'exploitation, pas de performance ;
-- **la CI n'exécute aucun test du portage — INF-001.** 14 jobs, **un seul** lance des tests
-  (`test-python`) ; les 13 autres sont statiques. Les 230 assertions de garde du portage et les 104
-  suites E2E ne protègent donc que la machine qui les lance. Trois paliers de coût croissant, dont **le
-  premier ne coûte rien** : un job `test-php` (`composer install` + `php artisan test`, **aucune
-  infrastructure**, la suite est hermétique par construction). Les deux autres — un sous-ensemble E2E,
-  puis le LOT complet — demandent une décision (secrets TOTP, ~100 min, verrouillage du second facteur
-  des trois comptes) ;
+- **INF-001 — RÉGLÉ le 2026-08-27, palier (1).** Le constat était : **13** jobs, **un seul** lançait des tests
+  (`test-python`) ; les 12 autres étaient statiques. **Le palier (1) est LIVRÉ** : un job `test-php`
+  (`composer install --no-scripts` → `key:generate` → `php artisan test`), `needs: lint-php`, **bloquant,
+  sans `continue-on-error`**, YAML validé **par un analyseur YAML** et non au `grep`. La CI porte
+  désormais **14** jobs, dont **deux** exécutent des tests.
+  **Une mesure a décidé d'une étape du job, et elle n'était pas devinable** : sans clé d'application, la
+  suite rend **226 échecs sur 232** — le groupe `web` chiffre les cookies, donc toute requête de test
+  échoue et seuls les six tests qui n'émettent aucune requête survivent. Sans cette mesure,
+  `key:generate` aurait pu être omis comme « du rituel Laravel », et le job aurait été **rouge au premier
+  déclenchement sur un dépôt pourtant vert**.
+  **Effet de bord non cherché, et il compte** : `lint-php` ne vérifiait la syntaxe que de `legacy/`. Une
+  erreur de syntaxe dans `laravel/` n'était vue par **aucun** job ; elle fait désormais échouer celui-ci.
+  **Le compte de jobs annoncé ici était faux, et par le piège habituel** : un
+  `grep -cE "^  [a-z0-9-]+:$"` dont la classe **exclut le tiret bas** ne comptait pas `pull_request:`
+  mais comptait `push:` — un **déclencheur** passait pour un job. Mot pour mot le piège de
+  `Navigation.php`, qui rendait 32 entrées pour 33. *Compter une structure de données, c'est la faire lire
+  par son propre analyseur* — recompté par `yaml.safe_load`.
+  **Restent les paliers (2) et (3)**, qui demandent une décision : un sous-ensemble E2E (un
+  `docker compose` complet et des secrets TOTP), puis le LOT complet (~100 min, verrouillage du second
+  facteur des trois comptes) ;
 - **réinitialiser `superadmin`** si l'on veut des captures sous ce compte précis. Effet de bord signalé :
   son `failed_attempts` est passé de 0 à 1 (seuil 5, aucun verrou) ;
 - **supprimer ou non les cinq comptes `e2e_test_*`** : actifs, rôle 1, **sans second facteur**. Vus
@@ -1471,6 +1484,67 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   sur le journal, jamais sur le code de sortie**.
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
+
+### ✅ L'index est PARTAGÉ, et le contrôle n'est pas atomique avec le commit (2026-08-27)
+
+**Quatrième occurrence de la famille « un commit emporte le travail d'une autre session » — et la
+première où la parade écrite a été RESPECTÉE.** C'est ce qui la rend décisive.
+
+La séquence, mesurée :
+
+```
+git add <les 7 chemins du sous-lot>
+git diff --cached --stat          → exactement 7 fichiers. Vérifié, relu.
+…deux minutes de lint sur la version INDEXÉE (git show :chemin)…
+git commit -F msg                 → 10 fichiers
+```
+
+Trois fichiers d'une autre session s'y sont ajoutés — elle avait fait son propre `git add` **entre le
+contrôle et le commit**. Rien n'est perdu, rien n'est faux : le contenu est intact, simplement commité
+sous un message qui ne le mentionne pas.
+
+**Le plan disait « `git diff --stat` sur ce qu'on s'apprête à ajouter, pas seulement `git status` ». La
+règle a été suivie au mot, et le trou est ailleurs : il est dans le DÉLAI.** Et l'ironie compte, parce
+qu'elle explique pourquoi la règle ne pouvait pas suffire : **ce qui a ouvert la fenêtre est une autre
+bonne pratique de ce document** — linter la version *indexée* plutôt que celle du disque.
+
+> **LA PROPRIÉTÉ, et elle remplace la règle :**
+>
+> ```
+> git commit -F msg -- <chemins>
+> ```
+>
+> Un `git commit` avec des chemins explicites implique `--only` : il committe **ces** chemins et
+> **IGNORE l'index**, quoi qu'une autre session y ait mis entre-temps. **La collision devient impossible
+> au lieu d'être une règle à se rappeler.**
+
+C'est la même forme que la neutralisation du quatrième régime de lecture — le runner qui se recopie dans
+`/tmp` et exécute la copie. *Une règle qu'on doit se rappeler est une propriété qu'on n'a pas encore
+construite*, et c'est la deuxième fois sur ce chantier qu'une règle de ce document se transforme en
+propriété.
+
+**Et la formulation qui explique pourquoi l'ancienne règle ne pouvait pas suffire est venue de la session
+qui a SUBI l'incident, pas de celle qui l'a causé** — les deux l'ont rapporté séparément, avec la même
+parade, et c'est le côté subi qui donne la bonne phrase :
+
+> La règle « `git add` ciblé » protège le **contenu de mon commit**. Ce qui manque est la protection de
+> mon **INDEX**, qui est partagé par toutes les sessions. **Entre le `add` et le `commit`, l'index est un
+> bien commun, et n'importe qui peut le publier.**
+>
+> Donc : **la règle ne peut pas vivre du côté de celui qui committe. Elle doit vivre du côté de celui qui
+> INDEXE.** Corollaire immédiat : **ne jamais laisser un fichier indexé entre deux appels d'outil.**
+
+Les deux premières occurrences allaient dans un sens — une session emportait le travail d'une autre.
+Celle-ci est la version **subie**, et c'est elle qui a montré où la règle devait vivre.
+
+**Ce qui n'a PAS été fait, et c'est juste** : aucune réécriture d'historique. Ni `--amend`, ni `reset`.
+Six sessions écrivent, et la gêne d'un message incomplet est très inférieure à celle d'un historique
+déplacé sous les pieds de quelqu'un.
+
+**Et une note d'hygiène qui vaut d'être dite** : `--no-verify` a été passé à ce commit, puis mesuré
+**après coup** — `.git/hooks/` ne contient aucun hook actif hors `.sample`, donc rien n'a été contourné.
+Mais l'ordre était le mauvais : on mesure **avant** de désarmer, jamais après.
+Remesure : `ls .git/hooks/ | grep -v sample`.
 
 ### Un drapeau par LECTURE, pas un drapeau par fonction (E-187, 2026-08-27)
 
