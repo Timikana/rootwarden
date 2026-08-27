@@ -62,8 +62,8 @@ return [
     'sensible' => "Production",
     'vide_titre' => "No machine in the fleet",
     'vide_texte' => "No machine is registered. The platform key has nothing to protect while the fleet is empty.",
-    'non_porte_titre' => "This page's actions are not ported yet",
-    'non_porte_texte' => "Deploying the key, deploying the administration account, testing a connection, reading the accounts, erasing or re-entering a password, and rotating the key are still done from the legacy portal. This page carries the state, its counters and its guards.",
+    'non_porte_titre' => "Only one action is not ported: key rotation",
+    'non_porte_texte' => "Rotating the platform key — regenerating it — is still done from the legacy portal. It is the broadest action in the portal: it acts on the whole fleet at once, without targeting any machine, and it destroys the current private key. Every other action on this page is ported here.",
     'non_porte_lien' => "Open the platform key in the legacy portal",
 
     // ── Sous-lot P2 : le test de connexion ───────────────────────────────
@@ -93,4 +93,81 @@ return [
     'guide_etape3' => "Once deployed, RootWarden connects without a password. The « Test » button checks it without writing anything.",
     'guide_etape4' => "« Erase the passwords » does NOT act on the machine: it erases the copy RootWarden keeps. The Unix account keeps its password, and whoever knows it still gets in. What RootWarden loses is its own fallback if the key stops working.",
     'guide_corrige' => "Two of these four steps correct the legacy portal's guide, measurement in hand. It claimed that « Deploy keypair installs the public key » without mentioning the NOPASSWD: ALL account; and that « Remove password disables password authentication ON THE SERVER (more secure) », which is false in both languages — the route does not touch the machine.",
+    // ══ P3 — THE ACTIONS THAT WRITE ══════════════════════════════════════
+    'btn_deployer' => "Deploy",
+    'btn_compte_service' => "Retry the administration account",
+    'btn_effacer' => "Erase the passwords",
+    'btn_ressaisir' => "Re-enter a password",
+
+    'parc_titre' => "The same actions, fleet-wide",
+    'parc_aide' => "Each button announces the number of machines in ITS own list, and acts on exactly those. The legacy portal displayed a subtraction of counters computed differently: the number announced and the number processed could differ.",
+    'parc_btn_deployer' => "Deploy on the :n machines without a key",
+    'parc_btn_compte_service' => "Retry the administration account on :n machine(s)",
+    'parc_btn_effacer' => "Erase the passwords of :n machine(s)",
+    'parc_rien' => "No fleet-wide action has anything to act on: every machine has its key and its administration account, and none still holds a password known to RootWarden.",
+
+    'refusees_titre' => ":n machine(s) that bulk erasure leaves out",
+    'refusees_texte' => "These machines have a key and a password, but no administration account: the backend refuses to erase their password, because RootWarden would then have no way left to become root. They are not « already done », they are blocked — and the administration-account action is what unblocks them. The legacy portal offered them anyway and counted the refusal as nothing.",
+
+    'champ_mdp' => "SSH password to store again",
+    'champ_mdp_aide' => "It is stored encrypted, and never displayed again. This action restores the SSH user's password; it does NOT restore the root password, which can only be rewritten from the Servers page.",
+    'annuler' => "Cancel",
+    'confirmer' => "Confirm",
+
+    'recharger' => "Reload the page to read the real state",
+    'geste_journal' => "Action log",
+    'geste_journal_vide' => "No action has been started from this page yet.",
+    'geste_en_cours' => "Running on :cibles…",
+    'geste_echec_reseau' => "The request did not leave or did not come back: :message. No conclusion can be drawn about what was written — the page must be reloaded to read the real state.",
+    'geste_sans_verdict' => "The server answered without a readable verdict. This is neither a success nor a failure: the state must be read again.",
+    'geste_ligne_ok' => ":machine: succeeded — :message",
+    'geste_ligne_echec' => ":machine: failed — :message",
+    'geste_bilan' => ":ok success(es) out of :total. Failed machines are named above, one per line.",
+    'ressaisie_mdp_vide' => "No password entered: nothing was sent.",
+    'confirmer_saisie_manquante' => "Fill in the field before confirming.",
+    'effacement_bilan' => ":ok erasure(s) out of :total.",
+    'effacement_interrompu' => "Interrupted after :fait machine(s) out of :total. This action leaves as one request per machine: the remaining ones were NOT sent, and the fleet is half migrated.",
+
+    // The decision panels, one per action. Each NAMES its consequence.
+    'panneaux' => [
+        'deployer' => [
+            'titre' => "Deploy the platform key",
+            'texte' => "This action opens an SSH session using the password and writes on the machine. It does two things, and the legacy portal announced only one.",
+            'effets' => [
+                "adds the public key to authorized_keys of both the SSH user and root",
+                "creates the Unix account « rootwarden » and grants it NOPASSWD: ALL through /etc/sudoers.d",
+                "taking that access back has no button in the portal: it is an operations action outside the portal",
+            ],
+        ],
+        'compte_service' => [
+            'titre' => "Retry the administration account",
+            'texte' => "This is not the next step of the deployment: deploying the key ALREADY tried to create this account, in the same request, and that attempt failed. This action retries it.",
+            'effets' => [
+                "creates the Unix account « rootwarden » if it is missing",
+                "grants it NOPASSWD: ALL through /etc/sudoers.d",
+                "then checks that « sudo whoami » answers root, and records success only in that case",
+            ],
+        ],
+        'effacer' => [
+            'titre' => "Erase the passwords known to RootWarden",
+            'texte' => "This action DOES NOT TOUCH the machine. It erases the copy RootWarden keeps of both passwords. The Unix account keeps its own, and whoever knows it still gets in.",
+            'effets' => [
+                "erases both the SSH password and the root password from the RootWarden database",
+                "after this action, RootWarden's only access to this machine is the platform key",
+                "« Re-enter » gives back only the SSH password: the root password can only be rewritten from the Servers page",
+            ],
+        ],
+        'ressaisir' => [
+            'titre' => "Store an SSH password again",
+            'texte' => "This action writes to the database and does not touch the machine. It restores only half of what the erasure removed.",
+            'effets' => [
+                "stores the SSH user's password again, encrypted",
+                "does NOT store the root password again — no backend route writes it",
+                "the root password is re-entered from the Servers page of the legacy portal",
+            ],
+        ],
+    ],
+    'panneau_cible_une' => "Target machine: :nom",
+    'panneau_cible_n' => ":n target machines: :noms",
+    'panneau_prod' => "⚠ This scope contains PRODUCTION: :noms",
 ];
