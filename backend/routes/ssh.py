@@ -418,6 +418,19 @@ def preflight_check():
             'ssh_ok': False,
             'os_version': None,
             'disk_free': None,
+            # E-194 : TOUJOURS present, et faux par defaut. L'audit d'impact
+            # ci-dessous vit dans un `try` imbrique : quand il levait, il
+            # journalisait sans rien ajouter a `errors`, et les trois champs
+            # qu'il produit restaient ABSENTS. L'ecran composait alors
+            # « badge OK · aucune erreur · aucun acces a revoquer · aucun
+            # prerequis manquant » — pour une machine dont l'inventaire n'avait
+            # pas pu etre lu. Un champ absent se rend comme une liste vide, et
+            # une liste vide se lit « rien a revoquer ».
+            #
+            # Ce drapeau porte la difference entre « etabli et vide » et
+            # « pas etabli ». Il vaut faux tant que l'audit n'a pas abouti —
+            # y compris quand la connexion SSH echoue avant de l'atteindre.
+            'audit_inventaire': False,
             'errors': [],
         }
 
@@ -527,8 +540,21 @@ def preflight_check():
                     managed_names = {r['username'] for r in inventory if r['status'] == 'managed' and r['managed_by'] == 'rootwarden'}
                     result['users_revoked'] = sorted(managed_names - authorized)
 
+                    # L'audit a ABOUTI : les trois champs ci-dessus sont des
+                    # constats, pas des absences.
+                    result['audit_inventaire'] = True
+
                 except Exception as ex:
                     logger.warning("Preflight inventory audit (%s): %s", m['name'], ex)
+                    # E-194 : DIRE que l'audit a echoue, au lieu de laisser un
+                    # champ absent. Sans cette ligne, la seule trace etait un
+                    # `logger.warning` cote serveur — invisible a l'ecran qui
+                    # prepare le deploiement.
+                    result['errors'].append(
+                        "Audit d'inventaire indisponible : la liste des acces qui "
+                        "seront REVOQUES n'a pas pu etre etablie. Ne pas deployer "
+                        "sans l'avoir relue."
+                    )
 
         except Exception as e:
             result['errors'].append(f"Connexion SSH echouee: {str(e)[:100]}")
