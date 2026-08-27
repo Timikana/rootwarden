@@ -167,4 +167,126 @@ class Fail2ban
 
         return $parMachine;
     }
+
+    /*
+     * ══ F6 : LA PORTEE DES DEUX GESTES DE PARC ═══════════════════════════
+     *
+     * `POST /fail2ban/ban_all_servers` et `POST /fail2ban/install_all` sont les
+     * DEUX SEULES routes du module qui ne prennent aucun `machine_id` : elles
+     * choisissent leurs cibles elles-memes, en base, et les joignent TOUTES.
+     * L'operateur ne peut donc pas connaitre la portee de son clic — meme en
+     * principe, puisque pour l'installation le corps envoye est VIDE (E-173).
+     *
+     * ══ POURQUOI LE SQL EST RECOPIE ICI PLUTOT QUE DEDUIT ════════════════
+     *
+     * La regle est APPLIQUEE par le backend. Un portage qui la devinerait —
+     * par exemple en lisant l'etat renvoye au dernier releve — repondrait
+     * juste tant que les deux raisonnements coincident, et faux le jour ou ils
+     * divergent. C'est la lecon de `maintenance/` : quand une regle vit
+     * ailleurs, on la REMONTE de la ou elle s'applique, on ne la recalcule pas.
+     *
+     * Ces deux requetes sont donc celles des routes, clause pour clause
+     * (`backend/routes/fail2ban.py:521` et `:680`), lues sur la MEME base.
+     * Ce sont des `SELECT` : aucune machine n'est jointe.
+     *
+     * ══ CE QU'ELLES REVELENT, ET QUI EST LE FOND D'E-172 ════════════════
+     *
+     * L'installation retient `f.installed IS NULL OR f.installed = 0`. Une
+     * machine JAMAIS relevee n'a pas de ligne dans `fail2ban_status` : le
+     * `LEFT JOIN` rend `NULL`, et `NULL` passe le `WHERE`. **Ne l'avoir jamais
+     * regardee suffit a la faire installer** — et c'est ainsi que `srv-zabbix`,
+     * la machine de production, entre dans la portee.
+     *
+     * Le ban de parc fait l'inverse (`INNER JOIN ... WHERE f.running = 1`) :
+     * il ne vise que les machines que le cache dit ACTIVES. Une machine dont
+     * fail2ban est tombe depuis le dernier releve y figure encore ; une machine
+     * installee depuis n'y figure pas.
+     *
+     * D'ou la date de releve rendue PAR MACHINE et non un maximum global : un
+     * etat sans sa date se prend pour un etat courant, et ici cette date decide
+     * du parc atteint par un geste irreversible.
+     *
+     * ══ UNE CIBLE QUE LE SELECTEUR NE MONTRE PAS ════════════════════════
+     *
+     * Ni l'une ni l'autre requete ne filtre `lifecycle_status`, alors que le
+     * selecteur de cette page ECARTE les machines archivees (`machines()`
+     * ci-dessus). Une machine retiree du parc reste donc une cible des gestes
+     * de parc, sans figurer nulle part a l'ecran. Aucune machine n'est archivee
+     * aujourd'hui — la branche est donc reelle et non exercee —, mais la portee
+     * la MARQUE plutot que de la taire : c'est exactement le defaut « deux
+     * sources pour la meme table » qui a laisse une machine archivee recevoir
+     * un `apt full-upgrade` dans `update/`.
+     */
+
+    /** Les cibles de `POST /fail2ban/install_all`, avec le SQL de la route. */
+    public function porteeInstallation(): array
+    {
+        return $this->cibles(
+            'SELECT m.id, m.name, m.environment, m.criticality, m.lifecycle_status, '
+            . 'f.last_checked, f.server_id '
+            . 'FROM machines m '
+            . 'LEFT JOIN fail2ban_status f ON m.id = f.server_id '
+            . 'WHERE f.installed IS NULL OR f.installed = 0 '
+            . 'ORDER BY m.name'
+        );
+    }
+
+    /** Les cibles de `POST /fail2ban/ban_all_servers`, avec le SQL de la route. */
+    public function porteeBan(): array
+    {
+        return $this->cibles(
+            'SELECT m.id, m.name, m.environment, m.criticality, m.lifecycle_status, '
+            . 'f.last_checked, f.server_id '
+            . 'FROM machines m '
+            . 'INNER JOIN fail2ban_status f ON m.id = f.server_id '
+            . 'WHERE f.running = 1 '
+            . 'ORDER BY m.name'
+        );
+    }
+
+    /**
+     * La portee complete, telle qu'elle voyage vers l'ecran.
+     *
+     * `parc` est le nombre total de machines de la table — celui sur lequel les
+     * deux routes travaillent, donc PAS le nombre d'entrees du selecteur, qui
+     * ecarte les archivees. Les deux comptes seraient egaux aujourd'hui ; les
+     * confondre serait annoncer un total qui n'est pas celui du geste.
+     */
+    public function portee(): array
+    {
+        $total = DB::select('SELECT COUNT(*) AS n FROM machines');
+
+        return [
+            'installer' => $this->porteeInstallation(),
+            'bannir'    => $this->porteeBan(),
+            'parc'      => (int) ($total[0]->n ?? 0),
+        ];
+    }
+
+    /**
+     * Une liste de cibles, decrite par ce dont l'ecran a besoin pour la NOMMER.
+     *
+     * `jamais` n'est pas « pas de date » : c'est l'absence de LIGNE dans
+     * `fail2ban_status`, ce qui est la raison meme pour laquelle la machine est
+     * dans la portee d'une installation. On le lit sur `f.server_id`, la cle du
+     * `LEFT JOIN`, et non sur `last_checked` — une ligne dont la date serait
+     * nulle existerait quand meme.
+     */
+    private function cibles(string $sql): array
+    {
+        $cibles = [];
+        foreach (DB::select($sql) as $l) {
+            $cibles[] = [
+                'id'        => (int) $l->id,
+                'nom'       => (string) $l->name,
+                'env'       => (string) ($l->environment ?? ''),
+                'sensible'  => $this->estSensible($l),
+                'archivee'  => strtolower(trim((string) ($l->lifecycle_status ?? ''))) === 'archived',
+                'jamais'    => $l->server_id === null,
+                'releve_le' => $l->last_checked,
+            ];
+        }
+
+        return $cibles;
+    }
 }

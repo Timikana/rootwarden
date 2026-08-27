@@ -179,7 +179,7 @@ sur les espaces, donc une charge qui en contient devient plusieurs entrées — 
 
 ## 3. QA-002 — les gardes du portage, côté PHP
 
-`laravel/tests/` · **230 PASS, 757 assertions, 0 FAIL**
+`laravel/tests/` · **232 PASS, 764 assertions, 0 FAIL**
 Commande : `sudo -n docker exec rootwarden_laravel php artisan test`
 
 Avant ce lot : **3 fichiers**, tous des gabarits Laravel d'origine, et le seul test
@@ -199,7 +199,7 @@ le disent.
 
 ### L'attente est ÉCRITE, pas dérivée
 
-`tests/Support/TableDesGardes.php` fige les **84 routes authentifiées** avec leurs
+`tests/Support/TableDesGardes.php` fige les **85 routes authentifiées** avec leurs
 gardes, et les **25 routes publiques** avec la **raison** de chacune.
 
 Il aurait été plus court de lire les gardes dans le routeur et de les comparer à
@@ -352,23 +352,43 @@ famille** : une autre route de relais sans rôle apparaîtrait au rouge.
 
 ## 5. INF-001 — la CI ne lance aucun test applicatif du portage
 
-Mesuré sur `.github/workflows/ci.yml` : **14 jobs**, dont **un seul** exécute des
+Mesuré sur `.github/workflows/ci.yml` : **13 jobs**, dont **un seul** exécutait des
 tests — `test-python` (pytest). Les autres sont statiques : ruff, `php -l`, bandit,
 semgrep, gitleaks, pip-audit, composer audit, Trivy, build Docker, auto-tag.
+
+> **Ce chiffre a d'abord été faux, et la faute est instructive.** J'avais annoncé
+> **14** — compté par `grep -cE "^  [a-z0-9-]+:$"`, dont la classe de caractères
+> **exclut le tiret bas** : `pull_request:` n'était pas compté, mais `push:` l'était,
+> et un déclencheur passait pour un job. C'est mot pour mot le piège déjà payé sur
+> `Navigation.php`, où une expression régulière rendait 32 entrées de menu pour 33.
+> **Compter une structure de données, c'est la faire lire par son propre analyseur.**
 
 Conséquences, en l'état :
 
 | ce qui n'est pas joué en CI | conséquence |
 |---|---|
-| `php artisan test` | **230 assertions de garde** ne protègent que la machine qui les lance |
-| les **104 suites** `tests/e2e/` | la non-régression du chantier est **entièrement manuelle** |
+| ~~`php artisan test`~~ | **FERMÉ le 2026-08-27** — job `test-php`, bloquant (voir plus bas) |
+| les **104 suites** `tests/e2e/` | la non-régression du chantier reste **entièrement manuelle** |
 
 **Proposition, dans cet ordre de coût croissant :**
 
-1. **un job `test-php`** — `composer install` puis `php artisan test`. Aucune
-   infrastructure : la suite est hermétique par construction (SQLite en mémoire, ni
-   MySQL ni backend). **C'est le seul geste de cette liste qui ne coûte rien**, et
-   c'est celui qui verrouille les gardes ;
+1. **un job `test-php`** — **FAIT le 2026-08-27**, sur autorisation explicite du Lead
+   (`ci.yml` n'a pas de propriétaire dans la table du protocole). `composer install`
+   puis `php artisan test`, **bloquant** et non `continue-on-error` : le dépôt a déjà
+   quatre portes bloquantes, et une suite hermétique n'a pas de raison d'être plus
+   indulgente qu'un linter. *Une porte qui ne bloque pas est un rapport, pas une
+   porte.*
+
+   **Une mesure a décidé d'une étape du job.** Sans clé d'application, la suite rend
+   **226 échecs sur 232** : le groupe `web` chiffre les cookies, donc toute requête de
+   test échoue, et seuls les six tests qui n'émettent aucune requête survivent. Le job
+   fait donc `cp .env.example .env && php artisan key:generate`. Sans la mesure, cette
+   étape aurait pu être omise comme « du rituel Laravel » — et le job aurait été rouge
+   au premier déclenchement, sur un dépôt pourtant vert.
+
+   **Effet de bord non cherché** : `lint-php` ne vérifie la syntaxe que de `legacy/`.
+   Une erreur de syntaxe dans `laravel/` n'était vue par **aucun** job ; elle fait
+   désormais échouer celui-ci ;
 2. **un sous-ensemble E2E** en CI — il demande la base, les deux portails et les
    trois comptes de test, donc un `docker compose` complet et des secrets TOTP. Coût
    réel, décision de l'exploitant ;
@@ -421,12 +441,18 @@ Le point 1 est celui que je recommande de trancher en premier.
 | 2026-08-27 | `rootwarden_python` redémarré à 11:52:26 | les cinq correctifs de la session 4 ne sont plus inertes |
 | 2026-08-27 | `test_fail2ban_manager.py` (E-174) | **75 passed, 1 xfailed** ; suite complète **464 passed** |
 | 2026-08-27 | les **cinq** verrous d'E-174 retirés un par un | **14, 1, 3 et 1 rouges** — aucun n'est décoratif |
+| 2026-08-27 | l'inventaire des gardes **a rougi de lui-même** sur `GET /fail2ban/portee` | route neuve de la session 3, inscrite au relevé ; **232 passed** |
+| 2026-08-27 | dépendance de la suite PHP à `APP_KEY` | sans clé : **226 failed / 6 passed** — l'étape `key:generate` du job CI vient de là |
+| 2026-08-27 | jobs de la CI, recomptés **par un analyseur YAML** | **13** avant, **14** avec `test-php`. Mon `grep` en annonçait 14 : il comptait `push:` |
 
 Chaque chiffre porte sa commande de remesure :
 
 ```bash
 sudo -n docker exec rootwarden_python  sh -c "cd /app && python -m pytest -q"
 sudo -n docker exec rootwarden_laravel php artisan test
-grep -cE "^  [a-z0-9-]+:$" .github/workflows/ci.yml   # jobs de la CI : 14
+# jobs de la CI : 14 depuis test-php. JAMAIS a l'expression reguliere — voir §5 :
+# une classe de caracteres qui oublie le tiret bas compte un declencheur pour un job.
+sudo -n docker exec -i rootwarden_python python3 -c \
+  "import yaml,sys; print(len(yaml.safe_load(sys.stdin)['jobs']))" < .github/workflows/ci.yml
 ls tests/e2e/go-*.mjs | wc -l                      # suites E2E, toutes manuelles
 ```

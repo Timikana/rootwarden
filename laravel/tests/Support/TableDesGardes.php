@@ -61,6 +61,7 @@ class TableDesGardes
             ['GET', 'docker', ['role:2']],
             ['GET', 'export-cve', ['role:1', 'perm:can_scan_cve']],
             ['GET', 'fail2ban', ['role:1', 'perm:can_manage_fail2ban']],
+            ['GET', 'fail2ban/portee', ['role:1', 'perm:can_manage_fail2ban']],
             ['GET', 'graylog', ['role:2', 'perm:can_manage_graylog']],
             ['GET', 'journal-audit', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'journal-audit/export', ['role:2', 'perm:can_admin_portal']],

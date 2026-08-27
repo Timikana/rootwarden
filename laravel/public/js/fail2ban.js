@@ -9,8 +9,15 @@
  * prouve ni l'un ni l'autre.
  *
  * F1 ne fait qu'une chose qui sorte : `/fail2ban/status`, sur la machine
- * CHOISIE, et sur un geste EXPLICITE. Bannir, installer, redemarrer, modifier
- * une jail ou la liste blanche sont F4, F5 et F6.
+ * CHOISIE, et sur un geste EXPLICITE. Bannir et debannir sont F4, les jails et
+ * la liste blanche F5, les deux gestes de parc F6.
+ *
+ * ══ F6 : DEUX GESTES QUI NE VISENT AUCUNE MACHINE ════════════════════════
+ *
+ * `ban_all_servers` et `install_all` ne prennent aucun `machine_id` : leurs
+ * cibles sont choisies EN BASE par le backend, et elles sont TOUTES jointes,
+ * `srv-zabbix` comprise. Rien ici ne calcule cette portee : elle est LUE sur
+ * la meme base, par `/fail2ban/portee`, avec le SQL des deux routes.
  */
 window.RW_FAIL2BAN = true;
 
@@ -18,6 +25,14 @@ window.RW_FAIL2BAN = true;
     'use strict';
 
     var PASSERELLE = '/api/gateway';
+    /*
+     * ROUTE DU PORTAGE, PAS DE LA PASSERELLE. Elle ne joint aucune machine :
+     * elle relit en base ce que les deux gestes de parc toucheraient. Il faut
+     * la relire apres un releve — un releve ECRIT le cache, donc la portee
+     * change, et un ecran qui garderait l'ancienne porterait deux verites sur
+     * le meme objet.
+     */
+    var PORTEE = '/fail2ban/portee';
 
     var textes = {};
     try {
@@ -91,6 +106,44 @@ window.RW_FAIL2BAN = true;
 
     var jailAActiver = null;
 
+    /* ── F6 : les deux gestes de parc et leur portee ─────────────────── */
+    var zonePortee = document.querySelector('[data-rw="f2b-portee"]');
+    var messagePortee = document.querySelector('[data-rw="f2b-portee-message"]');
+    var relirePortee = document.querySelector('[data-rw="f2b-portee-relire"]');
+    var boutonInstallerParc = document.querySelector('[data-rw="f2b-installer-parc"]');
+    var boutonBannirParc = document.querySelector('[data-rw="f2b-bannir-parc"]');
+    var aideParcBan = document.querySelector('[data-rw="f2b-parc-ban-aide"]');
+    var blocRecopie = document.querySelector('[data-rw="f2b-recopie-bloc"]');
+    var champRecopie = document.querySelector('[data-rw="f2b-recopie"]');
+    var messageRecopie = document.querySelector('[data-rw="f2b-recopie-message"]');
+
+    /*
+     * ══ UNE PORTEE INCONNUE N'EST PAS UNE PORTEE VIDE ═════════════════════
+     *
+     * Le repli `{ installer: [], bannir: [] }` se rendrait « ce geste ne
+     * toucherait aucune machine » — une phrase FAUSSE et rassurante, alors que
+     * la verite est « on ne sait pas ». Meme famille que l'etat vide qui
+     * promettait « aucun paquet en attente » quand un depot etait injoignable.
+     *
+     * `porteeLue` porte donc la difference, et les deux gestes sont REFUSES
+     * tant qu'elle est fausse : un geste de parc ne s'envoie pas sans savoir
+     * sur combien de machines il porte. Fail-closed.
+     */
+    var portee = { installer: [], bannir: [], parc: 0 };
+    var porteeLue = false;
+    try {
+        var blocPortee = document.getElementById('f2b-portee-donnees');
+        if (blocPortee) {
+            var brut = JSON.parse(blocPortee.textContent || 'null');
+            // On exige la FORME, pas seulement un objet : un JSON valide mais
+            // d'une autre forme donnerait des listes `undefined`.
+            if (brut && Array.isArray(brut.installer) && Array.isArray(brut.bannir)) {
+                portee = brut;
+                porteeLue = true;
+            }
+        }
+    } catch (e) { porteeLue = false; }
+
     var choix = document.querySelector('[data-rw="f2b-serveur"]');
     var relever = document.querySelector('[data-rw="f2b-relever"]');
     var message = document.querySelector('[data-rw="f2b-etat-message"]');
@@ -147,7 +200,17 @@ window.RW_FAIL2BAN = true;
         // Le detail d'une jail appartient a UNE machine : il se referme avec elle.
         if (detailJail) { detailJail.hidden = true; }
         jailCourante = null;
-        if (confirmation) { confirmation.hidden = true; }
+        /*
+         * CHANGER DE MACHINE ANNULE LA DECISION EN COURS, il ne la CACHE pas.
+         *
+         * Cette ligne posait `confirmation.hidden = true` — le panneau
+         * disparaissait mais `gestEnAttente` restait arme, avec la machine
+         * PRECEDENTE dans sa fermeture. C'est la forme exacte du defaut
+         * d'`update/` (« un panneau qui s'ouvre repart d'un etat connu »), et F6
+         * le rend consequent : un geste en attente peut viser tout le parc.
+         * `ferme()` remet aussi la recopie a zero.
+         */
+        ferme();
         if (blocBlanche) { blocBlanche.hidden = true; }
         if (reglages) { reglages.hidden = true; }
         jailAActiver = null;
@@ -732,6 +795,17 @@ window.RW_FAIL2BAN = true;
         if (enErreur) { p.className = 'rw-non-resolu'; }
         journalGestes.appendChild(p);
         journalGestes.scrollTop = journalGestes.scrollHeight;
+        // Le cadre annoncait « aucun geste » par son `aria-label` : il ne peut
+        // plus le dire des qu'il porte une ligne.
+        journalGestes.classList.remove('rw-journal--vide');
+        /*
+         * LE JOURNAL VIT AU NIVEAU DE LA PAGE, DONC LOIN DU GESTE.
+         *
+         * Meme raison que pour le panneau de decision : un verdict ecrit hors du
+         * champ ne vaut pas mieux qu'un verdict ecrit dans une section cachee.
+         * `nearest` ne bouge rien s'il est deja visible.
+         */
+        journalGestes.scrollIntoView({ block: 'nearest' });
     }
 
     function remplit(modele, valeurs) {
@@ -835,20 +909,91 @@ window.RW_FAIL2BAN = true;
      * ENGAGE — pas seulement ce qu'il fait.
      */
     var gestEnAttente = null;
+    /** Le nombre a recopier, ou `null` quand le geste n'en demande pas. */
+    var attendueRecopie = null;
 
-    function demande(cleTitre, cleTexte, valeurs, geste) {
+    /**
+     * Remet le panneau dans l'etat des gestes machine par machine.
+     *
+     * Appele a CHAQUE ouverture et a chaque fermeture : sans cela, un geste de
+     * parc laisserait sa recopie exigee — ou son bouton desactive — au geste
+     * suivant, qui n'a rien demande. Un panneau qui s'ouvre repart d'un etat
+     * connu, c'est la lecon des quatre panneaux d'`update/`.
+     */
+    function reinitialiseRecopie() {
+        attendueRecopie = null;
+        if (champRecopie) { champRecopie.value = ''; }
+        if (blocRecopie) { blocRecopie.hidden = true; }
+        if (messageRecopie) { messageRecopie.hidden = true; }
+        if (confirmer) { confirmer.disabled = false; }
+    }
+
+    /**
+     * Ouvre le panneau de decision.
+     *
+     * `options.recopie` — un NOMBRE — exige de le recopier avant que
+     * « Confirmer » ne s'active : c'est ce qui distingue une decision d'un
+     * acquiescement, et le nombre choisi est celui qu'il faut justement lire
+     * (combien de machines le geste touche).
+     *
+     * `options.bloque` rend la confirmation IMPOSSIBLE, parce que le geste ne
+     * peut rien faire : on n'envoie pas une requete dont on sait qu'elle ne
+     * touchera aucune machine. Le panneau s'ouvre quand meme — c'est lui qui
+     * explique pourquoi il n'y a rien a faire.
+     */
+    function demande(cleTitre, cleTexte, valeurs, geste, options) {
+        var opt = options || {};
         gestEnAttente = geste;
         confTitre.textContent = remplit(cleTitre, valeurs);
         confTexte.textContent = remplit(cleTexte, valeurs);
+        reinitialiseRecopie();
+        if (opt.bloque) {
+            gestEnAttente = null;
+            confirmer.disabled = true;
+        } else if (typeof opt.recopie === 'number' && blocRecopie && champRecopie) {
+            attendueRecopie = String(opt.recopie);
+            blocRecopie.hidden = false;
+            confirmer.disabled = true;
+        }
         confirmation.hidden = false;
-        // Le panneau vit au niveau de la PAGE : il peut etre loin du geste.
-        confirmation.scrollIntoView({ block: 'nearest' });
-        confirmer.focus();
+        /*
+         * `center`, ET NON `nearest` — VU A L'IMAGE, AUX DEUX GRANDES LARGEURS.
+         *
+         * Le panneau vit au niveau de la PAGE : quand le geste part du bas de
+         * page, il est AU-DESSUS de la fenetre, et `nearest` fait le defilement
+         * MINIMUM — donc il l'aligne en haut, exactement la ou l'en-tete collant
+         * du gabarit le recouvre. Mesure des captures de F6 : a 1400 px on lisait
+         * « critiques, et 2 n'ont jamais ete relevees… », a 1920 px seulement
+         * « machines a la fois… » — le TITRE et le debut du texte etaient
+         * caches. On confirmait une installation sur tout un parc sans voir sur
+         * quoi elle portait.
+         *
+         * Aucune assertion ne pouvait le voir : `innerText` rend le texte
+         * recouvert comme le reste. C'est le troisieme defaut de ce chantier a ne
+         * se montrer qu'a l'image pour cette raison precise — le plan le note
+         * pour `block: 'start'`, et `nearest` retombe dessus des que l'element
+         * est au-dessus du champ visible.
+         */
+        confirmation.scrollIntoView({ block: 'center' });
+        if (blocRecopie && ! blocRecopie.hidden) { champRecopie.focus(); }
+        else if (! confirmer.disabled) { confirmer.focus(); }
     }
 
     function ferme() {
         confirmation.hidden = true;
         gestEnAttente = null;
+        reinitialiseRecopie();
+    }
+
+    if (champRecopie) {
+        champRecopie.addEventListener('input', function () {
+            if (attendueRecopie === null) { return; }
+            var saisi = (champRecopie.value || '').trim();
+            var juste = saisi === attendueRecopie;
+            confirmer.disabled = ! juste;
+            // Un nombre faux se DIT ; un champ encore vide n'est pas une faute.
+            if (messageRecopie) { messageRecopie.hidden = juste || saisi === ''; }
+        });
     }
 
     /** Validee AVANT tout envoi : rien ne part sur une saisie qui n'est pas une adresse. */
@@ -1108,7 +1253,9 @@ window.RW_FAIL2BAN = true;
         reglagesTitre.textContent = remplit('jail_reglages_titre',
             { jail: nom, machine: nomMachineChoisie() });
         reglages.hidden = false;
-        reglages.scrollIntoView({ block: 'nearest' });
+        // Meme correction que pour le panneau de decision : `nearest` glisse sous
+        // l'en-tete collant des que la section est au-dessus du champ visible.
+        reglages.scrollIntoView({ block: 'center' });
     }
 
     function demandeActivation() {
@@ -1146,6 +1293,386 @@ window.RW_FAIL2BAN = true;
         ferme();
     }); }
 
+    /* ══ F6 : LES DEUX GESTES SUR TOUT LE PARC ═══════════════════════════
+     *
+     * `POST /fail2ban/ban_all_servers` et `POST /fail2ban/install_all` sont les
+     * deux seules routes du module qui ne prennent AUCUNE machine : le backend
+     * choisit ses cibles en base et les joint toutes.
+     *
+     * Le legacy ouvre pour chacune une boite native qui ne nomme rien :
+     * « Bannir cette IP sur TOUS les serveurs ? » — alors que le corps envoye
+     * porte l'adresse — et « Installer Fail2ban sur tous les serveurs sans
+     * Fail2ban ? », dont le corps est VIDE : la portee est decidee entierement
+     * cote serveur, et l'operateur ne peut pas la connaitre, meme en principe
+     * (E-173). Ici la portee est LUE, NOMMEE, et chiffree avant le geste.
+     */
+
+    /** Les noms, tels qu'on les montre. C'est ce qui rend la portee lisible. */
+    function nomsDe(liste) {
+        return (liste || []).map(function (m) { return m.nom; }).join(', ');
+    }
+
+    /**
+     * Une cible, avec ce qui decide qu'elle en est une.
+     *
+     * La date de releve est rendue PAR MACHINE, et son absence porte son propre
+     * mot : « jamais relevee » n'est pas « relevee il y a longtemps », c'est
+     * l'absence de ligne — et c'est precisement ce qui met la machine dans la
+     * portee d'une installation (E-172).
+     */
+    function ligneCible(m) {
+        var ligne = document.createElement('div');
+        ligne.className = 'rw-liste-etats__ligne';
+        ligne.setAttribute('data-rw', 'f2b-cible-' + m.id);
+
+        var nom = document.createElement('span');
+        nom.className = 'rw-liste-etats__nom';
+        nom.textContent = m.nom || '';
+        ligne.appendChild(nom);
+
+        var marques = document.createElement('span');
+        marques.className = 'rw-liste-etats__jails';
+
+        // LA PRODUCTION SE NOMME SUR LA LIGNE QUI LA VISE, pas dans une phrase
+        // d'ensemble : c'est cette machine-la qui recevrait le geste.
+        if (m.sensible) {
+            var prod = document.createElement('span');
+            prod.className = 'rw-badge rw-badge--alerte';
+            prod.setAttribute('data-rw', 'f2b-cible-prod-' + m.id);
+            prod.textContent = textes.sensible || '';
+            prod.title = textes.sensible_avert || '';
+            marques.appendChild(prod);
+        }
+        // UNE CIBLE QUE LE SELECTEUR NE MONTRE PAS. Les deux requetes de parc ne
+        // filtrent pas `lifecycle_status`, la liste du haut de page si.
+        if (m.archivee) {
+            var arch = document.createElement('span');
+            arch.className = 'rw-badge rw-badge--neutre';
+            arch.setAttribute('data-rw', 'f2b-cible-archivee-' + m.id);
+            arch.textContent = textes.portee_archivee || '';
+            arch.title = textes.portee_archivee_aide || '';
+            marques.appendChild(arch);
+        }
+
+        var etat = document.createElement('span');
+        etat.className = m.jamais ? 'rw-non-resolu' : 'rw-tableau__discret';
+        etat.setAttribute('data-rw',
+            (m.jamais ? 'f2b-cible-jamais-' : 'f2b-cible-date-') + m.id);
+        etat.textContent = m.jamais
+            ? (textes.portee_jamais || '')
+            : remplit('portee_releve_le', { date: dateLisible(m.releve_le) });
+        marques.appendChild(etat);
+
+        ligne.appendChild(marques);
+
+        return ligne;
+    }
+
+    function phrase(hote, classe, texte) {
+        if (! texte) { return; }
+        var p = document.createElement('p');
+        p.className = classe;
+        p.textContent = texte;
+        hote.appendChild(p);
+    }
+
+    function rendUnePortee(hote, cibles, cleAvec, cleSans, marqueur) {
+        var parc = portee.parc || 0;
+        if (! cibles.length) {
+            phrase(hote, 'rw-aide', remplit(cleSans, { parc: parc }));
+
+            return;
+        }
+        phrase(hote, 'rw-aide', remplit(cleAvec, { nb: cibles.length, parc: parc }));
+        var liste = document.createElement('div');
+        liste.className = 'rw-liste-etats';
+        liste.setAttribute('data-rw', marqueur);
+        cibles.forEach(function (m) { liste.appendChild(ligneCible(m)); });
+        hote.appendChild(liste);
+    }
+
+    /**
+     * LA PORTEE, RENDUE UNE SEULE FOIS ET AU MEME ENDROIT.
+     *
+     * Un seul rendu, alimente par la page puis par la relecture : il ne peut
+     * donc pas exister deux versions de cette liste — ni entre le premier
+     * affichage et les suivants, ni entre cette section et le bloc du detail
+     * d'une jail, qui lit la MEME donnee.
+     */
+    function rendPortee() {
+        var installer = portee.installer || [];
+        var bannir = portee.bannir || [];
+
+        if (! porteeLue) {
+            if (zonePortee) {
+                // `poseMessage` vide l'hote lui-meme et pose son propre titre.
+                poseMessage(zonePortee, 'portee_inconnue_titre', 'portee_inconnue', true);
+                zonePortee.hidden = false;
+            }
+            if (aideParcBan) {
+                aideParcBan.textContent = textes.parc_ban_inconnue || '';
+                aideParcBan.classList.add('rw-erreur');
+            }
+
+            return;
+        }
+
+        if (zonePortee) {
+            zonePortee.innerHTML = '';
+            phrase(zonePortee, 'rw-sous-titre-fort', textes.portee_titre || '');
+            phrase(zonePortee, 'rw-prose', textes.portee_cache || '');
+            rendUnePortee(zonePortee, installer,
+                'portee_installer', 'portee_installer_aucune', 'f2b-portee-installer');
+            rendUnePortee(zonePortee, bannir,
+                'portee_bannir', 'portee_bannir_aucune', 'f2b-portee-bannir');
+
+            // L'EXPLICATION S'AFFICHE, elle ne vit pas dans une infobulle : c'est
+            // la seule information qui dise POURQUOI une machine est visee.
+            if (installer.some(function (m) { return m.jamais; })) {
+                phrase(zonePortee, 'rw-prose', textes.portee_jamais_aide || '');
+            }
+            if (installer.concat(bannir).some(function (m) { return m.archivee; })) {
+                phrase(zonePortee, 'rw-prose', textes.portee_archivee_aide || '');
+            }
+            // DEVOILE SEULEMENT MAINTENANT : voir le commentaire de la vue.
+            zonePortee.hidden = false;
+        }
+
+        // Le bloc du detail d'une jail dit la MEME portee, en une ligne.
+        if (aideParcBan) {
+            aideParcBan.textContent = bannir.length
+                ? remplit('parc_ban_aide', { nb: bannir.length, machines: nomsDe(bannir) })
+                : (textes.parc_ban_aide_aucune || '');
+            aideParcBan.classList.toggle('rw-erreur', bannir.length === 0);
+        }
+    }
+
+    /**
+     * RELIRE LA PORTEE, PARCE QU'UN RELEVE L'A PEUT-ETRE CHANGEE.
+     *
+     * `/fail2ban/status` appelle `_update_status_cache` : relever une machine
+     * REECRIT la ligne qui decide de sa presence dans les deux portees. Sans
+     * cette relecture, l'ecran garderait celles du chargement — le defaut que F1
+     * a corrige sur la ligne du tableau de cache, ici a l'echelle du parc.
+     *
+     * On ne DEDUIT rien de la reponse du releve : on relit la base. Une
+     * deduction serait fausse des que les deux raisonnements divergeraient, et
+     * c'est le backend qui decide.
+     */
+    function rechargePortee() {
+        return fetch(PORTEE, { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.json().catch(function () { return null; }); })
+            .then(function (d) {
+                if (! d || d.success !== true || ! d.portee) {
+                    if (messagePortee) {
+                        messagePortee.textContent = textes.portee_echec || '';
+                        messagePortee.classList.add('rw-erreur');
+                    }
+
+                    return;
+                }
+                portee = d.portee;
+                porteeLue = true;
+                rendPortee();
+                if (messagePortee) {
+                    messagePortee.textContent = textes.portee_relue || '';
+                    messagePortee.classList.remove('rw-erreur');
+                }
+            })
+            .catch(function () {
+                if (messagePortee) {
+                    messagePortee.textContent = textes.portee_echec || '';
+                    messagePortee.classList.add('rw-erreur');
+                }
+            });
+    }
+
+    /**
+     * UN VERDICT DE PARC SE DERIVE DES MACHINES, PAS DU DRAPEAU GLOBAL.
+     *
+     * `install_all` rendait `success: True` **en dur** quel que soit le
+     * resultat : « Fail2ban installe sur 0/2 serveurs » arrivait avec un succes
+     * annonce. Cinquieme occurrence d'E-165 sur ce module, et derniere qui
+     * restait — `ban_all_servers` avait ete corrige au lot precedent et sa
+     * voisine oubliee, une fois de plus. **Corrige depuis, en v1.38.13** : la
+     * route compose desormais `ok == len(results) and len(results) > 0`.
+     *
+     * Ce code garde quand meme sa propre derivation, et c'est delibere. Chaque
+     * entree de `results` porte un verdict honnete — le backend y teste `rc` — et
+     * un ecran qui compte les machines lui-meme ne depend plus de la justesse
+     * d'un drapeau. Meme traitement pour les deux routes : rien ne distingue
+     * leurs reponses a l'ecran, donc rien ne doit les distinguer ici.
+     *
+     * `total` et `reussis` que la route rend desormais ne sont PAS lus : les
+     * compter sur `results` mesure ce qui est affiche ligne par ligne, donc
+     * l'ecran ne peut pas annoncer un compte que sa propre liste contredit.
+     */
+    function agitParc(chemin, envoi, cibles, apresInstall) {
+        ferme();
+        journalise(remplit('parc_envoi', { nb: cibles.length }), false);
+        fetch(PASSERELLE + chemin, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(envoi),
+        }).then(function (r) { return r.json().catch(function () { return null; }); })
+          .then(function (d) {
+              if (! d) {
+                  journalise(remplit('geste_echoue', { message: textes.lecture_echec || '' }), true);
+
+                  return;
+              }
+              var resultats = d.results || [];
+              var reussies = resultats.filter(function (r) { return r.success === true; }).length;
+              var toutes = resultats.length > 0 && reussies === resultats.length;
+
+              // La phrase du backend porte le compte : on la garde telle quelle,
+              // mais c'est NOTRE decompte qui decide si elle se lit en reussite.
+              // Une phrase absente ne devient pas une ligne vide.
+              if (d.message) { journalise(String(d.message), ! toutes); }
+              resultats.forEach(function (r) {
+                  /*
+                   * UN ECHEC SANS DETAIL SE DIT SANS TIRET EN L'AIR.
+                   *
+                   * `install_all` n'ajoute `error` que dans sa branche
+                   * d'exception : un `rc != 0` rend `{server, success: false}`
+                   * tout court. « echoue — » aurait laisse un tiret pendant a
+                   * l'ecran, ce qui se lit comme un detail perdu.
+                   */
+                  var detail = r.error || (r.exit_code == null ? '' : String(r.exit_code));
+                  journalise(remplit('parc_resultat_machine', {
+                      machine: r.server || '',
+                      etat: r.success === true
+                          ? (textes.parc_ok || '')
+                          : (detail
+                              ? remplit('parc_echec', { message: detail })
+                              : (textes.parc_echec_muet || '')),
+                  }), r.success !== true);
+              });
+              if (! resultats.length) { journalise(textes.parc_rien || '', true); }
+
+              /*
+               * INSTALLER N'EST PAS RELEVER. `install_all` n'ecrit pas le cache :
+               * la portee restera identique jusqu'a ce que chaque machine soit
+               * relevee. Sans cette ligne, on installerait, on relirait la
+               * portee, on y retrouverait les memes machines — et on en
+               * concluerait que le geste n'a rien fait.
+               */
+              if (apresInstall) { journalise(textes.parc_apres_install || '', false); }
+
+              rechargePortee();
+              /*
+               * SECOND TEMOIN — ET SEULEMENT S'IL EN EST UN.
+               *
+               * Relire le detail de la jail affichee ne prouve quelque chose que
+               * si la machine affichee etait DANS la portee. Le faire dans tous
+               * les cas ouvrirait une session SSH de plus qui ne temoigne de
+               * rien : `install_all` ne touche aucune jail, et le ban de parc ne
+               * touche pas forcement la machine qu'on regarde.
+               */
+              var vue = machineChoisie();
+              var etaitVisee = vue !== null && cibles.some(function (m) {
+                  return m.id === parseInt(vue.value, 10);
+              });
+              if (jailCourante && etaitVisee) { ouvreJail(jailCourante); }
+          })
+          .catch(function () {
+              journalise(remplit('geste_echoue', { message: textes.lecture_echec || '' }), true);
+          });
+    }
+
+    /*
+     * ══ CE QUE LA VALIDATION DU NAVIGATEUR N'EST PAS ══════════════════════
+     *
+     * E-174, trouve dans CE module : `_validate_ip` appelait
+     * `ipaddress.ip_address()` pour son effet de bord et rendait la chaine
+     * RECUE. L'identifiant de portee IPv6 — ce qui suit un `%` — n'est soumis a
+     * aucune contrainte, il traversait donc le validateur, se retrouvait
+     * interpole dans la commande distante, et le `sh -c` l'interpretait : une
+     * execution de commande en root. **Le pire vecteur etait
+     * `POST /fail2ban/ban_all_servers`** — role 2, aucun controle d'acces
+     * machine — c'est-a-dire la route que ce geste-ci appelle.
+     *
+     * **Ferme dans le backend** : refus de tout `%` (`fail2ban_manager.py:56`)
+     * ET `shlex.quote` a l'INTERIEUR de la commande (`:221`, `:230`). Deux
+     * verrous, parce que le premier ferme le vecteur connu et le second la
+     * classe. La normalisation, elle, n'aurait rien ferme : `str(ip_address())`
+     * conserve l'identifiant de portee tel quel — la parade « normaliser puis
+     * comparer » vaut quand la valeur sert a COMPARER, et ici elle COMPOSE.
+     *
+     * Ce que fait `adresseValide` ci-dessus, et ce qu'elle ne fait pas. Mesure :
+     * elle refuse les quatre charges d'E-174 (`fe80::1%;id;`, `%$(id)`,
+     * `` %`id` ``, `%'`) et `203.0.113.7; id`, elle accepte `203.0.113.7`,
+     * `fe80::1` et `2001:db8::1`. **Rien d'hostile ne peut donc PARTIR de cette
+     * page — et ce n'est pas la garde** : une requete forgee ne passe pas par
+     * cet ecran. La garde est celle du backend ; celle-ci evite un aller-retour
+     * et un message inutilement tardif, comme pour un ban d'une seule machine.
+     */
+    function demandeBanParc() {
+        if (! jailCourante || ! champBan) { return; }
+        if (! porteeLue) {
+            demande('conf_titre_parc_inconnue', 'conf_texte_parc_inconnue',
+                {}, null, { bloque: true });
+
+            return;
+        }
+        var adresse = (champBan.value || '').trim();
+        // Validee AVANT tout envoi, comme pour un ban d'une seule machine.
+        if (! adresseValide(adresse)) {
+            journalise(textes.ban_invalide || '', true);
+
+            return;
+        }
+        var cibles = portee.bannir || [];
+        if (! cibles.length) {
+            demande('conf_titre_parc_ban_vide', 'conf_texte_parc_ban_vide',
+                { ip: adresse }, null, { bloque: true });
+
+            return;
+        }
+        demande('conf_titre_parc_ban', 'conf_texte_parc_ban',
+            { ip: adresse, jail: jailCourante, nb: cibles.length, machines: nomsDe(cibles) },
+            function () {
+                agitParc('/fail2ban/ban_all_servers',
+                    { ip: adresse, jail: jailCourante }, cibles, false);
+            },
+            { recopie: cibles.length });
+    }
+
+    function demandeInstallParc() {
+        if (! porteeLue) {
+            demande('conf_titre_parc_inconnue', 'conf_texte_parc_inconnue',
+                {}, null, { bloque: true });
+
+            return;
+        }
+        var cibles = portee.installer || [];
+        if (! cibles.length) {
+            demande('conf_titre_parc_install_vide', 'conf_texte_parc_install_vide',
+                { parc: portee.parc || 0 }, null, { bloque: true });
+
+            return;
+        }
+        demande('conf_titre_parc_install', 'conf_texte_parc_install',
+            {
+                nb: cibles.length,
+                machines: nomsDe(cibles),
+                prod: cibles.filter(function (m) { return m.sensible; }).length,
+                jamais: cibles.filter(function (m) { return m.jamais; }).length,
+            },
+            // Le corps est VIDE, comme celui du legacy : c'est le backend qui
+            // choisit. Ce que le portage ajoute, c'est de le DIRE avant.
+            function () { agitParc('/fail2ban/install_all', {}, cibles, true); },
+            { recopie: cibles.length });
+    }
+
+    if (boutonBannirParc) { boutonBannirParc.addEventListener('click', demandeBanParc); }
+    if (boutonInstallerParc) { boutonInstallerParc.addEventListener('click', demandeInstallParc); }
+    if (relirePortee) { relirePortee.addEventListener('click', rechargePortee); }
+
+    // La portee s'affiche des le chargement : elle ne depend d'aucun geste, et
+    // c'est une information qui vaut par elle-meme.
+    rendPortee();
+
     if (voirConfig) { voirConfig.addEventListener('click', litConfig); }
     if (voirLogs) { voirLogs.addEventListener('click', litLogs); }
 
@@ -1173,6 +1700,10 @@ window.RW_FAIL2BAN = true;
             message.textContent = '';
             rendStatut(d);
             majLigneCache(parseInt(o.value, 10), d);
+            // LE RELEVE A REECRIT LE CACHE : la portee des gestes de parc a
+            // peut-etre change. On la relit en base plutot que de la deduire de
+            // la reponse qu'on vient de lire.
+            rechargePortee();
             // LES LECTURES DE F3 NE S'OFFRENT QUE SI LE SERVICE EST LA. Proposer
             // de lire un fichier dont on sait qu'il n'existe pas n'est pas une
             // offre — et la detection des services n'aurait rien a detecter.

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Fail2ban;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
 /**
@@ -11,6 +12,18 @@ use Illuminate\View\View;
  * **Ce controleur n'ouvre aucune session SSH.** Le statut affiche vient du CACHE
  * (`fail2ban_status`), et le rafraichir demande un geste explicite : ouvrir la
  * page ne doit pas joindre toutes les machines du parc.
+ *
+ * ══ F6 : LES DEUX GESTES DE PARC ET LEUR PORTEE ══════════════════════════
+ *
+ * `portee()` rend en JSON ce que les deux routes de parc du backend
+ * toucheraient. Elle existe pour une raison precise : un releve ECRIT le cache
+ * (`_update_status_cache`), donc la portee CHANGE apres un releve. Sans
+ * relecture, l'ecran porterait deux verites sur le meme objet — le defaut que
+ * F1 a corrige sur la ligne du tableau de cache, ici a l'echelle du parc.
+ *
+ * Elle porte les MEMES gardes que la page. Une capacite ne se garde pas moins
+ * parce qu'elle sert une zone d'information : ce qu'elle rend est la liste des
+ * machines du parc avec leur environnement.
  *
  * Garde : `role:1` + `perm:can_manage_fail2ban`, reprise telle quelle du legacy
  * — dont l'en-tete annonce pourtant « admin (2), superadmin (3) ». Voir
@@ -58,7 +71,7 @@ class Fail2banController extends Controller
             'compte_bannies_une', 'compte_bannies_plusieurs',
             'cache_maintenant', 'sensible_avert',
             // F2
-            'histo_choisir', 'histo_vide_titre', 'histo_vide', 'histo_echec_titre',
+            'histo_vide_titre', 'histo_vide', 'histo_echec_titre',
             'histo_echec', 'histo_tout', 'histo_tronque',
             'action_ban', 'action_unban', 'par_inconnu', 'par_repli', 'par_repli_aide',
             'frise_vide_titre', 'frise_vide', 'frise_jour',
@@ -66,7 +79,7 @@ class Fail2banController extends Controller
             'lu_a_l_instant', 'fichier_absent_titre', 'fichier_absent',
             'journal_absent_titre', 'journal_absent',
             'lecture_echec_titre', 'lecture_echec',
-            'services_installe', 'services_absent', 'services_jails',
+            'services_installe', 'services_absent',
             'services_jail_active', 'services_vide_titre', 'services_vide',
             // F4
             'jail_detail_titre', 'jail_maxretry', 'jail_bantime', 'jail_findtime',
@@ -74,7 +87,7 @@ class Fail2banController extends Controller
             'debannir', 'conf_titre_ban', 'conf_texte_ban',
             'conf_titre_debannir', 'conf_texte_debannir',
             'conf_titre_tout', 'conf_texte_tout',
-            'geste_echoue', 'ban_invalide',
+            'geste_reussi', 'geste_echoue', 'ban_invalide',
             // F5
             'blanche_lue', 'blanche_supposee_titre', 'blanche_supposee',
             'blanche_vide_titre', 'blanche_vide', 'blanche_retirer',
@@ -82,6 +95,22 @@ class Fail2banController extends Controller
             'conf_titre_blanche_ajout', 'conf_texte_blanche_ajout',
             'conf_titre_blanche_retrait', 'conf_texte_blanche_retrait',
             'jail_reglages_titre', 'conf_titre_jail', 'conf_texte_jail',
+            // F6
+            'portee_titre', 'portee_cache', 'portee_installer',
+            'portee_installer_aucune', 'portee_bannir', 'portee_bannir_aucune',
+            'portee_jamais', 'portee_jamais_aide', 'portee_archivee',
+            'portee_archivee_aide', 'portee_releve_le', 'portee_relue',
+            'portee_echec', 'sensible',
+            'portee_inconnue_titre', 'portee_inconnue', 'parc_ban_inconnue',
+            'conf_titre_parc_inconnue', 'conf_texte_parc_inconnue',
+            'parc_ban_aide', 'parc_ban_aide_aucune',
+            'conf_titre_parc_ban', 'conf_texte_parc_ban',
+            'conf_titre_parc_ban_vide', 'conf_texte_parc_ban_vide',
+            'conf_titre_parc_install', 'conf_texte_parc_install',
+            'conf_titre_parc_install_vide', 'conf_texte_parc_install_vide',
+            'parc_envoi', 'parc_resultat_machine',
+            'parc_ok', 'parc_echec', 'parc_echec_muet', 'parc_rien',
+            'parc_apres_install',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }
@@ -92,6 +121,43 @@ class Fail2banController extends Controller
             'sensibles' => $this->fail2ban->compteSensibles($machines),
             'total'     => count($machines),
             'textes'    => $textes,
+            // ── F6 ──────────────────────────────────────────────────────
+            'portee'    => $this->fail2ban->portee(),
+            /*
+             * LES DEUX GESTES DE PARC EXIGENT LE ROLE 2, ET EUX SEULS.
+             *
+             * `ban_all_servers` et `install_all` sont les deux seules routes du
+             * module a porter `@require_role(2)` (`fail2ban.py:508` et `:675`).
+             * Les quatorze autres portent `@require_machine_access`, dont
+             * `check_machine_access` rend `True` des le role 2 — c'est au role 1
+             * qu'il mord, en le bornant a `user_machine_access`. Les gestes de
+             * parc, eux, n'ont AUCUNE notion de machine a borner : le backend
+             * les ferme donc au role.
+             *
+             * Un role 1 lit cette page (la garde de la page l'admet) et ces deux
+             * gestes ne peuvent que lui rendre 403. Il recoit donc la RAISON, pas
+             * un bouton — la meme regle qu'E-169 pour une entree de liste blanche
+             * qu'aucun retrait ne peut aboutir.
+             *
+             * **Branche non exercee sur le banc, et c'est dit** : aucun compte de
+             * role 1 ne porte `can_manage_fail2ban`, donc aucun n'atteint la page.
+             */
+            'peutParc'  => ((int) request()->session()->get('role_id', 0)) >= 2,
+        ]);
+    }
+
+    /**
+     * La portee des deux gestes de parc, relue en base.
+     *
+     * Appelee au chargement par la page elle-meme et apres chaque releve : le
+     * releve ecrit le cache, donc la portee bouge. C'est une LECTURE — trois
+     * `SELECT`, aucune machine jointe.
+     */
+    public function portee(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'portee'  => $this->fail2ban->portee(),
         ]);
     }
 }
