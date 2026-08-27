@@ -76,7 +76,42 @@ Je les écris parce qu'elles disent où ce document peut encore se tromper.
 
 ---
 
-## 4. Remesure
+## 4. La méthode, rendue systématique plutôt que ponctuelle
+
+Les trois fautes du §3 ne sont pas trois accidents : ce sont trois **façons de lire trop vite**, et
+elles reviendront tant qu'elles dépendront de ma vigilance. Elles sont désormais encodées dans une
+sonde unique, chaque garde étant du code et non une consigne à se rappeler :
+
+| faute | garde |
+|---|---|
+| la prose comptée pour du code | docstring retirée de **chaque** fonction, classe et module avant analyse |
+| le **nom** de la variable lu à la place de sa valeur | les affectations sont résolues : `execute_as_root(client, command, …)` rend le contenu de `command` |
+| le corps lu seul | les appels sont suivis sur plusieurs niveaux, helpers compris |
+
+**Vérification par rejeu de mes propres erreurs.** Passée sur `apt_update`, la sonde corrigée rend
+maintenant les trois commandes que ma version fautive ne voyait pas :
+
+```
+&& apt-get update && apt-get full-upgrade -y
+&& apt-get update && apt-get upgrade --with-new-pkgs --only-upgrade -y
+&& apt-get update && apt-get install -y
+```
+
+**Et un classement du §2 a été re-contrôlé par lecture, pas par confiance.** `apt_check_lock` était
+rangée en « lecture seule » alors que sa commande est construite dans un helper — exactement la
+configuration qui avait produit la faute 3. Lecture de `_check_apt_lock` :
+
+```
+fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock … 2>/dev/null && echo LOCKED
+ps aux | grep -E 'apt|dpkg' | grep -v grep
+```
+
+**Lecture pure. Le classement tient** — mais il tient maintenant parce qu'il a été lu, et non parce
+qu'il avait été supposé.
+
+---
+
+## 5. Remesure
 
 ```bash
 # la liste des 28
