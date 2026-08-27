@@ -772,6 +772,44 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
 
 ## 7. Décisions qui attendent l'exploitant
 
+### ✅ QUATRE ARBITRAGES TRANCHÉS PAR L'EXPLOITANT — 2026-08-27
+
+Posés en questions fermées, répondus. **Ce sont les premiers arbitrages du §7 à sortir de l'attente
+depuis l'ouverture du chantier.**
+
+| question | réponse | ce qu'elle déclenche |
+|---|---|---|
+| le volume `platform_ssh` est-il sauvegardé ? | **NON** | la rotation est **définitivement irréversible** — voir ci-dessous |
+| la porte à quatre yeux | **brancher les deux routes** | correctif backend assigné, à verrouiller par un test |
+| `srv-zabbix` sans seconde voie | **il remet les mots de passe lui-même** | le gel reste tant que ce n'est pas confirmé ; **pas** de refus fail-closed |
+| `tickets` | **la route reste** | le menu seul est retiré ; rien d'autre à décider |
+
+#### ⚠ « Non sauvegardé » change la gravité, pas seulement l'urgence
+
+La question décidait si la rotation était *irréversible* ou *seulement pénible*. **La réponse est
+irréversible.** Trois conséquences à tenir :
+
+1. **`ssh_key_manager.py:117-126` fait `unlink()` sur la seule copie qui existe au monde.** Il n'y a ni
+   sauvegarde d'infrastructure, ni copie RootWarden — mesuré des deux côtés. Le geste détruit un secret
+   **non reproductible** ;
+2. **l'option « archiver au lieu de supprimer » gagne tout son poids.** Elle avait été écartée avec une
+   réserve juste — *une clé révoquée qui reste sur le disque est une surface* — mais cette réserve se
+   compare désormais à **une perte définitive**, et non à un désagrément. Même volume, même `0600` : le
+   niveau de risque ne change pas, et une purge doit être prévue. **À proposer, pas encore décidé** ;
+3. **le refus fail-closed n'est PAS retenu**, et c'est cohérent avec la troisième réponse : l'exploitant
+   remet les mots de passe, donc la rotation redevient récupérable **par la machine** au lieu de l'être
+   par le volume. C'est une meilleure issue que de bloquer la fonctionnalité — mais elle ne vaut
+   **qu'après** son geste.
+
+> **Tant que les mots de passe de `srv-zabbix` ne sont pas remis, les deux chemins de verrouillage sont
+> vivants et le gel tient** : aucune route de `remote_users` ni de `platform_key` n'est exercée, même en
+> refus, par aucune session.
+
+**Et le geste qu'il doit faire est en DEUX temps, ce qui n'est pas évident** : « Ressaisir » sur la page de
+la clé écrit `password` ; `root_password` demande **une autre page** (*Comptes → Serveurs*). Mesuré : une
+seule route écrit cette colonne dans tout le backend, **celle qui l'efface**. Un seul clic rend donc **la
+moitié** du filet — et c'est exactement E-202 §« le retour offert est à moitié ».
+
 ### ⚠⚠ E-201 / E-202 — DEUX CHEMINS VERROUILLENT ROOTWARDEN HORS DE `srv-zabbix`, EN UN APPEL
 
 **Trouvés le 2026-08-27 par pré-relecture AVANT portage — la première fois du chantier que la sécurité
