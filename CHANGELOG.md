@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.25** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.26** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2242,6 +2242,101 @@ il restait **six** modules a archiver. La propriete **derive** desormais la list
   explicitement** au lieu de se verifier sur un ensemble vide — sans quoi « toutes les parties archivees
   sont redirigees » deviendrait **vrai** le jour ou `tinker` casse.
 
+### v1.38.26 — le Lead a ecrit « aucun lien entrant » et c'etait faux pour quatre parties sur cinq
+
+**Le motif de la passe cherchait `href="…"`. Les tuiles du tableau de bord s'ecrivent `'url' => '…'`.**
+`legacy/index.php:378` porte bien celle de `graylog/`, et le balayage du Lead ne pouvait pas la voir.
+
+**La session 2 a nomme la distinction que le Lead avait ecrasee** : un lien **entrant depuis une autre
+partie** (etape 8) et un **point d'entree du legacy vers la partie** (etape 3) ne sont pas la meme chose,
+meme si leur effet apres archivage est identique — un 404. Le Lead a repondu « rien » a une question que sa
+passe ne posait pas. *Une passe qui repond « rien » ne dit rien tant qu'on n'a pas montre qu'elle peut
+repondre « quelque chose »* — regle inscrite le matin meme pour le quatrieme point d'entree verifie vide,
+et enfreinte par son auteur le meme jour.
+
+#### Les quatre emplacements, comptes pour les neuf parties — zeros compris
+
+    partie          laterale  tiroir  raccourci  tuile
+    security            1       3         1        1
+    bashrc              1       1         0        1
+    fail2ban            1       1         0        0
+    graylog             1       1         0        1
+    ssh                 1       1         1        1
+    iptables            1       1         1        1
+    ssh-audit           1       1         1        1
+    wazuh               1       1         0        1
+    groups              1       0         0        0
+
+**Ce tableau explique comment l'etape 4 a pu etre oubliee onze fois. `graylog/` est le MIROIR de
+`services/`** : `services/` avait le raccourci clavier et **pas** la tuile, `graylog/` a la tuile et **pas**
+le raccourci. **Aucun des deux n'exerce les quatre emplacements, et ils ne se recouvrent pas.**
+
+> **Chaque archivage n'eprouve qu'un sous-ensemble DIFFERENT — donc onze archivages ont pu valider le
+> cycle sans qu'aucun ne l'exerce en entier.** Et c'est **pire** qu'une etape eprouvee sur des cas ou elle
+> n'a rien a trouver : la, la verification **a l'air** d'avoir ete faite a chaque fois. *Un sous-ensemble
+> tournant est indiscernable d'une couverture complete quand on ne regarde qu'un archivage.*
+
+**Parade, une ligne** : les quatre emplacements se comptent par quatre `grep`, et **le compte s'ecrit dans
+le compte rendu y compris quand il vaut zero.** *Un zero ecrit est une mesure ; un zero non ecrit est une
+etape sautee, et rien ne les distingue apres coup.*
+
+Deux irregularites que le comptage revele : **`security/` porte TROIS occurrences dans le tiroir mobile**
+(trois bascules, pas une) et **`groups/` n'est ni dans le tiroir ni en tuile** — 1/0/0/0, la couverture la
+plus faible du parc.
+
+#### L'etape 6 ne demande pas « y a-t-il une adresse » mais « DANS QUEL SENS »
+
+`graylog/` est la premiere partie dont la reponse n'est pas « aucune adresse » : elle configure
+`server_host` et l'ecrit dans `/etc/rsyslog.d/` sur chaque machine. **L'etape est pourtant satisfaite**,
+parce que ce qui tranche est le sens — `chatops/` exposait une adresse **ENTRANTE** (le chemin que Slack
+appelait : il disparait et Slack tombe en silence), `graylog/` configure une adresse **SORTANTE** (celle ou
+les machines envoient : elle vit en base et dans `rsyslog.d`, pas dans le dossier archive).
+
+#### ⚠ Un motif a trois occurrences : le portage laisse tomber les conseils du legacy, module par module
+
+    legacy/lang/{fr,en}/tips.php   tip.ssh_step2, tip.admin_step5     -> remote_users
+    legacy/lang/{fr,en}/tips.php   tip.graylog_title + step1..4 (8)   -> graylog
+    laravel/lang/fr/graylog.php    AUCUNE cle de conseil
+
+**Le legacy porte, dans ses catalogues, une reponse contextuelle deja traduite que le portage ne reprend
+pas — et personne ne le voit parce que personne n'ouvre `lang/`.** La fenetre se ferme a l'archivage : une
+fois le dossier deplace, plus personne n'ira les chercher.
+
+**Et ca touche directement une demande de l'exploitant.** `tip.ssh_step2` — *« Scannez les utilisateurs du
+serveur dans Utilisateurs distants et classifiez chaque compte »* — nomme **exactement** la sequence dont
+il a dit qu'« un nouvel utilisateur ne le sait pas ». **FEAT-001 a ete concu pour resoudre un probleme dont
+la reponse existait deja, traduite, dans un fichier que personne n'ouvre.** Un comptage module par module
+est lance avant tout nouvel archivage : il decidera si FEAT-001 **reprend** cet acquis ou le remplace.
+
+#### `scan_server_users` n'est pas une lecture : il ECRIT, et il DECIDE
+
+`MODULE-PLATFORM-KEY.md` §8 classait P2 « les lectures distantes » et affirmait que ses deux gestes « ne
+modifient rien ». **Faux, mesure par la session 3 avant d'ecrire** : `ssh.py:1636` et `:1644` en `UPDATE`,
+`:1650-1675` en `INSERT` **avec auto-classement** — et l'un des statuts poses est `pending_review`, que la
+page des comptes distants documente comme **sans retour**.
+
+*« Sans effet » se lit dans la commande, pas dans le libelle.* Motif d'U3 pris a l'envers, et **en pire** :
+la, un intitule du **produit** mentait et l'inventaire l'a demasque ; ici c'est **l'inventaire** qui
+mentait, et un sous-lot nomme « lectures » est precisement celui ou personne ne rouvre le code. *Un
+decoupage est une hypothese, pas une donnee.*
+
+**Deux decisions prises** : le releve des comptes passe en **P3**, regime d'ecriture, cible
+`Test-Server-Debian` exclusivement — et la suite devra poser **son propre** compte, les 20 comptes du banc
+etant tous `excluded`. Et **le lien vers `comptes-distants` remplacera la table en ligne, mais SOUS
+CONDITION** : `rootwarden_keys` doit d'abord y etre affiche, et `/exclude_user` — une ecriture que ni P2 ni
+`comptes-distants` ne portent — reste ouvert et trace. *Re-siter une capacite et la retirer se ressemblent
+dans un journal de commits ; elles ne se ressemblent pas pour l'utilisateur.*
+
+#### `GET /settings/announceable` livree — et la borne « valeur effective » a mordu plus que prevu
+
+Douze reglages, liste **fermee** verifiee sur l'arbre syntaxique **docstrings retirees** (la premiere sonde
+comptait l'occurrence d'`os.environ` presente dans son propre commentaire). **Dix des douze vivent dans
+`Config`, deux n'y sont pas** — `PLATFORM_KEY_ARCHIVE_DAYS` est une constante de `ssh_key_manager`,
+`WEBHOOK_ENABLED` de `webhooks` : les relire depuis l'environnement aurait rejoue le defaut que la route
+supprime. Chacune est lue **dans le module qui s'en sert**. Une quatrieme propriete non demandee : un
+reglage non resoluble vaut `null` **et** son nom entre dans `non_resolus`, toujours present meme vide —
+*une interface doit pouvoir distinguer « ce drapeau est a faux » de « je n'ai pas su le lire »*.
+
 ### v1.38.24 — l'ordre d'archivage n'est plus une liste mais un GRAPHE, et une verification lancee du mauvais cote d'un montage rend « tout va bien »
 
 #### ⚠ Une huitieme etape au cycle d'archivage : les liens ENTRANTS
@@ -2342,7 +2437,7 @@ des comptes systeme, refus de l'utilisateur de connexion **et** du compte de ser
 appelee, **et le piege `userdel` traite** : apres le `userdel`, la route execute `id <username>` et **c'est
 ce verdict qui fait autorite**, pas le code de sortie.
 
-#### Six references inscrites, et la plus instructive est celle qui etait FAUSSE sans etre rouge
+### v1.38.25 — six references mesurees, et la plus instructive est celle qui etait FAUSSE sans etre rouge
 
     REF_LARAVEL[go-socle-navigation]  63 -> **64**
     REF_LARAVEL[go-page-search]       12 -> **13**   (la propriete `LiensLegacy`)
@@ -2497,7 +2592,8 @@ correspondance reelle :**
 | **v1.38.22** | `2b382c4` | **INF-002** — la garde sur 81 fichiers, et les 12 que le chiffre du Lead aurait laisses |
 | v1.38.23 | `0b5ccc7` | les 5 545 lignes de legacy deja porte, et la parallelisation du portage |
 | v1.38.24 | `90a6ac5` | l'ordre d'archivage devient un graphe ; INF-003 ; E-207 et E-208 — **contenu du Lead, emporte par le commit `graylog` d'une autre session : l'index est PARTAGE, seconde occurrence** |
-| v1.38.25 | (ce commit) | six references mesurees, et une prediction qui a rattrape une MESURE fausse |
+| v1.38.25 | `643927a` | six references mesurees, et une prediction qui a rattrape une MESURE fausse |
+| v1.38.26 | `a1cd400` | « aucun lien entrant » etait faux ; les 4 emplacements comptes ; les conseils du legacy non repris |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
