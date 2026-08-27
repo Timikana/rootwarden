@@ -2157,6 +2157,33 @@ le conteneur, avec `workers = 4` tous enfants du maître. **« Le backend est lu
 n'est donc plus une convention de ce document : c'est une propriété du service.** Troisième règle de ce
 chantier à devenir une propriété, après la recopie du runner dans `/tmp` et `git commit -- <chemins>`.
 
+### DANS UN MESSAGE ENTRE SESSIONS : UNE DURÉE, OU UNE HEURE AVEC SON FUSEAU (2026-08-27)
+
+**E-73 reproduit dans notre propre coordination, et c'est moi qui l'ai commis.** J'ai écrit à une session
+« départ de ton LOT : ~13:51:44 » — de l'**UTC**, sans le dire. Elle l'a lu en heure locale (**CEST**,
+UTC+2), comparé à son 15:57, conclu « deux heures pour quatre verdicts » et **failli déclarer le LOT
+bloqué**.
+
+**Ce qui l'a rattrapée n'est pas une relecture, c'est un instrument d'une autre nature** :
+
+> `etime` valait `06:06` — six minutes. **Une DURÉE relative ne peut pas se tromper d'horloge ; une heure
+> absolue, si.**
+
+**Convention** : dans un message entre sessions, donner une **durée** (`etime`) **ou** une heure **avec
+son fuseau**. **Jamais une heure nue.** Les conteneurs sont en **UTC**, l'hôte et le navigateur en
+**CEST** — c'est E-73, le décalage de deux heures qui a déjà fait mal **décider** sur les fenêtres de
+maintenance, et il traverse maintenant nos propres échanges.
+
+**Deuxième fois dans la journée qu'un mélange d'horloges fabrique un faux diagnostic**, après le `mtime`
+de `/proc/1` pris pour une heure de démarrage. Les deux se corrigent de la même façon : **préférer une
+grandeur relative quand on veut situer un événement par rapport à un autre**, et ne recourir à l'absolu
+que lorsqu'on nomme le fuseau.
+
+*Corollaire pour les chiffres de référence* : la référence `go-socle-navigation = 64` que j'avais inscrite
+après une reconstitution commit par commit était **juste — pour le menu de ce moment-là**. Elle est
+périmée **67 secondes** avant le départ du LOT, par une refonte du menu. Même classe que le « 125 » du
+matin : **un chiffre daté n'est pas un chiffre faux, et la seule parade est de dire de quand il date.**
+
 ### LE JETON DE BANC COUVRE AUSSI L'ÉCRITURE DANS `laravel/` ET `legacy/` (2026-08-27)
 
 **Trou dans ma propre formulation, et il a failli coûter un LOT de 100 minutes.** La convention disait
