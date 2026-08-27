@@ -8049,3 +8049,103 @@ jamais — et **un compte de plus est une identité de plus dans le parc**, visi
 d'administration et susceptible d'être proposée dans des listes. C'est exactement le reproche fait aux
 cinq `e2e_test_*` offerts comme identité ChatOps. Il devra donc porter un second facteur **et** être
 documenté au §6, pas seulement créé.
+
+---
+
+## E-188 — `active_sessions.last_activity` n'est JAMAIS mise à jour : la purge « inactive depuis 7 jours » signifie « CRÉÉE il y a 7 jours »
+
+**Trouvé le 2026-08-27 en cherchant un défaut chez soi** — les deux index posés sur cette colonne
+coûtent-ils une écriture d'index par requête, puisqu'elle porte `ON UPDATE CURRENT_TIMESTAMP` ? La mesure
+a dédouané les index et trouvé ceci.
+
+    total = 3930 · last_activity = created_at : 3930 · différentes : 0
+
+**Zéro mise à jour sur 3 930 lignes.** La colonne porte bien `ON UPDATE CURRENT_TIMESTAMP`, mais **rien
+ne l'écrit jamais** : la ligne est posée une fois à la connexion
+(`REPLACE INTO active_sessions (session_id, user_id, ip_address, user_agent)`,
+`auth/functions.php:81` et `login.php:212` — la colonne n'est pas dans la liste), et `verify.php:66` la
+**lit** à chaque requête sans jamais la toucher. Vérifié indépendamment : aucun `UPDATE` ni `SET` sur
+cette colonne dans `legacy/auth/`, `backend/` ni `backend/routes/`.
+
+### Pourquoi cela CORRIGE un arbitrage déjà porté à l'exploitant
+
+La purge dit `WHERE last_activity < NOW() - INTERVAL 7 DAY`. Cela se lit « inactive depuis 7 jours ».
+**Cela signifie en réalité « CRÉÉE il y a plus de 7 jours ».** Une session utilisée tous les jours serait
+révoquée au septième.
+
+**Les deux défauts se masquent mutuellement** : la purge ne tourne pas (`LOG_RETENTION_DAYS = 0`, E-180),
+donc personne n'a jamais été déconnecté à tort — **et c'est précisément pour cela que personne n'a jamais
+vu le second.**
+
+> **E-180 était donc incomplet, et l'incomplétude allait dans le sens dangereux.** Il disait « activer
+> `LOG_RETENTION_DAYS` n'est pas la bonne réponse seule : `user_logs` porte une chaîne scellée ». Vrai —
+> et il manquait que **les deux issues proposées déconnecteraient les exploitants tous les sept jours, en
+> pleine session.** Ce qui était présenté comme de l'**hygiène** coupe des sessions **actives**.
+
+**L'ordre correct est : réparer `last_activity` AVANT d'activer quoi que ce soit.** Trois formes, aucune
+tranchée ici — la mettre à jour là où `verify.php` lit déjà la ligne (une écriture par requête, à peser) ;
+renommer le prédicat pour qu'il dise ce qu'il fait (`created_at`) ; ou sortir ce nettoyage de la porte
+`LOG_RETENTION_DAYS` avec un seuil qui lui soit propre.
+
+**Relevé, non corrigé** : `profile.php:374` affiche à l'utilisateur une colonne « dernière activité » qui
+est en fait l'heure de **connexion** — égales sur les 3 930 lignes. C'est du legacy, et on ne soigne pas
+ce qu'on démonte ; mais **le portage héritera de la colonne s'il la reprend telle quelle.**
+
+**Et le soupçon initial est levé par la mesure** : la colonne ne changeant jamais après l'insertion,
+`idx_sessions_activity` et `idx_sessions_user_activity` ne sont touchés qu'à la connexion, une fois par
+session. **Coût nul sur le chemin chaud** — dit parce que le soupçon portait sur le travail de celui qui
+l'a vérifié.
+
+---
+
+*Décision sur E-152, prise le 2026-08-27 — l'ORDRE des deux décorateurs.*
+
+> **`@require_permission` AVANT `@require_machine_access`**, sans exception.
+
+**Et ce n'est pas un choix : c'est déjà la convention du dépôt**, mesurée par balayage AST des routes
+portant les **deux** décorateurs :
+
+| | |
+|---|---|
+| routes portant permission **et** accès machine | **34** |
+| permission **avant** | **34** |
+| accès machine avant | **0** |
+
+Réparties sur `bashrc.py` (6), `graylog.py` (3), `supervision.py` (18), `wazuh.py` (7). **Aucun
+contre-exemple dans tout le dépôt.** Adopter l'ordre inverse ferait de `fail2ban/` le seul module à
+l'inverser — **et cette asymétrie-là a déjà coûté** : c'est exactement elle, entre `/server_status` et
+`/server_lifecycle`, qui a fait écrire « IDOR » à tort dans `AUDIT-GARDES-BACKEND.md` §2, puis rétracter.
+*Un ordre qui varie sans raison écrite se lit comme une intention.*
+
+L'argument de non-divulgation — refuser pour absence de droit fonctionnel avant de parler de machines ne
+révèle pas quelles machines existent — tient, et reste la **seconde** raison. Il ne départageait pas
+seul.
+
+### La sonde ne demande AUCUNE fixture, et elle porte un TÉMOIN
+
+Non pas en lisant le **message** rendu, mais en **mesurant le statut** — la règle du chantier appliquée
+telle quelle. Une requête **sans `machine_id` du tout** : `require_machine_access` ne trouve alors aucun
+identifiant — son no-op connu — et laisse passer ; le corps refuse ensuite en 400.
+
+| requête | avant le correctif | après |
+|---|---|---|
+| `POST /fail2ban/status`, corps `{}`, `rw-test-user` (rôle 1, **sans** perm) | 400 | **403** |
+| idem, `rw-test-admin` (rôle 2, **avec** perm) | 400 | **400** ← le **témoin** |
+
+La première mesure le correctif ; la seconde **isole sa cause**. **La faiblesse connue de
+`require_machine_access` devient l'instrument qui mesure le garde posé au-dessus de lui.**
+
+**Et c'est un argument DE PLUS pour l'ordre retenu** : avec l'ordre inverse, le rôle 1 obtiendrait 403 lui
+aussi — par la permission placée après un no-op — donc **les deux ordres deviennent indistinguables au
+statut** et il faut revenir au message. L'ordre retenu se mesure **au statut ET au message** ; l'ordre
+inverse **seulement au message**. C'est donc le seul des deux qui se mesure **sans fabriquer une identité
+de plus dans le parc**.
+
+**Le quatrième compte n'est donc pas nécessaire**, et ses deux réserves — le secret TOTP qu'on n'invente
+jamais, l'identité de plus dans le parc — n'ont pas à être levées. Les trois raisons contre la révocation
+temporaire restent justes ; elles n'ont simplement plus d'objet.
+
+*Correction de compte* : un document d'audit annonçait **18** routes ; il y en a **19**. Rien de ce qui en
+découlait ne change — la route de l'injection, les comptes qui l'occupent, le correctif d'E-174 sont
+inchangés. Mais **un compte faux dans un document d'audit se recopie**, et celui-là l'avait déjà été une
+fois.
