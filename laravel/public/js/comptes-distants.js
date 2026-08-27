@@ -47,6 +47,54 @@
         });
     }
 
+    /**
+     * Comme `appelle()`, mais rend le CORPS et non un verdict.
+     *
+     * `appelle()` reste le fail-closed des trois gestes destructeurs : eux n'ont
+     * besoin que de « c'est parti ou non ». Le scan, lui, a besoin de ce que le
+     * serveur DIT — et depuis E-187 le serveur dit beaucoup plus qu'un booleen.
+     */
+    function lit(chemin, corps) {
+        return fetch(PASSERELLE + chemin, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corps),
+        }).then(function (r) {
+            return r.json().catch(function () { return null; });
+        }).catch(function () { return null; });
+    }
+
+    /*
+     * ══ E-187 : TROIS ISSUES, ET LE VERDICT NE SE JETTE PLUS ══════════════
+     *
+     * `POST /scan_server_users` rendait toujours `success: true`. Il rend
+     * desormais `false` avec `lectures` — un drapeau PAR SOURCE — quand une
+     * lecture a manque, et il n'ecrase plus l'inventaire dans ce cas.
+     *
+     * L'ecran testait bien `success` : il n'a jamais annonce un faux succes. Ce
+     * qu'il faisait, c'est jeter le CORPS — donc `lectures`, donc la seule
+     * information qui distingue « je n'ai pas lu les comptes » de « j'ai lu les
+     * comptes mais pas les cles ». Les deux ne se corrigent pas pareil, et
+     * « Le scan n'a pas abouti » etait trop absolu pour le second : les comptes
+     * affiches sont frais, seuls les compteurs de cles sont perimes.
+     *
+     * LES SOURCES SONT NOMMEES EN MOTS, PAS EN CHAMPS. Le `message` du backend
+     * enumere `cles_root, cles_utilisateur` — des identifiants. Les afficher tels
+     * quels serait la meme faute qu'une cle i18n rendue a l'ecran : on traduit
+     * les drapeaux ici, et la parite FR/EN les couvre.
+     */
+    function sourcesManquantes(lectures) {
+        var noms = {
+            comptes: libelles.scan_source_comptes,
+            cles_root: libelles.scan_source_cles_root,
+            cles_utilisateur: libelles.scan_source_cles_utilisateur,
+        };
+
+        return Object.keys(noms)
+            .filter(function (c) { return lectures[c] === false; })
+            .map(function (c) { return noms[c] || c; });
+    }
+
     /* ═══ Le scan ═════════════════════════════════════════════════════════ */
 
     var boutonScan = document.querySelector('[data-rw="distants-scanner"]');
@@ -59,8 +107,29 @@
             boutonScan.disabled = true;
             dit('[data-rw="distants-scan-etat"]', libelles.scan_en_cours);
 
-            appelle('/scan_server_users', { machine_id: machine }).then(function (ok) {
-                dit('[data-rw="distants-scan-etat"]', ok ? libelles.scan_fait : libelles.scan_echec);
+            lit('/scan_server_users', { machine_id: machine }).then(function (d) {
+                var zone = document.querySelector('[data-rw="distants-scan-etat"]');
+                if (! d) {
+                    // Ni JSON, ni reseau : on ne sait meme pas ce qui a echoue.
+                    dit('[data-rw="distants-scan-etat"]', libelles.scan_echec);
+                    if (zone) { zone.className = 'rw-annonce rw-annonce--echec'; }
+                } else if (d.success !== true) {
+                    var lectures = d.lectures || {};
+                    var manquantes = sourcesManquantes(lectures);
+                    var phrase = (libelles.scan_non_concluant || '')
+                        .replace('{sources}', manquantes.join(', '));
+                    // La seconde phrase n'apparait QUE dans le cas ou elle est
+                    // vraie : les comptes lus, les cles non. Une reserve
+                    // permanente devient un decor qu'on ne lit plus.
+                    if (lectures.comptes === true) {
+                        phrase += ' ' + (libelles.scan_comptes_lus || '');
+                    }
+                    dit('[data-rw="distants-scan-etat"]', phrase);
+                    if (zone) { zone.className = 'rw-annonce rw-annonce--attention'; }
+                } else {
+                    dit('[data-rw="distants-scan-etat"]', libelles.scan_fait);
+                    if (zone) { zone.className = 'rw-annonce rw-annonce--ok'; }
+                }
                 boutonScan.disabled = false;
             });
         });
