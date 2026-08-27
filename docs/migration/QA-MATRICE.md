@@ -101,6 +101,82 @@ bien deux moitiés — *un correctif évident peut casser le cas normal*.
 
 ---
 
+## 2 bis. QA-003 — E-174, une adresse IP ne doit pas porter une commande root
+
+`backend/tests/test_fail2ban_manager.py` · **75 PASS, 1 XFAIL, 0 FAIL**
+
+Le défaut : `_validate_ip` appelait `ipaddress.ip_address(ip)` pour son seul effet de
+bord, jetait l'objet, et rendait la chaîne **reçue**. L'identifiant de portée IPv6 —
+ce qui suit un `%` — n'est soumis à aucune contrainte, et la valeur repartait dans un
+`sh -c` distant. **Deux vecteurs**, et le second est pire : dans `manage_whitelist`,
+la ligne composée part dans un `sed -i '/\[DEFAULT\]/a\<ligne>'`, où une apostrophe
+**ferme l'argument de `sed`**.
+
+### Compter les verrous : un seul levé ne rouvre rien
+
+Le correctif en pose **cinq**. Un verrou dont on ne mesure que l'effet **combiné** est
+un verrou qu'on peut retirer sans que rien ne rougisse — alors chacun est mesuré
+séparément, et chacun a été **retiré** pour vérifier qu'il porte quelque chose :
+
+| verrou | ce qu'il ferme | rouges quand on le retire |
+|---|---|---|
+| 1. `_validate_ip` refuse le `%` | le vecteur connu | **14** |
+| 2. elle rend la forme **normalisée** | la valeur reçue ne ressort plus | (inclus dans les 14) |
+| 3. `shlex.quote` **dans** la commande | la **classe** entière | **1** |
+| 4. `_entree_whitelist_sure` filtre la **relecture** | ce qui revient du fichier distant | **3** |
+| 5. la garde fail-closed sur la ligne composée | un futur **troisième** chemin | **1** |
+
+Fichier restauré après chaque mutation, empreinte SHA-256 vérifiée, `git diff` vide.
+
+**Le verrou 2 est celui qui distingue les deux versions.** Une assertion « la fonction
+ne lève pas » passerait à l'identique sur l'ancienne et la nouvelle : c'est la
+**valeur rendue** qui les sépare (`FE80::0001` → `fe80::1`).
+
+**Le verrou 3 est mesuré sans le verrou 1**, en simulant un validateur percé — celui
+d'avant le correctif — puis en analysant la commande composée avec `shlex.split` :
+la charge doit rester **un seul argument**. C'est la seule façon de savoir que la
+ceinture tient toute seule.
+
+**Le verrou 5 est mesuré contre son propre commentaire.** Le code affirme « si un jour
+un troisième chemin alimente `current_ips`, c'est ici que ça s'arrête » — une
+affirmation de commentaire n'est pas une propriété, ce chantier compte cinq en-têtes
+qui annoncent un accès plus strict que leur code. Les deux filtres amont sont donc
+neutralisés, et la garde doit lever **avant** qu'aucune écriture n'ait été composée.
+
+### Trois propriétés que le brief ne nommait pas
+
+- **le cas normal n'est pas cassé** : sept adresses légitimes passent, et la valeur
+  rendue est bien la forme canonique. *Les autres classes seraient toutes vertes sur
+  une fonction qui refuse tout* ;
+- **le filtre écarte la charge ET RIEN D'AUTRE** : un filtre trop large viderait la
+  liste blanche d'une machine, ce qui sur fail2ban se paie en **exclusion de
+  l'exploitant lui-même** ;
+- **le refus arrive avant toute écriture** : une exception levée après le `sed`
+  laisserait la charge partie.
+
+### Ce qui reste ouvert — la lecture et l'écriture ne disent pas la même chose
+
+`action == 'list'` sort **avant** le filtre. La lecture rend donc la liste **brute** du
+fichier, entrée illisible comprise ; un `add` ou un `remove` ultérieur la fait
+disparaître — journalisée côté serveur, **silencieuse pour l'appelant**. Vu de
+l'exploitant : une entrée est affichée, un geste sans rapport est fait, l'entrée n'est
+plus là.
+
+Même famille qu'E-168 et que le défaut de D1, où « Vérifier l'intégrité » et « Sceller
+les orphelines » rendaient deux verdicts opposés à la même seconde. La règle du
+chantier est de **les faire répondre côte à côte** : séparément, chacun passe.
+
+La propriété est écrite — *« ce que la lecture montre, l'écriture le préserve, ou bien
+elle dit ce qu'elle a retiré »* — et laissée en **`xfail(strict=True)`**. Elle ne
+préjuge pas de la forme du correctif : filtrer aussi à la lecture, ou nommer les
+entrées écartées dans la réponse, la satisferaient toutes deux. **Laquelle retenir
+touche le CONTRAT de la route, donc le portage** : décision du Lead et de la session 3,
+pas de la QA.
+
+*Relevé au passage, sans conséquence sur la conclusion : la lecture découpe la ligne
+sur les espaces, donc une charge qui en contient devient plusieurs entrées — toutes
+écartées.*
+
 ## 3. QA-002 — les gardes du portage, côté PHP
 
 `laravel/tests/` · **230 PASS, 757 assertions, 0 FAIL**
@@ -321,22 +397,11 @@ Le point 1 est celui que je recommande de trancher en premier.
 - **`Droits`** : la lecture des permissions **temporaires** non expirées (E-134). Elle
   demande un vrai schéma SQLite posé par le test ; faisable, non fait ;
 - **la mutation symétrique** des gardes (§3, dernier paragraphe) ;
-- **quatre correctifs de la session 4 ne sont verrouillés par aucun test**, et ils
-  sont **inertes** tant que `rootwarden_python` n'a pas redémarré (le Python est lu au
-  démarrage du processus) :
-
-  | version | fichier | écart |
-  |---|---|---|
-  | `v1.38.11` | `supervision.py` | E-90 + `generic_reconfigure`, quatre routes |
-  | `v1.38.12` | `fail2ban_manager.py` | **E-174** — exécution root, deux vecteurs |
-  | `v1.38.13` | `fail2ban.py` | E-165, `install_all`, cinquième occurrence |
-  | `v1.38.14` | `wazuh.py` | `set_group`, même famille qu'E-90 |
-
-  **E-174 est le plus urgent à verrouiller** : les propriétés utiles sont que
-  `_validate_ip` refuse tout `%`, qu'elle rende une forme **normalisée**, et que
-  `_entree_whitelist_sure()` filtre aussi la **relecture** du fichier distant — un
-  filtre qui ne garderait que l'écriture laisserait rentrer par la lecture. Prochain
-  lot.
+- **trois correctifs de la session 4 restent sans test** : `v1.38.11`
+  `supervision.py` (E-90 + `generic_reconfigure`, quatre routes), `v1.38.13`
+  `fail2ban.py` (E-165, `install_all`, **cinquième occurrence**) et `v1.38.14`
+  `wazuh.py` (`set_group`, même famille qu'E-90). `v1.38.12` (E-174) est verrouillé
+  depuis QA-003. Les cinq sont **actifs** depuis le redémarrage de 11:52:26.
 
 ---
 
@@ -353,6 +418,9 @@ Le point 1 est celui que je recommande de trancher en premier.
 | 2026-08-27 | E-164 refermée par la session 4 ; les 2 `xfail(strict)` rougissent | signal rendu, marqueurs retirés, propriétés tenues en dur |
 | 2026-08-27 | `test_fail2ban.py` après retrait des marqueurs | **41 passed, 0 xfailed** ; suite complète **389 passed** |
 | 2026-08-27 | mutation fidèle du correctif `server_id` | **8 FAILED** — et une propriété sur quatre ne distingue pas les deux états (§4.1) |
+| 2026-08-27 | `rootwarden_python` redémarré à 11:52:26 | les cinq correctifs de la session 4 ne sont plus inertes |
+| 2026-08-27 | `test_fail2ban_manager.py` (E-174) | **75 passed, 1 xfailed** ; suite complète **464 passed** |
+| 2026-08-27 | les **cinq** verrous d'E-174 retirés un par un | **14, 1, 3 et 1 rouges** — aucun n'est décoratif |
 
 Chaque chiffre porte sa commande de remesure :
 
