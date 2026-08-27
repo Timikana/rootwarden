@@ -552,6 +552,13 @@ declare -A REF_LEGACY=(
   [go-page-graylog-g2]=21
   [go-vague0-legacy]=0
 )
+# `go-bashrc-b4` N'EST PAS DANS CETTE LISTE, ET C'EST DELIBERE.
+# Le portage de B4 est SUSPENDU (deux arbitrages, §7 du plan) : ses trois
+# boutons — deployer, simuler, multi-machines — n'existent pas cote portage.
+# Mesure du 2026-08-27 : la suite y rend 9 PASS / 3 FAIL, et les trois FAIL
+# sont exactement ces trois boutons. Un LOT complet affichait donc un ECHEC
+# qui ne dit rien — une absence VOULUE lue comme un defaut. La suite y
+# revient le jour ou B4 est porte, avec sa reference mesuree.
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
   go-page-commandlog go-page-approvals go-page-drift go-page-backups go-page-tasks
   go-page-tickets go-page-search go-page-cve-export go-page-conformite
@@ -562,7 +569,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
+  go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
