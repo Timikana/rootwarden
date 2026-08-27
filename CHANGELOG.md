@@ -2171,6 +2171,77 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.39 — le correctif de deux lignes du Lead etait faux TROIS fois, et l'une d'elles armait un piege qui n'existait pas avant lui
+
+**Meilleur refus d'instruction de la journee. La session 4 a mesure les trois erreurs avant d'ecrire.**
+
+#### 1. Il aurait ete PROUVABLEMENT INERTE
+
+    SELECT id, name, ip, port, user, password, root_password FROM machines
+    -- pas de `service_account_deployed`
+
+`m.get('service_account_deployed', False)` aurait rendu **`False` a chaque fois, sur les deux routes.** La
+ligne aurait ete ecrite, relue, approuvee — **et n'aurait rien fait.**
+
+**C'est « une cle non TRANSMISE rend du VIDE, pas son identifiant »** : le nom existait dans les deux
+catalogues — la colonne en base, le `.get()` dans le code — **et il ne voyageait pas.** Invisible parce que
+*la valeur de repli est celle qu'on observe d'ordinaire.* **Le correctif comptait TROIS parties, pas deux.**
+
+#### 2. Le decompte du Lead etait encore faux : 6 + 1 + 2, et non 7 + 2
+
+**Un appel passe `force_password=True` deliberement** (`ssh.py:738`) — domaine distinct, ce n'est pas un
+oubli. Le Lead l'avait range parmi les « corrects ». *Troisieme correction d'un de ses decomptes en une
+soiree, apres le 58/57 et le 8/5.*
+
+#### 3. ⚠ Sur `:970`, le correctif ARMAIT un piege qui n'existait pas avant lui
+
+La route se connecte desormais **par** le compte de service, donc `execute_as_root` eleve via `sudo sh -c` —
+**en s'appuyant sur le fichier sudoers que la premiere commande supprimait.** L'elevation valant pour toute
+l'invocation, la chaine se terminait quand meme ; **mais un arret en cours de route** (30 s expirees sur un
+`userdel -r` d'un gros repertoire, une coupure) laissait un etat **sans sortie** :
+
+    sudoers supprime · compte encore present · service_account_deployed = 1
+    -> la tentative suivante se reconnecte PAR un compte de service qui ne peut plus elever,
+       et `root_password` vaut '' sur une machine migree
+
+**Le retrait du sudoers passe donc EN DERNIER** : un echec partiel laisse au pire un fichier orphelin,
+inerte puisqu'aucun compte ne porte plus ce nom, **et la revocation reste rejouable.**
+
+> **Avant le correctif, supprimer le sudoers en premier etait sans consequence** — on passait par le compte
+> nominal, dont les droits ne dependaient pas de ce fichier. **C'est le correctif lui-meme qui arme le
+> piege.** *Un correctif qui rend un chemin possible doit regarder ce qu'il rend irreversible sur ce meme
+> chemin* — et la question ne se pose qu'apres le correctif, donc jamais dans la relecture de l'avant.
+
+#### Le verdict verifie desormais les DEUX effets
+
+L'ancien ne controlait que l'absence du **compte** : il aurait annonce une reussite **en laissant le sudoers
+en place**, et un `rootwarden` recree a la main y aurait retrouve un **`NOPASSWD: ALL` que personne n'a
+accorde.** Le code `2` nomme cet etat et **laisse `service_account_deployed` a 1** pour qu'un rejeu la
+termine. Detail qui compte : **les `if` ne declenchent pas `set -e`**, contrairement a un `test … && exit`.
+
+#### Une assertion absolue sur un corpus qui porte deja des violations finit desactivee
+
+Le Lead venait d'imposer sa propre parade — decroissance stricte du journal, verifiee par commande. **La
+session 4 l'a appliquee et elle a saute** : un bloc `v1.37.19 → v1.37.25` a ete ecrit en ordre croissant.
+
+    ruptures AVANT les ecritures du soir : 7        ruptures MAINTENANT : 7
+
+**Aucune regression.** *Une garde qui alarme sur un etat qu'on ne compte pas corriger finit desactivee — et
+ce jour-la elle n'attrape plus rien.*
+
+**Et la nuance qui rend les deux versions justes** : la commande du Lead ne lisait que `^### v1\.38\.` et
+**passait** ; celle de la session 4 lisait `v1\.\d+\.\d+` et **voyait le desordre de `1.37`.** Elles ne
+mesuraient pas le meme corpus. Regle retenue :
+
+| portee de la garde | forme correcte |
+|---|---|
+| le domaine qu'on ecrit (serie `1.38`) | **assertion absolue** |
+| le corpus entier, qui porte un passe | **mesure de REGRESSION** |
+
+*Le corollaire de « un invariant verifie par une commande vaut mieux qu'une convention a se rappeler » est que
+la commande doit mesurer la REGRESSION et non la perfection* — sinon elle produit un rouge permanent, et un
+rouge permanent s'apprend a ignorer. Troisieme forme du `go-bashrc-b4` du chantier.
+
 ### v1.38.37 — la contrepartie de P3 : supprimer le compte d'administration, avec ce que le geste NE fait pas
 
 **Capacité nouvelle, autorisée par le Lead** : `revoke_service_account` existait dans le backend
@@ -3486,6 +3557,9 @@ correspondance reelle :**
 | v1.38.34 | `c32f996` | une seule implementation de `_resolve_ssh_creds` |
 | v1.38.35 | `bd4bc3d` | E-217 — un predicat calcule par le backend, seul detenteur de la cle |
 | **v1.38.36** | `94f7eff` | **E-218 : le coupe-circuit d'un `NOPASSWD: ALL`, et son second porteur** |
+| v1.38.37 | (session 3) | la contrepartie de P3 : l'interface de revocation du compte d'administration |
+| v1.38.38 | (session 5) | la reserve d'E-218 est levee pour la revocation, elle TIENT pour la reprise |
+| v1.38.39 | (ce commit) | le correctif du Lead etait faux trois fois — dont une qui armait un piege |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
