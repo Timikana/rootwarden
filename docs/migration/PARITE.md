@@ -8663,3 +8663,47 @@ réel du parc est donc refusé par une règle écrite pour un autre domaine.
 elle est silencieuse. Elle confirme qu'il ne suffit pas de dire « deux notions » : **il faut dire laquelle
 s'applique où**, sinon le croisement se produit sans que personne ne l'ait décidé — ce qui est déjà le
 cas ici.
+
+---
+
+## E-199 — Un nom d'inventaire invalide est INSÉRÉ et MARQUÉ, et les trois conditions sont tenues
+
+Second bout d'E-197 — *valider aux deux bouts*. `scan_server_users` insérait sans valider ; il marque
+désormais. **Refermé le 2026-08-27**, décision de conception au §8 (« rendre visible un objet invalide
+mais présent »).
+
+| condition | ce qui est écrit, et ce qui a été mesuré pour l'établir |
+|---|---|
+| **drapeau renseigné, jamais omis** | chaque ligne porte `nom_valide` **et** `motif_invalide` — ce dernier vaut `None` quand le nom est bon, **il n'est pas absent**. `invalides_count` est dans la réponse **même à zéro**. C'est la forme d'`audit_inventaire` (E-194), réemployée le même jour |
+| **le motif est un CODE, pas une phrase** | `vide` · `trop_long` · `composant_de_chemin` · `caracteres_interdits`. Propriété mesurée : **aucun motif ne contient d'espace**, et deux causes distinctes rendent deux codes distincts. Un nom valide rend `None` **et pas `''`** — une chaîne vide se confondrait avec « motif inconnu » |
+| **hors des comptages qui appellent une décision** | `pending_count` exclut les lignes illisibles, et `invalides_count` est rendu **séparément** plutôt qu'un seul nombre corrigé : « 3 à examiner » et « 3 dont 1 illisible » n'appellent pas le même geste |
+
+### ⚠ Et la condition 3 a été REFUSÉE à un second endroit — avec raison
+
+Le préflight compte **aussi** les `pending_review`, en SQL (`ssh.py:479-487`), et ce compte **BLOQUE** le
+déploiement en ajoutant à `result['errors']`. **Il n'a pas été filtré, délibérément.**
+
+> **En exclure les lignes invalides DÉBLOQUERAIT un déploiement — donc desserrerait un garde.** La
+> condition 3 vise les nombres qui **promettent un travail** ; celui-là en **interdit** un. Appliquer la
+> règle mécaniquement aux deux aurait transformé une condition d'**information** en **relâchement de
+> sûreté**, sur la chaîne de K4.
+
+Vérifié : la ligne filtrée est bien celle du **listing** (`:1592`, `status == 'pending_review' and
+nom_valide`) et la ligne **:481** est intacte. **Conséquence assumée** : une ligne illisible en
+`pending_review` **bloque** le déploiement jusqu'à ce que quelqu'un la traite — **et l'écran dira
+désormais pourquoi**, ce qui était précisément le manque.
+
+### Une seule source pour la validité, et l'équivalence PROUVÉE
+
+`_valid_username` **ne porte plus sa propre règle** : elle dérive de `_motif_nom_invalide`. « Valide ? »
+et « pourquoi pas ? » ont donc la même source **par construction** — sans quoi une **quatrième**
+implémentation de la validité de nom serait née le jour même où E-197 expliquait pourquoi il n'en fallait
+pas. La route **importe** cette source au lieu de la recopier ; aucun cycle d'import.
+
+**L'ordre des tests porte le sens** : un nom vide passerait `strip('.') == ''` et serait annoncé
+« composant de chemin », ce qui serait **faux**. Le motif le plus **précis** gagne, et c'est écrit dans la
+docstring.
+
+**Équivalence du refactor prouvée sur 24 valeurs — 0 écart.** *Un refactor qui changerait le verdict
+serait pire que le défaut qu'il corrige*, et cela ne se savait pas sans le mesurer. `pytest` :
+**509 passed, 1 xfailed** ; sonde des trois conditions : 12 assertions, 12 PASS.

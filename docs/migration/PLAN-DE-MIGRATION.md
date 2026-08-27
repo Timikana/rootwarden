@@ -1647,6 +1647,21 @@ comme vérifiée).
 >    listes de gestes de masse, le sélecteur. **Une ligne visible qui ne peut recevoir aucun geste ne doit
 >    pas gonfler un nombre sur lequel on décide**, et ne doit jamais être présélectionnée.
 
+**⚠ La condition 3 ne s'applique QU'AUX nombres qui promettent un travail — pas à ceux qui en
+interdisent un.** Refus mesuré le 2026-08-27 : le préflight compte aussi les lignes en attente, et ce
+compte **BLOQUE** le déploiement. **En exclure les lignes invalides aurait DÉBLOQUÉ un déploiement, donc
+desserré un garde** — la condition d'information se serait retournée en relâchement de sûreté, sur la
+chaîne de K4.
+
+> **Avant d'appliquer une règle d'affichage à un nombre, demander ce que ce nombre AUTORISE.** Un compteur
+> qui appelle un travail et un compteur qui interdit un geste se ressemblent — ce sont deux `COUNT(*)` sur
+> la même table — et la même correction les affecte en sens **opposés**.
+
+C'est la même faute que « avant d'unifier deux copies, vérifier qu'elles valident la même chose », prise
+par l'autre bout : ici deux nombres **identiques en forme** portent des **fonctions inverses**. Et c'est
+la **troisième** fois dans la journée qu'une consigne du Lead est refusée par la mesure et que le refus a
+raison — après la fusion de la règle de révocation et l'alignement sur l'expression stricte.
+
 **Et une garantie mesurée qui rend l'issue sûre avant tout correctif** : côté portage, ces noms sont rendus
 par `textContent` et **jamais** par interpolation, y compris dans les panneaux de décision. **Un compte
 nommé `..` ou porteur de métacaractères de shell ne peut pas s'échapper de son nœud de texte.** Vrai
