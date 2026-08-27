@@ -2171,6 +2171,93 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.37 — la contrepartie de P3 : supprimer le compte d'administration, avec ce que le geste NE fait pas
+
+**Capacité nouvelle, autorisée par le Lead** : `revoke_service_account` existait dans le backend
+depuis le correctif A04-INSEC-N5 et **n'avait aucun appelant** — ni le legacy, ni le portage. P3
+venant de rendre l'**octroi** de `NOPASSWD: ALL` disponible en un clic, sa suppression l'est aussi.
+Livrer l'octroi sans la reprise, c'est livrer une porte sans poignée intérieure.
+
+**Relu par la session 5 avant commit**, comme exigé pour un geste qui retire un accès. Sa seule
+demande de modification portait sur le libellé, et elle était fondée — voir ci-dessous.
+
+#### Le libellé ne promet plus ce que le geste ne fait pas
+
+Le premier jet disait « Reprendre l'accès root ». **Mesuré dans le code**, sans toucher aucune
+machine : `deploy_platform_key` écrit la **même** clé publique dans `~/.ssh/authorized_keys` du compte
+nominal (`ssh.py:745`) **et** dans `/root/.ssh/authorized_keys` (`:755`) ; le compte de service en
+reçoit une troisième copie (`:808`, `:1081`). `revoke_service_account` ne supprime que le compte
+`rootwarden` et son `sudoers.d`.
+
+> **Le geste retire UNE porte sur TROIS. La clé reste autorisée sur `root` et sur le compte nominal.**
+
+Sa docstring nomme pourtant « compromission suspectée de la clé » — ce qu'il ne traite pas. Le libellé
+porte donc ce que le geste **fait** (« Supprimer le compte d'administration ») et le panneau dit ce
+qu'il **laisse en place**, ainsi que le fait que le seul remède à une clé compromise est la rotation.
+C'est le motif payé cinq fois par ce chantier : *un libellé qui promet plus que le code ne tient est
+un défaut.*
+
+#### E-218 reformulé : indisponibilité, pas insûreté — et un second porteur
+
+La borne dite dans le panneau porte la formulation **causale**, plus forte que « douteux dans l'état
+vers lequel la page pousse » : `remove_ssh_password` **refuse** de vider les mots de passe tant que
+`service_account_deployed` est faux (`ssh.py:1235`). **Le seul état où `root_password` est vide est
+donc exactement l'état où le compte de service existe.** Les deux conditions ne sont pas une
+conjonction malheureuse, c'est une implication — le geste échoue précisément et uniquement sur les
+machines qu'il existe pour protéger.
+
+**Et ce n'est pas un défaut de sûreté.** La commande part en **un seul** `execute_as_root` avec
+`set -e` : si l'élévation échoue, rien ne s'exécute — ni le retrait du sudoers, ni le `userdel`. Pas
+d'état partiel, `code != 0`, aucune écriture en base, et l'écran l'annonce. Il **échoue fermé et
+visiblement**. C'est une indisponibilité d'un contrôle de sécurité, pas un demi-geste.
+
+**Second porteur, non nommé au premier relevé** : sur neuf appels à `ssh_session` dans `ssh.py`, sept
+passent `service_account=`, un force délibérément le mot de passe (`:738`, premier déploiement) et
+**deux l'omettent — `:970` et `:1061`**. `:1061` est `deploy_service_account`, que cette page propose
+aussi, et l'aller-retour « supprimer puis redéployer » n'est donc **pas symétrique**. La borne du
+geste de reprise le dit, avec sa propre cause.
+
+Et « passer `service_account=True` » n'est **pas** le correctif évident qu'il paraît pour `:970` : on
+se connecterait par le compte qu'on s'apprête à supprimer. Ce qui manque est un **refus qui nomme sa
+cause** quand aucune élévation utilisable n'existe. Backend, hors périmètre de ce lot.
+
+#### Trois décisions de conception, confirmées en relecture
+
+- **le bouton n'est rendu qu'au rôle 3**, par une lecture de session. Ce test ne décide que d'**offrir** :
+  les gardes restent `RoutesBackend::ADMIN_SEULEMENT` et `@require_role(3)`. *Un rendu conditionnel est
+  de l'ergonomie, une garde est ailleurs* — et une valeur de session ne décide jamais d'une autorisation.
+- **l'asymétrie de rôle est DITE** aux comptes 1 et 2 concernés, et seulement s'il existe au moins une
+  machine visée. Un silence sur une irréversibilité se lit comme une réversibilité ; et l'information
+  porte sur les limites propres du compte, non sur des objets — elle n'apprend rien d'exploitable.
+- **202 et 409 sont des états définis**, traités **avant** tout verdict d'écriture et annonçant « rien
+  n'a encore été retiré ». Contrepartie exacte du message d'absence de verdict : là il faut avouer
+  l'ignorance, ici il ne faut pas la simuler.
+
+#### Deux corrections demandées par le Lead sur le lot précédent
+
+- **le message d'absence de verdict interdit désormais la relance.** Il portait « aucune conclusion
+  possible » sans dire quoi faire — or un exploitant qui voit une requête expirer relance, et relancer
+  accorde de **nouveaux** `NOPASSWD: ALL` pendant que la première tentative finit peut-être. Le message
+  dit maintenant : pas d'échec affirmé · **ne relance pas** · recharge puis utilise « Tester ». Le geste
+  de vérification est déjà porté sur la même page.
+- **« une propriété qui tient par l'état du parc n'est pas une propriété »** est inscrite là où
+  `sensibles` se calcule. Aucun geste de parc ne viserait `srv-zabbix` aujourd'hui, mais cela tient à
+  l'état des colonnes, pas à une règle.
+
+#### Un défaut de mon propre jet, attrapé par le croisement des clés
+
+Le paragraphe de borne référençait encore `plateforme.revoquer_borne` après que la clé unique soit
+devenue une carte par geste : il aurait **affiché son identifiant à l'écran**, sans erreur ni journal.
+Attrapé par le croisement clés employées / clés déclarées, pas par une relecture.
+
+#### Non mesuré
+
+**Aucun de ces gestes n'a été exécuté** — banc non tenu, et ceux-là écrivent. Vérifié : lint des 4 PHP,
+vue compilée en isolation, `node --check`, parité i18n **comparée** récursivement (139 = 139), zéro clé
+morte, zéro clé déclarée inemployée, et chacun des 5 gestes porte son panneau.
+
+---
+
 ### v1.38.36 — ⚠⚠ E-218 : le coupe-circuit d'un `NOPASSWD: ALL` ne fonctionne peut-etre pas dans l'etat exact vers lequel la page pousse
 
 **Trouve par la session 3 en ecrivant l'interface de `revoke_service_account` que le Lead venait d'autoriser

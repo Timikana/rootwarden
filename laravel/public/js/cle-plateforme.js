@@ -257,6 +257,9 @@ window.RW_CLE_PLATEFORME = true;
     var pCibles = document.querySelector('[data-rw="cle-panneau-cibles"]');
     var pProd = document.querySelector('[data-rw="cle-panneau-prod"]');
     var pChamp = document.querySelector('[data-rw="cle-panneau-champ"]');
+    var pMotif = document.querySelector('[data-rw="cle-panneau-motif"]');
+    var pMotifVal = document.querySelector('[data-rw="cle-panneau-motif-valeur"]');
+    var pBorne = document.querySelector('[data-rw="cle-panneau-borne"]');
     var pMdp = document.querySelector('[data-rw="cle-panneau-mdp"]');
     var pAnnuler = document.querySelector('[data-rw="cle-panneau-annuler"]');
     var pConfirmer = document.querySelector('[data-rw="cle-panneau-confirmer"]');
@@ -276,6 +279,10 @@ window.RW_CLE_PLATEFORME = true;
         compte_service: { route: '/deploy_service_account', liste: true,  mdp: false },
         effacer:        { route: '/remove_ssh_password',    liste: false, mdp: false },
         ressaisir:      { route: '/reenter_ssh_password',   liste: false, mdp: true },
+        // LA CONTREPARTIE DE L'OCTROI. La route prend une LISTE, exige un
+        // motif, et passe par la porte a quatre yeux — d'ou trois issues de
+        // plus que les autres gestes, traitees dans `noteVerdict`.
+        revoquer:       { route: '/revoke_service_account', liste: true,  motif: true },
     };
 
     var enCours = null;
@@ -296,6 +303,9 @@ window.RW_CLE_PLATEFORME = true;
         enCours = null;
         if (pMdp) { pMdp.value = ''; }
         if (pChamp) { pChamp.hidden = true; }
+        if (pMotifVal) { pMotifVal.value = ''; }
+        if (pMotif) { pMotif.hidden = true; }
+        if (pBorne) { pBorne.hidden = true; }
         if (pProd) { pProd.hidden = true; pProd.textContent = ''; }
     }
 
@@ -337,9 +347,24 @@ window.RW_CLE_PLATEFORME = true;
         }
 
         if (pChamp) { pChamp.hidden = ! GESTES[geste].mdp; }
+        if (pMotif) { pMotif.hidden = ! GESTES[geste].motif; }
+        // LA BORNE EST DITE DANS LE PANNEAU, pas seulement dans le journal :
+        // c'est ici que la decision se prend, et un avertissement qui arrive
+        // apres le clic n'a pas averti.
+        //
+        // Elle vient d'une CARTE par geste, jamais d'un `geste === '...'` :
+        // deux gestes butent sur la meme cause backend et ne la rencontrent pas
+        // au meme endroit. Un geste sans borne n'affiche rien du tout — le
+        // paragraphe reste `hidden`, il ne se vide pas en laissant un blanc.
+        if (pBorne) {
+            var borne = (textes.bornes || {})[geste] || '';
+            pBorne.textContent = borne;
+            pBorne.hidden = borne === '';
+        }
         panneau.hidden = false;
         panneau.scrollIntoView({ block: 'nearest' });
         if (GESTES[geste].mdp && pMdp) { pMdp.focus(); }
+        else if (GESTES[geste].motif && pMotifVal) { pMotifVal.focus(); }
     }
 
     /* Le verdict PAR MACHINE, tire de `results` et non du `success` global.
@@ -366,14 +391,42 @@ window.RW_CLE_PLATEFORME = true;
             ok === cibles.ids.length ? 'rw-annonce--ok' : 'rw-annonce--attention');
     }
 
+    /* LE STATUT REMONTE AVEC LE CORPS. La porte a quatre yeux repond 202
+     * (« demande creee ») ou 409 (« aucun approbateur disponible ») : ce sont
+     * des etats DEFINIS, et les confondre avec « absence de verdict » ferait
+     * dire « je ne sais pas » a un serveur qui vient de dire precisement
+     * pourquoi rien n'a ete fait. */
     function envoie(route, corps) {
         return fetch(PASSERELLE + route, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(corps),
         }).then(function (r) {
-            return r.json().catch(function () { return null; });
+            return r.json().catch(function () { return null; }).then(function (d) {
+                return { statut: r.status, corps: d };
+            });
         });
+    }
+
+    /* Les deux issues de la porte a quatre yeux, avant tout verdict d'ecriture.
+     * Rend `true` si la reponse est une issue de porte — donc si RIEN n'a ete
+     * ecrit et qu'il ne faut surtout pas conclure a un echec du geste. */
+    function noteIssueDePorte(d) {
+        if (! d) { return false; }
+        if (d.pending_approval === true) {
+            noteGeste(textes.geste_approbation_attente || '', 'rw-annonce--attention');
+
+            return true;
+        }
+        if (d.approbateur_manquant === true) {
+            noteGeste(remplit('geste_approbation_absente', {
+                message: String(d.message || ''),
+            }), 'rw-annonce--attention');
+
+            return true;
+        }
+
+        return false;
     }
 
     /* L'EFFACEMENT DE PARC : N requetes, et la progression est ECRITE.
@@ -393,7 +446,8 @@ window.RW_CLE_PLATEFORME = true;
             }
 
             return envoie('/remove_ssh_password', { machine_id: cibles.ids[i] })
-                .then(function (d) {
+                .then(function (rep) {
+                    var d = rep.corps;
                     fait += 1;
                     var reussi = d && d.success === true;
                     if (reussi) { ok += 1; }
@@ -426,6 +480,18 @@ window.RW_CLE_PLATEFORME = true;
         var cibles = enCours.cibles;
         var def = GESTES[geste];
 
+        var motif = '';
+        if (def.motif) {
+            motif = ((pMotifVal && pMotifVal.value) || '').trim();
+            if (motif === '') {
+                // CE GESTE RETIRE UN ACCES : il ne s'enregistre pas sans raison.
+                // Le panneau reste ouvert, la decision deja prise n'est pas perdue.
+                noteGeste(textes.motif_vide || '', 'rw-annonce--attention');
+
+                return;
+            }
+        }
+
         var motDePasse = '';
         if (def.mdp) {
             motDePasse = (pMdp && pMdp.value) || '';
@@ -444,14 +510,20 @@ window.RW_CLE_PLATEFORME = true;
 
         var travail;
         if (def.liste) {
-            travail = envoie(def.route, { machine_ids: cibles.ids })
-                .then(function (d) { noteResultats(d, cibles); });
+            var charge = { machine_ids: cibles.ids };
+            if (def.motif) { charge.reason = motif; }
+            travail = envoie(def.route, charge).then(function (rep) {
+                if (noteIssueDePorte(rep.corps)) { return; }
+                noteResultats(rep.corps, cibles);
+            });
         } else if (geste === 'effacer' && cibles.ids.length > 1) {
             travail = effaceEnSerie(cibles);
         } else {
             var corps = { machine_id: cibles.ids[0] };
             if (def.mdp) { corps.password = motDePasse; }
-            travail = envoie(def.route, corps).then(function (d) {
+            travail = envoie(def.route, corps).then(function (rep) {
+                var d = rep.corps;
+                if (noteIssueDePorte(d)) { return; }
                 if (! d || typeof d.success !== 'boolean') {
                     noteGeste(textes.geste_sans_verdict || '', 'rw-non-resolu');
 

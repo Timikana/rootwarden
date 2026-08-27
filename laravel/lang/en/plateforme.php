@@ -118,8 +118,8 @@ return [
     'geste_journal' => "Action log",
     'geste_journal_vide' => "No action has been started from this page yet.",
     'geste_en_cours' => "Running on :cibles…",
-    'geste_echec_reseau' => "The request did not leave or did not come back: :message. No conclusion can be drawn about what was written — the page must be reloaded to read the real state.",
-    'geste_sans_verdict' => "The server answered without a readable verdict. This is neither a success nor a failure: the state must be read again.",
+    'geste_echec_reseau' => "No verdict: the request did not come back (:message). The action may still be RUNNING on the server side. DO NOT RETRY — a second attempt would grant fresh root access while the first one may be finishing. Reload the page, then use « Test » on the machine to find out where it stands.",
+    'geste_sans_verdict' => "The server answered without a readable verdict. This is neither a success nor a failure, and the write may have happened. DO NOT RETRY. Reload the page, then use « Test » on the machine.",
     'geste_ligne_ok' => ":machine: succeeded — :message",
     'geste_ligne_echec' => ":machine: failed — :message",
     'geste_bilan' => ":ok success(es) out of :total. Failed machines are named above, one per line.",
@@ -157,6 +157,18 @@ return [
                 "« Re-enter » gives back only the SSH password: the root password can only be rewritten from the Servers page",
             ],
         ],
+        'revoquer' => [
+            'titre' => "Take back the root administration access",
+            'texte' => "This action opens an SSH session and DELETES the administration account on the machine. It is the counterpart of the deployment, and it cannot be undone without deploying again.",
+            'effets' => [
+                "removes /etc/sudoers.d/rootwarden, then deletes the Unix account « rootwarden » and its home directory",
+                "THEN checks that the account is really gone, and records success only in that case — the verdict comes from the effect, not from the deletion's return code",
+                "after this action RootWarden can no longer become root THROUGH THAT ACCOUNT; if the root password was erased, nothing on this page gives it back",
+                "WHAT THE ACTION LEAVES IN PLACE: the platform key stays authorized on the nominal account AND on root, because the deployment writes it there too. It removes ONE door out of THREE.",
+                "it therefore does NOT answer a compromised key, despite what its name suggests: the only remedy for a compromised key is to rotate it, and that action is not ported here",
+                "the action requires a second administrator's approval",
+            ],
+        ],
         'ressaisir' => [
             'titre' => "Store an SSH password again",
             'texte' => "This action writes to the database and does not touch the machine. It restores only half of what the erasure removed.",
@@ -170,4 +182,24 @@ return [
     'panneau_cible_une' => "Target machine: :nom",
     'panneau_cible_n' => ":n target machines: :noms",
     'panneau_prod' => "⚠ This scope contains PRODUCTION: :noms",
+    // ── Taking back the administration account ───────────────────────────
+    // The route has existed in the backend since the A04-INSEC-N5 fix and had
+    // NO caller at all. Since P3 makes the grant available in one click, so is
+    // taking it back: shipping one without the other ships a door with no
+    // handle on the inside.
+    'btn_revoquer' => "Delete the administration account",
+    'parc_btn_revoquer' => "Delete the administration account on :n machine(s)",
+    'champ_motif' => "Reason for taking it back",
+    'champ_motif_aide' => "It is recorded in the audit log together with the machine name. The backend truncates it at 200 characters.",
+    'motif_vide' => "No reason entered: nothing was sent. This action removes an access; it is not recorded without a reason.",
+    'geste_approbation_attente' => "Nothing has been removed yet: this action requires a second administrator's approval. The request has been created — it is handled from the Approvals page.",
+    'geste_approbation_absente' => "Nothing was removed, and the action is BLOCKED: dual approval is required for it and no second administrator is available to give it. What the server reports: :message",
+    'revoquer_asymetrie' => "This page can GRANT permanent root access from role 1 upwards, with the permission. Taking it back is restricted to role 3: the backend route requires it. Your account can therefore grant that access and cannot remove it — this is an asymmetry in the application, it is not fixed here, and it is stated rather than left to be discovered.",
+    // ── THE LIMITS, PER ACTION ───────────────────────────────────────────
+    // Stated INSIDE the decision panel, not in a log: a warning that arrives
+    // after the click has not warned.
+    'bornes' => [
+        'revoquer' => "This action may FAIL precisely on the machines it exists to protect. It connects with the nominal account's key, never with the administration account, then elevates using the root password — and the only state in which that password is empty is exactly the state in which the administration account exists: the erasure REFUSES to run until that account is deployed. The two conditions are therefore not independent, they are linked. This is not a risk to the machine: the command is sent as a single block and stops at the first error, so either everything is removed or nothing is, and the screen says which. It is an unavailability of the action, not a half-done action. Reported to the backend owner.",
+        'compte_service' => "This retry may FAIL on a machine whose administration account was deleted AFTER the passwords were erased: neither a root password nor an administration account is then left to elevate through. The « delete then redeploy » round trip is not symmetric. Same cause as above, same report.",
+    ],
 ];

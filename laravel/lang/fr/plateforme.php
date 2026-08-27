@@ -118,8 +118,8 @@ return [
     'geste_journal' => "Journal des gestes",
     'geste_journal_vide' => "Aucun geste n'a encore été lancé depuis cette page.",
     'geste_en_cours' => "En cours sur :cibles…",
-    'geste_echec_reseau' => "La requête n'est pas partie ou n'est pas revenue : :message. Aucune conclusion n'est possible sur ce qui a été écrit — il faut recharger la page pour lire l'état réel.",
-    'geste_sans_verdict' => "Le serveur a répondu sans verdict lisible. Ce n'est ni une réussite ni un échec : l'état doit être relu.",
+    'geste_echec_reseau' => "Aucun verdict : la requête n'est pas revenue (:message). Le geste peut être EN COURS côté serveur. NE RELANCE PAS — une seconde tentative accorderait de nouveaux accès root pendant que la première finit peut-être. Recharge la page, puis utilise « Tester » sur la machine pour savoir où elle en est.",
+    'geste_sans_verdict' => "Le serveur a répondu sans verdict lisible. Ce n'est ni une réussite ni un échec, et l'écriture a peut-être eu lieu. NE RELANCE PAS. Recharge la page, puis utilise « Tester » sur la machine.",
     'geste_ligne_ok' => ":machine : réussi — :message",
     'geste_ligne_echec' => ":machine : échoué — :message",
     'geste_bilan' => ":ok réussite(s) sur :total. Les machines en échec sont nommées ci-dessus, une par ligne.",
@@ -157,6 +157,18 @@ return [
                 "« Ressaisir » ne rend que le mot de passe SSH : le mot de passe root ne se réécrit que depuis la page Serveurs",
             ],
         ],
+        'revoquer' => [
+            'titre' => "Reprendre l'accès root d'administration",
+            'texte' => "Ce geste ouvre une session SSH et SUPPRIME le compte d'administration sur la machine. C'est la contrepartie du déploiement, et elle est irréversible sans un nouveau déploiement.",
+            'effets' => [
+                "retire /etc/sudoers.d/rootwarden, puis supprime le compte Unix « rootwarden » et son répertoire personnel",
+                "vérifie ENSUITE que le compte a bien disparu, et n'enregistre la réussite que dans ce cas — le verdict vient de l'effet, pas du code de retour de la suppression",
+                "après ce geste, RootWarden ne peut plus passer root PAR CE COMPTE ; si le mot de passe root a été effacé, plus rien ne le lui rend depuis cette page",
+                "CE QUE LE GESTE LAISSE EN PLACE : la clé de plateforme reste autorisée sur le compte nominal ET sur root, car le déploiement l'y écrit aussi. Il retire UNE porte sur TROIS.",
+                "il ne répond donc PAS à une clé compromise, malgré ce que suggère son nom : le seul remède à une clé compromise est de la faire tourner, et ce geste-là n'est pas porté ici",
+                "l'action exige la validation d'un second administrateur",
+            ],
+        ],
         'ressaisir' => [
             'titre' => "Réenregistrer un mot de passe SSH",
             'texte' => "Ce geste écrit en base et ne touche pas la machine. Il ne restaure que la moitié de ce que l'effacement a retiré.",
@@ -170,4 +182,24 @@ return [
     'panneau_cible_une' => "Machine visée : :nom",
     'panneau_cible_n' => ":n machines visées : :noms",
     'panneau_prod' => "⚠ Cette portée contient de la PRODUCTION : :noms",
+    // ── La reprise du compte d'administration ────────────────────────────
+    // La route existe dans le backend depuis le correctif A04-INSEC-N5 et
+    // n'avait AUCUN appelant. P3 rendant l'octroi disponible en un clic, sa
+    // reprise l'est aussi : livrer l'un sans l'autre, c'est livrer une porte
+    // sans poignee interieure.
+    'btn_revoquer' => "Supprimer le compte d'administration",
+    'parc_btn_revoquer' => "Supprimer le compte d'administration sur :n machine(s)",
+    'champ_motif' => "Motif de la reprise",
+    'champ_motif_aide' => "Il est enregistré dans le journal d'audit avec le nom de la machine. Le backend le tronque à 200 caractères.",
+    'motif_vide' => "Aucun motif saisi : rien n'a été envoyé. Ce geste retire un accès, il ne s'enregistre pas sans raison.",
+    'geste_approbation_attente' => "Rien n'a encore été retiré : ce geste demande la validation d'un second administrateur. La demande est créée — elle se traite depuis la page Approbations.",
+    'geste_approbation_absente' => "Rien n'a été retiré, et le geste est BLOQUÉ : la double validation est exigée pour cette action et aucun second administrateur n'est disponible pour la donner. Ce que le serveur rapporte : :message",
+    'revoquer_asymetrie' => "Cette page permet d'ACCORDER un accès root permanent à partir du rôle 1, avec la permission. Le reprendre est réservé au rôle 3 : la route du backend l'exige. Ton compte peut donc accorder cet accès et ne peut pas le retirer — c'est une asymétrie de l'application, elle n'est pas corrigée ici, et elle est dite plutôt que laissée à découvrir.",
+    // ── LES BORNES, PAR GESTE ────────────────────────────────────────────
+    // Dites DANS le panneau de decision et non dans un journal : un
+    // avertissement qui arrive apres le clic n'a pas averti.
+    'bornes' => [
+        'revoquer' => "Ce geste peut ÉCHOUER précisément sur les machines qu'il existe pour protéger. Il se connecte par la clé du compte nominal, jamais par le compte d'administration, puis s'élève avec le mot de passe root — et le seul état où ce mot de passe est vide est exactement l'état où le compte d'administration existe : l'effacement le REFUSE tant que ce compte n'est pas déployé. Les deux conditions ne sont donc pas indépendantes, elles sont liées. Ce n'est pas un risque pour la machine : la commande part en un seul bloc et s'interrompt à la première erreur, donc soit tout est retiré, soit rien ne l'est, et l'écran l'annonce. C'est une indisponibilité du geste, pas un demi-geste. Remonté au responsable du backend.",
+        'compte_service' => "Cette reprise peut ÉCHOUER sur une machine dont le compte d'administration a été supprimé APRÈS un effacement des mots de passe : il ne reste alors ni mot de passe root, ni compte d'administration par lequel s'élever. C'est l'aller-retour « supprimer puis redéployer » qui n'est pas symétrique. Même cause que ci-dessus, même remontée.",
+    ],
 ];
