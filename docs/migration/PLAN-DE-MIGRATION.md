@@ -1614,6 +1614,35 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### ⚠ INF-002 — DEUX CONVENTIONS POUR `verifie()`, ET UN APPEL FAUX NE LÈVE RIEN (2026-08-27)
+
+**La cause structurelle des « détails d'échec imprimés sur un PASS » — cinq occurrences documentées, et
+ce n'était pas de l'inattention.** Mesuré sur les 104 suites, et recompté indépendamment :
+
+| signature définie localement | suites | effet du 3ᵉ argument |
+|---|---|---|
+| `verifie(l, ok, d)` | 46 | `d` s'imprime **sur un PASS COMME sur un FAIL** |
+| `verifie(libelle, ok, detail)` | 24 | idem — **même famille, autre nommage** |
+| **`verifie(l, ok, d, toujours)`** | **12** | `d` est **conditionné**, `toujours` est l'informatif |
+
+**70 suites portent la convention majoritaire, 12 la minoritaire, et 22 ne définissent pas la fonction du
+tout.** Chaque suite définit **sa propre** copie.
+
+> **Un appel à quatre arguments dans un fichier à trois paramètres ne lève AUCUNE erreur** : le quatrième
+> est silencieusement ignoré, et **l'explication d'échec s'imprime en vert**.
+
+C'est « le clivage n'est pas le fichier » appliqué à l'outillage de test, **et en pire** : la parade
+documentée de ce chantier — *toujours lire les fichiers en entier* — **ne départage pas**, puisqu'il faut
+lire **l'autre** fichier pour savoir dans quelle convention on écrit. Le porteur du défaut venait de
+travailler sur `go-fail2ban-f2` et `f6`, **les deux qui portent la signature minoritaire**, et a exporté
+ce motif vers un fichier de l'autre convention. **Deux des quatre occurrences étaient préexistantes** :
+ce n'est donc pas une maladresse isolée.
+
+**Règle en attendant** : *relire la signature LOCALE de `verifie` avant d'écrire un appel.* Et c'est
+justement une règle à se rappeler, donc la mauvaise réponse — **INF-002 est ouvert** : une signature
+unique, où le quatrième argument existe partout ou nulle part. Tant qu'elle n'existe pas, la classe
+reviendra.
+
 ### AVANT D'UNIFIER DEUX COPIES, VÉRIFIER QU'ELLES VALIDENT LA MÊME CHOSE (2026-08-27)
 
 **Deux fois dans la même journée, une instruction du Lead « n'en garde qu'une » était fausse**, et les
