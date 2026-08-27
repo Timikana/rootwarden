@@ -81,13 +81,42 @@ elles ne mordent que si l'appelant fournit un identifiant.
 |---|---|
 | `GET /docker/results` | **DÉDOUANÉE** — `machine_id` est optionnel, mais le corps borne au périmètre du compte (`user_machine_access`, `get_current_user`). L'absence du décorateur ne crée pas de trou |
 | `POST /update_zabbix` | **DÉDOUANÉE** — c'est une redirection **307** vers `/supervision/zabbix/deploy`, qui porte `role(2)` + permission + `machine_access`. Le 307 préserve la méthode et le corps : les gardes s'appliquent à l'arrivée |
-| `GET /ssh-audit/policies` | ⚠ **LA SEULE RÉELLE** — `machine_id` optionnel, **aucun bornage au compte**, **aucun rôle**. Un appelant de rôle 1 qui omet le paramètre lit les politiques d'audit SSH **au-delà de son périmètre** |
+| `GET /ssh-audit/policies` | ⚠ **LA SEULE RÉELLE**, et **plus étroite que ce que ce document a d'abord écrit** — voir la correction ci-dessous |
 
-**Portée de la troisième** : c'est une **lecture** (`directive`, `policy`, `reason`, `updated_by`).
-Pas de secret, pas d'exécution. Mais c'est la même famille qu'**E-208** — trois pages legacy sur cinq
-ne bornent pas le parc au périmètre du compte. **Le legacy est incohérent avec lui-même, donc il n'y
-a aucune règle du produit à documenter, seulement cinq décisions dont deux ont divergé.** Une page de
-documentation lisserait cette incohérence sans le vouloir.
+### ⚠ CORRECTION — la première rédaction de ce document accusait TROP LARGE
+
+Elle disait : *« un appelant de rôle 1 qui omet le paramètre lit les politiques d'audit SSH au-delà
+de son périmètre »*. **C'est FAUX**, et la lecture du corps le montre :
+
+```sql
+if machine_id:  … WHERE machine_id = %s OR machine_id IS NULL
+else:           … WHERE machine_id IS NULL        -- les politiques GLOBALES seulement
+```
+
+Sans `machine_id`, la requête ne rend **que** les politiques globales du portail. **Aucune lecture
+transverse du parc.** Un lecteur de la première version aurait cherché une fuite de machines qui
+n'existe pas.
+
+**L'écart réel, plus étroit et toujours réel** : les politiques **globales** — `directive`, `policy`,
+`reason`, `updated_by` — sont lisibles par **tout porteur de la clé d'API**, quel que soit son rôle,
+**sans détenir `can_audit_ssh`**. La page legacy l'exige (`ssh-audit/index.php:13`), et **son seul
+appelant passe toujours `machine_id`** (`js/main.js:321`) : le chemin sans paramètre n'est exercé par
+**aucune interface**.
+
+**Ce qui en fait un écart, c'est le motif** : `@require_machine_access` ne trouve aucun identifiant
+dans les **paramètres d'URL**, donc il ne refuse rien — quatrième occurrence de « un garde sans objet
+ne garde rien », et la pire de la famille, parce que le repli rend un jeu de données **parfaitement
+cohérent** au lieu d'une erreur. *Un repli permissif ressemble à de la robustesse : le chemin non
+gardé est celui qui a l'air de bien se comporter.*
+
+**Et la façon dont cette erreur est arrivée est celle que §1 décrit** : ma sonde était écrite pour
+accuser, donc elle s'est trompée **du côté qui alarme** — sur sa trouvaille comme sur son décompte.
+Le 24 a été rattrapé parce que son ordre de grandeur était invraisemblable ; celle-ci ne l'était pas,
+et rien ne m'a prévenu. *Une intuition sur l'ordre de grandeur est le dernier filet, pas le premier.*
+
+C'est néanmoins la même famille qu'**E-208** : le legacy est incohérent avec lui-même, donc il n'y a
+aucune règle du produit à documenter, seulement des décisions dont certaines ont divergé. **Une page
+de documentation lisserait cette incohérence sans le vouloir.**
 
 ---
 
