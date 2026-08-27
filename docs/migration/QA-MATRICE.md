@@ -177,6 +177,88 @@ pas de la QA.
 sur les espaces, donc une charge qui en contient devient plusieurs entrées — toutes
 écartées.*
 
+## 2 ter. QA-004 — E-183 et E-187, la seule faute de cette famille qui DÉTRUISE
+
+`backend/tests/test_ssh_scan_users.py` · **19 PASS, 0 FAIL**
+
+Les autres écarts de la famille « l'état persisté ne suit pas le verdict » écrivent un
+état **faux**. Celui-ci **efface un état vrai** : une lecture SSH ratée rendait
+`scanned_users == []`, donc toutes les lignes d'inventaire de la machine devenaient des
+« fantômes », donc étaient **supprimées** — avec les clés dans la foulée — et le journal
+l'annonçait comme un nettoyage réussi.
+
+**Et le même chemin faisait deux choses opposées à la fois** : il détruisait la donnée
+**et** posait `users_scanned_at`, qui est la **précondition du préflight de
+déploiement** (`ssh.py:381`). Il refermait la porte derrière lui pendant qu'il vidait la
+pièce — sur l'inventaire même dont K4 se sert pour décider quelles clés déployer.
+
+### Deux drapeaux, deux lectures — et c'est tout le sujet
+
+| drapeau | ce qu'il mesure |
+|---|---|
+| `scan_concluant` | la lecture de `/etc/passwd` |
+| `cles_lues` | les deux dumps d'`authorized_keys` |
+
+Ce sont des lectures **différentes**, et E-187 est né de leur confusion. Chaque test
+fait donc échouer **une** lecture à la fois : un test qui les ferait échouer ensemble
+passerait à l'identique sur un correctif n'ayant posé qu'un seul des deux drapeaux.
+
+**L'assertion qui compte n'est pas une absence, c'est une présence.** Quand les comptes
+sont lus mais pas les clés, les comptes fantômes **doivent encore être purgés** :
+`ghost_usernames` est gardé par `scan_concluant` **seul**, `stale` par
+`scan_concluant ET cles_lues`. Cette asymétrie est le point délicat du correctif ; elle
+vivait dans le code sans avoir jamais été énoncée comme une propriété. **Un correctif
+trop strict — « on n'efface plus jamais rien » — passerait toutes les autres assertions
+et rendrait E-183 inopérant sur son propre cas.**
+
+### Preuve d'échec — quatre mutations, quatre signatures distinctes
+
+| mutation | rouges |
+|---|---|
+| `scan_concluant = True` (état d'avant E-183) | **8** |
+| `cles_lues = True` (état d'avant E-187) | **3** |
+| les deux drapeaux **fusionnés** en un seul sur la purge des clés | **1** |
+| seul le code de sortie testé, pas la liste vide | **3** |
+
+Chacune touche un ensemble **différent** de tests : la suite ne dit pas seulement
+« quelque chose a changé », elle dit **quoi**.
+
+### Et une correction de la MESURE, pas du code
+
+La première version inventait l'empreinte de la clé d'`alice` (`SHA256:aaa`). La clé
+était alors vue dans le dump **et** absente de l'inventaire sous ce nom : elle comptait
+comme disparue, et le test la déclarait supprimée à tort. **L'assertion échouait pour
+une faute de l'instrument** — et écrite dans l'autre sens, elle serait passée au vert en
+ne mesurant rien.
+
+> Ce qui doit correspondre à une valeur **calculée** par le code se **dérive** du code,
+> jamais ne se recopie. L'empreinte vient désormais de `_parse_authorized_keys_dump`
+> lui-même.
+
+### Un cas laissé ouvert, et il attend le banc
+
+`dump_script` sort en **0 même sans rien émettre** : « code nul + dump vide » est donc
+aussi ce que rend une machine qui n'a **légitimement aucune clé**. Le module laisse
+délibérément l'ambiguïté ouverte, avec la raison écrite dans le code — appliquer
+`rc == 0 and bool(dump)` sans mesure purgerait à tort une telle machine, **c'est-à-dire
+reproduirait E-183 à l'envers**.
+
+`Test-Server-Debian` (id 2) porte **20 lignes d'inventaire et zéro clé** : c'est
+exactement ce cas. **La mesure m'est attribuée et elle exige le banc.** Non faite.
+
+### Le protocole de mutation a changé, et c'est un acquis
+
+Muter un fichier du dépôt pour compter les rouges est **dangereux à sept sessions** :
+une autre session peut committer pendant la fenêtre, et emporter la mutation. Ce n'est
+pas une hypothèse — l'incident symétrique s'est produit le jour même (§6 bis).
+
+> **Les mutations se font désormais sur une COPIE, dans le conteneur** :
+> `cp -a /app /tmp/mut`, muter là, `pytest` là, jeter. **Le dépôt n'est jamais touché**,
+> donc aucune fenêtre de risque n'existe — ni pour moi, ni pour les autres.
+
+C'est la même leçon que le runner qui se recopie dans `/tmp` : *une règle qu'on doit se
+rappeler est une propriété qu'on n'a pas encore construite.*
+
 ## 3. QA-002 — les gardes du portage, côté PHP
 
 `laravel/tests/` · **232 PASS, 764 assertions, 0 FAIL**
@@ -487,6 +569,8 @@ la seule réparation qui ne coûte rien à personne.
 | 2026-08-27 | l'inventaire des gardes **a rougi de lui-même** sur `GET /fail2ban/portee` | route neuve de la session 3, inscrite au relevé ; **232 passed** |
 | 2026-08-27 | dépendance de la suite PHP à `APP_KEY` | sans clé : **226 failed / 6 passed** — l'étape `key:generate` du job CI vient de là |
 | 2026-08-27 | jobs de la CI, recomptés **par un analyseur YAML** | **13** avant, **14** avec `test-php`. Mon `grep` en annonçait 14 : il comptait `push:` |
+| 2026-08-27 | `test_ssh_scan_users.py` (E-183 + E-187) | **19 passed** ; suite complète **483 passed, 1 xfailed** |
+| 2026-08-27 | 4 mutations d'E-183/E-187, **sur une copie dans le conteneur** | **8, 3, 1 et 3 rouges**, ensembles distincts — le dépôt n'a pas été touché |
 
 Chaque chiffre porte sa commande de remesure :
 
