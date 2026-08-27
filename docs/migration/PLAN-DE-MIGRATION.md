@@ -1614,6 +1614,36 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### UNE REQUÊTE FORGÉE DEPUIS UNE PAGE REFUSÉE NE MESURE RIEN DU BACKEND (2026-08-27)
+
+**Propriété du dispositif que personne n'avait écrite, et qui invalide une famille entière de mesures.**
+
+Sur le legacy, une sonde forgée sous `rw-test-user` a rendu **403 « Aucun jeton CSRF trouvé dans la
+requête »** — **pas** un refus de permission. La cause : **le legacy SURCHARGE `window.fetch`** pour y
+joindre le jeton CSRF (`js/utils.js`). Une requête forgée en hérite donc **si le script de la page est
+chargé**, et pas sinon — et sur la page **403** servie à ce compte, il ne l'est pas.
+
+> **Une requête forgée depuis une page à laquelle le compte n'a PAS accès ne peut pas mesurer une
+> propriété du backend : elle ne franchit jamais le proxy.** Le refus qu'on lit est celui du transport,
+> pas celui qu'on voulait éprouver.
+
+Cela vaut pour **toute** suite qui voudrait éprouver une garde avec un compte refusé — c'est-à-dire le
+motif le plus naturel quand on veut mesurer un 403. **La parade est que la sonde porte sa précondition** :
+quand le refus nomme le jeton, le journal dit **NON MESURABLE** et **n'assert pas** — au lieu de compter
+un refus de transport comme un refus d'accès. C'est « une propriété doit porter sa propre PRÉCONDITION »
+appliquée au transport.
+
+**Et l'asymétrie qui en découle est mesurable** : la même propriété est vérifiable sur **trois** comptes
+côté portage et **deux** côté legacy — parce que la passerelle du portage lit le jeton dans l'en-tête du
+cadre, là où le legacy dépend d'un script de page. **Le portage est donc mesurable là où le legacy ne
+l'est pas**, et cela se voit dans les références : `go-fail2ban-f1` gagne **+3** en laravel et **+2** en
+legacy.
+
+**Corollaire pour toute mesure de correctif backend** : importer le module dans un processus neuf
+(`docker exec python -c "from … import …"`) lit **le disque**, pas le serveur en vol. Sur un correctif
+committé après le dernier redémarrage, cela « confirme » un correctif qui **n'est pas en service** —
+sixième forme du piège de l'observable, évitée de justesse. **Seule une requête réelle tranche.**
+
 ### ⚠ INF-002 — DEUX CONVENTIONS POUR `verifie()`, ET UN APPEL FAUX NE LÈVE RIEN (2026-08-27)
 
 **La cause structurelle des « détails d'échec imprimés sur un PASS » — cinq occurrences documentées, et
