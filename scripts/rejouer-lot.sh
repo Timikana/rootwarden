@@ -180,7 +180,20 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # `process.exit()` — lequel NE JOUE PAS le `finally`. La fixture y a fui pour de
 # vrai avant d'etre reprise a cet endroit.
 declare -A REF_LARAVEL=(
-  [go-socle-navigation]=64 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  # `go-socle-navigation` 64 -> 63 le 2026-08-27, mesuree SEULE AU REPOS apres le LOT.
+  # Le -1 vient du retrait de `tickets`, et il REFUTE ENCORE la formule courte :
+  # l'entree portait `'garde' => 'can_admin_portal'`, que SEUL `rw-test-super` detient
+  # — mesure en base, `rw-test-admin` ne l'a pas malgre ses neuf permissions. Elle
+  # n'etait donc visible QUE D'UN ROLE : -1, pas -2. La formule « +-2 par entree »
+  # aurait predit 62 et fait conclure a une assertion PERDUE. Troisieme cas ou
+  # « +1 par ROLE qui voit l'entree » tranche la ou elle se trompe.
+  #
+  # Dans le LOT elle a rendu 47/1 : `rw-test-user` restait bloque sur /second-facteur,
+  # donc ses assertions n'ont JAMAIS ete jouees. Un effondrement de -16 avec UN SEUL
+  # rouge est la signature d'un compte qui n'entre pas, pas d'une page cassee.
+  # TRANSITOIRE : 63/0 au repos. Deuxieme fois de la journee qu'un rejeu au repos
+  # separe un artefact d'un defaut, apres `go-fail2ban-f2`.
+  [go-socle-navigation]=63 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   [go-page-tasks]=17 [go-page-tickets]=15 [go-page-search]=12
   [go-page-update-u1]=21 [go-page-update-u2]=13 [go-page-update-u3]=15 [go-page-update-u4]=14

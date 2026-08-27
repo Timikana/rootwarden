@@ -8904,3 +8904,27 @@ révocation.
 **À trancher avec l'objectif 2.0**, et pas après : soit le portage tient la table (le cadre a son propre
 mécanisme de session, il faut donc décider lequel fait foi), soit l'écran cesse d'offrir un geste sans
 effet.
+
+---
+
+*Note sur E-90 — **REFERMÉ, et c'est le LOT complet qui l'a établi** (2026-08-27).*
+
+`go-page-supervision-deploiement` rend **FAIL**, et **c'est une bonne nouvelle** : son assertion de
+caractérisation **exige que le défaut soit PRÉSENT** —
+`forgee.conclut === true && apresForge.length === 1 && agentInstalle() === 'NON'`.
+
+La mesure donne `conclut = false`, un inventaire **vide**, et un flux qui remonte enfin ses vrais codes
+(`code 127`, `code 100`, `code 2`).
+
+> **Ce n'est pas la page qui a régressé, c'est la caractérisation qui est périmée.** E-90 — « le
+> déploiement backend n'inspecte aucun code de retour et inscrit un agent inexistant » — est **fermé**
+> depuis `v1.38.11`, et sa portée réelle était de **quatre** routes et non deux.
+
+**C'est le troisième `go-bashrc-b4` du chantier** : un **FAIL permanent qui ne dit rien de mauvais**, et
+qui rougirait à **chaque** LOT tant qu'il n'est pas tranché. Les deux précédents ont coûté, chacun, une
+demi-journée de diagnostic à quelqu'un qui lisait un rouge inexplicable.
+
+**Décision : l'assertion est RETOURNÉE** — « le déploiement ne conclut plus au succès quand la machine
+refuse ». Retourner une assertion de caractérisation équivaut à **déclarer un écart fermé**, ce qui
+appartient à ce fichier : c'est donc écrit ici, et la suite suit. La référence sera remesurée après le
+retournement.
