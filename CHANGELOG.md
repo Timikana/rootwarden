@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.4** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.5** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,78 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.5 — `fail2ban/` F4 caracterise : la table d'audit enregistre un ban qui n'a pas eu lieu
+
+`go-fail2ban-f4.mjs`, **legacy 14 PASS / 0 FAIL**, base rouge **10 PASS / 4 FAIL**. Le portage reste a
+faire. **Premier sous-lot du module qui ECRIT.**
+
+#### E-165 — une reussite annoncee sans etre verifiee
+
+`fail2ban_ban`, `fail2ban_unban` et `fail2ban_unban_all` recoivent le code de retour de la commande
+distante et **ne le testent jamais** :
+
+```python
+out, stderr, rc = ban_ip(client, root_pass, jail, target_ip)
+_log_ban_action(mid, jail, target_ip, 'ban', ...)          # inconditionnel
+return jsonify({'success': True, 'message': f'{target_ip} banni dans {jail}'})
+```
+
+Les deux routes voisines — `/install` et `/restart` — testent `rc`. **L'incoherence est interne au
+fichier.**
+
+Mesure du 2026-08-27 sur la machine d'essai, qui n'a pas fail2ban :
+
+| | |
+|---|---|
+| la page annonce | « 203.0.113.7 banni dans sshd » |
+| sa propre liste d'adresses bannies, rechargee juste apres | **ne le contient pas** |
+| `fail2ban_history` | **1 ligne creee** — `ban │ 203.0.113.7 │ 16` |
+
+Deux verites sur le meme ecran, a une ligne d'intervalle — et **une table d'audit qui affirme qu'un
+ban a eu lieu sur une machine ou fail2ban n'est meme pas installe**. C'est la forme la plus couteuse
+de ce defaut : un journal d'audit ne se relit pas, on lui fait confiance.
+
+La preuve se lit **sur la page**, sans rien savoir du backend : `banIp` recharge le detail juste
+apres, et cette liste est le second temoin.
+
+#### E-166 — les deux gestes les plus destructeurs ont perdu leur couleur d'alerte
+
+Le panneau de detail aligne trois boutons destructeurs, alimentes par le MEME champ :
+
+| bouton | portee | classe | fond **rendu** |
+|---|---|---|---|
+| « Ban » | la machine choisie | `bg-red-600` | `rgb(220, 38, 38)` |
+| « Ban global » | **TOUTES les machines, production comprise** | `bg-red-800` | **`rgba(0, 0, 0, 0)`** |
+| « Debannir tout » | vide la jail entiere | `bg-orange-600` | **`rgba(0, 0, 0, 0)`** |
+
+**Le seul bouton qui garde sa couleur d'alerte est le moins dangereux des trois.** Cinquieme
+occurrence de la famille « classe purgee » — et la premiere ou elle retire un signal de DANGER.
+Aucune assertion sur le DOM ne peut le voir : le HTML porte bien `bg-red-800`.
+
+S'y ajoute la geometrie : « Ban » et « Ban global » sont a **8 px** l'un de l'autre, de meme forme et
+de meme taille. Le geste qui atteint tout le parc est **entre** les deux qui ne l'atteignent pas.
+
+#### E-163, troisieme occurrence
+Le panneau de detail affiche « Jail **:name** ». `js.php:56` ecrit `:name`, `main.js:142` passe
+`{jail}`. Meme faute que `:count`, sur un troisieme message.
+
+#### La surete, point par point
+`srv-zabbix` n'est jamais jointe, meme en lecture. L'adresse bannie est `203.0.113.7`, dans TEST-NET-3
+(RFC 5737), reservee a la documentation : elle n'appartient a personne, **et surtout pas au portail**
+— bannir l'adresse du portail couperait son propre acces. `/fail2ban/ban_all_servers` est AVORTEE.
+**Les boites natives sont REFUSEES par defaut** : le drapeau n'est leve que par l'etape qui veut
+vraiment le geste, et il retombe aussitot — une confirmation acceptee par reflexe est une action
+destructrice declenchee sans decision. Les lignes d'audit creees sont retirees dans le `finally`,
+bornees par un delta d'`id`.
+
+#### La base rouge, lue passe par passe
+10 PASS / 4 FAIL, **et trois des dix passes sont creuses** : « chaque geste destructeur porte une
+couleur d'alerte » passe parce qu'AUCUN de ces boutons n'existe encore — un filtre sur « les boutons
+qui manquent de couleur » rend une liste vide quand il n'y a pas de bouton. « Aucune requete n'a
+joint la production » et « le ban sur tout le parc n'a jamais ete emis » passent pour la meme raison.
+
+**Reference du LOT** : `go-fail2ban-f4` entre avec **14 PASS sur le legacy**.
 
 ### v1.38.4 — `fail2ban/` F3 porte : une seule notion de « la machine », et E-164 corrige dans le backend
 
