@@ -283,39 +283,42 @@ class ClePlateforme
      *    qui finirait en 403. L'asymetrie elle-meme est DITE a l'ecran : elle
      *    n'est pas de mon fait et je ne la corrige pas en silence.
      *
-     * 2. LE GESTE PEUT ECHOUER EXACTEMENT SUR LES MACHINES QU'IL EXISTE POUR
-     *    PROTEGER — et les deux conditions ne sont pas independantes, elles
-     *    sont CAUSALEMENT LIEES.
+     * 2. E-218, ET LA RESERVE EST LEVEE POUR LA REVOCATION, PAS POUR LA
+     *    REPRISE. Le backend est corrige (`599d1a3`) : les deux routes passent
+     *    desormais `service_account=` ET selectionnent la colonne qui le porte
+     *    — sans quoi le correctif aurait ete prouvablement inerte, le drapeau
+     *    valant toujours `False`. Le retrait du sudoers passe en dernier, et le
+     *    verdict controle les DEUX effets (compte absent ET fichier absent).
      *
-     *    `revoke_service_account` ouvre `ssh_session(...)` **sans**
-     *    `service_account=` (`ssh.py:970`) : la connexion se fait par la cle du
-     *    compte NOMINAL, `_rootwarden_auth_method` vaut `keypair`, et
-     *    `execute_as_root` perd son court-circuit `NOPASSWD`
-     *    (`ssh_utils.py:537`) — il envoie `root_password`.
+     *    CE QUI RESTE VRAI, ET CE QUI NE L'EST PLUS.
      *
-     *    Or `remove_ssh_password` REFUSE de vider les mots de passe tant que
+     *    Pour la REVOCATION : la reserve est levee. La route se connecte par le
+     *    compte de service quand il est deploye, donc `execute_as_root`
+     *    court-circuite avec `sudo sh -c` et n'a plus besoin d'un mot de passe.
+     *    Il subsiste un cas RESIDUEL : `connect_ssh` retombe sur le compte
+     *    nominal si la connexion au compte de service echoue
+     *    (`ssh_utils.py:250-264`) — cas connu du depot, un `sshd_config` durci
+     *    par `AllowUsers`. Le repli rencontre alors `root_password = ''`.
+     *
+     *    Pour la REPRISE du compte de service : la reserve TIENT, et le
+     *    correctif ne pouvait pas la lever. Apres une revocation,
+     *    `service_account_deployed` vaut 0 : la route ne peut donc PAS se
+     *    connecter par un compte qui n'existe plus, retombe sur le compte
+     *    nominal, et sur une machine migree `root_password` est vide. L'aller-
+     *    retour « supprimer puis redeployer » n'est pas symetrique — et c'est le
+     *    bouton de revocation qui rend cet etat atteignable, puisque `ssh.py:986`
+     *    est la SEULE ecriture qui remette ce drapeau a 0.
+     *
+     *    LA CAUSE PROFONDE RESTE CELLE-CI, et elle ne depend d'aucun parametre :
+     *    `remove_ssh_password` REFUSE de vider les mots de passe tant que
      *    `service_account_deployed` est faux (`ssh.py:1235`). **Le seul etat ou
      *    `root_password` est vide est donc exactement l'etat ou le compte de
-     *    service existe.** Ce n'est pas une conjonction malheureuse, c'est une
-     *    implication.
+     *    service existe** — ou a existe. Ce n'est pas une conjonction
+     *    malheureuse, c'est une implication.
      *
-     *    CE N'EST PAS UN DEFAUT DE SURETE, C'EST UN DEFAUT DE DISPONIBILITE
-     *    sur un controle de securite. La commande part en UN SEUL
-     *    `execute_as_root` avec `set -e` : si l'elevation echoue, rien ne
-     *    s'execute — ni le retrait du sudoers, ni le `userdel`. Pas d'etat
-     *    partiel, `code != 0`, aucune ecriture en base, et l'ecran l'annonce.
-     *    Il echoue FERME et VISIBLEMENT.
-     *
-     *    Sur neuf appels a `ssh_session` dans ce fichier, sept passent
-     *    `service_account=`, un force deliberement le mot de passe (`:738`, le
-     *    premier deploiement) et **deux l'omettent : `:970` et `:1061`**.
-     *    `:1061` est `deploy_service_account`, que cette page propose aussi.
-     *
-     *    Et « passer `service_account=True` » n'est PAS le correctif evident
-     *    qu'il parait pour `:970` : on se connecterait par le compte qu'on
-     *    s'apprete a supprimer. Ce qui manque est plutot un REFUS QUI NOMME SA
-     *    CAUSE quand aucune elevation utilisable n'existe. Hors de mon
-     *    perimetre ; remonte, et la borne est dite dans le panneau.
+     *    DANS LES DEUX CAS, ECHEC FERME ET VISIBLE : la commande part en un
+     *    seul `execute_as_root` avec `set -e`, aucun etat partiel dangereux,
+     *    aucune ecriture en base, et l'ecran l'annonce.
      *
      * 3. LE GESTE RETIRE UNE PORTE SUR TROIS, ET SON NOM NE DOIT PAS LE TAIRE.
      *    `deploy_platform_key` ecrit la MEME cle publique dans

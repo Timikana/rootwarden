@@ -2171,6 +2171,36 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.40 — la réserve d'E-218 est levée pour la révocation, elle TIENT pour la reprise
+
+Le correctif backend d'E-218 (`599d1a3`) est arrivé **après** le commit de la révocation
+(v1.38.37) : la borne affichée dans le panneau de décision **n'était plus vraie**. Elle est réécrite
+plutôt que supprimée, parce que les deux gestes ne sont pas dans le même état.
+
+| geste | réserve | pourquoi |
+|---|---|---|
+| **révocation** | **levée**, un cas résiduel nommé | la route se connecte désormais par le compte d'administration et s'élève sans mot de passe. Résiduel : `connect_ssh` retombe sur le compte nominal si cette connexion échoue (`ssh_utils.py:250-264`) — cas connu du dépôt, un `sshd_config` durci par `AllowUsers` — et le repli rencontre alors `root_password = ''` |
+| **reprise du compte** | **TIENT** | le correctif ne pouvait pas la lever : après une révocation `service_account_deployed` vaut 0, donc la route ne peut pas se connecter par un compte qui n'existe plus. L'aller-retour « supprimer puis redéployer » n'est pas symétrique — et c'est le bouton de révocation qui rend cet état atteignable, `ssh.py:986` étant la **seule** écriture qui remette ce drapeau à 0 |
+
+**La cause profonde ne dépend d'aucun paramètre** et reste écrite : `remove_ssh_password` refuse de
+vider les mots de passe tant que `service_account_deployed` est faux (`ssh.py:1235`), donc le seul
+état où `root_password` est vide est exactement celui où le compte de service existe — ou a existé.
+
+Dans les deux cas l'échec est **fermé et visible** : un seul `execute_as_root` avec `set -e`, aucun
+état partiel dangereux, aucune écriture en base. Le correctif backend a en outre déplacé le retrait
+du `sudoers.d` **en dernier** et fait vérifier les **deux** effets, ce qui rend un échec partiel
+inerte et rejouable.
+
+**Un mot pour le prochain lot** : la route distingue désormais un troisième état — `exit 2`, « compte
+supprimé mais fichier sudoers subsistant, à rejouer ». Il n'arrive côté écran que dans le texte du
+message, sans marqueur lisible par la machine : la page l'affiche donc comme un échec dont le message
+dit « à rejouer ». Un drapeau serait plus sûr qu'une comparaison de chaîne, et c'est remonté plutôt
+que contourné.
+
+Parité i18n comparée : 139 = 139. Rien n'a été exécuté.
+
+---
+
 ### v1.38.39 — le correctif de deux lignes du Lead etait faux TROIS fois, et l'une d'elles armait un piege qui n'existait pas avant lui
 
 **Meilleur refus d'instruction de la journee. La session 4 a mesure les trois erreurs avant d'ecrire.**
