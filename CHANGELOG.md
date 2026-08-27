@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.9** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.11** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,137 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.12 — E-174 : une execution de commande en root, et un second vecteur PIRE que le premier
+
+`backend/fail2ban_manager.py`. **Le defaut le plus grave du chantier**, trouve par relecture hors du
+sous-lot en cours, **occupe le jour meme** par un compte actif au second facteur fonctionnel.
+
+`_validate_ip` appelait `ipaddress.ip_address()` **pour son seul effet de bord**, jetait le resultat et
+rendait la **chaine recue**. Un identifiant de portee IPv6 peut contenir n'importe quoi : `fe80::1%;id;`
+traverse. Et `str()` le **conserve verbatim** — donc « normaliser d'abord » n'aurait rien ferme. C'est le
+`%`, et lui seul, qui ouvre la porte : `1.2.3.4;id` etait bien refusee.
+
+**Le second vecteur, trouve en cherchant les branches jumelles, est pire.** `_validate_ip` a **cinq**
+appelants. `manage_whitelist` compose `sed -i '/\[DEFAULT\]/a\<ligne>' /etc/fail2ban/jail.local`, et
+l'identifiant de portee accepte **tout** — apostrophe, guillemet, accent grave, antislash, espace.
+L'apostrophe **ferme l'argument de `sed`** : ce vecteur ne depend meme pas du `sh -c` distant, il
+s'echappe tout seul. Et il a une source que `ban_ip` n'a pas : **la liste est RELUE dans le fichier
+distant puis recomposee**, donc une charge deja posee reviendrait par la relecture, correctif ou pas.
+C'est la lecon de V10a : **valider aux DEUX bouts.**
+
+**Trois verrous, et le premier seul ne fermait pas la classe** : (a) `_validate_ip` refuse tout `%` et
+rend la valeur normalisee ; (b) `_entree_whitelist_sure()` filtre la **relecture** (adresse ou CIDR, sans
+`%`), plus une garde fail-closed sur la ligne composee — ce qui rend la propriete **verifiable** au lieu
+d'etre deduite de deux filtres ; (c) ceinture : `shlex.quote()` sur `jail` **et** `ip` a l'interieur des
+quatre commandes `fail2ban-client`.
+
+**E-171 est REFERME par ce commit.** Il etait ouvert depuis F5 comme « interpolation brute de
+`manage_whitelist` — RELEVE PAR LECTURE, NON MESURE », avec la note que « le portage ne peut pas la
+refermer, la composition vit dans le backend ». Il est desormais **mesure** et ferme au bon endroit.
+
+**Les branches jumelles ailleurs dans `backend/` : AUCUNE, et c'est une mesure.** Aucun autre validateur
+ne rend la valeur recue apres l'avoir validee pour effet de bord ; `ipaddress` n'est employe ailleurs que
+dans `cve_scanner.py`, ou l'**objet** sert a DECIDER (garde SSRF) et non a composer — classe differente ;
+`iptables_manager` compose par base64, le motif sur. Et **un cas ou la ceinture aurait nui** :
+`enable_jail` / `disable_jail` interpolent `{jail}` dans une expression `sed`, mais `_validate_jail`
+impose `^[a-zA-Z0-9_-]+$` — ni apostrophe, ni `;`, ni `/`. Y poser un `shlex.quote` aurait change la regex
+`sed` elle-meme. **Laissees telles quelles, et la raison est ecrite.**
+
+`pytest` : **375 passed, 2 xfailed**, donc vert contre le `test_fail2ban.py` pose le meme jour par la
+session QA. Sonde d'execution : **33 assertions utiles, 33 PASS** — une 34e etait tautologique et a ete
+**ecartee du compte plutot que de le gonfler**. Le cas normal est mesure et non suppose : `192.168.0.1`,
+`8.8.8.8`, `2001:db8::1` passent, `FE80::0001` est normalisee en `fe80::1`, `1.2.3.4;id` reste refusee.
+**Non mesure au navigateur** : le `400` sur `fe80::1%x` reste a etablir au banc.
+
+**Le correctif n'existe pas tant que `rootwarden_python` n'a pas redemarre** — le Python est lu au
+demarrage du processus. Le commit rend le vecteur *corrige dans le depot*, pas *ferme en service.*
+
+### v1.38.11 — `supervision/` : quatre routes annoncaient une reussite, et le FLUX mentait ligne par ligne
+
+E-90 est **referme**, et sa portee reelle etait de **quatre** routes et non deux : `generic_reconfigure`
+et `generic_deploy` — les deux que le suivi nommait — mais aussi `zabbix_deploy` et
+`zabbix_reconfigure`. Les quatre jetaient **tous** leurs codes de retour.
+
+**Base rouge mesuree avant correctif**, sonde sur le code de `HEAD`, `_write_config_stream` pilotee avec
+une ecriture de cle refusee (code 1) : la valeur rendue a l'appelant etait `None`, le flux annoncait le
+succes, et **aucune ligne ne nommait l'echec**. Le flux ecrivait meme
+`Cle 'Server' definie a '1.2.3.4'` — une affirmation sur une ecriture qui n'a pas eu lieu — avant de
+conclure « mis a jour avec succes ». **C'est plus grave qu'E-90 tel qu'il etait ecrit** : le defaut
+n'est pas seulement que l'inventaire mente, c'est que le flux mente ligne par ligne, sous les yeux de
+l'exploitant qui le regarde defiler.
+
+Le mecanisme du correctif **existait deja dans le fichier et n'etait pas employe** :
+`execute_as_root_stream` rend son code, `execute_as_root` rend `(sortie, erreur, code)`. La forme de
+`_conclut_desinstallation` a ete reprise — `_echec()` puis `_conclut_geste()` — et l'effet
+(`_upsert_agent`) ne joue **que** si la liste d'echecs est vide. Meme patron qu'E-165 dans
+`fail2ban/` : c'est la troisieme fois cette semaine que « une reussite annoncee n'est pas une reussite
+verifiee » se corrige par la meme forme.
+
+**Une nuance assumee, ecrite dans le code** : pour `zabbix_deploy`, l'installation du **depot** n'est
+pas decisive a elle seule — une machine dont le depot est pose autrement la verrait echouer sans
+dommage. Elle est rapportee en avertissement ; c'est l'installation du **paquet**, juste apres, qui
+tranche. Le sens strict aurait refuse un deploiement qui marchait : *un correctif evident peut casser le
+cas normal*, et les deux moities ont ete pesees.
+
+**Risque de regression, nomme plutot que tu** : les quatre routes **REFUSENT** desormais la ou elles
+acceptaient. Si une commande d'installation rend un code non nul sur un chemin qui fonctionnait quand
+meme, le deploiement sera declare en echec et l'inventaire ne sera pas ecrit. C'est le sens voulu
+(fail-closed), et il **ne sera mesure contre une vraie machine qu'au premier deploiement reel** sur
+`Test-Server-Debian` — non declenche.
+
+`pytest` : **375 passed, 2 xfailed** dans `rootwarden_python`. La reference « 341 » que portait le plan
+etait un chiffre herite ; elle est remesuree. **Non mesure au navigateur** — le banc etait tenu par la
+session E2E.
+
+### v1.38.10 — PERF-001 : les quatre plus grosses tables du schema sont des journaux, et aucune n'avait d'index de date
+
+`mysql/migrations/062_index_journaux_et_purge.sql`. Les quatre tables les plus volumineuses sont des
+journaux, toutes filtrees **et** triees sur leur colonne de date, et **aucune ne portait d'index
+dessus**. Six requetes reelles touchees, cinq en parcours complet ou tri de fichier.
+
+**Mesure avant/apres** — mediane de 3 series de 200 iterations, dans le conteneur :
+
+| requete | avant | apres | gain |
+|---|---|---|---|
+| `active_sessions`, carte du profil | 14,700 ms | **0,493 ms** | × 30 |
+| `user_logs`, activite du profil | 4,064 ms | **0,651 ms** | × 6,2 |
+| journal d'audit, une page | 6,025 ms | **0,541 ms** | × 11 |
+
+`EXPLAIN` de la page du journal : `ALL` / 4 709 lignes / `filesort` → index / 50 lignes /
+`Backward index scan`.
+
+**La plus insidieuse n'est pas dans ce tableau** : `legacy/auth/login.php:47` purge `login_attempts` a
+**chaque tentative de connexion**, sans index — un parcours complet d'une table qui grossit precisement
+quand on attaque le portail.
+
+**Deux resultats ne suivent pas, et c'est dit aussi clairement** : la purge d'`active_sessions` reste en
+parcours complet (son predicat vise 28,6 % des lignes — l'optimiseur a raison, et sur 12 lignes sur
+3 908 il choisit bien `range` : c'est l'etat de regime), et l'export du journal reste en tri complet,
+puisqu'il n'a pas de `LIMIT` et lit tout par construction.
+
+**Idempotence prouvee, pas affirmee** : ligne 062 retiree de `schema_migrations`, migration rejouee →
+« 0 statement(s) execute(s), 8 tolere(s) idempotent(s) ».
+
+**Un piege de migration a corriger dans nos regles.** La regle ecrite etait « pas de commentaire `--`
+entre deux statements ». Elle est **trop etroite** : le runner decoupe sur `;` **avant** de retirer les
+commentaires. Un point-virgule ecrit entre guillemets **dans un commentaire d'en-tete** a coupe le
+fichier en deux au milieu d'une phrase. La regle exacte est **« aucun point-virgule nulle part,
+commentaires compris »**.
+
+**Releve, NON corrige — et c'est une decision d'exploitation** : `LOG_RETENTION_DAYS` est commentee
+dans `srv-docker.env`, donc vaut 0, donc `_purge_old_logs()` sort immediatement. **Rien n'a jamais ete
+purge** depuis la remise a zero du 2026-05-26. Et **trois nettoyages qui ne sont pas des politiques de
+retention** sont eteints par cette meme variable : sessions inactives, permissions temporaires
+expirees, jetons de reinitialisation. Mesure : **2 132** sessions en base pour `rw-test-super`, 1 094
+pour `rw-test-user`, 619 pour `superadmin` — et `verify.php:66` lit cette table a **chaque page
+protegee**, c'est la liste de revocation cote serveur, et elle ne vieillit jamais. **Activer la variable
+n'est pas la bonne reponse seule** : `user_logs` porte une chaine scellee, purger par la tete rompt la
+verification d'integrite. Porte au §7 du plan de migration.
+
+**Et une mesure qui DEDOUANE**, a dire aussi nettement qu'un reproche : le schema des relations est
+sain — 76 colonnes de cle etrangere declarees, et seulement trois colonnes de relation sans contrainte
+(`notifications.user_id`, `tasks.machine_id`, `tasks.created_by`).
 
 ### v1.38.9 — `fail2ban/` F6 caracterise : ne jamais avoir regarde une machine suffit a la faire installer
 

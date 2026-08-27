@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-25**, version `1.37.55`.
+Dernière mise à jour : **2026-08-27**, version `1.38.9`. Le chantier tourne désormais à **sept sessions** à propriété disjointe — table au §10 de `PROTOCOLE-SESSIONS.md`.
 
 ---
 
@@ -95,9 +95,9 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | entrées de menu portées | **25 sur 33**, et le total se RECONSTITUE — remesuré le 2026-08-27 en faisant lire `Navigation::SECTIONS` **par PHP lui-même** : `25 route + 8 legacy + 0 ni l'un ni l'autre = 33` (F1 a fait basculer `fail2ban`, après `sudo_policies`, `sftp_policies`, `bashrc` et `services`). Un premier comptage à l'expression régulière avait rendu 32, en manquant `wazuh` — voir §8. Restent en `legacy` : `iptables`, `ssh_audit`, **`wazuh`**, `groups`, `remote_users`, `platform_key`, `documentation`, `api_docs` |
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | **à remesurer** — dernière mesure d'ensemble le 2026-08-25 (97 exécutions, 1365 assertions, 0 échec). **Six suites ont été ajoutées depuis** (D1 à D6a), la dernière étant `go-adm-serveurs` (**18 legacy / 20 portage, 0 échec**), et `go-adm-permissions` est passée de 13 à **14** côté portage. D6b ajoute `go-adm-etiquettes-notes` (**10 / 18**) et D6d `go-adm-cycle-connexion` (**12 / 14**) et D7 `go-adm-cles-api` (**11 / 15**), D8 `go-adm-comptes-distants` (**11 / 17**) D9a `go-adm-politiques` (**12 / 18**) et D9b `go-adm-sftp` (**12 / 16**), toutes sans échec — les deux dernières inscrites au LOT avec leurs références. Chaque suite a été jouée sur ses deux cibles à son sous-lot ; le TOTAL, lui, n'a pas été rejoué — il demande ~100 min et verrouille le TOTP des trois comptes d'épreuve, ce qui est une décision de l'exploitant (§7). Depuis, **quatre suites de plus** portent leurs deux références : `go-bashrc-b1` à `b3`, `go-services-s1` à `s3`, et `go-fail2ban-f1` (**18 legacy / 20 portage**, inscrite le 2026-08-27) ; `go-bashrc-b4` reste **legacy seul**, son portage étant suspendu (§7) — il figurait pourtant dans `SUITES_LARAVEL` : **mesuré le 2026-08-27, il y rendait 9 PASS / 3 FAIL**, et les trois FAIL étaient exactement les trois boutons dont l'absence est VOULUE. Un LOT complet affichait donc un ÉCHEC qui ne disait rien. Retiré de la liste, il y revient le jour où B4 est porté. Remesure : `./scripts/rejouer-lot.sh` — **un LOT complet tournait le 2026-08-26 à 18h** (lancé par l'autre session) ; 19 verdicts conformes au moment de l'écriture, résultat total à relever au tour suivant.
+| LOT de tests E2E | **structure mesurée le 2026-08-27, contenu à remesurer.** **104** fichiers `tests/e2e/go-*.mjs`, dont **78** inscrits au LOT pour **149 verdicts** — une suite compte un verdict par cible où elle porte une référence — et **2 272 assertions déclarées** (1437 laravel + 835 legacy). Les **26** fichiers hors LOT ne sont pas des orphelins : 7 scripts de captures (`go-captures-*`), `go-ssh-audit-scanall` (**interdit, joint la production**), le reste antérieur à la migration. Remesure : `ls tests/e2e/go-*.mjs | wc -l`, et le compte des verdicts en faisant lire les tables par **bash** plutôt qu'au `grep` : `source <(sed -n "155,702p" scripts/rejouer-lot.sh); echo $((${#REF_LARAVEL[@]}+${#REF_LEGACY[@]}))`. **Le runner a été vérifié intègre dans les QUATRE sens** le 2026-08-27 — aucune suite jouée sans référence, aucune référence jamais jouée, aucun fichier manquant pour une suite inscrite, **aucun doublon de clé** : le piège « deux entrées de même clé dans la même table, la seconde écrase la première » ne s'est pas produit. **Le LOT complet du 2026-08-26 est enfin RELEVÉ** — il était « à relever au tour suivant » depuis la veille : journaux dans `/tmp/rw-lot-wQk8j5/`, 18:03 → 20:12 (**2 h 09**), **125 journaux** pour les **125 verdicts** que le runner portait à ce commit (`dc61a99`). Attention : **c'est une égalité de COMPTES, pas encore une bijection d'ENSEMBLES** — à croiser dans les deux sens avant d'être inscrite comme établie. Le total lui-même n'est pas encore livré, et pour une bonne raison : un premier motif de relecture déclarait **85 journaux « muets »**, ce qui était un défaut d'instrument — les suites ont **TROIS** formes de tampon final (« N PASS / M FAIL », « N étapes, N PASS, N FAIL ») et `go-vague0-legacy` n'en a **aucune**. Le TOTAL n'a pas été rejoué depuis : ~100 min, et il verrouille le TOTP des trois comptes d'épreuve — **décision de l'exploitant (§7)**. `go-bashrc-b4` reste **legacy seul** : il figurait dans `SUITES_LARAVEL` et y rendait **9 PASS / 3 FAIL**, les trois FAIL étant exactement les trois boutons dont l'absence est VOULUE — un LOT complet affichait donc un ÉCHEC qui ne disait rien. Il y revient le jour où B4 est porté.
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **163** — numérotés jusqu'à **E-173** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **171** — numérotés jusqu'à **E-181** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -251,8 +251,37 @@ clic. La page pose **deux** actions de masse derrière un simple `confirm()`
 
 | action | ce qu'elle fait vraiment | effet sortant |
 |---|---|---|
-| `drift_scan` | `scan_machine(mid)` pour **chaque** membre | session **SSH réelle** par machine |
+| `drift_scan` | `scan_machine(mid)` pour **chaque** membre | **AUCUN — corrigé le 2026-08-27, voir ci-dessous** |
 | `cve_scan` | tout le pipeline CVE via `_stream_cve_scan` | session **SSH réelle** **+ `send_cve_report`, un VRAI COURRIEL** |
+
+**⚠ CE TABLEAU A ÉTÉ FAUX PENDANT DEUX JOURS SUR `drift_scan`, et l'erreur était la mienne.**
+Corrigé le 2026-08-27 après mesure. `scan_machine` (`backend/routes/drift.py:110-118`) fait **trois
+`SELECT` et un `INSERT … ON DUPLICATE KEY UPDATE`** dans `config_drift`. Rien d'autre. Le fichier
+n'importe que `logging`, `flask` et `routes.helpers` : **zéro occurrence** de `paramiko`,
+`ssh_session`, `execute_as_root`, `ssh_utils` ou `subprocess` — vérifié deux fois, par la liste des
+imports et par un compte. Le mot « ssh » n'y apparaît que dans le nom de la catégorie `sshd` et dans
+une **lecture** de `ssh_audit_results`.
+
+Trois choses en découlent, et elles vont toutes dans le sens de l'avancement :
+
+1. **`drift_scan` sort de la demande d'arbitrage du §7.** Il n'y avait pas lieu d'y être. Un arbitrage
+   demandé pour un effet inexistant coûte deux fois : il bloque un sous-lot, et il use le crédit de
+   ceux qui sont réels.
+2. **Le geste peut être exécuté POUR DE VRAI** sur un groupe statique ne contenant que la machine 2 —
+   c'est le seul geste de masse du chantier mesurable de bout en bout sans arbitrage.
+3. **Le planificateur le fait déjà toutes les heures sur les trois machines** (`scheduler.py:723-726`,
+   `_drift_scan_all`) : **576 lignes** `Scan de dérive (toutes machines)` dans `tasks`, du 2026-06-10
+   au 2026-08-27, `created_by = NULL`. Conséquence pour la mesure : « `checked_at` rafraîchi » ne
+   distingue **pas** notre geste du sien. Le discriminant est `tasks.label`, que seul ce module écrit
+   — et qu'**aucune ligne ne porte aujourd'hui** : l'action de masse de ce module n'a **jamais** été
+   exécutée dans cette installation.
+
+**Et les deux textes du legacy avaient raison là où ce document se trompait** : `js.groups.tip_drift`
+dit « rapide, **sans SSH** », et `legacy/documentation.php:1233` le confirme. J'avais lu le nom de la
+fonction et le fait que `cve_scan` ouvre bien des sessions, et j'ai étendu à sa voisine. C'est la forme
+la plus banale du piège du chantier : **une hypothèse trop large n'a pas besoin d'être absurde pour
+être fausse.** Réserve à porter jusqu'au sous-lot : établi par **LECTURE**, pas par observation d'une
+exécution — à confirmer au réseau avant d'être tenu pour acquis ailleurs.
 
 **C'est l'effet même qui bloque S7b, atteint depuis une autre page et appliqué à un groupe entier.** Un
 clic, N machines, N courriels. Le `confirm()` du legacy est la seule barrière, et il ne protège de rien
@@ -570,17 +599,103 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
 
 ## 7. Décisions qui attendent l'exploitant
 
+### ⚠ E-174 — UNE EXÉCUTION DE COMMANDE EN ROOT, OUVERTE EN PRODUCTION, OCCUPÉE AUJOURD'HUI
+
+**Trouvée le 2026-08-27 par relecture, hors du sous-lot en cours. Elle passe devant tout ce qui
+suit.** Détail complet et preuve dans `PARITE.md` — E-174. Le résumé tient en trois lignes de code :
+`_validate_ip` appelle `ipaddress.ip_address()` **pour son effet de bord**, jette le résultat et rend
+la **chaîne reçue** ; celle-ci est interpolée dans un `f'fail2ban-client set {jail} banip {ip}'` ;
+`execute_as_root` l'émet en `sudo -S -p '' sh -c {shlex.quote(command)}` — où `shlex.quote` protège le
+shell **extérieur** et livre la commande entière, intacte, à un `sh -c` distant dont le travail est de
+l'interpréter. Un identifiant de portée IPv6 (`fe80::1%;id;`) traverse le validateur : mesuré, et
+`str()` le **conserve verbatim**, donc « normaliser » n'aurait rien fermé — il faut refuser le `%`.
+
+**Occupée, pas théorique.** `rw-test-admin` (id 15, rôle 2, actif, **second facteur fonctionnel**)
+atteint les trois machines, `srv-zabbix` comprise — `check_machine_access` rend `True` dès
+`role_id >= 2`. Aucune attribution de permission, aucun `UPDATE`, aucune étape. Et le pire vecteur est
+`POST /fail2ban/ban_all_servers` : `@require_role(2)`, **aucun** contrôle d'accès machine — un appel,
+le parc entier.
+
+**Établie sans être provoquée** : commande recomposée dans le conteneur, `fail2ban-client` remplacé
+par un `echo`, `sudo` retiré. Aucune session SSH ouverte, aucune machine du parc touchée.
+
+**Ce que j'ai fait sans attendre, et pourquoi.** J'ai autorisé la session 4 à appliquer le correctif —
+refuser `'%'` dans `_validate_ip`, plus `shlex.quote()` sur `jail` et `ip` à l'intérieur de la commande
+composée — sur `Migration-Laravel`, en m'appuyant sur la convention **§3.2** (« les modifications
+backend et legacy sont autorisées, ne plus bloquer, ne plus demander ») et sur le précédent que nous
+avons nous-mêmes créé cette semaine : E-164 et E-165 ont été corrigés dans ce même fichier en citant
+§3.2. Le correctif fait trois lignes, il est réversible, et il ne casse aucun appelant mesuré. La
+session 5 l'a proposé, la 4 l'applique, la 6 le verrouille par `pytest` : aucune session ne valide son
+propre travail. **À dire si vous vouliez être consulté d'abord — je n'ai pas voulu laisser une
+exécution root ouverte le temps d'une clarification de rédaction.**
+
+**Ce qui reste entièrement à vous** : rien de sortant n'a été émis, aucun `push`, aucun `merge`, et
+**aucune décision sur les comptes**. `opsuser` (id 2, rôle 1, actif) a pour **seule** machine autorisée
+`srv-zabbix`, la production ; son enrôlement 2FA est libre, faute de `totp_secret`. Le désactiver, lui
+retirer cet accès, ou ne rien faire, vous appartient.
+
+**Et cela amende E-152** : poser la permission sur les 21 routes **ne ferme pas** E-174. Un porteur
+légitime de `can_manage_fail2ban` conserverait l'exécution root. La permission est censée autoriser à
+bannir une adresse ; elle confère root sur chaque machine à portée. C'est une élévation par rapport à
+l'**intention documentée du produit**, pas seulement par rapport à une garde absente.
+
+### Deux contradictions de ce document, relevées le 2026-08-27 — elles décident qui peut travailler
+
+Elles ne sont pas des questions de fond : ce sont **deux endroits où mes propres pages se contredisent**,
+et chacune bloque une session. Je ne les tranche pas.
+
+1. **§3.2 contre §7 : les six correctifs backend sont-ils déjà autorisés ?** La convention §3.2, tranchée
+   par vous, dit « les modifications backend et legacy sont autorisées, ne plus bloquer, ne plus demander ».
+   Le §7 tient pourtant **six correctifs backend en attente d'arbitrage** — E-142, E-144, E-147, E-149,
+   E-150, E-152. Et **deux correctifs se sont déjà servis de §3.2 cette semaine** : E-164 et E-165, portés
+   dans `backend/routes/fail2ban.py` aux sous-lots F3, F4 et F6, en citant explicitement « §3.2 l'autorise ».
+   Le précédent existe donc, et il est de nous. Trois lectures possibles : les six sont couverts par §3.2
+   et partent aujourd'hui ; ils ne le sont pas, et E-164/E-165 ont été appliqués trop vite ; ou §3.2
+   couvre les correctifs de *fidélité* et pas ceux de *sécurité*, ce qui serait la distinction la plus
+   défendable mais n'est écrite nulle part. **En attendant, rien n'est appliqué** — la session 5 écrit les
+   patchs et les tient prêts.
+2. **§3.1 contre §10 du protocole : où vit un correctif de sécurité ?** §3.1 dit « tout se fait sur
+   `Migration-Laravel`, correctifs de sécurité compris ; plus de branche `security/…` séparée ». Le §10 de
+   `PROTOCOLE-SESSIONS.md` donne à la session 5 « une branche `security/…`, **jamais** `Migration-Laravel` ».
+   §3 « prévaut sur tout le reste », donc la lettre du plan gagne — mais la règle du protocole existait pour
+   une raison (une session ne valide pas seule sa propre modification de sécurité), et cette raison est
+   satisfaite autrement : **5 propose, 3 ou 4 applique**. La question est donc de savoir si la branche
+   dédiée reste utile une fois la séparation des rôles obtenue. Un mot suffit.
+
+
 **Effets sortants, à autoriser avant tout test**
 - **A3** — la réinitialisation de mot de passe envoie un courriel (`phpmailer`). Réserves déjà mesurées :
   le jeton **circule dans la query string** (historique, `Referer`, journaux Apache), et **un compte sans
   `email` n'a aucun chemin**.
 - **S7b** — un scan CVE réel.
-- **`groups/` — l'action de masse**, découverte le 2026-08-25 en lisant le module avant d'écrire un clic.
-  `POST /groups/<id>/run` lance un scan **réel** sur **chaque** membre du groupe : `drift_scan` ouvre une
-  session SSH par machine, `cve_scan` ouvre une session SSH **et envoie un courriel** par machine avec
-  des résultats. C'est l'effet de S7b, atteint depuis une autre page et **multiplié par le nombre de
-  membres** — un clic, N machines, N courriels. Le sous-lot testera le bouton par **interception et
-  avortement** ; un déclenchement réel attend votre mot.
+- **`groups/` — l'action de masse. RESSERRÉE le 2026-08-27 : la demande ne porte plus que sur
+  `cve_scan`.** `drift_scan` n'a **aucun** effet distant — mesuré, voir l'encadré du §4.2 : ce document
+  lui prêtait une session SSH par machine, c'était faux, et l'arbitrage demandé pour cette moitié
+  n'avait pas lieu d'être. Reste `cve_scan`, et il est tout ce qui était annoncé : `POST
+  /groups/<id>/run` ouvre une session SSH **et envoie un courriel** par machine avec des résultats.
+  C'est l'effet de S7b, atteint depuis une autre page et **multiplié par le nombre de membres** — un
+  clic, N machines, N courriels. Le sous-lot testera le bouton par **interception et avortement** ; un
+  déclenchement réel attend votre mot.
+  **Trois mesures qui donnent son échelle à la demande**, relevées le 2026-08-27 : le courriel est
+  **armé** (`MAIL_ENABLED = True`, `MAIL_TO` et `MAIL_SMTP_HOST` renseignés) ; la seule ligne de
+  `cve_scans` de toute l'installation porte **684 paquets et 1458 CVE dont 103 critiques**, sur
+  `srv-zabbix` — un `cve_scan` de masse sur un groupe la contenant **rejouerait ce scan et enverrait
+  ce rapport** ; et **la machine 1 n'a aucun filet dans le code** : mots de passe vides, mais
+  `platform_key_deployed = 1` et `service_account_deployed = 1`, donc le garde
+  `if not ssh_pass and not has_keypair` (`cve.py:56-60`) ne l'écarte pas. La règle « jamais jointe »
+  n'a **aucun équivalent dans le code** : elle ne tient que par nous.
+  **Non mesuré, et il faut le dire** : la machine 2 n'a jamais été scannée, donc on ne sait pas si un
+  `cve_scan` sur elle seule franchirait le seuil de 7.0 et déclencherait le courriel. Ne pas en
+  déduire qu'il serait sans effet.
+- **`groups/` — la règle qui S'INVERSE, et c'est l'état PAR DÉFAUT du formulaire.** Relevé le
+  2026-08-27, et ce n'est pas un effet sortant mais ça décide d'une fixture : `_resolve_dynamic` fait
+  `where = (' AND '.join(clauses)) if clauses else '1=1'` (`groups.py:77`) — **zéro critère coché ⇒ le
+  parc entier**. Le formulaire naît sur « Dynamique » avec aucune case cochée : saisir un nom et
+  cliquer Enregistrer — les deux seuls gestes obligatoires — crée un groupe contenant les **trois**
+  machines, `srv-zabbix` comprise, et la carte n'affiche **rien** qui le distingue d'un groupe voulu.
+  Et la fixture statique n'est plus une précaution, c'est la **seule qui existe** : mesuré combinaison
+  par combinaison, **aucun jeu des quatre énumérations ne rend la machine 2 seule** (le seul
+  discriminant serait un tag, et `machine_tags` est **vide**).
 
 **Trois décisions avant de porter D6c (import CSV)** — caractérisé le 2026-08-26, non porté
 - **La colonne `sudo` du format CSV** (E-130). L'import l'écrit sans contrôle de rôle, alors que
@@ -722,7 +837,51 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
   `git rev-list --count @{u}..HEAD`, et tout commit qui corrigerait le chiffre le périmerait ;
 - **rétroporter vers `main`** : **v1.37.16**, **v1.37.17**, **v1.37.48** — le dernier ferme une
   vulnérabilité **présente** en production ;
-- **relire `security/backend-cve`** (6 correctifs backend, 318 pytest, jamais fusionnée) ;
+- **`security/backend-cve` : RELUE le 2026-08-27, et la fusion est RECOMMANDÉE.** Elle attendait
+  depuis des jours et c'est la dette la moins chère à solder du chantier. Le chiffre qui fait peur —
+  **6 en avant, 168 en retard** — n'est pas celui qui décide : ce qui décide est le **recoupement**, et
+  il est **nul**. Mesuré par fichier touché (`git rev-list --count -- <fichier>`) : **aucun** des six
+  fichiers n'a bougé sur le tronc depuis la séparation. `git merge-tree --write-tree`, qui n'écrit rien
+  dans l'arbre : code 0, **zéro conflit**. Et recoupement avec le travail en vol des sept sessions :
+  **nul** également. **Elle n'a pas divergé** — corollaire désagréable : **les six failles sont donc
+  toutes encore ouvertes sur le tronc**, vérifié une par une dans le code d'aujourd'hui.
+  Trois de ces six comptent particulièrement :
+  **`a345e65` porte le pire, et ce n'est pas l'archivage** — le repli du scheduler **ÉLARGIT le
+  périmètre** : une cible `machines` dont le `target_value` se vide ou se corrompt retombe sur
+  `SELECT … FROM machines`, c'est-à-dire **tout le parc**. Or un scan CVE ouvre une session SSH **et
+  envoie un vrai courriel par machine**. C'est l'effet sortant que ce §7 réserve à votre mot (S7b),
+  **atteint par une corruption de donnée et sans que personne ne clique.** Cinquième forme de « un repli
+  qui retombe du côté permissif », et la plus large : les quatre autres ouvrent un **droit**, celle-ci
+  ouvre un **périmètre**, et son effet est sortant et irréversible.
+  **`399931a` FERME E-175** — l'écart relevé le matin même sans savoir que son correctif dormait depuis
+  six jours. E-175 n'a donc pas besoin d'un correctif propre : il a le sien, il attend une fusion.
+  **`427306c` est occupé** — `POST /cve_reprioritize` porte `@require_api_key` +
+  `@require_machine_access` et **ni rôle ni permission**, quand la page exige `can_scan_cve`. Or
+  `opsuser` n'a aucune permission, sa **seule** machine est `srv-zabbix`, et **la totalité des 1458
+  findings CVE, dont les 5 drapeaux KEV, est sur cette machine**. Le compte que la page refuse peut
+  réécrire exactement les données qui existent.
+  **Deux conditions avant, une après.** Avant : votre mot, et la **correction du message de commit** de
+  `399931a`, qui affirme qu'une route de `supervision/` est « désormais couverte, vérifiée par test »
+  alors qu'elle porte aussi `@require_role(2)` — le décorateur y est donc **inerte**, et le fichier le
+  savait déjà (`supervision.py:2440` : « require_machine_access est un no-op sur le mid d'URL »). Le
+  code reste juste et souhaitable ; c'est le **message** qui affirme plus que lui. Sixième occurrence du
+  motif, et **la première dans une branche de sécurité**. Après : **remesure `pytest`** — et le chiffre
+  attendu **n'est ni 318 ni 318 + 375** : les deux totaux sont mesurés sur des arbres différents et rien
+  ne dit qu'ils sont disjoints. **Fusionner sans rebase** : réécrire l'historique pendant que six
+  sessions travaillent est interdit, et un merge sans conflit rend le rebase inutile ;
+- **la purge ne tourne pas — E-180.** `LOG_RETENTION_DAYS` est commentée, donc vaut 0, donc rien n'a
+  jamais été purgé depuis le 2026-05-26 ; et la **même** variable éteint trois nettoyages qui ne sont
+  pas des politiques de rétention (sessions inactives, permissions temporaires expirées, jetons de
+  réinitialisation). 2 132 sessions en base pour un seul compte, lues à **chaque page protégée**.
+  **L'activer n'est pas la bonne réponse seule** : `user_logs` porte une chaîne scellée et purger par la
+  tête romprait la vérification d'intégrité. Décision d'exploitation, pas de performance ;
+- **la CI n'exécute aucun test du portage — INF-001.** 14 jobs, **un seul** lance des tests
+  (`test-python`) ; les 13 autres sont statiques. Les 230 assertions de garde du portage et les 104
+  suites E2E ne protègent donc que la machine qui les lance. Trois paliers de coût croissant, dont **le
+  premier ne coûte rien** : un job `test-php` (`composer install` + `php artisan test`, **aucune
+  infrastructure**, la suite est hermétique par construction). Les deux autres — un sous-ensemble E2E,
+  puis le LOT complet — demandent une décision (secrets TOTP, ~100 min, verrouillage du second facteur
+  des trois comptes) ;
 - **réinitialiser `superadmin`** si l'on veut des captures sous ce compte précis. Effet de bord signalé :
   son `failed_attempts` est passé de 0 à 1 (seuil 5, aucun verrou) ;
 - **supprimer ou non les cinq comptes `e2e_test_*`** : actifs, rôle 1, **sans second facteur**. Vus
