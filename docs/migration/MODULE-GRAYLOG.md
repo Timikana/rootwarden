@@ -447,3 +447,62 @@ sans regarder le verdict, et `uninstall` qui répond `success: true` en jetant l
 
 **Non bloquant, et mesuré** : tout le reste. Les huit étapes sont prêtes, `Navigation` est déjà
 conforme, le backend n'émet pas le chemin, aucune adresse entrante, aucun lien de déblocage.
+
+### 7.10 ⚠ Les conseils du legacy décrivent UN AUTRE PRODUIT — mesuré le 2026-08-27
+
+En cherchant si la **séquence** est dite sur la page portée, la question s'est retournée : **il n'y
+avait rien de vrai à porter.** Les quatre étapes du legacy décrivent **Graylog Sidecar** ; le module
+implémente un **transfert `rsyslog`**.
+
+| `tip.graylog_stepN` (legacy) | ce que le module fait |
+|---|---|
+| 1 — « URL du serveur + **token API** … (**token chiffré en base**) » | **`graylog_config` n'a AUCUNE colonne de jeton** : `server_host`, `server_port`, `protocol`, `tls_ca_path`, `ratelimit_burst`, `ratelimit_interval` |
+| 2 — « éditez les **collectors** (filebeat / nxlog / winlogbeat) » | des **gabarits `rsyslog`** (`graylog_templates`) |
+| 3 — « ajout du repo, install du paquet, **enrôlement auprès du manager** » | `apt-get install -y rsyslog`, **aucun enrôlement** |
+| 4 — « l'onglet **Sidecars** affiche le statut » | il n'y a pas d'onglet Sidecars |
+
+**Mesure** : `sidecar|filebeat|nxlog|winlogbeat|collector` apparaît **une seule fois** dans le backend,
+la page legacy et la vue portée réunis. Et `dashboard.sc_graylog_desc` porte la même fiction
+(« Déploie le sidecar, centralise et édite les collectors »).
+
+> **Ce n'est pas une étape qui dit faux, c'est le panneau entier.** E-209 avait montré que deux étapes
+> sur quatre mentaient sur `platform_key` ; ici les quatre décrivent un produit que RootWarden
+> n'installe pas.
+>
+> **Et cela explique la substitution de la session 3** : elle a mis, au même endroit, un guide de
+> **conséquence** (« Déployer ouvre une connexion SSH et installe rsyslog ») là où le legacy mettait
+> un guide de **procédure**. Ce n'était pas un choix de style — **la source était de la fiction.**
+> *Un acquis traduit n'est pas un acquis vérifié.*
+
+### 7.11 La séquence sur les quatre pages livrées — mesuré dans les CATALOGUES
+
+La question posée était : *la séquence — l'ORDRE des gestes — est-elle dite quelque part sur la page ?*
+
+**Deux fois j'ai mesuré le mauvais artefact avant de trouver le bon**, et c'est la leçon de méthode :
+d'abord `grep` sur le **gabarit**, qui rend deux correspondances — toutes deux des **commentaires du
+source**, invisibles à l'écran ; puis un compte de `disabled` sur le seul blade, qui rendait **0** pour
+`graylog` alors que le mécanisme y vit en **JS** et sous forme `hidden`. **Le texte affiché vit dans le
+CATALOGUE.** Même famille que la collision `tip.` / `tip_` : mesurer l'artefact voisin de celui qui
+porte la propriété.
+
+| page portée | l'ordre est-il **ÉNONCÉ** ? | le pas de **sûreté** est-il annoncé ? | l'ordre est-il **IMPOSÉ** ? |
+|---|---|---|---|
+| `fail2ban` | **oui** — « Choisissez une machine, **puis** relevez son état. » | — | oui, 12 `disabled` en JS |
+| `services` | **oui** — « Choisissez une machine, **puis** chargez ses services. » | — | oui, 8 |
+| `bashrc` | **partiellement** — la seule phrase d'ordre porte sur une **précondition externe** (« ajoutez des machines **avant de** déployer »), pas sur la séquence de la page | **oui, et mieux que le legacy** : « simule le :date par :auteur — **rien n'a été écrit** », estampillé sur le résultat plutôt qu'annoncé avant | oui, 6 |
+| **`graylog`** | **NON** | — | oui, 6 |
+
+**Ce que ça donne, et c'est différencié :**
+
+- `fail2ban` et `services` disent le **premier pas**, à l'endroit exact où l'utilisateur est bloqué —
+  l'état vide. Ce n'est pas la séquence entière, et **c'est suffisant** : le reste devient visible une
+  fois la machine choisie. **Ne rien leur ajouter** ;
+- `bashrc` annonce **le pas qui protège** mieux que le legacy ne le faisait, et sa page dit franchement
+  ce qui n'est pas encore porté (`non_porte_texte`). Il lui manque la phrase du premier pas ;
+- **`graylog` est le seul des quatre où rien ne dit par où commencer.** Et c'est cohérent : c'est le
+  seul dont la source legacy était inutilisable (§7.10). **Il n'y a pas eu de perte — il y a eu une
+  absence jamais comblée.**
+
+**Ce qui n'est PAS mesuré** : que les phrases relevées soient effectivement **rendues** à l'écran. Elles
+existent au catalogue et sont référencées par les vues ; qu'elles s'affichent dans l'état vide relève de
+la capture, pas de la lecture.
