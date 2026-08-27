@@ -684,6 +684,25 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/fail2ban', Fail2banController::class)
         ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
 
+    /*
+     * F6 : la PORTEE des deux gestes de parc, lue en base.
+     *
+     * `ban_all_servers` et `install_all` ne prennent aucun `machine_id` : leurs
+     * cibles sont choisies par un `LEFT JOIN`/`INNER JOIN` du backend, et
+     * toutes jointes. Cette route rend ce que ces deux requetes retiennent, en
+     * les rejouant sur la MEME base — elle ne recalcule pas la regle, elle la
+     * remonte de la ou elle s'applique.
+     *
+     * Elle existe parce qu'un releve ECRIT le cache qui decide de cette portee :
+     * sans relecture, l'ecran garderait celle du chargement. Trois `SELECT`,
+     * aucune machine jointe.
+     *
+     * Gardes IDENTIQUES a celles de la page : une capacite ne se garde pas moins
+     * parce qu'elle ne fait que renseigner.
+     */
+    Route::get('/fail2ban/portee', [Fail2banController::class, 'portee'])
+        ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban.portee');
+
     Route::get('/services', ServicesController::class)
         ->middleware(['role:1', 'perm:can_manage_services'])->name('services');
 

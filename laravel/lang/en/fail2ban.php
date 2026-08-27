@@ -52,8 +52,8 @@ return [
     'vide_titre' => 'No machine in the estate',
     'vide_texte' => 'No active machine is registered. Add one from server administration.',
     'vide_action' => 'Open servers',
-    'non_porte_titre' => 'The Fail2ban gestures are not ported yet',
-    'non_porte_texte' => 'Banning, unbanning, editing a jail or the allowlist are done from the legacy portal for now. This page carries the state and the access guards; the gestures follow.',
+    'non_porte_titre' => "Four Fail2ban actions are not ported yet",
+    'non_porte_texte' => "Installing Fail2ban on ONE machine, restarting the service, disabling a jail and looking up an address's geolocation are still done from the legacy portal. Everything else is here: state, jails, history, configuration, logs, bans, the allowlist and the two fleet actions.",
     'non_porte_lien' => 'Open Fail2ban in the legacy portal',
 
     // ── Sub-lot F2: history and timeline ─────────────────────────────────
@@ -164,4 +164,65 @@ return [
     'jail_findtime_aide' => 'Window over which failures are counted, in seconds. Minimum 60.',
     'conf_titre_jail' => 'Enable :jail on :machine?',
     'conf_texte_jail' => 'Jail :jail will be written to /etc/fail2ban/jail.local on :machine, with :maxretry attempt(s), a :bantime s ban and a :findtime s window. ⚠ The service RESTARTS: every ban currently in force on this machine will be lost.',
+
+    // ── Sub-lot F6: the two whole-fleet actions ──────────────────────────
+    //
+    // Neither action takes ANY machine parameter: the backend picks its
+    // targets in the database. No text here may suggest the operator chooses
+    // the scope — they can only READ it. And none says « all servers »
+    // without giving the number: the legacy did, and that is E-173.
+    'parc_titre' => "Whole-fleet actions",
+    'parc_aide' => "These two actions do not target the machine selected above: they take none. The backend picks its own targets, in the database, from the last recorded reading. What this section announces is the result of ITS queries, read from the same database.",
+    'parc_installer' => "Install Fail2ban across the fleet",
+    'parc_bannir' => "Ban across the fleet",
+    'parc_ban_titre' => "Ban across the fleet",
+    'parc_ban_aide' => "The address entered above would be banned on the machines the last reading calls active, and on those alone — :nb in total: :machines.",
+    'parc_ban_aide_aucune' => "The last reading calls NO machine active: this action would touch nothing. Read the machines' state so the scope becomes known.",
+    'parc_role_titre' => "These two actions require the administrator role",
+    'parc_role' => "The backend's two fleet routes require role 2 — the only ones in this module. With your role they would refuse. The machine-by-machine actions remain available.",
+    'portee_titre' => "What these actions would touch today",
+    'portee_cache' => "This scope is decided by the last recorded reading, machine by machine — not by the machines' state right now. A machine whose Fail2ban has died since its reading is absent from the installations even though it no longer protects anything; a machine installed since is still listed.",
+    'portee_installer' => "Installing Fail2ban across the fleet would touch :nb machine(s), out of a fleet of :parc:",
+    'portee_installer_aucune' => "Installing Fail2ban across the fleet would touch no machine: the recorded reading says the whole fleet (:parc) already has it.",
+    'portee_bannir' => "Banning an address across the fleet would touch :nb machine(s), out of a fleet of :parc:",
+    'portee_bannir_aucune' => "Banning an address across the fleet would touch NO machine: the recorded reading calls none of the fleet's machines (:parc) active.",
+    'portee_jamais' => "never read",
+    'portee_jamais_aide' => "A machine marked « never read » has no reading row at all. The installation query keeps the machines whose reading does not say « installed » — and a machine with no reading is one of them: never having looked at it is enough to have it installed.",
+    'portee_archivee' => "retired from the fleet",
+    'portee_archivee_aide' => "This machine is archived: it is absent from the selector above. The two fleet queries, however, do not filter on lifecycle — so it remains a target.",
+    'portee_releve_le' => "read on :date",
+    'portee_inconnue_titre' => "The scope could not be read",
+    'portee_inconnue' => "Neither the page load nor the re-read returned the scope of these two actions. This is NOT « no machine »: we do not know which ones would be touched, so both actions are refused here. Reload the page.",
+    'parc_ban_inconnue' => "The scope could not be read: this action is refused as long as we do not know which machines it would touch.",
+    'conf_titre_parc_inconnue' => "Scope unknown — nothing will be sent",
+    'conf_texte_parc_inconnue' => "The scope of this action could not be read. A fleet action is not sent without knowing how many machines it covers: nothing will be sent.",
+    'portee_relire' => "Re-read the scope",
+    'portee_relue' => "Scope re-read just now.",
+    'portee_echec' => "The scope could not be re-read. The lists shown are those from page load.",
+    'conf_titre_parc_ban' => "Ban :ip on :nb fleet machine(s)?",
+    'conf_texte_parc_ban' => ":ip will be banned in jail :jail on the machines the last reading calls active — :nb in total: :machines. Machines whose Fail2ban is absent or stopped are not touched, exposed as they may be. This action goes out to several machines at once.",
+    'conf_titre_parc_ban_vide' => "No machine would be banned",
+    'conf_texte_parc_ban_vide' => "The last reading calls no machine active: the scope of this action is 0 machines, and :ip would be banned nowhere. Nothing will be sent.",
+    'conf_titre_parc_install' => "Install Fail2ban on :nb fleet machine(s)?",
+    'conf_texte_parc_install' => "Fail2ban will be installed with apt-get on the machines whose reading does not say they have it — :nb in total: :machines. Machines in production or marked critical within this scope: :prod. Machines never read: :jamais — never having looked at one is enough to have it installed. This action installs a package on several machines at once, and it cannot be undone from this page.",
+    'conf_titre_parc_install_vide' => "No machine to install",
+    'conf_texte_parc_install_vide' => "The recorded reading says the whole fleet (:parc) already has Fail2ban: the scope of this action is 0 machines. Nothing will be sent.",
+    'recopie_etiquette' => "To confirm, retype the number of machines affected",
+    'recopie_aide' => "This action covers several machines at once. Confirming it means retyping their number: two « yes » in a row are a reflex, not two decisions.",
+    'recopie_faux' => "The number retyped does not match.",
+    'parc_envoi' => "Fleet action sent to :nb machine(s)…",
+    'parc_resultat_machine' => ":machine: :etat",
+    'parc_ok' => "succeeded",
+    'parc_echec' => "failed — :message",
+    'parc_echec_muet' => "failed — the backend does not say why",
+    'parc_apres_install' => "This action does not update the reading: the scope above will stay the same until each machine is read.",
+    'parc_rien' => "The backend reported no machine.",
+
+    // TWO KEYS WITH NO READER TODAY, SAID RATHER THAN FIXED.
+    // `histo_choisir` and `jail_desactiver` are read neither by the view nor by
+    // the script (measured 2026-08-27: zero occurrences outside these
+    // catalogues). `jail_desactiver` will be read by F7 —
+    // `/fail2ban/disable_jail` is one of its four capabilities. Removing them
+    // to put them back two sub-lots later costs an FR/EN divergence for
+    // nothing: decided 2026-08-27.
 ];

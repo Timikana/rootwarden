@@ -54,8 +54,8 @@ return [
     'vide_titre' => 'Aucune machine au parc',
     'vide_texte' => 'Aucune machine active n\'est enregistrée. Ajoutez-en depuis l\'administration des serveurs.',
     'vide_action' => 'Ouvrir les serveurs',
-    'non_porte_titre' => 'Les gestes sur Fail2ban ne sont pas encore portés',
-    'non_porte_texte' => 'Bannir, débannir, modifier une jail ou la liste blanche se font pour l\'instant depuis l\'ancien portail. Cette page porte l\'état et les accès ; les gestes suivent.',
+    'non_porte_titre' => "Quatre gestes de Fail2ban ne sont pas encore portés",
+    'non_porte_texte' => "Installer Fail2ban sur UNE machine, redémarrer le service, désactiver une jail et interroger la géolocalisation d'une adresse se font encore depuis l'ancien portail. Tout le reste est ici : l'état, les jails, l'historique, la configuration, les journaux, les bans, la liste blanche et les deux gestes de parc.",
     'non_porte_lien' => 'Ouvrir Fail2ban dans l\'ancien portail',
 
     // ── Sous-lot F2 : historique et frise ────────────────────────────────
@@ -166,4 +166,65 @@ return [
     'jail_findtime_aide' => 'Fenêtre pendant laquelle les échecs sont comptés, en secondes. Minimum 60.',
     'conf_titre_jail' => 'Activer :jail sur :machine ?',
     'conf_texte_jail' => 'La jail :jail sera écrite dans /etc/fail2ban/jail.local sur :machine, avec :maxretry tentative(s), un ban de :bantime s et une fenêtre de :findtime s. ⚠ Le service REDÉMARRE : tous les bans en cours sur cette machine seront perdus.',
+
+    // ── Sous-lot F6 : les deux gestes sur TOUT LE PARC ───────────────────
+    //
+    // Ces deux gestes ne prennent AUCUNE machine en parametre : le backend
+    // choisit ses cibles en base. Aucun texte de cette section ne doit donc
+    // laisser croire que l'operateur choisit la portee — il ne peut que la
+    // LIRE. Et aucun ne dit « tous les serveurs » sans donner le nombre : le
+    // legacy le faisait, et c'est E-173.
+    'parc_titre' => "Gestes sur tout le parc",
+    'parc_aide' => "Ces deux gestes ne visent pas la machine choisie ci-dessus : ils n'en prennent aucune. Le backend choisit ses cibles lui-même, en base, d'après le dernier relevé enregistré. Ce que cette section annonce est le résultat de SES requêtes, lues sur la même base.",
+    'parc_installer' => "Installer Fail2ban sur tout le parc",
+    'parc_bannir' => "Bannir sur tout le parc",
+    'parc_ban_titre' => "Bannir sur tout le parc",
+    'parc_ban_aide' => "L'adresse saisie ci-dessus serait bannie sur les machines que le dernier relevé dit actives, et sur elles seules — :nb au total : :machines.",
+    'parc_ban_aide_aucune' => "Le dernier relevé ne dit AUCUNE machine active : ce geste ne toucherait rien. Relevez l'état des machines pour que la portée soit connue.",
+    'parc_role_titre' => "Ces deux gestes demandent le rôle administrateur",
+    'parc_role' => "Les deux routes de parc du backend exigent le rôle 2 — ce sont les seules du module. Avec votre rôle, elles refuseraient. Les gestes machine par machine, eux, restent disponibles.",
+    'portee_titre' => "Ce que ces gestes toucheraient aujourd'hui",
+    'portee_cache' => "Cette portée est décidée par le dernier relevé enregistré, machine par machine — pas par l'état des machines à l'instant. Une machine dont Fail2ban est tombé depuis son relevé ne figure pas dans les installations, bien qu'elle ne protège plus rien ; une machine installée depuis y figure encore.",
+    'portee_installer' => "Installer Fail2ban sur tout le parc toucherait :nb machine(s), sur un parc de :parc :",
+    'portee_installer_aucune' => "Installer Fail2ban sur tout le parc ne toucherait aucune machine : le relevé enregistré dit que tout le parc (:parc) l'a déjà.",
+    'portee_bannir' => "Bannir une adresse sur tout le parc toucherait :nb machine(s), sur un parc de :parc :",
+    'portee_bannir_aucune' => "Bannir une adresse sur tout le parc ne toucherait AUCUNE machine : le relevé enregistré ne dit active aucune des machines du parc (:parc).",
+    'portee_jamais' => "jamais relevée",
+    'portee_jamais_aide' => "Une machine marquée « jamais relevée » n'a aucune ligne de relevé. La requête d'installation retient les machines dont le relevé ne dit pas « installé » — et une machine sans relevé en fait partie : ne l'avoir jamais regardée suffit à la faire installer.",
+    'portee_archivee' => "retirée du parc",
+    'portee_archivee_aide' => "Cette machine est archivée : elle ne figure pas dans le sélecteur ci-dessus. Les deux requêtes de parc, elles, ne filtrent pas le cycle de vie — elle reste donc une cible.",
+    'portee_releve_le' => "relevée le :date",
+    'portee_inconnue_titre' => "La portée n'a pas pu être lue",
+    'portee_inconnue' => "Ni le chargement de la page ni la relecture n'ont rendu la portée de ces deux gestes. Ce n'est PAS « aucune machine » : on ne sait pas lesquelles seraient touchées, et les deux gestes sont donc refusés ici. Rechargez la page.",
+    'parc_ban_inconnue' => "La portée n'a pas pu être lue : ce geste est refusé tant qu'on ne sait pas quelles machines il toucherait.",
+    'conf_titre_parc_inconnue' => "Portée inconnue — rien ne sera envoyé",
+    'conf_texte_parc_inconnue' => "La portée de ce geste n'a pas pu être lue. Un geste de parc ne s'envoie pas sans savoir sur combien de machines il porte : rien ne sera envoyé.",
+    'portee_relire' => "Relire la portée",
+    'portee_relue' => "Portée relue à l'instant.",
+    'portee_echec' => "La portée n'a pas pu être relue. Les listes affichées sont celles du chargement de la page.",
+    'conf_titre_parc_ban' => "Bannir :ip sur :nb machine(s) du parc ?",
+    'conf_texte_parc_ban' => ":ip sera bannie dans la jail :jail sur les machines que le dernier relevé dit actives — :nb au total : :machines. Les machines dont Fail2ban est absent ou arrêté ne sont pas touchées, même exposées. Ce geste part vers plusieurs machines à la fois.",
+    'conf_titre_parc_ban_vide' => "Aucune machine ne serait bannie",
+    'conf_texte_parc_ban_vide' => "Le dernier relevé ne dit aucune machine active : la portée de ce geste est de 0 machine, et :ip ne serait bannie nulle part. Rien ne sera envoyé.",
+    'conf_titre_parc_install' => "Installer Fail2ban sur :nb machine(s) du parc ?",
+    'conf_texte_parc_install' => "Fail2ban sera installé par apt-get sur les machines dont le relevé ne dit pas qu'elles l'ont — :nb au total : :machines. Machines de production ou marquées critiques dans cette portée : :prod. Machines jamais relevées : :jamais — ne l'avoir jamais regardée suffit à la faire installer. Ce geste installe un paquet sur plusieurs machines à la fois, et il ne se défait pas depuis cette page.",
+    'conf_titre_parc_install_vide' => "Aucune machine à installer",
+    'conf_texte_parc_install_vide' => "Le relevé enregistré dit que tout le parc (:parc) a déjà Fail2ban : la portée de ce geste est de 0 machine. Rien ne sera envoyé.",
+    'recopie_etiquette' => "Pour confirmer, recopiez le nombre de machines touchées",
+    'recopie_aide' => "Ce geste porte sur plusieurs machines à la fois. Le confirmer demande de recopier leur nombre : deux « oui » d'affilée sont un réflexe, pas deux décisions.",
+    'recopie_faux' => "Le nombre recopié ne correspond pas.",
+    'parc_envoi' => "Geste de parc envoyé vers :nb machine(s)…",
+    'parc_resultat_machine' => ":machine : :etat",
+    'parc_ok' => "abouti",
+    'parc_echec' => "échoué — :message",
+    'parc_echec_muet' => "échoué — le backend ne dit pas pourquoi",
+    'parc_apres_install' => "Le relevé n'est pas mis à jour par ce geste : la portée ci-dessus restera la même jusqu'à ce que chaque machine soit relevée.",
+    'parc_rien' => "Le backend n'a rapporté aucune machine.",
+
+    // DEUX CLES SANS LECTEUR AUJOURD'HUI, ET C'EST DIT PLUTOT QUE CORRIGE.
+    // `histo_choisir` et `jail_desactiver` ne sont lues ni par la vue ni par le
+    // script (mesure du 2026-08-27 : zero occurrence hors de ces catalogues).
+    // `jail_desactiver` le sera par F7 — `/fail2ban/disable_jail` est l'une de
+    // ses quatre capacites. Les retirer pour les remettre dans deux sous-lots
+    // coute une divergence FR/EN pour rien : arbitrage du 2026-08-27.
 ];

@@ -118,6 +118,73 @@ jobs:
           path: test-results.xml
 
   # ─────────────────────────────────────────────────────────────
+  # Job 3 bis : Tests PHPUnit du portage Laravel - BLOQUANT (INF-001)
+  #
+  # Pourquoi il existe. Jusqu'ici la CI portait 13 jobs et UN SEUL executait des
+  # tests : `test-python`. Les 232 tests du portage ne protegeaient donc que la
+  # machine qui les lancait, et les 104 suites E2E restent entierement manuelles.
+  # Ce job ferme la premiere moitie du trou, celle qui ne coute rien.
+  #
+  # Pourquoi il est BLOQUANT. La suite est HERMETIQUE : ni MySQL, ni backend
+  # Python, ni navigateur — `phpunit.xml` pointe la base sur un SQLite en
+  # memoire. Elle n'a donc aucune raison d'etre plus indulgente que les quatre
+  # portes deja bloquantes du depot (bandit, semgrep, pip-audit, gitleaks). Une
+  # porte qui ne bloque pas est un rapport, pas une porte.
+  #
+  # Ce qu'il mesure, et ce qu'il ne mesure pas. Il mesure les GARDES de route —
+  # `role:N`, `perm:xxx`, session authentifiee — sur les 85 routes placees
+  # derriere la session authentifiee, avec les trois roles. Il ne mesure NI qu'une page autorisee rende son
+  # contenu (il faudrait la base du banc et le backend), NI le jeton CSRF : le
+  # cadre EXEMPTE les tests (`PreventRequestForgery::runningUnitTests`), donc une
+  # assertion CSRF ecrite ici passerait sans rien mesurer. C'est
+  # `tests/e2e/go-socle-passerelle.mjs` qui la porte, et elle reste manuelle.
+  #
+  # En prime, et ce n'etait pas cherche : `lint-php` ne verifie la syntaxe que de
+  # `legacy/`. Une erreur de syntaxe dans `laravel/` n'etait vue par aucun job ;
+  # elle fait desormais echouer celui-ci.
+  # ─────────────────────────────────────────────────────────────
+  test-php:
+    name: Tests PHPUnit (portage Laravel)
+    runs-on: ubuntu-latest
+    needs: lint-php
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          # Nommees explicitement plutot que laissees au defaut de l'image :
+          # `pdo_sqlite` est ce sur quoi la suite entiere repose, et une
+          # extension absente se manifesterait par une erreur de connexion
+          # obscure plutot que par un message qui la nomme.
+          extensions: mbstring, dom, xml, ctype, tokenizer, fileinfo, curl, pdo, pdo_sqlite, sqlite3, bcmath
+          tools: composer
+
+      - name: Composer install
+        working-directory: laravel
+        # `--no-scripts` par coherence avec `sca-php` : on n'execute pas les
+        # hooks des paquets. La decouverte de paquets de Laravel n'en souffre
+        # pas — `PackageManifest` reconstruit son manifeste a la volee quand le
+        # fichier de cache est absent.
+        run: composer install --no-scripts --no-interaction --no-progress --prefer-dist
+
+      - name: Preparer l'environnement de test
+        working-directory: laravel
+        # MESURE, PAS PRECAUTION. Sans cle d'application, la suite rend
+        # **226 echecs sur 232** : le groupe `web` chiffre les cookies, donc
+        # toute requete de test echoue, et seuls les six tests qui n'emettent
+        # aucune requete survivent. Mesure le 2026-08-27 en forcant `APP_KEY` a
+        # vide dans le conteneur. La cle est jetable et locale au job : elle ne
+        # dechiffre rien qui existe ailleurs.
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: php artisan test
+        working-directory: laravel
+        run: php artisan test
+
+  # ─────────────────────────────────────────────────────────────
   # Job 4 : Build Docker images (sans push - validation only)
   # ─────────────────────────────────────────────────────────────
   build-docker:

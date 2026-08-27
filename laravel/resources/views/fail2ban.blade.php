@@ -86,12 +86,53 @@
         <p class="rw-sous-titre-fort" data-rw="f2b-confirmation-titre"></p>
         <p class="rw-aide" data-rw="f2b-confirmation-texte"></p>
     </div>
+    {{--
+        ── F6 : POUR UN GESTE DE PARC, LE PANNEAU DEMANDE UN AUTRE GESTE ───
+
+        Deux « oui » d'affilee sont un reflexe, pas deux decisions. Pour les deux
+        gestes qui partent vers PLUSIEURS machines a la fois, le bouton de
+        confirmation nait DESACTIVE et ne s'active qu'a l'egalite exacte avec le
+        NOMBRE de machines touchees — le nombre qu'on veut justement faire lire.
+
+        Ce bloc reste MASQUE pour les gestes machine par machine (F4, F5) : leur
+        confirmation part au premier clic, comme avant. Une exigence de recopie
+        posee sur tous les gestes ferait de la recopie un reflexe a son tour.
+    --}}
+    <label class="rw-etiquette-champ" data-rw="f2b-recopie-bloc" hidden>
+        <span>{{ __('fail2ban.recopie_etiquette') }}</span>
+        <input type="text" class="rw-saisie" data-rw="f2b-recopie"
+               inputmode="numeric" autocomplete="off" spellcheck="false">
+        <span class="rw-aide">{{ __('fail2ban.recopie_aide') }}</span>
+        <span class="rw-erreur" data-rw="f2b-recopie-message" hidden>{{ __('fail2ban.recopie_faux') }}</span>
+    </label>
     <div class="rw-panneau-decision__actions">
         <button type="button" class="rw-bouton rw-bouton--discret"
                 data-rw="f2b-annuler">{{ __('fail2ban.conf_annuler') }}</button>
         <button type="button" class="rw-bouton rw-bouton--danger"
                 data-rw="f2b-confirmer">{{ __('fail2ban.conf_confirmer') }}</button>
     </div>
+</div>
+
+{{--
+    ── LE JOURNAL DES GESTES, AU NIVEAU DE LA PAGE LUI AUSSI ───────────────
+
+    Il vivait DANS le detail d'une jail. Or les trois gestes de la liste blanche
+    et l'activation d'une jail s'exercent detail FERME : leur verdict s'ecrivait
+    donc dans une section `hidden` — invisible, alors que c'est la seule chose
+    qui dit si le geste a abouti. Deuxieme fois que ce module paie « un element
+    partage par plusieurs sections ne vit dans aucune d'elles » : F5 l'a corrige
+    pour le PANNEAU et l'a laisse sur le JOURNAL.
+
+    F6 rend le defaut incontournable : `install_all` ne vise AUCUNE jail, donc
+    son resultat n'aurait jamais pu s'afficher.
+
+    Vide, le cadre DIT qu'il est vide (`rw-journal--vide` rend `aria-label` en
+    contenu) plutot que d'etre un rectangle muet.
+--}}
+<div class="rw-section" data-rw="f2b-journal-bloc">
+    <h2 class="rw-section__entete">{{ __('fail2ban.geste_journal') }}</h2>
+    <div class="rw-journal__general rw-journal--vide" data-rw="f2b-journal"
+         aria-live="polite" aria-label="{{ __('fail2ban.geste_vide') }}"></div>
 </div>
 
 {{--
@@ -213,9 +254,31 @@
                 data-rw="f2b-bannir">{{ __('fail2ban.bannir') }}</button>
     </div>
 
-    <h3 class="rw-sous-titre-fort rw-titre--espace">{{ __('fail2ban.geste_journal') }}</h3>
-    <div class="rw-journal__general" data-rw="f2b-journal"
-         aria-live="polite" aria-label="{{ __('fail2ban.geste_vide') }}"></div>
+    {{--
+        ── F6 : BANNIR SUR TOUT LE PARC ────────────────────────────────────
+
+        Ce geste vit ICI, et non dans la section de parc, parce qu'il lit
+        l'adresse et la jail de cet ecran-la. Mais il est SORTI de la rangee
+        d'actions : le legacy aligne trois boutons alimentes par le meme champ,
+        et celui du milieu bannit sur toutes les machines actives du parc — a
+        deux centimetres de celui qui n'en bannit qu'une. Rien ne les distingue
+        que leur libelle.
+
+        Il dit sa portee AVANT le geste, chiffree et nommee. Elle vient de la
+        meme donnee que la section de parc : les deux ne peuvent pas diverger.
+    --}}
+    <div class="rw-encart" data-rw="f2b-parc-ban">
+        <p class="rw-sous-titre-fort">{{ __('fail2ban.parc_ban_titre') }}</p>
+        <p class="rw-aide" data-rw="f2b-parc-ban-aide"></p>
+        @if ($peutParc)
+            <div class="rw-actions">
+                <button type="button" class="rw-bouton rw-bouton--danger"
+                        data-rw="f2b-bannir-parc">{{ __('fail2ban.parc_bannir') }}</button>
+            </div>
+        @else
+            <p class="rw-prose">{{ __('fail2ban.parc_role') }}</p>
+        @endif
+    </div>
 </div>
 
 <div class="rw-section" data-rw="f2b-services-bloc" hidden>
@@ -382,6 +445,73 @@
     </div>
 </div>
 
+{{--
+    ── F6 : LES DEUX GESTES SUR TOUT LE PARC, ET LEUR PORTEE ───────────────
+
+    Cette section est en BAS de page, et c'est delibere : un geste irreversible
+    qui part vers tout le parc ne doit pas se rencontrer en passant. Elle est en
+    revanche TOUJOURS rendue — c'est la seule facon d'annoncer la portee, et
+    l'annonce vaut par elle-meme, avant tout geste.
+
+    Le legacy, lui, n'affiche son bouton d'installation de parc que si la machine
+    CHOISIE n'a pas fail2ban (`main.js:77`) : la disponibilite d'un geste de parc
+    y est decidee par un objet sur lequel il n'agit pas. C'est l'incoherence
+    qu'E-162 a fait corriger ailleurs dans ce meme module. Ici l'offre suit SA
+    portee : proposee quand elle n'est pas vide, et quand elle l'est, l'ecran le
+    DIT au lieu de proposer. **Divergence declaree** — le geste devient plus
+    atteignable que dans le legacy, en echange d'une portee enfin lisible et
+    d'une confirmation qui exige de recopier le nombre de machines.
+--}}
+<div class="rw-section" data-rw="f2b-parc">
+    <h2 class="rw-section__entete">{{ __('fail2ban.parc_titre') }}</h2>
+    <p class="rw-aide rw-prose">{{ __('fail2ban.parc_aide') }}</p>
+
+    {{--
+        Un seul rendu, en JS, alimente par la page puis par la relecture : il
+        n'existe donc jamais deux versions de cette liste.
+
+        IL NAIT `hidden`, ET LE SCRIPT LE DEVOILE APRES L'AVOIR PEINT.
+
+        Rendu vide, `rw-encart` est une boite BORDEE : la session 7 l'a vue a
+        l'image, aux trois largeurs et dans les deux langues, et elle ressemble a
+        un champ de saisie — dans la section qui porte le geste le plus dangereux
+        du module. Qu'elle ait ete surprise avant le peignage ou jamais peinte ne
+        change rien a la regle : **un encart sans contenu ne se rend pas.** Si le
+        script ne tourne pas, il n'y a pas de boite qui invite au clic ; s'il
+        tourne, il dit soit la portee, soit qu'il n'a pas pu la lire.
+    --}}
+    <div class="rw-encart" data-rw="f2b-portee" hidden></div>
+    <p class="rw-aide" role="status" aria-live="polite" data-rw="f2b-portee-message"></p>
+
+    @if ($peutParc)
+        <div class="rw-actions">
+            <div class="rw-actions__gauche">
+                <button type="button" class="rw-bouton rw-bouton--discret"
+                        data-rw="f2b-portee-relire">{{ __('fail2ban.portee_relire') }}</button>
+            </div>
+            {{-- Une INSTALLATION n'interrompt pas de service : teinte
+                 d'avertissement, pas rouge. Le rouge de cette page est reserve
+                 a ce qui coupe un acces — bannir. Et le poids de la decision
+                 appartient au panneau, pas au bouton qui l'ouvre. --}}
+            <button type="button" class="rw-bouton rw-bouton--avertissement"
+                    data-rw="f2b-installer-parc">{{ __('fail2ban.parc_installer') }}</button>
+        </div>
+    @else
+        {{--
+            LE BACKEND EXIGE LE ROLE 2 SUR CES DEUX ROUTES, ET SUR ELLES SEULES.
+
+            Un role 1 lit cette page et ces deux gestes ne peuvent que lui rendre
+            403. Il recoit donc la RAISON, pas un bouton — meme regle qu'E-169.
+            Branche NON exercee sur le banc : aucun compte de role 1 ne porte
+            `can_manage_fail2ban`, donc aucun n'atteint cette page.
+        --}}
+        <div class="rw-encart" data-rw="f2b-parc-refuse">
+            <p class="rw-sous-titre-fort">{{ __('fail2ban.parc_role_titre') }}</p>
+            <p class="rw-prose">{{ __('fail2ban.parc_role') }}</p>
+        </div>
+    @endif
+</div>
+
 <div class="rw-encart" data-rw="f2b-non-porte">
     <p class="rw-sous-titre-fort">{{ __('fail2ban.non_porte_titre') }}</p>
     <p class="rw-prose">{{ __('fail2ban.non_porte_texte') }}</p>
@@ -394,5 +524,9 @@
     <script id="f2b-textes" type="application/json">@json($textes)</script>
     {{-- Les noms de comptes, pour resoudre la colonne « Par » (E-157). --}}
     <script id="f2b-noms" type="application/json">@json($noms)</script>
+    {{-- F6 : la portee des deux gestes de parc, lue en base par le controleur
+         avec le SQL des routes. `@json` reste sur UNE ligne — multiligne, il
+         casse le PHP compile par Blade. --}}
+    <script id="f2b-portee-donnees" type="application/json">@json($portee)</script>
     <script src="/js/fail2ban.js?v={{ @filemtime(public_path('js/fail2ban.js')) ?: '0' }}"></script>
 @endsection
