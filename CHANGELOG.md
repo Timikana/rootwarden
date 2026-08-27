@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.27** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.28** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,84 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.28 — un balayage ne converge qu'en lisant, et le 114/57 du chantier se scinde en 116/59/54+3
+
+**Le releve des 229 routes backend a produit QUATRE chiffres successifs pour la meme question** — combien de
+`@require_machine_access` sont **sans objet** :
+
+    24   le corps de la route seul
+    17   + les helpers du MEME fichier (`_resolve_ssh_creds`)
+     3   + les helpers d'AUTRES modules (`validate_machine_id`)
+     1   apres les avoir lues une par une
+
+**La session 4 a failli publier « vingt-quatre gardes qui ne gardent rien ».** Chaque niveau d'appel suivi
+divisait le chiffre. *Un balayage qui s'arrete au premier niveau mesure la FORME de la route et non son
+EFFET — c'est la faute meme qu'il pretend denoncer.*
+
+**Et ce qui l'a arretee n'est pas une relecture : c'est que 24 sur 116 etait trop gros pour etre vrai.**
+Comme le controle creux rattrape parce que « le chiffre etait trop propre », et le greffage rattrape par
+l'ecart avec sa prediction. **Trois fois dans la journee, l'alerte est venue de la VRAISEMBLANCE d'un nombre
+et non d'une assertion** — c'est mince, et c'est pourquoi l'attente s'ecrit avant la mesure : *une intuition
+sur l'ordre de grandeur est le dernier filet, pas le premier.*
+
+> **Une sonde ecrite pour accuser se trompe du cote qui alarme.** C'est structurel : on l'ecrit en cherchant
+> un defaut, donc ses faux positifs sont des accusations et ses faux negatifs des silences. **Le jour ou
+> l'une se trompera dans l'autre sens, personne ne le verra** — un « 0 defaut » ne declenche aucune
+> verification.
+
+**Deux occurrences le meme jour, dans deux sessions, a deux heures d'intervalle** : celle-ci, et le balayage
+du Lead qui cherchait `href="…"` la ou les tuiles s'ecrivent `'url' => '…'`. Le Lead accusait par exces de
+confiance, la session 4 par exces de zele ; *les deux se corrigent en lisant, aucune en relancant le motif.*
+
+#### Le chiffre du chantier, remesure et confirme par un second moyen
+
+    116  routes portent `@require_machine_access`   (= les 114 connues + 2 posees ce jour)
+     59  redondantes (inertes des `role_id >= 2`)   (= les 57 connues + ces deux-la)
+     54  qui MORDENT reellement
+      3  SANS OBJET  (la requete ne porte aucun identifiant de machine)
+
+**Le recoupement avec l'audit tombe juste sur les trois lignes** — premiere fois de la journee qu'un chiffre
+du chantier est confirme par un moyen independant **sans qu'un ecart apparaisse**. Le tableau a **trois
+etats** — la garde mord · elle est redondante · elle est **sans objet** — remplace le decompte a deux etats,
+qui classait les 3 « presentes » et se trompait dans le sens rassurant.
+
+#### Ce qu'un releve de gardes doit dire de LUI-MEME
+
+`docs/migration/RELEVE-GARDES-BACKEND.md` (`86a5323`) porte en tete : **il decrit l'arbre de travail, pas le
+service** ; **les cinq routes dont l'etat differe sont listees avec LEURS DEUX ETATS** — `POST /deploy` y
+figure en clair, `role(2) + machine_access` dans l'arbre et **`@require_api_key` seule en service** ; et
+**deux chiffres y sont marques NON VERIFIES** (69 routes qui ecrivent, 98 qui joignent une machine) parce
+qu'ils viennent d'une recherche de motifs et non d'une lecture. *Apres la lecon du 24, un chiffre non lu se
+declare non lu.*
+
+Sans la premiere mention, « garde reelle » se lirait « garde en vigueur » — dans le document meme que la
+session 3 va lire pour ecrire une page qui **affirme des autorisations**.
+
+**Et les dedouanements y sont ecrits au meme titre que les accusations** : `/docker/results` borne au
+perimetre dans son corps ; `POST /update_zabbix` est une redirection **307** vers une route gardee, et le 307
+**preserve methode et corps**, donc les gardes s'appliquent a l'arrivee. *Un releve qui ne dedouane pas se lit
+comme un requisitoire, et on cesse de le croire.*
+
+#### E-211 — et sa portee annoncee etait plus large que sa portee reelle
+
+`GET /ssh-audit/policies` (`ssh_audit.py:478`) porte `@require_api_key` + `@require_machine_access`, **sans
+`@require_role` ni `@require_permission`**, et `machine_id` y est **optionnel**.
+
+**Le compte rendu annoncait « lit les politiques au-dela de son perimetre ». Faux** : sans `machine_id`, la
+requete rend **uniquement** `WHERE machine_id IS NULL` — les politiques **globales du portail**, pas celles
+des machines d'autrui. **Aucune lecture transverse du parc.**
+
+**L'ecart reel, plus etroit et toujours reel** : les politiques globales sont lisibles par **tout porteur de
+la cle d'API**, quel que soit son role, **sans detenir `can_audit_ssh`** — la page legacy l'exige
+(`ssh-audit/index.php:13`) et **son seul appelant passe toujours `machine_id`** (`js/main.js:321`), donc **le
+chemin sans parametre n'est exerce par aucune interface.** *Une correction qui retrecit un ecart le rend plus
+utile, pas moins* — annonce large, il aurait fait chercher une fuite de parc qui n'existe pas.
+
+**Quatrieme occurrence de « un garde sans objet ne garde rien », et la pire de la famille** : le decorateur ne
+trouve aucun identifiant, donc il ne refuse rien — **et le repli rend un jeu de donnees parfaitement coherent
+au lieu d'une erreur.** *Un repli permissif ressemble a de la robustesse* : le chemin non garde est celui qui
+a l'air de bien se comporter.
+
 ### v1.38.27 — ⚠ EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden
 
 **Le defaut le plus grave de la journee, trouve par la session 3 en REFUSANT de porter fidelement, et
@@ -2683,7 +2761,8 @@ correspondance reelle :**
 | v1.38.24 | `90a6ac5` | l'ordre d'archivage devient un graphe ; INF-003 ; E-207 et E-208 — **contenu du Lead, emporte par le commit `graylog` d'une autre session : l'index est PARTAGE, seconde occurrence** |
 | v1.38.25 | `643927a` | six references mesurees, et une prediction qui a rattrape une MESURE fausse |
 | v1.38.26 | `a1cd400` | « aucun lien entrant » etait faux ; les 4 emplacements comptes |
-| **v1.38.27** | (ce commit) | **E-209, en production : un guide qui enseigne un durcissement inexistant** ; E-210 |
+| **v1.38.27** | `5c2e599` | **E-209, en production : un guide qui enseigne un durcissement inexistant** ; E-210 |
+| v1.38.28 | (ce commit) | un balayage ne converge qu'en lisant ; 116/59/54+3 confirme ; E-211 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
