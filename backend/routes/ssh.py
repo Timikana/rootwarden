@@ -1145,10 +1145,22 @@ def scan_server_users():
                 "done"
             )
             ak_dump_root = ''
+            # E-187 : UN DRAPEAU PAR LECTURE, PAS UN PAR FONCTION.
+            # `scan_concluant` (E-183) mesure la lecture de `/etc/passwd`. Il ne
+            # dit RIEN de ces deux dumps-ci, qui sont des lectures entierement
+            # differentes — et ce sont elles qui alimentent la purge des cles et
+            # la colonne `keys_count`.
+            dump_root_ok = False
             try:
                 ak_dump_root, _err, _code = execute_as_root(client, dump_script, root_pass,
                                                             logger=logger, timeout=30)
-                if not ak_dump_root.strip():
+                # `_code` etait capture et JAMAIS lu. C'etait la seule occurrence
+                # de ce nom dans la fonction : la valeur qui ferme le trou etait
+                # deja la, a portee d'un `if`.
+                dump_root_ok = (_code == 0)
+                if not dump_root_ok:
+                    logger.warning("scan_server_users(%s): dump root authorized_keys en ECHEC (code=%s) -- fallback simple-user", mid, _code)
+                elif not ak_dump_root.strip():
                     logger.info("scan_server_users(%s): dump root vide (probable absence de fichiers ou silent fail). Fallback simple-user.", mid)
             except Exception as _e:
                 logger.warning("scan_server_users(%s): dump root authorized_keys echoue (%s) -- fallback simple-user", mid, _e)
@@ -1158,6 +1170,7 @@ def scan_server_users():
             # de tous les users car cat /home/X/.ssh/* en simple user echoue
             # pour les autres -> on cible le user de connexion uniquement.
             ak_dump_user = ''
+            dump_user_ok = False
             try:
                 user_script = (
                     "ak=\"$HOME/.ssh/authorized_keys\"; "
@@ -1170,8 +1183,31 @@ def scan_server_users():
                 )
                 _stdin, _stdout, _stderr = client.exec_command(user_script, timeout=10)
                 ak_dump_user = _stdout.read().decode('utf-8', errors='replace')
+                # E-187 : ce code de sortie n'etait meme pas OBTENU.
+                dump_user_ok = (_stdout.channel.recv_exit_status() == 0)
             except Exception as _e:
                 logger.warning("scan_server_users(%s): dump simple-user echoue (%s)", mid, _e)
+
+            # E-187 : AUCUNE des deux lectures de cles n'a abouti ?
+            # Alors on n'a AUCUNE donnee de cles, et tout ce qui en decoule est
+            # une invention : `keys_count = 0` sur chaque compte, et l'ensemble
+            # `seen_keys` vide, dont la difference vaut TOUTES les cles connues.
+            #
+            # Ce drapeau ne porte que sur le cas NON AMBIGU — un code de sortie
+            # non nul, ou une exception. Le cas « code nul mais dump vide » est
+            # DELIBEREMENT laisse de cote : la boucle du script sort en 0 meme
+            # sans rien emettre, donc un dump vide est aussi ce que rend une
+            # machine qui n'a reellement aucune cle. Les distinguer demande une
+            # mesure sur une machine a zero cle (Test-Server-Debian), attribuee
+            # a la session 6. Trancher sans elle reproduirait E-183 dans l'autre
+            # sens : purger a tort une machine qui n'a legitimement rien.
+            cles_lues = dump_root_ok or dump_user_ok
+            if not cles_lues:
+                logger.warning(
+                    "scan_server_users(%s): AUCUNE lecture de cles n'a abouti "
+                    "(root=%s, simple-user=%s) — `keys_count` et la purge des cles "
+                    "sont ABANDONNEES, l'inventaire des cles est conserve tel quel",
+                    mid, dump_root_ok, dump_user_ok)
 
             # Parse les 2 dumps. Root gagne en cas de doublon (dump_root est
             # autoritatif). Le simple-user comble les trous.
@@ -1239,13 +1275,28 @@ def scan_server_users():
                 uname = u['name']
                 if uname in existing:
                     # Mettre a jour les infos (last_seen, keys)
-                    cur.execute("""
-                        UPDATE server_user_inventory
-                        SET uid = %s, home_dir = %s, shell = %s, keys_count = %s,
-                            has_platform_key = %s, last_seen_at = NOW()
-                        WHERE machine_id = %s AND username = %s
-                    """, (u['uid'], u['home'], u['shell'], u['keys_count'],
-                          u['has_platform_key'], mid, uname))
+                    #
+                    # E-187 : les colonnes de CLES ne s'ecrivent que si une des
+                    # deux lectures de cles a abouti. Sinon `keys_count` vaudrait
+                    # 0 sur chaque compte — l'inventaire affirmerait qu'aucun
+                    # compte de la machine ne porte de cle, ce qui est la donnee
+                    # meme sur laquelle K4 raisonne. Les colonnes d'identite
+                    # (uid, home, shell) viennent de `/etc/passwd`, deja garde
+                    # par `scan_concluant` : elles restent ecrites.
+                    if cles_lues:
+                        cur.execute("""
+                            UPDATE server_user_inventory
+                            SET uid = %s, home_dir = %s, shell = %s, keys_count = %s,
+                                has_platform_key = %s, last_seen_at = NOW()
+                            WHERE machine_id = %s AND username = %s
+                        """, (u['uid'], u['home'], u['shell'], u['keys_count'],
+                              u['has_platform_key'], mid, uname))
+                    else:
+                        cur.execute("""
+                            UPDATE server_user_inventory
+                            SET uid = %s, home_dir = %s, shell = %s, last_seen_at = NOW()
+                            WHERE machine_id = %s AND username = %s
+                        """, (u['uid'], u['home'], u['shell'], mid, uname))
                 else:
                     # Nouveau user - classifier automatiquement
                     shell_basename = (u.get('shell') or '').rsplit('/', 1)[-1].lower()
@@ -1354,10 +1405,14 @@ def scan_server_users():
                     "WHERE machine_id = %s", (mid,))
                 existing_keys = {(r['username'], r['fingerprint_sha256'])
                                  for r in cur.fetchall()}
-                # E-183, meme garde : `seen_keys` se construit a partir des
-                # comptes lus. Un scan qui n'a rien lu rend `seen_keys` vide,
-                # donc `stale` = TOUTES les cles connues de la machine.
-                stale = (existing_keys - seen_keys) if scan_concluant else set()
+                # E-183 puis E-187 : `seen_keys` depend de DEUX lectures —
+                # celle de `/etc/passwd` (qui donne les comptes) et celle des
+                # `authorized_keys` (qui donne les cles). Il faut les DEUX, et
+                # c'est le defaut qu'E-183 avait laisse ouvert : `scan_concluant`
+                # seul laissait une purge complete partir quand le dump des cles
+                # avait echoue.
+                stale = ((existing_keys - seen_keys)
+                         if (scan_concluant and cles_lues) else set())
                 if stale:
                     for uname, fp in stale:
                         cur.execute(
@@ -1408,13 +1463,44 @@ def scan_server_users():
         finally:
             conn_inv.close()
 
-        return jsonify({
-            'success': True,
+        # ══ E-187 : LE VERDICT, LA MOITIE QU'E-183 AVAIT LAISSEE ═════════════
+        #
+        # E-183 a corrige l'ETAT PERSISTE — plus rien n'est efface sur une
+        # lecture ratee. Il n'a PAS corrige le verdict : cette route rendait
+        # encore `success: True` inconditionnellement, avec un inventaire ancien
+        # et aucun champ disant que rien n'avait ete lu. L'appelant recevait donc
+        # une liste de comptes correcte, et croyait qu'elle venait de la machine.
+        #
+        # C'est l'INVERSE exact d'E-90, ou le verdict avait ete corrige et pas
+        # l'etat persiste. La classe a deux moities ; les deux comptent.
+        #
+        # `lectures` nomme chaque source separement plutot que de rendre un seul
+        # booleen : « je n'ai pas lu les comptes » et « j'ai lu les comptes mais
+        # pas les cles » ne se corrigent pas de la meme facon, et une interface
+        # qui ne recoit qu'un `false` ne peut pas le dire a l'exploitant.
+        lectures = {
+            'comptes': bool(scan_concluant),
+            'cles_root': bool(dump_root_ok),
+            'cles_utilisateur': bool(dump_user_ok),
+        }
+        concluant = scan_concluant and cles_lues
+        reponse = {
+            'success': bool(concluant),
+            'concluant': bool(concluant),
+            'lectures': lectures,
             'machine_id': m['id'],
             'machine_name': m['name'],
             'users': inventory,
             'pending_count': pending_count,
-        })
+        }
+        if not concluant:
+            manquantes = [nom for nom, ok in lectures.items() if not ok]
+            reponse['message'] = (
+                "Scan non concluant : " + ", ".join(manquantes) +
+                " n'a pas pu etre lu. L'inventaire affiche est celui du dernier "
+                "scan abouti, il n'a pas ete modifie."
+            )
+        return jsonify(reponse)
     except Exception as e:
         logger.error("scan_server_users(%s): %s", machine_id, e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
