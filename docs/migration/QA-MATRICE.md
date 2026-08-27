@@ -183,29 +183,52 @@ et à inscrire ici.
 
 Aucun de ces points n'a été corrigé : la session QA qualifie et transmet.
 
-### 4.1 E-164 n'est refermé qu'à moitié — `server_id` reste
+### 4.1 E-164 — REFERMÉE, et c'est le `xfail` strict qui l'a fait revenir
 
-`int(server_id)` vit **à l'intérieur** du `try` qui rend « Erreur interne » sur
-`/fail2ban/stats` (`backend/routes/fail2ban.py:657`) et sur `/fail2ban/history`
-(`:345`). Un identifiant non numérique y obtient donc **500**.
+**Cet écart a été traité comme il fallait, et le mécanisme mérite d'être écrit.**
 
-Mesuré, pas supposé : `assert 500 == 400` sur les deux routes.
+Au premier passage, `int(server_id)` vivait **à l'intérieur** du `try` qui rend
+« Erreur interne » sur `/fail2ban/stats` et `/fail2ban/history` : un identifiant non
+numérique y obtenait **500**. Mesuré, pas supposé — `assert 500 == 400` sur les deux.
 
-**La gravité est moindre que celle d'E-164 d'origine, et il faut le dire** : ce 500
-est du **JSON** (`{"success": false, "message": "Erreur interne"}`), pas une page
-HTML. La moitié « l'appelant ne peut même pas lire la réponse » est fermée ; la
-moitié « la faute est dans la requête, le statut dit qu'elle est dans le serveur »
-ne l'est pas.
+Deux façons de l'inscrire, et une seule est bonne :
 
-Les deux tests correspondants sont dans la suite, marqués `xfail(strict=True)` : ils
-ne rougissent pas aujourd'hui, et ils **rougiront le jour du correctif**, ce qui
-obligera à retirer le marqueur plutôt qu'à oublier l'écart. Verrouiller le 500 actuel
-aurait figé le défaut au lieu de le signaler.
+| ce qu'on aurait pu écrire | effet |
+|---|---|
+| une assertion `status == 500` | **fige le défaut**. Le jour du correctif, la suite passe au rouge et on « corrige le test » |
+| `xfail(strict=True)` sur le comportement **attendu** | la suite reste verte, et elle **rougit le jour du correctif** |
 
-*Troisième occurrence du motif « à moitié corrigé » sur ce module, et la deuxième fois
-que le correctif partiel est le nôtre.*
+C'est le second qui a été écrit, et c'est exactement ce qui s'est produit le
+2026-08-27 : la session 4 a sorti le cast du `try`, les deux marqueurs sont passés
+`XPASS(strict)` donc **FAILED**, et la session est venue le dire au lieu de le
+découvrir. Les marqueurs ont été retirés ici, et les propriétés sont désormais tenues
+en dur.
 
-**Attribution : session 4 (BASE & PERFORMANCE).**
+> Un écart qu'on ne peut pas corriger soi-même se décrit par le comportement
+> **attendu**, jamais par le comportement **observé**. La seconde forme se relit comme
+> une spécification et survit à la correction ; la première devient un obstacle à sa
+> propre résolution.
+
+**Ce qui est tenu maintenant**, quatre propriétés et les deux dernières ne se
+devinent pas :
+
+1. le statut est 400 sur les deux routes, pour quatre charges différentes ;
+2. le corps est du JSON lisible ;
+3. **un identifiant ABSENT et un identifiant MAL FORMÉ ne disent pas la même
+   chose** (`server_id requis` contre `server_id doit etre un nombre`). Un refactor
+   qui casterait avant de vérifier la présence confondrait les deux, et l'appelant ne
+   saurait plus lequel des deux défauts corriger ;
+4. la requête refusée ne touche pas la table d'historique.
+
+**Preuve d'échec — et une nuance qu'il faut dire.** Le correctif a été défait
+fidèlement (bloc de cast retiré, `int()` remis dans les paramètres du `execute`) :
+**8 FAILED**. Fichier restauré, empreinte SHA-256 identique, `git diff` vide.
+
+Les 8 rouges sont les assertions de statut. **La propriété 4, elle, reste verte sur
+le code défectueux** — parce que la `ValueError` était levée en évaluant les
+paramètres, donc *avant* que `execute()` ne parte. C'est une propriété réelle, elle
+tenait déjà avant le correctif, et **elle ne distingue pas les deux états**. La dire
+plutôt que de laisser croire que les quatre propriétés protègent également.
 
 ### 4.2 Dix-sept routes portent une permission qui ne peut jamais décider
 
@@ -298,9 +321,22 @@ Le point 1 est celui que je recommande de trancher en premier.
 - **`Droits`** : la lecture des permissions **temporaires** non expirées (E-134). Elle
   demande un vrai schéma SQLite posé par le test ; faisable, non fait ;
 - **la mutation symétrique** des gardes (§3, dernier paragraphe) ;
-- **`backend/`** hors `fail2ban/` : les correctifs de la session 4 sur `supervision/`
-  (E-90, `generic_reconfigure`) ne sont pas encore verrouillés par un test de la
-  session 6.
+- **quatre correctifs de la session 4 ne sont verrouillés par aucun test**, et ils
+  sont **inertes** tant que `rootwarden_python` n'a pas redémarré (le Python est lu au
+  démarrage du processus) :
+
+  | version | fichier | écart |
+  |---|---|---|
+  | `v1.38.11` | `supervision.py` | E-90 + `generic_reconfigure`, quatre routes |
+  | `v1.38.12` | `fail2ban_manager.py` | **E-174** — exécution root, deux vecteurs |
+  | `v1.38.13` | `fail2ban.py` | E-165, `install_all`, cinquième occurrence |
+  | `v1.38.14` | `wazuh.py` | `set_group`, même famille qu'E-90 |
+
+  **E-174 est le plus urgent à verrouiller** : les propriétés utiles sont que
+  `_validate_ip` refuse tout `%`, qu'elle rende une forme **normalisée**, et que
+  `_entree_whitelist_sure()` filtre aussi la **relecture** du fichier distant — un
+  filtre qui ne garderait que l'écriture laisserait rentrer par la lecture. Prochain
+  lot.
 
 ---
 
@@ -314,6 +350,9 @@ Le point 1 est celui que je recommande de trancher en premier.
 | 2026-08-27 | `laravel/tests/` **avant** | 1 passed, **1 failed** (gabarit d'origine) |
 | 2026-08-27 | `laravel/tests/` **après** | **230 passed, 757 assertions** |
 | 2026-08-27 | 3 mutations du relevé de gardes | **2, 2 et 3 rouges** — la suite peut échouer |
+| 2026-08-27 | E-164 refermée par la session 4 ; les 2 `xfail(strict)` rougissent | signal rendu, marqueurs retirés, propriétés tenues en dur |
+| 2026-08-27 | `test_fail2ban.py` après retrait des marqueurs | **41 passed, 0 xfailed** ; suite complète **389 passed** |
+| 2026-08-27 | mutation fidèle du correctif `server_id` | **8 FAILED** — et une propriété sur quatre ne distingue pas les deux états (§4.1) |
 
 Chaque chiffre porte sa commande de remesure :
 
