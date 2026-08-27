@@ -803,6 +803,12 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   couches par le navigateur, sur un canevas de 1 px, et **vérifier qu'il a su lire chaque couleur** —
   une couleur qu'il refuse laisse `fillStyle` inchangé, donc rend silencieusement la précédente.
   **Une valeur hors de toute plage physique est un défaut d'instrument, jamais un résultat.**
+  **Le même instrument défectueux vit encore dans `tests/e2e/go-page-cve-priorite.mjs:239-259`** :
+  `lit()` y parse par `/[\d.]+/g`, et un fond translucide y est pris à sa valeur nominale au lieu
+  d'être composé. Il est **latent et non actif** — la pastille KEV du portage est peinte d'un jeton
+  OPAQUE (`rgb(185, 28, 28)`, 6,47:1), la seule forme que ce parseur lise juste. Vérifié le
+  2026-08-27 : la suite reste conforme. À reprendre quand `security/` S6 sera rouvert, en réutilisant
+  la composition par canevas de `go-captures-fail2ban.mjs`.
 - **Un défaut peut n'exister que dans un thème.** Les CINQ règles « texte coloré sur teinte de la même
   couleur » du socle échouaient le seuil AA en thème CLAIR (3,60 à 3,96:1) et le passaient toutes en
   thème SOMBRE (6,84 à 8,61:1) : la teinte rapproche le fond du texte sur une surface blanche, et l'en
