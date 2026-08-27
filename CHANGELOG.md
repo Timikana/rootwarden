@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.35** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.41** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,79 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.41 — ⚠⚠ E-219 : le « kill-switch » documente pour une COMPROMISSION DE CLE laisse la meme cle autorisee sur root
+
+**Trouve par la session 5 en relisant l'interface de revocation que la session 3 venait d'ecrire — donc dans
+une PRE-RELECTURE, avant qu'une ligne d'interface soit commitee.** Verifie par le Lead dans le code.
+
+    deploy_platform_key ecrit la MEME cle publique a TROIS endroits :
+      ssh.py:745   >> ~/.ssh/authorized_keys              du compte NOMINAL
+      ssh.py:755   >> /root/.ssh/authorized_keys          de ROOT
+      ssh.py:808   >  /home/<sa>/.ssh/authorized_keys     du compte de service
+
+`revoke_service_account` supprime le compte de service. **Les deux autres copies restent.** Et sa docstring
+annonce (`ssh.py:896-910`), sous l'etiquette `kill-switch` et le patch `A04-INSEC-N5` :
+
+    Cas d'usage : compromission suspectee de la cle Ed25519 plateforme,
+    rotation forcee, audit sortant.
+
+> **Si la cle est compromise, ce « kill-switch » laisse deux portes sur trois ouvertes — dont celle de root.**
+> Le geste ne traite **aucun** des trois cas qu'il nomme : la cle reste autorisee, elle ne tourne pas, les
+> acces subsistent. Le seul remede a une cle compromise est la **rotation**, un autre geste sur une autre page.
+
+**Cinquieme forme du motif « un texte qui affirme ce que le code ne fait pas », et la plus grave** : apres
+l'en-tete qui mente sur un acces (E-36), le libelle qui promette un controle (E-203), le guide qui se trompe
+sur son effet (E-209) et la description de permission fausse (E-212) — **un CONTROLE DE SECURITE qui ne
+remplit pas le cas d'usage qu'il documente.** *Les quatre premieres trompent en regime normal ; la cinquieme
+trompe pendant un incident* — au moment ou personne ne relit le code, ou l'on clique ce que la documentation
+designe, et ou l'erreur ne se rattrape pas. **Un coupe-circuit qui ne coupe pas est pire qu'un coupe-circuit
+absent : son absence fait chercher une autre parade.**
+
+**Corrige immediatement cote portage** : le libelle dit ce que le geste FAIT — « Supprimer le compte
+d'administration » — et le panneau dit ce qu'il LAISSE en place. *Un geste correctement nomme cesse d'etre un
+piege meme s'il reste partiel.* **La docstring backend et l'etiquette `kill-switch` restent fausses** :
+arbitrage de l'exploitant, l'autre issue (retirer les trois copies) changeant ce qui est detruit sur des
+machines reelles.
+
+#### La meme relecture RESSERRE E-218
+
+`remove_ssh_password` **refuse** tant que le compte de service n'est pas deploye. **Donc le seul etat ou
+`root_password` est vide est exactement celui ou ce compte existe** — *ce n'est pas une conjonction, c'est une
+implication.* La reserve est donc **levee pour la revocation**, avec un residuel nomme : `connect_ssh` retombe
+sur le compte nominal si la connexion echoue (`ssh_utils.py:250-264`, le cas `AllowUsers`), et **ce repli
+rencontre `root_password = ''`**.
+
+**Elle TIENT pour la REPRISE du compte** : apres une revocation le drapeau vaut 0, donc la route ne peut pas
+se connecter par un compte qui n'existe plus. **Et c'est le bouton de revocation lui-meme qui rend cet etat
+atteignable** — `ssh.py:986` est la seule ecriture qui remette ce drapeau a 0. *Deuxieme occurrence du jour de
+« un correctif qui rend un chemin possible doit regarder ce qu'il rend irreversible sur ce meme chemin » — et
+cette fois c'est une INTERFACE neuve qui ouvre le chemin.*
+
+#### Un etat que seule une PHRASE distingue n'est pas un etat
+
+Le correctif d'E-218 a introduit `exit 2` — « compte supprime mais sudoers subsistant, a rejouer ». **Il
+n'arrive a l'ecran que dans le TEXTE du message.** La session 3 refuse de comparer des chaines, et elle a
+raison : *un etat que seule une phrase distingue est une coincidence de redaction* — une traduction, une
+reformulation ou un changement de casse le supprime sans bruit. **Correction : un champ `partiel` dans la
+reponse.**
+
+#### Le pathspec ne protege pas les deux fichiers que tout le monde touche
+
+**Incident EVITE** : la session 3 a trouve **deux entrees `v1.38.38` non commitees** dans `CHANGELOG.md` — la
+sienne et celle d'une session en train de l'ecrire. Commiter aurait emporte ce travail. Manoeuvre : entree
+mise de cote **hors du depot**, fichier restaure a `HEAD`, reprise apres. Controle : **30 insertions, zero
+suppression.**
+
+> **Le pathspec protege des fichiers qu'on ne NOMME pas. Il ne protege pas de ceux qu'on nomme et qu'un autre
+> a deja touches.** Et `CHANGELOG.md` + `legacy/version.txt` sont dans ce cas **en permanence** : les seuls
+> fichiers du depot dont la propriete exclusive est contredite par l'usage.
+
+**Troisieme correction de la consigne de commit du Lead en une journee** — « relire le diff indexe » (contournee
+par un `add && commit` enchaine), « employer le pathspec » (ne marche pas sur une creation), « le pathspec
+protege » (faux sur les fichiers qu'on nomme). *Une consigne corrigee trois fois n'est pas une mauvaise
+consigne : c'est une consigne dont chaque enonce couvrait le cas qui l'avait motivee.* **Et les trois
+corrections sont venues des sessions, jamais du Lead qui l'avait ecrite.**
+
 ### v1.38.40 — la réserve d'E-218 est levée pour la révocation, elle TIENT pour la reprise
 
 Le correctif backend d'E-218 (`599d1a3`) est arrivé **après** le commit de la révocation
@@ -3589,7 +3662,9 @@ correspondance reelle :**
 | **v1.38.36** | `94f7eff` | **E-218 : le coupe-circuit d'un `NOPASSWD: ALL`, et son second porteur** |
 | v1.38.37 | (session 3) | la contrepartie de P3 : l'interface de revocation du compte d'administration |
 | v1.38.38 | (session 5) | la reserve d'E-218 est levee pour la revocation, elle TIENT pour la reprise |
-| v1.38.39 | (ce commit) | le correctif du Lead etait faux trois fois — dont une qui armait un piege |
+| v1.38.39 | `77fac52` | le correctif du Lead etait faux trois fois — dont une qui armait un piege |
+| v1.38.40 | `94f08e6` | la reserve d'E-218 reecrite : levee pour la revocation, elle TIENT pour la reprise |
+| **v1.38.41** | (ce commit) | **E-219 : le kill-switch laisse la meme cle sur root** ; le pathspec et les deux fichiers partages |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

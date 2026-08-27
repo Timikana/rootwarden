@@ -9693,3 +9693,92 @@ quatre autres. **Route backend, session 4** — et *qui écrit le code ne valide
 
 **En attendant, la borne est DITE dans le panneau de décision**, pas dans un journal : c'est là que la
 décision se prend. Le Lead confirme ce choix — *un avertissement qui arrive après le clic n'a pas averti.*
+
+---
+
+## E-219 — ⚠⚠ Le « kill-switch » documenté pour une COMPROMISSION DE CLÉ laisse la même clé autorisée sur root : il retire une porte sur trois
+
+**Trouvé par la session 5 en relisant l'interface de révocation que la session 3 venait d'écrire — donc dans
+une pré-relecture, avant qu'une ligne d'interface soit commitée. Vérifié par le Lead dans le code, sans
+toucher aucune machine.**
+
+### Les trois copies de la MÊME clé publique
+
+    deploy_platform_key
+      ssh.py:745    >> ~/.ssh/authorized_keys                  du compte NOMINAL
+      ssh.py:755    >> /root/.ssh/authorized_keys              de ROOT
+      ssh.py:808    >  /home/<sa>/.ssh/authorized_keys         du compte de service
+      (ssh.py:1081  la meme, par deploy_service_account)
+
+**`revoke_service_account` supprime le compte de service. Les deux autres copies restent.**
+
+### Ce que la docstring annonce, mot pour mot
+
+    ssh.py:896-910
+    @require_role(3)  # superadmin only - kill-switch
+    """
+    Patch A04-INSEC-N5 (OWASP A04 Insecure Design) - kill-switch.
+    ...
+    Cas d'usage : compromission suspectee de la cle Ed25519 plateforme,
+    rotation forcee, audit sortant.
+    """
+
+> **Si la clé de plateforme est compromise, ce « kill-switch » laisse deux portes sur trois ouvertes — dont
+> celle de root.** Le geste ne traite **aucun** des trois cas d'usage qu'il nomme : ni la compromission (la
+> clé reste autorisée), ni la rotation forcée (elle ne tourne pas), ni l'audit sortant (les accès subsistent).
+
+**Le seul remède à une clé compromise est la ROTATION**, qui est un autre geste, sur une autre page.
+
+### Cinquième forme du motif, et la plus grave de la série
+
+| forme | trompe | exemple |
+|---|---|---|
+| un en-tête qui mente sur un accès | qui relit le code | E-36, 4 occurrences |
+| un libellé qui promette un contrôle | qui clique | E-203 |
+| un guide qui se trompe sur son effet | qui ne sait pas | E-209 |
+| une description de permission fausse | qui **accorde** un droit | E-212 |
+| **un CONTRÔLE DE SÉCURITÉ qui ne remplit pas le cas d'usage qu'il documente** | **qui répond à un incident** | **celle-ci** |
+
+*Les quatre premières trompent en régime normal. La cinquième trompe pendant un incident* — au moment où
+personne ne relit le code, où l'on clique ce que la documentation désigne, et où l'erreur ne se rattrape pas.
+**Un coupe-circuit qui ne coupe pas est pire qu'un coupe-circuit absent** : son absence fait chercher une
+autre parade.
+
+### La correction, en deux temps
+
+**Immédiat, et fait** : le libellé du portage dit ce que le geste **fait** — « Supprimer le compte
+d'administration » — et le panneau dit ce qu'il **laisse en place**, plus le fait que le seul remède à une clé
+compromise est la rotation. *Un geste correctement nommé cesse d'être un piège même s'il reste partiel.*
+
+**À arbitrer** : la docstring backend et l'étiquette `kill-switch` sont **fausses** et vivent dans le code.
+Deux issues — corriger le texte pour qu'il décrive le geste réel, ou étendre le geste pour qu'il retire les
+trois copies. **La seconde change ce qui est détruit sur des machines réelles** et rendrait RootWarden
+incapable de joindre la machine autrement que par mot de passe : c'est un arbitrage de l'exploitant (§7).
+
+### Ce que la même relecture a établi, et qui RESSERRE E-218
+
+**Reformulation causale de la session 5, retenue** : `remove_ssh_password` **refuse** tant que le compte de
+service n'est pas déployé. **Donc le seul état où `root_password` est vide est exactement celui où ce compte
+existe.** Ce n'est pas une conjonction de deux états indépendants — **c'est une implication.**
+
+Conséquence sur E-218 : la réserve est **levée pour la révocation** — la route se connecte par le compte
+d'administration et s'élève sans mot de passe. **Un résiduel subsiste et il est nommé** : `connect_ssh`
+retombe sur le compte nominal si cette connexion échoue (`ssh_utils.py:250-264`) — le cas `AllowUsers` que ce
+dépôt connaît — et **ce repli rencontre `root_password = ''`**.
+
+**La réserve TIENT en revanche pour la REPRISE du compte** : après une révocation le drapeau vaut 0, donc la
+route ne peut pas se connecter par un compte qui n'existe plus. **Et c'est le bouton de révocation lui-même
+qui rend cet état atteignable** — `ssh.py:986` est la seule écriture qui remette ce drapeau à 0. *Deuxième
+occurrence du jour de « un correctif qui rend un chemin possible doit regarder ce qu'il rend irréversible sur
+ce même chemin » — cette fois c'est une INTERFACE neuve qui ouvre le chemin.*
+
+### Un état sans marqueur lisible par la machine
+
+Le correctif d'E-218 a introduit un troisième verdict — `exit 2`, « compte supprimé mais sudoers subsistant, à
+rejouer ». **Il n'arrive à l'écran que dans le TEXTE du message**, sans champ dédié. Le portage l'affiche donc
+comme un échec dont le message dit « à rejouer ».
+
+**La session 3 refuse de comparer des chaînes, et elle a raison** : *un état que seule une phrase distingue
+n'est pas un état, c'est une coïncidence de rédaction* — et une traduction, une reformulation ou un
+changement de casse le supprime sans bruit. **Correction : un champ `partiel` dans la réponse.** Route
+backend, session 4.
