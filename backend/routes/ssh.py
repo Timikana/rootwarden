@@ -916,22 +916,29 @@ def revoke_service_account():
     if not machine_ids:
         return jsonify({'success': False, 'message': 'machine_ids requis'}), 400
 
-    from approvals import gate
+    from approvals import gate, AucunApprobateur
     # ══ E-201 : LA PORTE A QUATRE YEUX EST ENFIN INTERROGEE ═════════════════
     #
     # `Config.APPROVAL_ACTIONS` nommait cette action depuis toujours, et
     # `gate()` n'etait JAMAIS appele : l'approbation existait en configuration
     # seulement. Une garde declaree et jamais interrogee.
     #
-    # ELLE N'EST PAS ENVELOPPEE D'UN `try/except` QUI AVALE. Sur les deux
-    # actions de `ACTIONS_SANS_REPLI`, `gate()` LEVE quand la base est
-    # indisponible : la porte qui echoue REFUSE. Attraper ici et continuer
-    # rendrait la levee inutile — c'est exactement le defaut des deux appels
-    # existants, dont le `logger.debug` n'est meme pas journalise en
-    # exploitation.
+    # LE SEUL `except` ATTRAPE LE REFUS MOTIVE, ET IL LE REND. Il n'avale
+    # rien d'autre : sur les deux actions de `ACTIONS_SANS_REPLI`, `gate()`
+    # LEVE aussi quand la base est indisponible, et cette levee-la traverse —
+    # la porte qui echoue REFUSE. Attraper tout et continuer rendrait les deux
+    # levees inutiles ; c'est le defaut des deux appels preexistants, dont le
+    # `logger.debug` n'est meme pas journalise en exploitation.
     _uid, _role = get_current_user()
-    _ap = gate('revoke_service_account', int(machine_ids[0]), 'compte de service',
-               {'machine_ids': machine_ids, 'reason': reason}, _uid, role=_role)
+    try:
+        _ap = gate('revoke_service_account', int(machine_ids[0]), 'compte de service',
+                   {'machine_ids': machine_ids, 'reason': reason}, _uid, role=_role)
+    except AucunApprobateur as _e:
+        # Le blocage est LISIBLE : il dit sa cause et la marche a suivre. Une
+        # fonctionnalite briquee en silence est pire qu'une fonctionnalite
+        # bloquee qui s'explique.
+        return jsonify({'success': False, 'approbateur_manquant': True,
+                        'message': str(_e)}), 409
     if _ap is not None:
         return jsonify({
             'success': False, 'pending_approval': True, 'request_id': _ap['id'],
@@ -1269,22 +1276,29 @@ def reenter_ssh_password():
 @threaded_route
 def regenerate_platform_key_route():
     """Regenere la keypair plateforme. ATTENTION : necessite re-deploiement."""
-    from approvals import gate
+    from approvals import gate, AucunApprobateur
     # ══ E-201 : LA PORTE A QUATRE YEUX EST ENFIN INTERROGEE ═════════════════
     #
     # `Config.APPROVAL_ACTIONS` nommait cette action depuis toujours, et
     # `gate()` n'etait JAMAIS appele : l'approbation existait en configuration
     # seulement. Une garde declaree et jamais interrogee.
     #
-    # ELLE N'EST PAS ENVELOPPEE D'UN `try/except` QUI AVALE. Sur les deux
-    # actions de `ACTIONS_SANS_REPLI`, `gate()` LEVE quand la base est
-    # indisponible : la porte qui echoue REFUSE. Attraper ici et continuer
-    # rendrait la levee inutile — c'est exactement le defaut des deux appels
-    # existants, dont le `logger.debug` n'est meme pas journalise en
-    # exploitation.
+    # LE SEUL `except` ATTRAPE LE REFUS MOTIVE, ET IL LE REND. Il n'avale
+    # rien d'autre : sur les deux actions de `ACTIONS_SANS_REPLI`, `gate()`
+    # LEVE aussi quand la base est indisponible, et cette levee-la traverse —
+    # la porte qui echoue REFUSE. Attraper tout et continuer rendrait les deux
+    # levees inutiles ; c'est le defaut des deux appels preexistants, dont le
+    # `logger.debug` n'est meme pas journalise en exploitation.
     _uid, _role = get_current_user()
-    _ap = gate('regenerate_platform_key', 0, 'flotte',
-               {'portee': 'flotte entiere'}, _uid, role=_role)
+    try:
+        _ap = gate('regenerate_platform_key', 0, 'flotte',
+                   {'portee': 'flotte entiere'}, _uid, role=_role)
+    except AucunApprobateur as _e:
+        # Le blocage est LISIBLE : il dit sa cause et la marche a suivre. Une
+        # fonctionnalite briquee en silence est pire qu'une fonctionnalite
+        # bloquee qui s'explique.
+        return jsonify({'success': False, 'approbateur_manquant': True,
+                        'message': str(_e)}), 409
     if _ap is not None:
         return jsonify({
             'success': False, 'pending_approval': True, 'request_id': _ap['id'],
@@ -2338,7 +2352,7 @@ def delete_remote_user():
     # Approbation 4-eyes : suppression d'utilisateur distant = action destructive.
     # Si activee, exige l'aval d'un 2e admin avant execution (store-and-replay).
     try:
-        from approvals import gate
+        from approvals import gate, AucunApprobateur
         _uid, _role = get_current_user()
         _ap = gate('delete_remote_user', int(machine_id), username,
                    {'username': username, 'remove_home': bool(remove_home)}, _uid, role=_role)
