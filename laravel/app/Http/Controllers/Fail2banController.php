@@ -68,6 +68,13 @@ class Fail2banController extends Controller
             'lecture_echec_titre', 'lecture_echec',
             'services_installe', 'services_absent', 'services_jails',
             'services_jail_active', 'services_vide_titre', 'services_vide',
+            // F4
+            'jail_detail_titre', 'jail_maxretry', 'jail_bantime', 'jail_findtime',
+            'jail_secondes', 'jail_inconnu', 'bannies_vide_titre', 'bannies_vide',
+            'debannir', 'conf_titre_ban', 'conf_texte_ban',
+            'conf_titre_debannir', 'conf_texte_debannir',
+            'conf_titre_tout', 'conf_texte_tout',
+            'geste_echoue', 'ban_invalide',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }

@@ -7122,3 +7122,49 @@ classe utilitaire.
 *Note sur E-163* — troisième occurrence relevée le 2026-08-27 : le panneau de détail d'une jail
 affiche « Jail **:name** ». `legacy/lang/fr/js.php:56` écrit `:name`, `main.js:142` passe `{jail}`.
 Même faute que `:count`, sur un troisième message.
+
+---
+
+## E-167 — Une confirmation destructrice qui ne nomme ni l'adresse, ni la jail, ni la machine
+
+`banIp` (`main.js:236`) passe les trois valeurs à la traduction :
+
+```js
+if (!confirm(__('f2b_confirm_ban', {ip, jail, server: _currentServer.name}))) return;
+```
+
+et les catalogues les ignorent **toutes les trois** :
+
+```php
+'js.f2b_confirm_ban'       => 'Bannir cette IP ?',            // fr
+'js.f2b_confirm_unban'     => 'Debannir cette IP ?',
+'js.f2b_confirm_unban_all' => 'Debannir TOUTES les IPs de ce jail ?',
+```
+
+Mesuré le 2026-08-27 : la boîte native affiche **« Bannir cette IP ? »**.
+
+**Quatrième occurrence du motif d'E-163** — des paramètres passés, jamais utilisés — et la seule où
+elle n'est pas cosmétique. On confirme un geste destructeur **sans savoir sur quelle adresse ni sur
+quelle machine il porte**, alors qu'E-162 vient de montrer que la machine peut différer de celle
+qu'affiche le sélecteur. Une boîte native ne peut d'ailleurs rien montrer de plus : elle tient en une
+ligne et s'accepte au réflexe.
+
+**FERMÉ au portage (`v1.38.6`)** — un panneau **en page**, qui nomme et qui explique ce que le geste
+engage :
+
+> « Bannir 203.0.113.7 sur Test-Server-Debian ? L'adresse 203.0.113.7 sera bannie dans la jail sshd,
+> sur Test-Server-Debian **et sur elle seule**. Toute connexion venant de cette adresse sera refusée
+> jusqu'à expiration du ban. »
+
+---
+
+*Note sur E-165* — **CORRIGÉ dans le backend le 2026-08-27 (`v1.38.6`).** Les trois routes testent
+désormais le code de retour : un échec rend `success: false` avec la sortie de la commande et son
+`exit_code`, et **n'écrit aucune ligne d'audit** — c'est correct, rien n'a eu lieu. §3.2 du plan
+l'autorise. Re-mesuré après coup, sur le legacy comme sur le portage : le geste rend « n'a PAS été
+banni », et `fail2ban_history` reste à **0 ligne**.
+
+*Note sur E-166* — **FERMÉ au portage (`v1.38.6`)** : le geste de parc n'est pas rendu — il appartient
+à F6 — et les deux gestes destructeurs de la page tirent leur couleur des **jetons du socle**, pas
+d'une classe utilitaire. Mesuré : plus aucun bouton destructeur sans fond peint. **Reste ouvert côté
+legacy**, où `bg-red-800` et `bg-orange-600` demeurent purgées.

@@ -129,11 +129,15 @@ service `Machines`, et cet inventaire vient de la mesurer cinq fois.
 inventoriés (zéro élément DOM absent, zéro fonction sans appelant, zéro désaccord de clés), et son
 pire dégât est **réversible**.
 
-`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails, **F2 PORTÉ `v1.38.2`** historique et frise, **F3 PORTÉ `v1.38.4`** configuration, journaux et services (⚠️ écrit déjà `fail2ban_status` : ce n'est pas
-un lot lecture seule) · **F4** bans
-par machine · **F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
+`fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails · **F2 PORTÉ `v1.38.2`** historique et frise ·
+**F3 PORTÉ `v1.38.4`** configuration, journaux et services · **F4 PORTÉ `v1.38.6`** bannir et
+débannir · **F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
 `127.0.0.1/8` qui échoue toujours, l'édition qui **redémarre le service** sans le dire) · **F6**
 actions parc entier.
+
+**Quatre sous-lots sur six sont portés.** Trois d'entre eux — F1, F2, F3 — étaient annoncés mutants
+par ce découpage et se sont révélés être des lectures : c'est la lecture du code qui a tranché,
+chaque fois. **F4 est le premier qui écrit vraiment.**
 
 ### F1, porté le 2026-08-27 — ce que le portage a changé
 
@@ -224,6 +228,29 @@ Quatre décisions de portage :
 
 `.rw-fichier` n'est pas « vert sur noir » : ce costume de terminal fait passer pour un flux vivant ce
 qui est un fichier lu une fois, et c'est lui qui a fait lire « [FICHIER ABSENT] » comme une directive.
+
+### F4, porté le 2026-08-27 — le premier sous-lot qui écrit
+
+Suite `go-fail2ban-f4` à **21 laravel / 14 legacy, 0 FAIL**. Trois écarts refermés.
+
+1. **E-165, corrigé DANS LE BACKEND.** Les trois routes de ban recevaient `rc` et ne le testaient
+   jamais, alors que leurs deux voisines le testaient. Elles le testent désormais : un échec rend
+   `success: false` avec la sortie et l'`exit_code`, et **n'écrit aucune ligne d'audit** — c'est
+   correct, rien n'a eu lieu. **Les deux portails en profitent.** §3.2 du plan l'autorise.
+2. **E-167, la confirmation nomme sa cible.** Le legacy ouvre un `confirm()` qui dit « Bannir cette
+   IP ? » — sans l'adresse, sans la jail, sans la machine, alors que les trois lui sont passées. Le
+   portage ouvre un panneau **en page** qui dit ce que le geste ENGAGE, et pas seulement ce qu'il
+   fait : « sur Test-Server-Debian **et sur elle seule** ».
+3. **E-166, les couleurs viennent des jetons.** Le geste de parc n'est pas rendu — il appartient à
+   F6 — et les deux gestes destructeurs de la page tirent leur couleur du socle, pas d'une classe
+   utilitaire qu'un purge peut retirer.
+
+**La validation de l'adresse est faite avant tout envoi** : une saisie qui n'est pas une adresse ne
+part pas. Le backend valide aussi (`ipaddress.ip_address`) — c'est lui qui fait autorité ; celle du
+navigateur ne fait qu'éviter un aller-retour et un message inutilement tardif.
+
+**Un second témoin après chaque geste** : la page relit le détail de la jail quel que soit le verdict
+annoncé. Une réussite qui ne se retrouve pas dans la liste des adresses bannies se voit.
 
 ## 7. Ce qui reste à mesurer
 

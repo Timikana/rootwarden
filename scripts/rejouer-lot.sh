@@ -378,6 +378,20 @@ declare -A REF_LARAVEL=(
   #      legacy en profite aussi : son INFO dit desormais « verifie sur le
   #      legacy aussi ».
   [go-fail2ban-f3]=22
+  # `fail2ban/` sous-lot F4 : bannir et debannir, portes.
+  # 21 sur le portage contre 14 sur le legacy. L'ecart de SEPT se decompose :
+  #   1  le geste qui atteint TOUT LE PARC se distingue du geste local — ici
+  #      par son ABSENCE : il appartient a F6 et n'est pas rendu ;
+  #   1  chaque geste destructeur porte une couleur d'alerte RENDUE (le legacy
+  #      a perdu celle des deux plus dangereux, classes purgees) ;
+  #   1  la confirmation NOMME l'adresse et la machine ;
+  #   1  la confirmation se fait EN PAGE, pas par une boite native ;
+  #   1  une reussite annoncee est confirmee par ce que la page affiche ensuite ;
+  #   1  la table d'audit n'enregistre que des faits qui ont eu lieu ;
+  #   1  aucun parametre de traduction n'apparait a l'ecran.
+  # Les deux avant-derniers sont refermes DANS LE BACKEND (E-165) : le legacy en
+  # profite aussi, et ses INFO disent « verifie sur le legacy aussi ».
+  [go-fail2ban-f4]=21
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -658,7 +672,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)

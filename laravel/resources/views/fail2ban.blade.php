@@ -136,6 +136,86 @@
     <div class="rw-grille" data-rw="f2b-jails"></div>
 </div>
 
+{{--
+    ── LE DETAIL D'UNE JAIL, ET LES DEUX GESTES QUI ECRIVENT ───────────────
+
+    Le legacy aligne TROIS boutons destructeurs alimentes par le meme champ, et
+    celui du milieu bannit sur TOUTES les machines de production. Les deux plus
+    dangereux sont d'ailleurs les seuls a avoir perdu leur couleur d'alerte —
+    `bg-red-800` et `bg-orange-600` sont purgees (E-166).
+
+    Ici : deux gestes seulement, le ban de parc appartenant a F6 et n'etant pas
+    rendu. Leurs couleurs viennent des JETONS du socle, pas d'une classe
+    utilitaire — une couleur d'alerte ne doit pas dependre d'un purge.
+--}}
+<div class="rw-section" data-rw="f2b-jail-detail" hidden>
+    <div class="rw-section__tete">
+        <h2 class="rw-section__entete" data-rw="f2b-jail-nom"></h2>
+        <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule"
+                data-rw="f2b-jail-fermer">{{ __('fail2ban.jail_fermer') }}</button>
+    </div>
+    <dl class="rw-faits" data-rw="f2b-jail-config"></dl>
+
+    <h3 class="rw-sous-titre-fort">{{ __('fail2ban.bannies_titre') }}</h3>
+    <div data-rw="f2b-bannies-message"></div>
+    <div class="rw-tableau-cadre" data-rw="f2b-bannies-cadre" hidden>
+        <table class="rw-tableau">
+            <thead>
+                <tr>
+                    <th>{{ __('fail2ban.bannies_th_ip') }}</th>
+                    <th>{{ __('fail2ban.bannies_th_action') }}</th>
+                </tr>
+            </thead>
+            <tbody data-rw="f2b-bannies-corps"></tbody>
+        </table>
+    </div>
+
+    <label class="rw-champ rw-champ--espace">
+        <span class="rw-champ__etiquette">{{ __('fail2ban.ban_etiquette') }}</span>
+        <input type="text" class="rw-saisie" data-rw="f2b-ban-ip"
+               placeholder="{{ __('fail2ban.ban_placeholder') }}"
+               autocomplete="off" spellcheck="false">
+    </label>
+    <p class="rw-aide">{{ __('fail2ban.ban_aide') }}</p>
+    <div class="rw-actions">
+        <div class="rw-actions__gauche">
+            <button type="button" class="rw-bouton rw-bouton--avertissement"
+                    data-rw="f2b-tout-debannir">{{ __('fail2ban.tout_debannir') }}</button>
+        </div>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="f2b-bannir">{{ __('fail2ban.bannir') }}</button>
+    </div>
+
+    {{--
+        ── LE PANNEAU DE DECISION ──────────────────────────────────────────
+
+        Le legacy ouvre un `confirm()` natif qui dit « Bannir cette IP ? » — il
+        ne nomme NI l'adresse, NI la jail, NI la machine, alors que les trois lui
+        sont passees (E-167). On confirme donc un geste destructeur sans savoir
+        sur quoi il porte, et F4 vient de montrer que la machine peut differer de
+        celle qu'affiche le selecteur.
+
+        Un panneau en page peut dire ce que l'action ENGAGE. Une boite native
+        tient en une ligne et s'accepte au reflexe.
+    --}}
+    <div class="rw-panneau-decision" data-rw="f2b-confirmation" hidden>
+        <div class="rw-panneau-decision__texte">
+            <p class="rw-sous-titre-fort" data-rw="f2b-confirmation-titre"></p>
+            <p class="rw-aide" data-rw="f2b-confirmation-texte"></p>
+        </div>
+        <div class="rw-panneau-decision__actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="f2b-annuler">{{ __('fail2ban.conf_annuler') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--danger"
+                    data-rw="f2b-confirmer">{{ __('fail2ban.conf_confirmer') }}</button>
+        </div>
+    </div>
+
+    <h3 class="rw-sous-titre-fort rw-titre--espace">{{ __('fail2ban.geste_journal') }}</h3>
+    <div class="rw-journal__general" data-rw="f2b-journal"
+         aria-live="polite" aria-label="{{ __('fail2ban.geste_vide') }}"></div>
+</div>
+
 <div class="rw-section" data-rw="f2b-services-bloc" hidden>
     <h2 class="rw-section__entete">{{ __('fail2ban.services_titre') }}</h2>
     <p class="rw-aide">{{ __('fail2ban.services_aide') }}</p>
