@@ -9622,3 +9622,74 @@ tienne**.
 **Le backend expose un booléen calculé** — « ce mot de passe déchiffre-t-il en vide ? » — et le portage le
 consomme. Même précédent qu'**E-168**, où le portage aurait dû *supposer* faute d'un drapeau `lue`, et
 qu'**INF-003**. Session 4 l'écrit, session 3 le consomme.
+
+---
+
+## E-218 — ⚠⚠ Le coupe-circuit d'un `NOPASSWD: ALL` ne fonctionne peut-être pas dans l'état exact vers lequel la page pousse — et le DÉPLOIEMENT porte le même défaut
+
+**Trouvé par la session 3 en écrivant l'interface de `revoke_service_account` que le Lead venait d'autoriser
+— donc en lisant une route qu'elle allait rendre cliquable. Le Lead a vérifié la chaîne entière et a trouvé
+un SECOND porteur.**
+
+### La chaîne, ligne par ligne
+
+    1. ssh.py:970   revoke_service_account
+                    with ssh_session(ip, port, user, ssh_pass, logger=logger)
+                    -> PAS de `service_account=` : le defaut est False
+
+    2. ssh_utils.py:246/278/312   `_rootwarden_auth_method` vaut donc
+                                  'keypair' ou 'password', JAMAIS 'service_account'
+
+    3. ssh_utils.py:537   execute_as_root court-circuite vers `sudo sh -c` SANS mot de passe
+                          UNIQUEMENT si _rootwarden_auth_method == 'service_account'
+                          -> sinon : `sudo -S -p ''` + root_password ecrit sur stdin
+
+    4. remove_ssh_password   sur une machine migree, root_password = '' (chaine vide)
+
+**Donc `sudo -S` reçoit un mot de passe vide.** Il ne réussit que si le compte **nominal** dispose d'un sudo
+sans mot de passe — **ce que rien ne garantit.**
+
+### Ce qui rend l'écart grave, et c'est sa position
+
+`revoke_service_account` est **le seul moyen de reprendre un `NOPASSWD: ALL`** accordé en un clic. S'il
+échoue sur les machines migrées, **l'octroi y est de fait définitif.**
+
+> **Le coupe-circuit est sûr tant qu'on n'en a pas besoin, et douteux dans l'état exact vers lequel toute la
+> page pousse.** C'est la forme que la session 3 venait d'inscrire ailleurs, appliquée à elle-même : *la
+> révocation ne tient pas par une règle, elle tient par les droits sudo du compte nominal — que rien ne
+> garantit.*
+
+### ⚠ Le second porteur : `deploy_service_account`
+
+    ssh.py:1061   deploy_service_account
+                  with ssh_session(...)    <- PAS de `service_account=` non plus
+                  puis trois `execute_as_root`
+
+**Comparaison avec les quatre routes qui le passent correctement** — `:595`, `:1460`, `:2234`, `:2375`
+portent toutes `service_account=m.get('service_account_deployed', False)`. **Seules `:970` et `:1061` l'omettent.**
+
+Pour un **premier** déploiement l'omission est défendable : le compte de service n'existe pas encore, on ne
+peut pas s'y connecter. **Mais pour un RE-déploiement sur une machine migrée, la même impasse s'ouvre** — et
+c'est le geste que la page propose en masse.
+
+*Fermer un défaut sans chercher ses autres implémentations, c'est le fermer à moitié* : la session 3 avait
+nommé une route, il y en a deux.
+
+### Ce qui n'est PAS mesuré, et ce qui borne l'écart
+
+**Rien n'a été exercé.** L'écart est **dérivé du code** — quatre maillons lus, aucun geste émis. Et le
+maillon final est un état de machine : **le compte nominal PEUT disposer d'un sudo sans mot de passe** (le
+dépôt connaît un `/etc/sudoers.d/rootwarden-<user>`), auquel cas les deux routes fonctionnent.
+
+**C'est précisément ce qui en fait un écart et non une panne** : la réussite dépend d'un état de parc que
+personne ne vérifie, sur le geste dont dépend la réversibilité d'un privilège root. *Une propriété qui tient
+par l'état du parc n'est pas une propriété* — quatrième occurrence du motif en une journée, après E-205 sans
+porteur, les gabarits `--dport 22`, et l'avertissement que la session 3 a inscrit pour `srv-zabbix`.
+
+### La correction
+
+Passer `service_account=m.get('service_account_deployed', False)` sur `:970` **et** sur `:1061`, comme les
+quatre autres. **Route backend, session 4** — et *qui écrit le code ne valide pas seul son correctif*.
+
+**En attendant, la borne est DITE dans le panneau de décision**, pas dans un journal : c'est là que la
+décision se prend. Le Lead confirme ce choix — *un avertissement qui arrive après le clic n'a pas averti.*
