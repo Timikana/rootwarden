@@ -123,6 +123,7 @@ def _log_ban_action(machine_id: int, jail: str, ip: str, action: str, user: str 
 
 @bp.route('/fail2ban/status', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_status():
@@ -144,6 +145,7 @@ def fail2ban_status():
 
 @bp.route('/fail2ban/jail', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_jail():
@@ -168,6 +170,7 @@ def fail2ban_jail():
 
 @bp.route('/fail2ban/install', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_install_route():
@@ -193,6 +196,7 @@ def fail2ban_install_route():
 
 @bp.route('/fail2ban/ban', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_ban():
@@ -245,6 +249,7 @@ def fail2ban_ban():
 
 @bp.route('/fail2ban/unban', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_unban():
@@ -282,6 +287,7 @@ def fail2ban_unban():
 
 @bp.route('/fail2ban/restart', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_restart():
@@ -305,6 +311,7 @@ def fail2ban_restart():
 
 @bp.route('/fail2ban/config', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_config():
@@ -325,6 +332,7 @@ def fail2ban_config():
 
 @bp.route('/fail2ban/history', methods=['GET'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_history():
@@ -374,6 +382,7 @@ def fail2ban_history():
 
 @bp.route('/fail2ban/services', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_services():
@@ -394,6 +403,7 @@ def fail2ban_services():
 
 @bp.route('/fail2ban/enable_jail', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_enable_jail():
@@ -427,6 +437,7 @@ def fail2ban_enable_jail():
 
 @bp.route('/fail2ban/disable_jail', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_disable_jail():
@@ -455,6 +466,7 @@ def fail2ban_disable_jail():
 
 @bp.route('/fail2ban/whitelist', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_whitelist():
@@ -485,6 +497,7 @@ def fail2ban_whitelist():
 
 @bp.route('/fail2ban/unban_all', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_unban_all():
@@ -521,6 +534,7 @@ def fail2ban_unban_all():
 @bp.route('/fail2ban/ban_all_servers', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_permission('can_manage_fail2ban')  # E-152
 @threaded_route
 def fail2ban_ban_all_servers():
     """Ban une IP sur tous les serveurs avec fail2ban actif."""
@@ -595,6 +609,7 @@ def fail2ban_ban_all_servers():
 
 @bp.route('/fail2ban/templates', methods=['GET'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @threaded_route
 def fail2ban_templates():
     """Retourne les templates de configuration jail."""
@@ -605,6 +620,7 @@ def fail2ban_templates():
 
 @bp.route('/fail2ban/logs', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_logs():
@@ -643,6 +659,7 @@ def fail2ban_logs():
 
 @bp.route('/fail2ban/stats', methods=['GET'])
 @require_api_key
+@require_permission('can_manage_fail2ban')  # E-152
 @require_machine_access
 @threaded_route
 def fail2ban_stats():
@@ -696,6 +713,7 @@ def fail2ban_stats():
 @bp.route('/fail2ban/install_all', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_permission('can_manage_fail2ban')  # E-152
 @threaded_route
 def fail2ban_install_all():
     """Installe fail2ban sur tous les serveurs qui ne l'ont pas."""

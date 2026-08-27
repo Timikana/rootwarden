@@ -64,6 +64,7 @@ def _resolve_ssh_creds(data):
 
 @bp.route('/iptables', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_iptables')  # E-152
 @require_machine_access
 @threaded_route
 def manage_iptables():
@@ -95,6 +96,7 @@ def manage_iptables():
 
 @bp.route('/iptables-validate', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_iptables')  # E-152
 @require_machine_access
 @threaded_route
 def validate_iptables():
@@ -123,6 +125,7 @@ def validate_iptables():
 
 @bp.route('/iptables-apply', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_iptables')  # E-152
 @require_machine_access
 @threaded_route
 def manage_iptables_apply():
@@ -200,6 +203,7 @@ def manage_iptables_apply():
 
 @bp.route('/iptables-restore', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_iptables')  # E-152
 @require_machine_access
 @threaded_route
 def manage_iptables_restore():
@@ -235,6 +239,7 @@ def manage_iptables_restore():
 
 @bp.route('/iptables-history', methods=['GET'])
 @require_api_key
+@require_permission('can_manage_iptables')  # E-152
 @require_machine_access
 @threaded_route
 def iptables_history():
@@ -319,6 +324,7 @@ def iptables_rollback():
 @bp.route('/iptables-logs')
 @require_api_key
 @require_role(2)  # Patch A01-NEW-04 : SSE logs reservees admin
+@require_permission('can_manage_iptables')  # E-152
 def iptables_logs():
     """Stream SSE des logs iptables."""
     log_file = '/app/logs/iptables.log'
