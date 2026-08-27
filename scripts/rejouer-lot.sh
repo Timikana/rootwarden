@@ -610,6 +610,24 @@ declare -A REF_LEGACY=(
   # alors la requete vers la machine d'ESSAI. Le sens inverse joindrait
   # `srv-zabbix`, et il n'est pas exerce.
   [go-fail2ban-f3]=16
+  # `fail2ban/` sous-lot F4 : bannir et debannir. 14 sur le legacy.
+  #
+  # PREMIER SOUS-LOT DU MODULE QUI ECRIT. Surete, point par point :
+  #   — `srv-zabbix` (id 1) n'est JAMAIS jointe, meme en lecture ;
+  #   — l'adresse bannie est `203.0.113.7`, TEST-NET-3 (RFC 5737), reservee a la
+  #     documentation : elle n'appartient a personne, et surtout pas au portail ;
+  #   — `/fail2ban/ban_all_servers` est AVORTEE — elle bannit sur TOUTES les
+  #     machines, production comprise, et appartient a F6. Son bouton est
+  #     pourtant a 8 px de celui qu'on clique ;
+  #   — les boites natives sont REFUSEES par defaut ; le drapeau n'est leve que
+  #     par l'etape qui veut vraiment le geste, et il retombe aussitot ;
+  #   — la machine d'essai n'a pas fail2ban : les commandes echouent, rien n'est
+  #     reellement banni. C'est ce qui rend ce lot mesurable sans danger — et
+  #     c'est aussi ce qui revele E-165.
+  #
+  # Les lignes de `fail2ban_history` creees par le geste sont retirees dans le
+  # `finally`, bornees par un DELTA d'`id`.
+  [go-fail2ban-f4]=14
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -655,7 +673,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

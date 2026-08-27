@@ -7053,3 +7053,72 @@ modifications backend et legacy sont autorisées, ne plus bloquer, ne plus deman
 correctif n'est **pas** de la même nature que les six qui attendent un arbitrage : ceux-là sont des
 gardes d'accès manquantes, celui-ci une validation d'entrée. Mesuré après coup : **400**, sur les
 deux portails, puisqu'ils partagent le backend.
+
+---
+
+## E-165 — Une réussite annoncée sans être vérifiée, et une table d'audit qui enregistre ce qui n'a pas eu lieu
+
+`fail2ban_ban` (`backend/routes/fail2ban.py:211`), `fail2ban_unban` (`:240`) et
+`fail2ban_unban_all` (`:456`) reçoivent le code de retour de la commande distante et **ne le testent
+jamais** :
+
+```python
+out, stderr, rc = ban_ip(client, root_pass, jail, target_ip)
+_log_ban_action(mid, jail, target_ip, 'ban', ...)          # inconditionnel
+return jsonify({'success': True, 'message': f'{target_ip} banni dans {jail}', 'output': out})
+```
+
+Les deux routes voisines — `/install` et `/restart` — testent `rc`. **L'incohérence est interne au
+fichier.**
+
+Mesuré le 2026-08-27 sur la machine d'essai, qui n'a pas fail2ban :
+
+| | |
+|---|---|
+| la page annonce | « 203.0.113.7 banni dans sshd » |
+| sa propre liste d'adresses bannies, rechargée juste après | **ne contient pas** l'adresse |
+| `fail2ban_history` | **1 ligne créée** — `ban │ 203.0.113.7 │ 16` |
+
+Deux vérités sur le même écran, à une ligne d'intervalle — et une **table d'audit qui affirme qu'un
+ban a eu lieu sur une machine où fail2ban n'est même pas installé**. C'est la forme la plus coûteuse
+de ce défaut : un journal d'audit ne se relit pas, on lui fait confiance.
+
+La preuve se lit **sur la page**, sans rien savoir du backend : `banIp` recharge le détail du jail
+juste après, et cette liste est le second témoin.
+
+**Le portage n'annonce une réussite qu'après l'avoir vérifiée**, et n'inscrit une ligne d'audit que
+pour un geste qui a abouti — ou l'inscrit comme un échec, ce qui est encore un fait.
+
+---
+
+## E-166 — Les deux gestes les plus destructeurs sont les seuls à avoir perdu leur couleur d'alerte
+
+Le panneau de détail d'une jail aligne **trois boutons destructeurs**, alimentés par le **même**
+champ d'adresse :
+
+| bouton | portée | classe | fond **rendu** |
+|---|---|---|---|
+| « Ban » | la machine choisie | `bg-red-600` | `rgb(220, 38, 38)` |
+| « Ban global » | **TOUTES les machines, production comprise** | `bg-red-800` | **`rgba(0, 0, 0, 0)`** |
+| « Débannir tout » | vide la jail entière | `bg-orange-600` | **`rgba(0, 0, 0, 0)`** |
+
+**Le seul bouton qui garde sa couleur d'alerte est le moins dangereux des trois.** `bg-red-800` et
+`bg-orange-600` sont absentes du CSS compilé — PurgeCSS ne garde que ce qu'il a vu — et les deux
+gestes qui touchent la production ou détruisent en masse sont rendus **sans fond**.
+
+**Cinquième occurrence** de la famille « classe purgée » sur ce chantier, et la première où elle
+retire un signal de **danger**. Aucune assertion sur le DOM ne peut le voir : le HTML porte bien
+`bg-red-800`.
+
+S'y ajoute la géométrie, mesurée : « Ban » et « Ban global » sont à **8 px** l'un de l'autre, de même
+forme et de même taille. Le geste qui atteint tout le parc est **entre** les deux qui ne l'atteignent
+pas, et rien ne l'annonce que son libellé.
+
+**Le portage sépare le geste de parc du geste local**, et ne fait pas dépendre un avertissement d'une
+classe utilitaire.
+
+---
+
+*Note sur E-163* — troisième occurrence relevée le 2026-08-27 : le panneau de détail d'une jail
+affiche « Jail **:name** ». `legacy/lang/fr/js.php:56` écrit `:name`, `main.js:142` passe `{jail}`.
+Même faute que `:count`, sur un troisième message.
