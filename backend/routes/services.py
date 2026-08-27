@@ -17,7 +17,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from routes.helpers import (
-    require_api_key, require_role, require_machine_access, threaded_route, get_db_connection,
+    require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection,
     server_decrypt_password, logger,
 )
 from ssh_utils import ssh_session
@@ -104,8 +104,37 @@ def _log_service_action(machine_id, service: str, action: str, user_id: str = '0
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 
+# ══ E-149 : LES HUIT ROUTES N'AVAIENT NI ROLE NI PERMISSION ═══════════════
+#
+# `can_manage_services` ne protegeait que l'ECRAN. Les huit routes ci-dessous —
+# dont `stop`, `disable` et `restart` — ne portaient que `@require_api_key` et
+# `@require_machine_access`, ce dernier etant inerte des le role 2.
+#
+# Reel dans le code, non exploitable par aucun compte du parc au moment de la
+# mesure — le seul role 2 detient la permission — mais trois gestes
+# d'administration ordinaires le rendaient vivant.
+#
+# DEUX CHOIX QUI NE SONT PAS DES OUBLIS :
+#
+# 1. PAS de `@require_role`. Les deux pages admettent le ROLE 1 porteur de la
+#    permission (`legacy/services/index.php:11-12`, et la route du portage).
+#    En ajouter un serait un durcissement que personne n'a demande, et il
+#    retirerait l'acces a des comptes qui l'ont legitimement.
+#    `require_permission` porte deja `if role_id >= 3` : le decorateur EST
+#    « cette permission OU role >= 3 ».
+#
+# 2. `/services/` n'est PAS ajoute a `ADMIN_SEULEMENT` cote passerelle. Cette
+#    liste exige le role >= 2, or la page admet le role 1 : l'y mettre
+#    CASSERAIT un chemin legitime. La passerelle n'a aucun mecanisme
+#    « permission » — le seul bon endroit est ici, sur le decorateur.
+#    Le mimetisme avec `/supervision/` serait une faute.
+#
+# L'ordre `permission` AVANT `machine_access` suit la convention du depot :
+# 34 routes portent les deux, 34 dans cet ordre, zero dans l'autre.
+
 @bp.route('/services/list', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_list():
@@ -126,6 +155,7 @@ def services_list():
 
 @bp.route('/services/status', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_status():
@@ -152,6 +182,7 @@ def services_status():
 
 @bp.route('/services/start', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_start():
@@ -188,6 +219,7 @@ def services_start():
 
 @bp.route('/services/stop', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_stop():
@@ -224,6 +256,7 @@ def services_stop():
 
 @bp.route('/services/restart', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_restart():
@@ -260,6 +293,7 @@ def services_restart():
 
 @bp.route('/services/enable', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_enable():
@@ -296,6 +330,7 @@ def services_enable():
 
 @bp.route('/services/disable', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_disable():
@@ -332,6 +367,7 @@ def services_disable():
 
 @bp.route('/services/logs', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_logs():
