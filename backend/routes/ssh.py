@@ -30,7 +30,10 @@ import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
 from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
-from configure_servers import _motif_nom_invalide
+from configure_servers import (
+    _motif_nom_invalide,
+    _valid_username as _valid_username_decouvert,
+)
 from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
 from config import Config
 
@@ -213,8 +216,37 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
 
 
 def _validate_username(username: str) -> bool:
-    """Valide qu'un nom d'utilisateur ne contient que des caracteres surs."""
-    return bool(_USERNAME_RE.match(username))
+    """Valide qu'un nom d'utilisateur ne contient que des caracteres surs.
+
+    ══ E-204 : C'ETAIT LA QUATRIEME IMPLEMENTATION, ET LA MEME FAUTE ════════
+
+    Ce fichier portait sa PROPRE expression, `^[a-zA-Z0-9._-]{1,32}$` — soit
+    exactement celle de `configure_servers` AVANT E-197. Elle acceptait donc
+    `.` et `..`, qui ne sont pas des noms de compte mais des COMPOSANTS DE
+    CHEMIN, sur quatre routes qui composent des chemins root
+    (`/home/<nom>/.ssh/authorized_keys`) et appellent `userdel`.
+
+    C'est ce trou qui a laisse passer la sonde fautive du 2026-08-27 : le nom
+    `..` qu'elle croyait refuse a traverse tous les gardes et atteint une
+    session SSH. Le defaut etait corrige a un endroit et pas ici.
+
+    ══ ELLE DERIVE, ELLE NE RECOPIE PLUS ═══════════════════════════════════
+
+    Le DOMAINE de ces quatre routes est celui des noms DECOUVERTS — ils
+    viennent de `server_user_inventory`, donc du `/etc/passwd` d'une machine
+    reelle, ou les majuscules existent (`Debian-exim`, `Timikana`). C'est le
+    domaine de `configure_servers._valid_username`, et c'est de la qu'elle
+    vient desormais.
+
+    LA RESERVE D'E-198 NE S'APPLIQUE PAS ICI, et c'est mesure : elle portait sur
+    le POINT, parce que `sudo` ignore les fichiers de `/etc/sudoers.d` dont le
+    nom en contient un. **Aucune de ces quatre routes ne compose de nom de
+    fichier `sudoers.d`** — elles font `userdel` et manipulent
+    `authorized_keys`. Un point au milieu d'un nom (`john.doe`) y est donc
+    legitime, et seuls `.` et `..` doivent tomber. C'est exactement ce que rend
+    la source.
+    """
+    return _valid_username_decouvert(username)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes
