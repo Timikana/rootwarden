@@ -1461,6 +1461,49 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
 
+### Un repli permissif ressemble à de la robustesse (2026-08-27)
+
+Trois écarts de ce chantier — **E-144**, **E-147** et le repli du scheduler de `security/backend-cve` —
+sont **la même faute écrite trois fois** :
+
+```python
+valeur = data.get('cle', <defaut_permissif>)
+```
+
+Elle est **invisible à la relecture parce qu'elle ressemble à de la robustesse** : un défaut, une
+tolérance, un code qui ne casse pas sur une entrée incomplète. C'est exactement ce qui la fait passer.
+
+> **La règle actionnable n'est pas « attention aux valeurs par défaut ».** Pour chaque
+> `get(cle, defaut)` qui décide d'un **PRIVILÈGE**, d'une **PORTÉE** ou d'une **CIBLE**, se demander ce
+> que l'**OMISSION** de la clé accorde. **Si elle accorde plus que la clé présente, ce n'est pas un
+> défaut : c'est une porte.**
+
+Les trois formes rencontrées, par gravité croissante de ce qu'ouvre l'omission :
+
+| écart | l'omission accorde |
+|---|---|
+| E-147 (`render_policy`) | quatre options, **toutes** vers le permissif |
+| E-144 (`sudo_deploy`, **deux** occurrences) | le préréglage que son propre module documente « ÉQUIVALENT ROOT » |
+| repli du scheduler (`a345e65`) | **tout le parc** — et un scan CVE ouvre une session SSH **et envoie un courriel par machine** |
+
+Le troisième est le plus large et le seul dont l'effet soit **sortant** : les deux premiers ouvrent un
+**droit**, celui-ci ouvre un **périmètre**. Et il s'atteint par une **corruption de donnée**, sans que
+personne ne clique.
+
+**Le corollaire, et il vaut aussi dans l'autre sens.** Deux fois le même jour, un validateur laissait
+passer et **ce qui protégeait n'était pas lui** : le rendu en base64 pour `_SAFE_VALUE_RE`, « un seul
+jeton sans `=` ni espace » pour `_SERVICE_RE`. D'où :
+
+> **Quand un validateur laisse passer, chercher ce qui referme EN AVAL avant de conclure au trou.** Et
+> **ce qui referme doit être documenté LÀ OÙ il referme** — une protection que personne n'a écrite est
+> **aussi fragile qu'un trou** : personne ne sait qu'il ne faut pas y toucher. Quelqu'un qui
+> remplacerait le base64 de `_write_config_stream` par un `printf` « pour la lisibilité » rouvrirait
+> `_SAFE_VALUE_RE` **sans qu'aucun test ne bouge**.
+
+C'est le pendant exact de « une garde présente n'est pas une garde qui garde » : ici, **une garde
+ABSENTE n'était pas une garde qui manque**. Les deux erreurs se lisent pareil dans un audit et ne se
+corrigent pas pareil.
+
 ### Sécurité et interface
 
 - **Un GET ne doit rien écrire** ; **un garde anti-rejeu par session est inerte** (le poser par compte et
