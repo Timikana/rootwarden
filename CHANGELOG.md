@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.45** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.46** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,41 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.46 — le predicat couvrait la colonne la moins consequente des deux
+
+**Symptome.** `GET /machines/credential-status` corrigeait `(password <> '')`, **et son `SELECT` ne
+portait pas `root_password`.** Relevé par la session 3 **en consommant la route** — donc en écrivant
+le code qui s'appuie dessus, pas en le relisant.
+
+**Pourquoi c'est la moitie qui comptait.** L'asymetrie Python/PHP ne tient a rien de propre a
+`password` : c'est le chiffrement de la **chaine vide** qui differe, donc `root_password` est dans le
+meme cas. Et c'est la colonne la plus consequente : **celle dont depend l'ELEVATION** — E-218, E-219 —
+et **la seule que la page de cle de plateforme ne peut pas reecrire**. Son etat affiche restait donc
+calcule sur `(colonne <> '')`, avec exactement l'approximation que le predicat venait de corriger sur
+l'autre.
+
+**Correctif.** La colonne au `SELECT`, et **un seul calcul (`_trois_etats`) pour les deux** — l'inverse
+d'un paragraphe duplique : *deux copies divergeraient, et c'est le motif referme le meme jour sur les
+cinq `_resolve_ssh_creds`.* La docstring **etend** son explication au lieu de la recopier.
+
+**Un changement de forme, dit plutot que subi.** Les entrees d'`indetermines` nomment desormais **la
+colonne** et non plus seulement la machine : « je n'ai pas su lire un secret » sans dire lequel
+n'apprend rien a un ecran qui en affiche deux. La route n'a jamais servi une requete, mais son
+consommateur s'ecrit en ce moment — **c'est a signaler, pas a laisser decouvrir**.
+
+**Mesure.** Les trois etats exerces sur les trois entrees reelles : colonne vide en base, cryptogramme
+PHP de la chaine vide, cryptogramme illisible. Rendent respectivement `(True, True)`, `(True, True)` et
+`(None, False)` avec l'entree correspondante dans `indetermines`.
+
+**Et la garde n'a PAS ete deplacee vers `ADMIN_SEULEMENT`**, sur le raisonnement de la session 3 : ce
+groupe exige un role ≥ 2 a la passerelle alors que la page s'ouvre des le role 1 avec la permission.
+L'y mettre aurait affiche **« indetermine » partout** — *un refus d'acces deguise en incapacite de
+lecture, exactement l'inverse de ce que le troisieme etat existe pour dire.* `null` signifie « je n'ai
+pas su lire le secret », **pas** « on ne m'a pas laisse demander ». La borne reste
+`check_machine_access` dans le corps.
+
+**Inerte jusqu'au redemarrage.**
 
 ### v1.38.45 — un refus d'acces deguise en incapacite de lecture, et la rotation est le seul remede a une cle compromise
 
