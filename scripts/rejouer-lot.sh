@@ -540,6 +540,26 @@ declare -A REF_LEGACY=(
   # en mesurant une page MORTE. Une assertion verifie desormais que le script a
   # tourne.
   [go-fail2ban-f1]=18
+  # `fail2ban/` sous-lot F2 : historique et frise. 14 sur le legacy.
+  #
+  # F2 NE JOINT AUCUNE MACHINE. Les deux routes (`GET /fail2ban/history` et
+  # `/fail2ban/stats`) sont des `SELECT` sur `fail2ban_history` : aucun SSH,
+  # aucune commande distante.
+  #
+  # LE STATUT EST SERVI, PAS TRANSMIS, et le motif est ecrit dans le fichier :
+  # `loadStatus` charge l'historique **a la fin de son propre succes**, donc une
+  # lecture EN BASE est rendue dependante d'une session SSH dont elle n'a aucun
+  # besoin (E-156). Le banc etant un conteneur sans systemd, laisser partir ce
+  # releve ferait echouer F2 pour une raison etrangere a son objet. Consequence
+  # voulue : `_update_status_cache` ne tourne pas, le cache `fail2ban_status`
+  # n'est pas ecrit — et une assertion le prouve, avant et apres.
+  #
+  # LA DONNEE D'EPREUVE S'ECRIT EN BASE. `fail2ban_history` etait VIDE (0 ligne
+  # au 2026-08-27) : sans elle, les deux sections restent cachees et tout le
+  # chemin de rendu est invisible. Les gestes qui peuplent cette table
+  # appartiennent a F4 et bannissent sur une machine reelle. Nettoyage borne par
+  # un DELTA d'`id`, jamais par un `DELETE` large.
+  [go-fail2ban-f2]=14
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -585,7 +605,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

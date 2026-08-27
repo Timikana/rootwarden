@@ -6749,3 +6749,164 @@ le rôle 1 — celui que l'en-tête dit exclu. La suite nomme cette mesure comme
 dans les deux listes « admin ». **Touche le backend de production.** Porté au §7 avec E-142, E-144,
 E-147, E-149 et E-150 : **six correctifs backend attendent le même arbitrage**, et cinq sont la même
 famille — un garde absent, ou un repli qui retombe du côté permissif.
+
+---
+
+## E-153 — Un historique vide se CACHE, et l'échec lui ressemble
+
+`loadHistory` (`legacy/fail2ban/js/main.js:287`) et `loadStats` (`:560`) sortent par `return` dès que
+la réponse est vide :
+
+```js
+if (!d.success || !d.history || d.history.length === 0) return;
+```
+
+Les sections `#history-section` et `#stats-section` restent donc `hidden`, **et rien à l'écran ne
+nomme l'absence**. « Aucun ban n'a jamais été enregistré sur cette machine » et « la lecture a
+échoué » produisent **exactement le même écran** : rien.
+
+Les deux fonctions se terminent d'ailleurs par un `catch (_) {}` — un échec est avalé sans un mot.
+
+Mesuré le 2026-08-27 par `go-fail2ban-f2` : sur une table vide, `histoVisible = false`,
+`friseVisible = false`, et aucun mot du texte de la page ne nomme l'absence.
+
+**Le portage doit un état vide qui dit ce qui manque ET pourquoi** (`.rw-vide`), et distinguer
+« rien à montrer » de « la lecture a échoué ».
+
+---
+
+## E-154 — Le tableau tronque à 50 lignes sans le dire
+
+`GET /fail2ban/history` (`backend/routes/fail2ban.py:313`) porte `LIMIT 50`. `loadHistory` rend ce
+qu'il reçoit, sans jamais demander le total ni signaler qu'il en manque.
+
+Mesuré : **60 lignes en base, 50 rendues**, et le texte de la section ne contient aucun mot de
+troncature. Rien à l'écran ne distingue « tout l'historique de cette machine » de « les 50 derniers
+événements ». Sur une machine active, un historique de bans dépasse 50 en quelques heures.
+
+C'est la forme la plus coûteuse du silence : la page **paraît** exhaustive.
+
+**Le portage doit annoncer la troncature** — et donner le total, qui coûte un `COUNT(*)`.
+
+---
+
+## E-155 — La frise : la hauteur et l'échelle ne mesurent pas la même grandeur
+
+`loadStats` (`main.js:575-577`) :
+
+```js
+const maxVal = Math.max(1, ...Object.values(days).map(d => d.ban + d.unban));
+const h = Math.max(4, (counts.ban / maxVal) * 100);
+```
+
+**L'échelle compte les bans ET les débans ; la hauteur ne compte que les bans.** Une barre est donc
+systématiquement plus basse que son échelle ne le laisse croire, et l'écart grandit avec la part de
+débans.
+
+Mesuré le 2026-08-27 sur une donnée d'épreuve de trois jours :
+
+| jour | événements | hauteur attendue | hauteur rendue |
+|---|---|---|---|
+| J-3 | 6 (0 ban, 6 déban) | 15 % | **4 %** (le plancher), et **en vert** |
+| J-2 | 40 (40 bans) | 100 % | 100 % |
+| J-1 | 14 (5 bans, 9 débans) | 35 % | **12,5 %** |
+
+Pire écart : **22,5 points**. Un classement des barres ne voit rien — les deux ordres coïncident ;
+c'est la **proportion** qui diverge.
+
+Le jour J-3 est le plus parlant : six débans, et la frise le rend au plancher, **en vert**, comme un
+jour où il ne s'est rien passé. Une intervention de déban en masse y devient invisible.
+
+**Second défaut de la même frise** : elle ne porte **aucun repère de date visible**. Les dates ne
+vivent que dans l'attribut `title` — donc au survol : invisibles au doigt, invisibles à un lecteur
+d'écran, invisibles sur une capture. Une frise de 30 jours sans axe ne se lit pas.
+
+---
+
+## E-156 — L'historique est en BASE, et une machine injoignable le masque
+
+`loadStatus` (`main.js:66-67`) sort avant tout :
+
+```js
+const d = await apiPost('/fail2ban/status', serverPayload(srv));
+if (!d.success) { appendLog(__('error_with_msg', {msg: d.message})); return; }
+```
+
+et n'appelle `loadHistory` / `loadStats` **qu'à la fin de son succès** (`:123-124`). Or ces deux
+routes sont des `SELECT` sur `fail2ban_history` : **elles ne joignent aucune machine**.
+
+Conséquence : une machine éteinte, injoignable, ou dont fail2ban est cassé **masque son propre
+historique de bans** — précisément la situation où on vient le consulter.
+
+Mesuré : avec un relevé de statut en échec, **zéro** lecture d'historique part, et la section reste
+cachée alors que 60 lignes l'attendent en base.
+
+**Le portage doit charger l'historique et la frise indépendamment du relevé.**
+
+---
+
+## E-157 — La colonne « Par » affiche un numéro — la moitié non corrigée d'un défaut connu
+
+`_log_ban_action` (`backend/routes/fail2ban.py:106`) reçoit
+`request.headers.get('X-User-ID', 'admin')` : `performed_by` contient donc **l'identifiant numérique**
+de l'utilisateur, ou la chaîne littérale `'admin'` en repli. La colonne affiche `16`, `7`, `3`.
+
+Mesuré : valeurs distinctes rendues à l'écran — **`16` et `admin`**.
+
+Ce défaut a été **corrigé dans `iptables`**, avec un commentaire de huit lignes qui l'explique, et
+laissé tel quel dans `fail2ban`. C'est la sixième occurrence du motif « à moitié corrigé » relevée
+sur ce chantier : quelqu'un rencontre un défaut, le nomme, et n'en protège qu'une branche.
+
+Le repli `'admin'` aggrave : il n'est pas un identifiant, et **rien ne le distingue d'un compte
+réellement nommé `admin`**.
+
+**Le portage doit résoudre l'identifiant en nom**, et dire explicitement quand il n'y parvient pas
+plutôt que d'afficher un numéro brut.
+
+---
+
+## E-158 — La page `fail2ban/` ne suit pas la langue de l'interface, à deux endroits
+
+La bascule fonctionne — mesuré : l'intitulé passe de « Historique des bans » à « Ban history ». Mais
+deux valeurs restent écrites en dur :
+
+- **`<html lang="fr">`** (`legacy/fail2ban/index.php:24`). La page en anglais se déclare française à
+  toute technologie d'assistance. **Deuxième occurrence** du défaut déjà relevé en E-111 sur la page
+  des notifications, là où `adm/audit_log.php:122` fait pourtant `<html lang="<?= getLang() ?>">` ;
+- **`toLocaleString('fr-FR')`** (`main.js:298`). Mesuré : interface en anglais, date rendue
+  `26/08/2026 03:59:44`. L'inventaire du module notait déjà que `fmtLocalDate` existe et n'est pas
+  utilisé ici.
+
+---
+
+## E-159 — La frise ne s'affiche pas du tout : `h-32` est purgée, et 100 % de zéro fait zéro
+
+E-155 décrit ce que la frise **dirait** si elle s'affichait. Elle ne s'affiche pas.
+
+`legacy/fail2ban/index.php:210` : `<div id="stats-chart" class="flex items-end gap-1 h-32">`. La
+hauteur du cadre vient de la classe Tailwind `h-32` — **absente du CSS compilé**. Le cadre a donc une
+hauteur de **0 px**, et les barres, dont la hauteur est exprimée en **pourcentage**
+(`bar.style.height = h + '%'`), se résolvent contre zéro.
+
+Mesuré le 2026-08-27, sur le style **calculé** :
+
+| | déclaré | rendu |
+|---|---|---|
+| cadre `#stats-chart` | `h-32` (8 rem) | **0 px** |
+| barre J-3 | `4%` | **0 × 360 px** |
+| barre J-2 | `100%` | **0 × 360 px** |
+| barre J-1 | `12.5%` | **0 × 360 px** |
+
+À l'écran, la carte « Statistiques » n'affiche que son titre. **Elle est vide, et elle a l'air
+normale** : rien ne signale qu'un contenu manque.
+
+**Quatrième occurrence** de la même famille dans ce projet — après la pastille KEV à 1,06:1, et deux
+autres. Le motif est toujours le même : le HTML est juste, la classe est juste, **PurgeCSS ne garde
+que ce qu'il a vu**, et aucune assertion sur le DOM ne peut le voir.
+
+Et il a piégé la mesure autant que la page : la première rédaction de `go-fail2ban-f2` lisait
+`b.style.height`, donc « 100% », et concluait que la barre était haute. **C'est la capture qui a
+montré la carte vide.** Une suite mesure désormais `getBoundingClientRect().height`.
+
+**Le portage n'exprime pas une hauteur en pourcentage d'un parent dont la hauteur vient d'une classe
+utilitaire.**
