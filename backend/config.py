@@ -180,7 +180,10 @@ class Config:
     # Opt-in (defaut false) : si active, les actions listees exigent l'aval d'un
     # SECOND admin avant execution. Desactive par defaut pour ne pas bloquer les
     # deploiements mono-admin.
-    APPROVAL_ENABLED   = os.getenv('APPROVAL_ENABLED', 'false').lower() == 'true'
+    # ACTIF PAR DEFAUT. Le repli compte autant que le fichier d'exemple : qui ne
+    # copie pas l'exemple obtient CE defaut-la, et la decision ne vaudrait sinon
+    # que pour ceux qui lisent le fichier. Les deux ont ete bascules ensemble.
+    APPROVAL_ENABLED   = os.getenv('APPROVAL_ENABLED', 'true').lower() == 'true'
     APPROVAL_ACTIONS   = {a.strip() for a in os.getenv(
         'APPROVAL_ACTIONS',
         'delete_remote_user,reboot_server,revoke_service_account,regenerate_platform_key'

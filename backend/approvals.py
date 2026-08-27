@@ -89,6 +89,50 @@ def find_request(cur, action_type, machine_id, target, requested_by, status):
     return cur.fetchone()
 
 
+def _compte_approbateurs_eligibles(cur, requested_by):
+    """Combien de comptes pourraient approuver une demande de `requested_by`.
+
+    L'ELIGIBILITE SE COMPTE, ELLE NE SE SUPPOSE PAS. Sans ce comptage, `gate()`
+    cree une demande que PERSONNE ne peut approuver et l'action reste bloquee
+    sans que rien ne dise pourquoi — un fail-closed qui masque son motif est un
+    fail-closed qu'on finit par croire casse.
+
+    LE CRITERE EST MESURE, PAS RECOPIE. La consigne disait
+    « role_id >= 2 ET can_admin_portal ». C'est TROP ETROIT :
+    `routes/approvals.py:88-91` garde l'approbation par `@require_role(2)` +
+    `@require_permission('can_admin_portal')`, et `require_permission` porte
+    `if role_id >= 3: return func(...)` (`helpers.py`). **Un role 3 SANS la
+    permission peut donc approuver**, et le critere etroit ne l'aurait pas
+    compte — donc aurait refuse alors qu'une approbation etait possible.
+
+    Aujourd'hui les deux comptes de role 3 portent la permission, donc les deux
+    criteres coincident PAR ACCIDENT. Retirer `can_admin_portal` a un superadmin
+    suffirait a les separer.
+
+    `id <> requested_by` : la regle 4-eyes est appliquee a la DECISION
+    (`routes/approvals.py:72`), et il faut la refleter ici — sinon un
+    administrateur seul se compterait lui-meme et le blocage redeviendrait muet.
+    """
+    cur.execute(
+        "SELECT COUNT(*) AS n FROM users u "
+        "LEFT JOIN permissions p ON p.user_id = u.id "
+        "WHERE u.active = 1 AND u.id <> %s "
+        "AND (u.role_id >= %s OR COALESCE(p.can_admin_portal, 0) = 1)",
+        (requested_by, ROLE_SUPERADMIN))
+    ligne = cur.fetchone()
+    if ligne is None:
+        raise RuntimeError("comptage des approbateurs : aucune ligne rendue")
+    return int(ligne['n'] if isinstance(ligne, dict) else ligne[0])
+
+
+class AucunApprobateur(RuntimeError):
+    """Levee quand aucun compte ne peut approuver la demande.
+
+    Porte son MOTIF et la marche a suivre : un blocage lisible vaut infiniment
+    mieux qu'une fonctionnalite briquee en silence.
+    """
+
+
 def gate(action_type, machine_id, target, payload, requested_by, role=None):
     """
     Verrou d'approbation. Retourne :
@@ -140,6 +184,19 @@ def gate(action_type, machine_id, target, payload, requested_by, role=None):
                 return {'status': 'pending', 'id': pend['id']}
 
             # 3) Sinon : creation d'une nouvelle demande
+            # E-205 : refuser en NOMMANT la cause, plutot que de creer une
+            # demande que personne ne pourra approuver. Sur les deux actions de
+            # `ACTIONS_SANS_REPLI` seulement : ailleurs, une demande en attente
+            # reste utile — un approbateur cree plus tard pourra la valider,
+            # et changer ca serait un durcissement non demande.
+            if action_type in ACTIONS_SANS_REPLI:
+                if _compte_approbateurs_eligibles(cur, requested_by) == 0:
+                    raise AucunApprobateur(
+                        "Aucun approbateur eligible autre que vous. Cette action exige "
+                        "l'aval d'un SECOND administrateur : creez un compte de role 2 "
+                        "porteur de la permission `can_admin_portal`."
+                    )
+
             ttl_hours = int(getattr(Config, 'APPROVAL_TTL_HOURS', 24))
             expires = datetime.now() + timedelta(hours=ttl_hours)
             cur.execute(
@@ -151,6 +208,10 @@ def gate(action_type, machine_id, target, payload, requested_by, role=None):
             req_id = cur.lastrowid
         finally:
             conn.close()
+    except AucunApprobateur:
+        # Ce n'est PAS une erreur de base : c'est un refus motive. Il traverse
+        # tel quel, sans etre requalifie en « erreur interne ».
+        raise
     except Exception as e:
         if action_type in ACTIONS_SANS_REPLI:
             # Une porte qui echoue REFUSE. L'appelant doit traiter cette
