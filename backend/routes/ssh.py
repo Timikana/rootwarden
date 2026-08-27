@@ -243,6 +243,19 @@ def rotate_logs_deployment():
 # Deploy + Logs SSE
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _journalise_verdict_deploiement(texte: str) -> None:
+    """Ajoute une ligne de verdict au journal de deploiement, sans le tronquer.
+
+    Ouverture en `a` : le sous-processus vient d'ecrire dans ce fichier ouvert
+    en `w`, et l'ecraser ici effacerait le journal qu'on cherche a conclure.
+    """
+    try:
+        with open(deployment_log_file, "a") as f:
+            f.write(f"\n[RootWarden] {texte}\n")
+    except Exception as e:
+        logging.error("[deploy] verdict non journalise : %s", e)
+
+
 @bp.route('/deploy', methods=['POST'])
 @require_api_key
 @threaded_route
@@ -269,6 +282,25 @@ def deploy():
         rotate_logs_deployment()
 
         def run_deployment():
+            # ══ LE CODE DE SORTIE DU SOUS-PROCESSUS EST LU, ET IL EST DIT ════
+            #
+            # E-193. `process.wait()` etait appele et son code JETE. La reponse
+            # HTTP de cette route est un accuse de reception — un
+            # `threading.Thread` dans le corps, pas un `@threaded_route` — donc
+            # elle ne peut pas porter le verdict, et c'est normal. Mais il
+            # n'etait porte NULLE PART : un deploiement qui meurt ne laissait
+            # aucun signal, et le seul endroit ou l'exploitant regarde est le
+            # flux SSE de `/logs`, qui ne lit que ce fichier.
+            #
+            # Le verdict est donc ECRIT DANS LE FLUX, la ou il est regarde.
+            # `stream_logs` suit le fichier pendant 30 s d'inactivite : une
+            # ligne ajoutee juste apres la fin du processus y parvient.
+            #
+            # Le terminateur `[Fin du flux de logs]` n'est PAS emis ici : c'est
+            # un JETON DE PROTOCOLE que le client compare litteralement, et
+            # l'ecrire dans le fichier ferait croire au client que le flux est
+            # fini alors que le serveur continue de le tenir.
+            code = None
             try:
                 with open(deployment_log_file, "w") as log_file:
                     process = subprocess.Popen(
@@ -276,9 +308,21 @@ def deploy():
                         stdout=log_file,
                         stderr=subprocess.STDOUT
                     )
-                    process.wait()
+                    code = process.wait()
             except Exception as e:
                 logging.error(f"Erreur lors de l'execution de configure_servers.py : {e}")
+                _journalise_verdict_deploiement(
+                    f"ECHEC : le deploiement n'a pas pu etre execute ({e}).")
+                return
+
+            if code == 0:
+                logging.info("[deploy] configure_servers.py termine (code 0).")
+                _journalise_verdict_deploiement("Deploiement termine (code 0).")
+            else:
+                logging.error("[deploy] configure_servers.py termine avec le code %s.", code)
+                _journalise_verdict_deploiement(
+                    f"ECHEC : le deploiement s'est termine avec le code {code}. "
+                    f"Les gestes deja emis n'ont PAS ete annules.")
         thread = threading.Thread(target=run_deployment)
         thread.start()
         return jsonify({"success": True, "message": "Deploiement lance avec succes."})
