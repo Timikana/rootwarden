@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.30** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.34** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,52 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.34 — cinq copies d'un resolveur, et le 7-uplet n'avait pas de domaine
+
+**Symptome.** `_resolve_ssh_creds` etait recopiee dans **cinq** modules de routes — `iptables`,
+`ssh_audit`, `services`, `fail2ban`, `policies` — avec **cinq empreintes distinctes** sur le code
+deparse, pour **41 sites d'appel**.
+
+**Ce que la comparaison ligne a ligne donne.** Une seule divergence de fond : `iptables` rendait un
+**7-uplet**, sans `machine_id`. Les quatre autres ecarts sont un nom de variable locale et trois
+chaines de journal.
+
+**La reserve posee avant d'unifier, et sa reponse.** *Avant d'unifier deux choses qui se ressemblent,
+nommer le DOMAINE de chacune.* Le 7-uplet **n'en a pas** : `iptables` a besoin de `machine_id` lui
+aussi, et il le **re-derivait** de la requete (`int(data.get('machine_id'))`, deux fois) au lieu de le
+recevoir. Ce n'est pas une raison, c'est un retard.
+
+**Correctif.** Une implementation unique, `routes/helpers.resolve_ssh_creds`. Les cinq copies sont
+retirees ; chaque module l'importe sous un **alias** (`as _resolve_ssh_creds`) pour que les **37 sites
+deja corrects ne bougent pas**. Les 4 sites d'`iptables` passent au 8-uplet, et ses deux
+re-derivations emploient desormais la valeur resolue.
+
+**Deux changements, et deux seulement.** Le `machine_id` rendu est `row['id']` — l'entier de la base —
+et non plus la valeur brute du client, qui pouvait etre la chaine `'5'` ; le journal nomme
+`request.path` au lieu du module, plus precis et insensible a un deplacement de fichier.
+
+**Ce qui n'est PAS change, deliberement.** `int(machine_id)` sur une valeur non numerique leve, est
+rattrape par le `except` et rend « Erreur BDD » — un message qui decrit mal sa cause.
+`validate_machine_id` dirait mieux, **mais changerait le message rendu au client sur 41 sites** :
+c'est une correction a part, pas un effet de bord d'unification.
+
+**Ce que la fonction n'est pas.** Une garde. Elle ne verifie aucun droit — `SELECT … WHERE id = %s`,
+aucun `check_machine_access`, aucun bornage au compte. Elle apporte une **precondition** : en refusant
+de travailler sans `machine_id`, elle rend vraie la premisse de `@require_machine_access`. *Nommer une
+precondition « garde » est l'erreur de categorie qui produit les commentaires affirmant une protection
+que le code n'exerce pas.* L'en-tete de la fonction le dit.
+
+**Cause racine.** Le motif d'**E-204** — quatre `_validate_username` dont une avait pris du retard, et
+le retard a laisse passer un `..` jusqu'a une session SSH — **pris avant qu'il ne coute quelque
+chose**. *Elles etaient d'accord aussi, jusqu'a ce qu'une bouge.*
+
+**Au passage.** La ligne d'avertissement en tete de ce fichier annoncait encore **v1.38.30** alors que
+les sections allaient a v1.38.33 : recalee ici.
+
+**Tests.** Les cinq modules importes reellement ; les cinq `_resolve_ssh_creds` verifies **identiques
+par identite d'objet** a `helpers.resolve_ssh_creds` ; arite de tous les `return` mesuree a 8 ; ruff
+vert sur les six fichiers. **Inerte jusqu'au redemarrage.**
 
 ### v1.38.33 — une regle du Lead RETIREE : ce qu'il croyait etre une protection dans un helper n'en etait pas
 
