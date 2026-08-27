@@ -953,7 +953,8 @@ def revoke_service_account():
         cur = conn.cursor(dictionary=True)
         fmt = ','.join(['%s'] * len(machine_ids))
         cur.execute(
-            f"SELECT id, name, ip, port, user, password, root_password "
+            f"SELECT id, name, ip, port, user, password, root_password, "
+            f"service_account_deployed "
             f"FROM machines WHERE id IN ({fmt})", machine_ids
         )
         machines = cur.fetchall()
@@ -967,14 +968,46 @@ def revoke_service_account():
         try:
             ssh_pass = server_decrypt_password(m['password'])
             root_pass = server_decrypt_password(m['root_password'])
-            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger) as client:
+            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                             service_account=m.get('service_account_deployed', False)) as client:
                 # Suppression user + sudoers (idempotent : si deja supprime, OK)
+                # ══ L'ORDRE COMPTE, ET C'EST LE CORRECTIF CI-DESSUS QUI LE REND
+                #    NECESSAIRE (E-218) ═══════════════════════════════════════
+                #
+                # Cette route se connecte desormais PAR le compte de service
+                # quand il est deploye. Or `execute_as_root` en ce mode eleve
+                # via `sudo sh -c`, donc en s'appuyant sur le fichier sudoers
+                # que la premiere commande supprimait.
+                #
+                # L'elevation vaut pour toute l'invocation : la chaine se
+                # terminait malgre tout. Mais un ARRET EN COURS DE ROUTE — le
+                # delai de 30 s expire sur un `userdel -r` d'un gros repertoire,
+                # une coupure reseau — laissait la machine dans un etat dont on
+                # ne pouvait PLUS SORTIR : sudoers supprime, compte encore la,
+                # `service_account_deployed` toujours a 1, et la tentative
+                # suivante se reconnectant par un compte de service qui ne peut
+                # plus eleverer. Sur une machine migree, `root_password` vaut
+                # '' : aucun repli.
+                #
+                # Le retrait du sudoers passe donc EN DERNIER. Un echec partiel
+                # laisse au pire un fichier orphelin — inerte, puisqu'aucun
+                # compte ne porte plus ce nom — et la revocation reste rejouable.
+                #
+                # ══ ET LE VERDICT VERIFIE LES DEUX EFFETS ═══════════════════
+                #
+                # L'ancien ne controlait que l'absence du COMPTE. Il aurait donc
+                # annonce une reussite en laissant le fichier sudoers en place :
+                # un `rootwarden` recree a la main y aurait retrouve un
+                # NOPASSWD: ALL que personne n'a accorde. Les `if` ne declenchent
+                # pas `set -e`, contrairement a un `test … && exit`.
                 cmd = (
                     "set -e; "
-                    "rm -f /etc/sudoers.d/rootwarden; "
                     "userdel -r -f rootwarden 2>/dev/null || true; "
                     "rm -rf /home/rootwarden /var/spool/mail/rootwarden 2>/dev/null || true; "
-                    "id rootwarden 2>/dev/null && exit 1 || exit 0"
+                    "rm -f /etc/sudoers.d/rootwarden; "
+                    "if id rootwarden 2>/dev/null; then exit 1; fi; "
+                    "if [ -e /etc/sudoers.d/rootwarden ]; then exit 2; fi; "
+                    "exit 0"
                 )
                 from ssh_utils import execute_as_root
                 _, err_out, code = execute_as_root(client, cmd, root_pass, logger=logger, timeout=30)
@@ -989,6 +1022,12 @@ def revoke_service_account():
                         conn2.commit()
                     r['success'] = True
                     r['message'] = 'Service account revoque'
+                elif code == 2:
+                    # Compte supprime mais fichier sudoers encore la : la
+                    # revocation est INCOMPLETE, et `service_account_deployed`
+                    # reste a 1 pour qu'un rejeu la termine.
+                    r['message'] = ('Compte supprime mais /etc/sudoers.d/rootwarden '
+                                    'subsiste : revocation incomplete, a rejouer')
                 else:
                     r['message'] = (err_out or '')[-300:].strip() or f'exit={code}'
         except Exception as e:
@@ -1043,7 +1082,8 @@ def deploy_service_account():
         cur = conn.cursor(dictionary=True)
         fmt = ','.join(['%s'] * len(machine_ids))
         cur.execute(
-            f"SELECT id, name, ip, port, user, password, root_password "
+            f"SELECT id, name, ip, port, user, password, root_password, "
+            f"service_account_deployed "
             f"FROM machines WHERE id IN ({fmt})", machine_ids
         )
         machines = cur.fetchall()
@@ -1058,7 +1098,8 @@ def deploy_service_account():
 
         try:
             # Connexion via keypair ou password existant
-            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger) as client:
+            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                             service_account=m.get('service_account_deployed', False)) as client:
                 sa_name = 'rootwarden'
 
                 # 0. Installer sudo si absent
