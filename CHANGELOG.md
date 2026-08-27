@@ -2308,12 +2308,26 @@ suffisent. *Une correction qui retire une justification fausse renforce la concl
 que celle-ci ne reposait pas dessus.*
 
 > **CE QUI EN DECOULE, ET QUI EST PIRE QU'« INCOMPLET ».** Sur une machine migree, **aucun chemin du
-> produit ne retire ce fichier** : `_purge_legacy_sudoers` l'exclut par exception explicite — ecrite
-> pour proteger un compte vivant, et qui **survit a sa disparition parce qu'elle ne la teste pas** — le
-> rejeu ne peut pas elever, et le seul geste qui l'ecrase, `deploy_service_account`, le **remplace** en
-> recreant le compte au lieu de le retirer. **L'etat n'est ni transitoire ni auto-reparant : il est
-> permanent.** Sur une machine non migree, le rejeu aboutit : le blocage est propre a l'etat vers
-> lequel toute la page pousse.
+> produit ne retire ce fichier** : le rejeu ne peut pas elever, le seul geste qui l'ecrase
+> (`deploy_service_account`) le **remplace** en recreant le compte au lieu de le retirer, et — surtout —
+> **aucune routine du produit ne balaie `/etc/sudoers.d/` a la recherche de fichiers sans compte
+> correspondant.** **L'etat n'est ni transitoire ni auto-reparant : il est permanent.** Sur une machine
+> non migree, le rejeu aboutit : le blocage est propre a l'etat vers lequel toute la page pousse.
+
+> **⚠ RECTIFICATION DE LA CAUSE (la conclusion, elle, ne bouge pas).** La premiere redaction accusait
+> l'exception `if username == _RESERVED_SA_USER` de `_purge_legacy_sudoers` — « une exception de surete
+> fondee sur *ce compte existe* qui survit a sa disparition ». **Mesure** : cette fonction n'est appelee
+> que depuis `add_to_sudoers` et `remove_from_sudoers`, **toujours avec le nom d'un utilisateur GERE par
+> le portail**. Elle ne regarde donc jamais `/etc/sudoers.d/rootwarden`, et son exception est un
+> **garde-fou de collision de noms** — le cas ou un utilisateur du portail s'appellerait `rootwarden`.
+> **Elle ne protege pas l'orphelin : elle ne le croise pas.** Le fichier survit **parce que personne ne
+> le cherche**, pas parce qu'une regle le protege.
+>
+> C'est la **troisieme fois de la journee** qu'une trouvaille juste recoit une explication fausse, apres
+> la portee puis la cause d'E-211. *Une trouvaille verifiee n'a pas son explication verifiee : ce sont
+> deux relectures distinctes.* Et le commentaire de `configure_servers.py:457` qui a induit ces trois
+> lectures a ete precise dans le meme geste — **une formulation vraie dans son contexte et trompeuse
+> hors de lui a le meme cout qu'une formulation fausse.**
 
 **Un changement de comportement sur K4, nomme plutot que decouvert.** `configure_servers.py:758` :
 `if not use_sa: ensure_sudo_installed(...)`. Le drapeau a 0 fait donc **executer** cette etape au

@@ -453,8 +453,20 @@ def remove_from_sudoers(channel, username: str, logger=None):
         return
     try:
         # Supprime le fichier unifie ET l'ancien fichier a nom nu (naming pre-fix),
-        # pour ne laisser AUCUNE regle residuelle. Le compte de service rootwarden
-        # (/etc/sudoers.d/rootwarden) est protege par _purge_legacy_sudoers.
+        # pour ne laisser AUCUNE regle residuelle.
+        #
+        # Portee de la garde de `_purge_legacy_sudoers`, ecrite precisement
+        # parce que la formulation precedente a induit TROIS lectures fausses le
+        # 2026-08-27 : elle ne s'applique que si `username` — un utilisateur
+        # GERE par le portail — vaut litteralement `rootwarden`. C'est un
+        # garde-fou de COLLISION DE NOMS, pas une protection generale du fichier
+        # du compte de service : cette fonction n'est jamais appelee avec autre
+        # chose qu'un nom d'utilisateur du portail, donc elle ne croise pas
+        # `/etc/sudoers.d/rootwarden` dans le cas ordinaire.
+        #
+        # Corollaire, et il compte : RIEN ici ne retire un fichier sudoers
+        # ORPHELIN — sans compte porteur. Aucune routine du produit ne balaie ce
+        # repertoire.
         execute_command_as_root(channel, f"rm -f {_sudoers_target(username)}", logger=logger)
         _purge_legacy_sudoers(channel, username, logger=logger)
         if logger:
