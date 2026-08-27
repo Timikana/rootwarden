@@ -3996,3 +3996,80 @@ seule**, en lisant le NOM de la variable `command` au lieu de sa valeur.
 Il a été trouvé sans filet : ni ordre de grandeur invraisemblable, ni pair qui relise. **Uniquement en
 rouvrant les corps.** *Le seul garde-fou qui a fonctionné contre une erreur rassurante, c'est de refaire le
 travail.*
+
+### UN REFUS D'ACCÈS DÉGUISÉ EN INCAPACITÉ DE LECTURE (2026-08-27)
+
+**Décision de la session 3 sur le prédicat d'E-217, et c'est le raisonnement qui mérite d'être gardé plus que
+la décision.**
+
+La route `GET /machines/credential-status` a été ajoutée à la liste blanche de la passerelle **et refusée dans
+`ADMIN_SEULEMENT`**. Ce groupe exige un rôle ≥ 2 à la passerelle — **or la page s'ouvre dès le rôle 1 avec la
+permission.** L'y mettre aurait rendu la réponse inaccessible à des comptes que la page admet, et l'écran
+aurait affiché **« indéterminé » partout**.
+
+> **Un refus d'accès déguisé en incapacité de lecture — exactement l'inverse de ce que le troisième état
+> existe pour dire.** `null` est là pour signifier « je n'ai pas su lire le secret », pas « on ne m'a pas
+> laissé demander.
+
+*Une garde posée au mauvais étage ne refuse pas : elle fabrique une donnée fausse.* Et la fausse donnée est du
+côté rassurant pour la garde (rien ne fuit) et trompeur pour l'écran (il annonce une indétermination qui n'en
+est pas une). La borne juste est celle que la route porte déjà : `check_machine_access` **dans le corps**,
+comme `/list_machines`.
+
+Même régime que `/server_users_inventory` (E-200) : **née pour le portage, absente du proxy legacy, on ne
+l'ajoute pas à `ALLOWED_PROXY_PREFIXES` d'un proxy de production.** Vérifié **par segment** : le chemin et ses
+sous-chemins passent, `/machines` **seul** est refusé, `/machines/credential-statusX` refusé.
+
+#### Deux choix d'affichage qui sont le motif, pas du détail
+
+- **le badge s'AJOUTE au texte du serveur, il ne le remplace pas.** L'écran montre les deux réponses et dit
+  laquelle vient d'où. *Effacer le texte serveur aurait caché la divergence au lieu de la nommer* — et nommer
+  la divergence est précisément ce que le portage a choisi contre E-207 ;
+- **un échec de la requête ne valide rien** : l'encart annonce alors que les compteurs restent approximatifs.
+  *Le silence aurait laissé croire à un accord* — c'est « je ne sais pas » déguisé en « c'est vrai », le
+  symétrique du défaut ci-dessus.
+
+#### ⚠ Et la limite du prédicat est la moitié la plus importante
+
+    ssh.py:2632   SELECT id, name, password, service_account_deployed, platform_key_deployed
+                  -- `root_password` N'Y FIGURE PAS
+
+**Le prédicat corrige donc la moitié du calcul à quatre états — et c'est la moins conséquente.**
+`root_password` est la colonne **sans aucun chemin de réécriture depuis cette page**, celle sur laquelle repose
+E-207 (la page Serveurs la réécrit sans toucher le drapeau) et la trouvaille « ressaisir n'en rend que la
+moitié ». **Son état affiché reste calculé sur la colonne, avec l'approximation qu'on vient de corriger
+ailleurs.**
+
+C'est **dit à l'écran** plutôt que laissé à supposer — *moins plutôt que faux* — mais l'écart subsiste. Une
+ligne de plus dans le `SELECT` et une seconde paire de champs le ferment. **Session 4.**
+
+#### Une portée gardée telle quelle, et la bonne raison
+
+`porteeEffacement()` qualifiait de « juste » la précondition `service_account_deployed`. Après E-220,
+l'**intention** l'est ; son **entrée** peut être périmée — sur une révocation partielle le drapeau reste
+délibérément à 1 alors que le compte n'existe plus.
+
+**La session 3 a gardé la portée inchangée** : c'est la même condition que celle du backend, et proposer plus
+étroit ferait **diverger deux règles au lieu d'une**. *Un drapeau de moins vaut mieux qu'une règle en double* —
+et c'est la réserve que trois sessions m'ont opposée aujourd'hui, appliquée dans l'autre sens : ici ne PAS
+diverger est le bon choix, et le commentaire dit l'intention **et** la péremption possible.
+
+### ⚠ LA ROTATION EST LE SEUL REMÈDE À UNE CLÉ COMPROMISE — ET LE PORTAIL ATTRIBUE CE CAS À UN AUTRE BOUTON (2026-08-27)
+
+**Conséquence d'E-219 sur P4, formulée par la session 3, et elle change ce que l'exploitant doit arbitrer.**
+
+`revoke_service_account` porte dans sa docstring « compromission suspectée de la clé Ed25519 plateforme » et
+**laisse la clé autorisée sur `root` et sur le compte nominal.** Donc :
+
+> **P4 n'est pas seulement « le geste le plus large » du module : c'est le SEUL qui réponde au cas d'usage que
+> le portail attribue à un autre bouton.**
+
+Deux effets, et le second est celui qui compte :
+
+1. **le panneau de P4 doit le dire** — la rotation est le remède, la révocation ne l'est pas ;
+2. **l'arbitrage d'E-219 se déplace.** Il ne s'agit plus seulement de corriger un texte faux : *tant que la
+   docstring désigne la révocation pour une compromission, le geste qui répond réellement au cas n'est
+   documenté nulle part.* Corriger le texte de la révocation **sans** dire où est le vrai remède laisse
+   l'exploitant sans réponse au même incident.
+
+*Un texte faux retiré sans son remplacement ne corrige pas la désinformation : il la rend muette.*
