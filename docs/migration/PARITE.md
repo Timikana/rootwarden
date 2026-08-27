@@ -8149,3 +8149,75 @@ temporaire restent justes ; elles n'ont simplement plus d'objet.
 découlait ne change — la route de l'injection, les comptes qui l'occupent, le correctif d'E-174 sont
 inchangés. Mais **un compte faux dans un document d'audit se recopie**, et celui-là l'avait déjà été une
 fois.
+
+---
+
+## E-189 — Le préflight de K4 teste le STATUT et pas le VERDICT : une fragilité placée au pire endroit
+
+**Ce n'est PAS un défaut aujourd'hui, et c'est dit d'abord.** Relevé le 2026-08-27 par un balayage
+systématique des appelants du portage, et vérifié à la main.
+
+`laravel/public/js/cles-ssh.js:189` — **l'écran qui décide si un déploiement de clés peut partir** —
+teste `rep.ok` et lit `d.results` **sans jamais regarder `d.success`**. Le commentaire l'assume même :
+« LE STATUT D'ABORD, et le message du corps s'il en porte un. »
+
+Et cela coïncide, aujourd'hui. `preflight_check` (`backend/routes/ssh.py:327`) n'a que **trois** retours,
+vérifiés un par un :
+
+| retour | statut | `success` |
+|---|---|---|
+| « Aucune machine spécifiée » | **400** | `False` |
+| « Accès refusé à la machine N » | **403** | `False` |
+| le chemin normal (`:494`) | **200** | **`True` — inconditionnellement** |
+
+**Les deux contrôles rendent donc le même verdict, et c'est une coïncidence, pas une propriété.**
+
+> Le jour où cette route gagne un `200 + success: false` — **ce qui vient précisément d'arriver à trois de
+> ses voisines** (E-184, E-186, E-187) — l'écran présenterait des **résultats partiels comme une
+> vérification réussie**, sur le module que ce plan appelle le plus dangereux du chantier, et juste avant
+> le geste qui **révoque des accès sur la production**.
+
+### Le résultat d'ensemble est un DÉDOUANEMENT, et sa raison est ce qui compte
+
+Relevé : **50 appels dans 29 fichiers**. **Aucun appelant du portage ne présente aujourd'hui un refus
+comme une réussite.** Mais la raison n'est pas que tout le monde lit `success` :
+
+> **C'est que tout refus porte aujourd'hui un statut non-200.** Tester `.ok` et tester `success` rendent
+> donc le même verdict, et les appelants qui ne testent que le statut sont **couplés à une coïncidence**
+> — celle que trois correctifs viennent de rompre.
+
+**Et c'est ce qui rend la règle exacte** : *quand une valeur cesse d'être constante, l'endroit à auditer
+est celui qui ne la testait pas.* Les cinq sites concernés sont **invisibles au diff** de ces trois
+correctifs, puisque rien n'y a changé. Les quatre autres visent des routes **Laravel**, dont tous les
+refus portent déjà 400/404 : **la famille de la cible est ce qui tranche**, et les confondre aurait
+produit un relevé de 28 « fautifs » dont 27 ne le sont pas.
+
+### Et l'instrument s'est trompé trois fois avant d'être juste — la troisième est la leçon
+
+| version du motif | résultat |
+|---|---|
+| `success` dans la fonction englobante | **28 « fautifs »** |
+| + « rend un `.json()` » | 26 — le motif ratait `corpsJson = await r.json(); return {corps: corpsJson}` |
+| + « lit du texte et jamais du JSON » | **dédouanait le préflight**, qui lit `.text()` dans sa branche d'ERREUR |
+| + `getReader()` d'abord | **5**, tous qualifiés à la main |
+
+**La troisième version a fabriqué un faux NÉGATIF.** Les deux premières accusaient des appelants
+corrects ; celle-là **dédouanait le seul cas fragile du relevé**.
+
+> Un motif trop large se trompe **dans les deux sens**, et la seconde erreur est la plus coûteuse :
+> **un vert ne se relit pas.**
+
+### La classe, que la matrice QA nomme désormais
+
+Elle réunit ce site, les passes creuses de F6 et l'assertion aveugle de `go-adm-comptes-distants` :
+
+> **Quand une route gagne un verdict, toute assertion qui passait par un PROXY de ce verdict devient
+> aveugle — et elle passe au vert en ne mesurant plus rien.** Un statut HTTP, une liste relue en base, un
+> compteur de départs de requêtes : trois proxys qu'un `200 + success:false` ne distingue plus.
+
+### Un point POSITIF relevé au passage, et il mérite d'être écrit
+
+`preflight_check` ne porte **aucun** décorateur d'accès machine : il appelle `check_machine_access(mid)`
+**dans une boucle, sur chaque machine visée** (`:342-345`). C'est le bon motif — un décorateur ne sait
+contrôler qu'**un** identifiant, et cette route en reçoit une liste. **Une garde absente qui n'est pas un
+trou**, et c'est la première de cette forme sur le chantier.
