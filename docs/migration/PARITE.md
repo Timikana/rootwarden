@@ -9806,17 +9806,75 @@ accordé en silence, sans que personne n'ait écrit de règle sudo.**
 **Sur le chemin de RootWarden c'est sans conséquence** : `deploy_service_account` écrit le fichier avec `>`
 (`ssh.py:813`, `:1127`), donc il l'écrase. **Sur tout autre chemin, non.**
 
-### ⚠ L'amplificateur : le fichier est protégé du nettoyage PAR CONCEPTION
+### ⚠⚠ CORRECTION DU LEAD, 2026-08-27 — « L'AMPLIFICATEUR » QUE J'AI ÉCRIT ÉTAIT FAUX
 
-    configure_servers.py:332   return  # ne jamais toucher /etc/sudoers.d/rootwarden (compte de service)
-    configure_servers.py:457   (/etc/sudoers.d/rootwarden) est protege par _purge_legacy_sudoers
+**J'avais écrit** : *« le seul mécanisme du produit qui purge des fichiers sudoers a une exception explicite
+pour celui-là, et elle rend l'orphelin durable — une exception de sûreté fondée sur "ce compte existe" survit
+à la disparition du compte parce qu'elle ne la teste pas. »* **C'est faux, et je l'ai relayé à l'exploitant.**
 
-**Le seul mécanisme du produit qui purge des fichiers sudoers a une exception explicite pour celui-là** — et
-elle est juste, tant que le compte existe : purger le sudoers du compte de service couperait l'accès de
-RootWarden. **Mais elle rend l'orphelin durable** : aucun geste du produit ne le retirera jamais.
+**Mesure.** `_purge_legacy_sudoers(channel, username)` (`configure_servers.py:328`) n'est appelée que depuis
+`add_to_sudoers` (`:430`) et `remove_from_sudoers` (`:459`), **toujours avec le nom d'un utilisateur GÉRÉ du
+portail.** Son exception `if username == _RESERVED_SA_USER: return` (`:331`) est un **garde-fou de collision
+de noms** : si un utilisateur du portail s'appelait `rootwarden`, ne pas écraser le fichier du compte de
+service. **Elle ne regarde jamais `/etc/sudoers.d/rootwarden` en dehors de ce cas.**
 
-*Une exception de sûreté fondée sur « ce compte existe » survit à la disparition du compte, parce qu'elle ne
-la teste pas.*
+> **L'exception n'est donc PAS ce qui maintient l'orphelin en vie.** La cause est plus simple et plus large :
+> **aucune routine du produit ne balaie `/etc/sudoers.d/` à la recherche de fichiers sans compte
+> correspondant.** Le fichier survit parce que personne ne le cherche, pas parce qu'une règle le protège.
+
+**La conclusion tient — l'état est permanent — mais mon mécanisme était faux.** Troisième fois de la journée
+qu'une trouvaille juste reçoit une explication fausse (après la portée puis la cause d'E-211), **et cette
+fois-ci c'est moi qui l'ai écrite, quelques heures après avoir posé la règle** : *une trouvaille vérifiée n'a
+pas son explication vérifiée, et ce sont deux relectures distinctes.* **Écrire une règle donne le sentiment de
+l'avoir appliquée.**
+
+### Ce qui maintient réellement l'état, et une demi-mesure que la mesure fait apparaître
+
+**Ce qui le maintient** : la révocation est le **seul** geste du produit qui tente de retirer ce fichier, et
+sur une machine migrée son rejeu ne peut pas élever (`root_password` vide). `deploy_service_account` l'écrase
+(`>`) — mais **en recréant le compte**, donc il résout l'orphelin en supprimant sa condition, pas en le
+nettoyant.
+
+**Donc l'état persiste exactement sur les machines révoquées et jamais redéployées.**
+
+**Et une demi-mesure existe, contrairement à ce que le relevé concluait** : un geste qui tourne déjà en root
+sur une machine **sans** compte de service — `deploy_platform_key`, ou la passe de configuration de K4 — peut
+retirer un `/etc/sudoers.d/rootwarden` **dont le compte n'existe pas**, en testant les deux. Auto-réparation,
+**sans changement de schéma et sans état à persister.**
+
+**Ce n'est pas une décision de portage** : c'est une écriture supplémentaire sur des machines réelles, donc un
+arbitrage de l'exploitant (§7). **Et l'argument qui la rend praticable est mesuré** : `deploy_platform_key`
+appelle `execute_as_root` et écrit dans `/root/.ssh/` — **donc si elle s'exécute, l'élévation a déjà réussi.**
+Le nettoyage **hérite** d'une élévation prouvée au lieu de payer la précondition qui bloque le rejeu.
+
+#### ⚠ DEUX GARDES OBLIGATOIRES, et sans elles le défaut irait dans le sens DESTRUCTEUR
+
+Relevé par la session 4, et c'est la réserve qui compte : la condition « aucun compte de ce nom n'existe »
+**n'est pas fail-closed naturellement.**
+
+`id rootwarden` peut échouer pour une raison qui **n'est pas** l'absence du compte — NSS indisponible, LDAP
+injoignable, délai dépassé. **Une condition écrite « si `id` échoue » retirerait alors un `NOPASSWD: ALL`
+légitime et casserait le compte de service d'une machine saine** — dans un geste de parc lancé en masse.
+
+    1. exiger l'absence POSITIVEMENT : `getent passwd rootwarden` distingue « absent » (code 2)
+       d'une « erreur de service » (autres codes). Ne retirer que sur l'absence NOMMEE,
+       jamais sur « la commande n'a pas reussi ».
+    2. croiser avec la BASE : ne retirer que si `service_account_deployed = 0`.
+       Apres E-220 le drapeau vaut 0 exactement dans l'etat orphelin — les deux
+       signaux doivent CONCORDER, sinon on ne touche a rien.
+
+*Un marqueur n'est pas un verdict, et un échec de commande n'est pas une réponse* — la règle a servi deux fois
+dans la journée, et ici elle décide entre un nettoyage et une casse.
+
+#### ⚠ ET L'OPTION 1 N'EST PAS UN SUR-ENSEMBLE DE L'OPTION 2
+
+**Correction de la présentation du Lead, par la session 4.** L'auto-réparation ne répare que les machines
+**redéployées**. **Une machine révoquée puis laissée telle quelle garde son privilège dormant
+indéfiniment** — et c'est précisément la population qui crée l'orphelin.
+
+> **Les deux options sont COMPLÉMENTAIRES, pas classées** : l'auto-réparation **réduit la population**, la
+> colonne **rend le reste visible**. Le Lead les avait présentées comme un premier choix et un repli ; c'est
+> faux. *Une mesure qui réduit un ensemble ne remplace pas celle qui décrit ce qui reste.*
 
 ### Le vrai défaut est que l'état n'a PAS DE NOM
 
@@ -9910,3 +9968,86 @@ session 4 d'attendre le redémarrage**, et la raison n'est pas la prudence :
 **Ce qui doit monter à l'exploitant n'est donc pas le correctif : c'est la PRIORITÉ du redémarrage.** Cet
 écart est le premier du lot qui décrive une **élévation de privilège atteignable par un compte existant** — et
 non un texte faux, un compteur trompeur ou un état dérivé du code.
+
+---
+
+## E-222 — La sauvegarde d'une copie de règles pare-feu DÉTRUIT l'ancienne avant d'écrire la nouvelle, sans transaction — et un échec ne laisse rien
+
+**Trouvé par la session 5 en portant `iptables/` I2, sur le schéma. Le Lead a vérifié et trouvé un mécanisme
+différent, plus probable et plus dommageable que celui relevé.**
+
+### Ce que la session 5 a relevé, et qui est exact
+
+    mysql/init.sql:138-145
+    CREATE TABLE iptables_rules (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      server_id INT NOT NULL,            -- AUCUNE contrainte UNIQUE
+      rules_v4 TEXT, rules_v6 TEXT,
+      FOREIGN KEY (server_id) REFERENCES machines(id) ON DELETE CASCADE )
+
+    legacy/iptables/index.php:110
+    SELECT rules_v4, rules_v6 FROM iptables_rules WHERE server_id = ?   -- puis fetch()
+                                                   -- ni ORDER BY, ni LIMIT
+
+**Si deux lignes existaient pour la même machine, celle qui est lue ne serait pas déterminée.** Même défaut
+que le `LIMIT 1` sans `ORDER BY` relevé sur la révocation des clés d'API, où il rendait la révocation non
+déterministe.
+
+### ⚠ Mais le chemin d'écriture n'est pas un `INSERT` : c'est un `DELETE` PUIS un `INSERT`, sans transaction
+
+    legacy/iptables/index.php:142-151
+    // Suppression de l'ancienne entree avant remplacement (pas d'UPSERT)
+    DELETE FROM iptables_rules WHERE server_id = ?      -- execute
+    INSERT INTO iptables_rules (server_id, rules_v4, rules_v6) VALUES (?, ?, ?)
+
+**Aucun `beginTransaction`, aucun `commit`, aucun `rollBack` dans le fichier — vérifié.** Deux conséquences,
+et la seconde est celle qui compte :
+
+1. **la duplication est peu probable sur le chemin normal** — le `DELETE` précède chaque écriture. Elle
+   demande un entrelacement concurrent (`DELETE A`, `DELETE B`, `INSERT A`, `INSERT B`). Le défaut relevé par
+   la session 5 est donc **réel mais difficile à atteindre** ;
+2. **et le défaut PROBABLE est l'inverse : si l'`INSERT` échoue après un `DELETE` réussi, la copie est
+   PERDUE.** Il n'en reste aucune. La page annonce alors « Erreur lors de la sauvegarde des règles » — message
+   **exact sur l'échec de l'écriture, et muet sur la destruction de l'existant.**
+
+> **Un « enregistrer » qui détruit avant d'écrire, sans transaction, n'est pas une sauvegarde risquée : c'est
+> une suppression suivie d'une tentative.** Et l'utilisateur qui lit « erreur lors de la sauvegarde » conclut
+> que rien n'a changé — *le message décrit le geste qui a échoué, jamais celui qui a réussi.*
+
+L'absence d'`UNIQUE` est donc la cause de la **forme** choisie — pas d'`UPSERT` possible sans elle, comme le
+commentaire du code le dit lui-même — et cette forme est la vraie faiblesse. **La contrainte manquante et le
+`DELETE` préalable sont un seul défaut, pris par deux bouts.**
+
+### Sans porteur aujourd'hui, et la table est vide
+
+**Aucune ligne** dans `iptables_rules`. L'écart est **réel et sans porteur**, comme E-205 et E-217 — et il
+s'ouvre à la première copie enregistrée. *Une propriété qui tient par l'état du parc n'est pas une propriété.*
+
+### Ce que le portage fait, et ce qu'il reste à faire
+
+**Fait par I2** : la lecture prend la ligne **la plus récente** et **annonce s'il y en a plusieurs** — au lieu
+de lire une ligne indéterminée en silence.
+
+**À faire** : une contrainte `UNIQUE (server_id)` et un véritable `UPSERT`, ou à défaut une transaction autour
+du `DELETE`/`INSERT`. **Migration sur une table de production** — donc arbitrage de l'exploitant, et la table
+étant vide, c'est le moment le moins coûteux de l'histoire du produit pour poser la contrainte.
+
+### Deux gestes de portage qui méritent d'être la règle
+
+**1. Un refus repris d'ailleurs plutôt qu'inventé.** Une copie dont l'IPv4 est vide est refusée **parce
+qu'`iptables-rollback` refuse déjà d'appliquer une version vide.** On remonte la règle existante au lieu d'en
+écrire une seconde.
+
+*C'est l'exact complément de la réserve que trois sessions ont opposée au Lead* — « avant d'unifier deux
+choses qui se ressemblent, nomme le domaine de chacune ». **Ici le domaine est le même**, donc réutiliser est
+juste, et écrire une seconde règle aurait créé deux vérités sur la même question. **La règle n'est ni
+« unifier » ni « distinguer » : c'est nommer le domaine, puis suivre ce qu'il dit.**
+
+**2. La borne des colonnes contrôlée AVANT l'écriture, en OCTETS.** `TEXT` tient 65 535 **octets**, et
+**MySQL tronque en silence** en mode permissif. Sans ce contrôle, *l'écran annoncerait « enregistré » sur une
+copie amputée, et la troncature ne se verrait qu'au moment de l'appliquer* — c'est-à-dire au pire moment,
+sur une règle de pare-feu.
+
+**Et un texte qui devenait faux** : l'encart d'I1 annonçait que la copie en base n'était pas portée. I2 la
+porte — corrigé dans les deux langues. *Un texte peut devenir faux sans qu'aucun test ne le voie*, et c'est
+la sixième occurrence de la famille aujourd'hui.
