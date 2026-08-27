@@ -51,6 +51,25 @@ def _require_env(name: str) -> str:
     return value
 
 class Config:
+    # ══ LE NOM DU COMPTE DE SERVICE, UNE SEULE FOIS ══════════════════════════
+    #
+    # Il vivait en TROIS endroits : `ssh_utils` (le seul qui AUTHENTIFIE
+    # reellement), `configure_servers._RESERVED_SA_USER`, et `routes/ssh.py`.
+    # Trois copies d'une valeur dont depend l'acces a toute machine sans mot de
+    # passe stocke — `srv-zabbix` en est une.
+    #
+    # IL VIT ICI ET PAS DANS `ssh_utils`, ET C'EST UNE MESURE :
+    # `backend/tests/conftest.py:74` remplace `ssh_utils` par un `MagicMock`.
+    # Une constante qui en viendrait deviendrait un Mock sous test, et les deux
+    # gardes qui la comparent — `_purge_legacy_sudoers` et la sonde de
+    # revocation — cesseraient de proteger SANS QUE RIEN NE LE DISE. Mesure du
+    # 2026-08-27 : deux tests rouges avant ce deplacement.
+    #
+    # UNE VALEUR QUI GARDE UN COMPORTEMENT NE DOIT PAS VIVRE DANS UN MODULE
+    # QU'ON REMPLACE POUR TESTER. `config` n'est pas mocke, et ce nom EST de la
+    # configuration.
+    NOM_COMPTE_SERVICE = 'rootwarden'
+
     """
     Classe de configuration globale du backend RootWarden.
 

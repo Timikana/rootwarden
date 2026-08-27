@@ -32,6 +32,7 @@ from flask import Blueprint, jsonify, request, Response
 from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
 from configure_servers import _motif_nom_invalide
 from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
+from config import Config
 
 bp = Blueprint('ssh', __name__)
 
@@ -753,7 +754,7 @@ def deploy_platform_key():
                     # Deployer le service account rootwarden dans la foulee
                     sa_ok = False
                     try:
-                        sa_name = 'rootwarden'
+                        sa_name = Config.NOM_COMPTE_SERVICE
                         if not re.match(r'^[a-z][a-z0-9_-]+$', sa_name):
                             raise ValueError(f"Nom de compte invalide: {sa_name}")
                         # Installer sudo si absent (utilise su - avec root_password)
@@ -2206,6 +2207,54 @@ def delete_remote_user():
     # Protection : ne pas supprimer l'utilisateur SSH de connexion
     if username == m['user']:
         return jsonify({'success': False, 'message': f"'{username}' est l'utilisateur SSH de connexion - suppression interdite"}), 400
+
+    # La garde ci-dessus protege `machines.user`. Elle ne suffit pas : sur une
+    # machine deployee par compte de service, ce n'est PAS ce compte-la qui
+    # ouvre la session.
+    #
+    # Mesure du 2026-08-27 sur le parc : `srv-zabbix` porte
+    # `user = 'user'`, `service_account_deployed = 1`, et AUCUN mot de passe
+    # stocke. Sa seule voie d'acces reelle est donc le compte de service — que
+    # rien n'empechait de supprimer. Un `userdel` dessus verrouille la machine
+    # DEFINITIVEMENT : plus de mot de passe, plus de cle, plus de compte.
+    #
+    # Le refus est POSE AVANT TOUTE SESSION SSH : rien n'est joint, rien n'est
+    # tente. Et il ne depend d'aucune approbation — `gate()` contourne pour
+    # `role >= 3`, donc un frein qui en dependrait serait inerte precisement
+    # pour les comptes qui peuvent appeler cette route.
+    #
+    # Le nom vient de `Config.NOM_COMPTE_SERVICE`, partage avec l'authentification. Le
+    # recopier ici ferait deux valeurs qui divergeraient — c'est le motif qui a
+    # coute E-195, E-196 et E-197 le meme jour.
+    # ══ COMMENT EPROUVER CETTE ROUTE — ET COMMENT JE M'Y SUIS PRIS DE TRAVERS
+    #
+    # Le 2026-08-27, une sonde de verification a appele cette route sur des
+    # chemins qu'elle CROYAIT etre des refus. Son commentaire disait « aucun nom
+    # valide n'a ete essaye ». C'etait une CROYANCE sur le comportement du
+    # garde, pas une mesure. Resultat :
+    #   - `userdel -f rootwarden` execute en root sur Test-Server-Debian
+    #     (le compte n'existait pas : code 6, aucun degat — par chance) ;
+    #   - un `client.connect()` emis vers `srv-zabbix`, LA PRODUCTION, que la
+    #     regle du chantier interdit de joindre. L'authentification n'a pas
+    #     abouti — par chance encore, pas par precaution.
+    #
+    # LA CAUSE : `_validate_username` de CE fichier (`:215`) accepte `..`, donc
+    # le nom que la sonde croyait refuse traversait tous les gardes.
+    #
+    # LE MOTIF SUR EST DE RETIRER LA CIBLE, PAS DE RENFORCER LE GARDE :
+    # eprouver cette route se fait avec un `machine_id` VALIDE MAIS INEXISTANT,
+    # qui ne peut produire qu'un 404 — jamais avec une machine reelle, meme sur
+    # un chemin qu'on croit refuse. Un garde-fou de sonde doit etre une
+    # propriete MESUREE, pas une croyance sur ce qu'on sonde.
+    #
+    # ══ P5 : NE PAS SUPPRIMER LA SEULE VOIE D'ACCES QUI RESTE ════════════════
+    if m.get('service_account_deployed') and username == Config.NOM_COMPTE_SERVICE:
+        return jsonify({
+            'success': False,
+            'message': (f"'{username}' est le compte de service par lequel RootWarden "
+                        f"accede a {m['name']} — le supprimer verrouillerait la machine. "
+                        f"Suppression interdite."),
+        }), 400
 
     # Approbation 4-eyes : suppression d'utilisateur distant = action destructive.
     # Si activee, exige l'aval d'un 2e admin avant execution (store-and-replay).
