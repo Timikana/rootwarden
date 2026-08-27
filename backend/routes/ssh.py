@@ -964,7 +964,10 @@ def revoke_service_account():
     import shlex as _shlex
     results = []
     for m in machines:
-        r = {'machine_id': m['id'], 'name': m['name'], 'success': False, 'message': ''}
+        # `sudoers_orphelin` est TOUJOURS present, meme a False : un champ
+        # absent se lit « rien a dire », et ici il y a quelque chose a dire.
+        r = {'machine_id': m['id'], 'name': m['name'], 'success': False,
+             'message': '', 'sudoers_orphelin': False}
         try:
             ssh_pass = server_decrypt_password(m['password'])
             root_pass = server_decrypt_password(m['root_password'])
@@ -1023,11 +1026,97 @@ def revoke_service_account():
                     r['success'] = True
                     r['message'] = 'Service account revoque'
                 elif code == 2:
-                    # Compte supprime mais fichier sudoers encore la : la
-                    # revocation est INCOMPLETE, et `service_account_deployed`
-                    # reste a 1 pour qu'un rejeu la termine.
-                    r['message'] = ('Compte supprime mais /etc/sudoers.d/rootwarden '
-                                    'subsiste : revocation incomplete, a rejouer')
+                    # ══ E-220 : LE DRAPEAU PASSE A 0, ET MA VERSION PRECEDENTE
+                    #    DISAIT L'INVERSE ═════════════════════════════════════
+                    #
+                    # Elle le laissait a 1 « pour qu'un rejeu termine ». C'ETAIT
+                    # FAUX, et le code juste au-dessus le prouve : on n'atteint
+                    # `code == 2` qu'apres avoir passe `if id rootwarden`, donc
+                    # LE COMPTE N'EXISTE PLUS. Avec le drapeau a 1, le rejeu
+                    # ouvrirait sa session EN TANT QUE `rootwarden` — un compte
+                    # supprime. Il ne s'authentifierait meme pas. Le chemin de
+                    # rattrapage que ce commentaire promettait etait ferme.
+                    #
+                    # Et le drapeau a 1 AMPLIFIAIT le defaut ailleurs :
+                    # `remove_ssh_password` (:1275) n'exige que ce drapeau. Elle
+                    # aurait donc ACCEPTE de vider les deux mots de passe d'une
+                    # machine dont le compte de service n'existe plus.
+                    #
+                    # A 0, les lecteurs redeviennent justes :
+                    # `remove_ssh_password` REFUSE, et `has_keypair` cesse de
+                    # compter un compte absent.
+                    #
+                    # ⚠ UNE TROISIEME RAISON FIGURAIT ICI ET ELLE ETAIT FAUSSE.
+                    # Elle disait : « le rejeu passe par le compte NOMINAL, le
+                    # seul qui puisse encore retirer le fichier ». Le rejeu part
+                    # bien du compte nominal — mais il ne peut pas TERMINER.
+                    # Releve par la session 5, verifie ici :
+                    #
+                    #   - meme avec le drapeau a 1, la connexion ABOUTIT :
+                    #     `connect_ssh` attrape `AuthenticationException` sur sa
+                    #     tentative 0 et se replie sur la cle de plateforme du
+                    #     compte nominal (`ssh_utils.py:250`) ;
+                    #   - ce qui echoue n'est donc pas l'authentification mais
+                    #     l'ELEVATION : `_rootwarden_auth_method` vaut alors
+                    #     'keypair', le court-circuit NOPASSWD ne s'applique pas,
+                    #     et `root_password` est envoye — VIDE sur une machine
+                    #     dont la migration est achevee.
+                    #
+                    # Le rejeu est donc ferme a 0 COMME a 1. Le drapeau reste a 0
+                    # pour les deux premieres raisons, qui suffisent.
+                    #
+                    # ══ CE QUI EN DECOULE, ET QUI EST PIRE QUE « INCOMPLET » ══
+                    #
+                    # Sur une machine migree, AUCUN chemin du produit ne retire
+                    # ce fichier : `_purge_legacy_sudoers` l'exclut par exception
+                    # explicite, le rejeu ne peut pas elever, et le seul geste
+                    # qui l'ecrase — `deploy_service_account` — le REMPLACE en
+                    # recreant le compte, il ne le retire pas.
+                    # L'etat n'est ni transitoire ni auto-reparant : IL EST
+                    # PERMANENT. Sur une machine NON migree (`root_password`
+                    # present) le rejeu aboutit — le blocage est propre a l'etat
+                    # vers lequel toute la page pousse.
+                    #
+                    # ══ UN CHANGEMENT DE COMPORTEMENT SUR K4, NOMME ══════════
+                    #
+                    # `configure_servers.py:758` : `if not use_sa:
+                    # ensure_sudo_installed(...)`. Le drapeau a 0 fait donc
+                    # EXECUTER cette etape au deploiement suivant. Installer
+                    # `sudo` la ou il est deja present est sans effet, et si
+                    # l'elevation manque l'echec est precoce — mais c'est un
+                    # comportement qui change, et il vaut mieux l'ecrire que le
+                    # decouvrir.
+                    #
+                    # ══ CE QUI RESTE, ET QUI N'A PAS DE PORTEUR EN BASE ══════
+                    #
+                    # Un `/etc/sudoers.d/rootwarden` orphelin : `NOPASSWD: ALL`
+                    # pour un compte qui n'existe plus. Inerte tant que rien ne
+                    # recree ce nom — et le seul purgeur du produit
+                    # (`configure_servers._purge_legacy_sudoers`) l'EXCLUT
+                    # explicitement, exception ecrite pour proteger un compte
+                    # vivant et qui survit a sa disparition parce qu'elle ne la
+                    # teste pas.
+                    #
+                    # Le nommer ici est donc le seul signalement qui existe. Une
+                    # colonne serait le vrai porteur, mais c'est une migration
+                    # sur `machines`, table de PRODUCTION : arbitrage exploitant,
+                    # pas effet de bord d'un correctif.
+                    with get_db_connection() as conn2:
+                        cur2 = conn2.cursor()
+                        cur2.execute(
+                            "UPDATE machines SET service_account_deployed = 0 WHERE id = %s",
+                            (m['id'],)
+                        )
+                        conn2.commit()
+                    r['sudoers_orphelin'] = True
+                    r['message'] = (
+                        "Compte de service supprime, mais /etc/sudoers.d/rootwarden SUBSISTE : "
+                        "NOPASSWD: ALL orphelin. Aucun geste du produit ne le retirera "
+                        "(exception de purge). A retirer a la main sur la machine.")
+                    logger.warning(
+                        "revoke_service_account : sudoers ORPHELIN sur %s (machine_id=%s) — "
+                        "NOPASSWD: ALL sans compte porteur, retrait manuel requis",
+                        m['name'], m['id'])
                 else:
                     r['message'] = (err_out or '')[-300:].strip() or f'exit={code}'
         except Exception as e:
@@ -1041,7 +1130,8 @@ def revoke_service_account():
                 cur3.execute(
                     "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
                     (user_id, f"[panic] revoke_service_account machine={_shlex.quote(m['name'])} "
-                              f"reason={_shlex.quote(reason)} ok={r['success']}")
+                              f"reason={_shlex.quote(reason)} ok={r['success']}"
+                              f"{' SUDOERS_ORPHELIN' if r['sudoers_orphelin'] else ''}")
                 )
                 conn3.commit()
         except Exception:
