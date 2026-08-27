@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.47** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.48** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,96 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.48 — ⚠⚠⚠ LA ROTATION DE CLE NE REVOQUE PAS LA CLE COMPROMISE, et le Lead avait ecrit le contraire
+
+**Trouve par la session 5 en relisant P4 AVANT son commit. Verifie ligne par ligne.**
+
+    ssh.py:745   printf … >> ~/.ssh/authorized_keys          compte NOMINAL     **APPEND**
+    ssh.py:755   printf … >> /root/.ssh/authorized_keys       ROOT               **APPEND**
+    ssh.py:808   printf … >  /home/<sa>/.ssh/authorized_keys  compte de service  ecrase
+    regenerate_platform_key : occurrences de `authorized_keys` / `sed -i` / `remove` -> **0**
+
+> **Apres une rotation puis un redeploiement, `root` et le compte nominal portent les DEUX cles publiques. Qui
+> detient la cle compromise garde un acces root sur chaque machine, APRES la rotation.** La rotation empeche
+> RootWarden d'UTILISER l'ancienne cle ; elle ne la REVOQUE pas.
+
+**Et le `sort -u` aggrave au lieu de proteger** : il **deduplique**, donc le fichier reste propre et parait
+intentionnel. *Un nettoyage cosmetique applique a un residu le rend indiscernable d'un etat voulu.*
+
+**Ce que le Lead avait ecrit et transmis a l'exploitant** — ~~« la rotation est le seul remede reel a une cle
+compromise »~~ — **est FAUX.** Le raisonnement etait juste dans sa forme (la revocation ne traite pas la
+compromission, E-219, donc un autre geste doit le faire) **et le Lead a conclu sans mesurer que la rotation le
+traitait.** *Une deduction par elimination suppose que la liste est complete et qu'un des membres repond ; ici
+aucun ne repond.*
+
+**Quatrieme fois du jour qu'une trouvaille juste recoit une explication fausse, seconde fois que c'est le
+Lead** — apres le faux « amplificateur » d'E-220. **Les deux fois, l'erreur est allee dans le sens
+RASSURANT** : *il existe un remede*, puis *il existe un nettoyage*.
+
+| geste | ce qu'il fait | ce qu'il laisse |
+|---|---|---|
+| `revoke_service_account` — documente « kill-switch, compromission » | supprime le compte de service | **la cle sur root et sur le nominal** (E-219) |
+| `regenerate_platform_key` — « le geste le plus large » | genere une paire neuve | **l'ancienne cle autorisee partout** |
+| `server_user_remove_key` — **aucune interface de parc** | retire une cle, un compte, une machine | atteste sans verifier, filtre par sous-chaine (E-215) |
+
+*Trois gestes, aucun qui ferme la porte, et celui qui en approche le plus n'a pas d'interface.*
+
+#### ⚠ P4 NE COMMITE PAS EN L'ETAT — deux points bloquants
+
+**1.** Le panneau annonce que la rotation repond a une cle compromise : **un texte faux sur l'ecran qu'on lit
+pendant un incident**, et **le portage etait en train de reproduire la cinquieme forme du motif en croyant
+corriger E-219.**
+
+**2.** **La rotation est le seul des six gestes du module a n'exiger RIEN** — la revocation demande un motif, la
+ressaisie un mot de passe. Le bouton n'est desactive que *pendant* la requete : **il ne nait pas desactive**, et
+aucun champ de recopie n'existe. **Le legacy en demandait deux.** *Le portage a pris la premiere moitie de la
+lecon — un panneau plutot que deux `confirm()` — et laisse la seconde.*
+
+#### Une consigne du Lead etait trop etroite
+
+Il avait interdit `tests/e2e/go-ssh-audit-scanall.mjs`. **Le danger n'est pas la suite** :
+`legacy/ssh-audit/index.php:82` porte `<button onclick="scanAll()">`. **Le geste est a UN CLIC sur la page.**
+Formulation qui protege : *sur cette page, ne cliquer que des elements vises par identifiant relu — jamais « le
+premier bouton », jamais un balayage.* **Dedouanement** : l'en-tete de ce fichier est **honnete**.
+
+#### E-223 — le portage lit `FEATURE_WAZUH`, qui n'existe NULLE PART
+
+`laravel/config/rootwarden.php:100` lit `env('FEATURE_WAZUH', true)` ; le legacy et le backend lisent
+`WAZUH_ENABLED`. **`FEATURE_WAZUH` n'apparait qu'a cette seule ligne du depot** — donc **le defaut `true`
+s'applique toujours.** Avec `WAZUH_ENABLED=false` : le legacy cache l'entree et rend 404, le backend
+n'enregistre pas le blueprint, **et le portage garde l'entree affichee avec un `'legacy' => '/wazuh/'` qui mene
+a un 404.** *Un module desactive se presente comme un module casse.*
+
+**Ce n'est pas « une garde qui ne garde rien »** — le blueprint n'est reellement pas enregistre. **C'est « une
+regle qui vit en deux langages »**, ici en trois, **avec deux noms de variable pour un seul drapeau** — et **le
+seul cas connu ou le portage CONTREDIT une decision d'exploitation.** Remede : `env('WAZUH_ENABLED', true)`,
+*un drapeau de moins et non une regle en double.*
+
+**Second desaccord, mesure interpreteur contre interpreteur** : `WAZUH_ENABLED=` (presente et vide) rend la page
+**servie** cote PHP et **toutes ses routes 404** cote Python. Et **un CINQUIEME emplacement a basculer**, dans
+aucune categorie du cycle : la cle `'feature' => 'wazuh'` de `Navigation.php:102`.
+
+#### E-224 — `POST /wazuh/install_all` est CASSE, et corrige il commencerait par la PRODUCTION
+
+`wazuh.py:467` fait `AND a.id IS NULL` ; `wazuh_agents` n'a **aucune colonne `id`** (`034_wazuh.sql:43` :
+`machine_id INT NOT NULL PRIMARY KEY`). **`ERROR 1054`, aucun `try`, 500.** `wazuh_agents` porte **0 ligne** :
+le module n'a jamais servi. `wazuh.py:298` porte le **meme** `LEFT JOIN` sans la faute.
+
+> **Ce n'est pas une protection, c'est un accident.** La requete corrigee, le geste part — **et il trie
+> `CRITIQUE` en premier, donc il commencerait par `srv-zabbix`.** *Un defaut qui protege par accident cesse de
+> proteger au moment exact ou on le corrige.*
+
+#### E-225 — `install` ajoute un depot tiers et sa cle GPG ; `uninstall` ne les retire pas
+
+`wazuh.py:348-350` importent `GPG-KEY-WAZUH` dans `/usr/share/keyrings/` et ecrivent
+`/etc/apt/sources.list.d/wazuh.list`. `uninstall` fait `purge || true && rm -rf /var/ossec` — **et ne retire ni
+le depot ni la cle.** *Un geste reversible qui ne rend pas tout ce qu'il a pris n'est pas reversible : il est
+partiel, et le reste est invisible.*
+
+**Dedouanement remarquable** : les **15** routes de `wazuh.py` portent **toutes** `@require_api_key` +
+`@require_role(2)` + `@require_permission('can_manage_wazuh')` — **le module le plus uniformement garde du
+chantier**, et **le premier ou la page n'est pas plus permissive que ses requetes.**
+
 ### v1.38.47 — mon « amplificateur » d'E-220 etait FAUX, et ma demi-mesure aurait pu casser des machines saines
 
 #### La correction, et elle a fait corriger du CODE
@@ -2304,7 +2394,7 @@ pas su lire le secret », **pas** « on ne m'a pas laisse demander ». La borne 
 
 **Inerte jusqu'au redemarrage.**
 
-### v1.38.45 — un refus d'acces deguise en incapacite de lecture, et la rotation est le seul remede a une cle compromise
+### v1.38.45 — un refus d'acces deguise en incapacite de lecture (⚠ et « la rotation seul remede » y est FAUX — voir E-226)
 
 #### Le predicat d'E-217 est consomme — et la garde a ete refusee au bon etage
 
@@ -4086,7 +4176,8 @@ correspondance reelle :**
 | **v1.38.42** | `6e11992` | **E-220 privilege orphelin sans nom** ; **E-221 elevation atteignable** ; deux regles de methode |
 | v1.38.43 | `c664596` | le predicat d'E-217 consomme par le portage |
 | v1.38.45 | `feeb1ec` | un refus d'acces deguise en incapacite de lecture ; la rotation, seul remede |
-| **v1.38.47** | (ce commit) | **mon amplificateur d'E-220 etait faux** ; ma demi-mesure aurait casse des machines saines ; **E-222** |
+| **v1.38.47** | `043f414` | **mon amplificateur d'E-220 etait faux** ; ma demi-mesure aurait casse des machines saines ; **E-222** |
+| **v1.38.48** | (ce commit) | **E-226 : la rotation ne revoque pas la cle compromise** ; E-223 ; E-224 ; E-225 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

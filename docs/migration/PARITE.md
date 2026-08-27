@@ -9727,7 +9727,11 @@ toucher aucune machine.**
 > celle de root.** Le geste ne traite **aucun** des trois cas d'usage qu'il nomme : ni la compromission (la
 > clé reste autorisée), ni la rotation forcée (elle ne tourne pas), ni l'audit sortant (les accès subsistent).
 
-**Le seul remède à une clé compromise est la ROTATION**, qui est un autre geste, sur une autre page.
+**⚠ CORRIGÉ PAR E-226 :** il était écrit ici que *« le seul remède à une clé compromise est la ROTATION »*.
+**Faux — mesuré.** La rotation ne révoque pas la clé : deux des trois écritures d'`authorized_keys` sont des
+**AJOUTS** (`ssh.py:745`, `:755`) et `regenerate_platform_key` n'en touche aucun. **Il n'existe AUCUN geste
+unique qui réponde à une clé compromise** — retirer l'ancienne clé exige `server_user_remove_key`, compte par
+compte et machine par machine, et ce geste porte E-215.
 
 ### Cinquième forme du motif, et la plus grave de la série
 
@@ -9747,7 +9751,7 @@ autre parade.
 ### La correction, en deux temps
 
 **Immédiat, et fait** : le libellé du portage dit ce que le geste **fait** — « Supprimer le compte
-d'administration » — et le panneau dit ce qu'il **laisse en place**, plus le fait que le seul remède à une clé
+d'administration » — et le panneau dit ce qu'il **laisse en place**. **⚠ Et la suite de cette phrase était FAUSSE** (E-226) : il y était écrit que le remède à une clé
 compromise est la rotation. *Un geste correctement nommé cesse d'être un piège même s'il reste partiel.*
 
 **À arbitrer** : la docstring backend et l'étiquette `kill-switch` sont **fausses** et vivent dans le code.
@@ -10051,3 +10055,246 @@ sur une règle de pare-feu.
 **Et un texte qui devenait faux** : l'encart d'I1 annonçait que la copie en base n'était pas portée. I2 la
 porte — corrigé dans les deux langues. *Un texte peut devenir faux sans qu'aucun test ne le voie*, et c'est
 la sixième occurrence de la famille aujourd'hui.
+
+---
+
+## E-223 — Le portage lit `FEATURE_WAZUH`, qui n'existe NULLE PART : désactiver Wazuh le cache dans le legacy et laisse le menu du portage pointer vers un 404
+
+**Trouvé par deux sessions indépendamment, à la même heure, sur la même question. Vérifié par le Lead.**
+
+    laravel/config/rootwarden.php:100   'wazuh' => env('FEATURE_WAZUH', true)
+    srv-docker.env.example:504          WAZUH_ENABLED=true
+    backend/config.py:143               WAZUH_ENABLED = os.getenv('WAZUH_ENABLED', 'true')...
+
+**`FEATURE_WAZUH` n'apparaît qu'à cette seule ligne dans tout le dépôt** — ni dans `srv-docker.env.example`,
+ni dans `laravel/.env.example`, ni dans `docker-compose.yml`. Le conteneur du portage reçoit bien
+`srv-docker.env` (`env_file`), **mais la variable y porte l'autre nom.**
+
+> **Le défaut par défaut `true` s'applique donc TOUJOURS, quoi que fasse l'exploitant.**
+
+### La chaîne complète quand `WAZUH_ENABLED=false`
+
+| étage | lit | quand | résultat |
+|---|---|---|---|
+| page legacy | `WAZUH_ENABLED` | **par requête** | menu caché **et** `wazuh/index.php:19` rend 404 |
+| proxy `api_proxy.php` | **aucun** | — | relaie ; `/wazuh/` est en liste blanche |
+| backend | `Config.WAZUH_ENABLED` | **une fois au démarrage** | **le blueprint n'est pas enregistré** → 404 natif |
+| **portage `Navigation`** | **`FEATURE_WAZUH`** | par requête | **`true` → l'entrée RESTE affichée** ⚠ |
+
+**Et l'entrée y est déclarée `'legacy' => '/wazuh/'`** : cliquer mène à la page legacy, **qui rend 404**.
+*Un module désactivé se présente comme un module cassé.*
+
+### Ce que ce n'est PAS, et il faut le dire
+
+**Ce n'est pas « une garde présente qui ne garde rien ».** Le drapeau backend conditionne l'**enregistrement
+du blueprint** : il n'existe aucune route à atteindre. *C'est plus fort qu'un contrôle par requête, pas plus
+faible* — le seul coût est opérationnel, basculer le drapeau demande une recréation du processus.
+
+**C'est la forme « une règle qui vit en deux langages »**, ici en **trois**, avec **deux noms de variable pour
+un seul drapeau.** Non exploitable : un défaut de cohérence et de disponibilité.
+
+**Et c'est le seul cas connu où le portage CONTREDIT une décision d'exploitation** : celui qui désactive Wazuh
+croit l'avoir désactivé partout. **Le chantier fabrique lui-même un 404 dans un menu** — même famille que
+l'oubli de `/docker/` dans `LiensLegacy`.
+
+### Un second désaccord, mesuré interpréteur contre interpréteur
+
+    valeur      PHP legacy    Python
+    'true'      ON            ON
+    'false'     OFF           OFF
+    ''          ON (defaut)   OFF     <-- DESACCORD
+    '1','yes'   OFF           OFF
+
+`feature_enabled()` traite `''` comme « absente » et rend **ON** ; Python fait `''.lower() == 'true'` → **OFF**.
+Donc `WAZUH_ENABLED=` — présente et vide, faute d'exploitation banale — rend **la page servie et toutes ses
+routes 404.** *Une colonne vide et une valeur absente ne sont pas la même chose, et les deux moitiés du
+produit ne s'accordent pas* — troisième occurrence de ce motif après `encrypt_password('')` (E-217).
+
+**Ce qui borne** : `wazuh` est le **seul** appelant de `feature_enabled()` dans tout le legacy. Le helper est
+générique, son rayon est d'un module.
+
+### La correction : un drapeau de MOINS, pas une règle en double
+
+`env('WAZUH_ENABLED', true)`, et **`FEATURE_WAZUH` disparaît.** *Le domaine est le même, donc le nom doit
+l'être* — l'inverse exact de la réserve « avant d'unifier, nomme le domaine de chacune ». **Session 3**,
+`laravel/config/` étant son périmètre.
+
+### ⚠ Et une cinquième place à basculer, qui n'est dans aucune catégorie du cycle
+
+`Navigation.php:102` porte une clé **`'feature' => 'wazuh'`** que le premier relevé avait manquée — *le motif
+ne cherchait pas cette forme.* **C'est le cinquième emplacement de ce module**, après la barre latérale, le
+tiroir, le raccourci clavier (absent) et la tuile du tableau de bord. Le cycle d'archivage n'en connaît que
+quatre : **à ajouter.**
+
+### Deux réserves déclarées, à ne pas croire sur parole
+
+1. **rien n'a été vérifié au navigateur** — c'est une lecture de code. La propriété à mesurer est *l'entrée de
+   menu est-elle rendue avec `WAZUH_ENABLED=false` ?*, et elle demande le jeton de banc ;
+2. **`env()` hors `config:cache` est lu par requête**, donc le portage n'a pas le régime « une fois au
+   démarrage » ici. **Mais l'entrypoint ne fait que `view:cache` : si quelqu'un ajoute `config:cache`, ce
+   drapeau se figerait**, et le nom corrigé n'y changerait rien.
+
+---
+
+## E-224 — ⚠ `POST /wazuh/install_all` est CASSÉ, personne ne l'a su, et corrigé il commencerait par la PRODUCTION
+
+**Trouvé par la session 2 en inventoriant `wazuh/`. Vérifié.**
+
+    backend/routes/wazuh.py:465-467
+    LEFT JOIN wazuh_agents a ON a.machine_id = m.id
+      ...
+      AND a.id IS NULL
+
+    mysql/migrations/034_wazuh.sql:43
+    machine_id INT NOT NULL PRIMARY KEY      -- il n'y a AUCUNE colonne `id`
+
+**`ERROR 1054 — Unknown column 'a.id' in 'where clause'`**, reproduit à l'identique. **Aucun `try` n'entoure la
+requête → 500.** Et `wazuh_agents` porte **0 ligne** : *le module n'a jamais servi, donc personne ne l'a vu.*
+
+À noter : `wazuh.py:298` porte le **même** `LEFT JOIN` sans la faute — la bonne écriture est à quelques lignes.
+
+### ⚠ Ce n'est pas une protection, c'est un accident
+
+**La requête corrigée, le geste part — et il trie `CRITIQUE` en premier, donc il commencerait par
+`srv-zabbix`.** Même famille que `/ssh-audit/scan-all` et `groups/run` : *une route sans paramètre de portée ne
+se borne pas par une fixture.* **Mais celle-là MUTE** : elle installe un paquet.
+
+> **Un défaut qui protège par accident cesse de protéger au moment exact où on le corrige** — et l'ordre de
+> tri fait de la production la **première** cible, pas une parmi trois.
+
+**Conséquence immédiate** : ne corriger cette requête **qu'avec** une borne de portée, jamais seule. Et
+**aucune suite ne doit approcher cette route**, au même titre que `go-ssh-audit-scanall.mjs`.
+
+---
+
+## E-225 — `install` ajoute un dépôt tiers et sa clé GPG ; `uninstall` ne les retire pas
+
+**Trouvé par la session 2. Vérifié.**
+
+    backend/routes/wazuh.py:348-350  (et :507-509 pour install_all)
+    curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg ... --import
+    chmod 644 /usr/share/keyrings/wazuh.gpg
+    echo 'deb [signed-by=...] https://packages.wazuh.com/4.x/apt/ stable main'
+        > /etc/apt/sources.list.d/wazuh.list
+
+**Donc chaque machine gérée émet vers Internet et fait confiance à ce dépôt de façon permanente.**
+
+`uninstall` fait `purge || true && rm -rf /var/ossec` — **et ne retire ni le dépôt ni la clé** (mesuré par la
+session 2 : zéro occurrence de `sources.list` ou `keyrings` dans la route).
+
+> **Désinstaller laisse la machine configurée pour faire confiance à un dépôt tiers**, avec sa clé de
+> signature installée dans `/usr/share/keyrings/`. *Un geste réversible qui ne rend pas tout ce qu'il a pris
+> n'est pas réversible : il est partiel, et le reste est invisible.*
+
+Même forme qu'E-220 — le privilège orphelin — appliquée à une **relation de confiance** au lieu d'un droit
+sudo : l'état résiduel est inerte tant que rien ne l'emploie, et il n'a **aucun porteur en base.**
+
+**Arbitrage de l'exploitant** : retirer le dépôt à la désinstallation change ce qui s'écrit sur des machines
+réelles, et un exploitant peut légitimement vouloir garder le dépôt pour réinstaller. **Ce qui n'est pas
+discutable, c'est que le geste ne le DIT pas.**
+
+### Le dédouanement, et il est remarquable
+
+**Les 15 routes de `wazuh.py` portent TOUTES `@require_api_key` + `@require_role(2)` +
+`@require_permission('can_manage_wazuh')`** — 15 sur 15, **le module le plus uniformément gardé du chantier**,
+devant `groups/` (6/6). **Et la page s'accorde avec ses routes** : `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`,
+rôle 2 des deux côtés — **premier module où la page n'est pas plus permissive que ses requêtes.**
+
+*Un relevé qui ne dédouane pas se lit comme un réquisitoire, et on cesse de le croire.*
+
+---
+
+## E-226 — ⚠⚠⚠ LA ROTATION DE CLÉ NE RÉVOQUE PAS LA CLÉ COMPROMISE. IL N'EXISTE AUCUN GESTE QUI Y RÉPONDE.
+
+**Trouvé par la session 5 en relisant P4 avant son commit. Vérifié par le Lead ligne par ligne. Cet écart
+CONTREDIT une conclusion que le Lead avait écrite dans ce fichier et transmise à l'exploitant.**
+
+### La mesure
+
+    ssh.py:745   printf … | base64 -d >> ~/.ssh/authorized_keys        compte NOMINAL   APPEND
+                 sort -u ~/.ssh/authorized_keys -o ~/.ssh/authorized_keys
+    ssh.py:755   printf … | base64 -d >> /root/.ssh/authorized_keys    ROOT             APPEND
+                 sort -u /root/.ssh/authorized_keys -o …
+    ssh.py:808   printf … | base64 -d >  /home/<sa>/.ssh/authorized_keys   compte de service   ECRASE
+
+    regenerate_platform_key : occurrences de `authorized_keys` / `sed -i` / `remove` -> **0**
+
+**Deux des trois écritures sont des AJOUTS. La rotation ne touche aucun `authorized_keys`.**
+
+> **Après une rotation puis un redéploiement, `root` et le compte nominal portent les DEUX clés publiques.
+> Qui détient la clé compromise garde un accès root sur chaque machine, après la rotation.**
+
+La rotation empêche RootWarden d'**utiliser** l'ancienne clé. **Elle ne la RÉVOQUE pas.**
+
+### Et le `sort -u` aggrave, au lieu de protéger
+
+Il **déduplique** — donc le fichier reste propre et paraît intentionnel. **Deux clés RootWarden distinctes s'y
+installent sans que rien n'ait l'air anormal.** *Un nettoyage cosmétique appliqué à un résidu le rend
+indiscernable d'un état voulu.*
+
+### ⚠ CE QUE LE LEAD AVAIT ÉCRIT, ET QUI EST FAUX
+
+Le Lead a inscrit dans ce fichier, et transmis à l'exploitant :
+
+> ~~*« La rotation est le seul remède réel à une clé compromise. P4 n'est pas seulement le geste le plus large
+> du module : c'est le SEUL qui réponde au cas d'usage que le portail attribue à un autre bouton. »*~~
+
+**FAUX.** La rotation n'est pas un remède partiel : **elle ne répond pas au cas.** Le raisonnement était juste
+dans sa forme — la révocation ne traite pas la compromission (E-219), donc un autre geste doit le faire — **et
+le Lead a conclu sans mesurer que la rotation le traitait.** *Une déduction par élimination suppose que la
+liste est complète et qu'un des membres répond ; ici aucun ne répond.*
+
+**C'est la quatrième fois de la journée qu'une trouvaille juste reçoit une explication fausse, et la seconde
+fois que c'est le Lead** — après le faux « amplificateur » d'E-220. Les deux fois, l'erreur est allée dans le
+sens **rassurant** : *il existe un remède*, puis *il existe un nettoyage*.
+
+### Il n'existe AUCUN geste unique qui réponde à une clé compromise
+
+Retirer la clé exige de réécrire les `authorized_keys` **compte par compte et machine par machine** —
+`server_user_remove_key` (`ssh.py:2211`). Et ce geste porte **E-215** : il atteste sans vérifier, et son mode
+sélectif filtre **par sous-chaîne**.
+
+**Donc la chaîne complète de réponse à une compromission est, aujourd'hui :**
+
+| geste | ce qu'il fait | ce qu'il laisse |
+|---|---|---|
+| `revoke_service_account` — documenté « kill-switch, compromission » | supprime le compte de service | **la clé sur root et sur le nominal** (E-219) |
+| `regenerate_platform_key` — P4, « le geste le plus large » | génère une paire neuve | **l'ancienne clé autorisée partout** (celui-ci) |
+| `server_user_remove_key` — aucune interface de parc | retire une clé, un compte, une machine | atteste sans vérifier, filtre par sous-chaîne (E-215) |
+
+*Trois gestes, aucun qui ferme la porte, et celui qui en approche le plus n'a pas d'interface.*
+
+### Conséquence immédiate : P4 NE COMMITE PAS EN L'ÉTAT
+
+Le panneau de P4 annonce que la rotation répond à une clé compromise. **C'est un texte faux sur l'écran qu'on
+lit pendant un incident** — la cinquième forme du motif, la plus grave, et **le portage était en train de la
+reproduire en croyant corriger E-219.**
+
+**Ce que le panneau doit dire** : la rotation **remplace la clé que RootWarden emploie** ; elle **ne retire pas
+l'ancienne des machines** ; et **répondre à une compromission demande, en plus, de retirer l'ancienne clé
+compte par compte.** *Moins plutôt que faux, et surtout : ne pas fabriquer la fausse certitude qu'on vient de
+se protéger.*
+
+### Second point bloquant sur P4, du même relecteur
+
+**La rotation est le seul des six gestes du module à n'exiger RIEN.** La révocation demande un motif, la
+ressaisie un mot de passe — **la rotation, un clic.** Le bouton de confirmation n'est désactivé que *pendant*
+la requête : **il ne naît pas désactivé**, et aucun champ de recopie n'existe. **Le legacy en demandait deux.**
+
+*Le portage a pris la première moitié de la leçon du chantier — un panneau plutôt que deux `confirm()` — et
+laissé la seconde.* Correction : **le bouton naît DÉSACTIVÉ et ne s'active qu'à l'égalité exacte d'une
+recopie.** Le panneau affiche déjà le total du parc ; le faire recopier n'invente rien.
+
+### ⚠ Et une consigne du Lead était trop étroite
+
+Le Lead a interdit `tests/e2e/go-ssh-audit-scanall.mjs`. **Le danger n'est pas la suite :**
+
+    legacy/ssh-audit/index.php:82   <button type="button" onclick="scanAll()">
+
+**Le geste est à UN CLIC sur la page.** Nommer le fichier et laisser le bouton, c'est laisser toute mesure
+conduite sur cette page — pour n'importe quel motif — à un clic malheureux de scanner tout le parc, production
+comprise. **La formulation qui protège** : *sur cette page, ne cliquer que des éléments visés par identifiant
+relu — jamais « le premier bouton », jamais un balayage.*
+
+**Dédouanement** : l'en-tête de ce fichier est **honnête**, conforme au code — après quatre en-têtes menteurs
+dans les modules voisins.
