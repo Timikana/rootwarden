@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.46** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.47** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,104 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.47 — mon « amplificateur » d'E-220 etait FAUX, et ma demi-mesure aurait pu casser des machines saines
+
+#### La correction, et elle a fait corriger du CODE
+
+J'avais ecrit que `_purge_legacy_sudoers` protegeait l'orphelin par une exception explicite, et que
+*« une exception de surete fondee sur ce compte existe survit a la disparition du compte parce qu'elle ne la
+teste pas »*. **Faux, et je l'avais relaye a l'exploitant.**
+
+**Mesure** : la fonction n'est appelee que depuis `add_to_sudoers` (`:430`) et `remove_from_sudoers` (`:459`),
+**toujours avec le nom d'un utilisateur GERE du portail**. Son exception est un **garde-fou de collision de
+noms**. Elle ne croise jamais `/etc/sudoers.d/rootwarden`. Et **aucun `ls`/`find`/`glob` sur ce repertoire dans
+tout le backend.**
+
+> **Le fichier survit parce que personne ne le cherche, pas parce qu'une regle le protege.** Conclusion
+> inchangee — l'etat est permanent — chemin plus court.
+
+**Et mon explication fausse etait entree dans le code** : le commentaire de `revoke_service_account` la
+reprenait. *Un commentaire qui affirme un mecanisme que le code n'a pas est exactement le defaut que ce
+chantier compte* — j'en aurais fabrique un de plus en me citant. Corrige, ainsi que
+`configure_servers.py:457`, le commentaire qui a induit les trois lectures : il dit maintenant la **portee** de
+la garde et le corollaire — *rien ici ne retire un fichier sudoers orphelin.*
+
+> **Une formulation vraie dans son contexte et trompeuse hors de lui a le meme cout qu'une formulation
+> fausse.** (session 4)
+
+**Troisieme fois de la journee qu'une trouvaille juste recoit une explication fausse** — apres la portee puis
+la cause d'E-211 — **et cette fois c'est le Lead, quelques heures apres avoir pose la regle** : *une trouvaille
+verifiee n'a pas son explication verifiee.* **Ecrire une regle donne le sentiment de l'avoir appliquee.**
+
+#### ⚠ Ma demi-mesure aurait pu casser des machines saines
+
+J'avais propose : *si `/etc/sudoers.d/rootwarden` existe ET qu'aucun compte de ce nom n'existe -> le retirer.*
+**Reserve de la session 4, et elle est decisive** : le second membre **n'est pas fail-closed naturellement.**
+
+`id rootwarden` peut echouer pour une raison qui n'est **pas** l'absence du compte — NSS indisponible, LDAP
+injoignable, delai depasse. **Une condition « si `id` echoue » retirerait un `NOPASSWD: ALL` legitime et
+casserait le compte de service d'une machine saine** — dans un geste de parc lance en masse. *Le defaut irait
+dans le sens destructeur.*
+
+    1. exiger l'absence POSITIVEMENT : `getent passwd` distingue « absent » (code 2) d'une
+       erreur de service — ne retirer que sur l'absence NOMMEE
+    2. croiser avec la BASE : ne retirer que si `service_account_deployed = 0`,
+       les deux signaux devant CONCORDER
+
+*Un marqueur n'est pas un verdict, et un echec de commande n'est pas une reponse.*
+
+**Ce qui rend la demi-mesure praticable est en revanche confirme, et mesure** : `deploy_platform_key` appelle
+`execute_as_root` et ecrit dans `/root/.ssh/` — **donc si elle s'execute, l'elevation a deja reussi.** Le
+nettoyage **herite** d'une elevation prouvee au lieu de payer la precondition qui bloque le rejeu.
+
+#### ⚠ Et l'option 1 n'est PAS un sur-ensemble de l'option 2
+
+**Correction de ma presentation a l'exploitant.** L'auto-reparation ne repare que les machines
+**redeployees** ; **une machine revoquee puis laissee telle quelle garde son privilege dormant
+indefiniment** — et c'est precisement la population qui cree l'orphelin.
+
+> **Les deux options sont COMPLEMENTAIRES, pas classees** : l'auto-reparation **reduit la population**, la
+> colonne **rend le reste visible**. *Une mesure qui reduit un ensemble ne remplace pas celle qui decrit ce qui
+> reste.*
+
+#### E-222 — un « enregistrer » qui DETRUIT avant d'ecrire, sans transaction
+
+Trouve par la session 5 en portant `iptables/` I2 : `iptables_rules` n'a **aucune contrainte `UNIQUE`** sur
+`server_id`, et la lecture fait `WHERE server_id = ?` puis `fetch()` **sans `ORDER BY` ni `LIMIT`** — deux
+lignes rendraient la lecture indeterminee. Meme defaut que le `LIMIT 1` sans `ORDER BY` de la revocation des
+cles d'API.
+
+**Le Lead a verifie et trouve un mecanisme different, plus probable et plus dommageable** : l'ecriture est un
+`DELETE` **puis** un `INSERT` (`index.php:142-151`), **sans aucune transaction** — verifie, pas de
+`beginTransaction` dans le fichier.
+
+- **la duplication demande un entrelacement concurrent** : reelle mais difficile a atteindre ;
+- **le defaut PROBABLE est l'inverse : si l'`INSERT` echoue apres un `DELETE` reussi, la copie est PERDUE.**
+  La page annonce « Erreur lors de la sauvegarde des regles » — **exact sur l'ecriture qui a echoue, muet sur
+  la destruction qui a reussi.**
+
+> **Un « enregistrer » qui detruit avant d'ecrire, sans transaction, n'est pas une sauvegarde risquee : c'est
+> une suppression suivie d'une tentative.** Et l'utilisateur qui lit « erreur lors de la sauvegarde » conclut
+> que rien n'a change — *le message decrit le geste qui a echoue, jamais celui qui a reussi.*
+
+**La contrainte manquante et le `DELETE` prealable sont un seul defaut pris par deux bouts** : sans `UNIQUE`,
+pas d'`UPSERT` possible — le commentaire du code le dit lui-meme. **Table vide aujourd'hui** : ecart reel et
+sans porteur, et **le moment le moins couteux de l'histoire du produit pour poser la contrainte.**
+
+#### Deux gestes de portage a eriger en regle
+
+**1. Un refus repris d'ailleurs plutot qu'invente** : une copie dont l'IPv4 est vide est refusee **parce
+qu'`iptables-rollback` refuse deja d'appliquer une version vide.** *Exact complement de la reserve « avant
+d'unifier, nomme le domaine de chacune »* — **ici le domaine est le meme**, donc reutiliser est juste et
+ecrire une seconde regle aurait cree deux verites sur la meme question.
+
+**2. La borne des colonnes controlee AVANT l'ecriture, en OCTETS** : `TEXT` tient 65 535 **octets** et **MySQL
+tronque en silence** en mode permissif. Sans ce controle, *l'ecran annoncerait « enregistre » sur une copie
+amputee, et la troncature ne se verrait qu'a l'application* — au pire moment, sur une regle de pare-feu.
+
+Et l'encart d'I1 annoncait que la copie en base n'etait pas portee : **sixieme occurrence du jour de « un texte
+peut devenir faux sans qu'aucun test ne le voie »**, corrigee dans les deux langues.
+
 ### v1.38.46 — le predicat couvrait la colonne la moins consequente des deux
 
 **Symptome.** `GET /machines/credential-status` corrigeait `(password <> '')`, **et son `SELECT` ne
@@ -3987,7 +4085,8 @@ correspondance reelle :**
 | **v1.38.41** | `8a6ff5e` | **E-219 : le kill-switch laisse la meme cle sur root** ; le pathspec et les deux fichiers partages |
 | **v1.38.42** | `6e11992` | **E-220 privilege orphelin sans nom** ; **E-221 elevation atteignable** ; deux regles de methode |
 | v1.38.43 | `c664596` | le predicat d'E-217 consomme par le portage |
-| v1.38.45 | (ce commit) | un refus d'acces deguise en incapacite de lecture ; la rotation, seul remede |
+| v1.38.45 | `feeb1ec` | un refus d'acces deguise en incapacite de lecture ; la rotation, seul remede |
+| **v1.38.47** | (ce commit) | **mon amplificateur d'E-220 etait faux** ; ma demi-mesure aurait casse des machines saines ; **E-222** |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
