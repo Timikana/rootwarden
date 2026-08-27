@@ -8928,3 +8928,86 @@ demi-journée de diagnostic à quelqu'un qui lisait un rouge inexplicable.
 refuse ». Retourner une assertion de caractérisation équivaut à **déclarer un écart fermé**, ce qui
 appartient à ce fichier : c'est donc écrit ici, et la suite suit. La référence sera remesurée après le
 retournement.
+
+---
+
+## E-205 — `Fail2ban::machines()` rend TOUTES les machines, quel que soit le rôle — un module déjà livré, et personne ne l'atteint aujourd'hui
+
+**Trouvé par la session 5 en portant `iptables/` I1, dans un module qui n'est pas le sien.** C'est la
+manière dont cet écart a été trouvé qui décide de sa gravité, et non son effet actuel.
+
+**Le legacy filtre, le portage ne filtre pas :**
+
+    legacy/fail2ban/index.php:14-20   filtre par `user_machine_access` des que le role < 2
+    legacy/iptables/index.php:52-58   fait exactement la meme chose
+    App\Services\Fail2ban::machines()  rend TOUTES les machines non archivees, quel que soit le role
+
+Les deux pages legacy portent la **même** règle, à deux endroits. Le portage de `fail2ban/` a repris la
+page et pas la règle.
+
+### Pourquoi il n'a aucun effet mesurable aujourd'hui, et pourquoi ça ne le referme pas
+
+**Aucun compte de rôle 1 ne détient `can_manage_fail2ban`** : personne n'atteint donc la page avec un
+rôle assez bas pour que le filtre compte. L'écart est **réel et sans porteur**.
+
+Il s'ouvrirait à la **première attribution de cette permission** — un geste d'administration ordinaire,
+fait depuis `/comptes`, par quelqu'un qui n'a aucune raison de savoir qu'il arme un écart. *Une propriété
+qui tient parce que personne n'exerce le chemin n'est pas une propriété : c'est un accident de
+configuration.* C'est le même mécanisme que `@require_machine_access` inerte sur 57 routes — la garde est
+*présente* et ne garde *rien* — et que les gabarits `iptables` codant `--dport 22` en dur, invisibles
+uniquement parce que les trois machines écoutent sur 22.
+
+### Ce qui a été fait, et ce qui ne l'a pas été
+
+**La session 5 ne l'a pas corrigé, et elle a eu raison** : `App\Services\Fail2ban` appartient à la
+session 3. Elle a en revanche **écrit la règle dans son propre service** `App\Services\Iptables`, pour
+que le portage de `iptables/` ne recopie pas le mauvais des deux précédents disponibles.
+
+*Fermer un défaut sans chercher ses autres implémentations, c'est le fermer à moitié* — et ici la
+symétrie était inverse : le défaut était déjà fermé dans le legacy aux **deux** endroits, et c'est le
+portage qui a perdu la règle sur l'un des deux. **Le troisième porteur possible est `groups/`**, dont le
+portage reste à faire : à vérifier au moment de G2.
+
+### La correction
+
+`App\Services\Fail2ban::machines()` filtre par `user_machine_access` dès que le rôle est inférieur à 2,
+comme `App\Services\Iptables` le fait déjà. **Le correctif appartient à la session 3**, et il n'est pas
+urgent au sens de l'exposition — il l'est au sens où il sera oublié dès que l'attention passera à un
+autre module.
+
+---
+
+## E-206 — `/search/` est archivée depuis le 2026-08-18 et son entrée de redirection n'a jamais été posée
+
+**Trouvé par la propriété `LiensLegacy` à sa PREMIÈRE mesure** — celle qui venait d'être écrite pour
+prévenir exactement ce défaut. Elle a trouvé le cas qu'elle devait empêcher, déjà présent.
+
+    parties archivees (`legacy/_deprecated/*`) ..... 13
+    entrees de `LiensLegacy::REMPLACEMENTS` ....... 16
+    parties archivees SANS entree ................. 2
+
+- `/services/` — archivée le 2026-08-27, table complétée dans le même lot. **Attendu** ;
+- **`/search/` — archivée le 2026-08-18, absente depuis neuf jours.** Vérifié :
+  `legacy/_deprecated/search/` porte bien `index.php` et `js/main.js`.
+
+### L'effet est nul, et c'est le point
+
+Comme pour `/docker/`, l'entrée serait **préventive** : le relevé exhaustif des liens que le backend pose
+en dur ne contient ni `/search/` ni `/services/` — seulement `/security/` ×4, `/ssh-audit/` ×2,
+`/update/index.php`, `/tickets/index.php`, `/profile.php`, `/approvals/`, `/adm/audit_log.php`,
+`/adm/admin_page.php` et `/`. **Aucun utilisateur ne rencontre ce lien mort aujourd'hui.**
+
+**Ce qui en fait un écart n'est donc pas son effet mais son mode de découverte.** `/docker/` — le même
+oubli, au même endroit, à la `v1.37.54` — avait été rattrapé par une **relecture**. `/search/` ne l'a pas
+été, et personne ne l'a vu pendant neuf jours et deux archivages. *Un défaut rattrapé par une relecture
+est un défaut dont la prochaine occurrence dépend de qui relit.*
+
+Il restait **cinq** parties à archiver quand la propriété a été écrite : elle arrive juste à temps pour
+les cinq suivantes, plutôt qu'une de trop tard.
+
+### La correction
+
+Deux entrées à poser dans `LiensLegacy::REMPLACEMENTS`, toutes deux préventives, **par la session 3** qui
+possède le fichier : `'/services/' => 'services'` et `'/search/' => 'recherche'`. Puis la propriété
+mesure `0` partie archivée sans entrée — et **c'est cette mesure-là qui vaut**, pas la relecture qui a
+servi à trouver le cas.

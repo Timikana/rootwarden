@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **187** — numérotés jusqu'à **E-199** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **193** — numérotés jusqu'à **E-206** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205/E-206 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle, et `/search/` absente de la table de redirection depuis neuf jours). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -596,12 +596,104 @@ Le sous-lot D10 n'est pas un portage mais une décision, portée en §7.
 la politique ni enregistrer l'ancien haché** — contournement complet ; et `:93-95` **affiche le mot de
 passe généré en clair dans le HTML**.
 
-### 4.3 Deux sous-lots bloqués dans des modules par ailleurs portés
+### 4.3 ⚠ SIX MODULES SONT PORTÉS ET LEUR DOSSIER LEGACY VIT ENCORE — 5 545 LIGNES (2026-08-27)
+
+**Mesuré pour la première fois le 2026-08-27, sur une remarque de l'exploitant** : « y a encore
+beaucoup trop de truc en legacy ». Jusque-là ce document ne comptait que des **entrées de menu**, et
+une entrée marquée `PORTE` laissait croire que le legacy correspondant avait disparu. Il n'avait pas
+disparu. Les lignes vivantes, par dossier :
+
+| dossier | lignes | entrée de menu | ce qui bloque l'archivage |
+|---|---|---|---|
+| `security/` | 2 255 | PORTÉE (S1→S7a) | **S7b** — envoie un vrai courriel, arbitrage exploitant |
+| `bashrc/` | 941 | PORTÉE (B1→B3) | **B4** — suspendu sur deux arbitrages |
+| `fail2ban/` | 872 | PORTÉE (F1→F6) | **F7** — quatre capacités non portées |
+| `services/` | **631** | PORTÉE (S1→S3) | **RIEN** |
+| `ssh/` | 458 | PORTÉE (K1→K3) | **K4** — le déploiement de clés |
+| `graylog/` | 388 | PORTÉE (G1) | **G2** — trois gestes qui mutent |
+
+**`services/` est entièrement porté depuis `v1.37.98` et n'a jamais été archivé.** Aucun sous-lot ne
+le retient, aucun arbitrage, aucune mesure manquante : il ne restait qu'à dérouler le §4.4. Le Lead
+dispatchait de nouveaux portages pendant que 631 lignes attendaient un `git mv`. **C'est un défaut de
+séquencement du Lead, pas des sessions** — et il était invisible parce que le suivi comptait la
+mauvaise unité.
+
+**La leçon, et elle vaut au-delà de l'archivage : « porté » et « le legacy est parti » sont deux
+propriétés distinctes, et un tableau qui n'en mesure qu'une donne l'autre pour acquise.** Un module
+porté dont le dossier reste servi laisse deux implémentations vivantes de la même capacité, chacune
+avec ses gardes — c'est exactement la configuration où un correctif appliqué d'un seul côté paraît
+complet. Compter **les lignes servies**, pas les cases cochées.
+
+**Conséquence sur l'ordre de travail** : l'archivage devient un **cycle propre, tenu par la session 2**,
+et non plus la dernière étape oubliée d'un portage. Dès qu'un sous-lot bloquant tombe, le dossier part.
+Quatre dossiers suivront `services/` par le même chemin ; `security/` et `ssh/` attendent l'exploitant.
+
+### 4.3 bis Les sous-lots bloqués dans des modules par ailleurs portés
 
 - **S7b** (`security/`) — le scan CVE qui aboutit **envoie un vrai courriel** (`send_cve_report` part
   dès que l'état passe à `done` avec des résultats). Prérequis techniques faits.
 - **K4** (`ssh/`) — le déploiement de clés. Bloqué par l'arbitrage du repli `NOPASSWD: ALL`, et un
   déploiement lancé en l'état **révoquerait** des accès.
+- **B4** (`bashrc/`) — suspendu sur deux arbitrages.
+- **F7** (`fail2ban/`) — quatre capacités non portées.
+- **G2** (`graylog/`) — trois gestes qui mutent.
+
+### 4.3 ter LE PORTAGE SÉRIALISAIT DERRIÈRE UN VERROU DE FICHIER, PAS DERRIÈRE UNE COMPÉTENCE (2026-08-27)
+
+Huit entrées restaient sur le legacy et **toutes attendaient la session 3**, seule propriétaire de
+`laravel/`. Le Lead avait lu ça comme un problème de rythme ; c'était un problème de **verrou**.
+
+**Or les fichiers d'un module sont disjoints** : un contrôleur, une vue, deux catalogues i18n, un JS.
+**Seuls quatre objets sont partagés par construction** — `routes/web.php`, `Navigation.php`, `rw.css`,
+les gabarits `layouts/`. La propriété exclusive de `laravel/` protégeait donc quatre fichiers en
+bloquant plusieurs centaines.
+
+**Découpage arrêté** — trois voies au lieu d'une, la session 3 devient **l'intégrateur** :
+
+| voie | modules | pourquoi cette session |
+|---|---|---|
+| session 3 | `platform_key`, `remote_users`, `ssh_audit`, `wazuh`, `groups` | garde les modules à gestes, et **pose seule** les routes et le menu |
+| session 5 | `iptables` (I1→I5) | a qualifié les 33 validateurs ancrés et E-152 ; **ne prend jamais le banc**, donc hors contention |
+| ~~session 4~~ | ~~`documentation`, `api_docs`~~ | **VOIE ANNULÉE le 2026-08-27** — voir ci-dessous |
+
+**La règle qui rend le découpage sûr** : une session qui porte un module **envoie sa déclaration de
+route et son entrée de menu au Lead, qui les fait poser par la session 3.** Personne d'autre n'écrit
+dans les quatre fichiers partagés. C'est la règle qui a déjà évité six collisions et elle ne change pas.
+
+**Et une réserve qui tient** : *qui écrit le code ne valide pas seul son correctif.* La session 5 porte
+`iptables` mais ne l'éprouve pas — la 6 écrit ses tests, la 7 sa suite. La règle avait été posée pour
+la session 4 ; elle s'applique à l'identique dès qu'une session sort de son rôle d'origine.
+
+**Ce que ce découpage ne résout pas** : il accélère le portage, pas les **archivages bloqués**. Les
+5 545 lignes du §4.3 ne partiront pas plus vite parce que deux sessions portent au lieu d'une — quatre
+d'entre elles attendent un sous-lot, deux attendent l'exploitant.
+
+#### ⚠ La voie « session 4 » est ANNULÉE : une réattribution entre sessions ne lève pas une interdiction de l'exploitant
+
+La session 4 a **refusé** `documentation` et `api_docs`, et elle avait raison. Son brief porte une
+interdiction explicite — *« ne modifie pas `laravel/` : signale à la session 3 »* — **posée par
+l'exploitant, pas par la table du §10.** Le Lead a raisonné en propriété de fichiers et n'a pas vu
+qu'il déplaçait une borne d'un autre ordre.
+
+**La règle, et elle vaut pour toute réattribution future** : *le Lead redistribue à l'intérieur du §10 ;
+il ne lève pas une consigne de l'exploitant, même en faveur de sa propre parallélisation.* Et la
+demande n'a **pas** été portée à l'exploitant, pour une raison qui n'est pas de la déférence :
+**le gain ne le méritait pas.** Deux pages statiques contre une exception à une frontière qui a tenu six
+collisions — *une frontière qu'on fait céder pour un petit gain ne tient plus pour un grand.* La
+cohérence de la session 4 était d'ailleurs mesurable : elle avait déjà renvoyé `JournalAudit.php`, la
+moitié écran d'E-194 et sa propre déclaration de route plutôt que d'y toucher.
+
+**Ce que la voie annulée produit quand même, et qui valait plus que la page** : la session 4 a modifié
+**vingt-six routes de gardes le 2026-08-27** — huit `services/`, dix-huit `fail2ban/` et `iptables/`,
+plus `/deploy` et les deux d'approbation. **Donc toute documentation de routes écrite avant ce
+matin est périmée, et `api_docs` en est une.** Ce n'était pas « une page statique de plus » : c'est une
+page qui **affirme des autorisations**, et la seule chose plus dangereuse qu'une garde absente est une
+garde annoncée qui n'existe pas — le commentaire de `/deploy` a **découragé la question** pendant
+longtemps, et celui d'`APPROVAL_ENABLED` est devenu faux **deux heures après** le correctif qui l'a
+rendu incomplet. La session 4 produit donc le **relevé mesuré** route par route, la session 3 écrit la
+page à partir de lui. Deux bornes sur ce relevé : **le dater et nommer son régime** — onze correctifs
+sont inertes, donc il décrit l'arbre de travail et non le service — et **ne pas le déduire des
+décorateurs seuls**, `@require_machine_access` étant *inerte sur 57 routes*.
 
 ### 4.4 Le cycle d'archivage, une fois un module complet
 
@@ -1554,6 +1646,162 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
   `$user['role_id'] === 3` sans transtyper — le motif exact d'une garde morte. Mesuré dans le
   conteneur : `ATTR_EMULATE_PREPARES = false` fait rendre `int(3)`, **la garde tient**. Sa jumelle 31
   lignes plus bas transtype, elle. Ce n'est pas un trou, c'est une **fragilité** : dire les deux.
+
+### LE BANC SE DEMANDE À SON PROPRIÉTAIRE — UN `ps` NE RÉPOND PAS AUX BONNES QUESTIONS (2026-08-27)
+
+La session 2 devait écrire pour ARC-001 pendant qu'un rejeu de la session 7 tournait, **avec
+`go-socle-navigation` dedans** — la suite qui compte les entrées de menu. Or l'archivage bascule
+`legacy/menu.php` et déplace `legacy/services`, et `legacy/**` est relu **à chaque requête** : le
+nombre serait devenu irreproductible et l'écart se lirait comme une régression sans cause visible.
+C'est le mécanisme du 2026-08-26 à 11:23:28, à l'identique.
+
+**Elle a demandé le banc à la session 7 en nommant ce que son écriture allait changer, au lieu de le
+déduire d'un `ps`.** C'est la bonne manière, et la raison est que les trois questions qui décident ne
+se lisent pas dans une liste de processus :
+
+1. **qu'est-ce que ce rejeu mesure ?** Un `ps` donne une ligne de commande, pas les propriétés en jeu ;
+2. **va-t-il bientôt finir ?** Un `etime` dit depuis quand, jamais jusqu'à quand ;
+3. **son propriétaire accepte-t-il de s'arrêter ?** Personne d'autre que lui ne le sait.
+
+*Le propriétaire du banc est la seule source qui réponde aux trois.* Et le corollaire : quand on rend
+le banc, **on l'annonce à qui attend** — la session 7 l'a fait vers la session 2 sans qu'on le lui
+demande.
+
+### UN TRAVAIL EN LECTURE N'ATTEND PAS LE BANC (2026-08-27)
+
+La session 2, bloquée sur ARC-001, a choisi de **ne pas** entamer son inventaire suivant : *« le laisser
+à moitié serait pire que de patienter »*. Corrigé par le Lead, et la distinction vaut d'être tenue.
+
+**Le banc protège les écritures qui changent ce qu'une suite mesure. Il ne protège pas le travail.** Un
+inventaire est un `grep` et une lecture : aucune écriture, aucune cible changée en vol, **aucun état à
+perdre** — interrompu au milieu, il reprend sans coût. Ce qui justifiait l'attente sur ARC-001 — le
+régime « relu à chaque requête » de `legacy/**` — ne s'applique pas à la lecture de `legacy/remote_users/`.
+
+*Attendre par prudence quand on ne peut rien casser, c'est du temps perdu qui ressemble à de la rigueur.*
+Les sessions 2 et 5 ne demandent jamais le banc précisément parce qu'elles lisent ; une session qui
+attend sans écrire renonce à ce qui la rend parallélisable.
+
+### ON COMPARE DES SEGMENTS, PAS DES SOUS-CHAÎNES (2026-08-27)
+
+ARC-001 devait chercher si `services/` exposait une adresse configurée **hors** de RootWarden — l'étape
+née de `chatops/webhook.php`, que Slack appelait. La réponse est non, et la seule occurrence trouvée
+était un **faux positif que la forme de la recherche a évité** :
+
+    WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ    (documentation.php:763)
+
+`services/` y est une **sous-chaîne sans rapport** dans une URL Slack. Un `grep` moins regardant
+l'aurait signalée comme une adresse à reporter, et l'archivage aurait « corrigé » une ligne juste.
+
+La même exigence protège les huit routes backend `/services/*` : `normalise('/services/list')` rend
+`/services/list/`, et `resoudre()` fait son `isset()` sur le chemin **normalisé en entier** — donc
+`/services/list/` ne vaut pas `/services/`. **Une table qui comparerait par préfixe les aurait
+réécrites**, et la page portée aurait cessé de fonctionner sans que rien ne le signale.
+
+C'est la même faute de forme que le lien `//exemple.com` qui passe tous les gardes fondés sur une
+classe de caractères, et que « un ban est dans fail2ban ». *Valider la FORME avant le contenu*, et
+préférer une comparaison de segments à toute recherche de sous-chaîne dès qu'un chemin est en jeu.
+
+### UNE GARDE QUI NE PEUT PAS SE DÉCLENCHER NE PROUVE RIEN — ET UN TEST DE GARDE QUI NE PEUT PAS LA DÉCLENCHER NON PLUS (2026-08-27)
+
+L'épreuve de la garde INF-002 a **échoué deux fois avant d'être valide**, et les deux échecs ne sont pas
+la même faute :
+
+1. **mutation à trois arguments.** Un appel de deux arguments muté en trois est **parfaitement
+   légitime** : la garde n'avait rien à déclencher. *Une mutation qui ne viole pas la règle n'éprouve
+   pas la règle.*
+2. **mutation à quatre arguments, mais jouée en `--legacy`** — et l'appel muté vit dans une branche que
+   cette cible **n'atteint jamais**, `update/` y étant archivé. La suite a rendu `8 / 0 conforme`, et la
+   conclusion tentante était « la garde ne marche pas ».
+
+**Ce qui a rattrapé le second n'est pas de la méfiance mais une question sur l'observable :
+l'assertion mutée figure-t-elle dans le journal ?** `grep -c` rendait 0. **Un `conforme` sur une
+assertion qui n'a pas joué est un silence, pas un verdict.**
+
+Troisième étage du même piège en une journée : le défaut silencieux, la garde qui le rend bruyant, et
+l'épreuve qui ne pouvait rien prouver. À rapprocher du constat d'archivage sur un chemin qui n'a jamais
+existé, et de la propriété « il n'y a pas eu de requête » qu'il faut mesurer **au réseau**.
+
+### UN CHIFFRE ANNONCÉ PAR LE LEAD EST UN PLANCHER, PAS UN COMPTE (2026-08-27)
+
+Le Lead a annoncé **70** fichiers à garder pour INF-002. La session 7 en a mesuré **82**, et les douze
+de plus sont la trouvaille de la pose : `verifiePortage` portait trois paramètres **aussi dans les douze
+fichiers de l'autre convention**, avec un quatrième argument ignoré de la même façon — et **ce sont les
+fichiers dont les auteurs ont l'habitude d'écrire quatre arguments**, donc les plus exposés.
+
+**Si la session s'était tenue au chiffre du Lead, les douze restaient silencieusement vulnérables.**
+
+Deuxième occurrence du jour : les « 163 écarts » de ce document étaient **191**, et ils sont **193** le soir même. Et le « 65 suites » du
+suivi était un chiffre hérité, jamais compté. *Un nombre annoncé par le Lead est une hypothèse à
+mesurer, jamais une borne de travail* — et une session qui mesure plus et pose plus fait ce qu'on
+attend d'elle, sans demander l'autorisation d'élargir.
+
+### UNE LIGNE DE `volumes` N'EST PAS PRISE PAR UN REDÉMARRAGE — IL FAUT RECRÉER (2026-08-27)
+
+Le portage n'affichait aucun numéro de version, et le Lead a annoncé « c'est trois lignes ». **Faux, et
+mesuré par la session 3** : `docker inspect` ne rend qu'**un** montage sur le conteneur du portage,
+`./laravel:/var/www/html`. `legacy/version.txt` n'existe **nulle part** dans son système de fichiers, et
+aucune variable de version n'existe dans `srv-docker.env.example`. **La donnée n'était pas là** — le
+Lead avait décrit le code à écrire et pas le chemin de la donnée. Quatrième fois qu'une formulation du
+Lead nomme un geste sans nommer son régime.
+
+**Trois issues, une seule sans dérive** : monter le fichier en lecture seule (source unique) · une
+variable d'environnement (le numéro existerait à **deux** endroits) · copier au démarrage (deux
+endroits, et **silencieusement**). Retenue : la première, une ligne dans `docker-compose.yml` —
+
+    - ./legacy/version.txt:/var/www/html/version.txt:ro
+
+**et l'argument qui l'emporte est la journée elle-même** : `legacy/version.txt` a dérivé **deux fois le
+2026-08-27** — resté à 1.38.17 pendant deux bumps, puis trois commits sur le même numéro. *Ajouter une
+seconde copie d'un chiffre qui vient de diverger, c'est traiter le symptôme en aggravant la cause.*
+
+**La borne à connaître avant de mesurer** : une ligne de `volumes` **ne prend pas effet à un
+`docker restart`** — il faut `docker compose up -d laravel`, une **recréation**. Le montage est donc
+**inert** jusqu'à ce que l'exploitant recrée le conteneur, et il rejoint le lot qui attend déjà le
+redémarrage du backend. Cinquième régime de lecture, à ajouter aux quatre du §8 :
+
+| objet | pris en compte | ce qui mord |
+|---|---|---|
+| `docker-compose.yml` (`volumes`, `ports`, `env_file`) | à la **recréation** du conteneur | `docker compose up -d <service>`, **pas** un `restart` |
+
+Et il se lit **à l'envers** des correctifs backend inertes : avant la recréation, l'écran affichera
+« version inconnue », qui est le **comportement correct du repli** et non un repli en échec.
+
+`docker-compose.yml` n'appartenait à personne dans le §10 : **il revient au Lead**, pour les lignes
+d'infrastructure qui débloquent une session.
+
+### UN DRAPEAU ET LES COLONNES QU'IL RÉSUME SONT DEUX SOURCES (2026-08-27)
+
+Trouvé par la session 3 en portant `platform_key`, et l'inventaire ne l'avait pas vu : le legacy compte
+« mot de passe supprimé » sur le **drapeau** `ssh_password_required`, **pas sur les colonnes**. Mesuré :
+`srv-zabbix` porte le drapeau à 0 alors que ses **deux** mots de passe sont présents. Cause : la page
+Serveurs est le seul chemin qui réécrit `root_password`, et **elle ne touche pas le drapeau**.
+
+Deux conséquences, qui ne vont pas dans le même sens :
+
+- **la bonne** : *aucune machine n'est aujourd'hui dans la position sans retour*, contrairement à ce que
+  l'inventaire relevait le matin même. C'est **calculé**, et ça abaisse la gravité de P4 ;
+- **celle qu'il ne faut pas perdre** : le portail **affiche une pastille verte « keypair » sur une
+  machine qui a encore ses deux mots de passe.** L'indicateur est faux **dans le sens rassurant** —
+  écart de parité à part entière.
+
+*Un drapeau et les colonnes qu'il prétend résumer sont deux sources, et il suffit d'un chemin
+d'écriture qui en oublie une pour qu'elles divergent sans bruit.* Même faute de forme que les deux
+copies du numéro de version refusées dans la même heure : **la session 3 a refusé une duplication dans
+le compose et en a trouvé une en base le même après-midi.**
+
+### AUCUNE SUITE N'ASSÈRE `LiensLegacy` — ET SIX ARCHIVAGES VONT PASSER (2026-08-27)
+
+Remonté par la session 3 pendant ARC-001, sans l'avoir cherché : **zéro occurrence de `LiensLegacy` dans
+`tests/e2e/` et `laravel/tests/`.** L'oubli de `/docker/` — l'archivage de `v1.37.54` avait sauté
+l'étape — a donc été trouvé par une **relecture**, et le prochain ne le sera pas davantage. Il reste
+**six** modules à archiver.
+
+La propriété qui ferme le trou : **dériver la liste attendue de `legacy/_deprecated/*` et la comparer à
+la table**, pour qu'elle rougisse le jour où quelqu'un archive sans compléter, au lieu de dépendre de
+qui relit. **Deux bornes, parce que la table n'est pas une image du dossier** : quatre entrées sont
+**préventives** — le backend n'émet ni `/docker/`, ni `/chatops/`, ni `/maintenance/`, ni `/supervision/`
+— et *tout `/partie/` n'est pas une page*, donc la comparaison porte sur le chemin **normalisé en
+entier**, jamais par préfixe.
 
 ### Tests
 

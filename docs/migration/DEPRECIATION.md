@@ -112,6 +112,9 @@ Une ligne par partie portee, ajoutee APRES la preuve du 404.
 | `update/` | 2026-08-20 | `mises-a-jour` | premier MODULE archive — 7 sous-lots, 4 points d'entree |
 | `supervision/` | 2026-08-23 | `supervision` | 12 sous-lots, 4 points d'entree, et une aide d'archivage qui mentait |
 | `docker/` | 2026-08-25 | `docker` | UN SEUL point d'entree — parce que le tiroir mobile du legacy est incomplet |
+| `chatops/` | 2026-08-25 | `chatops` | premiere partie dont une ADRESSE EXTERIEURE change |
+| `maintenance/` | 2026-08-26 | `maintenance` | le portage a corrige un defaut de DECISION |
+| **`services/`** | **2026-08-27** | `services` | **archivable depuis 3 jours et jamais archivee** — et son archivage revele que `/search/` manque a la table depuis le 18 |
 
 ### commandlog — la preuve du cycle
 
@@ -747,3 +750,114 @@ backend.
 | Partie | Suite, cible legacy |
 |---|---|
 | `maintenance/` | 5 PASS / 0 FAIL — partie archivée |
+
+### services — la partie qui etait ARCHIVABLE depuis trois jours, et le trou que son archivage a revele
+
+Portee en trois sous-lots — S1 `v1.37.94`, S2 `v1.37.96`, S3 `v1.37.98` — route `/services`, garde
+`role:1` **+** `perm:can_manage_services`. **Treizieme partie archivee.**
+
+**Et le fait le plus utile de cette ligne n'est pas l'archivage : c'est qu'il aurait pu etre fait trois
+jours plus tot.** Aucun sous-lot ne le retenait, aucun arbitrage, aucune mesure manquante — le cycle
+ci-dessus n'avait simplement pas ete deroule. Le Lead dispatchait de nouveaux portages pendant que
+631 lignes de code deja porte restaient servies par Apache. **C'est un defaut de sequencement du Lead**,
+et il etait invisible parce que le suivi comptait des **entrees de menu** au lieu de **lignes servies** :
+l'entree `services` etait marquee `PORTE` depuis le 24, ce qui laissait croire que le dossier avait
+disparu.
+
+> *« Porte » et « le legacy est parti » sont deux proprietes distinctes, et un tableau qui n'en mesure
+> qu'une donne l'autre pour acquise.* Une partie portee dont le dossier reste servi laisse **deux
+> implementations vivantes de la meme capacite**, chacune avec ses gardes — la configuration exacte ou
+> un correctif applique d'un seul cote parait complet. Cinq autres parties sont dans cet etat en ce
+> moment : `security/` 2 255 lignes, `bashrc/` 941, `fail2ban/` 872, `ssh/` 458, `graylog/` 388.
+
+| chemin | avant | apres |
+|---|---|---|
+| `/services/` | 302 | **404** |
+| `/services/index.php` | 302 | **404** |
+| `/services/js/main.js` | **200** | **404** |
+| `/api_proxy.php/services/list` | 302 | **302** — inchange |
+| `/graylog/` (temoin vivant) | 302 | 302 |
+| `/commandlog/` (temoin archive) | 404 | 404 |
+
+**Les chemins ont ete sondes AVANT le `git mv`**, et le `200` sur `main.js` n'est pas un defaut : Apache
+sert les fichiers statiques, c'est le comportement de toute application web. Il est note parce qu'il rend
+l'assertion **reellement mesurante** — `200 -> 404` — la ou elle aurait pu passer sur du vide.
+
+**2 fichiers, 631 lignes.** Reference d'archivage : `1 + 2 + 2 = 5`, **verifiee dans `archive.mjs`**
+(`:63`, `:67` pour `constateArchivage`, `:142`, `:150` pour `verifieMenuLegacy`) et non deduite de la
+formule — *une formule courte se verifie sur un cas ou elle pourrait etre fausse.*
+
+#### Trois points d'entree bascules, et un quatrieme verifie VIDE
+
+`menu.php:91` (barre laterale) · `menu.php:238` (tiroir mobile) · **`head.php:208`** (raccourci clavier
+`g s`, un objet JS qu'aucun controle sur les `href` ne voit).
+
+**Le quatrieme a ete cherche et ne porte rien** : `legacy/index.php:360-385` construit `$shortcuts[]`
+avec ssh, mises-a-jour, iptables, security, admin_page, supervision, bashrc, graylog, wazuh, ssh-audit,
+compliance_report, documentation. **Pas de `services`** — ni `fail2ban`, ni `groups`, ni `docker`. **Ce
+qui explique comment l'oubli de `docker/` avait pu passer** : il n'y avait rien a y oublier pour ce
+module-la, mais la verification manquait. Elle est faite maintenant, et elle le sera pour les cinq
+suivantes.
+
+`Navigation.php:85` portait deja `'route' => 'services'` : l'etape 4 du cycle etait satisfaite **sans
+ecriture**.
+
+#### Les huit routes backend `/services/*` restent vivantes — verifie aux DEUX couches
+
+*Tout `/partie/` n'est pas une page.* La protection ne repose pas sur une intention :
+
+- **dans la table** — `normalise('/services/list')` rend `/services/list/`, et `resoudre()` fait son
+  `isset()` sur le chemin **normalise en entier**. `/services/list/` ne vaut pas `/services/`. **Un
+  filtre par prefixe se serait trompe** ; celui-la ne le peut pas ;
+- **dans Apache** — `/services/list` rendait **deja 404** cote legacy, avant comme apres. Ces routes ne
+  sont atteignables que par `/api_proxy.php/services/…`, et la page portee les appelle par
+  `/api/gateway/services/…`.
+
+#### Aucune adresse configuree hors de RootWarden — et le faux positif que la forme de la recherche a evite
+
+La seule occurrence de « services/ » dans la documentation est
+`WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ` (`documentation.php:763`) : **une sous-chaine
+sans rapport** dans une URL Slack. Un `grep` moins regardant l'aurait signalee comme une adresse a
+reporter, et l'archivage aurait « corrige » une ligne juste. *On compare des segments, pas des
+sous-chaines* — meme faute de forme que le lien `//exemple.com` qui passe tous les gardes fondes sur une
+classe de caracteres.
+
+#### ⚠ L'archivage a revele que la table de redirection n'etait AS-SEREE PAR AUCUNE SUITE — et que `/search/` y manque depuis le 18 aout
+
+L'entree `'/services/' => 'services'` est **PREVENTIVE** : releve exhaustif fait, le backend ne pose en
+dur que `/security/` ×4, `/ssh-audit/` ×2, `/update/index.php`, `/tickets/index.php`, `/profile.php`,
+`/approvals/`, `/adm/audit_log.php`, `/adm/admin_page.php` et `/`. Il n'emet **jamais** `/services/`.
+
+**En posant cette entree, on a mesure pour la premiere fois que zero suite n'aserait
+`LiensLegacy::REMPLACEMENTS`** — aucune occurrence dans `tests/e2e/` ni `laravel/tests/`. L'oubli de
+`/docker/` (§`docker`) avait donc ete rattrape par une **relecture**, pas par un test. La propriete qui
+ferme le trou **derive** desormais la liste attendue de `legacy/_deprecated/*`, et **sa premiere mesure a
+trouve un second manque** :
+
+    parties archivees ......... 13
+    entrees de la table ....... 16
+    parties archivees SANS entree : 2  ->  /services/ (attendu) et **/search/**
+
+**`/search/` est archivee depuis le 2026-08-18 et son entree n'a jamais ete posee.** Verifie :
+`legacy/_deprecated/search/` porte bien `index.php` et `js/main.js`. Comme `/docker/`, l'entree serait
+preventive — donc l'oubli n'a **aucun effet mesurable** aujourd'hui. **Mais `/docker/` avait ete rattrape
+par une relecture et `/search/` ne l'a pas ete**, et il restait cinq parties a archiver : la propriete
+arrive juste a temps pour les cinq suivantes plutot qu'une de trop tard.
+
+#### Ce qui devient mort et n'est pas touche
+
+La liste blanche `/services/` d'`api_proxy.php:137` devient **surface morte**, comme `/supervision/`.
+Laissee en place : *on ne soigne pas ce qu'on demonte*, et le proxy du legacy meurt d'un bloc, avec le
+legacy.
+
+#### Ce qui n'a PAS ete verifie a l'archivage, et par qui il le sera
+
+Le rendu de `menu.php` et `head.php` **sous session authentifiee**. `php -l` prouve la syntaxe et un
+`302` sur `/` ne les exerce pas. **`go-socle-navigation` passe de 63 a 65 attendu** (+2 : les roles 2 et
+3 voient l'entree, `rw-test-admin` detenant `can_manage_services`) — **prediction a mesurer, pas
+reference a inscrire** : la formule courte « +2 par entree » est fausse en general, la regle exacte etant
+*+1 par role qui voit l'entree*, et elle s'est deja trompee d'une unite sur `tickets` le meme jour.
+
+| Partie | Suite, cible legacy |
+|---|---|
+| `services/` | reference d'archivage **5** — a mesurer au rejeu |

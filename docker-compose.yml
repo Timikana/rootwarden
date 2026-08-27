@@ -67,6 +67,13 @@ services:
       - "${LARAVEL_PORT:-8444}:80"
     volumes:
       - ./laravel:/var/www/html
+      # Le numéro de version a UNE seule source : legacy/version.txt, écrit par le
+      # mécanisme de bump. Le portage le LIT, en lecture seule, et n'en tient pas de
+      # copie — une seconde copie dériverait, et ce chiffre a déjà dérivé deux fois
+      # le 2026-08-27 (resté à 1.38.17 pendant deux bumps, puis trois commits sur le
+      # même numéro). Le chemin reste `legacy/` tant que le legacy est servi ; son
+      # emplacement à l'extinction du legacy est une question ouverte (§4.1 ter).
+      - ./legacy/version.txt:/var/www/html/version.txt:ro
     env_file:
       - srv-docker.env
     depends_on:
