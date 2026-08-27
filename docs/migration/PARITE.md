@@ -8450,3 +8450,87 @@ définition et une mention dans une **docstring de classe** (`:567`), qui annonc
 nettoie, alors que `configure()` dit en clair « le nettoyage automatique des utilisateurs est
 DÉSACTIVÉ ». Il n'y a donc pas **trois** traitements vivants d'une notion mais **deux**, plus une copie
 morte. **Sixième « en-tête qui mente » du chantier**, et la première dans une docstring de classe.
+
+---
+
+## E-192 — La révocation d'accès se VÉRIFIE, et le correctif évident était impossible
+
+Correctif de la seconde moitié d'E-191. **Refermé le 2026-08-27.**
+
+**Le correctif attendu — « lire le code de retour » — n'existait pas à ce niveau.**
+`execute_command_as_root` rend la **sortie**, jamais le code : mesuré, il le calcule sur son chemin
+`service_account` (`ssh_utils.py:831`) et le **jette**, et il le jette aussi en dépaquetant
+`execute_as_root`. **Un `rm -f` refusé est donc indiscernable d'un `rm -f` réussi pour TOUS ses
+appelants** — et le rendre ne se décide pas dans ce commit, la fonction ayant d'autres appelants dans
+`iptables_manager.py`.
+
+> **Donc on ne vérifie pas la commande : on vérifie son EFFET.** `_absence_verifiee` sonde l'état de la
+> machine **après** le geste — la clé SSH, le sudoers unifié, et l'ancien fichier à nom nu. Et le verdict
+> d'échec dit la phrase qui compte : **« L'ACCÈS DOIT ÊTRE CONSIDÉRÉ COMME ENCORE OUVERT. »**
+
+**Et le piège de `v1.37.11` devait être refermé ici aussi.** Le marqueur est assemblé par
+**concaténation shell**, parce que sur les machines en mode `su`/`sudo` interactif le canal **échote** la
+commande : un marqueur écrit en clair reviendrait dans la sortie **sans que rien n'ait été vérifié** —
+faux positif **permanent**, sur une révocation d'accès. Mesuré, 9 assertions / 9 PASS :
+
+| cas | verdict |
+|---|---|
+| écho PTY de la commande seule | **NON vérifié** — la ligne échotée ne contient pas `__RW_""ABSENT_OK__` |
+| écho PTY **+** vraie sortie | **VÉRIFIÉ** — l'écho n'aveugle pas la sonde |
+| marqueur en sous-chaîne | **NON vérifié** |
+| exception, ou sortie `None` | **NON vérifié** — fail-closed |
+
+**Un défaut trouvé au passage, et dédouané pour éviter une fausse alerte** : `uname` n'était pas validé
+avant d'être interpolé dans un `rm -f` root. **Ce n'est PAS une élévation de privilège** — le nom vient
+de `server_user_inventory`, donc du `/etc/passwd` de la machine, et seul le root de cette machine peut y
+poser un tel nom, la commande s'exécutant sur cette même machine. Mais un nom porteur d'un espace ou
+d'un `;` fait échouer le retrait **en silence** : c'est le défaut d'E-192 lui-même, donc corrigé au même
+commit.
+
+## E-193 — `/deploy` lit son code de sortie, et le verdict va là où on REGARDE
+
+**La réponse HTTP ne peut pas le porter, et c'est normal** : `threading.Thread` dans le corps, donc
+accusé de réception et non verdict (§8). Mais il n'était porté **nulle part**. Le seul endroit où
+l'exploitant regarde est le flux SSE, qui ne lit que `deployment.log` — **le verdict y est donc écrit.**
+
+Deux précautions, chacune pour un piège déjà payé : ouverture en `a` et **jamais** `w`, sinon on efface
+le journal qu'on cherche à conclure ; et le terminateur `[Fin du flux de logs]` **n'est pas émis** —
+c'est un **jeton de protocole** comparé littéralement, et l'écrire ferait croire au client que le flux
+est fini.
+
+Et sur un échec, le verdict dit aussi ce qui **reste vrai** : **« Les gestes déjà émis n'ont PAS été
+annulés. »** *Un déploiement partiel n'est pas un déploiement annulé.*
+
+## E-194 — Le préflight dit désormais qu'il n'a pas pu regarder
+
+`audit_inventaire` est **toujours présent**, faux par défaut, et ne passe à vrai qu'**après** le calcul
+de `users_revoked`. Il porte la différence entre « **établi et vide** » et « **pas établi** », que
+l'absence d'un champ ne pouvait pas porter — c'est la forme générale du défaut, et pas seulement son
+symptôme. L'`except` ajoute désormais à `errors`.
+
+**La moitié backend ne suffit pas** : un écran qui affiche « aucun accès à révoquer » doit le
+**conditionner à ce drapeau**, sinon le composite trompeur d'E-190 reste possible côté affichage.
+
+## E-195 — Deux ensembles s'appelaient « autorisés » et ne désignaient pas la même chose
+
+`authorized_names` → **`comptes_traites`**, et la compensation **écrite dans la branche `else` de
+`deploy_user_config`** — avec les **trois** fonctions qui la maintiennent ensemble, et ce qui casserait
+si l'on retirait ce `rm -f`. **Aucun changement de comportement, aucune fusion** : voir la rétractation
+sous E-191, où fusionner aurait fait **sous-annoncer** le préflight.
+
+C'est l'application du remède écrit le même jour — *le correctif n'est pas toujours du code, c'est
+parfois une phrase à l'endroit exact où la propriété tient* — et le premier cas du chantier où un
+renommage **est** le correctif.
+
+---
+
+*Sur les quatre : rien n'est mesuré en EXÉCUTION.* Les quatre sont vérifiés structurellement et par
+sonde ; **aucun n'a été éprouvé contre une machine**, et éprouver E-192 signifierait **révoquer un accès
+pour de vrai**. Ils sont par ailleurs **inertes jusqu'au prochain redémarrage** du conteneur — donc **une
+révocation lancée maintenant s'annoncerait encore sans se vérifier.**
+
+*Et une règle de coordination que ces quatre commits ont révélée* : **les numéros d'écart viennent du
+Lead, comme les numéros de version.** Ils ont été pris ici dans l'ordre et sans collision — vérifié,
+`E-192` à `E-195` claimés une fois chacun, `PARITE.md` s'arrêtant à `E-191` — mais c'est **la même classe
+que la collision de `v1.38.19`** : un identifiant choisi par message est valide au moment où on l'écrit,
+pas au moment où un autre l'emploie. **Nommer le défaut en clair suffit ; le numéro s'attribue ici.**
