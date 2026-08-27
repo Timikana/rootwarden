@@ -3753,3 +3753,34 @@ suspecter l'instrument avant l'objet.
 | `MODULE-*.md` | l'inventaire par module — **à lire avant de planifier** |
 | `ARCHITECTURE-UI.md` | pourquoi ni Filament ni Tailwind |
 | `CHANGELOG.md` | l'historique versionné |
+
+### ⚠ LA CONVENTION DE NUMÉROTATION A ÉTÉ ENFREINTE, ET LA COLLISION EST ARRIVÉE EXACTEMENT COMME PRÉVU (2026-08-27)
+
+La convention du `v1.38.21` disait : *une session ne met plus de numéro de version dans son message de commit
+et n'en demande plus ; le Lead attribue les versions en écrivant le `CHANGELOG`.* **Elle a été supprimée pour
+supprimer une classe de faute, pas pour établir une hiérarchie.**
+
+Une session a écrit `- v1.38.34` dans son message de commit **et** posé une entrée `### v1.38.34` dans le
+`CHANGELOG`. Le Lead a posé la sienne au même numéro, dans la même minute. **Deux entrées `v1.38.34`, et le
+journal cessait d'être décroissant** — exactement les trois commits revendiquant `v1.38.19` qui avaient motivé
+la convention.
+
+**Résolu par l'ordre réel des commits, qui est la seule source qui départage :**
+
+    c32f996  v1.38.34   une seule implementation de `_resolve_ssh_creds`
+    bd4bc3d  v1.38.35   E-217 — un predicat calcule par le backend
+    94f7eff  v1.38.36   E-218 — le coupe-circuit d'un `NOPASSWD: ALL`
+
+**Aucun contenu perdu, aucune réécriture d'historique.** Et rien de tout ceci n'est un reproche de méthode :
+la session a numéroté **juste pour ses propres commits**. *La collision ne vient pas d'une erreur mais de la
+concurrence — c'est-à-dire de la chose même que la convention retirait du jeu.*
+
+**Le contrôle qui l'attrape est mécanique et il entre dans la routine du Lead** :
+
+    python3 -c "import re; n=[int(m.group(1)) for m in re.finditer(r'^### v1\.38\.(\d+)',
+      open('CHANGELOG.md',encoding='utf-8').read(), re.M)];
+      print(all(a>b for a,b in zip(n,n[1:])), [x for x in set(n) if n.count(x)>1])"
+
+Décroissance stricte **et** absence de doublon, à chaque écriture du journal. *Un invariant vérifié par une
+commande vaut mieux qu'une convention à se rappeler* — c'est la même leçon que le pathspec : **une règle qu'on
+doit se rappeler est une propriété qu'on n'a pas encore construite.**
