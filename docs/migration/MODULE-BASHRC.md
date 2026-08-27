@@ -65,8 +65,30 @@ permission de la même façon des deux côtés ? — a une réponse mesurée :
 
 - le **contenu** part en **base64** (`deploy`, ligne 89 : « Deploiement via base64 (pattern securise) ») ;
 - le **nom de compte** est validé par `_USERNAME_RE = ^[a-z_][a-z0-9_-]{0,31}$` avant tout usage. Il est
-  ensuite interpolé brut dans `chown {uname}:{uname}` — **et c'est sûr**, parce que la liste blanche
-  n'admet aucun métacaractère de shell ;
+  ensuite interpolé brut dans `chown {uname}:{uname}`.
+
+  > **Corrigé le 2026-08-27, à la suite d'E-174.** Cette ligne disait *« et c'est sûr, parce que la
+  > liste blanche n'admet aucun métacaractère de shell »*. **La conclusion tient ; la raison était
+  > fausse**, et une raison fausse cesse de protéger dès qu'on touche à ce qu'elle décrit.
+  >
+  > Mesuré dans `rootwarden_python` — `_USERNAME_RE` est employée avec **`.match()`**
+  > (`bashrc.py:203, 395, 456, 593, 759`), et en Python `$` correspond aussi **juste avant un saut de
+  > ligne final** :
+  >
+  > | valeur | verdict |
+  > |---|---|
+  > | `root` | accepte |
+  > | **`root\n`** | **ACCEPTE** — un métacaractère de shell passe donc bien |
+  > | `root\nid` | refuse |
+  > | `root;id` · `root\ttouch` · `ro ot` | refuse |
+  >
+  > Ce qui rend le geste sûr n'est **pas** l'absence de métacaractère : c'est que **le seul qui passe
+  > ne peut rien porter derrière lui** — `$` n'admet qu'un saut de ligne, en toute fin, et rien après.
+  > Un `chown root\n:root\n` casse la commande, il n'en injecte pas une autre.
+  >
+  > **Ce n'est pas propre à ce module** : `.fullmatch()` n'est employé **nulle part** dans `backend/`,
+  > et les **33** validateurs ancrés `^…$` ont tous cet écart. Le relevé complet, avec ce qui est
+  > mesuré et ce qui ne l'est pas, est au **§8 de `MODULE-FILTRAGE.md`** ;
 - le **home**, qui vient du `/etc/passwd` **distant**, est validé par
   `_HOME_RE = ^/[A-Za-z0-9._/-]{1,128}$`, avec le pourquoi écrit juste à côté :
 
