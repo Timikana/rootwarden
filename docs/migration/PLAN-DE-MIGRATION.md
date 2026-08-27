@@ -628,7 +628,7 @@ pour ce qu'il écrit : une autorisation posée par une exécution survit à cett
 suite sans référence rend « (pas de référence) » : on **mesure** avant d'inscrire, et **on vérifie dans
 quelle table** on inscrit (deux entrées de même clé dans la même table : la seconde écrase la première).
 
-**Le LOT dure ~100 min pour 87 suites.** `setsid … > log 2>&1 < /dev/null &` puis, **dans un appel
+**Le LOT dure ~3 h, et non ~100 min** — chiffre corrigé le 2026-08-27 en cours de rejeu : **25 verdicts en 31 min** sur 150, mesuré. Le « ~100 min » datait de **125** verdicts, et les suites ajoutées depuis sont plus longues. Remesure : le rapport d'avancement du rejeu, jamais la valeur reconduite. `setsid … > log 2>&1 < /dev/null &` puis, **dans un appel
 séparé**, l'attente. **Ne jamais combiner la vérification d'un rejeu et son lancement** — la ligne de
 commande contient alors le chemin en clair et `pgrep` s'attrape lui-même (payé trois fois). Pour compter
 ce qui vit :
@@ -2156,6 +2156,45 @@ troisième mesure qui départage deux verdicts contradictoires.
 le conteneur, avec `workers = 4` tous enfants du maître. **« Le backend est lu au démarrage du processus »
 n'est donc plus une convention de ce document : c'est une propriété du service.** Troisième règle de ce
 chantier à devenir une propriété, après la recopie du runner dans `/tmp` et `git commit -- <chemins>`.
+
+### UNE MESURE BORNÉE PAR UN DELTA A ÉTÉ ÉPROUVÉE PAR ACCIDENT (2026-08-27)
+
+**La robustesse d'une suite ne se voit que le jour où le banc bouge sous elle.** Et c'est arrivé.
+
+Un `userdel -f` a été exécuté en root sur la machine du banc — incident déclaré, aucun dommage — et la
+fenêtre est tombée **exactement** sur `go-page-commandlog`, **la seule suite du LOT qui lit
+`command_log`**, pendant que le geste y était journalisé. **Verdict : 14 PASS / 0 FAIL, conforme.**
+
+> **Elle a tenu, et ce n'est pas de la chance** : sa mesure est bornée par un **DELTA** et non par un
+> total global. Une suite qui aurait compté les lignes de `command_log` dans l'absolu aurait vu **+1** et
+> **accusé la page**.
+
+C'est la parade que le §8 impose depuis « un nettoyage qui supprime par TYPE en retire plus qu'il n'en a
+posé » — et elle vient d'être **éprouvée par un événement que personne n'avait provoqué pour elle**. À
+garder comme argument : *une borne par delta n'est pas une élégance, c'est ce qui distingue une suite d'un
+compteur.*
+
+**Et une seconde confirmation en est sortie, par une voie indépendante** : `go-page-ssh-parc`,
+`go-page-ssh-preflight` et `go-page-ssh-flux` — les trois qui touchent aux comptes et aux clés de la
+machine touchée — sont **toutes conformes**. La ligne de base (20 comptes, 20 clés) est donc confirmée
+**par ce que les pages RENDENT**, et non seulement par une requête en base. *Deux voies indépendantes pour
+un même fait, c'est la règle du chantier appliquée à un incident.*
+
+### VÉRIFIER QU'UN GARDE VALIDE NE SUFFIT PAS — IL FAUT SAVOIR LAQUELLE, ET OÙ (2026-08-27)
+
+Corollaire de l'incident, et il resserre la règle du garde-fou de sonde.
+
+Une sonde s'appuyait sur « ce chemin sera refusé par le garde de nom ». Le garde **existe**, il **valide**
+— et il portait sa **PROPRE** expression, `^[a-zA-Z0-9._-]{1,32}$`, **la quatrième du backend**, qui
+accepte `..`. Le défaut avait été corrigé le matin même **dans un autre fichier**.
+
+> **Vérifier « le garde valide les noms » ne suffit pas : il faut vérifier QUELLE expression, dans QUEL
+> fichier.** C'est « trois énumérations de la même chose divergent » appliqué aux **validateurs**, et cela
+> vaut pour toute sonde qui s'appuie sur un refus attendu.
+
+Et la différence entre les deux sondes du jour tient à **une seule vérification** : celle qui a lu le code
+du garde avant d'écrire a tenu ; celle qui l'a supposé a joint la production. **La même méthode, à une
+lecture près.**
 
 ### UNE FENÊTRE D'ÉCRITURE SE DONNE PAR RÉGIME DE LECTURE, PAS PAR TÂCHE (2026-08-27)
 
