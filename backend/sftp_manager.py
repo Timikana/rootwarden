@@ -31,7 +31,22 @@ from ssh_utils import execute_as_root
 
 _log = logging.getLogger(__name__)
 
-_USERNAME_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
+# E-198 : la CASSE seulement. Ce validateur recevait des noms DECOUVERTS —
+# `policies.py` les resout dans `server_user_inventory` — et refusait les
+# majuscules, donc `Timikana`, `Debian-exim` et `Debian-snmp`, trois comptes
+# reels du parc. Un compte reel ne pouvait pas recevoir de politique a cause
+# d'une majuscule.
+#
+# CE QUI N'EST PAS ELARGI, ET POURQUOI : le POINT. Le validateur des noms
+# decouverts (`configure_servers._valid_username`) l'accepte, mais `sudo`
+# ignore les fichiers de `/etc/sudoers.d` dont le nom en contient un — une
+# politique deployee pour `a.b` serait ecrite et JAMAIS APPLIQUEE. Je n'ai pas
+# pu le MESURER (`visudo -cf` valide le contenu, pas l'inclusion), donc le
+# point reste refuse : c'est la direction sure, et la question est remontee.
+#
+# Les deux domaines ne different donc pas d'UNE chose mais de DEUX, et une
+# seule est un defaut. « Avant d'unifier, nommer le domaine de chacune. »
+_USERNAME_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$')
 _PATH_RE = re.compile(r'^/[A-Za-z0-9._/-]{1,510}$')
 
 SSHD_CONFIG_D_DIR = '/etc/ssh/sshd_config.d'
