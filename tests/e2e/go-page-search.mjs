@@ -26,6 +26,7 @@
  */
 import puppeteer from 'puppeteer';
 import { execFileSync } from 'child_process';
+import { readdirSync } from 'node:fs';
 import { createHmac } from 'crypto';
 import { constateArchivage, verifieMenuLegacy, sondeLegacy } from './archive.mjs';
 
@@ -74,13 +75,63 @@ function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
 
 let echecs = 0;
 const lignes = [];
-function verifie(libelle, ok, detail) {
+function verifie(libelle, ok, detail, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     lignes.push(`${ok ? 'PASS' : 'FAIL'}  ${libelle}${detail ? '  — ' + detail : ''}`);
     if (!ok) echecs++;
 }
 function constate(l, v) { lignes.push(`INFO  ${l} : ${v}`); }
 
-function verifiePortage(libelle, ok, detail) {
+function verifiePortage(libelle, ok, detail, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(libelle, ok, detail);
     constate(libelle, `non exigible du legacy — ${detail}`);
 }
@@ -194,6 +245,48 @@ async function cherche(page, terme) {
     return attendJusqua(page, (e) => e.meta !== '' && e.meta !== avant, 4000);
 }
 
+/*
+ * ══ LA TABLE DE REDIRECTION N'ETAIT ASSEREE PAR PERSONNE ═══════════════════
+ *
+ * `App\Support\LiensLegacy::REMPLACEMENTS` traduit les chemins du legacy que
+ * le backend ecrit EN DUR dans ses resultats de recherche. Mesure du
+ * 2026-08-27 : **zero occurrence de `LiensLegacy` dans `tests/e2e/` et
+ * `laravel/tests/`**. L'oubli de `/docker/` a la `v1.37.54` n'a donc pas ete
+ * trouve par un test mais par une relecture — et six modules restent a
+ * archiver.
+ *
+ * LA LISTE ATTENDUE SE DERIVE, ELLE NE SE RECOPIE PAS. Une liste ecrite a la
+ * main vieillit : c'est le defaut d'E-142, ou une enumeration recopiee avait
+ * derive de sa source. On lit donc `legacy/_deprecated/` — ce qui EST archive —
+ * et la table par PHP LUI-MEME (`artisan tinker`), jamais a l'expression
+ * reguliere : analyser du PHP au motif revient a reecrire un interpreteur, et
+ * une entree mal lue serait declaree absente a tort.
+ *
+ * PROPRIETE, dans UN SEUL SENS. Toute partie archivee doit avoir son entree,
+ * PREVENTIVE quand le backend n'emet pas son chemin. L'inverse n'est pas vrai :
+ * la table porte legitimement des entrees qui ne correspondent a aucun dossier
+ * archive (`/security/`, `/profile.php/`, `/`), et les compter comme un
+ * manquement accuserait une table saine.
+ */
+function partiesArchivees() {
+    const racine = new URL('../../legacy/_deprecated', import.meta.url).pathname;
+    try {
+        return readdirSync(racine, { withFileTypes: true })
+            .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+    } catch { return []; }
+}
+function tableDeRedirection() {
+    try {
+        // Le mot de passe ne circule pas ici : `tinker` ne lit que du code.
+        const sortie = execFileSync('sudo', ['-n', 'docker', 'exec', 'rootwarden_laravel',
+            'php', 'artisan', 'tinker', '--execute',
+            'foreach (App\\Support\\LiensLegacy::REMPLACEMENTS as $k => $v) echo "$k\\n";'],
+            { encoding: 'utf8', timeout: 30000 });
+
+        return sortie.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('/'));
+    } catch (e) { return null; }
+}
+
 try {
     if (CIBLE === 'legacy') {
         const archivee = await constateArchivage({
@@ -300,6 +393,47 @@ try {
     verifiePortage('aucun resultat ne mene a une page archivee',
                    morts.length === 0,
                    morts.join(' · ') || 'aucun lien mort');
+
+    /*
+     * ══ CHAQUE PARTIE ARCHIVEE A-T-ELLE SON ENTREE DE REDIRECTION ? ═══════
+     *
+     * DANS UN SEUL SENS, et c'est la borne qui rend l'assertion juste : la
+     * table n'est pas une image du dossier. Elle porte legitimement des entrees
+     * qui ne correspondent a AUCUNE partie archivee — `/security/`,
+     * `/profile.php/`, `/` — et les compter comme un manquement accuserait une
+     * table saine. On ne verifie donc que l'implication utile : **archive =>
+     * redirige**.
+     *
+     * Une entree peut etre PREVENTIVE : le backend n'emet en dur que
+     * `/update/index.php`, `/tickets/index.php` et `/security/`. Pour les
+     * autres, l'entree n'a aucun 404 a reparer — elle evite d'en fabriquer un
+     * le jour ou un resultat, un signet ou une documentation cite le chemin.
+     * C'est le cycle du plan : « mesurer si le backend emet le chemin,
+     * preventif sinon ».
+     *
+     * COMPARAISON PAR CHEMIN NORMALISE EN ENTIER, jamais par prefixe : le filtre
+     * d'archivage a deja accepte `/supervision/` parce qu'il CONTIENT
+     * `/supervision`, et huit archivages avaient valide ce filtre sans qu'aucun
+     * ne puisse le refuter.
+     */
+    const archivees = partiesArchivees();
+    const table = tableDeRedirection();
+    constate('parties archivees', `${archivees.length} — ${archivees.join(' ')}`);
+    if (table === null) {
+        verifiePortage('la table de redirection est lisible', false,
+            'impossible de lire `LiensLegacy::REMPLACEMENTS` — la propriete suivante '
+            + 'se serait verifiee sur un ensemble VIDE, donc sur rien');
+    } else {
+        constate('entrees de `LiensLegacy::REMPLACEMENTS`', `${table.length}`);
+        const sansEntree = archivees.filter((p) => ! table.includes(`/${p}/`));
+        verifiePortage('chaque partie archivee porte son entree de redirection',
+            table.length > 0 && sansEntree.length === 0,
+            sansEntree.length === 0
+                ? `${archivees.length} partie(s) archivee(s), toutes redirigees`
+                : `${sansEntree.map((p) => `/${p}/`).join(' · ')} — archivee(s) sans entree dans `
+                  + '`LiensLegacy::REMPLACEMENTS`. Un resultat de recherche, un signet ou une '
+                  + 'documentation citant ce chemin mene a un 404 brut d\'Apache');
+    }
 
     if (CIBLE === 'legacy' && morts.length) {
         constate('defaut du legacy',
