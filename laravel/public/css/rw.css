@@ -517,6 +517,31 @@ body {
 
 .rw-vide__titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
 
+/*
+ * « RIEN A MONTRER » ET « LA LECTURE A ECHOUE » NE SE RESSEMBLENT PAS.
+ *
+ * Pose au sous-lot F2 de `fail2ban/`. Le legacy sort par `return` dans les deux
+ * cas, laissant la section cachee : les deux situations produisent exactement
+ * le meme ecran — rien (E-153). Or elles n'appellent pas le meme geste : l'une
+ * se constate, l'autre se reessaie. La variante d'ERREUR garde la forme de
+ * l'etat vide et change son signal, plutot que d'emprunter le bandeau d'erreur
+ * d'un formulaire, qui annoncerait une saisie fautive.
+ */
+.rw-vide--erreur {
+    border-style: solid;
+    border-color: var(--rw-danger);
+    background: var(--rw-danger-fond);
+}
+.rw-vide--erreur .rw-sous-titre-fort { color: var(--rw-danger); }
+
+/* Une adresse IP se compare CHIFFRE A CHIFFRE : en chasse proportionnelle, deux
+   adresses voisines ne s'alignent pas et la comparaison demande un effort. */
+.rw-tableau__mono {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 /* L'ACTION D'UN ETAT VIDE A BESOIN DE SON PROPRE ESPACE. `.rw-vide p` est a
    `margin: 0` — juste pour du texte, faux des qu'un bouton s'y trouve : sa
    hauteur de ligne recouvrait alors la derniere ligne du paragraphe au-dessus,
@@ -2045,4 +2070,121 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     tab-size: 4;
     white-space: pre;
     overflow-wrap: normal;
+}
+
+/*
+ * ══ LA FRISE D'ACTIVITE ═════════════════════════════════════════════════════
+ *
+ * Posee au sous-lot F2 de `fail2ban/`, et sa hauteur est le point.
+ *
+ * Le legacy ecrit `<div id="stats-chart" class="flex items-end gap-1 h-32">` et
+ * donne a chaque barre une hauteur en POURCENTAGE. `h-32` etant absente du CSS
+ * compile — PurgeCSS ne garde que ce qu'il a vu —, le cadre mesure **0 px**, et
+ * un pourcentage de zero fait zero : les trois barres declarent 4 %, 100 % et
+ * 12,5 % et sont rendues a **0 px**. La carte s'affiche vide, et elle a l'air
+ * normale (E-159, quatrieme occurrence de cette famille dans ce projet).
+ *
+ * Deux regles en sortent :
+ *   — la hauteur du cadre est posee ICI, dans le CSS du socle, jamais par une
+ *     classe utilitaire ;
+ *   — les barres recoivent une hauteur en PIXELS, calculee par le script sur
+ *     `clientHeight`. Aucune hauteur relative a un parent dont la hauteur
+ *     pourrait ne pas exister.
+ */
+.rw-frise {
+    margin: 12px 0 6px;
+    padding: 10px 12px 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    overflow-x: auto;
+}
+.rw-frise__barres {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 148px;
+    min-width: 100%;
+}
+/*
+ * UNE BARRE PORTE SA VALEUR, ET SA VALEUR SE LIT.
+ *
+ * `title` ne suffit pas : il n'apparait qu'au survol, donc jamais au doigt et
+ * jamais sur une capture. Le nombre est donc ECRIT au-dessus de la barre, et
+ * `aria-label` porte la phrase complete pour un lecteur d'ecran.
+ */
+.rw-frise__barre {
+    flex: 1 1 0;
+    min-width: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3px;
+}
+.rw-frise__valeur {
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--rw-texte-doux);
+    line-height: 1;
+}
+.rw-frise__corps {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    background: var(--rw-accent);
+}
+/* La couleur dit ce qui DOMINE dans la journee, pas seulement « il y a eu un
+   ban » : un jour de debans se lisait en vert comme un jour vide. */
+.rw-frise__corps--ban   { background: var(--rw-danger); }
+.rw-frise__corps--unban { background: var(--rw-succes); }
+.rw-frise__corps--mixte {
+    background: linear-gradient(to top, var(--rw-succes) var(--rw-part-unban, 50%),
+                                        var(--rw-danger) var(--rw-part-unban, 50%));
+}
+/*
+ * L'AXE DES DATES EST VISIBLE, PAS SURVOLE. Le legacy ne met les dates que dans
+ * `title` : invisibles au doigt, invisibles a un lecteur d'ecran, invisibles sur
+ * une capture. Une frise de 30 jours sans axe ne se lit pas.
+ */
+.rw-frise__axe {
+    display: flex;
+    gap: 3px;
+    margin-top: 6px;
+    padding-bottom: 8px;
+    min-width: 100%;
+}
+.rw-frise__date {
+    flex: 1 1 0;
+    min-width: 10px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--rw-texte-doux);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rw-frise__legende {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+}
+.rw-frise__cle {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-left: 10px;
+}
+.rw-frise__cle:first-child { margin-left: 0; }
+.rw-frise__cle--ban   { background: var(--rw-danger); }
+.rw-frise__cle--unban { background: var(--rw-succes); }
+
+/* Une valeur non resolue se DIT, elle ne se devine pas : un identifiant de
+   compte absent de la table reste lisible, et se signale comme tel. */
+.rw-non-resolu {
+    font-style: italic;
+    color: var(--rw-texte-doux);
 }

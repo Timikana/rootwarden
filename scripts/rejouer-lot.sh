@@ -350,6 +350,21 @@ declare -A REF_LARAVEL=(
   # `fail2ban_status` est prise a l'entree et remise a la sortie, sur les deux
   # cibles.
   [go-fail2ban-f1]=20
+  # `fail2ban/` sous-lot F2 : historique et frise, portes.
+  # 24 sur le portage contre 14 sur le legacy. L'ecart de DIX se decompose
+  # entierement, et ce sont dix `verifiePortage` — INFO cote legacy, PASS cote
+  # portage. Sept ecarts refermes (E-153 a E-159) :
+  #   1  un historique VIDE est annonce plutot que cache ;
+  #   1  un tableau tronque DIT qu'il l'est, et donne le total ;
+  #   1  la colonne « Par » nomme une personne ;
+  #   1  la frise occupe reellement de la hauteur (le legacy la rend a 0 px) ;
+  #   1  la hauteur d'une barre est PROPORTIONNELLE aux evenements ;
+  #   1  un jour sans ban mais avec des debans se distingue d'un jour vide ;
+  #   1  la frise porte des reperes de date VISIBLES ;
+  #   1  l'historique reste consultable quand la machine est injoignable ;
+  #   1  l'attribut `lang` suit la langue de l'interface ;
+  #   1  la date suit la langue de l'interface.
+  [go-fail2ban-f2]=24
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -590,7 +605,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
