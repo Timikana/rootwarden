@@ -746,6 +746,31 @@ et chacune bloque une session. Je ne les tranche pas.
    dédiée reste utile une fois la séparation des rôles obtenue. Un mot suffit.
 
 
+### ⚠ SIX BRANCHES NON MESURÉES SONT UNE SEULE DÉCISION, PAS SIX — et elle vous appartient
+
+Reformulation apportée le 2026-08-27, et elle vaut mieux que six discussions séparées.
+
+Le portage a écrit, ce jour, **six branches établies par LECTURE et mesurées par aucune suite** : le
+troisième état du préflight · E-189 · le chemin non concluant du scan · le badge « retirée du parc » · la
+ligne d'inventaire invalide · le ban de parc à portée non vide.
+
+> **Elles ont toutes la MÊME forme : un état que le banc ne peut pas produire sans qu'on le fabrique.**
+> Ce ne sont pas six dettes, c'est **une seule limite du banc, vue six fois.**
+
+Et la question n'est donc pas « écrire six fixtures » — chacune **déplacerait ce qu'elle mesure**, et
+aucune n'a été fabriquée pour cette raison. La question est :
+
+> **Veut-on une machine d'épreuve dont l'état est ANORMAL par construction ?** Sans `systemd`, sans
+> fail2ban, avec un `/etc/passwd` sale, un compte injoignable, un dump de clés qui échoue.
+
+**Une seule décision fermerait les six.** Ce que cela coûte : une machine de plus à tenir, et un banc dont
+l'état ne ressemble plus à la production. Ce que cela rend : six branches de code destructeur qui cessent
+d'être établies par lecture seule — **et ce sont, sans exception, des branches de la chaîne de K4 ou de la
+révocation d'accès.**
+
+Ce que cela **ne** demande pas : toucher `srv-zabbix`, ni `Test-Server-Debian`, dont l'état normal est
+précisément ce qui rend les six inatteignables.
+
 **Effets sortants, à autoriser avant tout test**
 - **A3** — la réinitialisation de mot de passe envoie un courriel (`phpmailer`). Réserves déjà mesurées :
   le jeton **circule dans la query string** (historique, `Referer`, journaux Apache), et **un compte sans

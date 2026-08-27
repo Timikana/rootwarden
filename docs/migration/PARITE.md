@@ -8707,3 +8707,43 @@ docstring.
 **Équivalence du refactor prouvée sur 24 valeurs — 0 écart.** *Un refactor qui changerait le verdict
 serait pire que le défaut qu'il corrige*, et cela ne se savait pas sans le mesurer. `pytest` :
 **509 passed, 1 xfailed** ; sonde des trois conditions : 12 assertions, 12 PASS.
+
+---
+
+## E-200 — Le drapeau d'E-199 n'existe que sur le chemin d'ÉCRITURE : un compte illisible est invisible tant que personne ne rescanne
+
+Relevé le 2026-08-27 **en portant la moitié écran d'E-199**, et vérifié : `server_user_inventory` porte
+**15 colonnes** — `username`, `uid`, `home_dir`, `shell`, `status`, `managed_by`, `notes`, `keys_count`,
+`has_platform_key`, `first_seen_at`, `last_seen_at`, `reviewed_at`, `reviewed_by`, `machine_id`, `id` —
+et **aucune n'est `nom_valide`**. Le drapeau est **calculé** par la route de scan (`ssh.py:1577`,
+`row['nom_valide'] = motif is None`).
+
+Or la page rend son inventaire **depuis la base, au chargement**. Elle ne voit donc le drapeau **qu'au
+retour d'un scan**.
+
+> **Un compte nommé `..` reste invisible sur cette page tant que personne n'a relancé un scan — c'est-à-dire
+> précisément dans l'état où on en aurait le plus besoin.**
+
+**Et le portage a REFUSÉ de recopier la règle en PHP**, alors que c'était plus court et que la règle est
+simple (vide · > 32 · `strip('.') == ''` · classe de caractères). La raison est celle du chantier : *la
+question « quels gestes sont offerts » est tranchée par le backend, et une règle recopiée finit par
+diverger de celle qui décide.* Ce dépôt en compte trois occurrences, dont deux corrigées le même jour
+(E-195, E-197). **Un écran qui offrirait un geste que le backend refuse — ou l'inverse — serait pire que
+l'écran actuel.**
+
+### Deux issues, et la seconde est préférée
+
+| issue | coût | forme |
+|---|---|---|
+| **persister** le verdict | une colonne, donc une **migration** | l'état est figé au dernier scan, et se périme comme lui |
+| **exposer sur un chemin de LECTURE** | une route qui rend l'inventaire avec ses drapeaux, **sans joindre la machine** | **remonter la règle de là où elle s'applique**, au lieu de la recalculer |
+
+La seconde est préférée, et **elle a exactement la forme de `GET /fail2ban/portee`** — la route obtenue
+pour la même raison, et dont le bien-fondé s'est vérifié tout seul le même jour quand la portée est passée
+de 2 à 3 machines sans qu'aucune inférence côté navigateur n'ait à suivre.
+
+### Un détail de conception à ne pas deviner
+
+Le nombre fait autorité par `invalides_count`, les noms par la liste. **Si les deux se contredisent, c'est
+le TOTAL DU SERVEUR qui gagne** : il compte tout, la liste ne porte que ce qui a voyagé. Sans cette règle,
+une liste tronquée aurait fait afficher un nombre **plus petit que la réalité** — la direction dangereuse.
