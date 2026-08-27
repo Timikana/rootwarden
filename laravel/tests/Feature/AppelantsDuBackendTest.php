@@ -145,7 +145,15 @@ class AppelantsDuBackendTest extends TestCase
          * sans que quelqu'un le nomme.
          */
         $attendus = [
-            'cles-ssh.js:189',            // /api/gateway/preflight_check — BACKEND
+            // `cles-ssh.js:189` A DISPARU DE CETTE LISTE LE 2026-08-27, et c'est
+            // le mécanisme entier qui a fonctionné : le fichier a changé, le
+            // déclencheur a rougi, on a REGARDÉ, et le changement était la
+            // fermeture d'E-189 — le préflight de déploiement de clés teste
+            // désormais `d.success !== true` au lieu du seul statut HTTP.
+            //
+            // Une liste qui se raccourcit se relit aussi attentivement qu'une
+            // liste qui s'allonge : un site qui sort peut être corrigé, ou
+            // simplement devenu invisible à l'analyseur.
             'journal-audit.js:73',        // routes Laravel
             'planification-cve.js:78',    // route Laravel
             'planification-cve.js:180',   // routes Laravel

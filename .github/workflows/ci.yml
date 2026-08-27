@@ -184,6 +184,15 @@ jobs:
         working-directory: laravel
         run: php artisan test
 
+      - name: Epreuve du deriveur de version (INF-004)
+        # HERMETIQUE : elle fabrique un depot jetable — avec une FUSION, sans
+        # laquelle la propriete d'unicite ne serait pas eprouvee — et n'a donc
+        # besoin ni de l'historique de celui-ci, ni du reseau. Elle est ici
+        # plutot que dans `auto-tag` parce qu'`auto-tag` ne tourne QUE sur les
+        # poussees vers `main` : la regle de version serait alors verifiee apres
+        # avoir servi.
+        run: ./scripts/version.sh --epreuve
+
   # ─────────────────────────────────────────────────────────────
   # Job 4 : Build Docker images (sans push - validation only)
   # ─────────────────────────────────────────────────────────────
@@ -461,12 +470,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Read version
+      - name: Deriver la version
         id: version
+        # INF-004 : LA VERSION SE DERIVE, ELLE NE SE LIT PLUS.
+        #
+        # Cette etape lisait `legacy/version.txt`, c'est-a-dire un numero POSE A
+        # LA MAIN — et le repli `|| echo "0.0.0"` transformait un fichier absent
+        # en version plausible, donc en tag plausible. Un numero assigne est
+        # valide au moment ou on l'ecrit, pas au moment ou un autre l'emploie :
+        # trois commits de trois sessions ont revendique le meme le 2026-08-27.
+        #
+        # `scripts/version.sh` derive le correctif du depot lui-meme
+        # (`--first-parent` depuis la derniere modification de `VERSION-JALON`),
+        # et il ECHOUE plutot que de deviner. `fetch-depth: 0` ci-dessus est ce
+        # qui le rend possible : sans l'historique complet, le compte serait faux.
+        #
+        # PAS DE CYCLE : la source est le fichier de jalon, jamais les tags — que
+        # ce job produit. Deriver depuis les tags ferait du tag sa propre source.
         run: |
-          VERSION=$(cat legacy/version.txt 2>/dev/null || echo "0.0.0")
+          VERSION=$(./scripts/version.sh)
           echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version detected: v${VERSION}"
+          echo "Version derivee : v${VERSION}"
 
       - name: Check if tag exists
         id: check
