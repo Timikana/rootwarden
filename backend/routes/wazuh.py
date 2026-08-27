@@ -756,7 +756,31 @@ def set_group():
         with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
             # Update /var/ossec/etc/shared/agent.conf ou marquer dans client.keys
             # V1 minimale : on redemarre pour re-inscription
-            execute_as_root(client, "systemctl restart wazuh-agent", root_pwd, logger=logger, timeout=30)
+            _, err_out, code = execute_as_root(
+                client, "systemctl restart wazuh-agent", root_pwd, logger=logger, timeout=30)
+
+        # ══ L'ETAT PERSISTE SUIT LE VERDICT, IL NE LE PRECEDE PAS ═══════════
+        #
+        # Ce bloc jetait le resultat du redemarrage, ecrivait `group_name` en
+        # base et rendait `success: True` quoi qu'il arrive. Or c'est le
+        # redemarrage QUI FAIT le geste : le commentaire ci-dessus le dit —
+        # « on redemarre pour re-inscription ». S'il echoue, l'agent reste dans
+        # son ancien groupe et la base affirme le nouveau. Personne ne peut plus
+        # savoir lequel est vrai, et l'ecran a confirme.
+        #
+        # Meme famille qu'E-90 (supervision) et qu'E-165 (fail2ban), et meme
+        # remede que celui deja pose sur `graylog/deploy` : l'inventaire suit ce
+        # qu'on a pu CONSTATER. Ici le constat est binaire — le service a
+        # redemarre, ou non — donc l'etat ne s'ecrit que dans le premier cas.
+        if code != 0:
+            _audit(user_id, 'set_group_fail',
+                   f"machine_id={row['id']} group={group} code={code}")
+            return jsonify({
+                'success': False,
+                'message': ("Redemarrage de l'agent echoue : le groupe n'a pas ete "
+                            "applique, l'agent reste dans son groupe precedent"),
+                'stderr': (err_out or '')[-1500:],
+            }), 500
 
         _upsert_agent(row['id'], group_name=group)
         _audit(user_id, 'set_group', f"machine_id={row['id']} group={group}")
