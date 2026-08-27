@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **206** — numérotés jusqu'à **E-219** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **208** — numérotés jusqu'à **E-221** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -3944,3 +3944,55 @@ contredite par l'usage. Donc, sur ces deux-là et sur eux seuls :
 *Une consigne corrigée trois fois n'est pas une mauvaise consigne : c'est une consigne dont chaque énoncé
 couvrait le cas qui l'avait motivée.* Et les trois corrections sont venues des sessions, jamais du Lead qui
 l'avait écrite.
+
+### UNE MESURE TROUVE, UNE LECTURE GÉNÉRALISE — ET LA PRÉ-RELECTURE TROUVE CE QU'AUCUNE DES DEUX NE VOIT SEULE (2026-08-27)
+
+Deux règles de méthode établies le même soir, sur le même écart, et elles se complètent.
+
+#### La preuve par le code est meilleure que la mesure sur le parc
+
+Sur E-219, la session 5 a mesuré les empreintes des trois `authorized_keys` : **une seule clé, trois comptes,
+dont root.** La session 3 a ensuite établi la même chose **par la lecture des quatre `printf` de `ssh.py`** —
+et la session 5 l'a dit elle-même :
+
+> *« La mienne établissait un fait sur ce parc, la sienne établit une propriété du code. Ce n'est pas un
+> accident de configuration, c'est la conception. »*
+
+**C'est l'exact envers du motif sur lequel ce chantier a buté toute la journée** — *une propriété qui tient
+par l'état du parc n'est pas une propriété* : E-205 sans porteur, les gabarits `--dport 22`, E-218 dont la
+réussite dépend du sudo du compte nominal, l'avertissement `srv-zabbix`.
+
+**Les deux étaient nécessaires, dans cet ordre : une mesure TROUVE, une lecture GÉNÉRALISE.** Et la seconde a
+été obtenue **sans joindre la production**, là où la première avait dû interroger le parc.
+
+#### La pré-relecture avant commit trouve ce que ni l'auteur ni le relecteur ne voient seuls
+
+**Trois fois le 2026-08-27, et c'est vérifiable** : le compte de connexion dérivé (P1), une porte sur trois
+(E-219), le privilège orphelin (E-220). **Aucun des trois n'était un défaut visible.**
+
+> *« Ce n'est pas la relecture d'un code suspect, c'est le croisement de deux lectures d'un code correct. »*
+> — session 5
+
+**Le rendement se mesure** : **cinq des vingt derniers écarts** ont été trouvés par une session qui lisait une
+route **pour une raison sans rapport** avec le défaut qu'elle y a vu — `/exclude_user` lu pour vérifier qu'un
+retrait d'affichage ne perdrait rien (E-213), `revoke_service_account` lu pour lui écrire un bouton (E-218,
+E-219), le correctif d'E-218 relu pour le valider (E-220), `scan_server_users` lu avant de le porter comme une
+« lecture » (le défaut de découpage).
+
+**La conséquence sur l'ordre de travail** : *la pré-relecture passe devant le portage*, et elle est passée
+devant I2 trois fois de suite avec raison. **Ce n'est pas de la prudence, c'est le poste le plus rentable du
+dispositif** — et il ne vient pas de la suspicion mais du décalage de point de vue.
+
+#### Corollaire : une leçon écrite ne s'applique pas toute seule
+
+La session 4 a failli ne pas relire les corps un par un **parce qu'elle venait justement d'écrire qu'il
+fallait le faire** — et sa sonde avait classé `apt_update`, la route la plus mutante des 28, en **lecture
+seule**, en lisant le NOM de la variable `command` au lieu de sa valeur.
+
+> **Écrire une règle donne le sentiment de l'avoir appliquée.** *Une leçon écrite la veille ne s'applique pas
+> toute seule le lendemain* — et c'est la seule fois de la journée où une sonde s'est trompée **dans le sens
+> rassurant**, exactement le cas dont le §8 disait le matin que *personne ne le verrait.*
+
+Il a été trouvé sans filet : ni ordre de grandeur invraisemblable, ni pair qui relise. **Uniquement en
+rouvrant les corps.** *Le seul garde-fou qui a fonctionné contre une erreur rassurante, c'est de refaire le
+travail.*
