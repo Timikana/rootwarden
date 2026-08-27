@@ -133,23 +133,31 @@
         return connus[code] || libelles.motif_inconnu || '';
     }
 
-    function rendIllisibles(donnees) {
+    /*
+     * LA LISTE ET LE COMPTE SONT PASSES, PAS DEVINES.
+     *
+     * Les deux routes ne nomment PAS leur liste pareil : `/scan_server_users`
+     * rend `users`, `/server_users_inventory` rend `comptes`. Un `a || b` aurait
+     * marche et aurait cache la difference — donc aurait casse en silence le jour
+     * ou l'une des deux change. L'appelant passe ce que SA route rend.
+     */
+    function rendIllisibles(toutes, compteServeur) {
         var encart = document.querySelector('[data-rw="distants-illisibles"]');
-        if (! encart) { return; }
-        var lignes = (donnees.users || []).filter(function (u) { return u.nom_valide === false; });
+        if (! encart) { return []; }
+        var lignes = (toutes || []).filter(function (u) { return u.nom_valide === false; });
         /*
          * `invalides_count` FAIT AUTORITE SUR LE NOMBRE, la liste sur les noms.
          * Les deux viennent du serveur ; si elles se contredisaient, c'est le
          * compte du serveur qui a raison — il porte le total, la liste ne porte
          * que ce qui a voyage.
          */
-        var total = Number(donnees.invalides_count);
+        var total = Number(compteServeur);
         if (! Number.isFinite(total)) { total = lignes.length; }
         if (total === 0) {
             encart.hidden = true;
             encart.innerHTML = '';
 
-            return;
+            return [];
         }
         encart.innerHTML = '';
         var titre = document.createElement('p');
@@ -164,7 +172,7 @@
         texte.textContent = (libelles.illisibles_texte || '')
             .replace('{nombre}', String(total))
             .replace('{liste}', lignes.map(function (u) {
-                return (u.name || u.username || '') + ' (' + libelleMotif(u.motif_invalide) + ')';
+                return (u.username || '') + ' (' + libelleMotif(u.motif_invalide) + ')';
             }).join(', '));
         encart.appendChild(texte);
 
@@ -177,8 +185,105 @@
         bloque.textContent = libelles.illisibles_bloquant || '';
         encart.appendChild(bloque);
 
+        // CE QUI RESTE POSSIBLE SE DIT AUSSI. Un ecran qui n'annonce que des
+        // interdits laisse croire qu'il n'y a rien a faire.
+        var quoi = document.createElement('p');
+        quoi.className = 'rw-prose';
+        quoi.textContent = (libelles.illisible_classable || '') + ' '
+            + (libelles.illisible_hors_gestes || '');
+        encart.appendChild(quoi);
+
         encart.hidden = false;
+
+        return lignes;
     }
+
+    /*
+     * ══ E-200 : L'INVENTAIRE, SES DRAPEAUX, AU CHARGEMENT ═════════════════
+     *
+     * `GET /server_users_inventory` applique la regle A LA LECTURE et ne joint
+     * aucune machine : la page peut donc l'appeler en s'ouvrant. Avant elle, le
+     * drapeau n'existait qu'au retour d'un scan, et un compte nomme `..` restait
+     * invisible tant que personne n'en relancait un — precisement l'etat ou l'on
+     * en a le plus besoin.
+     *
+     * ══ CE QUI EST RETIRE, ET CE QUI NE L'EST PAS ════════════════════════
+     *
+     * « Aucun geste offert » vise les gestes DISTANTS — retrait de cles, sshd,
+     * suppression — que le backend refuse sur un nom illisible. Le compte sort
+     * donc du selecteur de ces trois gestes.
+     *
+     * **Le CLASSEMENT de la ligne, lui, est conserve, et c'est important.** Ce
+     * n'est pas un geste distant : c'est un changement de statut en base, il
+     * aboutit sur un nom illisible — et c'est **le seul geste qui debloque** le
+     * deploiement de cles, puisque le compteur du preflight compte ces lignes
+     * deliberement. Le retirer aurait strande l'operateur : le preflight lui dit
+     * « classez-les », et la page ne lui aurait offert aucun moyen de le faire.
+     *
+     * La consigne « aucun geste offert » ne s'applique donc pas a un geste qui
+     * DEBLOQUE. Meme famille que « un nombre qui interdit un travail ne se
+     * filtre pas » : avant de retirer une commande, demander ce qu'elle PERMET.
+     */
+    function annoteInventaire() {
+        var bouton = document.querySelector('[data-rw="distants-scanner"]');
+        if (! bouton || ! libelles.url_inventaire) { return; }
+        var machine = parseInt(bouton.dataset.machine, 10);
+        if (! machine) { return; }
+
+        fetch(libelles.url_inventaire + '?machine_id=' + machine,
+            { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.json().catch(function () { return null; }); })
+            .then(function (d) {
+                if (! d || d.success !== true) { return; }
+                var illisibles = rendIllisibles(d.comptes || [], d.invalides_count);
+                var orphelines = 0;
+
+                illisibles.forEach(function (u) {
+                    var nom = u.username || '';
+                    var ligne = document.querySelector(
+                        '[data-rw="distant-ligne"][data-username="' + CSS.escape(nom) + '"]');
+                    if (! ligne) {
+                        /*
+                         * DEUX LECTURES, DEUX SOURCES. Le tableau est rendu par
+                         * le serveur depuis la base ; ces drapeaux viennent d'une
+                         * requete posterieure. Une ligne presente ici et absente
+                         * la veut dire que la base a bouge entre les deux — on le
+                         * DIT plutot que de l'ignorer, c'est le defaut « deux
+                         * sources pour la meme table » rendu visible.
+                         */
+                        orphelines += 1;
+
+                        return;
+                    }
+                    var etat = ligne.querySelector('[data-rw="distant-statut"]');
+                    if (etat && ! ligne.querySelector('[data-rw="distant-illisible"]')) {
+                        var marque = document.createElement('span');
+                        marque.className = 'rw-non-resolu';
+                        marque.setAttribute('data-rw', 'distant-illisible');
+                        marque.textContent = ' ' + (libelles.illisible_ligne || '')
+                            .replace('{motif}', libelleMotif(u.motif_invalide));
+                        etat.parentNode.appendChild(marque);
+                    }
+                    // Hors du choix des gestes DISTANTS, jamais du classement.
+                    var option = document.querySelector(
+                        '[data-rw="distants-geste-compte"] option[value="' + CSS.escape(nom) + '"]');
+                    if (option) { option.remove(); }
+                });
+
+                if (orphelines > 0) {
+                    var p = document.createElement('p');
+                    p.className = 'rw-annonce rw-annonce--attention';
+                    p.setAttribute('data-rw', 'distants-divergence');
+                    p.textContent = (libelles.illisible_divergence || '')
+                        .replace('{nombre}', String(orphelines));
+                    var encart = document.querySelector('[data-rw="distants-illisibles"]');
+                    if (encart) { encart.appendChild(p); }
+                }
+            })
+            .catch(function () { /* l'encart reste cache : on n'affirme rien */ });
+    }
+
+    annoteInventaire();
 
     /* ═══ Le scan ═════════════════════════════════════════════════════════ */
 
@@ -217,7 +322,7 @@
                 }
                 // Concluant ou non : `invalides_count` est calcule AVANT le
                 // verdict, donc l'information existe dans les deux cas.
-                if (d) { rendIllisibles(d); }
+                if (d) { rendIllisibles(d.users || [], d.invalides_count); }
                 boutonScan.disabled = false;
             });
         });

@@ -66,6 +66,11 @@ class ComptesDistantsController extends Controller
             'libelles' => [
                 'scan_en_cours' => __('distants.scan_en_cours'),
                 'scan_fait' => __('distants.scan_fait'),
+                'illisible_ligne' => __('distants.illisible_ligne', ['motif' => '{motif}']),
+                'illisible_classable' => __('distants.illisible_classable'),
+                'illisible_hors_gestes' => __('distants.illisible_hors_gestes'),
+                'illisible_divergence' => __('distants.illisible_divergence', ['nombre' => '{nombre}']),
+                'url_inventaire' => '/api/gateway/server_users_inventory',
                 'illisibles_titre' => __('distants.illisibles_titre'),
                 'illisibles_texte' => __('distants.illisibles_texte', ['nombre' => '{nombre}', 'liste' => '{liste}']),
                 'illisibles_bloquant' => __('distants.illisibles_bloquant'),
