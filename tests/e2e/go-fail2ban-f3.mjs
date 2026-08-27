@@ -319,19 +319,34 @@ try {
          * fichier. Rien ne distingue « voici la configuration » de « il n'y en a
          * pas ».
          */
-        const marqueur = /\[FICHIER ABSENT\]|\[FILE MISSING\]/i.test(vu.texte);
-        constate('la machine a-t-elle rendu le marqueur d\'absence ?', marqueur ? 'OUI' : 'non');
-        if (marqueur) {
-            const explique = /absent|introuvable|aucune configuration|not installed|no configuration|manquant/i
-                .test(vu.texteSection.replace(vu.texte, ''));
-            verifiePortage('un fichier ABSENT est annonce, pas affiche comme un contenu',
-                explique,
-                '« [FICHIER ABSENT] » est pose dans le meme bloc de code qu\'une vraie '
-                + 'configuration : le marqueur du shell devient le contenu du fichier');
-        } else {
-            verifie('le marqueur d\'absence a pu etre mesure', false,
-                `la machine a rendu autre chose : « ${vu.texte.slice(0, 60)} »`);
-        }
+        /*
+         * LA PROPRIETE NE SE MESURE PAS SUR LA FORME DU LEGACY.
+         *
+         * Une premiere redaction cherchait le marqueur `[FICHIER ABSENT]` DANS le
+         * bloc de contenu, puis n'assertionnait que s'il s'y trouvait. Sur le
+         * portage il ne s'y trouve pas — precisement parce que le portage l'a
+         * TRAITE — et la branche `else` declarait la mesure impossible. Une
+         * mesure taillee sur la cible defectueuse ne peut pas juger la cible
+         * corrigee.
+         *
+         * La propriete, elle, tient dans les deux cas : **le marqueur fabrique
+         * par le `|| echo` du shell ne s'affiche jamais comme le contenu du
+         * fichier**, et l'ecran dit quelque chose de l'absence.
+         */
+        const marqueurBrut = /\[FICHIER ABSENT\]/i.test(vu.texte);
+        const horsContenu = vu.texteSection.replace(vu.texte, '');
+        const explique = /absent|introuvable|n'existe pas|aucun|does not exist|no configuration|no log|manquant/i
+            .test(horsContenu);
+        constate('marqueur du shell affiche comme contenu ?', marqueurBrut ? 'OUI' : 'non');
+        constate('ce que l\'ecran dit d\'autre', horsContenu.replace(/\s+/g, ' ').trim().slice(0, 90) || '(rien)');
+        verifie('la section de configuration dit quelque chose',
+            vu.texteSection.trim().length > 0, '(section vide)');
+        verifiePortage('une configuration ABSENTE est annoncee, pas affiche comme un contenu',
+            ! marqueurBrut && explique,
+            marqueurBrut
+                ? '« [FICHIER ABSENT] » est pose dans le meme bloc qu\'un vrai contenu : '
+                  + 'le marqueur du shell devient le contenu du fichier'
+                : 'rien a l\'ecran ne nomme l\'absence');
     });
 
     // ═══ 3. LES JOURNAUX ════════════════════════════════════════════════
@@ -353,19 +368,34 @@ try {
             abouties.map((a) => a.route).join(' '));
         constate('contenu rendu', (vu.texte || '(vide)').slice(0, 90));
 
-        const marqueur = /\[LOG ABSENT\]|\[LOG MISSING\]/i.test(vu.texte);
-        constate('la machine a-t-elle rendu le marqueur d\'absence ?', marqueur ? 'OUI' : 'non');
-        if (marqueur) {
-            const explique = /absent|introuvable|aucun journal|no log|manquant|jamais/i
-                .test(vu.texteSection.replace(vu.texte, ''));
-            verifiePortage('un journal ABSENT est annonce, pas affiche comme un contenu',
-                explique,
-                '« [LOG ABSENT] » est pose dans le meme bloc que de vraies lignes de '
-                + 'journal : le marqueur du shell devient le journal');
-        } else {
-            verifie('le marqueur d\'absence a pu etre mesure', false,
-                `la machine a rendu autre chose : « ${vu.texte.slice(0, 60)} »`);
-        }
+        /*
+         * LA PROPRIETE NE SE MESURE PAS SUR LA FORME DU LEGACY.
+         *
+         * Une premiere redaction cherchait le marqueur `[LOG ABSENT]` DANS le
+         * bloc de contenu, puis n'assertionnait que s'il s'y trouvait. Sur le
+         * portage il ne s'y trouve pas — precisement parce que le portage l'a
+         * TRAITE — et la branche `else` declarait la mesure impossible. Une
+         * mesure taillee sur la cible defectueuse ne peut pas juger la cible
+         * corrigee.
+         *
+         * La propriete, elle, tient dans les deux cas : **le marqueur fabrique
+         * par le `|| echo` du shell ne s'affiche jamais comme le contenu du
+         * fichier**, et l'ecran dit quelque chose de l'absence.
+         */
+        const marqueurBrut = /\[LOG ABSENT\]/i.test(vu.texte);
+        const horsContenu = vu.texteSection.replace(vu.texte, '');
+        const explique = /absent|introuvable|n'existe pas|aucun|does not exist|no configuration|no log|manquant/i
+            .test(horsContenu);
+        constate('marqueur du shell affiche comme contenu ?', marqueurBrut ? 'OUI' : 'non');
+        constate('ce que l\'ecran dit d\'autre', horsContenu.replace(/\s+/g, ' ').trim().slice(0, 90) || '(rien)');
+        verifie('la section journal dit quelque chose',
+            vu.texteSection.trim().length > 0, '(section vide)');
+        verifiePortage('un journal ABSENT est annonce, pas affiche comme un contenu',
+            ! marqueurBrut && explique,
+            marqueurBrut
+                ? '« [LOG ABSENT] » est pose dans le meme bloc qu\'un vrai contenu : '
+                  + 'le marqueur du shell devient le contenu du fichier'
+                : 'rien a l\'ecran ne nomme l\'absence');
     });
 
     // ═══ 3bis. LES SERVICES DETECTES ════════════════════════════════════
@@ -441,10 +471,35 @@ try {
          * vide, `viseeReelle` valait `null`, et l'assertion passait **faute
          * d'objet** — sixieme faux PASS de la meme famille sur ce module.
          */
-        const avantA = abouties.length;
-        const avantB = avortees.length;
-        await cliqueEtAttend(page, C.boutonLogs, true);
-        const emises = [...abouties.slice(avantA), ...avortees.slice(avantB)];
+        /*
+         * DEUX FAÇONS DE NE PAS VISER LA MAUVAISE MACHINE.
+         *
+         * Le portage RECACHE ses deux boutons de lecture des qu'on change de
+         * machine : ils ne se rouvrent qu'apres un releve qui dit que fail2ban
+         * est installe SUR CETTE machine. Le geste n'est donc plus offert — et
+         * cela satisfait la propriete tout autant que « le bouton vise la
+         * machine affichee ».
+         *
+         * Une premiere redaction cliquait sans regarder : Puppeteer levait
+         * « Node is either not clickable », et l'etape entiere echouait sur une
+         * cible qui a RAISON. On mesure donc d'abord si le geste est offert, et
+         * **on dit lequel des deux cas on observe** — jamais un PASS muet.
+         */
+        const utilisable = await page.evaluate((sel) => {
+            const b = document.querySelector(sel);
+
+            return b ? (b.offsetParent !== null && ! b.hidden && ! b.disabled) : false;
+        }, C.boutonLogs);
+        constate('le geste est-il encore offert apres le changement de machine ?',
+            utilisable ? 'OUI' : 'non — il a ete retire');
+
+        let emises = [];
+        if (utilisable) {
+            const avantA = abouties.length;
+            const avantB = avortees.length;
+            await cliqueEtAttend(page, C.boutonLogs, true);
+            emises = [...abouties.slice(avantA), ...avortees.slice(avantB)];
+        }
         const versLogs = emises.filter((e) => /logs/.test(e.route));
         constate('requetes emises', emises.map((e) => `${e.route}→${e.machine}`).join(' ') || '(aucune)');
 
@@ -457,10 +512,11 @@ try {
         /* L'INSTRUMENT D'ABORD : sans requete, la propriete n'a pas d'objet et
          * ne peut pas etre « satisfaite ». On le dit par un FAIL, pas par un
          * silence. */
-        verifie('le clic a bien emis une lecture de journaux', viseeReelle !== null,
-            emises.map((e) => e.route).join(' ') || '(aucune requete)');
-        verifiePortage('le bouton vise la machine que le selecteur AFFICHE',
-            viseeReelle === MACHINE_PRODUCTION,
+        verifie('la mesure a eu un objet',
+            utilisable ? viseeReelle !== null : true,
+            'le bouton etait cliquable et pourtant aucune lecture n\'est partie');
+        verifiePortage('aucun geste ne peut viser une machine que l\'ecran n\'affiche pas',
+            ! utilisable || viseeReelle === MACHINE_PRODUCTION,
             `le selecteur affiche « ${choisie} » et la requete part vers la machine `
             + `${viseeReelle} — \`_currentServer\` l'emporte sur \`getServer()\`, et douze `
             + 'gestes du module sur treize lisent `_currentServer`');
@@ -567,7 +623,28 @@ try {
     await etape('captures', async () => {
         const dossier = `${DOSSIER_CAPTURES}/${CIBLE}`;
         mkdirSync(dossier, { recursive: true });
+        /*
+         * UNE CAPTURE DOIT MONTRER UN ETAT ATTEIGNABLE — ET CELUI DU SOUS-LOT.
+         *
+         * Une premiere redaction se contentait de re-choisir la machine. Or le
+         * portage RECACHE les sections de F3 des qu'on change de machine : les
+         * images ne montraient donc rien de ce que F3 produit. On refait ici le
+         * parcours complet — relever, lire la configuration, lire le journal —
+         * pour photographier ce que le sous-lot rend vraiment.
+         */
         await choisitMachine(page, MACHINE_ID);
+        await cliqueEtAttend(page, C.relever, false);
+        const offert = await page.evaluate((sel) => {
+            const b = document.querySelector(sel);
+
+            return b ? (b.offsetParent !== null && ! b.hidden && ! b.disabled) : false;
+        }, C.boutonConfig);
+        if (offert) {
+            await cliqueEtAttend(page, C.boutonConfig, true);
+            await cliqueEtAttend(page, C.boutonLogs, true);
+        }
+        verifie('les captures montrent l\'etat produit par F3', offert,
+            'les deux lectures n\'etaient pas offertes au moment de la capture');
         for (const f of [{ n: 'grand', w: 1920, h: 1080 }, { n: 'bureau', w: 1400, h: 900 },
                          { n: 'mobile', w: 390, h: 844 }]) {
             await page.setViewport({ width: f.w, height: f.h });

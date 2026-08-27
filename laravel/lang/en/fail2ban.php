@@ -35,9 +35,11 @@ return [
     'jails_aucune' => 'No active jail. Fail2ban is running, but watching nothing.',
     // Plurals are composed, not parenthesised: « 1 bannies » reached the
     // screen — visible in a capture, invisible to every assertion.
-    'jails_une' => '1 jail',
+    // The count is always substituted, even in the singular form: it also
+    // serves zero, and a hard-coded "1" showed "1 banned address" for none.
+    'jails_une' => ':nb jail',
     'jails_plusieurs' => ':nb jails',
-    'adresses_une' => '1 banned address',
+    'adresses_une' => ':nb banned address',
     'adresses_plusieurs' => ':nb banned addresses',
     'bannies' => 'banned',
     'compte_bannies_une' => ':nb banned',
@@ -81,4 +83,25 @@ return [
     'frise_jour' => ':date — :bans banned, :unbans unbanned',
     'frise_legende_ban' => 'bans',
     'frise_legende_unban' => 'unbans',
+
+    // ── Sub-lot F3: configuration, logs, services ────────────────────────
+    'voir_config' => 'View jail.local',
+    'voir_logs' => 'View logs',
+    'config_titre' => 'Configuration — /etc/fail2ban/jail.local',
+    'logs_titre' => 'Log — /var/log/fail2ban.log',
+    'lu_a_l_instant' => 'Read just now on :machine.',
+    'fichier_absent_titre' => 'This file does not exist on the machine',
+    'fichier_absent' => 'The machine replied that no configuration file is present. This is not an empty configuration: there is none.',
+    'journal_absent_titre' => 'This log does not exist on the machine',
+    'journal_absent' => 'The machine replied that no log file is present. Fail2ban has therefore written nothing there yet — or is not running.',
+    'lecture_echec_titre' => 'The read failed',
+    'lecture_echec' => 'The machine did not answer, or refused the read. That is not the same as a missing file.',
+    'services_titre' => 'Detected services and available jails',
+    'services_aide' => 'What the machine replied to the detection. A service that is not installed cannot be watched: its jail would have nothing to read.',
+    'services_installe' => 'Installed',
+    'services_absent' => 'Not installed',
+    'services_jails' => 'Jails:',
+    'services_jail_active' => 'active',
+    'services_vide_titre' => 'No service detected',
+    'services_vide' => 'The detection reported no service. Fail2ban therefore has nothing to watch on this machine.',
 ];

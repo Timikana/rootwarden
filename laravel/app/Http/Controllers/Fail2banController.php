@@ -62,6 +62,12 @@ class Fail2banController extends Controller
             'histo_echec', 'histo_tout', 'histo_tronque',
             'action_ban', 'action_unban', 'par_inconnu', 'par_repli', 'par_repli_aide',
             'frise_vide_titre', 'frise_vide', 'frise_jour',
+            // F3
+            'lu_a_l_instant', 'fichier_absent_titre', 'fichier_absent',
+            'journal_absent_titre', 'journal_absent',
+            'lecture_echec_titre', 'lecture_echec',
+            'services_installe', 'services_absent', 'services_jails',
+            'services_jail_active', 'services_vide_titre', 'services_vide',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }

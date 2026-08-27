@@ -50,6 +50,18 @@
     <p class="rw-aide" role="status" aria-live="polite"
        data-rw="f2b-etat-message">{{ __('fail2ban.choisir') }}</p>
     <div class="rw-actions">
+        {{--
+            LES DEUX LECTURES SONT DES ACTIONS SECONDAIRES, donc a gauche : le
+            geste principal de cette page reste le releve. Elles restent cachees
+            tant qu'aucun releve n'a dit que fail2ban est installe — proposer de
+            lire un fichier dont on sait qu'il n'existe pas n'est pas une offre.
+        --}}
+        <div class="rw-actions__gauche">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="f2b-voir-config" hidden>{{ __('fail2ban.voir_config') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="f2b-voir-logs" hidden>{{ __('fail2ban.voir_logs') }}</button>
+        </div>
         <button type="button" class="rw-bouton" data-rw="f2b-relever"
                 disabled>{{ __('fail2ban.relever') }}</button>
     </div>
@@ -122,6 +134,44 @@
     <h2 class="rw-section__entete">{{ __('fail2ban.jails') }}</h2>
     <p class="rw-aide" data-rw="f2b-jails-compte"></p>
     <div class="rw-grille" data-rw="f2b-jails"></div>
+</div>
+
+<div class="rw-section" data-rw="f2b-services-bloc" hidden>
+    <h2 class="rw-section__entete">{{ __('fail2ban.services_titre') }}</h2>
+    <p class="rw-aide">{{ __('fail2ban.services_aide') }}</p>
+    <div data-rw="f2b-services-message"></div>
+    {{--
+        UN SERVICE ABSENT SE DIT, IL NE SE DEVINE PAS A UNE OPACITE.
+
+        Le legacy distingue installe et absent par `opacity-50` — une classe
+        Tailwind. Elle n'est pas purgee aujourd'hui (mesure : 1 et 0.5), mais une
+        distinction qui ne tient qu'a une classe utilitaire est a un purge pres
+        de disparaitre, et elle ne dit rien a un lecteur d'ecran. Chaque ligne
+        porte donc le MOT.
+    --}}
+    <div class="rw-liste-etats" data-rw="f2b-services"></div>
+</div>
+
+{{--
+    ── UN FICHIER DISTANT, ET CE QUI ARRIVE QUAND IL N'EXISTE PAS ──────────
+
+    Les deux commandes se terminent par `|| echo "[FICHIER ABSENT]"`. Le legacy
+    pose ce retour dans le meme bloc vert sur noir qu'une vraie configuration :
+    le marqueur du shell devient le contenu du fichier (E-161). Ici, l'absence
+    est reconnue et ANNONCEE, dans la langue de l'interface.
+--}}
+<div class="rw-section" data-rw="f2b-config" hidden>
+    <h2 class="rw-section__entete">{{ __('fail2ban.config_titre') }}</h2>
+    <p class="rw-aide" data-rw="f2b-config-source"></p>
+    <div data-rw="f2b-config-message"></div>
+    <pre class="rw-fichier" data-rw="f2b-config-contenu" hidden></pre>
+</div>
+
+<div class="rw-section" data-rw="f2b-logs" hidden>
+    <h2 class="rw-section__entete">{{ __('fail2ban.logs_titre') }}</h2>
+    <p class="rw-aide" data-rw="f2b-logs-source"></p>
+    <div data-rw="f2b-logs-message"></div>
+    <pre class="rw-fichier" data-rw="f2b-logs-contenu" hidden></pre>
 </div>
 
 {{--

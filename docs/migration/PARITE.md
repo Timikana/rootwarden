@@ -7045,5 +7045,11 @@ Deux remarques :
   `max(10, min(500, int(lines)))` (`fail2ban_manager.py:253`). La route double donc une validation
   qu'elle fait moins bien que le manager — et c'est sa copie qui casse.
 
-Une faute de la requête est rendue comme un défaut du serveur. **Touche le backend de production** :
-porté au §7 du plan avec les six autres correctifs backend en attente d'arbitrage.
+Une faute de la requête est rendue comme un défaut du serveur.
+
+**CORRIGÉ dans le backend le 2026-08-27 (`v1.38.4`).** Le cast est passé dans un `try`, et une valeur
+non numérique rend désormais **400** avec un message JSON. C'est §3.2 du plan qui l'autorise — « les
+modifications backend et legacy sont autorisées, ne plus bloquer, ne plus demander » — et ce
+correctif n'est **pas** de la même nature que les six qui attendent un arbitrage : ceux-là sont des
+gardes d'accès manquantes, celui-ci une validation d'entrée. Mesuré après coup : **400**, sur les
+deux portails, puisqu'ils partagent le backend.

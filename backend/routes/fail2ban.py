@@ -533,7 +533,21 @@ def fail2ban_templates():
 def fail2ban_logs():
     """Lit les dernieres lignes du log fail2ban."""
     data = request.get_json(silent=True) or {}
-    lines = int(data.get('lines', 50))
+    # UNE FAUTE DE LA REQUETE SE REFUSE, ELLE NE CASSE PAS.
+    #
+    # Ce cast etait hors du `try` de la route : un `lines` non numerique y levait
+    # une `ValueError` que rien n'attrapait, et Flask rendait une page **HTML**
+    # « 500 Internal Server Error » — pas meme du JSON, donc le frontend echouait
+    # aussi a la lire. La faute etait dans la requete, le statut disait qu'elle
+    # etait dans le serveur (E-164, mesure le 2026-08-27).
+    #
+    # La borne, elle, existait deja — mais ailleurs : `get_fail2ban_logs` fait
+    # `max(10, min(500, int(lines)))`. La route doublait donc une validation
+    # qu'elle faisait moins bien, et c'est sa copie qui cassait.
+    try:
+        lines = int(data.get('lines', 50))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'lines doit etre un nombre'}), 400
 
     ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
     if err:
