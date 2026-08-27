@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.44** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.45** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,76 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.45 — un refus d'acces deguise en incapacite de lecture, et la rotation est le seul remede a une cle compromise
+
+#### Le predicat d'E-217 est consomme — et la garde a ete refusee au bon etage
+
+`GET /machines/credential-status` est ajoutee a la liste blanche de la passerelle **et refusee dans
+`ADMIN_SEULEMENT`**. Ce groupe exige un role >= 2 a la passerelle — **or la page s'ouvre des le role 1 avec la
+permission.** L'y mettre aurait rendu la reponse inaccessible a des comptes que la page admet, et l'ecran
+aurait affiche **« indetermine » partout**.
+
+> **Un refus d'acces deguise en incapacite de lecture — exactement l'inverse de ce que le troisieme etat
+> existe pour dire.** `null` signifie « je n'ai pas su lire le secret », pas « on ne m'a pas laisse demander ».
+
+*Une garde posee au mauvais etage ne refuse pas : elle fabrique une donnee fausse.* Et la fausse donnee est
+**rassurante pour la garde** (rien ne fuit) et **trompeuse pour l'ecran** — c'est le `non_resolus` du backend
+qui aurait menti, sur le champ meme qui existe pour dire l'ignorance honnetement. Borne retenue :
+`check_machine_access` **dans le corps**, comme `/list_machines`. Meme regime que `/server_users_inventory`
+(E-200) : jamais `ALLOWED_PROXY_PREFIXES` du proxy legacy. Verifie **par segment** — `/machines` seul refuse,
+`/machines/credential-statusX` refuse.
+
+#### Deux choix d'affichage symetriques, poses le meme soir
+
+- **le badge s'AJOUTE au texte du serveur, il ne le remplace pas** — *effacer le texte serveur aurait cache la
+  divergence au lieu de la nommer*, ce que le portage avait deja choisi contre E-207 ;
+- **un echec de la requete ne valide rien** : l'encart annonce que les compteurs restent approximatifs. *Le
+  silence aurait laisse croire a un accord* — **« je ne sais pas » deguise en « c'est vrai », le symetrique
+  exact du defaut ci-dessus.**
+
+#### ⚠ Et le predicat corrige la moitie la MOINS importante
+
+    ssh.py:2632   SELECT id, name, password, service_account_deployed, platform_key_deployed
+                  -- `root_password` N'Y FIGURE PAS
+
+Releve par la session 3 **en le consommant**, donc en ecrivant le code qui s'appuie dessus. `root_password` est
+la colonne **sans aucun chemin de reecriture depuis cette page** — celle qui porte **E-207** (la page Serveurs
+la reecrit sans toucher le drapeau), la trouvaille « ressaisir n'en rend que la moitie », **et le maillon final
+d'E-218 et E-219.** Son etat affiche reste calcule sur `(colonne <> '')`, avec l'approximation qu'on vient de
+corriger sur l'autre colonne. **Dit a l'ecran** plutot que suppose — *moins plutot que faux* — mais l'ecart
+subsiste.
+
+#### Une portee gardee telle quelle, et la bonne raison
+
+Apres E-220, l'**intention** de la precondition `service_account_deployed` reste juste ; son **entree** peut
+etre perimee. **La portee est gardee inchangee** : c'est la meme condition que le backend, et proposer plus
+etroit ferait **diverger deux regles au lieu d'une.** *Un drapeau de moins vaut mieux qu'une regle en double.*
+
+**C'est la reserve que trois sessions ont opposee au Lead aujourd'hui, appliquee dans l'autre sens** : elles ont
+refuse d'unifier la ou les domaines differaient ; ici on refuse de **diverger** la ou ils sont identiques. *La
+regle n'est ni « unifier » ni « distinguer » — c'est « nommer le domaine, puis suivre ce qu'il dit ».*
+
+#### ⚠ La rotation est le seul remede a une cle compromise, et le portail attribue ce cas a un autre bouton
+
+**Consequence d'E-219 sur P4, et elle deplace l'arbitrage.** `revoke_service_account` porte « compromission
+suspectee de la cle Ed25519 plateforme » dans sa docstring et **laisse la cle autorisee sur `root`**. Donc :
+
+> **P4 n'est pas seulement « le geste le plus large » du module : c'est le SEUL qui reponde au cas d'usage que
+> le portail attribue a un autre bouton.**
+
+**Tant que la docstring designe la revocation pour une compromission, le geste qui repond reellement au cas
+n'est documente nulle part.** Corriger le texte de la revocation **sans dire ou est le vrai remede** laisserait
+l'exploitant sans reponse au meme incident. *Un texte faux retire sans son remplacement ne corrige pas la
+desinformation : il la rend muette.* Le panneau de P4 doit le dire — seul endroit ou l'information arrive au
+moment ou elle sert.
+
+#### La consigne des fichiers partages, verifiee empiriquement deux fois en une heure
+
+`git diff --numstat` a rendu **80 / 2** sur `CHANGELOG.md` — du travail non commite d'une autre session. Retrait,
+entree gardee hors du depot, reprise a **67 / 0**. Et **deux numeros de version differents parce qu'ils ont ete
+relus au dernier moment** : 1.38.40 puis 1.38.43, la ou 1.38.38 puis 1.38.40 avaient d'abord ete ecrits.
+*Reserver un numero en debut de lot est la faute ; le lire juste avant est la parade.*
+
 ### v1.38.44 — E-220 : un privilege dormant qu'aucun chemin du produit ne peut retirer
 
 **L'etat.** Quand la revocation du compte de service se termine sur `exit 2`, le compte est supprime
@@ -3866,7 +3936,9 @@ correspondance reelle :**
 | v1.38.39 | `77fac52` | le correctif du Lead etait faux trois fois — dont une qui armait un piege |
 | v1.38.40 | `94f08e6` | la reserve d'E-218 reecrite : levee pour la revocation, elle TIENT pour la reprise |
 | **v1.38.41** | `8a6ff5e` | **E-219 : le kill-switch laisse la meme cle sur root** ; le pathspec et les deux fichiers partages |
-| **v1.38.42** | (ce commit) | **E-220 privilege orphelin sans nom** ; **E-221 elevation atteignable** ; deux regles de methode |
+| **v1.38.42** | `6e11992` | **E-220 privilege orphelin sans nom** ; **E-221 elevation atteignable** ; deux regles de methode |
+| v1.38.43 | `c664596` | le predicat d'E-217 consomme par le portage |
+| v1.38.45 | (ce commit) | un refus d'acces deguise en incapacite de lecture ; la rotation, seul remede |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
