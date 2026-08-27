@@ -125,10 +125,11 @@ class AppelantsDuBackendTest extends TestCase
         }
 
         $this->assertSame([], $modifies,
-            "Des fichiers JavaScript ont changé depuis leur dernier examen.\n"
-            . "CE N'EST PAS UNE ACCUSATION : c'est le moment de regarder si un appelant\n"
-            . "neuf consomme un verdict sans le lire. Rejouer l'analyseur, LIRE sa sortie,\n"
-            . "puis rafraîchir l'instantané dans le même commit que la modification :\n"
+            "CE ROUGE N'ACCUSE PERSONNE : il dit « ce fichier n'a pas été relu par\n"
+            . "l'analyseur depuis qu'il a changé ».\n\n"
+            . "C'est le moment de regarder si un appelant neuf consomme un verdict sans le\n"
+            . "lire. Rejouer l'analyseur, LIRE sa sortie, puis rafraîchir l'instantané dans\n"
+            . "le même commit que la modification :\n"
             . '  ' . $this->commande() . "\n"
             . json_encode($modifies, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }

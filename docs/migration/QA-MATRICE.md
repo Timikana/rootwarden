@@ -337,6 +337,74 @@ et à inscrire ici.
 
 ---
 
+## 3 bis. QA-006 — la passerelle, et la propriété qui se mesure au RÉSEAU
+
+`laravel/tests/Feature/PasserelleTest.php` · **28 PASS, 68 assertions, 0 FAIL**
+
+Les 85 autres routes portent leurs gardes sur leur **déclaration**. Celle-ci relaie
+**~200 routes du backend** derrière une seule déclaration qui ne porte que
+`session.authentifiee` : ses quatre contrôles vivent **dans le code**, et rien ne les
+mesurait côté PHP.
+
+### Un 403 ne prouve pas qu'aucun octet n'est sorti
+
+Un refus rendu par la passerelle pourrait très bien suivre une requête **déjà
+transmise** : l'appelant ne verrait aucune différence, et le backend aurait travaillé.
+Chaque refus est donc mesuré **deux fois** — le statut, et `Http::assertNothingSent()`.
+
+> C'est « mesurer l'EFFET d'une garde, pas sa FORME », appliqué au bon niveau : ce qui
+> compte n'est pas le message, c'est qu'aucun octet ne soit parti.
+
+### Preuve d'échec — les quatre contrôles retirés un par un
+
+| contrôle retiré | rouges |
+|---|---|
+| traversée de chemin | **3** |
+| liste blanche | **4** |
+| réserve administration | **3** |
+| re-authentification ponctuelle | **5** |
+
+Ensembles **disjoints** : la suite dit *lequel* des quatre a disparu. Mutations faites
+sur une **copie** (`cp -a /var/www/html /tmp/mutl`) — le dépôt n'a pas été touché.
+
+**Un rouge mérite d'être nommé** : en retirant le step-up, le test du chemin
+**AUTORISÉ** rougit aussi. Il n'asserte pas seulement un 200, il asserte que la
+passerelle a **interrogé** `StepUp` sur le nom de cette route-là. Une assertion de
+statut seule n'aurait rien vu — la route passe encore, simplement sans plus être
+gardée.
+
+### Deux protections du contrôleur sont INATTEIGNABLES par le web
+
+Mesuré, et une relecture ne l'aurait jamais donné, parce que le code est correct :
+
+| forme | ce qui se passe réellement |
+|---|---|
+| `//list_machines` | le **cadre normalise** la double barre avant le routage ; le contrôleur reçoit `/list_machines` et **transmet** |
+| `…\..\secret` | le **cadre refuse** l'anti-slash lui-même, avant le contrôleur |
+
+**Ce n'est pas un trou** — l'une est neutralisée, l'autre refusée plus tôt. C'est une
+garde **présente et sans objet**, même famille que `@require_machine_access` inerte sur
+57 routes. Le dire évite qu'on la croie protectrice, **et surtout qu'on la retire un
+jour en la prenant pour du code mort** : elle protégerait encore un appelant qui n'est
+pas un navigateur.
+
+### La divergence VOULUE avec le legacy est tenue par une assertion
+
+`/supervision/` est **absent** de `ADMIN_ONLY_PREFIXES` côté legacy ; ce portage l'y
+ajoute. Une divergence non déclarée se relit comme une erreur et se « corrige » à
+l'envers : l'assertion dit que le refus opposé au rôle 1 est **délibéré**.
+
+De même, la comparaison **par segment** (`/searchall` refusé, `/search/xyz` accepté) est
+mesurée, faute de quoi le resserrement pourrait être défait par une simplification qui
+« ne change rien ».
+
+### Un piège de l'outillage, payé et écrit
+
+`Http::fake()` **fusionne** les stubs au lieu de les remplacer : un second appel dans un
+test ne prend pas la main sur celui de `setUp`. Deux tests annonçaient un 404 et
+recevaient un 200 — ils échouaient pour une faute de l'**instrument**. La parade est un
+stub **unique** qui lit une propriété modifiable en cours de test.
+
 ## 4. Ce que la mesure a trouvé — à arbitrer par le Lead
 
 Aucun de ces points n'a été corrigé : la session QA qualifie et transmet.
@@ -571,6 +639,8 @@ la seule réparation qui ne coûte rien à personne.
 | 2026-08-27 | jobs de la CI, recomptés **par un analyseur YAML** | **13** avant, **14** avec `test-php`. Mon `grep` en annonçait 14 : il comptait `push:` |
 | 2026-08-27 | `test_ssh_scan_users.py` (E-183 + E-187) | **19 passed** ; suite complète **483 passed, 1 xfailed** |
 | 2026-08-27 | 4 mutations d'E-183/E-187, **sur une copie dans le conteneur** | **8, 3, 1 et 3 rouges**, ensembles distincts — le dépôt n'a pas été touché |
+| 2026-08-27 | QA-005 — relevé des appelants (`acorn`) | **50 appels / 29 fichiers** ; 5 à examiner, tous qualifiés ; 4 tests, 12 assertions |
+| 2026-08-27 | QA-006 — `PasserelleTest` | **28 passed, 68 assertions** ; 4 mutations → **3, 4, 3 et 5 rouges** disjoints |
 
 Chaque chiffre porte sa commande de remesure :
 
