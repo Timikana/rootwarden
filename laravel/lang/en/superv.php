@@ -164,6 +164,7 @@ return [
     'version_absente' => 'No agent installed on :nom. The previous record was cleared.',
     // A REFUSAL IS NOT "NO AGENT": a client that does not read the status would
     // conclude "nothing installed" without having measured anything.
+    'version_non_concluante' => "The probe could not read anything on :nom: we do not know whether an agent is installed there. The recorded reading was NOT modified.",
     'version_refus' => 'The read was refused (status :statut). No conclusion can be drawn from it.',
     'version_echec' => 'The read did not complete: the server may be unreachable.',
     'aucune_machine_aide' => 'Every machine is archived, or the fleet is empty.',

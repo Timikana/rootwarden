@@ -165,6 +165,7 @@ return [
     'version_absente' => 'Aucun agent installe sur :nom. Le releve precedent a ete efface.',
     // UN REFUS NE SE CONFOND PAS AVEC « AUCUN AGENT » : un client qui ne lit pas
     // le statut conclurait « rien d'installe » sans avoir rien mesure.
+    'version_non_concluante' => "La sonde n'a rien pu lire sur :nom : on ne sait pas si un agent y est installe. Le releve enregistre n'a PAS ete modifie.",
     'version_refus' => 'La lecture a ete refusee (statut :statut). Aucune conclusion ne peut en etre tiree.',
     'version_echec' => 'La lecture n\'a pas abouti : le serveur est peut-etre injoignable.',
     'aucune_machine_aide' => 'Toutes les machines sont archivees, ou le parc est vide.',
