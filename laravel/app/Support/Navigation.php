@@ -24,50 +24,98 @@ namespace App\Support;
 class Navigation
 {
     /**
-     * Releve fidele du menu de legacy/menu.php au 2026-08-18 : 32 entrees,
-     * 3 sections. Les gardes sont celles du legacy, a l'identique.
+     * L'ORDRE DU MENU SUIT LA SEQUENCE OPERATIONNELLE, PAS UNE IMPORTANCE.
+     *
+     * NAV-001, decide par l'exploitant. Sa formulation donne le principe mieux
+     * que la consigne qu'il avait d'abord donnee : *quand on ajoute un serveur,
+     * les menus ou il faut aller ensuite sont « Cle SSH plateforme » puis
+     * « Utilisateurs distants » — et un nouvel utilisateur ne le sait pas.*
+     *
+     * La premiere section est donc LITTERALEMENT le parcours d'un serveur neuf.
+     * `platform_key` et `remote_users` remontent de l'administration, ou ils
+     * etaient enterres alors qu'ils sont les deux premiers gestes apres l'ajout
+     * d'une machine ; `sudo_policies` et `sftp_policies` les suivent parce
+     * qu'ils prolongent la meme question — qui accede, et avec quoi.
+     *
+     * Un ordre de menu AIDE, il ne GUIDE pas : le defaut « un nouvel
+     * utilisateur ne le sait pas » reste ouvert, et il appelle un indicateur de
+     * preparation par machine (FEAT-001), pas un ordre.
+     *
+     * 32 entrees, 5 sections. Les gardes sont INCHANGEES, a l'identique du
+     * releve du legacy : reordonner un menu ne deplace aucun droit. `tickets`
+     * est la seule entree retiree — sa route, sa vue et ses catalogues sont
+     * CONSERVES, voir l'encadre ci-dessous.
+     *
+     * ══ POURQUOI LA ROUTE `tickets` RESTE, ALORS QUE SON ENTREE PART ═══════
+     *
+     * Mesure faite AVANT de retirer quoi que ce soit, et elle a trouve trois
+     * consommateurs que le retrait de la seule entree n'aurait pas casses mais
+     * que le retrait de la route aurait casses en silence :
+     *
+     *   — `POST /tickets` appelle un fournisseur ITSM EXTERNE, et il est appele
+     *     depuis les pages CVE, pas depuis la page des tickets
+     *     (`ScanCveController` passe `url_ticket` a l'ecran de scan). C'est
+     *     l'exception de passerelle que le plan documente en §7 ;
+     *   — `GET /search` ecrit `link: '/tickets/index.php'` pour CHAQUE ticket
+     *     trouve (`backend/routes/search.py:82`), et `LiensLegacy` traduit ce
+     *     chemin vers la route `tickets`. Retirer la route ferait pointer cette
+     *     table sur une route inexistante — la recherche redeviendrait un menu
+     *     qui mene ailleurs, le defaut meme que `LiensLegacy` existe pour
+     *     empecher. Ce n'est PAS preventif : le backend l'emet vraiment ;
+     *   — `recherche.js` porte une categorie `tickets` dans ses filtres.
+     *
+     * Retirer l'entree est REVERSIBLE et se voit ; casser une integration
+     * sortante ne se voit pas. Les deux gestes sont donc separes, et le second
+     * attend l'arbitrage de l'exploitant : consulter un ticket dans RootWarden
+     * a-t-il encore un sens si le ticket vit dans l'ITSM ?
      */
     public const SECTIONS = [
-        'navigation' => [
+        // ── Le parcours d'un serveur neuf, dans l'ordre ou on le suit ──────
+        'parc' => [
             ['cle' => 'dashboard',      'garde' => 'tous',                    'route'  => 'accueil'],
-            ['cle' => 'ssh_keys',       'garde' => 'can_deploy_keys',         'route' => 'cles-ssh'],
+            ['cle' => 'platform_key',   'garde' => 'can_manage_platform_key', 'legacy' => '/adm/platform_keys.php'],
+            ['cle' => 'remote_users',   'garde' => 'can_manage_remote_users', 'legacy' => '/adm/server_users.php'],
+            ['cle' => 'ssh_keys',       'garde' => 'can_deploy_keys',         'route'  => 'cles-ssh'],
+            ['cle' => 'sudo_policies',  'garde' => 'sa',                      'route'  => 'politiques'],
+            ['cle' => 'sftp_policies',  'garde' => 'sa',                      'route'  => 'acces-sftp'],
+        ],
+
+        'exploitation' => [
             ['cle' => 'updates',        'garde' => 'can_update_linux',        'route'  => 'mises-a-jour'],
-            ['cle' => 'iptables',       'garde' => 'can_manage_iptables',     'legacy' => '/iptables/'],
-            ['cle' => 'fail2ban',       'garde' => 'can_manage_fail2ban',     'route' => 'fail2ban'],
-            ['cle' => 'services',       'garde' => 'can_manage_services',     'route' => 'services'],
-            ['cle' => 'ssh_audit',      'garde' => 'can_audit_ssh',           'legacy' => '/ssh-audit/'],
-            ['cle' => 'supervision',    'garde' => 'can_manage_supervision',  'route' => 'supervision'],
-            ['cle' => 'bashrc',         'garde' => 'can_manage_bashrc',       'route' => 'bashrc'],
-            ['cle' => 'graylog',      'garde' => 'can_manage_graylog',      'route'  => 'graylog'],
-            ['cle' => 'wazuh',          'garde' => 'can_manage_wazuh',        'legacy' => '/wazuh/', 'feature' => 'wazuh'],
-            ['cle' => 'cve_scan',       'garde' => 'can_scan_cve',            'route'  => 'scan-cve'],
+            ['cle' => 'services',       'garde' => 'can_manage_services',     'route'  => 'services'],
+            ['cle' => 'supervision',    'garde' => 'can_manage_supervision',  'route'  => 'supervision'],
+            ['cle' => 'bashrc',         'garde' => 'can_manage_bashrc',       'route'  => 'bashrc'],
             // Garde par ROLE et non par permission : releve tel quel du legacy.
             // L'ecart est signale dans INVENTAIRE.md — a arbitrer, pas a corriger
-            // en silence pendant un portage de navigation.
+            // en silence pendant un reordonnancement de navigation.
             ['cle' => 'docker',         'garde' => 'admin',                   'route'  => 'docker'],
+            ['cle' => 'graylog',        'garde' => 'can_manage_graylog',      'route'  => 'graylog'],
+        ],
+
+        'securite' => [
+            ['cle' => 'cve_scan',       'garde' => 'can_scan_cve',            'route'  => 'scan-cve'],
+            ['cle' => 'compliance',     'garde' => 'can_view_compliance',     'route'  => 'rapport-conformite'],
+            ['cle' => 'drift',          'garde' => 'can_view_compliance',     'route'  => 'derive-config'],
+            ['cle' => 'iptables',       'garde' => 'can_manage_iptables',     'legacy' => '/iptables/'],
+            ['cle' => 'fail2ban',       'garde' => 'can_manage_fail2ban',     'route'  => 'fail2ban'],
+            ['cle' => 'ssh_audit',      'garde' => 'can_audit_ssh',           'legacy' => '/ssh-audit/'],
+            ['cle' => 'wazuh',          'garde' => 'can_manage_wazuh',        'legacy' => '/wazuh/', 'feature' => 'wazuh'],
         ],
 
         'admin' => [
             ['cle' => 'admin',          'garde' => 'can_admin_portal',        'route'  => 'comptes'],
-            ['cle' => 'tasks',          'garde' => 'can_admin_portal',        'route'  => 'taches'],
             ['cle' => 'groups',         'garde' => 'can_admin_portal',        'legacy' => '/groups/index.php'],
-            ['cle' => 'maintenance',    'garde' => 'can_admin_portal',        'route'  => 'maintenance'],
             ['cle' => 'approvals',      'garde' => 'can_admin_portal',        'route'  => 'approbations'],
-            ['cle' => 'commandlog',     'garde' => 'can_admin_portal',        'route'  => 'journal-commandes'],
-            ['cle' => 'chatops',        'garde' => 'can_admin_portal',        'route'  => 'chatops'],
-            ['cle' => 'tickets',        'garde' => 'can_admin_portal',        'route'  => 'tickets'],
-            ['cle' => 'search',         'garde' => 'can_admin_portal',        'route'  => 'recherche'],
-            ['cle' => 'audit_log',      'garde' => 'can_admin_portal',        'route'  => 'journal-audit'],
+            ['cle' => 'maintenance',    'garde' => 'can_admin_portal',        'route'  => 'maintenance'],
+            ['cle' => 'tasks',          'garde' => 'can_admin_portal',        'route'  => 'taches'],
             ['cle' => 'backups',        'garde' => 'can_admin_portal',        'route'  => 'sauvegardes'],
-            ['cle' => 'remote_users',   'garde' => 'can_manage_remote_users', 'legacy' => '/adm/server_users.php'],
-            ['cle' => 'platform_key',   'garde' => 'can_manage_platform_key', 'legacy' => '/adm/platform_keys.php'],
-            ['cle' => 'sudo_policies',  'garde' => 'sa',                      'route' => 'politiques'],
-            ['cle' => 'sftp_policies',  'garde' => 'sa',                      'route' => 'acces-sftp'],
-            ['cle' => 'compliance',     'garde' => 'can_view_compliance',     'route'  => 'rapport-conformite'],
-            ['cle' => 'drift',          'garde' => 'can_view_compliance',     'route'  => 'derive-config'],
+            ['cle' => 'audit_log',      'garde' => 'can_admin_portal',        'route'  => 'journal-audit'],
+            ['cle' => 'commandlog',     'garde' => 'can_admin_portal',        'route'  => 'journal-commandes'],
+            ['cle' => 'search',         'garde' => 'can_admin_portal',        'route'  => 'recherche'],
+            ['cle' => 'chatops',        'garde' => 'can_admin_portal',        'route'  => 'chatops'],
         ],
 
-        'other' => [
+        'autre' => [
             ['cle' => 'profil',         'garde' => 'tous',                    'route'  => 'profil'],
             ['cle' => 'documentation',  'garde' => 'tous',                    'legacy' => '/documentation.php'],
             ['cle' => 'api_docs',       'garde' => 'sa',                      'legacy' => '/api/docs.php'],
