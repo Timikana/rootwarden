@@ -6663,3 +6663,41 @@ la seconde n'en ferme que ce qu'on a pensé à écrire.
 
 **Touche le backend de production.** Porté au §7 avec E-142, E-144, E-147 et E-149 : **cinq
 correctifs backend attendent le même arbitrage.**
+
+---
+
+## E-151 — `services/` : l'état au démarrage replie quatre valeurs de systemd sur deux
+
+**Mesuré** le 2026-08-27 par `go-services-s3.mjs`, sur une énumération **servie** (voir plus bas).
+
+systemd distingue quatre états de fichier d'unité — `enabled`, `disabled`, `static`, `masked`. Le
+legacy n'en affiche que deux :
+
+| unité | `unit_file_state` | legacy affiche | portage affiche |
+|---|---|---|---|
+| `nginx` | `enabled` | Active au boot | activé |
+| `postfix` | `disabled` | Desactive | désactivé |
+| `dbus` | **`static`** | **Desactive** | **statique** |
+| `telnet` | **`masked`** | **Desactive** | **masqué** |
+
+**Les trois derniers s'affichent pareil**, et ils ne veulent pas dire la même chose :
+
+- **`static`** n'a pas d'interrupteur : systemd la lance quand une autre unité en a besoin. La dire
+  « désactivée » suggère qu'on pourrait l'activer — on ne peut pas, et le legacy le sait puisqu'il
+  n'offre pas le bouton.
+- **`masked`** est activement bloquée : systemd *refusera* de la démarrer. La dire « désactivée »
+  laisse croire qu'un « Démarrer » suffirait.
+
+L'information existe, elle traverse le réseau, et l'affichage la perd. Même famille que le
+`custom_detected` de `bashrc/` §4.5 : **une mesure vraie que l'interface abandonne.**
+
+### Ce que la mesure a coûté à établir
+
+Le banc n'ayant **pas de systemd**, aucune des deux cibles ne rend jamais de ligne : le défaut était
+invisible et l'est resté pendant tout S2. Il n'a été vu qu'en **servant** une énumération synthétique
+à la place de la vraie — le filet répond à `/services/list` au lieu de transmettre, et tout le chemin
+de rendu s'exécute pour de vrai, sans qu'aucune machine ne soit jointe.
+
+> Un portage mesuré uniquement sur un tableau vide est un portage largement non mesuré. **Deux
+> défauts du portage y avaient vécu** — le champ lu sous le nom `enabled` au lieu de
+> `unit_file_state`, et traité comme un booléen alors qu'il porte cinq valeurs.

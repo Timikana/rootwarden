@@ -94,9 +94,15 @@
                 <tr>
                     <th>{{ __('services.col_service') }}</th>
                     <th>{{ __('services.col_etat') }}</th>
+                    {{--
+                        « État au démarrage » et non « activé oui/non » : systemd
+                        connaît `static` et `masked`, que ni « oui » ni « non »
+                        ne savent dire. Le champ vient de `unit_file_state`.
+                    --}}
                     <th>{{ __('services.col_active') }}</th>
                     <th>{{ __('services.col_categorie') }}</th>
                     <th>{{ __('services.col_description') }}</th>
+                    <th>{{ __('services.col_actions') }}</th>
                 </tr>
             </thead>
             <tbody data-rw="services-tableau"></tbody>
