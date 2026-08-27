@@ -2171,77 +2171,6 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
-### v1.38.22 — INF-002 : la garde qui rend BRUYANT un detail d'echec affiche sur un PASS, et les douze fichiers que le chiffre du Lead aurait laisses
-
-**82 fichiers mesures la ou le Lead en annoncait 70** — et les douze de plus sont la trouvaille de la
-pose, pas un detail de comptage : `verifiePortage` portait trois parametres **aussi dans les douze
-fichiers de l'autre convention**, avec un quatrieme argument ignore exactement de la meme facon. **Ce
-sont les fichiers dont les auteurs ont l'habitude d'ecrire quatre arguments, donc les plus exposes.**
-S'en tenir au chiffre annonce les laissait silencieusement vulnerables.
-
-    verifie garde ............. 70 fichiers
-    verifiePortage garde ...... 72 fichiers
-    total des fichiers touches . 82        (81 commites, voir ci-dessous)
-
-**Les trois criteres du Lead, remplis, et le troisieme comme il faut :**
-
-1. **statiquement inerte** — `0` appel a 4+ arguments vers une fonction gardee, mesure **par analyseur et
-   APRES la pose**, jamais au `grep`. C'est ce qui distingue « la garde ne mord sur rien » de « je n'ai
-   pas vu qu'elle mordait » ;
-2. **echantillon de 5 suites, 5 conformes, aucune reference deplacee** — `go-page-update-u2` 13/0 ·
-   `go-socle-navigation` **63**/0 · `go-page-supervision-deploiement` 31/0 · `go-adm-comptes-distants`
-   **18**/0 · `go-page-ssh-preflight` 13/0 ;
-3. **la garde LEVE, et son message nomme le remede** en donnant la forme exacte a ecrire —
-   `ok ? <ce qu'on a mesure> : <ce qui explique l'echec>`. *Une garde qui dit seulement « c'est
-   interdit » se contourne au hasard ; celle-ci enseigne.*
-
-**Et l'epreuve a echoue DEUX fois avant d'etre valide, ce qui vaut plus que le resultat.** Premier essai :
-une mutation a **trois** arguments — parfaitement legitime, la garde n'avait rien a declencher. *Une
-mutation qui ne viole pas la regle n'eprouve pas la regle.* Second essai : quatre arguments, mais joue en
-`--legacy`, et l'appel mute vit dans une branche que cette cible **n'atteint jamais** (`update/` y est
-archive). La suite a rendu `8 / 0 conforme`, et la conclusion tentante etait « la garde ne marche pas ».
-**Rattrape par une question sur l'observable — l'assertion mutee figure-t-elle dans le journal ? —
-`grep -c` rendait 0.**
-
-> **Une garde qui ne peut pas se declencher ne prouve rien, et un test de garde qui ne peut pas la
-> declencher non plus.** Troisieme etage du meme piege en une journee : le defaut silencieux, la garde
-> qui le rend bruyant, et l'epreuve qui ne pouvait rien prouver.
-
-**81 fichiers commites et non 82** : `go-page-search.mjs` porte **deux** chantiers — cette garde *et* la
-propriete `LiensLegacy` ci-dessous — et il sera commite seul, quand il pourra etre mesure, plutot que
-melange. Commit atomique verifie : `git show --name-only` ne rend rien hors `tests/e2e/`, par
-`git commit -F … -- <chemins>`, **l'index etant un bien commun entre le `add` et le `commit`**.
-
-#### La propriete `LiensLegacy` trouve, DES SA PREMIERE MESURE, le defaut qu'elle devait prevenir
-
-**Aucune suite n'aserait `LiensLegacy::REMPLACEMENTS`** — zero occurrence dans `tests/e2e/` et
-`laravel/tests/`. L'oubli de `/docker/` a la `v1.37.54` avait donc ete rattrape par une **relecture**, et
-il restait **six** modules a archiver. La propriete **derive** desormais la liste attendue de
-`legacy/_deprecated/*` au lieu de la recopier — et sa premiere mesure rend :
-
-    parties archivees ......... 13
-    entrees de la table ....... 16
-    parties archivees SANS entree : **2**
-
-- **`/services/`** — archivee a l'instant, table pas encore completee. Attendu ;
-- **`/search/`** — **archivee depuis longtemps, et absente.** Verifie : `legacy/_deprecated/search/`
-  porte bien `index.php` et `js/main.js`. L'entree serait **preventive**, exactement comme `/docker/`
-  l'etait. **`/docker/` avait ete rattrape par une relecture ; `/search/` ne l'a pas ete.**
-
-**Trois bornes, parce que la table n'est pas une image du dossier :**
-
-- **un seul sens** — `archive ⇒ redirige`. `/security/`, `/profile.php/` et `/` ne correspondent a aucune
-  partie archivee : les compter comme un manquement **accuserait une table saine** ;
-- **chemin normalise en entier, jamais par prefixe.** Le filtre d'archivage avait deja accepte
-  `/supervision/` parce qu'il *contient* `/supervision`, et **huit archivages avaient valide ce filtre
-  sans qu'aucun ne puisse le refuter** ;
-- **la table est lue par PHP lui-meme** (`artisan tinker`), jamais par une expression reguliere sur du
-  PHP — *analyser du PHP au motif revient a reecrire un interpreteur*, et une entree mal lue serait
-  declaree absente a tort. C'est la lecon du comptage de `Navigation` qui rendait 32 pour 33.
-- **et une quatrieme, ajoutee par la session : si la table est ILLISIBLE, l'assertion echoue
-  explicitement** au lieu de se verifier sur un ensemble vide — sans quoi « toutes les parties archivees
-  sont redirigees » deviendrait **vrai** le jour ou `tinker` casse.
-
 ### v1.38.26 — le Lead a ecrit « aucun lien entrant » et c'etait faux pour quatre parties sur cinq
 
 **Le motif de la passe cherchait `href="…"`. Les tuiles du tableau de bord s'ecrivent `'url' => '…'`.**
@@ -2573,6 +2502,77 @@ d'infrastructure qui debloquent une session.
 
 **Aucune reference du LOT ne bouge.** `go-socle-navigation` est confirmee a **63** par trois voies
 independantes, dont un rejeu tiers et une mesure posterieure a la pose de la garde INF-002.
+
+### v1.38.22 — INF-002 : la garde qui rend BRUYANT un detail d'echec affiche sur un PASS, et les douze fichiers que le chiffre du Lead aurait laisses
+
+**82 fichiers mesures la ou le Lead en annoncait 70** — et les douze de plus sont la trouvaille de la
+pose, pas un detail de comptage : `verifiePortage` portait trois parametres **aussi dans les douze
+fichiers de l'autre convention**, avec un quatrieme argument ignore exactement de la meme facon. **Ce
+sont les fichiers dont les auteurs ont l'habitude d'ecrire quatre arguments, donc les plus exposes.**
+S'en tenir au chiffre annonce les laissait silencieusement vulnerables.
+
+    verifie garde ............. 70 fichiers
+    verifiePortage garde ...... 72 fichiers
+    total des fichiers touches . 82        (81 commites, voir ci-dessous)
+
+**Les trois criteres du Lead, remplis, et le troisieme comme il faut :**
+
+1. **statiquement inerte** — `0` appel a 4+ arguments vers une fonction gardee, mesure **par analyseur et
+   APRES la pose**, jamais au `grep`. C'est ce qui distingue « la garde ne mord sur rien » de « je n'ai
+   pas vu qu'elle mordait » ;
+2. **echantillon de 5 suites, 5 conformes, aucune reference deplacee** — `go-page-update-u2` 13/0 ·
+   `go-socle-navigation` **63**/0 · `go-page-supervision-deploiement` 31/0 · `go-adm-comptes-distants`
+   **18**/0 · `go-page-ssh-preflight` 13/0 ;
+3. **la garde LEVE, et son message nomme le remede** en donnant la forme exacte a ecrire —
+   `ok ? <ce qu'on a mesure> : <ce qui explique l'echec>`. *Une garde qui dit seulement « c'est
+   interdit » se contourne au hasard ; celle-ci enseigne.*
+
+**Et l'epreuve a echoue DEUX fois avant d'etre valide, ce qui vaut plus que le resultat.** Premier essai :
+une mutation a **trois** arguments — parfaitement legitime, la garde n'avait rien a declencher. *Une
+mutation qui ne viole pas la regle n'eprouve pas la regle.* Second essai : quatre arguments, mais joue en
+`--legacy`, et l'appel mute vit dans une branche que cette cible **n'atteint jamais** (`update/` y est
+archive). La suite a rendu `8 / 0 conforme`, et la conclusion tentante etait « la garde ne marche pas ».
+**Rattrape par une question sur l'observable — l'assertion mutee figure-t-elle dans le journal ? —
+`grep -c` rendait 0.**
+
+> **Une garde qui ne peut pas se declencher ne prouve rien, et un test de garde qui ne peut pas la
+> declencher non plus.** Troisieme etage du meme piege en une journee : le defaut silencieux, la garde
+> qui le rend bruyant, et l'epreuve qui ne pouvait rien prouver.
+
+**81 fichiers commites et non 82** : `go-page-search.mjs` porte **deux** chantiers — cette garde *et* la
+propriete `LiensLegacy` ci-dessous — et il sera commite seul, quand il pourra etre mesure, plutot que
+melange. Commit atomique verifie : `git show --name-only` ne rend rien hors `tests/e2e/`, par
+`git commit -F … -- <chemins>`, **l'index etant un bien commun entre le `add` et le `commit`**.
+
+#### La propriete `LiensLegacy` trouve, DES SA PREMIERE MESURE, le defaut qu'elle devait prevenir
+
+**Aucune suite n'aserait `LiensLegacy::REMPLACEMENTS`** — zero occurrence dans `tests/e2e/` et
+`laravel/tests/`. L'oubli de `/docker/` a la `v1.37.54` avait donc ete rattrape par une **relecture**, et
+il restait **six** modules a archiver. La propriete **derive** desormais la liste attendue de
+`legacy/_deprecated/*` au lieu de la recopier — et sa premiere mesure rend :
+
+    parties archivees ......... 13
+    entrees de la table ....... 16
+    parties archivees SANS entree : **2**
+
+- **`/services/`** — archivee a l'instant, table pas encore completee. Attendu ;
+- **`/search/`** — **archivee depuis longtemps, et absente.** Verifie : `legacy/_deprecated/search/`
+  porte bien `index.php` et `js/main.js`. L'entree serait **preventive**, exactement comme `/docker/`
+  l'etait. **`/docker/` avait ete rattrape par une relecture ; `/search/` ne l'a pas ete.**
+
+**Trois bornes, parce que la table n'est pas une image du dossier :**
+
+- **un seul sens** — `archive ⇒ redirige`. `/security/`, `/profile.php/` et `/` ne correspondent a aucune
+  partie archivee : les compter comme un manquement **accuserait une table saine** ;
+- **chemin normalise en entier, jamais par prefixe.** Le filtre d'archivage avait deja accepte
+  `/supervision/` parce qu'il *contient* `/supervision`, et **huit archivages avaient valide ce filtre
+  sans qu'aucun ne puisse le refuter** ;
+- **la table est lue par PHP lui-meme** (`artisan tinker`), jamais par une expression reguliere sur du
+  PHP — *analyser du PHP au motif revient a reecrire un interpreteur*, et une entree mal lue serait
+  declaree absente a tort. C'est la lecon du comptage de `Navigation` qui rendait 32 pour 33.
+- **et une quatrieme, ajoutee par la session : si la table est ILLISIBLE, l'assertion echoue
+  explicitement** au lieu de se verifier sur un ensemble vide — sans quoi « toutes les parties archivees
+  sont redirigees » deviendrait **vrai** le jour ou `tinker` casse.
 
 ### v1.38.21 — la correspondance version -> commit, et pourquoi elle devient necessaire
 
