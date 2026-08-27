@@ -81,9 +81,38 @@ def render_policy(policy: dict) -> str:
     Retourne le contenu complet du fichier sshd_config.d/.
     """
     username = _validate_username(policy['username'])
+    # ══ E-147 : QUATRE REPLIS CONTREDISAIENT LA DOCSTRING DU MEME BLOC ═══
+    #
+    # La docstring ci-dessus documente la forme attendue : `sftp_only: True`,
+    # `allow_password_auth: False`, `allow_tcp_forwarding: False`,
+    # `allow_agent_forwarding: False`. Les valeurs par defaut du code etaient
+    # l'INVERSE des quatre, toutes vers le permissif.
+    #
+    # `sftp_only` est la plus grave : a `False`, le bloc ne pose ni
+    # `ForceCommand internal-sftp`, ni `PermitTunnel no`, ni `PermitTTY no` —
+    # **une cle omise transforme un compte SFTP restreint en compte SHELL**.
+    #
+    # Les quatre sont donc EXIGEES. `x11_forwarding` garde son repli a `False` :
+    # il est deja restrictif et conforme a ce que la docstring annonce.
+    #
+    # Reserve levee avant d'ecrire : `render_policy` n'a qu'UN appelant
+    # (`deploy_policy`), qui n'en a lui-meme qu'UN (`routes/policies.py:411`),
+    # et cette route compose ses sept cles a chaque appel. Aucun chemin vivant
+    # ne passe de dict partiel.
+    _obligatoires = ('sftp_only', 'allow_password_auth',
+                     'allow_tcp_forwarding', 'allow_agent_forwarding')
+    _absentes = [k for k in _obligatoires if k not in policy]
+    if _absentes:
+        raise ValueError(
+            "cles requises absentes de la politique SFTP : " + ', '.join(_absentes)
+            + " — aucune valeur permissive n'est supposee")
+
     sftp_only = bool(policy.get('sftp_only', False))
     chroot_dir = policy.get('chroot_dir')
     working_dir = policy.get('working_dir')
+    # Les `.get(..., True)` qui suivent sont desormais INATTEIGNABLES : la
+    # garde ci-dessus exige les quatre cles. Ils restent pour que la ligne
+    # se lise seule, mais ils ne decident plus de rien.
     allow_pw = bool(policy.get('allow_password_auth', True))
     allow_tcp = bool(policy.get('allow_tcp_forwarding', True))
     allow_agent = bool(policy.get('allow_agent_forwarding', True))
