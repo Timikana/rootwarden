@@ -194,10 +194,31 @@ class MotDePasse
         });
 
         /*
-         * LES AUTRES SESSIONS TOMBENT, la courante survit. Un changement de mot de
-         * passe doit fermer les portes ouvertes ailleurs — c'est souvent pour cela
-         * qu'on le change. Best-effort, comme le legacy : un echec de purge ne doit
-         * pas annuler un changement deja ecrit.
+         * ══ CE QUE CETTE PURGE FERME VRAIMENT — E-203 ════════════════════
+         *
+         * Le commentaire disait « LES AUTRES SESSIONS TOMBENT ». Il affirmait
+         * plus que le code, et sur un ecran de securite.
+         *
+         * Mesure du 2026-08-27 :
+         *   — le LEGACY verifie `active_sessions` a CHAQUE requete
+         *     (`auth/verify.php:58-66`) et force un re-login si la ligne a
+         *     disparu. Supprimer la ligne ferme donc reellement ses sessions ;
+         *   — le PORTAGE ne consulte JAMAIS cette table — zero occurrence dans
+         *     ses intergiciels et ses controleurs d'authentification. Ses
+         *     sessions vivent en FICHIERS (`SESSION_DRIVER=file`), et supprimer
+         *     une ligne de base n'en ferme aucune.
+         *
+         * Donc : cette purge ferme les sessions de l'ancien portail, et **aucune
+         * de celui-ci**. L'aide de l'ecran le dit desormais dans ces termes,
+         * plutot que de promettre une fermeture qu'elle n'obtient pas.
+         *
+         * Le correctif complet est que le portage ECRIVE cette table a la
+         * connexion, comme le legacy le fait (`login.php:212`), et la consulte.
+         * Aucune migration n'est necessaire : la table existe et porte deja les
+         * colonnes voulues.
+         *
+         * Best-effort, comme le legacy : un echec de purge ne doit pas annuler un
+         * changement de mot de passe deja ecrit.
          */
         try {
             $requete = DB::table('active_sessions')->where('user_id', $idCompte);

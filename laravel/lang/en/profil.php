@@ -29,7 +29,7 @@ return [
     'mdp_nouveau' => 'New password',
     'mdp_confirmation' => 'Confirm new password',
     'mdp_enregistrer' => 'Change password',
-    'mdp_effet_sessions' => 'Your other open sessions will be closed, and remembered logins forgotten. This one stays open.',
+    'mdp_effet_sessions' => "Your other sessions on the LEGACY portal will be closed — it checks on every request — and remembered logins forgotten. ⚠ On THIS portal, no other session will be closed: it does not consult the sessions table yet.",
     'mdp_ok' => 'Password changed successfully.',
     'mdp_erreur_actuel' => 'Current password is incorrect.',
     'mdp_erreur_correspondance' => 'The passwords do not match.',
