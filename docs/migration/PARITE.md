@@ -8877,3 +8877,30 @@ qui n'en parle pas** — il enchaîne `useradd`, dépôt de clé et
 `echo 'rootwarden ALL=(ALL:ALL) NOPASSWD: ALL'` « dans la foulée ».
 
 > **Accorder root tient en un clic ; le reprendre n'a pas de clic.**
+
+---
+
+## E-203 — Le portage n'a AUCUNE révocation de session côté serveur
+
+Relevé le 2026-08-27 en réparant `last_activity` (E-188). **Ce n'est pas un défaut de colonne, c'est un
+écart de parité fonctionnelle.**
+
+Le portage **ne tient pas `active_sessions`** : aucune écriture ni lecture dans son authentification,
+seulement des suppressions. Les **3 930** lignes de la table viennent donc **toutes** du legacy.
+
+> **Conséquence : un bouton « Révoquer » de `profile.php` n'a aucun effet sur une session Laravel.** Le
+> legacy porte une liste de révocation côté serveur — `verify.php` la consulte à chaque page protégée — et
+> le portage n'en a pas.
+
+**Aujourd'hui c'est masqué** parce que les deux portails coexistent et que l'authentification passe encore
+largement par le legacy. **Le jour où le legacy s'éteint — l'objectif 2.0 — la capacité disparaît
+silencieusement** : l'écran continuera d'offrir la révocation, et elle ne révoquera rien.
+
+C'est la même forme qu'E-188 prise un cran plus haut : là, une colonne n'était jamais écrite ; ici, c'est
+**le mécanisme entier** qui n'a pas de pendant. Et comme pour E-188, **les deux défauts se masquaient
+mutuellement** — la purge ne tournant pas, personne n'a jamais constaté qu'une session Laravel survit à sa
+révocation.
+
+**À trancher avec l'objectif 2.0**, et pas après : soit le portage tient la table (le cadre a son propre
+mécanisme de session, il faut donc décider lequel fait foi), soit l'écran cesse d'offrir un geste sans
+effet.

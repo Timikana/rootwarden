@@ -2157,6 +2157,39 @@ le conteneur, avec `workers = 4` tous enfants du maître. **« Le backend est lu
 n'est donc plus une convention de ce document : c'est une propriété du service.** Troisième règle de ce
 chantier à devenir une propriété, après la recopie du runner dans `/tmp` et `git commit -- <chemins>`.
 
+### UNE FENÊTRE D'ÉCRITURE SE DONNE PAR RÉGIME DE LECTURE, PAS PAR TÂCHE (2026-08-27)
+
+**Troisième formulation trop étroite de la même famille en une journée, et les trois sont de moi.** J'ai
+donné neuf correctifs en disant « écris librement, `backend/**.py` est lu au démarrage du processus, donc
+c'est inoffensif ». **Sept l'étaient. Deux touchaient `legacy/`, relu à CHAQUE requête** — et rien dans ma
+formulation ne les distinguait.
+
+> **Une fenêtre d'écriture pendant un rejeu se donne PAR RÉGIME DE LECTURE, pas par tâche.** Un lot de
+> correctifs peut traverser deux régimes ; c'est au Lead de les séparer avant de dire « écris ».
+
+Les trois échecs de formulation du jour, et ils se ressemblent :
+
+| ce que j'ai écrit | ce qui manquait |
+|---|---|
+| « ne pas prendre le banc » | la **charge** — un `phpunit` concurrent a fait passer une suite de 24/0 à 19/5 |
+| « lancer une suite » n'est pas parallélisable | l'**écriture** dans `laravel/` et `legacy/`, relus à chaque requête |
+| « `backend/` est inerte, écris librement » | que **deux des neuf** correctifs ne touchaient pas `backend/` |
+
+**Chaque fois, la règle nommait un GESTE au lieu de nommer le RÉGIME**, et chaque fois quelqu'un a fait
+exactement ce que la règle autorisait.
+
+**Et l'issue retenue n'est pas de revenir en arrière.** Remettre les deux fichiers dans leur état
+d'avant fabriquerait un **troisième** état à mi-parcours — le rejeu aurait alors mesuré trois cibles
+différentes au lieu de deux. **Geler est l'action la moins destructrice**, pour la deuxième fois de la
+journée.
+
+**Et l'impact a été MESURÉ plutôt que borné par précaution** : l'assertion exposée
+(`go-adm-politiques:329`) est en **`verifiePortage`** — donc *constatée* sur le legacy, sans verdict, et
+*exigée* du portage seul, où le catalogue était déjà correct. **Le verdict ne bouge d'aucun côté.** Et la
+suite n'avait **pas encore tourné** (12 journaux au moment de la mesure, aucun de ce nom) : elle jouera
+donc entièrement contre le legacy corrigé, **sans état mixte**. *Une divergence annoncée qu'on prend le
+temps de mesurer devient souvent une divergence inexistante.*
+
 ### DANS UN MESSAGE ENTRE SESSIONS : UNE DURÉE, OU UNE HEURE AVEC SON FUSEAU (2026-08-27)
 
 **E-73 reproduit dans notre propre coordination, et c'est moi qui l'ai commis.** J'ai écrit à une session
