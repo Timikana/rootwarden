@@ -9093,3 +9093,152 @@ décision de portage, et il porte sur le produit et non sur la migration.
 qu'avec un rôle 1 portant `can_manage_fail2ban`, et il n'en existe aucun. La correction est juste et
 **aucun test ne peut la démontrer** en l'état — c'est écrit ici pour que personne ne la « simplifie » plus
 tard en constatant qu'aucune suite ne la couvre.
+
+---
+
+## E-209 — ⚠ EN PRODUCTION : le guide de la clé de plateforme enseigne qu'un geste durcit la machine, alors qu'il retire le seul filet de RootWarden — et il dit « plus sécurisé »
+
+**Trouvé par la session 3 en portant `platform_key`, en refusant de porter fidèlement. C'est le défaut le
+plus grave de la journée, et il est servi en production sur `main` (v1.37.15).**
+
+### Ce que le guide affirme, mot pour mot, dans les deux langues
+
+    legacy/lang/fr/tips.php:125
+    'tip.platform_step4' => '<strong>Supprimer le password</strong> desactive l'authentification
+                             par mot de passe sur le serveur (plus securise).'
+    legacy/lang/en/tips.php:113
+    'tip.platform_step4' => '<strong>Remove password</strong> disables password authentication
+                             on the server (more secure).'
+
+Affiché par `legacy/adm/platform_keys.php:50`, dans un panneau « Comment ça marche ? » en quatre étapes.
+
+### Ce que le geste fait
+
+    backend/routes/ssh.py — remove_ssh_password
+    UPDATE machines SET password = '', root_password = '', ssh_password_required = FALSE WHERE id = %s
+
+**C'est tout.** Aucune `SSHClient`, aucun `connect`, aucun `exec_command`, aucune écriture dans
+`sshd_config`, aucun `PasswordAuthentication`. **Le geste ne joint pas la machine.**
+
+### Pourquoi c'est plus qu'une inexactitude
+
+Le compte Unix **garde son mot de passe**, et quiconque le connaît entre encore. Ce que le geste efface,
+c'est **la copie que RootWarden détenait** — c'est-à-dire son propre recours.
+
+> **« Plus sécurisé » est le mot qui coûte.** Le geste ne durcit pas la machine : il retire le filet. Un
+> exploitant qui suit ce guide **croit se protéger et se prive d'un recours** — sur la page même où toute
+> la mise en page le pousse vers cet état, et où la rotation de clé devient sans retour.
+
+**C'est la troisième forme du motif que ce chantier suit**, et la plus coûteuse :
+
+| forme | exemple | ce qu'elle trompe |
+|---|---|---|
+| un en-tête qui mente sur un accès | « superadmin uniquement » avec `ROLE_USER` (E-36, 4 occurrences) | qui relit le code |
+| un libellé qui promette un contrôle | le bouton « Révoquer » sans révocation (E-203) | qui clique |
+| **un guide qui enseigne une procédure en se trompant sur son EFFET** | **celui-ci** | **qui ne sait pas** |
+
+*Un guide est ce qu'on lit quand on ne sait pas.* Les deux premières formes trompent quelqu'un qui a déjà
+une hypothèse ; celle-ci **fabrique** l'hypothèse.
+
+### Et l'étape 2 est incomplète dans le sens qui compte aussi
+
+    'tip.platform_step2' => 'Deployer keypair installe la cle publique sur les serveurs selectionnes.'
+
+Vrai, et **incomplet** : le même geste crée le compte `rootwarden` avec **`NOPASSWD: ALL`**
+(`ssh.py:704-775`). Un guide qui décrit « installe une clé publique » et taît la création d'un compte à
+sudo sans mot de passe ne décrit pas le geste que l'exploitant autorise.
+
+### La correction, et la forme qu'elle prend
+
+Le portage écrit la séquence **corrigée**, en liste numérotée — *« déployer la clé » avant « effacer le mot
+de passe » n'est pas une préférence de présentation mais la différence entre une migration et un
+verrouillage* — et **la correction est DITE sous le guide, pas faite en silence** : un exploitant qui a lu
+l'ancien texte doit savoir lequel des deux croire.
+
+**Le legacy n'est pas corrigé par ce lot** — il est servi en production et toute écriture dans
+`legacy/lang/` est hors du régime du chantier. **Cela appartient à l'exploitant** (§7) : c'est le seul
+écart de la journée dont la version fausse est **lue par des utilisateurs en ce moment**.
+
+---
+
+## E-210 — Le panneau « Comment ça marche ? » n'a JAMAIS été porté : 26 pages, 148 clés traduites, aucun rendu — et un homonyme a fait croire le contraire
+
+**Mesuré par la session 2, et le fait n'est pas « le portage a fait moins bien sur deux modules » : c'est
+qu'une capacité du produit n'a jamais été portée du tout, et qu'elle disparaît à chaque `git mv`.**
+
+### Le compte
+
+    legacy/lang/{fr,en}/tips.php ....... 148 cles, FR = EN, jeux IDENTIQUES (parite parfaite)
+      dont motif `tip.<module>_(title|stepN)` .... 125 cles, 27 groupes
+      hors motif .................................. 23 cles
+    pages posant `includes/howto_tip.php` ........ 26   (15 vivantes, 11 deja archivees)
+
+    cles des parties DEJA ARCHIVEES ...... 52  (x2 langues = **104 chaines orphelines MAINTENANT**)
+    cles des parties ENCORE VIVANTES ..... 73  (x2 langues = 146, orphelines aux 5 archivages restants)
+
+**104 chaînes traduites sont orphelines aujourd'hui, et l'ont été archivage après archivage — douze fois
+— sans que personne ne le remarque.**
+
+### Ce n'est pas « porté sous un autre nom », et la preuve tient sur deux fondements indépendants
+
+1. **aucune clé d'étape dans aucun catalogue du portage** — parcours récursif de `laravel/lang/*/`, toute
+   clé nommée `etape`/`step` : **zéro** ;
+2. **et surtout : il n'y a AUCUN RENDU.** `legacy/includes/howto_tip.php` est un composant `<details>`
+   pliable avec mémorisation en `localStorage`. Le portage n'a pas d'équivalent — `rw-aide` est une classe
+   de **texte d'aide en ligne**, `rw-etapes` un **indicateur de progression d'authentification**. **Sans
+   renderer, aucune clé ne pourrait s'afficher même si elle existait.**
+
+Le second fondement est le plus solide : *il ne dépend d'aucun nom de clé.*
+
+### ⚠ Pourquoi personne ne l'a vu : un homonyme, et c'est la vraie cause
+
+    legacy   tip.graylog_step1     ->  panneau <details> « Comment ca marche ? »
+    portage  docker.tip_scan_one   ->  attribut title="" d'un bouton
+
+**Le portage emploie `tip_*` massivement — pour des INFOBULLES.** Un `grep tip` dans `laravel/lang/` rend
+des dizaines de correspondances. **Quiconque a vérifié « les tips sont-ils portés ? » par un motif a
+conclu que oui.** Même mot, deux objets sans rapport.
+
+*Un motif qui suppose une forme ne mesure que cette forme* — mais appliqué ici à un **contrôle de
+complétude de portage** et non à une garde, et c'est ce qui le rend coûteux : **le contrôle a l'air d'avoir
+été fait.** La parade est la même qu'ailleurs : **mesurer le RENDU, pas le nom.** La question juste n'est
+pas « les clés existent-elles » mais **« une page portée affiche-t-elle un panneau pas-à-pas ? »** — non,
+sur les 25 entrées portées.
+
+### Et une nuance de la session 3 qui déplace le diagnostic sans l'annuler
+
+Sur `graylog`, le portage a bien **cinq** clés de guide — mais elles ne répondent pas à la même question :
+
+- **le legacy explique COMMENT FAIRE** — une séquence : configurer l'URL et le jeton, éditer les
+  collecteurs, sélectionner et installer, lire l'onglet Sidecars ;
+- **le portage explique CE QUE LE BOUTON FAIT VRAIMENT** — « Déployer ouvre une connexion SSH et installe
+  rsyslog », « Retirer supprime les fichiers posés et redémarre ».
+
+**Les deux sont légitimes et complémentaires.** Le portage a donc opéré une **substitution** non nommée —
+un guide de *procédure* remplacé par un guide de *conséquence* — et il l'a fait parce que les libellés
+mentaient (E-209 en est la preuve). **Ce qui est perdu n'est pas « du conseil », c'est l'ORDRE.** Et là où
+le portage n'a rien mis, il est perdu sec : `platform_key` n'avait aucun guide une heure après son portage,
+dans le module même où la séquence décide entre une migration et un verrouillage.
+
+### Ce que ça décide pour FEAT-001, et la fenêtre qui se ferme
+
+**FEAT-001 ne remplace pas un acquis : il comble un trou ouvert depuis le premier archivage.** Le legacy
+répondait à la question de l'exploitant — *« un nouvel utilisateur ne le sait pas »* — sur **26 pages**, en
+deux langues.
+
+- **125 clés × 2 langues sont déjà écrites et traduites.** Reprendre coûte un composant Blade et un
+  mappage ; concevoir de zéro coûte la rédaction et la traduction de **250 chaînes** ;
+- **mais elles ne se reprennent pas telles quelles** : E-209 montre que deux des quatre étapes de
+  `platform_key` disaient faux. *Un acquis traduit n'est pas un acquis vérifié* ;
+- **la fenêtre se ferme module par module.** Après un `git mv`, les clés restent dans `tips.php` mais plus
+  rien ne dit **à quelle page** elles appartenaient. **Pour les 11 parties déjà archivées, cette
+  information n'est récupérable que dans `legacy/_deprecated/*/index.php`** — donc tant que `_deprecated/`
+  existe, et pas après la disparition finale du legacy.
+
+### Ce qui n'est pas mesuré, et qui borne l'écart
+
+La session 2 le déclare : elle affirme qu'il n'y a **pas de panneau** et **pas de clé d'étape** ; elle
+n'affirme **pas** que l'information est absente des écrans portés — une page a pu reformuler une étape dans
+un texte d'aide en ligne. Les 23 clés hors motif ne sont pas ventilées par module, et le **rendu effectif**
+des 15 pages vivantes n'est pas vérifié (le composant est un `<details>` : une page peut l'inclure et le
+rendre replié).
