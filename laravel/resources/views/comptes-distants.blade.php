@@ -41,6 +41,20 @@
                         data-machine="{{ $machine }}">{{ __('distants.btn_scanner') }}</button>
             </div>
             <p class="rw-aide" data-rw="distants-scan-etat" role="status" aria-live="polite"></p>
+            {{--
+                ── E-199 : LES COMPTES QUE LE SCAN A TROUVES ILLISIBLES ────────
+
+                Le drapeau `nom_valide` est calcule PAR LA ROUTE de scan, il
+                n'est pas une colonne de `server_user_inventory`. Cet encart ne
+                peut donc etre renseigne qu'APRES un scan, jamais au chargement
+                de la page — et il naît `hidden` plutot que de rendre une boite
+                vide qui inviterait au clic.
+
+                La regle n'est PAS recopiee ici : le portage ne compile pas de
+                Python, et une regle recopiee finit par diverger de celle qui
+                DECIDE. Ce qui manque pour un affichage durable est dit au Lead.
+            --}}
+            <div class="rw-encart" data-rw="distants-illisibles" hidden></div>
         @endif
     </section>
 

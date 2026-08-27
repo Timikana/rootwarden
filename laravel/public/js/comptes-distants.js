@@ -95,6 +95,91 @@
             .map(function (c) { return noms[c] || c; });
     }
 
+    /*
+     * ══ E-199 : UNE LIGNE QU'AUCUN GESTE NE PEUT VISER LE DIT ═════════════
+     *
+     * Le scan insere une ligne dont le nom est illisible plutot que de la
+     * refuser — un compte nomme `..` dans un `/etc/passwd` est un INDICE de
+     * manipulation, et le faire disparaitre de l'ecran serait perdre le signal.
+     * Il la MARQUE : `nom_valide` et `motif_invalide`, tous deux TOUJOURS
+     * renseignes, plus un `invalides_count` rendu meme a zero.
+     *
+     * ══ POURQUOI CET ENCART N'APPARAIT QU'APRES UN SCAN ══════════════════
+     *
+     * Le drapeau est calcule par la ROUTE, sur des lignes lues en base — ce
+     * n'est pas une colonne. Cette page, elle, rend son inventaire depuis la
+     * base au chargement : elle ne voit donc le drapeau qu'au retour d'un scan.
+     *
+     * Recopier la regle en PHP serait plus court et ce serait la mauvaise idee :
+     * la question « quels gestes sont offerts » est tranchee par le BACKEND, et
+     * une regle recopiee finit par diverger de celle qui decide — ce depot en
+     * compte deja trois occurrences. On affiche donc ce que le serveur DIT,
+     * quand il le dit, et l'affichage durable demande que le verdict soit
+     * persiste ou expose sur un chemin de lecture. Dit au Lead, pas devine ici.
+     *
+     * LE MOTIF EST UN CODE, DONC IL SE TRADUIT. Le backend rend `vide`,
+     * `trop_long`, `composant_de_chemin`, `caracteres_interdits` — sans espace,
+     * une cause par code. Un code inconnu se DIT inconnu plutot que de
+     * s'afficher tel quel : ce serait un identifiant a l'ecran.
+     */
+    function libelleMotif(code) {
+        var connus = {
+            vide: libelles.motif_vide,
+            trop_long: libelles.motif_trop_long,
+            composant_de_chemin: libelles.motif_composant_de_chemin,
+            caracteres_interdits: libelles.motif_caracteres_interdits,
+        };
+
+        return connus[code] || libelles.motif_inconnu || '';
+    }
+
+    function rendIllisibles(donnees) {
+        var encart = document.querySelector('[data-rw="distants-illisibles"]');
+        if (! encart) { return; }
+        var lignes = (donnees.users || []).filter(function (u) { return u.nom_valide === false; });
+        /*
+         * `invalides_count` FAIT AUTORITE SUR LE NOMBRE, la liste sur les noms.
+         * Les deux viennent du serveur ; si elles se contredisaient, c'est le
+         * compte du serveur qui a raison — il porte le total, la liste ne porte
+         * que ce qui a voyage.
+         */
+        var total = Number(donnees.invalides_count);
+        if (! Number.isFinite(total)) { total = lignes.length; }
+        if (total === 0) {
+            encart.hidden = true;
+            encart.innerHTML = '';
+
+            return;
+        }
+        encart.innerHTML = '';
+        var titre = document.createElement('p');
+        titre.className = 'rw-sous-titre-fort';
+        titre.textContent = libelles.illisibles_titre || '';
+        encart.appendChild(titre);
+
+        var texte = document.createElement('p');
+        texte.className = 'rw-prose';
+        // `textContent` : ces noms viennent d'un `/etc/passwd` distant, donc de
+        // ce que le root de la machine a bien voulu y ecrire.
+        texte.textContent = (libelles.illisibles_texte || '')
+            .replace('{nombre}', String(total))
+            .replace('{liste}', lignes.map(function (u) {
+                return (u.name || u.username || '') + ' (' + libelleMotif(u.motif_invalide) + ')';
+            }).join(', '));
+        encart.appendChild(texte);
+
+        // LA CONSEQUENCE EST BLOQUANTE, ET C'ETAIT LE MANQUE. Une de ces lignes
+        // en « attente d'examen » bloque le deploiement de cles : le compteur du
+        // preflight les compte, deliberement — en exclure une aurait desserre un
+        // garde. L'ecran qui envoie les classer doit le DIRE.
+        var bloque = document.createElement('p');
+        bloque.className = 'rw-annonce rw-annonce--attention';
+        bloque.textContent = libelles.illisibles_bloquant || '';
+        encart.appendChild(bloque);
+
+        encart.hidden = false;
+    }
+
     /* ═══ Le scan ═════════════════════════════════════════════════════════ */
 
     var boutonScan = document.querySelector('[data-rw="distants-scanner"]');
@@ -130,6 +215,9 @@
                     dit('[data-rw="distants-scan-etat"]', libelles.scan_fait);
                     if (zone) { zone.className = 'rw-annonce rw-annonce--ok'; }
                 }
+                // Concluant ou non : `invalides_count` est calcule AVANT le
+                // verdict, donc l'information existe dans les deux cas.
+                if (d) { rendIllisibles(d); }
                 boutonScan.disabled = false;
             });
         });
