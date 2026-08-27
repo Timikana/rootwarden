@@ -1560,6 +1560,42 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
 
+### ⚠ UN REDÉMARRAGE PUBLIE L'ARBRE DE TRAVAIL, PAS L'HISTORIQUE (2026-08-27)
+
+**Trou dans la consigne de ce document, trouvé par la session qui exécutait la consigne.** Elle est plus
+importante que la règle d'index dont elle est le prolongement, parce qu'elle inverse une phrase que ce
+plan répète depuis trois jours.
+
+Le §8 dit : *« écrire dans `backend/` pendant le rejeu d'une autre session est inoffensif — c'est le
+`docker restart` qui mord »*. C'est vrai, et **incomplet**. Ce qui mord n'est pas seulement la mesure de
+l'autre : **c'est que le redémarrage met en service TOUT ce qui traîne dans l'arbre de travail, commité ou
+non.**
+
+Vécu : une fenêtre de redémarrage accordée « pour v1.38.16 et v1.38.17 » aurait mis en service **172
+lignes de patch non commité** sur `ssh.py` — dont un **changement de contrat** (`success` conditionnel)
+que personne n'avait validé et que le portage n'avait pas vu. Le `git log` était propre ; l'arbre ne
+l'était pas.
+
+> **Le redémarrage publie l'ARBRE, pas l'historique.** « Écris librement dans `backend/`, c'est inerte »
+> est vrai **jusqu'au redémarrage** — et à cet instant précis tout ce qui traîne entre en service.
+> **Celui qui redémarre vérifie son ARBRE, pas seulement son log.**
+
+Et la parade employée mérite d'être reprise, parce que le réflexe évident était le mauvais :
+
+```bash
+git diff > /tmp/patch     # PAS `git stash` : il passe par l'index, qui est PARTAGÉ
+git checkout -- <chemin>
+# … docker restart sur un arbre propre …
+git apply /tmp/patch
+```
+
+**`git stash` aurait traversé l'index d'une autre session.** L'index est resté vide de bout en bout —
+c'est la règle ci-dessous, appliquée à un geste qui n'a rien à voir avec un commit.
+
+**Corollaire pour le Lead** : une fenêtre de redémarrage ne s'accorde pas « pour tel commit ». Elle
+s'accorde **pour l'état de l'arbre**, et celui qui la reçoit doit dire ce qu'il y a dedans. La fenêtre
+citée couvrait en réalité **quatre** commits et un patch non commité, pas les deux annoncés.
+
 ### ✅ L'index est PARTAGÉ, et le contrôle n'est pas atomique avec le commit (2026-08-27)
 
 **Quatrième occurrence de la famille « un commit emporte le travail d'une autre session » — et la
