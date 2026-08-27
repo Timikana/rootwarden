@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.23** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.24** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2242,6 +2242,106 @@ il restait **six** modules a archiver. La propriete **derive** desormais la list
   explicitement** au lieu de se verifier sur un ensemble vide — sans quoi « toutes les parties archivees
   sont redirigees » deviendrait **vrai** le jour ou `tinker` casse.
 
+### v1.38.24 — l'ordre d'archivage n'est plus une liste mais un GRAPHE, et une verification lancee du mauvais cote d'un montage rend « tout va bien »
+
+#### ⚠ Une huitieme etape au cycle d'archivage : les liens ENTRANTS
+
+Les treize premiers archivages ont tous verifie les liens **sortants** — menu, tiroir mobile, raccourcis
+clavier, tableau de bord. **Aucun n'a cherche ce qui pointe VERS la partie depuis le reste du legacy.**
+INV-004 l'a rendu visible sur `remote_users`, et la passe qui a suivi a trouve **quatre liens de plus**
+que le releve initial, dans **quatre natures differentes** :
+
+    1. legacy/ssh/js/main.js:135       chaine injectee par innerHTML — aucun controle sur les href ne la voit
+    2. legacy/adm/admin_page.php:145   href, dans une AUTRE partie que celle qu'on archive
+    3. legacy/lang/fr/tips.php:8       **DANS UN CATALOGUE DE TRADUCTION** (`tip.ssh_step2`)
+    4. legacy/lang/en/tips.php         idem — et la PARITE double l'oubli par construction
+    5. legacy/lang/{fr,en}/tips.php:26 idem (`tip.admin_step5`)
+
+**Le n°1 est le plus grave, et pas parce qu'il est en JS** : c'est le **seul chemin de deblocage** du
+preflight de deploiement SSH. Quand le preflight trouve des comptes non classes, il **refuse le
+deploiement** et renvoie l'operateur par ce lien. L'archiver sans le reecrire ne casse pas un lien
+d'agrement — **ca ferme la seule porte de sortie d'un refus.**
+
+> **`LiensLegacy::REMPLACEMENTS` ne couvre AUCUN des cinq**, et la propriete neuve qui l'assere ne
+> rougirait pas davantage. Elle traduit ce que le **PORTAGE** rend, pas ce que le **LEGACY** ecrit dans
+> ses propres pages. Deux tables qui se ressemblent et ne couvrent pas le meme ensemble.
+
+**Consequence : `remote_users` ne peut pas etre archive avant `ssh/`** — premier module du chantier dont
+l'ordre d'archivage est contraint par un autre, et le premier qui n'est donc **pas** un `git mv` simple.
+**Mesure rassurante** : les cinq dossiers qui restent (`security/`, `bashrc/`, `fail2ban/`, `graylog/`,
+`ssh/`) n'ont **aucun** lien entrant, ni en JS, ni dans les `.php`, ni dans les catalogues.
+
+**Et ce que ces liens disent du produit** : `tip.ssh_step2` et `tip.admin_step5` sont **exactement la
+sequence** dont l'exploitant a dit qu'« un nouvel utilisateur ne le sait pas ». **Le legacy portait deja
+une reponse, en conseils contextuels, et le portage ne l'a pas reprise.** FEAT-001 a ete concu sans savoir
+que ces chaines existaient : ce sont un **acquis a reprendre**, deja traduit, qui nomme la sequence dans
+le bon ordre.
+
+#### ✅ INF-003 tranche — une route unique pour les reglages qu'une interface doit annoncer
+
+**Trois fois le meme jour, un ecran a eu besoin d'une valeur qui vit dans un conteneur qu'il ne voit pas** :
+son numero de version, la duree de reversibilite de la rotation de cle, la retention d'un journal. Releve
+de la classe entiere : **douze** reglages concernes. **Decision : `GET /settings/announceable`, une route
+de lecture unique** — pas une par valeur, sans quoi le treizieme reglage n'aurait pas de porteur.
+
+Des deux issues ecartees, la premiere est instructive : **coder la valeur en dur dans l'ecran est pire que
+ne pas l'afficher**, parce qu'un exploitant qui change le reglage croira que l'ecran le sait. *Un nombre
+affiche comme une garantie et fige dans un autre fichier est un mensonge a retardement.* Le repli retenu en
+attendant la route — « une duree limitee, configuree cote serveur », sans le nombre — est *moins plutot que
+faux*. **Trois bornes** : liste **fermee** enumeree dans le code (lecon de V10a) · aucun secret ni adresse ·
+la valeur **effective**, jamais le defaut du code.
+
+#### Une verification lancee depuis le mauvais cote d'un montage rend « tout va bien »
+
+    glob('/var/www/html/../legacy/_deprecated/*')   depuis le conteneur Laravel
+    -> tableau VIDE (ce conteneur ne monte que `laravel/`)
+    -> la boucle ne tourne jamais
+    -> « aucune partie manquante » est VRAI sur l'ensemble vide
+
+**C'est le meme montage absent que `version.txt` du meme apres-midi, pris par l'autre bout** : la, le
+conteneur ne voyait pas le fichier et l'ecran disait « version inconnue » — un **echec visible**. Ici, il
+ne voyait pas le dossier et le controle a affiche une **reussite**. *Le meme montage absent produit un
+symptome bruyant quand on LIT une valeur, et un silence rassurant quand on ENUMERE un ensemble.*
+
+Ce qui l'a rattrape : **le chiffre etait trop propre** — une intuition sur la forme du resultat, pas une
+assertion. **Quatrieme forme de ce piege en une journee**, apres le `conforme` sur une assertion qui n'a
+pas joue, le constat d'archivage sur un chemin inexistant, et la garde qu'une mutation legitime ne pouvait
+pas declencher. **La parade est une precondition, pas de la vigilance** : toute propriete qui boucle sur un
+ensemble enumere assere d'abord que l'ensemble n'est pas vide — **pour les deux ensembles mis en regard**,
+pas seulement celui qu'on soupconne — et l'enumeration se fait depuis le cote du montage qui voit le chemin.
+
+#### Ecarts neufs
+
+- **E-207** — la pastille verte « keypair » est affichee sur une machine qui a encore ses **deux** mots de
+  passe. Deux lecteurs du drapeau `ssh_password_required` (`platform_keys.php:24` et `:160`) et un ecrivain
+  qui les perime (`adm/includes/manage_servers.php:136,182` remplit `root_password` sans y toucher).
+  **L'indicateur est faux dans le sens rassurant** — *un compteur qui sous-estime une migration fait poser
+  une question ; un compteur qui la surestime fait cesser de la poser*, et c'est le tableau qu'on regarde
+  pour decider si la bascule est terminee. **Bonne nouvelle calculee au passage : aucune machine n'est
+  aujourd'hui dans la position sans retour**, ce qui abaisse la gravite de P4 ;
+- **E-208** — **trois pages legacy sur cinq ne bornent pas le parc au perimetre du compte**, et celle qui
+  expose le plus n'etait pas surveillee : `adm/platform_keys.php` rend **tout le parc**, avec l'etat de la
+  cle et du compte de service, a un role 1 porteur de la permission. **Le legacy est incoherent avec
+  lui-meme** — donc aucune regle du produit a reprendre, seulement cinq decisions dont deux ont diverge.
+  *Un portage fidele ne peut pas trancher une incoherence de l'original : il la reproduit et la nomme.*
+  Resserrer serait un **changement de droits**, pas un correctif de parite : arbitrage de l'exploitant.
+  **Corollaire utile : `groups/` n'est PAS le troisieme porteur d'E-205** — annonce comme probable par le
+  Lead, mesure comme faux. Sa page ne filtre pas, la reprendre fidelement a G2 sera juste.
+
+#### `remote_users` est a MOITIE porte, et deliberement
+
+Trois routes sans effet distant portees (`classify`, `classify_bulk`, `server_user_keys`) ; **cinq qui
+touchent une machine ne le sont pas**. **La coupure est nette et c'est la bonne** — donc l'entree `legacy`
+de `Navigation` est **juste**, et la charge restante n'est pas les 387 lignes du fichier mais celle des cinq
+gestes distants. **C'est l'inverse exact de `services/`** : la un module entier trainait, ici rien ne traine
+et c'est le portage qui est a mi-chemin. Le decompte « jamais porte » du §2 est corrige en consequence.
+
+**Et un dedouanement, dit aussi nettement qu'une accusation** : `delete_remote_user` est le **premier geste
+destructeur du chantier correctement garde aux quatre niveaux** — validation du nom decouvert, liste noire
+des comptes systeme, refus de l'utilisateur de connexion **et** du compte de service, `gate()` reellement
+appelee, **et le piege `userdel` traite** : apres le `userdel`, la route execute `id <username>` et **c'est
+ce verdict qui fait autorite**, pas le code de sortie.
+
 ### v1.38.23 — six modules etaient PORTES avec leur dossier legacy vivant, et le portage serialisait derriere un verrou de fichier
 
 Deux constats du 2026-08-27, tous deux nes d'une remarque de l'exploitant — *« y a encore beaucoup trop
@@ -2361,7 +2461,8 @@ correspondance reelle :**
 | **v1.38.20** | `a0c80b0` | **le contrat d'E-184 cassait un affichage du portage** — voir ci-dessous |
 | v1.38.21 | `304ee68` | la convention de numerotation, et la correspondance ci-dessus |
 | **v1.38.22** | `2b382c4` | **INF-002** — la garde sur 81 fichiers, et les 12 que le chiffre du Lead aurait laisses |
-| v1.38.23 | (ce commit) | les 5 545 lignes de legacy deja porte, et la parallelisation du portage |
+| v1.38.23 | `0b5ccc7` | les 5 545 lignes de legacy deja porte, et la parallelisation du portage |
+| v1.38.24 | (ce commit) | l'ordre d'archivage devient un graphe ; INF-003 ; E-207 et E-208 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

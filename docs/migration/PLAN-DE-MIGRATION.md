@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **193** — numérotés jusqu'à **E-206** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205/E-206 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle, et `/search/` absente de la table de redirection depuis neuf jours). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **195** — numérotés jusqu'à **E-208** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc, et celle qui expose le plus n'était pas surveillée**). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -737,6 +737,69 @@ la page de maintenance aurait cessé de fonctionner sans que rien ne le signale.
 module, lesquels des chemins qui se ressemblent sont des pages et lesquels sont des routes.
 
 ---
+
+### ⚠ UNE HUITIÈME ÉTAPE AU CYCLE : LES LIENS **ENTRANTS** DEPUIS LES AUTRES PARTIES DU LEGACY (2026-08-27)
+
+Les treize premiers archivages ont tous vérifié les liens **sortants** — les points d'entrée du menu, du
+tiroir mobile, des raccourcis clavier, du tableau de bord. **Aucun n'a cherché ce qui pointe VERS la
+partie depuis le reste du legacy.** INV-004 l'a rendu visible, et la mesure qui a suivi en a trouvé
+**quatre de plus** que le relevé initial.
+
+**Le cas : `remote_users` (`/adm/server_users.php`) reçoit CINQ liens entrants, dans QUATRE endroits de
+nature différente :**
+
+| # | où | nature | ce qui le rend invisible |
+|---|---|---|---|
+| 1 | `legacy/ssh/js/main.js:135` | chaîne injectée par **`innerHTML`** | n'est pas un `href` d'un gabarit — aucun contrôle sur les `href` ne le voit |
+| 2 | `legacy/adm/admin_page.php:145` | `href` ordinaire | dans une **autre** partie que celle qu'on archive |
+| 3 | `legacy/lang/fr/tips.php:8` (`tip.ssh_step2`) | **dans un catalogue de traduction** | personne ne cherche une URL dans un fichier de langue |
+| 4 | `legacy/lang/en/tips.php` (idem) | idem | idem — et la **parité** fait que l'oubli est double |
+| 5 | `legacy/lang/{fr,en}/tips.php` (`tip.admin_step5`) | idem | idem |
+
+**Le n°1 est le plus grave, et pas parce qu'il est en JS** : c'est le **seul chemin de déblocage** du
+préflight de déploiement SSH. Quand le préflight trouve des comptes non classés, il **refuse le
+déploiement** et renvoie l'opérateur par ce lien. L'archiver sans le réécrire ne casse pas un lien
+d'agrément : **ça ferme la seule porte de sortie d'un refus.**
+
+> **`LiensLegacy::REMPLACEMENTS` NE COUVRE AUCUN DES CINQ.** Elle traduit ce que le **PORTAGE** rend, pas
+> ce que le **LEGACY** écrit dans ses propres pages. C'est une distinction qu'il est facile de perdre
+> parce que la table *ressemble* à une table de redirection générale. Elle ne l'est pas, et la propriété
+> neuve qui l'assère ne rougirait pas davantage : elle vérifie que toute partie archivée a une entrée,
+> jamais que les liens du legacy vers cette partie ont été réécrits.
+
+#### L'ordre d'archivage n'est plus une liste : c'est un GRAPHE
+
+**`remote_users` ne peut pas être archivé avant `ssh/`** — ou alors son lien de déblocage doit être
+réécrit **dans le legacy** au moment de l'archivage, et `ssh/` n'étant pas porté (K4), l'équivalent
+portage de cette page n'existe pas pour y poser le bon lien. **Premier module du chantier dont l'ordre
+d'archivage est contraint par un autre module**, et le premier qui n'est donc **pas** un `git mv` simple.
+
+Même famille que le témoin de `go-page-conformite` pour `groups/`, **mais d'un cran au-dessus** : celui-là
+était un test, celui-ci est une **porte utilisateur**.
+
+#### La passe à faire, et son résultat pour les cinq parties qui restent
+
+    # liens injectes en JS, dossiers legacy vivants
+    find legacy -name '*.js' -not -path '*_deprecated*' -not -path '*vendor*' -not -name '*.min.js' \
+      | xargs grep -oE 'href=\\?"(/[a-zA-Z0-9_.-]+/?[a-zA-Z0-9_.-]*)'
+    # liens dans les .php des autres parties, et DANS LES CATALOGUES
+    grep -rnoE 'href="/(<partie>)/?[a-zA-Z0-9_.-]*"' legacy --include=*.php
+    grep -rn '<partie>' legacy/lang/
+
+**Résultat mesuré le 2026-08-27** : sur les dossiers legacy vivants, **un seul** lien inter-modules est
+injecté en JS — celui de `remote_users` — et **aucun** lien entrant n'existe vers `security/`, `bashrc/`,
+`fail2ban/`, `graylog/` ni `ssh/`, ni dans les `.php`, ni dans les catalogues. **Les cinq archivages qui
+restent ne sont donc pas contraints.** La passe est bon marché et elle vient d'être payée une fois ; elle
+entre au cycle pour que la prochaine partie ne dépende pas de qui a lu quoi.
+
+#### Et une chose que ces liens disent du produit, pas du chantier
+
+`tip.ssh_step2` — *« Scannez les utilisateurs du serveur dans **Utilisateurs distants** et classifiez
+chaque compte »* — et `tip.admin_step5` sont exactement la **séquence opérationnelle** dont l'exploitant a
+dit qu'*« un nouvel utilisateur ne le sait pas »*. **Le legacy portait donc déjà une réponse, sous forme
+de conseils contextuels, et le portage ne l'a pas reprise.** FEAT-001 (l'indicateur de préparation à
+quatre états) a été conçu sans savoir que ces deux chaînes existaient : elles sont un **acquis à
+reprendre**, pas un doublon à écarter — et elles nomment la séquence dans le bon ordre.
 
 ## 5. La méthode, neuf temps
 
@@ -1802,6 +1865,85 @@ qui relit. **Deux bornes, parce que la table n'est pas une image du dossier** : 
 **préventives** — le backend n'émet ni `/docker/`, ni `/chatops/`, ni `/maintenance/`, ni `/supervision/`
 — et *tout `/partie/` n'est pas une page*, donc la comparaison porte sur le chemin **normalisé en
 entier**, jamais par préfixe.
+
+### ✅ INF-003 TRANCHÉ — UNE ROUTE UNIQUE POUR LES RÉGLAGES QU'UNE INTERFACE DOIT POUVOIR ANNONCER (2026-08-27)
+
+**Trois fois le 2026-08-27, un écran a eu besoin d'une valeur qui vit dans un conteneur qu'il ne voit
+pas.** La session 3 a nommé le motif après la troisième, et la mesure lui donne raison :
+
+| # | l'écran voulait dire | la valeur vit | issue prise |
+|---|---|---|---|
+| 1 | son numéro de version | `legacy/version.txt`, non monté | **montage** en lecture seule |
+| 2 | « réversible pendant N jours » | `PLATFORM_KEY_ARCHIVE_DAYS`, conteneur Python | **cette route** |
+| 3 | la durée de rétention d'un journal | idem | idem |
+
+**Ce ne sont pas trois incidents, c'est une classe.** Relevé : **douze** réglages d'environnement qu'une
+interface pourrait légitimement devoir annoncer — `PLATFORM_KEY_ARCHIVE_DAYS`, `SSH_TIMEOUT`,
+`CVE_MAX_PAGES`, `CVE_PAGE_LIMIT`, et les huit drapeaux `*_ENABLED` (`APPROVAL`, `MAIL`, `CHATOPS`,
+`WEBHOOK`, `TICKETING`, `WAZUH`, `CVE_ENRICH`, `NVD_ENRICHMENT`).
+
+**Décision : une route de lecture unique, `GET /settings/announceable`, écrite par la session 4.** Pas une
+route par valeur — douze routes pour douze nombres, c'est douze occasions d'en oublier une, et le
+treizième réglage n'aurait pas de porteur.
+
+**Et la raison de trancher plutôt que de laisser chacun se débrouiller est dans les deux issues
+écartées :**
+
+- **coder la valeur en dur dans l'écran** — c'est **pire que ne pas l'afficher**. Un exploitant qui change
+  `PLATFORM_KEY_ARCHIVE_DAYS` croira que l'écran le sait. *Un nombre affiché comme une garantie et figé
+  dans un autre fichier est un mensonge à retardement*, et c'est exactement le motif de la seconde copie
+  du numéro de version, refusée le même jour par la même session ;
+- **ne rien dire du tout** — « une durée limitée, configurée côté serveur ». Moins utile, mais **vrai**.
+  C'est le repli que la session 3 prend par défaut, et il est légitime tant que la route n'existe pas :
+  *moins plutôt que faux.*
+
+**Trois bornes sur cette route, parce qu'elle expose de la configuration :**
+
+1. **liste FERMÉE, énumérée dans le code de la route.** Jamais « rends `os.environ` filtré par un motif » :
+   un `*_ENABLED` d'aujourd'hui est inoffensif, le réglage qu'on ajoutera demain ne l'est pas
+   nécessairement. C'est la leçon de V10a — une interface à liste fermée, parce que la valeur d'un
+   override devenait une ligne de configuration ;
+2. **aucun secret, aucune adresse, aucun identifiant.** Des durées, des bornes, des drapeaux. Si un
+   réglage a besoin d'être annoncé *et* qu'il est sensible, il ne passe pas par là ;
+3. **elle dit la valeur EFFECTIVE, pas le défaut du code.** `int(os.getenv('X', '30'))` rend 30 quand la
+   variable est absente : la route doit rendre ce que le backend **emploie**, sans quoi elle rejoue le
+   défaut qu'elle est censée supprimer.
+
+**Ce que la route ne résout pas, et qu'il faut dire à l'écran** : elle rend la valeur au moment de la
+requête. Elle ne rend **pas** la réversibilité une garantie — *l'archive de rotation vit dans le MÊME
+volume que la clé courante, et ce volume n'est sauvegardé nulle part.* Le panneau doit donc porter les
+**deux** bornes : « réversible pendant N jours » **et** « si le volume survit ». Une seule des deux se lit
+comme une promesse.
+
+### UNE VÉRIFICATION LANCÉE DEPUIS LE MAUVAIS CÔTÉ D'UN MONTAGE REND « TOUT VA BIEN » (2026-08-27)
+
+La session 3 a contrôlé que `LiensLegacy` couvrait bien les treize parties archivées, et son contrôle a
+rendu **« aucune manquante »** — sans avoir rien comparé :
+
+    glob('/var/www/html/../legacy/_deprecated/*')   depuis le conteneur Laravel
+    -> tableau VIDE, car ce conteneur ne monte que `laravel/`
+    -> la boucle ne tourne jamais
+    -> « aucune partie manquante » est VRAI sur l'ensemble vide
+
+**Ce qui l'a rattrapée : le chiffre était trop propre.** Pas une assertion, pas un garde — une intuition
+sur la forme du résultat. C'est mince, et c'est pour ça que la règle doit être écrite.
+
+**C'est le même mur que `version.txt` du même après-midi, pris par l'autre bout** : là, le conteneur ne
+voyait pas le fichier et l'écran affichait « version inconnue » — **un échec visible**. Ici, le conteneur
+ne voyait pas le dossier et le contrôle a affiché **une réussite**. *Le même montage absent produit un
+symptôme bruyant quand on LIT une valeur et un silence rassurant quand on ÉNUMÈRE un ensemble.*
+
+> **Une énumération qui rend le vide satisfait toutes les propriétés universelles qu'on lui applique.**
+> `[].every()` est vrai, « toutes les parties archivées ont une entrée » est vrai, « aucun appel fautif ne
+> subsiste » est vrai. Quatrième forme de ce piège en une journée, après le `conforme` sur une assertion
+> qui n'a pas joué, le constat d'archivage sur un chemin inexistant, et la garde qu'une mutation
+> légitime ne pouvait pas déclencher.
+
+**La parade est une précondition, pas de la vigilance** : toute propriété qui boucle sur un ensemble
+énuméré doit d'abord **assérer que l'ensemble n'est pas vide** — et échouer explicitement s'il l'est. La
+session 7 l'avait déjà ajoutée de son côté pour le cas « la table est illisible » ; c'est la même parade,
+et elle vaut pour **les deux** ensembles qu'une comparaison met en regard, pas seulement pour celui qu'on
+soupçonne. **Et l'énumération se fait depuis le côté du montage qui voit le chemin** — ici, l'hôte.
 
 ### Tests
 

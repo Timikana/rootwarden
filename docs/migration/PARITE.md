@@ -9011,3 +9011,85 @@ Deux entrées à poser dans `LiensLegacy::REMPLACEMENTS`, toutes deux préventiv
 possède le fichier : `'/services/' => 'services'` et `'/search/' => 'recherche'`. Puis la propriété
 mesure `0` partie archivée sans entrée — et **c'est cette mesure-là qui vaut**, pas la relecture qui a
 servi à trouver le cas.
+
+---
+
+## E-207 — La pastille « keypair » est verte sur une machine qui a encore ses DEUX mots de passe : un drapeau et les colonnes qu'il résume sont deux sources
+
+**Trouvé par la session 3 en portant `platform_key` P1, et l'inventaire du module ne l'avait pas vu.**
+
+### Les deux lecteurs du drapeau, et l'écrivain qui les périme
+
+    legacy/adm/platform_keys.php:24    $nbPasswordRemoved = count(array_filter($servers,
+                                         fn($s) => !$s['ssh_password_required']));
+    legacy/adm/platform_keys.php:160   pastille verte « keypair » : $deployed && !$pwRequired
+
+    legacy/adm/includes/manage_servers.php:136,182
+                                       remplissent `root_password` SANS jamais toucher
+                                       `ssh_password_required`
+
+**Mesuré : `srv-zabbix` porte `ssh_password_required = 0` avec `password` ET `root_password` présents.**
+La page Serveurs est le seul chemin qui réécrit le mot de passe root, et elle ne touche pas le drapeau.
+L'ancien portail compte donc cette machine comme migrée et **lui donne la pastille verte**.
+
+### L'indicateur est faux dans le sens rassurant
+
+C'est ce qui le classe. Un compteur qui sous-estime une migration fait poser une question ; un compteur
+qui la surestime fait **cesser** de la poser. Ici l'écran annonce « mot de passe supprimé » sur une
+machine dont les deux mots de passe sont en base — et c'est le tableau qu'un exploitant regarde pour
+décider si la bascule vers l'authentification par clé est terminée.
+
+### La bonne nouvelle, qui est calculée et non supposée
+
+**Aucune machine n'est aujourd'hui dans la position sans retour** — celle où le mot de passe a été retiré
+et où la clé est le seul accès. C'est l'inverse de ce que l'inventaire relevait le matin même, et ça
+**abaisse la gravité de P4**. Le drapeau menait la lecture dans les deux sens : il faisait croire à une
+migration acquise *et* à un risque qui n'existait pas.
+
+### La correction
+
+`App\Services\ClePlateforme::compteurs()` compte les **colonnes** et non le drapeau, et **dit** quand le
+drapeau les contredit — au lieu de choisir silencieusement l'une des deux sources. Porté par la session 3.
+
+*Un drapeau et les colonnes qu'il prétend résumer sont deux sources, et il suffit d'un chemin d'écriture
+qui en oublie une pour qu'elles divergent sans bruit.* Même faute de forme que la seconde copie du numéro
+de version, refusée par la même session le même après-midi — **elle a refusé une duplication dans le
+compose et en a trouvé une en base dans la même heure.**
+
+---
+
+## E-208 — TROIS pages legacy sur CINQ ne bornent pas le parc au périmètre du compte, et celle qui expose le plus n'est pas celle qu'on surveillait
+
+**Relevé par la session 3 en corrigeant E-205, sur les cinq pages qui listent des machines** — et non sur
+les trois annoncées par le Lead, *parce que les gardes ne sont pas au même niveau et que l'intuition ne
+les devine pas* :
+
+    legacy/fail2ban/index.php:14-20    filtre par `user_machine_access` si role < 2
+    legacy/iptables/index.php:52-58    filtre
+    legacy/bashrc/index.php:25-35      ne filtre PAS
+    legacy/groups/index.php:22         ne filtre PAS
+    legacy/adm/platform_keys.php:18    ne filtre PAS
+
+**Deux conséquences immédiates pour le chantier :**
+
+1. **`groups/` n'est PAS le troisième porteur d'E-205.** Le Lead l'avait annoncé comme un porteur possible
+   à vérifier au moment de G2 ; mesuré, sa page ne filtre pas, donc **la reprendre fidèlement sera juste**.
+   Bon à savoir avant d'y arriver plutôt qu'après ;
+2. **`adm/platform_keys.php` expose le plus, et personne ne la regardait** : *tout le parc, avec l'état de
+   la clé et du compte de service par machine*, à un rôle 1 porteur de la permission. Le portage P1 ne
+   filtre pas non plus, **par fidélité** — et c'est le bon choix par défaut.
+
+### Ce que ça dit, et pourquoi ce n'est pas une correction
+
+**Le legacy est incohérent avec lui-même** : deux pages sur cinq bornent le parc, trois non. Il n'existe
+donc **aucune règle du produit** à reprendre — seulement cinq décisions historiques dont deux ont divergé.
+*Un portage fidèle ne peut pas trancher une incohérence de l'original : il la reproduit et la nomme.*
+
+**Resserrer les trois pages serait un changement de droits**, pas un correctif de parité — un rôle 1 qui
+voit aujourd'hui tout le parc cesserait de le voir. **C'est un arbitrage de l'exploitant** (§7), pas une
+décision de portage, et il porte sur le produit et non sur la migration.
+
+**Et une septième branche non exerçable est livrée avec le correctif d'E-205** : le filtre ne s'exerce
+qu'avec un rôle 1 portant `can_manage_fail2ban`, et il n'en existe aucun. La correction est juste et
+**aucun test ne peut la démontrer** en l'état — c'est écrit ici pour que personne ne la « simplifie » plus
+tard en constatant qu'aucune suite ne la couvre.
