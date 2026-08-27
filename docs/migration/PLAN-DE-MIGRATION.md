@@ -2163,6 +2163,63 @@ Les deux cas du jour se distinguent par ce seul maillon :
 comparaison, pas par une introspection.* Deux commandes, et c'est la seule chose qui sépare les deux
 cas.
 
+### ✅ INF-002 TRANCHÉ — IL N'EXISTE PAS D'UNIFICATION INERTE, DONC ON REND L'ERREUR BRUYANTE (2026-08-27)
+
+**Mon instruction était fausse, et c'est le septième refus mesuré de la journée.** J'avais demandé
+« une signature unique, où le quatrième argument existe partout ou nulle part », en croyant la différence
+**cosmétique**. Elle est **sémantique**, et les deux familles sont **opposées** :
+
+    70 fichiers   `${d ? '  — ' + d : ''}`          -> `d` s'affiche sur un PASS COMME sur un FAIL
+    12 fichiers   `toujours || (! ok && d) || ''`   -> `d` ne s'affiche QUE sur un FAIL
+
+| conversion | ce qu'elle détruit | visible à la mesure ? |
+|---|---|---|
+| sur le corps des **12** | le détail de **~1400 lignes de PASS** — « 20 comptes rapportés », « 2 = 2 »… | **NON** : le compte de `^PASS` ne bouge pas, aucune référence ne bouge, le LOT dit « conforme » |
+| sur le corps des **70** | rien — mais elle **imprime ~190 explications d'échec sur des PASS** | non : c'est le défaut qu'on vient de corriger quatre fois, en 190 exemplaires |
+
+> **Il n'existe pas d'unification inerte des deux sémantiques.** Toute conversion déplace de
+> l'information ; la question n'est pas « laquelle » mais « accepte-t-on d'en perdre ». Et la première
+> serait **invisible à la mesure et destructrice à la lecture** — la pire combinaison possible.
+
+**La voie retenue ne unifie rien : elle rend l'erreur BRUYANTE.** Une garde de trois lignes dans les 70
+fichiers, qui **lève** si un quatrième argument est passé, en nommant le remède
+(`ok ? info : explication`) :
+
+- **strictement inerte** — 0 appel concerné, mesuré par un **analyseur** et non déduit ;
+- **aucune ligne de journal ne change**, donc aucune référence ne bouge ;
+- **le défaut silencieux devient un échec immédiat et nommé.** Aujourd'hui un quatrième argument est
+  *ignoré* et l'explication s'imprime en vert ; demain la suite meurt en disant quoi faire.
+
+*« Relire la signature locale » était une règle ; ceci est une propriété.* Et cela **ne ferme pas** la
+porte à une unification ultérieure — cela la rend **sûre**, puisque toute conversion mal faite se
+signalerait.
+
+**Et l'analyseur qui a établi le point 1 avait d'abord accusé à tort** : sa première version ne gérait
+pas les commentaires, un backtick dans un `//` la faisait entrer en mode chaîne. **Ce qui l'a rattrapée
+n'est pas la méfiance : c'est d'avoir imprimé le FRAGMENT retenu au lieu du seul compte** — le texte
+débordait visiblement sur l'appel suivant. *Un compte sans son extrait n'est pas vérifiable.*
+
+### ✅ E-203 NE DEMANDE AUCUNE MIGRATION — la table existe déjà (2026-08-27)
+
+Le portage devait « tenir une table d'index des sessions », et la demande incluait une migration, donc un
+blocage sur un autre périmètre. **Mesuré : la table existe, et elle porte exactement les colonnes
+voulues.**
+
+    active_sessions : session_id · user_id · ip_address · user_agent · last_activity · created_at
+
+Le legacy l'écrit à la connexion (`login.php:212`, `REPLACE INTO`) et la retire à la déconnexion
+(`logout.php:44`). **Le portage ne l'écrit pas** — seules deux références existent dans `laravel/app/`,
+et ce sont des suppressions.
+
+> **Le correctif n'est donc pas « créer un index », c'est « le portage écrit la table que le legacy
+> écrit déjà ».** Aucune migration, aucun schéma neuf, et `last_activity` vient d'être réparée (E-188)
+> donc la colonne est enfin significative.
+
+**Et la réserve intermédiaire est retenue telle quelle** : tant que le portage n'écrit pas, **l'écran
+doit cesser d'affirmer.** Le bouton « Révoquer » ne fait rien et ne le dit pas — *un bouton qui mime est
+pire qu'un bouton absent : il fait croire qu'on a révoqué.* Il est remplacé **dès maintenant** par
+l'énoncé de ce qui est vrai, sans attendre l'écriture de la table.
+
 ### ⚠ INF-002 — DEUX CONVENTIONS POUR `verifie()`, ET UN APPEL FAUX NE LÈVE RIEN (2026-08-27)
 
 **La cause structurelle des « détails d'échec imprimés sur un PASS » — cinq occurrences documentées, et
