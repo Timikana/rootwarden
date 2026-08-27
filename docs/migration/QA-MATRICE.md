@@ -259,6 +259,74 @@ pas une hypothèse — l'incident symétrique s'est produit le jour même (§6 b
 C'est la même leçon que le runner qui se recopie dans `/tmp` : *une règle qu'on doit se
 rappeler est une propriété qu'on n'a pas encore construite.*
 
+## 2 quater. QA-007 — E-192, une révocation ANNONCÉE n'est pas une révocation FAITE
+
+`backend/tests/test_revocation_acces.py` · **26 PASS, 0 FAIL**
+
+**Cet écart est pire que celui d'avant.** E-183 détruisait une donnée vraie : cela se
+répare en rescannant. Celui-ci produit une **fausse attestation** — « accès révoqué »
+sur un accès qui reste ouvert. *Personne ne rouvre un dossier de conformité clos.*
+
+### L'instrument est le sujet, et il a un artefact connu
+
+`execute_command_as_root` rend la **sortie**, jamais le code de retour : un `rm -f`
+refusé est indiscernable d'un `rm -f` réussi. On ne vérifie donc pas la commande mais
+son **effet**, par une sonde — qui vit sur des machines dont le canal **échote la
+commande envoyée**.
+
+**Les deux cas qui séparent l'instrument de son artefact, et le second est celui qu'on
+oublie :**
+
+| ce que rend le canal | verdict attendu |
+|---|---|
+| **uniquement** l'écho de la commande | `False` — sinon faux positif **permanent** |
+| l'écho **puis** la vraie sortie | `True` — sinon la sonde est inutilisable |
+
+Une parade brutale — « si la sortie contient la commande, refuser » — passerait le
+premier et **casserait** le second : plus aucune révocation ne pourrait jamais être
+confirmée sur ces machines. Les deux sont assertés, séparément.
+
+La parade réelle est **structurelle** et se mesure sur la **commande émise**, pas sur le
+verdict : le marqueur voyage **coupé** (`__RW_""ABSENT_OK__`), donc sa forme échotée ne
+peut pas être confondue avec sa forme rendue.
+
+### Preuve d'échec — six mutations, et la question posée par la session 4
+
+Elle demandait explicitement : *« muter la sonde doit rougir uniquement les assertions
+de verdict, pas celles du chemin de refus ; si une mutation rougit les deux, mes deux
+gardes sont couplés et je veux le savoir. »*
+
+| mutation | rouges | où |
+|---|---|---|
+| la sonde rend toujours `True` | **15** | verdict + structure — **aucun** sur le chemin de refus |
+| le marqueur envoyé **en clair** | **1** | la propriété structurelle, et elle seule |
+| comparaison en **sous-chaîne** | **3** | les trois formes de marqueur enfoui |
+| chemins joints par `\|\|` | **1** | la conjonction |
+| le `continue` du nom invalide retiré | **5** | **uniquement** « zéro commande émise » |
+| le `rm -f` de la branche inactive retiré | **1** | la compensation d'E-195 |
+
+> **Les deux gardes ne sont pas couplés.** C'est la réponse à la question posée, et
+> elle ne se lisait pas dans le code.
+
+### Ce qui n'est pas mesuré, et c'est étroit
+
+**Qu'un `rm -f` réel retire le fichier et que la sonde le voie sur une vraie machine.**
+Cela mesurerait le monde ; tout le reste mesure la décision. Le **chemin d'échec
+complet** est en revanche exercé — un canal qui simule un `rm -f` refusé le produit sans
+qu'aucune machine ne soit jointe, et c'est justement le cas qu'un test contre une vraie
+machine ne produirait pas facilement : il faudrait **fabriquer** l'échec.
+
+### Deux choix de rédaction qui valent d'être dits
+
+- **on fige la PROPRIÉTÉ du message, pas son libellé.** Le journal doit dire que
+  l'accès peut rester ouvert ; figer la phrase exacte ferait du texte d'un journal un
+  **contrat**, et le premier reformulateur casserait un test sans avoir rien cassé ;
+- **les chemins sondés sont DÉRIVÉS du module** (`cs._sudoers_target`), jamais recopiés.
+  Une première version les écrivait à la main avec le mauvais préfixe — et pire, elle
+  les cherchait en **sous-chaîne** : `/etc/sudoers.d/rootwarden` est une sous-chaîne de
+  `/etc/sudoers.d/rootwarden-alice`, donc l'assertion aurait dit « le fichier nu est
+  sondé » sur une commande qui ne le sonde pas. **Un vert sur une propriété fausse.**
+
 ## 3. QA-002 — les gardes du portage, côté PHP
 
 `laravel/tests/` · **232 PASS, 764 assertions, 0 FAIL**
@@ -641,6 +709,7 @@ la seule réparation qui ne coûte rien à personne.
 | 2026-08-27 | 4 mutations d'E-183/E-187, **sur une copie dans le conteneur** | **8, 3, 1 et 3 rouges**, ensembles distincts — le dépôt n'a pas été touché |
 | 2026-08-27 | QA-005 — relevé des appelants (`acorn`) | **50 appels / 29 fichiers** ; 5 à examiner, tous qualifiés ; 4 tests, 12 assertions |
 | 2026-08-27 | QA-006 — `PasserelleTest` | **28 passed, 68 assertions** ; 4 mutations → **3, 4, 3 et 5 rouges** disjoints |
+| 2026-08-27 | QA-007 — E-192 (révocation d'accès) | **26 passed** ; 6 mutations → **15, 1, 3, 1, 5 et 1 rouges**, signatures séparées |
 
 Chaque chiffre porte sa commande de remesure :
 
