@@ -38,7 +38,15 @@ class Fail2banController extends Controller
 
     public function __invoke(): View
     {
-        $machines = $this->fail2ban->machines();
+        /*
+         * E-205 : LE PARC EST BORNE PAR LE ROLE, comme dans le legacy. Les deux
+         * valeurs viennent de la SESSION, ou elles ont ete posees apres
+         * verification en base au second facteur.
+         */
+        $machines = $this->fail2ban->machines(
+            (int) request()->session()->get('utilisateur_id', 0),
+            (int) request()->session()->get('role_id', 0)
+        );
         $statuts = $this->fail2ban->dernierStatut();
 
         // ── F2 : ce qu'il faut pour que l'ecran ne mente pas ────────────
