@@ -163,6 +163,7 @@
                     <th>{{ __('plateforme.th_compte_service') }}</th>
                     <th>{{ __('plateforme.th_mot_de_passe') }}</th>
                     <th class="rw-colonne-secondaire">{{ __('plateforme.th_depuis') }}</th>
+                    <th>{{ __('plateforme.th_actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -201,11 +202,35 @@
                         <td class="rw-colonne-secondaire rw-tableau__discret">
                             {{ $m->platform_key_deployed_at ?: __('plateforme.jamais') }}
                         </td>
+                        <td>
+                            {{-- P2 : LE TEST EST OFFERT MEME AVANT DEPLOIEMENT, et
+                                 c'est fidele — le backend repond alors « rien a
+                                 tester », ce qui est une information utile. Le
+                                 masquer forcerait a deviner l'ordre des etapes. --}}
+                            <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule"
+                                    data-rw="cle-tester-{{ $m->id }}"
+                                    data-machine="{{ $m->id }}" data-nom="{{ $m->name }}">
+                                {{ __('plateforme.tester') }}
+                            </button>
+                        </td>
                     </tr>
                 @endforeach
             </tbody>
         </table>
     </div>
+    <p class="rw-aide rw-prose">{{ __('plateforme.tester_aide') }}</p>
+
+    {{--
+        ── LE JOURNAL DES TESTS, AU NIVEAU DE LA SECTION ───────────────────
+
+        Une region persistante et non une bulle : une bulle disparue ne dit plus
+        si le verdict qu'on relit est celui d'avant ou celui d'apres. Vide, le
+        cadre DIT qu'il est vide.
+    --}}
+    <h3 class="rw-sous-titre-fort rw-titre--espace">{{ __('plateforme.test_journal') }}</h3>
+    <div class="rw-journal__general rw-journal--vide" data-rw="cle-test-journal"
+         aria-live="polite" aria-label="{{ __('plateforme.test_journal_vide') }}"></div>
+
     {{-- CE QUE LE COMPTE D'ADMINISTRATION ACCORDE, DIT UNE FOIS SOUS LE
          TABLEAU plutot que cache dans une infobulle : « NOPASSWD: ALL ». --}}
     <p class="rw-aide rw-prose">{{ __('plateforme.compte_service_aide') }}</p>

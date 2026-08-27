@@ -50,6 +50,9 @@ class ClePlateformeController extends Controller
         foreach ([
             'cle_chargement', 'cle_echec', 'cle_absente_titre', 'cle_absente',
             'cle_copier', 'cle_copiee',
+            // P2
+            'test_en_cours', 'test_ok', 'test_rien_a_tester', 'test_echec',
+            'test_indecis',
         ] as $cle) {
             $textes[$cle] = __('plateforme.' . $cle);
         }

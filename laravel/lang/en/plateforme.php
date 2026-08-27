@@ -46,6 +46,7 @@ return [
     'th_compte_service' => "Administration account",
     'th_mot_de_passe' => "Known passwords",
     'th_depuis' => "Key deployed on",
+    'th_actions' => "Test",
     'etat_cle_seule' => "key only",
     'etat_cle_et_mot_de_passe' => "key and password",
     'etat_mot_de_passe_seul' => "password only",
@@ -64,4 +65,19 @@ return [
     'non_porte_titre' => "This page's actions are not ported yet",
     'non_porte_texte' => "Deploying the key, deploying the administration account, testing a connection, reading the accounts, erasing or re-entering a password, and rotating the key are still done from the legacy portal. This page carries the state, its counters and its guards.",
     'non_porte_lien' => "Open the platform key in the legacy portal",
+
+    // ── Sous-lot P2 : le test de connexion ───────────────────────────────
+    // QUATRE situations, et le legacy les replie sur un rouge unique. « Cle non
+    // deployee » est un ETAT, pas un echec ; et le backend ne distingue pas
+    // « refusee » d'« injoignable » — les deux rendent `auth_method: password`.
+    // L'ecran ne pretend donc pas savoir laquelle, il dit les deux.
+    'tester' => "Test the connection",
+    'tester_aide' => "Opens an SSH session to the machine with the key, then closes it. Nothing is written, neither on the machine nor in the database.",
+    'test_en_cours' => "Connecting to :machine…",
+    'test_ok' => "The key works on :machine.",
+    'test_rien_a_tester' => "Nothing to test on :machine: the key is not deployed there. This is not a failure — it is the previous step.",
+    'test_echec' => "The key did not work on :machine. Two possible causes the backend does not tell apart: it is refused by the machine, or the machine is unreachable. What the server reports: :message",
+    'test_indecis' => "The test returned no verdict on :machine. This is neither a success nor a key failure: the answer could not be read.",
+    'test_journal' => "Test log",
+    'test_journal_vide' => "No test has been run on this page yet.",
 ];

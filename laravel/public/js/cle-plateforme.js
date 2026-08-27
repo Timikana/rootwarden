@@ -97,6 +97,105 @@ window.RW_CLE_PLATEFORME = true;
         });
 
     /*
+     * ══ P2 : LE TEST DE CONNEXION — QUATRE SITUATIONS, PAS DEUX ═══════════
+     *
+     * `POST /test_platform_key` rend quatre reponses distinctes, et le legacy
+     * les replie toutes sur `d.success ? 'success' : 'error'` :
+     *
+     *   success, `keypair`   la cle fonctionne
+     *   false,   `none`      la cle n'est pas deployee, ou aucune paire n'existe
+     *                        — **ce n'est pas un echec, c'est l'etape d'avant**,
+     *                        et le legacy la peint en ROUGE
+     *   false,   `password`  AuthenticationException : la cle est REFUSEE
+     *   false,   `password`  toute autre exception : machine injoignable, delai…
+     *
+     * **Les deux dernieres sont indiscernables** : le backend rend le meme
+     * `auth_method` et ne differe que par le TEXTE du message. Distinguer
+     * demanderait de lire une phrase francaise — donc l'ecran ne pretend pas
+     * savoir laquelle : il dit les deux causes et rapporte ce que le serveur
+     * dit. *Une mesure plus fine que la donnee est une invention.*
+     *
+     * Et `auth_method: 'password'` ne veut PAS dire « authentifie par mot de
+     * passe » : il veut dire « la cle n'a pas marche ». Le mot n'est pas montre
+     * a l'ecran, il induirait en erreur.
+     *
+     * LE MESSAGE DU SERVEUR PORTE UN `str(e)` DE PARAMIKO. Il est rendu par
+     * `textContent`, jamais interpole : une banniere SSH distante hostile ne
+     * peut pas s'echapper de son noeud de texte.
+     *
+     * CE GESTE N'ECRIT RIEN — ni sur la machine, ni en base. Verifie route par
+     * route : aucun `INSERT`, `UPDATE` ni `DELETE` dans `test_platform_key`.
+     */
+    var journal = document.querySelector('[data-rw="cle-test-journal"]');
+
+    function journalise(texte, classe) {
+        if (! journal) { return; }
+        var p = document.createElement('p');
+        p.textContent = texte;
+        if (classe) { p.className = classe; }
+        journal.appendChild(p);
+        journal.classList.remove('rw-journal--vide');
+        journal.scrollTop = journal.scrollHeight;
+        journal.scrollIntoView({ block: 'nearest' });
+    }
+
+    function remplit(modele, valeurs) {
+        var t = textes[modele] || '';
+        Object.keys(valeurs).forEach(function (c) {
+            t = t.split(':' + c).join(String(valeurs[c]));
+        });
+
+        return t;
+    }
+
+    [].slice.call(document.querySelectorAll('[data-rw^="cle-tester-"]'))
+        .forEach(function (bouton) {
+            bouton.addEventListener('click', function () {
+                var machine = parseInt(bouton.dataset.machine, 10);
+                var nom = bouton.dataset.nom || '';
+                if (! machine) { return; }
+                // LE BOUTON SE DESACTIVE : le test ouvre une session SSH et dure.
+                // Sans cela on clique trois fois en croyant que rien ne se passe.
+                bouton.disabled = true;
+                journalise(remplit('test_en_cours', { machine: nom }), 'rw-aide');
+
+                fetch(PASSERELLE + '/test_platform_key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ machine_id: machine }),
+                }).then(function (r) {
+                    return r.json().catch(function () { return null; });
+                }).then(function (d) {
+                    if (! d || typeof d.success !== 'boolean') {
+                        // NI VERDICT NI ECHEC DE LA CLE : la reponse est illisible.
+                        journalise(remplit('test_indecis', { machine: nom }), 'rw-non-resolu');
+
+                        return;
+                    }
+                    if (d.success === true) {
+                        journalise(remplit('test_ok', { machine: nom }), 'rw-annonce--ok');
+
+                        return;
+                    }
+                    if (d.auth_method === 'none') {
+                        // UN ETAT, PAS UN ECHEC. Le legacy le peint en rouge.
+                        journalise(remplit('test_rien_a_tester', { machine: nom }), 'rw-aide');
+
+                        return;
+                    }
+                    journalise(remplit('test_echec', {
+                        machine: nom,
+                        message: String(d.message == null ? '' : d.message),
+                    }), 'rw-non-resolu');
+                }).catch(function () {
+                    journalise(remplit('test_indecis', { machine: nom }), 'rw-non-resolu');
+                }).finally(function () {
+                    bouton.disabled = false;
+                });
+            });
+        });
+
+    /*
      * COPIER SANS `prompt()` NI SELECTION FORCEE. Le legacy rend le bloc
      * `select-all` et cliquable, ce qui fait qu'un clic pour lire selectionne
      * tout. Ici le geste est un bouton, et son resultat est ANNONCE dans une
