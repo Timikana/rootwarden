@@ -642,6 +642,23 @@ declare -A REF_LEGACY=(
   # Les lignes de `fail2ban_history` creees par le geste sont retirees dans le
   # `finally`, bornees par un DELTA d'`id`.
   [go-fail2ban-f4]=14
+  # `fail2ban/` sous-lot F5 : jails et liste blanche. 10 sur le legacy.
+  #
+  # LES ECRITURES SONT SERVIES, ET CE N'EST PAS PAR PRUDENCE. `enable_jail`,
+  # `disable_jail` et `whitelist add|remove` font toutes `touch
+  # /etc/fail2ban/jail.local` : elles CREENT le fichier. Or `go-fail2ban-f3`
+  # mesure precisement qu'il est ABSENT du banc — laisser passer une seule
+  # ecriture de F5 CASSERAIT la caracterisation de F3, et le LOT deviendrait
+  # dependant de l'ordre de ses suites.
+  #
+  # UNE SEULE ECRITURE PASSE, ET ELLE NE PEUT PAS ECRIRE : le retrait de
+  # `127.0.0.1/8`. `_validate_ip` leve une `ValueError` sur un CIDR AVANT toute
+  # commande d'ecriture. C'est ce qui rend E-169 mesurable sans rien toucher.
+  #
+  # L'INTERPOLATION BRUTE (E-171) N'EST PAS EXERCEE : la demontrer exigerait
+  # d'ecrire une apostrophe dans le `jail.local` d'une vraie machine, donc de la
+  # COMMETTRE. Elle est relevee par lecture, et dite comme telle.
+  [go-fail2ban-f5]=10
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -672,7 +689,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)

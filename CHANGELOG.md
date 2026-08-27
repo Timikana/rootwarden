@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.6** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.7** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,64 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.7 — `fail2ban/` F5 caracterise : le seul geste qui confirme est celui qui RENFORCE la protection
+
+`go-fail2ban-f5.mjs`, **legacy 10 PASS / 0 FAIL**, base rouge **5 PASS / 5 FAIL**. Le portage reste a
+faire.
+
+#### Les ecritures sont SERVIES, et ce n'est pas par prudence
+
+`enable_jail`, `disable_jail` et `whitelist add|remove` font toutes trois
+`touch /etc/fail2ban/jail.local` : **elles CREENT le fichier**, puis redemarrent le service.
+
+Or `go-fail2ban-f3` mesure precisement que ce fichier est ABSENT du banc — la machine y repond
+`[FICHIER ABSENT]`, et c'est ce retour qui porte E-161. **Laisser passer une seule ecriture de F5
+casserait la caracterisation de F3**, et le LOT deviendrait dependant de l'ordre de ses suites.
+
+**Une seule ecriture est laissee passer, et elle ne peut pas ecrire** : le retrait de `127.0.0.1/8`.
+`_validate_ip` leve une `ValueError` sur un CIDR AVANT toute commande d'ecriture — une lecture
+inoffensive, puis un refus.
+
+#### Quatre ecarts neufs
+
+| | |
+|---|---|
+| **E-168** | la liste blanche affichee est **SUPPOSEE**, pas lue : `manage_whitelist` rend `['127.0.0.1/8', '::1']` quand le fichier distant n'a aucune ligne `ignoreip`. L'ecran montre une liste qui n'existe nulle part sur la machine, et rien ne le dit |
+| **E-169** | une de ces deux entrees par defaut porte un `×` qui ne peut **JAMAIS** aboutir — `127.0.0.1/8` est un CIDR, et `ipaddress.ip_address()` le refuse. Le geste est offert sur quelque chose qui n'existe pas, et le refus arrive APRES la confirmation |
+| **E-170** | `manage_whitelist` finit par `restart_fail2ban` : ajouter ou retirer une exemption **redemarre le service**, ce qui lache tous les bans en cours. **Le seul geste qui confirme est `removeWhitelistIp`** — celui qui RENFORCE la protection. Ajouter une exemption et activer une jail passent sans un mot, et aucun des trois n'annonce le redemarrage |
+| **E-171** | l'interpolation brute de `manage_whitelist` — **relevee par LECTURE, NON MESUREE** |
+
+#### E-171 — pourquoi il n'est pas exerce
+
+`new_line` contient les adresses **deja presentes dans le fichier distant**, lues par un `grep` et
+decoupees sans aucune validation, puis interpolees dans un `sed -i '...'`. Une apostrophe dans la
+ligne `ignoreip` ferme le litteral shell. **La branche de secours du meme `||` passe, elle, par
+base64** — une branche sur deux, sixieme occurrence du motif « a moitie corrige ».
+
+Le demontrer exigerait d'ecrire une apostrophe dans le `jail.local` d'une machine reelle,
+c'est-a-dire de **le commettre**. Meme regle qu'en `services/` S3, ou `stop ssh.socket` n'a pas ete
+forge.
+
+Portee reelle, dite honnetement : l'exploitation suppose d'avoir DEJA ecrit dans `jail.local`, donc
+**pas d'escalade depuis le portail**. C'est une elevation de « j'ecris un fichier de configuration »
+a « j'execute du root au prochain passage de RootWarden ». **Le portage ne peut pas le refermer** :
+la composition vit dans le backend.
+
+#### Une huitieme mesure fausse, et la seule qui vienne du DOM
+
+`offsetParent` vaut **`null` pour un element en `position: fixed`**. La fenetre de reglages d'une
+jail etait donc declaree FERMEE — alors que la meme mesure lisait son contenu, « Configurer le
+jail : sshd, Template… ». Les sept precedentes venaient d'un motif trop large ou d'une unite
+melangee ; celle-ci vient d'une propriete du DOM. Le test de visibilite d'une modale passe desormais
+par `getBoundingClientRect().height > 0`, plus `display` et `visibility`.
+
+#### La base rouge, lue passe par passe
+5 PASS / 5 FAIL, **et deux des cinq passes sont creuses** : « aucune ecriture distante n'a ete
+laissee passer » et « aucune requete n'a vise la production » passent parce qu'aucun geste n'existe
+encore cote portage.
+
+**Reference du LOT** : `go-fail2ban-f5` entre avec **10 PASS sur le legacy**.
 
 ### v1.38.6 — `fail2ban/` F4 porte : une reussite verifiee, et une confirmation qui nomme sa cible
 

@@ -7168,3 +7168,91 @@ banni », et `fail2ban_history` reste à **0 ligne**.
 à F6 — et les deux gestes destructeurs de la page tirent leur couleur des **jetons du socle**, pas
 d'une classe utilitaire. Mesuré : plus aucun bouton destructeur sans fond peint. **Reste ouvert côté
 legacy**, où `bg-red-800` et `bg-orange-600` demeurent purgées.
+
+---
+
+## E-168 — La liste blanche affichée est SUPPOSÉE, pas lue
+
+`manage_whitelist` (`fail2ban_manager.py:207-212`) lit la ligne `ignoreip` du `jail.local` distant.
+Si elle est absente, il **suppose** :
+
+```python
+else:
+    current_ips = ['127.0.0.1/8', '::1']
+```
+
+et rend cette liste comme si elle venait de la machine. Mesuré le 2026-08-27 sur le banc, dont le
+`jail.local` **n'existe pas** : l'écran affiche `127.0.0.1/8` et `::1`, et **rien ne dit que ces deux
+entrées sont une hypothèse**.
+
+Un opérateur lit donc une liste blanche qui n'existe nulle part sur la machine — et il en tirera
+qu'il n'a pas besoin d'y ajouter `127.0.0.1`.
+
+---
+
+## E-169 — Une des deux entrées par défaut porte un `×` qui ne peut JAMAIS aboutir
+
+`_validate_ip` (`fail2ban_manager.py:26`) appelle `ipaddress.ip_address(ip)`. **Un CIDR y lève une
+`ValueError`.** Or `127.0.0.1/8` *est* un CIDR — et c'est l'une des deux entrées qu'E-168 affiche par
+défaut.
+
+Son `×` envoie donc une requête que le backend refuse **toujours**. Mesuré : la requête part, la
+liste reste inchangée, et le journal de la page affiche `Exception : Error: H…` — pas même un refus
+lisible.
+
+Trois choses en une :
+
+- **un geste est offert alors qu'il ne peut pas aboutir** ;
+- il est offert sur une entrée **supposée**, donc sur quelque chose qui n'existe pas ;
+- et le refus arrive **après** la confirmation, en fin de course.
+
+Le refus lui-même est correct — `127.0.0.1/8` n'est pas une adresse. C'est de l'**offrir** qui ne
+l'est pas.
+
+---
+
+## E-170 — Le geste qui affaiblit la protection est le seul à ne pas confirmer, et aucun des deux ne dit que le service REDÉMARRE
+
+`manage_whitelist` finit par `restart_fail2ban(client, root_password)`. Ajouter **ou** retirer une
+exemption **redémarre fail2ban** — et un redémarrage **lâche tous les bans en cours**.
+
+| geste | effet | confirmation |
+|---|---|---|
+| `addWhitelistIp` — **ajoute** une exemption | réécrit `jail.local`, redémarre | **aucune** |
+| `removeWhitelistIp` — **retire** une exemption | réécrit `jail.local`, redémarre | `confirm()` |
+| `submitEnableJail` — active une jail | réécrit `jail.local`, redémarre | **aucune** |
+
+**Le seul geste qui confirme est celui qui RENFORCE la protection.** Les deux qui l'affaiblissent —
+exempter une adresse, et réécrire une configuration — passent sans un mot.
+
+Et **aucun des trois n'annonce le redémarrage**. Mesuré : la fenêtre de réglages d'une jail propose
+trois nombres (`maxretry`, `bantime`, `findtime`) et ne dit ni qu'elle va écrire un fichier, ni que
+le service va redémarrer.
+
+---
+
+## E-171 — L'interpolation brute de `manage_whitelist` — RELEVÉ PAR LECTURE, NON MESURÉ
+
+```python
+f"grep -q '\\[DEFAULT\\]' /etc/fail2ban/jail.local && "
+f"sed -i '/\\[DEFAULT\\]/a\\{new_line}' /etc/fail2ban/jail.local || "
+f"printf '%s\\n' '{base64.b64encode(...)}' | base64 -d | ..."
+```
+
+`new_line` vaut `'ignoreip = ' + ' '.join(current_ips)`, et `current_ips` contient **les adresses
+déjà présentes dans le fichier distant**, lues par un `grep` et découpées **sans aucune validation**.
+Une apostrophe dans la ligne `ignoreip` de `jail.local` ferme le littéral shell.
+
+**La branche de secours du même `||` passe, elle, par base64.** Une branche sur deux : quelqu'un a vu
+le problème et n'en a protégé qu'une — sixième occurrence du motif « à moitié corrigé ».
+
+**Ce défaut n'a PAS été mesuré, et c'est délibéré.** Le démontrer exigerait d'écrire une apostrophe
+dans le `jail.local` d'une machine réelle, c'est-à-dire de **le commettre**. Même règle qu'en
+`services/` S3, où `stop ssh.socket` n'a pas été forgé.
+
+Portée réelle, dite honnêtement : l'exploitation suppose d'avoir **déjà** écrit dans `jail.local`,
+donc **pas d'escalade depuis le portail**. C'est une élévation de « j'écris un fichier de
+configuration » à « j'exécute du root au prochain passage de RootWarden ».
+
+**Le portage ne peut pas refermer celui-ci** : la composition vit dans le backend. Porté au §7 avec
+les autres correctifs backend.
