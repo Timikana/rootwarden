@@ -1703,6 +1703,34 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### UNE SONDE QUI REND « AUCUN DÉFAUT » DOIT ÊTRE ÉPROUVÉE SUR UN CAS OÙ ELLE DEVRAIT EN TROUVER UN (2026-08-27)
+
+**La règle qui retire le confort du constat rassurant de la journée.** Trois sondes de mesure se sont
+trompées le 2026-08-27 — un `UNION` qui comptait un message d'erreur MySQL comme un nom, une introspection
+qui prouvait le fichier au lieu du serveur, un motif qui trouvait `len(comptes)` **dans sa propre
+docstring**. Et **les trois se sont trompées dans le sens qui ALARME.**
+
+C'était présenté comme le seul point rassurant. Ce n'en est pas un :
+
+> **Elles se sont trompées dans le sens qui alarme parce qu'elles étaient écrites pour ACCUSER** — pas
+> par chance, et pas parce que l'instrument était bon. Un motif trop large accuse, un motif trop étroit
+> dédouane. **Le jour où l'une se trompera dans l'autre sens, personne ne le verra.**
+
+Et la raison est structurelle : **une sonde qui dédouane à tort ne produit AUCUN symptôme.** Elle rend un
+vert, on passe à la suite, et *un vert ne se relit pas*. Les trois fautes du jour ont été trouvées parce
+qu'un rouge inexplicable oblige à regarder ; un faux vert n'oblige à rien.
+
+> **D'où la règle : une sonde qui rend « aucun défaut » doit être éprouvée sur un cas où elle DEVRAIT en
+> trouver un.**
+
+Les deux cas du jour le montrent par contraste : la sonde d'E-183 a été mesurée **sur le code d'avant le
+correctif** — donc elle a prouvé qu'elle savait rougir. Le `UNION` a rendu « 0 compte cassé » **sans que
+rien ne le contredise**, et il a fallu qu'un listing brut, deux commandes plus haut, montre déjà un des
+comptes à l'écran.
+
+C'est la forme générale de « **N validations précédentes ne prouvent rien si aucune ne pouvait échouer** »,
+appliquée non plus aux assertions d'une suite mais **aux instruments de mesure eux-mêmes**.
+
 ### UN DISCRIMINANT DOIT ÊTRE UN SEUIL, PAS UNE INÉGALITÉ (BUG-201, 2026-08-27)
 
 **Quatrième instrument pris pour un résultat en une journée, et le seul qui soit trop SENSIBLE au lieu de
