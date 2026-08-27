@@ -1114,6 +1114,10 @@ def scan_server_users():
             cmd = "awk -F: '{print $1\":\"$3\":\"$6\":\"$7}' /etc/passwd"
             stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
             passwd_output = stdout.read().decode('utf-8', errors='replace')
+            # E-183. Le code de sortie de CETTE lecture decide de la purge des
+            # « fantomes », plus bas. Il n'etait jamais lu — et `recv_exit_status`
+            # n'apparaissait pas une seule fois dans ce fichier.
+            passwd_rc = stdout.channel.recv_exit_status()
 
             # 2. Dump des authorized_keys.
             # Strategie en 2 etages :
@@ -1276,8 +1280,41 @@ def scan_server_users():
             # autre console, compte systeme supprime, etc.). Sans ca, un
             # compte comme `cleopatre` reste visible a vie dans l'UI.
             # On identifie les fantomes = rows en DB non-touchees par ce scan.
+            #
+            # ══ E-183 : LE SENS DU REPLI CHANGE, ET C'EST DELIBERE ═══════════
+            #
+            # AVANT : « je n'ai rien vu » signifiait « il n'y a plus rien ».
+            # APRES : « je n'ai rien vu » signifie « je ne sais pas ».
+            #
+            # Le code de sortie de la lecture de `/etc/passwd` n'etait jamais
+            # lu. Une lecture qui echoue ou qui rend une sortie vide donnait
+            # donc `scanned_users == []`, donc TOUTES les lignes d'inventaire
+            # de la machine devenaient des « fantomes », donc etaient
+            # SUPPRIMEES — avec `server_user_ssh_keys` dans la foulee. Un
+            # incident SSH passager effacait 72 lignes d'inventaire et 20 cles,
+            # et le journal l'annoncait comme un nettoyage reussi.
+            #
+            # C'est la forme DESTRUCTRICE de la classe « l'etat persiste ne suit
+            # pas le verdict » (E-90, E-165) : pas « ecrire un etat faux » mais
+            # « effacer un etat vrai ».
+            #
+            # L'asymetrie tranche : au pire, ce garde laisse un compte mort
+            # visible a l'ecran — le defaut meme que le commentaire ci-dessus
+            # voulait eviter, et qui se corrige au scan suivant. Sans lui, la
+            # donnee est perdue. Et c'est cet inventaire qui fonde l'arbitrage
+            # de K4 : un deploiement de cles raisonne dessus.
+            #
+            # Le repli est NOMME dans le journal, pas silencieux : remplacer un
+            # faux succes par une absence ne serait qu'un autre mensonge.
             scanned_usernames = {u['name'] for u in scanned_users}
-            ghost_usernames = [u for u in existing.keys() if u not in scanned_usernames]
+            scan_concluant = (passwd_rc == 0 and bool(scanned_users))
+            if not scan_concluant:
+                logger.warning(
+                    "scan_server_users(%s): scan NON CONCLUANT (code=%s, %d compte(s) lu(s)) — "
+                    "purge des fantomes ABANDONNEE, l'inventaire (%d ligne(s)) est conserve tel quel",
+                    mid, passwd_rc, len(scanned_users), len(existing))
+            ghost_usernames = ([u for u in existing.keys() if u not in scanned_usernames]
+                               if scan_concluant else [])
             if ghost_usernames:
                 placeholders = ','.join(['%s'] * len(ghost_usernames))
                 cur.execute(
@@ -1317,7 +1354,10 @@ def scan_server_users():
                     "WHERE machine_id = %s", (mid,))
                 existing_keys = {(r['username'], r['fingerprint_sha256'])
                                  for r in cur.fetchall()}
-                stale = existing_keys - seen_keys
+                # E-183, meme garde : `seen_keys` se construit a partir des
+                # comptes lus. Un scan qui n'a rien lu rend `seen_keys` vide,
+                # donc `stale` = TOUTES les cles connues de la machine.
+                stale = (existing_keys - seen_keys) if scan_concluant else set()
                 if stale:
                     for uname, fp in stale:
                         cur.execute(
@@ -1332,9 +1372,21 @@ def scan_server_users():
                 logger.warning("scan_server_users: maj server_user_ssh_keys echoue (%s)", _e)
                 conn_inv.rollback()
 
-            # Marquer scanne
-            cur.execute("UPDATE machines SET users_scanned_at = NOW() WHERE id = %s", (mid,))
-            conn_inv.commit()
+            # Marquer scanne — SEULEMENT si le scan a abouti.
+            #
+            # E-183, la face qui touche K4. `users_scanned_at` n'est pas un
+            # horodatage d'affichage : c'est la PRECONDITION du preflight de
+            # deploiement (`ssh.py:381`, « Bloquer si le serveur n'a jamais ete
+            # scanne »). L'ecrire apres un scan qui n'a rien lu leve un garde de
+            # surete sur le module le plus dangereux du chantier, en s'appuyant
+            # sur un scan qui n'a pas eu lieu.
+            if scan_concluant:
+                cur.execute("UPDATE machines SET users_scanned_at = NOW() WHERE id = %s", (mid,))
+                conn_inv.commit()
+            else:
+                logger.warning(
+                    "scan_server_users(%s): `users_scanned_at` NON mis a jour — "
+                    "le preflight de deploiement continue d'exiger un scan concluant", mid)
 
             # Recharger l'inventaire complet pour la reponse
             cur.execute("""
