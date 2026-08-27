@@ -68,6 +68,33 @@
 </div>
 
 {{--
+    ── LE PANNEAU DE DECISION, AU NIVEAU DE LA PAGE ────────────────────────
+
+    Il vivait DANS le detail d'une jail. Or il sert aussi aux gestes de la liste
+    blanche, qui s'exercent detail ferme : le panneau s'ouvrait alors dans un
+    parent cache, donc **il ne s'affichait pas** — et un geste destructeur
+    partait sans que rien ne l'ait annonce. Un element partage par plusieurs
+    sections ne vit dans aucune d'elles.
+
+    Le legacy ouvre un `confirm()` natif qui dit « Bannir cette IP ? » — il ne
+    nomme NI l'adresse, NI la jail, NI la machine, alors que les trois lui sont
+    passees (E-167). Un panneau en page peut dire ce que l'action ENGAGE ; une
+    boite native tient en une ligne et s'accepte au reflexe.
+--}}
+<div class="rw-panneau-decision" data-rw="f2b-confirmation" hidden>
+    <div class="rw-panneau-decision__texte">
+        <p class="rw-sous-titre-fort" data-rw="f2b-confirmation-titre"></p>
+        <p class="rw-aide" data-rw="f2b-confirmation-texte"></p>
+    </div>
+    <div class="rw-panneau-decision__actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="f2b-annuler">{{ __('fail2ban.conf_annuler') }}</button>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="f2b-confirmer">{{ __('fail2ban.conf_confirmer') }}</button>
+    </div>
+</div>
+
+{{--
     ── LE DERNIER RELEVÉ CONNU, ET SA DATE ─────────────────────────────────
 
     Lu dans le cache `fail2ban_status`, pas sur la machine : ouvrir la page ne
@@ -186,31 +213,6 @@
                 data-rw="f2b-bannir">{{ __('fail2ban.bannir') }}</button>
     </div>
 
-    {{--
-        ── LE PANNEAU DE DECISION ──────────────────────────────────────────
-
-        Le legacy ouvre un `confirm()` natif qui dit « Bannir cette IP ? » — il
-        ne nomme NI l'adresse, NI la jail, NI la machine, alors que les trois lui
-        sont passees (E-167). On confirme donc un geste destructeur sans savoir
-        sur quoi il porte, et F4 vient de montrer que la machine peut differer de
-        celle qu'affiche le selecteur.
-
-        Un panneau en page peut dire ce que l'action ENGAGE. Une boite native
-        tient en une ligne et s'accepte au reflexe.
-    --}}
-    <div class="rw-panneau-decision" data-rw="f2b-confirmation" hidden>
-        <div class="rw-panneau-decision__texte">
-            <p class="rw-sous-titre-fort" data-rw="f2b-confirmation-titre"></p>
-            <p class="rw-aide" data-rw="f2b-confirmation-texte"></p>
-        </div>
-        <div class="rw-panneau-decision__actions">
-            <button type="button" class="rw-bouton rw-bouton--discret"
-                    data-rw="f2b-annuler">{{ __('fail2ban.conf_annuler') }}</button>
-            <button type="button" class="rw-bouton rw-bouton--danger"
-                    data-rw="f2b-confirmer">{{ __('fail2ban.conf_confirmer') }}</button>
-        </div>
-    </div>
-
     <h3 class="rw-sous-titre-fort rw-titre--espace">{{ __('fail2ban.geste_journal') }}</h3>
     <div class="rw-journal__general" data-rw="f2b-journal"
          aria-live="polite" aria-label="{{ __('fail2ban.geste_vide') }}"></div>
@@ -252,6 +254,76 @@
     <p class="rw-aide" data-rw="f2b-logs-source"></p>
     <div data-rw="f2b-logs-message"></div>
     <pre class="rw-fichier" data-rw="f2b-logs-contenu" hidden></pre>
+</div>
+
+{{--
+    ── LA LISTE BLANCHE ────────────────────────────────────────────────────
+
+    Deux choses que le legacy ne dit pas :
+
+    — quand `/etc/fail2ban/jail.local` n'a aucune ligne `ignoreip`, le backend en
+      SUPPOSE une. Le legacy affiche donc une liste qui n'existe nulle part sur
+      la machine (E-168). Le backend porte desormais un drapeau `lue`, et l'ecran
+      le dit ;
+    — `127.0.0.1/8` est un RESEAU, pas une adresse, et `_validate_ip` n'accepte
+      que des adresses. Son « × » ne peut donc jamais aboutir — alors que c'est
+      l'une des deux entrees affichees par defaut (E-169). Ici, une entree qui ne
+      peut pas etre retiree ne porte pas de bouton : elle porte la RAISON.
+--}}
+<div class="rw-section" data-rw="f2b-blanche" hidden>
+    <h2 class="rw-section__entete">{{ __('fail2ban.blanche_titre') }}</h2>
+    <p class="rw-aide">{{ __('fail2ban.blanche_aide') }}</p>
+    <p class="rw-aide" data-rw="f2b-blanche-source"></p>
+    <div data-rw="f2b-blanche-message"></div>
+    <div class="rw-liste-etats" data-rw="f2b-blanche-liste"></div>
+
+    <label class="rw-champ rw-champ--espace">
+        <span class="rw-champ__etiquette">{{ __('fail2ban.blanche_etiquette') }}</span>
+        <input type="text" class="rw-saisie" data-rw="f2b-blanche-ip"
+               placeholder="{{ __('fail2ban.ban_placeholder') }}"
+               autocomplete="off" spellcheck="false">
+    </label>
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--avertissement"
+                data-rw="f2b-blanche-ajouter">{{ __('fail2ban.blanche_ajouter') }}</button>
+    </div>
+</div>
+
+{{--
+    ── LES REGLAGES D'UNE JAIL ─────────────────────────────────────────────
+
+    La fenetre du legacy propose trois nombres et ne dit ni qu'elle va ECRIRE un
+    fichier, ni que le service va REDEMARRER — donc que tous les bans en cours
+    seront perdus (E-170). Ici l'avertissement est en tete, avant les champs.
+--}}
+<div class="rw-section" data-rw="f2b-jail-reglages" hidden>
+    <h2 class="rw-section__entete" data-rw="f2b-reglages-titre"></h2>
+    <p class="rw-avertissement">{{ __('fail2ban.jail_reglages_avert') }}</p>
+    <div class="rw-grille-champs">
+        <label class="rw-champ">
+            <span class="rw-champ__etiquette">{{ __('fail2ban.jail_maxretry') }}</span>
+            <input type="number" class="rw-saisie" data-rw="f2b-maxretry" min="1" max="100" value="5">
+            <span class="rw-aide">{{ __('fail2ban.jail_maxretry_aide') }}</span>
+        </label>
+        <label class="rw-champ">
+            <span class="rw-champ__etiquette">{{ __('fail2ban.jail_bantime') }}</span>
+            <input type="number" class="rw-saisie" data-rw="f2b-bantime" min="60" value="3600">
+            <span class="rw-aide">{{ __('fail2ban.jail_bantime_aide') }}</span>
+        </label>
+        <label class="rw-champ">
+            <span class="rw-champ__etiquette">{{ __('fail2ban.jail_findtime') }}</span>
+            <input type="number" class="rw-saisie" data-rw="f2b-findtime" min="60" value="600">
+            <span class="rw-aide">{{ __('fail2ban.jail_findtime_aide') }}</span>
+        </label>
+    </div>
+    <div class="rw-actions">
+        <div class="rw-actions__gauche">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="f2b-reglages-annuler">{{ __('fail2ban.conf_annuler') }}</button>
+        </div>
+        <button type="button" class="rw-bouton rw-bouton--avertissement"
+                data-rw="f2b-jail-activer">{{ __('fail2ban.jail_activer') }}</button>
+    </div>
 </div>
 
 {{--

@@ -361,10 +361,35 @@ try {
          * Le geste est laisse passer parce qu'il ne peut pas ecrire : la
          * `ValueError` est levee avant toute commande d'ecriture.
          */
+        /*
+         * UN GESTE QUI N'EST PAS OFFERT SATISFAIT LA PROPRIETE.
+         *
+         * Une premiere redaction exigeait que le bouton EXISTE, puis mesurait
+         * ce qu'il envoyait. Le portage ne l'offre pas — c'est precisement la
+         * correction — et l'assertion echouait sur une cible qui a raison.
+         * Troisieme fois sur ce module : une mesure taillee sur la forme de la
+         * cible defectueuse ne peut pas juger la cible corrigee.
+         *
+         * On mesure donc d'abord si le geste est offert, et **on dit lequel des
+         * deux cas on observe**.
+         */
         const cible = C.retirer(IRRETIRABLE);
         const existe = await page.$(cible);
-        verifie(`le retrait de ${IRRETIRABLE} est offert a l'ecran`, existe !== null, cible);
-        if (! existe) return;
+        constate(`le retrait de ${IRRETIRABLE} est-il offert ?`,
+            existe !== null ? 'OUI' : 'non — il n\'est pas propose');
+        if (! existe) {
+            verifiePortage('un geste qui ne peut pas aboutir n\'est pas offert', true, '');
+            const raison = await page.evaluate((ip) => {
+                const e = document.querySelector(`[data-rw="f2b-blanche-figee-${ip}"]`);
+
+                return e ? (e.textContent || '').trim() + ' — ' + (e.title || '') : '';
+            }, IRRETIRABLE);
+            constate('ce que l\'ecran met a la place', raison.slice(0, 130) || '(rien)');
+            verifie('l\'ecran DIT pourquoi ce retrait n\'est pas possible',
+                raison.trim().length > 0, '(aucune explication)');
+
+            return;
+        }
 
         const avant = boites.length;
         accepteLaBoite = true;

@@ -392,6 +392,18 @@ declare -A REF_LARAVEL=(
   # Les deux avant-derniers sont refermes DANS LE BACKEND (E-165) : le legacy en
   # profite aussi, et ses INFO disent « verifie sur le legacy aussi ».
   [go-fail2ban-f4]=21
+  # `fail2ban/` sous-lot F5 : jails et liste blanche, portes.
+  # 15 sur le portage contre 9 sur le legacy. L'ecart de SIX se decompose :
+  #   1  une liste blanche SUPPOSEE est annoncee comme telle (E-168) — le
+  #      backend porte desormais un drapeau `lue`, le deviner reviendrait a
+  #      supposer a son tour ;
+  #   1  un geste qui ne peut pas aboutir n'est pas offert (E-169) — ici par son
+  #      ABSENCE, et l'ecran dit pourquoi a la place ;
+  #   1  l'ecran DIT pourquoi ce retrait n'est pas possible ;
+  #   1  ajouter une exemption demande confirmation (E-170) ;
+  #   1  le redemarrage du service est ANNONCE, a l'ajout ;
+  #   1  la fenetre de reglages dit que le service va REDEMARRER.
+  [go-fail2ban-f5]=15
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et
@@ -658,7 +670,7 @@ declare -A REF_LEGACY=(
   # L'INTERPOLATION BRUTE (E-171) N'EST PAS EXERCEE : la demontrer exigerait
   # d'ecrire une apostrophe dans le `jail.local` d'une vraie machine, donc de la
   # COMMETTRE. Elle est relevee par lecture, et dite comme telle.
-  [go-fail2ban-f5]=10
+  [go-fail2ban-f5]=9
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -704,7 +716,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1

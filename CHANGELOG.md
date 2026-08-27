@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.7** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.8** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,71 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.8 — `fail2ban/` F5 porte : une liste blanche qui dit d'ou elle vient, et trois gestes qui annoncent le redemarrage
+
+`go-fail2ban-f5` entre au LOT avec **15 PASS sur le portage** contre **9 sur le legacy**, 0 FAIL des
+deux cotes. **Cinq sous-lots sur six sont portes.**
+
+#### E-168 a demande un changement de BACKEND, et c'etait la seule issue honnete
+
+`manage_whitelist` SUPPOSE `['127.0.0.1/8', '::1']` quand le fichier distant n'a aucune ligne
+`ignoreip`, et rendait **la meme forme dans les deux cas**. Le portage ne pouvait donc pas savoir si
+la liste venait de la machine — et **le deviner reviendrait a comparer la liste au defaut, donc a
+supposer a son tour**.
+
+Le backend porte desormais un drapeau `lue`. L'ecran dit soit « Lue dans /etc/fail2ban/jail.local sur
+Test-Server-Debian », soit :
+
+> **Cette liste est SUPPOSEE, pas lue.** Le fichier /etc/fail2ban/jail.local de Test-Server-Debian ne
+> contient aucune ligne ignoreip. Les entrees ci-dessous sont celles que fail2ban applique par
+> defaut — elles ne figurent nulle part dans la configuration de cette machine, et il n'y a donc rien
+> a en retirer.
+
+#### E-169 — une entree qui ne peut pas etre retiree porte la RAISON, pas un bouton
+
+Le legacy offre un « × » sur `127.0.0.1/8`, que `_validate_ip` refusera **toujours** : c'est un
+reseau, pas une adresse. Le refus est correct ; c'est de l'OFFRIR qui ne l'est pas.
+
+Deux cas, dits separement : une entree **supposee** n'est pas dans le fichier, donc il n'y a rien a
+en retirer ; une entree qui est un **reseau** ne sera jamais acceptee. La regle du portage est celle
+du backend, pas une approximation.
+
+#### E-170 — les trois gestes confirment, et les trois annoncent le redemarrage
+
+Le legacy ne fait confirmer que le RETRAIT d'une exemption — **donc le seul geste qui renforce la
+protection**. Exempter une adresse et activer une jail passaient sans un mot, alors que les trois
+appellent `restart_fail2ban` et perdent tous les bans en cours.
+
+L'avertissement de la fenetre de reglages est **avant** les champs, pas apres :
+
+> ⚠ Activer une jail REECRIT /etc/fail2ban/jail.local et REDEMARRE le service : tous les bans en
+> cours sur cette machine seront perdus.
+
+#### E-171 reste ouvert, et le restera de ce cote-ci
+L'interpolation brute vit dans le backend, et la demontrer reviendrait a la commettre. Porte au §7.
+
+#### Un defaut de conception du portage, trouve par la suite
+
+**Le panneau de decision vivait DANS le detail d'une jail.** Or les gestes de la liste blanche
+s'exercent detail ferme : le panneau s'ouvrait dans un parent cache, donc **il ne s'affichait pas** —
+et un geste destructeur partait sans que rien ne l'ait annonce. Il vit desormais au niveau de la
+page, avec un `scrollIntoView` puisqu'il peut etre loin du geste. **Un element partage par plusieurs
+sections ne vit dans aucune d'elles.**
+
+#### Et une neuvieme mesure taillee sur la cible defectueuse
+« Le retrait de 127.0.0.1/8 est offert a l'ecran » exigeait que le bouton EXISTE, puis mesurait ce
+qu'il envoyait. Le portage ne l'offre pas — **c'est precisement la correction** — et l'assertion
+echouait sur une cible qui a raison. Troisieme fois sur ce module. Elle mesure desormais si le geste
+est offert, et **dit lequel des deux cas elle observe**.
+
+**Fichiers** : `backend/fail2ban_manager.py`, `laravel/app/Http/Controllers/Fail2banController.php`,
+`laravel/resources/views/fail2ban.blade.php`, `laravel/public/js/fail2ban.js`,
+`laravel/lang/{fr,en}/fail2ban.php` (**139 cles chacune, parite stricte**),
+`laravel/public/css/rw.css`, `tests/e2e/go-fail2ban-f5.mjs`, `scripts/rejouer-lot.sh`.
+
+**Reste `fail2ban/` F6** — les gestes sur tout le parc, dont celui qui bannit sur toutes les machines
+de production. Puis `iptables/` I1 a I5.
 
 ### v1.38.7 — `fail2ban/` F5 caracterise : le seul geste qui confirme est celui qui RENFORCE la protection
 

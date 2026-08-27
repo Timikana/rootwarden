@@ -7188,6 +7188,11 @@ entrées sont une hypothèse**.
 Un opérateur lit donc une liste blanche qui n'existe nulle part sur la machine — et il en tirera
 qu'il n'a pas besoin d'y ajouter `127.0.0.1`.
 
+**FERMÉ au portage (`v1.38.8`).** Le backend porte désormais un drapeau `lue` : c'était la seule
+façon honnête de trancher, puisque **le deviner reviendrait à comparer la liste au défaut, donc à
+supposer à son tour**. L'écran dit soit « Lue dans /etc/fail2ban/jail.local sur <machine> », soit
+« Cette liste est SUPPOSÉE, pas lue » avec ce que cela implique.
+
 ---
 
 ## E-169 — Une des deux entrées par défaut porte un `×` qui ne peut JAMAIS aboutir
@@ -7209,6 +7214,11 @@ Trois choses en une :
 Le refus lui-même est correct — `127.0.0.1/8` n'est pas une adresse. C'est de l'**offrir** qui ne
 l'est pas.
 
+**FERMÉ au portage (`v1.38.8`).** Une entrée qui ne peut pas être retirée ne porte pas de bouton :
+elle porte la **raison**. Deux cas, dits séparément — une entrée *supposée* n'est pas dans le fichier,
+donc il n'y a rien à en retirer ; une entrée qui est un *réseau* ne sera jamais acceptée par
+`_validate_ip`. La règle du portage est celle du backend, pas une approximation.
+
 ---
 
 ## E-170 — Le geste qui affaiblit la protection est le seul à ne pas confirmer, et aucun des deux ne dit que le service REDÉMARRE
@@ -7228,6 +7238,11 @@ exempter une adresse, et réécrire une configuration — passent sans un mot.
 Et **aucun des trois n'annonce le redémarrage**. Mesuré : la fenêtre de réglages d'une jail propose
 trois nombres (`maxretry`, `bantime`, `findtime`) et ne dit ni qu'elle va écrire un fichier, ni que
 le service va redémarrer.
+
+**FERMÉ au portage (`v1.38.8`).** Les trois gestes confirment, et les trois annoncent le
+redémarrage — l'avertissement de la fenêtre de réglages est **avant** les champs, pas après :
+« ⚠ Activer une jail RÉÉCRIT /etc/fail2ban/jail.local et REDÉMARRE le service : tous les bans en
+cours sur cette machine seront perdus. »
 
 ---
 

@@ -131,11 +131,11 @@ pire dégât est **réversible**.
 
 `fail2ban/` — **F1 PORTÉ `v1.38.0`** statut et jails · **F2 PORTÉ `v1.38.2`** historique et frise ·
 **F3 PORTÉ `v1.38.4`** configuration, journaux et services · **F4 PORTÉ `v1.38.6`** bannir et
-débannir · **F5** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
+débannir · **F5 PORTÉ `v1.38.8`** jails et liste blanche (le plus délicat : l'interpolation brute, le `×` de
 `127.0.0.1/8` qui échoue toujours, l'édition qui **redémarre le service** sans le dire) · **F6**
 actions parc entier.
 
-**Quatre sous-lots sur six sont portés.** Trois d'entre eux — F1, F2, F3 — étaient annoncés mutants
+**Cinq sous-lots sur six sont portés.** Trois d'entre eux — F1, F2, F3 — étaient annoncés mutants
 par ce découpage et se sont révélés être des lectures : c'est la lecture du code qui a tranché,
 chaque fois. **F4 est le premier qui écrit vraiment.**
 
@@ -251,6 +251,28 @@ navigateur ne fait qu'éviter un aller-retour et un message inutilement tardif.
 
 **Un second témoin après chaque geste** : la page relit le détail de la jail quel que soit le verdict
 annoncé. Une réussite qui ne se retrouve pas dans la liste des adresses bannies se voit.
+
+### F5, porté le 2026-08-27 — trois écarts refermés, un que le portage ne peut pas refermer
+
+Suite `go-fail2ban-f5` à **15 laravel / 9 legacy, 0 FAIL**.
+
+1. **E-168 a demandé un changement de BACKEND**, et c'était la seule issue honnête : le portage ne
+   peut pas savoir si la liste blanche vient du fichier ou d'une hypothèse — le deviner reviendrait à
+   comparer la liste au défaut, donc à supposer à son tour. `manage_whitelist` porte désormais un
+   drapeau `lue`.
+2. **E-169** — une entrée qui ne peut pas être retirée ne porte pas de bouton : elle porte la
+   **raison**. Deux cas distincts, dits séparément : une entrée *supposée* n'est pas dans le fichier,
+   une entrée qui est un *réseau* ne sera jamais acceptée par `_validate_ip`.
+3. **E-170** — les trois gestes confirment, et les trois annoncent que le service **redémarre** et
+   que les bans en cours seront perdus. L'avertissement de la fenêtre de réglages est **avant** les
+   champs.
+
+**E-171 reste ouvert et le restera de ce côté-ci** : l'interpolation brute vit dans le backend, et la
+démontrer reviendrait à la commettre.
+
+**Les écritures de F5 sont servies par la suite, et ce n'est pas par prudence** : elles créeraient
+`/etc/fail2ban/jail.local`, or F3 mesure précisément qu'il est absent. Laisser passer une seule
+écriture rendrait le LOT dépendant de l'ordre de ses suites.
 
 ## 7. Ce qui reste à mesurer
 

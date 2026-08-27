@@ -204,14 +204,25 @@ def manage_whitelist(client, root_password: str, action: str, ip: str = '') -> d
         "grep -E '^ignoreip\\s*=' /etc/fail2ban/jail.local 2>/dev/null || echo ''",
         root_password, timeout=10)
 
+    # ══ DIRE SI LA LISTE EST LUE OU SUPPOSEE ═════════════════════════════
+    #
+    # Quand le fichier distant n'a aucune ligne `ignoreip`, cette fonction en
+    # SUPPOSE une. Elle rendait jusqu'ici la meme forme dans les deux cas :
+    # l'interface affichait donc une liste blanche qui n'existe nulle part sur la
+    # machine, sans pouvoir le savoir ni le dire (E-168, mesure le 2026-08-27).
+    #
+    # `lue` porte la difference. C'est la seule facon honnete pour une interface
+    # de distinguer les deux — le deviner reviendrait a comparer la liste au
+    # defaut, donc a supposer a son tour.
     current_line = out.strip()
-    if current_line.startswith('ignoreip'):
+    lue = current_line.startswith('ignoreip')
+    if lue:
         current_ips = [x.strip() for x in current_line.split('=', 1)[1].strip().split() if x.strip()]
     else:
         current_ips = ['127.0.0.1/8', '::1']
 
     if action == 'list':
-        return {'success': True, 'ips': current_ips}
+        return {'success': True, 'ips': current_ips, 'lue': lue}
 
     if action == 'add':
         ip = _validate_ip(ip)
@@ -237,7 +248,10 @@ def manage_whitelist(client, root_password: str, action: str, ip: str = '') -> d
         execute_as_root(client, cmd, root_password, timeout=10)
 
     restart_fail2ban(client, root_password)
-    return {'success': True, 'ips': current_ips, 'message': f'Whitelist mise a jour ({action} {ip})'}
+
+    # Apres une ecriture, la liste EST dans le fichier : elle n'est plus supposee.
+    return {'success': True, 'ips': current_ips, 'lue': True,
+            'message': f'Whitelist mise a jour ({action} {ip})'}
 
 
 def unban_all(client, root_password: str, jail: str) -> tuple[str, str, int]:
