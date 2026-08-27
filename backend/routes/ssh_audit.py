@@ -17,6 +17,7 @@ import datetime
 import threading
 from flask import Blueprint, jsonify, request
 
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
 from routes.helpers import (
     require_api_key, require_role, require_permission, require_machine_access,
     threaded_route, get_db_connection,
@@ -35,43 +36,6 @@ bp = Blueprint('ssh_audit', __name__)
 
 # ── Helper : resolution credentials SSH ────────────────────────────────────
 
-def _resolve_ssh_creds(data):
-    """
-    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials dans le HTML).
-    Retourne (ip, port, user, ssh_pass, root_pass, svc_account, machine_id, error).
-    """
-    machine_id = data.get('machine_id')
-    if not machine_id:
-        return None, None, None, None, None, False, None, "machine_id requis."
-
-    # Patch (bug/A09) : with-context + message generique (detail en log).
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor(dictionary=True)
-            cur.execute(
-                "SELECT id, ip, port, user, password, root_password, "
-                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-                (int(machine_id),))
-            row = cur.fetchone()
-    except Exception as e:
-        logger.error("Erreur BDD _resolve_ssh_creds (ssh_audit): %s", e)
-        return None, None, None, None, None, False, None, "Erreur BDD"
-
-    if not row:
-        return None, None, None, None, None, False, None, "Machine introuvable."
-
-    server_ip = row['ip']
-    server_port = row.get('port', 22)
-    ssh_user = row['user']
-    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
-    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
-    svc_account = row.get('service_account_deployed', False)
-    has_keypair = svc_account or row.get('platform_key_deployed', False)
-
-    if not ssh_password and not has_keypair:
-        return None, None, None, None, None, False, None, "Ni mot de passe ni keypair disponible."
-
-    return server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, machine_id, None
 
 
 def _log_audit_action(machine_id, action, details, user_id='0'):

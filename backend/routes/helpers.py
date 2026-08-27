@@ -348,6 +348,83 @@ def require_machine_access(func):
     return wrapper
 
 
+def resolve_ssh_creds(data):
+    """Resout les identifiants SSH d'une machine a partir de son `machine_id`.
+
+    Rend un 8-uplet :
+        (ip, port, user, ssh_password, root_password, service_account, machine_id, erreur)
+    `erreur` vaut None en cas de succes ; sinon tous les autres champs valent
+    None/False et `erreur` porte le message a rendre au client.
+
+    ══ POURQUOI CETTE FONCTION VIT ICI, ET PAS DANS CINQ MODULES ════════════
+
+    Elle etait recopiee dans `iptables`, `ssh_audit`, `services`, `fail2ban` et
+    `policies`. Les cinq copies avaient CINQ empreintes distinctes, pour UNE
+    seule divergence de fond : `iptables` rendait un 7-uplet, sans `machine_id`.
+    Les quatre autres ecarts etaient un nom de variable locale et trois chaines
+    de journal.
+
+    C'est exactement le motif d'E-204 — quatre `_validate_username` dont une
+    avait pris du retard, et le retard a laisse passer un `..` jusqu'a une
+    session SSH — mais pris AVANT qu'il ne coute quelque chose. Elles etaient
+    d'accord aussi, jusqu'a ce qu'une bouge.
+
+    ══ CE QU'ELLE N'EST PAS : UNE GARDE ═════════════════════════════════════
+
+    Elle ne verifie AUCUN droit. Pas de `check_machine_access`, pas de bornage
+    au compte appelant : elle fait `SELECT … WHERE id = %s` et rend des
+    identifiants de connexion. L'autorisation est faite par
+    `@require_machine_access`, et par lui seul.
+
+    Ce qu'elle apporte est une PRECONDITION, pas une garde : en refusant de
+    travailler sans `machine_id`, elle rend VRAIE la premisse du decorateur.
+    Nommer une precondition « garde » est l'erreur de categorie qui produit les
+    commentaires qui affirment une protection que le code n'exerce pas — ce
+    depot en compte trois.
+
+    ══ DEUX CHOSES CHANGENT PAR RAPPORT AUX CINQ COPIES, ET C'EST TOUT ══════
+
+    1. `machine_id` rendu est `row['id']` — l'entier de la base — et non plus la
+       valeur BRUTE du client, qui pouvait etre la chaine `'5'`. Meme valeur,
+       type sur. Les copies rendaient ce qu'elles avaient recu.
+    2. Le journal nomme `request.path` au lieu du module. Les cinq copies
+       ecrivaient leur propre nom en dur ; la route est plus precise et ne peut
+       pas se desynchroniser d'un deplacement de fichier.
+
+    Le reste est IDENTIQUE, deliberement. En particulier `int(machine_id)` sur
+    une valeur non numerique leve, est rattrape par le `except` et rend
+    « Erreur BDD » — un message qui decrit mal la cause. `validate_machine_id`
+    dirait mieux, mais changerait le message rendu au client sur les 41 sites
+    d'appel : c'est une correction a part, pas un effet de bord d'unification.
+    """
+    machine_id = data.get('machine_id')
+    if not machine_id:
+        return None, None, None, None, None, False, None, 'machine_id requis.'
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, ip, port, user, password, root_password, "
+                "service_account_deployed, platform_key_deployed "
+                "FROM machines WHERE id = %s",
+                (int(machine_id),))
+            row = cur.fetchone()
+    except Exception as e:
+        logger.error("Erreur BDD resolve_ssh_creds (%s): %s", request.path, e)
+        return None, None, None, None, None, False, None, 'Erreur BDD'
+    if not row:
+        return None, None, None, None, None, False, None, 'Machine introuvable.'
+
+    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
+    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
+    svc_account = row.get('service_account_deployed', False)
+    has_keypair = svc_account or row.get('platform_key_deployed', False)
+    if not ssh_password and not has_keypair:
+        return None, None, None, None, None, False, None, 'Ni mot de passe ni keypair disponible.'
+    return (row['ip'], row.get('port', 22), row['user'], ssh_password,
+            root_password, svc_account, row['id'], None)
+
+
 def server_decrypt_password(encrypted_password, logger=None):
     """Dechiffre un mot de passe stocke en BDD. Retourne toujours une string (jamais None).
 

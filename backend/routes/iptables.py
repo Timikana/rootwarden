@@ -16,6 +16,7 @@ import base64
 import mysql.connector
 from flask import Blueprint, jsonify, request, Response
 
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
 from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, check_machine_access, get_current_user, threaded_route, get_db_connection, server_decrypt_password, logger
 from ssh_utils import db_config, ssh_session, execute_as_root, execute_as_root_stream
 from iptables_manager import get_iptables_rules, apply_iptables_rules
@@ -23,43 +24,6 @@ from iptables_manager import get_iptables_rules, apply_iptables_rules
 bp = Blueprint('iptables', __name__)
 
 
-def _resolve_ssh_creds(data):
-    """
-    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials cote client).
-    Retourne (server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, error_msg).
-    """
-    machine_id = data.get('machine_id')
-    if not machine_id:
-        return None, None, None, None, None, False, "machine_id requis."
-
-    # Patch (bug/A09) : with-context + message generique (detail en log).
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor(dictionary=True)
-            cur.execute(
-                "SELECT id, ip, port, user, password, root_password, "
-                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-                (int(machine_id),))
-            row = cur.fetchone()
-    except Exception as e:
-        logger.error("Erreur BDD _resolve_ssh_creds (iptables): %s", e)
-        return None, None, None, None, None, False, "Erreur BDD"
-
-    if not row:
-        return None, None, None, None, None, False, "Machine introuvable."
-
-    server_ip = row['ip']
-    server_port = row.get('port', 22)
-    ssh_user = row['user']
-    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
-    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
-    svc_account = row.get('service_account_deployed', False)
-    has_keypair = svc_account or row.get('platform_key_deployed', False)
-
-    if not ssh_password and not has_keypair:
-        return None, None, None, None, None, False, "Ni mot de passe ni keypair disponible."
-
-    return server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, None
 
 
 @bp.route('/iptables', methods=['POST'])
@@ -71,7 +35,7 @@ def manage_iptables():
     try:
         data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         action = data.get('action')
-        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
+        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, mid, err = _resolve_ssh_creds(data)
         if err:
             return jsonify({"success": False, "message": err}), 400
         if not action:
@@ -103,7 +67,7 @@ def validate_iptables():
     try:
         data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         rules_v4 = data.get('rules_v4', '')
-        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
+        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, mid, err = _resolve_ssh_creds(data)
         if err:
             return jsonify({"success": False, "message": err}), 400
         if not rules_v4.strip():
@@ -132,7 +96,7 @@ def manage_iptables_apply():
     try:
         data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
         action = data.get('action')
-        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
+        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, mid, err = _resolve_ssh_creds(data)
         if err:
             return jsonify({"success": False, "message": err}), 400
         if not action:
@@ -169,7 +133,7 @@ def manage_iptables_apply():
                     # ligne des que deux machines partagent une IP (NAT, ports
                     # SSH differents) : l'historique d'un serveur recevait alors
                     # les regles d'un autre.
-                    machine_pk = int(data.get('machine_id'))
+                    machine_pk = mid  # valeur RESOLUE, pas re-lue du client (source unique)
                     with get_db_connection() as hist_conn:
                         hist_cur = hist_conn.cursor()
                         hist_cur.execute("SELECT name FROM users WHERE id = %s", (user_id,))
@@ -209,7 +173,7 @@ def manage_iptables_apply():
 def manage_iptables_restore():
     try:
         data = request.get_json(silent=True) or {}  # robustesse : pas de 500 sur body non-JSON
-        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, err = _resolve_ssh_creds(data)
+        server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, mid, err = _resolve_ssh_creds(data)
         if err:
             return jsonify({"success": False, "message": err}), 400
         with mysql.connector.connect(**db_config) as conn:
@@ -220,7 +184,7 @@ def manage_iptables_restore():
             # sur celle que le client avait designee.
             cursor.execute(
                 "SELECT rules_v4, rules_v6 FROM iptables_rules WHERE server_id = %s ORDER BY id DESC LIMIT 1",
-                (int(data.get('machine_id')),)
+                (mid,)  # valeur RESOLUE, pas re-lue du client
             )
             rules = cursor.fetchone()
         if not rules:
