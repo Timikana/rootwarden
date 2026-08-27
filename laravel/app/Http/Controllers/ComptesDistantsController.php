@@ -66,6 +66,11 @@ class ComptesDistantsController extends Controller
             'libelles' => [
                 'scan_en_cours' => __('distants.scan_en_cours'),
                 'scan_fait' => __('distants.scan_fait'),
+                'scan_non_concluant' => __('distants.scan_non_concluant', ['sources' => '{sources}']),
+                'scan_comptes_lus' => __('distants.scan_comptes_lus'),
+                'scan_source_comptes' => __('distants.scan_source_comptes'),
+                'scan_source_cles_root' => __('distants.scan_source_cles_root'),
+                'scan_source_cles_utilisateur' => __('distants.scan_source_cles_utilisateur'),
                 'scan_echec' => __('distants.scan_echec'),
                 'geste_sans_compte' => __('distants.geste_sans_compte'),
                 'geste_en_cours' => __('distants.geste_en_cours'),
