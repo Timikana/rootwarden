@@ -1472,6 +1472,68 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
 
+### Un drapeau par LECTURE, pas un drapeau par fonction (E-187, 2026-08-27)
+
+Trouvé en **relisant un correctif déjà appliqué** — celui d'E-183 — et c'est ce qui rend la leçon
+utile : le correctif était juste, argumenté, et fermait ce qu'il annonçait.
+
+`scan_concluant` mesure la lecture de `/etc/passwd`. Il garde **trois** écritures, dont **deux** qui
+dépendent de lectures **entièrement différentes** — les deux dumps `authorized_keys`. Le code de sortie
+de l'une est **capturé puis jamais lu** ; celui de l'autre n'est **pas obtenu**.
+
+> **Un garde nommé d'après le GESTE qu'il protège donne l'impression de couvrir tout le geste. Il ne
+> couvre que LA LECTURE QU'IL MESURE.** Quand une fonction fait plusieurs lectures distantes et
+> plusieurs écritures destructrices, il faut **un drapeau par lecture**, pas un drapeau par fonction —
+> sinon **le nom du drapeau devient à son tour un commentaire qui affirme plus que le code.**
+
+`scan_concluant` est un **excellent** nom. C'est précisément ce qui rend le trou difficile à voir : on
+lit le nom, on lit la garde, on conclut que le geste est couvert. Huitième forme du motif « l'en-tête qui
+mente » — après le commentaire de fichier, le libellé d'interface, le docblock, la ligne d'inventaire,
+et maintenant **le nom d'une variable**.
+
+**Et la classe a DEUX moitiés qui se ferment séparément** : le correctif d'E-183 a protégé la **donnée**
+et laissé le **verdict** (`success: True` inconditionnel sur un scan non concluant) — l'inverse exact
+d'E-90, où le verdict avait été corrigé sans l'état persisté. Vérifier les deux, à chaque fois.
+
+### Une variable dont un champ ne prend qu'UNE valeur ne peut pas servir de discriminant (F6, 2026-08-27)
+
+Forme générale d'un défaut de mesure rencontré **trois fois sur la même variable** en une journée, et
+c'est la troisième qui donne la règle.
+
+Dans `go-fail2ban-f6.mjs`, `abouties.push` n'apparaît **qu'une seule fois** dans tout le fichier — dans
+la branche `BASE_SEULE`, avec `quoi` fixé au **littéral** `'base'` :
+
+```js
+if (BASE_SEULE.test(url)) { abouties.push({ route: chemin, quoi: 'base' }); }
+...
+! abouties.some((a) => /parc/.test(a.quoi))   // `some` TOUJOURS faux  -> assertion TOUJOURS vraie
+abouties.every((a) => a.quoi === 'base')      // TOUJOURS vraie
+```
+
+**Deux assertions interrogent une dimension qui n'a qu'une valeur possible.** Elles ne peuvent pas
+échouer, quoi que fasse la page — la sûreté réelle vient de l'`abort`, pas d'elles. Et la seconde
+**cumule** un second piège déjà écrit : `[].every()` rend `true`, donc elle passerait aussi sur une liste
+**vide**, c'est-à-dire si le filet avait tout avorté par erreur — **le cas où l'on voudrait le plus
+qu'elle parle**.
+
+Les trois formes de la même variable, dans l'ordre où elles ont coûté :
+
+| # | ce qu'on a cru | ce qu'elle mesurait |
+|---|---|---|
+| 1 | « les lectures ont **abouti** » | les **départs** — peuplée dans `page.on('request')`, aucun écouteur de réponse dans la suite |
+| 2 | « rien de parc n'a abouti » | rien — `quoi` ne vaut jamais autre chose que `'base'` |
+| 3 | « seules des lectures ont abouti » | rien, **et** vrai sur l'ensemble vide |
+
+> **Le remède n'est pas de retoucher l'assertion — ce serait déplacer le mensonge.** Il faut **peupler le
+> collecteur dans TOUTES les branches qui laissent passer**, avec une valeur qui reflète la vraie nature
+> de la route. Les deux assertions redeviennent alors capables d'échouer **sans qu'une ligne de leur
+> énoncé change**.
+
+Et le corollaire de sélection, payé sur `security/` où il a fabriqué un **faux défaut structurel** :
+ancrer une mesure sur la **donnée** (`closest('.rw-tableau-cadre')` depuis le corps du tableau visé) et
+jamais sur `querySelector('.rw-tableau-cadre')` — une page porte plusieurs tableaux et **le premier n'est
+pas le bon**. Même discipline que remonter d'un champ à son `form`.
+
 ### `scrollIntoView({block:'nearest'})` retombe dans le piège de l'en-tête collant (F6, 2026-08-27)
 
 Le plan notait ce piège pour `'start'`. **`'nearest'` y retombe dès que l'élément est AU-DESSUS du champ
