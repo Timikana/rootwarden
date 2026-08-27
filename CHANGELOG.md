@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.8** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.9** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,82 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.9 — `fail2ban/` F6 caracterise : ne jamais avoir regarde une machine suffit a la faire installer
+
+`go-fail2ban-f6.mjs`, **legacy 8 PASS / 0 FAIL**, base rouge **9 PASS / 1 FAIL**. **Le module est
+caracterise en entier** ; reste le portage de F6.
+
+#### Aucun des deux gestes n'est laisse partir. Jamais.
+
+`ban_all_servers` et `install_all` sont les deux seules routes du module qui ne prennent **aucun**
+`machine_id` : elles choisissent leurs cibles en base et les joignent TOUTES, `srv-zabbix` comprise.
+Le filet les avorte sans exception, et une assertion de surete le verifie.
+
+**La portee se calcule EN BASE, avec le SQL exact des deux routes.** C'est une lecture : elle ne
+joint personne. C'est la seule facon de savoir ce que le bouton toucherait sans le laisser toucher.
+
+#### E-172 — « jamais relevee » compte comme « fail2ban absent »
+
+```sql
+LEFT JOIN fail2ban_status f ON m.id = f.server_id
+WHERE f.installed IS NULL OR f.installed = 0
+```
+
+Une machine jamais relevee n'a pas de ligne dans le cache : le `LEFT JOIN` rend `NULL`, et `NULL`
+passe le `WHERE`. Mesure du 2026-08-27 :
+
+> « installer sur tout le parc » toucherait : **`srv-zabbix` (PROD)** · `OpenCVE-Test-OnPrem` (DEV)
+
+`srv-zabbix` est la machine que toutes les suites de ce chantier ont consigne de ne jamais joindre.
+Elle est dans la portee **parce qu'elle n'a jamais ete relevee**.
+
+`ban_all_servers` fait l'inverse — `INNER JOIN … WHERE f.running = 1` — et toucherait donc
+**(aucune)**, le cache datant du **2026-08-12**. Le parc atteint par un geste irreversible est decide
+par un releve qui peut avoir des semaines, et l'ecran ne le dit pas.
+
+#### E-173 — les confirmations ne nomment rien
+
+| geste | corps reellement envoye | ce que la confirmation dit |
+|---|---|---|
+| bannir sur tout le parc | `{"ip":"203.0.113.7","jail":"sshd"}` | « Bannir cette IP sur TOUS les serveurs ? » |
+| installer sur tout le parc | `{}` | « Installer Fail2ban sur tous les serveurs sans Fail2ban ? » |
+
+`banIpAllServers` passe `{ip, jail}` a la traduction et le catalogue les ignore tous les deux —
+**cinquieme occurrence** du motif d'E-163, et celle dont l'enjeu est le plus grand.
+
+Pour l'installation de masse, le corps est **vide** : la portee est decidee entierement cote serveur.
+L'operateur ne peut donc pas la connaitre, meme en principe.
+
+#### Deux correctifs backend au meme lot, et le correctif partiel etait le NOTRE
+
+**Quatrieme occurrence d'E-165.** `ban_all_servers` ne **nommait meme pas** `rc` :
+`ban_ip(client, root_pass, jail, target_ip)` sans affectation, puis `_log_ban_action` inconditionnel,
+puis `success: True`. Le resume « banni sur 3/3 serveurs » se calculait la-dessus. Les trois premieres
+occurrences avaient ete corrigees le 2026-08-27 ; celle-ci oubliee. **C'est exactement le motif « a
+moitie corrige » reproche six fois a ce module.** Le `success` global n'est desormais vrai que si
+TOUTES les machines ont abouti — un « 0/3 » rendu avec `success: True` se lit comme une reussite.
+
+**Meme chose pour E-164 sur `/fail2ban/stats`** : `days = min(int(...))` etait hors de tout `try`.
+Chercher la branche jumelle est une regle de ce chantier, pas une precaution.
+
+#### Une onzieme mesure fausse, et la premiere causee par le FILET
+
+La suite avortait `/fail2ban/jail`, donc le panneau de detail ne s'ouvrait pas, donc le bouton « Ban
+global » n'etait pas visible — et **trois assertions passaient « parce que le geste n'est pas
+offert »**, sur le legacy, ou il l'est. Quand une propriete peut etre satisfaite par une ABSENCE,
+verifier d'abord que l'absence n'est pas de notre fait.
+
+Et une dixieme, du meme genre que les precedentes : « l'ecran enumere-t-il les machines touchees ? »
+cherchait les noms dans `document.body.innerText` — et les trouvait, parce qu'ils sont dans le
+SELECTEUR de machine.
+
+#### La base rouge, lue passe par passe
+9 PASS / 1 FAIL, **et CINQ des neuf passes sont creuses** — le ratio le plus eleve du chantier. Les
+trois assertions de confirmation passent parce que les gestes n'existent pas cote portage, et les
+deux de surete pour la meme raison. Cette base rouge dit surtout : « le portage n'a pas ces gestes ».
+
+**Reference du LOT** : `go-fail2ban-f6` entre avec **8 PASS sur le legacy**.
 
 ### v1.38.8 — `fail2ban/` F5 porte : une liste blanche qui dit d'ou elle vient, et trois gestes qui annoncent le redemarrage
 

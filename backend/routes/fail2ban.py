@@ -539,7 +539,25 @@ def fail2ban_ban_all_servers():
             svc = m.get('service_account_deployed', False)
             with ssh_session(m['ip'], m['port'], m['user'], ssh_pass,
                              logger=logger, service_account=svc) as client:
-                ban_ip(client, root_pass, jail, target_ip)
+                # ══ LA QUATRIEME OCCURRENCE D'E-165, ET LA PLUS LARGE ═════
+                #
+                # `rc` n'etait meme pas NOMME ici. `success: True` ne disait donc
+                # que « la session SSH s'est ouverte et la commande est partie » —
+                # et la ligne de resume, « banni sur 3/3 serveurs », se calculait
+                # sur cette base. Sur TOUT LE PARC, production comprise.
+                #
+                # E-165 avait ete corrige sur `/ban`, `/unban` et `/unban_all` le
+                # 2026-08-27 ; cette route-ci avait ete oubliee. C'est exactement
+                # le motif « a moitie corrige » reproche six fois a ce module —
+                # et cette fois le correctif partiel etait le notre.
+                #
+                # `/install_all` et `/restart`, eux, testaient deja `rc`.
+                out, stderr, rc = ban_ip(client, root_pass, jail, target_ip)
+                if rc != 0:
+                    results.append({'server': m['name'], 'success': False,
+                                    'error': ((stderr or '') + (out or ''))[:100],
+                                    'exit_code': rc})
+                    continue
                 _log_ban_action(m['id'], jail, target_ip, 'ban',
                                 request.headers.get('X-User-ID', 'admin'))
                 results.append({'server': m['name'], 'success': True})
@@ -547,9 +565,13 @@ def fail2ban_ban_all_servers():
             results.append({'server': m['name'], 'success': False, 'error': str(e)[:100]})
 
     ok = sum(1 for r in results if r['success'])
+    # `success` global : vrai seulement si TOUTES les machines ont abouti. Un
+    # « 0/3 » rendu avec `success: True` se lit comme une reussite.
     return jsonify({
-        'success': True,
+        'success': ok == len(results) and len(results) > 0,
         'message': f'{target_ip} banni sur {ok}/{len(results)} serveurs',
+        'total': len(results),
+        'reussis': ok,
         'results': results,
     })
 
@@ -611,7 +633,14 @@ def fail2ban_logs():
 def fail2ban_stats():
     """Stats des bans/unbans par jour (30 jours)."""
     server_id = request.args.get('server_id') or request.args.get('machine_id')
-    days = min(int(request.args.get('days', 30)), 90)
+    # Meme faute qu'E-164, restee sur cette route : un `days` non numerique y
+    # levait une `ValueError` hors de tout `try`, donc une page HTML 500. Corrige
+    # au meme lot que la quatrieme occurrence d'E-165 — chercher la branche
+    # jumelle est une regle de ce chantier, pas une precaution.
+    try:
+        days = min(max(1, int(request.args.get('days', 30))), 90)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'days doit etre un nombre'}), 400
 
     if not server_id:
         return jsonify({'success': False, 'message': 'server_id requis'}), 400

@@ -671,6 +671,23 @@ declare -A REF_LEGACY=(
   # d'ecrire une apostrophe dans le `jail.local` d'une vraie machine, donc de la
   # COMMETTRE. Elle est relevee par lecture, et dite comme telle.
   [go-fail2ban-f5]=9
+  # `fail2ban/` sous-lot F6 : les gestes sur TOUT LE PARC. 8 sur le legacy.
+  #
+  # AUCUN DE CES DEUX GESTES N'EST LAISSE PARTIR, JAMAIS. Ce sont les deux
+  # seules routes du module qui ne prennent aucun `machine_id` : elles
+  # choisissent leurs cibles en base et les joignent TOUTES, `srv-zabbix`
+  # comprise. Le filet les avorte sans exception, et une assertion le verifie.
+  #
+  # LA PORTEE SE CALCULE EN BASE, avec le SQL exact des deux routes. C'est une
+  # LECTURE : elle ne joint personne. C'est la seule facon de savoir ce que le
+  # bouton toucherait sans le laisser toucher — et c'est ainsi qu'E-172 a ete
+  # mesure : `srv-zabbix` (PROD) est dans la portee d'une installation de masse
+  # PARCE QU'ELLE N'A JAMAIS ETE RELEVEE.
+  #
+  # Le detail d'une jail est SERVI : sans lui le panneau ne s'ouvre pas, le
+  # bouton « Ban global » reste cache, et trois assertions passaient « parce que
+  # le geste n'est pas offert » sur une cible ou il l'est.
+  [go-fail2ban-f6]=8
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -716,7 +733,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5 go-fail2ban-f6
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1
