@@ -231,9 +231,25 @@ def sudo_deploy():
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
+    # ══ E-144 : LE REPLI RETOMBAIT DU COTE PERMISSIF ═════════════════════
+    #
+    # C'etait `data.get('preset', 'apt_only')`. Une requete qui OMET `preset`
+    # obtenait donc `apt_only` — le prereglage dont la docstring de son propre
+    # module dit : « AVERTISSEMENT : ce preset est EQUIVALENT ROOT »
+    # (`sudo_manager.py:80`).
+    #
+    # Deviner un prereglage de privileges est une decision, et une decision ne
+    # se prend pas par defaut. Fail-closed : la cle est EXIGEE.
+    #
+    # Le portage envoie toujours `preset`, donc il ne rencontrait pas ce repli —
+    # c'est pour ca qu'il a survecu. Il restait ouvert pour tout autre appelant.
+    if not data.get('preset'):
+        return jsonify({'success': False,
+                        'message': 'preset requis'}), 400
+
     policy = {
         'username': username,
-        'preset': data.get('preset', 'apt_only'),
+        'preset': data.get('preset'),
         'nopasswd': bool(data.get('nopasswd', False)),
         'runas': data.get('runas', 'root'),
         'custom_rules': data.get('custom_rules', ''),
