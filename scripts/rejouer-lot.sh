@@ -316,6 +316,15 @@ declare -A REF_LARAVEL=(
   # journal — cette derniere a REVELE une regression du portage, corrigee dans
   # le meme lot (`ExigePermission` refusait sans rien enregistrer).
   [go-services-s1]=19
+  # `services/` sous-lot S2 : les lectures distantes, portees.
+  # 14 sur le portage contre 12 sur le legacy. L'ecart tient a deux assertions :
+  # le bouton de chargement porte un `data-rw` (celui du legacy n'a AUCUN
+  # identifiant), et un resultat vide DIT s'il vient de la machine ou du geste.
+  #
+  # ATTENTION : le banc est un conteneur SANS systemd. Le rendu d'un TABLEAU
+  # PEUPLE n'est mesure sur aucune des deux cibles — seulement le chemin, la
+  # cible, l'absence d'ecriture, et ce que la page dit d'un resultat vide.
+  [go-services-s2]=14
   [go-adm-cles-api]=15
   # `graylog/` sous-lot G1 : configuration, gabarits, onglets, gardes.
   # 26 sur le portage contre 25 sur le legacy. L'ecart est d'UNE assertion, et

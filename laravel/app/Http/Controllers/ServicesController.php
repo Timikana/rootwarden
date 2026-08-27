@@ -40,6 +40,10 @@ class ServicesController extends Controller
         foreach ([
             'choisir_serveur', 'chargement', 'echec', 'aucun_service',
             'filtres_inactifs', 'journaux_vides', 'sensible_confirmer',
+            // S2 — le tableau et ses filtres.
+            'etat_actif', 'etat_arrete', 'etat_echoue', 'active_oui', 'active_non',
+            'protege', 'protege_aide', 'charges', 'aucun_systemd', 'filtres_actifs',
+            'filtre_tous', 'aucun_resultat', 'resultat_compte', 'journal_lu',
         ] as $cle) {
             $textes[$cle] = __('services.' . $cle);
         }
