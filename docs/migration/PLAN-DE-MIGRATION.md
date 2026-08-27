@@ -1560,6 +1560,43 @@ Chacun a coûté quelque chose. Les skills `rw-pieges`, `rw-e2e` et `rw-laravel`
 - **Un remplacement global peut réécrire le corps de la fonction qu'il vient de définir.**
 - **Un `rm` à chemin relatif après un `cd` ne supprime rien.**
 
+### ✅ UN NUMÉRO DE VERSION NE SE DISTRIBUE PLUS PAR MESSAGE (2026-08-27)
+
+**Mesuré : `git log --format='%s' -14 | grep -oE 'v1\.38\.[0-9]+' | sort | uniq -c` rend `3 v1.38.19`.**
+Trois commits de trois sessions différentes revendiquent le même numéro, en **2 minutes 6 secondes** —
+et `legacy/version.txt` porte `1.38.19`, ce qui ne départage rien. Aucun contenu n'est faux ; trois
+messages portent une étiquette fausse.
+
+**Ce n'est pas un défaut de discipline, et la cause est exactement celle du défaut d'index** : un
+contrôle juste, séparé de son usage par un **délai**. Un numéro que le Lead distribue par message est
+valide **au moment où il l'écrit** et plus au moment où on l'emploie. C'est le **quatrième** chiffre de
+la journée à se périmer entre un message et un commit — et cette fois la victime est le mécanisme
+lui-même.
+
+> **La convention change, et elle supprime la classe au lieu de la gérer :**
+>
+> 1. **une session ne met plus de numéro de version dans son message de commit**, et ne m'en demande
+>    plus. Elle nomme le défaut — `E-nnn`, `BUG-nnn`, `F6`, `QA-001` — qui est stable et ne se périme
+>    pas ;
+> 2. **le Lead attribue les versions en écrivant le `CHANGELOG`**, depuis l'ordre **réel** des commits,
+>    et pose `legacy/version.txt` **une fois** par lot. Le fichier redevient donc toujours le vrai
+>    maximum, et il ne peut plus diverger de l'historique ;
+> 3. le tag est de toute façon **calculé** depuis `legacy/version.txt` par la CI : il n'y a jamais eu
+>    besoin que le numéro voyage par message.
+
+**Il n'y a plus de numéro à périmer** — c'est ce qui distingue cette parade d'une règle à se rappeler.
+Quatrième règle de ce chantier à devenir une propriété aujourd'hui, après la recopie du runner dans
+`/tmp`, `git commit -- <chemins>`, et `use_reloader = False`.
+
+**La variante écartée, et pourquoi** : faire lire et incrémenter `version.txt` par celui qui committe,
+dans son propre commit atomique. Elle **narrowit** la course sans l'éliminer — deux sessions qui lisent
+la même valeur à la même seconde incrémentent vers le même numéro, et la seconde écrase la première.
+Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
+
+**Les trois messages fautifs ne sont PAS réécrits.** `--amend` reste interdit tant qu'une session peut
+travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
+correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
+
 ### UN OBSERVABLE NE DIT JAMAIS PAR QUEL CHEMIN IL A ÉTÉ PRODUIT (2026-08-27)
 
 **La règle du jour, et elle réunit QUATRE incidents distincts** relevés par trois sessions différentes.
