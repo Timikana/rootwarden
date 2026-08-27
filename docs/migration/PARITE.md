@@ -8339,3 +8339,114 @@ conséquence directe :
 **Portée d'aujourd'hui, et elle borne l'urgence** : K4 n'étant pas porté, **aucun déploiement ne part de
 cette page**. L'écran est celui qu'on lit **avant** d'aller déclencher le geste ailleurs — donc le
 mensonge porte sur l'information qui prépare la décision, pas sur le geste lui-même.
+
+---
+
+## E-191 — `POST /deploy` : la route la plus destructrice du chantier est la MOINS gardée, et elle annonce des révocations qu'elle ne vérifie pas
+
+**Mesuré le 2026-08-27, décorateur par décorateur.** C'est le §7 « `can_deploy_keys` appliquée sur la
+PAGE et nulle part sur la REQUÊTE » enfin **chiffré** — et c'est pire que « pas de permission » : il n'y
+a **pas de rôle non plus**.
+
+| route | ce qu'elle fait | gardes |
+|---|---|---|
+| **`POST /deploy`** (`ssh.py:246`) | écrit des clés root sur **toute une flotte** sélectionnée, **et révoque** | **`@require_api_key` SEUL** |
+| `POST /deploy_platform_key` (`:517`) | écrit une clé sur **une** machine | `api_key` + **`role(2)`** + **`machine_access`** |
+| `POST /reboot_server` (`monitoring.py:224`) | **redémarre** une machine | `api_key` + **`role(2)`** + **`machine_access`** |
+
+> **La route qui écrit en root sur un parc entier est moins gardée que celle qui redémarre une seule
+> machine.** Et sa voisine du même fichier, 270 lignes plus bas, porte le jeu complet avec un commentaire
+> de patch explicite — « *Patch A01 : déploiement de clé plateforme réservé admin* ». **Quelqu'un a donc
+> durci le déploiement d'une clé sur une machine et laissé ouvert celui du parc entier.**
+
+Ce n'est pas une omission isolée : c'est une **asymétrie entre deux gestes du même module**, et le motif
+« le cas visible traité, le cas subtil pris à l'envers » à son maximum — le geste durci est le moins
+dangereux des deux.
+
+### Et `/deploy` n'a NI fenêtre de maintenance NI approbation à quatre yeux
+
+Mesuré : **zéro** occurrence de `is_allowed|maintenance|approvals|gate(` dans la route. Or d'autres
+gestes du parc en ont. La route qui déploie et révoque sur une flotte n'a donc **aucun** des trois
+contrôles que le dépôt sait poser.
+
+### `/deploy` est une enveloppe mince, et son code de retour est JETÉ
+
+    subprocess.Popen(["python3", "/app/configure_servers.py"] + machine_ids)
+    process.wait()          # :279 — le code de retour n'est jamais lu
+
+**Il n'ajoute rien au geste** : décrire `/deploy` en lisant `configure_servers.py` était donc **juste**.
+**Dédouané, et cherché** : pas d'injection par l'`argv` — `argparse`, et les identifiants ne servent qu'à
+`[m for m in all_machines if str(m['id']) in machines_to_configure]`, une comparaison de chaînes contre
+des identifiants venus de la base. Une chaîne arbitraire ne sélectionne rien et sort en `exit(1)`.
+Mais un déploiement **qui meurt** ne laisse **aucun** signal ailleurs que dans son fichier de log — **et
+ce log est tronqué** (`open(..., "w")`) au déploiement suivant. Famille E-90, sur la route la plus
+dangereuse du dépôt.
+
+### ⚠ ET LA RÉVOCATION EST ANNONCÉE SANS ÊTRE VÉRIFIÉE — c'est l'INVERSE d'E-183
+
+Dans la boucle de révocation, **ni** `rm -f {ak_path}` **ni** `remove_from_sudoers` ne lit son code de
+retour — confirmé pour les deux. Et la boucle journalise, pour chaque compte,
+« *Accès révoqué — retrait clé SSH et sudo* ».
+
+> **Le déploiement peut donc annoncer une révocation qui n'a pas eu lieu.** E-183 **détruisait une donnée
+> vraie** ; celui-ci laisse un **accès ouvert en affirmant qu'il est fermé**, sur le module qui écrit en
+> root. **Pour un exploitant qui révoque un accès pour une raison de conformité, c'est la pire des
+> deux** — la première se répare, la seconde se croit faite.
+
+### Correctifs, par gravité — et le dernier n'est PAS un correctif
+
+1. **la boucle de révocation lit ses codes de retour**, pour le `rm -f` de la clé **et** pour le
+   sudoers. Un accès annoncé révoqué et non révoqué sort en **erreur**, pas en `logger.info` ;
+2. **`/deploy` lit le code de retour de son sous-processus** ;
+3. **la fenêtre de maintenance et l'approbation à quatre yeux sur `/deploy`** : c'est un **ajout de
+   garde** sur la chaîne K4, pas un correctif de fiabilité. **Même régime que les six en arbitrage — rien
+   ne sera écrit sans le mot de l'exploitant.** Et le rôle absent relève du même arbitrage, ouvert au §7
+   depuis le début du chantier.
+
+---
+
+*Rétractation sur E-190 §« deux implémentations de la règle de révocation » — la prémisse était fausse,
+et fusionner aurait été une ERREUR.*
+
+J'avais demandé de n'en garder qu'une, en invoquant la leçon de `maintenance/`. **La mesure l'interdit.**
+`deploy_user_config` est appelée pour **TOUS** les comptes, actifs et inactifs, et elle porte
+(`configure_servers.py:499`, `:517-520`) :
+
+```python
+if user.get('active') and ssh_key:
+    …écrit la clé…
+else:
+    execute_command_as_root(channel, f"rm -f {authorized_keys_path}")   # RETIRE la clé
+```
+
+**Les comptes inactifs perdent donc bien leur clé — par un autre chemin, en aval.** Et la branche
+inactive appelle **aussi** `remove_from_sudoers`.
+
+| compte | ce que le préflight annonce | ce que le déploiement fait |
+|---|---|---|
+| actif, autorisé | garde l'accès | clé écrite |
+| **inactif**, autorisé | **révoqué** | **clé retirée** — par `deploy_user_config` |
+| absent de `all_users`, managé | révoqué | clé retirée — par la boucle |
+
+**Le préflight dit vrai dans les trois cas.** Il ne sur-annonce pas : il annonce une révocation qui a
+réellement lieu, par un chemin différent.
+
+**Ce qui est réellement en cause est un NOM.** Les deux ensembles s'appellent « autorisés » et désignent
+deux notions distinctes — pour le préflight, « les comptes qui **garderont** l'accès » ; pour
+`configure_users`, « les comptes que `configure_user` a **traités** », dont le seul rôle est de décider
+qui **n'entre pas** dans la boucle de révocation. **N'en garder qu'une les confondrait, et le préflight
+cesserait d'annoncer les révocations de comptes inactifs — une SOUS-annonce, exactement la direction
+qu'on voulait éviter.**
+
+Le fond de ma lecture tient — l'équivalence n'est écrite nulle part et elle est maintenue par une
+compensation dans une **troisième** fonction — mais **le remède que je proposais ne s'applique pas.**
+Le bon remède est celui que la même journée avait déjà écrit : *le correctif n'est pas toujours du code,
+c'est parfois une phrase à l'endroit exact où la propriété tient.* Donc : **renommer** `authorized_names`
+en ce qu'il est, **écrire la compensation** dans `deploy_user_config` à la ligne `else`, **aucune
+fusion**, aucun changement de comportement.
+
+*Et une correction à mon relevé : `clean_up_users` est du CODE MORT.* Aucun appelant — seulement sa
+définition et une mention dans une **docstring de classe** (`:567`), qui annonce toujours qu'elle
+nettoie, alors que `configure()` dit en clair « le nettoyage automatique des utilisateurs est
+DÉSACTIVÉ ». Il n'y a donc pas **trois** traitements vivants d'une notion mais **deux**, plus une copie
+morte. **Sixième « en-tête qui mente » du chantier**, et la première dans une docstring de classe.
