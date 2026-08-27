@@ -9389,3 +9389,122 @@ comportement réel — pas depuis le legacy.
 **Le legacy est servi en PRODUCTION**, et les trois sites y sont faux dans les **deux** langues. `legacy/lang/`
 est hors du régime du chantier : **arbitrage de l'exploitant** (§7), au même titre qu'E-209. Le n°3 est celui
 qui devrait partir en premier — il est lu au moment où un droit est accordé.
+
+---
+
+## E-213 — ⚠⚠ UN STATUT NOMMÉ `excluded` N'EXCLUT PAS : deux magasins ont divergé, et la décision de suppression ne lit que l'un des deux
+
+**Trouvé par la session 4 en lisant le corps de `/exclude_user` sur ma demande. C'est le défaut le plus
+conséquent du chantier à ce jour : il DÉTRUIT des données, en silence, et le mot que l'interface emploie pour
+la protection est exactement celui qui ne protège pas.**
+
+### Les deux magasins
+
+    user_exclusions                 <- ecrit par `/exclude_user` SEULE  (admin.py:129, INSERT IGNORE)
+                                    -> LU par la DECISION DE SUPPRESSION (configure_servers.py:793)
+
+    server_user_inventory.status    <- ecrit par `classify`, `classify_bulk`, `scan_server_users`
+                                    -> lu UNIQUEMENT pour `status = 'managed'` (configure_servers.py:887),
+                                       et seulement pour retirer des cles
+
+**La migration 030 les a copiés une fois. Rien ne les synchronise depuis.**
+
+### La décision de suppression, mot pour mot
+
+    configure_servers.py:818-832
+    for username in valid_existing_users:
+        if username.lower() in _PROTECTED_USERS or username in allowed_usernames:  continue
+        if username in excluded_usernames:                                          continue   # <- user_exclusions
+        execute_command_as_root(channel, f"userdel -r {username}", ...)                         # <- TOUT LE RESTE
+
+**`status = 'excluded'` n'est jamais consulté par cette décision.** Et la suppression est **`userdel -r`** :
+le compte **et son répertoire personnel**.
+
+> **Classer un compte `excluded` dans `comptes-distants` ne le protège PAS du `userdel -r`.** Il sera
+> supprimé, avec son `$HOME`, au déploiement suivant.
+
+### Ce qui en fait le pire de sa famille
+
+Ce n'est pas une capacité manquante. **C'est un bouton remplacé par un sosie** — un statut nommé
+littéralement `excluded`, dans la page vers laquelle on proposait de renvoyer l'utilisateur, qui n'a pas cet
+effet.
+
+> *Perdre un bouton se voit. Le remplacer par un bouton qui a l'air de faire la même chose ne se voit pas.*
+
+Et `ComptesDistants.php:29` écrit que `classify` n'a « aucun effet distant ». **C'est exact, et ce n'est pas
+le point** : l'effet ne vient pas du classement, il vient de **ce que le déploiement lit** — et il lit
+l'autre table. *Une affirmation vraie sur son propre périmètre peut être trompeuse sur le périmètre qui
+compte.*
+
+C'est aussi la quatrième occurrence du motif « **deux sources pour la même notion** » en une journée : le
+drapeau `ssh_password_required` contre les colonnes (E-207), les deux copies refusées du numéro de version,
+les deux conventions de `verifie()` (INF-002), et celle-ci — **la seule des quatre qui détruise.**
+
+### Conséquences immédiates sur le chantier
+
+1. **Le lien ne remplace pas la table de `platform_key`, et pour une raison plus forte que la mienne.** Ma
+   condition était « rien ne doit être perdu » — insuffisante : ce qu'on aurait obtenu est **un renvoi vers
+   une page dont le statut de protection ne protège pas** ;
+2. **K4 reste bloqué, et ce blocage est désormais PROTECTEUR.** Un déploiement lancé aujourd'hui exécuterait
+   `userdel -r` sur tout compte non autorisé et non présent dans `user_exclusions` — y compris ceux qu'un
+   exploitant croit protégés. Le blocage sur l'arbitrage `NOPASSWD: ALL` couvre incidemment celui-ci ;
+3. **le portage de C4 devra lire les DEUX magasins** ou aucun geste de classement ne devra prétendre protéger.
+
+### Les trois issues, et aucune n'est un arbitrage de portage
+
+- **unifier les deux magasins** — change ce qui est **détruit sur des machines réelles**, et des lignes
+  `excluded` existent déjà depuis la migration 030 ;
+- **porter le geste `/exclude_user` tel quel** dans `comptes-distants`, à côté du classement — deux notions
+  visibles au lieu d'une trompeuse ;
+- **ne rien retirer**, et **dire** dans l'interface que le classement ne protège pas.
+
+**C'est un arbitrage de l'exploitant** (§7) : la première touche à ce qui est supprimé en production.
+
+---
+
+## E-214 — `sshd_allow_user` atteste « AllowUsers patché » même si `sshd` n'a jamais rechargé : `|| true` rend le code de sortie toujours nul
+
+**Mesuré par la session 4, démontrable sans rien exécuter — c'est de la sémantique de shell.**
+
+    systemctl reload … || … || true      -> code de sortie TOUJOURS 0
+
+**La branche de rollback est du code mort**, et la fonction annonce la réussite dans tous les cas.
+
+**Ce qui est faux est l'ATTESTATION, pas l'état** : aucun accès n'est coupé — l'ancienne configuration
+tourne encore, `sshd` n'ayant simplement pas rechargé. C'était la crainte portée au plan pour C3 ; elle est
+**levée sur ce point précis**, et remplacée par une plus discrète : *le portail affirme un durcissement qui
+n'a pas eu lieu, donc personne ne le refera.*
+
+Même famille qu'E-192 et que les quatre routes de `supervision/` corrigées en `v1.38.11` : *un `|| true`
+transforme une vérification en décoration.*
+
+**Non mesuré** : le helper ne patche que la **première** ligne `AllowUsers`, et un fichier `.conf` inclus
+devrait primer. Signalé par la session 4, **pas compté** comme un défaut — aucune machine pour le vérifier.
+
+---
+
+## E-215 — `remove_user_keys` : E-192 est revenu, sur une RÉVOCATION D'ACCÈS — et son mode sélectif filtre par sous-chaîne
+
+**Deux défauts sur le même geste, et le premier est une récidive nommée.**
+
+**1. La fausse attestation.** Le résultat d'`execute_as_root` est **jeté**, `success: True` rendu sans rien
+vérifier. Le commentaire d'E-192 dit déjà pourquoi c'est la pire forme de ce motif : *« une FAUSSE
+ATTESTATION — personne ne rouvre un dossier de conformité clos. »* **Ici l'objet est une révocation
+d'accès** : le portail atteste qu'une clé a été retirée, et elle peut être restée.
+
+**2. La sélection par sous-chaîne.** Le mode `rootwarden_only` fait `sed '/rootwarden/d'` — **là où sa
+voisine du MÊME fichier recalcule les empreintes avec `ssh-keygen -lf`.** Une clé **étrangère** dont le
+commentaire contient ce mot **saute en silence**.
+
+*On compare des segments, pas des sous-chaînes* — troisième occurrence de la règle en une journée, après le
+`hooks.slack.com/services/` de l'archivage et le `//exemple.com` des liens. **Et ici la sous-chaîne décide
+d'une suppression**, pas d'un affichage.
+
+### Ce qui est DÉDOUANÉ, et le dire compte autant
+
+**Sur les trois corps lus — `sshd_allow_user`, `remove_user_keys`, `server_user_remove_key` — la question
+d'E-174 rend NON pour les trois** : `shlex.quote` partout, et `_validate_username` dérivée (E-204) en amont.
+*Un relevé qui ne dédouane pas se lit comme un réquisitoire, et on cesse de le croire.*
+
+**Non corrigés** : ce sont des gestes distants dont le correctif change ce qui s'écrit sur des machines
+réelles. À qualifier par la session 5 avant écriture.

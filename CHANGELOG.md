@@ -2171,6 +2171,113 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.31 — ⚠⚠ un statut nomme `excluded` n'exclut pas : deux magasins ont diverge, et `userdel -r` ne lit que l'un des deux
+
+**Le defaut le plus consequent du chantier a ce jour. Il DETRUIT des donnees, en silence, et le mot que
+l'interface emploie pour la protection est exactement celui qui ne protege pas.** Trouve par la session 4 en
+lisant le corps de `/exclude_user` — une lecture demandee pour une raison sans rapport : verifier qu'un
+retrait d'affichage ne perdrait rien.
+
+    user_exclusions               <- ecrit par `/exclude_user` SEULE  (admin.py:129)
+                                  -> LU par la DECISION DE SUPPRESSION (configure_servers.py:793)
+
+    server_user_inventory.status  <- ecrit par classify / classify_bulk / scan_server_users
+                                  -> lu UNIQUEMENT pour `status='managed'` (:887), et seulement
+                                     pour retirer des cles
+
+La migration 030 les a copies **une fois**. **Rien ne les synchronise depuis.**
+
+    configure_servers.py:818-832
+    if username.lower() in _PROTECTED_USERS or username in allowed_usernames:  continue
+    if username in excluded_usernames:                                          continue   # <- user_exclusions
+    execute_command_as_root(channel, f"userdel -r {username}", ...)                         # <- TOUT LE RESTE
+
+**`status = 'excluded'` n'est jamais consulte par cette decision, et la suppression est `userdel -r`** : le
+compte **et son repertoire personnel**.
+
+> **Classer un compte `excluded` dans `comptes-distants` ne le protege PAS.** Et ce n'est pas une capacite
+> manquante : **c'est un bouton remplace par un sosie** — un statut nomme litteralement `excluded`, dans la
+> page vers laquelle on proposait de renvoyer l'utilisateur, qui n'a pas cet effet. *Perdre un bouton se
+> voit. Le remplacer par un bouton qui a l'air de faire la meme chose ne se voit pas.*
+
+`ComptesDistants.php:29` ecrit que `classify` n'a « aucun effet distant ». **C'est exact, et ce n'est pas le
+point** : l'effet ne vient pas du classement mais de **ce que le deploiement lit**, et il lit l'autre table.
+*Une affirmation vraie sur son propre perimetre peut etre trompeuse sur le perimetre qui compte.*
+
+**Quatrieme occurrence du motif « deux sources pour la meme notion » en une journee** — le drapeau
+`ssh_password_required` contre les colonnes (E-207), les deux copies refusees du numero de version, les deux
+conventions de `verifie()` (INF-002), et celle-ci : **la seule des quatre qui detruise.**
+
+**Trois consequences immediates :**
+
+1. **le lien ne remplace pas la table de `platform_key`, et pour une raison plus forte que celle du Lead.** La
+   condition posee etait « rien ne doit etre perdu » — **insuffisante** : on aurait obtenu un renvoi vers une
+   page dont le statut de protection ne protege pas ;
+2. **K4 reste bloque, et ce blocage est desormais PROTECTEUR.** Un deploiement lance aujourd'hui executerait
+   `userdel -r` sur tout compte non autorise absent de `user_exclusions`, y compris ceux qu'un exploitant
+   croit proteges. Le blocage sur l'arbitrage `NOPASSWD: ALL` couvre **incidemment** celui-ci ;
+3. **le portage de C4 devra lire les DEUX magasins**, ou aucun geste de classement ne devra pretendre proteger.
+
+**Trois issues, aucune n'est un arbitrage de portage** : unifier (change ce qui est **detruit sur des machines
+reelles**, et des lignes `excluded` existent depuis 030) · porter `/exclude_user` a cote du classement (deux
+notions visibles au lieu d'une trompeuse) · ne rien retirer et **dire** que le classement ne protege pas.
+
+#### E-214 — `sshd_allow_user` atteste « AllowUsers patche » meme si `sshd` n'a jamais recharge
+
+`systemctl reload … || … || true` rend le code de sortie **toujours nul** : la branche de rollback est du
+**code mort**. Demontrable sans rien executer — semantique de shell.
+
+**Ce qui est faux est l'ATTESTATION, pas l'etat** : aucun acces n'est coupe, l'ancienne configuration tourne
+encore. **La crainte portee au plan pour C3 — « se tromper coupe l'acces SSH » — est levee sur ce point**, et
+remplacee par une plus discrete : *le portail affirme un durcissement qui n'a pas eu lieu, donc personne ne
+le refera.* Meme famille que les quatre routes de `supervision/` corrigees en `v1.38.11` : *un `|| true`
+transforme une verification en decoration.*
+
+#### E-215 — `remove_user_keys` : E-192 est revenu, sur une REVOCATION D'ACCES
+
+Le resultat d'`execute_as_root` est **jete**, `success: True` rendu sans rien verifier. Le commentaire
+d'E-192 dit deja pourquoi c'est la pire forme : *« une FAUSSE ATTESTATION — personne ne rouvre un dossier de
+conformite clos. »* **Ici l'objet est une revocation d'acces** : le portail atteste qu'une cle a ete retiree,
+et elle peut etre restee.
+
+**Et son mode `rootwarden_only` filtre par SOUS-CHAINE** — `sed '/rootwarden/d'` — **la ou sa voisine du MEME
+fichier recalcule les empreintes avec `ssh-keygen -lf`.** Une cle **etrangere** dont le commentaire contient
+ce mot **saute en silence**. Troisieme occurrence de *on compare des segments, pas des sous-chaines* en une
+journee — et **la seule ou la sous-chaine decide d'une suppression** et non d'un affichage.
+
+#### Ce qui est DEDOUANE, et le dire compte autant
+
+**Sur les trois corps lus, la question d'E-174 rend NON pour les trois** : `shlex.quote` partout, et
+`_validate_username` derivee (E-204) en amont. *Un releve qui ne dedouane pas se lit comme un requisitoire,
+et on cesse de le croire.*
+
+#### Trois regles au §8, dont une CORRECTION d'une forme que le Lead avait distribuee
+
+- **`git commit -F - -- <chemins>` ne marche PAS sur une creation** : un pathspec ne designe que des fichiers
+  **suivis**. Pour un fichier neuf, `git add` **puis** le commit borne — l'`add` le fait connaitre, le
+  pathspec borne quand meme la publication. **L'erreur est bloquante et non silencieuse**, donc rien de faux
+  n'est parti. *Une parade se teste sur le cas qu'elle doit couvrir, pas seulement sur celui qui l'a motivee*
+  — le defaut d'index etait survenu sur des fichiers existants, donc la forme n'a ete verifiee que sur eux ;
+- **une route sans parametre de portee ne se borne pas par une fixture.** `/ssh-audit/scan-all` selectionne
+  **tout le parc** (`WHERE lifecycle_status != 'archived'`), sans `machine_id`, sans filtre utilisateur, puis
+  ouvre une session **par machine**. Parc mesure : trois machines actives -> **1, 2, 3**, dont `srv-zabbix`,
+  qui porte `platform_key_deployed = 1` **et** `service_account_deployed = 1` : **la session aboutirait.**
+  *Une fixture borne un argument ; elle ne borne pas une route dont la portee est « tout le parc ».* Et le
+  geste est une **LECTURE** — ce n'est pas ce qui l'interdit, la regle du chantier ne distinguant pas lecture
+  et ecriture sur la production. **Ce qui est recuperable** : son assertion utile (« reponse immediate < 8 s »,
+  qui mesure `v1.37.13`) est **portable sur `/ssh-audit/scan` UNE machine** — *une suite interdite peut
+  contenir une propriete autorisee ; l'interdit porte sur la cible, pas sur la question* ;
+- **ce qui referme doit etre documente la ou il referme.** Sur les cinq routes de `ssh_audit` portant
+  `@require_machine_access` sans `@require_role`, **quatre sont fermees par un CONTROLE DE VALIDITE D'ENTREE**
+  (`_resolve_ssh_creds` -> 400), pas par un controle d'acces — et **E-211 est la seule dont le corps ne
+  rattrape pas le garde.** Ce qui protege `/scan`, `/config` et `/backups` est donc une ligne
+  `if not machine_id` dans un helper **partage** ou **rien ne dit que c'est une protection** : un repli
+  permissif introduit la ouvrirait **trois routes qui ouvrent une session SSH**, d'un coup, **et aucun test ne
+  bougerait.** *Une protection qui vit dans un controle de validite est une protection dont personne ne sait
+  qu'il la tient.* **Ampleur NON mesuree** : le balayage du Lead trouve **58** routes dans ce cas sur tout le
+  backend, dont le releve n'en classe que **3** « sans objet » — donc 55 sont fermees par autre chose.
+  *Combien par un helper partage ?* Ce nombre manque, et c'est lui qui donne la portee du risque.
+
 ### v1.38.30 — E-211 : rendre le parametre obligatoire aurait ete le reflexe, et il aurait ete FAUX
 
 **Symptome.** `GET /ssh-audit/policies` porte `@require_machine_access`, mais son `machine_id` est un
@@ -2877,7 +2984,9 @@ correspondance reelle :**
 | **v1.38.27** | `5c2e599` | **E-209, en production : un guide qui enseigne un durcissement inexistant** ; E-210 |
 | v1.38.28 | `29aafb1` | un balayage ne converge qu'en lisant ; 116/59/54+3 confirme ; E-211 |
 | v1.38.30 | — | E-211 corrige ; le releve accusait trop large, retreci ; `/exclude_user` lu |
-| **v1.38.29** | (ce commit) | **E-212, en production : le portail decrit un produit qu'il n'installe pas** ; FEAT-001 raffine |
+| **v1.38.29** | `c107935` | **E-212, en production : le portail decrit un produit qu'il n'installe pas** ; FEAT-001 raffine |
+| v1.38.30 | `2ca5bcb` | E-211 corrige — `@require_permission('can_audit_ssh')`, et l'import qui manquait |
+| **v1.38.31** | (ce commit) | **E-213 : un statut nomme `excluded` n'exclut pas, et `userdel -r` ne lit que l'autre magasin** ; E-214 ; E-215 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
