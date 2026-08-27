@@ -334,23 +334,50 @@ def _build_config_lines(global_cfg, machine_row, overrides=None, profile=None):
 
 
 def _write_config_stream(client, root_password, file_path, config_lines):
-    """Met a jour un fichier de config Zabbix en streaming (base64 safe)."""
+    """Met a jour un fichier de config Zabbix en streaming (base64 safe).
+
+    RENVOIE le nombre de cles dont l'ecriture a ECHOUE — 0 si tout est passe,
+    et `None` si la fonction s'est interrompue sur une exception. Un appelant
+    qui fait `yield from` sans affectation ne voit aucun changement : l'ajout
+    est ADDITIF, comme celui d'`execute_as_root_stream`.
+
+    Avant, cette fonction jetait les trois valeurs de retour d'`execute_as_root`
+    (`(sortie, erreur, code)`) et annoncait « mis a jour avec succes » quoi qu'il
+    arrive. Un `sed` refuse — fichier absent, disque plein, droits — donnait donc
+    exactement le meme flux qu'une reussite, et les deux routes qui l'appellent
+    concluaient au deploiement. E-90.
+    """
+    echecs = 0
     try:
         for key, value in config_lines.items():
             grep_regex = f"^[#[:space:]]*{re.escape(key)}[[:space:]]*="
             delete_cmd = f"sed -i -E '/{grep_regex}/d' {file_path}"
-            execute_as_root(client, delete_cmd, root_password)
+            _, _, rc_purge = execute_as_root(client, delete_cmd, root_password)
+            if rc_purge != 0:
+                echecs += 1
+                yield f"ERROR: Cle '{key}' : purge refusee (code {rc_purge}).\n"
+                continue
             yield f"INFO: Cle '{key}' purgee.\n"
 
             line = f"{key}={value}\n"
             encoded = base64.b64encode(line.encode('utf-8')).decode('ascii')
-            execute_as_root(client,
+            _, _, rc_ecrit = execute_as_root(client,
                 f"printf '%s' '{encoded}' | base64 -d >> {file_path}", root_password)
+            if rc_ecrit != 0:
+                echecs += 1
+                yield f"ERROR: Cle '{key}' : ecriture refusee (code {rc_ecrit}).\n"
+                continue
             yield f"INFO: Cle '{key}' definie a '{value}'.\n"
 
-        yield f"INFO: Fichier {file_path} mis a jour avec succes.\n"
+        if echecs:
+            yield (f"ERROR: Fichier {file_path} : {echecs} cle(s) sur "
+                   f"{len(config_lines)} n'ont pas ete ecrites.\n")
+        else:
+            yield f"INFO: Fichier {file_path} mis a jour avec succes.\n"
+        return echecs
     except Exception as e:
         yield f"ERROR: write_config_stream: {e}\n"
+        return None
 
 
 def _config_file_path(agent_type, platform='zabbix'):
@@ -788,14 +815,31 @@ def zabbix_deploy():
                     except Exception as e:
                         logger.warning("Dechiffrement PSK supervision echoue : %s", e)
 
+                # Les etapes DECISIVES sont collectees ici : le verdict se
+                # compose, il ne se lit pas sur le dernier marqueur.
+                echecs = []
+
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
-                    # Installation repo
-                    yield from execute_as_root_stream(client, install_repo_cmd, root_pass, logger=logger)
-                    # Installation paquet
-                    yield from execute_as_root_stream(client, install_pkg_cmd, root_pass, logger=logger)
+                    # Installation repo. NON decisive a elle seule, et c'est
+                    # delibere : sur une machine dont le depot Zabbix est deja
+                    # pose autrement, cette commande peut echouer sans que le
+                    # deploiement soit compromis. Ce qui tranche est
+                    # l'installation du paquet, juste apres — si le depot
+                    # manquait vraiment, elle echouera et sera comptee, elle.
+                    rc_repo = yield from execute_as_root_stream(
+                        client, install_repo_cmd, root_pass, logger=logger)
+                    if rc_repo != 0:
+                        yield (f"WARN: Depot Zabbix : code {rc_repo}. L'installation "
+                               f"du paquet dira si cela porte a consequence.\n")
 
-                    # Ecriture PSK
+                    # Installation paquet — DECISIVE.
+                    rc_pkg = yield from execute_as_root_stream(
+                        client, install_pkg_cmd, root_pass, logger=logger)
+                    echecs += _echec("installation du paquet", rc_pkg)
+
+                    # Ecriture PSK — DECISIVE quand une PSK est configuree :
+                    # sans elle l'agent ne peut pas parler au serveur.
                     if psk_value:
                         psk_b64 = base64.b64encode(psk_value.encode('utf-8')).decode('ascii')
                         write_psk_cmd = (
@@ -803,32 +847,39 @@ def zabbix_deploy():
                             f"printf '%s' '{psk_b64}' | base64 -d > /etc/zabbix/zabbix_agent2.d/server.key && "
                             f"chmod 640 /etc/zabbix/zabbix_agent2.d/server.key"
                         )
-                        execute_as_root(client, write_psk_cmd, root_pass, logger=logger)
-                        yield "INFO: Cle PSK deployee.\n"
+                        _, _, rc_psk = execute_as_root(client, write_psk_cmd, root_pass, logger=logger)
+                        echecs += _echec("ecriture de la cle PSK", rc_psk)
+                        if rc_psk == 0:
+                            yield "INFO: Cle PSK deployee.\n"
 
-                    # Configuration
-                    yield from _write_config_stream(client, root_pass, config_path, config_lines)
+                    # Configuration — DECISIVE.
+                    nb_cles_ratees = yield from _write_config_stream(
+                        client, root_pass, config_path, config_lines)
+                    echecs += _echec("ecriture de la configuration", nb_cles_ratees)
 
-                    # Extra config
+                    # Extra config — DECISIVE : l'exploitant l'a saisie, la
+                    # perdre en silence rendrait la machine differente de ce
+                    # que l'ecran annonce.
                     if global_cfg.get('extra_config'):
                         extra_b64 = base64.b64encode(
                             (global_cfg['extra_config'] + '\n').encode('utf-8')).decode('ascii')
-                        execute_as_root(client,
+                        _, _, rc_extra = execute_as_root(client,
                             f"printf '%s' '{extra_b64}' | base64 -d >> {config_path}", root_pass)
-                        yield "INFO: Configuration supplementaire ajoutee.\n"
+                        echecs += _echec("ajout de la configuration supplementaire", rc_extra)
+                        if rc_extra == 0:
+                            yield "INFO: Configuration supplementaire ajoutee.\n"
 
-                    # Restart + enable
+                    # Restart + enable — DECISIVE.
                     service_name = 'zabbix-agent2' if agent_type == 'zabbix-agent2' else 'zabbix-agent'
-                    yield from execute_as_root_stream(client,
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name} && systemctl enable {service_name}",
                         root_pass, logger=logger)
+                    echecs += _echec("redemarrage du service", rc_svc)
 
-                # Mise a jour BDD
-                try:
-                    _upsert_agent(machine_id, 'zabbix', agent_version, config_deployed=True)
-                    yield f"SUCCESS_MACHINE::{machine_id}::Deploiement reussi pour {machine_name}.\n"
-                except Exception as db_err:
-                    yield f"ERROR_MACHINE::{machine_id}::Echec MAJ BDD: {db_err}\n"
+                yield from _conclut_geste(
+                    machine_id, machine_name, "Deploiement", echecs,
+                    lambda: _upsert_agent(machine_id, 'zabbix', agent_version,
+                                          config_deployed=True))
 
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
@@ -887,6 +938,53 @@ def zabbix_version():
         logger.error("[supervision/zabbix/version] %s", e)
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+def _echec(etape, code):
+    """Rend `[(etape, code)]` si le code n'est pas un succes, `[]` sinon.
+
+    `None` compte comme un ECHEC : c'est ce que rend `execute_as_root_stream`
+    quand elle s'interrompt sur une exception, et « je ne sais pas » ne vaut
+    pas « ca s'est bien passe ». Fail-closed.
+    """
+    return [] if code == 0 else [(etape, code)]
+
+
+def _conclut_geste(machine_id, machine_name, libelle, echecs, effet_si_reussi=None):
+    """Conclut un deploiement ou une reconfiguration SELON CE QUI S'EST PASSE.
+
+    Meme regle que `_conclut_desinstallation` (E-88), etendue aux gestes qui
+    ECRIVENT : l'inventaire suit le VERDICT, jamais l'intention.
+
+    Avant ce correctif, les quatre routes de deploiement et de reconfiguration
+    jetaient tous leurs codes de retour, appelaient `_upsert_agent(...,
+    config_deployed=True)` **inconditionnellement** et emettaient
+    `SUCCESS_MACHINE::` a la suite. Un `apt-get install` en echec inscrivait donc
+    en base un agent qui n'existe pas, et le portail annoncait la reussite. E-90.
+
+    C'est aussi le defaut « le dernier marqueur d'un flux n'est pas son
+    verdict » : `systemctl restart` pouvait rendre 127 deux lignes plus haut,
+    le marqueur concluait quand meme a la reussite.
+
+    :param echecs: liste de `(etape, code)`, construite par `_echec`. Vide =
+        toutes les etapes decisives ont rendu 0.
+    :param effet_si_reussi: callable sans argument, joue UNIQUEMENT si `echecs`
+        est vide — c'est la que vit `_upsert_agent`.
+    """
+    if echecs:
+        detail = ', '.join(f"{etape} (code {code})" for etape, code in echecs)
+        yield (f"ERROR_MACHINE::{machine_id}::{libelle} echouee sur {machine_name} — "
+               f"{detail}. L'inventaire n'a pas ete modifie.\n")
+        return
+
+    if effet_si_reussi is not None:
+        try:
+            effet_si_reussi()
+        except Exception as db_err:
+            yield f"ERROR_MACHINE::{machine_id}::Echec MAJ BDD: {db_err}\n"
+            return
+
+    yield f"SUCCESS_MACHINE::{machine_id}::{libelle} reussie pour {machine_name}.\n"
 
 
 def _conclut_desinstallation(machine_id, platform, machine_name, code):
@@ -1005,7 +1103,11 @@ def zabbix_reconfigure():
                     except RuntimeError as be:
                         yield f"WARN: Backup echoue: {be}\n"
 
-                    yield from _write_config_stream(client, root_pass, config_path, config_lines)
+                    echecs = []
+
+                    nb_cles_ratees = yield from _write_config_stream(
+                        client, root_pass, config_path, config_lines)
+                    echecs += _echec("ecriture de la configuration", nb_cles_ratees)
 
                     # PSK
                     psk_value = None
@@ -1016,20 +1118,28 @@ def zabbix_reconfigure():
                             psk_value = enc.decrypt_password(global_cfg['tls_psk_value'])
                         except Exception as e:
                             logger.warning("Dechiffrement PSK reconfigure echoue : %s", e)
+                            # Le dechiffrement rate ne se journalisait QUE cote
+                            # serveur : l'ecran annoncait une reconfiguration
+                            # reussie avec l'ancienne PSK toujours en place.
+                            echecs.append(("dechiffrement de la cle PSK", "illisible"))
 
                     if psk_value:
                         psk_b64 = base64.b64encode(psk_value.encode('utf-8')).decode('ascii')
-                        execute_as_root(client,
+                        _, _, rc_psk = execute_as_root(client,
                             f"printf '%s' '{psk_b64}' | base64 -d > /etc/zabbix/zabbix_agent2.d/server.key && "
                             f"chmod 640 /etc/zabbix/zabbix_agent2.d/server.key",
                             root_pass, logger=logger)
-                        yield "INFO: Cle PSK mise a jour.\n"
+                        echecs += _echec("ecriture de la cle PSK", rc_psk)
+                        if rc_psk == 0:
+                            yield "INFO: Cle PSK mise a jour.\n"
 
                     # Restart
-                    yield from execute_as_root_stream(client,
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name}", root_pass, logger=logger)
+                    echecs += _echec("redemarrage du service", rc_svc)
 
-                yield f"SUCCESS_MACHINE::{machine_id}::Reconfiguration reussie pour {machine_name}.\n"
+                yield from _conclut_geste(machine_id, machine_name,
+                                          "Reconfiguration", echecs)
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
@@ -1641,35 +1751,45 @@ def generic_deploy(platform):
 
                 install_cmds = _get_install_commands(platform, global_cfg, linux_version)
 
+                echecs = []
+
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
-                    for cmd in install_cmds:
-                        yield from execute_as_root_stream(client, cmd, root_pass, logger=logger)
+                    for rang, cmd in enumerate(install_cmds, 1):
+                        rc_inst = yield from execute_as_root_stream(
+                            client, cmd, root_pass, logger=logger)
+                        echecs += _echec(f"installation, commande {rang}", rc_inst)
 
                     if global_cfg:
                         overrides = _get_overrides(machine_id)
                         config_content = _build_agent_config_content(platform, global_cfg, row, overrides)
                         if config_content:
                             config_dir = '/'.join(config_path.split('/')[:-1])
-                            execute_as_root(client, f"mkdir -p {config_dir}", root_pass)
+                            _, _, rc_dir = execute_as_root(client, f"mkdir -p {config_dir}", root_pass)
+                            echecs += _echec("creation du repertoire de configuration", rc_dir)
                             _backup_agent_config(client, root_pass, config_path)
                             b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
-                            execute_as_root(client,
+                            _, _, rc_cfg = execute_as_root(client,
                                 f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
-                            yield f"INFO: Configuration deployee dans {config_path}\n"
+                            echecs += _echec("ecriture de la configuration", rc_cfg)
+                            if rc_cfg == 0:
+                                yield f"INFO: Configuration deployee dans {config_path}\n"
 
                     if global_cfg and global_cfg.get('extra_config') and platform != 'telegraf':
                         extra_b64 = base64.b64encode(
                             (global_cfg['extra_config'] + '\n').encode('utf-8')).decode('ascii')
-                        execute_as_root(client,
+                        _, _, rc_extra = execute_as_root(client,
                             f"printf '%s' '{extra_b64}' | base64 -d >> {config_path}", root_pass)
+                        echecs += _echec("ajout de la configuration supplementaire", rc_extra)
 
-                    yield from execute_as_root_stream(client,
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name} && systemctl enable {service_name}",
                         root_pass, logger=logger)
+                    echecs += _echec("redemarrage du service", rc_svc)
 
-                _upsert_agent(machine_id, platform, config_deployed=True)
-                yield f"SUCCESS_MACHINE::{machine_id}::Deploiement {platform} reussi pour {machine_name}.\n"
+                yield from _conclut_geste(
+                    machine_id, machine_name, f"Deploiement {platform}", echecs,
+                    lambda: _upsert_agent(machine_id, platform, config_deployed=True))
 
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
@@ -1800,20 +1920,42 @@ def generic_reconfigure(platform):
                 yield f"START_MACHINE::{machine_id}::Reconfiguration {platform} sur {machine_name}.\n"
                 ip, port, ssh_user, ssh_pass, root_pass, svc_account = _get_ssh_creds(row)
 
+                echecs = []
+
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
                     _backup_agent_config(client, root_pass, config_path)
+
+                    # « Reconfigurer » sans configuration a ecrire n'est pas une
+                    # reconfiguration reussie : c'est une reconfiguration qui
+                    # n'a pas eu lieu. Sans configuration globale, ou avec un
+                    # contenu vide, l'ancienne version redemarrait le service et
+                    # annoncait « reussie » sans avoir touche un octet.
+                    config_content = None
                     if global_cfg:
                         overrides = _get_overrides(machine_id)
                         config_content = _build_agent_config_content(platform, global_cfg, row, overrides)
-                        if config_content:
-                            b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
-                            execute_as_root(client,
-                                f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
-                            yield f"INFO: Configuration mise a jour.\n"
-                    yield from execute_as_root_stream(client,
+
+                    if not config_content:
+                        yield (f"ERROR_MACHINE::{machine_id}::Reconfiguration {platform} "
+                               f"impossible sur {machine_name} : aucune configuration a "
+                               f"ecrire (configuration globale absente ou vide). Rien n'a "
+                               f"ete modifie.\n")
+                        continue
+
+                    b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
+                    _, _, rc_cfg = execute_as_root(client,
+                        f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
+                    echecs += _echec("ecriture de la configuration", rc_cfg)
+                    if rc_cfg == 0:
+                        yield f"INFO: Configuration mise a jour.\n"
+
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name}", root_pass, logger=logger)
-                yield f"SUCCESS_MACHINE::{machine_id}::Reconfiguration {platform} reussie pour {machine_name}.\n"
+                    echecs += _echec("redemarrage du service", rc_svc)
+
+                yield from _conclut_geste(machine_id, machine_name,
+                                          f"Reconfiguration {platform}", echecs)
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
