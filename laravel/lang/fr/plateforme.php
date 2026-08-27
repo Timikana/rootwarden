@@ -62,8 +62,8 @@ return [
     'sensible' => "Production",
     'vide_titre' => "Aucune machine au parc",
     'vide_texte' => "Aucune machine n'est enregistrée. La clé de plateforme n'a rien à protéger tant que le parc est vide.",
-    'non_porte_titre' => "Les gestes de cette page ne sont pas encore portés",
-    'non_porte_texte' => "Déployer la clé, déployer le compte d'administration, tester une connexion, relever les comptes, effacer ou ressaisir un mot de passe, et faire tourner la clé se font encore depuis l'ancien portail. Cette page porte l'état, ses compteurs et ses gardes.",
+    'non_porte_titre' => "Un seul geste n'est pas porté : la rotation de la clé",
+    'non_porte_texte' => "Faire tourner la clé de plateforme — la régénérer — se fait encore depuis l'ancien portail. C'est le geste le plus large du portail : il agit sur tout le parc à la fois, sans viser de machine, et il détruit la clé privée en cours. Tous les autres gestes de cette page sont portés ici.",
     'non_porte_lien' => "Ouvrir la clé de plateforme dans l'ancien portail",
 
     // ── Sous-lot P2 : le test de connexion ───────────────────────────────
@@ -93,4 +93,81 @@ return [
     'guide_etape3' => "Une fois déployée, RootWarden se connecte sans mot de passe. Le bouton « Tester » le vérifie sans rien écrire.",
     'guide_etape4' => "« Effacer les mots de passe » n'agit PAS sur la machine : il efface la copie que RootWarden en garde. Le compte Unix garde son mot de passe, et qui le connaît entre encore. Ce que RootWarden perd, c'est son propre recours si la clé cesse de fonctionner.",
     'guide_corrige' => "Deux de ces quatre étapes corrigent le guide de l'ancien portail, mesure en main. Il annonçait que « Déployer keypair installe la clé publique » sans mentionner le compte NOPASSWD: ALL ; et que « Supprimer le password désactive l'authentification par mot de passe SUR LE SERVEUR (plus sécurisé) », ce qui est faux dans les deux langues — la route ne touche pas la machine.",
+    // ══ P3 — LES GESTES QUI ECRIVENT ═════════════════════════════════════
+    'btn_deployer' => "Déployer",
+    'btn_compte_service' => "Reprendre le compte d'administration",
+    'btn_effacer' => "Effacer les mots de passe",
+    'btn_ressaisir' => "Ressaisir un mot de passe",
+
+    'parc_titre' => "Les mêmes gestes, à l'échelle du parc",
+    'parc_aide' => "Chaque bouton annonce le nombre de machines de SA propre liste, et agit sur exactement celles-là. L'ancien portail affichait une soustraction de compteurs calculés autrement : le nombre annoncé et le nombre traité pouvaient différer.",
+    'parc_btn_deployer' => "Déployer sur les :n machines sans clé",
+    'parc_btn_compte_service' => "Reprendre le compte d'administration sur :n machine(s)",
+    'parc_btn_effacer' => "Effacer les mots de passe de :n machine(s)",
+    'parc_rien' => "Aucun geste de parc n'a d'objet : toutes les machines ont leur clé et leur compte d'administration, et aucune ne porte plus de mot de passe connu de RootWarden.",
+
+    'refusees_titre' => ":n machine(s) que l'effacement de masse écarte",
+    'refusees_texte' => "Ces machines ont une clé et un mot de passe, mais pas de compte d'administration : le backend refuse d'effacer leur mot de passe, parce que RootWarden n'aurait alors plus aucun moyen de passer root. Elles ne sont pas « déjà faites », elles sont bloquées — et c'est le geste du compte d'administration qui les débloque. L'ancien portail les proposait quand même et comptait le refus comme rien.",
+
+    'champ_mdp' => "Mot de passe SSH à réenregistrer",
+    'champ_mdp_aide' => "Il est enregistré chiffré, et il n'est jamais réaffiché. Ce geste restaure le mot de passe de l'utilisateur SSH ; il ne restaure PAS le mot de passe root, qui ne se réécrit que depuis la page Serveurs.",
+    'annuler' => "Annuler",
+    'confirmer' => "Confirmer",
+
+    'recharger' => "Recharger la page pour lire l'état réel",
+    'geste_journal' => "Journal des gestes",
+    'geste_journal_vide' => "Aucun geste n'a encore été lancé depuis cette page.",
+    'geste_en_cours' => "En cours sur :cibles…",
+    'geste_echec_reseau' => "La requête n'est pas partie ou n'est pas revenue : :message. Aucune conclusion n'est possible sur ce qui a été écrit — il faut recharger la page pour lire l'état réel.",
+    'geste_sans_verdict' => "Le serveur a répondu sans verdict lisible. Ce n'est ni une réussite ni un échec : l'état doit être relu.",
+    'geste_ligne_ok' => ":machine : réussi — :message",
+    'geste_ligne_echec' => ":machine : échoué — :message",
+    'geste_bilan' => ":ok réussite(s) sur :total. Les machines en échec sont nommées ci-dessus, une par ligne.",
+    'ressaisie_mdp_vide' => "Aucun mot de passe saisi : rien n'a été envoyé.",
+    'confirmer_saisie_manquante' => "Remplis le champ avant de confirmer.",
+    'effacement_bilan' => ":ok effacement(s) sur :total.",
+    'effacement_interrompu' => "Interrompu après :fait machine(s) sur :total. Ce geste part en autant de requêtes qu'il y a de machines : les suivantes n'ont PAS été envoyées, et le parc est à moitié migré.",
+
+    // Les panneaux de decision, un par geste. Chacun NOMME sa consequence.
+    'panneaux' => [
+        'deployer' => [
+            'titre' => "Déployer la clé de plateforme",
+            'texte' => "Ce geste ouvre une session SSH par mot de passe et écrit sur la machine. Il fait deux choses, et l'ancien portail n'en annonçait qu'une.",
+            'effets' => [
+                "ajoute la clé publique dans authorized_keys de l'utilisateur SSH et de root",
+                "crée le compte Unix « rootwarden » et lui accorde NOPASSWD: ALL via /etc/sudoers.d",
+                "reprendre cet accès n'a aucun bouton dans le portail : c'est un geste d'exploitation hors portail",
+            ],
+        ],
+        'compte_service' => [
+            'titre' => "Reprendre le compte d'administration",
+            'texte' => "Ce n'est pas l'étape suivante du déploiement : le déploiement de la clé a DÉJÀ tenté de créer ce compte, dans la même requête, et cette tentative a échoué. Ce geste la reprend.",
+            'effets' => [
+                "crée le compte Unix « rootwarden » s'il manque",
+                "lui accorde NOPASSWD: ALL via /etc/sudoers.d",
+                "vérifie ensuite que « sudo whoami » répond root, et n'enregistre la réussite que dans ce cas",
+            ],
+        ],
+        'effacer' => [
+            'titre' => "Effacer les mots de passe connus de RootWarden",
+            'texte' => "Ce geste NE TOUCHE PAS la machine. Il efface la copie que RootWarden garde des deux mots de passe. Le compte Unix garde le sien, et qui le connaît entre encore.",
+            'effets' => [
+                "efface le mot de passe SSH ET le mot de passe root de la base RootWarden",
+                "après ce geste, le seul accès de RootWarden à cette machine est la clé de plateforme",
+                "« Ressaisir » ne rend que le mot de passe SSH : le mot de passe root ne se réécrit que depuis la page Serveurs",
+            ],
+        ],
+        'ressaisir' => [
+            'titre' => "Réenregistrer un mot de passe SSH",
+            'texte' => "Ce geste écrit en base et ne touche pas la machine. Il ne restaure que la moitié de ce que l'effacement a retiré.",
+            'effets' => [
+                "réenregistre le mot de passe de l'utilisateur SSH, chiffré",
+                "ne réenregistre PAS le mot de passe root — aucune route du backend ne l'écrit",
+                "le mot de passe root se ressaisit depuis la page Serveurs de l'ancien portail",
+            ],
+        ],
+    ],
+    'panneau_cible_une' => "Machine visée : :nom",
+    'panneau_cible_n' => ":n machines visées : :noms",
+    'panneau_prod' => "⚠ Cette portée contient de la PRODUCTION : :noms",
 ];

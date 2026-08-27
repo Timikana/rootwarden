@@ -155,6 +155,112 @@ class ClePlateforme
         return $cle ? 'cle_et_mot_de_passe' : 'mot_de_passe_seul';
     }
 
+    /**
+     * ══ P3 — LES PORTEES DES GESTES QUI ECRIVENT ═════════════════════════
+     *
+     * Chaque geste de masse porte sa PROPRE liste, et le nombre annonce sur le
+     * bouton est celui de CETTE liste. Le legacy en avait deux, et elles ne
+     * concordaient pas.
+     *
+     * Mesure du 2026-08-27, `platform_keys.php:61` : le bouton d'effacement de
+     * masse affiche `$nbDeployed - $nbPasswordRemoved`, ou `$nbPasswordRemoved`
+     * compte `! ssh_password_required` sur TOUT le parc — machines sans cle
+     * incluses. La liste sur laquelle il agit (`:329`) exige en plus
+     * `platform_key_deployed`. Les deux predicats different : une machine qui
+     * n'a jamais commence la migration DIMINUE le nombre affiche sans sortir de
+     * la liste. Le compte annonce et le compte agi peuvent donc differer.
+     *
+     * Ici une portee est un tableau `['ids' => int[], 'noms' => string[],
+     * 'sensibles' => string[]]`. Le nombre est `count($p['ids'])`, point.
+     */
+    private function portee(array $machines, callable $predicat): array
+    {
+        $retenues = array_values(array_filter($machines, $predicat));
+
+        return [
+            'ids'       => array_map(fn ($m) => (int) $m->id, $retenues),
+            'noms'      => array_map(fn ($m) => (string) $m->name, $retenues),
+            // Les machines de PRODUCTION de la portee, nommees a part : le
+            // panneau de decision doit pouvoir les dire, et non les noyer dans
+            // un nombre. Le legacy ne distingue rien.
+            'sensibles' => array_values(array_map(
+                fn ($m) => (string) $m->name,
+                array_filter($retenues, fn ($m) => $this->estSensible($m))
+            )),
+        ];
+    }
+
+    /** Les machines sans cle de plateforme — la portee de « deployer ». */
+    public function porteeDeploiement(array $machines): array
+    {
+        return $this->portee($machines, fn ($m) => ! ((int) $m->platform_key_deployed));
+    }
+
+    /**
+     * Les machines a cle dont le compte de service manque.
+     *
+     * ══ CE GESTE EST UNE REPRISE, PAS UNE ETAPE SUIVANTE ═════════════════
+     *
+     * `deploy_platform_key` cree DEJA le compte `rootwarden` avec
+     * `NOPASSWD: ALL`, dans la meme requete (`ssh.py:786-861`, « dans la
+     * foulee »), et pose `service_account_deployed` lui-meme (`:855`). Une
+     * machine n'apparait donc ici que si cette tentative incluse a ECHOUE —
+     * `ssh.py:862` avale l'exception en `logger.warning` et rend « Keypair
+     * deployee OK (service account echoue - deployer manuellement) ».
+     *
+     * Le legacy presente les deux boutons cote a cote, sans dire que le second
+     * ne sert qu'au rattrapage du premier. L'ecran le dit.
+     */
+    public function porteeCompteService(array $machines): array
+    {
+        return $this->portee($machines, fn ($m) => ((int) $m->platform_key_deployed)
+            && ! ((int) $m->service_account_deployed));
+    }
+
+    /**
+     * Les machines dont RootWarden peut effacer sa copie des mots de passe.
+     *
+     * ══ LA PRECONDITION DU BACKEND, QUE LE LEGACY N'APPLIQUE PAS ═════════
+     *
+     * `remove_ssh_password` REFUSE (400, « Service account non deploye ») si
+     * `service_account_deployed` est faux (`ssh.py:1235-1237`). C'est une
+     * precondition juste : sans le compte de service, effacer les mots de passe
+     * retire a RootWarden tout moyen de passer root — `execute_as_root` ne
+     * court-circuite le mot de passe que sur ce compte (`ssh_utils.py:537`).
+     *
+     * Le bouton PAR LIGNE du legacy la respecte (`:203` teste `$saDeployed`).
+     * **Le bouton de MASSE ne la teste pas** (`:329` : `platform_key_deployed`
+     * et `ssh_password_required` seulement). Il propose donc des machines que
+     * le backend va refuser — et la boucle qui les envoie compte les reussites
+     * sans jamais nommer les refus (`:333-340` : `if (d.success) ok++`, et un
+     * `catch` vide). L'exploitant lit « 3/7 » sans savoir lesquelles, ni
+     * pourquoi.
+     *
+     * La portee porte donc la precondition, et `porteeEffacementRefusees()`
+     * nomme ce qui en est ecarte : une portee qui retrecit en silence se lit
+     * comme une portee complete.
+     */
+    public function porteeEffacement(array $machines): array
+    {
+        return $this->portee($machines, fn ($m) => ((int) $m->platform_key_deployed)
+            && ((int) $m->service_account_deployed)
+            && (((int) $m->a_mot_de_passe) || ((int) $m->a_mot_de_passe_root)));
+    }
+
+    /**
+     * Ce que le legacy aurait propose et que le backend refuserait.
+     *
+     * La cle est deployee, un mot de passe subsiste, mais le compte de service
+     * manque. Ces machines ne sont pas « deja faites » : elles sont BLOQUEES,
+     * et ce qui les debloque est le geste du compte de service.
+     */
+    public function porteeEffacementRefusees(array $machines): array
+    {
+        return $this->portee($machines, fn ($m) => ((int) $m->platform_key_deployed)
+            && ! ((int) $m->service_account_deployed)
+            && (((int) $m->a_mot_de_passe) || ((int) $m->a_mot_de_passe_root)));
+    }
+
     /** `PROD` ou `CRITIQUE`, et une valeur inconnue compte comme sensible. */
     public function estSensible(object $m): bool
     {

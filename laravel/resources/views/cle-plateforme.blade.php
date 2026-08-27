@@ -238,9 +238,71 @@
                                  masquer forcerait a deviner l'ordre des etapes. --}}
                             <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule"
                                     data-rw="cle-tester-{{ $m->id }}"
-                                    data-machine="{{ $m->id }}" data-nom="{{ $m->name }}">
+                                    data-machine="{{ $m->id }}" data-nom="{{ $m->name }}"
+                                        data-sensible="{{ $l['sensible'] ? '1' : '0' }}">
                                 {{ __('plateforme.tester') }}
                             </button>
+
+                            {{-- ── P3 : LES GESTES QUI ECRIVENT ─────────────
+
+                                 Chacun n'est rendu que lorsqu'il a un objet, et
+                                 la condition est celle du BACKEND, pas celle de
+                                 l'apparence. Un bouton toujours visible qui
+                                 repond « rien a faire » se clique pour savoir ;
+                                 un bouton absent a deja repondu.
+
+                                 Aucun de ces boutons n'agit : ils OUVRENT le
+                                 panneau de decision, qui nomme la machine et la
+                                 consequence. `confirm()` est proscrit. --}}
+                            @if (! (int) $m->platform_key_deployed)
+                                <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                        data-rw="cle-deployer-{{ $m->id }}"
+                                        data-geste="deployer"
+                                        data-machine="{{ $m->id }}" data-nom="{{ $m->name }}"
+                                        data-sensible="{{ $l['sensible'] ? '1' : '0' }}">
+                                    {{ __('plateforme.btn_deployer') }}
+                                </button>
+                            @endif
+
+                            @if ((int) $m->platform_key_deployed && ! (int) $m->service_account_deployed)
+                                {{-- REPRISE et non etape suivante : le deploiement
+                                     de la cle a DEJA tente ce compte et a echoue. --}}
+                                <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule"
+                                        data-rw="cle-compte-service-poser-{{ $m->id }}"
+                                        data-geste="compte_service"
+                                        data-machine="{{ $m->id }}" data-nom="{{ $m->name }}"
+                                        data-sensible="{{ $l['sensible'] ? '1' : '0' }}">
+                                    {{ __('plateforme.btn_compte_service') }}
+                                </button>
+                            @endif
+
+                            @if ((int) $m->platform_key_deployed && (int) $m->service_account_deployed
+                                 && ($l['mots_de_passe'] !== 'aucun'))
+                                <button type="button" class="rw-bouton rw-bouton--danger rw-bouton--minuscule"
+                                        data-rw="cle-effacer-{{ $m->id }}"
+                                        data-geste="effacer"
+                                        data-machine="{{ $m->id }}" data-nom="{{ $m->name }}"
+                                        data-sensible="{{ $l['sensible'] ? '1' : '0' }}">
+                                    {{ __('plateforme.btn_effacer') }}
+                                </button>
+                            @endif
+
+                            @if ((int) $m->platform_key_deployed && $l['mots_de_passe'] !== 'les_deux')
+                                {{-- « RESSAISIR » EST OFFERT DES QU'UN MOT DE PASSE
+                                     MANQUE, et non seulement quand le drapeau dit
+                                     « supprime » : c'est le FAIT qui decide, comme
+                                     partout ailleurs sur cette page. Le legacy
+                                     testait `! $pwRequired` et manquait donc le cas
+                                     ou le drapeau et les colonnes divergent. --}}
+                                <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule"
+                                        data-rw="cle-ressaisir-{{ $m->id }}"
+                                        data-geste="ressaisir"
+                                        data-machine="{{ $m->id }}" data-nom="{{ $m->name }}"
+                                        data-sensible="{{ $l['sensible'] ? '1' : '0' }}"
+                                        data-manquant="{{ $l['mots_de_passe'] }}">
+                                    {{ __('plateforme.btn_ressaisir') }}
+                                </button>
+                            @endif
                         </td>
                     </tr>
                 @endforeach
@@ -260,6 +322,114 @@
     <div class="rw-journal__general rw-journal--vide" data-rw="cle-test-journal"
          aria-live="polite" aria-label="{{ __('plateforme.test_journal_vide') }}"></div>
 
+    {{--
+        ═══ P3 — LES GESTES A L'ECHELLE DU PARC ════════════════════════════
+
+        Trois portees, TROIS NOMBRES, chacun celui de la liste sur laquelle son
+        bouton agit. Le legacy affichait des soustractions de compteurs calcules
+        sur d'autres predicats : le nombre annonce et le nombre agi pouvaient
+        differer sans que rien ne le dise.
+
+        Un bouton dont la portee est vide n'est PAS rendu : il n'y a rien a
+        decider. Le cas « rien a faire » s'enonce en toutes lettres a la place.
+    --}}
+    <h3 class="rw-sous-titre-fort rw-titre--espace">{{ __('plateforme.parc_titre') }}</h3>
+    <p class="rw-aide rw-prose">{{ __('plateforme.parc_aide') }}</p>
+
+    <div class="rw-actions" data-rw="cle-parc">
+        @foreach (['deployer' => 'rw-bouton', 'compte_service' => 'rw-bouton rw-bouton--discret', 'effacer' => 'rw-bouton rw-bouton--danger'] as $geste => $classe)
+            @if (count($portees[$geste]['ids']) > 0)
+                <button type="button" class="{{ $classe }}"
+                        data-rw="cle-parc-{{ $geste }}"
+                        data-geste="{{ $geste }}" data-portee="parc">
+                    {{ __('plateforme.parc_btn_' . $geste, ['n' => count($portees[$geste]['ids'])]) }}
+                </button>
+            @endif
+        @endforeach
+    </div>
+
+    @if (count($portees['deployer']['ids']) === 0 && count($portees['compte_service']['ids']) === 0
+         && count($portees['effacer']['ids']) === 0)
+        <p class="rw-aide" data-rw="cle-parc-rien">{{ __('plateforme.parc_rien') }}</p>
+    @endif
+
+    {{--
+        ── CE QUE L'EFFACEMENT DE MASSE ECARTE, ET POURQUOI ────────────────
+
+        Le legacy proposait ces machines et le backend les REFUSAIT une par une
+        (400, « Service account non deploye »), sans que la boucle ne le dise :
+        elle comptait les reussites et avalait le reste. Ici elles sortent de la
+        portee — et elles sont NOMMEES, avec le geste qui les debloque.
+
+        Une portee qui retrecit en silence se lit comme une portee complete.
+    --}}
+    @if (count($effacementRefusees['ids']) > 0)
+        <div class="rw-encart" data-rw="cle-effacement-refusees">
+            <p class="rw-sous-titre-fort">{{ __('plateforme.refusees_titre', ['n' => count($effacementRefusees['ids'])]) }}</p>
+            <p class="rw-prose">{{ __('plateforme.refusees_texte') }}</p>
+            <p class="rw-tableau__mono">{{ implode(', ', $effacementRefusees['noms']) }}</p>
+        </div>
+    @endif
+
+    {{--
+        ═══ LE PANNEAU DE DECISION, UN SEUL POUR TOUS LES GESTES ═══════════
+
+        Il nait `hidden`, il NOMME sa cible, et il porte le champ de ressaisie —
+        `type="password"`, la ou le legacy ouvrait un `prompt()` natif qui
+        affiche le mot de passe en clair et le laisse dans l'historique du
+        dialogue du navigateur.
+
+        Les machines de PRODUCTION de la portee sont annoncees a part : un
+        nombre ne dit pas qu'on est sur le point d'ecrire en root sur la
+        production.
+    --}}
+    <div class="rw-panneau-decision" data-rw="cle-panneau" hidden>
+        <p class="rw-panneau-decision__texte" data-rw="cle-panneau-titre"></p>
+        <p class="rw-prose" data-rw="cle-panneau-texte"></p>
+
+        <ul class="rw-liste-effets" data-rw="cle-panneau-effets"></ul>
+
+        <p class="rw-tableau__mono" data-rw="cle-panneau-cibles"></p>
+
+        <p class="rw-annonce rw-annonce--attention" data-rw="cle-panneau-prod" hidden></p>
+
+        {{-- Le champ n'existe que pour la ressaisie : il est devoile par le
+             script, jamais rendu conditionnellement — un panneau unique reste un
+             seul contrat DOM pour les suites. --}}
+        <label class="rw-champ" data-rw="cle-panneau-champ" hidden>
+            <span class="rw-etiquette">{{ __('plateforme.champ_mdp') }}</span>
+            <input type="password" class="rw-saisie" data-rw="cle-panneau-mdp"
+                   autocomplete="new-password" spellcheck="false">
+            <span class="rw-aide">{{ __('plateforme.champ_mdp_aide') }}</span>
+        </label>
+
+        <div class="rw-panneau-decision__actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="cle-panneau-annuler">{{ __('plateforme.annuler') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--danger"
+                    data-rw="cle-panneau-confirmer">{{ __('plateforme.confirmer') }}</button>
+        </div>
+    </div>
+
+    {{-- LE JOURNAL DES GESTES est distinct de celui des tests : un test ne
+         change rien, un geste ecrit. Les melanger ferait relire un verdict de
+         lecture comme la preuve d'une ecriture. --}}
+    <h3 class="rw-sous-titre-fort rw-titre--espace">{{ __('plateforme.geste_journal') }}</h3>
+    <div class="rw-journal__general rw-journal--vide" data-rw="cle-geste-journal"
+         aria-live="polite" aria-label="{{ __('plateforme.geste_journal_vide') }}"></div>
+
+    {{-- ── PAS DE RECHARGEMENT AUTOMATIQUE ────────────────────────────────
+
+         Le legacy fait `location.reload()` 1,5 s apres chaque geste — et
+         effface donc le journal qu'il vient d'ecrire. Sur un geste de parc, ces
+         1,5 s sont tout ce dont on dispose pour lire N lignes dont certaines
+         disent « echoue ». Le rechargement devient un GESTE, offert quand il y
+         a quelque chose de neuf a relire. --}}
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="cle-recharger" hidden>{{ __('plateforme.recharger') }}</button>
+    </div>
+
     {{-- CE QUE LE COMPTE D'ADMINISTRATION ACCORDE, DIT UNE FOIS SOUS LE
          TABLEAU plutot que cache dans une infobulle : « NOPASSWD: ALL ». --}}
     <p class="rw-aide rw-prose">{{ __('plateforme.compte_service_aide') }}</p>
@@ -278,5 +448,6 @@
 @endif
 
     <script id="cle-textes" type="application/json">@json($textes)</script>
+    <script id="cle-portees" type="application/json">@json($portees)</script>
     <script src="/js/cle-plateforme.js?v={{ @filemtime(public_path('js/cle-plateforme.js')) ?: '0' }}"></script>
 @endsection

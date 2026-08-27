@@ -2171,6 +2171,79 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.32 — P3 porte les quatre gestes qui ECRIVENT, et la portee de chaque bouton est celle sur laquelle il agit
+
+**Portage** de `legacy/adm/platform_keys.php` — sous-lot P3, la migration mot de passe → clé :
+`deploy_platform_key`, `deploy_service_account`, `remove_ssh_password`, `reenter_ssh_password`.
+La rotation (P4) **n'est pas portée** et le reste : elle agit sur tout le parc sans viser de machine.
+
+**Aucun `confirm()`, aucun `prompt()`.** Chaque geste ouvre un panneau de décision dans la page,
+qui nomme sa cible, liste ses effets, et distingue les machines de **production** de la portée.
+Le mot de passe de ressaisie se saisit dans un champ `type="password"` — le legacy ouvrait un
+`prompt()` natif, donc en clair et conservé dans l'historique du dialogue du navigateur.
+
+#### Cinq défauts du legacy, mesurés puis corrigés — et dits à l'écran
+
+1. **Le nombre annoncé et le nombre traité pouvaient différer.** Le bouton d'effacement de masse
+   affichait `$nbDeployed - $nbPasswordRemoved` (`:61`), où `$nbPasswordRemoved` compte
+   `! ssh_password_required` sur **tout** le parc, machines sans clé incluses ; la liste sur
+   laquelle il agissait (`:329`) exigeait en plus `platform_key_deployed`. Une machine n'ayant
+   jamais commencé la migration **diminuait le nombre affiché sans sortir de la liste**. Chaque
+   bouton porte désormais sa propre portée, et le nombre annoncé est `count()` de cette portée.
+
+2. **L'effacement de masse proposait des machines que le backend refuse.** `remove_ssh_password`
+   répond 400 (« Service account non deploye ») si `service_account_deployed` est faux
+   (`ssh.py:1235`) — précondition juste : sans ce compte, `execute_as_root` n'a plus de
+   court-circuit `NOPASSWD` (`ssh_utils.py:537`) et RootWarden perd tout moyen de passer root.
+   Le bouton **par ligne** du legacy la respectait (`:203`), **celui de masse non** (`:329`).
+   Et la boucle qui envoyait avalait le refus : `if (d.success) ok++` avec un `catch` vide. La
+   portée porte la précondition, et les machines écartées sont **nommées**, avec le geste qui les
+   débloque — une portée qui rétrécit en silence se lit comme une portée complète.
+
+3. **« Admin distant » n'est pas l'étape suivante, c'est une reprise.** `deploy_platform_key` crée
+   déjà le compte `rootwarden` avec `NOPASSWD: ALL` dans la même requête (`ssh.py:786-861`, « dans
+   la foulée ») et pose `service_account_deployed` lui-même (`:855`). Une machine n'apparaît dans
+   cette portée que si la tentative incluse a **échoué** (`:862` avale l'exception en
+   `logger.warning`). Le legacy posait les deux boutons côte à côte sans le dire.
+
+4. **Le rechargement automatique effaçait le journal qu'il venait d'écrire.** Le legacy fait
+   `location.reload()` 1,5 s après chaque geste. Sur un geste de parc, ces 1,5 s sont tout ce dont
+   on dispose pour lire N lignes dont certaines disent « échoué ». Le rechargement devient un
+   **geste**, offert quand il y a du neuf à relire.
+
+5. **« Ressaisir » est offert dès qu'un mot de passe manque**, et non seulement quand le drapeau
+   dit « supprimé » : le legacy testait `! $pwRequired` et manquait donc le cas — **présent dans le
+   parc** — où le drapeau et les colonnes divergent.
+
+#### Un dépassement de délai n'est PAS un échec, et il est atteignable
+
+`PasserelleController:130` impose **120 s** aux routes hors `RoutesBackend::EN_FLUX`, et les deux
+routes de déploiement n'y sont pas. Or elles sont les plus longues du module : par machine, une
+session SSH, une installation de `sudo` au besoin, une dizaine de commandes en root et deux
+connexions de test — **séquentiel, dans une seule requête HTTP** (`threaded_route` bloque sur
+`future.result()`, il ne rend pas la main plus tôt). Le navigateur peut donc voir la requête expirer
+**pendant que le backend écrit encore**. Annoncer « échoué » ferait croire qu'aucune clé n'a été
+déployée et qu'aucun `NOPASSWD: ALL` n'a été accordé, alors que les deux ont peut-être eu lieu :
+le message dit **« aucune conclusion possible, recharge pour lire l'état réel »**. Le plafond
+lui-même est un réglage de passerelle et **remonte à l'arbitrage**, il n'est pas corrigé ici.
+
+#### Porté tel quel et ANNONCÉ
+
+`remove_ssh_password` n'accepte **qu'une** machine : l'effacement de parc reste N requêtes
+séquentielles, comme dans le legacy. Le porter « en une requête » demanderait une route nouvelle,
+donc du backend. La progression est donc **écrite machine par machine**, et une interruption laisse
+dans le journal le nombre exact de machines traitées — là où le legacy ne rendait qu'un `ok/total`
+final, jamais atteint si l'onglet se fermait.
+
+#### Non mesuré
+
+**Aucun de ces gestes n'a été exécuté** : le banc n'a pas été tenu et P3 écrit sur une machine.
+La syntaxe est vérifiée (les 4 PHP, la vue compilée en isolation, `node --check`), la parité i18n
+est **comparée** (121 = 121, récursivement), et le croisement des clés employées et déclarées ne
+laisse ni clé morte ni clé manquante. Le comportement, lui, reste à mesurer sur `Test-Server-Debian`.
+
+---
+
 ### v1.38.31 — ⚠⚠ un statut nomme `excluded` n'exclut pas : deux magasins ont diverge, et `userdel -r` ne lit que l'un des deux
 
 **Le defaut le plus consequent du chantier a ce jour. Il DETRUIT des donnees, en silence, et le mot que

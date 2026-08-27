@@ -8,10 +8,15 @@ use Illuminate\View\View;
 /**
  * La cle de plateforme — sous-lot P1.
  *
- * **Ce controleur n'ecrit rien et ne joint aucune machine.** Il lit `machines`
- * et rend la page ; la cle PUBLIQUE est lue par le script, a travers la
- * passerelle. Deployer, tester, relever les comptes, effacer un mot de passe et
- * faire tourner la cle sont P2, P3 et P4.
+ * **Ce controleur n'ecrit rien et ne joint aucune machine**, et cela reste vrai
+ * apres P3 : les gestes qui ecrivent partent du NAVIGATEUR vers la passerelle,
+ * comme dans le legacy. Le controleur ne fait que lire `machines` et calculer
+ * les PORTEES que les panneaux de decision annoncent. La rotation (P4) n'est
+ * pas portee.
+ *
+ * Un commentaire qui affirmerait « aucune ecriture dans ce module » serait faux :
+ * la page DECLENCHE quatre ecritures distantes. Ce qui est vrai est plus etroit,
+ * et c'est ce qui est ecrit ici.
  *
  * Garde : `role:1` + `perm:can_manage_platform_key`, reprise telle quelle du
  * legacy — dont l'en-tete annonce pourtant « superadmin uniquement »
@@ -53,7 +58,26 @@ class ClePlateformeController extends Controller
             // P2
             'test_en_cours', 'test_ok', 'test_rien_a_tester', 'test_echec',
             'test_indecis',
+            // P3 — les gestes qui ecrivent
+            'geste_en_cours', 'geste_echec_reseau', 'geste_sans_verdict',
+            'geste_ligne_ok', 'geste_ligne_echec', 'geste_bilan',
+            'ressaisie_mdp_vide', 'effacement_bilan',
+            'effacement_interrompu', 'confirmer_saisie_manquante',
         ] as $cle) {
+            $textes[$cle] = __('plateforme.' . $cle);
+        }
+
+        $portees = [
+            'deployer'       => $this->cles->porteeDeploiement($machines),
+            'compte_service' => $this->cles->porteeCompteService($machines),
+            'effacer'        => $this->cles->porteeEffacement($machines),
+        ];
+
+        // Les panneaux de decision sont des tableaux imbriques (titre, texte,
+        // liste d'effets). `__()` les rend tels quels ; les aplatir ici ferait
+        // deriver la structure du catalogue et celle du script.
+        $textes['panneaux'] = __('plateforme.panneaux');
+        foreach (['panneau_cible_une', 'panneau_cible_n', 'panneau_prod'] as $cle) {
             $textes[$cle] = __('plateforme.' . $cle);
         }
 
@@ -61,6 +85,19 @@ class ClePlateformeController extends Controller
             'lignes'    => $lignes,
             'compteurs' => $compteurs,
             'textes'    => $textes,
+            // ══ P3 — CHAQUE GESTE DE MASSE PORTE SA PROPRE PORTEE ═════════
+            //
+            // Le nombre annonce sur un bouton est `count(...['ids'])` de SA
+            // portee, jamais une soustraction de deux compteurs calcules sur
+            // des predicats differents — c'est le defaut mesure du legacy.
+            //
+            // LES PORTEES PARTENT EN JSON, PAS EN ATTRIBUTS. Un `data-noms`
+            // separe par des virgules serait ambigu des qu'un nom de machine
+            // contient une virgule — et les noms de ce parc admettent espaces
+            // et « + ». Le separateur serait un piege silencieux : la liste
+            // annoncee dans le panneau differerait de la liste envoyee.
+            'portees'            => $portees,
+            'effacementRefusees' => $this->cles->porteeEffacementRefusees($machines),
         ]);
     }
 
