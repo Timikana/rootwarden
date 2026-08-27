@@ -138,12 +138,45 @@ def check_linux_version():
         with ssh_session(row['ip'], row['port'], row['user'], ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
             stdin, stdout, stderr = client.exec_command("cat /etc/os-release", timeout=15)
             output = stdout.read().decode('utf-8', errors='replace')
+            # E-184, troisieme forme : le code de sortie n'etait pas lu.
+            lecture_rc = stdout.channel.recv_exit_status()
+
+        # ══ UNE SONDE QUI ECHOUE N'EFFACE PAS CE QU'ELLE N'A PAS PU REGARDER ══
+        #
+        # `parse_os_release('')` rend `'Inconnue'` — mesure. L'`UPDATE` ci-dessous
+        # ECRASAIT donc une version connue-bonne par cette sentinelle des que la
+        # lecture echouait, et rendait `success: True` par-dessus.
+        #
+        # Le garde porte sur la LECTURE, pas sur le resultat du parseur : une
+        # machine dont l'`/etc/os-release` est reellement illisible merite bien
+        # d'etre inventoriee « Inconnue », et c'est alors un fait sur la machine.
+        # Ce qui n'en est pas un, c'est une sortie vide parce que la commande n'a
+        # pas tourne.
+        #
+        # La consequence n'etait pas benigne : `linux_version` DECIDE ailleurs —
+        # `generic_deploy` refuse un OS qui ne contient ni « Debian » ni
+        # « Ubuntu ». Une sentinelle ecrite a tort faisait donc refuser un
+        # deploiement legitime, jusqu'au prochain scan reussi.
+        if lecture_rc != 0 or not output.strip():
+            logger.warning(
+                "[linux_version] lecture NON CONCLUANTE sur machine_id=%s (code=%s, "
+                "sortie vide=%s) — `linux_version` n'est PAS modifiee",
+                machine_id, lecture_rc, not output.strip())
+            return jsonify({
+                "success": False,
+                "concluante": False,
+                "message": "Lecture non concluante : la version de l'OS n'a pas pu etre lue. "
+                           "L'inventaire n'a pas ete modifie.",
+                "machine_id": machine_id,
+                "version": None,
+            })
+
         version_str = parse_os_release(output)
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE machines SET linux_version = %s, last_checked = NOW() WHERE id = %s", (version_str, machine_id))
             conn.commit()
-        return jsonify({"success": True, "machine_id": machine_id, "version": version_str})
+        return jsonify({"success": True, "concluante": True, "machine_id": machine_id, "version": version_str})
     except Exception as e:
         logger.error("[linux_version] Erreur: %s", e)
         return jsonify({"success": False, "message": "Erreur interne"}), 500

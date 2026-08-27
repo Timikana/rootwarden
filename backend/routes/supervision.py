@@ -913,6 +913,25 @@ def zabbix_version():
                 root_pass, timeout=15)
             out = out.strip()
 
+            # E-184 : sans ce garde, une sonde qui n'a rien pu lire tombait
+            # dans le `else`, ne trouvait pas de version, et faisait
+            # `_remove_agent` — un incident SSH effacait l'agent de
+            # l'inventaire. Voir `_sonde_concluante`.
+            if not _sonde_concluante(rc, out):
+                logger.warning(
+                    "[supervision/zabbix/version] sonde NON CONCLUANTE sur machine_id=%s "
+                    "(code=%s, sortie vide=%s) — l'inventaire n'est PAS modifie",
+                    row['id'], rc, not out)
+                return jsonify({
+                    'success': False,
+                    'concluante': False,
+                    'message': "Sonde non concluante : la version n'a pas pu etre lue. "
+                               "L'inventaire n'a pas ete modifie.",
+                    'version': None,
+                    'agent_type': None,
+                    'machine_id': row['id'],
+                })
+
             if 'NOT_INSTALLED' in out:
                 version_str = None
                 agent_type = None
@@ -930,6 +949,7 @@ def zabbix_version():
 
         return jsonify({
             'success': True,
+            'concluante': True,
             'version': version_str,
             'agent_type': agent_type,
             'machine_id': row['id'],
@@ -938,6 +958,23 @@ def zabbix_version():
         logger.error("[supervision/zabbix/version] %s", e)
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+def _sonde_concluante(rc, sortie):
+    """E-184 : une sonde qui echoue n'efface pas ce qu'elle n'a pas pu regarder.
+
+    Les deux routes de version faisaient `_remove_agent` des que la version
+    etait fausse. Or `version_str` est faux dans DEUX situations opposees :
+    l'agent est absent — verdict, et l'effacement est alors VOULU, c'est ainsi
+    qu'une desinstallation se verifie — ou la sonde n'a rien pu lire, ce qui
+    n'est pas un verdict. Le second cas effacait l'inventaire sur un incident.
+
+    La commande porte elle-meme son marqueur d'absence (`|| echo NOT_INSTALLED`)
+    et ce marqueur sort avec un code nul : l'absence RESTE donc concluante, et
+    l'effet voulu est conserve. Ce qui change est la troisieme issue, qui
+    n'existait pas : « je ne sais pas ».
+    """
+    return rc == 0 and bool((sortie or '').strip())
 
 
 def _echec(etape, code):
@@ -1823,6 +1860,21 @@ def generic_version(platform):
                          logger=logger, service_account=svc_account) as client:
             out, _, rc = execute_as_root(client, agent_info['version_cmd'], root_pass, timeout=15)
             out = out.strip()
+            # E-184, meme garde que `zabbix_version`.
+            if not _sonde_concluante(rc, out):
+                logger.warning(
+                    "[supervision/%s/version] sonde NON CONCLUANTE sur machine_id=%s "
+                    "(code=%s, sortie vide=%s) — l'inventaire n'est PAS modifie",
+                    platform, row['id'], rc, not out)
+                return jsonify({
+                    'success': False,
+                    'concluante': False,
+                    'message': "Sonde non concluante : la version n'a pas pu etre lue. "
+                               "L'inventaire n'a pas ete modifie.",
+                    'version': None,
+                    'platform': platform,
+                    'machine_id': row['id'],
+                })
             if 'NOT_INSTALLED' in out:
                 version_str = None
             else:
@@ -1835,7 +1887,7 @@ def generic_version(platform):
             _remove_agent(row['id'], platform)
 
         return jsonify({
-            'success': True, 'version': version_str,
+            'success': True, 'concluante': True, 'version': version_str,
             'platform': platform, 'machine_id': row['id'],
         })
     except Exception as e:
