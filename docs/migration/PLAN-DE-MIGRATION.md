@@ -346,6 +346,51 @@ dépôt.** Il n'y a alors plus de numéro à périmer.
 `version.txt` dans `laravel/` — les seuls lecteurs sont trois fichiers PHP du legacy et le job `auto-tag`.
 **Le jour où le legacy s'éteint, c'est-à-dire l'objectif 2.0, la version disparaît de l'interface.**
 
+### 4.1 ter — DÉFINITION DE TERMINÉ POUR LA 2.0, arrêtée par le Lead le 2026-08-27
+
+**Mesuré à l'instant, par PHP lisant `Navigation::SECTIONS` :** `24 portées · 8 restantes · total 32`.
+
+    encore sur le legacy : platform_key · remote_users · iptables · ssh_audit
+                           wazuh · groups · documentation · api_docs
+
+#### L'ordre, et il est dicté par les inventaires déjà faits
+
+**Trois des huit ont leur `MODULE-*.md` prêt** — le portage peut commencer sans attendre personne :
+
+| # | module | inventaire | note |
+|---|---|---|---|
+| 1 | **`platform_key`** | `MODULE-PLATFORM-KEY.md` | lettre **P**, P1→P4. **P4 (la rotation) NE S'EXÉCUTE JAMAIS** — interception et avortement seuls |
+| 2 | **`iptables`** | `MODULE-FILTRAGE.md` | I1→I5, déjà découpé |
+| 3 | **`groups`** | `MODULE-GROUPS.md` | lettre **R**, R1→R4. **R4 (`cve_scan` réel) attend l'exploitant** ; `drift_scan` s'exécute pour de vrai |
+| 4 | `remote_users` | *en cours* | lettre **P** partagée ou **U** — à trancher à la livraison de l'inventaire |
+| 5 | `ssh_audit` | *à faire* | **le scan de tout le parc est à UN CLIC sur la page**, pas seulement dans le fichier interdit |
+| 6 | `wazuh` | *à faire* | derrière `FEATURE_WAZUH` — vérifier si le drapeau est lu **partout** ou seulement à l'enregistrement |
+| 7-8 | `documentation`, `api_docs` | *à faire* | les plus légers, et ils ferment le compte |
+
+#### Les six conditions de « terminé », et aucune n'est négociable
+
+1. **`Navigation` porte `route` pour les 32 entrées**, et l'assertion du total se reconstitue — la suite et le §2 portent la **même** constante, et se mettent à jour **ensemble** ;
+2. **chaque module a sa suite, sur ses deux cibles**, et ses références inscrites **après** un passage vert ;
+3. **un LOT complet vert**, avec chaque écart expliqué — la ligne de base du 2026-08-27 (150 exécutions, 2282 PASS) est le point de comparaison ;
+4. **`legacy/` archivé** — et `adm/` ne peut PAS l'être comme une unité : quatre de ses fichiers appartiennent au socle, `includes/crypto.php` en tête. **Soit ils sortent vers `legacy/includes/` avant le `git mv`, soit `adm/` est le dernier archivé** ;
+5. **le portage affiche une version** — aujourd'hui **zéro** lecteur dans `laravel/`, donc à l'extinction du legacy le numéro disparaît de l'interface ;
+6. **E-203 tranché** — le portage n'a **aucune** révocation de session côté serveur. À l'extinction du legacy, un bouton « Révoquer » cessera d'avoir un effet **sans que rien ne le dise**.
+
+#### Ce qui reste hors de « terminé », et pourquoi c'est assumé
+
+- **les gestes à effet SORTANT** : le scan CVE réel (courriel), l'action de masse `groups/`, la réinitialisation de mot de passe (A3), le déploiement de clés (K4). Chacun se porte **avec sa suite en interception et avortement** ; leur déclenchement réel n'est pas une condition de la 2.0 ;
+- **P4, la rotation de la clé de flotte** : sa **réussite ne sera jamais mesurée**, faute de cible sûre. **Écrit dans le fichier de suite**, sinon quelqu'un comblera un jour un trou qui est une précaution ;
+- **le `merge` et le `push`** : ils attendent le mot de l'exploitant, et rien dans cette définition ne les inclut.
+
+#### État des risques de production au moment où cette définition est arrêtée
+
+| risque | état |
+|---|---|
+| E-202 — deux chemins de verrouillage sans retour | **MITIGÉ** : les mots de passe de `srv-zabbix` sont remis, mesuré en base (`password` **et** `root_password`). Ce n'est plus un verrouillage, c'est un incident |
+| E-201 — porte à quatre yeux inerte | correctif écrit, **inerte** jusqu'au prochain redémarrage |
+| approbateur éligible | **AUCUN** — aucun rôle 2 ne porte `can_admin_portal`. Dès que la porte sera en service, les deux gestes de flotte seront **impossibles** jusqu'à la création du compte. C'est **l'épreuve gratuite** du refus explicite |
+| clé de plateforme non sauvegardée | l'archivage est décidé, la purge doit vivre **hors de `LOG_RETENTION_DAYS`** |
+
 ### 4.2 Les 19 entrées de menu restantes
 
 Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
