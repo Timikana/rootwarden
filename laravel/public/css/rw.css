@@ -283,6 +283,19 @@ body {
 
 .rw-liste-effets li { margin: 2px 0; }
 
+/*
+ * UNE SEQUENCE SE NUMEROTE, ELLE NE SE PUCE PAS.
+ *
+ * `.rw-liste-effets` enumere des effets — leur ordre n'a pas de sens, une puce
+ * convient. Un guide de procedure, lui, tient tout son interet de son ORDRE :
+ * « deployer la cle » AVANT « effacer le mot de passe » n'est pas un detail de
+ * presentation, c'est la difference entre une migration et un verrouillage.
+ * Modificateur additif plutot que seconde classe : la premiere reste ce qu'elle
+ * est, et `.rw-etapes` n'est pas reemployable ici — ses etats `--fait` et
+ * `--courant` annoncent une progression, or ce guide ne suit personne.
+ */
+.rw-liste-effets--ordonnee { list-style: decimal; }
+
 .rw-note {
     margin: 22px 0 0;
     padding-top: 16px;

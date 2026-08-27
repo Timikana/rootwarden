@@ -13,6 +13,35 @@
 --}}
 <p class="rw-aide rw-prose" data-rw="cle-garde">{{ __('plateforme.garde_reelle') }}</p>
 
+{{--
+    ── LE GUIDE DE PROCEDURE, PORTE ET CORRIGE ─────────────────────────────
+
+    Le legacy affiche un guide en quatre etapes (`platform_keys.php:50`, via
+    `howto_tip.php`). **Mon premier jet de P1 l'avait laisse tomber** — un acquis
+    du legacy perdu sans que rien ne le signale, parce que personne n'ouvre
+    `lang/`. Le Lead a nomme le motif : le legacy porte dans ses catalogues une
+    reponse contextuelle que le portage laisse tomber module apres module.
+
+    Ce que ce guide apporte est son ORDRE : « deployer la cle » AVANT « effacer le
+    mot de passe » n'est pas une preference de presentation, c'est la difference
+    entre une migration et un verrouillage. D'ou une liste NUMEROTEE.
+
+    Et DEUX de ses quatre etapes sont corrigees, mesure en main — le porter
+    fidelement aurait porte deux affirmations fausses, dont une dans le sens
+    rassurant. La correction est DITE sous le guide plutot que faite en silence :
+    un exploitant qui a lu l'ancien texte doit savoir lequel des deux croire.
+--}}
+<div class="rw-encart" data-rw="cle-guide">
+    <p class="rw-sous-titre-fort">{{ __('plateforme.guide_titre') }}</p>
+    <ol class="rw-liste-effets rw-liste-effets--ordonnee">
+        <li>{{ __('plateforme.guide_etape1') }}</li>
+        <li>{{ __('plateforme.guide_etape2') }}</li>
+        <li>{{ __('plateforme.guide_etape3') }}</li>
+        <li>{{ __('plateforme.guide_etape4') }}</li>
+    </ol>
+    <p class="rw-note rw-prose">{{ __('plateforme.guide_corrige') }}</p>
+</div>
+
 @if ($compteurs['total'] === 0)
     <div class="rw-vide" data-rw="cle-vide">
         <p class="rw-vide__titre">{{ __('plateforme.vide_titre') }}</p>
