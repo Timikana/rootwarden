@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **structure mesurée le 2026-08-27, contenu à remesurer.** **104** fichiers `tests/e2e/go-*.mjs`, dont **78** inscrits au LOT pour **149 verdicts** — une suite compte un verdict par cible où elle porte une référence — et **2 272 assertions déclarées** (1437 laravel + 835 legacy). Les **26** fichiers hors LOT ne sont pas des orphelins : 7 scripts de captures (`go-captures-*`), `go-ssh-audit-scanall` (**interdit, joint la production**), le reste antérieur à la migration. Remesure : `ls tests/e2e/go-*.mjs | wc -l`, et le compte des verdicts en faisant lire les tables par **bash** plutôt qu'au `grep` : `source <(sed -n "155,702p" scripts/rejouer-lot.sh); echo $((${#REF_LARAVEL[@]}+${#REF_LEGACY[@]}))`. **Le runner a été vérifié intègre dans les QUATRE sens** le 2026-08-27 — aucune suite jouée sans référence, aucune référence jamais jouée, aucun fichier manquant pour une suite inscrite, **aucun doublon de clé** : le piège « deux entrées de même clé dans la même table, la seconde écrase la première » ne s'est pas produit. **Le LOT complet du 2026-08-26 est enfin RELEVÉ** — il était « à relever au tour suivant » depuis la veille : journaux dans `/tmp/rw-lot-wQk8j5/`, 18:03 → 20:12 (**2 h 09**), **125 journaux** pour les **125 verdicts** que le runner portait à ce commit (`dc61a99`). Attention : **c'est une égalité de COMPTES, pas encore une bijection d'ENSEMBLES** — à croiser dans les deux sens avant d'être inscrite comme établie. Le total lui-même n'est pas encore livré, et pour une bonne raison : un premier motif de relecture déclarait **85 journaux « muets »**, ce qui était un défaut d'instrument — les suites ont **TROIS** formes de tampon final (« N PASS / M FAIL », « N étapes, N PASS, N FAIL ») et `go-vague0-legacy` n'en a **aucune**. Le TOTAL n'a pas été rejoué depuis : ~100 min, et il verrouille le TOTP des trois comptes d'épreuve — **décision de l'exploitant (§7)**. `go-bashrc-b4` reste **legacy seul** : il figurait dans `SUITES_LARAVEL` et y rendait **9 PASS / 3 FAIL**, les trois FAIL étant exactement les trois boutons dont l'absence est VOULUE — un LOT complet affichait donc un ÉCHEC qui ne disait rien. Il y revient le jour où B4 est porté.
 | tests backend | **341 pytest** |
-| écarts de parité documentés | **171** — numérotés jusqu'à **E-181** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **174** — numérotés jusqu'à **E-184** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -509,7 +509,42 @@ quelle table** on inscrit (deux entrées de même clé dans la même table : la 
 **Le LOT dure ~100 min pour 87 suites.** `setsid … > log 2>&1 < /dev/null &` puis, **dans un appel
 séparé**, l'attente. **Ne jamais combiner la vérification d'un rejeu et son lancement** — la ligne de
 commande contient alors le chemin en clair et `pgrep` s'attrape lui-même (payé trois fois). Pour compter
-ce qui vit : `ps -eo pid,etime,cmd | grep "rejouer-lot.sh" | grep -v grep` — **un rejeu = deux lignes**.
+ce qui vit :
+
+```bash
+# dans un appel SEPARE, qui ne cite AUCUN nom de suite ailleurs dans la commande
+ps -eo pid,etime,cmd | grep -E "[r]ejouer-lot-[A-Za-z0-9]+\.sh|[g]o-[a-z0-9-]+\.mjs" | grep -v grep
+```
+
+> **⚠ La commande que ce document donnait était PÉRIMÉE, et dans le mauvais sens.** Elle disait
+> `grep "rejouer-lot.sh"` — **un rejeu = deux lignes**. Les deux affirmations sont fausses depuis
+> `v1.37.85`, le commit qui a fait se recopier le runner dans `/tmp` pour neutraliser le quatrième
+> régime de lecture. La copie s'appelle `rejouer-lot-XXXXXX.sh` (`mktemp -t`, ligne 80 du runner) :
+> **le `.` du motif est un joker qui exige UN caractère, et il y en a sept.** Le motif ne correspond
+> donc à **rien**, et un rejeu en cours en produit **trois** lignes, pas deux — le lanceur, le
+> `timeout`, et le `node`.
+>
+> **C'est un FAUX NÉGATIF, et c'est le mauvais côté de l'erreur** : il dit « le banc est libre »
+> pendant qu'il est occupé. Deux connexions du même compte dans la même fenêtre TOTP, et le journal
+> accuse le code. Payé le 2026-08-27 par la session qui l'a trouvé : sa boucle d'attente a annoncé
+> « rejeu terminé » au bout de quelques secondes alors que le nœud tournait depuis 40 s.
+>
+> **Et le zombie se trompe dans l'autre sens.** Un `bash -c` d'instantané de shell d'une session
+> antérieure (PID 3858777, **55 521 s** de vie au moment du relevé) boucle sur
+> `until ! pgrep -f "rejouer-lot"` — donc **il s'attrape lui-même et ne sortira jamais**. Il a fait
+> rendre « 1 rejeu en cours » sur une machine au repos. `pgrep -f "rejouer-lot"` **sans** le `.sh`
+> attrape bien la copie, mais il attrape aussi ce zombie : il rend « occupé » en permanence.
+> **Les deux erreurs sont donc de sens opposé, et la commande corrigée ci-dessus vise les `node`** —
+> une suite qui tourne est toujours un `node go-*.mjs`, quel que soit le nom du lanceur.
+>
+> **Éprouvée dans les deux sens** : elle attrape les trois lignes réelles d'un rejeu, et elle rend
+> **0** sur une machine au repos. Mais uniquement **dans un appel séparé** : au premier essai elle a
+> rendu **2**, parce que les noms de suites de mon propre test figuraient ailleurs dans la même
+> invocation. **Cinquième occurrence du piège `[r]ejouer-lot`, commise en corrigeant la commande qui
+> le documente.** La classe de caractères ne dédouble que le motif, jamais le texte de la commande.
+>
+> *Une règle qui rassure sans protéger est pire que pas de règle* — et celle-ci était écrite dans la
+> consigne elle-même.
 
 Après modification du backend : `sudo -n docker restart rootwarden_python` + ~17 s. Après une vue :
 `view:clear` puis `view:cache`. Pas plus de 3 suites par commande. Jamais en root. Exécution parallèle
