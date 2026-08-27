@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **205** — numérotés jusqu'à **E-218** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **206** — numérotés jusqu'à **E-219** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -3904,3 +3904,43 @@ doublons, eux, sont tous de ce soir.
 *Une convention qui suppose un état partagé n'est pas une convention, c'est une course* — et la session 4 a
 adopté la première moitié sans qu'on la lui redemande (`599d1a3` ne porte aucun numéro), ce qui montre que la
 partie transmissible de la règle était la bonne.
+
+### ⚠ LE PATHSPEC NE PROTÈGE PAS LES DEUX FICHIERS QUE TOUT LE MONDE TOUCHE (2026-08-27)
+
+**Troisième correction de ma consigne de commit en une journée, et celle-ci vient d'un incident ÉVITÉ.**
+
+La session 3 préparait son entrée de journal et a trouvé **deux entrées `v1.38.38` non commitées** dans
+`CHANGELOG.md` : la sienne et celle d'une autre session **en train de l'écrire**. Commiter le fichier aurait
+emporté ce travail — la faute exacte qui a coûté trois fichiers deux jours plus tôt.
+
+**Ce qu'elle a fait, et c'est la bonne manœuvre** : entrée mise de côté **hors du dépôt**, `CHANGELOG.md`
+rendu identique à `HEAD`, reprise sous un autre numéro une fois l'autre session partie. Contrôle avant
+commit : **30 insertions, zéro suppression.** Et `git commit -- <chemins>` a exclu tout seul
+`backend/routes/ssh.py`, qu'une troisième session avait en cours.
+
+> **Le pathspec protège des fichiers qu'on ne NOMME pas. Il ne protège pas de ceux qu'on nomme et qu'un autre
+> a déjà touchés.**
+
+**Et deux fichiers sont dans ce cas en permanence** — `CHANGELOG.md` et `legacy/version.txt` : *toutes* les
+sessions les modifient à *chaque* commit. Ce sont les seuls fichiers du dépôt dont la propriété exclusive est
+contredite par l'usage. Donc, sur ces deux-là et sur eux seuls :
+
+1. **regarder le diff AVANT de commiter** — `git diff -- CHANGELOG.md legacy/version.txt`, et vérifier qu'il
+   ne porte **aucune suppression** ;
+2. **si le diff contient du travail d'autrui : s'écarter.** Mettre sa propre entrée de côté **hors du dépôt**,
+   restaurer le fichier à `HEAD`, revenir après ;
+3. **un numéro de version se réserve en le LISANT au dernier moment**, jamais au début du lot. C'est la même
+   règle que celle des trois collisions de la soirée, vue depuis l'autre bout : *le numéro n'est pas une
+   ressource qu'on prend, c'est une mesure qu'on refait.*
+
+**Historique de cette consigne, parce que sa correction répétée est instructive** :
+
+| version de la consigne | ce qui l'a corrigée |
+|---|---|
+| « relire `git diff --cached --stat` avant de commiter » | *la relecture n'était pas la protection, elle en donnait l'apparence* — un `add && commit` enchaîné la contourne |
+| « employer `git commit -F - -- <chemins>` » | **ne marche pas sur une CRÉATION** : un pathspec ne désigne que des fichiers suivis |
+| « le pathspec protège » | **faux pour les fichiers qu'on nomme** et qu'un autre a touchés — les deux ci-dessus |
+
+*Une consigne corrigée trois fois n'est pas une mauvaise consigne : c'est une consigne dont chaque énoncé
+couvrait le cas qui l'avait motivée.* Et les trois corrections sont venues des sessions, jamais du Lead qui
+l'avait écrite.
