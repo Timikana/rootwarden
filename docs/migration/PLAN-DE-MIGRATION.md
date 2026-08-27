@@ -3784,3 +3784,123 @@ concurrence — c'est-à-dire de la chose même que la convention retirait du je
 Décroissance stricte **et** absence de doublon, à chaque écriture du journal. *Un invariant vérifié par une
 commande vaut mieux qu'une convention à se rappeler* — c'est la même leçon que le pathspec : **une règle qu'on
 doit se rappeler est une propriété qu'on n'a pas encore construite.**
+
+### UNE ASSERTION ABSOLUE SUR UN CORPUS QUI PORTE DÉJÀ DES VIOLATIONS FINIT DÉSACTIVÉE (2026-08-27)
+
+Le Lead venait d'imposer sa propre parade — *décroissance stricte et absence de doublon, vérifiées par
+commande à chaque écriture du journal.* **La session 4 l'a appliquée telle quelle et elle a sauté.**
+
+**Le désordre est PRÉEXISTANT** : un bloc `v1.37.19 → v1.37.25` a été écrit en ordre croissant. Mesure
+comparée :
+
+    ruptures AVANT les ecritures du soir : 7
+    ruptures MAINTENANT                  : 7
+
+**Aucune régression. L'assertion absolue alarmait sur un état que personne ne compte corriger.**
+
+> **Une garde qui alarme sur un état qu'on ne compte pas corriger finit désactivée — et ce jour-là elle
+> n'attrape plus rien.** *Comparer le nombre de ruptures avant/après vaut mieux qu'exiger zéro.*
+
+**Et la nuance qui rend les deux versions justes** : la commande du Lead ne lisait que `^### v1\.38\.` et
+**passait**, parce que la série `1.38` est bien ordonnée ; celle de la session 4 lisait `v1\.\d+\.\d+` et
+**voyait le désordre de `1.37`.** Ni l'une ni l'autre n'était fausse — elles ne mesuraient pas le même
+corpus.
+
+**La règle qui en sort, et elle vaut pour toute garde ajoutée à un dépôt existant :**
+
+| portée de la garde | forme correcte |
+|---|---|
+| **le domaine qu'on est en train d'écrire** (ici la série `1.38`) | **assertion absolue** — on est responsable de tout ce qu'il contient |
+| **le corpus entier**, qui porte un passé | **mesure de RÉGRESSION** — le compte après ne dépasse pas le compte avant |
+
+*Le corollaire de « un invariant vérifié par une commande vaut mieux qu'une convention à se rappeler » est
+que la commande doit mesurer la RÉGRESSION et non la perfection* — sans quoi elle produit un rouge permanent,
+et un rouge permanent s'apprend à ignorer. C'est le troisième `go-bashrc-b4` du chantier sous une autre
+forme : un FAIL qui ne dit rien de mauvais coûte, chaque fois, une demi-journée à quelqu'un qui lit un rouge
+inexplicable.
+
+### ⚠ UN CORRECTIF QUI REND UN CHEMIN POSSIBLE DOIT REGARDER CE QU'IL REND IRRÉVERSIBLE SUR CE MÊME CHEMIN (E-218, 2026-08-27)
+
+**Le correctif de deux lignes demandé par le Lead sur E-218 était faux trois fois, et la session 4 a mesuré
+les trois. C'est le meilleur refus d'instruction de la journée.**
+
+#### 1. Il aurait été PROUVABLEMENT INERTE
+
+    SELECT id, name, ip, port, user, password, root_password FROM machines
+    -- pas de `service_account_deployed`
+
+Donc `m.get('service_account_deployed', False)` aurait rendu **`False` à chaque fois, sur les deux routes.**
+La ligne aurait été écrite, relue, approuvée — **et n'aurait rien fait.**
+
+**C'est « une clé non TRANSMISE rend du VIDE, pas son identifiant »** : le nom existait dans les deux
+catalogues — la colonne en base, le `.get()` dans le code — **et il ne voyageait pas.** Invisible parce que
+*la valeur de repli est celle qu'on observe d'ordinaire.* **La colonne devait être ajoutée aux deux `SELECT` :
+sans elle, le reste ne fait rien.** Le correctif comptait donc **trois** parties, pas deux.
+
+#### 2. Le décompte du Lead était encore faux : 6 + 1 + 2, et non 7 + 2
+
+**Un appel passe `force_password=True` délibérément** (`ssh.py:738`) — **domaine distinct, ce n'est pas un
+oubli.** Le Lead l'avait rangé parmi les « corrects » sans le distinguer des six autres. *Troisième
+correction d'un de ses décomptes en une soirée, après le 58/57 et le 8/5.*
+
+#### 3. ⚠ Et sur `:970`, le correctif ARMAIT un piège qui n'existait pas avant lui
+
+La route se connecte désormais **par** le compte de service. Or `execute_as_root` élève alors via
+`sudo sh -c` — **donc en s'appuyant sur le fichier sudoers que la première commande de la chaîne
+supprimait.**
+
+L'élévation vaut pour toute l'invocation (`sudo sh -c '<toute la chaîne>'`, `ssh_utils.py:537`), donc la
+chaîne se terminait quand même. **Mais un arrêt en cours de route** — 30 s expirées sur un `userdel -r` d'un
+gros répertoire, une coupure — laissait un état **sans sortie** :
+
+    sudoers supprime · compte encore present · service_account_deployed = 1
+    -> la tentative suivante se reconnecte PAR un compte de service qui ne peut plus elever,
+       et `root_password` vaut '' sur une machine migree
+
+**Le retrait du sudoers passe donc EN DERNIER.** Un échec partiel laisse au pire un fichier orphelin —
+inerte, puisqu'aucun compte ne porte plus ce nom — **et la révocation reste rejouable.**
+
+> **Avant le correctif du Lead, supprimer le sudoers en premier était sans conséquence** : on passait par le
+> compte nominal, dont les droits ne dépendaient pas de ce fichier. **C'est le correctif lui-même qui arme le
+> piège.** *Un correctif qui rend un chemin possible doit regarder ce qu'il rend irréversible sur ce même
+> chemin* — et la question ne se pose qu'après le correctif, donc jamais dans la relecture de l'avant.
+
+#### Et le verdict vérifie désormais les DEUX effets
+
+L'ancien ne contrôlait que l'absence du **compte**. Il aurait annoncé une réussite **en laissant le fichier
+sudoers en place** — et un `rootwarden` recréé à la main y aurait retrouvé un **`NOPASSWD: ALL` que personne
+n'a accordé**. Le code `2` nomme cet état et **laisse `service_account_deployed` à 1** pour qu'un rejeu la
+termine. Détail qui compte : **les `if` ne déclenchent pas `set -e`**, contrairement à un `test … && exit`.
+
+**Rien n'a été exercé** : l'écart et son correctif restent dérivés du code.
+
+### ⚠ MA CONVENTION DE NUMÉROTATION A ÉCHOUÉ TROIS FOIS EN VINGT MINUTES — LE NUMÉRO SE CALCULE, IL NE SE SUPPOSE PAS (2026-08-27)
+
+La convention du `v1.38.21` retirait le numéro des messages de commit pour que le Lead l'attribue en écrivant
+le journal. **Elle a produit trois collisions en vingt minutes** — `v1.38.34`, `v1.38.37`, `v1.38.38` — chacune
+coûtant un cycle de renumérotation.
+
+**Et la cause n'est pas la désobéissance des sessions.** C'est que **le Lead supposait le numéro suivant au
+lieu de le lire**, exactement le défaut qu'il reproche ailleurs : *une conclusion écrite sur un état mutable se
+périme sans prévenir.* Un journal écrit par sept sessions concurrentes **est** un état mutable, et
+`dernier + 1` est une supposition sur son contenu.
+
+**La parade, appliquée depuis** — le numéro se calcule **depuis le fichier**, à l'instant de l'écriture :
+
+    pris  = {int(m.group(1)) for m in re.finditer(r'^### v1\.38\.(\d+)', contenu, re.M)}
+    libre = max(pris) + 1
+
+Puis les deux contrôles, **en mesure de régression et non en assertion absolue** : le nombre de ruptures
+d'ordre ne dépasse pas celui d'avant, et il n'y a **aucun doublon**. Le second peut rester absolu — les
+doublons, eux, sont tous de ce soir.
+
+**Ce que la convention garde de valable, et ce qu'elle abandonne** :
+
+| | |
+|---|---|
+| **garde** | *un message de commit nomme le DÉFAUT* (`E-218`, `INF-003`) — un identifiant stable ne se périme pas |
+| **abandonne** | *le Lead connaît le numéro suivant* — il ne le connaît pas, il le mesure |
+
+*Une convention qui suppose un état partagé n'est pas une convention, c'est une course* — et la session 4 a
+adopté la première moitié sans qu'on la lui redemande (`599d1a3` ne porte aucun numéro), ce qui montre que la
+partie transmissible de la règle était la bonne.
