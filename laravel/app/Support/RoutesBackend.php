@@ -54,6 +54,29 @@ class RoutesBackend
          * legacy, et cette route ne fait que LIRE — elle ne joint aucune machine.
          */
         '/server_users_inventory',
+        /*
+         * `/machines/credential-status` (E-219) : MEME REGIME QUE CI-DESSUS, et
+         * pour la meme raison — nee pour le portage, absente du proxy legacy, on
+         * ne l'ajoute pas a `ALLOWED_PROXY_PREFIXES` d'un proxy de PRODUCTION.
+         *
+         * Elle repond a une question que le portage ne peut PAS calculer :
+         * « ce secret dechiffre-t-il en vide ? ». Le test SQL `(password <> '')`
+         * est faux, parce que PHP chiffre la chaine vide en `sodium:…` la ou
+         * Python rend `''` — donc la colonne est NON VIDE pour un mot de passe
+         * REELLEMENT vide. Seul le detenteur de la cle peut trancher, et
+         * recopier le dechiffrement ici serait recopier une regle de securite.
+         *
+         * ELLE N'EST PAS DANS `ADMIN_SEULEMENT`, ET C'EST DELIBERE. Ce groupe
+         * exige un role >= 2 a la passerelle ; or la page de la cle de
+         * plateforme s'ouvre des le role 1 avec `can_manage_platform_key`. L'y
+         * mettre rendrait la reponse inaccessible a des comptes que la page
+         * admet, et l'ecran afficherait « indetermine » partout — un refus
+         * d'acces deguise en incapacite de lecture. La borne juste est celle que
+         * la route porte deja : `check_machine_access` DANS LE CORPS, machine
+         * par machine, comme `/list_machines`. Elle ne joint aucune machine et
+         * ne rend JAMAIS un secret, seulement un predicat sur lui.
+         */
+        '/machines/credential-status',
         '/server_user_keys', '/server_user_remove_key',
         '/remove_user_keys', '/delete_remote_user',
         '/logs', '/update', '/update-logs', '/update_zabbix', '/update_security_exec',

@@ -202,4 +202,19 @@ return [
         'revoquer' => "Reservation LIFTED by the backend fix: this action now connects using the administration account itself when it is deployed, and elevates without a password. One residual case remains: if that connection fails — the known case is a hardened server whose sshd configuration does not allow that account — it falls back to the nominal account, whose root password was erased on a migrated machine, and elevation then fails. This is not a risk to the machine: the sudoers file is removed last, a partial failure leaves at worst an inert orphan file, and the revocation stays replayable.",
         'compte_service' => "This retry may FAIL on a machine whose administration account was deleted AFTER the passwords were erased: since the account no longer exists, the connection uses the nominal account, whose root password is empty — nothing is then left to elevate through. The « delete then redeploy » round trip is therefore not symmetric. Reservation STILL VALID after the backend fix, which could not lift it: it does not come from a forgotten parameter but from the absence of the account itself. Reported.",
     ],
+    // ══ E-219 — THE BACKEND PREDICATE, SOLE HOLDER OF THE KEY ════════════
+    // `(password <> '')` is FALSE as a test for « this machine has a password »:
+    // PHP encrypts the empty string as `sodium:…`, Python returns `''`.
+    // The column is therefore NON-EMPTY for a REALLY empty password.
+    // The port cannot decide — copying the decryption would copy a security
+    // rule. It ASKS instead, and displays THREE states.
+    'credential_titre' => "What the holder of the key answers",
+    'credential_aide' => "The counters and the « Password » column above are computed from the presence of bytes in the encrypted column. That is not the same question as « is this secret empty ». The backend, the only holder of the key, is asked and its answer annotates the table.",
+    'credential_borne_root' => "This answer covers the SSH password only. The root password is not covered by the predicate: its displayed state is still computed from the column, with the same approximation. Yet it is the one with no rewrite path from this page — reported.",
+    'credential_divergence' => ":n machine(s) where the column announces a password and the secret decrypts to EMPTY: :noms. For those, the counters above overstate.",
+    'credential_indetermine' => ":n machine(s) whose secret COULD NOT be decrypted: :noms. This is neither « empty » nor « present » — the question stays unanswered, and no counter should settle it.",
+    'credential_accord' => "The holder of the key confirms the column on every machine: no divergence, no indeterminate case.",
+    'credential_echec' => "The holder of the key did not answer. The counters remain those of the column, with their known approximation — they are not corrected, and it is not claimed that they are right.",
+    'badge_mdp_vide_reel' => "actually empty",
+    'badge_mdp_illisible' => "unreadable",
 ];

@@ -237,10 +237,23 @@ class ClePlateforme
      * ══ LA PRECONDITION DU BACKEND, QUE LE LEGACY N'APPLIQUE PAS ═════════
      *
      * `remove_ssh_password` REFUSE (400, « Service account non deploye ») si
-     * `service_account_deployed` est faux (`ssh.py:1235-1237`). C'est une
-     * precondition juste : sans le compte de service, effacer les mots de passe
-     * retire a RootWarden tout moyen de passer root — `execute_as_root` ne
-     * court-circuite le mot de passe que sur ce compte (`ssh_utils.py:537`).
+     * `service_account_deployed` est faux (`ssh.py:1235-1237`). L'INTENTION est
+     * juste : sans le compte de service, effacer les mots de passe retire a
+     * RootWarden tout moyen de passer root — `execute_as_root` ne court-circuite
+     * le mot de passe que sur ce compte (`ssh_utils.py:537`).
+     *
+     * MAIS SON ENTREE PEUT ETRE PERIMEE, et c'est un DRAPEAU de plus qui ne dit
+     * pas le fait. Sur une revocation partielle (`exit 2` : compte supprime,
+     * fichier sudoers subsistant), `service_account_deployed` reste
+     * DELIBEREMENT a 1 pour garder le rejeu ouvert — aucune ecriture en base
+     * dans cette branche. La precondition dit donc « le compte existe » alors
+     * qu'il n'existe plus, et cette portee inclurait la machine.
+     *
+     * On la garde telle quelle : c'est la MEME condition que celle du backend,
+     * et proposer une portee plus etroite que ce que la route accepte ferait
+     * divergerer deux regles au lieu d'une. Ce qui manque est un etat nomme cote
+     * backend, demande et non contourne ici — le distinguer par le TEXTE du
+     * message serait une coincidence de redaction, pas une mesure.
      *
      * Le bouton PAR LIGNE du legacy la respecte (`:203` teste `$saDeployed`).
      * **Le bouton de MASSE ne la teste pas** (`:329` : `platform_key_deployed`

@@ -202,4 +202,19 @@ return [
         'revoquer' => "Réserve LEVÉE depuis le correctif du backend : ce geste se connecte désormais par le compte d'administration lui-même quand il est déployé, et s'élève sans mot de passe. Il reste un cas résiduel : si cette connexion échoue — le cas connu est un serveur durci dont la configuration sshd n'autorise pas ce compte — le repli se fait par le compte nominal, dont le mot de passe root a été effacé sur une machine migrée, et l'élévation échoue alors. Ce n'est pas un risque pour la machine : le retrait du fichier sudoers passe en dernier, un échec partiel laisse au pire un fichier orphelin inerte, et la révocation reste rejouable.",
         'compte_service' => "Cette reprise peut ÉCHOUER sur une machine dont le compte d'administration a été supprimé APRÈS un effacement des mots de passe : le compte n'existant plus, la connexion se fait par le compte nominal, dont le mot de passe root est vide — il ne reste alors rien par quoi s'élever. L'aller-retour « supprimer puis redéployer » n'est donc pas symétrique. Réserve TOUJOURS VALABLE après le correctif du backend, qui ne pouvait pas la lever : elle ne vient pas d'un paramètre oublié mais de l'absence du compte lui-même. Remonté.",
     ],
+    // ══ E-219 — LE PREDICAT DU BACKEND, SEUL DETENTEUR DE LA CLE ═════════
+    // `(password <> '')` est FAUX comme test de « cette machine a un mot de
+    // passe » : PHP chiffre la chaine vide en `sodium:…`, Python rend `''`.
+    // La colonne est donc NON VIDE pour un mot de passe REELLEMENT vide.
+    // Le portage ne peut pas trancher — recopier le dechiffrement serait
+    // recopier une regle de securite. Il DEMANDE, et affiche TROIS etats.
+    'credential_titre' => "Ce que le détenteur de la clé répond",
+    'credential_aide' => "Les compteurs et la colonne « Mot de passe » ci-dessus sont calculés sur la présence d'octets dans la colonne chiffrée. Ce n'est pas la même question que « ce secret est-il vide ». Le backend, seul à détenir la clé, est interrogé et sa réponse annote le tableau.",
+    'credential_borne_root' => "Cette réponse ne porte que sur le mot de passe SSH. Le mot de passe root n'est pas couvert par le prédicat : son état affiché reste calculé sur la colonne, avec la même approximation. C'est pourtant lui qui n'a aucun chemin de réécriture depuis cette page — signalé.",
+    'credential_divergence' => ":n machine(s) où la colonne annonce un mot de passe et où le secret déchiffre en VIDE : :noms. Pour celles-là, les compteurs ci-dessus surestiment.",
+    'credential_indetermine' => ":n machine(s) dont le secret n'a PAS PU être déchiffré : :noms. Ce n'est ni « vide » ni « présent » — la question reste sans réponse, et aucun compteur ne devrait la trancher.",
+    'credential_accord' => "Le détenteur de la clé confirme la colonne sur toutes les machines : aucun écart, aucune indétermination.",
+    'credential_echec' => "Le détenteur de la clé n'a pas répondu. Les compteurs restent ceux de la colonne, avec leur approximation connue — ils ne sont pas corrigés, et ce n'est pas dit qu'ils sont justes.",
+    'badge_mdp_vide_reel' => "vide en réalité",
+    'badge_mdp_illisible' => "illisible",
 ];

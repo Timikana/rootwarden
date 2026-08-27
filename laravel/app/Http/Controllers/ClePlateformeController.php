@@ -66,6 +66,9 @@ class ClePlateformeController extends Controller
             'effacement_interrompu', 'confirmer_saisie_manquante',
             // La reprise du compte de service, et ses DEUX issues de porte
             'motif_vide', 'geste_approbation_attente', 'geste_approbation_absente',
+            // E-219 — le predicat du detenteur de la cle, en TROIS etats
+            'credential_divergence', 'credential_indetermine', 'credential_accord',
+            'credential_echec', 'badge_mdp_vide_reel', 'badge_mdp_illisible',
         ] as $cle) {
             $textes[$cle] = __('plateforme.' . $cle);
         }

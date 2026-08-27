@@ -2171,6 +2171,73 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.43 — le portage cesse de calculer ce qu'il ne peut pas savoir : il DEMANDE au détenteur de la clé
+
+**E-219, côté portage.** Les compteurs de la page de la clé de plateforme et sa colonne
+« Mot de passe » reposaient sur `(password <> '')`. Ce test compte des **octets dans une colonne
+chiffrée**, pas la présence d'un secret : PHP chiffre la chaîne vide en `sodium:…` (63 octets mesurés)
+là où Python rend `''`. Un mot de passe **réellement vide** saisi depuis l'ancien portail rend donc la
+colonne **non vide**, et le compteur surestime.
+
+**C'était mon propre correctif P1 qui portait cet angle mort** : il corrigeait « le drapeau au lieu du
+fait » et échangeait une réponse fausse contre une autre sur ce cas précis. Trouvé sur mon code
+quelques heures après l'avoir écrit, déclaré, et corrigé ici.
+
+#### Le portage ne recalcule pas : il demande
+
+`GET /machines/credential-status` (livré par le backend, seul détenteur de la clé) rend **trois
+états** — vide, non vide, et `null` **indéterminé** quand le déchiffrement a échoué. Recopier le
+déchiffrement dans le portage aurait été recopier une règle de sécurité ; c'est la règle du dépôt et
+elle passe devant l'exactitude d'un compteur.
+
+**Le troisième état est le plus important** : sans lui, « je n'ai pas su lire » se déguiserait en
+« c'est vide ». L'écran nomme donc séparément les machines où la colonne se trompe et celles dont le
+secret est illisible — les fondre en un nombre réunirait deux situations qui n'appellent pas le même
+geste.
+
+Le badge **s'ajoute** au texte du serveur, il ne le remplace pas : l'écran montre les deux réponses et
+dit laquelle vient d'où. Effacer le texte serveur cacherait la divergence au lieu de la nommer.
+
+**Un échec de la requête ne valide rien** : l'encart annonce alors que les compteurs restent
+approximatifs. Le silence aurait laissé croire à un accord.
+
+#### Ce que la réponse NE couvre pas, et c'est dit à l'écran
+
+Le prédicat ne porte que sur `password`. **`root_password` n'y figure pas** — et c'est pourtant la
+colonne sans aucun chemin de réécriture depuis cette page. Son état affiché reste calculé sur la
+colonne, avec la même approximation. Signalé plutôt que laissé à supposer.
+
+#### La route et la passerelle
+
+`/machines/credential-status` est ajoutée à `RoutesBackend::LISTE_BLANCHE`, **même régime que
+`/server_users_inventory`** (E-200) : née pour le portage, absente du proxy legacy, et on ne l'ajoute
+pas à `ALLOWED_PROXY_PREFIXES` d'un proxy de production.
+
+**Elle n'est PAS dans `ADMIN_SEULEMENT`, et c'est délibéré.** Ce groupe exige un rôle ≥ 2 à la
+passerelle, or la page s'ouvre dès le rôle 1 avec `can_manage_platform_key` : l'y mettre rendrait la
+réponse inaccessible à des comptes que la page admet, et l'écran afficherait « indéterminé » partout —
+**un refus d'accès déguisé en incapacité de lecture**. La borne juste est celle que la route porte
+déjà : `check_machine_access` **dans le corps**, machine par machine, comme `/list_machines`. Elle ne
+joint aucune machine et ne rend jamais un secret, seulement un prédicat sur lui.
+
+Vérifié par segment : `/machines/credential-status` et ses sous-chemins passent, `/machines` seul est
+**refusé**, `/machines/credential-statusX` est **refusé**.
+
+#### Une précondition dont l'entrée peut être périmée
+
+Le commentaire de `porteeEffacement()` qualifiait de « juste » la précondition
+`service_account_deployed` de `remove_ssh_password`. L'**intention** l'est ; son **entrée** peut être
+périmée : sur une révocation partielle (`exit 2`), le drapeau reste délibérément à 1 pour garder le
+rejeu ouvert, alors que le compte n'existe plus. La portée est **gardée telle quelle** — c'est la même
+condition que celle du backend, et proposer plus étroit ferait diverger deux règles au lieu d'une. Ce
+qui manque est un état **nommé** côté backend, demandé et non contourné : le distinguer par le texte
+du message serait une coïncidence de rédaction, pas une mesure.
+
+Parité i18n comparée récursivement : 148 = 148. Zéro clé morte, zéro clé inemployée. Rien n'a été
+exécuté.
+
+---
+
 ### v1.38.42 — E-220 un privilege orphelin sans nom, E-221 une elevation de privilege atteignable, et deux regles de methode
 
 #### E-220 — `NOPASSWD: ALL` pour un compte qui n'existe plus, et le fichier est protege du nettoyage PAR CONCEPTION
