@@ -272,6 +272,80 @@ legacy est une **dépendance morte**. Le portage devra aussi offrir un écran de
 n'en existe aucun, le lien d'onboarding du legacy est **mort** (`includes/onboarding.php:68`) et son
 étape « 2FA » est **toujours cochée** (`:64`).
 
+### 4.1 bis — LA FIN DE PARTIE : objectif 2.0, décidé par l'exploitant le 2026-08-27
+
+> « **Finis la migration complète. Objectif fin Laravel 2.0.** Quand je te donnerai l'ordre, c'est de
+> merger tout. » — et **le `merge` n'est PAS donné** : il attend son mot, comme le `push`.
+
+**Il reste 8 entrées de menu sur le legacy**, et l'exploitant en a nommé **cinq** comme les plus
+importantes — `remote_users`, `platform_key`, `iptables`, `ssh_audit`, `wazuh`. **Ce sont exactement cinq
+des huit restantes** : son instinct et la mesure coïncident. Les trois autres sont `groups`,
+`documentation`, `api_docs`.
+
+#### L'ordre du menu suit la SÉQUENCE, pas une importance abstraite
+
+Il demandait « par importance ». Sa remarque suivante donne un principe bien meilleur, et c'est celui qui
+est retenu :
+
+> « **Quand on ajoute un nouveau serveur, les menus où on doit aller après c'est Clé SSH plateforme et
+> Utilisateurs distants. Donc la logique pour un nouvel utilisateur, il ne le sait pas !** »
+
+**Le menu ne s'ordonne donc pas par importance : il s'ordonne par l'ordre dans lequel on s'en sert.** La
+première section devient littéralement le parcours d'un serveur neuf — et les deux pages qu'il nomme,
+enterrées jusqu'ici dans l'administration, en deviennent le deuxième et le troisième geste.
+
+**Cinq sections, 32 entrées** (33 − `tickets`) :
+
+| section | entrées, dans l'ordre |
+|---|---|
+| **`parc`** — Parc & accès | `accueil` · **`platform_key`** · **`remote_users`** · `ssh_keys` · `sudo_policies` · `sftp_policies` |
+| **`exploitation`** | `updates` · `services` · `supervision` · `bashrc` · `docker` · `graylog` |
+| **`securite`** | `cve_scan` · `compliance` · `drift` · `iptables` · `fail2ban` · `ssh_audit` · `wazuh` |
+| **`admin`** | `admin` · `groups` · `approvals` · `maintenance` · `tasks` · `backups` · `audit_log` · `commandlog` · `search` · `chatops` |
+| **`autre`** | `profil` · `documentation` · `api_docs` |
+
+`sudo_policies` et `sftp_policies` suivent les deux premières parce qu'elles prolongent **le même
+sujet** — *qui accède, et avec quoi*. La section `securite` est neuve : elle rassemble ce qui était
+dispersé entre navigation et administration, et c'est l'identité du produit.
+
+**`tickets` SORT** — décision de l'exploitant. `legacy/tickets/` est déjà archivé, donc rien à `git mv` ;
+mais le §7 mentionne **une exception de passerelle vers un ITSM externe**, et **cela se vérifie avant de
+retirer la route**, pas après : supprimer une page est réversible, casser une intégration sortante ne se
+voit pas.
+
+**Conséquences de mesure, à ne pas subir** : le total passe de **33 à 32**, donc l'assertion « le décompte
+se reconstitue » change de constante ; `go-socle-navigation` perd les entrées de `tickets` ; et deux
+sections neuves changent la structure du DOM. **Le LOT complet est lancé AVANT cette vague**, pour que la
+ligne de base existe.
+
+#### FEAT-001 — l'ordre aide, il ne guide pas
+
+« *Un nouvel utilisateur ne le sait pas* » est un défaut d'**interface**, pas d'ordre de menu. Et les
+trois colonnes qui décrivent la préparation d'un serveur **existent déjà** :
+`platform_key_deployed` · `service_account_deployed` · `users_scanned_at` — **exactement les trois étapes,
+dans l'ordre.**
+
+Un indicateur de préparation par machine, nommant **le geste suivant et sa page**, est donc à portée sans
+schéma neuf. Trois conditions, celles du §8 : le drapeau vient du **backend** ; un état inconnu se **dit**
+inconnu ; il n'entre pas dans un comptage qui appelle une décision. **La forme est à proposer avant
+d'écrire du gabarit.**
+
+#### INF-004 — la version se DÉRIVE, elle ne s'assigne plus
+
+Exigence de l'exploitant : « **faut que ça bump AUTO** ». Et la cause de l'échec est trouvée :
+**`scripts/bump-version.sh:22` pointe sur `www/version.txt`, qui n'existe plus depuis Vague 0.** Le script
+sort sur « introuvable ». **Il est mort depuis le renommage** — et c'est la cause directe de l'incident du
+jour, où **trois commits ont revendiqué `v1.38.19` en 2 min 06 s**.
+
+**Réparer le chemin serait traiter le symptôme.** Un numéro **assigné** — par un humain, par un message —
+est valide au moment où on l'écrit et plus au moment où un autre l'emploie : c'est le défaut d'index, pour
+la troisième fois. **Le principe tranché : `MAJEUR.MINEUR` dans un fichier de jalon, `CORRECTIF` DÉRIVÉ du
+dépôt.** Il n'y a alors plus de numéro à périmer.
+
+**Et un trou que personne n'avait vu : le portage n'affiche AUCUNE version.** Zéro occurrence de
+`version.txt` dans `laravel/` — les seuls lecteurs sont trois fichiers PHP du legacy et le job `auto-tag`.
+**Le jour où le legacy s'éteint, c'est-à-dire l'objectif 2.0, la version disparaît de l'interface.**
+
 ### 4.2 Les 19 entrées de menu restantes
 
 Par taille de code legacy. L'ordre proposé va du plus rentable au plus lourd.
