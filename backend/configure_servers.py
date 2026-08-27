@@ -546,6 +546,25 @@ def deploy_user_config(channel, user: dict, logger=None):
         )
         execute_command_as_root(channel, key_command, logger=logger)
     else:
+        # ══ C'EST ICI QU'UN COMPTE INACTIF PERD SA CLE ══════════════════════
+        #
+        # E-195, et cette phrase est le correctif — il n'y a pas de code a
+        # changer. Cette branche est la COMPENSATION qui rend correct le fait
+        # que `configure_users` laisse les comptes inactifs hors de sa boucle
+        # de revocation : ils ne gardent pas leur acces pour autant, ils le
+        # perdent ici.
+        #
+        # Trois fonctions maintiennent ensemble une propriete que personne
+        # n'avait ecrite, et qui n'etait donc vraie que par accident :
+        #   `configure_users`      met le compte inactif hors de la revocation
+        #   `deploy_user_config`   (ICI) lui retire sa cle
+        #   `configure_user`       (branche inactive) lui retire son sudo
+        # Le preflight, lui, l'annonce comme REVOQUE — et il dit vrai.
+        #
+        # Retirer ce `rm -f` « parce que la branche inactive ne fait rien
+        # d'utile » rendrait un acces a chaque compte desactive du parc, en
+        # silence, et le preflight continuerait d'annoncer une revocation qui
+        # n'aurait plus lieu.
         if logger:
             logger.info(f"[{username}] Suppression de la cle SSH.")
         execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
@@ -760,12 +779,29 @@ class ServerConfigurator:
           retire la cle SSH et le sudo SANS supprimer le compte
         """
         mid = self.machine['id']
-        authorized_names = set()
+
+        # ══ CE N'EST PAS « QUI GARDE L'ACCES » — C'EST « QUI A ETE TRAITE » ══
+        #
+        # E-195. Cet ensemble s'appelait `authorized_names`, et le preflight
+        # (`routes/ssh.py`) appelle `authorized` un ensemble calcule autrement :
+        # `… JOIN user_machine_access … WHERE u.active = 1`. Deux noms
+        # identiques pour DEUX NOTIONS DIFFERENTES, dans deux fichiers.
+        #
+        # Celui-ci ne filtre PAS sur `active`, et c'est correct : son seul role
+        # est de dire qui `configure_user` a deja pris en charge, donc qui n'a
+        # pas besoin de la boucle de revocation ci-dessous. Un compte INACTIF y
+        # figure — et il perd quand meme sa cle, par un autre chemin : voir la
+        # branche `else` de `deploy_user_config`, ou la compensation est ecrite.
+        #
+        # Les fusionner serait une ERREUR : le preflight cesserait d'annoncer
+        # les revocations de comptes inactifs, qui ont pourtant bien lieu. Il
+        # SOUS-annoncerait ce qui va etre detruit.
+        comptes_traites = set()
 
         # 1. Deployer les users autorises
         for user in self.all_users:
             if mid in user.get('allowed_servers', []):
-                authorized_names.add(user.get('name'))
+                comptes_traites.add(user.get('name'))
                 self.configure_user(channel, user)
 
         # 2. Retirer les cles des users managed qui ont perdu l'acces
@@ -783,7 +819,7 @@ class ServerConfigurator:
             self.logger.warning(f"Impossible de charger l'inventaire : {e}")
             managed_users = set()
 
-        revoked = managed_users - authorized_names
+        revoked = managed_users - comptes_traites
         for uname in revoked:
             # ══ UNE REVOCATION ANNONCEE N'EST PAS UNE REVOCATION FAITE ═══════
             #
