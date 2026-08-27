@@ -54,8 +54,16 @@ class ClePlateforme
             //
             // On ne rend JAMAIS la valeur, seulement sa presence : ces colonnes
             // sont chiffrees et n'ont aucune raison de traverser un gabarit.
-            . "(password <> '') AS a_mot_de_passe, "
-            . "(root_password <> '') AS a_mot_de_passe_root "
+            //
+            // `IS NOT NULL AND <> ''` ET NON LE SEUL `<> ''`. Une comparaison
+            // avec une colonne NULL rend NULL, pas 0. Aucune machine n'a de
+            // colonne nulle aujourd'hui — mesure — et PHP traite NULL comme
+            // faux, donc le resultat serait juste. Mais ce booleen peut un jour
+            // partir en JSON vers le navigateur, ou `null` et `0` ne sont pas la
+            // meme valeur. Motif deja employe par `Supervision.php:272` pour
+            // `tls_psk_value` : on s'y aligne plutot que d'en inventer un second.
+            . "(password IS NOT NULL AND password <> '') AS a_mot_de_passe, "
+            . "(root_password IS NOT NULL AND root_password <> '') AS a_mot_de_passe_root "
             . 'FROM machines ORDER BY name'
         );
     }
