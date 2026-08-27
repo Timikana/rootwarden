@@ -44,6 +44,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
@@ -232,6 +233,45 @@ async function etape(titre, fn) {
 }
 
 try {
+    /*
+     * ══ `services/` EST ARCHIVE — LE CONSTAT VIENT EN TETE DU `try` ═══════
+     *
+     * EN TETE, et c'est la seule place possible : le bloc appelle
+     * `process.exit()`, qui **ne joue pas le `finally`**. Place plus bas, il
+     * laisserait derriere lui tout ce que la suite a pose — fixture en base,
+     * etat distant, autorisation accordee. Ici, il n'y a rien a defaire.
+     *
+     * Sonde AVANT / APRES relevee par la session 2, meme sonde :
+     *     /services/            302 -> 404
+     *     /services/index.php   302 -> 404
+     *     /services/js/main.js  **200** -> 404
+     * Le `200` du script rend l'assertion MESURANTE plutot que creuse : elle
+     * passe d'un contenu servi a un 404, au lieu de valider du vide. C'est le
+     * contraire du piege « sonder un chemin qui n'a jamais existe ».
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: '/services/',
+            fichiers: ['/services/index.php', '/services/js/main.js'], verifie, constate,
+        });
+        if (archivee) {
+            const s = await connecte(COMPTE, SECRET);
+            await verifieMenuLegacy(s.page, '/services', verifie);
+            try { await s.ctx.close(); } catch { /* deja ferme */ }
+            /*
+             * PAS DE `console.log(lignes.join())` ICI : dans ces suites, `note()`
+             * fait DEJA `console.log` au fil de l'eau. Reimprimer le tampon
+             * doublait chaque ligne — le runner compte `grep -c '^PASS'`, et il
+             * a rendu **10** la ou la suite en mesurait 5. Un compte double est
+             * un compte faux, et il ne se voit pas dans un verdict « 0 FAIL ».
+             */
+            console.log(`\ncible=${CIBLE} : `
+                + `${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL`
+                + ' — partie archivee');
+            try { await navigateur.close(); } catch { /* deja ferme */ }
+            process.exit(echecs > 0 ? 1 : 0);
+        }
+    }
     const s = await connecte(COMPTE, SECRET);
     const { page, erreursJs } = s;
     verifie('la session a tenu', ! s.surConnexion, page.url());
