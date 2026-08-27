@@ -6701,3 +6701,51 @@ de rendu s'exécute pour de vrai, sans qu'aucune machine ne soit jointe.
 > Un portage mesuré uniquement sur un tableau vide est un portage largement non mesuré. **Deux
 > défauts du portage y avaient vécu** — le champ lu sous le nom `enabled` au lieu de
 > `unit_file_state`, et traité comme un booléen alors qu'il porte cinq valeurs.
+
+---
+
+## E-152 — `iptables/` et `fail2ban/` : sur 23 routes, DEUX portent une permission
+
+**Relevé** par `MODULE-FILTRAGE.md` §1 ; **numéroté le 2026-08-27**, l'inventaire ne lui ayant jamais
+donné d'entrée de parité. **Septième occurrence** du motif « la garde est sur la page, pas sur la
+requête », et la plus large mesurée jusqu'ici.
+
+| couche | ce qu'elle exige |
+|---|---|
+| **pages** | `checkAuth([USER, ADMIN, SUPERADMIN])` **et** `checkPermission('can_manage_iptables'/'can_manage_fail2ban')` |
+| **proxy** | `/iptables`, `/iptables-` et `/fail2ban/` **absents** de `$ADMIN_ONLY_PREFIXES` |
+| **backend, 23 routes** | **deux** portent un `@require_permission` — `/iptables-rollback` et `/fail2ban/geoip` |
+
+> **La protection la plus forte est posée sur les deux actions les plus faibles.** `/fail2ban/geoip`
+> est une lecture qui n'ouvre aucune session SSH, et c'est la **seule** route fail2ban gardée ;
+> `/fail2ban/ban`, `/enable_jail` et `/whitelist` — qui écrivent **et redémarrent le service** — n'ont
+> ni rôle ni permission. Symétriquement, `/iptables-rollback` exige la permission alors que
+> `/iptables-apply`, qui fait la même chose avec des règles **arbitraires**, non.
+
+Un compte authentifié sans `can_manage_iptables` peut donc `POST /iptables-apply` et réécrire
+`/etc/iptables/rules.v4` sur une machine de son périmètre.
+
+### Le rôle, lui, est un choix ASSUMÉ
+
+`CHANGELOG.md:3078-3085` arbitre explicitement : « un rôle 1 inscrit dans `user_machine_access` est
+opérateur de ses machines ». Ce n'est donc pas le rôle qui pose problème — **c'est la permission, qui
+n'existe qu'à l'affichage.**
+
+### Deux en-têtes qui mentent, et le journal qui le prouve
+
+`iptables/index.php:14` annonce « superadmin (role_id = 3) **uniquement** — accès refusé à tous les
+autres rôles » ; `:45` admet `ROLE_USER`. `fail2ban/index.php:5` annonce « admin (2), superadmin
+(3) » ; `:10` admet `ROLE_USER`. **Troisième et quatrième occurrences du motif E-36.**
+
+Aucun compte d'épreuve ne permet de le montrer par un clic — `rw-test-user` n'a pas la permission,
+donc il est refusé, mais **par la permission**. `go-fail2ban-f1.mjs` le prouve **indirectement** : le
+refus est journalisé « Permission refusee : can_manage_fail2ban », or un refus par *rôle* ne passe
+jamais par `checkPermission`. Trouver cette ligne après le 403 établit que `checkAuth` a laissé passer
+le rôle 1 — celui que l'en-tête dit exclu. La suite nomme cette mesure comme indirecte.
+
+### Correction, et à qui elle appartient
+
+`@require_permission` sur les 21 routes qui en manquent, et `/iptables`, `/iptables-`, `/fail2ban/`
+dans les deux listes « admin ». **Touche le backend de production.** Porté au §7 avec E-142, E-144,
+E-147, E-149 et E-150 : **six correctifs backend attendent le même arbitrage**, et cinq sont la même
+famille — un garde absent, ou un repli qui retombe du côté permissif.

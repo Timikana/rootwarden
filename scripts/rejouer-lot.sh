@@ -514,6 +514,16 @@ declare -A REF_LEGACY=(
   # n'est pas protegee, la requete aboutirait, et couperait potentiellement
   # l'acces SSH. Demontrer le defaut reviendrait a le commettre.
   [go-services-s3]=13
+  # `fail2ban/` sous-lot F1 : statut et jails. 18 sur le legacy.
+  # F1 N'EST PAS UN LOT EN LECTURE SEULE : `/fail2ban/status` ecrit le cache
+  # `fail2ban_status`. La suite en prend une copie a l'entree et la remet a la
+  # sortie — un test ne change pas un etat partage, meme un cache.
+  #
+  # Le filet liste les ROUTES REELLES : une premiere redaction, `/fail2ban/[a-z_]+`,
+  # avortait `/fail2ban/js/main.js` — le script de la page. Elle passait au vert
+  # en mesurant une page MORTE. Une assertion verifie desormais que le script a
+  # tourne.
+  [go-fail2ban-f1]=18
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -537,7 +547,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
@@ -552,7 +562,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
-  go-services-s1 go-services-s2 go-services-s3
+  go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1
   go-page-graylog-g1 go-page-graylog-g2
   go-vague0-legacy
   go-page-update-u1
