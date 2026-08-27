@@ -1614,6 +1614,44 @@ Elle coûterait en plus l'exclusivité du fichier pour un gain partiel.
 travailler, et cela vaut aussi quand c'est le Lead qui est en cause. Le `CHANGELOG` porte la
 correspondance version → commit ; c'est lui qui départage, pas le sujet du commit.
 
+### RENDRE VISIBLE UN OBJET INVALIDE MAIS PRÉSENT — trois conditions (2026-08-27)
+
+Tranché sur E-197 : un compte nommé `..` découvert dans un `/etc/passwd` distant doit-il être **refusé à
+l'insertion**, **inséré et marqué**, ou **inséré et laissé au refus du geste** ? La réponse est
+**inséré et marqué**, et les trois issues méritent d'être écrites parce que le raisonnement se
+généralise.
+
+**Pourquoi pas « refuser à l'insertion ».** Un compte nommé `..` n'est pas une donnée anodine : c'est un
+**indice de manipulation de la machine**. Refuser l'insertion rendrait l'inventaire **propre** pendant que
+la machine porte l'anomalie — et **un écran propre sur une machine anormale est pire qu'un écran qui
+dérange**. C'est un *fail-open sur l'information* : sûr pour le geste, **silencieux sur le fait**.
+
+**Pourquoi pas « laisser le geste refuser ».** C'est *rendre visible APRÈS le geste une règle appliquée
+AVANT* — un refus qu'on découvre **en le provoquant**. Le chantier a déjà tranché contre ce motif trois
+fois.
+
+**Pourquoi « insérer et marquer », et ce n'est pas une préférence** : c'est le motif que ce dépôt porte
+déjà deux fois — **E-169** (« une entrée qui ne peut pas être retirée ne porte pas de bouton : elle porte
+la **RAISON** ») et **E-190** (une machine dont l'inventaire n'a pas pu être lu cesse de se présenter
+comme vérifiée).
+
+> **Les trois conditions sans lesquelles cette issue devient la troisième déguisée :**
+>
+> 1. **le backend RENSEIGNE un drapeau, il n'OMET pas un champ.** Si l'information est portée par
+>    l'**absence**, l'écran ne peut pas la distinguer de « rien à dire » — mot pour mot E-183, puis sa
+>    reprise dans E-190 où un champ absent se rendait comme une **liste vide** ;
+> 2. **le motif est AFFICHÉ, pas mis en infobulle**, et la ligne dit **pourquoi** aucun geste ne lui est
+>    offert — sinon l'exploitant ne peut pas distinguer « pas de bouton parce que le nom est invalide » de
+>    « pas de bouton parce que je n'ai pas la permission ». **Deux causes, un même vide** ;
+> 3. **l'objet sort des COMPTAGES qui appellent une décision** — « N comptes attendent un examen », les
+>    listes de gestes de masse, le sélecteur. **Une ligne visible qui ne peut recevoir aucun geste ne doit
+>    pas gonfler un nombre sur lequel on décide**, et ne doit jamais être présélectionnée.
+
+**Et une garantie mesurée qui rend l'issue sûre avant tout correctif** : côté portage, ces noms sont rendus
+par `textContent` et **jamais** par interpolation, y compris dans les panneaux de décision. **Un compte
+nommé `..` ou porteur de métacaractères de shell ne peut pas s'échapper de son nœud de texte.** Vrai
+aujourd'hui, et c'est ce qui autorise à afficher plutôt qu'à masquer.
+
 ### UNE REQUÊTE FORGÉE DEPUIS UNE PAGE REFUSÉE NE MESURE RIEN DU BACKEND (2026-08-27)
 
 **Propriété du dispositif que personne n'avait écrite, et qui invalide une famille entière de mesures.**
