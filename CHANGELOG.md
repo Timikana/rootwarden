@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.34** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.35** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,61 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.35 — `(password <> '')` est VRAI pour un mot de passe reellement vide
+
+**Symptome.** Les deux portails ne chiffrent pas la chaine vide de la meme facon :
+
+```
+Python  encrypt_password('')         -> ''          (chaine vide)
+PHP     encryptPassword('', false)   -> 'sodium:…'  (63 octets, mesure)
+```
+
+Le formulaire legacy passe `$validate = false`. Un mot de passe **reellement vide** saisi la-bas est
+donc stocke comme un cryptogramme **non vide**, et le predicat SQL `(password <> '')` rend **VRAI**
+pour une machine qui n'a aucun mot de passe.
+
+**Mesure de bout en bout, pas une deduction.** Le cryptogramme produit par le conteneur PHP a ete
+dechiffre par le conteneur Python : 63 octets en entree, chaine vide en sortie, `password <> ''` a
+VRAI. Les trois maillons ont ete exerces.
+
+**Pourquoi le portage n'a pas tranche lui-meme, et il a eu raison.** Il aurait fallu reimplementer le
+dechiffrement cote Laravel — *ne jamais recopier une regle de crypto*. La seule issue honnete etait que
+le backend, seul detenteur de la cle, expose le predicat **deja calcule**. Meme precedent qu'E-168 et
+qu'INF-003.
+
+**Correctif.** `GET /machines/credential-status`. Elle ne rend **ni le secret, ni sa longueur, ni son
+cryptogramme** : des booleens et le nom de machine que l'appelant voit deja.
+
+**TROIS etats, pas deux — et c'est le coeur.** `server_decrypt_password` rend `""` dans **deux** cas
+que rien ne distingue : le clair est vide, ou le dechiffrement a **echoue** (fail-closed). Un simple
+booleen aurait recopie cette confusion dans l'interface, et un ecran aurait affiche « pas de mot de
+passe » pour une machine dont la cle a change.
+
+```
+mot_de_passe_vide = true    le clair est vide, mesure
+mot_de_passe_vide = false   le clair n'est pas vide
+mot_de_passe_vide = null    INDETERMINE : le dechiffrement a echoue
+```
+
+Les indeterminees sont **aussi** listees dans `indetermines`, toujours present meme vide — lecon
+d'E-183 puis d'E-194, deja appliquee a `/settings/announceable`.
+
+**Et un champ decrit le COMPORTEMENT, pas seulement le fait.** `joignable_selon_le_backend` reproduit
+exactement ce que `resolve_ssh_creds` decidera, **echec de dechiffrement compris**. Quand il vaut
+`true` alors que `mot_de_passe_vide` vaut `null`, l'ecran sait que la decision repose sur le keypair et
+non sur un secret que le backend aurait su lire. *Decrire le comportement est ce qui evite de le
+reimplementer.*
+
+**La garde, et elle applique l'invariant d'E-211.** `@require_api_key` au decorateur, **bornage dans le
+corps** machine par machine par `check_machine_access`. La route ne prend **aucun** `machine_id` :
+`@require_machine_access` n'aurait rien trouve a refuser — un garde sans objet. Le perimetre du compte
+est la vraie borne, et elle est la ou elle mord.
+
+**Journalisation.** Sur echec, ni le secret ni l'exception telle quelle — un message d'erreur de crypto
+peut porter des octets du cryptogramme. Seul l'identifiant de machine est trace.
+
+**Inerte jusqu'au redemarrage.**
 
 ### v1.38.34 — cinq copies d'un resolveur, et le 7-uplet n'avait pas de domaine
 

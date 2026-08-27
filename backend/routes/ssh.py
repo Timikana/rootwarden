@@ -29,7 +29,7 @@ import time
 import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
+from routes.helpers import require_api_key, require_role, require_machine_access, check_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
 from configure_servers import (
     _motif_nom_invalide,
     _valid_username as _valid_username_decouvert,
@@ -2467,3 +2467,123 @@ def _cleanup_user_inventory(machine_id, username):
     except Exception as e:
         logger.warning("cleanup server_user_inventory (%s/%s) failed: %s",
                        machine_id, username, e)
+
+
+@bp.route('/machines/credential-status', methods=['GET'])
+@require_api_key
+@threaded_route
+def machines_credential_status():
+    """Dit, par machine, si le secret stocke DECHIFFRE EN VIDE — sans jamais le rendre.
+
+    ══ POURQUOI CETTE ROUTE EXISTE ═══════════════════════════════════════════
+
+    `(password <> '')` en SQL est FAUX comme predicat de « cette machine a un mot
+    de passe ». Les deux portails ne chiffrent pas la chaine vide de la meme
+    facon :
+
+        Python  encrypt_password('')          -> ''          (chaine vide)
+        PHP     encryptPassword('', false)    -> 'sodium:…'  (56 octets)
+
+    Le formulaire legacy passe `$validate = false` : un mot de passe REELLEMENT
+    VIDE saisi la-bas est donc stocke comme un cryptogramme NON VIDE, et
+    `(password <> '')` rend VRAI pour une machine qui n'a pas de mot de passe.
+
+    Le portage a REFUSE de reimplementer le dechiffrement pour trancher — et il
+    a eu raison : *ne jamais recopier une regle de crypto.* Il n'existait
+    qu'une issue honnete : que le backend, seul detenteur de la cle, expose le
+    predicat DEJA CALCULE. Meme precedent qu'E-168 et INF-003.
+
+    ══ CE QU'ELLE NE REND PAS ═══════════════════════════════════════════════
+
+    Ni le secret, ni sa longueur, ni son cryptogramme, ni le nombre de
+    caracteres. Rien qui aide a le deviner : des booleens, et le nom de la
+    machine que l'appelant voit deja.
+
+    ══ TROIS ETATS, PAS DEUX — ET C'EST LE COEUR ════════════════════════════
+
+    `server_decrypt_password` rend `""` dans DEUX cas que rien ne distingue :
+    le clair est vide, ou le dechiffrement a ECHOUE (fail-closed). Rendre un
+    simple booleen « le mot de passe est vide » recopierait cette confusion dans
+    l'interface, et un ecran afficherait « pas de mot de passe » pour une
+    machine dont la cle a change.
+
+        mot_de_passe_vide = true   le clair est vide, mesure
+        mot_de_passe_vide = false  le clair n'est pas vide
+        mot_de_passe_vide = null   INDETERMINE : le dechiffrement a echoue
+
+    C'est la lecon d'E-183 puis d'E-194, deja appliquee a
+    `/settings/announceable` : une interface doit pouvoir distinguer « c'est
+    faux » de « je n'ai pas pu lire ». Les machines indeterminees sont AUSSI
+    listees dans `indetermines`, toujours present meme vide.
+
+    ══ ET LE BACKEND, LUI, CONFOND LES DEUX ═════════════════════════════════
+
+    `joignable_selon_le_backend` reproduit EXACTEMENT ce que
+    `helpers.resolve_ssh_creds` decidera — echec de dechiffrement compris, donc
+    traite comme « pas de mot de passe ». Ce champ n'est pas une redite du
+    precedent : quand il vaut `true` alors que `mot_de_passe_vide` vaut `null`,
+    l'ecran sait que la decision du backend repose sur le keypair et non sur un
+    secret qu'il aurait su lire. **Decrire le comportement, et pas seulement le
+    fait, est ce qui evite de reimplementer le comportement.**
+
+    ══ LA GARDE ════════════════════════════════════════════════════════════
+
+    `@require_api_key` seule au niveau du decorateur, et le bornage est FAIT
+    DANS LE CORPS, machine par machine, par `check_machine_access`. C'est
+    delibere et c'est l'invariant qu'E-211 vient d'etablir : cette route ne
+    prend AUCUN `machine_id`, donc `@require_machine_access` n'aurait rien
+    trouve a refuser — un garde sans objet. Le perimetre du compte est la vraie
+    borne, et elle est ici.
+    """
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id, name, password, service_account_deployed, "
+                    "platform_key_deployed FROM machines ORDER BY name")
+        lignes = cur.fetchall()
+        conn.close()
+    except Exception as e:
+        logger.error("machines/credential-status : lecture BDD : %s", e)
+        return jsonify({'success': False, 'message': 'Erreur BDD'}), 500
+
+    machines, indetermines = [], []
+    for row in lignes:
+        if not check_machine_access(row['id']):
+            continue
+        secret = row.get('password') or ''
+        if not secret:
+            vide, dechiffrable = True, True
+        else:
+            try:
+                vide, dechiffrable = (encryption.decrypt_password(secret) == ''), True
+            except Exception:
+                # On ne journalise NI le secret NI l'exception telle quelle :
+                # un message d'erreur de crypto peut porter des octets du
+                # cryptogramme. Seul l'identifiant de la machine est trace.
+                logger.warning("machines/credential-status : dechiffrement "
+                               "impossible pour machine_id=%s", row['id'])
+                vide, dechiffrable = None, False
+                indetermines.append(row['id'])
+
+        keypair = bool(row.get('service_account_deployed')
+                       or row.get('platform_key_deployed'))
+        # Reproduit `resolve_ssh_creds` A L'IDENTIQUE : un echec de
+        # dechiffrement y devient une chaine vide, donc « pas de mot de passe ».
+        mdp_effectif = '' if (vide or not dechiffrable) else 'x'
+        machines.append({
+            'machine_id': row['id'],
+            'nom': row['name'],
+            'secret_stocke': bool(secret),
+            'mot_de_passe_vide': vide,
+            'dechiffrable': dechiffrable,
+            'keypair_deploye': keypair,
+            'joignable_selon_le_backend': bool(mdp_effectif) or keypair,
+        })
+
+    return jsonify({
+        'success': True,
+        'machines': machines,
+        # Toujours present, meme vide — un champ absent se lit « rien a dire ».
+        'indetermines': indetermines,
+    })
+
