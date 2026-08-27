@@ -327,6 +327,66 @@ machine ne produirait pas facilement : il faudrait **fabriquer** l'échec.
   `/etc/sudoers.d/rootwarden-alice`, donc l'assertion aurait dit « le fichier nu est
   sondé » sur une commande qui ne le sonde pas. **Un vert sur une propriété fausse.**
 
+## 2 quinquies. QA-008 — la porte à quatre yeux, et deux instruments pris en défaut
+
+`backend/tests/test_approbation_quatre_yeux.py` · **30 PASS** — plus `test_ssh.py`
+réécrit.
+
+`Config.APPROVAL_ACTIONS` nommait quatre actions ; `gate()` n'était appelé que par
+deux. L'approbation à quatre yeux sur les deux gestes de **flotte** existait **en
+configuration seulement** — une garde qui n'était pas absente mais **déclarée**, et
+dont la déclaration se relisait comme une protection.
+
+### Un test rouge qui mesurait l'ENVIRONNEMENT
+
+On me signalait `assert 202 == 200`. Exact — mais le test portait un second défaut :
+**il ne déclarait pas `APPROVAL_ENABLED`**, dont la valeur différait entre le fichier
+d'exemple, le conteneur du banc et la CI. **Le même commit rendait 200 en CI et 202
+ici.** Le corriger « pour qu'il passe » l'aurait rendu rouge en CI, avec un diagnostic
+impossible à poser depuis un journal d'exécution.
+
+Il est remplacé par deux tests qui **posent** le drapeau et le **rendent** — une
+fixture qui laisse un drapeau levé contamine les suivants, qui échouent alors pour une
+cause étrangère.
+
+### Preuve d'échec — cinq mutations, et la quatrième m'a pris
+
+| mutation | rouges |
+|---|---|
+| le contournement du rôle 3 redevient général (E-201 annulé) | **16** |
+| le fail-closed sur erreur de base retiré | **3** |
+| le comptage des approbateurs retiré (E-205 annulé) | **5** |
+| **le demandeur n'est plus exclu du comptage** | **0 → puis 1** |
+| la demande créée **avant** le comptage | **5** |
+
+**La quatrième n'a d'abord rien fait rougir.** Mon assertion vérifiait que
+l'identifiant du demandeur figurait parmi les **paramètres** de la requête — ce qui
+reste vrai quand on retire `u.id <> %s` du `WHERE`. Elle mesurait la **forme** de
+l'appel, pas son **effet** : exactement le travers que ce document reproche aux gardes
+qu'il audite.
+
+> **La parade n'est pas une assertion plus fine sur le texte de la requête** — ce
+> serait recopier la règle. La requête est **relevée sur le curseur**, donc c'est celle
+> du code, puis **exécutée** sur un moteur réel (SQLite en mémoire) contre un jeu de
+> données connu : un demandeur, un second administrateur, un compte inactif. Le
+> comptage doit rendre **1**. La mutation rougit désormais.
+
+### Et mon `conftest.py` rendait une MAUVAISE réponse, pas rien
+
+E-205 ajoute un `SELECT COUNT(*) AS n FROM users u LEFT JOIN permissions p …`. Cette
+requête contient `from users` **et** `role_id` : elle tombait dans la branche
+d'identité du `MockCursor` partagé, qui rend `{'id', 'role_id', 'active'}`. `gate()` y
+cherchait `['n']`, levait un `KeyError`, que son propre `except Exception` journalisait
+en **« erreur de base »**.
+
+> Le mock ne rendait pas « rien » : **il rendait une autre réponse**, ce qui est pire.
+> Le diagnostic partait au mauvais endroit, pour un défaut du banc.
+
+C'est la contrepartie de la leçon reçue le même jour — *une valeur qui garde un
+comportement ne doit pas vivre dans un module qu'on remplace pour tester* — vue depuis
+l'autre bout : **mon `conftest.py` décide de ce qui est mesurable**, et chacun de ses
+neuf remplacements est un angle mort que personne ne relit.
+
 ## 3. QA-002 — les gardes du portage, côté PHP
 
 `laravel/tests/` · **232 PASS, 764 assertions, 0 FAIL**
@@ -710,6 +770,9 @@ la seule réparation qui ne coûte rien à personne.
 | 2026-08-27 | QA-005 — relevé des appelants (`acorn`) | **50 appels / 29 fichiers** ; 5 à examiner, tous qualifiés ; 4 tests, 12 assertions |
 | 2026-08-27 | QA-006 — `PasserelleTest` | **28 passed, 68 assertions** ; 4 mutations → **3, 4, 3 et 5 rouges** disjoints |
 | 2026-08-27 | QA-007 — E-192 (révocation d'accès) | **26 passed** ; 6 mutations → **15, 1, 3, 1, 5 et 1 rouges**, signatures séparées |
+| 2026-08-27 | QA-008 — E-201 / E-205 (porte à quatre yeux) | **30 passed** ; 5 mutations → **16, 3, 5, 1 et 5 rouges** — la quatrième après correction de l'instrument |
+| 2026-08-27 | l'analyseur d'appelants pris en défaut **deux fois** par `pare-feu.js` | `JSON.parse` ignoré : faux dédouanement, puis fausse accusation sur la branche jumelle |
+| 2026-08-27 | suites après la vague `cle-plateforme` + `pare-feu` | **540 pytest**, **268 PHPUnit / 858 assertions** |
 
 Chaque chiffre porte sa commande de remesure :
 

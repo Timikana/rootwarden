@@ -135,6 +135,26 @@ class MockCursor:
         self._last_params = params
 
     def fetchone(self):
+        # ══ LE COMPTAGE DES APPROBATEURS PASSE EN PREMIER, ET IL LE FAUT ═════
+        #
+        # E-205 ajoute a `approvals.gate()` un
+        # `SELECT COUNT(*) AS n FROM users u LEFT JOIN permissions p ...`.
+        # Cette requete contient `from users` ET `role_id` : elle tombait donc
+        # dans la branche d'identite juste en dessous, qui rend
+        # `{'id', 'role_id', 'active'}` — et `gate()` y cherchait `['n']`.
+        #
+        # Le mock ne rendait pas « rien » : il rendait UNE AUTRE REPONSE, ce qui
+        # est pire. `gate()` levait un `KeyError` attrape par son propre
+        # `except Exception`, donc journalise en « erreur de base » — un
+        # diagnostic envoye au mauvais endroit, pour un defaut du banc.
+        #
+        # Valeur rendue : UN approbateur eligible, l'etat du banc (deux comptes
+        # de role 3). Un test qui veut mesurer le cas « aucun approbateur » doit
+        # donc poser son propre curseur, et c'est ce que fait
+        # `test_approbation_quatre_yeux.py` — ce mock partage sert le chemin
+        # ORDINAIRE, jamais les cas limites.
+        if 'count(*) as n' in self._last_query:
+            return {'n': 1}
         # Recognize SELECT id, role_id, active FROM users WHERE id = %s
         if 'from users' in self._last_query and 'role_id' in self._last_query:
             uid = (self._last_params[0] if self._last_params else 0)
