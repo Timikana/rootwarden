@@ -3,20 +3,20 @@
   "dossier": "laravel/public/js",
   "totaux": {
     "fichiers": 29,
-    "appels": 50,
-    "verifie": 22,
+    "appels": 52,
+    "verifie": 24,
     "flux": 6,
-    "delegue": 17,
+    "delegue": 18,
     "delegue_sans_lecteur": 2,
-    "ignore": 3
+    "ignore": 2
   },
   "empreintes": {
     "acces-sftp.js": "558a0929f6338813",
     "approbations.js": "874aa42ba41121f0",
     "bashrc.js": "b1f82c8e4b9408f5",
     "chatops.js": "607141666c99b287",
-    "cles-ssh.js": "bad6211314c8324c",
-    "comptes-distants.js": "1c4363e098e7e4ef",
+    "cles-ssh.js": "de7d0a5777ba4594",
+    "comptes-distants.js": "9520ed9b433918f4",
     "comptes.js": "b60f1d1ae2a77e0b",
     "derive-config.js": "d9d473c325b78901",
     "docker.js": "5af42feedb7c8546",
@@ -42,16 +42,6 @@
     "tickets.js": "1b9803433b017d1e"
   },
   "a_examiner": [
-    {
-      "fichier": "cles-ssh.js",
-      "ligne": 189,
-      "fonction": "verifie",
-      "cible": "L.url_preflight",
-      "success": false,
-      "ok": true,
-      "verdict": "ignore",
-      "fichier_consulte_success": false
-    },
     {
       "fichier": "journal-audit.js",
       "ligne": 73,
