@@ -293,7 +293,45 @@ le réécrit est `legacy/adm/includes/manage_servers.php:136,182`, c'est-à-dire
 > Le bouton « Ressaisir » **paraît** annuler « Supprimer les mots de passe ». Il en annule **la
 > moitié**.
 
-### 4.4 L'état RÉEL du parc, et il rend le scénario concret
+### 4.4 L'état RÉEL du parc
+
+> ### ⚠ PÉRIMÉ — remesuré le 2026-08-27 au soir. **`srv-zabbix` n'est plus dans la position sans retour.**
+>
+> Ce paragraphe affirmait que la machine de production n'avait **ni mot de passe SSH ni mot de passe
+> root** connus de RootWarden. **C'était vrai à l'heure de la mesure ; l'exploitant les a ressaisis
+> depuis.** Remesuré par moi, en ne faisant rendre que des **longueurs**, jamais des valeurs :
+>
+> | machine | chiffré | **déchiffré** | verdict |
+> |---|---|---|---|
+> | 1 `srv-zabbix` | 79 / 79 | **13 / 13 caractères** | **secret réel** |
+> | 2 `Test-Server-Debian` | 87 / 87 | 20 / 20 | secret réel |
+> | 3 `OpenCVE-Test-OnPrem` | 71 / 71 | 8 / 8 | secret réel |
+>
+> **La longueur du chiffré ne suffisait pas à trancher** — PHP chiffre la chaîne vide en un blob de
+> même forme, et un test SQL `<> ''` mesure des **octets**, pas la présence d'un secret. C'est le
+> déchiffrement qui décide, et c'est lui qui a été fait.
+>
+> **Ce que ça change, et ce que ça ne change pas.** La phrase *« RootWarden ne peut plus administrer
+> `srv-zabbix` »* **sort du vocabulaire** : elle est fausse aujourd'hui. L'interdiction du sous-lot P4
+> tient sur ses **autres** fondements — `UPDATE` sans `WHERE` à l'échelle du parc, volume non
+> sauvegardé, archive dans le **même** volume que la clé courante. *Un interdit qui repose sur quatre
+> fondements dont un est faux se fait démolir sur le faux.*
+>
+> **Et la leçon est sur moi** : j'avais présenté ce fait comme « mesuré en base » dans un message,
+> alors que je le **reprenais de ce document** au lieu de le remesurer. *Une conclusion écrite sur un
+> état MUTABLE se périme sans prévenir, et rien dans le document ne le signalait.* Les états de parc
+> se remesurent à chaque emploi, exactement comme les comptes de commits.
+>
+> **Un fait NEUF, sorti de cette remesure** : `ssh_password_required` vaut toujours **0** sur
+> `srv-zabbix`, alors que les deux colonnes portent des secrets réels. **Le drapeau et la donnée se
+> contredisent.** Or la page lit le drapeau (`platform_keys.php:180`, `$pwRequired`) : elle affiche
+> donc « mot de passe **supprimé** » pour une machine qui en a un. Famille *« un champ qui décrit le
+> backend n'est pas un état d'interface »*. Le seul écrivain de ce drapeau est
+> `remove_ssh_password` / `reenter_ssh_password` ; une ressaisie faite **par la page Serveurs** ne le
+> remet pas à 1.
+>
+> **Le corps ci-dessous est conservé tel quel** : c'est la mesure qui a motivé l'arbitrage, et un
+> constat effacé ne s'apprend pas.
 
 ```sql
 SELECT id,name,environment,(password<>'') AS a_mdp,(root_password<>'') AS a_root_mdp,
