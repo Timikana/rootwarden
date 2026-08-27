@@ -2371,3 +2371,18 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     gap: 14px;
     margin: 14px 0 4px;
 }
+
+/*
+ * Pied de page du portail : le NUMERO DE VERSION, et rien d'autre.
+ *
+ * Discret par construction — c'est une information de tracabilite, pas un
+ * contenu. Il se lit quand on le cherche et ne prend pas la place de ce qui est
+ * au-dessus. Pas de bordure haute : le `main` porte deja sa fin, et une ligne de
+ * plus ferait croire a une section.
+ */
+.rw-pied {
+    padding: 18px 0 26px;
+    color: var(--rw-texte-doux);
+    font-size: 12px;
+    text-align: right;
+}
