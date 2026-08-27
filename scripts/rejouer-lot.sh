@@ -296,7 +296,14 @@ declare -A REF_LARAVEL=(
   # toute navigation et jamais leve.
   # 17 contre 11 : le portage separe le geste de sa confirmation, et la suite
   # asserte qu'ouvrir le panneau n'emet RIEN.
-  [go-adm-comptes-distants]=17
+  # 17 -> 18 le 2026-08-27 : UNE assertion, la scission de « le scan aboutit » en deux
+  # proprietes qui se corrigent a deux endroits — ce que le scan RAPPORTE (la reponse) et
+  # ce que l'ecran MONTRE (la base, donc un scan anterieur, ce que la page avoue elle-meme).
+  # L'ancien libelle affirmait « le scan aboutit » sur la foi d'un STATUT, et un scan non
+  # concluant rend 200. Mesure : `HTTP 200 success=true comptes=20` — verte pour une BONNE
+  # raison, pas parce que la fonctionnalite est absente.
+  # ⚠ MESUREE CONTRE L'ANCIEN BACKEND : E-187 n'etait pas en service. A reconfirmer.
+  [go-adm-comptes-distants]=18
   # `adm/` sous-lot D9a : droits sudo par compte distant.
   # 18 sur le portage contre 12 sur le legacy, et les six d'ecart portent tous
   # sur les deux defauts corriges : le prereglage par defaut qui ne donne plus
@@ -376,7 +383,14 @@ declare -A REF_LARAVEL=(
   # F1 N'EST PAS EN LECTURE SEULE cote portage non plus : la copie du cache
   # `fail2ban_status` est prise a l'entree et remise a la sortie, sur les deux
   # cibles.
-  [go-fail2ban-f1]=20
+  # 20 -> 23 le 2026-08-27 : TROIS sondes de base rouge pour E-152, une par compte
+  # d'epreuve. Elles rendent 400 « machine_id requis. » aujourd'hui, ce qui EST le resultat
+  # attendu — le patch est gele, aucune permission n'est encore exigee sur cette route.
+  # ⚠ CELLE DE `rw-test-user` ECHOUERA VOLONTAIREMENT LE JOUR DU CORRECTIF : elle passera a
+  # 403, et son detail le dit (« un 403 ICI signifie que le correctif est POSE »). Les deux
+  # autres resteront a 400 et servent de TEMOIN — c'est ce qui isolera la cause. Sans cette
+  # note, un rouge inexplicable : exactement `go-bashrc-b4`.
+  [go-fail2ban-f1]=23
   # `fail2ban/` sous-lot F2 : historique et frise, portes.
   # 24 sur le portage contre 14 sur le legacy. L'ecart de DIX se decompose
   # entierement, et ce sont dix `verifiePortage` — INFO cote legacy, PASS cote
@@ -432,7 +446,13 @@ declare -A REF_LARAVEL=(
   #   1  aucun parametre de traduction n'apparait a l'ecran.
   # Les deux avant-derniers sont refermes DANS LE BACKEND (E-165) : le legacy en
   # profite aussi, et ses INFO disent « verifie sur le legacy aussi ».
-  [go-fail2ban-f4]=21
+  # 21 -> 22 le 2026-08-27 : UNE assertion, E-174. Le portage refuse PLUS TOT que le legacy
+  # — le champ retient la saisie — donc la propriete se mesure par une requete FORGEE, avec
+  # son motif ecrit : une garde du navigateur DEPLACE le refus, elle ne le supprime pas.
+  # Charge INOFFENSIVE deliberement (`%eth0`, un nom d'interface) : envoyer `%$(id)` pour
+  # « demontrer » reviendrait a COMMETTRE l'execution root sur la machine d'essai. On mesure
+  # le verdict du garde sur la FORME, jamais son contournement.
+  [go-fail2ban-f4]=22
   # `fail2ban/` sous-lot F5 : jails et liste blanche, portes.
   # 15 sur le portage contre 9 sur le legacy. L'ecart de SIX se decompose :
   #   1  une liste blanche SUPPOSEE est annoncee comme telle (E-168) — le
@@ -566,7 +586,8 @@ declare -A REF_LEGACY=(
   [go-adm-serveurs]=18
   [go-adm-etiquettes-notes]=10
   [go-adm-cycle-connexion]=12
-  [go-adm-comptes-distants]=11
+  # 11 -> 12 le 2026-08-27 : la meme scission, double cible. Meme reserve E-187.
+  [go-adm-comptes-distants]=12
   [go-adm-politiques]=12
   [go-adm-sftp]=12
   [go-bashrc-b1]=17
@@ -634,7 +655,14 @@ declare -A REF_LEGACY=(
   # avortait `/fail2ban/js/main.js` — le script de la page. Elle passait au vert
   # en mesurant une page MORTE. Une assertion verifie desormais que le script a
   # tourne.
-  [go-fail2ban-f1]=18
+  # 18 -> 20 le 2026-08-27 : DEUX sondes E-152 et non trois, et la raison est une propriete
+  # du dispositif que personne n'avait ecrite. Sur le legacy, `rw-test-user` rend 403
+  # « Aucun jeton CSRF trouve dans la requete » — pas un refus de permission : le legacy
+  # SURCHARGE `window.fetch` pour y joindre le jeton (`js/utils.js`), donc une requete forgee
+  # n'en herite QUE si le script de la page est charge. Sur la page 403 servie a ce compte,
+  # il ne l'est pas. La sonde porte donc sa PRECONDITION : quand le refus nomme le jeton, le
+  # journal dit NON MESURABLE et n'assert pas.
+  [go-fail2ban-f1]=20
   # `fail2ban/` sous-lot F2 : historique et frise. 14 sur le legacy.
   #
   # F2 NE JOINT AUCUNE MACHINE. Les deux routes (`GET /fail2ban/history` et
@@ -695,7 +723,9 @@ declare -A REF_LEGACY=(
   #
   # Les lignes de `fail2ban_history` creees par le geste sont retirees dans le
   # `finally`, bornees par un DELTA d'`id`.
-  [go-fail2ban-f4]=14
+  # 14 -> 15 le 2026-08-27 : la meme assertion E-174, cote legacy — ou la requete PART et
+  # rend 400 avec le meme message. Le portage la retient plus tot : renforcement, pas ecart.
+  [go-fail2ban-f4]=15
   # `fail2ban/` sous-lot F5 : jails et liste blanche. 10 sur le legacy.
   #
   # LES ECRITURES SONT SERVIES, ET CE N'EST PAS PAR PRUDENCE. `enable_jail`,
