@@ -34,6 +34,31 @@ class LiensLegacy
         '/backups/'    => 'sauvegardes',
         '/tasks/'      => 'taches',
         '/tickets/'    => 'tickets',
+        /*
+         * `/services/` (archive le 2026-08-27, ARC-001) et `/search/` (archive
+         * de longue date). Les deux sont PREVENTIVES : releve exhaustif des
+         * `link` que le backend ecrit en dur — `/security/`, `/ssh-audit/`,
+         * `/update/index.php`, `/tickets/index.php`, `/profile.php`,
+         * `/approvals/`, `/adm/audit_log.php`, `/adm/admin_page.php`, `/` — ni
+         * l'un ni l'autre n'y figure. Elles ne reparent aucun 404 constate ;
+         * elles evitent d'en fabriquer un le jour ou une recherche, une
+         * notification ou un rapport citera ces chemins.
+         *
+         * `/search/` MANQUAIT depuis son archivage et personne ne l'avait vu.
+         * `/docker/` avait connu le meme oubli a la `v1.37.54`, rattrape par une
+         * relecture ; celui-ci ne l'a jamais ete. C'est la propriete de la
+         * session 7 — deriver la liste de `legacy/_deprecated/*` et la comparer
+         * a cette table — qui l'a trouve A SA PREMIERE MESURE.
+         *
+         * Et la protection du voisinage tient a DEUX niveaux, mesures :
+         * `resoudre()` compare le chemin NORMALISE EN ENTIER, donc
+         * `/services/list/` ne vaut pas `/services/` ; et sur le legacy
+         * `/services/list` rend 404, ces huit routes ne passant que par
+         * `/api_proxy.php/services/…`. Un filtre par prefixe n'aurait donc meme
+         * pas casse la page portee — mais ce n'est pas une raison d'en ecrire un.
+         */
+        '/services/'   => 'services',
+        '/search/'     => 'recherche',
         // Le backend ecrit `/update/index.php` en dur pour CHAQUE machine trouvee
         // (`backend/routes/search.py`) : pour ce module, la table cesse d'etre
         // preventive. Sans cette ligne, la recherche mene a un 404 mesurable.
