@@ -30,6 +30,7 @@ import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
 from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
+from configure_servers import _motif_nom_invalide
 from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
 
 bp = Blueprint('ssh', __name__)
@@ -1554,8 +1555,42 @@ def scan_server_users():
                     if row.get(k) and hasattr(row[k], 'isoformat'):
                         row[k] = row[k].isoformat()
 
-            # Compter les pending
-            pending_count = sum(1 for r in inventory if r['status'] == 'pending_review')
+                # ══ E-199 : LA LIGNE EST INSEREE **ET** MARQUEE ══════════════
+                #
+                # Un compte nomme `..` dans un `/etc/passwd` est un INDICE de
+                # manipulation de la machine. Le refuser a l'insertion rendrait
+                # l'inventaire propre pendant que la machine porte l'anomalie —
+                # un ecran propre sur une machine anormale est pire qu'un ecran
+                # qui derange. On insere donc, et on DIT.
+                #
+                # LE DRAPEAU EST TOUJOURS RENSEIGNE, JAMAIS OMIS. C'est la
+                # lecon d'E-183 puis d'E-190 : une information portee par
+                # l'ABSENCE d'un champ ne se distingue pas de « rien a dire »,
+                # et un champ absent se rend comme une liste vide ou un faux.
+                # Meme forme que l'`audit_inventaire` d'E-194.
+                #
+                # Le motif est un CODE, pas une phrase : l'ecran l'affiche et
+                # doit pouvoir SEPARER les causes. « pas de bouton parce que le
+                # nom est invalide » et « pas de bouton parce que je n'ai pas la
+                # permission » sont deux causes pour un meme vide.
+                motif = _motif_nom_invalide(row.get('username'))
+                row['nom_valide'] = motif is None
+                row['motif_invalide'] = motif
+
+            # ══ UNE LIGNE QUI NE PEUT RECEVOIR AUCUN GESTE NE GONFLE PAS ═════
+            #    UN NOMBRE SUR LEQUEL ON DECIDE
+            #
+            # `pending_count` alimente « N comptes a examiner ». Une ligne au
+            # nom invalide ne peut recevoir aucun geste distant — E-192 refuse
+            # la revocation, `configure_user` et `deploy_user_config` refusent
+            # aussi. La compter la ferait promettre un travail impossible.
+            #
+            # Les deux nombres sont rendus SEPAREMENT plutot qu'un seul
+            # corrige : « 3 a examiner » et « 3 a examiner dont 1 illisible »
+            # ne demandent pas le meme geste.
+            pending_count = sum(1 for r in inventory
+                                if r['status'] == 'pending_review' and r['nom_valide'])
+            invalides_count = sum(1 for r in inventory if not r['nom_valide'])
 
         finally:
             conn_inv.close()
@@ -1589,6 +1624,9 @@ def scan_server_users():
             'machine_name': m['name'],
             'users': inventory,
             'pending_count': pending_count,
+            # Toujours present, meme a zero : un ecran ne peut pas distinguer
+            # « aucune ligne illisible » d'un champ absent.
+            'invalides_count': invalides_count,
         }
         if not concluant:
             manquantes = [nom for nom, ok in lectures.items() if not ok]
