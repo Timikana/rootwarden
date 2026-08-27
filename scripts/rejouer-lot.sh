@@ -391,7 +391,21 @@ declare -A REF_LARAVEL=(
   #   1  l'historique reste consultable quand la machine est injoignable ;
   #   1  l'attribut `lang` suit la langue de l'interface ;
   #   1  la date suit la langue de l'interface.
-  [go-fail2ban-f2]=24
+  # 24 -> 25 le 2026-08-27 : UNE assertion prealable, qui nomme laquelle des deux causes
+  # explique un tableau vide — « la requete n'est pas revenue », « la REPONSE est vide,
+  # le defaut n'est PAS dans le rendu », ou « le defaut est dans le RENDU ». Elle a ete
+  # ajoutee avec un collecteur `page.on('response')` : la suite n'en avait AUCUN, et
+  # `abouties` etait peuple dans `page.on('request')` — donc au DEPART de la requete.
+  # L'attente fixe de 700 ms est devenue une attente de PROPRIETE (empreinte du corps du
+  # tableau qui change puis cesse de bouger), les 700 ms restant en PLANCHER.
+  [go-fail2ban-f2]=25
+  # `fail2ban/` sous-lot F6, les deux gestes de parc entier. PORTE, mesure 13 le
+  # 2026-08-27 — et NON 12 : entre la mesure du porteur et celle du banc, deux passes
+  # CREUSES ont ete reparees et une troisieme, faible, remplacee. Les creuses
+  # interrogeaient `abouties.quoi`, qui ne peut valoir que `base` : elles ne pouvaient pas
+  # echouer, et `[].every()` rendant `true`, la seconde passait meme sur une liste vide —
+  # le cas ou l'on voudrait le plus qu'elle parle.
+  [go-fail2ban-f6]=13
   # `fail2ban/` sous-lot F3 : configuration, journaux et services, portes.
   # 21 sur le portage contre 15 sur le legacy. L'ecart de SIX se decompose
   # entierement — six `verifiePortage`, INFO cote legacy, PASS cote portage :
@@ -640,7 +654,8 @@ declare -A REF_LEGACY=(
   # chemin de rendu est invisible. Les gestes qui peuplent cette table
   # appartiennent a F4 et bannissent sur une machine reelle. Nettoyage borne par
   # un DELTA d'`id`, jamais par un `DELETE` large.
-  [go-fail2ban-f2]=14
+  # 14 -> 15 le 2026-08-27 : la meme assertion prealable, double cible.
+  [go-fail2ban-f2]=15
   # `fail2ban/` sous-lot F3 : configuration, journaux et services. 13 sur le legacy.
   #
   # LES TROIS SONT DES LECTURES. Elles sont en POST — elles portent des
@@ -714,7 +729,15 @@ declare -A REF_LEGACY=(
   # Le detail d'une jail est SERVI : sans lui le panneau ne s'ouvre pas, le
   # bouton « Ban global » reste cache, et trois assertions passaient « parce que
   # le geste n'est pas offert » sur une cible ou il l'est.
-  [go-fail2ban-f6]=8
+  # 8 -> 9 le 2026-08-27 : UNE assertion neuve, sur la MUTATION. Le filet laissait
+  # passer SANS LES ENREGISTRER les requetes que `ROUTES_MODULE` ne reconnaissait pas —
+  # donc un renommage ou une casse differente partait POUR DE VRAI, invisible a toute
+  # assertion. Mesure et non suppose : `/api_proxy.php/cve_trends` est effectivement
+  # laissee passer par la page fail2ban. Inoffensive (un GET), mais elle prouve que le
+  # trou est EMPRUNTE. La propriete juste n'est pas « rien d'etranger n'est passe » —
+  # une premiere version l'exigeait et ACCUSAIT une page saine — mais « rien de ce qui
+  # est passe ne peut MUTER », jugee sur la METHODE.
+  [go-fail2ban-f6]=9
   # (12 -> 13 : l'etape « tableau peuple » ajoute une assertion cote legacy.)
   [go-adm-cles-api]=11
   # `graylog/` G1 : 25 sur le legacy, mesure le 2026-08-26 du premier coup. La
@@ -774,6 +797,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
+  go-fail2ban-f6
   go-page-graylog-g1 go-page-graylog-g2
   go-page-update-u1 go-page-update-u2 go-page-update-u3
   go-page-update-u4 go-page-update-u5 go-page-update-u6 go-page-update-u6b)
