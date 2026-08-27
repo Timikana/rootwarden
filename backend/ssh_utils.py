@@ -238,7 +238,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             pkey = get_platform_private_key()
             if pkey:
                 client.connect(
-                    hostname=host, port=port, username='rootwarden',
+                    hostname=host, port=port, username=Config.NOM_COMPTE_SERVICE,
                     pkey=pkey,
                     look_for_keys=False, allow_agent=False,
                     timeout=10

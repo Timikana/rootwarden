@@ -284,7 +284,9 @@ def setup_logging(log_file: str):
 # d'accumuler) et on purge l'ancien fichier a nom nu. Le compte de service
 # (/etc/sudoers.d/rootwarden, gere par routes/ssh.py) n'est JAMAIS touche.
 _SUDOERS_PREFIX = 'rootwarden-'
-_RESERVED_SA_USER = 'rootwarden'  # compte de service : son fichier /etc/sudoers.d/rootwarden est intouchable
+_RESERVED_SA_USER = Config.NOM_COMPTE_SERVICE  # son /etc/sudoers.d/<nom> est intouchable
+# Le nom vient de `Config`, source unique partagee avec l'authentification.
+# Le recopier ici ferait deux valeurs qui finiraient par diverger.
 
 
 def _sudoers_target(username: str) -> str:
