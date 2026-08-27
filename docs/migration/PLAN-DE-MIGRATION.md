@@ -772,6 +772,48 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
 
 ## 7. Décisions qui attendent l'exploitant
 
+### ⚠⚠ E-201 / E-202 — DEUX CHEMINS VERROUILLENT ROOTWARDEN HORS DE `srv-zabbix`, EN UN APPEL
+
+**Trouvés le 2026-08-27 par pré-relecture AVANT portage — la première fois du chantier que la sécurité
+passe en amont, et c'est ce qui les a trouvés.** Détail et preuves dans `PARITE.md`.
+
+**L'état du parc, mesuré, est ce qui les rend mortels** : `srv-zabbix` (production) n'a **ni mot de passe
+ni mot de passe root** connu de RootWarden. Sa **seule** voie est la clé de plateforme. Les machines 2 et
+3 ont un mot de passe ; elle, non.
+
+| chemin | rôle | ce qu'il fait | retour |
+|---|---|---|---|
+| `regenerate_platform_key` | **3** | `unlink()` la clé privée puis régénère — les trois tentatives de `connect_ssh` emploient la **même** clé | **aucun** |
+| `delete_remote_user` visant `rootwarden` | **2** | `userdel` le compte par lequel RootWarden s'authentifie | **aucun** |
+
+Le second est **plus bas en rôle** que le premier. Et sa protection énumère
+`{'root','nobody','daemon','bin','sys','www-data'}` — **`rootwarden` n'y est pas** — puis compare à
+`machines.user`, qui vaut `'user'` pour cette machine alors que le compte de connexion **réel** est
+`rootwarden`, en dur dans `ssh_utils.py:241`. *La protection énumère des NOMS au lieu de résoudre une
+FONCTION.*
+
+**Et la porte à quatre yeux ne couvre pas le premier.** `APPROVAL_ENABLED=true` et
+`APPROVAL_ACTIONS` **nomme** `regenerate_platform_key` — mais `gate()` n'est appelé que **deux fois** dans
+tout le backend, pour `reboot_server` et `delete_remote_user`. **La configuration affirme une protection
+que le code ne consulte pas.**
+
+**Ce qu'il faut décider, et le premier point conditionne tout le reste :**
+
+1. **le volume `platform_ssh` est-il sauvegardé par l'infrastructure ?** RootWarden n'en fait **aucune**
+   copie — mesuré. **C'est la question qui décide si la rotation est irréversible ou seulement pénible**, et
+   elle ne se répond pas depuis le dépôt ;
+2. **la porte à quatre yeux** : la brancher sur les deux routes, ou **retirer les deux noms de la
+   configuration**. Ne rien faire est la seule issue qui laisse croire à un garde inexistant ;
+3. **`srv-zabbix` doit-elle rester sans seconde voie d'accès ?** Tant qu'elle l'est, les deux chemins sont
+   des verrouillages définitifs et non des incidents ;
+4. le correctif *fail-closed* proposé — refuser la rotation tant qu'une machine deviendrait injoignable —
+   **rendrait le geste IMPOSSIBLE sur ce parc** jusqu'à ce que (3) soit réglé. C'est un blocage
+   fonctionnel réel, et il vaut mieux qu'un verrouillage. Mais c'est un choix.
+
+**Ce qui est déjà tenu sans vous** : aucun de ces gestes n'est porté, aucun n'a été déclenché, et la
+contrainte de test est écrite — **la réussite de la rotation ne doit JAMAIS être mesurée, il n'existe
+aucune cible sûre.** Seul le refus est mesurable.
+
 ### ⚠ E-174 — UNE EXÉCUTION DE COMMANDE EN ROOT, OUVERTE EN PRODUCTION, OCCUPÉE AUJOURD'HUI
 
 **Trouvée le 2026-08-27 par relecture, hors du sous-lot en cours. Elle passe devant tout ce qui
@@ -2114,6 +2156,30 @@ troisième mesure qui départage deux verdicts contradictoires.
 le conteneur, avec `workers = 4` tous enfants du maître. **« Le backend est lu au démarrage du processus »
 n'est donc plus une convention de ce document : c'est une propriété du service.** Troisième règle de ce
 chantier à devenir une propriété, après la recopie du runner dans `/tmp` et `git commit -- <chemins>`.
+
+### LE JETON DE BANC COUVRE AUSSI L'ÉCRITURE DANS `laravel/` ET `legacy/` (2026-08-27)
+
+**Trou dans ma propre formulation, et il a failli coûter un LOT de 100 minutes.** La convention disait
+« une seule session à la fois peut faire tourner un test qui se connecte », et le §9 listait « lancer une
+suite » comme non parallélisable. **Écrire dans `laravel/` n'y ressemblait pas** — et la session
+concernée n'avait rien lancé, personne ne détenait le banc à sa connaissance, et elle venait de recevoir
+trois missions « dans cet ordre ».
+
+> **Le jeton de banc couvre aussi l'ÉCRITURE dans `laravel/` et `legacy/`, parce qu'ils sont relus à
+> CHAQUE REQUÊTE.** Sinon quelqu'un refera exactement le même geste **en respectant la règle telle
+> qu'elle est écrite.**
+
+**Ce qui nous a épargnés est l'ordre, pas la règle** : ses écritures (15:50:37, 15:51:10) **précèdent** le
+départ du LOT (~15:53). Le LOT a donc mesuré le nouveau menu **de bout en bout, de façon cohérente** — la
+cible n'a pas changé en plein vol. Mesuré aux `mtime` et aux journaux, pas déduit.
+
+**Et le bon réflexe n'était pas de revenir en arrière.** Un `git checkout` pour restaurer l'ancien menu
+aurait changé la cible **pendant** le rejeu — « le geste le plus discret des trois et le plus difficile à
+diagnostiquer après coup ». **Geler était l'action la moins destructrice**, et c'est celle qui a été
+prise.
+
+*Une règle qu'on doit se rappeler est une propriété qu'on n'a pas encore construite — et une règle dont
+la formulation ne nomme pas le geste ne protège de rien.*
 
 ### ⚠ UN REDÉMARRAGE PUBLIE L'ARBRE DE TRAVAIL, PAS L'HISTORIQUE (2026-08-27)
 
