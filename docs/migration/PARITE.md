@@ -8534,3 +8534,75 @@ Lead, comme les numéros de version.** Ils ont été pris ici dans l'ordre et sa
 `E-192` à `E-195` claimés une fois chacun, `PARITE.md` s'arrêtant à `E-191` — mais c'est **la même classe
 que la collision de `v1.38.19`** : un identifiant choisi par message est valide au moment où on l'écrit,
 pas au moment où un autre l'emploie. **Nommer le défaut en clair suffit ; le numéro s'attribue ici.**
+
+---
+
+## E-197 — `_valid_username` accepte `.` et `..`, et la version STRICTE existe déjà deux fois dans le dépôt
+
+Trouvé le 2026-08-27 **en vérifiant une supposition faite en écrivant E-192** : ce correctif rend
+`_valid_username` **porteur** — c'est lui qui décide si un nom d'inventaire peut être interpolé dans un
+`rm -f` root — et cela n'avait pas été mesuré.
+
+`configure_servers.py:56` : `_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')`. **Il accepte `.` et
+`..`, qui sont des composants de chemin et non des noms de compte.** Chemins normalisés, mesurés :
+
+| nom | clé SSH | sudoers unifié | sudoers legacy |
+|---|---|---|---|
+| `alice` | `/home/alice/.ssh/authorized_keys` | `…/rootwarden-alice` | `…/alice` |
+| **`..`** | **`/.ssh/authorized_keys`** | `…/rootwarden-..` | **`/etc`** |
+| **`.`** | **`/home/.ssh/authorized_keys`** | `…/rootwarden-.` | **`/etc/sudoers.d`** |
+| `-rf` | `/home/-rf/.ssh/…` | `…/rootwarden--rf` | `…/-rf` |
+
+**`-rf` est DÉDOUANÉ** : les trois chemins sont préfixés, donc aucune injection d'option. Et les deux
+chemins `rootwarden-..` / `rootwarden-.` **ne traversent pas** — `..` ne traverse que comme composant
+entier, et là il est collé au préfixe.
+
+### La portée destructrice est PLUS ÉTROITE que la table ne le suggère — mesuré
+
+`rm -f` **échoue sur un répertoire**. Mesuré dans le conteneur, sur une cible jetable :
+
+    rm: cannot remove '/tmp/rwtest/d': Is a directory
+    code=1  ·  le repertoire EXISTE ENCORE
+
+Donc `..` → `/etc` et `.` → `/etc/sudoers.d` **échouent sans effet**. **La seule cible réellement
+supprimable est `/.ssh/authorized_keys`** (cas `..`), qui n'existe que là où le répertoire personnel de
+root est `/` — pas le défaut sur Debian. **Le défaut est donc « un `rm -f` root sur un chemin qui n'est
+pas celui visé », et non « un `rm -f` sur `/etc` »**, et il faut le dire ainsi : une formulation trop
+large aurait fait chercher une catastrophe là où il y a un défaut de validation.
+
+**Ce n'est PAS une élévation de privilège**, pour la même raison qu'au relevé précédent : seul le root de
+la machine peut poser un tel nom dans son `/etc/passwd`, et la commande s'exécute **sur cette même
+machine**. Rien n'est gagné.
+
+**Atteignable, par une seule voie** : `scan_server_users` **ne valide pas** les noms qu'il insère dans
+`server_user_inventory` — il valide `home` par une expression régulière et **pas** `username`. Un
+`/etc/passwd` portant une ligne `..:` produit donc une ligne d'inventaire nommée `..`.
+
+### ⚠ Et la version JUSTE existe déjà DEUX fois dans le même dépôt
+
+    backend/configure_servers.py:56   ^[a-zA-Z0-9._-]{1,32}$        <- accepte `.` et `..`
+    backend/sudo_manager.py:32        ^[a-z_][a-z0-9_-]{0,31}$      <- les REFUSE
+    backend/sftp_manager.py:34        ^[a-z_][a-z0-9_-]{0,31}$      <- les REFUSE
+
+Vérifié : la stricte refuse `.` et `..` et accepte `alice`. **Il y a donc TROIS implémentations de « un
+nom d'utilisateur valide », et la plus permissive est celle qui garde le chemin d'un `rm -f` root.**
+
+> **Ce n'est pas « ajouter une garde » : c'est aligner la plus dangereuse des trois sur les deux autres.**
+> Même classe qu'E-152 — *la convention existait déjà, et personne ne l'avait mesurée* — et qu'E-195,
+> *plusieurs implémentations d'une même notion*. Le correctif n'est donc pas d'écrire une quatrième
+> expression mais de **reprendre celle qui existe**.
+
+**Risque sur le cas normal : nul, et c'est mesurable** — aucun système Linux n'a de compte nommé `.` ou
+`..`, `useradd` les refuse. Les quatre autres appelants n'en profitent que dans le bon sens.
+
+### L'effet de bord est instructif : E-192 échoue FERMÉ, mais pour la mauvaise raison
+
+Pour `..`, la sonde d'E-192 teste `test ! -e /etc`, qui existe toujours — elle rend donc
+**« RÉVOCATION NON VÉRIFIÉE » en permanence**. Le correctif échoue donc **du bon côté**, ce qui est la
+bonne direction, **mais il le fait pour une raison qui n'est pas la vraie cause et sans jamais la
+nommer.** Un fail-closed qui masque son motif est un fail-closed qu'on finit par croire cassé.
+
+**Un second endroit, DISTINCT, à ne pas traiter au même commit** : `scan_server_users` devrait **refuser
+d'insérer** un nom invalide plutôt que de laisser l'inventaire porter des lignes qu'aucun geste ne pourra
+honorer. C'est *valider aux deux bouts* — mais c'est un autre défaut, et il change ce que l'écran
+d'inventaire affiche.
