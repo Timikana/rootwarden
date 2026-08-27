@@ -7909,3 +7909,93 @@ journal (« scan NON CONCLUANT, purge ABANDONNÉE, l'inventaire (N ligne(s)) est
 changement de sens est **écrit dans le code**. Et `recv_exit_status`, qui n'apparaissait **pas une seule
 fois** dans `ssh.py`, y figure maintenant — **exactement là où un code de retour décide d'une
 suppression**. Remesure : `grep -c recv_exit_status backend/routes/ssh.py`.
+
+---
+
+## E-187 — La purge des CLÉS est gardée par la mauvaise lecture, et la valeur qui la fermerait est déjà dans le code
+
+Trouvé le 2026-08-27 par **relecture croisée du correctif d'E-183 déjà appliqué** — donc sur du code en
+place, pas sur une proposition. C'est la moitié que ce correctif n'a pas fermée.
+
+`scan_concluant = (passwd_rc == 0 and bool(scanned_users))` (`:1310`) mesure la lecture de
+**`/etc/passwd`**. Or la purge des clés (`:1364`) et l'écriture de `keys_count` ne dépendent **pas** de
+cette lecture : `seen_keys` vient des **deux dumps `authorized_keys`**, qui sont deux lectures
+**différentes**.
+
+| lecture | ligne | son code de sortie |
+|---|---|---|
+| `/etc/passwd` | `:1120` | **LU** — c'est ce que le correctif a ajouté |
+| dump **root** des clés | `:1149` | **CAPTURÉ PUIS JAMAIS LU** (`_code`) |
+| dump simple-utilisateur | `:1171` | **jamais obtenu** |
+
+**`_code` est la seule occurrence de ce nom dans la fonction** — vérifié. **La valeur qui fermerait le
+défaut est déjà dans le code, à portée d'un `if`.** C'est le motif « le cas visible traité, le cas subtil
+pris à l'envers », et il est ici particulièrement net : la valeur était dans la main.
+
+Le chemin : `/etc/passwd` se lit bien → `scan_concluant = True`. Le dump root échoue (sudo refusé, mot de
+passe root absent, `NOPASSWD` non déployé) → attrapé, journalisé « dump root vide », **et on continue**.
+Le dump simple-utilisateur ne rend que les clés du compte de connexion, ou rien. → `seen_keys` quasi vide
+→ `stale` = **les clés de tous les autres comptes** → supprimées, garde inactif.
+
+**Seconde face, qui ne demande même pas de suppression** : `keys_count` est **écrit** dans l'inventaire.
+Un dump raté écrit donc `keys_count = 0` sur **tous** les comptes, sans rien effacer.
+**L'inventaire affirme alors qu'aucun compte de la machine ne porte de clé** — et c'est exactement la
+donnée sur laquelle K4 raisonne.
+
+### Occupation mesurée, et c'est la production
+
+| machine | mot de passe | mot de passe root | compte de service | lignes | clés |
+|---|---|---|---|---|---|
+| 1 `srv-zabbix` | **non** | **non** | oui | 28 | 6 |
+| 2 `Test-Server-Debian` | oui | oui | non | 20 | 0 |
+| 3 `OpenCVE-Test-OnPrem` | oui | oui | non | 24 | 14 |
+
+**`srv-zabbix` ne stocke ni mot de passe ni mot de passe root.** Son dump root dépend **entièrement** du
+`NOPASSWD` du compte de service — c'est-à-dire de la chose même que l'arbitrage K4 tient pour **non
+validée**. Si ce `NOPASSWD` cesse de fonctionner, `execute_as_root` retombe sur `sudo -S` avec un mot de
+passe **vide**, le dump échoue, et le scan suivant purge. **Ce n'est pas une hypothèse lointaine :
+« redéployer la clé SSH pour valider `NOPASSWD` » est une action EN ATTENTE du chantier.**
+
+### Et le journal contredit la réponse
+
+`scan_server_users` rend **inconditionnellement** `{'success': True, 'users': inventory, …}`. Sur un scan
+non concluant, le journal écrit un avertissement explicite et **l'appelant reçoit une réussite**, avec un
+inventaire conservé donc **ancien**, et aucun champ qui dise que rien n'a été lu. L'écran affiche un
+inventaire d'apparence fraîche.
+
+**Le correctif d'E-183 a protégé la DONNÉE et laissé le VERDICT** — l'inverse exact d'E-90, où le verdict
+avait été corrigé sans l'état persisté. La classe a deux moitiés et elles se ferment séparément.
+
+### La mesure DÉDOUANE sur l'étendue, et c'est dit aussi nettement
+
+**Il n'y a que DEUX purges par différence d'ensembles dans tout `ssh.py`**, toutes deux dans
+`scan_server_users`. Les quatre suppressions du fichier :
+
+| ligne | ce qu'elle supprime | forme | garde |
+|---|---|---|---|
+| `:1321` | inventaire, fantômes | différence d'ensembles | **OK** (E-183) |
+| `:1364` | clés, obsolètes | différence d'ensembles | **mauvais drapeau** — cet écart |
+| `:1704` | une clé **nommée** | ciblée | `if code != 0: return 500` — **le bon motif** |
+| `:1940` | un compte **nommé** | ciblée | après suppression confirmée |
+
+**Le bon motif existe déjà dans ce fichier** (`server_user_remove_key`, `:1689-1697` : il lit son code de
+sortie, refuse de nettoyer la base si la commande distante a échoué, et rend 500). C'est ce qui rend
+l'omission de `:1149` d'autant plus visible **une fois qu'on la cherche**.
+
+**Une observation adjacente, bornée exprès** : sur 37 appels à `execute_as_root`, 25 jettent leur retour —
+**et ce n'est pas la même classe.** 4 sont des restaurations de secours dans un chemin d'échec (délibéré,
+correct) ; 19 composent la création du compte de service, dont le résultat est vérifié **globalement**
+juste après par un `sudo whoami` ; 2 restent à examiner. **Aucun des 25 ne pilote une purge par
+différence.** Les compter ensemble aurait produit un « 25 appels sans contrôle » du même genre que le
+« 21 routes mutantes » qui comptait des routes où le décorateur n'aurait rien fait.
+
+### Non mesuré, et nommé
+
+- **ce que rend `dump_script` quand AUCUN `authorized_keys` n'existe.** La boucle sort en 0 même sans rien
+  émettre, donc `rc == 0` avec un dump vide est un cas **légitime**. C'est la mesure qui distingue
+  « échec de lecture » de « rien à lire », et **tout correctif proposé repose dessus.** À faire sur
+  `Test-Server-Debian`, **jamais** sur la machine 1 ;
+- **l'effet du verdict sur les deux écrans** : toute page qui teste `if (data.success)` verrait un scan
+  non concluant comme un échec. C'est le comportement voulu, mais il change l'écran ;
+- **les trois autres fichiers de `ssh/`** — `configure_servers.py`, `ssh_key_manager.py`, `ssh_utils.py`.
+  La question portait sur `ssh.py`. **Ils ne sont pas dédouanés : ils ne sont pas mesurés.**
