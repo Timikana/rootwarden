@@ -931,7 +931,18 @@ dépôt.**
   attendu **n'est ni 318 ni 318 + 375** : les deux totaux sont mesurés sur des arbres différents et rien
   ne dit qu'ils sont disjoints. **Fusionner sans rebase** : réécrire l'historique pendant que six
   sessions travaillent est interdit, et un merge sans conflit rend le rebase inutile ;
-- **la purge ne tourne pas — E-180.** `LOG_RETENTION_DAYS` est commentée, donc vaut 0, donc rien n'a
+- **la purge ne tourne pas — E-180, ET MA PRÉSENTATION EN ÉTAIT INCOMPLÈTE DANS LE SENS DANGEREUX
+  (corrigé le 2026-08-27, E-188).** Je vous ai dit « activer `LOG_RETENTION_DAYS` n'est pas la bonne
+  réponse seule : `user_logs` porte une chaîne scellée ». C'était vrai et il manquait l'essentiel :
+  **`active_sessions.last_activity` n'est JAMAIS mise à jour** — 3 930 lignes, 3 930 où
+  `last_activity = created_at`, **zéro** différente, mesuré. La colonne porte bien
+  `ON UPDATE CURRENT_TIMESTAMP` mais rien ne l'écrit : elle est posée à la connexion et seulement lue
+  ensuite. Donc `WHERE last_activity < NOW() - 7 DAY` ne veut pas dire « inactive depuis 7 jours » mais
+  **« CRÉÉE il y a plus de 7 jours »** : **les deux issues que je vous proposais déconnecteraient les
+  exploitants tous les sept jours, en pleine session.** Ce qui était présenté comme de l'hygiène coupe
+  des sessions actives. **Les deux défauts se masquaient mutuellement** — la purge ne tournant pas,
+  personne n'a jamais été déconnecté à tort, et c'est exactement pour cela que personne n'avait vu le
+  second. **L'ordre correct : réparer `last_activity` AVANT d'activer quoi que ce soit.**  `LOG_RETENTION_DAYS` est commentée, donc vaut 0, donc rien n'a
   jamais été purgé depuis le 2026-05-26 ; et la **même** variable éteint trois nettoyages qui ne sont
   pas des politiques de rétention (sessions inactives, permissions temporaires expirées, jetons de
   réinitialisation). 2 132 sessions en base pour un seul compte, lues à **chaque page protégée**.
