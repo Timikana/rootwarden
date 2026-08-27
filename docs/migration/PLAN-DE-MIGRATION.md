@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-27**, version `1.38.9`. Le chantier tourne désormais à **sept sessions** à propriété disjointe — table au §10 de `PROTOCOLE-SESSIONS.md`.
+Dernière mise à jour : **2026-08-27** (fin de journée), version `1.38.21`. Le chantier tourne désormais à **sept sessions** à propriété disjointe — table au §10 de `PROTOCOLE-SESSIONS.md`.
 
 ---
 
@@ -96,8 +96,8 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **structure mesurée le 2026-08-27, contenu à remesurer.** **104** fichiers `tests/e2e/go-*.mjs`, dont **78** inscrits au LOT pour **149 verdicts** — une suite compte un verdict par cible où elle porte une référence — et **2 272 assertions déclarées** (1437 laravel + 835 legacy). Les **26** fichiers hors LOT ne sont pas des orphelins : 7 scripts de captures (`go-captures-*`), `go-ssh-audit-scanall` (**interdit, joint la production**), le reste antérieur à la migration. Remesure : `ls tests/e2e/go-*.mjs | wc -l`, et le compte des verdicts en faisant lire les tables par **bash** plutôt qu'au `grep` : `source <(sed -n "155,702p" scripts/rejouer-lot.sh); echo $((${#REF_LARAVEL[@]}+${#REF_LEGACY[@]}))`. **Le runner a été vérifié intègre dans les QUATRE sens** le 2026-08-27 — aucune suite jouée sans référence, aucune référence jamais jouée, aucun fichier manquant pour une suite inscrite, **aucun doublon de clé** : le piège « deux entrées de même clé dans la même table, la seconde écrase la première » ne s'est pas produit. **Le LOT complet du 2026-08-26 est enfin RELEVÉ** — il était « à relever au tour suivant » depuis la veille : journaux dans `/tmp/rw-lot-wQk8j5/`, 18:03 → 20:12 (**2 h 09**), **125 journaux** pour les **125 verdicts** que le runner portait à ce commit (`dc61a99`). Attention : **c'est une égalité de COMPTES, pas encore une bijection d'ENSEMBLES** — à croiser dans les deux sens avant d'être inscrite comme établie. Le total lui-même n'est pas encore livré, et pour une bonne raison : un premier motif de relecture déclarait **85 journaux « muets »**, ce qui était un défaut d'instrument — les suites ont **TROIS** formes de tampon final (« N PASS / M FAIL », « N étapes, N PASS, N FAIL ») et `go-vague0-legacy` n'en a **aucune**. Le TOTAL n'a pas été rejoué depuis : ~100 min, et il verrouille le TOTP des trois comptes d'épreuve — **décision de l'exploitant (§7)**. `go-bashrc-b4` reste **legacy seul** : il figurait dans `SUITES_LARAVEL` et y rendait **9 PASS / 3 FAIL**, les trois FAIL étant exactement les trois boutons dont l'absence est VOULUE — un LOT complet affichait donc un ÉCHEC qui ne disait rien. Il y revient le jour où B4 est porté.
-| tests backend | **341 pytest** |
-| écarts de parité documentés | **174** — numérotés jusqu'à **E-184** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
+| écarts de parité documentés | **187** — numérotés jusqu'à **E-199** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés. Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -107,6 +107,54 @@ indépendantes : `Navigation.php`, le DOM (le menu y figure **deux fois** — ba
 la tuile « Déjà portés » de l'accueil du portage. Cette tuile est **calculée** depuis `Navigation`
 (`$modulesPortes / $modulesAccessibles`), jamais écrite en dur : elle suit d'elle-même, et il n'y a donc
 aucun chiffre à y corriger après un portage.
+
+### Ce que la journée du 2026-08-27 a changé, et ce qu'elle laisse
+
+**86 commits**, sept sessions, et **le travail le plus utile n'a pas été le portage** : c'est ce que la
+relecture croisée a trouvé dans du code déjà écrit, souvent déjà corrigé, parfois par celui qui relisait.
+
+**Sept correctifs backend, tous EN SERVICE** — vérifiés par la comparaison `StartedAt` / `mtime`, pas par
+une introspection : E-192 → E-197 depuis 11:57:42 UTC, E-199 depuis 12:11:33.
+
+| ce qui est fermé | ce qu'il faut retenir |
+|---|---|
+| **E-174** exécution de commande **en root**, occupée le jour même | le correctif évident — normaliser — n'aurait rien fermé : `str()` conserve l'identifiant de portée. Et le **second** vecteur, `sed` + apostrophe, ne dépendait même pas du `sh -c` distant |
+| **E-183 / E-192** une révocation **annoncée sans avoir eu lieu** | l'inverse d'E-183 : celui-là détruisait une donnée vraie, celui-ci laissait un **accès ouvert en affirmant qu'il est fermé**. Et « lire le code de retour » **n'existait pas** à ce niveau : on vérifie l'**effet** |
+| **E-190** une phrase **fausse en service** sur l'écran de K4 | « ne déploierait rien » se lisait « ne ferait rien ». La ligne **deux lignes plus haut** portait déjà le bon raisonnement |
+| **E-191** `POST /deploy` porte `@require_api_key` **seul** | la route qui écrit en root sur un parc entier est **moins gardée** que celle qui redémarre une machine. Sa voisine, 270 lignes plus bas, porte le jeu complet **avec un commentaire de patch** |
+| **E-197 / E-199** un nom d'inventaire non validé, puis marqué | et l'expression « stricte » qu'il fallait « reprendre » **refuse trois comptes réels** |
+
+**Trois consignes du Lead ont été refusées par la mesure, et les trois refus avaient raison** : fusionner
+la règle de révocation (aurait fait **sous-annoncer**), reprendre l'expression stricte (aurait rendu trois
+comptes **irrévocables en silence**), filtrer un compteur (aurait **débloqué** un déploiement). Les trois
+sont au §8. *Une consigne qui traverse une session sans être éprouvée n'est qu'une préférence* — et les
+trois refus n'ont été possibles que parce que la consigne nommait ses fichiers, ses lignes, et demandait
+« dis-moi ce que tu trouves **avant** d'écrire ».
+
+**Cinq règles sont devenues des PROPRIÉTÉS** — c'est-à-dire qu'il n'y a plus rien à se rappeler : le
+runner se recopie dans `/tmp` ; `git commit -- <chemins>` **ignore l'index partagé** ; `use_reloader =
+False` **prouve** que le backend est lu au démarrage ; les mutations de test se font sur une **copie** dans
+le conteneur ; et **le numéro de version ne voyage plus par message** — trois commits en avaient revendiqué
+le même en 2 min 06 s.
+
+**Quatre instruments ont été pris pour des résultats, dans quatre couches différentes** — un statut 200
+qui n'est pas un verdict, le `mtime` de `/proc/1` qui n'est pas une heure de démarrage, un 403 de
+**transport** qui n'est pas un refus d'accès, et un `!==` qui classe « replié » **deux pixels**. Le dernier
+complète la classe par son autre bord : **un instrument peut mentir en voyant TROP.**
+
+**Ce que la journée LAISSE, et qui doit être dit ensemble** :
+
+- **cinq branches du portage établies par LECTURE et mesurées par aucune suite** — le troisième état du
+  préflight, E-189, le chemin non concluant du scan, le badge « retirée du parc », la ligne d'inventaire
+  invalide. Aucune ne sera mesurée sans une fixture qui **déplacerait ce qu'elle mesure**, et aucune n'est
+  fabriquée ;
+- **quatre propriétés de sûreté qui tiennent sans être écrites** (base64, « un seul jeton », l'inclusion
+  d'ensembles, le statut non-200) — une seule des quatre a été écrite **au moment où elle servait à
+  décider** ;
+- **INF-002** : deux conventions pour `verifie()` sur 82 fichiers, dont un appel faux **ne lève rien**.
+  L'unifier demande un **LOT complet** pour le prouver plutôt que le déduire ;
+- **le LOT n'a pas été rejoué en entier** depuis le 2026-08-26 : ~100 min et le verrouillage du second
+  facteur des trois comptes.
 
 ### Les deux blocages de la v2.0
 
