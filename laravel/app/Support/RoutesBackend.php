@@ -38,6 +38,22 @@ class RoutesBackend
         '/deploy_service_account', '/revoke_service_account', '/regenerate_platform_key',
         '/remove_ssh_password', '/reenter_ssh_password',
         '/scan_server_users', '/sshd_allow_user',
+        /*
+         * `/server_users_inventory` (E-200) N'EST PAS DANS LE PROXY LEGACY, ET
+         * CETTE LISTE CESSE DONC D'EN ETRE UN RELEVE FIDELE — c'est dit ici
+         * plutot que laisse a la lecture suivante.
+         *
+         * La route est NEE pour le portage : elle rend l'inventaire des comptes
+         * distants avec `nom_valide` et `motif_invalide`, que la page a besoin de
+         * connaitre AU CHARGEMENT et qui n'existaient qu'au retour d'un scan.
+         * Aucune page du legacy ne l'appelle, et l'ajouter a
+         * `ALLOWED_PROXY_PREFIXES` elargirait la surface d'un proxy de PRODUCTION
+         * pour une route sans appelant. On ne l'y ajoute donc pas.
+         *
+         * Sens de la divergence : le portage autorise UNE route de plus que le
+         * legacy, et cette route ne fait que LIRE — elle ne joint aucune machine.
+         */
+        '/server_users_inventory',
         '/server_user_keys', '/server_user_remove_key',
         '/remove_user_keys', '/delete_remote_user',
         '/logs', '/update', '/update-logs', '/update_zabbix', '/update_security_exec',
@@ -62,6 +78,13 @@ class RoutesBackend
         '/deploy_service_account', '/revoke_service_account', '/regenerate_platform_key',
         '/deploy_platform_key', '/remove_ssh_password', '/reenter_ssh_password',
         '/scan_server_users', '/sshd_allow_user', '/remove_user_keys', '/delete_remote_user',
+        /*
+         * Meme famille que `/scan_server_users`, juste au-dessus : cette route
+         * ENUMERE DES NOMS DE COMPTES. Le backend la garde par `@require_role(2)`
+         * et la page l'exige aussi ; la citer ici est la defense en profondeur que
+         * cette classe annonce. Absente du legacy pour la raison dite plus haut.
+         */
+        '/server_users_inventory',
         '/server_user_remove_key', '/admin/', '/policy/', '/exclude_user',
         '/server_lifecycle', '/update_security_exec', '/drift/', '/tasks/',
         '/groups', '/maintenance/windows', '/approvals', '/command_log',
