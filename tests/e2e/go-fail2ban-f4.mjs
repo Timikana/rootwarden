@@ -63,6 +63,20 @@ const MACHINE_PRODUCTION = 1;
 const JAIL = 'sshd';
 /** TEST-NET-3 (RFC 5737) : reservee a la documentation, n'appartient a personne. */
 const ADRESSE = '203.0.113.7';
+/*
+ * E-174 — l'identifiant de PORTEE IPv6, celui qui suit un `%`.
+ *
+ * L'ancienne validation appelait `ipaddress.ip_address(ip)` pour son seul effet
+ * de bord, jetait l'objet et rendait la chaine RECUE : la portee repartait
+ * verbatim dans un f-string vers `fail2ban-client`, puis dans un `sh -c`
+ * distant. Execution de commande arbitraire en root.
+ *
+ * LA CHARGE EST INOFFENSIVE ET C'EST DELIBERE : `%eth0` est un nom d'interface
+ * ordinaire, pas une commande. Demontrer la faille en envoyant `%$(id)`
+ * reviendrait A LA COMMETTRE sur la machine d'essai. Ce qu'on mesure est le
+ * VERDICT du garde — refuse-t-il la FORME ? —, jamais son contournement.
+ */
+const ADRESSE_PORTEE = 'fe80::1%eth0';
 
 /** Ce que F4 laisse aboutir, et seulement vers la machine 2. */
 const GESTES_F4 = /\/fail2ban\/(jail|ban|unban|unban_all)(\?|$)/;
@@ -117,7 +131,32 @@ function verifie(l, ok, d, toujours) {
     if (! ok) echecs += 1;
 }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
-function verifiePortage(l, ok, d) {
+function verifiePortage(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
 }
@@ -159,6 +198,7 @@ const navigateur = await puppeteer.launch({
 });
 const contextes = [];
 const abouties = [];
+const reponses = [];
 const avortees = [];
 const servies = [];
 const boites = [];
@@ -218,6 +258,24 @@ async function connecte(nom, secret) {
             motif: HORS_LOT.test(url) ? 'appartient a F5 ou F6' : 'machine hors perimetre',
         });
         r.abort('blockedbyclient').catch(() => {});
+    });
+
+    /*
+     * LES REPONSES — f4 n'en collectait aucune.
+     *
+     * `abouties` est peuple dans `page.on('request')` : il dit qu'une requete
+     * est PARTIE, jamais ce que le serveur en a fait. Pour E-174 la propriete
+     * porte precisement sur le VERDICT du backend (400), donc sur la reponse.
+     */
+    page.on('response', async (r) => {
+        const u = r.url();
+        if (! /\/fail2ban\//.test(u)) return;
+        let message = '';
+        try {
+            const t = await r.text();
+            try { message = String(JSON.parse(t).message || ''); } catch { message = t.slice(0, 120); }
+        } catch { /* corps illisible ou deja consomme */ }
+        reponses.push({ route: u.replace(/^https?:\/\/[^/]+/, ''), statut: r.status(), message });
     });
 
     await page.goto(`${BASE}${C.connexion}`, { waitUntil: 'networkidle2' });
@@ -558,6 +616,68 @@ try {
     });
 
     // ═══ 3bis. LES PARAMETRES DE TRADUCTION ═════════════════════════════
+    // ═══ 3b. E-174 — UNE ADRESSE A IDENTIFIANT DE PORTEE EST-ELLE REFUSEE ? ══
+    await etape('une adresse a identifiant de portee est refusee', async () => {
+        const avant = reponses.length;
+        await page.click(C.champIp, { clickCount: 3 });
+        await page.type(C.champIp, ADRESSE_PORTEE, { delay: 10 });
+
+        accepteLaBoite = true;
+        await cliqueEtAttend(page, C.bannir, 2500);
+        accepteLaBoite = false;
+        // Sur le portage le geste ne part qu'apres le second clic.
+        const ouvert = C.confirmation ? await page.evaluate((sels) => {
+            const p = document.querySelector(sels.confirmation);
+
+            return p ? (p.offsetParent !== null && ! p.hidden) : false;
+        }, C) : false;
+        if (ouvert && C.confirmer) await cliqueEtAttend(page, C.confirmer, 3000);
+
+        const neuves = reponses.slice(avant).filter((x) => /\/ban(\?|$)/.test(x.route));
+        const derniere = neuves[neuves.length - 1];
+        constate('reponses au ban a portee', neuves.length
+            ? neuves.map((x) => `HTTP ${x.statut} « ${x.message.slice(0, 70)} »`).join(' | ')
+            : '(aucune)');
+
+        /*
+         * SI LA REQUETE N'EST PAS PARTIE, LA PROPRIETE N'EST PAS SATISFAITE :
+         * elle est NON MESUREE. Une garde du navigateur deplace le refus, elle
+         * ne le supprime pas — et c'est le SERVEUR qu'on veut eprouver ici. On
+         * le dit par un FAIL explicite plutot que par un silence, et la requete
+         * FORGEE depuis la page (l'une des deux exceptions du §3.7, motif ecrit)
+         * etablit alors le verdict serveur.
+         */
+        if (! derniere) {
+            constate('aucune requete de ban emise', 'le champ ou la page a retenu la saisie');
+            const forge = await page.evaluate(async (chemin, ip, jail, mid) => {
+                try {
+                    const rep = await fetch(chemin, {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ip, jail, machine_id: mid, server_id: mid }),
+                    });
+
+                    return { statut: rep.status, corps: (await rep.text()).slice(0, 160) };
+                } catch (e) { return { statut: 0, corps: String(e.message || e) }; }
+            }, CIBLE === 'laravel' ? '/api/gateway/fail2ban/ban' : '/api_proxy.php/fail2ban/ban',
+               ADRESSE_PORTEE, JAIL, MACHINE_ID);
+            constate('requete FORGEE depuis la page', `HTTP ${forge.statut} — ${forge.corps}`);
+            verifie('le backend REFUSE une adresse a identifiant de portee (E-174)',
+                forge.statut === 400,
+                `HTTP ${forge.statut} — attendu 400. Un 200 signifie que la portee est passee `
+                + 'jusqu\'a la composition de la commande distante',
+                `HTTP ${forge.statut}`);
+
+            return;
+        }
+
+        verifie('le backend REFUSE une adresse a identifiant de portee (E-174)',
+            derniere.statut === 400,
+            `HTTP ${derniere.statut} — attendu 400. Un 200 signifie que la portee est passee `
+            + 'jusqu\'a la composition de la commande distante',
+            `HTTP ${derniere.statut}`);
+    });
+
     await etape('aucun parametre de traduction a l\'ecran', async () => {
         // Meme controle qu'en F3, sur un autre ecran : le panneau de detail
         // affiche « Jail :name » — troisieme occurrence du motif.

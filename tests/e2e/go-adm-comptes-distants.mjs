@@ -107,9 +107,59 @@ const C = CIBLE === 'laravel'
 let echecs = 0;
 const lignes = [];
 function note(l) { lignes.push(l); console.log(l); }
-function verifie(l, ok, d) { note(`${ok ? 'PASS' : 'FAIL'}  ${l}${d ? '  — ' + d : ''}`); if (!ok) echecs += 1; }
+function verifie(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+ note(`${ok ? 'PASS' : 'FAIL'}  ${l}${d ? '  — ' + d : ''}`); if (!ok) echecs += 1; }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
-function verifiePortage(l, ok, d) {
+function verifiePortage(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, `ecart assume du legacy — ${d}`);
 }
@@ -245,8 +295,36 @@ try {
     await etape('enumerer les comptes distants, par un clic', async () => {
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         const vues = [];
+        /*
+         * LE STATUT NE DIT PAS QUE LE SCAN A ABOUTI.
+         *
+         * `vues` ne portait que `r.status()`, et un scan NON CONCLUANT rend
+         * **200** avec `success: false` : la moitie « une reponse est arrivee »
+         * de l'assertion etait donc satisfaite par un scan qui n'a rien lu.
+         * L'autre moitie l'etait aussi — le tableau est rendu par le serveur
+         * DEPUIS LA BASE, donc depuis le dernier scan abouti, ce que la page
+         * avoue elle-meme (« Rechargez pour voir l'inventaire a jour »).
+         * Deux intermediaires pour une propriete qu'aucun des deux ne mesure.
+         *
+         * On lit donc le CORPS. Et l'on peut mesurer des AUJOURD'HUI, sans
+         * attendre E-187 : le backend rend encore `success: true` de facon
+         * inconditionnelle, mais une reussite annoncee QUI NE RAPPORTE AUCUN
+         * COMPTE reste une incoherence — et elle, elle se voit.
+         */
         const ecoute = (r) => {
-            if (/scan_server_users/.test(r.url())) vues.push(`${r.status()}`);
+            if (! /scan_server_users/.test(r.url())) return;
+            const statut = r.status();
+            r.text().then((t) => {
+                let annonce = null;
+                let comptesRendus = null;
+                try {
+                    const j = JSON.parse(t);
+                    annonce = j.success === true;
+                    const tab = Object.values(j).find((v) => Array.isArray(v));
+                    comptesRendus = tab ? tab.length : 0;
+                } catch { /* corps illisible ou pas du JSON */ }
+                vues.push({ statut, annonce, comptesRendus });
+            }).catch(() => vues.push({ statut, annonce: null, comptesRendus: null }));
         };
         page.on('response', ecoute);
 
@@ -258,7 +336,9 @@ try {
         // Une session SSH plus une enumeration : on laisse le temps.
         await dors(20000);
         page.off('response', ecoute);
-        constate('reponses de /scan_server_users', vues.join(' | ') || '(aucune)');
+        constate('reponses de /scan_server_users',
+            vues.map((v) => `HTTP ${v.statut} success=${v.annonce} comptes=${v.comptesRendus}`)
+                .join(' | ') || '(aucune)');
 
         const comptes = await page.evaluate((sel) => {
             const e = document.querySelector(sel);
@@ -266,8 +346,35 @@ try {
             return e ? (e.textContent || '').trim().length : 0;
         }, C.conteneur);
         constate('longueur du rendu de la liste', String(comptes));
-        verifie('le scan aboutit et la liste se garnit', vues.length > 0 && comptes > 0,
-            `${vues.length} reponse(s), ${comptes} caracteres`);
+        /*
+         * L'ANCIEN LIBELLE AFFIRMAIT « le scan aboutit » sur la foi d'un statut.
+         * Les deux proprietes sont desormais DISTINCTES, parce qu'elles se
+         * corrigent a deux endroits differents : ce que le scan a RAPPORTE, et
+         * ce que l'ecran MONTRE (qui vient de la base, donc d'un scan anterieur).
+         */
+        const derniere = vues[vues.length - 1];
+        /*
+         * LE DETAIL SE GARDE PAR LA CONDITION — et j'avais suppose la mauvaise
+         * SIGNATURE. `verifie` vaut ici `(l, ok, d)` et affiche `d` SUR UN PASS
+         * COMME SUR UN FAIL ; celui de `go-fail2ban-f2` vaut `(l, ok, d,
+         * toujours)` et conditionne. J'ai ecrit un appel a quatre arguments : le
+         * quatrieme etait ignore, et l'explication d'echec s'imprimait sur des
+         * lignes VERTES. Un journal qui dit « le conteneur est vide » a cote de
+         * PASS n'est plus lisible au moment ou il sert.
+         */
+        const okScan = derniere !== undefined && derniere.annonce === true
+            && derniere.comptesRendus > 0;
+        verifie('le scan rapporte au moins un compte', okScan,
+            okScan
+                ? `${derniere.comptesRendus} compte(s) rapportes`
+                : derniere === undefined
+                    ? 'aucune reponse de /scan_server_users — la requete n\'est pas revenue'
+                    : derniere.annonce !== true
+                        ? `le scan annonce success=${derniere.annonce}`
+                        : 'le scan annonce une reussite et ne rapporte AUCUN compte '
+                          + '(HTTP 200 + `success: true` ne sont pas un verdict)');
+        verifie('la liste affichee est garnie', comptes > 0,
+            comptes > 0 ? `${comptes} caracteres` : 'le conteneur est vide');
     });
 
     // ══ 4. LES GESTES DESTRUCTEURS : CLIQUES, MESURES, AVORTES ═════════════
@@ -291,7 +398,8 @@ try {
                 return opt.value;
             }, C.choixCompte);
             constate('compte designe pour les gestes', choisi || '(aucun)');
-            verifie('un compte peut etre designe dans la liste', choisi !== '', '(liste vide)');
+            verifie('un compte peut etre designe dans la liste', choisi !== '',
+                choisi !== '' ? `« ${choisi} »` : '(liste vide)');
         }
 
         for (const [nom, selecteur] of [['retrait des cles', C.retirerCles], ['suppression du compte', C.supprimer]]) {

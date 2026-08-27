@@ -101,7 +101,32 @@ function verifie(l, ok, d, toujours) {
     if (! ok) echecs += 1;
 }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
-function verifiePortage(l, ok, d) {
+function verifiePortage(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
 }
@@ -141,6 +166,8 @@ const navigateur = await puppeteer.launch({
 });
 const contextes = [];
 const abouties = [];
+/** Les sondes E-152, laissees passer DELIBEREMENT — voir le filet. */
+const sondes = [];
 const avortees = [];
 
 async function connecte(nom, secret) {
@@ -159,6 +186,27 @@ async function connecte(nom, secret) {
         // LE GARDE VISE LES NOMS DE ROUTES : `/fail2ban/` est aussi le chemin de
         // LA PAGE, et l'avorter tuerait la suite (piege paye en B2).
         if (! ROUTES_MODULE.test(url)) { r.continue().catch(() => {}); return; }
+
+        /*
+         * LA SONDE E-152 EST DELIBEREE : LE FILET DOIT LA LAISSER PASSER.
+         *
+         * Premiere redaction : elle partait sans marque, `machineVisee` rendait
+         * `null` sur un corps VIDE — c'est tout l'objet de la sonde — et le filet
+         * l'avortait comme « machine hors perimetre ». Les six mesures rendaient
+         * `HTTP 0 — Failed to fetch`, et l'assertion accusait le BACKEND de ne
+         * pas repondre. **Le filet avait fabrique le defaut qu'il rapportait
+         * ensuite** — le piege que ce chantier documente, commis ici.
+         *
+         * La laisser passer est SUR, et ce n'est pas une concession : le corps
+         * vide fait sortir la route sur « machine_id requis. » (400) AVANT tout
+         * `ssh_session` (`fail2ban.py:131-133`). Aucune machine n'est jointe.
+         */
+        if (r.headers()['x-sonde-e152']) {
+            sondes.push(url.replace(/^https?:\/\/[^/]+/, ''));
+            r.continue().catch(() => {});
+
+            return;
+        }
         const cible = machineVisee(r);
         if (LECTURES.test(url) && ! AUTRES.test(url) && cible === MACHINE_ID) {
             abouties.push({ route: url.replace(/^https?:\/\/[^/]+/, ''), machine: cible });
@@ -234,6 +282,85 @@ try {
                 constate(`${compte.nom} : statut`, `${statut} — ${compte.motif}`);
                 verifie(`${compte.nom} (role ${compte.role}) est ${compte.admis ? 'admis' : 'refuse'}`,
                     compte.admis ? statut === 200 : statut === 403, `statut ${statut}`);
+
+                /*
+                 * ══ E-152 — LA SONDE A CORPS VIDE, ET SON TEMOIN ═══════════
+                 *
+                 * 16 des 19 routes de `fail2ban.py` ne portent NI role NI
+                 * permission : seule la PAGE est gardee. La sonde mesure ce que
+                 * le BACKEND oppose, la ou l'ecran ne dit rien.
+                 *
+                 * POURQUOI UN CORPS VIDE. `require_machine_access` ne trouve
+                 * alors aucun identifiant a refuser — son no-op connu, « un
+                 * garde sans objet ne garde rien » — et laisse passer ; c'est le
+                 * corps de la route qui refuse ensuite (`machine_id requis.`,
+                 * 400). La faiblesse du garde du dessous devient donc
+                 * l'INSTRUMENT qui mesure le garde pose au-dessus de lui. Et
+                 * l'on mesure au STATUT, jamais au texte du corps.
+                 *
+                 * CE QUE CETTE SONDE REND AUJOURD'HUI :
+                 *     rw-test-user   role 1, SANS la permission  -> 400
+                 *     rw-test-admin  role 2, AVEC la permission  -> 400
+                 *     rw-test-super  role 3, contournement       -> 400
+                 * **Les trois se ressemblent, et c'est le resultat attendu** :
+                 * le patch d'E-152 est GELE, donc aucune permission n'est encore
+                 * exigee sur cette route. C'est la BASE ROUGE de la propriete.
+                 * Le jour ou le correctif sera pose, seule la PREMIERE ligne
+                 * passera a 403 — les deux autres resteront a 400, et c'est
+                 * ce qui isolera la cause. Un 400 lu ici n'est donc PAS un
+                 * echec de la sonde.
+                 *
+                 * REQUETE FORGEE, et son motif : aucune interface n'envoie un
+                 * corps vide, donc aucun `<input>` ne peut violer cette
+                 * propriete. Elle part DEPUIS LA PAGE, avec la session reelle.
+                 */
+                const sonde = await s.page.evaluate(async (chemin) => {
+                    try {
+                        const rep = await fetch(chemin, {
+                            method: 'POST', credentials: 'same-origin',
+                            // La marque que le filet reconnait : sans elle, la
+                            // sonde est avortee comme « machine hors perimetre ».
+                            headers: { 'Content-Type': 'application/json',
+                                'X-Sonde-E152': '1' },
+                            body: '{}',
+                        });
+
+                        return { statut: rep.status, corps: (await rep.text()).slice(0, 120) };
+                    } catch (e) { return { statut: 0, corps: String(e.message || e) }; }
+                }, CIBLE === 'laravel'
+                    ? '/api/gateway/fail2ban/status' : '/api_proxy.php/fail2ban/status');
+                constate(`${compte.nom} : sonde E-152 (corps vide)`,
+                    `HTTP ${sonde.statut} — ${sonde.corps}`);
+
+                /*
+                 * LA SONDE N'EST PAS EMISSIBLE DEPUIS UNE PAGE REFUSEE, et le
+                 * legacy vient de me l'apprendre. `rw-test-user` y rend
+                 * « Aucun jeton CSRF trouve dans la requete » : le legacy
+                 * SURCHARGE `window.fetch` pour y joindre le jeton (`js/utils.js`),
+                 * et sur la page 403 servie a ce compte ce script n'est jamais
+                 * charge. Ma requete forgee part donc SANS jeton, et le proxy la
+                 * refuse — pour une raison qui n'a rien a voir avec E-152.
+                 *
+                 * On ne peut pas asserter une propriete du BACKEND a travers un
+                 * refus du PROXY. On le DIT — une propriete sans objet ne se
+                 * tait pas — mais on ne compte pas un echec la ou la mesure n'a
+                 * pas eu lieu : ce serait un rouge permanent qui n'apprend rien.
+                 */
+                const sansJeton = /csrf|jeton/i.test(sonde.corps);
+                if (sansJeton) {
+                    constate(`${compte.nom} : sonde E-152 NON MESURABLE`,
+                        `le proxy refuse faute de jeton CSRF — la page etant refusee a ce compte, `
+                        + 'la surcouche `fetch` qui joint le jeton n\'est pas chargee. '
+                        + 'La propriete se mesure sur le PORTAGE, ou la passerelle lit '
+                        + 'le jeton dans l\'en-tete du cadre');
+                } else {
+                    verifie(`${compte.nom} : la route repond, et son refus n'est pas un 403 de PERMISSION`,
+                        sonde.statut === 400,
+                        `HTTP ${sonde.statut} — un 403 ICI signifie que le correctif d'E-152 est POSE `
+                        + '(attendu, et alors il faut inverser cette attente pour le role 1 seul) ; '
+                        + 'tout autre statut est un defaut',
+                        `HTTP ${sonde.statut}`);
+                }
             } finally {
                 await s.ctx.close();
             }

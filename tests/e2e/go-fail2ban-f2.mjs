@@ -122,7 +122,32 @@ function verifie(l, ok, d, toujours) {
     if (! ok) echecs += 1;
 }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
-function verifiePortage(l, ok, d) {
+function verifiePortage(l, ok, d, __quatrieme) {
+    /*
+     * INF-002 — LE QUATRIEME ARGUMENT N'EXISTE PAS ICI, ET IL NE PASSERA PLUS
+     * EN SILENCE.
+     *
+     * Ce depot porte DEUX semantiques du troisieme argument, et elles sont
+     * OPPOSEES : dans ce fichier (70 suites) le detail s'affiche sur un PASS
+     * COMME sur un FAIL ; dans 12 autres, il ne s'affiche QUE sur un FAIL, et
+     * un quatrieme argument y porte l'informatif. Rien ne les distingue a la
+     * lecture d'un appel.
+     *
+     * Un appel a quatre arguments ecrit pour l'autre convention etait donc
+     * SILENCIEUSEMENT tronque : le quatrieme ignore, et l'explication d'echec
+     * imprimee sur des lignes VERTES. Quatre occurrences mesurees le
+     * 2026-08-27, dont deux preexistantes. On ne le laisse plus arriver sans
+     * bruit — et le message nomme le REMEDE, faute de quoi on le contourne en
+     * retirant l'argument.
+     */
+    if (__quatrieme !== undefined) {
+        throw new Error(
+            'INF-002 : `verifie` de ce fichier prend TROIS arguments, et son detail '
+            + 's\'affiche sur un PASS COMME sur un FAIL. Pour une explication qui ne '
+            + 'doit paraitre qu\'en cas d\'echec, ecrire le troisieme argument ainsi : '
+            + '`ok ? <ce qu\'on a mesure> : <ce qui explique l\'echec>`.');
+    }
+
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
 }
@@ -198,9 +223,22 @@ const navigateur = await puppeteer.launch({
     protocolTimeout: 180000,
 });
 const contextes = [];
-const abouties = [];
+const abouties = [];   // requetes EMISES et laissees passer — PAS des reponses recues
 const avortees = [];
 const servies = [];
+/*
+ * LES REPONSES, QUE CETTE SUITE NE REGARDAIT PAS.
+ *
+ * `abouties` est peuple dans `page.on('request')` : il dit qu'une requete est
+ * PARTIE, jamais qu'une reponse est revenue ni ce qu'elle portait. Son nom
+ * laisse croire l'inverse, et je m'y suis laisse prendre le 2026-08-27 en
+ * ecrivant « les huit lectures ont abouti » sur la foi de ce nom.
+ *
+ * Sans ce collecteur, « zero ligne a l'ecran » a DEUX causes indiscernables :
+ * la reponse etait vide, ou elle portait des donnees que l'ecran n'a pas
+ * peintes. Elles ne se corrigent pas au meme endroit.
+ */
+const reponses = [];
 
 /** Ce que le filet sert au prochain releve. `null` = un ECHEC de statut. */
 let statutServi = { success: true, installed: false, running: false, jails: [] };
@@ -241,6 +279,24 @@ async function connecte(nom, secret) {
         }
         avortees.push({ route: chemin, motif: 'appartient a F4, F5 ou F6' });
         r.abort('blockedbyclient').catch(() => {});
+    });
+
+    page.on('response', async (r) => {
+        const url = r.url();
+        if (! LECTURES.test(url)) return;
+        let taille = null;
+        let elements = null;
+        try {
+            const t = await r.text();
+            taille = t.length;
+            // On ne SUPPOSE pas le nom de la cle : on compte le premier tableau
+            // rencontre. Les cles de charge utile de ce depot ont deja diverge
+            // entre backend et frontend (`machines` contre `servers`).
+            const tab = Object.values(JSON.parse(t)).find((v) => Array.isArray(v));
+            elements = tab ? tab.length : 0;
+        } catch { /* corps illisible, deja consomme, ou pas du JSON */ }
+        reponses.push({ chemin: url.replace(/^https?:\/\/[^/]+/, ''),
+            statut: r.status(), taille, elements });
     });
 
     await page.goto(`${BASE}${C.connexion}`, { waitUntil: 'networkidle2' });
@@ -294,15 +350,53 @@ async function choisitMachine(page) {
     return valeur;
 }
 
-/** Cliquer le releve, puis attendre que la lecture de l'historique soit partie. */
+/**
+ * Cliquer le releve, puis attendre que la lecture soit partie ET que le corps
+ * du tableau ait FINI de se peindre.
+ *
+ * Le `dors(700)` fixe qui tenait ce role a lache le 2026-08-27 a 11:27, sous la
+ * charge d'un phpunit concurrent : les huit lectures avaient ABOUTI — le journal
+ * les liste — et le corps n'etait pas encore peint. Cinq assertions ont mesure un
+ * tableau vide et accuse un portage sain ; la MEME execution rendait une date deux
+ * etapes plus loin, ce qui prouve que les lignes existaient. Rejeu de controle au
+ * repos : 24/0, 50 lignes rendues.
+ *
+ * On attend donc la PROPRIETE, jamais une duree : l'empreinte du corps CHANGE,
+ * puis CESSE DE BOUGER. Le plancher de 700 ms est conserve comme plancher — pas
+ * comme total — pour ne jamais etre plus rapide que ce qui passait avant.
+ */
 async function releve(page) {
     const avant = abouties.length;
+
+    // L'empreinte se releve AVANT le clic : sans point de comparaison, un corps
+    // encore vide serait pris pour un corps stabilise — c'est la forme du piege
+    // « s'arreter avant la premiere ligne ».
+    const empreinte = async () => page.evaluate((sel) => {
+        const c = document.querySelector(sel);
+        if (! c) return 'absent';
+        // Le NOMBRE de lignes et la LONGUEUR du texte : le nombre seul laisserait
+        // passer un remplacement a nombre de lignes egal.
+        return c.querySelectorAll('tr').length + ':' + c.textContent.trim().length;
+    }, C.corpsHisto).catch(() => 'illisible');
+
+    const initiale = await empreinte();
     await page.click(C.relever);
+
     for (let i = 0; i < 60; i += 1) {
         if (abouties.length > avant) break;
         await dors(200);
     }
+
     await dors(700);
+
+    let precedente = await empreinte();
+    let aChange = precedente !== initiale;
+    let stable = 0;
+    for (let i = 0; i < 80 && ! (aChange && stable >= 3); i += 1) {
+        await dors(150);
+        const e = await empreinte();
+        if (e === precedente) { stable += 1; } else { stable = 0; precedente = e; aChange = true; }
+    }
 }
 
 let etapes = 0;
@@ -396,6 +490,36 @@ try {
         titreFr = vu.titre;
         constate('intitule de la section, en francais', titreFr || '(vide)');
         constate('lignes rendues', `${vu.rangs} pour ${TOTAL_POSE} en base`);
+
+        /*
+         * UNE PROPRIETE DOIT PORTER SA PRECONDITION — pris par l'autre bout.
+         *
+         * Le 2026-08-27 a 11:27 cette suite a rendu CINQ FAIL. Ce n'etait pas
+         * cinq proprietes cassees : c'etait UNE lecture sans donnee et quatre
+         * echos. Aucune des quatre — la troncature annoncee, une barre par jour,
+         * la hauteur rendue, le plancher d'un jour sans ban — ne PEUT passer sur
+         * zero ligne. Compter cinq faisait croire a cinq defauts de la PAGE, la
+         * ou la mesure disait « la lecture n'a rien rendu ».
+         *
+         * Le detail dit LAQUELLE des deux causes, parce qu'elles ne se corrigent
+         * pas au meme endroit : une reponse vide est un defaut de passerelle ou
+         * de donnees, un rendu absent est un defaut de peignage.
+         */
+        const lectures = reponses.filter((r) => /history/.test(r.chemin));
+        const derniere = lectures[lectures.length - 1];
+        constate('derniere reponse d\'historique', derniere
+            ? `HTTP ${derniere.statut}, ${derniere.elements} element(s), ${derniere.taille} octets`
+            : '(aucune reponse observee)');
+        verifie('la lecture de l\'historique a rendu des lignes', vu.rangs > 0,
+            ! derniere
+                ? 'AUCUNE reponse d\'historique observee — la requete n\'est pas revenue'
+                : derniere.elements === 0
+                    ? `la REPONSE est vide (HTTP ${derniere.statut}, 0 element) — `
+                      + 'le defaut n\'est PAS dans le rendu, et les assertions qui suivent '
+                      + 'mesureraient un ecran sans objet'
+                    : `la reponse portait ${derniere.elements} element(s) et l\'ecran n\'en `
+                      + 'rend AUCUN — le defaut est dans le RENDU',
+            vu.rangs > 0 ? `${vu.rangs} ligne(s)` : '');
         constate('premiere ligne', vu.premiere.join(' | '));
         constate('valeurs distinctes de la colonne « Par »', vu.auteurs.join(' · '));
 
