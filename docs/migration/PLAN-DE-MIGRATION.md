@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **195** — numérotés jusqu'à **E-208** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc, et celle qui expose le plus n'était pas surveillée**). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **197** — numérotés jusqu'à **E-210** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -842,6 +842,32 @@ satisfaite**, parce que la distinction qui tranche est le sens :
 
 La passe est bon marché et elle vient d'être payée deux fois ; elle entre au cycle pour que la prochaine
 partie ne dépende pas de qui a lu quoi.
+
+### ⚠ UNE NEUVIÈME ÉTAPE : LES CLÉS DE CONSEIL, PARCE QUE LEUR APPARTENANCE SE PERD AU `git mv` (2026-08-27)
+
+**Mesuré : 104 chaînes traduites sont déjà orphelines, et personne ne l'a remarqué en douze archivages.**
+Le détail est en E-210 ; ce qui entre au cycle est la **fenêtre**, et elle est étroite.
+
+Après un `git mv`, les clés `tip.<module>_*` **restent dans `legacy/lang/{fr,en}/tips.php`** — rien ne les
+déplace. Mais **plus rien ne dit à quelle page elles appartenaient** : le seul lien était le
+`require howto_tip.php` de `index.php`, qui part avec le dossier. **Pour les onze parties déjà archivées,
+cette information n'est récupérable que dans `legacy/_deprecated/*/index.php`** — donc tant que
+`_deprecated/` existe, et pas après la disparition finale du legacy.
+
+**L'étape, avant le `git mv`** : relever les clés `tip.*` de la partie, les **compter**, et dire si le
+portage rend une séquence équivalente. **Compter, y compris quand le compte est zéro** — même parade que
+les quatre emplacements.
+
+> **Et ne pas les recopier telles quelles.** E-209 montre que **deux des quatre étapes** de `platform_key`
+> disaient faux, dont une qui affirmait qu'un geste durcissait la machine en la qualifiant de « plus
+> sécurisé » alors qu'il retire le seul recours de RootWarden. *Un acquis traduit n'est pas un acquis
+> vérifié* — et un guide est ce qu'on lit quand on ne sait pas, donc il fabrique l'hypothèse au lieu de la
+> corriger.
+
+**La question à poser page par page n'est pas « les clés sont-elles portées »** — le portage emploie
+`tip_*` pour des **infobulles**, donc tout contrôle par motif conclut « oui » (E-210). **C'est : la
+SÉQUENCE, l'ordre des gestes, est-elle dite quelque part sur la page portée ?** Formulation de la session 3,
+et c'est la seule qui mesure quelque chose.
 
 #### Et une chose que ces liens disent du produit, pas du chantier
 

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.26** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.27** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,95 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.27 — ⚠ EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden
+
+**Le defaut le plus grave de la journee, trouve par la session 3 en REFUSANT de porter fidelement, et
+servi en production sur `main` (v1.37.15).**
+
+    legacy/lang/fr/tips.php:125    « Supprimer le password desactive l'authentification par mot de
+                                     passe SUR LE SERVEUR (plus securise). »
+    legacy/lang/en/tips.php:113    idem, en anglais
+
+    backend/routes/ssh.py — remove_ssh_password
+    UPDATE machines SET password = '', root_password = '', ssh_password_required = FALSE WHERE id = %s
+
+**C'est tout.** Aucune `SSHClient`, aucun `connect`, aucun `exec_command`, aucune ecriture dans
+`sshd_config`. **Le geste ne joint pas la machine.** Le compte Unix garde son mot de passe et qui le
+connait entre encore ; ce que le geste efface est **la copie que RootWarden detenait** — son propre recours.
+
+> **« Plus securise » est le mot qui coute.** Un exploitant qui suit ce guide **croit se proteger et se
+> prive d'un recours** — sur la page meme ou toute la mise en page le pousse vers cet etat, et ou la
+> rotation de cle devient sans retour.
+
+**Troisieme forme du motif que ce chantier suit, et la plus couteuse** : ni un en-tete qui mente sur un
+acces (E-36), ni un libelle qui promette un controle (E-203), mais **un guide qui enseigne une procedure en
+se trompant sur son EFFET**. *Un guide est ce qu'on lit quand on ne sait pas* — les deux premieres formes
+trompent quelqu'un qui a deja une hypothese, celle-ci la **fabrique**.
+
+**Et l'etape 2 est incomplete dans le sens qui compte** : « installe la cle publique sur les serveurs »
+tait que le meme geste cree le compte `rootwarden` avec **`NOPASSWD: ALL`** (`ssh.py:704-775`). Un guide qui
+decrit l'installation d'une cle et omet un compte a sudo sans mot de passe ne decrit pas le geste que
+l'exploitant autorise.
+
+Le portage ecrit la sequence **corrigee**, en liste numerotee — *« deployer la cle » avant « effacer le mot
+de passe » n'est pas une preference de presentation mais la difference entre une migration et un
+verrouillage* — et **la correction est DITE sous le guide, pas faite en silence.** **Le legacy n'est pas
+corrige par ce lot** : il est servi en production, et c'est le seul ecart de la journee dont la version
+fausse est **lue par des utilisateurs en ce moment**. Arbitrage de l'exploitant.
+
+#### E-210 — le panneau « Comment ca marche ? » n'a JAMAIS ete porte, et un homonyme a fait croire le contraire
+
+    legacy/lang/{fr,en}/tips.php ....... 148 cles, FR = EN, jeux IDENTIQUES
+      motif `tip.<module>_(title|stepN)` ... 125 cles, 27 groupes
+    pages posant `includes/howto_tip.php` .. 26   (15 vivantes, 11 deja archivees)
+    cles des parties DEJA ARCHIVEES ........ 52 x2 langues = **104 chaines orphelines MAINTENANT**
+    cles des parties encore vivantes ....... 73 x2 langues = 146, aux 5 archivages restants
+
+**Ce n'est pas « le portage a fait moins bien sur deux modules » : c'est une capacite du produit qui n'a
+jamais ete portee du tout**, et qui disparait a chaque `git mv`. Deux fondements independants, dont le
+second ne depend d'aucun nom de cle : **aucune cle d'etape dans aucun catalogue du portage** (parcours
+recursif : zero) et surtout **aucun RENDU** — `howto_tip.php` est un `<details>` pliable a memorisation,
+`rw-aide` est du texte d'aide en ligne, `rw-etapes` un indicateur de progression d'authentification.
+
+> **⚠ Pourquoi personne ne l'a vu : le portage emploie `tip_*` massivement — pour des INFOBULLES.**
+> `legacy: tip.graylog_step1` est un panneau ; `portage: docker.tip_scan_one` est un `title=""` de bouton.
+> Un `grep tip` dans `laravel/lang/` rend des dizaines de correspondances : **quiconque a verifie « les
+> tips sont-ils portes ? » par un motif a conclu que oui.** Meme mot, deux objets sans rapport — et
+> applique ici a un **controle de completude de portage**, ce qui le rend couteux : *le controle a l'air
+> d'avoir ete fait.*
+
+**La nuance de la session 3 deplace le diagnostic sans l'annuler** : sur `graylog`, le portage a bien cinq
+cles de guide — mais **le legacy explique COMMENT FAIRE** (une sequence) et **le portage CE QUE LE BOUTON
+FAIT VRAIMENT** (« Deployer ouvre une connexion SSH et installe rsyslog »). Les deux sont legitimes et
+complementaires ; le portage a opere une **substitution non nommee**, un guide de *procedure* remplace par
+un guide de *consequence*, **et il l'a fait parce que les libelles mentaient** — E-209 en est la preuve.
+**Ce qui est perdu n'est pas « du conseil », c'est l'ORDRE.**
+
+**Ce que ca decide pour FEAT-001 : il ne remplace pas un acquis, il comble un trou ouvert depuis le premier
+archivage.** 125 cles x 2 langues sont deja ecrites et traduites — reprendre coute un composant Blade et un
+mappage, concevoir de zero coute la redaction et la traduction de **250 chaines**. **Mais elles ne se
+reprennent pas telles quelles** : *un acquis traduit n'est pas un acquis verifie.* Et la fenetre se ferme
+module par module — apres un `git mv`, les cles restent dans `tips.php` mais **plus rien ne dit a quelle
+page elles appartenaient** ; pour les onze parties deja archivees, l'information n'est recuperable que dans
+`legacy/_deprecated/*/index.php`.
+
+**Neuvieme etape au cycle d'archivage** : relever et **compter** les cles `tip.*` de la partie avant le
+`git mv`, zeros compris, et dire si le portage rend une sequence equivalente. **La question qui mesure n'est
+pas « les cles sont-elles portees » mais « la SEQUENCE, l'ordre des gestes, est-elle dite quelque part sur
+la page portee ? »**
+
+#### Une regle qui devient une propriete : le pathspec, apres la seconde occurrence
+
+La session 2 a constate son propre defaut d'index sur `90a6ac5` — quatre fichiers du Lead emportes — et
+nomme la cause exactement : *« j'avais relu `git diff --cached --stat` avant mes deux commits precedents ;
+sur celui-la j'ai enchaine `git add && git commit` sans le refaire. La relecture n'etait pas la protection,
+elle en donnait l'apparence. »*
+
+> **Une regle qu'on doit se rappeler est une propriete qu'on n'a pas encore construite.** Elle a enfreint
+> le matin la regle qu'elle appliquait l'apres-midi. `git commit -F - -- <chemins>` **ignore l'index** ;
+> c'est une propriete, pas un rappel. Pas de reecriture d'historique : d'autres sessions travaillent, et la
+> correspondance version -> commit du present fichier departage.
+
 ### v1.38.26 — le Lead a ecrit « aucun lien entrant » et c'etait faux pour quatre parties sur cinq
 
 **Le motif de la passe cherchait `href="…"`. Les tuiles du tableau de bord s'ecrivent `'url' => '…'`.**
@@ -2593,7 +2682,8 @@ correspondance reelle :**
 | v1.38.23 | `0b5ccc7` | les 5 545 lignes de legacy deja porte, et la parallelisation du portage |
 | v1.38.24 | `90a6ac5` | l'ordre d'archivage devient un graphe ; INF-003 ; E-207 et E-208 — **contenu du Lead, emporte par le commit `graylog` d'une autre session : l'index est PARTAGE, seconde occurrence** |
 | v1.38.25 | `643927a` | six references mesurees, et une prediction qui a rattrape une MESURE fausse |
-| v1.38.26 | `a1cd400` | « aucun lien entrant » etait faux ; les 4 emplacements comptes ; les conseils du legacy non repris |
+| v1.38.26 | `a1cd400` | « aucun lien entrant » etait faux ; les 4 emplacements comptes |
+| **v1.38.27** | (ce commit) | **E-209, en production : un guide qui enseigne un durcissement inexistant** ; E-210 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
