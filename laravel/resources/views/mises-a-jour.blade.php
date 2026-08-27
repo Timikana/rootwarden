@@ -286,7 +286,7 @@
          les classes sont ceux du legacy (`logs-container`, `logs`,
          `.server-log-window`, `.log-window`, `.log-line`) : le MEME test vise
          les deux cibles. --}}
-    <section class="rw-journal" data-rw="journal">
+    <section class="rw-journal-section" data-rw="journal">
         <div class="rw-entete-page">
             <div>
                 <h2 class="rw-sous-titre-fort">{{ __('maj.journal_titre') }}</h2>
