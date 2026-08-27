@@ -413,10 +413,21 @@ contraint** dans l'ordre d'archivage, contrairement à `remote_users`.
 
 ### 7.8 Ce que la passe a trouvé EN PLUS, et qui n'est pas un lien
 
-**Huit clés de conseil orphelines à l'archivage** : `tip.graylog_title` et `tip.graylog_step1..4`,
+**CINQ clés de conseil orphelines à l'archivage — dix chaînes traduites** : `tip.graylog_title` et
+`tip.graylog_step1..4`,
 en **FR et EN** (`legacy/lang/{fr,en}/tips.php`), consommées par `howto_tip.php` depuis
 `legacy/graylog/index.php`. Plus `dashboard.sc_graylog` et `sc_graylog_desc`, qui étiquettent la tuile
 du §7.2 et **restent utiles** une fois l'URL basculée.
+
+> **⚠ CORRIGÉ le 2026-08-27 — ce paragraphe portait DEUX erreurs, toutes deux de moi.**
+> J'avais écrit « huit clés », alors que mon propre tableau de comptage rendait **5** — cinq clés,
+> dix chaînes (FR+EN). Le nombre contredisait ma propre mesure dans le même document.
+> Et j'avais écrit que le portage n'en reprenait **aucune** : la session 3 a mesuré que
+> `laravel/lang/fr/graylog.php` en porte **cinq**. Ce qui est vrai est plus fin, et plus intéressant :
+> **le legacy dit COMMENT FAIRE — une séquence ; le portage dit CE QUE LE BOUTON FAIT — une
+> conséquence.** Les deux sont légitimes. Le portage a opéré une **substitution non nommée**, et il
+> l'a faite parce que les libellés du legacy mentaient.
+> **Ce qui est perdu n'est donc pas « du conseil » : c'est l'ORDRE.**
 
 **Et le portage ne les a pas reprises** : `laravel/lang/fr/graylog.php` existe et ne porte **aucune**
 clé de conseil (mesuré). Les quatre étapes du legacy — configurer le serveur et le jeton, éditer les
