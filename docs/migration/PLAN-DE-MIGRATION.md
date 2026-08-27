@@ -1639,10 +1639,32 @@ cadre, là où le legacy dépend d'un script de page. **Le portage est donc mesu
 l'est pas**, et cela se voit dans les références : `go-fail2ban-f1` gagne **+3** en laravel et **+2** en
 legacy.
 
-**Corollaire pour toute mesure de correctif backend** : importer le module dans un processus neuf
-(`docker exec python -c "from … import …"`) lit **le disque**, pas le serveur en vol. Sur un correctif
-committé après le dernier redémarrage, cela « confirme » un correctif qui **n'est pas en service** —
-sixième forme du piège de l'observable, évitée de justesse. **Seule une requête réelle tranche.**
+**Corollaire pour toute mesure de correctif backend, et il a fallu deux tours pour l'écrire juste.**
+
+Un `docker exec python -c "import X"` lit le **disque** dans un processus **neuf** : il ne dit rien du
+serveur en vol, **quelle que soit la finesse de l'introspection**. C'est vrai même d'une sonde qui
+inspecte les modules chargés — `inspect.getsourcefile` rend un **chemin**, donc relit le fichier, et le
+`docker exec` a son propre PID.
+
+> **Ce qui permet de conclure n'est JAMAIS la sonde : c'est la comparaison du `StartedAt` du processus
+> contre le `mtime` du fichier.** Sans elle, la sonde et le serveur peuvent diverger sans que rien ne le
+> signale.
+
+**Ma première rédaction disait « seule une requête réelle tranche ». C'était trop fort**, et ça
+interdisait une inférence valide et gratuite : un processus Python importe ses modules **au démarrage**,
+donc *fichier antérieur au démarrage* ⇒ *c'est ce fichier qui est chargé*. C'est une **inférence**, pas
+une observation, et elle est solide **tant que son maillon de temps est vérifié**.
+
+Les deux cas du jour se distinguent par ce seul maillon :
+
+| | fichier | démarrage | verdict |
+|---|---|---|---|
+| la sonde qui a failli conclure à tort | modifié **11:58** | 10:55 | **postérieur → la sonde mentait** |
+| la preuve valide | modifiés 11:30 / 11:25 / 10:12 | 11:57 | **tous antérieurs → chargés** |
+
+**Et le corollaire opérationnel appartient au Lead** : *une fenêtre de redémarrage se clôt par cette
+comparaison, pas par une introspection.* Deux commandes, et c'est la seule chose qui sépare les deux
+cas.
 
 ### ⚠ INF-002 — DEUX CONVENTIONS POUR `verifie()`, ET UN APPEL FAUX NE LÈVE RIEN (2026-08-27)
 
