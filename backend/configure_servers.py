@@ -57,8 +57,49 @@ _USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
 
 
 def _valid_username(username) -> bool:
-    """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32)."""
-    return bool(username) and bool(_USERNAME_RE.match(str(username)))
+    """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32).
+
+    E-197. La classe de caracteres seule ne suffit pas : elle accepte `.` et
+    `..`, qui ne sont pas des noms de compte mais des COMPOSANTS DE CHEMIN. Or
+    ce nom est interpole dans des chemins executes en root — la cle SSH
+    (`/home/<nom>/.ssh/authorized_keys`) et les deux fichiers sudoers. Mesure du
+    2026-08-27 :
+
+        '..'  ->  rm -f /.ssh/authorized_keys        (et /etc pour le legacy)
+        '.'   ->  rm -f /home/.ssh/authorized_keys   (et /etc/sudoers.d)
+
+    Le nom vient de `server_user_inventory`, donc de ce qui a ete lu dans le
+    `/etc/passwd` de la machine — et ce scan ne valide pas ce qu'il insere.
+
+    CE N'EST PAS UNE ELEVATION DE PRIVILEGE : seul le root de cette machine peut
+    poser un tel nom, et la commande s'execute sur cette meme machine. Ce qui
+    est reel est un `rm -f` root sur un chemin qui n'est PAS celui vise.
+
+    POURQUOI PAS L'EXPRESSION STRICTE QUI EXISTE DEJA DEUX FOIS DANS LE DEPOT
+    `sudo_manager.py:32` et `sftp_manager.py:34` portent `^[a-z_][a-z0-9_-]{0,31}$`,
+    identiques a l'octet, et elles refusent bien `.` et `..`. Les reprendre ici
+    etait la premiere idee — elle CASSE le cas normal. Mesure sur les 41 noms
+    reels du parc : elle refuserait **`Debian-exim`**, **`Debian-snmp`** et
+    **`Timikana`**. Les deux premiers sont des comptes systeme Debian standard,
+    presents sur toute machine du parc.
+
+    La raison est un DOMAINE, pas une severite : ces deux modules valident des
+    noms que RootWarden GERE, ou la regle de `useradd` est la bonne. Ce fichier
+    valide des noms DECOUVERTS dans le `/etc/passwd` d'une machine reelle, ou
+    les majuscules existent. Trois implementations, mais DEUX notions — les
+    fondre serait E-195 a nouveau.
+
+    Le correctif est donc etroit : la classe de caracteres reste, et ce qui est
+    refuse est ce qui n'est fait que de points.
+    """
+    nom = str(username or '')
+    if not _USERNAME_RE.match(nom):
+        return False
+    # `.`, `..`, `...` — total pour la classe, la ou tester deux valeurs
+    # laisserait passer la troisieme.
+    if nom.strip('.') == '':
+        return False
+    return True
 
 # ===================================================
 # Classe CustomFormatter pour Gérer l'Absence du Champ 'machine'
