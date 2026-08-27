@@ -276,7 +276,10 @@ def reboot_server():
             return jsonify({'success': False, 'pending_approval': True,
                             'request_id': _ap['id'], 'message': msg}), 202
     except Exception as e:
-        logger.debug("approval gate (reboot) skipped: %s", e)
+        # Une porte a quatre yeux qui s'ouvre doit laisser une TRACE : `debug`
+        # n'est pas journalise en exploitation. Un repli silencieux n'est pas
+        # un repli, c'est une absence.
+        logger.error("approval gate (reboot) OUVERTE sur erreur : %s", e)
 
     try:
         with get_db_connection() as conn:

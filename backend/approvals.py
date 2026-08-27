@@ -29,6 +29,44 @@ _log = logging.getLogger(__name__)
 
 ROLE_SUPERADMIN = 3
 
+# ══ DEUX ACTIONS NE SE CONTOURNENT PAS ET NE SE REPLIENT PAS ════════════════
+#
+# E-201. Une SEULE liste gouverne DEUX regles — le contournement du role 3 et le
+# repli sur erreur de base — parce que ce sont deux facons de laisser passer le
+# meme geste, et qu'un drapeau par appelant les disperserait entre quatre
+# endroits.
+#
+# ┌─ LE CONTOURNEMENT DU ROLE 3 EST LEVE ICI SCIEMMENT ─────────────────────┐
+# │                                                                          │
+# │ Il n'etait PAS un oubli : sa docstring dit qu'il existe parce que « sur   │
+# │ un deploiement avec un seul administrateur, la regle 4-eyes ne pourrait   │
+# │ jamais etre satisfaite et bloquerait toute action ».                      │
+# │                                                                          │
+# │ Or ces deux routes sont `@require_role(3)` : brancher la porte dessus     │
+# │ REPRODUIT EXACTEMENT le cas pour lequel le contournement a ete ecrit. La  │
+# │ brancher sans lever le contournement aurait donc pose une ligne qui ne    │
+# │ peut jamais rien faire — une garde presente qui ne garde pas.            │
+# │                                                                          │
+# │ La levee est donc une DECISION, prise le 2026-08-27, et elle a une        │
+# │ condition : l'exploitant cree un second compte d'administration reel.     │
+# │ Sans lui, ces deux gestes deviennent impossibles.                         │
+# │                                                                          │
+# │ ET L'APPROBATEUR N'A PAS BESOIN DU ROLE 3 : `routes/approvals.py:28-29`   │
+# │ exige `role(2)` + `can_admin_portal`, avec `approved_by != requested_by`. │
+# │ Un role 2 porteur de la permission approuve donc une action de role 3 —   │
+# │ separation des taches SANS escalade. Ne pas supposer l'inverse.          │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# LE REPLI : sur erreur de base, `gate()` rend `None` — l'action passe. C'est
+# tenable pour un redemarrage ; ca ne l'est pas pour la rotation de la paire de
+# cles de la flotte entiere ni pour le kill-switch du compte de service. Pour
+# ces deux-la, une porte qui ECHOUE doit REFUSER.
+#
+# Un fail-closed EN BLOC changerait le comportement de `delete_remote_user` et
+# `reboot_server`, qui refuseraient sur une simple erreur de base. La liste
+# fermee l'evite : ailleurs, rien ne change.
+ACTIONS_SANS_REPLI = frozenset({'regenerate_platform_key', 'revoke_service_account'})
+
 
 def _conn():
     return mysql.connector.connect(**Config.DB_CONFIG)
@@ -71,7 +109,8 @@ def gate(action_type, machine_id, target, payload, requested_by, role=None):
     if not is_required(action_type):
         return None
 
-    if role is not None and int(role) >= ROLE_SUPERADMIN:
+    if (role is not None and int(role) >= ROLE_SUPERADMIN
+            and action_type not in ACTIONS_SANS_REPLI):
         _log.info("Approbation 4-eyes contournee (superadmin) action=%s cible=%s",
                   action_type, target)
         return None
@@ -113,6 +152,12 @@ def gate(action_type, machine_id, target, payload, requested_by, role=None):
         finally:
             conn.close()
     except Exception as e:
+        if action_type in ACTIONS_SANS_REPLI:
+            # Une porte qui echoue REFUSE. L'appelant doit traiter cette
+            # exception comme un refus, jamais la journaliser et continuer.
+            _log.error("approvals.gate BDD error (FAIL-CLOSED) action=%s : %s",
+                       action_type, e)
+            raise
         _log.warning("approvals.gate BDD error (fail-open): %s", e)
         return None
 
