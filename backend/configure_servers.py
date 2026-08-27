@@ -220,6 +220,37 @@ def _sudoers_target(username: str) -> str:
     return f"/etc/sudoers.d/{_SUDOERS_PREFIX}{username}"
 
 
+def _absence_verifiee(channel, chemins, logger=None) -> bool:
+    """Vrai si AUCUN des chemins n'existe plus sur la machine distante.
+
+    E-192. `execute_command_as_root` rend la SORTIE, jamais le code : il le
+    calcule sur son chemin `service_account` (`ssh_utils.py:831`) et le JETTE,
+    et il le jette aussi en depaquetant `execute_as_root`. Un `rm -f` refuse est
+    donc indiscernable d'un `rm -f` reussi pour tous ses appelants.
+
+    On ne verifie donc pas la COMMANDE mais son EFFET — c'est la regle du
+    chantier : « une reussite annoncee n'est pas une reussite verifiee ».
+
+    LE MARQUEUR EST POSITIF ET FAIL-CLOSED, et il est assemble par
+    CONCATENATION SHELL. Sur les machines en mode `su`/`sudo` interactif, le
+    canal ECHOTE la commande envoyee (v1.37.11) : un marqueur ecrit en clair
+    reviendrait dans la sortie sans que rien n'ait ete verifie. La ligne echotee
+    porte `__RW_""ABSENT_OK__`, la sortie reelle porte `__RW_ABSENT_OK__` — et
+    on le cherche comme LIGNE ENTIERE, jamais en sous-chaine.
+
+    Tout ce qui n'est pas ce marqueur exact vaut « non verifie ».
+    """
+    tests = " && ".join(f"test ! -e {c}" for c in chemins)
+    try:
+        sortie = execute_command_as_root(
+            channel, f'{tests} && echo "__RW_""ABSENT_OK__"', logger=logger) or ''
+    except Exception as e:
+        if logger:
+            logger.error(f"_absence_verifiee : sonde echouee ({e})")
+        return False
+    return any(ligne.strip() == '__RW_ABSENT_OK__' for ligne in str(sortie).splitlines())
+
+
 def _purge_legacy_sudoers(channel, username: str, logger=None) -> None:
     """Supprime l'ancien fichier a nom nu /etc/sudoers.d/<user> (naming pre-fix),
     sauf s'il s'agit du compte de service rootwarden (fichier reserve)."""
@@ -754,11 +785,50 @@ class ServerConfigurator:
 
         revoked = managed_users - authorized_names
         for uname in revoked:
-            self.logger.info(f"[{uname}] Acces revoque - retrait cle SSH et sudo (compte conserve).")
+            # ══ UNE REVOCATION ANNONCEE N'EST PAS UNE REVOCATION FAITE ═══════
+            #
+            # E-192. Cette boucle journalisait « Acces revoque » AVANT d'agir,
+            # puis jetait le resultat des deux gestes. Elle pouvait donc
+            # affirmer qu'un acces etait ferme alors qu'il restait OUVERT.
+            #
+            # C'est l'inverse d'E-183, et c'est pire : E-183 detruisait une
+            # donnee vraie, qui se repare en rescannant. Celle-ci produit une
+            # FAUSSE ATTESTATION — personne ne rouvre un dossier de conformite
+            # clos.
+            #
+            # Le nom vient de `server_user_inventory`, donc de ce qui a ete lu
+            # dans le `/etc/passwd` de la machine, et il n'etait PAS valide
+            # avant d'etre interpole dans un `rm -f` root. Ce n'est pas une
+            # elevation de privilege — seul le root de cette machine peut poser
+            # un tel nom, et la commande s'execute sur cette meme machine —
+            # mais un nom porteur d'un espace ou d'un `;` fait echouer le
+            # retrait EN SILENCE, ce qui est exactement le defaut ci-dessus.
+            if not _valid_username(uname):
+                self.logger.error(
+                    f"[{uname!r}] REVOCATION REFUSEE : nom de compte invalide en "
+                    f"inventaire. Aucun geste emis, l'acces reste en l'etat.")
+                continue
+
+            self.logger.info(f"[{uname}] Revocation DEMANDEE - retrait cle SSH et sudo (compte conserve).")
             try:
                 ak_path = f"/home/{uname}/.ssh/authorized_keys"
                 execute_command_as_root(channel, f"rm -f {ak_path}", logger=self.logger)
                 remove_from_sudoers(channel, uname, logger=self.logger)
+
+                # Le VERDICT se lit sur l'etat de la machine, pas sur le fait
+                # d'avoir envoye les commandes.
+                chemins = [ak_path, _sudoers_target(uname)]
+                if uname != _RESERVED_SA_USER:
+                    chemins.append(f"/etc/sudoers.d/{uname}")
+
+                if _absence_verifiee(channel, chemins, logger=self.logger):
+                    self.logger.info(
+                        f"[{uname}] Acces REVOQUE et verifie : cle SSH et regles sudo absentes.")
+                else:
+                    self.logger.error(
+                        f"[{uname}] REVOCATION NON VERIFIEE : au moins un de "
+                        f"{chemins} subsiste ou n'a pas pu etre lu. "
+                        f"L'ACCES DOIT ETRE CONSIDERE COMME ENCORE OUVERT.")
             except Exception as e:
                 self.logger.error(f"[{uname}] Erreur retrait acces : {e}")
 
