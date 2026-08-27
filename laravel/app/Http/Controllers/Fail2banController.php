@@ -75,6 +75,13 @@ class Fail2banController extends Controller
             'conf_titre_debannir', 'conf_texte_debannir',
             'conf_titre_tout', 'conf_texte_tout',
             'geste_echoue', 'ban_invalide',
+            // F5
+            'blanche_lue', 'blanche_supposee_titre', 'blanche_supposee',
+            'blanche_vide_titre', 'blanche_vide', 'blanche_retirer',
+            'blanche_non_retirable', 'blanche_non_retirable_aide',
+            'conf_titre_blanche_ajout', 'conf_texte_blanche_ajout',
+            'conf_titre_blanche_retrait', 'conf_texte_blanche_retrait',
+            'jail_reglages_titre', 'conf_titre_jail', 'conf_texte_jail',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }

@@ -75,6 +75,22 @@ window.RW_FAIL2BAN = true;
 
     var jailCourante = null;
 
+    var blocBlanche = document.querySelector('[data-rw="f2b-blanche"]');
+    var sourceBlanche = document.querySelector('[data-rw="f2b-blanche-source"]');
+    var messageBlanche = document.querySelector('[data-rw="f2b-blanche-message"]');
+    var listeBlanche = document.querySelector('[data-rw="f2b-blanche-liste"]');
+    var champBlanche = document.querySelector('[data-rw="f2b-blanche-ip"]');
+    var ajouterBlanche = document.querySelector('[data-rw="f2b-blanche-ajouter"]');
+    var reglages = document.querySelector('[data-rw="f2b-jail-reglages"]');
+    var reglagesTitre = document.querySelector('[data-rw="f2b-reglages-titre"]');
+    var champMaxretry = document.querySelector('[data-rw="f2b-maxretry"]');
+    var champBantime = document.querySelector('[data-rw="f2b-bantime"]');
+    var champFindtime = document.querySelector('[data-rw="f2b-findtime"]');
+    var boutonActiver = document.querySelector('[data-rw="f2b-jail-activer"]');
+    var reglagesAnnuler = document.querySelector('[data-rw="f2b-reglages-annuler"]');
+
+    var jailAActiver = null;
+
     var choix = document.querySelector('[data-rw="f2b-serveur"]');
     var relever = document.querySelector('[data-rw="f2b-relever"]');
     var message = document.querySelector('[data-rw="f2b-etat-message"]');
@@ -132,6 +148,9 @@ window.RW_FAIL2BAN = true;
         if (detailJail) { detailJail.hidden = true; }
         jailCourante = null;
         if (confirmation) { confirmation.hidden = true; }
+        if (blocBlanche) { blocBlanche.hidden = true; }
+        if (reglages) { reglages.hidden = true; }
+        jailAActiver = null;
     });
     majChoix();
 
@@ -663,6 +682,19 @@ window.RW_FAIL2BAN = true;
             var jails = document.createElement('span');
             jails.className = 'rw-liste-etats__jails';
             (s.jails || []).forEach(function (j) {
+                if (s.installed && ! j.enabled) {
+                    // ACTIVER UNE JAIL EST UNE ECRITURE : c'est un bouton, pas
+                    // une pastille. Et il n'est offert que si le service est la.
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule';
+                    b.setAttribute('data-rw', 'f2b-activer-' + (j.name || ''));
+                    b.textContent = (j.name || '') + ' +';
+                    b.addEventListener('click', function () { ouvreReglages(j.name || ''); });
+                    jails.appendChild(b);
+
+                    return;
+                }
                 var p = document.createElement('span');
                 p.className = 'rw-badge ' + (j.enabled ? 'rw-badge--ok' : 'rw-badge--neutre');
                 p.textContent = (j.name || '') + (j.enabled
@@ -809,6 +841,8 @@ window.RW_FAIL2BAN = true;
         confTitre.textContent = remplit(cleTitre, valeurs);
         confTexte.textContent = remplit(cleTexte, valeurs);
         confirmation.hidden = false;
+        // Le panneau vit au niveau de la PAGE : il peut etre loin du geste.
+        confirmation.scrollIntoView({ block: 'nearest' });
         confirmer.focus();
     }
 
@@ -913,6 +947,205 @@ window.RW_FAIL2BAN = true;
         ferme();
     }); }
 
+    /* ══ F5 : LA LISTE BLANCHE, ET LES REGLAGES D'UNE JAIL ═══════════════ */
+
+    /**
+     * UNE ENTREE QU'ON NE PEUT PAS RETIRER NE PORTE PAS DE BOUTON.
+     *
+     * `_validate_ip` appelle `ipaddress.ip_address()` : un CIDR y leve une
+     * `ValueError`. Le « × » de `127.0.0.1/8` ne peut donc JAMAIS aboutir — et
+     * c'est l'une des deux entrees que le backend suppose par defaut (E-169).
+     * Ce n'est pas le refus qui est fautif, c'est de l'OFFRIR.
+     *
+     * La regle est la meme que celle du backend, pas une approximation : une
+     * adresse, jamais un reseau.
+     */
+    function estUneAdresse(v) {
+        var t = String(v || '').trim();
+        if (t.indexOf('/') !== -1) { return false; }
+
+        return /^(\d{1,3}\.){3}\d{1,3}$/.test(t)
+            ? t.split('.').every(function (n) { return Number(n) <= 255; })
+            : /^[0-9a-f:]+$/i.test(t) && t.indexOf(':') !== -1;
+    }
+
+    function rendBlanche(ips, lue) {
+        listeBlanche.innerHTML = '';
+        messageBlanche.innerHTML = '';
+        blocBlanche.hidden = false;
+        var machine = nomMachineChoisie();
+
+        // LUE OU SUPPOSEE : le backend le dit desormais (E-168).
+        sourceBlanche.textContent = lue
+            ? remplit('blanche_lue', { machine: machine })
+            : '';
+        if (! lue) {
+            var bloc = document.createElement('div');
+            bloc.className = 'rw-vide';
+            bloc.setAttribute('data-rw', 'f2b-blanche-supposee');
+            var t = document.createElement('p');
+            t.className = 'rw-sous-titre-fort';
+            t.textContent = textes.blanche_supposee_titre || '';
+            var x = document.createElement('p');
+            x.className = 'rw-prose';
+            x.textContent = remplit('blanche_supposee', { machine: machine });
+            bloc.appendChild(t);
+            bloc.appendChild(x);
+            messageBlanche.appendChild(bloc);
+        }
+        if (! ips || ! ips.length) {
+            poseMessage(messageBlanche, 'blanche_vide_titre', 'blanche_vide', false);
+
+            return;
+        }
+
+        ips.forEach(function (adresse) {
+            var ligne = document.createElement('div');
+            ligne.className = 'rw-liste-etats__ligne';
+            ligne.setAttribute('data-rw', 'f2b-blanche-' + adresse);
+
+            var nom = document.createElement('span');
+            nom.className = 'rw-liste-etats__nom rw-tableau__mono';
+            nom.textContent = adresse;
+            ligne.appendChild(nom);
+
+            var actions = document.createElement('span');
+            actions.className = 'rw-liste-etats__jails';
+            // Une entree SUPPOSEE n'est pas dans le fichier : il n'y a rien a en
+            // retirer. Une entree qui n'est pas une adresse ne peut pas l'etre.
+            if (lue && estUneAdresse(adresse)) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule';
+                b.setAttribute('data-rw', 'f2b-blanche-retirer-' + adresse);
+                b.textContent = textes.blanche_retirer || '';
+                b.addEventListener('click', function () { demandeRetraitBlanche(adresse); });
+                actions.appendChild(b);
+            } else {
+                var raison = document.createElement('span');
+                raison.className = 'rw-non-resolu';
+                raison.setAttribute('data-rw', 'f2b-blanche-figee-' + adresse);
+                raison.textContent = textes.blanche_non_retirable || '';
+                raison.title = lue
+                    ? remplit('blanche_non_retirable_aide', { ip: adresse })
+                    : (textes.blanche_supposee_titre || '');
+                actions.appendChild(raison);
+            }
+            ligne.appendChild(actions);
+            listeBlanche.appendChild(ligne);
+        });
+    }
+
+    function chargeBlanche() {
+        var o = machineChoisie();
+        if (! blocBlanche || ! o) { return; }
+        litDistant('/fail2ban/whitelist', { machine_id: parseInt(o.value, 10), action: 'list' })
+            .then(function (d) {
+                if (! d) {
+                    listeBlanche.innerHTML = '';
+                    messageBlanche.innerHTML = '';
+                    blocBlanche.hidden = false;
+                    poseMessage(messageBlanche, 'lecture_echec_titre', 'lecture_echec', true);
+
+                    return;
+                }
+                rendBlanche(d.ips || [], d.lue === true);
+            });
+    }
+
+    /*
+     * LES DEUX GESTES CONFIRMENT, ET LES DEUX ANNONCENT LE REDEMARRAGE.
+     *
+     * Le legacy ne fait confirmer que le RETRAIT d'une exemption — donc le geste
+     * qui renforce la protection. Ajouter une exemption, qui l'affaiblit, passe
+     * sans un mot ; et aucun des deux ne dit que `manage_whitelist` finit par
+     * `restart_fail2ban`, donc que tous les bans en cours seront perdus (E-170).
+     */
+    function demandeAjoutBlanche() {
+        var o = machineChoisie();
+        if (! o) { return; }
+        var adresse = (champBlanche.value || '').trim();
+        if (! estUneAdresse(adresse)) {
+            journalise(textes.ban_invalide || '', true);
+
+            return;
+        }
+        demande('conf_titre_blanche_ajout', 'conf_texte_blanche_ajout',
+            { ip: adresse, machine: nomMachineChoisie() },
+            function () {
+                agitBlanche({ machine_id: parseInt(o.value, 10), action: 'add', ip: adresse });
+            });
+    }
+
+    function demandeRetraitBlanche(adresse) {
+        var o = machineChoisie();
+        if (! o) { return; }
+        demande('conf_titre_blanche_retrait', 'conf_texte_blanche_retrait',
+            { ip: adresse, machine: nomMachineChoisie() },
+            function () {
+                agitBlanche({ machine_id: parseInt(o.value, 10), action: 'remove', ip: adresse });
+            });
+    }
+
+    function agitBlanche(envoi) {
+        ferme();
+        litDistant('/fail2ban/whitelist', envoi).then(function (d) {
+            if (! d) {
+                journalise(remplit('geste_echoue', { message: textes.lecture_echec || '' }), true);
+                chargeBlanche();
+
+                return;
+            }
+            journalise(remplit('geste_reussi', { message: d.message || '' }), false);
+            champBlanche.value = '';
+            rendBlanche(d.ips || [], d.lue === true);
+        });
+    }
+
+    /** Les reglages d'une jail : l'avertissement AVANT les champs. */
+    function ouvreReglages(nom) {
+        jailAActiver = nom;
+        reglagesTitre.textContent = remplit('jail_reglages_titre',
+            { jail: nom, machine: nomMachineChoisie() });
+        reglages.hidden = false;
+        reglages.scrollIntoView({ block: 'nearest' });
+    }
+
+    function demandeActivation() {
+        var o = machineChoisie();
+        if (! o || ! jailAActiver) { return; }
+        var maxretry = Math.max(1, Math.min(100, parseInt(champMaxretry.value, 10) || 5));
+        var bantime = Math.max(60, parseInt(champBantime.value, 10) || 3600);
+        var findtime = Math.max(60, parseInt(champFindtime.value, 10) || 600);
+        demande('conf_titre_jail', 'conf_texte_jail',
+            { jail: jailAActiver, machine: nomMachineChoisie(),
+              maxretry: maxretry, bantime: bantime, findtime: findtime },
+            function () {
+                var nom = jailAActiver;
+                ferme();
+                reglages.hidden = true;
+                jailAActiver = null;
+                litDistant('/fail2ban/enable_jail', {
+                    machine_id: parseInt(o.value, 10), jail: nom,
+                    maxretry: maxretry, bantime: bantime, findtime: findtime,
+                }).then(function (d) {
+                    journalise(d
+                        ? remplit('geste_reussi', { message: d.message || '' })
+                        : remplit('geste_echoue', { message: textes.lecture_echec || '' }), ! d);
+                    detecteServices();
+                    chargeBlanche();
+                });
+            });
+    }
+
+    if (ajouterBlanche) { ajouterBlanche.addEventListener('click', demandeAjoutBlanche); }
+    if (boutonActiver) { boutonActiver.addEventListener('click', demandeActivation); }
+    if (reglagesAnnuler) { reglagesAnnuler.addEventListener('click', function () {
+        reglages.hidden = true;
+        jailAActiver = null;
+        ferme();
+    }); }
+
     if (voirConfig) { voirConfig.addEventListener('click', litConfig); }
     if (voirLogs) { voirLogs.addEventListener('click', litLogs); }
 
@@ -945,7 +1178,7 @@ window.RW_FAIL2BAN = true;
             // offre — et la detection des services n'aurait rien a detecter.
             if (voirConfig) { voirConfig.hidden = ! d.installed; }
             if (voirLogs) { voirLogs.hidden = ! d.installed; }
-            if (d.installed) { detecteServices(); }
+            if (d.installed) { detecteServices(); chargeBlanche(); }
             // LES JAILS NE SE RENDENT QUE SI LE SERVICE TOURNE. Une grille vide
             // sous un « pas installe » ferait croire a un service sans jails.
             if (etatDe(d) === 'actif') { rendJails(d.jails); }

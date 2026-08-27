@@ -2294,3 +2294,12 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 
 .rw-champ--espace { margin-top: 14px; }
 .rw-titre--espace { margin-top: 16px; }
+
+/* Trois reglages cote a cote sur grand ecran, empiles au doigt. Pose au
+   sous-lot F5 de `fail2ban/`. */
+.rw-grille-champs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin: 14px 0 4px;
+}
