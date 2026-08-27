@@ -103,10 +103,22 @@ n'existe pas.
 appelant passe toujours `machine_id`** (`js/main.js:321`) : le chemin sans paramètre n'est exercé par
 **aucune interface**.
 
-**Ce qui en fait un écart, c'est le motif** : `@require_machine_access` ne trouve aucun identifiant
-dans les **paramètres d'URL**, donc il ne refuse rien — quatrième occurrence de « un garde sans objet
-ne garde rien », et la pire de la famille, parce que le repli rend un jeu de données **parfaitement
-cohérent** au lieu d'une erreur. *Un repli permissif ressemble à de la robustesse : le chemin non
+**Ce qui en fait un écart — et une SECONDE correction, parce que la première explication se trompait
+de mécanisme.** Il était écrit que le décorateur « ne trouve aucun identifiant dans les paramètres
+d'URL ». **Faux** : il les lit explicitement.
+
+```python
+single = (data.get('machine_id') or request.args.get('machine_id')
+          or data.get('server_id') or request.args.get('server_id'))
+```
+
+Avec `?machine_id=5`, il trouve l'identifiant et vérifie l'accès. Ce qui le neutralise n'est pas la
+**provenance** du paramètre mais son caractère **facultatif** : absent, la liste reste vide, et une
+liste vide ne refuse rien. *« Le décorateur ne lit pas la query-string » aurait envoyé corriger le
+décorateur — qui n'a rien à corriger — au lieu de la route.*
+
+C'est la quatrième occurrence de « un garde sans objet ne garde rien », et la pire de la famille,
+parce que le repli rend un jeu de données **parfaitement cohérent** au lieu d'une erreur. *Un repli permissif ressemble à de la robustesse : le chemin non
 gardé est celui qui a l'air de bien se comporter.*
 
 **Et la façon dont cette erreur est arrivée est celle que §1 décrit** : ma sonde était écrite pour

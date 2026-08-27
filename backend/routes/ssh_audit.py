@@ -486,8 +486,23 @@ def ssh_audit_policies_get():
 
     ══ E-211 : POURQUOI UNE PERMISSION, ET PAS UN PARAMETRE OBLIGATOIRE ═════
 
-    `@require_machine_access` ne garde RIEN ici : `machine_id` est un parametre
-    d'URL OPTIONNEL, le decorateur n'en trouve aucun, et il ne refuse donc rien.
+    `@require_machine_access` ne garde RIEN ici, mais PAS pour la raison qu'on
+    croit — et cette precision compte, parce que la premiere redaction se
+    trompait de mecanisme.
+
+    Le decorateur LIT BIEN les parametres d'URL :
+
+        single = (data.get('machine_id') or request.args.get('machine_id')
+                  or data.get('server_id') or request.args.get('server_id'))
+
+    Avec `?machine_id=5`, il trouve l'identifiant et il verifie l'acces. Ce qui
+    le neutralise ici n'est pas la PROVENANCE du parametre, c'est son caractere
+    FACULTATIF : quand il est absent, la liste `ids` reste vide, `denied` reste
+    vide, et rien n'est refuse.
+
+    La distinction n'est pas academique. « Le decorateur ne lit pas la
+    query-string » aurait envoye corriger le decorateur — qui n'a rien a
+    corriger — au lieu de la route.
     Quatrieme occurrence de « un garde sans objet ne garde rien » — et la pire
     de la famille, parce que le repli rend un jeu de donnees PARFAITEMENT
     COHERENT au lieu d'une erreur. Un repli permissif ressemble a de la
