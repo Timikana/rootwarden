@@ -460,33 +460,77 @@ class TestJoursNonNumeriques:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestIdentifiantDeServeurNonNumerique:
-    """MEME FAMILLE QU'E-164, ET TOUJOURS OUVERTE.
+    """E-164, LA MOITIE QUI RESTAIT — refermee par la session 4 le 2026-08-27.
 
-    `days` a ete corrige sur `/stats` ; `server_id` ne l'a pas ete, ni sur
-    `/stats` ni sur `/history`. Le cast `int(server_id)` vit a l'interieur du
-    `try` qui rend « Erreur interne » : une faute de la requete y obtient donc un
-    **500**, exactement le defaut que le correctif nommait.
+    Historique de ce bloc, parce qu'il explique sa forme actuelle. Ces deux tests
+    ont d'abord ete ecrits en `xfail(strict=True)` : `int(server_id)` vivait a
+    l'interieur du `try` qui rend « Erreur interne », donc une faute de la requete
+    y obtenait un **500**. Verrouiller ce 500 aurait FIGE le defaut ; le decrire en
+    xfail strict garantissait au contraire que la suite rougirait le jour du
+    correctif, ce qui obligerait a revenir ici plutot qu'a oublier l'ecart.
 
-    Ces deux tests decrivent le comportement ATTENDU et sont marques
-    `xfail(strict=True)` : ils ne rougissent pas la suite aujourd'hui, et ils
-    LA rougiront le jour ou le correctif arrivera — ce qui obligera a retirer le
-    marqueur plutot qu'a oublier l'ecart. Un test qui verrouillerait le 500
-    actuel figerait le defaut au lieu de le signaler.
+    C'est ce qui s'est passe : le correctif est arrive, les deux marqueurs sont
+    passes XPASS(strict) donc FAILED, et le signal a ete rendu. Les marqueurs sont
+    retires et les proprietes sont desormais tenues **en dur**.
 
-    Attribution : `backend/routes/` appartient a la session BASE & PERFORMANCE.
-    La session QA qualifie et transmet ; elle ne corrige pas.
+    Quatre proprietes, et les deux dernieres ne se devinent pas :
+      1. le statut est 400, pas 500 ;
+      2. le corps est du JSON lisible ;
+      3. un `server_id` ABSENT et un `server_id` MAL FORME ne disent pas la meme
+         chose. Les deux refus sont legitimes, mais un refactor qui casterait
+         avant de verifier la presence transformerait « requis » en « doit etre un
+         nombre » — l'appelant ne saurait plus lequel des deux defauts corriger ;
+      4. la requete refusee ne touche pas la table d'historique. Un refus qui
+         interrogerait quand meme la base ne serait pas un refus, seulement un
+         message.
     """
 
-    @pytest.mark.xfail(strict=True, reason="E-164 residuel : int(server_id) est dans le try qui rend 500")
-    def test_stats_refuse_un_server_id_non_numerique(self, client_f2b, mock_cursor, admin_headers):
+    ROUTES = ('/fail2ban/stats', '/fail2ban/history')
+
+    @pytest.mark.parametrize('route', ROUTES)
+    @pytest.mark.parametrize('valeur', ['abc', '2; DROP TABLE fail2ban_history', '1.5', 'NaN'])
+    def test_un_server_id_non_numerique_rend_400(self, client_f2b, mock_cursor, admin_headers,
+                                                 route, valeur):
         mock_cursor._results = []
-        reponse = client_f2b.get('/fail2ban/stats?server_id=abc&days=30', headers=admin_headers)
+        reponse = client_f2b.get(f'{route}?server_id={valeur}', headers=admin_headers)
+
+        assert reponse.status_code == 400, \
+            f"{route} avec server_id={valeur!r} : la faute est dans la requete"
+        assert reponse.is_json, f"corps non JSON : {reponse.content_type}"
+        assert 'nombre' in corps(reponse)['message']
+
+    @pytest.mark.parametrize('route', ROUTES)
+    def test_un_server_id_absent_ne_dit_pas_la_meme_chose(self, client_f2b, mock_cursor,
+                                                          admin_headers, route):
+        mock_cursor._results = []
+        reponse = client_f2b.get(route, headers=admin_headers)
 
         assert reponse.status_code == 400
+        message = corps(reponse)['message']
+        assert 'requis' in message, \
+            f"{route} : un identifiant ABSENT doit se dire autrement qu'un identifiant " \
+            f"mal forme ; le message rendu est {message!r}"
 
-    @pytest.mark.xfail(strict=True, reason="E-164 residuel : int(server_id) est dans le try qui rend 500")
-    def test_history_refuse_un_server_id_non_numerique(self, client_f2b, mock_cursor, admin_headers):
+    @pytest.mark.parametrize('route', ROUTES)
+    def test_la_table_d_historique_n_est_pas_interrogee(self, client_f2b, mock_cursor,
+                                                        admin_headers, route):
         mock_cursor._results = []
-        reponse = client_f2b.get('/fail2ban/history?server_id=abc', headers=admin_headers)
+        client_f2b.get(f'{route}?server_id=abc', headers=admin_headers)
 
-        assert reponse.status_code == 400
+        # Le curseur factice retient la DERNIERE requete executee. Les lectures de
+        # `users` et `permissions` faites par les decorateurs sont attendues ; ce
+        # qui ne doit PAS apparaitre est la table que la route allait lire.
+        assert 'fail2ban_history' not in mock_cursor._last_query, \
+            f"la requete refusee a quand meme interroge la base : {mock_cursor._last_query!r}"
+
+    @pytest.mark.parametrize('route', ROUTES)
+    def test_un_server_id_numerique_passe(self, client_f2b, mock_cursor, admin_headers, route):
+        """L'autre moitie. Un correctif evident peut casser le cas normal, et un
+        cast sorti d'un `try` est exactement le genre de deplacement qui le fait."""
+        mock_cursor._results = []
+        reponse = client_f2b.get(f'{route}?server_id=2000', headers=admin_headers)
+
+        assert reponse.status_code == 200
+        assert corps(reponse)['success'] is True
+        assert mock_cursor._last_params[0] == 2000, \
+            "l'identifiant doit arriver a la requete SQL sous forme de NOMBRE"
