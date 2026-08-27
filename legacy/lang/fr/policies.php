@@ -25,7 +25,7 @@ return [
     'policies.preset_custom' => 'Custom (lignes sudoers brutes)',
     'policies.preset_hint_all_nopasswd' => 'DANGEREUX : equivaut a root sans password. A reserver aux comptes de service automatises.',
     'policies.preset_hint_restart_services' => 'Autorise systemctl restart/reload/status sur N\'IMPORTE QUEL service. Pour restreindre, utiliser le preset systemctl specifiques.',
-    'policies.preset_hint_apt_only' => 'Pour utilisateurs qui doivent appliquer les mises a jour systeme sans avoir root complet.',
+    'policies.preset_hint_apt_only' => 'Pour operateurs DEJA DE CONFIANCE : ce prereglage EQUIVAUT A ROOT. Un paquet construit permet d\'obtenir un shell root.',
     'policies.preset_hint_read_logs' => 'Utilisateurs ops qui consultent /var/log/* sans pouvoir modifier le systeme.',
     'policies.preset_hint_systemctl_specific' => 'Liste blanche de services autorises. Saisir les noms separes par virgule ou espace.',
     'policies.preset_hint_custom' => 'Lignes sudoers brutes - sera validee par visudo -cf cote serveur. ATTENTION : potentiel de prise de pouvoir.',
@@ -93,7 +93,7 @@ return [
     // Explications detaillees des presets sudo (phrase concrete + consequence)
     'policies.preset_help_all_nopasswd' => 'L\'utilisateur devient administrateur TOTAL (root) et peut TOUT faire, sans meme taper de mot de passe. A reserver aux comptes automatiques (robots), jamais a une personne.',
     'policies.preset_help_restart_services' => 'L\'utilisateur peut demarrer / arreter / redemarrer n\'importe quel service (ex : le serveur web, la base de donnees). Il ne peut rien faire d\'autre en admin.',
-    'policies.preset_help_apt_only' => 'L\'utilisateur peut installer et mettre a jour des logiciels (commande « apt »). Il ne peut pas toucher au reste du systeme.',
+    'policies.preset_help_apt_only' => 'L\'utilisateur peut installer et mettre a jour des logiciels (commande « apt »). ATTENTION : cela EQUIVAUT A ROOT — « apt install » execute des scripts de mainteneur en root, donc un paquet construit donne un shell root. Il n\'existe pas de moyen sur de limiter a apt sans donner root.',
     'policies.preset_help_read_logs' => 'L\'utilisateur peut seulement LIRE les journaux du serveur (dossier /var/log). Il ne peut RIEN modifier. Ideal pour du support / supervision.',
     'policies.preset_help_systemctl_specific' => 'Comme « redemarrer des services », mais uniquement pour la liste de services que TU choisis (ex : seulement « nginx »). Plus precis et plus sur.',
     'policies.preset_help_custom' => 'Pour experts : tu ecris toi-meme les regles. Le serveur les verifie (visudo) avant de les appliquer ; si elles sont invalides, rien n\'est change.',

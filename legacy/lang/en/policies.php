@@ -25,7 +25,7 @@ return [
     'policies.preset_custom' => 'Custom (raw sudoers rules)',
     'policies.preset_hint_all_nopasswd' => 'DANGEROUS: equivalent to root without password. Reserve for automated service accounts.',
     'policies.preset_hint_restart_services' => 'Allows systemctl restart/reload/status on ANY service. For restrictions, use specific systemctl preset.',
-    'policies.preset_hint_apt_only' => 'For users who must apply system updates without full root access.',
+    'policies.preset_hint_apt_only' => 'For ALREADY TRUSTED operators: this preset is EQUIVALENT TO ROOT. A crafted package yields a root shell.',
     'policies.preset_hint_read_logs' => 'Ops users who view /var/log/* without ability to modify the system.',
     'policies.preset_hint_systemctl_specific' => 'Whitelist of allowed services. Enter names separated by comma or space.',
     'policies.preset_hint_custom' => 'Raw sudoers lines - validated by visudo -cf server-side. WARNING: potential for privilege escalation.',
@@ -90,7 +90,7 @@ return [
 
     'policies.preset_help_all_nopasswd' => 'The user becomes a FULL administrator (root) and can do EVERYTHING, without even typing a password. Reserve for automated accounts (bots), never a person.',
     'policies.preset_help_restart_services' => 'The user can start / stop / restart any service (e.g. the web server, the database). They cannot do anything else as admin.',
-    'policies.preset_help_apt_only' => 'The user can install and update software (the "apt" command). They cannot touch the rest of the system.',
+    'policies.preset_help_apt_only' => 'The user can install and update software (the "apt" command). WARNING: this is EQUIVALENT TO ROOT — "apt install" runs maintainer scripts as root, so a crafted package yields a root shell. There is no safe way to limit to apt without granting root.',
     'policies.preset_help_read_logs' => 'The user can only READ the server logs (/var/log). They cannot change anything. Ideal for support / monitoring.',
     'policies.preset_help_systemctl_specific' => 'Like "restart services", but only for the list of services YOU choose (e.g. only "nginx"). More precise and safer.',
     'policies.preset_help_custom' => 'For experts: you write the rules yourself. The server validates them (visudo) before applying; if invalid, nothing changes.',
