@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **198** — numérotés jusqu'à **E-211** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **199** — numérotés jusqu'à **E-212** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -865,9 +865,39 @@ les quatre emplacements.
 > corriger.
 
 **La question à poser page par page n'est pas « les clés sont-elles portées »** — le portage emploie
-`tip_*` pour des **infobulles**, donc tout contrôle par motif conclut « oui » (E-210). **C'est : la
-SÉQUENCE, l'ordre des gestes, est-elle dite quelque part sur la page portée ?** Formulation de la session 3,
-et c'est la seule qui mesure quelque chose.
+`tip_*` pour des **infobulles**, donc tout contrôle par motif conclut « oui » (E-210).
+
+**Et la formulation a été raffinée DEUX fois, par les deux sessions qui l'ont mesurée :**
+
+1. session 3 — *« la SÉQUENCE, l'ordre des gestes, est-elle dite quelque part sur la page portée ? »* ;
+2. **session 2, après mesure — *« le PREMIER PAS est-il dit LÀ OÙ L'UTILISATEUR EST BLOQUÉ ? »***
+
+**La seconde est meilleure et c'est elle qui fait foi.** Plus courte, vérifiable **à l'écran**, et surtout :
+**deux modules sur quatre la satisfont déjà sans qu'aucun conseil n'ait été porté.** `fail2ban` et `services`
+disent « Choisissez une machine, **puis** relevez son état » **à l'endroit exact où l'utilisateur est
+bloqué — l'état vide** ; le reste devient visible dès qu'une machine est choisie. *Un guide complet en haut
+de page résout moins bien qu'une phrase à l'endroit du blocage.*
+
+#### Le résultat sur les quatre modules livrés, et il n'est PAS « il manque des conseils partout »
+
+| page | l'ordre est ÉNONCÉ ? | le pas de SÛRETÉ ? | l'ordre est IMPOSÉ ? |
+|---|---|---|---|
+| `fail2ban` | **oui**, dans l'état vide | — | oui, 12 `disabled` en JS |
+| `services` | **oui**, dans l'état vide | — | oui, 8 |
+| `bashrc` | **partiellement** — sa phrase d'ordre porte sur une précondition **externe** | **oui, et MIEUX que le legacy** : « simule le :date par :auteur — **rien n'a été écrit** », estampillé **sur le résultat** plutôt qu'annoncé avant | oui, 6 |
+| **`graylog`** | **NON** | — | oui, 6 |
+
+- **`fail2ban` et `services` : ne rien leur ajouter.** Ils font déjà ce qu'il faut ;
+- **`bashrc` fait MIEUX que le legacy** sur le pas qui protège — et *une garantie estampillée sur le
+  résultat vaut mieux qu'une promesse affichée avant le geste*, parce qu'elle survit au fait qu'on n'ait pas
+  lu l'avertissement. Il lui manque seulement la phrase du premier pas ;
+- **`graylog` est le seul des quatre où rien ne dit par où commencer** — et E-212 explique pourquoi : **il
+  n'y a pas eu de perte, il y a eu une absence jamais comblée**, la source étant entièrement fausse.
+
+**Conséquence sur FEAT-001, et elle durcit la réserve** : sur quatre modules mesurés, **un** avait des
+conseils intégralement faux, **un** a été *amélioré* par le portage, **deux** n'ont besoin de rien. **Le taux
+de reprise directe est faible : c'est le RELEVÉ qui a de la valeur, pas le texte.** Les 125 clés ne se
+reprennent pas — *elles se relisent une par une.*
 
 #### Et une chose que ces liens disent du produit, pas du chantier
 

@@ -9310,3 +9310,82 @@ la session 6 écrit le test.
 compte, donc **il n'existe aucune règle du produit à reprendre**. Et la conséquence pour `api_docs` est celle
 que la session 4 nomme : **une page de documentation lisserait cette incohérence sans le vouloir**, en
 présentant comme une règle ce qui n'est qu'une collection de décisions dont certaines ont divergé.
+
+---
+
+## E-212 — ⚠ EN PRODUCTION : tout ce que le portail dit de Graylog décrit un produit qu'il n'installe pas — et le backend le sait
+
+**Trouvé par la session 2 en mesurant si la SÉQUENCE était dite. La question s'est retournée : il n'y avait
+rien de vrai à porter.** E-209 montrait deux étapes sur quatre qui mentaient ; **ici c'est le panneau entier,
+son titre, et deux autres textes.**
+
+### Le module fait du transfert `rsyslog`. Les textes annoncent Graylog **Sidecar**.
+
+| ce que le legacy affiche | ce que le module fait |
+|---|---|
+| « Comment déployer le Graylog **Sidecar** ? » | il installe `rsyslog` |
+| « URL du serveur + **token API** … *token chiffré en base* » | **`graylog_config` n'a AUCUNE colonne de jeton** |
+| « éditez les **collectors** (filebeat / nxlog / winlogbeat) » | des gabarits **rsyslog** |
+| « ajout du repo, install du paquet, **enrôlement auprès du manager** » | `apt-get install -y rsyslog`, **aucun enrôlement** |
+| « l'onglet **Sidecars** affiche le statut par machine » | **il n'y a pas d'onglet Sidecars** |
+
+**Mesures, vérifiées indépendamment du compte rendu :**
+
+    colonnes de `graylog_config` : id · server_host · server_port · tls_ca_path
+                                   ratelimit_burst · ratelimit_interval · updated_by · updated_at
+                                   -> AUCUN jeton, aucune cle d'API
+
+    occurrences de sidecar|filebeat|nxlog|winlogbeat :
+      legacy/graylog/index.php ......... 0
+      legacy/graylog/js/graylog.js ..... 0
+      laravel/.../graylog.blade.php .... 0
+      backend/routes/graylog.py ........ 1   <- et c'est un COMMENTAIRE : « Approche rsyslog (pas de sidecar) »
+
+### ⚠ Le backend le SAIT, l'écrit, et personne n'a corrigé l'écran
+
+`backend/routes/graylog.py:8` porte, en clair : **« Approche rsyslog (pas de sidecar) »**. La seule
+occurrence du mot dans tout le code d'exécution est **la note qui dit que ce n'est pas ça.**
+
+*Ce n'est donc pas un défaut de connaissance, c'est un défaut de propagation* — quelqu'un a su, l'a écrit à
+l'endroit que lisent les développeurs, et les trois textes que lisent les **utilisateurs** sont restés faux.
+
+### Trois sites, et le troisième est le plus grave
+
+    1. legacy/lang/{fr,en}/tips.php        le panneau « Comment ca marche ? », titre + 4 etapes
+    2. legacy/lang/fr/dashboard.php:49     « Deploie le sidecar, centralise et edite les collectors »
+    3. legacy/lang/fr/admin.php:89         perms.desc_graylog :
+                                           « Deployer le Graylog Sidecar et gerer les collectors »
+
+**Le n°3 est la description de la PERMISSION**, affichée dans la page d'administration des comptes. **Un
+administrateur qui accorde `can_manage_graylog` lit une description fausse de ce qu'il accorde.**
+
+C'est un cran au-dessus de la hiérarchie d'E-209, et il faut l'ajouter :
+
+| forme | trompe | conséquence |
+|---|---|---|
+| un en-tête qui mente sur un accès (E-36) | qui relit le code | une relecture rassurée |
+| un libellé qui promette un contrôle (E-203) | qui clique | un geste cru fait |
+| un guide qui se trompe sur son effet (E-209) | qui ne sait pas | **fabrique** l'hypothèse |
+| **une description de permission fausse** | **qui ACCORDE un droit** | **une décision d'habilitation prise sur une fiction** |
+
+*Les trois premières trompent quelqu'un sur ce qu'il fait ; la quatrième trompe quelqu'un sur ce qu'il
+autorise autrui à faire.*
+
+### Ce que ça requalifie, et qui n'est pas un détail
+
+**La « substitution non nommée » d'E-210 n'était pas un choix de style : la source était inutilisable.** Le
+portage n'a pas remplacé un guide de *procédure* par un guide de *conséquence* par préférence — **il n'y
+avait pas de procédure vraie à porter.** Donc :
+
+> **Sur `graylog`, ce qui est perdu n'est PAS l'ORDRE : il n'a jamais été dit correctement.** La formulation
+> « la séquence est-elle dite quelque part ? » vaut pour les autres modules ; **pas pour celui-là**, où la
+> bonne question était « ce qui est dit est-il vrai ? ».
+
+### La correction
+
+**Le portage** : rien à reprendre du panneau. Il lui manque une phrase de premier pas, à écrire depuis le
+comportement réel — pas depuis le legacy.
+
+**Le legacy est servi en PRODUCTION**, et les trois sites y sont faux dans les **deux** langues. `legacy/lang/`
+est hors du régime du chantier : **arbitrage de l'exploitant** (§7), au même titre qu'E-209. Le n°3 est celui
+qui devrait partir en premier — il est lu au moment où un droit est accordé.

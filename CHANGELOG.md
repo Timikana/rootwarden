@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.28** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.29** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,84 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.29 — ⚠ EN PRODUCTION : tout ce que le portail dit de Graylog decrit un produit qu'il n'installe pas, et le backend le SAIT
+
+**Trouve par la session 2 en mesurant si la SEQUENCE etait dite. La question s'est retournee : il n'y avait
+rien de vrai a porter.** E-209 montrait deux etapes sur quatre qui mentaient ; **ici c'est le panneau entier,
+son titre, et deux autres textes.**
+
+Le module fait du transfert **`rsyslog`**. Les textes annoncent Graylog **Sidecar** — un autre produit.
+
+    colonnes de `graylog_config` : id · server_host · server_port · tls_ca_path
+                                   ratelimit_burst · ratelimit_interval · updated_by · updated_at
+                                   -> AUCUN jeton, la ou le guide promet un « token API chiffre en base »
+
+    sidecar|filebeat|nxlog|winlogbeat :  legacy page 0 · legacy JS 0 · vue portee 0
+                                         backend 1  <- un COMMENTAIRE : « Approche rsyslog (pas de sidecar) »
+
+> **Le backend le sait, l'ecrit, et personne n'a corrige l'ecran.** La seule occurrence du mot dans tout le
+> code d'execution est **la note qui dit que ce n'est pas ca**. *Ce n'est pas un defaut de connaissance,
+> c'est un defaut de propagation* — quelqu'un a su, l'a ecrit a l'endroit que lisent les developpeurs, et les
+> textes que lisent les **utilisateurs** sont restes faux.
+
+**Trois sites, et le troisieme est le plus grave** : le panneau `tips.php` · `dashboard.sc_graylog_desc` ·
+et **`perms.desc_graylog` — la description de la PERMISSION**, « Deployer le Graylog Sidecar et gerer les
+collectors ». **Un administrateur qui accorde `can_manage_graylog` lit une description fausse de ce qu'il
+accorde.** Cran supplementaire dans la hierarchie d'E-209 : *les trois premieres formes trompent quelqu'un
+sur ce qu'il fait ; celle-ci trompe quelqu'un sur ce qu'il autorise autrui a faire.*
+
+**Et ca requalifie la « substitution non nommee » d'E-210** : le portage n'a pas remplace un guide de
+procedure par un guide de consequence **par choix de style** — la source etait **inutilisable**. Donc sur
+`graylog`, **ce qui est perdu n'est PAS l'ORDRE : il n'a jamais ete dit correctement.** La question juste
+n'etait pas « la sequence est-elle dite » mais **« ce qui est dit est-il vrai »**.
+
+#### La mesure de FEAT-001 est raffinee, et par celle qui l'a exercee
+
+    session 3 :  « la SEQUENCE, l'ordre des gestes, est-elle dite quelque part ? »
+    session 2 :  « le PREMIER PAS est-il dit LA OU L'UTILISATEUR EST BLOQUE ? »   <- fait foi
+
+**La seconde est meilleure : plus courte, verifiable a l'ecran, et deux modules sur quatre la satisfont deja
+sans qu'aucun conseil n'ait ete porte.** `fail2ban` et `services` disent « Choisissez une machine, **puis**
+relevez son etat » **dans l'etat vide**, exactement la ou l'utilisateur bloque. *Un guide complet en haut de
+page resout moins bien qu'une phrase a l'endroit du blocage.*
+
+| page | ordre ENONCE | pas de SURETE | ordre IMPOSE |
+|---|---|---|---|
+| `fail2ban` | **oui**, etat vide | — | oui, 12 `disabled` en JS |
+| `services` | **oui**, etat vide | — | oui, 8 |
+| `bashrc` | partiellement (precondition externe) | **oui, MIEUX que le legacy** — « rien n'a ete ecrit », estampille **sur le resultat** | oui, 6 |
+| `graylog` | **NON** | — | oui, 6 |
+
+**Ne rien ajouter a `fail2ban` ni `services`.** `bashrc` fait mieux que le legacy sur le pas qui protege —
+*une garantie estampillee sur le resultat vaut mieux qu'une promesse affichee avant le geste, parce qu'elle
+survit au fait qu'on n'ait pas lu l'avertissement.*
+
+**Conclusion sur FEAT-001, qui durcit la reserve** : sur quatre modules, **un** avait des conseils
+integralement faux, **un** a ete *ameliore* par le portage, **deux** n'ont besoin de rien. **Le taux de
+reprise directe est faible : c'est le RELEVE qui a de la valeur, pas le texte.**
+
+#### Deux visees a cote avant de trouver, et c'est la meme faute que la collision `tip.`
+
+La session 2 le declare : premier essai, `grep` sur les gabarits -> deux correspondances « puis », **toutes
+deux des COMMENTAIRES du source**, invisibles a l'ecran — elle allait rapporter « deux pages sur quatre
+enoncent l'ordre ». Second essai, compte de `disabled` sur le blade -> **0 pour `graylog`**, faux aussi, le
+mecanisme y vivant en JS et sous forme `hidden`. **Le texte affiche vit dans le CATALOGUE.**
+
+> **Mesurer l'artefact VOISIN de celui qui porte la propriete.** Meme famille que la collision `tip.` / `tip_`
+> qu'elle avait signalee une heure plus tot — et **elle l'a refaite deux fois dans la mesure suivante.**
+> *Connaitre une classe de faute n'immunise pas contre elle : seule la question « ou vit reellement la
+> propriete que je mesure ? » le fait.*
+
+#### Une erreur mal attribuee fait corriger le mauvais processus
+
+Le Lead avait ecrit « mon chiffre etait faux, je te l'avais relaye sans le verifier » a propos des 8 cles
+`tip.graylog_*`. **Correction de la session 2 : le huit venait de SON fichier, et son propre tableau de
+comptage rendait deja 5** — sa prose contredisait sa mesure dans le meme document.
+
+*Le dire compte : mal attribuer une erreur fait corriger le mauvais processus.* Le Lead se serait impose une
+verification de relais qu'il applique deja, au lieu du controle qui manquait — **la coherence entre la prose
+et le tableau d'un meme document.**
+
 ### v1.38.28 — un balayage ne converge qu'en lisant, et le 114/57 du chantier se scinde en 116/59/54+3
 
 **Le releve des 229 routes backend a produit QUATRE chiffres successifs pour la meme question** — combien de
@@ -2762,7 +2840,8 @@ correspondance reelle :**
 | v1.38.25 | `643927a` | six references mesurees, et une prediction qui a rattrape une MESURE fausse |
 | v1.38.26 | `a1cd400` | « aucun lien entrant » etait faux ; les 4 emplacements comptes |
 | **v1.38.27** | `5c2e599` | **E-209, en production : un guide qui enseigne un durcissement inexistant** ; E-210 |
-| v1.38.28 | (ce commit) | un balayage ne converge qu'en lisant ; 116/59/54+3 confirme ; E-211 |
+| v1.38.28 | `29aafb1` | un balayage ne converge qu'en lisant ; 116/59/54+3 confirme ; E-211 |
+| **v1.38.29** | (ce commit) | **E-212, en production : le portail decrit un produit qu'il n'installe pas** ; FEAT-001 raffine |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
