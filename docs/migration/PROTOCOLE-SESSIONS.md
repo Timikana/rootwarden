@@ -219,3 +219,40 @@ ajoute le risque de porter un module contre un frontend qui n'est pas celui qui 
 
 **À réserver** à un cas précis : un travail long et purement statique (analyse, réécriture massive sans
 exécution), où l'isolement des fichiers vaut plus que l'accès au banc.
+
+---
+
+## 10. L'équipe à SEPT sessions — table de propriété disjointe
+
+Décision de l'exploitant du 2026-08-27. Sept sessions permanentes. Ce qui rend le nombre tenable est
+la **disjonction stricte** de la propriété des fichiers, et le fait que **trois sessions sur sept
+n'ont jamais besoin du banc**.
+
+| # | session | propriété EXCLUSIVE | banc |
+|---|---|---|---|
+| 1 | **LEAD / ARCHITECTE** | `PLAN-DE-MIGRATION.md`, `PARITE.md`, `DEPRECIATION.md`, `CHANGELOG.md`, `ROADMAP.md`, `legacy/version.txt`, `scripts/rejouer-lot.sh` | non |
+| 2 | **ANALYSTE LEGACY** | `docs/migration/MODULE-*.md` | **jamais** |
+| 3 | **BACKEND LARAVEL** | `laravel/app/`, `laravel/resources/`, `laravel/public/`, `laravel/lang/`, `laravel/routes/` | partagé |
+| 4 | **BASE & PERFORMANCE** | `mysql/migrations/`, `backend/` | partagé |
+| 5 | **SÉCURITÉ** | `docs/SECURITY_AUDIT.md`, `docs/migration/AUDIT-*.md` — **et une branche `security/…`, jamais `Migration-Laravel`** | **jamais** |
+| 6 | **QA / NON-RÉGRESSION** | `laravel/tests/`, `backend/tests/`, `docs/migration/QA-*.md` | partagé |
+| 7 | **NAVIGATEUR / E2E** | `tests/e2e/`, `tests/pw/` | **priorité** |
+
+### Le jeton de banc ne circule qu'entre 3, 4, 6 et 7
+
+Et **7 a la priorité** : ses mesures sont la non-régression du projet. Quand 7 demande le banc, les
+autres le rendent au prochain point d'arrêt propre. Le Lead tranche les égalités.
+
+Les sessions 2 et 5 ne le demandent jamais — elles lisent. C'est ce qui permet d'avoir sept sessions au
+lieu de trois : **quatre sessions se coordonnent, trois travaillent sans contrainte.**
+
+### Les frontières qui restaient ambiguës, tranchées
+
+| fichier | propriétaire | pourquoi |
+|---|---|---|
+| `backend/routes/*.py` | **4**, pas 3 | c'est la couche données et API ; 3 ne fait que la consommer par la passerelle |
+| `backend/tests/*.py` | **6**, pas 4 | qui écrit le code ne valide pas seul son propre correctif |
+| `laravel/tests/` | **6** | il est vide aujourd'hui (3 fichiers) — c'est un trou mesuré, il lui appartient |
+| `laravel/routes/web.php` | **3** | mais toute route neuve est ANNONCÉE au Lead, deux modules y déclarent |
+| `laravel/public/css/rw.css` | **3** | partagé par construction entre modules : annoncer avant d'écrire |
+| les correctifs de sécurité | **5 propose, 3 ou 4 applique** | une session ne valide pas seule une modification de sécurité qu'elle vient d'écrire |
