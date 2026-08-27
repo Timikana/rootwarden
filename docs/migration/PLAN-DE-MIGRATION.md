@@ -1079,7 +1079,13 @@ déchiffrement n'est que journalisé · les quatre routes de profils sans `@requ
 `telegraf_output_token` non masqué · le `POST` sans `WHERE platform` · la lecture via `execute_as_root` ·
 `agent_type` calculé puis jeté · les **huit branches mortes** qui armeraient un `@threaded_route`
 **imbriqué** (le pool se **bloque** si l'on supprime la règle statique en la prenant pour un doublon) ·
-les 21 routes de filtrage sans permission · la garde de la page `ssh/` · `can_deploy_keys` côté requête ·
+les 21 routes de filtrage sans permission · la garde de la page `ssh/` ·
+**`can_deploy_keys` côté requête — MESURÉ le 2026-08-27, et c'est pire que « pas de permission » : `POST /deploy`
+(`ssh.py:246`) porte `@require_api_key` SEUL, donc PAS DE RÔLE non plus. Sa voisine
+`deploy_platform_key` (`:517`), qui écrit une clé sur UNE machine, porte `api_key + role(2) + machine_access`
+avec un commentaire de patch explicite ; et `reboot_server`, qui ne fait que REDÉMARRER, porte le même jeu
+complet. La route qui écrit en root sur un parc entier ET révoque est donc la MOINS gardée des trois — voir
+E-191** ·
 la fuite du mot de passe dans `deployment.log` · OpenCVE TLS désactivée · le verrou et la limite de débit
 du scan CVE par processus · **les deux défauts de `manage_roles.php`**.
 
