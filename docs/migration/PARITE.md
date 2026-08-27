@@ -7780,3 +7780,98 @@ Pour la seconde, **l'effet est documenté comme VOULU** au §7 du plan, pour vé
 pu regarder »**. C'est la même phrase que pour E-183, et c'est la formule de la classe entière :
 
 > *Une sonde qui échoue n'efface pas ce qu'elle n'a pas pu regarder.*
+
+*Note sur E-174 — **VERROUILLÉ le 2026-08-27*** par `backend/tests/test_fail2ban_manager.py`
+(**75 assertions**, 1 `xfail`). Les **cinq** verrous du correctif ont été retirés **un par un** :
+**14, 1, 3 et 1** rouges — **aucun n'est redondant**, et c'est un résultat, pas une relecture : il ne se
+déduisait pas du code.
+
+Deux mesures qui ne vont pas de soi et qui méritent d'être gardées comme méthode :
+
+- **le verrou qui SÉPARE l'ancienne version de la nouvelle est la valeur RENDUE** (`FE80::0001` →
+  `fe80::1`). Une assertion « la fonction ne lève pas » passerait **à l'identique** sur les deux
+  versions : le défaut était que la valeur reçue était rendue telle quelle, pas que la validation
+  échouait. *Mesurer ce que la fonction REND, pas qu'elle accepte* ;
+- **la ceinture `shlex.quote` est mesurée SANS le validateur**, en simulant celui d'avant le correctif,
+  puis en analysant la commande par `shlex.split` : la charge doit rester **un seul argument**. C'est la
+  seule façon de savoir que la ceinture tiendra le jour où un caractère passerait la boucle — mesurer
+  une défense en profondeur exige de **désarmer** celle du dessus ;
+- **la garde fail-closed est mesurée CONTRE SON PROPRE COMMENTAIRE.** Le code affirme « si un jour un
+  troisième chemin alimente `current_ips`, c'est ici que ça s'arrête ». Le troisième chemin a été
+  fabriqué en neutralisant les deux filtres amont : elle lève, avant toute écriture composée. **Le
+  commentaire dit vrai** — ce qui n'allait pas de soi sur un chantier qui compte cinq en-têtes annonçant
+  un accès plus strict que leur code.
+
+`pytest` : **464 passed, 1 xfailed** (348 en début de journée).
+
+---
+
+## E-185 — `manage_whitelist` : la lecture montre une entrée que l'écriture supprime en silence
+
+Relevé le 2026-08-27 en verrouillant E-174, et **signalé spontanément par la session qui venait
+d'écrire le correctif** plutôt que laissé à trouver.
+
+`action == 'list'` sort **avant** le filtre de sécurité. La lecture rend donc la liste **brute** du
+fichier distant, **entrée illisible comprise**. Un `add` ou un `remove` ultérieur recompose la liste
+filtrée : l'entrée disparaît — **journalisée côté serveur, silencieuse pour l'appelant**.
+
+Vu de l'exploitant : une entrée est affichée, un geste **sans rapport** est fait, l'entrée n'est plus là.
+Le drapeau `lue` continue de dire `true`, et il ne mente pas sur l'origine de la liste — mais **il ne dit
+rien du fait que la liste RÉÉCRITE n'est pas celle qui a été LUE.**
+
+Même famille qu'E-168, et que le défaut de D1 où « Vérifier l'intégrité » et « Sceller les orphelines »
+rendaient **deux verdicts opposés à la même seconde**.
+
+### Ce qui est décidé — l'issue (b), et pourquoi pas (a)
+
+Deux issues étaient sur la table : **(a)** filtrer aussi à la lecture, **(b)** rendre un champ
+`ecartees` que l'écran nomme.
+
+**(b) est retenue.** (a) masquerait une entrée qui **existe réellement dans le fichier** — c'est-à-dire
+qu'elle réintroduirait exactement E-168, « la liste blanche affichée est SUPPOSÉE, pas lue », que F5
+venait de refermer en obtenant du backend un drapeau `lue`. On ne referme pas un écart en rouvrant celui
+d'avant. (b) garde la lecture **fidèle** et **nomme** ce qui ne survivra pas à une écriture.
+
+**Le champ est ADDITIF**, donc sans effet sur le legacy, qui ne lit que les clés qu'il connaît — même
+raisonnement que l'`active_now` de `maintenance/`.
+
+**Et le libellé ne doit pas promettre des LIGNES** : la relecture découpe la ligne sur les **espaces**,
+donc une charge qui en contient devient **plusieurs** entrées. Un champ `ecartees` compte des
+**fragments**, pas des lignes. Le dire, ou l'écran mentira sur un nombre.
+
+La propriété est posée en `xfail(strict=True)`, formulée pour **ne pas préjuger** de l'issue : *« ce que
+la lecture montre, l'écriture le préserve, ou bien elle dit ce qu'elle a retiré »* — les deux issues la
+satisfont. Elle rougira le jour du correctif, ce qui obligera à revenir l'écrire pour de bon : **le
+mécanisme qui vient de fonctionner sur E-164.**
+
+*Amendements du 2026-08-27 — deux écarts existent en DEUX exemplaires, et un seul patch en laisserait un armé.*
+
+**E-144 existe DEUX fois.** La liste nommait `policies.py:236`. Il y a aussi **`sudo_manager.py:169`**,
+dans `render_policy` **elle-même** : `preset = policy.get('preset', 'apt_only')`. Corriger la seule route
+laisserait le repli **armé pour tout autre appelant** — le motif « chercher la branche jumelle », qui en
+est à sa sixième occurrence sur ce chantier.
+
+Et la **dérivation** exigée pour ne pas recopier une classification a confirmé le piège annoncé : le
+marqueur « shell root » aurait classé `read_logs` — **le préréglage le plus borné des six** — comme
+donnant root, parce que sa docstring emploie ces mots pour expliquer qu'on a **retiré** `less` (qui
+permettait `!sh`). Le marqueur qui dérive juste est `ÉQUIVALENT ROOT` en majuscules dans un
+avertissement, ou `Accès root complet`. **Deux** préréglages sortent : `all_nopasswd` (par construction)
+et `apt_only` (par avertissement explicite de son propre code). Aucun autre.
+
+**E-142 a une jumelle, et le défaut n'est plus que côté LEGACY — donc en production.** La liste nommait
+`policies.preset_help_apt_only` (« Il ne peut pas toucher au reste du système »). Il y a aussi
+**`policies.preset_hint_apt_only`** : « appliquer les mises à jour système **sans avoir root complet** »
+— exactement aussi faux, même fichier, autres mots. **Quatre chaînes** à corriger (2 clés × FR/EN).
+**Le portage est DÉJÀ correct** (`laravel/lang/{fr,en}/politiques.php`, `aide_apt_only` dit « CELA
+ÉQUIVAUT À UN ACCÈS ROOT »). La phrase fausse ne se lit donc plus que sur l'ancien portail.
+
+**Une erreur à ne PAS commettre sur E-149, et elle était tentante.** Ajouter `/services/` à
+`ADMIN_SEULEMENT` en défense en profondeur, comme cela a été fait pour `/supervision/`, **casserait un
+chemin légitime** : `ADMIN_SEULEMENT` exige le rôle ≥ 2, or **les deux pages admettent le rôle 1**
+porteur de la permission (`legacy/services/index.php:11-12`, et `web.php` côté portage). La passerelle
+n'a **aucun** mécanisme « permission » : le seul bon endroit est le décorateur backend. **Même
+raisonnement pour `/fail2ban/`.**
+
+**Ordre imposé entre E-174 et E-152** : E-174 d'abord, E-152 **ensuite**, comme défense en profondeur.
+L'inverse donnerait le sentiment d'avoir traité le sujet — un porteur légitime de `can_manage_fail2ban`
+conserverait l'exécution root.
