@@ -440,35 +440,96 @@ systemctl enable --now wazuh-agent
 @require_permission('can_manage_wazuh')
 @threaded_route
 def install_all():
-    """Installe Wazuh agent sur TOUS les serveurs sans agent.
+    """Installe Wazuh agent sur les serveurs DESIGNES qui n'ont pas d'agent.
 
     Boucle sequentielle (pas en parallele : chaque install fait apt-get update
     et tire des paquets, parallele ferait surcharge reseau + manager Wazuh).
     Renvoie un resume {ok, fail, skipped} avec details par machine.
 
     Body JSON :
-        group (str, optional) : groupe Wazuh applique a tous (sinon default)
+        machine_ids (list[int], OBLIGATOIRE) : les machines a traiter
+        group (str, optional)                : groupe Wazuh applique (sinon default)
+
+    ══ E-224 : DEUX DEFAUTS QUI SE TENAIENT L'UN L'AUTRE ════════════════════
+
+    La requete portait `AND a.id IS NULL` — or `wazuh_agents` n'a **aucune
+    colonne `id`** (`034_wazuh.sql:42` : `machine_id INT NOT NULL PRIMARY KEY`).
+    L'`execute()` n'etant protege par aucun `try`, la route rendait **500**.
+    Elle n'a donc jamais rien installe, et personne ne l'a vu : la table porte
+    zero ligne, le module n'a jamais servi.
+
+    **Corriger ce SQL seul aurait ete plus dangereux que le laisser.** Sans
+    agent en base, la requete corrigee rend TOUT LE PARC, et son
+    `ORDER BY … CASE WHEN criticality = 'CRITIQUE' THEN 0` place la
+    **production en premier**. Et il n'aurait pas fallu cliquer : la page de
+    diagnostic `legacy/adm/health_check.php` POSTait sur cette route avec un
+    **corps vide**, a chaque chargement, sous le commentaire « dry, vide la
+    liste » — un mot qui decrivait un **accident** (la liste etait vide parce
+    que la requete echouait), pas une conception.
+
+    *Un defaut qui protege par accident cesse de proteger au moment exact ou on
+    le corrige.* Les deux correctifs sont donc dans le meme commit.
+
+    ══ LA BORNE : `machine_ids` OBLIGATOIRE ════════════════════════════════
+
+    Absent ou vide -> **400**, aucune machine touchee. Trois raisons :
+
+    1. **un appel a corps vide echoue FERME**, sans qu'il faille se souvenir de
+       modifier quoi que ce soit ailleurs — et la memoire est precisement ce qui
+       a manque ici pendant des mois ;
+    2. **la page a deja la liste** : `wazuh.js` affiche le compte des machines
+       sans agent. Le bouton « Installer sur tous » garde son sens, et ce sens
+       devient EXPLICITE ;
+    3. *ne pas offrir d'entree libre plutot que la valider* — **un perimetre
+       absent n'est pas un perimetre**.
+
+    ══ POURQUOI PAS LE PRECEDENT DE `/supervision/scan-all` ════════════════
+
+    C'est la seule route de parc du produit qui se borne, par `machine_ids` plus
+    `check_machine_access` dans le corps. **Le recopier ici donnerait une borne
+    qui ne borne pas** : `check_machine_access` rend `True` sans condition des
+    le role 2, et cette route porte `@require_role(2)` — le filtre serait inerte
+    pour EXACTEMENT son public. Ce serait la cinquieme occurrence de « un garde
+    sans objet ne garde rien », ecrite en croyant fermer un trou.
+
+    Et **pas de filtre sur `criticality`** non plus : ce serait inventer une
+    politique depuis une etiquette d'inventaire que rien ne garantit a jour.
     """
     data = request.get_json(silent=True) or {}
     requested_group = (data.get('group') or '').strip()
+
+    machine_ids = data.get('machine_ids')
+    if not isinstance(machine_ids, list) or not machine_ids:
+        return jsonify({
+            'success': False,
+            'message': "machine_ids requis : cette route n'a plus de perimetre implicite. "
+                       "Envoie la liste des machines a traiter."
+        }), 400
+    try:
+        machine_ids = [int(x) for x in machine_ids]
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'machine_ids doit etre une liste d entiers'}), 400
 
     cfg = _get_config()
     if not cfg:
         return jsonify({'success': False, 'message': 'Config Wazuh absente (onglet Configuration)'}), 400
 
-    # Liste des serveurs sans agent (LEFT JOIN wazuh_agents puis filter NULL)
+    # Parmi les machines DESIGNEES, celles qui n'ont pas encore d'agent.
+    # `a.machine_id IS NULL` : c'est la colonne qui existe (cf E-224 ci-dessus).
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
-        cur.execute("""
+        fmt = ','.join(['%s'] * len(machine_ids))
+        cur.execute(f"""
             SELECT m.id, m.name
             FROM machines m
             LEFT JOIN wazuh_agents a ON a.machine_id = m.id
-            WHERE (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')
-              AND a.id IS NULL
+            WHERE m.id IN ({fmt})
+              AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')
+              AND a.machine_id IS NULL
             ORDER BY
                 CASE WHEN m.criticality = 'CRITIQUE' THEN 0 ELSE 1 END,
                 m.name
-        """)
+        """, machine_ids)
         targets = cur.fetchall()
 
     if not targets:

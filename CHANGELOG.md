@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.67** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.68** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,40 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.68 — E-224 : le SQL et la borne, parce que le SQL seul etait plus dangereux que le defaut
+
+**Le defaut.** `/wazuh/install_all` filtrait `AND a.id IS NULL` — `wazuh_agents` n'a **aucune colonne
+`id`** (`034_wazuh.sql:42`). L'`execute()` n'etant dans aucun `try`, la route rendait **500**. Elle n'a
+donc jamais rien installe, et personne ne l'a vu : la table porte zero ligne.
+
+**Pourquoi le corriger seul aurait ete pire.** Sans agent en base, la requete corrigee rend **tout le
+parc**, et son `ORDER BY … CASE WHEN criticality = 'CRITIQUE'` place la **production en premier**. Et
+il n'aurait pas fallu cliquer : `health_check.php` POSTait sur cette route **avec un corps vide, a
+chaque chargement**, sous le commentaire « dry, vide la liste » — un mot qui decrivait un **accident**,
+la liste etant vide parce que la requete echouait. *Un defaut qui protege par accident cesse de
+proteger au moment exact ou on le corrige.*
+
+**La borne : `machine_ids` obligatoire.** Absent ou vide → **400**, aucune machine touchee. Un appel a
+corps vide **echoue ferme**, sans qu'il faille se souvenir de modifier quoi que ce soit ailleurs — et
+la memoire est precisement ce qui a manque ici pendant des mois.
+
+**Le precedent du produit a ete ECARTE, mesure a l'appui.** `/supervision/scan-all` se borne par
+`machine_ids` **plus** `check_machine_access` dans le corps. Le recopier ici donnerait **une borne qui
+ne borne pas** : `check_machine_access` rend `True` sans condition des le role 2, et cette route porte
+`@require_role(2)` — le filtre serait inerte **pour exactement son public**. Cinquieme occurrence de
+« un garde sans objet ne garde rien » si on l'avait recopie. Pas de filtre sur `criticality` non plus :
+*une etiquette d'inventaire n'est pas un garde-fou.*
+
+**⚠ CONTRAINTE DE LIVRAISON — LE BOUTON DE LA PAGE VA RENDRE 400.** `legacy/wazuh/js/wazuh.js:157`
+envoie `JSON.stringify({})`. **La page a pourtant deja la liste** : `:78` calcule `noAgent` en
+filtrant `r.servers`, elle la **compte** au lieu de l'envoyer. Le correctif y est d'une ligne
+(`.map(s => s.id)`), et **ce fichier n'est pas le perimetre de la session 4**. Tant qu'il n'est pas
+fait, « Installer sur tous » repond 400 — ce qui est le comportement voulu de la borne, mais qui doit
+etre **corrige dans la meme livraison** et non decouvert.
+
+**Verifie** : bornee a `(2, 3)`, la requete rend les deux machines DEV et **jamais `srv-zabbix`**, qui
+n'est atteignable que si on l'ecrit explicitement. **Inerte jusqu'au redemarrage.**
 
 ### v1.38.67 — ⚠ PREALABLE AU REDEMARRAGE : le backend ignorait les permissions temporaires
 
