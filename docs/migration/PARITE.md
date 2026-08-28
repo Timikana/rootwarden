@@ -10726,7 +10726,62 @@ chiffres diffèrent, ce qui est en soi le résultat.**
 préfixes nommés, `startswith` pour les espaces de noms. *Sans la normalisation, un `<int:id>` ne correspond à
 aucun préfixe littéral et le compte s'effondre — c'est le piège que la spec d'API a déjà payé (E-231).*
 
-### ⚠ Le DSI compte 151, le Lead 123 — et ni l'un ni l'autre ne se relaie
+### ✅ RÉCONCILIÉ (2026-08-28, 15:0x CEST) — TROIS LECTURES, ET LA MIENNE ÉTAIT FAUSSE SUR SES PROPRES TERMES
+
+    la regle du PHP, telle qu'ecrite (api_proxy.php:154-156)
+        if ($path === $prefix || strpos($path, $prefix) === 0)
+
+    A  ce que le PHP FAIT           (startswith sur les 63)                    **199**
+    B  ce que la liste SEMBLE dire  (exact sur 48 nommes, startswith sur 15 NS) **191**
+    C  la lecture du Lead                                                       171   <- FAUSSE
+    ---------------------------------------------------------------------------------
+    surface d'ACCIDENT (A - B)                                                    **8**
+
+**Mon `171` n'était pas « une autre question » : c'était B, mal exécutée.** J'ai détecté les espaces de noms
+par **`endswith('/')` seul — 13 au lieu de 15** — et manqué **`/cve_`** et **`/iptables-`**, qui en sont, avec
+un `_` et un `-` pour séparateur. **Les 20 routes d'écart sont exactement celles-là.**
+
+> **Même classe de faute que les deux orthographes de la spec d'API et que « on compare des segments, pas des
+> sous-chaînes » : une hypothèse sur la FORME du séparateur.** *Une sonde qui suppose un séparateur ne mesure
+> que ce séparateur* — et j'ai signé cette règle trois fois aujourd'hui avant de la commettre.
+
+**Le `151` du DSI est reproduit** et il répond bien à *« combien le proxy laisse-t-il passer sans les
+nommer »* — `199 − 48`.
+
+### ⚠⚠ ET LA MESURE QUI MANQUAIT RENVERSE LA LECTURE
+
+**Les huit routes de la surface d'accident, nommées :**
+
+    /approvals/stats · /approvals/{x}/approve · /approvals/{x}/reject
+    /chatops/users/{x}/{x} · /command_log/contexts
+    /groups/{x} · /groups/{x}/members · /groups/{x}/run
+
+> **Ce sont TOUTES des sous-chemins légitimes de la ressource nommée.** `/approvals` couvrant
+> `/approvals/stats` est le comportement qu'on attend d'un préfixe de ressource. **Il n'existe aujourd'hui
+> AUCUNE collision accidentelle de type `/search` → `/searchall`.**
+
+**Donc le 151 est dominé par les 15 espaces de noms, qui sont DÉLIBÉRÉS.** Le DSI l'écrit contre lui-même :
+*« j'ai publié l'agrégat sans séparer les deux populations, et l'agrégat vaut vingt fois la population qui
+inquiète. C'est la sonde écrite pour accuser — celle que je reproche depuis ce matin — appliquée à ma propre
+décision. »*
+
+**Sa phrase « une route nouvelle devient atteignable sans que personne ne l'ait décidé » reste vraie comme
+MÉCANISME et fausse comme AMPLEUR : zéro occurrence.**
+
+*Un agrégat qui mélange une population délibérée et une population accidentelle mesure la première et alarme
+sur la seconde.* **La mesure qui décide n'était ni 151 ni 171 : c'était 8, puis leur lecture.**
+
+### Et ce qui reste NON expliqué est dit comme tel
+
+Le DSI ne sait pas d'où venait mon 171 — *« je le dis plutôt que de fabriquer une explication : j'ai failli
+publier que ta sonde n'appliquait pas `startswith` aux préfixes nommés, et la mesure a montré que
+`/admin/backups` passe par `/admin/`, un espace de noms. Mon hypothèse était fausse. »*
+
+**Elle l'était, et la vraie cause est celle mesurée ci-dessus.** *Deux chiffres réconciliés sur le point qui
+décide valent mieux qu'une explication inventée pour le reste* — et refuser d'inventer a laissé la place à la
+mesure qui a trouvé.
+
+### ~~Le DSI compte 151, le Lead 123~~ — conservé pour la trace
 
 **L'écart de 28 est probablement dans la définition de « nommée »** : ma correspondance exacte sur chemin
 normalisé classe comme *nommée* une route qu'une correspondance par préfixe classerait comme *couverte par un
