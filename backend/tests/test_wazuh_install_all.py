@@ -93,9 +93,19 @@ def config_presente():
 class TestBorneObligatoire:
     """Le corps doit NOMMER les machines. Sans borne, refus."""
 
-    @pytest.mark.xfail(strict=True,
-                       reason="E-224 : la borne `machine_ids` n'est pas encore posee "
-                              "(la session BASE & PERFORMANCE l'ecrit avec le SQL)")
+    # ── LE MARQUEUR `xfail` A ETE RETIRE LE 2026-08-28 ──────────────────────
+    #
+    # Il a fait ce pour quoi il etait pose : la borne est arrivee (`70bc2f7`),
+    # les trois cas sont passes XPASS(strict) donc FAILED, et le rejeu m'a
+    # ramenee ici. Verrouiller le comportement d'AVANT aurait fige le defaut ;
+    # decrire l'ATTENDU a garanti qu'on revienne au moment ou il devient vrai.
+    #
+    # Verifie avant de retirer, pas deduit du vert : `wazuh.py` documente la
+    # borne, et le correctif porte AUSSI le SQL — `AND a.id IS NULL` sur une
+    # table sans colonne `id`. *Corriger ce SQL seul aurait ete plus dangereux
+    # que le laisser* : sans agent en base, la requete corrigee rend TOUT LE
+    # PARC. Un defaut qui protege par accident cesse de proteger au moment exact
+    # ou on le corrige.
     @pytest.mark.parametrize('corps', [{}, {'machine_ids': []}, {'group': 'default'}])
     def test_un_corps_sans_machines_est_refuse(self, client_wazuh, mock_db, sans_machine,
                                                config_presente, superadmin_headers, corps):
@@ -115,6 +125,25 @@ class TestBorneObligatoire:
         message = (reponse.get_json() or {}).get('message', '')
         assert 'onfig' not in message, (
             f'le 400 vient de la configuration, pas de la borne : {message!r}')
+
+        # ── ET IL NE SUFFIT PAS D'EXCLURE UNE SEULE MAUVAISE RAISON ─────────
+        #
+        # Mesure par mutation : en neutralisant la borne, `{}` et
+        # `{'group': …}` rendent TOUJOURS 400 — par le cast qui suit
+        # (`[int(x) for x in None]` leve, et la route rend « machine_ids doit
+        # etre une liste d entiers »). Seul le cas `machine_ids: []` rougissait.
+        #
+        # Un 400 obtenu pour une autre raison n'est pas un refus de ce qu'on
+        # teste, et EXCLURE UNE SEULE MAUVAISE RAISON N'EN EXCLUT PAS DEUX.
+        # On exige donc que le refus porte sur l'EXIGENCE, pas sur le type.
+        #
+        # Cette assertion depend d'un mot du message, et je l'assume : c'est le
+        # seul signal qui distingue deux 400 qui ne different que par leur
+        # MOTIF. Si le libelle change, ce test rougit — et c'est le bon moment
+        # pour verifier que le motif, lui, n'a pas change.
+        assert 'requis' in message, (
+            f"le refus doit porter sur l'EXIGENCE de `machine_ids`, pas sur son "
+            f'type : {message!r}')
         assert ssh.ouvertures == []
 
 
