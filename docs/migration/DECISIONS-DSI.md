@@ -875,13 +875,51 @@ est faux **dans les deux sens** :
 > désinstallé ».** *Choisir une valeur avant d'avoir un mot pour l'état, c'est écrire une valeur fausse
 > dans les deux sens.*
 
-### La décision : un état NOMMÉ, et le drapeau cesse d'être binaire
+### ⚠ RETIRÉ — `desinstalle_partiel` était la mauvaise réponse, et à une question mal posée
 
-**Même remède que `sudoers_orphelin`, et pour la même raison** — *un nom porte la raison, un booléen
-porte une couleur* :
+**Ma décision créait un état nommé `desinstalle_partiel`. Elle est retirée le 2026-08-28 à 14:17 UTC**,
+sur retrait par le Lead de sa **propre** prémisse — *« le vocabulaire n'a pas de mot pour partiellement
+désinstallé »* — et vérification par moi. **Le vocabulaire en avait un :**
 
-    reponse de /wazuh/uninstall :  desinstalle_partiel: true   (paquet subsistant, donnees detruites)
-    et l etat persiste porte le MEME nom, pas un booleen retourne
+    mysql/migrations/034_wazuh.sql:48
+    status ENUM('active','disconnected','never_connected','pending','unknown')
+
+**`unknown` existe, et de bout en bout** — vérifié : écrit par `detect` (`wazuh.py:741-745`, par une
+expression conditionnelle), rendu en badge gris (`legacy/wazuh/js/wazuh.js:102`) **et couvert par un
+repli pour tout statut non mappé** (`:105`).
+
+**Et ce n'est pas un pis-aller, c'est la seule des trois écritures honnête** : `unknown` ne dit pas
+« partiellement désinstallé », il dit **« je ne sais pas ce qu'il y a sur cette machine »** — ce qui est
+exactement la vérité de l'état atteint. *Mes deux options affirmaient toutes deux quelque chose de faux ;
+celle-ci n'affirme rien.*
+
+**Ce que mon erreur aurait coûté** : un `ALTER TABLE` sur un ENUM, donc **une migration** — alors que
+063 attend déjà une signature et que ma propre décision n°8 refuse de créer une file de migrations non
+appliquées. *J'ai tranché une décision qui contredisait la mienne, sur une prémisse que je n'avais pas
+mesurée.*
+
+### ⚠ ET LE DÉFAUT EST PIRE QUE CE QUE LA PRÉMISSE DISAIT : IL Y A UNE TROISIÈME FAUSSE ÉCRITURE, ET C'EST L'ACTUELLE
+
+    backend/routes/wazuh.py:818   _, _, code_v = execute_as_root(client, verif_cmd, ...)   <- calcule
+                            :819   _upsert_agent(row['id'], status='never_connected', ...)  <- INCONDITIONNEL
+
+**`uninstall` écrit `never_connected`, quoi qu'ait rendu la vérification.** Et `code_v` — la valeur qui
+distingue « paquet retiré » de « paquet resté », celle que le correctif d'E-225 vient d'ajouter — est
+**calculée puis jetée.**
+
+> **`never_connected` affirme que l'agent n'a JAMAIS été connecté.** Sur une machine qui en portait un,
+> c'est faux de la façon la plus large des trois : les deux autres se trompaient sur l'**état présent**,
+> celle-ci se trompe sur l'**histoire**. *Le verdict a été corrigé et l'état persisté est resté* — la
+> moitié exacte d'E-90, et l'inverse d'E-183.
+
+### La décision : écrire `unknown`, et lire `code_v`
+
+    si code_v == 7  ->  status = 'unknown'      (le paquet subsiste, on ne sait pas ce qui tourne)
+    sinon           ->  status = 'never_connected' ... voir la reserve ci-dessous
+
+**Aucune migration. Aucun drapeau à débinariser. Aucune ligne d'interface à ajouter** — le repli de
+`wazuh.js:105` couvre déjà tout statut non mappé. **Le geste est délégable tout de suite** : lire une
+valeur déjà calculée et écrire une valeur déjà dans l'ENUM.
 
 **Trois conditions, celles du chantier, et la troisième est celle qu'on oublie :**
 
@@ -903,3 +941,27 @@ exactement ce que la colonne fait pour l'auto-réparation du sudoers.
 
 **Porteur mesuré : aucun.** `wazuh_agents` porte **0 ligne** — le module n'a jamais servi. *Écrire un nom
 d'état quand aucune machine ne l'occupe est la seule fenêtre où se tromper ne coûte rien.*
+
+### ⚠ Une réserve à porter AVEC le geste, et elle est de calendrier
+
+**Il n'existe aucun `laravel/lang/{fr,en}/wazuh.php`** — vérifié : `wazuh` n'est pas porté. Si `unknown`
+est retenu, **le libellé doit exister au moment du portage**, sinon l'écran affichera
+`wazuh.status_unknown` **en clair**.
+
+*C'est la quatrième occurrence du motif « un catalogue de traduction du portage ne se clé pas comme celui
+du legacy »* — et la seule fois où on peut l'éviter **avant** la première capture plutôt qu'en la
+regardant. **À inscrire dans la mission de la session 3**, pas à découvrir au premier rendu.
+
+### Ce que cette correction dit de ma méthode
+
+**J'ai tranché sur une liste de statuts que je n'ai pas vérifiée dans le schéma.** La liste venait d'un
+motif sur les affectations littérales `status='…'` ; `unknown` est écrit par une **expression
+conditionnelle**, qu'aucun motif de ce genre ne voit.
+
+> **Le vocabulaire d'un champ, c'est le SCHÉMA — pas ce que le code écrit.** Formulation du Lead,
+> retenue. *Et lire `information_schema` avant de raisonner sur une colonne est une règle que ce
+> document citait déjà, empruntée au §8, sans l'appliquer ici.*
+
+**Quatrième fois aujourd'hui que je reprends un fait sans le mesurer** — et la première où cela a produit
+**une décision**, pas seulement une phrase. *Un fait faux dans un compte rendu se corrige au tour
+suivant ; un fait faux dans une décision fait faire un geste.*
