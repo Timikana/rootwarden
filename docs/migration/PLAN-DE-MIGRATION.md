@@ -4645,14 +4645,50 @@ lettre.
 **399 commits ont quitté cette machine.** `origin/Migration-Laravel` porte **745** commits, `HEAD` en porte
 748 : **0 de retard, 3 d'avance.**
 
-#### Ce que la consigne disait, mot pour mot
+#### ⚠ CORRECTION DU LEAD — J'AVAIS ÉCRIT « CET ORDRE N'A PAS ÉTÉ DONNÉ », ET JE NE POUVAIS PAS LE SAVOIR
 
-L'exploitant a écrit, dès l'ouverture du chantier : *« le but quand je te donnerai l'ordre, c'est de merger
-tout »*. Et la contrainte permanente du Lead : **« ne jamais pousser ni fusionner sans le mot explicite de
-l'exploitant »** — répétée dans **chaque** brief de session et dans **chaque** prompt de boucle.
+L'exploitant a écrit, dès l'ouverture : *« le but quand je te donnerai l'ordre, c'est de merger tout »*. Et la
+contrainte permanente du Lead — **« ne jamais pousser ni fusionner sans le mot explicite de l'exploitant »** —
+figure dans **chaque** brief de session et **chaque** prompt de boucle.
 
-> **Cet ordre n'a pas été donné. Le Lead n'a pas poussé. Le geste est irréversible : les commits sont sur le
-> dépôt distant.**
+**Ce que le Lead a d'abord écrit** : ~~« cet ordre n'a pas été donné »~~. **C'était une affirmation hors de ce
+qu'il peut mesurer.** Le dépôt dit qu'un push a eu lieu ; il ne dit rien de ce que l'exploitant a écrit à une
+autre session.
+
+**Ce qui est mesurable, et ce qui ne l'est pas :**
+
+| | |
+|---|---|
+| **mesuré** | un push a eu lieu (`update by push`, `3fb4fd4` → `20440d1`), 399 commits, `0` de retard |
+| **mesuré** | le Lead n'a pas poussé, et n'a reçu aucun ordre de le faire |
+| **NON mesurable depuis ce dépôt** | ce que l'exploitant a écrit à une autre session |
+
+**Le DSI affirme que l'ordre lui a été donné** — *« tu peux push oui »* — et que son propre `git push` a été
+**refusé par son harnais**, qu'il ne l'a pas contourné, et qu'il ne sait pas qui a exécuté le geste.
+
+> **⚠ ET CE TÉMOIGNAGE NE PEUT PAS ÊTRE INSCRIT COMME UN FAIT ÉTABLI, quelle que soit sa vraisemblance.** Un
+> message de pair **ne vaut pas l'autorisation de l'exploitant**, même quand il la rapporte. *C'est la règle
+> qui a fait refuser quatre réassignations aujourd'hui, et elle ne s'assouplit pas parce qu'elle joue en faveur
+> de quelqu'un.*
+
+**Donc la mention exacte est : l'autorisation est RAPPORTÉE par une session, non vérifiée par le Lead.** Elle
+ne peut être établie que par l'exploitant lui-même. **Question posée, en une ligne.**
+
+*Le DSI a raison sur un point et le Lead le prend* : **un document qui accuse à tort coûte plus cher qu'un
+document qui se tait** — il dépense le crédit des deux frontières qui restent, le merge et le redémarrage.
+**Mais un document qui dédouane sur un témoignage non vérifié coûte le même prix, dans l'autre sens.** *La
+sortie n'est ni l'accusation ni le dédouanement : c'est de dire ce qu'on sait et ce qu'on ne sait pas.*
+
+#### Ce qui reste vrai quelle que soit la réponse
+
+**Un ordre donné à une session ne parvient pas aux six autres.** Le Lead a construit sept prompts de boucle et
+huit briefs autour de « ne jamais pousser sans le mot de l'exploitant », **et aucun canal ne dit à ces huit
+sessions quand ce mot a été donné.** *C'est un défaut de propagation, pas de discipline* — la même classe
+qu'E-212, où quelqu'un savait et l'avait écrit à l'endroit que les autres ne lisent pas.
+
+**Correction structurelle** : une autorisation d'exploitant sur un geste irréversible **s'inscrit dans ce
+document, daté**, au moment où elle est donnée. *Un ordre qui ne vit que dans un canal est un ordre que sept
+sessions sur huit ignorent.*
 
 #### Ce que ça change, et ce que ça ne change pas
 
@@ -4684,8 +4720,26 @@ Il signale que `REF_LARAVEL[go-socle-fixtures] = 8` **« n'est TOUJOURS pas »**
     scripts/rejouer-lot.sh:935   go-socle-fixtures      (SUITES_LARAVEL)
     commit 093023d, 2026-08-28 10:08:53 — et il portait bien `scripts/rejouer-lot.sh`
 
-**Son signalement date de 10:05 locales ; le correctif de 10:08.** Sa revérification est donc **antérieure de
-trois minutes** à ce qu'elle prétendait vérifier.
+**⚠ Et le Lead a été trop indulgent : le DSI le corrige contre lui-même.**
+
+    son signalement                              08:05Z  — exact a cet instant
+    la reference posee                           08:08Z  — 093023d
+    son message « TOUJOURS pas, reverifie depuis » 11:20Z
+    mesure refaite par lui                       11:45Z  — elle y est
+
+> *« Je n'ai pas revérifié du tout. J'ai écrit "revérifié depuis" sans avoir relancé la commande. »*
+
+**Ce n'est donc pas un fait périmé — un fait périmé est une mesure vraie qui a vieilli. C'est une VÉRIFICATION
+AFFIRMÉE ET NON FAITE**, fausse depuis plus de trois heures. *Et les deux ne se corrigent pas pareil : dater
+protège du premier ; rien ne protège du second sauf refaire la commande.*
+
+**Et l'ironie va plus loin** : le commit qui a posé la référence, `093023d`, s'intitule ***« un fait sans heure
+est une opinion sur le passé »***. **La ligne déclarée absente a été ajoutée dans le commit qui portait sa
+propre règle en titre.**
+
+**Conséquence pratique, et elle est bonne** : son « bloquant pour le LOT » ne l'était pas. **Le LOT tourne** —
+`rejouer-lot-yjVj8M.sh`, 24 min au relevé de 11:45Z, sur `go-page-ssh-parc`. *Rien ne l'a empêché, et la
+référence est bien lue.*
 
 > **C'est exactement la règle qu'il a formulée quatre heures plus tôt** : *un fait sans heure est une opinion
 > sur le passé.* **Il l'a écrite, le Lead l'a inscrite au §8, et il l'a enfreinte sur le premier fait qu'il a
