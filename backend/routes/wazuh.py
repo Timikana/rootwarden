@@ -145,6 +145,24 @@ def _upsert_agent(machine_id, **fields):
         conn.commit()
 
 
+# ══ CE QUE L'AMORCAGE LAISSE DERRIERE LUI (E-225) ══════════════════════════
+#
+# L'installation ne pose pas que le paquet : elle etablit une RELATION DE
+# CONFIANCE — une cle de signature et un depot — et la desinstallation ne les
+# retire pas. Ce n'est pas forcement un defaut : un exploitant peut vouloir
+# garder le depot pour reinstaller sans refaire l'amorcage. **Ce qui n'est pas
+# defendable, c'est que le geste ne le DISE pas** : le bouton s'appelle
+# « desinstaller ».
+#
+# Ces valeurs sont la SOURCE UNIQUE de la reponse d'`uninstall`. Elles decrivent
+# ce que le script d'amorcage ecrit, par famille.
+VESTIGES_AMORCAGE = {
+    'debian': ['/usr/share/keyrings/wazuh.gpg', '/etc/apt/sources.list.d/wazuh.list'],
+    'rhel':   ['cle GPG importee dans le trousseau RPM', '/etc/yum.repos.d/wazuh.repo'],
+    'suse':   ['cle GPG importee dans le trousseau RPM', '/etc/zypp/repos.d/wazuh.repo'],
+}
+
+
 def _wazuh_pkg_specs(version: str):
     """Retourne (pkg_deb, pkg_rpm) selon la version Wazuh demandee.
 
@@ -749,6 +767,17 @@ def uninstall():
     user_id, _ = get_current_user()
     ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
 
+    # ⚠ CETTE COMMANDE EST `apt`-ONLY, ALORS QUE L'INSTALLATION NE L'EST PLUS.
+    #
+    # Le commentaire de l'installation le dit lui-meme : « avant v1.18.x c'etait
+    # apt-only -> fail silencieux sur RHEL family ». Ce defaut a ete corrige a
+    # l'installation et **jamais reporte ici**. Sur RHEL et SUSE, `apt-get purge`
+    # n'existe pas, le `|| true` avale l'echec, seul `rm -rf /var/ossec` agit —
+    # le paquet reste installe, et `code == 0` fait annoncer une reussite.
+    #
+    # NON CORRIGE ICI : rendre cette commande multi-famille est un CHANGEMENT DE
+    # COMPORTEMENT sur un geste destructeur distant, et E-225 demandait
+    # explicitement de ne pas en faire. Signale, pas repare.
     cmd = (
         "export DEBIAN_FRONTEND=noninteractive && "
         "systemctl stop wazuh-agent 2>/dev/null || true && "
@@ -760,7 +789,18 @@ def uninstall():
             _, err_out, code = execute_as_root(client, cmd, root_pwd, logger=logger, timeout=180)
         _upsert_agent(row['id'], status='never_connected', agent_id=None, version=None)
         _audit(user_id, 'uninstall', f"machine_id={row['id']} code={code}")
-        return jsonify({'success': code == 0})
+        # E-225 : la reponse NOMME ce qui subsiste. Aucun changement de
+        # comportement — on ne retire pas le depot, on cesse de faire croire
+        # qu'il est parti. Un geste reversible qui ne rend pas tout ce qu'il a
+        # pris n'est pas reversible : il est partiel, et le reste est invisible.
+        vestiges = {
+            'retire': ['paquet wazuh-agent', '/var/ossec'],
+            'subsiste': VESTIGES_AMORCAGE,
+            'note': ("Le depot Wazuh et sa cle de signature ne sont PAS retires : "
+                     "la machine continuera de les consulter a chaque mise a jour. "
+                     "Retrait manuel si vous ne comptez pas reinstaller."),
+        }
+        return jsonify({'success': code == 0, 'vestiges': vestiges})
     except Exception as e:
         logger.exception("Erreur uninstall wazuh : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
