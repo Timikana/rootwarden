@@ -793,3 +793,62 @@ d'`api_proxy.php` et pourtant **atteignable**, par un fichier d'entrée qui lui 
 **Et une divergence signalée par la session 2 est dédouanée** : `/platform_key` en liste blanche et
 absente de la liste administration rend la **clé publique**, faite pour être distribuée. *Deux listes
 qui ne coïncident pas ne sont pas forcément incohérentes ; encore faut-il lire ce que la route rend.*
+
+### ⚠ Réconciliation des chiffres, et elle CORRIGE ma propre formulation — 2026-08-28, 12:55 UTC
+
+Le Lead a mesuré indépendamment et trouvé **123** là où j'avais publié **151**, en refusant de relayer
+l'un ou l'autre : *« à réconcilier par celui qui a écrit la décision, avec sa méthode explicite. »*
+Refait moi-même, méthode donnée :
+
+    prefixes du proxy      63   dont 15 espaces de noms / racines ('/', '_', '-') et 48 nommes
+    routes backend        203   (`<int:id>` normalise en `{x}` — sans quoi le compte s effondre)
+
+    atteignables, regle du PHP telle qu ecrite  (`$path === $x || strpos($path,$x) === 0`)   199
+      dont NOMMEES exactement                                                                 48
+      dont couvertes SANS etre nommees                                                       151
+    non atteignables                                                                           4
+
+**Le 151 est reproduit.** Il répond à *« combien de routes le proxy laisse-t-il passer sans les
+nommer ? »*, et il compte la **règle telle que le PHP l'exécute**, sur tous les préfixes.
+
+### ⚠ Et la mesure qui manquait renverse la lecture : la surface d'ACCIDENT est de **8**, pas de 151
+
+J'avais écrit : *« une route backend nouvelle dont le nom commence par un préfixe autorisé devient
+atteignable sans que personne ne l'ait décidé »*. **Vrai comme mécanisme, et trompeur comme ampleur.**
+Comparaison des deux lectures :
+
+    atteignables — ce que le PHP FAIT (startswith sur les 63)            199
+    atteignables — ce que la liste SEMBLE dire
+                   (exact sur les 48 nommes, startswith sur les 15 NS)   191
+                                                                        ----
+    ECART, c est-a-dire la surface d ACCIDENT                              8
+
+**Et les huit, nommées :** `/approvals/stats` · `/approvals/{x}/approve` · `/approvals/{x}/reject` ·
+`/chatops/users/{x}/{x}` · `/command_log/contexts` · `/groups/{x}` · `/groups/{x}/members` ·
+`/groups/{x}/run`.
+
+> **Les huit sont des SOUS-CHEMINS légitimes de la ressource nommée.** `/approvals` couvrant
+> `/approvals/stats` est le comportement qu'on attend d'un préfixe de ressource. **Il n'existe
+> aujourd'hui aucune collision accidentelle de type `/search` → `/searchall`.**
+
+**Donc le 151 est dominé par les espaces de noms** — `/admin/`, `/cve_` — **qui sont délibérés**, et non
+par des collisions. *Un chiffre qui compte ensemble le voulu et l'accidentel alarme sur le voulu.*
+**C'est la sonde écrite pour accuser, appliquée à ma propre décision** : j'ai publié l'agrégat sans
+séparer les deux populations, et l'agrégat est vingt fois la population qui inquiète.
+
+### Ce que la décision devient
+
+**Inchangée : ne rien resserrer.** Et **mieux soutenue** — resserrer coûterait un travail réel sur un
+fichier programmé pour disparaître, contre une surface d'accident **actuellement nulle**. La
+formulation, elle, change :
+
+| ce que j'avais écrit | ce que la mesure soutient |
+|---|---|
+| « 151 routes autorisées sans être nommées » | exact, et **dominé par 15 espaces de noms délibérés** |
+| « une route nouvelle devient atteignable sans décision » | **vrai comme mécanisme**, et **0 occurrence** aujourd'hui |
+| — | **8 routes** couvertes par un préfixe nommé, **toutes sous-chemins légitimes** |
+
+**Ce que le mécanisme garde de réel, et qui justifie de l'écrire plutôt que de le classer** : *une liste
+blanche qui autorise par préfixe n'est pas une liste blanche, c'est une liste de FAMILLES* — personne ne
+peut dire de mémoire ce qu'elle contient, et la prochaine route Python nommée `/searchall` entrerait
+sans décision. **Mesurable, non resserré, raison écrite.**
