@@ -2846,33 +2846,85 @@ bruyant et ne le rend pas prouve qu'il écoute.* Corrigé par un **plancher** (l
 et une **reconstitution de total** — les deux emprunts croisés entre deux sessions, chacune appliquant à son
 outil la parade de l'autre.
 
-### CINQUIÈME CORRECTION DE MA CONSIGNE DE COMMIT : `git rm` STAGE AUSSI (2026-08-28)
+### ⚠ MA CINQUIÈME CORRECTION VISAIT LA MAUVAISE MOITIÉ — LA RÈGLE N'ÉNUMÈRE PAS, ELLE RESTREINT (2026-08-28)
 
-**Incident déclaré par son autrice.** La suppression de `bump-version.sh` est partie dans le commit **d'une
-autre session**, dont le message ne la mentionne pas. Rien n'est perdu et la suppression est bonne — mais :
+**Ce paragraphe disait que la cause était que `git rm` stage aussi, là où la consigne ne parlait que de
+`git add`. C'est vrai, et CE N'EST PAS CE QUI S'EST PASSÉ.** Corrigé par la session 4, qui a déclaré son
+propre geste :
 
-> *« J'avais écrit "ne jamais laisser un fichier INDEXÉ entre deux appels d'outil", en pensant à `git add`.*
-> **`git rm` stage aussi — immédiatement, et silencieusement.** *J'ai ensuite fait six appels d'outil avant de
-> committer. »*
+    git add <mes fichiers>
+    git commit -F - <<'MSG'          <- SANS `-- <chemins>`
 
-**La règle corrigée** : *tout geste qui touche l'index — `git add` comme `git rm` — doit être dans la MÊME
-commande que son `git commit`.* Et une conséquence pratique : **`git commit -- <chemin>` ÉCHOUE après un
-`git rm`** (le chemin ne correspond plus à rien) — il faut les enchaîner, ou supprimer d'abord dans l'arbre
-de travail seul.
+> **`git add` restreint ce que MOI je mets dans l'index ; il ne fait rien contre ce qui y est DÉJÀ.** Avec
+> `git commit -- <chemins>`, **ni un `git rm` ni un `git add` d'une autre session n'auraient pu entrer** — la
+> forme complète **ignore l'index**, et c'est exactement pourquoi elle existe.
 
-**Historique de cette consigne, cinq énoncés en deux jours :**
+**Deux commits ont été contaminés, tous deux vérifiés** — le contenu est intact, **seule l'attribution est
+fausse** :
+
+    52838f2  « E-215 »  porte aussi la SUPPRESSION de scripts/bump-version.sh    (session 6)
+    77ae2c2  « E-214 »  porte aussi la CREATION de
+                        backend/tests/test_verdicts_deux_cents.py, 241 lignes    (session 6)
+
+**Le second est le plus gênant** : `backend/tests/` est le périmètre de la session 6, et son fichier apparaît
+dans l'historique comme créé par un commit sur `sshd_config`.
+
+#### La règle, réécrite
+
+> **Committer PAR CHEMINS, toujours. Pas « en plus » d'un `git add` restreint — À LA PLACE de s'y fier.**
+
+*Une règle qui énumère les cas dangereux sera toujours en retard d'un cas ; une règle qui restreint la portée
+ne l'est jamais.* **Ma cinquième correction — « étendre la consigne à `git rm` » — aurait laissé le défaut
+ouvert** : elle protégeait contre une opération de plus, là où le pathspec protège contre **toutes, connues et
+à venir.**
+
+**Historique de cette consigne, six énoncés en deux jours — et le sixième est le seul qui ne soit pas une
+énumération :**
 
 | énoncé | ce qui l'a corrigé |
 |---|---|
 | « relire `git diff --cached --stat` avant de commiter » | *la relecture n'était pas la protection, elle en donnait l'apparence* |
-| « employer `git commit -F - -- <chemins>` » | **ne marche pas sur une CRÉATION** — un pathspec ne désigne que des fichiers suivis |
+| « employer `git commit -F - -- <chemins>` » | **ne marche pas sur une CRÉATION** — le pathspec ne désigne que des fichiers suivis |
 | « le pathspec protège » | **faux pour les fichiers qu'on nomme** et qu'un autre a touchés |
 | « contrôler le diff avant de commiter » | *protège LES AUTRES de moi ; rien ne protège MON travail non commité d'eux* |
-| « ne pas laisser un fichier indexé entre deux appels » | **`git rm` stage aussi**, immédiatement et silencieusement |
+| « ne pas laisser un fichier indexé entre deux appels » | **`git rm` stage aussi** — vrai, mais **pas la cause** |
+| **« committer par chemins, toujours »** | *rien encore* — et par construction, rien de cette famille |
 
-*Une consigne corrigée cinq fois n'est pas une mauvaise consigne : c'est une consigne dont chaque énoncé
-couvrait le cas qui l'avait motivée.* **Et les cinq corrections sont venues des sessions, jamais du Lead qui
-l'avait écrite.**
+**Et la faute n'est pas celle de la consigne** : son autrice l'a appliquée pendant des heures puis laissée
+tomber sans s'en apercevoir. **Sixième occurrence du jour de *écrire une règle donne le sentiment de l'avoir
+appliquée*** — et la troisième où c'est l'auteur de la règle qui l'enfreint.
+
+#### ✅ Arbitrage : PAS de réécriture d'historique
+
+Les deux commits **ne sont pas publiés** (382 d'avance), donc une réécriture serait techniquement possible.
+**Elle n'aura pas lieu.** *`--amend` et toute réécriture restent interdits tant qu'une session peut
+travailler* — **sept commitent sur cette branche**, et réécrire sous leurs pieds coûterait plus cher que
+l'attribution fausse.
+
+**C'est le `CHANGELOG` qui départage**, comme pour les trois collisions de numéro de version : *l'attribution
+d'un contenu se répare par un registre, jamais par une réécriture.* Et la session 4 a refusé de toucher
+`backend/tests/` **même pour réparer son propre dégât** — c'est le bon réflexe, et il vaut plus que la
+réparation.
+
+### ⚠ UNE TÂCHE REDEMANDÉE EST AUSSI COÛTEUSE QU'UNE TÂCHE OUBLIÉE (2026-08-28)
+
+**Le Lead a redemandé l'unification des cinq `_resolve_ssh_creds`. Elle était faite depuis `c32f996`, et il
+avait lui-même confirmé la réponse le jour même.** Mesuré :
+
+    definitions locales dans backend/routes/  ->  AUCUNE
+    definition canonique                      ->  routes/helpers.py:351 resolve_ssh_creds
+    importateurs                              ->  5 modules
+
+**Et la réserve que le Lead avait posée avait reçu sa réponse dans le même commit** : le 7-uplet d'`iptables`
+**n'avait pas de domaine** — il avait besoin de `machine_id` lui aussi et le **re-dérivait** de la requête
+(`int(data.get('machine_id'))`, deux fois) au lieu de le recevoir. *Ce n'était pas une raison, c'était un
+retard.*
+
+> **Redemander cette tâche aurait touché 41 sites d'appel une seconde fois.** *Le Lead relit ses propres §8
+> avant d'assigner ; il ne relisait pas les commits de ceux à qui il assigne.*
+
+**La parade est mécanique** : avant d'assigner une tâche nommée dans un compte rendu antérieur, `git log -S`
+sur le symbole concerné. Trois lignes, et elle aurait suffi ici.
 
 ### Base et shell
 
