@@ -2171,6 +2171,54 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.65 — `docker` cesse d'annoncer un total de parc sur un flux qui n'a pas de fin
+
+Suite du correctif précédent, et c'est un écran mieux écrit ailleurs qui l'a révélé.
+
+`scan-cve.js:539` porte un contrôle que je n'avais pas : *« un flux qui se termine sans `done` ni
+`error` n'est pas un succès »*. Appliqué à `docker`, il montre ce qui manquait à ma propre correction :
+je distinguais « aucune ligne lisible », pas **« des lignes, mais pas la fin »**.
+
+**Mesuré** : `docker.py:141-149` émet une ligne par machine et **aucun marqueur terminal**. Un flux
+tronqué — connexion coupée, délai de passerelle — est donc **indiscernable d'une fin normale**. Sur
+huit machines dont trois rapportent avant la coupure, mon bilan disait « 3 réussi(s) sur 3 » : un
+succès complet.
+
+Le contrôle de `scan-cve.js` **ne se transpose pas** — son flux, lui, porte un événement terminal. On
+ne peut donc pas mesurer la troncature ici ; on peut seulement **cesser de prétendre** :
+
+- le libellé compte les serveurs qui ont **rapporté**, plus « tous les serveurs » ;
+- une borne sous le bilan dit que le flux ne porte aucun marqueur de fin, que le nombre n'est pas
+  celui du parc, et qu'une interruption ne se distingue pas d'une fin normale ;
+- **elle s'affiche dès qu'un bilan chiffré est affiché**, échecs ou non — un « 8 sur 8 » sans réserve
+  se lit comme un parc complet.
+
+*Une mesure plus fine que la donnée serait une invention.* Le marqueur manquant est **remonté**, pas
+contourné : c'est au flux de dire qu'il est fini.
+
+#### Et les trois routes de flux que le relevé QA laissait en silence
+
+Mesurées côté portage, avec l'**ensemble complet** des chemins de chaque fichier plutôt que l'absence
+d'un seul — « je ne l'ai pas trouvé » et « il n'y est pas » ne sont pas la même affirmation :
+
+| route | verdict |
+|---|---|
+| `/cve_scan` | **appelée** par `scan-cve.js:498` (chemin injecté par PHP, donc invisible au relevé), et **correctement** consommée — statut d'abord, flux lu, reste du tampon traité, absence de marqueur terminal annoncée |
+| `/cve_scan_all` | **aucun appelant** dans le portage |
+| `/iptables-logs` | **aucun appelant** — `pare-feu.js` appelle `/iptables` et mes deux routes de portage, rien d'autre |
+| `/update-logs` | **aucun appelant** — `mises-a-jour.js` appelle douze chemins, celui-là n'y est pas |
+
+Le silence du relevé tombe donc à zéro, mais d'une autre nature que prévu : **ces trois-là ne sont pas
+non résolues, elles sont non consommées.**
+
+**Réserve déclarée sur ma propre mesure** : je suis l'auteur des trois fichiers, donc ce relevé est une
+lecture, pas une mesure — et il conclut à un dédouanement. Les ensembles complets sont transmis à la
+QA pour qu'une seconde méthode puisse les contredire.
+
+Parité i18n comparée : `docker` 43 = 43.
+
+---
+
 ### v1.38.64 — le DSI a tranche les sept arbitrages, et il a corrige DEUX premisses du Lead
 
 **Sept decisions, huit dossiers — `DECISIONS-DSI.md` + `DOSSIER-01..08`, commit `b327ae0`. Et deux phrases du

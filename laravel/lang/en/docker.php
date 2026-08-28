@@ -50,7 +50,8 @@ return [
     // `POST /docker/scan_all` returns a JSON-lines STREAM as `text/plain`: the
     // 200 leaves BEFORE the first scan runs. A verdict drawn from the HTTP
     // status therefore announces success even if every machine failed.
-    'scan_all_done_simple' => 'Scan of every server finished: :ok succeeded out of :total.',
+    'scan_all_done_simple' => 'Scan finished: :ok succeeded out of :total server(s) reported.',
+    'scan_all_sans_fin' => "The stream carries no end marker: the number above counts the servers that REPORTED, not the fleet. An interruption part-way through is therefore indistinguishable from a normal end — reload the page to read each server's real state.",
     'scan_all_echecs'      => ':n server(s) failed: :noms',
     'scan_all_illisible'   => "The scan was started, but its report could not be read: there is no way to say how many servers succeeded. Reload the page to read the real state.",
     'scan_all_aucun'       => "The scan returned no report at all — either no server was processed, or the stream stopped before the first answer.",
