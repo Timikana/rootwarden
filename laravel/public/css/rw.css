@@ -2460,14 +2460,43 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * oubli ne se voit pas — le panneau s'ouvre, il est simplement a moitie sous
  * l'en-tete.
  *
- * ⚠ LE NOMBRE EST UN PLANCHER, PAS UNE EGALITE, et c'est dit parce que le
- * commentaire ne doit pas affirmer plus que le code. `.rw-entete` n'a pas de
- * hauteur explicite : elle vient de son contenu (`padding: 11px`, texte de
- * 15px, plus une bordure), soit ~44 px mesures a la lecture et non au rendu. Le
- * jeton vaut donc 64 px — assez pour degager l'en-tete avec une marge visible,
- * et sans pretendre valoir sa hauteur exacte. Si l'en-tete grandit, ce nombre
- * doit suivre : les deux ne sont PAS lies par le code.
+ * ══ LE NOMBRE, ET POURQUOI IL N'EST PAS DERIVABLE ═══════════════════════
+ *
+ * Premier jet : 64 px, estimes EN LISANT le CSS (`padding: 11px`, texte de
+ * 15px, une bordure) — soit ~44 px, arrondis vers le haut par prudence.
+ *
+ * **La hauteur RENDUE est 65 px.** L'estimation etait fausse de 21 px, et le
+ * plancher ne couvrait pas : 64 < 65. Mesure au rendu par la session 7, dont
+ * l'assertion etait ecrite pour NE PAS dependre de cette regle — c'est
+ * precisement pour cela qu'elle a pu la trouver courte.
+ *
+ * *Un test qui depend d'une propriete la mesure mal ; un test qui la mesure n'en
+ * depend pas.*
+ *
+ * ══ AUCUNE DERIVATION CSS N'EXISTE, ET C'EST CE QUI DECIDE ══════════════
+ *
+ * Il n'y a aucun moyen, en CSS, de lire la hauteur RENDUE d'un element dans une
+ * propriete personnalisee : pas d'`attr()` pour les longueurs, rien qui remonte
+ * une boite. La derivation demandee est donc impossible ici.
+ *
+ * ET DONNER A `.rw-entete` UNE HAUTEUR FIXE serait pire que le probleme. Elle
+ * porte `$titre`, qui depend de la page, plus un bloc de compte, une cloche et
+ * un selecteur de langue ; `@media (max-width: 900px)` change deja ce qui s'y
+ * affiche. Une hauteur figee y couperait du contenu le jour ou un titre est
+ * long. Un `min-height` ne fermerait rien non plus : il empeche l'en-tete de
+ * rapetisser, pas de GRANDIR — et c'est grandir qui rend la marge courte.
+ *
+ * ══ CE QUI TIENT A LA PLACE ═════════════════════════════════════════════
+ *
+ * Un nombre dont la justesse NE DEPEND PAS de la precision de la mesure : 88 px
+ * pour un en-tete de 65, soit 23 px francs. Une erreur de lecture comme la
+ * mienne ne le rendrait plus court.
+ *
+ * Et la relation est GARDEE AILLEURS : l'assertion de la suite compare la marge
+ * EFFECTIVE a la hauteur RENDUE, donc elle rougit si l'en-tete grandit. **La
+ * derivation vit dans la mesure, pas dans le CSS** — dit ici pour que personne
+ * ne croie que ce nombre se maintient tout seul.
  */
-:root { --rw-defilement-marge: 64px; }
+:root { --rw-defilement-marge: 88px; }
 
 html { scroll-padding-top: var(--rw-defilement-marge); }
