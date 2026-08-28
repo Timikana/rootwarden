@@ -178,6 +178,53 @@ class RoutesBackend
          * On ne depend jamais d'un seul rempart.
          */
         '/wazuh/',
+        /*
+         * ══ E-235c : LES DEUX ROUTES DE PARC, ET ELLES SEULES ═════════════
+         *
+         * On m'a demande d'ajouter `/ssh-audit/` et `/cve_` en entier, au motif
+         * que leurs routes de parc ne portent qu'un role. **Le motif est juste,
+         * la portee demandee ne l'est pas** — et le test decisif est celui que
+         * le precedent `/supervision/` impose lui-meme : *personne de legitime
+         * ne doit perdre un acces.*
+         *
+         * MESURE. Les deux pages admettent le ROLE 1 avec leur permission, des
+         * deux cotes :
+         *   `security/index.php:37`  checkAuth([ROLE_USER, …]) + can_scan_cve
+         *   `ssh-audit/index.php:12` checkAuth([ROLE_USER, …]) + can_audit_ssh
+         *   portage : `/scan-cve` en `role:1` + `perm:can_scan_cve`
+         *
+         * Et un role 1 porteur de la permission atteint aujourd'hui `/cve_scan`,
+         * `/cve_results`, `/cve_history`, `/cve_compare`, `/cve_reprioritize` —
+         * TOUTES gardees par `@require_machine_access`, c'est-a-dire la garde
+         * qui MORD au role 1 et le borne a SES machines.
+         *
+         * Fermer le prefixe entier remplacerait donc une borne PRECISE (vos
+         * machines) par une borne AVEUGLE (personne sous le role 2), et
+         * casserait la page pour les comptes auxquels elle est destinee. Ce
+         * serait le contraire du precedent invoque.
+         *
+         * CE QUI SE FERME SANS RIEN COUTER : les deux routes de PARC, qui n'ont
+         * aucune borne par machine et que le backend garde deja par
+         * `@require_role(2)` seul. Un role 1 n'y a jamais eu acces.
+         *
+         *   /ssh-audit/scan-all   require_api_key + require_role(2)
+         *   /cve_scan_all         require_api_key + require_role(2)
+         *
+         * Ce sont des entrees EXACTES : la comparaison par segment fait que
+         * `/cve_scan_all` ne couvre pas `/cve_scan`, verifie.
+         *
+         * DIVERGENCE DECLAREE : le legacy ne les porte pas dans
+         * `ADMIN_ONLY_PREFIXES`.
+         *
+         * ET DEUX ROUTES QUE LE RELEVE N'AVAIT PAS NOMMEES : `/cve_trends` et
+         * `/cve_test_connection` portent `@require_api_key` SEUL — ni role, ni
+         * permission, ni borne par machine. Ce sont des lectures, mais
+         * `/cve_trends` rend des donnees de flotte. Signale, non ferme : elles
+         * sont couvertes par le prefixe `/cve_` de la liste blanche, et les
+         * fermer une par une sans arbitrage refait le defaut ci-dessus en petit.
+         */
+        '/ssh-audit/scan-all',
+        '/cve_scan_all',
     ];
 
     /**

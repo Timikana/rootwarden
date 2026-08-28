@@ -2171,6 +2171,69 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.89 — E-235c : les deux routes de parc fermées, et le périmètre demandé REFUSÉ avec sa mesure
+
+#### Ce qui était demandé, et pourquoi la portée ne tenait pas
+
+On m'a demandé d'ajouter `/ssh-audit/` et `/cve_` **en entier** à `ADMIN_SEULEMENT`, au motif que leurs
+routes de parc ne portent qu'un rôle. **Le motif est juste ; la portée ne l'est pas** — et le test qui
+tranche est celui que le précédent `/supervision/` impose lui-même : *personne de légitime ne doit
+perdre un accès.*
+
+**Mesuré.** Les deux pages admettent le **rôle 1** avec leur permission, des deux côtés :
+
+    security/index.php:37    checkAuth([ROLE_USER, …]) + checkPermission('can_scan_cve')
+    ssh-audit/index.php:12   checkAuth([ROLE_USER, …]) + checkPermission('can_audit_ssh')
+    portage                  /scan-cve en role:1 + perm:can_scan_cve
+
+Et un rôle 1 porteur de la permission atteint aujourd'hui `/cve_scan`, `/cve_results`, `/cve_history`,
+`/cve_compare`, `/cve_reprioritize` — **toutes gardées par `@require_machine_access`**, c'est-à-dire la
+garde qui **mord** au rôle 1 et le borne à **ses** machines.
+
+> **Fermer le préfixe entier remplacerait une borne PRÉCISE (vos machines) par une borne AVEUGLE
+> (personne sous le rôle 2), et casserait la page pour les comptes auxquels elle est destinée.** Ce
+> serait le contraire du précédent invoqué.
+
+#### Ce qui se ferme sans rien coûter
+
+Les deux routes de **parc**, qui n'ont aucune borne par machine et que le backend garde déjà par
+`@require_role(2)` seul — un rôle 1 n'y a jamais eu accès :
+
+    /ssh-audit/scan-all     require_api_key + require_role(2)
+    /cve_scan_all           require_api_key + require_role(2)
+
+Entrées **exactes** : la comparaison par segment fait que `/cve_scan_all` ne couvre pas `/cve_scan`.
+**Vérifié après pose** — les deux fermées, les huit routes par machine intactes.
+
+**Divergence déclarée** : le legacy ne les porte pas dans `ADMIN_ONLY_PREFIXES`.
+
+#### Deux nombres à ne pas mal lire
+
+**Le compte d'entrées sans rempart reste 39, et c'est correct** : mes deux ajouts sont des routes
+exactes, pas des entrées de liste blanche. `/cve_` reste sans rempart *en tant qu'entrée* ; seul le
+chemin `/cve_scan_all` est désormais couvert. Le dire évite de lire « 39 » comme « rien n'a changé ».
+
+**Et le 38 annoncé était 39.** La dérivation `66 − 28` suppose une bijection entre les deux listes, qui
+n'existe pas : plusieurs entrées de `ADMIN_SEULEMENT` sont plus spécifiques que l'entrée de liste
+blanche qui les couvre. Le nombre juste vient de demander `reserveeAdmin()` sur chaque entrée, pas de
+soustraire deux longueurs.
+
+#### Deux routes que le relevé n'avait pas nommées
+
+`/cve_trends` et `/cve_test_connection` portent **`@require_api_key` seul** — ni rôle, ni permission,
+ni borne par machine. Ce sont des lectures, mais `/cve_trends` rend des données de flotte.
+
+**Signalées, non fermées** : elles sont couvertes par le préfixe `/cve_` de la liste blanche, et les
+fermer une par une sans arbitrage referait en petit le défaut refusé ci-dessus.
+
+#### Le lint, repassé sur ce que le gel m'avait fait écrire sans
+
+Le gel est levé. `RoutesBackend.php` — le seul PHP écrit pendant la contrainte — passe le lint **et se
+charge** : `LISTE_BLANCHE=66`, `ADMIN_SEULEMENT=30`, et `/wazuh/install_all` bien réservé. *Une syntaxe
+juste ne prouve pas une classe utilisable* : les deux ont été vérifiées.
+
+---
+
 ### v1.38.88 — le vocabulaire d'un champ c'est le SCHEMA, et la portee d'E-236 est UN compte reel
 
 #### ⚠ E-237 : ma liste de statuts etait courte d'un, et c'est celui qui resout
