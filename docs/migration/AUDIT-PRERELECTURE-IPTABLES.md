@@ -309,3 +309,124 @@ jeté**. La sortie affichée peut donc être amputée d'une portion d'espaces, q
 recomposition. Sans conséquence sur le verdict — le marqueur n'est pas blanc — mais la sortie
 affichée n'est pas *exactement* celle de la machine. **C'est dans `ssh_utils.py`, hors du périmètre
 de ce diff, et je ne le corrige pas dans le même geste** : ce fichier sert des dizaines d'appelants.
+
+---
+
+## 7. Ce que I4 a rendu lisible, et ce qu'il n'a pas fermé
+
+I4 est porté (`c42fe48`). Ce sous-lot n'applique aucun correctif : il rend
+visible un défaut du backend que le legacy présentait comme un verdict.
+
+### 7.1 SEC-011 — le verdict de `/iptables-validate` est faillible, et il alarme
+
+**GRAVITÉ** — moyenne. Pas d'élévation de privilège, pas de fuite. Un faux
+négatif qui **fait corriger des règles saines**.
+
+**SURFACE** — `backend/routes/iptables.py:78-79`.
+
+```python
+output_lines = list(execute_as_root_stream(client, test_cmd, root_password, logger=logger))
+exit_code = 0 if any('EXIT_CODE=0' in l for l in output_lines) else 1
+```
+
+**PRÉCONDITIONS EXACTES** — `execute_as_root_stream` rend des fragments de
+**4096 octets**, pas des lignes. Le marqueur `EXIT_CODE=0` fait 12 octets. Il
+suffit qu'il chevauche une frontière de fragment pour n'être présent dans
+**aucun** des deux : `any(...)` rend `False`, et un jeu de règles **valide**
+est déclaré invalide.
+
+La probabilité croît avec la longueur de la sortie. `iptables-restore --test`
+est silencieux quand tout va bien — c'est ce qui rend le défaut rare, donc
+durable : il ne s'arme que sur les sorties longues, c'est-à-dire précisément
+quand il y a beaucoup de règles à lire.
+
+**UN COMPTE RÉEL L'OCCUPE-T-IL AUJOURD'HUI** — non, et c'est mesuré : la route
+n'était atteignable que depuis le legacy, dont la page ne l'appelle que sur le
+contenu de sa zone d'édition. Aucun compte du parc ne détient
+`can_manage_iptables` hors `superadmin` (§3). Le défaut n'a jamais été observé
+en exploitation.
+
+**CHEMIN DE REPRODUCTION** — sans toucher aucune machine : le calcul est local.
+Un `execute_as_root_stream` dont les fragments coupent la chaîne à l'octet 4090
+suffit à le démontrer sur banc. **Non exécuté** : la route ouvre une vraie
+session SSH.
+
+**CORRECTIF PROPOSÉ — il n'appartient pas à ce portage.** Accumuler le flux puis
+chercher le marqueur dans la chaîne **reconstituée**, ou parser le nombre après
+`EXIT_CODE=` plutôt que tester l'appartenance d'une phrase. C'est la même classe
+qu'E-183 (« le marqueur n'est pas le verdict ») : lire le flux entier, parser le
+nombre, jamais la phrase. **La session 4 (`backend/`) applique ; je ne me
+valide pas moi-même.**
+
+**CE QUE LE CORRECTIF CASSERAIT** — rien à l'appelant : la forme de la réponse
+ne bouge pas. Il ferait basculer en `success: true` des validations qui rendent
+aujourd'hui `false` à tort — ce qui est l'objet.
+
+**CE QUE I4 A FAIT À LA PLACE** — le cas « déclarées invalides » est rendu en
+`attention` et non en `echec`, avec la sortie brute et la consigne de la lire.
+Peindre en rouge un verdict qui peut être faux ferait corriger des règles
+saines. *Le portage ne répare pas le backend ; il cesse de présenter une
+incertitude comme un verdict.*
+
+### 7.2 SEC-012 — `/iptables-` est une entrée à PRÉFIXE de la liste blanche
+
+**GRAVITÉ** — à qualifier, pas encore fermée. **Aucun compte ne l'occupe.**
+
+**SURFACE** — `laravel/app/Support/RoutesBackend.php`, `LISTE_BLANCHE` porte
+`'/iptables'` **et** `'/iptables-'`. Dans `correspond()`, un dernier caractère
+`/`, `_` ou `-` déclenche `str_starts_with` :
+
+```php
+if ($derniere === '/' || $derniere === '_' || $derniere === '-') {
+    if (str_starts_with($chemin, $entree)) { return true; }
+}
+```
+
+Le même préfixe ouvre donc `/iptables-validate`, `/iptables-apply` et
+`/iptables-rollback` **sans les distinguer**. La passerelle ne peut pas être
+l'endroit où l'application se referme.
+
+**UN COMPTE RÉEL L'OCCUPE-T-IL AUJOURD'HUI** — **non.** Ce qui tient :
+
+1. le backend garde les trois routes par `@require_permission('can_manage_iptables')`
+   **et** `@require_machine_access` — mesuré sur les trois ;
+2. `can_manage_iptables` n'est détenue par aucun compte hors `superadmin`
+   (§3, et la décision du plan de **ne pas** l'accorder à `rw-test-admin`) ;
+3. le portage ne compose **aucune** requête vers `-apply` ni `-rollback` :
+   la fermeture reste **par l'absence**, comme en I1.
+
+Ce n'est donc pas une faille occupée. C'est une **borne mal placée** : elle
+repose entièrement sur la garde du backend, alors que le reste du portage
+suppose que la passerelle est une seconde barrière.
+
+**CORRECTIF PROPOSÉ** — **aucun, pour l'instant, et délibérément.** Remplacer le
+préfixe par des entrées exactes ferme `-apply` et `-rollback`… et casserait I5,
+qui est précisément le sous-lot en attente d'arbitrage. Le fermer maintenant
+déciderait de I5 par un effet de bord de liste blanche, ce qui est le contraire
+d'un arbitrage. **C'est un point à trancher AVEC I5, pas avant.**
+
+C'est le même raisonnement que celui déjà tenu sur `/cve_` (§ liste blanche du
+plan) : *fermer un préfixe une route à la fois sans arbitrage refait en petit
+le défaut qu'on veut éviter.*
+
+### 7.3 Ce que I4 n'a PAS couvert, et qui est écrit sur la page
+
+`/iptables-validate` lit `rules_v4` et **rien d'autre**. `rules_v6` n'est ni
+envoyé ni examiné. Une copie dont l'IPv6 est mal formé **passe** la validation
+et échouerait à l'application.
+
+Ce n'est pas un défaut du portage : c'est le contrat de la route. Le portage
+l'**écrit sur la page**, avant le geste, plutôt que de laisser croire qu'une
+validation réussie couvre les deux familles.
+
+### 7.4 Deux clés servies au JS et jamais employées — hors périmètre de I4
+
+`copie_absente` et `releve_le` sont dans la table `$textes` du contrôleur et
+aucun `t()` ne les appelle. `copie_absente` est redondante — le contrôleur la
+rend déjà comme `message` dans la réponse JSON. `releve_le` (« Relevé le
+:date ») **n'est affichée nulle part** : I1 annonce le nom de la machine et
+pas la date.
+
+Aucune conséquence de sécurité, aucune sur le rendu. **Signalé, non corrigé** :
+ce sont des résidus d'I1 et d'I2, et les toucher depuis I4 mélangerait les
+sous-lots. À la session qui reprendra ce module.
