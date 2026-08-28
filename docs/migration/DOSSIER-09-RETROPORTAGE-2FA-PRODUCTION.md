@@ -131,8 +131,10 @@ orpheline » — fausse, seule `srv-zabbix` porte `sa = 1`).
 # 1. le correctif, transpose — un seul fichier de production
 #    source : legacy/auth/enable_2fa.php  (cette branche, corrige)
 #    cible  : www/auth/enable_2fa.php     (origin/main)
-#    les QUATRE volets, et RIEN d autre : ni CHANGELOG, ni PARITE, ni runner,
-#    ni version.txt, ni la suite E2E — ils appartiennent au chantier
+#    les TROIS volets MANQUANTS — divulgation, debit, anti-rejeu.
+#    PAS le CSRF : `main` l appelle deja (:76), le transposer dupliquerait.
+#    Et RIEN d autre : ni CHANGELOG, ni PARITE, ni runner, ni version.txt,
+#    ni la suite E2E — ils appartiennent au chantier
 
 # 2. controle AVANT, en lecture
 git show origin/main:www/auth/enable_2fa.php | grep -c 'checkCsrfToken()'    # rend 1 : DEJA present
