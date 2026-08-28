@@ -10944,3 +10944,52 @@ La session 6 a signale que sa premiere mesure rendait l'inverse, et **c'est ce s
 a permis de la verifier.** *Un releve qui s'annonce comme redresse se controle ; un releve
 silencieux se croit.* Sans son controle de vraisemblance sur quatre entrees connues, le
 chantier aurait recu un ecart imaginaire sur `/groups` et manque le vrai sur `/wazuh/`.
+
+## E-235b — l'ecart etait sur TROIS espaces, pas un : `/ssh-audit/`, `/docker/`, `/fail2ban/` — et `/wazuh/` est deja ferme
+
+**Mesure du 2026-08-28, 16:10 CEST.** La session 6 a demande d'elargir E-235, avec le bon
+motif : *un defaut a moitie corrige revient par la branche jumelle.* **Elle avait raison
+d'elargir, et l'ensemble n'est pas celui qu'elle nommait.**
+
+    espace          LISTE_BLANCHE   ADMIN_SEULEMENT
+    /wazuh/         OUI             OUI            <- FERME entre-temps (eb0b6f7, 15:58)
+    /ssh-audit/     OUI             non            <- rempart manquant
+    /docker/        OUI             non            <- rempart manquant
+    /fail2ban/      OUI             non            <- rempart manquant
+    /supervision/   OUI             OUI
+    /groups         OUI             OUI
+    /drift/         OUI             OUI
+
+**Deux corrections a la demande :** `/wazuh/` etait deja corrige par la session 3 douze minutes
+avant qu'elle ecrive — l'ecart s'est ferme pendant qu'on en parlait ; et **`/fail2ban/`, qu'elle
+n'a pas nomme, est le troisieme.** *Une demande d'elargissement se remesure comme une
+accusation : elle peut viser trop peu.*
+
+### Et le contraste des gardes est une CONCEPTION, pas un oubli
+
+Verifie decorateur par decorateur, parce qu'une premiere sonde annoncait « aucun role » sur
+trois routes et que c'etait sa fenetre de lecture, pas le code :
+
+    /ssh-audit/scan       une machine   @require_machine_access   (mord pour un role 1)
+    /ssh-audit/scan-all   tout le parc  @require_role(2)          AUCUNE permission
+    /docker/scan          une machine   @require_machine_access
+    /docker/scan_all      tout le parc  @require_role(2)          AUCUNE permission
+    /fail2ban/install_all tout le parc  @require_role(2) + can_manage_fail2ban
+
+> **Les routes a UNE machine se gardent par machine ; celles de PARC se gardent par role.**
+> C'est coherent — le role 2 *est* la portee du parc dans ce depot — et les sessions 4 et 5 le
+> concluent independamment. **Ce n'est pas un defaut.**
+
+**Mais c'est ce qui rend le rempart manquant consequent.** Un role 1 passe la passerelle vers
+`/ssh-audit/scan-all` ; arrive au backend, il n'y a **pas** de `@require_machine_access` pour le
+rattraper sur la variante de parc — seulement `@require_role(2)`. **Une seule barriere, et sur
+`/ssh-audit/scan-all` comme `/docker/scan_all` il n'y a meme aucune permission derriere.**
+
+`/ssh-audit/scan-all` est le pire cas des trois : SSH sur toute la flotte, **role 2 sans aucune
+permission**, et c'est la route dont la consigne permanente du chantier dit « ne jamais lancer
+`go-ssh-audit-scanall.mjs` ».
+
+### Le geste, en une fois et non en trois
+
+Ajouter les **trois** espaces a `ADMIN_SEULEMENT`, divergence declaree, precedent `/supervision/`
+— *on ne depend jamais d'un seul rempart.* Fichier de la session 3.
