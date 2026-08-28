@@ -11390,7 +11390,7 @@ fait que `textContent` et `className`) · **l'appel reseau — avec un hote vide
 fait `return` AVANT tout envoi.** *Donc le defaut survient sans qu'aucune requete ne parte : ce n'est
 pas la reponse du serveur qui casse les onglets.*
 
-### CE QUE LE LEAD AJOUTE : LA PISTE CITABLE, ET ELLE EXPLIQUE L'ERREUR D'ORIGINE
+### ⚠ LA PISTE DU LEAD EST REFUTEE — mesuree par la session 3, verifiee par le Lead a 17:35 CEST
 
 Verifie dans l'arbre :
 
@@ -11406,9 +11406,64 @@ bouge entre le calcul des coordonnees et l'arrivee du clic.
 `type="button"`** — donc aucune navigation ; `ouvreOnglet` et `enregistreConfig` sont corrects a la
 lecture ; les quatre panneaux portent bien un `data-rw` concordant.
 
-**Non localise, et le Lead ne le pretend pas** : la piste explique le *« not clickable »* d'origine,
-pas le *« le clic n'a plus d'effet »* d'apres correction. `graylog.js` et `graylog.blade.php`
-appartiennent a la session 3.
+**REFUTEE, sur les trois mecanismes que le Lead avait proposes :**
+
+    graylog.blade.php:47   <div id="graylog-panneau-config">      <- OUVRE le panneau
+                     :99       <p class="rw-annonce" ...>          <- l'annonce est DEDANS
+    rw.css .rw-onglets     display:flex — ni sticky, ni absolute, ni overflow
+    graylog.js:69-75       la bascule des panneaux
+              :76-77       PUIS chargeMachines() / chargeGabarits()
+
+1. **le decalage de mise en page ne peut pas atteindre les onglets** : `graylog-config-etat`
+   est **a l'interieur** du panneau `config`, donc **sous** la barre d'onglets. Gagner une
+   hauteur pousse ce qui est **en dessous**, jamais les boutons au-dessus. Et `.rw-onglets`
+   est un flex **statique** ;
+2. **l'hypothese d'une exception dans `chargeGabarits` ne peut pas produire ce symptome** : la
+   bascule se fait **AVANT** les appels (`:69-75` puis `:76-77`), donc `hidden` aurait deja
+   change. Et ce sont des `async` appelees **sans `await`** — une levee y devient un rejet non
+   traite, pas une exception dans le gestionnaire de clic ;
+3. **aucune destruction de DOM ne touche les onglets** : les huit operations destructrices du
+   fichier visent `graylog-gabarit-panneau`, `cadre`, `liste` et des `<tr>`. Les ecouteurs sont
+   poses **une fois** (`:486-487`). Et `q()` interroge **18** selecteurs, la vue en pose **26**,
+   **zero absent**.
+
+**Les deux pistes refutees etaient du Lead, et toutes deux dans le sens qui EXPLIQUE.** *Une
+hypothese qui rend compte du symptome se croit plus qu'une qui n'explique rien — c'est
+exactement ce qui la rend dangereuse quand on ne la mesure pas.*
+
+### LA FORMULATION DE LA SESSION 3 EST CELLE A GARDER
+
+> **Ce n'est pas « la page est saine » — c'est « je n'ai pas trouve de mecanisme par la
+> lecture ». La premiere ferme, la seconde invite a chercher.**
+
+C'est exactement la distinction que le Lead avait manquee deux heures plus tot. `graylog.js` et
+`graylog.blade.php` appartiennent a la session 3, qui **refuse de corriger sans mecanisme** —
+*corriger sans mecanisme, c'est changer du code au hasard et appeler ca un correctif.*
+
+### L'EXPERIENCE QUI TRANCHE, arbitree au banc par le Lead
+
+Le doute porte sur **une seule** alternative : le clic **n'atteint pas** le bouton, ou le
+gestionnaire **ne fait plus son travail**. Deux lignes les separent — a l'etape 4 :
+
+```js
+await page.evaluate(() => document.querySelector('[data-onglet="templates"]').click());
+```
+
+*le panneau bascule* -> le JS est sain, **le clic n'arrive pas** (coordonnees perimees,
+recouvrement, defilement) : c'est la suite ou le CSS · *il ne bascule pas* -> le gestionnaire
+est perdu ou `ouvreOnglet` echoue : c'est le JS.
+
+Puis, si le premier cas se confirme, **nommer ce qui recoit le clic** — a lancer AVANT l'etape 3
+**et apres** :
+
+```js
+const b = document.querySelector('[data-onglet="templates"]');
+const r = b.getBoundingClientRect();
+const cible = document.elementFromPoint(r.x + r.width/2, r.y + r.height/2);
+return { rect: r.toJSON(), recu: cible && (cible.dataset.onglet || cible.className) };
+```
+
+**Si `recu` change, le coupable est nomme ; si le `rect` bouge, la cause du deplacement l'est.**
 
 ### Et arbre et service concordent ici — verifie
 
