@@ -361,7 +361,40 @@ reste possible plus tard ; le dire est vrai tout de suite.
 
 **Et une redite à traiter au passage** : la séquence d'amorçage est écrite **deux fois**. *Elles sont
 d'accord jusqu'à ce que l'une bouge* — c'était l'état des cinq `_resolve_ssh_creds` la veille de leur
-divergence. Une seule implémentation, et le texte de la réponse en dérive au lieu d'être recopié.
+divergence.
+
+> **⚠ ELLES ONT DÉJÀ DIVERGÉ — mesuré par la session 4 le 2026-08-28.** Six lignes d'écart, **toutes
+> dans le message d'erreur** : l'une nomme les familles supportées, l'autre dit « OS non supporté ».
+> *La divergence porte précisément sur ce dont on a besoin quand ça échoue.* Une seule implémentation,
+> et le texte de la réponse en **dérive** au lieu d'être recopié.
+
+### ⚠ Et une trouvaille en écrivant le texte, qui SCINDE cette décision en deux
+
+**`uninstall` est `apt`-only, alors que l'installation ne l'est plus** — et le commentaire de
+l'installation le dit lui-même : *« avant v1.18.x c'était apt-only → fail silencieux sur RHEL family »*.
+
+> **Le défaut a été corrigé à l'installation et jamais reporté à la désinstallation.** Sur RHEL et SUSE,
+> `apt-get purge` n'existe pas, le `|| true` avale l'échec, seul `rm -rf /var/ossec` agit — **le paquet
+> reste installé et `code == 0` annonce une réussite.** Septième occurrence de *« fermer un défaut sans
+> chercher ses autres implémentations, c'est le fermer à moitié »*, et la première où la moitié oubliée
+> est le geste de **retour**.
+
+**Les deux moitiés ne se décident pas au même endroit :**
+
+| moitié | ce qu'elle change | qui décide |
+|---|---|---|
+| **cesser d'attester une réussite** — lire le code de retour, ne pas rendre `success` sur un `purge` qui n'a pas eu lieu | **rien sur la machine.** Le geste fait déjà ce qu'il fait ; seule l'**attestation** cesse d'être fausse | **délégué — à faire** |
+| rendre `uninstall` multi-famille (`dnf`, `zypper`) | **ce qui s'exécute sur des machines réelles** | **`DOSSIER-04`** |
+
+**La première part maintenant**, et elle ne rencontre pas le piège d'E-215 : là-bas, *« la vérification
+seule aurait armé le piège »* parce que lire le code rendait le geste effectif à chaque fois, clé de
+plateforme comprise. **Ici lire le code ne rend rien effectif** — le `purge` ne marche pas davantage, il
+cesse seulement d'être annoncé comme réussi. *Une fausse attestation sur une désinstallation est de la
+même famille qu'E-192 : personne ne rouvre un dossier clos.*
+
+**Porteur mesuré : aucun.** `wazuh_agents` porte **0 ligne**, et les trois machines du parc sont de
+famille Debian. L'écart s'ouvre à la première machine RHEL ou SUSE — *une propriété qui tient par l'état
+du parc n'est pas une propriété.*
 
 ---
 
@@ -432,6 +465,27 @@ corrige* — la requête réparée rend tout le parc, triée production en tête
 **Écrit par la session 4** (`backend/` est son périmètre), **verrouillé par une suite de la session 6**
 qui mesure le 400 sur corps vide. **Et aucune suite n'approche cette route autrement**, au même titre
 que `go-ssh-audit-scanall.mjs`.
+
+> **⚠ LA LIVRAISON COMPTE TROIS PARTIES, PAS DEUX — corrigé le 2026-08-28 sur mesure de la session 4.**
+>
+>     legacy/wazuh/js/wazuh.js:157   body: JSON.stringify({})     <- le bouton « Installer sur tous »
+>     legacy/wazuh/js/wazuh.js:78    calcule `noAgent` en filtrant `r.servers` — il la COMPTE
+>
+> **J'avais écrit « la page a déjà la liste, elle peut l'envoyer ». C'est vrai et ce n'est pas
+> suffisant : elle ne l'envoie pas.** Bornée, la route rend **400** et **le bouton casse** — c'est le
+> comportement voulu de la borne, et c'est une page de production qui cesse de fonctionner.
+>
+> **Le correctif est d'une ligne** (`.map(s => s.id)`) et il part **dans la même livraison**. *Une borne
+> fail-closed qui casse un appelant légitime n'est pas une borne, c'est une panne différée* — et la
+> découvrir après la livraison, c'est la découvrir sur un bouton d'administration.
+>
+> **`legacy/wazuh/js/` n'est le périmètre de personne au §10.** `wazuh` est dispatché à la session 3 ;
+> §3.2 autorise la modification du legacy. **Le Lead assigne** — mais les trois parties partent
+> ensemble ou aucune.
+
+**Et une chose que la session 4 a vérifiée et que je n'avais pas demandée** : bornée à `(2,3)`, la
+requête rend les deux machines de développement et **jamais `srv-zabbix`**. *La borne ne se contente pas
+d'exister : on a mesuré ce qu'elle laisse passer.*
 
 ---
 
