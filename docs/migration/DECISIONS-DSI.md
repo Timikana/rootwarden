@@ -731,3 +731,65 @@ empêché.
 
 **Sixième de mes écrits retourné par la mesure en une journée** — et le premier qui ne soit pas une
 erreur de lecture mais une **omission de geste**.
+
+---
+
+## 9 — Neuve : la surface d'autorisation du proxy legacy — **ne pas la resserrer, et le DIRE dans `api_docs`**
+
+**Décidée le 2026-08-28, 11:52 UTC**, sur la mesure à trois couches de la session 4.
+
+### Ce qui a été mesuré
+
+    legacy/api_proxy.php:155   if ($path === $prefix || strpos($path, $prefix) === 0)
+                               -> un PREFIXE, pas un segment
+
+    sur 203 routes :  48 ont une entree EXACTE
+                     151 sont autorisees par un prefixe QUI NE LES NOMME PAS
+                         ('/cve_' en couvre 14 a lui seul)
+
+> **Une route backend nouvelle dont le nom commence par un préfixe autorisé devient atteignable sans
+> que personne ne l'ait décidé.** Ce n'est pas un trou ouvert : c'est une surface qui s'élargit toute
+> seule.
+
+### La décision : **ne rien resserrer côté legacy**
+
+**Et la raison n'est pas la prudence : c'est que le portage l'a déjà fait, mieux, et l'a vérifié.**
+`RoutesBackend.php` compare par **forme d'entrée** — espace de noms (`/fail2ban/`), racine voulue
+(`/cve_`), sinon route exacte plus ses sous-chemins. `/search` n'y autorise donc **pas** `/searchall`.
+
+**Et le resserrement a été mesuré AVANT d'être appliqué**, sur les 201 routes réellement déclarées :
+**les deux filtres rendent le même verdict, zéro différence.** *Un resserrement dont on a mesuré qu'il
+ne change aucun verdict actuel ne peut pas casser un appelant* — c'est la forme exacte que je demandais
+pour la borne d'E-224, obtenue ici sans qu'on la demande.
+
+**Donc le défaut ne migre pas : il meurt avec le legacy.** Même raisonnement qu'E-208 — *on ne soigne
+pas ce qu'on démonte*, et ici la raison est plus forte qu'un « zéro porteur » : **le remplaçant est
+écrit, mesuré, et en service.**
+
+### ⚠ Ce qui NE meurt pas avec le legacy, et qui doit entrer dans `api_docs`
+
+**Il n'y a pas « un » proxy : il y a des POINTS D'ENTRÉE.** `/chatops/command` est **absente**
+d'`api_proxy.php` et pourtant **atteignable**, par un fichier d'entrée qui lui est propre.
+
+> **Un relevé qui ne lit qu'`api_proxy.php` conclut « inatteignable » sur une route qui reçoit des
+> webhooks.** C'est la leçon de `chatops/webhook.php` — le point d'entrée que Slack appelait et que
+> personne dans RootWarden n'aurait vu casser — reprise du côté de l'**autorisation** au lieu de
+> l'archivage.
+
+**Ce qu'`api_docs` doit donc dire**, et c'est la décision de produit :
+
+1. **l'autorisation a TROIS couches** — décorateurs backend, liste blanche du proxy, liste
+   administration — et elles ne coïncident pas ;
+2. **la liste blanche n'est pas l'inventaire des routes atteignables** : elle en autorise 151 qu'elle ne
+   nomme pas, et il existe des chemins qui l'ignorent ;
+3. **« pas de décorateur » ne veut pas dire « pas de garde ».** `/update_security_exec` s'authentifie
+   **dans son corps**, par un jeton HMAC lié au `machine_id`, `hmac.compare_digest`, 401 fail-closed. La
+   sonde de la session 4 l'avait classée « aucune garde » parce qu'elle cherchait des décorateurs.
+   **C'est la borne la plus importante de la page** ;
+4. **trois routes nées pour le portage sont absentes du proxy legacy et présentes dans
+   `RoutesBackend`** — `credential-status`, `server_users_inventory`, `settings/announceable`. **C'est
+   l'état correct**, et la page doit le dire plutôt que de laisser lire un oubli.
+
+**Et une divergence signalée par la session 2 est dédouanée** : `/platform_key` en liste blanche et
+absente de la liste administration rend la **clé publique**, faite pour être distribuée. *Deux listes
+qui ne coïncident pas ne sont pas forcément incohérentes ; encore faut-il lire ce que la route rend.*
