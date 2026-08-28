@@ -758,8 +758,21 @@ Mes deux suites sont **hermétiques** : `laravel/tests/` tourne sur un SQLite vi
 propriété que je ne veux pas perdre — un test qui la lirait accuserait la page pour un
 état du banc, et il faudrait le jeton de banc pour le jouer.
 
-> **La protection est donc organisationnelle, pas mécanique.** Je le dis plutôt que de
-> laisser croire qu'un vert la garantit. Sa remesure :
+> ~~**La protection est donc organisationnelle, pas mécanique.**~~ — **corrigé, et
+> l'erreur est de portée.**
+>
+> J'ai écrit « aucun test ne peut protéger cette fixture ». **C'était vrai de MES suites
+> et faux du dépôt** : la session qui détient le jeton de banc l'a écrit en quatre
+> minutes (`go-socle-fixtures.mjs`, 8 PASS, commité). Elle lit la base parce qu'elle a
+> déjà le jeton ; le coût que je refusais n'existe pas pour elle.
+>
+> **Avant d'écrire qu'une chose est impossible, demander à qui possède l'objet.** Une
+> impossibilité vraie *pour son propre périmètre* énoncée comme une propriété du dépôt
+> ferme une porte que quelqu'un d'autre peut ouvrir sans effort — et personne ne rouvre
+> une porte déclarée murée.
+>
+> Ce qui reste vrai de ma réserve : **mes suites ne doivent pas lire le banc**, et la
+> garde vit chez qui détient déjà le jeton. La remesure manuelle garde sa valeur :
 
 ```bash
 P=$(grep -oP '^MYSQL_ROOT_PASSWORD=\K.*' srv-docker.env)
