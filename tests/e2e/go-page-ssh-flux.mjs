@@ -133,9 +133,42 @@ function journal(commande) {
     return execFileSync('sudo', ['-n', 'docker', 'exec', 'rootwarden_python', 'sh', '-c', commande],
         { encoding: 'utf-8' });
 }
-function ecritSonde() { journal(`printf '%s\\n' '${SONDE_BALISE}' >> ${JOURNAL}`); }
-function videJournal() { journal(`: > ${JOURNAL}`); }
-function tailleJournal() { return parseInt(journal(`wc -c < ${JOURNAL}`).trim(), 10); }
+/*
+ * ══ LE JOURNAL PEUT NE PAS EXISTER, ET LA SUITE MOURAIT AVANT SON TAMPON ══
+ *
+ * Mesure du LOT du 2026-08-28 : **0 PASS / 0 FAIL sur les DEUX cibles**, en
+ * 2 et 3 secondes.
+ *
+ *     sh: cannot open /app/logs/deployment.log: No such file
+ *
+ * `deployment.log` avait ete ROTATIONNE en `deployment.log.1` la veille a 22:43
+ * — c'est E-196, le correctif des regles de rotation. Le fichier n'est recree
+ * qu'au prochain deploiement.
+ *
+ * **Ni le correctif ni cette suite n'etait fautif : c'est le LIEN qui n'existait
+ * nulle part.** Aucune execution isolee ne pouvait le trouver — il fallait que
+ * la rotation ait eu lieu — et il aurait mordu a chaque LOT. Meme famille que
+ * `go-bashrc-b4`, qui accusait la page d'un geste produit par sa suite soeur.
+ *
+ * ⚠ ET ON NE LE CREE PAS NAIVEMENT. `docker exec` tourne en **root** : un
+ * `touch` nu laisserait un fichier `root:root` dans un repertoire que
+ * l'application possede (`rootwarden:rootwarden`, verifie), et **le prochain
+ * deploiement ne pourrait plus y ecrire**. La suite aurait casse la
+ * fonctionnalite qu'elle mesure. On repose donc le proprietaire.
+ */
+function assureJournal() {
+    journal(`[ -e ${JOURNAL} ] || { : > ${JOURNAL}; `
+        + `chown rootwarden:rootwarden ${JOURNAL} 2>/dev/null; chmod 640 ${JOURNAL}; }`);
+}
+function ecritSonde() { assureJournal(); journal(`printf '%s\\n' '${SONDE_BALISE}' >> ${JOURNAL}`); }
+function videJournal() { assureJournal(); journal(`: > ${JOURNAL}`); }
+/** Rend 0 quand le fichier est absent : « absent » et « vide » se valent ICI,
+ *  puisque la propriete mesuree est la taille de ce que le flux transporte. */
+function tailleJournal() {
+    const t = journal(`wc -c < ${JOURNAL} 2>/dev/null || echo 0`).trim();
+
+    return parseInt(t, 10) || 0;
+}
 
 const navigateur = await puppeteer.launch({
     headless: 'new',
