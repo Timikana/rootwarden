@@ -14,7 +14,7 @@ sans prévenir* — et deux des mesures ci-dessous ont déjà retourné une pré
 
 ---
 
-## Table des sept
+## Table des huit
 
 | # | arbitrage | décision | ce qu'elle coûte |
 |---|---|---|---|
@@ -571,7 +571,69 @@ qu'avec la contrainte.** Les deux se livrent ensemble, sinon la migration ne ref
 
 ---
 
-## Ce que ces sept décisions ne font pas
+---
+
+## 8 — Neuve : **GEL DES CORRECTIFS BACKEND jusqu'au redémarrage**
+
+**Décidée le 2026-08-28, 08:25 UTC.** Elle n'était pas dans les sept : elle est née de la mesure de
+croissance du lot.
+
+### La décision
+
+**Aucun correctif backend n'est écrit tant que `rootwarden_python` n'a pas redémarré** — y compris les
+vingt et quelques items que le §7 du plan range en *« autorisés, donc à faire — ne plus demander »*
+(`generic_reconfigure`, le `SELECT *` de `list_profiles`, `telegraf_output_token`, les huit branches
+mortes, la fuite dans `deployment.log`…).
+
+**Deux exceptions, étroites** : ce qu'un dossier signé débloque, et un correctif qui répondrait à un
+défaut **exploité**, pas seulement ouvert.
+
+### Ce n'est pas neuf, c'est une extension mesurée
+
+Le plan avait déjà tranché exactement cela pour E-221 : *« écrire le correctif maintenant ne protège
+rien — l'écriture est inerte, seul le redémarrage mord — et ça aggrave le seul risque réel du lot. »*
+
+**Ce qui a changé, c'est que le raisonnement est devenu un chiffre.** Deux relevés du même dossier,
+`StartedAt` inchangé :
+
+    06:47Z   28 commits backend/ · 19 fichiers .py hors tests
+    08:12Z   36 commits          · 20 fichiers          -> +8 commits, +1 module en 85 min
+
+> **Chaque correctif juste écrit aujourd'hui agrandit le seul risque réel du lot et ne protège
+> personne.** *Un correctif inerte n'est pas un correctif en attente : c'est un correctif dont le
+> comportement n'a jamais été vu* — et on en met vingt-cinq en service d'un coup.
+
+**La chose la plus utile pour la sûreté du service, aujourd'hui, est de ne pas écrire de code backend.**
+C'est désagréable, et c'est la seule conclusion que les deux corrections successives du dossier de la
+session 4 n'ont pas fait bouger.
+
+### La borne de cette décision, et elle compte
+
+**Je ne réassigne personne.** Le Lead dispatche ; je dis ce que la mesure fait à la balance du risque.
+Une session qui reçoit du Lead une consigne contraire suit le Lead — *le DSI décide le produit, pas
+l'ordre de travail* — mais elle le fait en sachant ce que ça coûte.
+
+### Ce qui reste à faire, et qui n'agrandit rien
+
+Le gel porte sur l'**écriture backend**, pas sur le travail. **Deux mesures en lecture pure sont
+demandées à la session 4**, et elles alimentent des décisions bloquées :
+
+1. **parmi les 33 routes qui gagnent une garde, combien sont atteintes par une page PORTÉE ?** C'est le
+   seul trou déclaré du `DOSSIER-01`. Une route gardée qu'aucune page n'appelle ne peut casser personne
+   ; une route appelée par une page portée est celle qu'il faudra regarder en premier. **Ça transforme
+   « observer les 20 modules » en une liste ordonnée** ;
+2. **le relevé d'autorisation à TROIS couches** pour `api_docs` — décorateurs, `$ALLOWED_PROXY_PREFIXES`,
+   `$ADMIN_ONLY_PREFIXES`. La session 2 a mesuré que **le proxy est une troisième source qui diverge
+   déjà** : deux routes `platform_key` en liste blanche et absentes de la liste administration. *Un
+   relevé qui ne lit que le backend décrira une page fausse d'une couche* — et cette page **affirme des
+   autorisations**.
+
+**Et pas de nouvelle migration non plus** : 063 attend déjà une signature, et une file de migrations non
+appliquées est le même défaut que le lot de correctifs inertes, sur une autre couche.
+
+---
+
+## Ce que ces huit décisions ne font pas
 
 Aucune n'écrit sur une machine, ne redémarre un service, n'applique une migration, ne pousse ni ne
 fusionne. **Aucune n'accorde ni ne retire un droit à un compte** — la n°2 se conclut par un
