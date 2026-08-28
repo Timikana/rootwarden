@@ -2171,6 +2171,100 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.74 — `api_docs` : la description d'API n'est plus servie, elle est DÉRIVÉE
+
+`legacy/api/docs.php` est une coquille Swagger de 40 lignes qui sert **un YAML statique de 91 Ko, daté
+du 2026-08-20, que rien ne régénère.**
+
+#### Mesuré avant de décider quoi porter
+
+    chemins declares dans la spec : 146
+    routes reelles du backend     : 203
+    apres NORMALISATION des parametres de chemin :
+      documentes ET reels     : 139
+      documentes INEXISTANTS  :   7
+      reels NON documentes    :  64
+
+**Ma première mesure disait 22 fantômes et 79 non documentés** : je comparais `{id}` d'OpenAPI à
+`<int:id>` de Flask, deux notations. La normalisation a **divisé les fantômes par trois**. La sonde se
+trompait du côté qui alarme, et le chiffre a été corrigé avant de sortir.
+
+**Les 7 fantômes ont une seule cause** : la spec déclare le module d'audit SSH sous **deux
+séparateurs** — dix routes avec le tiret (servies) et sept avec le souligné (404).
+`/ssh_audit/fleet` et `/ssh-audit/fleet` y figurent **tous deux** : une même route, deux orthographes,
+une fausse, et rien ne dit laquelle. `/ssh_audit/history` n'existe sous aucun séparateur.
+
+#### Pourquoi la page dérive au lieu de porter
+
+**Un portage fidèle reproduit un comportement contradictoire et le nomme. Un artefact figé que rien ne
+régénère n'est pas un comportement — le reproduire, c'est recopier un cache.** Vingt-six routes ont
+changé de garde le 27 août seul : aucun document figé ne peut suivre ce rythme.
+
+`AutorisationsPasserelle` dérive donc `RoutesBackend` **à chaque affichage**.
+
+#### Trois couches, et la page n'en décrit qu'une — dit avant les tableaux
+
+1. la garde de la **page** — rôle et permission sur la route du portail ;
+2. la **passerelle** — liste blanche, réserve à l'administration, re-authentification, relais en flux.
+   **La seule dérivée** ;
+3. les **décorateurs** du backend — invisibles depuis le portail, qui ne monte pas `backend/`. **La
+   page ne les affirme pas.** Les embarquer en copie recréerait le cache qu'on vient de retirer, et le
+   relevé qui les mesure dit lui-même décrire *l'arbre de travail, pas le service*.
+
+Et le **silence hérité est nommé** : les 64 routes que l'ancienne description passait sous silence ne
+sont pas documentées ici non plus — la différence est que la page le **dit**. *Un document qui omet ce
+qu'il ne sait pas est plus trompeur qu'un document daté.*
+
+La page annonce aussi, **avant** son contenu, qu'elle **n'est pas une référence d'API** : elle dérive
+des autorisations, pas des contrats.
+
+#### ⚠ Un défaut de mon premier jet, que les NOMBRES ont révélé
+
+Le service parcourait la liste blanche en demandant, pour chaque entrée : réservée ? en flux ? exige
+une re-authentification ? Les compteurs ont rendu `step_up = 0` alors que deux motifs existent, et
+`flux = 3` pour sept chemins.
+
+**Cause** : `correspond()` compare par **segment**, et 15 des 66 entrées sont des **espaces de noms**.
+`/supervision/` autorise `/supervision/zabbix/deploy` sans être elle-même un flux ; `/policy/`
+autorise `/policy/sudo/deploy` sans exiger elle-même une re-authentification.
+
+> **Interroger l'ENTRÉE au lieu du CHEMIN rendait « aucune route n'exige de re-authentification » —
+> faux, et du côté rassurant.**
+
+Chaque liste est donc énumérée **depuis sa propre source**. Aucun produit croisé : un tableau qui
+prétend résumer trois listes sur la clé de la première ment sur les deux autres.
+
+Mesures après correction : 66 entrées (dont 15 espaces de noms), 27 réservées à l'administration
+(**0 sans objet** — calculé, et le zéro s'énonce), 7 relayées en flux (**0 hors liste blanche**),
+2 motifs de re-authentification.
+
+#### La garde portée est celle du CODE, pas de son commentaire
+
+`api/docs.php:4` annonce « Accessible uniquement aux admins et superadmins » ; sa ligne 9 fait
+`checkAuth([ROLE_SUPERADMIN])`. Le commentaire promet un accès **plus large** que le code — E-231, et
+consigne de ne pas le transporter. La route porte `role:3`, sans permission inventée.
+
+Vérifié sur la route résolue : `[web, session.authentifiee, role:3]`. Menu : visible au rôle 3 seul,
+`route` posée et `legacy` retirée — l'invariant *route OU legacy, jamais les deux* tient sur les 32
+entrées (0 avec les deux, 0 avec aucune). 26 portées sur 32.
+
+#### ⚠ Et une erreur de ma part, rattrapée avant le commit
+
+J'ai créé mon catalogue sous le nom `passerelle.php` — **qui existait déjà** et portait les six
+messages de refus de la passerelle, consommés par `PasserelleController`. Mon `cat >` les a écrasés.
+
+Restauré depuis `HEAD`, catalogue relogé en `autorisations.php`, et **vérifié que les six clés
+d'origine se résolvent toujours**. La faute : avoir écrit sur un chemin sans regarder ce qu'il
+contenait. Attrapée en lisant `git status` — `M` et non `??` — plutôt qu'en le survolant.
+
+Parité i18n : `autorisations` 39 = 39, `passerelle` 6 = 6 (intact). Zéro clé morte, zéro clé
+inemployée, balises équilibrées. **Rien n'a été exécuté au navigateur.**
+
+**Reste à faire** : archiver `legacy/api/` selon le cycle éprouvé (l'URL doit rendre 404) et rediriger
+l'entrée du menu **du legacy**. Ces deux gestes touchent `legacy/` et attendent le feu vert.
+
+---
+
 ### v1.38.73 — E-231 : la specification d'API porte les DEUX orthographes du meme module, et DERIVER l'emporte sur porter
 
 #### La question n'etait pas COMMENT porter `api_docs`, mais QUOI porter
