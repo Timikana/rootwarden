@@ -88,8 +88,21 @@ tronc depuis la séparation ; `git merge-tree --write-tree` rend **zéro conflit
 
 **Une condition avant, et elle n'est pas technique** : le message de `399931a` affirme qu'une route de
 `supervision/` est « désormais couverte, vérifiée par test » alors qu'elle porte aussi `@require_role(2)`
-— **le décorateur y est inerte**. *Le code est juste ; c'est le message qui affirme plus que lui.* Il se
-corrige avant la fusion, pas après.
+— **le décorateur y est inerte**. *Le code est juste ; c'est le message qui affirme plus que lui.*
+
+> **⚠ RÉVISION DU 2026-08-28 — comment cette condition se remplit, et ma première rédaction était
+> fausse.** J'avais écrit *« il se corrige avant la fusion »*, ce qui veut dire **amender un commit de
+> six jours sur une branche que trois sessions référencent par son empreinte.** **La session 5 a refusé,
+> et elle a raison : c'est ce que la règle du dépôt interdit** — *ne jamais réécrire l'historique tant
+> qu'une autre session peut travailler.*
+>
+> **Sa contre-proposition est adoptée : la réserve est portée dans le message de FUSION.** Le commit de
+> merge est le lieu naturel — il est écrit **au moment** de la décision, il n'existe pas encore donc il
+> ne casse aucune référence, et il est lu par quiconque cherche pourquoi la branche est entrée.
+>
+> *Corriger un texte faux ne demande pas de réécrire celui qui le porte : il suffit que le texte qui
+> décide soit juste.* Et le Lead l'a reconnu de lui-même : il réclamait ce que sa propre règle
+> interdit.
 
 **Fusionner sans rebase.** Réécrire l'historique pendant que sept sessions travaillent est interdit, et
 un merge sans conflit rend le rebase inutile.
