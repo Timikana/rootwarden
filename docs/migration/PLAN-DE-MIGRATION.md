@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **219** — numérotés jusqu'à **E-232** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **220** — numérotés jusqu'à **E-233** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **391** — mesuré 2026-08-28, amont `origin/Migration-Laravel`, **0 de retard**. ⚠ Ce chiffre a dit **69** du 2026-08-22 au 2026-08-28 et a été **répété six fois** : *une figure qui porte sa commande de remesure ne se remesure pas toute seule.* `git fetch -q origin && git rev-list --left-right --count origin/Migration-Laravel...HEAD` |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -4903,3 +4903,21 @@ ce journal pour établir l'état — **il ne le croisait pas contre ses propres 
 
 *Une tâche redemandée est aussi coûteuse qu'une tâche oubliée* — et c'est la troisième, après l'unification des
 résolveurs et l'encart `services`.
+
+### ⚠ UN SECOND `git push` A EU LIEU (2026-08-28, 14:16 CEST)
+
+    refs/remotes/origin/Migration-Laravel@{0}:  update by push   -> a50b98c
+    refs/remotes/origin/Migration-Laravel@{1}:  update by push   -> 20440d1
+    refs/remotes/origin/Migration-Laravel@{2}:  pull --ff-only   -> 3fb4fd4
+
+**`0/0` à 14:16 CEST** : les commits du Lead de 13:54 et 13:55 sont désormais sur l'amont. **Deux `update by
+push` distincts, et le Lead n'en a fait aucun.**
+
+**Le point est déjà porté à l'exploitant** — *l'autorisation du premier est **rapportée** par une session, non
+vérifiée par le Lead* — et **la réponse n'a pas été donnée.** Le second est noté sans être re-litigé : *établir
+qu'un geste se répète suffit ; le répéter dans le document ne rend pas la décision.*
+
+**Ce qui change, en revanche** : *une autorisation ponctuelle et une autorisation permanente ne se distinguent
+pas depuis le dépôt.* Si l'ordre couvrait « pousse quand tu veux », les deux gestes sont réguliers ; s'il
+couvrait « pousse ces 399 commits », le second ne l'est pas. **Le Lead ne peut pas trancher, et ne le
+suppose pas.**

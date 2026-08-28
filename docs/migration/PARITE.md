@@ -10705,3 +10705,58 @@ dont la **huitième** (liens entrants, quatre natures) et la **neuvième** (clé
 compris). **Mais l'étape zéro est celle-ci** : *savoir si l'on archive une capacité portée ou une capacité
 retirée change ce qu'on écrit dans `DEPRECIATION.md`* — et ce registre est le seul endroit où la différence
 restera lisible dans six mois.
+
+---
+
+## E-233 — Le proxy legacy autorise par ESPACE DE NOMS : la majorité des routes qu'il laisse passer n'y est jamais nommée
+
+**Relevé par le DSI (9e décision, `e438000`). Mesuré indépendamment par le Lead à 14:18 CEST — et les deux
+chiffres diffèrent, ce qui est en soi le résultat.**
+
+### Ma mesure, avec sa méthode
+
+    prefixes du proxy         : 63   (50 nommes, 13 ESPACES DE NOMS finissant par `/`)
+    routes backend            : 203
+    atteignables par le proxy : 171
+      dont NOMMEES explicitement            :  48
+      dont par ESPACE DE NOMS, jamais nommees : **123**
+    non atteignables          :  32
+
+**Commande** : normalisation des paramètres de chemin (`<int:id>` → `{x}`), correspondance **exacte** pour les
+préfixes nommés, `startswith` pour les espaces de noms. *Sans la normalisation, un `<int:id>` ne correspond à
+aucun préfixe littéral et le compte s'effondre — c'est le piège que la spec d'API a déjà payé (E-231).*
+
+### ⚠ Le DSI compte 151, le Lead 123 — et ni l'un ni l'autre ne se relaie
+
+**L'écart de 28 est probablement dans la définition de « nommée »** : ma correspondance exacte sur chemin
+normalisé classe comme *nommée* une route qu'une correspondance par préfixe classerait comme *couverte par un
+espace de noms*.
+
+> **Les deux chiffres répondent à deux questions distinctes** — *« combien de routes le proxy laisse-t-il passer
+> sans les nommer ? »* et *« combien de routes ne figurent-elles nulle part dans sa liste ? »* **Aucune des deux
+> n'est fausse ; une seule répond à la question qu'on se pose.**
+
+*Le Lead ne reprend donc pas le 151, et n'impose pas son 123* — **à réconcilier par celui qui a écrit la
+décision, avec sa méthode explicite.** C'est la règle du jour appliquée à un chiffre : *un fait sans sa commande
+est une opinion sur une méthode.*
+
+### ✅ Et la décision de NE PAS resserrer est la bonne
+
+**Le Lead la confirme, pour une raison que la mesure rend nette** : `api_proxy.php` est **le proxy du legacy**.
+Il **meurt d'un bloc, avec le legacy** — c'est ce qui est écrit pour les onze parties déjà archivées, dont les
+entrées de liste blanche sont devenues **surface morte** et ont été **laissées en place** : *on ne soigne pas ce
+qu'on démonte.*
+
+**Resserrer les 13 espaces de noms en 123 lignes nommées** coûterait un travail réel **sur un fichier dont la
+disparition est programmée**, et **chaque ligne ajoutée serait une occasion de casser un chemin vivant** —
+*treize `startswith` qui marchent contre 123 égalités dont une seule mal écrite coupe une page.*
+
+**La borne qui compte est ailleurs, et elle existe** : la passerelle du **portage** (`RoutesBackend`) est
+énumérée, et c'est elle qui survivra. *Durcir le chemin qu'on garde vaut mieux que durcir celui qu'on retire.*
+
+### Ce qui reste vrai et doit être dit
+
+**171 routes sur 203 sont atteignables par le proxy legacy aujourd'hui**, et **123 le sont sans figurer
+nommément dans sa liste.** *Une liste blanche qui autorise par préfixe n'est pas une liste blanche : c'est une
+liste de familles*, et personne ne peut dire de mémoire ce qu'elle contient. **C'est mesurable, ce n'est pas
+resserré, et la raison est écrite** — la triade que ce chantier demande à chaque écart sans porteur.
