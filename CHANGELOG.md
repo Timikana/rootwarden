@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.79** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.80** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,63 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.80 — E-233 : le proxy legacy autorise par ESPACE DE NOMS, et deux mesures divergent — ce qui est le resultat
+
+#### Ma mesure, avec sa methode (14:18 CEST)
+
+    prefixes du proxy         : 63   (50 nommes, 13 ESPACES DE NOMS)
+    routes backend            : 203
+    atteignables par le proxy : 171
+      dont NOMMEES explicitement              :  48
+      dont par ESPACE DE NOMS, jamais nommees : **123**
+    non atteignables          :  32
+
+Normalisation des parametres de chemin (`<int:id>` → `{x}`), correspondance **exacte** pour les prefixes
+nommes, `startswith` pour les espaces de noms. *Sans la normalisation, un `<int:id>` ne correspond a aucun
+prefixe litteral et le compte s'effondre — le piege que la spec d'API a deja paye (E-231).*
+
+#### ⚠ Le DSI compte 151, le Lead 123 — et ni l'un ni l'autre ne se relaie
+
+L'ecart de 28 est probablement dans la definition de « nommee ».
+
+> **Les deux chiffres repondent a deux questions distinctes** — *« combien de routes le proxy laisse-t-il passer
+> sans les nommer ? »* et *« combien ne figurent-elles nulle part dans sa liste ? »* **Aucune n'est fausse ; une
+> seule repond a la question qu'on se pose.**
+
+*Le Lead ne reprend pas le 151 et n'impose pas son 123* — a reconcilier par celui qui a ecrit la decision, avec
+sa methode explicite. **La regle du jour, appliquee a un chiffre : un fait sans sa commande est une opinion sur
+une methode.**
+
+#### ✅ Et la decision de NE PAS resserrer est la bonne
+
+`api_proxy.php` est **le proxy du legacy** : il **meurt d'un bloc, avec le legacy** — c'est ce qui est deja
+ecrit pour les onze parties archivees, dont les entrees devenues **surface morte** ont ete **laissees en
+place** : *on ne soigne pas ce qu'on demonte.*
+
+**Resserrer 13 espaces de noms en 123 lignes nommees** coûterait un travail reel **sur un fichier dont la
+disparition est programmee**, et *treize `startswith` qui marchent valent mieux que 123 egalites dont une seule
+mal ecrite coupe une page.*
+
+**La borne qui compte est ailleurs et elle existe** : la passerelle du **portage** est enumeree, et c'est elle
+qui survivra. *Durcir le chemin qu'on garde vaut mieux que durcir celui qu'on retire.*
+
+**Ce qui reste a dire** : *une liste blanche qui autorise par prefixe n'est pas une liste blanche, c'est une
+liste de FAMILLES* — et personne ne peut dire de memoire ce qu'elle contient. **Mesurable, non resserre, raison
+ecrite** : la triade que ce chantier demande a chaque ecart sans porteur.
+
+#### ⚠ Un SECOND `git push` a eu lieu
+
+    @{0}:  update by push   -> a50b98c        @{1}:  update by push   -> 20440d1
+    @{2}:  pull --ff-only   -> 3fb4fd4
+
+**`0/0` a 14:16 CEST** : les commits du Lead de 13:54 et 13:55 sont sur l'amont. **Deux `update by push`
+distincts, et le Lead n'en a fait aucun.** Le point est deja porte a l'exploitant et **la reponse n'a pas ete
+donnee** ; le second est note sans etre re-litige — *etablir qu'un geste se repete suffit.*
+
+**Ce qui change** : *une autorisation ponctuelle et une autorisation permanente ne se distinguent pas depuis le
+depot.* Si l'ordre couvrait « pousse quand tu veux », les deux gestes sont reguliers ; s'il couvrait « pousse
+ces 399 commits », le second ne l'est pas. **Le Lead ne peut pas trancher, et ne le suppose pas.**
 
 ### v1.38.79 — la regle du jour etait a moitie ecrite, et le sixieme en-tete qui mente est le premier dans l'AUTRE sens
 
