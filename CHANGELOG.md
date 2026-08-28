@@ -2171,6 +2171,55 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.97 — la marge de défilement était courte d'un pixel, et le pixel n'est pas le sujet
+
+Ma réserve du commit précédent s'est réalisée dans l'heure. J'avais écrit que 64 px était *« un
+plancher, pas une égalité »*, que `.rw-entete` n'a pas de hauteur explicite, et que j'avais lu **~44 px
+dans le CSS sans les mesurer au rendu**.
+
+    hauteur RENDUE de .rw-entete : 65 px
+    jeton pose                   : 64 px
+    -> le plancher ne couvre pas
+
+**Mon estimation était fausse de 21 px.** L'écart visible est d'un pixel et sans conséquence ; ce qui
+compte est que **la valeur n'était pas dérivée**, et qu'une constante posée à côté d'une grandeur
+qu'elle doit couvrir finit par diverger — *personne ne remesure un nombre qui a l'air juste.*
+
+#### Trouvé par une assertion écrite pour NE PAS dépendre de la règle
+
+La session 7 a séparé deux choses au lieu de choisir entre elles : son **geste** garde son
+recentrage explicite — une suite dont le geste dépend d'une règle CSS échoue de façon **obscure** le
+jour où la règle bouge, en rendant « élément non cliquable » — et la **règle** est mesurée à part, par
+une assertion qui la nomme.
+
+> **Un test qui dépend d'une propriété la mesure mal ; un test qui la mesure n'en dépend pas.**
+
+C'est cette assertion, écrite pour ne pas dépendre de ma règle, qui a trouvé ma règle courte.
+
+#### Pourquoi je n'ai pas dérivé, alors que c'était l'issue préférée
+
+**Aucune dérivation CSS n'existe.** Il n'y a aucun moyen de lire la hauteur *rendue* d'un élément dans
+une propriété personnalisée : pas d'`attr()` pour les longueurs, rien qui remonte une boîte.
+
+**Et donner à `.rw-entete` une hauteur fixe serait pire que le problème.** Elle porte `$titre`, qui
+dépend de la page, plus un bloc de compte, une cloche et un sélecteur de langue ;
+`@media (max-width: 900px)` change déjà ce qui s'y affiche. Une hauteur figée y couperait du contenu
+le jour où un titre est long. **Et un `min-height` ne fermerait rien** : il empêche l'en-tête de
+rapetisser, pas de **grandir** — or c'est grandir qui rend la marge courte.
+
+#### Ce qui tient à la place
+
+**Un nombre dont la justesse ne dépend pas de la précision de la mesure** : 88 px pour un en-tête de
+65, soit 23 px francs. Une erreur de lecture comme la mienne ne le rendrait plus court.
+
+Et la relation est **gardée ailleurs** : l'assertion de la suite compare la marge *effective* à la
+hauteur *rendue*, donc elle rougit si l'en-tête grandit. **La dérivation vit dans la mesure, pas dans
+le CSS** — écrit dans le fichier pour que personne ne croie que ce nombre se maintient tout seul.
+
+`rw.css` est partagé : un jeton modifié, signalé.
+
+---
+
 ### v1.38.96 — E-242 : `supervision` et `wazuh` ne se contredisent pas en jugement, ils divergent en VOCABULAIRE
 
 La session 6 a releve que les deux modules font **l'inverse** l'un de l'autre sur « desinstaller un
