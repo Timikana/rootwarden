@@ -594,6 +594,54 @@ test ne prend pas la main sur celui de `setUp`. Deux tests annonçaient un 404 e
 recevaient un 200 — ils échouaient pour une faute de l'**instrument**. La parade est un
 stub **unique** qui lit une propriété modifiable en cours de test.
 
+## 3 ter. QA-010 — j'avais muté ce que mes instruments ATTRAPENT, jamais ce qu'ils LAISSENT PASSER
+
+La session 7 a formulé, à propos de son propre invariant, la question qui manquait à
+tous mes lots :
+
+> *« J'avais éprouvé mon invariant par mutation — et j'avais muté ce qu'il attrapait,
+> jamais ce qu'il laissait passer. Une épreuve qui ne teste que le sens accusateur laisse
+> le sens exonérant intact, et c'est précisément là qu'un instrument coûte cher. »*
+
+Appliquée à mon analyseur d'appelants, elle a trouvé un trou en une lecture.
+
+### Un fichier illisible exonérait TOUS ses appelants, en silence
+
+Le code portait pourtant ce commentaire : *« Un fichier illisible se DIT. Le sauter en
+silence retirerait ses appels du relevé, donc les dédouanerait tous. »* **L'intention
+était juste et la propriété était fausse** : l'entrée partait **sans verdict**, donc elle
+n'entrait ni dans la liste à examiner ni dans aucun total.
+
+Mesuré sur une copie : un fichier rendu non analysable fait passer le relevé de **59
+appels à 54**, et **rien ne le dit**. Six appelants disparaissent — pas « sans défaut »,
+*absents*.
+
+> Une affirmation de commentaire n'est pas une propriété. C'est la même forme que les
+> cinq en-têtes du chantier qui annoncent un accès plus strict que leur code — sauf que
+> celui-ci était le mien, et qu'il décrivait exactement la parade qu'il n'appliquait pas.
+
+### Trois gardes ajoutées, et deux d'entre elles sont des reprises
+
+| garde | d'où elle vient |
+|---|---|
+| le verdict `illisible` entre dans la liste à examiner | le cas le plus urgent, pas le plus discret |
+| **un plancher** : sous 30 appels, l'analyseur **échoue** au lieu de rendre un relevé | emprunté au `PLANCHER_ROUTES_GARDEES` de la session 7 |
+| **le total se reconstitue** : somme des verdicts == nombre d'appels | ma propre règle sur le compte des routes, que je n'avais pas appliquée ici |
+
+**Preuve d'échec**, sur une copie hors du dépôt : un fichier rendu illisible apparaît
+avec le verdict `illisible` dans la liste figée ; un répertoire vide fait sortir
+l'analyseur en **code 3** avec le motif nommé.
+
+### Ce que ça dit de mes autres lots
+
+Toutes mes campagnes de mutation ont retiré un correctif pour vérifier que la suite
+rougit — le **sens accusateur**. Aucune n'a rendu un instrument plus **permissif** pour
+vérifier qu'une garde le rattrape. Les deux structures qui en avaient besoin sont
+traitées : l'invariant `@require_machine_access` (§2 sexies, garde symétrique) et
+l'analyseur d'appelants (ici). **Les suites de comportement n'ont pas ce mode de
+défaillance** — elles mesurent un code, pas un relevé — mais la question doit être posée
+à chaque instrument neuf.
+
 ## 4. Ce que la mesure a trouvé — à arbitrer par le Lead
 
 Aucun de ces points n'a été corrigé : la session QA qualifie et transmet.
@@ -835,6 +883,7 @@ la seule réparation qui ne coûte rien à personne.
 | 2026-08-27 | l'analyseur d'appelants pris en défaut **deux fois** par `pare-feu.js` | `JSON.parse` ignoré : faux dédouanement, puis fausse accusation sur la branche jumelle |
 | 2026-08-27 | suites après la vague `cle-plateforme` + `pare-feu` | **540 pytest**, **268 PHPUnit / 858 assertions** |
 | 2026-08-28 | QA-009 — invariant `@require_machine_access` repris | **4 passed** ; suite complète **544 pytest** ; 3 mutations → **1, 1 et 3 rouges** |
+| 2026-08-28 | QA-010 — mon analyseur d'appelants exonérait un fichier illisible | 59 appels → **54** sans un mot ; 3 gardes ajoutées, 2 mutations les font tomber |
 
 Chaque chiffre porte sa commande de remesure :
 

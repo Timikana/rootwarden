@@ -174,6 +174,66 @@ class AppelantsDuBackendTest extends TestCase
             . "par un changement de code qu'il faut relire. Voir docs/migration/QA-APPELANTS.md.");
     }
 
+    #[Test]
+    public function le_compte_des_verdicts_se_reconstitue(): void
+    {
+        /*
+         * UN TOTAL QU'ON NE SAIT PAS RECONSTITUER N'EST PAS UN TOTAL.
+         *
+         * L'analyseur classe chaque appel dans exactement un verdict. Si la somme
+         * des verdicts n'égale plus le nombre d'appels, c'est qu'une famille
+         * d'appels sort du classement **sans être comptée nulle part** — et un
+         * appel non classé est un appel exonéré.
+         *
+         * Ce n'est pas une hypothèse : c'était le cas d'un fichier JavaScript
+         * devenu illisible. Son entrée partait sans verdict, donc elle
+         * n'apparaissait ni dans la liste à examiner ni dans aucun total, et ses
+         * appels disparaissaient en silence. Mesuré le 2026-08-28 sur une copie :
+         * **59 appels devenaient 54**, et rien ne le disait.
+         */
+        $totaux = $this->instantane()['totaux'] ?? [];
+
+        $this->assertNotSame([], $totaux, "l'instantané ne porte aucun total");
+
+        $somme = 0;
+        foreach ($totaux as $cle => $valeur) {
+            if ($cle !== 'fichiers' && $cle !== 'appels') {
+                $somme += (int) $valeur;
+            }
+        }
+
+        $this->assertSame((int) $totaux['appels'], $somme,
+            "La somme des verdicts ne reconstitue pas le nombre d'appels : "
+            . "{$somme} contre {$totaux['appels']}.\n"
+            . "Une famille d'appels sort du classement sans être comptée — "
+            . "et un appel non classé est un appel EXONÉRÉ.\n"
+            . json_encode($totaux));
+    }
+
+    #[Test]
+    public function aucun_fichier_javascript_n_est_devenu_illisible(): void
+    {
+        /*
+         * Le cas le plus urgent à regarder, pas le plus discret. Un fichier que
+         * l'analyseur ne sait plus lire n'a plus AUCUN appelant dans le relevé :
+         * tous sont exonérés d'un coup, et le relevé reste plausible.
+         *
+         * Cette assertion double celle de la liste figée — qui rougirait aussi,
+         * l'entrée `illisible` y entrant désormais. Deux assertions pour une
+         * propriété, parce que celle-ci NOMME la cause au lieu de la faire
+         * deviner.
+         */
+        $illisibles = array_values(array_filter(
+            $this->instantane()['a_examiner'] ?? [],
+            fn (array $a) => ($a['verdict'] ?? '') === 'illisible',
+        ));
+
+        $this->assertSame([], $illisibles,
+            "Des fichiers JavaScript ne sont plus analysables — leurs appelants "
+            . "ont DISPARU du relevé, ils n'y sont pas 'sans défaut' :\n"
+            . json_encode($illisibles, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
     /** @return array<string,string> nom => chemin */
     private function fichiersJs(): array
     {
