@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.84** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.86** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,73 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.86 — E-236, E-237 et E-235c : une garde plus stricte sur un axe peut etre plus permissive sur un autre, et une liste d'exemples se corrige indefiniment
+
+#### ⚠ Et cette entree a failli ne pas exister : mon numero etait deja pris
+
+`v1.38.85` avait ete ecrit par la session 3 (`eb0b6f7`, 15:58) **pendant que je redigeais**. Mon
+propre garde-fou anti-doublon a mordu — mais **le commit est parti quand meme**, avec un
+`version.txt` en collision et **sans l'entree**. *Un controle qui interrompt l'ecriture d'un
+fichier n'interrompt pas le commit des autres.* Le numero est desormais **calcule depuis le
+fichier a l'instant de l'ecriture**, jamais retenu d'une mesure precedente — meme vieille de
+trois minutes.
+
+#### E-236 — un role 2 a qui le portail REFUSE le module peut lancer le scan SSH du parc
+
+    legacy/ssh-audit/index.php:12-13   checkAuth([1,2,3]) + checkPermission('can_audit_ssh')
+    /ssh-audit/scan-all                @require_role(2)  --  AUCUNE permission
+
+**Les deux gardes ne s'ordonnent pas** : la page est plus souple sur le role et plus stricte sur
+la permission ; la route l'inverse. Donc **un role 2 sans `can_audit_ssh` ne peut pas ouvrir la
+page, et peut appeler la route.**
+
+> **La route que la consigne permanente designe comme « a ne jamais lancer » est atteignable par
+> un compte a qui le portail refuse d'afficher le module.**
+
+**La forme est neuve** : six occurrences numerotees de *la garde est sur la PAGE, pas sur la
+REQUETE* — **les six comparaient un seul axe.** Ici la route a l'air **plus stricte**, et c'est ce
+qui l'a dedouanee partout. *Une garde plus stricte sur un axe peut etre plus permissive sur un
+autre ; croiser role ET permission, ne pas les additionner en un « niveau ».*
+
+**OUBLI pour `ssh-audit`, CONCEPTION pour `docker`** — seule l'existence de la colonne les separe :
+`can_audit_ssh` existe et la page l'applique ; `can_manage_docker` **n'existe pas**, et `docker`
+est garde par le role a *tous* les niveaux. *Deux routes au meme releve brut, deux verdicts
+opposes.*
+
+#### E-237 — deux sessions se contredisent sur `/wazuh/uninstall`, et les deux ont raison
+
+**Corrige** : `success` vaut `paquet_retire`, mesure par l'effet (`dpkg-query`, `rpm`).
+**Pas corrige** : `_upsert_agent(status='never_connected')` est appele **ligne 59,
+inconditionnellement**, alors que `paquet_retire` est derive **apres**. Sur RHEL/SUSE : paquet
+installe, `/var/ossec` supprime, **inventaire disant qu'il n'y a rien**.
+
+**Et le correctif evident est faux dans l'autre sens** — n'ecrire qu'en cas de reussite laisserait
+`active` sur une machine vidée : **un agent mort annonce comme fonctionnel**. *Aucune des deux
+ecritures n'est juste, parce que le vocabulaire n'a pas de mot pour l'etat atteint.* Meme forme
+que `sudoers_orphelin` : **nommer l'etat avant de choisir une valeur.**
+
+#### E-235c — l'ensemble derive est 38 espaces, pas 7
+
+    session 6  ->  2      Lead  ->  3      session 6  ->  7      DERIVE  ->  38
+
+> **La parade n'est pas une liste plus longue : c'est de DERIVER l'ensemble. Une liste d'exemples
+> se corrige indefiniment ; une enumeration ne se corrige qu'une fois.**
+
+Les trois premieres listes ne voyaient que les prefixes finissant par `/` — 15 sur 66. **Meme
+angle mort que mon 171 sur le proxy legacy.** Et la derivation trouve ce qu'aucune liste n'avait :
+**`/cve_`, 7 chemins distincts gardes par un role seul**, la plus forte concentration du depot.
+
+Deux precisions contre la conclusion trop rapide : **`/cve_scan_all` est hors liste blanche du
+proxy LEGACY et dedans celle du PORTAGE** — deux passerelles, deux mesures justes ; et **11
+n'etait pas un nombre de routes** mais d'enregistrements `@bp.route`, soit 7 chemins. *Un compte
+qui melange chemins et methodes gonfle du cote qui alarme.*
+
+#### Et j'ai demande a la session 5 quelque chose que ma propre regle interdit
+
+Amender le message de `399931a` avant de remonter la fusion. **Elle a refuse et elle a raison** :
+c'est reecrire un commit de six jours sur une branche que trois sessions referencent par son
+empreinte. Sa contre-proposition est meilleure : **porter la reserve dans le message de FUSION.**
 
 ### v1.38.85 — E-235 : `/wazuh/` passait la passerelle pour un rôle 1, et deux de mes mesures étaient fausses
 
