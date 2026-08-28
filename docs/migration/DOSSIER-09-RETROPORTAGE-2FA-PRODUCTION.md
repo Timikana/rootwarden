@@ -55,12 +55,38 @@ mot de passe et AVANT le second facteur.**
 **Ce n'est pas un contournement du 2FA : c'est sa négation.** Un facteur qui se dérive de l'autre n'est
 pas un second facteur — la page conçue pour *établir* le second facteur est celle qui le divulgue.
 
-### Ce que le correctif ferme, et il ne manque rien en code
+### Ce que le correctif ferme — et **TROIS volets sur quatre**, pas quatre
 
-`23a6063` (v1.37.48, **2026-08-23**) porte **quatre volets**, relus ligne par ligne par le Lead sur cette
-branche : la divulgation (`:65-67`), le débit 5/session + 10/IP (`:113-134`), l'anti-rejeu (`:149-150`),
-et **`checkCsrfToken()` réellement APPELÉE** dans la branche POST (`:104-105`) — pas seulement le jeton
-émis. *Une garde émise n'est pas une garde appelée* : c'est la distinction qui a coûté E-125 et E-126.
+`23a6063` (v1.37.48, **2026-08-23**) porte quatre volets sur cette branche : la divulgation, le débit
+5/session + 10/IP, l'anti-rejeu, et `checkCsrfToken()` appelée dans la branche POST.
+
+> **⚠ CORRECTION DE MA PROPRE PREMIÈRE RÉDACTION, 13:52 UTC.** J'ai écrit ci-dessous, en contrôle,
+> *« `grep -c 'checkCsrfToken()'` — attendu : 0 avant »*. **Mesuré : il rend 1.**
+
+    origin/main:www/auth/enable_2fa.php:75   if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['2fa_code'])) {
+                                        :76       checkCsrfToken();
+
+**La production APPELLE déjà `checkCsrfToken()`, dans la branche POST.** Le quatrième volet n'y manque
+pas. Comparaison volet par volet, mesurée sur les deux fichiers :
+
+    volet                 origin/main (176 lignes)      cette branche (253 lignes)
+    divulgation           OUVERTE — la page rend le secret et le QR      fermee
+    debit                 ABSENT — 0 occurrence                          4 occurrences
+    anti-rejeu            a lire — 4 candidats, dont le `verify()` du TOTP  present
+    CSRF appelee          PRESENTE deja (:76)                            presente
+
+> **La transposition porte donc TROIS volets, pas quatre — et transposer le quatrième
+> DUPLIQUERAIT un appel existant.**
+
+**Et c'est ma borne n°3 enfreinte dans le document qui la pose** : j'y écris *« transposer n'est pas
+recopier : le fichier de `main` a divergé sur 79 versions, la transposition doit être relue contre la
+CIBLE »* — **et j'ai écrit un contrôle attendu sans lire la cible.** *Écrire une règle donne le sentiment
+de l'avoir appliquée*, deuxième fois pour moi aujourd'hui, et cette fois dans le même fichier que la
+règle.
+
+**Ce que la correction ne change pas** : la vulnérabilité. Elle ne tenait jamais au CSRF — elle tient à
+la **garde de la page** (`:33-34`, `temp_user` seul) et à la **divulgation** du secret. *Une garde qui
+protège l'écriture ne protège pas la lecture*, et c'est la lecture qui divulgue.
 
 ### ⚠ Et ce n'est PAS un incident isolé : c'est 1 sur 30
 
@@ -109,11 +135,12 @@ orpheline » — fausse, seule `srv-zabbix` porte `sa = 1`).
 #    ni version.txt, ni la suite E2E — ils appartiennent au chantier
 
 # 2. controle AVANT, en lecture
-git show origin/main:www/auth/enable_2fa.php | grep -c 'checkCsrfToken()'    # attendu : 0 avant
+git show origin/main:www/auth/enable_2fa.php | grep -c 'checkCsrfToken()'    # rend 1 : DEJA present
+git show origin/main:www/auth/enable_2fa.php | grep -c 'login_attempts'      # rend 0 : debit ABSENT
 git ls-tree origin/main -- www/auth/enable_2fa.php                            # le chemin cible
 
-# 3. controle APRES : les quatre volets presents, et `checkCsrfToken()` APPELEE
-#    dans la branche POST — pas seulement le jeton emis
+# 3. controle APRES : les TROIS volets manquants presents — divulgation fermee,
+#    debit en place, anti-rejeu — et `checkCsrfToken()` toujours appelee UNE fois
 ```
 
 **Qui écrit** : ce n'est pas mon périmètre — j'instruis. `www/` sur `main` n'appartient à personne dans
