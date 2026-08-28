@@ -27,9 +27,19 @@
  * DEUX MISES A JOUR DU 2026-08-27, ET AUCUNE NE CHANGE LA CONCLUSION.
  *
  * (a) `regenerate_platform_key()` ne fait plus `unlink()` mais
- *     `_archive_platform_key()` : la clef est archivee, plus detruite. Le risque
- *     « secret non reproductible » est LEVE. Une conclusion juste dont la raison
- *     a change se reecrit, elle ne se recopie pas.
+ *     `_archive_platform_key()`. **Mais le risque « secret non reproductible »
+ *     n'est pas LEVE : il est DEPLACE, et conditionne.** Le catalogue du portage
+ *     le dit mieux que ne le disait ma premiere redaction
+ *     (`lang/fr/plateforme.php:213`) :
+ *
+ *         « cette archive vit dans le MEME volume Docker que la clef courante :
+ *           une perte du volume emporte les deux, et RootWarden ne sauvegarde
+ *           pas ce volume. "Reversible pendant N jours" ne vaut donc que si le
+ *           volume survit, et cette seconde condition ne depend pas du produit. »
+ *
+ *     J'avais ecrit « le risque est LEVE ». C'etait trop optimiste, et du cote
+ *     qui rassure. Une conclusion juste dont la raison a change se reecrit —
+ *     et une reecriture peut etre fausse a son tour.
  *
  * (b) **ET LA ROTATION NE REVOQUE RIEN** — mesure d'une relecture de securite
  *     (`AUDIT-PRERELECTURE-K-MODULES.md` §9.3, commit `e6b8530`) :
@@ -353,6 +363,122 @@ try {
                 passees.length === avantPassees && avortees.length === avantAvortees,
                 `${passees.length - avantPassees} passee(s)`, 'aucune');
         }
+    });
+
+    // ══ 3b. P1 — L'ECRAN DIT-IL VRAI SUR LES MACHINES SANS RETOUR ? ══════
+    await etape('les machines sans retour sont dites, ou leur absence est enoncee', async () => {
+        /*
+         * LA PROPRIETE NAIVE N'A AUCUN OBJET AUJOURD'HUI, ET C'EST TOUT LE SUJET.
+         *
+         * « L'ecran nomme les machines qui deviendraient injoignables » se
+         * verifierait sur ZERO machine : mesure du 2026-08-28, les trois
+         * machines du parc portent un mot de passe, donc `sans_retour` vaut 0.
+         * Ecrite ainsi, l'assertion passerait **par absence d'objet** — la forme
+         * d'echec la plus couteuse, parce qu'un vert ne se relit pas.
+         *
+         * On mesure donc la propriete qui ne peut PAS etre creuse : **l'ecran
+         * concorde-t-il avec la base ?** Elle a un objet dans les deux cas —
+         * nommer quand il y en a, enoncer l'absence quand il n'y en a pas — et
+         * elle bascule d'elle-meme au premier effacement de mot de passe, sans
+         * qu'on ait a la reecrire.
+         *
+         * LA LISTE ATTENDUE SE DERIVE, elle ne se code pas. Le predicat est
+         * celui du portage (`ClePlateforme.php`) : cle deployee ET aucun mot de
+         * passe ET aucun mot de passe root. Coder « srv-zabbix » ici
+         * mesurerait mon presse-papier, pas le parc.
+         */
+        const sansRetour = litEnBase(
+            'SELECT name FROM rootwarden.machines WHERE platform_key_deployed = 1 '
+            + "AND (password IS NULL OR password = '') "
+            + "AND (root_password IS NULL OR root_password = '')");
+        constate('machines SANS RETOUR, derivees de la base',
+            sansRetour.join(' · ') || '(aucune)');
+
+        const vu = await page.evaluate((sels) => {
+            const lire = (s) => {
+                const e = document.querySelector(s);
+
+                return e ? (e.innerText || '').replace(/\s+/g, ' ').trim() : null;
+            };
+
+            return { nomme: lire(sels.sansRetour), aucune: lire(sels.sansRetourAucune) };
+        }, { sansRetour: '[data-rw="cle-rotation-sans-retour"]',
+             sansRetourAucune: '[data-rw="cle-rotation-sans-retour-aucune"]' });
+        constate('ce que l\'ecran affiche',
+            vu.nomme !== null ? `NOMME : « ${vu.nomme.slice(0, 100)} »`
+                : vu.aucune !== null ? `ENONCE L'ABSENCE : « ${vu.aucune.slice(0, 100)} »`
+                : '(ni l\'un ni l\'autre)');
+
+        if (sansRetour.length > 0) {
+            // Le cas qui compte : chaque machine derivee doit etre NOMMEE.
+            const manquantes = sansRetour.filter((m) => ! (vu.nomme || '').includes(m));
+            verifiePortage('chaque machine sans retour est NOMMEE a l\'ecran',
+                vu.nomme !== null && manquantes.length === 0,
+                vu.nomme === null
+                    ? `${sansRetour.length} machine(s) sans retour et l'ecran n'en nomme AUCUNE`
+                    : `absentes de l'ecran : ${manquantes.join(', ')}`);
+        } else {
+            /*
+             * UN COMPTEUR A ZERO S'ENONCE. Ne rien afficher laisserait croire
+             * que la question n'a pas ete posee — c'est la difference entre
+             * « aucune machine n'est concernee » et « on ne sait pas ».
+             */
+            verifiePortage('l\'absence de machine sans retour est ENONCEE, pas tue',
+                vu.aucune !== null && vu.aucune !== '' && ! /:[a-z_]{3,}/.test(vu.aucune),
+                vu.aucune === null
+                    ? 'aucun enonce : l\'ecran ne dit pas que le compte vaut zero'
+                    : `jeton non substitue : « ${vu.aucune.slice(0, 60)} »`);
+            verifiePortage('et l\'ecran ne nomme AUCUNE machine sans retour',
+                vu.nomme === null,
+                `l'ecran nomme « ${(vu.nomme || '').slice(0, 80)} » alors que la base n'en rend aucune`);
+        }
+    });
+
+    // ══ 3c. P3 — LE PANNEAU PORTE-T-IL SES FAITS ? ═══════════════════════
+    await etape('le panneau de decision porte ses faits', async () => {
+        if (! C.panneau) {
+            constate('panneau de decision', 'le legacy n\'en a pas — il ouvre un `confirm()` natif');
+            verifiePortage('le panneau enumere les effets du geste', false,
+                'le legacy tient sa confirmation en une ligne de `confirm()`');
+
+            return;
+        }
+        const bouton = await page.$(C.lancer);
+        if (! bouton) { verifie('le bouton de rotation est atteignable', false, C.lancer); return; }
+        await bouton.click();
+        await dors(700);
+        const vu = await page.evaluate(() => {
+            const p = document.querySelector('[data-rw="cle-panneau"]');
+            if (! p) return { ouvert: false, effets: [], cibles: '' };
+            const b = p.getBoundingClientRect();
+            const lis = [...p.querySelectorAll('[data-rw="cle-panneau-effets"] li')]
+                .map((e) => (e.innerText || '').trim()).filter(Boolean);
+            const c = p.querySelector('[data-rw="cle-panneau-cibles"]');
+
+            return {
+                ouvert: ! p.hidden && b.height > 0 && getComputedStyle(p).display !== 'none',
+                effets: lis,
+                cibles: c ? (c.innerText || '').trim() : '',
+            };
+        });
+        constate('effets enumeres par le panneau', vu.effets.length
+            ? vu.effets.map((e) => `« ${e.slice(0, 60)} »`).join(' | ') : '(aucun)');
+        constate('cibles nommees par le panneau', vu.cibles || '(aucune)');
+
+        /*
+         * LA PROPRIETE INCLUT L'EXISTENCE. « Le panneau ne dit rien de faux » se
+         * verifie sur un panneau VIDE : c'est le piege de D9a, ou une aide
+         * illisible satisfaisait la propriete qu'elle devait porter. On exige
+         * donc que les faits SOIENT LA, puis qu'ils disent quelque chose.
+         */
+        verifiePortage('le panneau enumere les effets du geste',
+            vu.ouvert && vu.effets.length >= 3
+                && vu.effets.every((e) => e.length > 0 && ! /:[a-z_]{3,}/.test(e)),
+            ! vu.ouvert ? 'le panneau ne s\'ouvre pas'
+                : `${vu.effets.length} effet(s) enumere(s) — attendu au moins 3, non vides et sans jeton`);
+
+        const annuler = await page.$(C.panneauAnnuler);
+        if (annuler) { await annuler.click(); await dors(400); }
     });
 
     // ══ 4. L'ENONCE QUE LE PORTAGE AJOUTE ════════════════════════════════
