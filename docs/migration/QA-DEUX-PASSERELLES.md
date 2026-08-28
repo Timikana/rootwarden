@@ -97,6 +97,46 @@ sur le legacy sans que personne ne l'ait décidé.* Le portage ne le fait pas.
 
 ---
 
+## 3 bis. Le rempart manquant — dérivé par CHEMIN, et « 36 espaces » est la mauvaise unité
+
+La question suivante est distincte de la précédente : non plus *les deux passerelles
+divergent-elles*, mais *que laisse passer celle du portage*. Elle avait été estimée en
+**espaces** — 2, 3, 7, puis 38. **L'espace est une commodité d'écriture ; ce qui est
+atteignable est un CHEMIN.**
+
+Dérivé par chemin : **34** sont transmis, hors réserve administration, et **sans
+permission**. Mais ils ne se valent pas, et les compter ensemble efface ce qui décide :
+
+| classe | n | ce qu'un compte doit avoir pour l'atteindre |
+|---|---|---|
+| **aucune garde** | **1** | rien — `/test` |
+| **`require_api_key` seul** | **8** | une session authentifiée, **rôle 1 suffit** |
+| `require_role` seul — portée **parc** | **11** | un rôle 2, **aucune permission** |
+| `require_role` + `require_machine_access` | **14** | rôle 2, ou rôle 1 avec accès à la machine |
+
+**`/test` n'est pas un défaut, et je le dis aussi net que j'aurais dit l'inverse** : elle
+rend une chaîne fixe — *« Serveur Flask fonctionne correctement »* — et ne consulte rien.
+Une route sans garde qui ne divulgue rien n'a pas besoin de garde.
+
+**La classe qui mérite une question est la deuxième** : `/cve_test_connection`,
+`/cve_trends`, `/filter_servers`, `/list_machines`, `/machines/credential-status`,
+`/platform_key`, `/preflight_check`, `/settings/announceable`. Toutes atteignables par un
+**rôle 1**.
+
+`/preflight_check` est celle que je nomme, et **comme une question, pas comme un écart** :
+elle énumère les machines visées et leur inventaire de comptes — de la métadonnée
+d'exploitation, jamais un secret. *Faut-il qu'un rôle 1 l'atteigne ?* Je ne tranche pas :
+trois de mes sondes se sont trompées **du côté qui alarme** aujourd'hui, et l'erreur dans
+ce sens coûte plus cher qu'un signalement tardif.
+
+> **La dérivation par espace sur-comptait, et par une cause précise** : la plupart des
+> espaces hors `ADMIN_SEULEMENT` portent une **permission sur chacune de leurs routes**
+> — `/bashrc/`, `/graylog/`, `/maintenance/`, `/services/`, `/fail2ban/`. Compter
+> l'espace revient à compter le contenant plutôt que ce qu'il contient.
+>
+> **Deux dérivations correctes peuvent répondre à deux questions différentes, et seule
+> l'unité dit laquelle.**
+
 ## 4. Ce que cette dérivation ne dit pas
 
 - elle compare **les deux passerelles entre elles**, pas chacune à ce qu'elle *devrait*
