@@ -784,9 +784,38 @@ def uninstall():
         "apt-get purge -y wazuh-agent 2>/dev/null || true && "
         "rm -rf /var/ossec"
     )
+    # ══ E-225 (moitie deleguee) : CESSER D'ATTESTER ═════════════════════════
+    #
+    # `success` valait `code == 0`. Sur RHEL et SUSE, `apt-get purge` n'existe
+    # pas, le `|| true` avale l'echec, `rm -rf /var/ossec` reussit — et la route
+    # annoncait une REUSSITE sur un paquet reste installe. Fausse attestation de
+    # la famille E-192.
+    #
+    # LA VERIFICATION EST EN LECTURE SEULE, ET C'EST CE QUI LA REND POSSIBLE
+    # ICI. Elle interroge le gestionnaire de paquets present ; elle ne detruit
+    # rien et ne rend le geste effectif nulle part. Le `purge` reste apt-only —
+    # le rendre multi-famille serait un changement de comportement sur un geste
+    # destructeur distant, et il est en arbitrage (DOSSIER-04).
+    #
+    # **Ca ne rencontre donc PAS le piege d'E-215**, ou poser la verification
+    # seule armait le geste : ici il n'y a rien a armer, le geste ne devient pas
+    # plus efficace, il cesse seulement d'etre annonce comme reussi.
+    #
+    # Controle par l'EFFET, pas par le code de sortie — et pas non plus par
+    # l'absence de `/var/ossec`, qui serait trompeuse : `rm -rf` la produit
+    # meme quand le paquet reste installe.
+    verif_cmd = (
+        "if command -v dpkg-query >/dev/null 2>&1 && "
+        "dpkg-query -W -f='${Status}' wazuh-agent 2>/dev/null "
+        "| grep -q 'install ok installed'; then exit 7; fi; "
+        "if command -v rpm >/dev/null 2>&1 && rpm -q wazuh-agent >/dev/null 2>&1; "
+        "then exit 7; fi; "
+        "exit 0"
+    )
     try:
         with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
             _, err_out, code = execute_as_root(client, cmd, root_pwd, logger=logger, timeout=180)
+            _, _, code_v = execute_as_root(client, verif_cmd, root_pwd, logger=logger, timeout=30)
         _upsert_agent(row['id'], status='never_connected', agent_id=None, version=None)
         _audit(user_id, 'uninstall', f"machine_id={row['id']} code={code}")
         # E-225 : la reponse NOMME ce qui subsiste. Aucun changement de
@@ -800,7 +829,22 @@ def uninstall():
                      "la machine continuera de les consulter a chaque mise a jour. "
                      "Retrait manuel si vous ne comptez pas reinstaller."),
         }
-        return jsonify({'success': code == 0, 'vestiges': vestiges})
+        paquet_retire = (code_v == 0)
+        if not paquet_retire:
+            logger.warning("wazuh uninstall : le paquet wazuh-agent est TOUJOURS "
+                           "installe sur machine_id=%s (code_v=%s) — la commande "
+                           "de purge est apt-only", row['id'], code_v)
+        return jsonify({
+            # Le verdict suit l'EFFET mesure, plus le code de sortie d'une
+            # commande dont une moitie ne s'applique pas partout.
+            'success': paquet_retire,
+            'paquet_retire': paquet_retire,
+            'message': None if paquet_retire else (
+                "/var/ossec a ete retire, mais le paquet wazuh-agent est TOUJOURS "
+                "installe : la commande de purge ne couvre que la famille Debian. "
+                "Retrait manuel requis (rpm/zypper)."),
+            'vestiges': vestiges,
+        })
     except Exception as e:
         logger.exception("Erreur uninstall wazuh : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
