@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.88** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.90** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,66 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.90 — E-238 : le backend en service est celui d'HIER, et le redemarrage cesse d'etre un cout pour devenir un prealable de JUSTESSE
+
+#### E-238 — 27 fichiers backend modifies APRES le demarrage du process
+
+    docker inspect rootwarden_python --format '{{.State.StartedAt}}'  ->  2026-08-27T12:28:43Z
+    find backend -name '*.py' -newermt '2026-08-27 14:28' | wc -l        ->  27
+
+**Trois comportements pour une meme route selon ce qu'on lit** : `/wazuh/install_all` en SERVICE
+rend **500** (l'ancien SQL sur une table sans colonne `id`), dans l'ARBRE **400** (E-224), et ce que
+j'annonçais — « geste de parc » — est faux depuis le correctif.
+
+> **Une suite ecrite contre l'arbre et jouee contre le service mesure l'ecart entre les deux, et
+> l'attribue a la page.**
+
+**Ce que ça change au dossier de redemarrage** : je le presentais comme « 27 modules ecrits et
+inertes », un **cout**. *Ce n'en est plus un* — **tant que le redemarrage n'a pas eu lieu, aucune
+mesure sur `wazuh`, `ssh` ou `ssh_audit` n'est interpretable.** Et mon « 20 modules » relaye depuis
+ce matin etait perime : **27**.
+
+#### E-235c bis — mon 38 etait 39, et la soustraction annonçait une amelioration fictive
+
+    soustraction, ADMIN_SEULEMENT=28  ->  38    (inscrit)
+    soustraction, ADMIN_SEULEMENT=30  ->  36    (apres correctif)
+    DERIVE par entree                 ->  39    AVANT ET APRES
+
+La session 3 a ajoute deux **routes exactes**, pas deux entrees de liste blanche : **la soustraction
+a baisse de 2 pendant que la realite ne bougeait pas.** *J'avais derive l'appartenance a l'ensemble,
+puis reintroduit le raccourci dans l'arithmetique.* **Deriver un ensemble et compter ses elements
+sont deux gestes, et le second peut defaire le premier.**
+
+Et deux routes non nommees : **`/cve_trends`** (donnees de FLOTTE) et `/cve_test_connection`,
+`@require_api_key` seul. *Mon motif cherchait dans `cve.py` ; `/cve_trends` vit dans
+`monitoring.py`* — **quatrieme motif du jour qui suppose une forme ou un lieu d'ecriture.**
+
+#### E-239 — j'ai transpose la CONCLUSION d'un precedent sans verifier sa CONDITION
+
+J'ai demande de fermer `/ssh-audit/` et `/cve_` en entier, au motif de `/supervision/`. **La session
+3 a refuse, et elle avait raison** : les deux pages admettent le **role 1** des deux cotes, et un
+role 1 porteur de la permission atteint cinq routes **gardees par `@require_machine_access` — la
+garde qui MORD au role 1** et le borne a **ses** machines.
+
+> **Fermer le prefixe entier remplacerait une borne PRECISE — vos machines — par une borne AVEUGLE
+> — personne sous le role 2.** Le precedent ne se transpose pas parce que sa CONDITION differe :
+> `/supervision/` exigeait le role 2 des deux cotes, **personne n'y perdait rien.**
+
+**La condition d'un precedent decide, pas sa conclusion.** *Un remede qui resserre un axe peut
+desserrer la protection reelle* — meme forme qu'E-236. Ferme au bon perimetre : les deux routes de
+parc seulement, **les huit routes par machine intactes.**
+
+#### pytest : 566, avec son heure et son commit — et le quatrieme faux desaccord du jour
+
+**566 passed · 1 skipped · 1 xfailed**, commit `bb02e4d`, 2026-08-28 10:10 CEST. **509 et 549
+etaient tous deux justes**, a onze heures d'ecart ; **462 comptait des FONCTIONS** — une fonction
+parametree a six jeux rend six cas. *Le seul chiffre a corriger etait l'etiquette, pas la valeur.*
+
+**Quatrieme fois en deux jours que deux mesures justes ont ete prises pour un desaccord**, apres
+`iptables` 369/870, les cles Graylog 5 et 5, et `/wazuh/uninstall`. **La cause est chaque fois
+qu'un chiffre voyage sans son heure.** A ne pas inscrire comme chiffre courant : sept sessions ont
+commite depuis.
 
 ### v1.38.89 — E-235c : les deux routes de parc fermées, et le périmètre demandé REFUSÉ avec sa mesure
 
