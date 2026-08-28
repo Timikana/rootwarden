@@ -8,14 +8,15 @@
     "flux": 6,
     "delegue": 21,
     "delegue_sans_lecteur": 2,
-    "ignore": 2
+    "ignore": 2,
+    "illisible": 0
   },
   "empreintes": {
     "acces-sftp.js": "558a0929f6338813",
     "approbations.js": "874aa42ba41121f0",
     "bashrc.js": "b1f82c8e4b9408f5",
     "chatops.js": "607141666c99b287",
-    "cle-plateforme.js": "a1f277cdbff2df8f",
+    "cle-plateforme.js": "847da8fc8e2f3f9c",
     "cles-ssh.js": "de7d0a5777ba4594",
     "comptes-distants.js": "9520ed9b433918f4",
     "comptes.js": "b60f1d1ae2a77e0b",
