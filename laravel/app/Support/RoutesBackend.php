@@ -75,8 +75,36 @@ class RoutesBackend
          * la route porte deja : `check_machine_access` DANS LE CORPS, machine
          * par machine, comme `/list_machines`. Elle ne joint aucune machine et
          * ne rend JAMAIS un secret, seulement un predicat sur lui.
+         *
+         * ET CETTE BOUCLE N'EST PAS UN CLOISONNEMENT DE FLOTTE — a ne pas
+         * relire comme tel. `check_machine_access` rend `True` SANS CONDITION
+         * des le role 2 (`helpers.py:299`) : le filtre ne mord donc qu'au
+         * role 1. Un role 2 porteur de la permission voit tout le parc, ce qui
+         * est coherent avec la garde de la page et avec le reste du depot. Ce
+         * n'est pas un defaut ; le prendre pour une segmentation ferait
+         * conclure de travers a la prochaine lecture.
          */
         '/machines/credential-status',
+        /*
+         * `/settings/announceable` : MEME REGIME, et pour P4. Elle rend la
+         * valeur EFFECTIVE d'une liste fermee de reglages — dont
+         * `platform_key_archive_days`, la duree pendant laquelle une cle de
+         * plateforme detruite reste rejouable depuis son archive.
+         *
+         * POURQUOI LA LIRE PLUTOT QUE D'ECRIRE « 30 ». Cette duree est
+         * configurable. Un nombre recopie dans un gabarit devient faux le jour
+         * ou l'exploitant la change, et il devient faux EN SILENCE : l'ecran
+         * continue d'annoncer une reversibilite de 30 jours sur un geste
+         * irreversible. Un nombre affiche comme une garantie et fige dans un
+         * autre fichier est un mensonge a retardement.
+         *
+         * PAS DANS `ADMIN_SEULEMENT` non plus : la route se garde par
+         * `@require_api_key` SEULE, et le backend le DECLARE avec son motif —
+         * aucune des douze valeurs ne distingue un utilisateur d'un autre, et ce
+         * qui la borne est la liste fermee, pas un decorateur. Exiger un role
+         * ici donnerait a croire qu'il y a la quelque chose a proteger.
+         */
+        '/settings/announceable',
         '/server_user_keys', '/server_user_remove_key',
         '/remove_user_keys', '/delete_remote_user',
         '/logs', '/update', '/update-logs', '/update_zabbix', '/update_security_exec',

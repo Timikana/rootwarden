@@ -392,6 +392,90 @@
     @endif
 
     {{--
+        ═══ P4 — LA ROTATION : PORTEE, ET JAMAIS EXERCEE ═══════════════════
+
+        Le geste le plus large du portail. Il ne prend AUCUN `machine_id` : son
+        corps est vide et il fait un `UPDATE machines SET platform_key_deployed
+        = FALSE` **sans clause de restriction**. C'est pourquoi
+        `@require_machine_access` ne serait pas une garde ici mais un decor : un
+        decorateur qui cherche un identifiant dans un corps qui n'en a pas
+        laisserait tout passer. La garde juste est celle qui est la,
+        `@require_role(3)`, plus la porte a quatre yeux.
+
+        LA SECTION N'EST RENDUE QU'AU ROLE 3, pour la meme raison que la
+        suppression du compte d'administration : offrir un geste qui finira en
+        403 n'est pas une garde, c'est une promesse fausse.
+
+        CE QUE LE BOUTON FAIT AU CLIC : il OUVRE le panneau. Il n'emet AUCUNE
+        requete. C'est la propriete que la suite mesure — au reseau, par
+        interception — et c'est aussi la raison pour laquelle ce geste peut etre
+        porte sans jamais etre execute.
+    --}}
+    @if ($estSuperadmin)
+        <section class="rw-carte rw-carte--pleine" data-rw="cle-rotation">
+            <p class="rw-etiquette">{{ __('plateforme.rotation_titre') }}</p>
+            <p class="rw-aide rw-prose">{{ __('plateforme.rotation_aide') }}</p>
+
+            {{-- LE REMEDE EST NOMME ICI, ET C'EST LE SEUL ENDROIT OU IL ARRIVE
+                 AU MOMENT OU IL SERT. Corriger le libelle de la suppression du
+                 compte sans dire ou est le vrai remede aurait rendu la
+                 desinformation muette au lieu de la corriger. --}}
+            {{-- TROIS AFFIRMATIONS, ET LA DEUXIEME EST CELLE QUI MANQUAIT.
+
+                 Mon premier jet disait que le geste de retrait « n'a aucune
+                 interface de parc ici », ce qui laissait entendre qu'il n'existe
+                 pas. C'est le pire des deux mensonges possibles sur un ecran
+                 d'incident : il envoie chercher ailleurs, ou conclure qu'il n'y
+                 a rien a faire.
+
+                 Le geste EXISTE, il est soigneux — sauvegarde, empreintes
+                 recalculees par `ssh-keygen -lf` ligne par ligne, code de sortie
+                 lu — et il REFUSE par defaut de retirer la cle de plateforme.
+                 Ce refus est ce qu'on veut pendant un incident, et l'appel du
+                 legacy ne passe pas `force` : la protection s'applique.
+
+                 J'avais confondu cette route avec `remove_user_keys`, sa voisine
+                 du meme fichier, qui vide `authorized_keys` et atteste sans
+                 verifier. Celle-la n'est PAS nommee ici : diriger quelqu'un vers
+                 un geste qui ment sur son propre effet serait refaire le motif a
+                 l'etage au-dessus. --}}
+            <div class="rw-encart" data-rw="cle-rotation-remede">
+                <p class="rw-prose">{{ __('plateforme.rotation_remede') }}</p>
+                <p class="rw-prose" data-rw="cle-rotation-remede-ou">{{ __('plateforme.rotation_remede_ou') }}</p>
+                <p class="rw-aide rw-prose" data-rw="cle-rotation-remede-parc">{{ __('plateforme.rotation_remede_parc') }}</p>
+            </div>
+
+            {{-- LES MACHINES POUR LESQUELLES LA ROTATION EST SANS RETOUR AU SENS
+                 STRICT. Le nombre est CALCULE (cf. `compteurs()`), jamais ecrit
+                 en dur : il vaut zero aujourd'hui et changera au premier
+                 effacement de mot de passe. Un compteur a zero s'enonce. --}}
+            @if ($compteurs['sans_retour'] > 0)
+                <p class="rw-annonce rw-annonce--attention" data-rw="cle-rotation-sans-retour">
+                    {{ __('plateforme.rotation_sans_retour', [
+                        'n' => $compteurs['sans_retour'],
+                        'noms' => implode(', ', $compteurs['noms_sans_retour']),
+                    ]) }}
+                </p>
+            @else
+                <p class="rw-aide rw-prose" data-rw="cle-rotation-sans-retour-aucune">
+                    {{ __('plateforme.rotation_sans_retour_aucune') }}
+                </p>
+            @endif
+
+            <p class="rw-aide rw-prose" data-rw="cle-rotation-jamais">{{ __('plateforme.rotation_jamais_exercee') }}</p>
+
+            <div class="rw-actions">
+                <button type="button" class="rw-bouton rw-bouton--danger"
+                        data-rw="cle-rotation-lancer"
+                        data-geste="rotation" data-portee="flotte"
+                        data-total="{{ $compteurs['total'] }}">
+                    {{ __('plateforme.btn_rotation') }}
+                </button>
+            </div>
+        </section>
+    @endif
+
+    {{--
         ═══ LE PANNEAU DE DECISION, UN SEUL POUR TOUS LES GESTES ═══════════
 
         Il nait `hidden`, il NOMME sa cible, et il porte le champ de ressaisie —
@@ -419,6 +503,27 @@
         {{-- Le motif : obligatoire, et journalise avec le nom de la machine.
              Le legacy demandait ses motifs par `prompt()` ailleurs dans ce
              module ; ici c'est un champ, comme le mot de passe. --}}
+        {{-- LA RECOPIE. Le bouton de confirmation naît DÉSACTIVÉ pour les
+             gestes qui l'exigent, et ne s'active qu'à l'égalité EXACTE. Le
+             legacy demandait deux `confirm()` pour la rotation ; le portage
+             avait remplacé deux réflexes par un seul clic, ce qui est moins
+             exigeant que ce qu'il remplaçait. Le nombre à recopier est celui
+             que le panneau vient d'afficher : on ne demande rien qu'il ne
+             montre.
+
+             ⚠ CE CHAMP N'EST PAS LA SÉCURITÉ, C'EST L'ANNONCE. Il rend la
+             règle lisible AVANT le geste. La sécurité est la revérification
+             faite au moment de confirmer, dans le script — `disabled` est un
+             état du DOM, il se retire depuis la console et ne survit pas à un
+             `click()` programmatique. Écrit ici pour que personne ne retire un
+             jour le second contrôle en le croyant redondant. --}}
+        <label class="rw-champ" data-rw="cle-panneau-recopie" hidden>
+            <span class="rw-etiquette">{{ __('plateforme.champ_recopie') }}</span>
+            <input type="text" inputmode="numeric" class="rw-saisie rw-saisie--court"
+                   data-rw="cle-panneau-recopie-valeur" autocomplete="off" spellcheck="false">
+            <span class="rw-aide">{{ __('plateforme.champ_recopie_aide') }}</span>
+        </label>
+
         <label class="rw-champ" data-rw="cle-panneau-motif" hidden>
             <span class="rw-etiquette">{{ __('plateforme.champ_motif') }}</span>
             <input type="text" class="rw-saisie" data-rw="cle-panneau-motif-valeur"
@@ -512,12 +617,20 @@
     <p class="rw-aide rw-prose">{{ __('plateforme.mdp_aide_partiel') }}</p>
 </div>
 
-<div class="rw-encart" data-rw="cle-non-porte">
-    <p class="rw-sous-titre-fort">{{ __('plateforme.non_porte_titre') }}</p>
-    <p class="rw-prose">{{ __('plateforme.non_porte_texte') }}</p>
-    <a class="rw-bouton" data-rw="cle-lien-legacy"
+{{-- ── LE LIEN VERS L'ANCIEN PORTAIL RESTE, MAIS IL NE DIT PLUS
+     « NON PORTE » ──────────────────────────────────────────────────────
+
+     Tous les gestes de cette page sont portes, la rotation comprise. Le lien
+     subsiste parce que la comparaison entre les deux portails a une valeur
+     pendant la migration — mais l'annoncer comme une capacite manquante serait
+     desormais faux, et c'est exactement le motif que ce module a passe la
+     journee a corriger. --}}
+<div class="rw-encart" data-rw="cle-comparer">
+    <p class="rw-sous-titre-fort">{{ __('plateforme.comparer_titre') }}</p>
+    <p class="rw-prose">{{ __('plateforme.comparer_texte') }}</p>
+    <a class="rw-bouton rw-bouton--discret" data-rw="cle-lien-legacy"
        href="{{ rtrim(config('app.url_legacy'), '/') }}/adm/platform_keys.php"
-       target="_blank" rel="noopener">{{ __('plateforme.non_porte_lien') }} ↗</a>
+       target="_blank" rel="noopener">{{ __('plateforme.comparer_lien') }} ↗</a>
 </div>
 @endif
 

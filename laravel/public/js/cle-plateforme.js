@@ -1,15 +1,16 @@
 /**
- * cle-plateforme.js — la cle de plateforme, P1 a P3.
+ * cle-plateforme.js — la cle de plateforme, P1 a P4.
  *
  * P1 : `GET /platform_key`, une lecture. P2 : `/test_platform_key`, une lecture
  * distante. P3 : QUATRE ECRITURES — `/deploy_platform_key`,
- * `/deploy_service_account`, `/remove_ssh_password`, `/reenter_ssh_password`.
- * P4, la rotation, n'est pas portee : elle agit sur tout le parc sans viser de
- * machine et detruit la cle privee en cours.
+ * `/deploy_service_account`, `/remove_ssh_password`, `/reenter_ssh_password` —
+ * plus la suppression du compte d'administration. P4 : la ROTATION, portee
+ * elle aussi, et jamais exercee.
  *
  * Aucun `confirm()` ni `prompt()` : les gestes passent par un panneau de
- * decision dans la page, qui nomme sa cible et sa consequence, et le mot de
- * passe se saisit dans un champ masque.
+ * decision dans la page, qui nomme sa cible et sa consequence, le mot de passe
+ * se saisit dans un champ masque, et les gestes les plus larges EXIGENT
+ * quelque chose — un motif, ou la recopie du nombre de machines visees.
  *
  * `window.RW_CLE_PLATEFORME` est pose des la premiere ligne : une suite s'en
  * sert pour ASSERTER que ce fichier a ete charge ET evalue. Un `<script>`
@@ -257,6 +258,8 @@ window.RW_CLE_PLATEFORME = true;
     var pCibles = document.querySelector('[data-rw="cle-panneau-cibles"]');
     var pProd = document.querySelector('[data-rw="cle-panneau-prod"]');
     var pChamp = document.querySelector('[data-rw="cle-panneau-champ"]');
+    var pRecopie = document.querySelector('[data-rw="cle-panneau-recopie"]');
+    var pRecopieVal = document.querySelector('[data-rw="cle-panneau-recopie-valeur"]');
     var pMotif = document.querySelector('[data-rw="cle-panneau-motif"]');
     var pMotifVal = document.querySelector('[data-rw="cle-panneau-motif-valeur"]');
     var pBorne = document.querySelector('[data-rw="cle-panneau-borne"]');
@@ -283,7 +286,43 @@ window.RW_CLE_PLATEFORME = true;
         // motif, et passe par la porte a quatre yeux — d'ou trois issues de
         // plus que les autres gestes, traitees dans `noteVerdict`.
         revoquer:       { route: '/revoke_service_account', liste: true,  motif: true },
+        /* P4 — LA ROTATION N'A AUCUNE CIBLE, et c'est ce qui la rend la plus
+         * large. Son corps est VIDE : pas de `machine_ids`, pas de `machine_id`.
+         * Le backend fait un `UPDATE machines SET platform_key_deployed = FALSE`
+         * sans clause de restriction, donc la portee EST la flotte.
+         *
+         * `sansCible: true` change deux choses : le corps envoye est `{}`, et le
+         * panneau ne nomme pas une machine — il nomme le PARC et, separement,
+         * les machines pour lesquelles le geste est sans retour au sens strict.
+         * Le legacy posait deux `confirm()` d'affilee sans un chiffre ni un nom :
+         * deux « OK » de suite sont un reflexe, pas deux decisions. */
+        // `recopie: true` : le bouton de confirmation NAIT DESACTIVE et ne
+        // s'active qu'a l'egalite exacte avec le total affiche. Le legacy
+        // exigeait DEUX `confirm()` pour ce geste ; remplacer deux reflexes par
+        // un seul clic aurait ete moins exigeant que ce qu'on remplace.
+        rotation:       { route: '/regenerate_platform_key', liste: false, sansCible: true, recopie: true },
     };
+
+    /* La duree pendant laquelle l'archive reste rejouable. LUE PAR LA ROUTE,
+     * jamais recopiee : `platform_key_archive_days` est configurable, et un
+     * nombre fige dans un gabarit devient faux en silence le jour ou
+     * l'exploitant le change — l'ecran continuerait d'annoncer une
+     * reversibilite sur un geste devenu irreversible.
+     *
+     * Tant qu'elle est inconnue, le panneau DIT qu'elle est inconnue et invite a
+     * traiter le geste comme sans retour. Il ne met pas 30 par defaut : une
+     * valeur de repli inventee serait exactement le mensonge qu'on evite. */
+    var joursArchive = null;
+
+    fetch(PASSERELLE + '/settings/announceable', { headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json().catch(function () { return null; }); })
+        .then(function (d) {
+            var v = d && d.settings ? d.settings.platform_key_archive_days : null;
+            // `null` ET le nom dans `non_resolus` : le backend distingue « ce
+            // reglage vaut faux » de « je n'ai pas pu le lire ». On ne retient
+            // un nombre que si c'en est un.
+            if (typeof v === 'number' && isFinite(v) && v >= 0) { joursArchive = v; }
+        }).catch(function () { /* joursArchive reste null, et le panneau le dira */ });
 
     var enCours = null;
 
@@ -305,6 +344,12 @@ window.RW_CLE_PLATEFORME = true;
         if (pChamp) { pChamp.hidden = true; }
         if (pMotifVal) { pMotifVal.value = ''; }
         if (pMotif) { pMotif.hidden = true; }
+        if (pRecopieVal) { pRecopieVal.value = ''; }
+        if (pRecopie) { pRecopie.hidden = true; }
+        // Le bouton est REARME en sortant : le laisser desactive rendrait le
+        // panneau suivant inutilisable, et le laisser actif ferait naitre actif
+        // un panneau qui exige une recopie.
+        pConfirmer.disabled = false;
         if (pBorne) { pBorne.hidden = true; }
         if (pProd) { pProd.hidden = true; pProd.textContent = ''; }
     }
@@ -313,8 +358,30 @@ window.RW_CLE_PLATEFORME = true;
         var p = (textes.panneaux || {})[geste] || {};
         enCours = { geste: geste, cibles: cibles };
 
-        pTitre.textContent = p.titre || '';
-        if (pTexte) { pTexte.textContent = p.texte || ''; }
+        // Les valeurs substituees dans le panneau. `jours` vaut le texte
+        // « inconnu » quand la route n'a pas repondu — donc l'effet se lit
+        // toujours, et il ne promet jamais un nombre qu'on n'a pas.
+        var valeurs = {
+            total: cibles.total == null ? cibles.ids.length : cibles.total,
+            jours: joursArchive === null ? '?' : joursArchive,
+        };
+        // Le titre RESOLU est memorise : le gestionnaire de confirmation vit
+        // dans une autre portee et ne voit ni `p` ni `subst`. Le referencer
+        // depuis la-bas aurait leve une ReferenceError — que `node --check` ne
+        // voit pas, puisqu'il ne verifie que la syntaxe.
+        enCours.titre = '';
+        var subst = function (t) {
+            var s = String(t == null ? '' : t);
+            Object.keys(valeurs).forEach(function (c) {
+                s = s.split(':' + c).join(String(valeurs[c]));
+            });
+
+            return s;
+        };
+
+        enCours.titre = subst(p.titre);
+        pTitre.textContent = enCours.titre;
+        if (pTexte) { pTexte.textContent = subst(p.texte); }
 
         // Les effets sont POSES A NEUF a chaque ouverture : reutiliser la liste
         // precedente ferait lire les consequences d'un autre geste.
@@ -322,12 +389,22 @@ window.RW_CLE_PLATEFORME = true;
             pEffets.textContent = '';
             (p.effets || []).forEach(function (e) {
                 var li = document.createElement('li');
-                li.textContent = e;
+                li.textContent = subst(e);
                 pEffets.appendChild(li);
             });
+            // LA DUREE INCONNUE SE DIT, elle ne se devine pas.
+            if (geste === 'rotation' && joursArchive === null) {
+                var avert = document.createElement('li');
+                avert.textContent = textes.rotation_jours_inconnus || '';
+                avert.className = 'rw-annonce--attention';
+                pEffets.appendChild(avert);
+            }
         }
 
         if (pCibles) {
+            pCibles.hidden = cibles.ids.length === 0;
+        }
+        if (pCibles && cibles.ids.length > 0) {
             pCibles.textContent = cibles.ids.length === 1
                 ? remplit('panneau_cible_une', { nom: cibles.noms[0] || '' })
                 : remplit('panneau_cible_n', {
@@ -348,6 +425,16 @@ window.RW_CLE_PLATEFORME = true;
 
         if (pChamp) { pChamp.hidden = ! GESTES[geste].mdp; }
         if (pMotif) { pMotif.hidden = ! GESTES[geste].motif; }
+
+        // LE BOUTON NAIT DESACTIVE quand une recopie est exigee. `attendu` est
+        // le nombre que le panneau vient d'afficher — on ne demande jamais de
+        // recopier une valeur qu'on n'a pas montree.
+        var exigeRecopie = GESTES[geste].recopie === true;
+        if (pRecopie) { pRecopie.hidden = ! exigeRecopie; }
+        pConfirmer.disabled = exigeRecopie;
+        if (exigeRecopie && pRecopieVal) {
+            pRecopieVal.dataset.attendu = String(valeurs.total);
+        }
         // LA BORNE EST DITE DANS LE PANNEAU, pas seulement dans le journal :
         // c'est ici que la decision se prend, et un avertissement qui arrive
         // apres le clic n'a pas averti.
@@ -364,6 +451,7 @@ window.RW_CLE_PLATEFORME = true;
         panneau.hidden = false;
         panneau.scrollIntoView({ block: 'nearest' });
         if (GESTES[geste].mdp && pMdp) { pMdp.focus(); }
+        else if (exigeRecopie && pRecopieVal) { pRecopieVal.focus(); }
         else if (GESTES[geste].motif && pMotifVal) { pMotifVal.focus(); }
     }
 
@@ -386,6 +474,23 @@ window.RW_CLE_PLATEFORME = true;
                 machine: String((r && r.name) || ''),
                 message: String((r && r.message) || ''),
             }), reussi ? 'rw-annonce--ok' : 'rw-non-resolu');
+
+            // ══ E-220 — UN PRIVILEGE ORPHELIN, ET IL A UN NOM ═══════════
+            //
+            // Le backend rend `sudoers_orphelin`, TOUJOURS present meme a
+            // `false`. On ne compare donc aucune chaine : un etat que seule une
+            // phrase distingue n'est pas un etat, c'est une coincidence de
+            // redaction — une traduction ou une reformulation le supprimerait
+            // sans bruit, et l'echec retomberait du cote rassurant.
+            //
+            // La ligne s'AJOUTE au verdict au lieu de le remplacer : le geste a
+            // bien echoue, ET il a laisse quelque chose derriere lui. Les deux
+            // se disent.
+            if (r && r.sudoers_orphelin === true) {
+                noteGeste(remplit('geste_sudoers_orphelin', {
+                    machine: String((r && r.name) || ''),
+                }), 'rw-annonce--attention');
+            }
         });
         noteGeste(remplit('geste_bilan', { ok: ok, total: cibles.ids.length }),
             ok === cibles.ids.length ? 'rw-annonce--ok' : 'rw-annonce--attention');
@@ -479,6 +584,30 @@ window.RW_CLE_PLATEFORME = true;
         var geste = enCours.geste;
         var cibles = enCours.cibles;
         var def = GESTES[geste];
+        // Resolu a l'OUVERTURE du panneau : `ferme()` remet `enCours` a null
+        // avant que la promesse ne rende, donc on ne peut pas le relire plus tard.
+        var titreGeste = enCours.titre || '';
+
+        // ══ LA SECURITE EST ICI, ET NON DANS LE CHAMP ══════════════════
+        //
+        // Le champ qui arme le bouton est une ANNONCE : il rend la regle
+        // lisible avant le geste. Ce controle-ci est celui qui DECIDE.
+        //
+        // `disabled` est un etat du DOM : il se retire depuis la console et ne
+        // survit pas a un `click()` programmatique. Le controle qui decide doit
+        // vivre sur le chemin du geste, pas sur son apparence — c'est « la garde
+        // est sur la PAGE, pas sur la REQUETE » transpose au navigateur.
+        //
+        // NE PAS RETIRER CE BLOC en le croyant redondant avec le `disabled` :
+        // les deux ne mesurent pas la meme chose.
+        if (def.recopie === true) {
+            var attenduC = (pRecopieVal && pRecopieVal.dataset.attendu) || '';
+            if (! pRecopieVal || pRecopieVal.value.trim() !== attenduC) {
+                noteGeste(textes.confirmer_saisie_manquante || '', 'rw-annonce--attention');
+
+                return;
+            }
+        }
 
         var motif = '';
         if (def.motif) {
@@ -509,7 +638,23 @@ window.RW_CLE_PLATEFORME = true;
         noteGeste(remplit('geste_en_cours', { cibles: cibles.noms.join(', ') }), 'rw-aide');
 
         var travail;
-        if (def.liste) {
+        if (def.sansCible) {
+            // CORPS VIDE. La route ne lit aucun parametre ; lui envoyer un
+            // `machine_ids` donnerait a croire, a la lecture, qu'elle est bornee.
+            travail = envoie(def.route, {}).then(function (rep) {
+                var d = rep.corps;
+                if (noteIssueDePorte(d)) { return; }
+                if (! d || typeof d.success !== 'boolean') {
+                    noteGeste(textes.geste_sans_verdict || '', 'rw-non-resolu');
+
+                    return;
+                }
+                noteGeste(remplit(d.success ? 'geste_ligne_ok' : 'geste_ligne_echec', {
+                    machine: titreGeste,
+                    message: String(d.message || ''),
+                }), d.success ? 'rw-annonce--ok' : 'rw-non-resolu');
+            });
+        } else if (def.liste) {
             var charge = { machine_ids: cibles.ids };
             if (def.motif) { charge.reason = motif; }
             travail = envoie(def.route, charge).then(function (rep) {
@@ -551,6 +696,19 @@ window.RW_CLE_PLATEFORME = true;
         });
     });
 
+    /* EGALITE EXACTE, sur la valeur ROGNEE et comparee en CHAINE.
+     *
+     * Pas de `parseInt` : « 3abc » vaut 3 pour lui, et « 03 » aussi. Une
+     * comparaison numerique armerait donc le bouton sur une saisie qui n'est
+     * pas ce qu'on a demande de recopier. Ce qu'on veut est « la personne a
+     * bien retape CE nombre », pas « la valeur est numeriquement egale ». */
+    if (pRecopieVal) {
+        pRecopieVal.addEventListener('input', function () {
+            var attendu = pRecopieVal.dataset.attendu || '';
+            pConfirmer.disabled = pRecopieVal.value.trim() !== attendu;
+        });
+    }
+
     if (pAnnuler) { pAnnuler.addEventListener('click', ferme); }
 
     if (bRecharger) {
@@ -575,6 +733,25 @@ window.RW_CLE_PLATEFORME = true;
                     ids: [id],
                     noms: [nom],
                     sensibles: bouton.dataset.sensible === '1' ? [nom] : [],
+                });
+            });
+        });
+
+    // ── Le bouton de FLOTTE (P4) ─────────────────────────────────────────
+    //
+    // CE CLIC N'EMET RIEN. Il ouvre le panneau, et rien d'autre : c'est la
+    // propriete que la suite mesure au reseau, et c'est ce qui permet de porter
+    // ce geste sans jamais l'executer.
+    [].slice.call(document.querySelectorAll('[data-portee="flotte"]'))
+        .forEach(function (bouton) {
+            bouton.addEventListener('click', function () {
+                var geste = bouton.dataset.geste;
+                if (! GESTES[geste]) { return; }
+                ouvre(geste, {
+                    ids: [],
+                    noms: [],
+                    sensibles: [],
+                    total: parseInt(bouton.dataset.total, 10) || 0,
                 });
             });
         });
@@ -606,11 +783,16 @@ window.RW_CLE_PLATEFORME = true;
      * dechiffrement a echoue. Ce troisieme etat est le plus important : sans lui
      * « je n'ai pas su lire » se deguiserait en « c'est vide ».
      *
-     * CE QUE CETTE REPONSE NE COUVRE PAS : le predicat ne porte que sur
-     * `password`. `root_password` n'y figure pas, et c'est pourtant la colonne
-     * sans chemin de reecriture depuis cette page. Son etat affiche reste donc
-     * calcule sur la colonne, avec la meme approximation — dit a l'ecran plutot
-     * que laisse a supposer.
+     * LA LIMITE EST LEVEE : le predicat couvre desormais LES DEUX colonnes
+     * (`mot_de_passe_vide` / `dechiffrable` pour l'utilisateur SSH,
+     * `root_password_vide` / `root_dechiffrable` pour root). Elle ne portait que
+     * sur la premiere jusqu'au correctif du backend, et c'etait la moitie la
+     * moins consequente — `root_password` est la colonne qui n'a AUCUN chemin de
+     * reecriture depuis cette page.
+     *
+     * LES DEUX COLONNES SONT ANNONCEES SEPAREMENT, jamais fondues en un
+     * nombre : « root vide » et « SSH vide » n'appellent pas le meme geste de
+     * reparation, et l'un des deux ne se repare pas depuis ici.
      *
      * UN ECHEC DE CETTE REQUETE NE VALIDE RIEN. L'encart annonce alors que les
      * compteurs restent approximatifs. Le silence aurait laisse croire a un
@@ -635,7 +817,11 @@ window.RW_CLE_PLATEFORME = true;
         if (! cellule) { return; }
         var badge = document.createElement('span');
         badge.className = 'rw-badge ' + classe;
-        badge.setAttribute('data-rw', 'cle-mdp-badge-' + id);
+        // L'IDENTIFIANT PORTE LA CLE, pas seulement la ligne : une machine peut
+        // porter DEUX badges (SSH et root). Un identifiant par ligne les aurait
+        // rendus indiscernables pour une suite, et le second aurait ecrase le
+        // premier dans toute recherche par attribut.
+        badge.setAttribute('data-rw', 'cle-badge-' + cle + '-' + id);
         badge.textContent = textes[cle] || '';
         cellule.appendChild(badge);
     }
@@ -654,6 +840,8 @@ window.RW_CLE_PLATEFORME = true;
 
             var divergentes = [];
             var indeterminees = [];
+            var divergentesRoot = [];
+            var indetermineesRoot = [];
 
             d.machines.forEach(function (m) {
                 var id = m.machine_id;
@@ -669,15 +857,32 @@ window.RW_CLE_PLATEFORME = true;
                 // `password` — l'y inclure inventerait une divergence.
                 var serveurDitMdp = vuServeur === 'les_deux' || vuServeur === 'utilisateur';
 
+                // Le serveur a-t-il annonce un mot de passe ROOT ? `utilisateur`
+                // seul ne concerne pas cette colonne.
+                var serveurDitRoot = vuServeur === 'les_deux' || vuServeur === 'root';
+
+                // ── LA COLONNE DE L'UTILISATEUR SSH ──────────────────────
+                //
+                // PAS de `return` apres ce bloc : les deux colonnes se lisent
+                // INDEPENDAMMENT. Un `return` ici — ce que faisait mon premier
+                // jet quand une seule colonne existait — aurait rendu la
+                // colonne root muette des qu'un secret SSH est illisible, et
+                // c'est justement la colonne qui compte le plus.
                 if (m.mot_de_passe_vide === null || m.dechiffrable === false) {
                     indeterminees.push(String(m.nom || id));
                     badgeMotDePasse(id, 'badge_mdp_illisible', 'rw-badge--attention');
-
-                    return;
-                }
-                if (m.mot_de_passe_vide === true && serveurDitMdp) {
+                } else if (m.mot_de_passe_vide === true && serveurDitMdp) {
                     divergentes.push(String(m.nom || id));
                     badgeMotDePasse(id, 'badge_mdp_vide_reel', 'rw-badge--alerte');
+                }
+
+                // ── LA COLONNE ROOT, celle sans chemin de reecriture ─────
+                if (m.root_password_vide === null || m.root_dechiffrable === false) {
+                    indetermineesRoot.push(String(m.nom || id));
+                    badgeMotDePasse(id, 'badge_root_illisible', 'rw-badge--attention');
+                } else if (m.root_password_vide === true && serveurDitRoot) {
+                    divergentesRoot.push(String(m.nom || id));
+                    badgeMotDePasse(id, 'badge_root_vide_reel', 'rw-badge--alerte');
                 }
             });
 
@@ -693,6 +898,16 @@ window.RW_CLE_PLATEFORME = true;
             if (indeterminees.length > 0) {
                 lignes.push(remplit('credential_indetermine', {
                     n: indeterminees.length, noms: indeterminees.join(', '),
+                }));
+            }
+            if (divergentesRoot.length > 0) {
+                lignes.push(remplit('credential_divergence_root', {
+                    n: divergentesRoot.length, noms: divergentesRoot.join(', '),
+                }));
+            }
+            if (indetermineesRoot.length > 0) {
+                lignes.push(remplit('credential_indetermine_root', {
+                    n: indetermineesRoot.length, noms: indetermineesRoot.join(', '),
                 }));
             }
             if (lignes.length === 0) {

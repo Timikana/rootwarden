@@ -69,6 +69,13 @@ class ClePlateformeController extends Controller
             // E-219 — le predicat du detenteur de la cle, en TROIS etats
             'credential_divergence', 'credential_indetermine', 'credential_accord',
             'credential_echec', 'badge_mdp_vide_reel', 'badge_mdp_illisible',
+            // Le predicat couvre les DEUX colonnes depuis le correctif backend
+            'credential_divergence_root', 'credential_indetermine_root',
+            'badge_root_vide_reel', 'badge_root_illisible',
+            // E-220 : le privilege orphelin, nomme par le backend
+            'geste_sudoers_orphelin',
+            // P4 — la rotation
+            'rotation_jours_inconnus',
         ] as $cle) {
             $textes[$cle] = __('plateforme.' . $cle);
         }

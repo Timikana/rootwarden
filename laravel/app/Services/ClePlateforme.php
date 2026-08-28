@@ -249,11 +249,30 @@ class ClePlateforme
      * dans cette branche. La precondition dit donc « le compte existe » alors
      * qu'il n'existe plus, et cette portee inclurait la machine.
      *
-     * On la garde telle quelle : c'est la MEME condition que celle du backend,
-     * et proposer une portee plus etroite que ce que la route accepte ferait
-     * divergerer deux regles au lieu d'une. Ce qui manque est un etat nomme cote
-     * backend, demande et non contourne ici — le distinguer par le TEXTE du
-     * message serait une coincidence de redaction, pas une mesure.
+     * On la garde telle quelle, et pour DEUX raisons dont la seconde est la
+     * plus forte :
+     *
+     * 1. c'est la MEME condition que celle du backend. Proposer une portee plus
+     *    etroite que ce que la route accepte ferait diverger deux regles au lieu
+     *    d'une — un drapeau de moins vaut mieux qu'une regle en double ;
+     *
+     * 2. UNE PORTEE PLUS ETROITE MASQUERAIT LE CORRECTIF AMONT. Le jour ou le
+     *    backend posera `service_account_deployed` a 0 sur la revocation
+     *    partielle, il refusera de lui-meme et **cette portee se resserrera
+     *    seule** : une regle, une source, et la correction devient visible a
+     *    l'ecran sans qu'on touche a rien ici. Une condition plus stricte ecrite
+     *    en dur rendrait ce correctif INVISIBLE — l'ecran offrirait deja moins,
+     *    donc rien ne changerait, et personne ne saurait si la correction a pris.
+     *
+     * LE CRITERE, pour la fois suivante : resserrer pour coller a un refus que
+     * le backend applique DEJA est juste — on annonce plus tot. Resserrer EN
+     * DESSOUS de ce que le backend accepte cree une seconde regle. La question
+     * n'est pas « est-ce plus prudent », c'est « mon resserrement DECOULE-t-il
+     * d'une regle existante, ou en CREE-t-il une ? ».
+     *
+     * Ce qui manque est un etat nomme cote backend, demande et non contourne
+     * ici — le distinguer par le TEXTE du message serait une coincidence de
+     * redaction, pas une mesure.
      *
      * Le bouton PAR LIGNE du legacy la respecte (`:203` teste `$saDeployed`).
      * **Le bouton de MASSE ne la teste pas** (`:329` : `platform_key_deployed`

@@ -62,9 +62,9 @@ return [
     'sensible' => "Production",
     'vide_titre' => "Aucune machine au parc",
     'vide_texte' => "Aucune machine n'est enregistrée. La clé de plateforme n'a rien à protéger tant que le parc est vide.",
-    'non_porte_titre' => "Un seul geste n'est pas porté : la rotation de la clé",
-    'non_porte_texte' => "Faire tourner la clé de plateforme — la régénérer — se fait encore depuis l'ancien portail. C'est le geste le plus large du portail : il agit sur tout le parc à la fois, sans viser de machine, et il détruit la clé privée en cours. Tous les autres gestes de cette page sont portés ici.",
-    'non_porte_lien' => "Ouvrir la clé de plateforme dans l'ancien portail",
+    'comparer_titre' => "Comparer avec l'ancien portail",
+    'comparer_texte' => "Tous les gestes de cette page sont portés ici, la rotation de la clé comprise. L'ancien portail reste accessible le temps de la migration, pour comparer ce que les deux écrans disent du même parc — plusieurs de ses libellés se sont révélés faux, et ce lien sert à le vérifier soi-même.",
+    'comparer_lien' => "Ouvrir la même page dans l'ancien portail",
 
     // ── Sous-lot P2 : le test de connexion ───────────────────────────────
     // QUATRE situations, et le legacy les replie sur un rouge unique. « Cle non
@@ -157,6 +157,17 @@ return [
                 "« Ressaisir » ne rend que le mot de passe SSH : le mot de passe root ne se réécrit que depuis la page Serveurs",
             ],
         ],
+        'rotation' => [
+            'titre' => "Faire tourner la clé de plateforme",
+            'texte' => "C'est le geste le plus large du portail. Il ne vise AUCUNE machine : il agit sur la flotte entière, en une fois, et détruit la clé privée en cours.",
+            'effets' => [
+                "génère une nouvelle paire et détruit celle qui sert aujourd'hui",
+                "remet « clé déployée » à faux sur les :total machines du parc, sans distinction — un seul UPDATE, sans clause de restriction",
+                "les machines gardent l'ANCIENNE clé publique dans leurs authorized_keys : après ce geste RootWarden ne peut plus s'y connecter par clé tant que la nouvelle n'y est pas déployée",
+                "réversible pendant :jours jours depuis l'archive horodatée — ET SEULEMENT si le volume qui la contient survit : l'archive vit dans le MÊME volume que la clé courante, donc une perte du volume emporte les deux",
+                "l'action exige la validation d'un second administrateur",
+            ],
+        ],
         'revoquer' => [
             'titre' => "Reprendre l'accès root d'administration",
             'texte' => "Ce geste ouvre une session SSH et SUPPRIME le compte d'administration sur la machine. C'est la contrepartie du déploiement, et elle est irréversible sans un nouveau déploiement.",
@@ -199,6 +210,7 @@ return [
     // Dites DANS le panneau de decision et non dans un journal : un
     // avertissement qui arrive apres le clic n'a pas averti.
     'bornes' => [
+        'rotation' => "Deux bornes, et la seconde annule souvent la première. La clé détruite reste rejouable depuis une archive horodatée pendant un nombre de jours que l'écran lit dans les réglages effectifs — jamais recopié ici. MAIS cette archive vit dans le MÊME volume Docker que la clé courante : une perte du volume emporte les deux, et RootWarden ne sauvegarde pas ce volume. « Réversible pendant N jours » ne vaut donc que si le volume survit, et cette seconde condition ne dépend pas du produit.",
         'revoquer' => "Réserve LEVÉE depuis le correctif du backend : ce geste se connecte désormais par le compte d'administration lui-même quand il est déployé, et s'élève sans mot de passe. Il reste un cas résiduel : si cette connexion échoue — le cas connu est un serveur durci dont la configuration sshd n'autorise pas ce compte — le repli se fait par le compte nominal, dont le mot de passe root a été effacé sur une machine migrée, et l'élévation échoue alors. Ce n'est pas un risque pour la machine : le retrait du fichier sudoers passe en dernier, un échec partiel laisse au pire un fichier orphelin inerte, et la révocation reste rejouable.",
         'compte_service' => "Cette reprise peut ÉCHOUER sur une machine dont le compte d'administration a été supprimé APRÈS un effacement des mots de passe : le compte n'existant plus, la connexion se fait par le compte nominal, dont le mot de passe root est vide — il ne reste alors rien par quoi s'élever. L'aller-retour « supprimer puis redéployer » n'est donc pas symétrique. Réserve TOUJOURS VALABLE après le correctif du backend, qui ne pouvait pas la lever : elle ne vient pas d'un paramètre oublié mais de l'absence du compte lui-même. Remonté.",
     ],
@@ -210,11 +222,43 @@ return [
     // recopier une regle de securite. Il DEMANDE, et affiche TROIS etats.
     'credential_titre' => "Ce que le détenteur de la clé répond",
     'credential_aide' => "Les compteurs et la colonne « Mot de passe » ci-dessus sont calculés sur la présence d'octets dans la colonne chiffrée. Ce n'est pas la même question que « ce secret est-il vide ». Le backend, seul à détenir la clé, est interrogé et sa réponse annote le tableau.",
-    'credential_borne_root' => "Cette réponse ne porte que sur le mot de passe SSH. Le mot de passe root n'est pas couvert par le prédicat : son état affiché reste calculé sur la colonne, avec la même approximation. C'est pourtant lui qui n'a aucun chemin de réécriture depuis cette page — signalé.",
-    'credential_divergence' => ":n machine(s) où la colonne annonce un mot de passe et où le secret déchiffre en VIDE : :noms. Pour celles-là, les compteurs ci-dessus surestiment.",
-    'credential_indetermine' => ":n machine(s) dont le secret n'a PAS PU être déchiffré : :noms. Ce n'est ni « vide » ni « présent » — la question reste sans réponse, et aucun compteur ne devrait la trancher.",
+    'credential_borne_root' => "Cette réponse porte maintenant sur les DEUX mots de passe — celui de l'utilisateur SSH et celui de root. Elle ne couvrait que le premier jusqu'au correctif du backend, et c'était la moitié la moins conséquente : le mot de passe root est celui qui n'a aucun chemin de réécriture depuis cette page.",
+    'credential_divergence' => ":n machine(s) où la colonne annonce un mot de passe SSH et où le secret déchiffre en VIDE : :noms. Pour celles-là, les compteurs ci-dessus surestiment.",
+    'credential_indetermine' => ":n machine(s) dont le mot de passe SSH n'a PAS PU être déchiffré : :noms. Ce n'est ni « vide » ni « présent » — la question reste sans réponse, et aucun compteur ne devrait la trancher.",
     'credential_accord' => "Le détenteur de la clé confirme la colonne sur toutes les machines : aucun écart, aucune indétermination.",
     'credential_echec' => "Le détenteur de la clé n'a pas répondu. Les compteurs restent ceux de la colonne, avec leur approximation connue — ils ne sont pas corrigés, et ce n'est pas dit qu'ils sont justes.",
     'badge_mdp_vide_reel' => "vide en réalité",
     'badge_mdp_illisible' => "illisible",
+    // ══ P4 — LA ROTATION : INTERFACE PORTEE, JAMAIS EXERCEE ══════════════
+    'rotation_titre' => "Faire tourner la clé",
+    'rotation_aide' => "Ce geste n'a pas de cible : il agit sur la flotte entière en une fois. Il est réservé au rôle 3 et exige la validation d'un second administrateur.",
+    'btn_rotation' => "Faire tourner la clé de plateforme",
+    'rotation_remede' => "Ce geste remplace la clé que RootWarden emploie. Il ne retire PAS l'ancienne des machines : le déploiement l'ajoute au fichier de clés autorisées du compte nominal ET de root, et la rotation ne touche aucun de ces fichiers. Après une rotation puis un redéploiement, ces deux comptes portent les DEUX clés. Répondre à une clé compromise demande donc EN PLUS de retirer l'ancienne, compte par compte et machine par machine.",
+    'rotation_remede_ou' => "Ce geste-là EXISTE : la route « server_user_remove_key » sauvegarde le fichier, recalcule l'empreinte de chaque ligne au lieu de filtrer un mot, et refuse par défaut de retirer la clé de plateforme elle-même — ce refus est une protection, pas une panne. Il n'a pas encore d'interface ici : aujourd'hui il se fait depuis l'ancien portail, page des comptes distants, clé par clé.",
+    'rotation_remede_parc' => "Il n'existe volontairement aucun geste de parc pour ce retrait : appliqué partout d'un coup à la clé de plateforme, il verrouillerait la flotte entière hors de portée de RootWarden.",
+    'rotation_jamais_exercee' => "Ce geste n'a jamais été exécuté, sur aucun banc. Il n'existe qu'une clé, dans un seul fichier, et aucun réglage ne la déplace : il n'y a donc aucune manière de l'exercer sans agir sur le parc réel. Ce que l'écran promet ici est lu dans le code et dans les réglages effectifs, pas constaté à l'usage.",
+    'rotation_sans_retour' => "⚠ :n machine(s) n'ont plus que cette clé pour accès — RootWarden n'y détient plus aucun mot de passe : :noms. Pour celles-là, la rotation est sans retour au sens strict : si le déploiement de la nouvelle clé échoue, il n'existe aucune autre voie.",
+    'rotation_sans_retour_aucune' => "Aucune machine ne dépend uniquement de cette clé : toutes gardent un mot de passe connu de RootWarden. Ce nombre est calculé, pas supposé — il changera dès qu'un mot de passe sera effacé.",
+    'rotation_jours_inconnus' => "La durée pendant laquelle l'archive reste rejouable n'a pas pu être lue. Elle n'est pas écrite en dur ici : tant qu'elle est inconnue, considère que ce geste est sans retour.",
+    // Le predicat couvre les DEUX colonnes depuis le correctif du backend. Les
+    // messages sont separes PAR COLONNE plutot que parametres : « root » et
+    // « SSH » n'appellent pas le meme geste de reparation, et le mot de passe
+    // root n'a aucun chemin de reecriture depuis cette page.
+    'credential_divergence_root' => ":n machine(s) où la colonne annonce un mot de passe ROOT et où le secret déchiffre en VIDE : :noms. C'est la colonne sans chemin de réécriture ici — elle ne se ressaisit que depuis la page Serveurs.",
+    'credential_indetermine_root' => ":n machine(s) dont le mot de passe ROOT n'a PAS PU être déchiffré : :noms. Sans réponse sur cette colonne, l'état d'élévation de ces machines est inconnu.",
+    'badge_root_vide_reel' => "root vide en réalité",
+    'badge_root_illisible' => "root illisible",
+
+    // ── E-220 : UN PRIVILEGE ORPHELIN, ET IL A UN NOM ────────────────────
+    // Le backend rend `sudoers_orphelin`, toujours present meme a false. On ne
+    // compare donc AUCUNE chaine : un etat que seule une phrase distingue n'est
+    // pas un etat, c'est une coincidence de redaction.
+    'geste_sudoers_orphelin' => "⚠ :machine : le compte a bien été supprimé, mais le fichier de droits sudo SUBSISTE sur la machine. Il accorde « NOPASSWD: ALL » à un nom qui n'existe plus — inerte aujourd'hui, et vivant à l'instant où quoi que ce soit recrée un compte de ce nom. Rejoue le geste pour le terminer.",
+    // ── LA RECOPIE : LA SECONDE MOITIE DE LA LECON ───────────────────────
+    // Le portage avait pris la premiere — un panneau qui nomme, plutot que deux
+    // `confirm()` qui ne nomment rien — et laisse la seconde : le legacy
+    // EXIGEAIT deux gestes. La rotation etait le seul des six gestes a
+    // n'exiger qu'un clic, alors que c'est le plus large.
+    'champ_recopie' => "Pour confirmer, recopie le nombre de machines concernées",
+    'champ_recopie_aide' => "Ce nombre est affiché ci-dessus. Le bouton reste inactif tant que la recopie ne correspond pas exactement.",
 ];

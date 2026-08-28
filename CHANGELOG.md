@@ -2171,6 +2171,119 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.53 — P4 : la rotation portée sans être exercée, et ce que le geste ne fait PAS
+
+Dernier sous-lot de `platform_key`. Le geste le plus large du portail : **aucune cible**, corps vide,
+et côté backend un `UPDATE machines SET platform_key_deployed = FALSE` **sans clause de restriction**.
+
+#### La propriété portée est « le clic n'émet rien avant consentement », et elle est MESURÉE
+
+C'est ce qui permet de porter ce geste sans jamais l'exécuter. Mesuré sur le code, pas affirmé :
+
+    le bloc du bouton de flotte contient 'fetch'  : False
+    le bloc du bouton de flotte contient 'envoie' : False
+    il appelle                                    : ['ouvre']
+    appels sortants du fichier : /platform_key · /test_platform_key
+                                 /settings/announceable · /machines/credential-status  → quatre LECTURES
+
+**Seul le REFUS est mesurable sur ce geste** : il n'existe qu'une clé, dans un seul fichier, et aucun
+réglage ne la déplace — donc aucune manière de l'exercer sans agir sur le parc réel, `srv-zabbix`
+compris. La page **le dit à l'écran**, avec cette raison.
+
+#### ⚠ E-226 — mon panneau affirmait l'inverse de la vérité, sur l'écran qu'on lit pendant un incident
+
+Le premier jet disait que la rotation est le remède à une clé compromise. **Remesuré avant correction**,
+parce que l'affirmation venait d'une source qui s'était déjà trompée deux fois dans le sens rassurant :
+
+    ssh.py:745   … base64 -d >> ~/.ssh/authorized_keys       AJOUT   (compte nominal)
+    ssh.py:755   … base64 -d >> /root/.ssh/authorized_keys   AJOUT   (root)
+    ssh.py:808   … base64 -d >  /home/<sa>/.ssh/…            écrase  (compte de service)
+    regenerate_platform_key_route : occurrences d'authorized_keys → 0
+
+Deux ajouts, un écrasement, et la rotation ne touche **aucun** de ces fichiers. Après rotation puis
+redéploiement, `root` et le compte nominal portent les **deux** clés : qui détient la clé compromise
+garde un accès root. Et le `sort -u` déduplique, donc le fichier reste propre et paraît intentionnel.
+
+Le panneau dit maintenant **trois** choses : la rotation remplace la clé que RootWarden emploie ; elle
+ne retire pas l'ancienne des machines ; retirer l'ancienne se fait compte par compte et machine par
+machine.
+
+#### Et la quatrième, qui manquait — corrigée en relecture
+
+Le jet disait que ce geste de retrait « n'a aucune interface de parc ici », **ce qui laissait entendre
+qu'il n'existe pas**. C'est le pire des deux mensonges possibles sur un écran d'incident : il envoie
+chercher ailleurs, ou conclure qu'il n'y a rien à faire.
+
+**J'avais confondu deux routes voisines du même fichier**, et la relecture l'a vu :
+
+| route | ce qu'elle fait |
+|---|---|
+| `remove_user_keys` (`:2352`) | `printf '' > authorized_keys`, `sed -i '/rootwarden/d'`, retours **jetés**, `success: True` inconditionnel — **c'est elle qui porte E-215** |
+| `server_user_remove_key` (`:2200`) | sauvegarde le fichier, recalcule l'empreinte de **chaque ligne** par `ssh-keygen -lf`, lit son code de sortie, et **refuse** de retirer la clé de plateforme sans `force` |
+
+L'écran nomme donc la **seconde**, avec la bonne réserve : *elle refuse par défaut sur la clé de
+plateforme, et ce refus est une protection, pas une panne* — l'appel du legacy ne passe pas `force`,
+la protection s'applique. Il dit aussi **où** : ancien portail, page des comptes distants, clé par clé.
+Et qu'il n'existe **volontairement** aucun geste de parc pour ce retrait — appliqué partout d'un coup,
+il verrouillerait la flotte.
+
+`remove_user_keys` n'est **pas** nommée : diriger quelqu'un vers un geste qui ment sur son propre effet
+referait le motif à l'étage au-dessus.
+
+#### La seconde moitié de la leçon du chantier
+
+La rotation était **le seul des six gestes à n'exiger qu'un clic**, alors que le legacy en demandait
+deux. Le portage avait pris la première moitié — un panneau qui nomme, plutôt que deux `confirm()` qui
+ne nomment rien — et laissé la seconde.
+
+Le bouton **naît désactivé** et s'arme à la recopie exacte du nombre de machines, celui que le panneau
+vient d'afficher. Deux points de forme :
+
+- **le contrôle est double, et c'est le second qui décide.** Le champ est une **annonce** : il rend la
+  règle lisible avant le geste. La sécurité est la revérification au moment de confirmer — `disabled`
+  est un état du DOM, il se retire depuis la console et ne survit pas à un `click()` programmatique.
+  *La garde est sur la PAGE, pas sur la REQUÊTE*, transposé au navigateur. C'est écrit dans le code
+  pour que personne ne retire le second en le croyant redondant ;
+- **comparaison en chaîne, jamais `parseInt`.** `parseInt('3abc')` vaut 3, et `'03'` aussi. La
+  propriété à mesurer n'est pas « la valeur est numériquement égale » mais **« cette personne a retapé
+  CE nombre »** : une comparaison de chaîne mesure un geste, une comparaison numérique mesure une
+  valeur.
+
+#### Les deux bornes, et la seconde annule souvent la première
+
+`platform_key_archive_days` est **lu** par `GET /settings/announceable`, jamais recopié — la durée est
+configurable, et un nombre figé dans un gabarit devient faux en silence. Si la route ne répond pas, le
+panneau affiche `?` **et ajoute une ligne disant de traiter le geste comme sans retour**. Pas de valeur
+de repli inventée.
+
+Seconde borne : l'archive vit dans le **même** volume que la clé courante, et RootWarden ne le
+sauvegarde pas. « Réversible pendant N jours » ne vaut donc que si le volume survit.
+
+#### Deux consommations, livrées dans le même lot
+
+- **le prédicat couvre désormais les DEUX colonnes** (`root_password` ajouté en amont). Cela a rendu
+  **fausse** une phrase que la page affichait — « cette réponse ne porte que sur le mot de passe SSH » —
+  corrigée. Les deux colonnes sont annoncées **séparément** : « root vide » et « SSH vide » n'appellent
+  pas le même geste, et l'un des deux ne se répare pas depuis cette page.
+  **Un `return` hérité de l'époque à une seule colonne a été retiré** : il aurait rendu la colonne root
+  muette dès qu'un secret SSH est illisible, c'est-à-dire la colonne qui compte le plus, silencieuse
+  exactement quand l'autre est en défaut ;
+- **`sudoers_orphelin` est lu sur le drapeau**, aucune chaîne comparée. La ligne **s'ajoute** au verdict
+  au lieu de le remplacer : le geste a échoué **et** il a laissé un fichier de droits sudo accordant
+  `NOPASSWD: ALL` à un nom qui n'existe plus. Deux faits, pas un choix entre deux.
+
+#### Contrôles
+
+Lint des 5 PHP, vue compilée en isolation, `node --check`, **contrôle de portée JS** — deux variables
+locales à `ouvre()` étaient référencées depuis une autre portée, une `ReferenceError` que `node --check`
+ne voit pas ; le contrôle rend zéro. Parité i18n comparée récursivement **173 = 173**, zéro clé morte,
+zéro clé inemployée, les six gestes ont chacun leur panneau, les trois bornes visent des gestes connus,
+et `remove_user_keys` n'apparaît nulle part dans les catalogues.
+
+**Rien n'a été exécuté.**
+
+---
+
 ### v1.38.52 — ⚠⚠⚠ E-227 : ouvrir la page de diagnostic deployait un `NOPASSWD: ALL` sur la PRODUCTION
 
 **Trouve en retirant l'entree d'E-224 : la ligne voisine etait vivante, et la mesure a montre bien pire.**
