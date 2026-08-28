@@ -288,7 +288,39 @@ async function ouvreOnglet(page, nom, borneMs = 8000) {
     const limite = Date.now() + borneMs;
     let visible = await panneauVisible(page, nom);
     while (! visible && Date.now() < limite) {
-        try { await page.click(C.onglet(nom)); } catch { /* pas encore cliquable */ }
+        /*
+         * ══ AMENER LE BOUTON AU CENTRE AVANT DE CLIQUER ══════════════════
+         *
+         * E-241 est clos, et ce n'etait NI le JS de la page NI un enchainement :
+         * **la sequence fait defiler la page de 480 px**, le bouton d'onglet
+         * remonte a `y = -7`, et **l'EN-TETE COLLANT intercepte le clic**.
+         * `elementFromPoint` a nomme le coupable :
+         *
+         *     AVANT  rect.y = 473  scroll =   0  recu = « templates »
+         *     APRES  rect.y =  -7  scroll = 480  recu = « **rw-entete** »
+         *
+         * Le clic par `evaluate` reussissait — il n'emprunte pas les
+         * coordonnees ; celui par coordonnees echouait. C'est ce qui a separe
+         * « le gestionnaire est perdu » de « le clic n'arrive pas ».
+         *
+         * Le defilement automatique de Puppeteer ne suffit pas : il amene
+         * l'element au bord (`block: 'start'`), donc **sous** l'en-tete. C'est
+         * exactement le piege des captures deja paye — *`'start'` glisse la
+         * section sous l'en-tete collant, `'center'` non.*
+         *
+         * ⚠ ET LE DEFAUT D'INTERFACE RESTE, LUI : un exploitant qui a defile
+         * voit la barre d'onglets passer sous l'en-tete, et son clic atteint
+         * l'en-tete. Il s'en sort en remontant ; la suite, elle, ne le voyait
+         * pas. **Corriger la mesure ne corrige pas la page** — signale a part.
+         */
+        try {
+            await page.evaluate((sel) => {
+                const b = document.querySelector(sel);
+                if (b) b.scrollIntoView({ block: 'center', behavior: 'instant' });
+            }, C.onglet(nom));
+            await dors(120);
+            await page.click(C.onglet(nom));
+        } catch { /* pas encore cliquable : on retentera */ }
         await dors(250);
         visible = await panneauVisible(page, nom);
     }
