@@ -114,3 +114,64 @@ d'une borne — il met la production en premier.
 **Et l'erreur allait encore dans le sens rassurant.** C'est la deuxième fois en deux jours ; le Lead
 vient de signaler la même chose sur lui-même. *Rien ne prévient quand l'erreur rassure* — seule la
 lecture du corps l'a montrée.
+
+---
+
+# E-225 — un geste réversible qui ne rend pas ce qu'il a pris
+
+**Documenté, pas corrigé** : c'est un arbitrage d'exploitant.
+
+## Ce que l'installation pose
+
+```bash
+# wazuh.py:366-368  ET  wazuh.py:525-527 — la meme sequence, ecrite DEUX FOIS
+curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg … --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import
+chmod 644 /usr/share/keyrings/wazuh.gpg
+echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' > /etc/apt/sources.list.d/wazuh.list
+```
+
+## Ce que la désinstallation rend
+
+```bash
+# wazuh.py:694-695
+apt-get purge -y wazuh-agent 2>/dev/null || true && rm -rf /var/ossec
+```
+
+**Le paquet et ses données. Pas la clé de signature, pas le dépôt.**
+
+> Ce qui subsiste n'est pas un fichier de configuration : c'est une **relation de confiance**. La
+> machine continue d'accepter comme légitime tout paquet signé par cette clé, et de consulter ce
+> dépôt à chaque `apt-get update` — y compris pendant les mises à jour de sécurité, qui sont un geste
+> de parc de ce même produit.
+
+**Même forme qu'E-220**, appliquée à une relation de confiance au lieu d'un droit `sudo` : *un geste
+réversible qui ne rend pas tout ce qu'il a pris n'est pas réversible — il est partiel, et le reste
+est invisible.*
+
+## Pourquoi je ne le corrige pas
+
+**Un exploitant peut légitimement vouloir garder le dépôt** pour réinstaller sans refaire l'amorçage.
+C'est un choix défendable. **Ce qui ne l'est pas, c'est que le geste ne le dise pas** : le bouton
+s'appelle « désinstaller », et rien dans la réponse ne mentionne ce qui reste.
+
+Trois issues, par ordre de coût, et **aucune n'est mon arbitrage** :
+
+1. **le dire** — la réponse de `uninstall` nomme ce qui subsiste ; aucun changement de comportement ;
+2. **l'offrir** — un drapeau `retirer_depot`, par défaut à ce que l'exploitant choisit ;
+3. **le retirer** — et alors une réinstallation refait l'amorçage complet.
+
+## Deux dédouanements, dits aussi nettement
+
+- **`wazuh.py` est le module le plus uniformément gardé du chantier** : les **15** routes portent
+  `@require_api_key` + `@require_role(2)` + `@require_permission('can_manage_wazuh')`. **Le premier
+  module où la page n'est pas plus permissive que ses requêtes.**
+- La clé est importée dans un **keyring dédié** (`/usr/share/keyrings/wazuh.gpg`) et le dépôt est
+  `signed-by=` ce keyring. **Ce n'est pas un `apt-key add`** : la confiance est **limitée à ce
+  dépôt**, elle n'est pas globale. C'est la bonne pratique, et elle réduit nettement la portée de ce
+  qui subsiste.
+
+## Et une redite à signaler au passage
+
+La séquence d'amorçage est écrite **deux fois** (`:366` et `:525`). Ni l'une ni l'autre n'est fausse
+aujourd'hui — c'est exactement l'état des cinq `_resolve_ssh_creds` la veille de leur divergence.
+*Elles sont d'accord jusqu'à ce que l'une bouge.*
