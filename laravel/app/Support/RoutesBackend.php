@@ -152,6 +152,32 @@ class RoutesBackend
          * seul rempart. Le legacy garde son trou, et il est declare.
          */
         '/supervision/',
+        /*
+         * ══ E-235 : `/wazuh/` — MEME MOTIF, MEME REMEDE ═══════════════════
+         *
+         * `/wazuh/` est dans la liste blanche et ABSENT de la reserve a
+         * l'administration : la passerelle le laisse donc passer pour un role 1
+         * porteur de `can_manage_wazuh`.
+         *
+         * **Ce n'est PAS un trou** : les 15 routes du module portent
+         * `@require_role(2)` cote backend — releve par analyse syntaxique, pas
+         * par motif textuel, parce qu'un `grep` rend l'inverse sur ce fichier.
+         * L'appel serait donc refuse. C'est **un rempart manquant sur deux**.
+         *
+         * Et la page exige `role:2` des DEUX cotes : le legacy fait
+         * `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` (`wazuh/index.php:25`) et la
+         * route portee `role:2`. **Personne de legitime ne perd un acces en
+         * l'ajoutant ici** — c'est la meme demonstration que pour
+         * `/supervision/` juste au-dessus.
+         *
+         * DIVERGENCE DECLAREE : `ADMIN_ONLY_PREFIXES` du legacy ne le porte pas.
+         * Cette liste cesse donc d'en etre le releve fidele sur une entree de
+         * plus — dit ici plutot que laisse a la lecture suivante, comme pour
+         * `/server_users_inventory` et `/machines/credential-status`.
+         *
+         * On ne depend jamais d'un seul rempart.
+         */
+        '/wazuh/',
     ];
 
     /**
