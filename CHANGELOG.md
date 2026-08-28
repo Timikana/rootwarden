@@ -2171,6 +2171,64 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.61 — deux causes pour un même symptôme, et un « scan terminé » qui n'avait rien lu
+
+#### Le lecteur de version visait le mauvais chemin, et le repli le cachait
+
+`App\Support\Version` lisait `public_path('/version.txt')`, qui résout
+`/var/www/html/public/version.txt`. Or `docker-compose.yml:76` monte le fichier à
+`/var/www/html/version.txt` — **hors de la racine web**, ce qui est délibéré : le numéro n'a pas à
+être servi par HTTP. Les deux chemins différaient d'un segment.
+
+**Ce défaut était invisible parce qu'une autre cause produisait le même symptôme.** Le montage n'a pas
+encore pris effet — une ligne de `volumes` exige une **recréation**, pas un `restart`, et
+`docker inspect` n'en déclare qu'un seul. Fichier absent et chemin faux rendent tous deux
+« version inconnue ».
+
+Diagnostiquer la seule cause annoncée aurait laissé celle-ci en place, pour resurgir sous la forme
+« la recréation n'a rien changé ». *Un symptôme dit qu'il y a un problème, jamais lequel* — et rien
+n'empêche qu'il y en ait **deux**.
+
+Corrigé en `base_path('version.txt')`. **Vérifié** : le chemin visé et la destination du montage
+concordent désormais exactement. **Non vérifié, et dit comme tel** : le chemin nominal, qui demande
+que le conteneur soit recréé — tâche de l'exploitant. Le repli reste `null` → « version inconnue »,
+qui est le comportement correct d'ici là.
+
+#### ⚠ `docker` annonçait « scan terminé » sans avoir lu une seule ligne
+
+`POST /docker/scan_all` rend `Response(stream(), mimetype='text/plain')` (`docker.py:150`) : **le 200
+part avant que le premier scan ne tourne.** Le geste faisait `if (r.ok) annonce(scan_all_done)`.
+
+**Deux fautes en une, et la seconde est structurelle :**
+
+1. `r.ok` était **toujours** vrai — l'écran annonçait une réussite même si toutes les machines avaient
+   échoué ;
+2. le helper partagé fait `await r.json()`, or le corps est du **JSON-lines** : plusieurs objets
+   séparés par des sauts de ligne, ce qui n'est pas du JSON valide. `r.json()` levait donc à chaque
+   fois, l'exception était avalée, et `corps` valait `null` **structurellement**. Le compte rendu par
+   machine n'était pas mal lu : **il n'était pas lu du tout.**
+
+Le flux est maintenant lu ligne par ligne, avec le motif déjà éprouvé de `cles-ssh.js:398` plutôt que
+réinventé. **Trois issues, pas deux** : abouti avec un bilan **chiffré** · **illisible** (le flux n'a
+rendu aucune ligne lisible, donc on ne dit pas combien) · et les échecs **nommés**, parce que « 2 sur
+5 » ne dit pas sur lesquelles revenir. Un bilan « 0 sur 0 » se lirait comme une réussite : c'est
+pourquoi l'absence de ligne est une issue distincte.
+
+Le dernier fragment du tampon est conservé d'un tour à l'autre : le traiter immédiatement couperait un
+objet JSON en deux et le ferait compter comme illisible.
+
+#### Le balayage qui l'a trouvé
+
+Sur les 22 fichiers de script du portage qui emploient `.ok`, le motif dominant est
+`r.ok && r.corps.success` — les deux vérifiés, ce qui est correct. Les `! r.ok` sont des **sorties
+précoces** sur échec de transport, également correctes. Le motif dangereux est la forme **positive**
+où `.ok` décide seul : quatre candidats, dont trois sont des routes **du portage** servies par Laravel
+— `.ok` y est un verdict légitime. Le quatrième était celui-ci.
+
+Parité i18n comparée : `docker` 42 = 42.
+
+---
+
 ### v1.38.60 — ma cinquieme correction visait la mauvaise moitie, et j'ai redemande une tache deja faite
 
 **Deux corrections de la session 4, les deux justes, et la premiere annule une regle que je viens d'inscrire.**

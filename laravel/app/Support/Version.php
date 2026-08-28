@@ -39,8 +39,32 @@ namespace App\Support;
  */
 final class Version
 {
-    /** Le chemin du montage en lecture seule, a la racine servie. */
-    private const CHEMIN = '/version.txt';
+    /**
+     * Le chemin du montage en lecture seule.
+     *
+     * ══ `base_path`, ET SURTOUT PAS `public_path` ═════════════════════════
+     *
+     * Le premier jet lisait `public_path('/version.txt')`, qui resout
+     * `/var/www/html/public/version.txt`. Or `docker-compose.yml:76` monte le
+     * fichier a `/var/www/html/version.txt` — **hors de la racine web**, ce qui
+     * est deliberé : le numero n'a pas a etre servi par HTTP.
+     *
+     * Les deux chemins differaient donc d'un segment, et le lecteur rendait
+     * `null` MEME APRES la recreation du conteneur.
+     *
+     * ══ POURQUOI CE DEFAUT ETAIT INVISIBLE ═══════════════════════════════
+     *
+     * Le montage n'avait pas encore pris effet — une ligne de `volumes` exige
+     * une RECREATION, pas un `restart`, et `docker inspect` n'en declarait
+     * qu'un seul. Les DEUX causes rendent exactement le meme symptome :
+     * « version inconnue ».
+     *
+     * Diagnostiquer la seule cause annoncee aurait laisse celle-ci en place, et
+     * elle serait revenue sous la forme « la recreation n'a rien change ».
+     * *Un symptome dit qu'il y a un probleme, jamais lequel* — et rien
+     * n'empeche qu'il y en ait deux.
+     */
+    private const CHEMIN = 'version.txt';
 
     /** Memorise pour la requete : le fichier ne change pas en cours de route. */
     private static ?string $lue = null;
@@ -54,7 +78,7 @@ final class Version
         }
         self::$deja = true;
 
-        $chemin = public_path(self::CHEMIN);
+        $chemin = base_path(self::CHEMIN);
         if (! is_file($chemin) || ! is_readable($chemin)) {
             return self::$lue = null;
         }

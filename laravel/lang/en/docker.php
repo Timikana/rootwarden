@@ -46,7 +46,14 @@ return [
     'scanning'             => 'Docker scan running…',
     'scanning_all'         => 'Docker scan of every server…',
     'scan_done'            => 'Docker scan finished.',
-    'scan_all_done_simple' => 'Scan of every server finished.',
+    // ── THE SUMMARY IS COUNTED, AND IT NAMES THE FAILURES ────────────
+    // `POST /docker/scan_all` returns a JSON-lines STREAM as `text/plain`: the
+    // 200 leaves BEFORE the first scan runs. A verdict drawn from the HTTP
+    // status therefore announces success even if every machine failed.
+    'scan_all_done_simple' => 'Scan of every server finished: :ok succeeded out of :total.',
+    'scan_all_echecs'      => ':n server(s) failed: :noms',
+    'scan_all_illisible'   => "The scan was started, but its report could not be read: there is no way to say how many servers succeeded. Reload the page to read the real state.",
+    'scan_all_aucun'       => "The scan returned no report at all — either no server was processed, or the stream stopped before the first answer.",
     'no_docker'            => 'Docker is not installed on this server.',
     'err_load'             => 'Could not load the inventory.',
     'err_scan'             => 'The Docker scan failed.',

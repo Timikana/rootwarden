@@ -198,16 +198,122 @@
         annonce(r.reseau ? L.err_reseau : ((r.corps && r.corps.message) || L.err_scan), 'echec');
     }
 
+    /*
+     * ══ LE VERDICT VIENT DU FLUX, PAS DU STATUT HTTP ══════════════════════
+     *
+     * `POST /docker/scan_all` rend `Response(stream(), mimetype='text/plain')`
+     * (`docker.py:150`) : **le 200 part AVANT que le premier scan ne tourne.**
+     * Le statut ne peut donc rien dire de ce qui s'est passe.
+     *
+     * Le jet precedent faisait `if (r.ok) annonce(scan_all_done)`. Deux fautes
+     * en une :
+     *
+     * 1. `r.ok` etait TOUJOURS vrai — l'ecran annoncait « scan termine » meme si
+     *    toutes les machines avaient echoue ;
+     * 2. `appelle()` fait `await r.json()`, or le corps est du **JSON-lines** :
+     *    plusieurs objets separes par des sauts de ligne, ce qui n'est pas du
+     *    JSON valide. `r.json()` levait donc a chaque fois, l'exception etait
+     *    avalee, et `corps` valait `null` **structurellement**. Le compte rendu
+     *    par machine n'etait pas « mal lu » : il n'etait pas lu du tout.
+     *
+     * On lit donc le flux ligne par ligne, on COMPTE, et on NOMME les echecs.
+     * Motif repris de `cles-ssh.js:398` plutot que reinvente.
+     *
+     * TROIS ISSUES, PAS DEUX : abouti avec un bilan chiffre · illisible (le flux
+     * n'a pas pu etre lu, donc on ne dit pas combien) · vide (aucune ligne, donc
+     * aucune machine traitee). Un bilan « 0 sur 0 » se lirait comme une reussite.
+     */
     async function scanTout(bouton) {
         bouton.disabled = true;
         annonce(L.scanning_all);
-        const r = await appelle('/docker/scan_all', { method: 'POST', body: '{}' });
-        bouton.disabled = false;
-        if (r.ok) {
-            annonce(L.scan_all_done_simple, 'ok');
-        } else {
-            annonce(r.reseau ? L.err_reseau : L.err_scan, 'echec');
+
+        let ok = 0;
+        const echecs = [];
+        let lu = false;
+
+        try {
+            const rep = await fetch(PASSERELLE + '/docker/scan_all', {
+                method: 'POST',
+                body: '{}',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': jetonCsrf(),
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (! rep.ok) {
+                bouton.disabled = false;
+                annonce(L.err_scan, 'echec');
+                charge();
+
+                return;
+            }
+
+            const lecteur = rep.body.getReader();
+            const decodeur = new TextDecoder();
+            let tampon = '';
+
+            const traite = function (ligne) {
+                const t = ligne.trim();
+                if (t === '') { return; }
+                let o = null;
+                try { o = JSON.parse(t); } catch (e) { return; }
+                lu = true;
+                if (o && o.type === 'error') {
+                    echecs.push(String(o.name || o.machine_id || ''));
+                } else if (o && o.type === 'done') {
+                    ok += 1;
+                }
+            };
+
+            for (;;) {
+                const { done, value } = await lecteur.read();
+                if (done) { break; }
+                tampon += decodeur.decode(value, { stream: true });
+                const morceaux = tampon.split('\n');
+                // La DERNIERE part peut etre incomplete : on la garde pour le
+                // tour suivant. La traiter maintenant couperait un objet JSON
+                // en deux et le ferait compter comme illisible.
+                tampon = morceaux.pop();
+                morceaux.forEach(traite);
+            }
+            traite(tampon);
+        } catch (e) {
+            bouton.disabled = false;
+            annonce(L.err_reseau, 'echec');
+            charge();
+
+            return;
         }
+
+        bouton.disabled = false;
+
+        if (! lu) {
+            // NI REUSSITE NI ECHEC : le flux n'a rendu aucune ligne lisible.
+            annonce(L.scan_all_aucun, 'attention');
+            charge();
+
+            return;
+        }
+
+        const total = ok + echecs.length;
+        annonce(String(L.scan_all_done_simple).split(':ok').join(String(ok))
+            .split(':total').join(String(total)),
+            echecs.length === 0 ? 'ok' : 'attention');
+
+        if (echecs.length > 0) {
+            // LES ECHECS SONT NOMMES, pas seulement comptes : « 2 sur 5 » ne dit
+            // pas sur lesquelles il faut revenir.
+            const zone = document.createElement('p');
+            zone.className = 'rw-aide';
+            zone.setAttribute('data-rw', 'docker-scan-echecs');
+            zone.textContent = String(L.scan_all_echecs)
+                .split(':n').join(String(echecs.length))
+                .split(':noms').join(echecs.join(', '));
+            message.parentNode.insertBefore(zone, message.nextSibling);
+        }
+
         charge();
     }
 
