@@ -28,7 +28,32 @@ passé.* Conteneurs en **UTC**, hôte et navigateur en **CEST**.
 > *Combinées telles quelles, elles auraient produit une exposition doublement fausse.* C'est ce qui a
 > fait remesurer plutôt que relayer.
 
-**Redémarrer.** Un seul préalable subsiste, et c'est une vérification, pas un travail.
+> ## ⚠ AJOUT DU 2026-08-28, 11:20 UTC — UN PRÉALABLE REVIENT, ET CE N'EST PAS UN CORRECTIF
+>
+> **La ligne de base du LOT a 44 commits de retard.** Le point de comparaison du plan est le rejeu du
+> **2026-08-27** — 150 exécutions, 2282 PASS, 3 FAIL expliqués. Depuis :
+>
+>     git log --oneline --since='2026-08-27T20:00Z' -- laravel/ legacy/ backend/ tests/e2e/   ->  44
+>
+> Et le redémarrage changera **20 modules backend** par-dessus ces 44 commits.
+>
+> > **Sans rejeu préalable, toute anomalie constatée après le redémarrage aura DEUX causes candidates
+> > — le redémarrage, ou l'un des 44 commits — et rien pour les séparer.** *Un écart n'est pas
+> > forcément une régression, mais il doit toujours être expliqué* : ici l'explication serait
+> > indisponible par construction.
+>
+> **Recommandation : rejouer le LOT complet AVANT le redémarrage** (~3 h, session 7, jeton de banc).
+> Ce n'est pas un correctif de plus — c'est ce qui rend le redémarrage **observable**, et le §3 de ce
+> dossier demande justement d'observer les 20 modules.
+>
+> **Et cela ne contredit pas « attendre augmente le risque »** : les deux se composent. *Le lot grossit
+> tant qu'on écrit du backend* — d'où le **gel** (`DECISIONS-DSI.md` §8). Sous gel, trois heures de
+> rejeu **n'ajoutent aucun module au lot** et rendent le geste mesurable. **C'est le gel qui rend ce
+> préalable gratuit.**
+>
+> Mesuré à 11:17Z : **le banc est libre**, aucun `node go-*.mjs` ne tourne.
+
+**Redémarrer.** Un préalable de vérification, et un préalable de mesure ajouté ci-dessus.
 
 | # | préalable | pourquoi | bloquant ? |
 |---|---|---|---|
