@@ -2192,6 +2192,103 @@ def server_user_keys():
         conn.close()
 
 
+def _script_retrait_par_empreintes(username, empreintes):
+    """Script root qui retire d'`authorized_keys` les lignes dont l'empreinte figure dans `empreintes`.
+
+    ══ POURQUOI CE HELPER EXISTE (E-215) ════════════════════════════════════
+
+    Ce script etait le corps de `server_user_remove_key`. Sa voisine
+    `remove_user_keys` faisait le MEME geste par `sed -i '/rootwarden/d'` : une
+    selection par SOUS-CHAINE, sur un fichier qui accorde des acces.
+
+    On REMONTE l'implementation prudente au lieu d'en ecrire une seconde. Une
+    regle appliquee ailleurs se remonte de la ; elle ne se recalcule pas.
+
+    ══ CE QU'IL GARANTIT ════════════════════════════════════════════════════
+
+    - la selection se fait sur l'EMPREINTE SHA256 recalculee ligne par ligne
+      (`ssh-keygen -lf`), jamais sur le texte du commentaire ;
+    - une sauvegarde est posee AVANT toute reecriture ;
+    - les commentaires du fichier sont preserves ;
+    - le code de sortie DISTINGUE les etats :
+        0  au moins une cle retiree
+        1  pas de fichier `authorized_keys`
+        2  aucune des empreintes visees n'a ete trouvee (fichier INTACT)
+
+    `empreintes` est une liste : un seul appelant en passe une, l'autre en passe
+    plusieurs. La comparaison reste une EGALITE EXACTE, jamais une inclusion.
+    """
+    user_q = shlex.quote(username)
+    liste = ' '.join(shlex.quote(e) for e in empreintes)
+    return f"""
+set -e
+home=$(getent passwd {user_q} | cut -d: -f6)
+ak="$home/.ssh/authorized_keys"
+if [ ! -f "$ak" ]; then
+    echo "no authorized_keys for" {user_q} >&2
+    exit 1
+fi
+tmp=$(mktemp)
+cp "$ak" "${{tmp}}.bak"
+removed=0
+while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$line" ] && continue
+    case "$line" in \\#*) echo "$line" >> "$tmp"; continue;; esac
+    fp=$(printf '%s\\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{{print $2}}' | sed 's/^SHA256://')
+    cible=0
+    for c in {liste}; do
+        if [ "$fp" = "$c" ]; then cible=1; break; fi
+    done
+    if [ "$cible" = 1 ]; then
+        removed=$((removed + 1))
+    else
+        echo "$line" >> "$tmp"
+    fi
+done < "$ak"
+if [ "$removed" -eq 0 ]; then
+    rm -f "$tmp" "${{tmp}}.bak"
+    echo "fingerprint not found" >&2
+    exit 2
+fi
+mv "$tmp" "$ak"
+chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true
+chmod 600 "$ak"
+echo "removed=$removed"
+"""
+
+
+def _script_vidage_complet(username):
+    """Script root qui VIDE `authorized_keys`, avec la meme prudence que le retrait cible.
+
+    Meme exigences que `_script_retrait_par_empreintes` : sauvegarde avant, code
+    de sortie qui distingue, et une VERIFICATION que le fichier est bien vide
+    apres coup. `printf '' >` seul ne prouvait rien — son retour n'etait meme pas
+    lu.
+
+        0  fichier vide, verifie
+        1  pas de fichier `authorized_keys`
+        3  le fichier n'est PAS vide apres l'operation
+    """
+    user_q = shlex.quote(username)
+    return f"""
+set -e
+home=$(getent passwd {user_q} | cut -d: -f6)
+ak="$home/.ssh/authorized_keys"
+if [ ! -f "$ak" ]; then
+    echo "no authorized_keys for" {user_q} >&2
+    exit 1
+fi
+avant=$(grep -c . "$ak" 2>/dev/null || echo 0)
+cp -a "$ak" "$ak.bak.rw"
+printf '' > "$ak"
+if [ -s "$ak" ]; then
+    echo "authorized_keys non vide apres vidage" >&2
+    exit 3
+fi
+echo "removed=$avant"
+"""
+
+
 @bp.route('/server_user_remove_key', methods=['POST'])
 @require_api_key
 @require_role(2)
@@ -2264,43 +2361,10 @@ def server_user_remove_key():
 
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m.get('root_password') or '')
-    fp_q = shlex.quote(fingerprint)
-    user_q = shlex.quote(username)
-
-    # Script bash root-side : pour CHAQUE ligne du authorized_keys, recalculer
-    # le fingerprint via ssh-keygen -lf, comparer, garder la ligne si != cible.
-    # ssh-keygen est universel sur tout systeme avec OpenSSH installe.
-    remove_script = f"""
-set -e
-home=$(getent passwd {user_q} | cut -d: -f6)
-ak="$home/.ssh/authorized_keys"
-if [ ! -f "$ak" ]; then
-    echo "no authorized_keys for {username}" >&2
-    exit 1
-fi
-tmp=$(mktemp)
-cp "$ak" "${{tmp}}.bak"
-removed=0
-while IFS= read -r line || [ -n "$line" ]; do
-    [ -z "$line" ] && continue
-    case "$line" in \\#*) echo "$line" >> "$tmp"; continue;; esac
-    fp=$(printf '%s\\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{{print $2}}' | sed 's/^SHA256://')
-    if [ "$fp" = {fp_q} ]; then
-        removed=$((removed + 1))
-    else
-        echo "$line" >> "$tmp"
-    fi
-done < "$ak"
-if [ "$removed" -eq 0 ]; then
-    rm -f "$tmp" "${{tmp}}.bak"
-    echo "fingerprint not found" >&2
-    exit 2
-fi
-mv "$tmp" "$ak"
-chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true
-chmod 600 "$ak"
-echo "removed=$removed"
-"""
+    # E-215 : le script vit desormais dans `_script_retrait_par_empreintes`,
+    # partage avec `remove_user_keys`. Comportement inchange ici : une seule
+    # empreinte visee, comparaison par egalite exacte, memes codes de sortie.
+    remove_script = _script_retrait_par_empreintes(username, [fingerprint])
 
     user_id, _ = get_current_user()
     try:
@@ -2350,63 +2414,150 @@ echo "removed=$removed"
 @require_machine_access
 @threaded_route
 def remove_user_keys():
-    """
-    Supprime les cles SSH d'un utilisateur sur un serveur distant.
-    Peut supprimer toutes les cles ou seulement les cles RootWarden.
-    Body JSON : {machine_id, username, mode: 'all'|'rootwarden_only'}
+    """Retire les cles SSH d'un utilisateur distant. Corps : {machine_id, username, mode, force}.
+
+    ══ E-215 : CETTE ROUTE FAISAIT SANS GARDE CE QUE SA VOISINE BLOQUE ══════
+
+    `server_user_remove_key`, 150 lignes plus haut, REFUSE de retirer la cle de
+    plateforme sans `force` — son message dit « te locker hors du serveur ».
+    Celle-ci le faisait sans garde, sans confirmation, et **sans lire son code de
+    sortie** : les deux branches jetaient le retour d'`execute_as_root` et
+    rendaient `success: True`. Le `; echo OK` du second mode forcait meme le code
+    a zero, si bien qu'un lecteur futur n'aurait rien pu en tirer.
+
+    C'etait E-192 revenu sur une REVOCATION D'ACCES : une fausse attestation, et
+    personne ne rouvre un dossier de conformite clos.
+
+    ══ TROIS CHANGEMENTS, ET LE PREMIER EST LE PLUS IMPORTANT ══════════════
+
+    1. **la selection se fait par EMPREINTE, plus par sous-chaine.** Le mode
+       cible faisait `sed -i '/rootwarden/d'` — plus large que sa propre
+       docstring, qui annoncait `@rootwarden` ou `rootwarden-platform`. Mesure
+       sur trois cles reelles : le `sed` en retirait DEUX, dont une cle
+       PERSONNELLE commentee `backup-from-rootwarden-host` ; le retrait par
+       empreinte en retire UNE, la bonne ;
+    2. **la cle de plateforme est protegee comme chez la voisine** : refus sans
+       `force`, meme motif et meme formulation. Cela vaut pour les deux modes —
+       le mode cible ne vise QUE cette cle, donc il l'exige toujours ;
+    3. **le code de sortie est lu**, et il distingue : rien a retirer n'est pas
+       une reussite, et un fichier non vide apres vidage non plus.
+
+    ══ LA VERIFICATION SEULE AURAIT ARME LE PIEGE ══════════════════════════
+
+    Aujourd'hui la route peut echouer en silence, et cette non-fiabilite est —
+    par accident — ce qui limite les degats. Lui faire lire son code de retour
+    rend le geste EFFECTIF A CHAQUE FOIS, y compris quand il retire la cle de
+    plateforme. **La garde et la verification sont donc dans le meme commit** :
+    un correctif qui rend un chemin possible doit regarder ce qu'il rend
+    irreversible sur ce meme chemin.
     """
     data = request.get_json(silent=True) or {}
     machine_id = data.get('machine_id')
     username = (data.get('username') or '').strip()
     mode = data.get('mode', 'all')  # 'all' ou 'rootwarden_only'
+    force = bool(data.get('force', False))
 
     if not machine_id or not username:
         return jsonify({'success': False, 'message': 'machine_id et username requis'}), 400
     if not _validate_username(username):
         return jsonify({'success': False, 'message': 'Nom utilisateur invalide (caracteres interdits)'}), 400
+    if mode not in ('all', 'rootwarden_only'):
+        return jsonify({'success': False, 'message': "mode doit valoir 'all' ou 'rootwarden_only'"}), 400
 
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, name, ip, port, user, password, root_password, service_account_deployed FROM machines WHERE id = %s", (int(machine_id),))
+        cur.execute("SELECT id, name, ip, port, user, password, root_password, "
+                    "service_account_deployed FROM machines WHERE id = %s", (int(machine_id),))
         m = cur.fetchone()
+        if not m:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+
+        # Les empreintes de plateforme connues pour ce couple machine/compte.
+        # Meme source que `server_user_remove_key` : l'inventaire, alimente par
+        # le scan. On ne DEVINE pas une cle de plateforme depuis un commentaire.
+        cur.execute("SELECT fingerprint_sha256 FROM server_user_ssh_keys "
+                    "WHERE machine_id = %s AND username = %s AND is_platform_key = 1",
+                    (int(machine_id), username))
+        empreintes_plateforme = [r['fingerprint_sha256'] for r in cur.fetchall()]
     finally:
         conn.close()
 
-    if not m:
-        return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+    # ── La garde de la cle de plateforme, reprise TELLE QUELLE de la voisine ──
+    if empreintes_plateforme and not force:
+        return jsonify({
+            'success': False,
+            'platform_key_protegee': True,
+            'message': "Suppression bloquee : la cle plateforme RootWarden est parmi les cles "
+                       "visees. Utilise --force si tu veux vraiment te locker hors du serveur."
+        }), 400
+
+    if mode == 'rootwarden_only' and not empreintes_plateforme:
+        # Ni sous-chaine, ni supposition : sans inventaire on ne sait pas QUOI
+        # retirer, et le dire vaut mieux que balayer au motif.
+        return jsonify({
+            'success': False,
+            'message': "Aucune cle plateforme en inventaire pour ce compte - relance un scan"
+        }), 404
 
     ssh_pass = server_decrypt_password(m['password'])
-    root_pass = server_decrypt_password(m['root_password'])
+    root_pass = server_decrypt_password(m.get('root_password') or '')
+    if mode == 'all':
+        script = _script_vidage_complet(username)
+    else:
+        script = _script_retrait_par_empreintes(username, empreintes_plateforme)
+
+    user_id, _ = get_current_user()
+    try:
+        with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                         service_account=m.get('service_account_deployed', False)) as client:
+            out, err_out, code = execute_as_root(client, script, root_pass,
+                                                 logger=logger, timeout=60)
+    except Exception as e:
+        logger.error("[remove_user_keys] %s : %s", m['name'], e)
+        return jsonify({'success': False, 'message': f'Erreur SSH : {str(e)[:200]}'}), 500
+
+    # ── LE CODE DE SORTIE EST LU, ET IL DISTINGUE ────────────────────────────
+    motifs = {
+        1: "Aucun fichier authorized_keys pour ce compte - rien n'a ete retire",
+        2: "Aucune des cles visees n'a ete trouvee - le fichier est INTACT",
+        3: "Le fichier n'est pas vide apres le vidage - rien ne garantit le retrait",
+    }
+    if code != 0:
+        logger.warning("remove_user_keys(%s,%s) mode=%s : exit=%s err=%s",
+                       machine_id, username, mode, code, (err_out or '')[:200])
+        return jsonify({
+            'success': False,
+            'code': code,
+            'message': motifs.get(code) or (err_out or out or f'exit={code}').strip()[:200],
+        }), 500
+
+    retirees = None
+    for ligne in (out or '').splitlines():
+        if ligne.startswith('removed='):
+            try:
+                retirees = int(ligne.split('=', 1)[1].strip())
+            except ValueError:
+                pass
 
     try:
-        with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
-            # Trouver le home de l'utilisateur
-            stdin, stdout, stderr = client.exec_command(f"getent passwd {shlex.quote(username)} | cut -d: -f6", timeout=10)
-            home = stdout.read().decode().strip()
-            if not home:
-                return jsonify({'success': False, 'message': f"Utilisateur '{username}' introuvable sur le serveur"})
+        with get_db_connection() as conn2:
+            cur2 = conn2.cursor()
+            cur2.execute(
+                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
+                (user_id, f"[ssh-keys] remove_user_keys mode={mode} force={force} "
+                          f"sur {username}@{m['name']} : {retirees} cle(s) retiree(s)"))
+            conn2.commit()
+    except Exception:
+        pass
 
-            ak_path = f"{home}/.ssh/authorized_keys"
-
-            # Valider le path (anti-injection)
-            if not re.match(r'^/[a-zA-Z0-9/_.-]+$', ak_path):
-                return jsonify({'success': False, 'message': 'Chemin invalide'}), 400
-
-            if mode == 'all':
-                # Supprimer TOUTES les cles (vider le fichier)
-                cmd = f"printf '' > {ak_path}"
-                execute_as_root(client, cmd, root_pass, logger=logger)
-                return jsonify({'success': True, 'message': f"Toutes les cles de '{username}' supprimees"})
-            else:
-                # Supprimer seulement les cles RootWarden (qui contiennent @rootwarden ou rootwarden-platform)
-                cmd = f"sed -i '/rootwarden/d' {ak_path} 2>/dev/null; echo OK"
-                execute_as_root(client, cmd, root_pass, logger=logger)
-                return jsonify({'success': True, 'message': f"Cles RootWarden de '{username}' supprimees"})
-
-    except Exception as e:
-        logger.error("[remove_user_keys] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+    return jsonify({
+        'success': True,
+        'mode': mode,
+        # Toujours present : `null` dit « le compte n'a pas ete rendu », pas zero.
+        'cles_retirees': retirees,
+        'message': f"{retirees} cle(s) retiree(s) pour '{username}' sur {m['name']}",
+    })
 
 
 @bp.route('/delete_remote_user', methods=['POST'])
