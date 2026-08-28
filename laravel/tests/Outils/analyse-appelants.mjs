@@ -240,6 +240,66 @@ function litUnFlux(fonction) {
     return lecteur || (texte && !json);
 }
 
+/**
+ * Les CHEMINS que les appelants locaux passent a cette fonction.
+ *
+ * ── POURQUOI CETTE PASSE EXISTE ─────────────────────────────────────────────
+ *
+ * La jointure « appelant -> route du backend » ne resolvait que **22 %** des
+ * sites d'appel. La raison n'est pas une faiblesse de l'analyseur, elle est
+ * STRUCTURELLE : presque chaque fichier route ses appels par un helper —
+ * `lit(chemin)`, `appelle(chemin)`, `agit(chemin)` — si bien que la cible du
+ * `fetch` est une VARIABLE a l'endroit ou on la lit.
+ *
+ * Le chemin litteral existe, mais un cran plus haut : chez les appelants du
+ * helper. On remonte donc d'un niveau — c'est la meme discipline que « remonter
+ * du CHAMP a son `form` » plutot que de prendre le premier bouton.
+ *
+ * On ne suit pas la valeur a travers les fichiers : un helper importe d'ailleurs
+ * reste non resolu, et **c'est un silence qui se dit** plutot qu'un chemin
+ * devine.
+ */
+function cheminsDesAppelants(arbre, fonction, expressionCible) {
+    // Quel PARAMETRE de la fonction porte la cible ?
+    const params = (fonction.params || [])
+        .filter((p) => p.type === 'Identifier')
+        .map((p) => p.name);
+    const nommes = new Set();
+    parcours(expressionCible, (n) => {
+        if (n.type === 'Identifier' && params.includes(n.name)) nommes.add(n.name);
+    });
+    if (nommes.size !== 1) return [];          // ni un parametre, ou plusieurs : on ne devine pas
+    const index = params.indexOf([...nommes][0]);
+
+    // Le nom sous lequel la fonction est appelee dans CE fichier.
+    let nom = fonction.id?.name || null;
+    if (!nom) {
+        parcours(arbre, (n, parents) => {
+            if (nom) return;
+            if (n === fonction) {
+                const p = parents[parents.length - 1];
+                if (p?.type === 'VariableDeclarator' && p.id?.type === 'Identifier') nom = p.id.name;
+            }
+        });
+    }
+    if (!nom) return [];
+
+    const chemins = [];
+    parcours(arbre, (n) => {
+        if (n.type !== 'CallExpression') return;
+        if (!(n.callee.type === 'Identifier' && n.callee.name === nom)) return;
+        const arg = n.arguments[index];
+        if (!arg) return;
+        if (arg.type === 'Literal' && typeof arg.value === 'string') chemins.push(arg.value);
+        // `'/fail2ban/' + jail` : le PREFIXE litteral suffit a nommer la route.
+        else if (arg.type === 'BinaryExpression' && arg.operator === '+'
+                 && arg.left.type === 'Literal' && typeof arg.left.value === 'string') {
+            chemins.push(arg.left.value);
+        }
+    });
+    return [...new Set(chemins)].sort();
+}
+
 /** Le texte source d'un noeud, tronque. */
 function source(code, noeud, max = 70) {
     const t = code.slice(noeud.start, noeud.end).replace(/\s+/g, ' ');
@@ -297,6 +357,10 @@ for (const nom of fichiers) {
             // `delegue`  : elle rend le corps analyse, son appelant decidera
             // `ignore`   : ni l'un ni l'autre — personne ne lit le verdict ici
             verdict: verifie ? 'verifie' : (flux ? 'flux' : (delegue ? 'delegue' : 'ignore')),
+            // Les chemins litteraux passes par les appelants LOCAUX du helper.
+            // Vide quand la cible est deja litterale, ou quand rien ne se resout.
+            chemins_appelants: n.arguments[0]
+                ? cheminsDesAppelants(arbre, englobante, n.arguments[0]) : [],
         });
     });
 }
