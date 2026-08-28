@@ -25,7 +25,7 @@ vérification omise ne se corrige qu'en refaisant le geste, et rien ne signale s
 
 ---
 
-## Table des huit
+## Table des dix
 
 | # | arbitrage | décision | ce qu'elle coûte |
 |---|---|---|---|
@@ -37,6 +37,9 @@ vérification omise ne se corrige qu'en refaisant le geste, et rien ne signale s
 | 6 | E-224 — borne d'`install_all` | **`machine_ids` obligatoire**, 400 si absent ou vide | le bouton « installer sur tous » envoie sa liste |
 | 7 | E-222 — `UNIQUE (server_id)` | **écrire la migration**, ne pas l'appliquer | `DOSSIER-06` pour la signature |
 | **8** | **neuve** — écrire d'autres correctifs backend avant le redémarrage | **GEL** jusqu'au redémarrage | vingt items justes attendent ; le lot cesse de grossir |
+| **9** | E-233 — le proxy legacy autorise par préfixe | **ne rien resserrer** ; le portage l'a déjà fait, mesuré | rien : surface d'accident **nulle**, et le défaut meurt avec le legacy |
+| **10** | E-237 — l'état persisté d'`uninstall` Wazuh | **lire `code_v`, écrire `unknown`** — ⚠ ma 1re version demandait une migration, retirée | rien : la valeur est déjà au schéma et déjà rendue |
+| — | E-234 — porter la console d'API du legacy | **NON** — elle ne se porte pas | la page ferme par l'**archivage**, pas par un correctif |
 
 ---
 
@@ -645,7 +648,7 @@ appliquées est le même défaut que le lot de correctifs inertes, sur une autre
 
 ---
 
-## Ce que ces huit décisions ne font pas
+## Ce que ces décisions ne font pas
 
 Aucune n'écrit sur une machine, ne redémarre un service, n'applique une migration, ne pousse ni ne
 fusionne. **Aucune n'accorde ni ne retire un droit à un compte** — la n°2 se conclut par un
