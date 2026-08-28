@@ -61,9 +61,46 @@ durcissement ne retire aucun chemin d'interface.**
 > lot est sa taille.* **Chaque heure d'attente ajoute au nombre de modules qui prendront effet ensemble
 > sans avoir jamais été observés.**
 
-**Les routes qui gagnent une garde n'ont PAS bougé** : recomptées à 08:12Z, toujours **+33**
-(iptables +6, fail2ban +18, services +8, ssh_audit +1). *Un chiffre qui ne bouge pas se dit aussi, sinon
-on ne sait pas s'il a été repris ou remesuré.*
+**Les routes qui gagnent une garde : 34, et non 33** — corrigé le 2026-08-28 à 08:30Z par la session 4,
+vérifié par moi.
+
+    + require_permission('can_manage_fail2ban')   18
+    + require_permission('can_manage_services')    8
+    + require_permission('can_manage_iptables')    6
+    + require_permission('can_audit_ssh')          1
+    + require_role(2) + require_machine_access     1     <- `POST /deploy`, E-191
+                                                  ---
+                                                   34
+
+**Les deux chiffres sont justes sur leur propre définition, et c'est l'écart qui instruit** : je comptais
+les routes qui gagnent **une des quatre permissions** (33) ; elle compte celles qui gagnent **une garde,
+quelle qu'elle soit** (34). *La mienne répondait à « qui doit recevoir une permission » ; la sienne
+répond à « qu'est-ce qui cesse de fonctionner » — et c'est la question de ce dossier.* Vérifié sur le
+commit servi :
+
+    6663e83  @require_api_key · @threaded_route
+    HEAD     @require_api_key · @require_role(2) · @require_machine_access · @threaded_route
+
+**Et sa méthode a trouvé son propre angle mort** : sa première sonde indexait par **chemin seul**, donc
+le `GET` et le `POST` d'un même chemin s'écrasaient. *Trouvé parce que le résultat tombait pile sur le
+chiffre attendu* — **un décompte qui confirme exactement ce qu'on attendait mérite la même vérification
+qu'un décompte qui surprend.**
+
+### ✅ LE TROU DÉCLARÉ DE CE DOSSIER EST COMBLÉ — 21 sur 34
+
+`ROUTES-DURCIES-ATTEINTES-PAR-LE-PORTAGE.md`, relevé du 2026-08-28 08:30Z :
+
+| | routes | appelant porté |
+|---|---|---|
+| **atteintes par une page portée** | **21** | `fail2ban` 14 · `services` 6 · `iptables` 1 |
+| non atteintes | 13 | dont `POST /deploy`, `/ssh-audit/policies`, 5 d'`iptables`, 4 de `fail2ban` |
+
+> **« Observer les 20 modules » devient une liste ordonnée.** Les 21 sont ce qu'il faut regarder en
+> premier après le geste ; les 13 autres **ne peuvent casser aucune page portée**.
+
+**La borne de ce relevé, et elle est dite** : les 13 restent atteignables **par le portail legacy et par
+la clé d'API**. *Ce relevé ne dit rien de ces deux chemins-là* — il borne le risque côté portage, pas
+côté legacy.
 
 Les **19**, nommés — parce qu'un lot qu'on ne peut pas nommer ne s'observe pas :
 
@@ -201,4 +238,7 @@ une garde annoncée qui n'existe pas.*
 - **l'état servi exactement au `StartedAt`** — reconstruit depuis l'historique, pas lu dans le
   processus. La comparaison `StartedAt` / `mtime` établit l'**inertie** ; elle n'établit pas le
   **contenu** ;
-- **le nombre de routes qui, parmi les 33, sont atteintes par une page portée** — non compté.
+- ~~le nombre de routes qui, parmi les 33, sont atteintes par une page portée~~ — **MESURÉ le
+  2026-08-28 à 08:30Z : 21 sur 34.** Ce trou est comblé ;
+- **ce que les 13 non atteintes peuvent casser côté LEGACY et côté clé d'API** — le relevé borne le
+  risque côté portage seulement, et il le dit.
