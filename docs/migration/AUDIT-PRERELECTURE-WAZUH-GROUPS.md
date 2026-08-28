@@ -171,3 +171,127 @@ saut de ligne désigne un fichier qui n'existe pas, et `$` n'admet rien **après
   dédouané ;
 - **les corps de `groups` PUT/DELETE** — non lus. Ils manipulent des groupes, pas des machines, mais
   supprimer un groupe peut avoir des effets en cascade que je n'ai pas tracés.
+
+---
+
+# 5. ADDENDUM DU 2026-08-28 ~10:40 — deux questions du Lead, mesurées
+
+## 5.1 `/wazuh/uninstall` — le VERDICT est corrigé, l'ÉTAT PERSISTÉ ne l'est pas
+
+E-225 a été traité, et **bien** : la vérification est **par l'effet** (`dpkg-query` puis `rpm`, en
+lecture seule), `success` vaut désormais `paquet_retire` et non `code == 0`, et la réponse **nomme
+les vestiges**. Le commentaire raisonne même explicitement sur le piège d'E-215 — *« il n'y a rien à
+armer, le geste ne devient pas plus efficace, il cesse seulement d'être annoncé comme réussi »*.
+Rien à reprendre sur le verdict.
+
+**Mais :**
+
+```python
+_, err_out, code   = execute_as_root(client, cmd,       …)
+_, _,       code_v = execute_as_root(client, verif_cmd, …)
+_upsert_agent(row['id'], status='never_connected', agent_id=None, version=None)   # ← INCONDITIONNEL
+…
+paquet_retire = (code_v == 0)      # ← le verdict est calculé APRÈS
+```
+
+**L'inventaire est écrit avant que le verdict existe, et sans le consulter.** Sur RHEL ou SUSE — où
+`apt-get purge` n'existe pas, où le `|| true` avale l'échec et où seul `rm -rf /var/ossec` agit — la
+route répond correctement `success: false` **et a déjà inscrit `never_connected`**.
+
+État réel après ce chemin : **paquet installé, `/var/ossec` supprimé, inventaire disant « jamais
+connecté »**. L'inventaire est faux **dans la direction qui masque le problème** : il annonce qu'il
+n'y a rien, donc personne ne va chercher le paquet resté en place.
+
+C'est E-90 / E-183 à l'identique : *le verdict est corrigé, l'état persisté ne suit pas.*
+
+### Et le correctif évident est FAUX dans l'autre sens
+
+Écrire l'inventaire **seulement en cas de réussite** laisserait l'ancien état — par exemple
+`active`, avec un identifiant et une version — sur une machine dont `/var/ossec` vient d'être
+supprimé. **L'inventaire annoncerait alors qu'un agent mort fonctionne**, ce qui est pire pour un
+exploitant qu'un « jamais connecté » erroné.
+
+**Aucune des deux écritures n'est juste, parce que le vocabulaire n'a pas de mot pour l'état
+atteint.** Statuts existants, relevés : `pending`, `active`, `disconnected`, `never_connected`.
+**Aucun ne signifie « partiellement désinstallé ».**
+
+> **Même forme que `sudoers_orphelin` : un champ énuméré pour une réalité qui a gagné un état qu'il
+> ne peut pas exprimer.** Et le même remède : **nommer l'état** plutôt que choisir la valeur la moins
+> fausse. Tant qu'il n'a pas de nom, aucune autre route ne peut en tenir compte.
+
+**Ce que je recommande** : ne pas déplacer `_upsert_agent` sous une condition tant que l'état n'a pas
+de nom — cela échangerait un mensonge contre un autre. Poser le nom d'abord ; la décision d'ajouter
+une valeur au vocabulaire appartient à l'exploitant, comme celle de la colonne pour
+`sudoers_orphelin`.
+
+## 5.2 Les dix routes de masse — conception ou oubli, route par route
+
+| route | rôle | permission | porte | borne |
+|---|---|---|---|---|
+| `/regenerate_platform_key` | **3** | aucune | **oui** | — |
+| `/revoke_service_account` | **3** | aucune | **oui** | `machine_ids` |
+| `/supervision/scan-all` | 2 | `can_manage_supervision` | non | `machine_ids` |
+| `/wazuh/install_all` | 2 | `can_manage_wazuh` | non | `machine_ids` |
+| `/fail2ban/ban_all_servers` | 2 | `can_manage_fail2ban` | non | — |
+| `/fail2ban/install_all` | 2 | `can_manage_fail2ban` | non | — |
+| `/groups/<id>/run` | 2 | `can_admin_portal` | non | — |
+| `/cve_scan_all` | 2 | **aucune** | non | — |
+| `/docker/scan_all` | 2 | **aucune** | non | — |
+| `/ssh-audit/scan-all` | 2 | **aucune** | non | — |
+
+**Les trois « aucune permission » ne sont pas trois anomalies. Ce sont un dédouanement, une
+conception et un oubli.**
+
+**Les deux routes de rôle 3 sont correctes sans permission** : une permission vaut « cette permission
+OU superadmin », donc l'ajouter à une route déjà fermée au rôle 3 serait **inerte**. Même raisonnement
+que la docstring d'`install_all` refusant un `check_machine_access` inerte.
+
+**`/cve_scan_all` — dédouanée** : **hors liste blanche** des deux passerelles. Aucun des deux portails
+ne peut l'atteindre. *(Mesure du Lead, non reproduite ici : lecture pure.)*
+
+**`/docker/scan_all` — CONCEPTION, et elle est cohérente à tous les niveaux :**
+
+```
+legacy/_deprecated/docker/index.php:14   checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])   ← rôle seul
+Navigation.php:91                        'garde' => 'admin'
+web.php:277                              ->middleware(['role:2'])
+backend                                  @require_role(2), aucune permission
+```
+
+**Aucun niveau n'exige de permission, et il n'existe aucune colonne `can_manage_docker`.** C'est
+déjà relevé dans les conventions du portage : *« `docker` est gardé par le RÔLE et non par une
+permission — relevé tel quel, signalé, pas corrigé en silence »*. **Rien à corriger.**
+
+**`/ssh-audit/scan-all` — OUBLI. Sixième occurrence de « la garde est sur la PAGE, pas sur la
+REQUÊTE ».**
+
+```
+legacy/ssh-audit/index.php:12-13   checkAuth([1,2,3]) + checkPermission('can_audit_ssh')
+backend                            @require_role(2), AUCUNE permission
+```
+
+La permission **existe** (`can_audit_ssh` est une colonne réelle) et **la page l'applique**. Une
+décision de conception se verrait comme une absence à *tous* les niveaux — c'est le cas de `docker`.
+Ici elle est appliquée à un niveau et pas à l'autre : c'est la définition de l'écart.
+
+### Et les deux gardes sélectionnent des populations DIFFÉRENTES
+
+| compte | la page | la requête |
+|---|---|---|
+| rôle 1 **avec** `can_audit_ssh` | **admis** | refusé (rôle) |
+| rôle 2 **sans** `can_audit_ssh` | **refusé** | **admis** |
+
+**La seconde ligne est le trou** : un compte de rôle 2 qui ne peut pas ouvrir la page peut lancer,
+par la passerelle, **un scan SSH sur toute la flotte** — `srv-zabbix` comprise. La route est en liste
+blanche, et `ADMIN_SEULEMENT` n'y changerait rien puisqu'elle exige le rôle ≥ 2.
+
+**Occupation NON MESURÉE** — la contrainte de lecture pure l'interdit (le LOT tourne). La requête qui
+la tranche, à jouer quand le banc se libère :
+
+```sql
+SELECT u.id, u.name, u.role_id, COALESCE(p.can_audit_ssh, 0) AS peut
+FROM users u LEFT JOIN permissions p ON p.user_id = u.id
+WHERE u.active = 1 AND u.role_id = 2;
+```
+
+**Tout compte de rôle 2 dont `peut` vaut 0 occupe l'écart.**
