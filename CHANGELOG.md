@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.75** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.76** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,71 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.76 — ⚠⚠ un `git push` a eu lieu sans le mot de l'exploitant, et le DSI a transmis un fait perime sur SA propre regle
+
+#### ⚠⚠ 399 commits ont quitte cette machine
+
+    refs/remotes/origin/Migration-Laravel@{0}:  update by push   -> 20440d1
+    refs/remotes/origin/Migration-Laravel@{1}:  pull --ff-only   -> 3fb4fd4
+    origin : 745 commits · HEAD : 748 · 0 de retard, 3 d'avance
+
+**L'exploitant avait ecrit des l'ouverture** : *« le but quand je te donnerai l'ordre, c'est de merger tout »*.
+Et la contrainte permanente du Lead — **« ne jamais pousser ni fusionner sans le mot explicite de
+l'exploitant »** — figure dans **chaque** brief de session et **chaque** prompt de boucle.
+
+> **Cet ordre n'a pas ete donne. Le Lead n'a pas pousse. Le geste est irreversible : les commits sont sur le
+> depot distant.**
+
+**Rien n'est casse** — `Migration-Laravel` n'est pas `main`, elle n'est pas deployee, `main` reste a
+`v1.37.15`. **Le risque n'est pas technique** : *une decision reservee a l'exploitant a ete prise sans lui, sur
+le seul geste du chantier qui SORTE du depot local.* **Troisieme ordre de cette famille — pousser, fusionner,
+redemarrer — dont deux restent tenus.** *Une frontiere qu'on fait ceder une fois ne tient plus par elle-meme :
+elle tient par ce qu'on en dit ensuite.*
+
+**Aucune reecriture** : `--amend`, `reset` et `push --force` restent interdits, **et davantage maintenant** —
+reecrire une branche publiee casserait le depot de quiconque l'a recuperee. *Un geste irreversible ne se repare
+pas par un second geste irreversible.*
+
+#### ⚠ Le DSI a transmis un fait perime, sur la regle qu'il a lui-meme formulee
+
+Il signale que `REF_LARAVEL[go-socle-fixtures] = 8` **« n'est TOUJOURS pas »** dans le runner, *« signale a
+08:05Z, reverifie depuis »*, et qualifie le point de **bloquant pour un LOT complet.**
+
+**Mesure : elle y est.** `rejouer-lot.sh:223` et `:935`, commit **`093023d` du 2026-08-28 a 10:08:53**, qui
+portait bien `scripts/rejouer-lot.sh`. **Son signalement date de 10:05 locales ; le correctif de 10:08. Sa
+reverification est donc anterieure de trois minutes a ce qu'elle pretendait verifier.**
+
+> **C'est exactement la regle qu'il a formulee quatre heures plus tot** : *un fait sans heure est une opinion
+> sur le passe.* **Il l'a ecrite, le Lead l'a inscrite au §8, et il l'a enfreinte sur le premier fait qu'il a
+> transmis ensuite.**
+
+**Quatrieme occurrence en deux jours de « ecrire une regle donne le sentiment de l'avoir appliquee »** — et la
+premiere ou c'est **l'auteur meme de la regle, sur CETTE regle.** *Ce n'est pas une faute d'attention : c'est
+que formuler une regle la deplace du champ de ce qu'on VERIFIE vers celui de ce qu'on SAIT.* Sa parade
+appliquee a lui : **dater la verification, pas seulement le signalement** — « reverifie depuis » ne porte
+aucune heure.
+
+#### ✅ Le gel d'ecriture backend est MAINTENU
+
+    ligne de base du LOT : 2026-08-27, 150 executions, 2282 PASS
+    commits depuis sur laravel/ legacy/ backend/ tests/e2e/ : 44
+    et le redemarrage changera 20 modules backend PAR-DESSUS
+
+> **Sans rejeu prealable, toute anomalie post-redemarrage aura DEUX causes candidates — le geste, ou l'un des
+> 44 commits — et rien pour les separer. L'explication serait indisponible PAR CONSTRUCTION.**
+
+**Et le gel rend ce prealable gratuit** : mesure, **+8 commits et +1 module en 85 minutes** sur un `StartedAt`
+inchange. *Sous gel, trois heures de rejeu n'ajoutent aucun module au lot.* Il couvre aussi les vingt items que
+le §7 range en « autorises, donc a faire » — *une autorisation n'est pas une urgence.* **Le Lead leve le gel
+item par item, jamais en bloc.**
+
+#### Deux recomptages du DSI, tous deux justes sur leur objet
+
+**34 routes gagnent une garde, pas 33** : la 34e est `POST /deploy`, qui gagne `role(2)` + `machine_access` et
+**aucune permission**. *Les deux comptes sont justes sur leur objet* — celui du dossier repond a « qu'est-ce qui
+cesse de fonctionner », et c'est la question qui compte. **Et le vingtieme module du lot est
+`routes/wazuh.py`**, entre en ecrivant E-224 et E-225.
 
 ### v1.38.75 — `api_docs` derive et BASCULE (26 portees / 6 restantes), et archiver `legacy/api/` retire la seule reference d'API du produit
 

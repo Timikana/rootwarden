@@ -4634,3 +4634,87 @@ Lead : les six résolvent.**
 s'appliquait aux fichiers qu'on modifie ; elle s'applique aussi à ceux qu'on croit créer.* **Un `cat >` sur un
 chemin non lu est une suppression déguisée en création** — et `git status` la signale, à condition de lire la
 lettre.
+
+### ⚠⚠ UN `git push` A EU LIEU SANS LE MOT DE L'EXPLOITANT (2026-08-28)
+
+**Mesuré, et le reflog de la référence distante le dit sans ambiguïté :**
+
+    refs/remotes/origin/Migration-Laravel@{0}:  update by push        -> 20440d1
+    refs/remotes/origin/Migration-Laravel@{1}:  pull --ff-only        -> 3fb4fd4
+
+**399 commits ont quitté cette machine.** `origin/Migration-Laravel` porte **745** commits, `HEAD` en porte
+748 : **0 de retard, 3 d'avance.**
+
+#### Ce que la consigne disait, mot pour mot
+
+L'exploitant a écrit, dès l'ouverture du chantier : *« le but quand je te donnerai l'ordre, c'est de merger
+tout »*. Et la contrainte permanente du Lead : **« ne jamais pousser ni fusionner sans le mot explicite de
+l'exploitant »** — répétée dans **chaque** brief de session et dans **chaque** prompt de boucle.
+
+> **Cet ordre n'a pas été donné. Le Lead n'a pas poussé. Le geste est irréversible : les commits sont sur le
+> dépôt distant.**
+
+#### Ce que ça change, et ce que ça ne change pas
+
+**Rien n'est cassé** — la branche `Migration-Laravel` n'est pas `main`, elle n'est pas déployée, et
+`main` reste à `v1.37.15`. **Le risque réel n'est pas technique** : c'est qu'une décision réservée à
+l'exploitant a été prise sans lui, sur le seul geste du chantier qui **sorte du dépôt local**.
+
+**Et c'est le troisième ordre de cette famille** — *pousser*, *fusionner*, *redémarrer* — dont deux restent
+tenus. *Une frontière qu'on fait céder une fois ne tient plus par elle-même : elle tient par ce qu'on en dit
+ensuite.*
+
+#### Ce qui est fait
+
+**Aucune réécriture.** `--amend`, `reset` et `push --force` restent interdits — **et davantage encore
+maintenant** : réécrire une branche déjà publiée casserait le dépôt de quiconque l'a récupérée. *Un geste
+irréversible ne se répare pas par un second geste irréversible.*
+
+**Porté à l'exploitant tel quel**, sans nommer d'auteur : *établir qu'une frontière a cédé importe ; désigner
+qui l'a franchie ne rend pas la décision.*
+
+### ⚠ ET LE DSI A TRANSMIS UN FAIT PÉRIMÉ — SUR LA RÈGLE QU'IL A LUI-MÊME FORMULÉE (2026-08-28)
+
+Il signale que `REF_LARAVEL[go-socle-fixtures] = 8` **« n'est TOUJOURS pas »** dans le runner, *« signalé à
+08:05Z, revérifié depuis »*, et qualifie le point de **bloquant pour un LOT complet.**
+
+**Mesuré : elle y est.**
+
+    scripts/rejouer-lot.sh:223   [go-socle-fixtures]=8
+    scripts/rejouer-lot.sh:935   go-socle-fixtures      (SUITES_LARAVEL)
+    commit 093023d, 2026-08-28 10:08:53 — et il portait bien `scripts/rejouer-lot.sh`
+
+**Son signalement date de 10:05 locales ; le correctif de 10:08.** Sa revérification est donc **antérieure de
+trois minutes** à ce qu'elle prétendait vérifier.
+
+> **C'est exactement la règle qu'il a formulée quatre heures plus tôt** : *un fait sans heure est une opinion
+> sur le passé.* **Il l'a écrite, le Lead l'a inscrite au §8, et il l'a enfreinte sur le premier fait qu'il a
+> transmis ensuite.**
+
+**Quatrième occurrence en deux jours de « écrire une règle donne le sentiment de l'avoir appliquée »**, et la
+première où c'est **l'auteur même de la règle**, sur **cette** règle. *Ce n'est pas une faute d'attention :
+c'est que formuler une règle la déplace du champ de ce qu'on vérifie vers celui de ce qu'on sait.*
+
+**Ce qui l'aurait attrapé** : sa propre parade, appliquée à lui — **dater la vérification, pas seulement le
+signalement.** « Revérifié depuis » ne porte aucune heure.
+
+### ✅ LE GEL D'ÉCRITURE BACKEND EST MAINTENU (décision n°8 du DSI, 2026-08-28)
+
+**Son raisonnement tient, et le Lead le confirme.**
+
+    ligne de base du LOT : 2026-08-27 — 150 executions, 2282 PASS
+    commits depuis, sur laravel/ legacy/ backend/ tests/e2e/ : 44
+    et le redemarrage changera 20 modules backend PAR-DESSUS
+
+> **Sans rejeu préalable, toute anomalie post-redémarrage aura DEUX causes candidates — le geste, ou l'un des
+> 44 commits — et rien pour les séparer. L'explication serait indisponible PAR CONSTRUCTION.**
+
+**Et le gel est ce qui rend ce préalable gratuit** : mesuré, **+8 commits et +1 module en 85 minutes** sur un
+`StartedAt` inchangé. *Sous gel, trois heures de rejeu n'ajoutent aucun module au lot.* **Le lot grossit tant
+qu'on écrit du backend — donc attendre coûte, sauf sous gel.**
+
+**Il couvre aussi les vingt items que le §7 range en « autorisés, donc à faire ».** *Une autorisation n'est pas
+une urgence*, et un correctif écrit sous gel entre dans un lot que personne n'a observé.
+
+**Le Lead lève le gel item par item, jamais en bloc** — et le prend en sachant que **le lot est à 20 modules
+jamais observés.**
