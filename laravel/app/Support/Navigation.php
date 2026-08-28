@@ -118,7 +118,19 @@ class Navigation
         'autre' => [
             ['cle' => 'profil',         'garde' => 'tous',                    'route'  => 'profil'],
             ['cle' => 'documentation',  'garde' => 'tous',                    'legacy' => '/documentation.php'],
-            ['cle' => 'api_docs',       'garde' => 'sa',                      'legacy' => '/api/docs.php'],
+            /*
+             * `api_docs` BASCULE, et la garde reste `sa`.
+             *
+             * `legacy/api/docs.php:4` annonce « admins et superadmins » ; sa
+             * ligne 9 fait `checkAuth([ROLE_SUPERADMIN])`. Le commentaire promet
+             * un acces PLUS LARGE que le code (E-231) — la garde portee est
+             * celle du code.
+             *
+             * La page portee ne sert PAS la description OpenAPI statique du
+             * legacy : elle DERIVE ce que la passerelle autorise. Voir
+             * `AutorisationsPasserelle`.
+             */
+            ['cle' => 'api_docs',       'garde' => 'sa',                      'route'  => 'autorisations-passerelle'],
         ],
     ];
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
+use App\Http\Controllers\AutorisationsPasserelleController;
 use App\Http\Controllers\Fail2banController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\BashrcController;
@@ -753,6 +754,24 @@ Route::middleware('session.authentifiee')->group(function () {
 
     Route::get('/fail2ban', Fail2banController::class)
         ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
+
+    /*
+     * Ce que la passerelle autorise — remplace `legacy/api/docs.php`.
+     *
+     * `role:3` SEUL, et c'est la garde du CODE legacy, pas celle de son
+     * commentaire : `api/docs.php:4` annonce « admins et superadmins » alors que
+     * sa ligne 9 fait `checkAuth([ROLE_SUPERADMIN])` — E-231, un commentaire qui
+     * promet un acces plus large que le code. On porte le code.
+     *
+     * Pas de permission : le legacy n'en exige aucune sur cette page, et en
+     * inventer une resserrerait sans mandat.
+     *
+     * La page ne sert AUCUNE description figee. Elle derive `RoutesBackend` a
+     * chaque affichage — la description OpenAPI du legacy etait un fichier
+     * statique date du 2026-08-20 dont 7 chemins n'existaient pas.
+     */
+    Route::get('/autorisations-passerelle', AutorisationsPasserelleController::class)
+        ->middleware(['role:3'])->name('autorisations-passerelle');
 
     /*
      * F6 : la PORTEE des deux gestes de parc, lue en base.
