@@ -1009,7 +1009,7 @@ while [ $# -gt 0 ]; do
 done
 
 echo "journaux : $JOURNAUX"
-ecarts=0 ; premiere=1
+ecarts=0 ; premiere=1 ; jouees=0
 for cible in "${CIBLES[@]}"; do
   if [ ${#NOMMEES[@]} -gt 0 ]; then
     suites=("${NOMMEES[@]}")
@@ -1037,25 +1037,55 @@ for cible in "${CIBLES[@]}"; do
     # Ceci ne s'applique QU'AUX suites nommees : les deux listes ne contiennent,
     # par construction, que des suites qui visent leur cible. Et l'ignore ne
     # consomme pas de fenetre TOTP — donc pas d'attente de 30 s pour rien.
+    # ⚠ CORRECTIF 2026-08-28 — LE DISCRIMINANT ETAIT FAUX, ET IL EMPECHAIT TOUTE
+    # SUITE NEUVE DE NAITRE.
+    #
+    # La garde d'origine ignorait une suite nommee des qu'elle n'avait pas de
+    # reference SUR CETTE CIBLE. Or une suite qui vient d'etre ecrite n'en a sur
+    # AUCUNE des deux : elle etait donc ignoree partout, et « LOT conforme »
+    # s'affichait sur ZERO execution. Sans mesure, pas de reference ; sans
+    # reference, pas de mesure. Releve par la session 7 en ecrivant la suite P1.
+    #
+    # La question n'est pas « a-t-elle une reference sur CETTE cible » mais
+    # « en a-t-elle une sur L'AUTRE » : c'est cela qui distingue une suite
+    # RESTREINTE volontairement (go-socle-navigation, laravel seulement) d'une
+    # suite JAMAIS MESUREE. Une suite neuve doit tourner pour qu'on l'inscrive.
+    #
+    # « Un garde-fou qui se declenche a tort ne protege plus : il empeche. »
     if [ ${#NOMMEES[@]} -gt 0 ]; then
-      if [ "$cible" = legacy ] && [ -z "${REF_LEGACY[$suite]+x}" ]; then
-        echo "  IGNOREE   legacy/$suite - aucune reference legacy : cette suite ne vise pas cette cible."
+      if [ "$cible" = legacy ] && [ -z "${REF_LEGACY[$suite]+x}" ] \
+         && [ -n "${REF_LARAVEL[$suite]+x}" ]; then
+        echo "  IGNOREE   legacy/$suite - reference laravel SEULE : cette suite ne vise pas cette cible."
         continue
       fi
-      if [ "$cible" = laravel ] && [ -z "${REF_LARAVEL[$suite]+x}" ]; then
-        echo "  IGNOREE   laravel/$suite - aucune reference laravel : cette suite ne vise pas cette cible."
+      if [ "$cible" = laravel ] && [ -z "${REF_LARAVEL[$suite]+x}" ] \
+         && [ -n "${REF_LEGACY[$suite]+x}" ]; then
+        echo "  IGNOREE   laravel/$suite - reference legacy SEULE : cette suite ne vise pas cette cible."
         continue
+      fi
+      if [ -z "${REF_LEGACY[$suite]+x}" ] && [ -z "${REF_LARAVEL[$suite]+x}" ]; then
+        echo "  NEUVE     $cible/$suite - aucune reference : elle TOURNE, son compte est a inscrire."
       fi
     fi
     [ "$premiere" = 0 ] && attendLaFenetreTotp
     premiere=0
+    jouees=$((jouees + 1))
     joue "$cible" "$suite" || ecarts=$((ecarts + 1))
   done
 done
 
 echo
-if [ "$ecarts" -eq 0 ]; then
-  echo "LOT conforme."
+# ⚠ « LOT conforme » sur ZERO execution est un SILENCE, pas un verdict.
+# Le 2026-08-28, la garde ci-dessus ignorait toutes les suites nommees et le
+# runner annoncait « LOT conforme » sans avoir rien joue. Sans lire la ligne
+# IGNOREE, on croyait sa suite verte.
+if [ "$jouees" -eq 0 ]; then
+  echo "AUCUNE SUITE N'A ETE JOUEE — ce n'est PAS un LOT conforme."
+  echo "Toutes les suites nommees ont ete ignorees. Verifie leur nom, ou leur"
+  echo "presence dans SUITES_LARAVEL / SUITES_LEGACY."
+  exit 2
+elif [ "$ecarts" -eq 0 ]; then
+  echo "LOT conforme — $jouees execution(s)."
 else
   echo "$ecarts ecart(s). Les journaux sont dans $JOURNAUX — LIRE LE LOG, pas seulement"
   echo "le code de sortie : une suite qui echoue A L'APPEL ne dit pas ce qu'elle ne"
