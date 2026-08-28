@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.71** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.72** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,56 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.72 — ⚠ un chiffre FAUX que j'avais inscrit DANS LE CODE, et la fin d'une fausse attestation
+
+**⚠ E-213 — mon annotation etait fausse d'un facteur ~35, dans le sens qui alarme.** Elle annoncait
+« 69 comptes que le portail affiche comme exclus recevraient un `userdel -r` ». **C'est le compte des
+lignes `excluded` de l'inventaire, et l'inventaire n'est pas l'entree de cette methode** : la liste des
+candidats vient de la MACHINE, filtree par `awk -F: '$3 >= 1001'` (`configure_servers.py:842`). Les UID
+inferieurs a 1001 n'y apparaissent jamais.
+
+```
+server_user_inventory, status = 'excluded' . 69 lignes
+  -> dont UID >= 1001 ........................ 2
+  -> et ces 2 sont `nobody` (65534), deja dans _PROTECTED_USERS
+  -> donc reellement supprimes AUJOURD'HUI ... 0
+```
+
+**Ce qui rend cette erreur plus grave que les precedentes, c'est l'endroit.** Elle n'etait pas dans un
+compte rendu : elle etait **dans une annotation de code**, a cote d'une methode morte, et elle aurait
+**survecu a la conversation** pour etre lue par quelqu'un qui deciderait sur elle. *Une sonde ecrite
+pour accuser se trompe du cote qui alarme* — et un chiffre faux dans un commentaire ne se corrige pas
+tout seul au tour suivant.
+
+**Ce qui reste vrai, et c'est l'essentiel** : `user_exclusions` est **vide**. Les deux magasins ont
+diverge, c'est le premier que cette methode lit, et la seule protection restante serait la liste des
+six noms systeme — sur un parc dont l'inventaire peut lui-meme etre faux (E-187). *Le danger reste
+entier ; il ne repose simplement pas sur le nombre qu'on croyait.*
+
+**E-225, moitie deleguee — `uninstall` cesse d'ATTESTER.** `success` valait `code == 0`. Sur RHEL et
+SUSE, `apt-get purge` n'existe pas, le `|| true` avale l'echec, `rm -rf /var/ossec` reussit — et la
+route **annoncait une reussite sur un paquet reste installe**. Fausse attestation de la famille E-192.
+
+Le verdict suit desormais **l'effet mesure** : une verification **en lecture seule** interroge le
+gestionnaire de paquets present (`dpkg-query -W`, `rpm -q`) et rend `7` si `wazuh-agent` est toujours
+la. **Elle ne detruit rien et ne rend le geste effectif nulle part** — le `purge` reste `apt`-only, son
+extension est en arbitrage.
+
+> **Ca ne rencontre donc PAS le piege d'E-215**, ou poser la verification seule armait le geste. Ici il
+> n'y a rien a armer : le geste ne devient pas plus efficace, il cesse seulement d'etre annonce comme
+> reussi.
+
+**Et le controle ne passe pas par l'absence de `/var/ossec`**, qui serait trompeuse : `rm -rf` la
+produit **meme quand le paquet reste installe**. C'est la meme regle que `sshd -T` pour E-214 et
+`id rootwarden` pour la suppression de compte — *mesurer l'effet qu'on annonce, pas un effet voisin.*
+
+**Deux faux positifs de ma propre sonde de controle, dans la meme mesure**, et je les note parce qu'ils
+vont **dans le sens inverse de mon biais habituel** : elle a declare la commande « destructive » sur le
+`>` de `>/dev/null`, puis sur le mot `install` de la chaine `'install ok installed'` **qu'on cherche**.
+Verbes reellement employes : `command`, `dpkg-query`, `grep`, `rpm`, `exit`. **Lecture pure.**
+
+**Inerte jusqu'au redemarrage.**
 
 ### v1.38.71 — un fait sans heure est une opinion sur le passe, et le redemarrage n'a plus de prealable bloquant
 

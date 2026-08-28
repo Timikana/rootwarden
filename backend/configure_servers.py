@@ -790,18 +790,30 @@ class ServerConfigurator:
     # 2026-08-28. `configure()` n'appelle que `configure_users`. Elle ne
     # detruit donc rien aujourd'hui.
     #
-    # CE QU'ELLE FERAIT SI ON RETABLISSAIT L'APPEL. Elle epargne un compte s'il
-    # figure dans `_PROTECTED_USERS`, dans les autorises, ou dans la table
-    # `user_exclusions`. Or, mesure du meme jour sur la base du banc :
+    # CE QU'ELLE FERAIT SI ON RETABLISSAIT L'APPEL — ET LE CHIFFRE D'ABORD
+    # ECRIT ICI ETAIT FAUX D'UN FACTEUR ~35, DANS LE SENS QUI ALARME.
     #
-    #     user_exclusions ............................ 0 ligne
+    # Il annoncait « 69 comptes que le portail affiche comme exclus recevraient
+    # un `userdel -r` ». C'est le compte des lignes `excluded` de l'inventaire,
+    # et **l'inventaire n'est pas l'entree de cette methode** : la liste des
+    # candidats vient de la MACHINE, filtree par
+    #
+    #     awk -F: '$3 >= 1001 {print $1}' /etc/passwd        (ligne 842)
+    #
+    # Les UID < 1001 n'y apparaissent jamais. Mesure du 2026-08-28 :
+    #
     #     server_user_inventory, status = 'excluded' . 69 lignes
+    #       -> dont UID >= 1001 ........................ 2
+    #       -> et ces 2 sont `nobody` (65534), deja dans _PROTECTED_USERS
+    #       -> donc reellement supprimes AUJOURD'HUI ... 0
     #
-    # Les deux magasins ont diverge (la migration 030 les a copies UNE fois,
-    # rien ne les synchronise depuis), et c'est le PREMIER que cette methode
-    # lit. **Soixante-neuf comptes que le portail affiche comme « exclus »
-    # recevraient un `userdel -r`** — le compte ET son repertoire personnel.
-    # Leur seule protection serait la liste de six noms systeme.
+    # CE QUI RESTE VRAI, ET C'EST L'ESSENTIEL : `user_exclusions` est VIDE (0
+    # ligne). Les deux magasins ont diverge — la migration 030 les a copies UNE
+    # fois, rien ne les synchronise depuis — et c'est le PREMIER que cette
+    # methode lit. La seule protection restante serait donc la liste des six
+    # noms systeme, sur un parc dont l'inventaire peut lui-meme etre faux
+    # (E-187). **Le danger reste entier ; il ne repose simplement pas sur le
+    # nombre qu'on croyait.**
     #
     # Son retrait est recommande et releve d'un arbitrage en cours. En
     # attendant, cet avertissement remplace l'invitation que portait la
