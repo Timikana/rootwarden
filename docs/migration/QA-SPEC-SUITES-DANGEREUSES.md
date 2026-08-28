@@ -38,9 +38,15 @@ remesurerait ça mesurerait moins bien, plus lentement, et sur un banc partagé.
 
 ## 2. ⚠ UN ÉCART MESURÉ, ET IL CONCERNE `wazuh` DIRECTEMENT
 
-`/wazuh/` est dans la **liste blanche** de la passerelle et **absent** de
-`ADMIN_SEULEMENT`. Un compte de **rôle 1** porteur de `can_manage_wazuh` peut donc
-atteindre `/api/gateway/wazuh/install_all` : la passerelle **transmet**.
+> ⚠ **`/wazuh/` A ÉTÉ FERMÉ pendant que nous en discutions** — ajouté à
+> `ADMIN_SEULEMENT` à 15:58, douze minutes avant que je le signale. Remesuré :
+> `ADMIN_SEULEMENT` porte **28** entrées et `/wazuh/` en fait partie. **Cette section
+> décrit donc un écart refermé**, et elle est gardée pour son raisonnement, pas pour son
+> objet.
+
+`/wazuh/` était dans la **liste blanche** de la passerelle et **absent** de
+`ADMIN_SEULEMENT`. Un compte de **rôle 1** porteur de `can_manage_wazuh` pouvait donc
+atteindre `/api/gateway/wazuh/install_all` : la passerelle **transmettait**.
 
 Le backend refuse — les quatre routes portent `@require_role` :
 
@@ -67,6 +73,35 @@ fichier. **Transmis** (E-235).
 > **Une mesure qu'on a faite soi-même ne protège pas d'un cadrage qu'on reprend.**
 
 ---
+
+## 2 ter. L'ENSEMBLE COMPLET des remparts manquants — dérivé, pas listé
+
+J'avais demandé d'élargir l'écart de **deux** espaces à **trois**. On m'a corrigée : il en
+manquait un (`/fail2ban/`) et l'un des miens était déjà fermé (`/wazuh/`).
+
+**La leçon est que ni mon ensemble ni le sien n'était le bon, parce que les deux étaient
+des LISTES D'EXEMPLES.** Mesuré exhaustivement — pour chaque espace de la liste blanche,
+sa présence dans `ADMIN_SEULEMENT`, et les routes qu'il couvre dont la garde est un
+**rôle seul**, sans permission ni accès-machine :
+
+| espace | réservé admin | routes de parc **sans permission** |
+|---|---|---|
+| **`/ssh-audit/`** | **NON** | **8** — `scan-all`, `fleet`, `policies`, `schedules` ×4, `trends` |
+| **`/docker/`** | **NON** | **1** — `scan_all` |
+| `/fail2ban/` | **NON** | — *(toutes ses routes portent une permission)* |
+| `/bashrc/`, `/graylog/`, `/maintenance/`, `/services/` | **NON** | — |
+| `/admin/`, `/drift/`, `/policy/`, `/supervision/`, `/tasks/`, `/wazuh/` | oui | — |
+
+**Sept espaces** manquent le rempart, pas trois. **Deux** seulement portent des routes que
+rien d'autre ne garde qu'un rôle — et `/ssh-audit/` en porte **huit**, pas une.
+
+> **Une demande d'élargissement se remesure comme une accusation : elle peut viser trop
+> peu — et trop large sur une autre dimension.** Mon ensemble était incomplet ; celui qui
+> me corrigeait l'était aussi, et il rangeait `/fail2ban/` au même niveau que
+> `/ssh-audit/` alors que toutes ses routes portent une permission.
+>
+> **La parade n'est pas une liste plus longue : c'est de DÉRIVER l'ensemble.** Une liste
+> d'exemples se corrige indéfiniment ; une énumération ne se corrige qu'une fois.
 
 ## 2 bis. ⚠ LA FAMILLE LA PLUS EXPOSÉE — et ce n'est pas `install_all`
 
