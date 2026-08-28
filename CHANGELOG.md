@@ -2171,6 +2171,63 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.66 — quatre issues et non trois : « rien reçu » et « reçu puis silence » sont deux pannes
+
+Correction issue de la relecture QA, sur un correctif commité une heure plus tôt. Elle porte sur une
+nuance que j'avais aplatie.
+
+J'avais conclu que le motif de `scan-cve.js` était « meilleur » que le mien et qu'il fallait aligner.
+**C'était mal posé** : les deux distinguent trois issues, mais **pas les mêmes**, et les troisièmes
+**ne se recouvrent pas** :
+
+| écran | sa troisième issue |
+|---|---|
+| `scan-cve.js` | des lignes, puis un arrêt **sans marqueur terminal** |
+| `docker.js` | **aucune ligne lisible** |
+
+> **« Aucune ligne lisible » dit que le canal n'a rien donné ; « des lignes puis un arrêt » dit qu'il a
+> donné puis s'est tu.** Remplacer l'une par l'autre aurait perdu une information — il en faut
+> **quatre**, pas trois.
+
+#### Ce que le jet précédent perdait
+
+Sur une lecture qui **lève** — coupure réseau, flux avorté — le `catch` jetait `ok` et `echecs` pour
+n'annoncer qu'une erreur réseau. Or à ce point le flux a peut-être rapporté cinq machines sur huit :
+
+- les taire fait croire qu'**aucune** n'a été traitée ;
+- et pousse à **relancer** un geste qui a déjà tourné sur la moitié du parc — le même danger que la
+  relance après expiration sur la clé de plateforme.
+
+L'interruption **nomme désormais le compte partiel** : tant de réussies, tant en échec, et les
+suivantes non traitées. Ni réussite ni échec global.
+
+#### Ce qui reste non mesurable, et le reste
+
+Cette branche attrape une lecture qui lève. Elle **ne peut pas** attraper un serveur qui ferme
+proprement le flux avant la fin, faute de marqueur terminal côté backend. Cette part-là est **dite par
+la borne, pas mesurée** — et le marqueur manquant reste remonté.
+
+La ligne à retenir, et elle vient de la QA :
+
+> **Un flux qui se termine sans `done` ni `error` n'est PAS un succès.** C'est « le marqueur n'est pas
+> le verdict » appliqué à son **absence** — la moitié qu'on oublie, parce qu'un flux qui s'arrête
+> proprement *ressemble* à un flux qui a fini.
+
+#### L'absence des trois routes est désormais établie, pas seulement non trouvée
+
+La QA a contredit mon relevé par arbre syntaxique et sur les **deux** couches : 1 370 littéraux JS
+commentaires exclus, 0 concaténation de littéraux, 11 URL injectées par les contrôleurs, et un résidu
+de 8 gabarits interpolés **tous** préfixés `/supervision/` — donc incapables de produire les trois
+chemins. Elle n'a pas pu me contredire, et c'est ce qui rend le dédouanement utilisable.
+
+Et son contre-exemple vaut d'être gardé : **`/cve_scan` est absent des 1 370 littéraux JS et pourtant
+consommé**, parce qu'un contrôleur l'injecte. Une mesure d'absence sur la seule couche JavaScript
+l'aurait déclaré non consommé — à tort, et dans le sens qui rassure.
+
+Parité i18n comparée : `docker` 44 = 44.
+
+---
+
 ### v1.38.65 — `docker` cesse d'annoncer un total de parc sur un flux qui n'a pas de fin
 
 Suite du correctif précédent, et c'est un écran mieux écrit ailleurs qui l'a révélé.

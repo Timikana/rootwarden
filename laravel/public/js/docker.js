@@ -280,8 +280,32 @@
             }
             traite(tampon);
         } catch (e) {
+            /* ══ UNE INTERRUPTION NOMME CE QUI A DEJA ETE LU ═══════════════
+             *
+             * Le jet precedent jetait `ok` et `echecs` pour n'annoncer qu'une
+             * erreur reseau. Or a ce point le flux a peut-etre rapporte cinq
+             * machines sur huit : les taire fait croire qu'aucune n'a ete
+             * traitee, et pousse a relancer un geste qui a deja tourne sur la
+             * moitie du parc.
+             *
+             * QUATRE ISSUES, PAS TROIS. « Aucune ligne lisible » et « des
+             * lignes, puis un arret » sont deux pannes DIFFERENTES : la
+             * premiere dit que le canal n'a rien donne, la seconde qu'il a
+             * donne puis s'est tu. Les fondre en perdrait une.
+             *
+             * Ce que cette branche attrape : une lecture qui LEVE — coupure
+             * reseau, flux avorte. Ce qu'elle ne peut PAS attraper : un serveur
+             * qui ferme proprement le flux avant la fin, faute de marqueur
+             * terminal cote backend. Cette part-la reste dite par la borne, pas
+             * mesuree. */
             bouton.disabled = false;
-            annonce(L.err_reseau, 'echec');
+            if (lu) {
+                annonce(String(L.scan_all_interrompu || '')
+                    .split(':ok').join(String(ok))
+                    .split(':echecs').join(String(echecs.length)), 'attention');
+            } else {
+                annonce(L.err_reseau, 'echec');
+            }
             charge();
 
             return;
