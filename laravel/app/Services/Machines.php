@@ -80,6 +80,75 @@ class Machines
     }
 
     /**
+     * Le parc VU PAR CE COMPTE, et le parc entier — les deux, jamais l'un seul.
+     *
+     * ══ E-208 : LE TABLEAU DE BORD DU LEGACY NE CLOISONNE PAS ════════════
+     *
+     * `legacy/index.php` sert la taille du parc a tout le monde, sans filtrer
+     * selon les machines auxquelles le compte a acces. Porter fidelement
+     * reproduirait la fuite ; porter borne sans rien dire retirerait une
+     * visibilite. L'arbitrage rendu est : **borner, ET dire le total.**
+     *
+     * D'ou DEUX nombres. « 1 de vos machines » seul laisserait croire que le
+     * parc en compte une ; « 3 au parc » seul serait la fuite. Ensemble, ils
+     * disent la borne sans la cacher : un compte qui ne voit qu'une machine sur
+     * trois DOIT savoir que le parc en compte trois, sinon le tableau de bord
+     * mentirait par omission au lieu de fuir.
+     *
+     * Le predicat de bornage est celui de `pourMisesAJour` ci-dessus, et celui
+     * d'`Iptables::machines` et `Fail2ban::machines` : role >= 2 voit le parc,
+     * role 1 est joint a `user_machine_access`. On le REPREND, on ne le
+     * reinvente pas — trois implementations d'une meme regle finissent par
+     * diverger.
+     *
+     * Cout mesure de la borne : un seul compte reel la subit, et les deux
+     * machines qu'il cesse de voir sont deux machines auxquelles il n'a aucun
+     * acces.
+     *
+     * @return array{perimetre:int,parc:int,borne:bool,lisible:bool}
+     */
+    public function compteursPerimetre(int $roleId, int $userId): array
+    {
+        $actives = function ($q) {
+            $q->whereNull('m.lifecycle_status')
+              ->orWhere('m.lifecycle_status', '!=', 'archived');
+        };
+
+        try {
+            $parc = DB::table('machines as m')->where($actives)->count();
+
+            if ($roleId >= 2) {
+                // Pas de jointure : le perimetre EST le parc. Le dire ainsi
+                // evite un compte redondant et rend `borne` faux, ce qui permet
+                // a l'ecran de ne pas afficher une reserve sans objet.
+                return ['perimetre' => $parc, 'parc' => $parc, 'borne' => false, 'lisible' => true];
+            }
+
+            $perimetre = DB::table('machines as m')
+                ->join('user_machine_access as uma', 'm.id', '=', 'uma.machine_id')
+                ->where('uma.user_id', $userId)
+                ->where($actives)
+                ->count();
+
+            return [
+                'perimetre' => $perimetre,
+                'parc'      => $parc,
+                'borne'     => true,
+                'lisible'   => true,
+            ];
+        } catch (\Throwable $e) {
+            // UNE BASE INJOIGNABLE N'EST PAS UN PARC VIDE. Rendre des zeros
+            // afficherait « 0 de vos machines · 0 au parc », ce qui se lit comme
+            // un fait. `lisible` a faux laisse l'ecran DIRE qu'il n'a pas su
+            // lire — c'est le defaut que le commentaire de `pourMisesAJour`
+            // signale juste au-dessus, et qu'on ne refait pas ici.
+            Log::error('[Machines::compteursPerimetre] parc illisible : ' . $e->getMessage());
+
+            return ['perimetre' => 0, 'parc' => 0, 'borne' => false, 'lisible' => false];
+        }
+    }
+
+    /**
      * Les etiquettes posees sur le parc, pour alimenter le filtre.
      *
      * Elles sont ecrites par le module `adm/`, non porte : cette page ne fait

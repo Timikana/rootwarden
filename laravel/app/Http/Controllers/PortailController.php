@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Droits;
+use App\Services\Machines;
 use App\Services\MotDePasse;
 use App\Services\StepUp;
 use App\Support\Navigation;
@@ -20,7 +21,10 @@ use Illuminate\View\View;
  */
 class PortailController extends Controller
 {
-    public function __construct(private readonly Droits $droits)
+    public function __construct(
+        private readonly Droits $droits,
+        private readonly Machines $machines,
+    )
     {
     }
 
@@ -36,15 +40,63 @@ class PortailController extends Controller
         return redirect()->route('accueil');
     }
 
+    /**
+     * L'ORDRE DES RACCOURCIS, repris de `legacy/index.php:363-385`.
+     *
+     * Douze tuiles, dans cet ordre. Ce ne sont pas les douze premieres entrees
+     * du menu : c'est une selection, et l'ordre du legacy est conserve parce
+     * qu'un exploitant qui connait la page retrouve ses reperes au meme endroit.
+     *
+     * `documentation` est la douzieme et le legacy l'affiche SANS condition.
+     * Elle est ici soumise au menu comme les autres — ce qui ne change rien en
+     * pratique (l'entree est accessible a tous les roles) et evite une regle
+     * particuliere pour une seule tuile.
+     */
+    private const RACCOURCIS = [
+        'ssh_keys', 'updates', 'iptables', 'cve_scan', 'admin', 'supervision',
+        'bashrc', 'graylog', 'wazuh', 'ssh_audit', 'compliance', 'documentation',
+    ];
+
     public function accueil(Request $requete): View
     {
         $menu = $this->menuDuCompte($requete);
         $entrees = collect($menu)->flatten(1);
 
+        /*
+         * ══ LES TUILES SE DERIVENT DU MENU, ELLES NE RECOPIENT PAS SES GARDES ══
+         *
+         * `legacy/index.php` reecrit ONZE tests de permission pour ses douze
+         * tuiles — les memes que son menu, une seconde fois. Deux copies d'une
+         * regle de droits finissent par diverger, et c'est le motif que ce
+         * portage refuse partout ailleurs.
+         *
+         * Ici `Navigation::pour()` a deja applique le role, les permissions ET
+         * le drapeau de fonctionnalite (`wazuh`) : on FILTRE son resultat. Une
+         * tuile ne peut donc pas apparaitre sans son entree de menu, ni viser
+         * l'ancien portail quand la page est portee — les deux se lisent au meme
+         * endroit.
+         *
+         * Le LIBELLE vient de `nav.<cle>`, pas d'un second jeu de cles : le
+         * legacy en a deux (`dashboard.sc_*` et son menu) qui disent la meme
+         * chose. Seule la DESCRIPTION est propre aux tuiles.
+         */
+        $parCle = $entrees->keyBy('cle');
+        $raccourcis = collect(self::RACCOURCIS)
+            ->map(fn (string $cle) => $parCle->get($cle))
+            ->filter()
+            ->values()
+            ->all();
+
         return view('accueil', [
             'modulesAccessibles' => $entrees->count(),
             'modulesPortes'      => $entrees->filter(fn ($e) => isset($e['route']))->count(),
             'libelleRole'        => $this->libelleRole((int) $requete->session()->get('role_id', 0)),
+            'raccourcis'         => $raccourcis,
+            // E-208 : borne au perimetre, ET le total du parc avec.
+            'parc'               => $this->machines->compteursPerimetre(
+                (int) $requete->session()->get('role_id', 0),
+                (int) $requete->session()->get('utilisateur_id', 0),
+            ),
         ]);
     }
 
