@@ -1,6 +1,11 @@
 # Ce que le redémarrage de `rootwarden_python` fera prendre effet
 
-Mesuré le **2026-08-27**, session 4. Le Lead remonte à l'exploitant la **priorité du redémarrage**.
+> **Toutes les heures de ce document sont en UTC, avec leur équivalent CEST entre parenthèses.**
+> Les conteneurs sont en UTC, l'hôte en CEST (**UTC+2**), et E-73 a déjà fait décider de travers sur
+> ces deux heures d'écart. *Une heure sans fuseau dans un document de décision est une heure fausse
+> pour la moitié de ses lecteurs.*
+
+Mesuré le **2026-08-27 vers 16:50 UTC** (18:50 CEST), session 4. Le Lead remonte à l'exploitant la **priorité du redémarrage**.
 Ce document dit ce qui changera **au moment où il aura lieu** — pas la liste des correctifs, mais
 **ce qui cessera de fonctionner pour des comptes réels**.
 
@@ -18,7 +23,7 @@ fichiers modifies depuis 18:10 -> 18:40
 contre le `mtime` des fichiers — et non une introspection du processus, qui décrirait le fichier et
 non le serveur.
 
-| | 2026-08-27 soir | **2026-08-28 · 08:14Z** |
+| | **2026-08-27 · 16:50 UTC** (18:50 CEST) | **2026-08-28 · 08:14 UTC** (10:14 CEST) |
 |---|---|---|
 | commits touchant `backend/` depuis le démarrage | 23 | **36** |
 | fichiers source dont le **code** change (docstrings et commentaires exclus) | 19 | **20** |
@@ -26,7 +31,7 @@ non le serveur.
 | fichiers de test (sans effet sur le service) | 2 | 2 |
 
 **Le `StartedAt` n'a pas bougé entre les deux relevés** — c'est le lot qui grossit, pas la référence
-qui glisse. **+13 commits et +1 module en une nuit**, et le module ajouté est `wazuh.py` : **le mien**.
+qui glisse. **+13 commits et +1 module en 15 h 24** (16:50 UTC → 08:14 UTC), et le module ajouté est `wazuh.py` : **le mien**.
 
 > **Attendre ne réduit pas le risque de ce redémarrage : ça l'augmente.** Le seul risque réel de ce
 > lot est sa **taille** — vingt modules qui prendront effet ensemble sans qu'aucun n'ait jamais été
@@ -70,7 +75,7 @@ Parmi ces neuf, combien détiennent déjà la permission qui deviendra nécessai
 
 ### ⚠⚠ DEUX CORRECTIONS SUCCESSIVES, ET LA PREMIERE ETAIT FAUSSE DU COTE QUI FAIT AGIR
 
-**Première correction (le 2026-08-28, matin) — et elle était FAUSSE.** Elle affirmait, sur un décompte
+**Première correction (2026-08-28 · 08:14 UTC, soit 10:14 CEST) — et elle était FAUSSE.** Elle affirmait, sur un décompte
 de `user_logs`, que `fail2ban` et `services` avaient **30 actions historiques** d'un compte de rôle < 3
 et que « le redémarrage retire une capacité à un compte qui s'en servait la veille ». Elle en tirait
 une recommandation : **attribuer deux permissions à ce compte avant le redémarrage.**
