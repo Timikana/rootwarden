@@ -4931,7 +4931,7 @@ depuis 26 minutes. **Employé à vérifier le seul document dont le Lead est com
 |---|---|---|---|
 | entrées de menu portées | **24** sur 32 | **26** | depuis la bascule de `platform_key`, puis d'`api_docs` |
 | parties du legacy archivées | **12** | **13** | depuis `services/`, **le 2026-08-27** |
-| tests backend | **509** | **à remesurer** (549 publié par la QA) | depuis le 2026-08-28 au matin |
+| tests backend | **509** | **566** — tranché à 16:28, `c282fbe` | depuis le 2026-08-28 au matin. ⚠ *Ni `509` ni `549` n'étaient faux : **c'est le chiffre qui voyageait sans son heure**. Le seul faux était le repère de `462`, qui comptait des fonctions et non des cas* |
 | commits non poussés | **391** | **1** | depuis le second push, ce midi |
 
 #### Ce que cet audit établit, et ce n'est pas « quatre erreurs »
