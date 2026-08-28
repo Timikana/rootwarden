@@ -204,6 +204,53 @@ Restent trois routes sans appelant trouvé — `cve_compare`, `iptables-validate
 `wazuh/detect` — et **je n'affirme pas qu'elles n'en ont pas** : je dis que ni le
 JavaScript ni les contrôleurs PHP ne nomment leur chemin. C'est une absence de preuve.
 
+### La seconde moitié est faite — 71 % de couverture, et zéro appelant à risque
+
+`laravel/tests/Outils/jointure.py` + `extrait-urls.php`. **Trois langages, trois
+analyseurs, aucune expression régulière sur du code** : `acorn` pour le JavaScript,
+`token_get_all()` pour le PHP, `ast` pour le Python.
+
+**Ce qui a fait passer la couverture de 22 % à 71 %** est une remontée d'un niveau.
+Presque chaque fichier route ses appels par un helper — `lit(chemin)`, `appelle(chemin)`
+— si bien que la cible du `fetch` est une **variable** là où on la lit. Le chemin
+littéral existe, mais chez les **appelants du helper**. C'est la même discipline que
+*remonter du champ à son `form`* plutôt que de prendre le premier bouton.
+
+| | |
+|---|---|
+| sites résolus **directement** | 13 |
+| sites résolus **par remontée** | 29 |
+| **silences mesurés** (clé PHP interpolée) | 4 |
+| **silences par incapacité** (cible variable) | 13 |
+| **couverture** | **71 %** — 42 sites sur 59, 75 chemins |
+
+**Aucun appelant à risque** : aucune route de la famille « 200 menteuse » n'est consommée
+par un appelant qui ne lit pas le verdict.
+
+### L'outil produit des CANDIDATS, jamais des verdicts — trois fois de suite
+
+| ce qu'il a annoncé | ce que la lecture a montré |
+|---|---|
+| « aucun appelant » pour 5 routes | 2 résolues en une commande **sur la couche PHP** |
+| `mises-a-jour.js:63 → /linux_version` **à risque** | `releve()` teste `res.corps.success === false` (ligne 274) — **faux positif** |
+| `docker_results` exonérée *(invariant voisin)* | l'instrument, pas le code |
+
+La deuxième vient d'une règle de risque trop large : elle comptait `delegue` comme un
+risque, alors que `delegue` veut précisément dire *« un appelant du fichier lit le
+verdict »*. **Trois fausses accusations dans le développement d'un seul outil, et les
+trois rattrapées en LISANT le code signalé.**
+
+### Deux sortes de silence, et elles ne se ressemblent que dans un tableau
+
+- **mesuré** : la clé PHP existe, mais son URL est **interpolée**
+  (`url("/api/gateway/supervision/{$plateforme}/version")`). On sait pourquoi on ne sait
+  pas ;
+- **par incapacité** : la cible est une variable qu'on ne remonte pas — helper importé
+  d'un autre fichier, ou chemin construit ailleurs.
+
+Les deux sont comptés séparément. **Un « 0 défaut » sur 71 % de couverture n'est pas un
+« 0 défaut ».**
+
 ### Ce qui reste à faire pour que la jointure soit mécanique
 
 Résoudre, **par analyse et non par `grep`**, la chaîne `libellé JS → clé PHP → chemin de
