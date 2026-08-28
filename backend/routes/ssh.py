@@ -990,19 +990,53 @@ def deploy_platform_key():
 @require_role(3)  # superadmin only - kill-switch
 @threaded_route
 def revoke_service_account():
-    """
-    Patch A04-INSEC-N5 (OWASP A04 Insecure Design) - kill-switch.
+    """Retire le compte de service `rootwarden` des machines designees.
 
-    Revoque le compte de service 'rootwarden' sur une ou plusieurs machines :
-    - Supprime l'utilisateur Linux distant (userdel -r -f)
-    - Retire le fichier /etc/sudoers.d/rootwarden
-    - Marque service_account_deployed=0 en BDD
-    - Audit log immutable
+    Body JSON : {machine_ids: [int], reason: str}. Superadmin uniquement.
 
-    Cas d'usage : compromission suspectee de la clé Ed25519 plateforme,
-    rotation forcee, audit sortant. Superadmin only.
+    Ce qu'elle fait, machine par machine :
+    - supprime l'utilisateur Linux distant (`userdel -r -f`)
+    - retire `/etc/sudoers.d/rootwarden`
+    - passe `service_account_deployed` a 0
+    - ecrit une entree d'audit
 
-    Body JSON : {machine_ids: [int], reason: str}
+    ══ E-219 : CE N'EST PAS UN KILL-SWITCH, ET L'ETIQUETTE A ETE RETIREE ════
+
+    Cette docstring portait le mot « kill-switch » et trois cas d'usage :
+    « compromission suspectee de la cle Ed25519 plateforme, rotation forcee,
+    audit sortant ». **Le geste n'en remplit AUCUN**, et le nom faisait croire
+    l'inverse a qui le lisait avant de decider.
+
+    CE QU'IL LAISSE, ET C'EST LA MOITIE QUI MANQUAIT. La cle de plateforme
+    reste deployee sur `root` (`ssh.py` : `>> /root/.ssh/authorized_keys`) ET
+    sur le compte nominal (`>> ~/.ssh/authorized_keys`). Retirer le compte de
+    service ne retire donc **aucune** des deux autres copies : une cle
+    compromise reste acceptee par la machine, par deux chemins.
+
+    ══ LA CHAINE REELLE, POUR UNE CLE COMPROMISE ═══════════════════════════
+
+        1. `regenerate_platform_key`  remplace la cle EMPLOYEE — elle ne retire
+                                      RIEN des machines (E-226)
+        2. `server_user_remove_key`   retire l'ancienne, COMPTE PAR COMPTE et
+                                      MACHINE PAR MACHINE
+
+    **Aucun geste unique n'y repond.** Le dire ici est le seul endroit ou
+    quelqu'un le lira au moment ou il en a besoin.
+
+    ⚠ `server_user_remove_key`, PAS `remove_user_keys` — la confusion a ete
+    faite TROIS fois, y compris dans `PARITE.md`. C'est la route soigneuse :
+    sauvegarde, empreintes recalculees, refus par defaut sur la cle de
+    plateforme, code de retour lu. *Deux fonctions voisines qui font le meme
+    geste sous des noms symetriques sont un piege de lecture avant d'etre un
+    defaut de code.*
+
+    ══ ET LE GESTE NE GRANDIT PAS ══════════════════════════════════════════
+
+    Etendre cette revocation aux trois copies a ete REFUSE : elle rendrait
+    RootWarden injoignable autrement que par mot de passe, c'est-a-dire qu'elle
+    detruirait l'acces au lieu de le restreindre. **Une route qui ne fait qu'une
+    partie du travail et qui le DIT vaut mieux qu'une route qui fait tout et
+    verrouille le parc.**
     """
     data = request.get_json(silent=True) or {}
     machine_ids = data.get('machine_ids', [])

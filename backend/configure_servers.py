@@ -700,8 +700,15 @@ class ServerConfigurator:
     Pour chaque machine, la classe se charge de :
       - Se connecter via SSH avec retry automatique.
       - Mettre à jour le .bashrc root.
-      - Nettoyer les utilisateurs non autorisés (clean_up_users).
       - Créer/configurer les utilisateurs autorisés (configure_users).
+
+    ⚠ Cette liste annonçait aussi « nettoyer les utilisateurs non autorisés
+    (clean_up_users) ». C'est FAUX depuis que l'appel a été retiré : `configure`
+    n'appelle que `configure_users`. La méthode existe encore, plus bas, et
+    personne ne l'appelle — voir l'avertissement qui la précède.
+
+    Le dire compte, parce qu'une docstring qui annonce une étape absente
+    n'informe pas : elle INVITE à rétablir l'appel.
 
     Attributs :
         machine       (dict): Métadonnées de la machine (id, name, ip, port, user, password, root_password).
@@ -777,6 +784,28 @@ class ServerConfigurator:
             self.configure_users(root_channel)
         self.logger.info(f"=== Configuration terminée pour la machine : {self.name} ===")
 
+    # ══ ⚠ CODE MORT, ET LE RETABLIR DETRUIRAIT 69 COMPTES (E-213) ══════════
+    #
+    # `clean_up_users` n'a AUCUN appelant dans tout le depot — mesure du
+    # 2026-08-28. `configure()` n'appelle que `configure_users`. Elle ne
+    # detruit donc rien aujourd'hui.
+    #
+    # CE QU'ELLE FERAIT SI ON RETABLISSAIT L'APPEL. Elle epargne un compte s'il
+    # figure dans `_PROTECTED_USERS`, dans les autorises, ou dans la table
+    # `user_exclusions`. Or, mesure du meme jour sur la base du banc :
+    #
+    #     user_exclusions ............................ 0 ligne
+    #     server_user_inventory, status = 'excluded' . 69 lignes
+    #
+    # Les deux magasins ont diverge (la migration 030 les a copies UNE fois,
+    # rien ne les synchronise depuis), et c'est le PREMIER que cette methode
+    # lit. **Soixante-neuf comptes que le portail affiche comme « exclus »
+    # recevraient un `userdel -r`** — le compte ET son repertoire personnel.
+    # Leur seule protection serait la liste de six noms systeme.
+    #
+    # Son retrait est recommande et releve d'un arbitrage en cours. En
+    # attendant, cet avertissement remplace l'invitation que portait la
+    # docstring de la classe.
     def clean_up_users(self, channel):
         """
         Nettoie les utilisateurs non autorisés sur la machine, en tenant compte des exclusions.

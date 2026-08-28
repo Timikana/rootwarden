@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.68** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.70** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,60 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.70 — trois gestes qui ne disaient pas ce qu'ils laissent (E-219, E-225, E-213)
+
+**E-219 — `revoke_service_account` n'est pas un « kill-switch ».** Sa docstring portait ce mot et trois
+cas d'usage : *compromission suspectee de la cle, rotation forcee, audit sortant.* **Le geste n'en
+remplit aucun.** Ce qu'il LAISSE est la moitie qui manquait : la cle de plateforme reste deployee sur
+`root` (`ssh.py:846`) **et** sur le compte nominal (`:836`) — verifie. Retirer le compte de service ne
+retire **aucune** des deux autres copies.
+
+La chaine reelle est desormais nommee : `regenerate_platform_key` remplace la cle **employee** sans
+rien retirer des machines (E-226), puis `server_user_remove_key` retire l'ancienne **compte par compte
+et machine par machine**. **Aucun geste unique n'y repond**, et le dire dans cette docstring est le
+seul endroit ou quelqu'un le lira au moment ou il en a besoin. ⚠ `server_user_remove_key`, **pas**
+`remove_user_keys` — la confusion a ete faite trois fois. *Deux fonctions voisines qui font le meme
+geste sous des noms symetriques sont un piege de lecture avant d'etre un defaut de code.*
+
+**Le geste ne grandit pas** : etendre la revocation aux trois copies est refuse, ca rendrait RootWarden
+injoignable autrement que par mot de passe. *Une route qui ne fait qu'une partie du travail et qui le
+DIT vaut mieux qu'une route qui fait tout et verrouille le parc.*
+
+**E-225 — la reponse d'`uninstall` nomme ce qui subsiste.** Le depot Wazuh et sa cle de signature, par
+famille, depuis **une seule source** (`VESTIGES_AMORCAGE`). **Aucun changement de comportement : on ne
+retire pas le depot, on cesse de faire croire qu'il est parti.**
+
+**⚠ Et une trouvaille en l'ecrivant : `uninstall` est `apt`-only, alors que l'installation ne l'est
+plus.** Le commentaire de l'installation le dit lui-meme — *« avant v1.18.x c'etait apt-only → fail
+silencieux sur RHEL family »*. **Le defaut a ete corrige a l'installation et jamais reporte a la
+desinstallation.** Sur RHEL et SUSE, `apt-get purge` n'existe pas, le `|| true` avale l'echec, seul
+`rm -rf /var/ossec` agit — **le paquet reste installe et `code == 0` fait annoncer une reussite**.
+**Signale, pas repare** : rendre cette commande multi-famille est un changement de comportement sur un
+geste destructeur distant.
+
+**Et les deux copies du script d'amorcage ont DEJA diverge** (`wazuh.py:366` et `:586`) : six lignes
+d'ecart, toutes dans le **message d'erreur** — l'une nomme les familles supportees, l'autre dit « OS non
+supporte ». *C'est-a-dire que la divergence porte precisement sur ce dont on a besoin quand ca echoue.*
+
+**E-213 — une docstring qui annoncait une etape absente.** La classe declarait « nettoyer les
+utilisateurs non autorises (`clean_up_users`) » dans sa sequence. **`clean_up_users` n'a aucun appelant
+dans tout le depot** ; `configure()` n'appelle que `configure_users`. Elle ne detruit donc rien
+aujourd'hui — **mais la docstring invitait a retablir l'appel**.
+
+Mesure du jour, qui dit ce que ce retablissement couterait :
+
+```
+user_exclusions ............................  0 ligne
+server_user_inventory, status = 'excluded' . 69 lignes
+```
+
+**Les deux magasins ont diverge, et c'est le PREMIER que cette methode lit.** Soixante-neuf comptes que
+le portail affiche comme « exclus » recevraient un `userdel -r` — le compte **et** son repertoire
+personnel. Leur seule protection serait la liste de six noms systeme. La docstring est corrigee et un
+avertissement mesure precede la methode ; **son retrait releve d'un arbitrage en cours.**
+
+**Inerte jusqu'au redemarrage.**
 
 ### v1.38.69 — l'accueil porte ses douze raccourcis, dit la séquence, et borne le parc au périmètre du compte
 
