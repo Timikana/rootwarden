@@ -106,7 +106,7 @@ et c'est cette fois dans le bon sens.*
 | # | question | qui |
 |---|---|---|
 | 1 | la console se porte-t-elle ? | **délégué — tranché ci-dessous** |
-| 2 | les 6 883 mots de prose en dur à 96,4 % | **hors de mon périmètre** : ce n'est plus un portage, c'est un projet de rédaction à chiffrer, et son coût appartient à l'exploitant |
+| 2 | le volume de prose en dur de la page | **hors de mon périmètre** : ce n'est plus un portage, c'est un projet de rédaction à chiffrer, et son coût appartient à l'exploitant |
 
 **✅ DÉCISION sur la n°1 : la console NE SE PORTE PAS.**
 
@@ -166,4 +166,11 @@ rôle ≥ 2 — le `DOSSIER-02` en propose deux de plus.
   la machine que le chantier a l'interdiction de joindre ;
 - **`/docker/scan_all` et `POST /groups/<id>/run`**, relevés par le Lead comme atteignables par la même
   console, ne sont pas revérifiés ici. **Je le dis plutôt que de les reprendre** : deux maillons vérifiés
-  ne valident pas les trois autres lignes d'un tableau.
+  ne valident pas les trois autres lignes d'un tableau ;
+- **le VOLUME de prose de la page.** Le relevé du Lead annonce **6 883 mots à 96,4 % en dur** ; je l'ai
+  d'abord recopié dans ce dossier **sans le mesurer**. Ma propre mesure, grossière et déclarée comme
+  telle — texte entre balises de plus de vingt caractères, compté par `wc -w` — rend **~3 861**, soit un
+  **plancher** et non un compte comparable. *Deux méthodes différentes sur le même objet ne se
+  départagent pas par le chiffre le plus gros.* **Le chiffre est retiré du corps du dossier** : la
+  décision qu'il soutient — *ce n'est plus un portage, c'est un projet de rédaction* — ne dépend pas de
+  savoir s'il vaut 3 861 ou 6 883.
