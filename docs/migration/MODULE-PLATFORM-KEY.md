@@ -653,7 +653,16 @@ compte root permanent sur le banc. *Une fixture, c'est aussi ce que le test ACCO
 - **La voie XSS par le message du backend** (§6.6) : les messages de succès sont des littéraux, donc
   sûrs ; les branches d'erreur propagent un `str(e)` de paramiko que **je n'ai pas tracé jusqu'au
   bout**. Non prouvé, non écarté. Le portage échappe de toute façon.
-- **`/exclude_user`** : `MODULE-ADM.md` laissait la question ouverte, je la referme **à moitié** — j'ai
+- **`/exclude_user` — QUESTION FERMÉE le 2026-08-28**, et la réponse est un défaut. La route écrit
+  `INSERT IGNORE INTO user_exclusions` (`admin.py:129`). **Le seul lecteur de cette table dans tout le
+  backend est `configure_servers.py`, à l'intérieur de `clean_up_users` — qui n'a AUCUN appelant.**
+  Donc le bouton « Exclure » de cette page **écrit dans une table que rien de vivant ne lit**, et
+  annonce à l'exploitant qu'un compte est exclu. Mesuré : `user_exclusions` porte **0 ligne**, face à
+  **69** comptes marqués `excluded` dans `server_user_inventory` — deux expressions de la même idée,
+  dont une vide. Et `delete_remote_user`, le seul chemin de suppression vivant, **ne consulte ni l'une
+  ni l'autre** (0 occurrence dans son corps). **Sixième occurrence du motif « écrit et lu par
+  personne », et la première qui porte sur une TABLE entière alimentée par un bouton visible.**
+  *Énoncé d'origine, conservé :* j'ai
   mesuré ses gardes (`@require_api_key` + `@require_role(2)`, **pas** de `@require_machine_access`,
   sans effet puisque le rôle 2 contourne) mais **je n'ai pas lu son corps** ni ce qu'il écrit.
 - **`systemctl`, `userdel`, l'état réel des machines** : rien n'a été joint. Toutes les affirmations

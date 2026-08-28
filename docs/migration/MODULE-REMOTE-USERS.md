@@ -143,6 +143,25 @@ autorité**, pas le code de sortie. Le commentaire va plus loin et distingue le 
 > quatre niveaux** : validation du nom, liste noire, approbation, et vérification de l'effet par une
 > mesure indépendante du code de retour. **Le dire vaut autant qu'une accusation.**
 
+> **⚠ CE QUE `excluded` NE PROTÈGE PAS — mesuré le 2026-08-28**
+>
+> La page classe les comptes en `managed` / `pending_review` / `excluded`, et « exclu » se lit
+> naturellement comme « mis hors de portée des gestes ». **Il n'en est rien sur le chemin vivant.**
+>
+> `delete_remote_user` **ne consulte NI `user_exclusions` NI la colonne `status`** — 0 occurrence de
+> l'un ou de l'autre dans son corps. Les cinq protections du tableau ci-dessus sont réelles et
+> suffisantes contre les cibles dangereuses (compte système, compte de connexion, compte de service),
+> mais **le classement de l'inventaire n'en fait pas partie** : un compte `excluded` se supprime
+> exactement comme un autre.
+>
+> Et les deux tables qui expriment l'exclusion divergent : `user_exclusions` porte **0 ligne**, face à
+> **69** comptes `excluded` dans `server_user_inventory`. La première n'est lue que par
+> `configure_servers.py`, **dans `clean_up_users`, qui n'a aucun appelant** — donc par personne. Le
+> bouton « Exclure » de `platform_keys.php` l'alimente pourtant (`admin.py:129`).
+>
+> **La conséquence pour le portage est une question de PRÉSENTATION, pas de garde** : le portage ne
+> doit pas laisser croire qu'« exclu » borne quoi que ce soit. Il borne l'affichage, et rien d'autre.
+
 **Un incident réel est inscrit dans le code, et il vaut d'être retenu** : le 2026-08-27, une sonde de
 vérification a appelé cette route et **`userdel -f rootwarden` a été exécuté en root sur
 `Test-Server-Debian`**. Le compte n'existait pas — code 6, aucun dégât, *« par chance »*, dit le
