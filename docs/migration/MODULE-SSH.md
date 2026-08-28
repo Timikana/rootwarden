@@ -322,6 +322,26 @@ injecte `machines.name` sans validation dans chaque ligne, donc le vecteur de l'
 
 Deux fonctions **sans aucun appelant** :
 
+> **⚠ REMESURÉ le 2026-08-28 — ce que ce document dit est JUSTE, et le danger est ailleurs.**
+>
+> `clean_up_users` n'a toujours **aucun appelant** : `grep -rn "clean_up_users" backend/` ne rend que
+> sa **définition** (`configure_servers.py:780`) et **une mention de docstring** (`:703`). Ce fichier
+> l'écrit correctement depuis le début ; rien à corriger ici.
+>
+> **Mais les deux docstrings du même fichier se contredisent, à 45 lignes d'écart** :
+>
+> | où | ce qu'elle annonce |
+> |---|---|
+> | docstring de **classe**, `:703` | « Pour chaque machine, la classe se charge de : … **Nettoyer les utilisateurs non autorisés (`clean_up_users`)** … » |
+> | docstring de **méthode** `configure()`, `:750-752` | **deux** étapes seulement : `ensure_sudo_installed`, `configure_users` |
+> | **le corps** de `configure()`, `:771-774` | « Le nettoyage automatique des utilisateurs est **DESACTIVE**. La suppression de comptes se fait uniquement depuis Administration > Utilisateurs distants (action explicite). » |
+>
+> **C'est l'en-tête de CLASSE qui ment — celui qu'on lit en premier.** Le corps et la docstring de
+> méthode disent vrai. Le danger n'est donc pas que quelqu'un croie le nettoyage actif : c'est qu'il
+> **invite à rétablir l'appel**, en présentant une fonction morte et destructrice comme une étape
+> normale de la séquence. *Un texte qui décrit un geste absent ne se contente pas d'être faux : il
+> propose de l'écrire.*
+
 - **`clean_up_users`** — elle fait des `userdel`. La laisser en place, c'est la laisser à un appel de sa
   réactivation ; elle est encore citée dans le docstring de la classe, qui annonce donc un comportement
   que le code n'a plus ;
