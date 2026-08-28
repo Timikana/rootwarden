@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.48** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.50** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,106 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.50 — ma garde du runner empechait TOUTE suite neuve de naitre, et annoncait « LOT conforme » sur zero execution
+
+**Relevee par la session 7 en ecrivant la suite P1 (`go-page-cle-plateforme.mjs`). La garde est de moi, posee
+la veille pour un defaut reel — et son discriminant etait faux.**
+
+    IGNOREE   laravel/go-page-cle-plateforme - aucune reference laravel
+    IGNOREE   legacy/go-page-cle-plateforme - aucune reference legacy
+    LOT conforme.
+
+**Sans reference la suite est ignoree ; sans mesure on ne peut pas inscrire de reference. Aucune suite ne
+pouvait plus naitre.**
+
+**Le discriminant n'est pas « a-t-elle une reference sur CETTE cible » mais « en a-t-elle une sur L'AUTRE »** :
+c'est cela qui distingue une suite **restreinte volontairement** (`go-socle-navigation`, laravel seulement)
+d'une suite **jamais mesuree**. Corrige, et **verifie sur quatre cas sans lancer aucune suite** :
+
+    go-socle-navigation      laravel joue · legacy IGNOREE      (restriction voulue)
+    go-page-search           joue · joue
+    go-services-s1           joue · joue
+    go-page-cle-plateforme   NEUVE -> joue · NEUVE -> joue      (suite neuve)
+
+> **Un garde-fou qui se declenche a tort ne protege plus : il empeche.** Troisieme forme du motif apres le
+> rouge permanent de `go-bashrc-b4` et l'assertion absolue sur un corpus qui porte un passe.
+
+#### ⚠ Et la moitie la plus grave n'etait pas le blocage
+
+**Le runner annoncait « LOT conforme » sur ZERO execution.** *Sans lire la ligne `IGNOREE`, on croyait sa suite
+verte.* **Un « conforme » sur zero execution est un silence, pas un verdict** — quatrieme occurrence de cette
+famille en deux jours, apres le `conforme` sur une assertion qui n'a pas joue, l'enumeration qui rend le vide,
+et le constat d'archivage sur un chemin inexistant.
+
+**Correction** : le runner **compte ses executions** et **echoue en `exit 2`** quand il n'en a joue aucune, en
+disant pourquoi. Le verdict conforme porte desormais son compte — `LOT conforme — N execution(s)`.
+
+*Une garde ecrite pour empecher une faute doit dire ce qu'elle a empeche ; sinon son silence ressemble a une
+reussite.*
+
+### v1.38.49 — E-223, l'écran cesse d'attester une révocation non vérifiée, et les deux routes d'I2
+
+Trois corrections indépendantes, dans trois fichiers distincts. **Aucune ne touche la page de la clé
+de plateforme**, dont le lot attend une relecture.
+
+#### E-223 — un drapeau de fonctionnalité qui ne pouvait jamais valoir faux
+
+`laravel/config/rootwarden.php:100` lisait `env('FEATURE_WAZUH')`. **Occurrence unique dans tout le
+dépôt**, mesurée : le legacy (`wazuh/index.php:17`) et le backend (`config.py:143`) lisent tous deux
+`WAZUH_ENABLED`.
+
+La chaîne de conséquence est réelle et vérifiée jusqu'au bout :
+`config('rootwarden.fonctionnalites.wazuh')` → `Droits::fonctionnalites()` → `Navigation::pour()`,
+qui filtre les entrées par leur clé `feature`. Avec `WAZUH_ENABLED=false`, le legacy cache son entrée
+et rend 404, le backend n'enregistre pas son blueprint, **et le portage gardait l'entrée affichée,
+pointant vers ce 404.**
+
+Corrigé en `env('WAZUH_ENABLED', true)` — *un drapeau de moins, pas une règle en double : le domaine
+est le même, donc le nom doit l'être.*
+
+**Mesuré après correction, et sans effet visible aujourd'hui** : `WAZUH_ENABLED` vaut `true` dans
+l'environnement courant, `FEATURE_WAZUH` rend `NULL`. La valeur effective ne change donc pas — elle
+changerait avec le drapeau à faux, ce qui est précisément le cas qui ne fonctionnait pas.
+
+**Deux réserves déclarées** : rien n'a été vérifié au navigateur avec le drapeau à faux ; et si
+`config:cache` entrait un jour dans l'entrypoint, cette valeur se figerait au démarrage — le nom
+corrigé n'y changerait rien.
+
+#### E-215 — la page cesse d'attester ce que le backend ne vérifie pas
+
+`comptes-distants` appelle `remove_user_keys`, qui rend `success: True` **sans vérifier son propre
+effet** — sur une révocation d'accès. La page annonçait « Le geste a abouti ».
+
+Le message dit maintenant que **la demande est partie et que le serveur l'a acceptée**, que ce n'est
+pas la preuve d'un effet sur la machine, et qu'il faut relancer un scan pour lire l'état réel.
+
+**Le correctif backend n'est pas attendu pour cela** : retirer une attestation ne dépend de personne,
+et laisser l'écran affirmer une révocation non vérifiée pendant qu'on attend serait garder le défaut
+pour une raison de calendrier.
+
+#### I2 — les deux routes du pare-feu, posées pour la session 5
+
+`POST /pare-feu/copie` et `POST /pare-feu/copie/enregistrer`, `role:1` + `perm:can_manage_iptables`,
+**la même garde que la page, mot pour mot**. Ce n'est pas une commodité : ces routes ne passent
+**pas** par la passerelle, elles sont servies par le portage — `RoutesBackend` ne les voit jamais, et
+la seule garde qui existe est celle qui est écrite là.
+
+`POST` pour les deux, la lecture comprise : `charger` prend son `machine_id` dans le **corps** et le
+contrôleur le résout avant de décider. Un `GET` porterait l'identifiant dans l'URL, donc dans les
+journaux d'accès et l'historique du navigateur.
+
+**Gardes vérifiées sur la route RÉSOLUE**, pas déduites de la source :
+
+    pare-feu                   GET|HEAD  [web, session.authentifiee, role:1, perm:can_manage_iptables]
+    pare-feu/copie             POST      [web, session.authentifiee, role:1, perm:can_manage_iptables]
+    pare-feu/copie/enregistrer POST      [web, session.authentifiee, role:1, perm:can_manage_iptables]
+
+L'entrée de menu **ne bascule pas** : `Navigation` garde `'legacy' => '/iptables/'` jusqu'à I5.
+
+Parité i18n comparée récursivement : `plateforme` 171 = 171, `distants` 78 = 78. Rien n'a été exécuté.
+
+---
+
 ### v1.38.48 — ⚠⚠⚠ LA ROTATION DE CLE NE REVOQUE PAS LA CLE COMPROMISE, et le Lead avait ecrit le contraire
 
 **Trouve par la session 5 en relisant P4 AVANT son commit. Verifie ligne par ligne.**
@@ -4177,7 +4277,8 @@ correspondance reelle :**
 | v1.38.43 | `c664596` | le predicat d'E-217 consomme par le portage |
 | v1.38.45 | `feeb1ec` | un refus d'acces deguise en incapacite de lecture ; la rotation, seul remede |
 | **v1.38.47** | `043f414` | **mon amplificateur d'E-220 etait faux** ; ma demi-mesure aurait casse des machines saines ; **E-222** |
-| **v1.38.48** | (ce commit) | **E-226 : la rotation ne revoque pas la cle compromise** ; E-223 ; E-224 ; E-225 |
+| **v1.38.48** | `b12835f` | **E-226 : la rotation ne revoque pas la cle compromise** ; E-223 ; E-224 ; E-225 |
+| v1.38.50 | (ce commit) | ma garde du runner empechait toute suite neuve, et disait « conforme » sur zero execution |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
