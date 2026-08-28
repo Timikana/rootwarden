@@ -61,6 +61,13 @@
     var annonceCopie  = document.querySelector('[data-rw="ipt-copie-annonce"]');
     var blocsCopie    = document.querySelector('[data-rw="ipt-copie-blocs"]');
 
+    // I3 — declares ici pour la meme raison que ceux d'I2.
+    var sectionHisto   = document.querySelector('[data-rw="ipt-histo"]');
+    var annonceHisto   = document.querySelector('[data-rw="ipt-histo-annonce"]');
+    var cadreHisto     = document.querySelector('[data-rw="ipt-histo-cadre"]');
+    var corpsHisto     = document.querySelector('[data-rw="ipt-histo-corps"]');
+    var etatHistoZone  = document.querySelector('[data-rw="ipt-histo-etat"]');
+
     /*
      * CE QUE LE DERNIER RELEVE A RENDU.
      *
@@ -146,6 +153,13 @@
         if (sectionCopie) { sectionCopie.hidden = !id; }
         if (blocsCopie) { blocsCopie.hidden = true; blocsCopie.replaceChildren(); }
         annonceCopieDire('');
+        // I3 : l'historique suit la MACHINE, pas le releve. Il est en base.
+        if (sectionHisto) { sectionHisto.hidden = !id; }
+        if (cadreHisto) { cadreHisto.hidden = true; }
+        if (corpsHisto) { corpsHisto.replaceChildren(); }
+        if (etatHistoZone) { etatHistoZone.replaceChildren(); }
+        annonceHistoDire('');
+        if (id) { chargeHistorique(); }
 
         if (!id || !opt) {
             bouton.disabled = true;
@@ -429,6 +443,104 @@
 
     if (boutonCharger) { boutonCharger.addEventListener('click', chargeLaCopie); }
     if (boutonEnreg)   { boutonEnreg.addEventListener('click', enregistreLaCopie); }
+
+
+    // ════════════════════════════════════════════════════════════════════
+    //  SOUS-LOT I3 — L'HISTORIQUE DES VERSIONS ARCHIVEES
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // Il se charge au CHOIX de la machine, jamais apres un releve. Le legacy
+    // appelle `loadHistory()` dans la branche de succes de son releve : une
+    // machine injoignable masque alors son propre historique, qui est pourtant
+    // en BASE et ne demande aucune machine (E-156).
+
+    function annonceHistoDire(texte, variante) {
+        if (!annonceHisto) { return; }
+        annonceHisto.textContent = texte || '';
+        annonceHisto.className = 'rw-annonce' + (variante ? ' rw-annonce--' + variante : '');
+    }
+
+    /** Rend l'auteur d'une version, jamais un `#7` brut. */
+    function auteurTexte(auteur) {
+        if (!auteur || !auteur.forme) { return t('histo_auteur_inconnu'); }
+        if (auteur.forme === 'nom') { return String(auteur.valeur || ''); }
+        if (auteur.forme === 'compte_supprime') {
+            return t('histo_auteur_supprime', { id: String(auteur.valeur || '') });
+        }
+        return t('histo_auteur_inconnu');
+    }
+
+    function etatHisto(titre, texte) {
+        etatHistoZone.replaceChildren();
+        etatHistoZone.appendChild(etatVide(titre, texte));
+    }
+
+    function chargeHistorique() {
+        var id = selecteur.value;
+        if (!id) { return; }
+
+        annonceHistoDire(t('histo_chargement'));
+        cadreHisto.hidden = true;
+        corpsHisto.replaceChildren();
+        etatHistoZone.replaceChildren();
+
+        appellePortage('/pare-feu/historique', { machine_id: Number(id) }).then(function (r) {
+            /*
+             * TROIS ISSUES, PAS UNE. Le legacy replie l'echec de lecture et
+             * l'absence d'historique sur le meme message — or les deux appellent
+             * des gestes opposes : reessayer, ou ne rien attendre.
+             */
+            if (r.statut === 0 || !r.ok || r.corps.success !== true) {
+                annonceHistoDire('', '');
+                etatHisto(t('histo_echec_titre'),
+                          String(r.corps.message || t('histo_echec')));
+                return;
+            }
+
+            if (r.corps.aucun_historique) {
+                annonceHistoDire('', '');
+                etatHisto(t('histo_vide_titre'), t('histo_vide'));
+                return;
+            }
+
+            var versions = r.corps.versions || [];
+            for (var i = 0; i < versions.length; i++) {
+                var v = versions[i];
+                var tr = document.createElement('tr');
+                tr.dataset.rw = 'ipt-histo-ligne-' + v.id;
+
+                var tdDate = document.createElement('td');
+                tdDate.className = 'rw-tableau__fort';
+                tdDate.textContent = String(v.date || '');
+
+                var tdAuteur = document.createElement('td');
+                tdAuteur.textContent = auteurTexte(v.auteur);
+
+                var tdMotif = document.createElement('td');
+                var motif = String(v.motif || '').trim();
+                // Un motif absent se DIT : une cellule vide se lit aussi bien
+                // « pas de motif » que « la colonne n'a pas ete lue ».
+                tdMotif.textContent = motif !== '' ? motif : t('histo_sans_motif');
+                if (motif === '') { tdMotif.className = 'rw-tableau__discret'; }
+
+                tr.append(tdDate, tdAuteur, tdMotif);
+                corpsHisto.appendChild(tr);
+            }
+            cadreHisto.hidden = false;
+
+            /*
+             * LE TOTAL, PAS LA LONGUEUR DE LA LISTE. La route du backend rend
+             * 20 lignes au plus sans annoncer de total : on ne peut alors pas
+             * distinguer « il y en a 20 » de « il y en a 200 » (E-154).
+             */
+            var total = Number(r.corps.total || 0);
+            var affichees = Number(r.corps.affichees || versions.length);
+            annonceHistoDire(
+                affichees < total
+                    ? t('histo_tronque', { affichees: affichees, total: total })
+                    : t('histo_tout', { nb: total }));
+        });
+    }
 
     surChoix();
 }());

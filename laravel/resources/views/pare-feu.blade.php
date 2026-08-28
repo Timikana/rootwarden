@@ -124,6 +124,40 @@
     <div class="rw-grille" data-rw="ipt-copie-blocs" hidden></div>
 </div>
 
+{{--
+    ══ I3 : L'HISTORIQUE DES VERSIONS ARCHIVEES ═════════════════════════════
+
+    Il se charge au CHOIX de la machine, PAS apres un releve reussi. Le legacy
+    appelle `loadHistory()` DANS la branche de succes de son releve
+    (`js/main.js:79`) : une machine injoignable masque donc son propre
+    historique — qui est en BASE et ne demande aucune machine. C'est E-156,
+    refermee sur `fail2ban` par F2, et reproduite ici a l'identique.
+
+    Un TABLEAU et non une liste de decision : ce sont des lignes de donnees
+    qu'on compare colonne par colonne. Le defilement appartient au CADRE.
+--}}
+<div class="rw-section" data-rw="ipt-histo" hidden>
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.histo_titre') }}</p>
+    <p class="rw-aide rw-prose">{{ __('pare-feu.histo_intro') }}</p>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-histo-annonce"></p>
+
+    <div class="rw-tableau-cadre" data-rw="ipt-histo-cadre" hidden>
+        <table class="rw-tableau">
+            <thead>
+                <tr>
+                    <th>{{ __('pare-feu.histo_col_date') }}</th>
+                    <th>{{ __('pare-feu.histo_col_auteur') }}</th>
+                    <th>{{ __('pare-feu.histo_col_motif') }}</th>
+                </tr>
+            </thead>
+            <tbody data-rw="ipt-histo-corps"></tbody>
+        </table>
+    </div>
+
+    <div data-rw="ipt-histo-etat"></div>
+</div>
+
 <div class="rw-encart" data-rw="ipt-non-porte">
     <p class="rw-sous-titre-fort">{{ __('pare-feu.suite_titre') }}</p>
     <p class="rw-prose">{{ __('pare-feu.suite') }}</p>
