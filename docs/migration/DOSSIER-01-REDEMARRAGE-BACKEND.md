@@ -73,12 +73,15 @@ passé.* Conteneurs en **UTC**, hôte et navigateur en **CEST**.
 >
 > Mesuré à 11:17Z : **le banc est libre**, aucun `node go-*.mjs` ne tourne.
 
-**Redémarrer.** Un préalable de vérification, et un préalable de mesure ajouté ci-dessus.
+## **REDÉMARRER. Aucune condition technique ne subsiste.**
 
-| # | préalable | pourquoi | bloquant ? |
-|---|---|---|---|
-| ~~1~~ | ~~fermer la divergence `temporary_permissions`~~ | **FAIT** — `72b0518`, 2026-08-28 07:59 UTC | levé |
-| 2 | contrôler l'**arbre de travail** à l'instant du geste | un redémarrage publie l'arbre, pas l'historique | oui, mais c'est une vérification |
+| # | préalable | état au 2026-08-28 14:15 UTC |
+|---|---|---|
+| ~~1~~ | ~~fermer la divergence `temporary_permissions`~~ | **LEVÉ** — `72b0518`, 07:59 UTC |
+| ~~2~~ | ~~rejouer le LOT pour disposer d'une ligne de base~~ | **FRANCHI** — 153 exécutions, 2298 PASS, 2 FAIL |
+| 3 | contrôler l'**arbre de travail** à l'instant du geste | **reste** — mais c'est une vérification de trente secondes, pas un travail |
+
+> **Le dossier attend une signature, et rien d'autre.**
 
 **Un résiduel, non bloquant et qui doit être dit** : le repli du correctif, **sur erreur SQL**, dégrade
 vers « les temporaires ne comptent pas » et journalise un avertissement. Le porteur perd alors son accès
