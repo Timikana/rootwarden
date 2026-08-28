@@ -2171,6 +2171,96 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.69 — l'accueil porte ses douze raccourcis, dit la séquence, et borne le parc au périmètre du compte
+
+Arbitrage DSI rendu, l'onglet `accueil` est écrit.
+
+#### Les douze raccourcis se DÉRIVENT du menu, ils ne recopient pas ses gardes
+
+`legacy/index.php:363-385` réécrit **onze tests de permission** pour ses douze tuiles — les mêmes que
+son propre menu, une seconde fois. Deux copies d'une règle de droits finissent par diverger.
+
+Ici la liste est **filtrée** depuis `Navigation::pour()`, qui a déjà appliqué le rôle, les permissions
+**et** le drapeau de fonctionnalité. Conséquences directes : une tuile ne peut pas apparaître sans son
+entrée de menu, ni viser l'ancien portail quand la page est portée — les deux se lisent au même
+endroit. Le **libellé** vient de `nav.<clé>`, la clé du menu ; seule la **description** est propre aux
+tuiles. Le legacy en a deux jeux qui disent la même chose.
+
+L'ordre du legacy est conservé : un exploitant qui connaît la page retrouve ses repères au même
+endroit.
+
+**Mesuré sur les trois rôles :**
+
+    role 1 sans permission   menu= 3  tuiles= 1  documentation
+    role 2, 8 permissions    menu=12  tuiles= 6  ssh_keys, updates, cve_scan, supervision, compliance, documentation
+    role 3 superadmin        menu=32  tuiles=12  les douze, dans l'ordre du legacy
+    tuiles sans entrée de menu : 0        drapeau wazuh respecté
+
+#### E-208 — le parc borné, ET son total dit
+
+`legacy/index.php` sert la taille du parc à tout le monde, sans filtrer selon les machines
+attribuées. Porter fidèlement reproduirait la fuite ; porter borné sans rien dire retirerait une
+visibilité. La forme retenue affiche **les deux nombres** :
+
+> « 1 de vos machines · 3 au parc ». **Un compte qui ne voit qu'une machine sur trois doit savoir que
+> le parc en compte trois**, sinon le tableau de bord mentirait par omission au lieu de fuir.
+
+Le prédicat de bornage est **repris** de `pourMisesAJour`, `Iptables::machines` et
+`Fail2ban::machines` — rôle ≥ 2 voit le parc, rôle 1 est joint à `user_machine_access`. Trois
+implémentations d'une même règle finiraient par diverger ; il y en a une.
+
+**Deux raffinements que la mesure a imposés :**
+
+- **la réserve n'apparaît que si la borne mord.** Un rôle ≥ 2 voit le parc entier : lui afficher
+  « vous ne voyez que vos machines » serait une réserve sans objet, et celles-là deviennent un décor
+  qu'on ne lit plus ;
+- **une base injoignable n'est pas un parc vide.** Rendre des zéros afficherait « 0 · 0 », ce qui se
+  lit comme un fait. L'écran **dit** qu'il n'a pas su lire — c'est le défaut que le commentaire de
+  `pourMisesAJour` signale, et qu'on ne refait pas.
+
+**Vérifié par deux sources indépendantes** — le service, puis la base :
+
+    id  2  role 1   périmètre=1  parc=3  borné    (opsuser)
+    id 14  role 1   périmètre=0  parc=3  borné    (fixture)
+    id  3,4,5,10,12 role 1   périmètre=0           (résidus e2e)
+    role >= 2        périmètre=3  parc=3  NON borné
+
+#### La séquence, dite à l'endroit où l'on arrive
+
+Demande de l'exploitant : *« quand on ajoute un serveur, les menus où aller ensuite ne sont pas
+évidents, et un nouvel utilisateur ne le sait pas. »*
+
+Une liste **numérotée** — pas `rw-etapes`, dont les états `--fait`/`--courant` annoncent une
+progression alors que ce guide ne suit personne. Réemployer un composant dont les états mentent est le
+même défaut en plus petit.
+
+**L'ordre est l'acquis** : vérifier la clé avant d'effacer le mot de passe, sinon on retire à
+RootWarden son unique moyen de revenir sur le serveur. C'est la correction déjà portée sur la page de
+la clé de plateforme, dite ici à l'endroit où la question se pose **pour la première fois**.
+
+#### Trois manques attrapés avant le premier rendu
+
+Le contrôle des classes CSS avant exécution — obligatoire, et payé trois fois par ce dépôt sur des
+classes purgées — a rendu : `rw-tuile--lien` **absente**, `rw-tuile__appoint` **absente**, et
+`nav.marqueur_titre` **inexistante** (la vraie clé du marqueur est `nav.non_porte_titre`, celle
+qu'emploie le partiel du menu). Le marqueur est désormais **identique** à celui du menu, libellé et
+`aria-label` compris.
+
+**`rw.css` est un fichier partagé** : deux classes ajoutées, `.rw-tuile--lien` (une tuile qui est un
+lien perd son soulignement et gagne une affordance au survol **et au clavier** — `:focus-visible` est
+la moitié qu'on oublie) et `.rw-tuile__appoint` (le second nombre d'un couple doit se lire comme une
+précision, pas comme une valeur de même poids). Signalé.
+
+#### Et le texte d'orientation devenait faux
+
+Il annonçait « les pages métier restent servies par l'ancien portail ». Vingt-cinq des trente-deux
+entrées sont portées. Corrigé.
+
+Parité i18n comparée : `accueil` 40 = 40, zéro clé morte, zéro clé orpheline, balises équilibrées.
+**Rien n'a été exécuté au navigateur.**
+
+---
+
 ### v1.38.68 — E-224 : le SQL et la borne, parce que le SQL seul etait plus dangereux que le defaut
 
 **Le defaut.** `/wazuh/install_all` filtrait `AND a.id IS NULL` — `wazuh_agents` n'a **aucune colonne
