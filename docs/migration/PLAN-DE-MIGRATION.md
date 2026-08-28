@@ -4513,3 +4513,65 @@ Deux effets, et le second est celui qui compte :
    l'exploitant sans réponse au même incident.
 
 *Un texte faux retiré sans son remplacement ne corrige pas la désinformation : il la rend muette.*
+
+### UN FAIT SANS HEURE EST UNE OPINION SUR LE PASSÉ (2026-08-28)
+
+**Formulée par la QA, reprise par le DSI, et le Lead se l'est appliquée dans le même tour.**
+
+**Le cas du DSI** : deux sessions lui ont annoncé **la même** divergence `temporary_permissions` **en se
+contredisant** — la QA disant *« le trou existe, confirmé »*, la sécurité disant *« le remède n'est pas
+commité, un `git checkout` ramènerait les 33 gardes sans lui »*.
+
+> **Les deux étaient vraies à leur instant et périmées au sien, dans des sens OPPOSÉS.** *Combinées telles
+> quelles, elles produisaient une exposition doublement fausse.*
+
+**Le cas du Lead, une heure plus tard** : mesurant l'arbre avant de conclure sur le redémarrage, il a relevé
+**trois fichiers backend modifiés** et écrit qu'ils bloquaient le geste — *un redémarrage publie l'arbre, pas
+l'historique.* **Remesuré à l'appel d'outil suivant : l'arbre était propre.** Les trois avaient été commités
+entre les deux mesures.
+
+> **À sept sessions qui commitent en continu, un relevé transmis est une PHOTOGRAPHIE, pas un état.**
+
+**La parade adoptée par tout le monde** : *dater chaque fait qu'on transmet, et remesurer au lieu de relayer.*
+C'est la généralisation de la règle du §1 — *chaque chiffre porte sa commande de remesure* — appliquée non plus
+aux documents mais **aux messages entre sessions**, qui n'en portaient aucune.
+
+**Et c'est la seconde forme d'un motif déjà payé** : le numéro de version distribué par message était valide *à
+l'écriture* et plus *à l'emploi*. **Même cause, autre objet** — *un contrôle juste, séparé de son usage par un
+délai.*
+
+### AVANT D'ÉCRIRE QU'UNE CHOSE EST IMPOSSIBLE, DEMANDER À QUI POSSÈDE L'OBJET (2026-08-28)
+
+Le DSI avait écrit que la protection d'une fixture de garde était **organisationnelle et non mécanique**, sur
+la réserve de la QA. **Faux** — et sa correction nomme exactement l'erreur :
+
+> *« Sa réserve valait pour SON périmètre, pas pour le chantier. La session 7 possède le banc et a écrit la
+> garde. »*
+
+**« Aucun test ne peut protéger ceci » était une affirmation sur un périmètre, présentée comme une affirmation
+sur le chantier.** *La disjonction stricte des périmètres, qui protège l'écriture, rend chaque session aveugle
+à ce que les autres peuvent faire* — donc **une impossibilité déclarée depuis un seul périmètre est une
+impossibilité locale.**
+
+**Trois autres corrections du DSI sur ses propres écrits, toutes déclarées :**
+
+1. **il recommandait de porter `/exclude_user`** à côté du classement. **Retiré** : `user_exclusions` n'a
+   **aucun lecteur vivant** — son unique lecteur (`configure_servers.py:805`) est **dans** `clean_up_users`,
+   sans appelant. **Le porter aurait ajouté un SECOND mot décoratif.** Remplacé par : faire lire les deux
+   magasins à `delete_remote_user`, le seul chemin vivant, avec un `force` explicite — *une borne qui n'ajoute
+   qu'un refus ne peut pas détruire davantage.*
+   > **⚠ Aucune des trois issues d'E-213 n'était la bonne : les trois supposaient qu'un des deux magasins était
+   > LU.** *Une décision entre trois options fausses reste fausse, et le tort est dans la question.*
+2. **sa forme d'affichage pour le tableau de bord supposait deux nombres lisibles** — rendre `0 · 0` sur un
+   échec de lecture se lirait comme un **fait**. *« Il a passé la matinée à mesurer qu'une énumération vide
+   satisfait toute propriété universelle, et proposé un affichage qui prend un zéro pour une mesure. »*
+3. **une réserve ne s'affiche QUE si la borne mord** — montrer « vous ne voyez que vos machines » à un rôle ≥ 2
+   serait une **réserve sans objet**, et *une réserve sans objet devient un décor qu'on ne lit plus : elle
+   affaiblit celles qui en ont un.*
+
+**Et deux arbitrages de fixtures qui méritent d'être gardés** : un **quatrième compte d'épreuve** (rôle 2, zéro
+permission, **ligne de zéros EXPLICITES et non absence de ligne**) plutôt qu'une révocation temporaire — *une
+fixture qui échoue ouvert sur un état partagé casserait treize suites avec un symptôme de régression* ; et la
+fixture de permission temporaire **abandonnée**, parce qu'elle ferait rougir la garde qu'une autre session
+vient de poser sur cette même table. ***On ne fabrique pas un état qu'une autre suite est chargée
+d'interdire.***

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.70** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.71** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,86 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.71 — un fait sans heure est une opinion sur le passe, et le redemarrage n'a plus de prealable bloquant
+
+#### ✅ Le seul prealable bloquant du redemarrage est LEVE
+
+Le DOSSIER-01 avait posé **un** blocage : la divergence `temporary_permissions`, que les deux portails lisent
+et que le backend ignorait (E-230). **Fermee 64 minutes apres avoir ete relevee** — `72b0518`,
+`helpers.py:264`, verifie par le Lead :
+
+    SELECT permission FROM temporary_permissions WHERE user_id = %s AND expires_at > NOW()
+    perms[nom] = True      # ajoute seulement, ne retire jamais
+
+**Le repli est le bon** : sur erreur SQL, degrader vers « les temporaires ne comptent pas » plutot que refuser
+toute authentification — *degrader vers ce qu'on faisait hier vaut mieux que fermer la porte a tout le monde*,
+et **il ne peut pas accorder a tort.** Residuel non bloquant, et il est dit : pendant un incident SQL, le 403
+du porteur ne distingue pas *« vous ne l'avez pas »* de *« je n'ai pas pu lire si vous l'aviez »* — **la classe
+exacte d'E-217, prise par l'autre bout.**
+
+**Il reste un contrôle et pas un travail** : l'arbre de travail a l'instant du geste, *un redemarrage publiant
+l'arbre et non l'historique.*
+
+#### ⚠ Un fait sans heure est une opinion sur le passe
+
+**Deux sessions ont annonce au DSI la MEME divergence en se CONTREDISANT** — l'une « le trou existe », l'autre
+« le remede n'est pas commite ». **Les deux etaient vraies a leur instant et perimees au sien, dans des sens
+OPPOSES.** *Combinees telles quelles, elles produisaient une exposition doublement fausse.*
+
+**Et le Lead s'est fait prendre dans le meme tour** : mesurant l'arbre avant de conclure sur le redemarrage, il
+a releve **trois fichiers backend modifies** et ecrit qu'ils bloquaient le geste. **Remesure a l'appel d'outil
+SUIVANT : l'arbre etait propre.**
+
+> **A sept sessions qui commitent en continu, un releve transmis est une PHOTOGRAPHIE, pas un etat.**
+
+*Dater chaque fait qu'on transmet, et remesurer au lieu de relayer.* C'est la regle du §1 — *chaque chiffre
+porte sa commande de remesure* — appliquee non plus aux documents mais **aux messages entre sessions**, qui n'en
+portaient aucune. **Seconde forme d'un motif deja paye** : le numero de version distribue par message etait
+valide *a l'ecriture* et plus *a l'emploi*. *Un controle juste, separe de son usage par un delai.*
+
+#### Avant d'ecrire qu'une chose est impossible, demander a qui possede l'objet
+
+Le DSI avait ecrit qu'une protection de fixture etait **organisationnelle et non mecanique**. **Faux** : *« la
+reserve de la QA valait pour SON perimetre, pas pour le chantier — la session 7 possede le banc et a ecrit la
+garde. »*
+
+> **« Aucun test ne peut proteger ceci » etait une affirmation sur un PERIMETRE, presentee comme une
+> affirmation sur le chantier.** *La disjonction stricte qui protege l'ecriture rend chaque session aveugle a
+> ce que les autres peuvent faire* — une impossibilite declaree depuis un seul perimetre est **locale**.
+
+#### ⚠ Aucune des trois issues d'E-213 n'etait la bonne
+
+Le DSI retire sa recommandation de **porter `/exclude_user`** : `user_exclusions` n'a **aucun lecteur vivant**
+— son unique lecteur (`configure_servers.py:805`) est **dans** `clean_up_users`, sans appelant. **Le porter
+aurait ajoute un SECOND mot decoratif.** Le bouton « Exclure » est visible, documente, il ecrit, **et rien ne
+lit.**
+
+> **Les trois issues d'E-213 supposaient qu'un des deux magasins etait LU.** *Une decision entre trois options
+> fausses reste fausse, et le tort est dans la question.*
+
+Remplacee par : faire lire les deux magasins a `delete_remote_user`, **le seul chemin vivant**, avec un `force`
+explicite — *une borne qui n'ajoute qu'un refus ne peut pas detruire davantage.*
+
+#### Deux arbitrages de fixtures, gardes pour leur raison
+
+**Un quatrieme compte d'epreuve** (role 2, zero permission, **ligne de zeros EXPLICITES et non absence de
+ligne**) plutot qu'une revocation temporaire : *une fixture qui echoue ouvert sur un etat partage casserait
+treize suites avec un symptome de regression.* Et la **fixture de permission temporaire abandonnee**, parce
+qu'elle ferait rougir la garde qu'une autre session vient de poser sur cette table. ***On ne fabrique pas un
+etat qu'une autre suite est chargee d'interdire.***
+
+#### `REF_LARAVEL[go-socle-fixtures] = 8` inscrite
+
+**Elle manquait au runner** alors que la suite existe et passe — donc elle aurait tourne **sans verdict**.
+Elle ne mesure **aucune page** : elle mesure *ce sur quoi les autres suites s'appuient sans le verifier* — les
+droits des trois comptes d'epreuve et la composition du parc. **Le plan annoncait UNE permission pour
+`rw-test-admin`, il en porte NEUF**, et plusieurs suites mesurent une garde en s'appuyant sur « ce compte n'a
+PAS telle permission » : *concevoir un tel test sur une ligne fausse produit un vert qui ne mesure rien.*
+
+**Une seule cible, deliberement** — la base est **partagee** par les deux portails, la jouer en legacy
+mesurerait deux fois la meme chose. C'est le cas « restriction voulue » que la garde du runner distingue d'une
+suite jamais mesuree.
 
 ### v1.38.70 — trois gestes qui ne disaient pas ce qu'ils laissent (E-219, E-225, E-213)
 
