@@ -642,6 +642,30 @@ l'analyseur d'appelants (ici). **Les suites de comportement n'ont pas ce mode de
 défaillance** — elles mesurent un code, pas un relevé — mais la question doit être posée
 à chaque instrument neuf.
 
+## 3 quater. Un geste INEXERÇABLE — `bashrc.js:387`
+
+Signalé par la session qui tient `laravel/`, et c'est une information de **testabilité**,
+donc la mienne.
+
+Le geste de déploiement de `bashrc/` est derrière un **`confirm()` natif**. Conséquence
+pour toute suite qui voudrait l'exercer :
+
+> **Un dialogue natif ne rend pas un geste dangereux : il le rend INEXERÇABLE — ce qui
+> est pire, parce que le geste part quand même, sans filet.**
+
+Le même défaut a été trouvé et **corrigé** sur `services.js:257`, où **les cinq gestes
+qui écrivent sur une machine** étaient les seuls du module qu'aucune suite ne pouvait
+exercer. Son commentaire disait *« le legacy le fait aussi, c'est de la parité »* — **la
+parité du texte se garde, la boîte non.**
+
+`bashrc.js:387` reste **non corrigé** : le module est bloqué par B4, et le corriger
+demanderait un panneau et des clés dans un module dont l'encart attend lui-même
+vérification. Mêler les deux aurait produit deux demi-corrections.
+
+**Ce que ça veut dire pour mes suites** : aucune suite ne peut aujourd'hui exercer le
+déploiement `bashrc`. Une suite qui l'annoncerait comme couvert mentirait, et une
+assertion qui « passerait » sur ce geste passerait **par absence**.
+
 ## 4. Ce que la mesure a trouvé — à arbitrer par le Lead
 
 Aucun de ces points n'a été corrigé : la session QA qualifie et transmet.

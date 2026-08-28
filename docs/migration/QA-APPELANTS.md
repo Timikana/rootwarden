@@ -260,6 +260,44 @@ mesuré**, pas dédouanement.
 > peut rendre un `400` en JSON puis un flux en `200`, et les deux propriétés doivent se
 > dire ensemble.
 
+#### Le silence sur les flux est descendu de 12 à 3 — dont 9 par vérification à la main
+
+| routes | comment elles sont couvertes |
+|---|---|
+| `/cve_scan`, `/docker/scan_all`, `/logs` | **résolues par l'outil** — les trois appelants sont classés `flux` |
+| les **six** de `supervision/` | **vérifiées à la main**, par deux méthodes qui concordent |
+| `/update`, `/security_updates`, `/dry_run_update` | **tracées à la main** jusqu'à `verseLeFlux`, classé `flux` |
+| `/cve_scan_all`, `/iptables-logs`, `/update-logs` | **silence mesuré** |
+
+**Les six de supervision ont été vérifiées deux fois, indépendamment.** La session qui
+tient `laravel/` les a lues ; je les ai remesurées de mon côté sans lire sa liste :
+`supervision.js:635, 806, 1417` testent `!reponse.ok`, sortent tôt, font
+`return reponse.text()`, puis dérivent un verdict du **contenu**
+(`verdictDesinstallation`, `verdictDuFlux`, `verdictDeploiement`). Mon analyseur les
+classe `flux` indépendamment. **Deux méthodes, un même résultat** — c'est ce qui permet
+de retirer ces six du silence sans les avoir résolues automatiquement.
+
+#### Et une TROISIÈME limite de l'outil, trouvée en creusant les trois dernières
+
+`/update`, `/security_updates` et `/dry_run_update` n'étaient pas remontés. La cause
+n'est pas la mienne d'hier :
+
+```js
+async function surChaqueMachine(bouton, chemin, choix, …, executeUne) {
+    const executeSurUne = executeUne || verseLeFlux;   // <- le helper est une VALEUR
+    …  ok = await executeSurUne(chemin, m);
+```
+
+Le chemin littéral entre **deux niveaux au-dessus** du `fetch`, et le helper est
+**tenu dans une variable** — donc ni le site d'appel ni ses appelants directs ne le
+nomment. Ma passe de remontée va **un** niveau et ne suit pas une fonction passée comme
+valeur.
+
+> Aller plus loin demanderait une vraie analyse interprocédurale. **C'est la frontière de
+> l'outil, et elle est nommée** — pas un silence par incapacité générique, mais une
+> incapacité dont on connaît la forme exacte.
+
+
 ### L'outil produit des CANDIDATS, jamais des verdicts — trois fois de suite
 
 | ce qu'il a annoncé | ce que la lecture a montré |
