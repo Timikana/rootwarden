@@ -56,6 +56,7 @@ return [
     // part AVANT que le premier scan ne tourne. Un verdict tire du statut HTTP
     // annonce donc une reussite meme si toutes les machines ont echoue.
     'scan_all_done_simple' => 'Scan terminé : :ok réussi(s) sur :total serveur(s) rapporté(s).',
+    'scan_all_interrompu' => "Le flux s'est interrompu en cours de route : :ok réussi(s) et :echecs échec(s) avaient déjà été rapportés, et les serveurs suivants n'ont PAS été traités. Ce n'est ni une réussite ni un échec global — recharge la page pour lire l'état réel.",
     'scan_all_sans_fin' => "Le flux ne porte aucun marqueur de fin : le nombre ci-dessus est celui des serveurs qui ont RAPPORTÉ, et non celui du parc. Une interruption en cours de route est donc indiscernable d'une fin normale — recharge la page pour lire l'état réel de chaque serveur.",
     'scan_all_echecs'      => ':n serveur(s) en échec : :noms',
     'scan_all_illisible'   => "Le scan a été lancé, mais son compte rendu n'a pas pu être lu : impossible de dire combien de serveurs ont abouti. Recharge la page pour lire l'état réel.",
