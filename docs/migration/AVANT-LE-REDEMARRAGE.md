@@ -18,12 +18,20 @@ fichiers modifies depuis 18:10 -> 18:40
 contre le `mtime` des fichiers — et non une introspection du processus, qui décrirait le fichier et
 non le serveur.
 
-| | |
-|---|---|
-| commits touchant `backend/` depuis le démarrage | **23** |
-| fichiers source dont le **code** change (docstrings et commentaires exclus) | **19** |
-| fichiers où **seule la prose** change | **0** |
-| fichiers de test (sans effet sur le service) | 2 |
+| | 2026-08-27 soir | **2026-08-28 · 08:14Z** |
+|---|---|---|
+| commits touchant `backend/` depuis le démarrage | 23 | **36** |
+| fichiers source dont le **code** change (docstrings et commentaires exclus) | 19 | **20** |
+| fichiers où **seule la prose** change | 0 | **0** |
+| fichiers de test (sans effet sur le service) | 2 | 2 |
+
+**Le `StartedAt` n'a pas bougé entre les deux relevés** — c'est le lot qui grossit, pas la référence
+qui glisse. **+13 commits et +1 module en une nuit**, et le module ajouté est `wazuh.py` : **le mien**.
+
+> **Attendre ne réduit pas le risque de ce redémarrage : ça l'augmente.** Le seul risque réel de ce
+> lot est sa **taille** — vingt modules qui prendront effet ensemble sans qu'aucun n'ait jamais été
+> observé en fonctionnement. *Chaque livraison qui « prépare » le redémarrage agrandit ce qu'il faudra
+> observer d'un coup.* Je l'écris en sachant que j'y contribue.
 
 Le classement code/prose est fait par comparaison d'**arbres syntaxiques normalisés**, pas par
 `git diff` : un fichier dont seule une docstring bouge rendrait le même arbre. **Aucun n'est dans ce
@@ -59,6 +67,37 @@ Parmi ces neuf, combien détiennent déjà la permission qui deviendra nécessai
 > **Aucun compte non-administrateur ne peut plus toucher au pare-feu après le redémarrage.** Ce n'est
 > pas un défaut du correctif — c'est son effet voulu, et c'est exactement pourquoi il doit être
 > annoncé avant et non constaté après. *Un durcissement non annoncé est indiscernable d'une panne.*
+
+### ⚠ CORRECTION — CETTE LIGNE EST LA PLUS SPECTACULAIRE ET LA MOINS COÛTEUSE
+
+Le tableau ci-dessus classe le risque par **l'écart de permission**. Mesuré le 2026-08-28 sur
+`user_logs` — **2855 lignes** émises par des comptes de rôle < 3 — le classement par **usage réel**
+l'inverse :
+
+| page | détenteurs | actions historiques d'un compte rôle < 3 |
+|---|---|---|
+| `iptables` | **0 / 9** | **0** ← personne ne s'en est jamais servi |
+| `ssh-audit` | 1 / 9 | **0** |
+| `fail2ban` | 1 / 9 | **22** |
+| `services` | 1 / 9 | **8** |
+
+Et les 30 actions `fail2ban` + `services` viennent d'**un seul compte, qui ne détient ni l'une ni
+l'autre permission** — sa dernière action de ce type date du **2026-08-27 à 16 h 23**.
+
+> **Le redémarrage retire donc une capacité à un compte qui s'en servait la veille.** Ce n'est pas le
+> pare-feu, dont le chiffre alarmant décrit une capacité que personne n'a jamais exercée. *Un écart se
+> classe par ce qu'il coûte, pas par l'ampleur du nombre qui le décrit.*
+
+**Deux permissions attribuées avant le redémarrage suffisent à supprimer tout l'impact observable** —
+`can_manage_fail2ban` et `can_manage_services`, sur ce compte. Les deux autres restent à faire, mais
+elles ne rattrapent aucun usage.
+
+### Et un précédent qui rassure, mesuré aussi
+
+`can_manage_wazuh` est exigé par les **15** routes de `wazuh.py` **dans le code qui tourne
+aujourd'hui**, et **0 compte non-administrateur ne le détient**. La situation « une permission que
+personne ne porte » existe donc **déjà en production, sans incident** — parce que personne n'utilise
+cette page. C'est ce qui rend crédible que `iptables` et `ssh-audit` passent de même.
 
 ### Et le point qui dédouane, dit aussi nettement
 
