@@ -142,6 +142,76 @@ d'exhaustivité ; sixième site à examiner → le test de qualification.
 
 ---
 
+## 5 bis. La JOINTURE — première moitié faite, et sa négation ne vaut rien
+
+`backend/tests/test_verdicts_deux_cents.py` · **5 PASS**
+
+La question que le §1 laissait ouverte est désormais mécanique d'un côté : **quelles
+routes du backend peuvent rendre `200` avec `success: false` ?** Mesuré par arbre
+syntaxique sur les **230 routes** :
+
+| famille | n | ce que ça veut dire |
+|---|---|---|
+| `dur` | **11** | un `return jsonify({'success': False})` **sans statut** — donc 200 |
+| `conditionnel` | **20** | un `success` **calculé** (`rc == 0`) : il rend 200 quoi qu'il arrive |
+| `jamais` | 199 | tout refus porte un statut non-200 |
+
+**Le cas `conditionnel` est le moins visible et le plus nombreux.** Une lecture rapide
+n'y voit pas de refus ; un appelant qui teste `.ok` n'en voit pas davantage. Il
+appartient à la même classe de risque sans en avoir la forme.
+
+### La règle qui rend cette liste utile
+
+> Quand une route **rejoint** cette famille, ses appelants doivent être relus. **Rien ne
+> change chez eux** : ils sont invisibles au diff du correctif.
+
+C'est la formulation générale de ce qui a coûté deux heures le 2026-08-27 sur « Détecter
+la version ».
+
+### La garde symétrique a servi au PREMIER rejeu
+
+`ssh.py:remove_user_keys` était dans la liste figée et n'y était déjà plus. Cause
+vérifiée par lecture, et c'est la bonne des deux : **la route a été corrigée** (E-215),
+ses deux refus portent désormais 400 et 404. Sans cette garde, l'entrée serait restée —
+*une liste qui se raccourcit en silence passe au vert en ne mesurant plus rien.*
+
+### Le croisement avec les appelants — et pourquoi sa NÉGATION ne vaut rien
+
+| route | appelant identifié | verdict de l'appelant |
+|---|---|---|
+| `/fail2ban/ban`, `/unban`, `/unban_all` | `fail2ban.js` | **vérifie** |
+| `/linux_version` | `mises-a-jour.js` | délègue / flux |
+| `/delete_remote_user` | `comptes-distants.js` | **vérifie** |
+| `/test_platform_key` | `cle-plateforme.js` | **vérifie** |
+| `/supervision/zabbix/version` | `supervision.js`, via `url_version` | **vérifie** |
+
+**Aucun appelant identifié ne manque le verdict.** Le dédouanement du §1 tient donc
+maintenant pour une raison **mesurée** et non plus par coïncidence — pour les appelants
+que j'ai su résoudre.
+
+> **Et c'est là que ma première version a produit exactement l'erreur qu'on m'avait
+> annoncée.** Un premier croisement, fait par `grep` du chemin littéral dans le
+> JavaScript, rendait « AUCUN appelant » pour **cinq** routes. Deux de ces cinq ont été
+> résolues **en une commande** sur la couche PHP : `supervision.js` n'écrit jamais
+> `/supervision/zabbix/version`, il lit `url_version`, fabriqué par
+> `SupervisionController.php:725`.
+>
+> **La jointure traverse trois langages, et un motif qui n'en lit qu'un se trompe DANS
+> LE SENS QUI RASSURE.** Les résultats POSITIFS de ce tableau sont solides ; ses
+> résultats NÉGATIFS ne valent rien, et je ne les publie pas comme tels.
+
+Restent trois routes sans appelant trouvé — `cve_compare`, `iptables-validate`,
+`wazuh/detect` — et **je n'affirme pas qu'elles n'en ont pas** : je dis que ni le
+JavaScript ni les contrôleurs PHP ne nomment leur chemin. C'est une absence de preuve.
+
+### Ce qui reste à faire pour que la jointure soit mécanique
+
+Résoudre, **par analyse et non par `grep`**, la chaîne `libellé JS → clé PHP → chemin de
+passerelle`. Les contrôleurs la fabriquent par `url('/api/gateway/…')` et par
+interpolation (`url("/api/gateway/supervision/{$plateforme}/version")`), donc une part
+n'est pas statiquement résoluble. **Le relevé restera partiel, et il devra dire lequel de
+ses silences est mesuré.**
+
 ## 6. Ce qui n'est pas mesuré
 
 - **la jointure appelant → route du backend n'est pas automatique.** L'analyseur lit
