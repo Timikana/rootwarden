@@ -10649,3 +10649,59 @@ elle est dans un `if ($isAdmin)` avec `$isAdmin = $role >= 2` (`:16`). **Le rôl
 
 *La règle qui a arrêté l'accusation est celle de la journée : lire la fonction qui décide avant de conclure.*
 **Et le dire compte** — c'est la troisième fausse alerte de la journée levée par son auteur avant transmission.
+
+---
+
+## E-232 — Archiver `legacy/api/` retire la SEULE référence d'API du produit, et la page dérivée ne la remplace pas
+
+**Conséquence directe de la décision E-231, et il faut la dire avant l'archivage, pas après.**
+
+`api_docs` est **basculé** — `Navigation.php:133`, `'route' => 'autorisations-passerelle'`. Le menu passe donc
+à **26 portées / 6 restantes.** Et la page dérivée tient les trois bornes du Lead, **y compris celle qui la
+disqualifie comme référence** :
+
+    laravel/lang/fr/autorisations.php   'pas_reference_titre' · 'pas_reference_texte'
+                                       -> annonce AVANT son contenu qu'elle n'est pas une reference d'API
+
+> **C'est exactement ce qui a été demandé, et c'est exactement pourquoi elle ne remplace pas ce qu'on
+> archive.** Elle décrit **des autorisations**, pas des **contrats** : ni schémas de requête, ni codes de
+> réponse, ni exemples.
+
+### Ce que `legacy/api/` contient, et ce qui disparaît
+
+    docs.php  ·  openapi.php  ·  openapi.yaml (92 Ko)  ·  swagger/
+
+**En l'archivant, le produit n'a plus de référence d'API du tout.** *Re-siter une capacité et la retirer se
+ressemblent dans un journal de commits ; elles ne se ressemblent pas pour l'utilisateur* — et ici c'est bien un
+**retrait**, assumé.
+
+### L'argument qui le rend défendable, et sa limite
+
+**Le YAML était faux à 32 %** : 7 chemins fantômes, **64 routes sur 203 non documentées**, et **les deux
+orthographes du même module**. *Une référence fausse à ce point n'est pas une référence : c'est un piège daté.*
+**Mais « le remplacement était faux » ne rend pas « aucun remplacement » suffisant.**
+
+### ⚠ ARBITRAGE — délégable, et il appartient au DSI
+
+**Trois issues, aucune ne détruit :**
+
+1. **accepter le retrait** — le produit n'expose plus de référence d'API. Cohérent avec la dépréciation
+   complète du legacy, **et à écrire dans `DEPRECIATION.md` comme une capacité RETIRÉE**, jamais comme une
+   capacité portée ;
+2. **régénérer une spécification DEPUIS les routes** — le même geste que la page dérivée, appliqué au catalogue
+   au lieu des autorisations. *Ce qui a rendu le YAML faux est qu'il était figé ; un catalogue dérivé ne peut
+   pas l'être.* Coût réel, et **c'est la seule issue qui rende au produit ce qu'il perd** ;
+3. **garder `legacy/api/` hors archivage** jusqu'à la régénération — *le legacy survit sur ce seul point*, ce
+   qui contredit l'instruction de l'exploitant.
+
+**Recommandation du Lead : la 2.** Le mécanisme est déjà écrit et éprouvé deux fois aujourd'hui — les douze
+tuiles dérivées du menu, et cette page dérivée de la liste blanche. *Dériver un catalogue de routes est le même
+geste, sur une autre source.*
+
+### ⚠ Et l'archivage ne peut pas partir avant cette décision
+
+`legacy/api/` porte **quatre** fichiers et un dossier `swagger/`. Le cycle du §4.4 s'applique — **neuf étapes**,
+dont la **huitième** (liens entrants, quatre natures) et la **neuvième** (clés de conseil, comptées zéro
+compris). **Mais l'étape zéro est celle-ci** : *savoir si l'on archive une capacité portée ou une capacité
+retirée change ce qu'on écrit dans `DEPRECIATION.md`* — et ce registre est le seul endroit où la différence
+restera lisible dans six mois.
