@@ -133,6 +133,89 @@ seulement gênés.
 
 ---
 
+---
+
+# Second geste sur `/comptes` — un QUATRIÈME compte d'épreuve, rôle 2, zéro permission
+
+**Ajouté le 2026-08-28, sur mesure de la session 6.** Même dossier parce que c'est le même geste : une
+ligne dans `users`, et un enrôlement.
+
+## La décision, et l'énoncé qui la commande
+
+J'avais écrit à la session 6 que « les trois autres gardes restent inmesurables ». **C'est faux au
+niveau du schéma, et elle l'a mesuré** : le compte **77** est rôle 2 et ne porte **aucune** des quatre
+permissions. La fixture existe pour les quatre, pas seulement pour `iptables`.
+
+**Sa conclusion opérationnelle tient, pour une autre raison — et la différence change l'action :**
+
+| énoncé | ce qu'il appelle |
+|---|---|
+| ~~« le schéma n'a pas cette ligne »~~ | créer une ligne |
+| **« la ligne existe, son compte est INUTILISABLE »** | **un quatrième compte d'épreuve** |
+
+Le compte 77 est celui d'une personne réelle : **son secret TOTP est inconnu, et on n'invente jamais un
+secret TOTP.** Aucune suite ne peut s'en servir.
+
+> **DÉCIDÉ : un quatrième compte d'épreuve, rôle 2, ZÉRO permission.** Et non la seconde option que le
+> plan proposait — *une révocation temporaire de `can_manage_fail2ban` sur `rw-test-admin`, restaurée
+> dans le `finally`*.
+
+**La raison du choix, et elle n'est pas le confort** : la révocation temporaire **mute une fixture
+partagée pendant un rejeu**, et **treize suites dépendent de `rw-test-admin`**. Si le `finally` ne
+tourne pas — interruption, exception qui emporte le journal, rejeu tué — le compte perd la permission
+**définitivement**, et treize suites cassent d'un coup, avec un symptôme qui ressemble à une régression
+de l'application. *Une fixture qui échoue ouvert sur un état partagé coûte plus cher que l'identité
+qu'elle économise.* Un compte stable ne peut pas échouer ainsi.
+
+**Et ce que le quatrième compte rend, qui est plus que ce qu'on demandait** : les **quatre** gardes
+deviennent mesurables — `can_manage_iptables`, `can_manage_fail2ban`, `can_manage_services`,
+`can_audit_ssh` — là où `rw-test-admin` n'en laisse mesurer qu'une.
+
+## ⚠ La réserve, et elle est réelle
+
+**Un compte de rôle 2 atteint TOUTES les machines, `srv-zabbix` comprise** — `check_machine_access`
+rend `True` sans condition dès `role_id >= 2`. C'est déjà vrai de `rw-test-admin` (E-174 le mesure), et
+un quatrième compte ajoute **une quatrième identité qui atteint la production**.
+
+**Trois bornes, en conséquence, et elles ne sont pas négociables :**
+
+1. **zéro permission, en permanence.** La ligne `permissions` existe et toutes ses colonnes valent 0 —
+   *pas d'absence de ligne* : le compte 77 n'en a aucune, et c'est ce qui a rendu mon relevé ambigu ;
+2. **aucune machine dans `user_machine_access`** — inutile au rôle 2, mais qui rend l'intention
+   lisible ;
+3. **il ne sert QU'À mesurer une garde.** Jamais aux captures, jamais à un geste de parc.
+
+## Ce que la session 6 dit et qu'il faut garder
+
+> **« Je ne peux PAS protéger cette fixture par un test. »** Ses deux suites sont **hermétiques** —
+> SQLite vide et base mockée — et aucune ne lit la base du banc. Elle refuse de perdre cette propriété :
+> *un test qui lirait le banc accuserait la page pour un état du banc, et il faudrait le jeton de banc
+> pour le jouer.*
+
+**La protection de `rw-test-admin` est donc ORGANISATIONNELLE, pas mécanique**, et elle est dite plutôt
+que laissée croire. C'est exactement la forme qu'exige le §8 : *un « aucun défaut » n'est éprouvable que
+si l'instrument peut nommer la raison de son silence.*
+
+## Le geste exact
+
+    Administration > Comptes > Ajouter
+      nom      rw-test-admin-nu   (ou equivalent : le nom dit qu il ne porte RIEN)
+      role     2
+      permissions   AUCUNE — la ligne existe, toutes les colonnes a 0
+    puis, par son titulaire : changement de mot de passe impose + ENROLEMENT 2FA
+
+**L'enrôlement est le seul point qui ne peut pas être automatisé** : on ne demande jamais de coller un
+secret, et on n'en invente jamais un. C'est ce qui fait de ce geste un dossier et non une décision.
+
+## Ce qui se passe si on ne fait rien
+
+**Les quatre gardes restent inmesurables**, et c'est le défaut qu'E-152 a nommé sur cinq suites d'un
+coup : *elles resteraient vertes si le correctif n'était jamais appliqué, ET si on l'appliquait de
+travers.* Le redémarrage va poser **33** de ces gardes. **Sans ce compte, aucune suite ne pourra dire si
+l'une d'elles mord.**
+
+---
+
 ## Ce qui n'est pas mesuré
 
 - **si 77 et 78 sont la même personne.** La base ne le dit pas, et je ne l'ai pas demandé : c'est la
