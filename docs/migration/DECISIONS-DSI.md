@@ -238,12 +238,56 @@ qui transmet toujours `X-User-ID` (`api_proxy.php:87`) — comme la passerelle d
 corriger, seulement à savoir avant d'émettre une clé à un consommateur extérieur.
 **Remesure : `SELECT name,last_used_ip FROM api_keys WHERE revoked_at IS NULL`.**
 
+### ✅ CONFIRMÉ PAR UNE MESURE VENUE POUR ME CONTREDIRE — 2026-08-28, 08:17 UTC
+
+**La session 4 a classé les quatre permissions par USAGE RÉEL plutôt que par écart de détention** — bonne
+méthode, et elle a rendu une conclusion alarmante :
+
+    iptables    0/9 detenteurs    0 action
+    ssh-audit   1/9               0
+    fail2ban    1/9              22        <- « un compte qui s en servait la veille »
+    services    1/9               8
+
+> *« Le redémarrage retire une capacité à un compte qui s'en servait la veille. »* Et la recommandation
+> qui suivait : **deux permissions à accorder avant le redémarrage suffiraient à supprimer tout
+> l'impact observable.**
+
+**Mesuré moi-même. Les 30 lignes sont 30 REFUS.**
+
+    SELECT LEFT(action,110), COUNT(*) FROM user_logs WHERE user_id = 14
+      AND (action LIKE '%fail2ban%' OR action LIKE '%service%') GROUP BY 1
+
+    Permission refusee : can_manage_fail2ban    22
+    Permission refusee : can_manage_services     8
+
+**Aucune action réussie. Ce sont les lignes que `checkPermission` écrit quand elle REFUSE.** Et le
+compte est **`rw-test-user` (id 14)** — rôle 1, zéro permission, **D-5 : ne pas toucher** —, la fixture
+dont le rôle *est* d'être refusée. Les 30 lignes, du 2026-08-26 22:30 au 2026-08-27 16:23, sont des
+exécutions de suites.
+
+> **La phrase s'inverse mot pour mot** : ce compte a été refusé trente fois **par la garde qui existe
+> déjà**. Les 30 lignes ne contredisent pas ma décision — **elles la prouvent.**
+
+**Et la recommandation aurait fait accorder `can_manage_fail2ban` et `can_manage_services` à la fixture
+D-5**, dont plusieurs suites mesurent le « rôle 1 → 403 ». **Deuxième fois de la journée qu'une
+recommandation bien intentionnée aurait détruit une fixture de garde**, après `can_manage_iptables` sur
+`rw-test-admin`. *Les deux fois, la formulation partait d'un chiffre réel et sautait la question « à qui
+appartient ce compte ».*
+
+**Le mécanisme est celui du §8, et c'est le plus coûteux** : *un observable ne dit jamais par quel chemin
+il a été produit.* Un `COUNT(*)` de lignes `user_logs` contenant « fail2ban » ne distingue pas un geste
+d'un refus — et il s'est trompé **du côté qui alarme, donc du côté qui fait agir.**
+
+**La méthode reste la bonne** : appliquée à la bonne donnée, le classement par usage rend **zéro usage
+sur les quatre permissions**, ce qui est plus fort que ce qu'elle annonçait.
+
 ### La décision, en une ligne
 
 > **Aucune permission n'est accordée. Le durcissement ne retire aucun accès d'interface : les pages
 > portent déjà la garde que les routes s'apprêtent à porter.** La tâche de configuration « à faire
-> avant, pas après » n'a pas d'objet — *et le geste qu'elle appelait le plus naturellement,
-> `can_manage_iptables` à `rw-test-admin`, aurait détruit la seule fixture de garde du parc.*
+> avant, pas après » n'a pas d'objet — *et les deux gestes qu'elle appelait le plus naturellement,
+> `can_manage_iptables` à `rw-test-admin` puis `can_manage_fail2ban`/`can_manage_services` à
+> `rw-test-user`, auraient détruit les DEUX fixtures de garde du parc.*
 
 **Ce que je n'ai pas mesuré, et qui reste :** que les 33 routes se comportent comme prévu une fois en
 service. Personne ne l'a mesuré — c'est l'objet du `DOSSIER-01`, et c'est le vrai risque du lot.
