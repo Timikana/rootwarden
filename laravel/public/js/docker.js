@@ -297,10 +297,33 @@
             return;
         }
 
+        /* ══ CE TOTAL N'EST PAS CELUI DU PARC, ET L'ECRAN LE DIT ═════════
+         *
+         * `docker.py:141-149` emet UNE ligne par machine et **aucun marqueur de
+         * fin**. Un flux tronque — connexion coupee, delai de passerelle — est
+         * donc indiscernable d'une fin normale : le client ne peut pas savoir
+         * qu'il manque des machines.
+         *
+         * `cve_scan` fait mieux (`scan-cve.js:539` : « un flux qui se termine
+         * sans `done` ni `error` n'est pas un succes »), parce que SON flux
+         * porte un evenement terminal. Ici il n'y en a pas, donc le controle ne
+         * se transpose pas — on peut seulement cesser de pretendre.
+         *
+         * Le libelle compte donc les serveurs qui ont RAPPORTE, pas le parc, et
+         * la borne le dit sous le bilan. *Une mesure plus fine que la donnee
+         * serait une invention* — le marqueur manquant est remonte. */
         const total = ok + echecs.length;
         annonce(String(L.scan_all_done_simple).split(':ok').join(String(ok))
             .split(':total').join(String(total)),
             echecs.length === 0 ? 'ok' : 'attention');
+
+        // LA BORNE EST DITE DES QU'UN BILAN CHIFFRE EST AFFICHE, echecs ou
+        // non : un « 8 sur 8 » sans reserve se lit comme un parc complet.
+        const borne = document.createElement('p');
+        borne.className = 'rw-aide';
+        borne.setAttribute('data-rw', 'docker-scan-sans-fin');
+        borne.textContent = L.scan_all_sans_fin || '';
+        message.parentNode.insertBefore(borne, message.nextSibling);
 
         if (echecs.length > 0) {
             // LES ECHECS SONT NOMMES, pas seulement comptes : « 2 sur 5 » ne dit

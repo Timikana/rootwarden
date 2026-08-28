@@ -55,7 +55,8 @@ return [
     // `POST /docker/scan_all` rend un FLUX JSON-lines en `text/plain` : le 200
     // part AVANT que le premier scan ne tourne. Un verdict tire du statut HTTP
     // annonce donc une reussite meme si toutes les machines ont echoue.
-    'scan_all_done_simple' => 'Scan de tous les serveurs terminé : :ok réussi(s) sur :total.',
+    'scan_all_done_simple' => 'Scan terminé : :ok réussi(s) sur :total serveur(s) rapporté(s).',
+    'scan_all_sans_fin' => "Le flux ne porte aucun marqueur de fin : le nombre ci-dessus est celui des serveurs qui ont RAPPORTÉ, et non celui du parc. Une interruption en cours de route est donc indiscernable d'une fin normale — recharge la page pour lire l'état réel de chaque serveur.",
     'scan_all_echecs'      => ':n serveur(s) en échec : :noms',
     'scan_all_illisible'   => "Le scan a été lancé, mais son compte rendu n'a pas pu être lu : impossible de dire combien de serveurs ont abouti. Recharge la page pour lire l'état réel.",
     'scan_all_aucun'       => "Le scan n'a rendu aucun compte rendu — aucun serveur n'a été traité, ou le flux s'est interrompu avant la première réponse.",
