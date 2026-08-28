@@ -10815,3 +10815,132 @@ disparition est programmée**, et **chaque ligne ajoutée serait une occasion de
 nommément dans sa liste.** *Une liste blanche qui autorise par préfixe n'est pas une liste blanche : c'est une
 liste de familles*, et personne ne peut dire de mémoire ce qu'elle contient. **C'est mesurable, ce n'est pas
 resserré, et la raison est écrite** — la triade que ce chantier demande à chaque écart sans porteur.
+
+## E-234 — `documentation.php` porte une CONSOLE D'API : la page dont le nom promet qu'elle ne fait rien est un client HTTP generique vers la passerelle
+
+**Mesure du 2026-08-28, 15:50 CEST.** Releve par la session 2, verifie par le Lead
+(`sed -n '11p;16p;1719,1724p;1741,1745p' legacy/documentation.php`).
+
+`legacy/documentation.php` (1756 lignes, **aucun JS separe** : tout est en ligne) n'est pas une
+page statique. Son unique appel sortant reel est **arbitraire** :
+
+    :1624   <input type="text" id="api-endpoint" value="/cve_test_connection">   CHAMP LIBRE
+    :1629   <select id="api-method">                                            GET / POST
+    :1636   <textarea id="api-payload">                                         corps JSON libre
+    :1743   fetch('/api_proxy.php' + endpoint, options)
+
+**Controle d'acces EFFECTIF :**
+
+    :11   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])   -- et AUCUN checkPermission
+    :16   $isAdmin = $role >= 2
+    :1721 <?php if ($isAdmin): ?>                               -- la console
+
+> **Tout compte de role >= 2 obtient un client HTTP generique vers la passerelle, sans
+> qu'aucune permission ne soit exigee.**
+
+### Ce que ce n'est PAS, et il faut le dire aussi nettement
+
+**Ce n'est pas une escalade de privilege.** Le proxy applique sa liste blanche et
+`$ADMIN_ONLY_PREFIXES` — que le role 2 franchit de toute facon — et le backend applique ses
+decorateurs. **Un role 2 n'atteint par la console rien qu'il n'atteindrait par les pages.**
+
+### Ce que c'est : le contournement de l'INTERFACE, pas des gardes
+
+### ⚠ MA PREMIERE LISTE ETAIT FAUSSE SUR DEUX ENTREES ET MANQUAIT LES TROIS QUI COMPTENT
+
+**Rectification du 2026-08-28 16:00 CEST**, apres mesure route par route (role, permission,
+`gate()`, liste blanche du proxy) — la premiere version de cet ecart, ecrite dix minutes plus
+tot, annoncait `/regenerate_platform_key` et un `install_all` « de parc par construction ».
+**La session 5 m'a contredit, et elle avait mesure.**
+
+    /regenerate_platform_key   role=3  gate=OUI   ->  HORS D'ATTEINTE d'un role 2
+    /wazuh/install_all         machine_ids OBLIGATOIRE, corps vide -> 400
+    /cve_scan_all              ABSENT de $ALLOWED_PROXY_PREFIXES  ->  le proxy BLOQUE
+
+**Les trois faux dedouanent, et je les avais ecrits comme aggravants.** Pire : `install_all`
+est borne **par un correctif que j'ai numerote moi-meme, E-224** — j'ai repete « de parc »
+apres deux sessions sans relire la borne que j'avais inscrite. *Trois lecteurs d'accord ne
+valent pas une mesure ; c'est la quatrieme session, seule contre trois, qui avait raison.*
+
+### CE QUE LA CONSOLE ATTEINT REELLEMENT — mesure, role 2
+
+`$ADMIN_ONLY_PREFIXES` (25 entrees) ne borne que les roles < 2 : **pour le public de la
+console, seule la liste blanche compte**, puis les decorateurs du backend.
+
+| route | role | permission backend | atteignable par la console |
+|---|---|---|---|
+| **`POST /ssh-audit/scan-all`** | 2 | **AUCUNE** | **OUI** — SSH sur toute la flotte |
+| **`POST /docker/scan_all`** | 2 | **AUCUNE** | **OUI** |
+| `POST /wazuh/install_all` | 2 | `can_manage_wazuh` | oui, avec la permission — et `machine_ids` obligatoire |
+| `POST /groups/<id>/run` | 2 | `can_admin_portal` | oui — **3 effets sortants PAR MACHINE** |
+| `POST /fail2ban/install_all` | 2 | `can_manage_fail2ban` | oui |
+| `POST /supervision/scan-all` | 2 | `can_manage_supervision` | oui |
+| `POST /drift/scan_all` | 2 | `can_view_compliance` | oui |
+| `POST /cve_scan_all` | 2 | — | **non** : hors liste blanche |
+| `POST /regenerate_platform_key` | **3** | — + **`gate()`** | **non** |
+
+> **Le fait le plus net n'etait pas dans ma premiere liste : `POST /ssh-audit/scan-all` ouvre
+> une session SSH sur toute la flotte, en role 2, SANS AUCUNE PERMISSION, dans la liste
+> blanche, hors `ADMIN_ONLY`, sans porte d'approbation** — et depuis la console, **sans panneau,
+> sans nom de machine, sans compte annonce.** C'est la route dont la consigne permanente du
+> chantier dit « ne jamais lancer `go-ssh-audit-scanall.mjs` ». `/docker/scan_all` est dans le
+> meme cas.
+
+Et **`/cve_scan_all` est bloque par la liste blanche** : la console **n'envoie donc pas** de
+courriel. C'est un dedouanement, et il compte autant que le reste — l'effet sortant de S7b
+n'est pas joignable par la.
+
+**Aucun panneau de decision, aucun nom de machine, aucun compte annonce** — alors que chacune
+de ces pages en porte un, et que ce chantier a passe des semaines a les poser.
+
+> **C'est l'inverse du motif habituel du depot.** D'ordinaire la garde est sur la PAGE et pas
+> sur la REQUETE — six occurrences numerotees. **Ici les gardes de requete tiennent toutes, et
+> c'est tout ce que l'interface AJOUTE qui manque.** Un panneau de confirmation n'est pas une
+> garde ; il n'en est pas moins la seule chose qui empeche un geste de masse d'etre involontaire.
+
+### Consequence directe sur la depreciation du legacy
+
+Tant que `documentation.php` est servi, cette console est joignable par **tout** compte de
+role >= 2 **sans permission**. *L'argument le plus fort pour finir la depreciation ne se
+trouvait pas dans le plan : il est sur la page dont le nom promet qu'elle ne fait rien.*
+
+### Arbitrage EXPLOITANT — la console se porte-t-elle ?
+
+Ce n'est pas un detail de fidelite : **c'est la seule capacite vivante de la page.** Trois
+issues, aucune neutre : la porter telle quelle (fidelite stricte, on reconduit le
+contournement) · la porter derriere `role:3` + une permission dediee + un panneau (divergence
+declaree, comme `/supervision/`) · ne pas la porter (perte de capacite assumee, a inscrire).
+
+## E-235 — `/wazuh/` passe la passerelle pour un role 1 : un rempart manquant sur deux, et le precedent `/supervision/` a deja tranche dans l'autre sens
+
+**Mesure du 2026-08-28, 15:52 CEST.** Releve par la session 6, **verifie par le Lead avec un
+analyseur independant** — un automate qui distingue chaine, commentaire de ligne et commentaire
+de bloc, parce qu'un `grep` sur ce fichier rend l'INVERSE de la verite (les apostrophes des
+commentaires francais, `n'a`, `l'un`, ouvrent de fausses chaines et la premiere extraction de
+la session 6 declarait `/wazuh/` **et** `/groups` hors liste blanche).
+
+    LISTE_BLANCHE      66 entrees   wazuh=['/wazuh/']   groups=['/groups']
+    ADMIN_SEULEMENT    27 entrees   wazuh=-             groups=['/groups']
+
+**`/wazuh/` est dans la liste blanche et ABSENT de `ADMIN_SEULEMENT`.** Un role 1 porteur de
+`can_manage_wazuh` atteint donc `/api/gateway/wazuh/install_all` : **la passerelle transmet.**
+
+**Le backend refuse** — les 15 routes portent `@require_api_key` + `@require_role(2)` +
+`@require_permission('can_manage_wazuh')`, le module le plus uniformement garde du chantier.
+**C'est donc un rempart manquant sur deux, pas un trou.** Il faut le dire dans les deux sens :
+rien n'est joignable aujourd'hui, et il ne reste qu'une barriere.
+
+**Le precedent existe et il a tranche dans l'autre sens** : `/supervision/` a ete AJOUTE a
+`ADMIN_SEULEMENT` alors que le legacy ne l'y avait pas, divergence declaree, *parce qu'on ne
+depend jamais d'un seul rempart*. **`/wazuh/` merite le meme traitement, et pour une raison
+plus forte : `install_all` installe un paquet sur un parc entier.**
+
+`laravel/app/Support/RoutesBackend.php` est le fichier de la session 3. Divergence a declarer,
+non a decider seul.
+
+### Et la faute d'instrument vaut d'etre inscrite pour elle-meme
+
+La session 6 a signale que sa premiere mesure rendait l'inverse, et **c'est ce signalement qui
+a permis de la verifier.** *Un releve qui s'annonce comme redresse se controle ; un releve
+silencieux se croit.* Sans son controle de vraisemblance sur quatre entrees connues, le
+chantier aurait recu un ecart imaginaire sur `/groups` et manque le vrai sur `/wazuh/`.
