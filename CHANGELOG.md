@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.52** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.54** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,58 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.54 — j'avais attribue E-215 a la mauvaise fonction, et j'ai confirme une consigne qui visait a cote
+
+**Correction relevee par la session 3, avec la mesure. Deux fonctions du meme fichier, meme geste, et j'ai
+pris l'une pour l'autre — apres qu'elle-meme et la session 5 aient fait la meme confusion.**
+
+    `sed -i '/rootwarden/d' … ; echo OK`   ->  ssh.py:2403, dans **remove_user_keys**  (def :2352)
+    def server_user_remove_key                                                          (def :2200)
+
+**`server_user_remove_key` est la route SOIGNEUSE du fichier** : elle **refuse** `is_platform_key` sans
+`force` (« utilise --force si tu veux vraiment te locker hors du serveur »), **sauvegarde** (`${tmp}.bak`),
+**recalcule les empreintes ligne par ligne** avec `ssh-keygen -lf`, distingue `exit 1` d'`exit 2`, et **lit son
+code de retour**. C'est exactement l'implementation que la session 5 demande de **remonter** pour corriger
+`remove_user_keys`.
+
+> **Le nom ne dit pas laquelle.** *Deux fonctions du meme fichier, meme geste, des noms qui ne different que
+> par un prefixe — et l'une garde ce que l'autre ignore.*
+
+**Ce que ma confusion aurait coute** : j'avais confirme a la session 3 de **ne pas nommer le geste a l'ecran**
+pendant une compromission, au motif qu'il « ment sur son propre effet ». **La regle etait bonne, l'objet
+faux** — et appliquee, elle aurait produit exactement le defaut que j'avais inscrit le matin meme :
+
+> *Un texte faux retire sans son remplacement ne corrige pas la desinformation : il la rend muette.* Dire
+> « ce geste n'existe pas ici » pendant une compromission envoie chercher ailleurs ou conclure qu'il n'y a
+> rien a faire — **le pire des deux mensonges possibles sur cet ecran-la.**
+
+**La session 3 a maintenu contre ma confirmation**, et son ecran nomme desormais le geste **avec sa
+protection** : il existe, il sauvegarde, il recalcule les empreintes, **et il refuse par defaut** de retirer la
+cle de plateforme — *ce refus est une protection, pas une panne.* Et il dit **ou** : ancien portail, page des
+comptes distants, cle par cle. **Aucun geste de parc, volontairement** — applique partout d'un coup, il
+verrouillerait la flotte.
+
+**Verifie : `remove_user_keys` n'est nommee dans aucun catalogue** (0 occurrence), contre 1 pour la route
+soigneuse.
+
+#### Et la generalisation de la session 3 sur E-227 merite d'etre gardee
+
+> *« Une cible qui tient par l'ordre implicite d'un `SELECT` »* — meme famille que **« une propriete qui tient
+> par l'etat du parc n'est pas une propriete »**. `SELECT id FROM machines LIMIT 1` sans `ORDER BY` ne choisit
+> pas « une machine quelconque » : il choisit toujours la meme, et c'etait la production. **La cible d'un
+> diagnostic se choisit, elle ne se tire pas au sort par accident de tri.**
+
+#### Le poste 7 est repourvu, et la collision est declaree
+
+La session qui tenait le banc a ecrit `backend/tests/test_invariant_machine_id.py` **dans le perimetre
+exclusif du poste 6**, en croyant ce poste vacant — je l'avais annonce vacant de bonne foi. Elle l'a signale
+d'elle-meme et rendu la main. **Le travail reste et il est eprouve par mutation** ; c'est au poste 6 de decider
+s'il vit la.
+
+> **Une table de propriete ne protege que ceux qui savent qui tient quoi** — et un poste « vacant » annonce de
+> bonne foi ne l'etait pas. **Quatre sessions ont refuse un role mal adresse aujourd'hui ; c'est ce qui a
+> empeche les degats, pas la table.**
 
 ### v1.38.53 — P4 : la rotation portée sans être exercée, et ce que le geste ne fait PAS
 
@@ -4484,7 +4536,9 @@ correspondance reelle :**
 | **v1.38.48** | `b12835f` | **E-226 : la rotation ne revoque pas la cle compromise** ; E-223 ; E-224 ; E-225 |
 | v1.38.50 | `e41e18c` | ma garde du runner empechait toute suite neuve, et disait « conforme » sur zero execution |
 | v1.38.51 | `4920acd` | finir chaque onglet : les manques declares, et le tableau de bord RETENU |
-| **v1.38.52** | (ce commit) | **E-227 : ouvrir le diagnostic deployait un NOPASSWD: ALL sur la production** |
+| **v1.38.52** | `a354902` | **E-227 : ouvrir le diagnostic deployait un NOPASSWD: ALL sur la production** |
+| v1.38.53 | `737320d` | `platform_key` P4 porte, les deux points bloquants corriges |
+| v1.38.54 | (ce commit) | j'avais attribue E-215 a la mauvaise fonction |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

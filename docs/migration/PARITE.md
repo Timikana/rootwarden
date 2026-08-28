@@ -10251,8 +10251,24 @@ sens **rassurant** : *il existe un remède*, puis *il existe un nettoyage*.
 ### Il n'existe AUCUN geste unique qui réponde à une clé compromise
 
 Retirer la clé exige de réécrire les `authorized_keys` **compte par compte et machine par machine** —
-`server_user_remove_key` (`ssh.py:2211`). Et ce geste porte **E-215** : il atteste sans vérifier, et son mode
-sélectif filtre **par sous-chaîne**.
+`server_user_remove_key` (`ssh.py:2200`).
+
+> **⚠ CORRECTION DU LEAD, 2026-08-28 — J'AVAIS ATTRIBUÉ E-215 À LA MAUVAISE FONCTION.**
+> Il était écrit ici que `server_user_remove_key` « atteste sans vérifier et filtre par sous-chaîne ».
+> **Faux, et relevé par la session 3 avec la mesure :**
+>
+>     `sed -i '/rootwarden/d' … ; echo OK`  ->  ssh.py:2403, dans **remove_user_keys** (def :2352)
+>     def server_user_remove_key                                                        (def :2200)
+>
+> **`server_user_remove_key` est la route SOIGNEUSE du fichier** : elle refuse `is_platform_key` sans `force`
+> (« utilise --force si tu veux vraiment te locker hors du serveur »), **sauvegarde** (`${tmp}.bak`),
+> **recalcule les empreintes ligne par ligne** avec `ssh-keygen -lf`, distingue `exit 1` d'`exit 2`, et **lit
+> son code de retour**. C'est précisément l'implémentation que la session 5 demande de **remonter** pour
+> corriger `remove_user_keys`.
+>
+> **Deux sessions ont fait la même confusion avant de mesurer, le Lead compris.** *Deux fonctions du même
+> fichier, même geste, des noms qui ne diffèrent que par un préfixe — et l'une garde ce que l'autre ignore.*
+> **Le nom ne dit pas laquelle.**
 
 **Donc la chaîne complète de réponse à une compromission est, aujourd'hui :**
 
@@ -10260,7 +10276,7 @@ sélectif filtre **par sous-chaîne**.
 |---|---|---|
 | `revoke_service_account` — documenté « kill-switch, compromission » | supprime le compte de service | **la clé sur root et sur le nominal** (E-219) |
 | `regenerate_platform_key` — P4, « le geste le plus large » | génère une paire neuve | **l'ancienne clé autorisée partout** (celui-ci) |
-| `server_user_remove_key` — aucune interface de parc | retire une clé, un compte, une machine | atteste sans vérifier, filtre par sous-chaîne (E-215) |
+| `server_user_remove_key` — aucune interface de parc | retire une clé, un compte, une machine — **soigneusement** : sauvegarde, empreintes recalculées, refus par défaut sur la clé de plateforme | **rien** — c'est `remove_user_keys` qui porte E-215, pas elle |
 
 *Trois gestes, aucun qui ferme la porte, et celui qui en approche le plus n'a pas d'interface.*
 
