@@ -267,7 +267,7 @@ mesuré**, pas dédouanement.
 | `/cve_scan`, `/docker/scan_all`, `/logs` | **résolues par l'outil** — les trois appelants sont classés `flux` |
 | les **six** de `supervision/` | **vérifiées à la main**, par deux méthodes qui concordent |
 | `/update`, `/security_updates`, `/dry_run_update` | **tracées à la main** jusqu'à `verseLeFlux`, classé `flux` |
-| `/cve_scan_all`, `/iptables-logs`, `/update-logs` | **silence mesuré** |
+| `/cve_scan_all`, `/iptables-logs`, `/update-logs` | **absence ÉTABLIE** — voir ci-dessous |
 
 **Les six de supervision ont été vérifiées deux fois, indépendamment.** La session qui
 tient `laravel/` les a lues ; je les ai remesurées de mon côté sans lire sa liste :
@@ -276,6 +276,37 @@ tient `laravel/` les a lues ; je les ai remesurées de mon côté sans lire sa l
 (`verdictDesinstallation`, `verdictDuFlux`, `verdictDeploiement`). Mon analyseur les
 classe `flux` indépendamment. **Deux méthodes, un même résultat** — c'est ce qui permet
 de retirer ces six du silence sans les avoir résolues automatiquement.
+
+#### Les trois dernières ne sont pas « non résolues » : elles sont NON CONSOMMÉES
+
+La session qui tient `laravel/` a relevé l'ensemble complet des chemins de ses fichiers
+et conclu que ces trois routes n'ont aucun appelant. **Elle a elle-même posé la limite de
+son relevé** : elle est l'auteur des fichiers qu'elle mesure, donc c'est une **lecture**,
+et elle conclut à un **dédouanement** — ce qui ne se relit pas. Elle a demandé une
+contradiction indépendante.
+
+`laravel/tests/Outils/absence.mjs` la fournit, **par arbre syntaxique et sur les deux
+couches** :
+
+| mesure | résultat |
+|---|---|
+| **1 370** chaînes littérales distinctes dans les 31 fichiers JS (commentaires **exclus**) | les trois : **absentes** |
+| **0** concaténation de deux littéraux | l'évasion `'/iptables' + '-logs'` n'existe pas ici |
+| **11** URL injectées par les contrôleurs PHP | les trois : **absentes** |
+| **8** gabarits PHP **interpolés** — le résidu | tous de forme `/supervision/{$plateforme}/…` |
+
+**Le résidu est mesuré, pas supposé** : les huit gabarits ont un préfixe `/supervision/`
+littéral et fixe, et aucun ne peut produire `/update-logs`, `/iptables-logs` ni
+`/cve_scan_all`.
+
+> **L'absence est donc ÉTABLIE, pas seulement non trouvée.** La distinction est celle
+> qui manquait à mon premier croisement, qui annonçait « aucun appelant » pour cinq
+> routes sur la foi d'un `grep`.
+
+**Et `/cve_scan` prouve pourquoi les deux couches sont nécessaires** : il est absent des
+1 370 littéraux JS et pourtant bien consommé — le chemin est injecté par
+`ScanCveController`. Une mesure d'absence sur le seul JavaScript l'aurait déclaré non
+consommé, à tort.
 
 #### Et une TROISIÈME limite de l'outil, trouvée en creusant les trois dernières
 
