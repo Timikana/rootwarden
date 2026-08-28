@@ -74,6 +74,8 @@ class TableDesGardes
             ['GET', 'notifications', ['role:1']],
             ['GET', 'notifications/compte', ['role:1']],
             ['GET', 'pare-feu', ['role:1', 'perm:can_manage_iptables']],
+            ['POST', 'pare-feu/copie', ['role:1', 'perm:can_manage_iptables']],
+            ['POST', 'pare-feu/copie/enregistrer', ['role:1', 'perm:can_manage_iptables']],
             ['GET', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/tout-lire', ['role:1']],
