@@ -10,11 +10,17 @@
 
 ## 1. Recommandation
 
-**Ne pas unifier les deux magasins. Porter le geste `/exclude_user` à côté du classement** — l'issue
-n°2 des trois qu'E-213 proposait — **et dire dans l'interface que le classement ne protège pas.**
+**Ne pas unifier les deux magasins. Faire LIRE les deux par `delete_remote_user`**, le seul chemin de
+suppression vivant, avec un `force` explicite — **et retirer `clean_up_users` du dépôt.**
 
-**Et retirer `clean_up_users` du dépôt, ou le rendre appelable** — les deux se défendent, l'entre-deux
-non.
+> ⚠ **Révision du 2026-08-28, sur mesure de la session 2.** Ma première recommandation était *« porter
+> le geste `/exclude_user` à côté du classement »* — l'issue n°2 des trois qu'E-213 proposait. **Elle
+> est retirée : `user_exclusions` n'a AUCUN lecteur vivant**, donc la porter aurait ajouté un second
+> mot décoratif à côté du premier. Détail au §3.2.
+
+**Aucune des trois issues d'E-213 n'était donc la bonne** — et ce n'est pas un reproche à qui les a
+écrites : les trois supposaient qu'un des deux magasins était lu. *Quand deux options se partagent une
+prémisse fausse, en choisir une est encore la suivre.*
 
 **Ce que je ne recommande PAS : unifier.** C'était l'issue qui rendait ce dossier non délégable, parce
 qu'elle *« change ce qui est détruit sur des machines réelles »*. **Mesuré, elle ne changerait rien de
@@ -124,9 +130,52 @@ corriger   la docstring :703, qui l'annonce encore dans la sequence
 > faisant partie de la séquence, est la configuration exacte où quelqu'un « restaure » un oubli.*
 > **Ma recommandation est de le retirer.**
 
-**2. Porter `/exclude_user` à côté du classement — session 3, page `comptes-distants` :**
-deux notions visibles au lieu d'une trompeuse. Le geste écrit `user_exclusions` (`admin.py:129`,
-`INSERT IGNORE`), qui est la table que le code de suppression lirait.
+**2. ⚠ CORRIGÉ le 2026-08-28 — NE PAS porter `/exclude_user`. Le rendre EFFECTIF sur le chemin vivant.**
+
+> **Ma recommandation initiale était « porter `/exclude_user` à côté du classement — deux notions
+> visibles au lieu d'une trompeuse ». Elle est retirée, sur mesure de la session 2, vérifiée :**
+>
+>     ecrivains de user_exclusions   admin.py:129  (/exclude_user, INSERT IGNORE)
+>     LECTEURS                       configure_servers.py:805  -- et SEULEMENT lui
+>                                    or :805 est DANS clean_up_users (:780-857), qui n a aucun appelant
+>
+> **`user_exclusions` n'a aucun lecteur vivant.** Le bouton « Exclure » de `platform_keys.php:458` est
+> visible, documenté (`documentation.php:390` le décrit nommément), il écrit — **et rien ne lit.**
+> *Porter ce geste aurait ajouté un SECOND mot décoratif à côté du premier* : deux boutons qui ne
+> protègent de rien, dont un que j'aurais recommandé d'ajouter.
+
+**La décision qui remplace, et elle est du même ordre qu'E-224** : *rendre `excluded` vrai sur le seul
+chemin qui détruise.*
+
+```
+backend/routes/ssh.py, `delete_remote_user` — session 4
+
+  avant toute session SSH, apres les cinq gardes existantes :
+    le compte est-il present dans `user_exclusions` (machine_id, username)
+    OU porte-t-il `server_user_inventory.status = 'excluded'` ?
+      -> REFUS, sauf `force: true` explicite
+      -> et le refus DIT lequel des deux magasins l a marque, et quand
+```
+
+**Trois raisons, dans cet ordre :**
+
+1. **c'est le seul geste vivant**, donc le seul endroit où le mot peut devenir vrai. Le rendre effectif
+   là coûte une lecture ; l'annoncer ailleurs ne coûte rien et ne protège rien ;
+2. **il lit les DEUX magasins, et ce n'est pas une unification.** Chacun garde son écrivain ; c'est le
+   *lecteur* qui consulte les deux. Ne lire que `user_exclusions` protégerait **0 compte** (table vide) ;
+   ne lire que `status` ignorerait le bouton. *Avant d'unifier deux copies, vérifier qu'elles valident la
+   même chose* — ici elles disent la même chose (« ne touche pas à ce compte »), donc les lire ensemble
+   est juste, et les fusionner serait détruire l'une des deux ;
+3. **une garde qui n'ajoute qu'un REFUS ne peut pas détruire davantage.** C'est le précédent d'E-224,
+   délégué pour cette raison exacte : une borne fail-closed sur un geste destructeur est une décision de
+   conception, pas un arbitrage sur des données.
+
+**Et la réserve qui vient avec, parce qu'elle a déjà mordu ici** : *un garde-fou qui se déclenche à tort
+ne protège plus, il empêche* — `stopped_at_tamper` a rendu le seul remède au trou d'audit définitivement
+inerte. **D'où le `force` explicite**, qui est déjà le motif de la maison : `server_user_remove_key`
+refuse la clé de plateforme sans `force` et dit pourquoi. **Et le refus doit NOMMER sa cause** — sinon
+l'exploitant ne peut pas distinguer « refusé parce qu'exclu » de « refusé parce que je n'ai pas le
+droit ». *Deux causes, un même vide.*
 
 **3. Dire ce qui est vrai — session 3, i18n FR/EN dans le même commit :**
 le classement `excluded` **n'a aucun effet distant** ; il documente une intention. `ComptesDistants.php:29`
