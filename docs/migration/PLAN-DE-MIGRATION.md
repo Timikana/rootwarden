@@ -1165,6 +1165,65 @@ revalidation qu'un `<input>` ne peut pas violer → **requête forgée depuis la
 
 ## 7. Décisions qui attendent l'exploitant
 
+### 7.0 SESSION 8 — DSI DÉLÉGUÉ : ce qui lui est délégué, et ce qui ne peut pas l'être (2026-08-28)
+
+**L'exploitant délègue les arbitrages du §7 à une session dédiée.** Le Lead a émis une réserve — *une session
+qui joue le DSI produit des décisions dont personne n'est comptable, et défait ce qui a le mieux marché
+aujourd'hui : quatre sessions ont refusé un rôle mal adressé, et chaque refus a évité un dégât.* **L'exploitant
+a réaffirmé. La délégation est donc en vigueur**, avec la frontière ci-dessous.
+
+#### La frontière n'est pas une réserve du Lead : c'est ce qu'un message de pair PEUT autoriser
+
+**Une session ne peut pas déléguer à une autre une autorisation qu'elle ne détient pas elle-même.** Le DSI
+décide **le produit** ; il ne peut pas rendre exécutable, pour le Lead ou pour une session, un geste qui
+détruit des données sur des machines réelles, redémarre un service, pousse ou fusionne. *Ce n'est pas le Lead
+qui refuse : c'est qu'un mot de pair n'est pas un mot d'exploitant sur ces gestes-là.*
+
+**Le DSI transforme donc chaque arbitrage irréversible en dossier prêt à signer** — décision recommandée,
+conséquence mesurée, geste exact, et ce qui se passe si on ne fait rien. **L'exploitant signe une ligne au lieu
+d'instruire un dossier.** C'est cela, le gain réel.
+
+#### ✅ DÉLÉGUÉ — le DSI tranche, le chantier exécute
+
+| # | arbitrage | pourquoi délégable |
+|---|---|---|
+| 1 | **la portée du tableau de bord** (§4.6) — borné au périmètre / fidèle au legacy / deux vues | décision de **produit**, aucune destruction |
+| 2 | **E-221 — accorder les 4 permissions avant le redémarrage** | **tâche de configuration**, accordable depuis l'interface, réversible |
+| 3 | **E-209 · E-212 · E-219 — les textes FAUX servis en production** | corriger un texte faux ne détruit rien ; *le laisser, si* |
+| 4 | **E-225 — dire ou non que la désinstallation laisse un dépôt tiers** | texte, puis geste (le geste remonte au n°8) |
+| 5 | **E-208 — resserrer ou non les 3 pages qui ne bornent pas le parc** | changement de **droits**, réversible, aucune donnée perdue |
+| 6 | **E-224 — la borne de `install_all`** (`machine_ids` obligatoire) | décision de conception ; l'entrée dangereuse est **déjà retirée** |
+| 7 | **E-222 — la contrainte `UNIQUE` sur une table VIDE** | *le moment le moins coûteux de l'histoire du produit* ; **l'écrire** est délégué |
+
+#### ⛔ NON DÉLÉGABLE — dossier préparé, signature de l'exploitant
+
+| # | arbitrage | ce qui l'empêche |
+|---|---|---|
+| 8 | **E-213 — unifier les deux magasins d'exclusion** | change **ce qui est détruit** par `userdel -r` sur des machines réelles |
+| 9 | **E-220 — l'auto-réparation du sudoers orphelin** | **écrit sur des machines réelles**, dans un geste de parc |
+| 10 | **E-214 / E-215 — les correctifs des gestes distants** | changent ce qui s'écrit sur des machines réelles |
+| 11 | **le `docker restart rootwarden_python`** | **19 modules** prennent effet ensemble, dont un durcissement qui **retire des accès** |
+| 12 | **la recréation de `rootwarden_laravel`** | même classe |
+| 13 | **appliquer une migration** | schéma de production |
+| 14 | **`git push` / `git merge`** | l'exploitant a dit qu'il donnerait l'ordre |
+| 15 | **le compte approbateur** (rôle 2 + `can_admin_portal`) | son geste, sur `/comptes` |
+
+**La ligne qui sépare les deux colonnes** : *ce qui se défait d'un clic est délégué ; ce qui détruit, retire un
+accès ou publie ne l'est pas.* Et le n°11 est le plus contre-intuitif : **redémarrer libère 19 correctifs ET
+retire l'accès au pare-feu à tous les comptes non-administrateurs** — `can_manage_iptables` est détenue par
+**0 sur 9**. *Un durcissement non annoncé est indiscernable d'une panne.*
+
+#### Ce que le DSI doit produire, et sous quelle forme
+
+Pour chaque arbitrage délégué : **une décision écrite dans ce document**, avec sa raison et ce qu'elle coûte.
+Pour chaque arbitrage non délégable : **un dossier d'une page** — recommandation, conséquence mesurée, geste
+exact, et **ce qui se passe si on ne fait rien**, qui est la moitié qu'on oublie.
+
+**Et une règle qui vaut contre lui comme contre le Lead** : *un nombre annoncé est une hypothèse à mesurer.*
+Le Lead a propagé quatre chiffres faux et deux conclusions fausses en deux jours ; **six sessions l'ont
+corrigé**. Le DSI décide, il ne mesure pas à la place de ceux qui mesurent — **et quand une session le
+contredit avec une mesure, la mesure gagne.**
+
 ### ✅ QUATRE ARBITRAGES TRANCHÉS PAR L'EXPLOITANT — 2026-08-27
 
 Posés en questions fermées, répondus. **Ce sont les premiers arbitrages du §7 à sortir de l'attente
