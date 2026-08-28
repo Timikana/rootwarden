@@ -906,9 +906,22 @@ mesurée.*
     backend/routes/wazuh.py:818   _, _, code_v = execute_as_root(client, verif_cmd, ...)   <- calcule
                             :819   _upsert_agent(row['id'], status='never_connected', ...)  <- INCONDITIONNEL
 
-**`uninstall` écrit `never_connected`, quoi qu'ait rendu la vérification.** Et `code_v` — la valeur qui
-distingue « paquet retiré » de « paquet resté », celle que le correctif d'E-225 vient d'ajouter — est
-**calculée puis jetée.**
+**`uninstall` écrit `never_connected`, quoi qu'ait rendu la vérification.**
+
+> **⚠ Correction de ma formulation, 14:20 UTC, sur mesure du Lead.** J'avais écrit que `code_v` était
+> *« calculée puis jetée »*. **C'est plus large que la mesure** — elle **est** relue :
+>
+>     :818   _, _, code_v = execute_as_root(client, verif_cmd, ...)
+>     :819   _upsert_agent(..., status='never_connected', ...)   <- INCONDITIONNEL, AVANT le verdict
+>     :832   paquet_retire = (code_v == 0)                       <- code_v EST relu, ICI
+>
+> **`code_v` n'est pas jetée : elle est lue pour la RÉPONSE, jamais pour l'ÉTAT.** Ma propre
+> caractérisation était la juste — *le verdict a été corrigé, l'état persisté est resté* — et la scission
+> est exactement là, **entre deux usages de la même valeur.**
+>
+> **C'est ce qui la rend invisible** : quelqu'un a pensé à l'échec, et l'a écrit dans **la seule des deux
+> sorties qu'on relit en testant.** *Une formulation trop large sur un défaut réel le rend réfutable* —
+> et un défaut réfutable se fait classer.
 
 > **`never_connected` affirme que l'agent n'a JAMAIS été connecté.** Sur une machine qui en portait un,
 > c'est faux de la façon la plus large des trois : les deux autres se trompaient sur l'**état présent**,
@@ -923,6 +936,14 @@ distingue « paquet retiré » de « paquet resté », celle que le correctif d'
 **Aucune migration. Aucun drapeau à débinariser. Aucune ligne d'interface à ajouter** — le repli de
 `wazuh.js:105` couvre déjà tout statut non mappé. **Le geste est délégable tout de suite** : lire une
 valeur déjà calculée et écrire une valeur déjà dans l'ENUM.
+
+> **⚠ ET SON EFFET EST NUL JUSQU'AU REDÉMARRAGE — à dire, sinon le geste sera cru faux.** Le service
+> tourne sur le commit d'hier (`StartedAt = 2026-08-27T12:28:43Z`, remesuré à 14:20Z ; **20 fichiers
+> `.py` hors tests postérieurs**). **Donc le correctif d'E-225 n'est pas actif non plus** : ce qui tourne
+> rend encore `success = (code == 0)`, et **`code_v` n'existe pas dans le process en service.**
+>
+> *Quelqu'un qui poserait ce geste puis mesurerait l'ancien comportement concluerait que le correctif ne
+> marche pas.* **La scission décrite ci-dessus est réelle dans l'arbre et pas encore en production.**
 
 **Trois conditions, celles du chantier, et la troisième est celle qu'on oublie :**
 

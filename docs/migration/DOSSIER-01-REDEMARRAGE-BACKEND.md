@@ -73,6 +73,33 @@ passé.* Conteneurs en **UTC**, hôte et navigateur en **CEST**.
 >
 > Mesuré à 11:17Z : **le banc est libre**, aucun `node go-*.mjs` ne tourne.
 
+> ## ⚠⚠ LA RAISON DE CE DOSSIER A CHANGÉ — 2026-08-28, 14:20 UTC
+>
+> **Ce dossier demandait le redémarrage pour METTRE EN SERVICE 20 modules. Il le demande maintenant
+> aussi pour que les MESURES soient interprétables.** C'est un argument plus fort, et il vient d'un
+> relevé de la session 2 vérifié par moi.
+>
+>     StartedAt rootwarden_python     2026-08-27T12:28:43Z   (remesure a 14:20Z, inchange)
+>     fichiers .py hors tests posterieurs                20
+>     le commit servi (6663e83) porte encore `AND a.id IS NULL`   <- le SQL casse d E-224
+>
+> > **Tant que le redémarrage n'a pas eu lieu, aucune mesure sur `wazuh`, `ssh` ou `ssh_audit` n'est
+> > interprétable.** Une suite écrite contre l'**arbre** et jouée contre le **service** mesure l'écart
+> > entre les deux — **et l'attribue à la page.**
+>
+> **Trois comportements pour `/wazuh/install_all` selon ce qu'on lit :**
+>
+>     500                en service — l ancien SQL sur une table sans colonne `id`
+>     400                dans l arbre — la borne d E-224
+>     « geste de parc »  dans ce que le suivi annoncait encore ce matin
+>
+> **Le redémarrage cesse d'être une mise en service : il devient un préalable de JUSTESSE.** *Vingt
+> modules inertes n'étaient présentés que comme un coût ; ce n'en est plus un — c'est une impossibilité
+> de mesurer.*
+>
+> **Et cela ne remplace pas la raison d'origine, cela s'y ajoute** : le lot grossit toujours, et il
+> prendra toujours effet d'un coup.
+
 ## **REDÉMARRER. Aucune condition technique ne subsiste.**
 
 | # | préalable | état au 2026-08-28 14:15 UTC |
