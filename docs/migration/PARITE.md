@@ -11303,3 +11303,32 @@ deux cotes.
 **Ferme au bon perimetre** : les **deux routes de parc seulement**, deja en `require_role(2)`, sans
 borne par machine — un role 1 n'y a jamais eu acces. **Les huit routes par machine intactes**,
 verifie apres pose.
+
+## E-240 — un jeu de regles VALIDE declare invalide : le marqueur de code de sortie est cherche dans des FRAGMENTS de 4096 octets, pas dans la sortie recomposee
+
+**Releve et reproduit sans SSH par la session 5** (`AUDIT-PRERELECTURE-IPTABLES.md` §1), inscrit par
+le Lead le 2026-08-28 a 17:15 CEST.
+
+La detection cherche `EXIT_CODE=0` dans chaque **fragment** de lecture de 4096 octets. **Des que le
+marqueur chevauche une frontiere de fragment, il n'est trouve dans aucun des deux** — et un jeu de
+regles parfaitement valide est declare invalide.
+
+> **Et l'echo PTY est ce qui rend cette frontiere ATTEIGNABLE** : le canal legacy echote la commande,
+> donc la sortie porte des centaines d'octets qui ne viennent pas du programme. Sans lui, la
+> frontiere tomberait rarement au mauvais endroit ; avec lui, la position du marqueur depend de la
+> longueur de la commande envoyee.
+
+**C'est la troisieme consequence de l'echo PTY inscrite dans ce chantier**, apres le faux « visudo
+refuse » permanent et le `isdigit()` global. *Un canal qui echote transforme toute mesure positionnelle
+en pari.* Le remede general reste le meme : **recomposer d'abord, parser ensuite, et par ligne.**
+
+**Le correctif est d'une ligne et il touche le backend.** Donc, sous E-238 : **a preparer, pas a
+appliquer** — le process en service date d'hier, un correctif pose aujourd'hui serait inerte, et un
+ecran qui annoncerait la protection mentirait sur l'etat reel.
+
+### La regle de conduite qui en decoule pour I4
+
+**I4 ne doit ni corriger ni annoncer une correction.** Il doit rendre le defaut LISIBLE : quand la
+validation echoue, distinguer *« les regles sont invalides »* de *« je n'ai pas pu lire le verdict »* —
+les deux memes issues que I3 vient de separer sur l'historique. *Le portage ne repare pas le backend ;
+il cesse de presenter une incertitude comme un verdict.*

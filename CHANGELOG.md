@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.90** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.91** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,33 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.91 — E-240 : un jeu de regles VALIDE declare invalide, et l'echo PTY rend la frontiere atteignable
+
+Releve et **reproduit sans SSH** par la session 5. La detection cherche `EXIT_CODE=0` dans chaque
+**fragment de 4096 octets** au lieu de la sortie recomposee : des que le marqueur chevauche une
+frontiere, il n'est trouve dans aucun des deux, et un jeu de regles valide est declare invalide.
+
+> **L'echo PTY est ce qui rend cette frontiere ATTEIGNABLE** — le canal legacy echote la commande,
+> donc la position du marqueur depend de la longueur de ce qu'on envoie. **Troisieme consequence de
+> l'echo PTY inscrite ici**, apres le faux « visudo refuse » permanent et le `isdigit()` global.
+> *Un canal qui echote transforme toute mesure positionnelle en pari.*
+
+**Correctif d'une ligne, dans le backend — donc a PREPARER, pas a appliquer** (E-238 : le process en
+service date d'hier). Et **I4 ne doit ni corriger ni annoncer une correction** : il doit rendre le
+defaut lisible, en distinguant *« les regles sont invalides »* de *« je n'ai pas pu lire le
+verdict »*. *Le portage ne repare pas le backend ; il cesse de presenter une incertitude comme un
+verdict.*
+
+#### I3 porte — et il ferme un defaut heritee du legacy
+
+L'historique se chargeait **dans la branche de succes du releve** (`js/main.js:79`) : une machine
+injoignable masquait **son propre historique**, qui est en base, qu'aucune panne distante ne rend
+illisible, et qui est **precisement ce qu'on veut consulter quand la machine repond mal.** Meme
+defaut que `fail2ban`, referme par F2. **Trois issues la ou le legacy n'en distingue qu'une** :
+echec de lecture et absence de donnee rendaient le meme message, pour **deux gestes opposes**.
+
+**Restent I4 et I5** — I5 bloque par l'arbitrage du port SSH.
 
 ### v1.38.90 — E-238 : le backend en service est celui d'HIER, et le redemarrage cesse d'etre un cout pour devenir un prealable de JUSTESSE
 
