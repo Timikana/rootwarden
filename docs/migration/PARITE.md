@@ -11526,3 +11526,72 @@ decider ce que le legacy aurait du faire. »*
 **C'est exactement la lecon d'E-239** — la ou j'ai transpose la conclusion d'un precedent sans verifier
 sa condition, et ou fermer un prefixe entier aurait casse le role 1. **Un ecart se mesure ; ce que le
 legacy aurait du faire s'arbitre.** Les confondre fait poser des correctifs sans mandat.
+
+## E-242 — `supervision` et `wazuh` semblent se contredire sur la desinstallation : ce n'est pas un desaccord de JUGEMENT, c'est une difference de SCHEMA
+
+**Question posee par la session 6 le 2026-08-28 vers 17:05 CEST, mesuree par le Lead a 17:10.**
+Elle la posait comme un arbitrage entre deux regles opposees et **refusait de la trancher, faute de
+mandat**. La mesure dissout l'arbitrage au lieu de le trancher.
+
+### Les deux comportements, verifies
+
+    supervision._conclut_desinstallation (E-88, v1.37.44)
+      code 0      -> _remove_agent()  : la ligne est SUPPRIMEE
+      code != 0   -> l'inventaire n'est PAS touche
+
+    wazuh.uninstall
+      :818  code_v calcule
+      :819  _upsert_agent(status='never_connected', agent_id=None, version=None)  INCONDITIONNEL
+      :833  paquet_retire = (code_v == 0)     <- le verdict vient APRES
+
+### ⚠ LA MESURE QUI DECIDE : LES DEUX TABLES N'ONT PAS LE MEME VOCABULAIRE
+
+    034_wazuh.sql:48          status ENUM('active','disconnected','never_connected','pending','unknown')
+    024_supervision_agents    machine_id · platform · agent_version · installed_at · config_deployed
+                              -> AUCUNE colonne de statut
+
+**`supervision_agents` est un inventaire par PRESENCE** : une ligne veut dire « agent installe ».
+**« Je ne sais pas » n'y est pas exprimable** — les deux seules ecritures possibles sont *garder la
+ligne* (affirme installe) et *la supprimer* (affirme absent).
+
+> **Les deux modules ne se contredisent pas en jugement : ils divergent en VOCABULAIRE.**
+> `supervision` fait le mieux que sa table permette ; **`wazuh` fait PIRE que la sienne ne permet**,
+> et c'est exactement ce qu'E-237 corrige.
+
+**Donc il n'y a rien a arbitrer entre les deux regles :**
+- **`wazuh`** -> ecrire `unknown` (E-237, deja tranche par le DSI, **aucune migration**) ;
+- **`supervision`** -> **deja optimal pour son schema.** Garder la ligne est le moins faux des deux
+  choix disponibles, et le motif d'E-88 tient : *un inventaire qui oublie un agent encore installe est
+  pire qu'un inventaire qui n'a pas su.*
+
+### Ce qui RESTE, et c'est la troisieme occurrence du meme motif
+
+Le troisieme etat — « l'agent est peut-etre encore la, je n'ai pas pu verifier » — **coute une colonne
+a `supervision_agents`.** C'est la famille de `sudoers_orphelin` et d'E-237 : **un champ face a une
+realite qui a gagne un etat qu'il ne peut pas exprimer.** Arbitrage exploitant, au meme dossier que la
+colonne de `sudoers_orphelin` — pas un correctif.
+
+### Et une imprecision de commentaire, mineure mais du motif connu
+
+La docstring d'E-88 ecrit : *« code != 0 -> on ne sait pas ce qui reste sur la machine. L'inventaire
+n'est PAS touche. »* **Ne pas toucher l'inventaire n'enregistre pas « on ne sait pas » : ca preserve
+l'affirmation precedente**, `agent_version` comprise. Le commentaire decrit une **intention** que la
+donnee ne porte pas.
+
+*C'est le motif du chantier — un texte qui affirme plus que le code — sous sa forme la plus benigne :
+le code fait bien ce que la phrase decrit **proceduralement** (« ne pas toucher »), pas ce qu'elle
+decrit **semantiquement** (« enregistrer l'ignorance »).* A corriger dans le commentaire, pas dans le
+code.
+
+### Ce que la session 6 a fait de juste, et qui vaut la note
+
+Elle a ecrit la question **en toutes lettres dans le fichier de test** et **n'a asserte NI l'un ni
+l'autre comportement** : *« le verrouiller figerait une reponse que personne n'a donnee ; un
+`xfail(strict)` en figerait l'autre. »*
+
+> **Un test est une decision deguisee : verrouiller un comportement non arbitre, c'est arbitrer sans
+> mandat — et le faire a l'endroit ou personne ne relit les decisions.**
+
+Et son releve du bon cote compte : **`wazuh.uninstall` rend deja un `success` JUSTE** (il suit l'effet
+mesure, E-225). *Ce n'est donc pas un mensonge a l'ecran — c'est une ligne d'inventaire qui ne dit pas
+la meme chose que l'ecran juste au-dessus.*

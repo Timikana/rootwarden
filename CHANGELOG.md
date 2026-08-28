@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.94** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.96** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.96 — E-242 : `supervision` et `wazuh` ne se contredisent pas en jugement, ils divergent en VOCABULAIRE
+
+La session 6 a releve que les deux modules font **l'inverse** l'un de l'autre sur « desinstaller un
+agent », l'a pose comme un arbitrage entre deux regles, et **a refuse de le trancher faute de
+mandat**. **La mesure dissout l'arbitrage au lieu de le trancher :**
+
+    034_wazuh.sql:48       status ENUM('active','disconnected','never_connected','pending','unknown')
+    024_supervision_agents machine_id · platform · agent_version · installed_at · config_deployed
+                           -> AUCUNE colonne de statut
+
+**`supervision_agents` est un inventaire par PRESENCE** — une ligne veut dire « agent installe », et
+**« je ne sais pas » n'y est pas exprimable.** Les deux seules ecritures possibles sont *garder* et
+*supprimer*.
+
+> **`supervision` fait le mieux que sa table permette ; `wazuh` fait PIRE que la sienne ne permet.**
+
+Donc rien a arbitrer entre les deux regles : **`wazuh`** ecrit `unknown` (E-237, deja tranche, aucune
+migration) ; **`supervision`** est **deja optimal pour son schema**, et le motif d'E-88 tient — *un
+inventaire qui oublie un agent encore installe est pire qu'un inventaire qui n'a pas su.*
+
+**Ce qui reste est la TROISIEME occurrence du meme motif** : le troisieme etat coute une **colonne** a
+`supervision_agents`. Famille de `sudoers_orphelin` et d'E-237 — *un champ face a une realite qui a
+gagne un etat qu'il ne peut pas exprimer.* Arbitrage exploitant, au dossier de `sudoers_orphelin`.
+
+#### Et une imprecision de commentaire, du motif connu sous sa forme la plus benigne
+
+La docstring d'E-88 dit *« code != 0 -> on ne sait pas ce qui reste. L'inventaire n'est PAS touche. »*
+**Ne pas toucher l'inventaire n'enregistre pas « on ne sait pas » : ca preserve l'affirmation
+precedente**, `agent_version` comprise. *Le code fait ce que la phrase decrit PROCEDURALEMENT, pas ce
+qu'elle decrit SEMANTIQUEMENT.* A corriger dans le commentaire, pas dans le code.
+
+#### La regle que la session 6 etablit en refusant d'ecrire une assertion
+
+Elle a ecrit la question **en toutes lettres dans le fichier de test** sans asserter ni l'un ni l'autre
+comportement — *« le verrouiller figerait une reponse que personne n'a donnee ; un `xfail(strict)` en
+figerait l'autre. »*
+
+> **Un test est une decision deguisee : verrouiller un comportement non arbitre, c'est arbitrer sans
+> mandat — et le faire a l'endroit ou personne ne relit les decisions.**
 
 ### v1.38.95 — E-241b : le défaut que la suite corrigée cessait de voir, et il n'était pas dans `graylog`
 
