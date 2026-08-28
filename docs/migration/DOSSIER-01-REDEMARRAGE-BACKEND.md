@@ -1,7 +1,11 @@
 # DOSSIER 01 — Redémarrer `rootwarden_python`
 
-**Pour signature de l'exploitant.** Préparé par la session 8 le **2026-08-28**, mesures de 06:40–06:55
-UTC. C'est le dossier le plus urgent : **six autres décisions n'ont d'effet qu'après lui.**
+**Pour signature de l'exploitant.** Préparé par la session 8 le **2026-08-28**. C'est le dossier le plus
+urgent : **six autres décisions n'ont d'effet qu'après lui.**
+
+**Chaque mesure porte SA date, en UTC** — l'en-tête annonçait d'abord une fenêtre unique de quinze
+minutes, et quatre révisions l'ont périmée dans la journée. *Un fait sans heure est une opinion sur le
+passé.* Conteneurs en **UTC**, hôte et navigateur en **CEST**.
 
 ---
 
@@ -102,20 +106,23 @@ qu'un décompte qui surprend.**
 la clé d'API**. *Ce relevé ne dit rien de ces deux chemins-là* — il borne le risque côté portage, pas
 côté legacy.
 
-Les **19**, nommés — parce qu'un lot qu'on ne peut pas nommer ne s'observe pas :
+Les **20**, nommés — parce qu'un lot qu'on ne peut pas nommer ne s'observe pas (relevé 11:17Z) :
 
     approvals · config · configure_servers · scheduler · server · services_manager
     sftp_manager · ssh_key_manager · ssh_utils · sudo_manager
     routes/ : fail2ban · helpers · iptables · monitoring · policies · services
-              settings · ssh · ssh_audit
+              settings · ssh · ssh_audit · **wazuh**
 
-> Le compte de 19 est ici obtenu **par `mtime`** ; celui d'`AVANT-LE-REDEMARRAGE.md` l'était par
+**Le vingtième est `routes/wazuh.py`** — entré dans le lot en écrivant les correctifs d'E-224 et E-225.
+*Chaque livraison qui « prépare » le redémarrage agrandit ce qu'il faudra observer d'un coup.*
+
+> Le compte est ici obtenu **par `mtime`** ; celui d'`AVANT-LE-REDEMARRAGE.md` l'était par
 > **comparaison d'arbres syntaxiques**. **Deux moyens indépendants, le même nombre** — et les deux
 > critères ne sont pas les mêmes (le mien compterait un fichier dont seule une docstring bouge ; l'autre
 > a mesuré qu'il n'y en a aucun). *L'accord de deux mesures de nature différente vaut mieux qu'une
 > mesure répétée.*
 
-### Les routes qui gagnent une garde : **33**, et non 27
+### Le décompte antérieur, conservé pour sa MÉTHODE — 33 (06:47Z), superseded par les 34 ci-dessus
 
     module        en service   arbre    nouvelles
     iptables           1          7        +6
@@ -124,7 +131,8 @@ Les **19**, nommés — parce qu'un lot qu'on ne peut pas nommer ne s'observe pa
     ssh_audit          0          1        +1
                                           +33
 
-Compté par **blocs de décorateurs** (un `require_permission` peut vivre ailleurs que sur une route), et
+**Ce décompte ne portait que sur les quatre permissions** — il est exact sur son objet et ce n'est pas
+celui du dossier. Compté par **blocs de décorateurs** (un `require_permission` peut vivre ailleurs que sur une route), et
 recoupé par un second comptage d'occurrences brutes. « En service » est reconstruit depuis `47e5f11`,
 dernier commit de `backend/routes/` antérieur au `StartedAt` : **c'est un proxy** — un redémarrage
 publie l'arbre, donc l'état servi n'est pas exactement l'état commité. **L'inertie, elle, est mesurée
