@@ -1,0 +1,433 @@
+/**
+ * go-page-cle-plateforme.mjs — P1 : la cle de plateforme, sur les deux cibles.
+ *
+ * legacy   `/adm/platform_keys.php`        portage  `/cle-plateforme`
+ *
+ * ══ CE QUE CETTE SUITE NE MESURERA JAMAIS, ET POURQUOI C'EST ECRIT ICI ════
+ *
+ * **La REUSSITE de la rotation n'est mesuree sur aucune cible, et ne le sera
+ * pas.** Ce n'est pas une lacune a combler un jour : c'est une decision, et
+ * elle doit rester lisible pour que personne ne « repare » ce trou.
+ *
+ * `POST /regenerate_platform_key` ne prend AUCUN `machine_id`. Son corps est
+ * vide et il porte sur la FLOTTE :
+ *
+ *     UPDATE machines SET platform_key_deployed = FALSE   -- sans clause WHERE
+ *
+ * Il n'existe donc **aucune cible sure**. Le motif habituel du chantier —
+ * « retirer la cible plutot que renforcer le garde » — ne s'applique pas, parce
+ * qu'il n'y a rien a retirer : la portee est le parc entier, `srv-zabbix`
+ * comprise, dont la cle de plateforme est la SEULE authentification (ni mot de
+ * passe, ni mot de passe root — mesure de l'exploitant).
+ *
+ * Une rotation lancee une fois coupe l'acces a toutes les machines jusqu'au
+ * re-deploiement, qui exige lui-meme un acces. **Mesurer ce geste une seule
+ * fois briquerait la production.**
+ *
+ * DEUX MISES A JOUR DU 2026-08-27, ET AUCUNE NE CHANGE LA CONCLUSION.
+ *
+ * (a) `regenerate_platform_key()` ne fait plus `unlink()` mais
+ *     `_archive_platform_key()` : la clef est archivee, plus detruite. Le risque
+ *     « secret non reproductible » est LEVE. Une conclusion juste dont la raison
+ *     a change se reecrit, elle ne se recopie pas.
+ *
+ * (b) **ET LA ROTATION NE REVOQUE RIEN** — mesure d'une relecture de securite
+ *     (`AUDIT-PRERELECTURE-K-MODULES.md` §9.3, commit `e6b8530`) :
+ *
+ *         ssh.py:745   printf … >> ~/.ssh/authorized_keys        APPEND
+ *         ssh.py:755   printf … >> /root/.ssh/authorized_keys    APPEND
+ *         ssh.py:808   printf … >  …/<compte de service>/…       ecrase
+ *
+ *     La rotation genere une paire neuve ; elle ne retire l'ancienne clef
+ *     publique d'AUCUN `authorized_keys`. Apres rotation ET redeploiement,
+ *     `root` et le compte nominal portent les DEUX clefs.
+ *
+ * Il faut donc tenir les deux faits ensemble, et ils ne disent pas la meme chose :
+ *
+ *   1. **RootWarden PERD l'acces** jusqu'au redeploiement — la nouvelle paire
+ *      n'est dans aucun `authorized_keys`, et `srv-zabbix` n'a ni mot de passe
+ *      ni mot de passe root. C'est ce qui rend le geste sans retour ICI ;
+ *   2. **l'ancienne clef reste AUTORISEE** — qui la detient garde un acces root
+ *      sur chaque machine, apres la rotation. Elle arrete l'USAGE de la clef par
+ *      RootWarden ; elle ne la REVOQUE pas.
+ *
+ * La seconde interdit d'ecrire, ici ou a l'ecran, que ce geste « repond a une
+ * clef compromise ». **Aucun geste unique n'y repond** : l'en retirer demande
+ * `server_user_remove_key`, compte par compte et machine par machine. C'est
+ * desagreable a ecrire et c'est ce qu'il faut ecrire.
+ *
+ * ══ CE QUE LA SUITE MESURE A LA PLACE ═════════════════════════════════════
+ *
+ * La propriete utile n'est pas « le geste aboutit » mais **« avant tout
+ * consentement, RIEN n'est parti »** — mesuree au RESEAU, jamais au DOM : un
+ * panneau peut s'ouvrir ET l'appel partir quand meme.
+ *
+ * ══ ASYMETRIE ASSUMEE ENTRE LES DEUX CIBLES ═══════════════════════════════
+ *
+ * Sur le PORTAGE le bouton OUVRE un panneau : le clic est LOCAL, donc on clique
+ * pour de vrai et l'on mesure qu'aucune requete ne part.
+ * Sur le LEGACY, `regenerateKey()` part au premier clic derriere un `confirm()`
+ * natif. **On ne clique donc pas** : la propriete « le geste ne part pas seul »
+ * s'y lit dans la STRUCTURE — presence du bouton, forme de son `onclick` — sans
+ * jamais l'actionner. C'est la regle de S7a : *un portail qui declenche AU CLIC
+ * ne se teste pas en cliquant.*
+ *
+ * ══ SURETE ════════════════════════════════════════════════════════════════
+ *
+ * Filet a interception : `/regenerate_platform_key`, `/deploy_platform_key`,
+ * `/deploy_service_account`, `/remove_ssh_password`, `/reenter_ssh_password`
+ * sont AVORTES sans condition, et **toute** requete citant la machine 1 l'est
+ * aussi. Une assertion de surete le verifie a la fin — le filet ne se suppose
+ * pas, il se mesure.
+ */
+import puppeteer from 'puppeteer';
+import { createHmac } from 'crypto';
+import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { mkdirSync } from 'node:fs';
+
+const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
+const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
+const MACHINE_PRODUCTION = 1;
+
+/* Secrets RELEVES dans les suites du depot, jamais inventes. */
+const COMPTES = {
+    super: { nom: 'rw-test-super', role: 3,
+        secret: 'MZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW',
+        admis: true, motif: 'le role 3 contourne, SANS detenir la permission' },
+    user: { nom: 'rw-test-user', role: 1,
+        secret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSW',
+        admis: false, motif: 'refuse par la PERMISSION, pas par le role' },
+};
+
+/* Les gestes qui ne doivent JAMAIS partir, quelle que soit la cible. */
+const INTERDITS = /\/(regenerate_platform_key|deploy_platform_key|deploy_service_account|remove_ssh_password|reenter_ssh_password)(\?|$)/;
+/* Ce qui vise le backend, quel que soit le portail. */
+const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
+
+const C = CIBLE === 'laravel'
+    ? { connexion: '/connexion', page: '/cle-plateforme',
+        bloc: '[data-rw="cle-bloc"]', valeur: '[data-rw="cle-valeur"]',
+        rotation: '[data-rw="cle-rotation"]', lancer: '[data-rw="cle-rotation-lancer"]',
+        jamais: '[data-rw="cle-rotation-jamais"]',
+        panneau: '[data-rw="cle-panneau"]', panneauTexte: '[data-rw="cle-panneau-texte"]',
+        panneauAnnuler: '[data-rw="cle-panneau-annuler"]',
+        cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
+    : { connexion: '/auth/login.php?lang=fr', page: '/adm/platform_keys.php',
+        bloc: '#pubkey-display', valeur: '#pubkey-display',
+        rotation: null, lancer: 'button[onclick="regenerateKey()"]',
+        jamais: null, panneau: null, panneauTexte: null, panneauAnnuler: null,
+        cgu: /terms\.php/, accepte: 'button[name="accept_terms"]' };
+
+let echecs = 0;
+const lignes = [];
+function note(l) { lignes.push(l); console.log(l); }
+/** `d` n'est imprime QUE sur un FAIL ; `toujours` sort dans les deux verdicts. */
+function verifie(l, ok, d, toujours) {
+    const suffixe = toujours || (! ok && d) || '';
+    note(`${ok ? 'PASS' : 'FAIL'}  ${l}${suffixe ? '  — ' + suffixe : ''}`);
+    if (! ok) echecs += 1;
+}
+function constate(l, v) { note(`INFO  ${l} : ${v}`); }
+function verifiePortage(l, ok, d) {
+    if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
+    constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
+}
+
+function b32(s){const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let b='';for(const c of s.replace(/=+$/,''))b+=A.indexOf(c.toUpperCase()).toString(2).padStart(5,'0');const o=[];for(let i=0;i+8<=b.length;i+=8)o.push(parseInt(b.slice(i,i+8),2));return Buffer.from(o)}
+function totp(s){const k=b32(s);const c=Math.floor(Date.now()/1000/30);const buf=Buffer.alloc(8);buf.writeBigUInt64BE(BigInt(c));const h=createHmac('sha1',k).update(buf).digest();const o=h[h.length-1]&0x0f;return((h.readUInt32BE(o)&0x7fffffff)%1000000).toString().padStart(6,'0')}
+function dors(ms){return new Promise(r=>setTimeout(r,ms))}
+function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
+
+const avortees = [];
+const passees = [];
+const boites = [];
+
+const navigateur = await puppeteer.launch({
+    headless: 'new',
+    args: ['--ignore-certificate-errors', '--allow-insecure-localhost'],
+    defaultViewport: { width: 1400, height: 900 },
+    protocolTimeout: 120000,
+});
+const contextes = [];
+
+async function connecte(compte) {
+    try { litEnBase('DELETE FROM rootwarden.login_attempts'); } catch { /* deja vide */ }
+    const ctx = await navigateur.createBrowserContext();
+    contextes.push(ctx);
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(45000);
+    const erreursJs = [];
+    page.on('pageerror', (e) => erreursJs.push(String(e.message || e).split('\n')[0]));
+    // Un `confirm()` natif du legacy ne doit JAMAIS etre accepte : on le compte
+    // et on le REFUSE. C'est ce qui rend le clic impossible a rendre dangereux.
+    page.on('dialog', async (d) => {
+        boites.push({ type: d.type(), message: d.message() });
+        try { await d.dismiss(); } catch { /* deja ferme */ }
+    });
+
+    await page.setRequestInterception(true);
+    page.on('request', (r) => {
+        const url = r.url();
+        const chemin = url.replace(/^https?:\/\/[^/]+/, '');
+        let corps = '';
+        try { corps = r.postData() || ''; } catch { /* pas de corps */ }
+
+        // FAIL-CLOSED, DANS CET ORDRE : les gestes interdits d'abord, la machine
+        // de production ensuite. Un geste interdit qui citerait la machine 2
+        // serait avorte quand meme.
+        if (INTERDITS.test(url)) {
+            avortees.push({ route: chemin, motif: 'geste INTERDIT sur ce module', corps });
+            r.abort('blockedbyclient').catch(() => {});
+
+            return;
+        }
+        if (new RegExp(`"machine_id"\\s*:\\s*${MACHINE_PRODUCTION}\\b`).test(corps)
+            || new RegExp(`[?&](machine_id|server_id)=${MACHINE_PRODUCTION}\\b`).test(url)) {
+            avortees.push({ route: chemin, motif: 'vise la PRODUCTION', corps });
+            r.abort('blockedbyclient').catch(() => {});
+
+            return;
+        }
+        if (VERS_BACKEND.test(url)) passees.push({ route: chemin, methode: r.method() });
+        r.continue().catch(() => {});
+    });
+
+    await page.goto(`${BASE}${C.connexion}`, { waitUntil: 'networkidle2' });
+    await page.type('input[name="username"]', compte.nom, { delay: 8 });
+    await page.type('input[name="password"]', MDP, { delay: 8 });
+    let nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+    await page.click('button[type="submit"]'); try { await nav; } catch {}
+    if (resteFenetre() < 6) await dors((resteFenetre() + 1) * 1000);
+    for (let essai = 0; essai < 2; essai += 1) {
+        const champ = await page.$('input[name="2fa_code"]');
+        if (! champ) break;
+        if (essai > 0) await dors((resteFenetre() + 1) * 1000);
+        await champ.click({ clickCount: 3 });
+        await champ.type(totp(compte.secret), { delay: 8 });
+        nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+        await page.click('button[type="submit"]'); try { await nav; } catch {}
+    }
+    if (C.cgu.test(page.url())) {
+        nav = page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+        const b = await page.$(C.accepte);
+        if (b) { await b.click(); try { await nav; } catch {} }
+    }
+
+    return { ctx, page, erreursJs, surConnexion: /connexion|login\.php/.test(page.url()) };
+}
+
+let etapes = 0;
+async function etape(titre, fn) {
+    etapes += 1;
+    try { await fn(); } catch (e) {
+        verifie(`etape « ${titre} »`, false, String(e.message || e).split('\n')[0]);
+    }
+}
+
+try {
+    /*
+     * LA PRECONDITION, MESUREE ET NON SUPPOSEE. La garde est « la permission OU
+     * le role 3 ». Si un compte d'epreuve venait a DETENIR la permission, le
+     * chemin mesure ci-dessous cesserait d'etre le contournement — et les
+     * assertions diraient autre chose que ce que leur libelle annonce.
+     */
+    const porteurs = litEnBase(
+        "SELECT u.name FROM rootwarden.users u JOIN rootwarden.permissions p "
+        + "ON p.user_id = u.id WHERE p.can_manage_platform_key = 1");
+    constate('comptes detenant `can_manage_platform_key`', porteurs.join(', ') || '(aucun)');
+    verifie('aucun compte d\'epreuve ne detient la permission',
+        ! porteurs.some((n) => n.startsWith('rw-test-')),
+        `${porteurs.join(', ')} — le chemin mesure n'est plus le contournement du role 3`,
+        porteurs.join(', ') || 'aucun');
+
+    // ══ 1. LES DEUX CHEMINS DE LA GARDE, MESURES AU STATUT ═══════════════
+    for (const cle of ['user', 'super']) {
+        const compte = COMPTES[cle];
+        await etape(`garde : ${compte.nom} (role ${compte.role})`, async () => {
+            const s = await connecte(compte);
+            try {
+                verifie(`${compte.nom} : la session a tenu`, ! s.surConnexion, s.page.url());
+                if (s.surConnexion) return;
+                const rep = await s.page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+                const statut = rep ? rep.status() : 0;
+                constate(`${compte.nom} : statut`, `${statut} — ${compte.motif}`);
+                // AU STATUT, jamais au texte du corps : un 404 dit « cette page
+                // n'existe pas », pas « vous n'y avez pas droit ».
+                verifie(`${compte.nom} (role ${compte.role}) est ${compte.admis ? 'admis' : 'refuse'}`,
+                    compte.admis ? statut === 200 : statut === 403, `statut ${statut}`);
+            } finally {
+                try { await s.ctx.close(); } catch { /* deja ferme */ }
+            }
+        });
+        await dors((resteFenetre() + 1) * 1000);
+    }
+
+    // ══ 2. LA PAGE, AU COMPTE QUI Y ACCEDE ═══════════════════════════════
+    const s = await connecte(COMPTES.super);
+    verifie('la session a tenu', ! s.surConnexion, s.page.url());
+    if (s.surConnexion) throw new Error('session non etablie');
+    const page = s.page;
+    await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
+    await dors(700);
+
+    await etape('la cle publique est rendue', async () => {
+        const vu = await page.evaluate((sel) => {
+            const e = document.querySelector(sel);
+
+            return { present: e !== null, texte: e ? (e.textContent || '').trim() : '' };
+        }, C.valeur);
+        constate('bloc de cle', vu.present ? `${vu.texte.length} caracteres` : '(absent)');
+        // LA PROPRIETE PORTE SA PRECONDITION : un bloc vide se verifierait sur
+        // rien. On exige qu'il soit rendu ET qu'il porte une clef.
+        verifie('la cle publique de la plateforme est affichee',
+            vu.present && /^ssh-|^ecdsa-|AAAA/.test(vu.texte),
+            vu.present ? `« ${vu.texte.slice(0, 40)} »` : 'le bloc n\'est pas rendu',
+            `${vu.texte.length} caracteres`);
+    });
+
+    // ══ 3. LA ROTATION — LE GESTE QU'ON N'EXERCE PAS ═════════════════════
+    await etape('la rotation ne part pas seule', async () => {
+        const avantPassees = passees.length;
+        const avantAvortees = avortees.length;
+        const bouton = await page.$(C.lancer);
+        constate('bouton de rotation', bouton ? 'present' : '(absent)');
+
+        if (CIBLE === 'laravel') {
+            /*
+             * SUR LE PORTAGE LE CLIC EST LOCAL : il ouvre un panneau. On clique
+             * donc pour de vrai — c'est le cablage du bouton qu'on eprouve,
+             * qu'un `page.evaluate` ne mesurerait pas — et l'on verifie AU
+             * RESEAU qu'aucune requete n'est partie. Un panneau peut s'ouvrir ET
+             * l'appel partir quand meme.
+             */
+            verifie('le bouton de rotation est offert au role 3', bouton !== null, C.lancer);
+            if (! bouton) return;
+            await bouton.click();
+            await dors(800);
+            const vu = await page.evaluate((sels) => {
+                const p = document.querySelector(sels.panneau);
+                if (! p) return { ouvert: false, texte: '' };
+                const b = p.getBoundingClientRect();
+
+                return {
+                    // `offsetParent` vaut `null` pour un element en `position: fixed` :
+                    // on mesure la place REELLEMENT occupee.
+                    ouvert: ! p.hidden && b.height > 0 && getComputedStyle(p).display !== 'none',
+                    texte: (p.innerText || '').replace(/\s+/g, ' ').trim(),
+                };
+            }, C);
+            constate('panneau de decision', vu.ouvert ? `« ${vu.texte.slice(0, 120)} »` : '(ferme)');
+            verifie('le clic OUVRE un panneau de decision', vu.ouvert,
+                'le panneau ne s\'affiche pas — un geste de flotte partirait sans etre annonce');
+            verifie('le panneau annonce que le geste est SANS RETOUR',
+                vu.ouvert && /sans retour|irr[ée]versible|no return/i.test(vu.texte),
+                `le panneau ne nomme pas l'irreversibilite : « ${vu.texte.slice(0, 90)} »`);
+            verifie('AUCUNE requete n\'est partie avant consentement',
+                passees.length === avantPassees && avortees.length === avantAvortees,
+                `${passees.length - avantPassees} passee(s), ${avortees.length - avantAvortees} avortee(s)`,
+                'aucune');
+
+            // ON N'IRA PAS PLUS LOIN. Le panneau se referme par ANNULATION.
+            const annuler = await page.$(C.panneauAnnuler);
+            if (annuler) { await annuler.click(); await dors(400); }
+            constate('suite du geste', 'ANNULE — la reussite de la rotation n\'est mesuree sur aucune cible');
+        } else {
+            /*
+             * SUR LE LEGACY, `regenerateKey()` part au PREMIER clic, derriere un
+             * `confirm()` natif. On ne clique donc pas : la propriete se lit
+             * dans la STRUCTURE. Regle de S7a — un portail qui declenche au clic
+             * ne se teste pas en cliquant.
+             */
+            const forme = await page.evaluate((sel) => {
+                const b = document.querySelector(sel);
+
+                return b ? (b.getAttribute('onclick') || '') : null;
+            }, C.lancer);
+            constate('cablage du bouton legacy', forme === null ? '(absent)' : `onclick="${forme}"`);
+            verifie('le geste de rotation est offert par le legacy', forme !== null, C.lancer);
+            constate('pourquoi il n\'est pas clique',
+                'NON MESURABLE SANS DETRUIRE : `regenerateKey()` part au premier clic et le geste '
+                + 'porte sur la FLOTTE. Aucune cible sure n\'existe — la portee est le parc entier');
+            verifie('AUCUNE requete n\'est partie de cette etape',
+                passees.length === avantPassees && avortees.length === avantAvortees,
+                `${passees.length - avantPassees} passee(s)`, 'aucune');
+        }
+    });
+
+    // ══ 4. L'ENONCE QUE LE PORTAGE AJOUTE ════════════════════════════════
+    await etape('le portage dit que le geste n\'est jamais exerce', async () => {
+        if (! C.jamais) {
+            verifiePortage('la page enonce que la rotation n\'est jamais exercee au banc', false,
+                'le legacy ne porte pas cet enonce');
+
+            return;
+        }
+        const texte = await page.evaluate((sel) => {
+            const e = document.querySelector(sel);
+
+            return e ? (e.innerText || '').trim() : '';
+        }, C.jamais);
+        constate('enonce', texte ? `« ${texte.slice(0, 110)} »` : '(absent)');
+        verifiePortage('la page enonce que la rotation n\'est jamais exercee au banc',
+            texte !== '' && ! /:[a-z_]{3,}/.test(texte),
+            texte === '' ? 'aucun enonce rendu' : `jeton non substitue : « ${texte.slice(0, 60)} »`);
+    });
+
+    await etape('aucune erreur JavaScript', async () => {
+        verifie('aucune erreur JavaScript sur la page', s.erreursJs.length === 0,
+            s.erreursJs.slice(0, 3).join(' | '), 'aucune');
+    });
+
+    // ══ 5. CAPTURES ══════════════════════════════════════════════════════
+    await etape('captures', async () => {
+        const dossier = new URL(`./screenshots/cle-plateforme/${CIBLE}`, import.meta.url).pathname;
+        mkdirSync(dossier, { recursive: true });
+        for (const f of [{ n: 'grand', w: 1920, h: 1080 }, { n: 'bureau', w: 1400, h: 900 },
+                         { n: 'mobile', w: 390, h: 844 }]) {
+            await page.setViewport({ width: f.w, height: f.h });
+            await dors(400);
+            await page.screenshot({ path: `${dossier}/p1-${f.n}.png`, fullPage: true });
+        }
+        verifie('les trois captures sont ecrites', true, '', dossier);
+    });
+} catch (e) {
+    verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+} finally {
+    // ══ SURETE — LE FILET NE SE SUPPOSE PAS, IL SE MESURE ════════════════
+    try {
+        constate('requetes AVORTEES', avortees.length
+            ? avortees.map((a) => `${a.route} (${a.motif})`).join(' | ') : '(aucune)');
+        constate('requetes laissees passer', passees.length
+            ? passees.map((p) => `${p.methode} ${p.route}`).join(' | ') : '(aucune)');
+        constate('boites natives ouvertes', boites.length
+            ? boites.map((b) => `${b.type} « ${b.message.slice(0, 60)} »`).join(' | ') : '(aucune)');
+
+        verifie('AUCUN geste interdit n\'a abouti',
+            ! passees.some((p) => INTERDITS.test(p.route)),
+            passees.filter((p) => INTERDITS.test(p.route)).map((p) => p.route).join(' '),
+            `${passees.length} requete(s) laissee(s) passer`);
+        verifie('AUCUNE requete n\'a vise la production',
+            ! passees.some((p) => new RegExp(`[?&](machine_id|server_id)=${MACHINE_PRODUCTION}\\b`).test(p.route)),
+            'une requete a vise `srv-zabbix`');
+    } catch (e) { note(`FAIL  controle de surete : ${e.message}`); echecs += 1; }
+    try {
+        const zabbix = litEnBase("SELECT CONCAT(name,'|',ip) FROM rootwarden.machines WHERE id = 1");
+        verifie('srv-zabbix est intacte', zabbix.length === 1 && /^srv-zabbix\|/.test(zabbix[0]),
+            zabbix[0] || '(absente)', zabbix[0] || '');
+        // L'ETAT DE DEPLOIEMENT DU PARC : c'est LUI que la rotation remettrait a
+        // zero. On le relit pour prouver qu'elle n'a pas eu lieu.
+        const deployees = compteEnBase(
+            'SELECT COUNT(*) FROM rootwarden.machines WHERE platform_key_deployed = 1');
+        verifie('l\'etat de deploiement du parc est intact',
+            deployees > 0,
+            `${deployees} machine(s) marquee(s) deployee(s) — une rotation les remettrait toutes a 0`,
+            `${deployees} machine(s) deployee(s)`);
+    } catch (e) { note(`FAIL  controle de l'etat : ${e.message}`); echecs += 1; }
+    for (const c of contextes) { try { await c.close(); } catch { /* deja ferme */ } }
+    try { await navigateur.close(); } catch { /* deja ferme */ }
+}
+
+note(`\n${etapes} etapes, ${lignes.filter((l) => l.startsWith('PASS')).length} PASS, ${echecs} FAIL`);
+note(echecs === 0 ? '=== TOUT OK ===' : '=== DES ECHECS ===');
+process.exit(echecs === 0 ? 0 : 1);
