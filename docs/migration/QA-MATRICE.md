@@ -754,12 +754,32 @@ FROM users u LEFT JOIN permissions p ON p.user_id = u.id WHERE u.active = 1;"
 
 ### Deux autres affirmations vérifiées, et elles tiennent
 
-- **le backend ne lit PAS `temporary_permissions`.** `get_current_user` remplit son cache
-  depuis `permissions` seule ; la table n'apparaît que dans le **planificateur**, qui la
-  purge. Les deux portails, eux, la lisent. Après le redémarrage, un porteur de
-  permission temporaire ouvrira la page et prendra 403 sur toutes les routes. **Zéro
-  porteur aujourd'hui** (table vide, mesuré) — donc aucune suite ne peut le voir sans
-  qu'on fabrique la fixture ;
+- ~~**le backend ne lit PAS `temporary_permissions`**~~ — **CORRIGÉ, et ma mesure est
+  périmée d'une heure.**
+
+  Mesuré à **09:55** : `get_current_user` ne lisait que `permissions`, la table
+  n'apparaissant que dans le planificateur. **Vrai à cet instant.** Remesuré à **10:01**
+  sur signalement de la session SÉCURITÉ : `helpers.py:264` lit désormais
+  `temporary_permissions` avec la borne `expires_at > NOW()`, et le correctif est
+  **commité** (`72b0518`).
+
+  **La divergence n'existe plus, et l'arbitrage qu'on me demandait dessus tombe.**
+
+  > Trois fois aujourd'hui, un fait sur le dépôt s'est périmé entre deux appels d'outil.
+  > La règle qui en sort n'est pas « mesurer plus souvent » — c'est **dater la mesure et
+  > la republier quand quelqu'un s'en sert pour décider.** Un fait sans heure est une
+  > opinion sur le passé.
+
+  Ce que la lecture du correctif ajoute, et qui vaut d'être retenu : sa requête a son
+  **propre `try`**. Sans lui, une erreur sur les permissions **temporaires** refuserait
+  **toute** authentification, permanente comprise — le repli dégrade vers « les
+  temporaires ne comptent pas », c'est-à-dire vers le comportement de la veille.
+  *Dégrader vers ce qu'on faisait hier vaut mieux que fermer la porte à tout le monde.*
+
+  **Le résidu qui reste, et il est de ma famille** : ce repli est **silencieux pour
+  l'appelant**. Le porteur temporaire perd son accès pendant l'incident, et le 403 ne
+  distingue pas « vous ne l'avez pas » de « je n'ai pas pu lire si vous l'aviez ».
+  Le `logger.warning` existe ; l'écran ne voit rien ;
 - **`clean_up_users` n'a aucun appelant** : sa seule autre occurrence est une mention
   dans une docstring. Une suite qui supposerait qu'un déploiement fait `userdel -r`
   mesurerait une branche morte.
