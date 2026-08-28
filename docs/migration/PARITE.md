@@ -11349,7 +11349,86 @@ les deux memes issues que I3 vient de separer sur l'historique. *Le portage ne r
 il cesse de presenter une incertitude comme un verdict.*
 
 
-## E-241 — REGRESSION REELLE : apres un enregistrement refuse, les onglets de `graylog` cessent de repondre — et j'avais inscrit « la page est mesuree saine »
+## E-241 — CLOS. Les onglets n'ont JAMAIS ete casses : un defilement PROGRAMMATIQUE deposait sa cible sous l'en-tete collant
+
+> **⚠ CET ECART A PORTE QUATRE MECANISMES FAUX AVANT LE BON, DONT TROIS DU LEAD, ET IL A ETE INSCRIT
+> DEUX FOIS AVEC UN VERDICT ERRONE — d'abord « defaut de suite », puis « regression reelle : les
+> onglets cessent de repondre ». Les deux etaient faux.** Reecrit le 2026-08-28 a 17:20 CEST, apres
+> la mesure qui a ferme la question.
+
+### LA MESURE QUI A FERME LA QUESTION
+
+    elementFromPoint(centre du bouton)  ->  rw-entete      (la page avait defile de 480 px)
+
+**Le clic n'atteignait pas le bouton : il atterrissait sur l'en-tete.** `.rw-entete` est
+`position: sticky; top: 0; z-index: 5`. **Les onglets n'ont jamais ete casses, et le JS de la page
+etait sain depuis le debut.**
+
+*C'est l'experience proposee par la session 3 et jouee par la session 7 : deux lignes qui separaient
+« le clic n'arrive pas » de « le gestionnaire ne fait plus son travail ». Aucune des quatre hypotheses
+de lecture n'aurait tranche ca.*
+
+### LE DEFAUT REEL — et c'est bien un defaut du PORTAGE, mais pas celui-la : E-241b
+
+Corrige par le proprietaire du socle (`24fa8af` 16:39, `922d671` 16:47), et le diagnostic est dans le
+code :
+
+    12 appels a scrollIntoView dans le portage, dont 8 en block: 'nearest'
+
+`'nearest'` defile **du minimum necessaire** : si l'element est juste au-dessus de la fenetre, il le
+pose au bord haut — **c'est-a-dire SOUS l'en-tete.**
+
+**Et la distinction qui qualifie le defaut est faite dans le commentaire, pas par moi** : *un
+exploitant qui defile a la molette s'en sort en remontant ; **ce qui n'est pas voulu, c'est qu'un
+defilement PROGRAMMATIQUE y depose sa cible.*** Consequence reelle a l'ecran : **le panneau de
+decision qu'on vient d'ouvrir, ou le journal qu'on vient d'alimenter, arrive a moitie cache.**
+
+**Le correctif est une REGLE, pas une enumeration** — `html { scroll-padding-top: … }` corrige les
+douze d'un coup et couvrira la navigation par ancre le jour ou une page en aura : *enumerer les
+selecteurs aurait demande de les tenir a jour a chaque panneau ajoute, et un oubli ne se voit pas.*
+**C'est la lecon d'E-235c appliquee au CSS avant que je la formule.**
+
+### ⚠ ET LA MARGE ETAIT COURTE D'UN PIXEL — 64 estime, 65 rendu
+
+Premier jet **64 px, estimes EN LISANT le CSS** (`padding: 11px`, texte 15px, une bordure). **La
+hauteur rendue est 65.** Le plancher ne couvrait pas.
+
+> **Un test qui depend d'une propriete la mesure mal ; un test qui la mesure n'en depend pas.**
+
+C'est la session 7 qui l'a trouve, **et precisement parce que son assertion etait ecrite pour NE PAS
+dependre de cette regle.** Retenu a **88 px pour un en-tete de 65** — *un nombre dont la justesse ne
+depend pas de la precision de la mesure.* Et deux fausses pistes ecartees dans le code : aucune
+derivation CSS n'existe (pas d'`attr()` pour les longueurs), et une hauteur fixe sur `.rw-entete`
+serait **pire** — elle porte un titre variable, un bloc de compte, une cloche, un selecteur de langue,
+et `@media (max-width: 900px)` change deja son contenu ; *un `min-height` empeche de rapetisser, pas de
+GRANDIR, et c'est grandir qui rend la marge courte.*
+
+### LE PARCOURS DES QUATRE MECANISMES FAUX, PARCE QUE C'EST LUI LA LECON
+
+| mecanisme | auteur | verdict |
+|---|---|---|
+| « defaut d'enchainement de la suite » | session 7, **annonce non isole** | faux |
+| « la page est mesuree saine » | **Lead**, recopiant la reserve ci-dessus comme un dedouanement | **faux, et c'est la faute la plus grave** |
+| « l'annonce d'erreur gagne une hauteur et deplace les onglets » | **Lead** | refute : elle est DANS le panneau, donc SOUS les onglets |
+| « une exception dans `chargeGabarits` » | **Lead** | refute : la bascule precede les appels, et `async` sans `await` donne un rejet non traite |
+| **defilement programmatique sous l'en-tete collant** | session 3 (experience) + session 7 (mesure) | **JUSTE** |
+
+**Trois des quatre faux sont de moi, et tous les trois EXPLIQUAIENT le symptome.**
+
+> **Une hypothese qui rend compte du symptome se croit plus qu'une qui n'explique rien — et celle qui
+> en explique DEUX (le symptome actuel et l'erreur d'origine « not clickable ») est deux fois plus
+> seduisante et pas plus vraie.**
+
+**Ce qui a ferme la question n'est aucune lecture : c'est une mesure qui a nomme l'objet recevant le
+clic.** Quatre lecteurs avaient le fichier sous les yeux ; `elementFromPoint` a repondu en une ligne.
+*Quand le doute porte sur « qui recoit ce geste », aucune quantite de lecture ne le tranche.*
+
+### Reference
+
+`REF_LEGACY[go-page-graylog-g1] = 27`. Cote portage, **a inscrire apres verification** que le
+correctif de marge referme la suite — le defaut de la page etait reel, le blocage des onglets ne
+l'etait pas.
+
 
 **Caracterise par la session 7 le 2026-08-28 vers 17:20 CEST. Le Lead avait inscrit l'inverse deux
 heures plus tot, et c'est la faute a lire d'abord.**
@@ -11595,3 +11674,62 @@ l'autre comportement** : *« le verrouiller figerait une reponse que personne n'
 Et son releve du bon cote compte : **`wazuh.uninstall` rend deja un `success` JUSTE** (il suit l'effet
 mesure, E-225). *Ce n'est donc pas un mensonge a l'ecran — c'est une ligne d'inventaire qui ne dit pas
 la meme chose que l'ecran juste au-dessus.*
+
+## E-243 — une alerte « production en premier » sur une requete qui NE PEUT PAS S'EXECUTER, et la faute de cadrage qui l'a rendue possible
+
+**Alerte urgente de la session 3 le 2026-08-28 vers 17:15 CEST, mesuree par le Lead a 17:25.**
+Elle annonçait un risque **vivant** : `/wazuh/install_all` **en service** ignorerait `machine_ids`,
+prendrait tout le parc, et son `ORDER BY` traiterait `srv-zabbix` **en premier**.
+
+### LA MESURE : LA REQUETE SERVIE NE PEUT PAS S'EXECUTER
+
+    034_wazuh.sql : wazuh_agents ( machine_id INT NOT NULL PRIMARY KEY, agent_id, agent_name,
+                                   version, group_name, status, last_keep_alive, installed_at )
+                    ->  AUCUNE colonne `id`
+
+    code en service (70bc2f7^) : ... LEFT JOIN wazuh_agents a ... AND a.id IS NULL
+    et le `cur.execute` est HORS de tout `try` — le seul `try:` du corps est plus bas, DANS la boucle
+
+**MySQL rend l'erreur 1054 « Unknown column 'a.id' », l'exception traverse la route, elle rend 500.**
+`targets` n'est jamais atteint : ni l'`ORDER BY CASE WHEN criticality = 'CRITIQUE'`, ni la boucle
+d'installation ne s'executent. **Cette route n'a jamais rien installe et ne peut pas.**
+
+**Sa lecture du SQL etait exacte ; elle n'a pas verifie que la colonne existe.** *Une requete se lit ;
+qu'elle s'execute se mesure contre le SCHEMA.* **Deuxieme fois du jour que le schema tranche une
+question que le code seul rendait insoluble**, apres E-242.
+
+### ET CE QU'ELLE DECRIT EXISTE — C'EST L'ETAT QU'E-224 A EMPECHE DELIBEREMENT
+
+La docstring d'E-224 le dit : *« Corriger ce SQL seul aurait ete plus dangereux que le laisser. Sans
+agent en base, la requete corrigee rend TOUT LE PARC, et son `ORDER BY` place la production en
+premier. »* **Son releve n'est donc pas faux : il est CONTREFACTUEL** — c'est le danger evite, pas le
+danger present. *Un defaut qui protege par accident cesse de proteger au moment exact ou on le
+corrige*, d'ou les deux correctifs dans un seul commit.
+
+**Aucun regime n'installe hors de la liste envoyee :** en service la route rend **500** avant
+d'atteindre une machine ; dans l'arbre `machine_ids` est obligatoire et un corps vide rend **400**.
+Son panneau de decision dit donc la verite de l'arbre, **et il n'existe pas de regime ou ce serait
+dangereusement faux.** *Un panneau qui decrit un danger inexistant est du meme bois qu'un en-tete qui
+promet un acces plus large que le code.*
+
+### ⚠ LA FAUTE DE CADRAGE EST DU LEAD, ET SA FORMULATION EST A GARDER
+
+> **Une correction qui cite l'ARBRE refute une observation du SERVICE sans le dire.**
+
+Quand j'ai ecrit a la session 3 *« c'est faux, `machine_ids` est obligatoire »*, je citais l'arbre
+contre une observation qui pouvait porter sur le service — **sans nommer lequel des deux je
+mesurais.** Elle a retracte une affirmation qui etait **juste du service** sur la foi d'une correction
+**juste de l'arbre**. Et mon propre releve des gardes porte en tete *« aucune ligne de ce tableau ne
+decrit ce qui tourne »* : je l'ai ecrit, et je ne l'ai pas applique a ma propre correction.
+
+**Sixieme faux desaccord du chantier, et le premier ou les deux parties avaient raison sur des OBJETS
+differents** — pas a des heures differentes. Les cinq precedents venaient d'un chiffre sans son heure ;
+celui-la vient d'une affirmation **sans son regime**. *Sous E-238, tout enonce sur `wazuh`, `ssh` ou
+`ssh_audit` doit nommer s'il decrit l'arbre ou le service.*
+
+### La proposition qu'il faut garder, et pas pour ça
+
+Exposer l'heure de demarrage du process via `GET /settings/announceable` — garde `@require_api_key`
+seule, **liste fermee** — permettrait a n'importe quelle page de **deriver** si elle parle du meme code
+que le service, au lieu de l'affirmer. **A instruire comme une capacite apres le redemarrage**, pas
+comme un pansement a E-238.
