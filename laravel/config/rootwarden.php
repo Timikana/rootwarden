@@ -97,7 +97,29 @@ return [
     ],
 
     'fonctionnalites' => [
-        'wazuh' => env('FEATURE_WAZUH', true),
+        /*
+         * ══ E-223 : `WAZUH_ENABLED`, ET NON UN NOM INVENTE ICI ═══════════
+         *
+         * Ce reglage lisait `FEATURE_WAZUH`, qui n'existe NULLE PART ailleurs —
+         * occurrence unique dans tout le depot, mesuree. Le legacy
+         * (`wazuh/index.php:17`) et le backend (`config.py:143`) lisent tous
+         * deux `WAZUH_ENABLED`.
+         *
+         * Consequence du nom invente : avec `WAZUH_ENABLED=false`, le legacy
+         * cache son entree et rend 404, le backend n'enregistre pas son
+         * blueprint, et le portage — lui — gardait l'entree AFFICHEE, pointant
+         * vers ce 404. Le drapeau du portage ne pouvait jamais valoir faux.
+         *
+         * Un drapeau de moins, pas une regle en double : le domaine est le
+         * meme, donc le nom doit l'etre.
+         *
+         * DEUX RESERVES, declarees plutot que tues :
+         * - rien n'a ete verifie au navigateur avec le drapeau a faux ;
+         * - si `config:cache` entrait un jour dans l'entrypoint, cette valeur se
+         *   figerait au demarrage. Le nom corrige n'y changerait rien, et c'est
+         *   l'une des raisons pour lesquelles la migration s'en passe.
+         */
+        'wazuh' => env('WAZUH_ENABLED', true),
     ],
 
     /*
