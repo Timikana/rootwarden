@@ -104,4 +104,21 @@ return [
     'histo_auteur_inconnu' => 'Author not recorded',
     'histo_auteur_supprime' => 'Deleted account (no. :id)',
     'histo_sans_motif' => 'No reason given',
+
+    // ── I4: dry-run validation ──────────────────────────────────────────
+    'valid_titre' => 'Dry-run validation',
+    'valid_intro' => 'The server can check that a ruleset is syntactically applicable, without applying it.',
+    'valid_bouton' => 'Validate the stored copy',
+    'valid_avant' => 'This check OPENS an SSH session on the machine and writes a temporary file there. It modifies no firewall table.',
+    'valid_limite' => 'Validation covers IPv4 rules ONLY. A copy whose IPv6 is malformed would pass this check and fail on apply.',
+    'valid_v4_vide' => 'This copy carries no IPv4 rules. There is nothing to validate: validation only knows IPv4, and refuses an empty copy.',
+    'valid_sans_copie' => 'Load the stored copy first: it is what gets validated.',
+    'valid_en_cours' => 'Validation running on the machine…',
+    'valid_ok' => 'The server reports these rules as applicable.',
+    'valid_invalide_court' => 'The server reports these rules as invalid — verdict to be re-read below.',
+    'valid_invalide_titre' => 'Reported invalid — verdict to be re-read',
+    'valid_invalide' => 'The server reports these rules as invalid. This verdict IS NOT RELIABLE on long output: the exit-code detection looks for its marker inside 4096-byte chunks, and a VALID ruleset can be reported invalid when the marker straddles a boundary. Read the output before concluding.',
+    'valid_echec_titre' => 'Check did not complete',
+    'valid_echec' => 'The check did not complete. This is neither "valid" nor "invalid": nothing was verified.',
+    'valid_sortie' => 'Server output',
 ];
