@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.86** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.87** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,73 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.87 — nouvelle ligne de base du LOT, le gel est leve, et les deux passerelles ne divergent nulle part dans la direction dangereuse
+
+#### LOT COMPLET, 2026-08-28 : 153 executions · 2298 PASS · 2 FAIL · 2 h 39
+
+**+16 PASS et un FAIL de moins que la ligne de base d'hier, apres 44 commits.** Les deux ecarts
+sont des defauts de **suite**, aucun n'est une regression du portage — et le premier est le genre
+de chose pour laquelle un LOT complet existe :
+
+**`go-page-ssh-flux` rend 0/0 sur les DEUX cibles.** `deployment.log` a ete **rotationne** en
+`.log.1` le 27/08 a 22:43 — par **E-196, notre propre correctif des regles de rotation**. La suite
+**suppose l'existence d'un fichier qu'elle ne cree pas** et meurt avant d'imprimer son tampon.
+*Le correctif etait juste, la suite etait fragile, et rien ne les reliait avant ce LOT.*
+
+**`go-page-graylog-g1` 21/2 — et la page est mesuree SAINE.** Rejouee seule au repos : 21/2 aussi,
+donc l'hypothese de la charge est **refutee**, et la session 7 le dit parce que c'etait sa premiere
+explication. Sonde jetable : le clic ouvre le panneau, champ a 45 px, contrat DOM intact, zero
+erreur JS. Le defaut est dans l'enchainement de la suite, **non isole et non pretendu tel**. *Deux
+fausses pistes avaient precede — un recouvrement par le pied de page (mesure : `position: static`,
+il ne recouvre rien) et un 403 venant du mauvais compte dans l'instrument lui-meme.*
+
+**Le LOT s'est arrete A SA FIN. Le gel des conteneurs est LEVE** (16:45 CEST). Il tenait sur un
+motif precis : *si le LOT s'etait arrete sur un incident, une charge posee maintenant aurait
+efface la trace.*
+
+#### Les deux passerelles comparees par DERIVATION, sur les 203 chemins reels
+
+Session 6, puis **rederive independamment par le Lead** avec les deux semantiques ecrites a la
+main depuis la source (`strpos(...) === 0` pour le legacy, `correspond()` segment pour le portage) :
+
+    chemins distincts                                   203
+    DIRECTION DANGEREUSE (legacy reserve, portage ouvre)  0
+    liste blanche, divergences                            3   toutes « portage seul »
+    reserve admin, divergences                           38   toutes PROTECTRICES (27 supervision + 11 wazuh)
+
+> **Il n'existe aucun chemin que le legacy reserve a l'administration et que le portage laisse
+> ouvert.** Et le resultat ne depend d'aucune liste ecrite a la main.
+
+**Deux derivations independantes qui concordent VALENT une mesure** — et c'est la distinction que
+la session 6 avait elle-meme posee le matin : *deux souvenirs independants qui concordent ne valent
+rien, et ils se ressemblent exactement de l'interieur.* Ici ce sont deux derivations depuis la
+source, pas deux souvenirs.
+
+#### Et j'ai verifie les 3 chemins que le portage ouvre en plus — le seul sens porteur de risque
+
+La session 6 les qualifiait « des lectures », sans mesurer leurs gardes. Mesure :
+
+    /settings/announceable        @require_api_key SEUL   -- aucun role, aucune permission
+    /machines/credential-status   @require_api_key SEUL   -- aucun role, aucune permission
+    /server_users_inventory       role(2) + machine_access
+
+**Les deux absences sont DECLAREES avec leur motif, et les motifs tiennent** — donc **pas un
+defaut**, et je le dis aussi net que j'aurais dit l'inverse :
+
+- `/settings/announceable` rend douze valeurs d'une **liste fermee**, toutes deja visibles dans le
+  fichier d'exemple livre. Sa docstring declare l'absence : *« ce qui garde reellement cette route
+  est la LISTE FERMEE, pas un decorateur »*, et *« une absence de garde se DECLARE, avec son
+  motif »* — en citant les trois commentaires du depot qui affirmaient une garde plus stricte que
+  le code ;
+- `/machines/credential-status` dit si un secret **dechiffre en vide, sans jamais le rendre**. Elle
+  existe a cause de l'asymetrie qui avait piege mon propre correctif P1 : `encrypt_password('')`
+  rend `''` en Python et `'sodium:…'` en PHP, donc `(password <> '')` est un predicat FAUX.
+
+**Une question reste ouverte, et je la pose comme une question** : faut-il qu'un compte de role 1
+atteigne l'inventaire par machine des secrets absents ? Ce n'est pas une fuite de secret — c'est de
+la metadonnee d'exploitation. *Je la sous-declare volontairement : trois de mes sondes se sont
+trompees du cote qui alarme aujourd'hui.*
 
 ### v1.38.86 — E-236, E-237 et E-235c : une garde plus stricte sur un axe peut etre plus permissive sur un autre, et une liste d'exemples se corrige indefiniment
 
