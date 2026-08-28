@@ -11486,3 +11486,43 @@ localise : *un `dors(900)` fixe ne cache pas seulement une lenteur, il cache la 
 `REF_LARAVEL[go-page-graylog-g1]` **n'est pas inscrite** tant que le defaut vit. *Une reference posee
 sur un rouge legitime transforme le defaut en etat normal.* **`REF_LEGACY = 27`** (de 25 : les deux
 assertions d'ouverture d'onglet y passent).
+
+
+## Note de methode — la discipline de remesure a EVITE une mesure, et c'est une premiere
+
+**Releve par la session 6 le 2026-08-28 a 16:30 CEST.** Le compte `pytest` a fait quatre fois le tour
+du chantier comme un desaccord — `462`, `509`, `549`, `566`. **Il n'y en avait pas :** trois de ces
+chiffres sont justes a des heures differentes, et le quatrieme comptait autre chose.
+
+**Ce qui l'a ferme n'est pas une mesure, c'est un registre.** La session 4 a relu les corps de commit
+au lieu de charger le conteneur ; le Lead a fait de meme pour valider `566`. **La session BASE &
+PERFORMANCE s'appretait a charger pour trancher — le protocole a economise le geste.**
+
+> **C'est la premiere fois que la regle « chaque chiffre porte sa commande de remesure » a EVITE une
+> mesure au lieu d'en documenter une.** Un chiffre date et sourcé dans un commit n'a pas besoin
+> d'etre refait ; il a besoin d'etre **lu**.
+
+*Et refaire n'est pas gratuit : relancer `pytest` a cet instant aurait coute a la session 7 la sonde
+qui debloque E-241 — donc deux entrees de menu.* **Verifier un registre plutot que refaire une mesure
+est le geste juste quand refaire coute a quelqu'un d'autre.**
+
+### La cause des QUATRE faux desaccords est unique, et ce n'est pas la mesure
+
+Apres `temporary_permissions`, les 20/21 routes conditionnelles, `fail2ban_ban_all_servers`, et
+celui-la : **un chiffre voyage sans son heure.**
+
+> **Sur un chantier a huit sessions dont une gele les ecritures backend, une mesure sans horodatage
+> n'est pas une donnee incomplete : c'est une donnee FAUSSE des qu'elle est relayee.**
+
+*Corollaire deja paye trois fois aujourd'hui : `566` ne sera plus vrai a la premiere ecriture de la
+session 4, et personne ne le saura si l'heure ne voyage pas avec.*
+
+### Et le mandat de la session 6 sur E-235 est le bon
+
+Elle refuse de refermer les 36 espaces restants et pose *« un role 1 devrait-il atteindre
+`/preflight_check` ? »* **comme une question, pas comme un ecart** : *« je n'ai pas le mandat de
+decider ce que le legacy aurait du faire. »*
+
+**C'est exactement la lecon d'E-239** — la ou j'ai transpose la conclusion d'un precedent sans verifier
+sa condition, et ou fermer un prefixe entier aurait casse le role 1. **Un ecart se mesure ; ce que le
+legacy aurait du faire s'arbitre.** Les confondre fait poser des correctifs sans mandat.

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.92** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.94** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,55 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.94 — le compte est tranche a 566, et la discipline de remesure a EVITE une mesure pour la premiere fois
+
+**`566 passed · 1 skipped · 1 xfailed`** (pytest) et **`277 passed · 888 assertions`** (`php artisan
+test`), mesures a 16:28 sur un banc **rendu explicitement** par la session 7 — pas deduit d'un
+silence. Commit `c282fbe`, **verifie au registre par le Lead et non remesure** : relancer `pytest` a
+cet instant aurait coute a la session 7 la sonde qui debloque E-241, donc deux entrees de menu.
+
+> **Verifier un registre plutot que refaire une mesure est le geste juste quand refaire coute a
+> quelqu'un d'autre.**
+
+#### Il n'y a JAMAIS eu de contradiction — quatrieme faux desaccord en deux jours
+
+`509` (27/08 13:18) et `549` (28/08 08:49) sont **tous deux justes, a onze heures d'ecart** :
+`375 → 464 → 483 → 509 → 540 → 543 → 549 → 551 → 552 → 566`, chaque palier date dans son commit.
+**Le seul chiffre faux etait `462`** — il comptait des `def test_`, donc des **fonctions** : une
+fonction parametree a six jeux rend six cas. *Et c'est ce repere qui rendait tous les ecarts
+inexplicables tant qu'on le gardait.*
+
+Apres `temporary_permissions`, les 20/21 routes conditionnelles et `fail2ban_ban_all_servers`, la
+cause des quatre est unique — **et ce n'est pas la mesure, c'est le transport :**
+
+> **Sur un chantier a huit sessions dont une gele les ecritures backend, une mesure sans horodatage
+> n'est pas une donnee incomplete : c'est une donnee FAUSSE des qu'elle est relayee.**
+
+*`566` reste vrai exactement le temps du gel d'ecriture backend.*
+
+#### Une premiere : la regle a EVITE un geste au lieu de le tracer
+
+La session BASE & PERFORMANCE s'appretait a charger le conteneur pour trancher. **Le registre a
+suffi.** *C'est la premiere fois que « chaque chiffre porte sa commande de remesure » economise une
+mesure au lieu d'en documenter une — un chiffre date et sourcé n'a pas besoin d'etre refait, il a
+besoin d'etre LU.*
+
+#### Et les trois rouges de la QA etaient des references, pas des defauts
+
+**Route neuve** `GET /autorisations-passerelle`, `role:3` **seul** — inscrite. Et le motif est du bon
+cote : `api/docs.php` **annonce** « admins et superadmins » quand sa ligne 9 fait
+`checkAuth([ROLE_SUPERADMIN])` (**E-231**). **La session 3 a porte le CODE, pas le commentaire** — et
+n'a invente aucune permission, ce qui aurait resserre sans mandat. *Le bon arbitrage dans les deux
+sens.* **Trois JS modifies** : `docker.js` gagne `scanTout` (classe `flux`), `pare-feu.js` et
+`services.js` ont bouge de lignes ; la liste a examiner reste a **quatre**. Aucun defaut.
+
+#### Le mandat sur E-235 : la session 6 refuse de refermer, et elle a raison
+
+Elle pose *« un role 1 devrait-il atteindre `/preflight_check` ? »* **comme une question, pas comme un
+ecart** — *« je n'ai pas le mandat de decider ce que le legacy aurait du faire. »* **C'est la lecon
+d'E-239**, ou fermer un prefixe entier aurait casse le role 1. **Un ecart se mesure ; ce que le legacy
+aurait du faire s'arbitre.**
 
 ### v1.38.93 — les catalogues `wazuh`, portés avant la page pour que rien ne s'affiche en clair
 
