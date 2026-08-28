@@ -14,9 +14,14 @@ révisions ayant suivi. *Un fait sans heure est une opinion sur le passé*, et �
 commitent en continu, un relevé est une **photographie** et non un état. Les conteneurs sont en **UTC**,
 l'hôte et le navigateur en **CEST** : E-73 a déjà fait mal décider sur ces deux heures.
 
-**Cinq de mes propres écrits ont été retournés par la mesure en une matinée** — quatre par des pairs, un
+**Six de mes propres écrits ont été retournés par la mesure en une journée** — cinq par des pairs, un
 par moi. Chacun est marqué à l'endroit où il était faux, jamais effacé : *un document qui efface ses
 erreurs ne permet pas de savoir laquelle des deux versions on a lue.*
+
+**Le sixième n'est pas de la même nature que les cinq autres, et c'est le seul qui compte vraiment** :
+les cinq étaient des lectures fausses — une prémisse, un chiffre, une recommandation. **Le sixième est
+une vérification affirmée et non faite.** *Une erreur de lecture se corrige en relisant ; une
+vérification omise ne se corrige qu'en refaisant le geste, et rien ne signale son absence.*
 
 ---
 
