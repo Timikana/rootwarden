@@ -87,4 +87,21 @@ return [
     'copie_lignes_multiples' => 'Warning: :nb copies exist for this machine. The most recent one is shown.',
     'copie_bloc_v4' => 'IPv4 copy',
     'copie_bloc_v6' => 'IPv6 copy',
+
+    // ── I3: the archived version history ────────────────────────────────
+    'histo_titre' => 'Archived versions',
+    'histo_intro' => 'Every rule application archives the rules it replaces. An empty version is never archived: every version listed here can be restored.',
+    'histo_chargement' => 'Reading history…',
+    'histo_vide_titre' => 'No archived version',
+    'histo_vide' => 'No rule application has taken place on this machine from this portal yet. There is therefore nothing to restore.',
+    'histo_echec_titre' => 'History unreadable',
+    'histo_echec' => 'The history could not be read. That is not the same as an empty history: do not conclude there is nothing to restore.',
+    'histo_tout' => ':nb archived version(s).',
+    'histo_tronque' => 'The :affichees most recent, out of :total in total.',
+    'histo_col_date' => 'Archived on',
+    'histo_col_auteur' => 'By',
+    'histo_col_motif' => 'Reason',
+    'histo_auteur_inconnu' => 'Author not recorded',
+    'histo_auteur_supprime' => 'Deleted account (no. :id)',
+    'histo_sans_motif' => 'No reason given',
 ];

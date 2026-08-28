@@ -248,4 +248,74 @@ class Iptables
             );
         });
     }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  SOUS-LOT I3 — L'HISTORIQUE DES VERSIONS ARCHIVEES
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** Combien de versions cette machine porte-t-elle ? Le TOTAL, pas la page. */
+    public function compteHistorique(int $machineId): int
+    {
+        $lignes = DB::select(
+            'SELECT COUNT(*) AS n FROM iptables_history WHERE server_id = ?',
+            [$machineId]
+        );
+
+        return (int) ($lignes[0]->n ?? 0);
+    }
+
+    /**
+     * Les versions archivees d'une machine, les plus recentes d'abord.
+     *
+     * ══ AUCUNE REGLE NE VOYAGE ═══════════════════════════════════════════
+     *
+     * `iptables_history` porte `rules_v4` et `rules_v6` en `LONGTEXT`. Ce
+     * listing ne les SELECTionne pas : afficher des dates ne demande pas de
+     * transporter le pare-feu de la machine jusqu'au navigateur, et vingt
+     * versions completes pour une liste de vingt lignes est un cout sans
+     * contrepartie. C'est la meme discipline que « les secrets ne se
+     * SELECTionnent pas », appliquee au VOLUME plutot qu'au SECRET.
+     *
+     * ══ LECTURE DIRECTE EN BASE, ET C'EST CE QUI EVITE UN DEFAUT ═════════
+     *
+     * Le legacy passe par `GET /iptables-history`, dont le decorateur
+     * `@require_machine_access` retient `machine_id` EN PREMIER alors que la
+     * route lit `server_id` : une requete portant les deux fait autoriser l'une
+     * et servir l'autre (E-175). Le correctif dort sur une branche non
+     * fusionnee.
+     *
+     * Le portage lit la base directement — c'est la regle du chantier, et ici
+     * elle a un effet de bord utile : **il n'herite pas de cet ecart**, parce
+     * qu'il n'y a plus qu'un seul identifiant, resolu et controle en un point.
+     */
+    public function historique(int $machineId, int $limite = 20): array
+    {
+        return DB::select(
+            'SELECT id, changed_by, change_reason, created_at '
+            . 'FROM iptables_history WHERE server_id = ? '
+            . 'ORDER BY created_at DESC, id DESC LIMIT ' . max(1, min(100, $limite)),
+            [$machineId]
+        );
+    }
+
+    /**
+     * L'auteur d'une version, rendu lisible.
+     *
+     * `changed_by` est deja un NOM cote backend — contrairement a
+     * `fail2ban_history.performed_by`, qui reste un identifiant numerique.
+     * Mais il porte un repli `#<id>` quand le compte a disparu, et un `#7` brut
+     * a l'ecran ne veut rien dire. On le DIT.
+     */
+    public function auteurLisible(?string $changedBy): array
+    {
+        $v = trim((string) $changedBy);
+        if ($v === '') {
+            return ['forme' => 'inconnu', 'valeur' => ''];
+        }
+        if (preg_match('/^#(\d+)$/', $v, $m) === 1) {
+            return ['forme' => 'compte_supprime', 'valeur' => $m[1]];
+        }
+
+        return ['forme' => 'nom', 'valeur' => $v];
+    }
 }

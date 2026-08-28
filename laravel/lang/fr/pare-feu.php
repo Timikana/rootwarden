@@ -85,4 +85,21 @@ return [
     'copie_lignes_multiples' => 'Attention : :nb copies existent pour cette machine. La plus récente est affichée.',
     'copie_bloc_v4' => 'Copie IPv4',
     'copie_bloc_v6' => 'Copie IPv6',
+
+    // ── I3 : l'historique des versions archivées ────────────────────────
+    'histo_titre' => 'Versions archivées',
+    'histo_intro' => 'Chaque application de règles archive celles qu\'elle remplace. Une version vide n\'est jamais archivée : toutes celles listées ici sont restaurables.',
+    'histo_chargement' => 'Lecture de l\'historique…',
+    'histo_vide_titre' => 'Aucune version archivée',
+    'histo_vide' => 'Aucune application de règles n\'a encore eu lieu sur cette machine depuis ce portail. Il n\'y a donc rien à restaurer.',
+    'histo_echec_titre' => 'Historique illisible',
+    'histo_echec' => 'L\'historique n\'a pas pu être lu. Ce n\'est pas la même chose qu\'un historique vide : ne concluez pas qu\'il n\'y a rien à restaurer.',
+    'histo_tout' => ':nb version(s) archivée(s).',
+    'histo_tronque' => 'Les :affichees plus récentes, sur :total au total.',
+    'histo_col_date' => 'Archivée le',
+    'histo_col_auteur' => 'Par',
+    'histo_col_motif' => 'Motif',
+    'histo_auteur_inconnu' => 'Auteur non enregistré',
+    'histo_auteur_supprime' => 'Compte supprimé (n° :id)',
+    'histo_sans_motif' => 'Aucun motif indiqué',
 ];

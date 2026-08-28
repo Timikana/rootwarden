@@ -69,6 +69,10 @@ class PareFeuController extends Controller
             // I2
             'copie_absente', 'copie_le', 'copie_rien_a_enregistrer',
             'copie_lignes_multiples', 'copie_bloc_v4', 'copie_bloc_v6',
+            // I3
+            'histo_chargement', 'histo_vide_titre', 'histo_vide',
+            'histo_echec_titre', 'histo_echec', 'histo_tout', 'histo_tronque',
+            'histo_auteur_inconnu', 'histo_auteur_supprime', 'histo_sans_motif',
         ] as $cle) {
             $textes[$cle] = __('pare-feu.' . $cle);
         }
@@ -209,6 +213,59 @@ class PareFeuController extends Controller
         return response()->json([
             'success' => true,
             'message' => __('pare-feu.copie_enregistree', ['machine' => $machine->name]),
+        ]);
+    }
+
+
+    /**
+     * L'historique des versions archivees — sous-lot I3.
+     *
+     * ══ TROIS ISSUES, PAS UNE ════════════════════════════════════════════
+     *
+     * Le legacy replie tout sur un seul message : `if (!d.success || !d.history
+     * || d.history.length === 0)` rend « aucun historique » aussi bien quand la
+     * lecture a ECHOUE que quand il n'y a RIEN. Les deux appellent des gestes
+     * opposes — reessayer, ou ne rien attendre.
+     *
+     * Ici : un refus rend 403, une absence rend `success: true` avec
+     * `aucun_historique`, et une liste rend la liste ET son total.
+     */
+    public function historique(Request $requete): JsonResponse
+    {
+        $machine = $this->machineDeLaRequete($requete);
+        if ($machine === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pare-feu.machine_refusee'),
+            ], 403);
+        }
+
+        $lignes = $this->iptables->historique((int) $machine->id);
+        $total = $this->iptables->compteHistorique((int) $machine->id);
+
+        $versions = [];
+        foreach ($lignes as $l) {
+            $versions[] = [
+                'id'       => (int) $l->id,
+                'date'     => (string) ($l->created_at ?? ''),
+                'auteur'   => $this->iptables->auteurLisible($l->changed_by ?? null),
+                'motif'    => (string) ($l->change_reason ?? ''),
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'aucun_historique' => $total === 0,
+            'versions' => $versions,
+            /*
+             * LE TOTAL VOYAGE AVEC LA PAGE. La route du backend rend 20 lignes
+             * au plus SANS annoncer de total : un ecran ne peut alors pas
+             * distinguer « il y en a 20 » de « il y en a 200 et vous en voyez
+             * 20 ». C'est E-154, refermee sur `fail2ban` par F2 ; on ne la
+             * reproduit pas ici.
+             */
+            'total' => $total,
+            'affichees' => count($versions),
         ]);
     }
 
