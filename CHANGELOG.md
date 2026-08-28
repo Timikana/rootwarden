@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.57** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.58** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,64 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.58 — E-214 : un `|| true` rendait une branche de retour arriere litteralement inatteignable
+
+**Les trois temps sont dans UN commit, et c'est la qualification elle-meme qui l'impose** : *corriger le
+`|| true` sans verifier le retour arriere elargit un defaut existant au lieu de le fermer.*
+
+**1. Le `|| true`.** `systemctl reload sshd … || systemctl reload ssh … || true` rendait `code_r`
+**toujours nul**. La branche de retour arriere de l'etape 4 etait **du code mort**, et la fonction
+annoncait « AllowUsers patche » **meme si `sshd` n'avait jamais recharge**.
+
+**2. Le retour arriere mentait DEJA, sur deux chemins vivants.** Les trois branches faisaient `cp -a`
+— et parfois un rechargement — **en jetant les deux retours**, puis annoncaient « rollback effectue ».
+**Si la copie echouait, le fichier restait patche et l'appelant l'ignorait.** Les rollbacks des etapes
+2 et 3 portaient deja ce defaut **et sont vivants**. Ils passent desormais par `_restaure_sshd`, qui
+lit ses codes et dont le message **dit** que le fichier est reste modifie quand c'est le cas.
+
+**3. L'attestation se fait par l'EFFET.** `sshd -T` rend la configuration **effective, tous les
+`Include` resolus**, en lecture. C'est le seul controle honnete — et **il referme du meme coup une
+borne restee ouverte** : ce helper ne patche que la **premiere** ligne `AllowUsers`, or sur Debian
+recente `Include sshd_config.d/*.conf` est en tete du fichier. Si un `.conf` inclus porte un
+`AllowUsers`, **c'est lui qui gagne, et patcher le fichier principal est inerte meme apres un
+rechargement reussi**. `sshd -T` le voit ; le code de sortie du rechargement, non.
+
+**Le verdict est un CODE DE SORTIE, pas un texte** — rien a parser, donc rien qu'un echo de terminal
+puisse falsifier. `0` atteste, `4` `sshd -T` indisponible, `5` le compte n'apparait pas.
+
+**Mesure de l'attestation, sur le piege corrige le meme jour ailleurs :**
+
+| sortie `sshd -T` | verdict |
+|---|---|
+| `allowusers alice rootwarden bob` | **0 — atteste** |
+| `allowusers alice rootwarden-bis bob` | **5 — absent** ← pas de faux positif par sous-chaine |
+| `allowusers alice bob` | 5 — absent |
+| `AllowUsers` en majuscules | 0 — atteste (mot-cle insensible a la casse) |
+
+**Un troisieme etat, parce que deux ne suffisaient pas.** Le helper rend desormais
+`(modifie, atteste, message)` : le fichier peut avoir change **sans** que l'effet soit confirme. *Un
+etat que seule une phrase distingue n'est pas un etat.* Sur `4`, **on ne revient pas en arriere sur une
+modification valide** — on refuse seulement de la declarer effective.
+
+**Les deux appelants suivent l'effet :**
+
+- la route rendait `success: True` **quoi qu'ait dit le helper**, y compris apres un retour arriere.
+  Elle rend maintenant `success: atteste`, avec `modified` **et** `atteste` toujours presents — ils
+  peuvent diverger, et c'est justement ce qu'il faut pouvoir lire ;
+- l'auto-reparation interne **retentait la connexion sur `modified`**. Elle retente sur `atteste` : un
+  fichier patche dont `sshd -T` ne montre pas l'effet ne changera rien a l'essai suivant.
+
+**Et le temps qui manquait a la qualification est inscrit dans le code** : *le fichier, lui, EST
+patche.* Le changement prendra effet **au prochain redemarrage de sshd** — un reboot, une mise a jour
+de paquet. Ce n'est pas « rien ne s'est passe », c'est **« quelque chose arrivera plus tard, sans
+declencheur que personne ne puisse nommer »**.
+
+**Ce qui etait bien fait est conserve** : sauvegarde, patch `awk`, validation par `sshd -t`, retour
+arriere sur chaque echec. *C'etait une fonction prudente dont seule la derniere etape mentait.*
+
+**Rien n'a ete exerce sur une machine.** Syntaxe des scripts validee par `sh -n`, logique
+d'attestation rejouee sur cinq sorties. **Inerte jusqu'au redemarrage.**
 
 ### v1.38.57 — E-215 : la route faisait sans garde ce que sa voisine bloque et nomme « te locker hors du serveur »
 
