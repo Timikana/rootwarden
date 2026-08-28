@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.64** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.67** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,51 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.67 — ⚠ PREALABLE AU REDEMARRAGE : le backend ignorait les permissions temporaires
+
+**Symptome.** Les **deux** portails accordent l'acces sur une permission **temporaire** non expiree
+(`legacy/auth/functions.php:296`, `laravel/.../Droits.php:64`). Le backend ne lisait que la table
+`permissions` — les **permanentes seules**. Apres le redemarrage, un compte porteur d'un
+`can_manage_fail2ban` temporaire aurait **ouvert la page** et pris **403 sur ses 18 routes** : tous les
+boutons en echec, et rien a l'ecran pour l'expliquer.
+
+**⚠ Et cet ecart etait DEJA NOMME dans ce depot, la veille.** `routes/ssh.py`, sur le choix de garder
+`role(2)` plutot qu'une permission sur `/deploy` : *« un compte dont la permission est temporaire
+passerait la page et serait refuse ici »*. **Les 33 routes d'E-149 et E-152 ont reproduit exactement ce
+que ce commentaire refusait.** *Un piege ecrit noir sur blanc dans un fichier n'empeche pas de tomber
+dedans dans un autre.*
+
+**Correctif.** `get_current_user` charge les octrois temporaires non expires et les fusionne. **La
+regle est DERIVEE du legacy, pas reinventee** : un octroi temporaire **ajoute** un droit et n'en retire
+jamais, le filtre est `expires_at > NOW()`, et `machine_id` de cette table est **volontairement ignore
+parce que les portails l'ignorent**. *Le backend ne doit pas etre plus strict que la page qu'il sert —
+c'est tout l'objet du correctif, et l'y rendre plus strict sur un autre axe le manquerait.*
+
+**Le mode d'echec est delibere.** La requete a son **propre `try`**. Sans lui, une table absente ou une
+erreur SQL remonterait au `except` englobant qui rend `(0, 0)` : **un incident sur les permissions
+temporaires refuserait TOUTE authentification, y compris permanente.** Le repli retenu est l'ancien
+comportement — les temporaires ne comptent pas. *Degrader vers ce qu'on faisait hier vaut mieux que
+fermer la porte a tout le monde.*
+
+**Un droit temporaire employe se TRACE.** `require_permission` journalise quand c'est un octroi
+temporaire qui a decide : c'est une elevation bornee dans le temps, et **la seule facon de le savoir
+apres coup est de le dire au moment ou il passe**.
+
+**Deux docstrings qui se contredisaient, corrigees.** `require_permission` annoncait « les permissions
+sont transmises par le proxy PHP via `X-User-Permissions` » — **six lignes sous
+`get_user_permissions`, qui dit l'inverse et a raison** : les en-tetes ont ete abandonnes au
+durcissement A01-01 parce qu'ils permettaient de **forger** n'importe quel droit.
+
+**Et le commentaire de `ssh.py` est rectifie deux fois** : son mecanique etait deja faux quand il a ete
+ecrit (le backend lisait la table, pas les en-tetes — la conclusion tenait par un autre chemin), et
+**son objection est desormais sans objet**. On garde `role(2)`, mais parce que c'est la garde mesuree
+comme suffisante, plus parce qu'une permission casserait un chemin legitime. *Une trouvaille juste peut
+etre expliquee faux, et l'explication est ce qu'on reutilise* — celle-ci a servi d'argument pendant une
+journee entiere.
+
+**Porteur aujourd'hui : AUCUN.** `temporary_permissions` porte **0 ligne** (mesure). L'ecart est donc
+reparable **a froid** — mais c'est un **prealable** au redemarrage, pas un correctif d'apres.
 
 ### v1.38.66 — quatre issues et non trois : « rien reçu » et « reçu puis silence » sont deux pannes
 

@@ -199,6 +199,7 @@ def get_current_user():
     if user_id <= 0:
         g._rw_user_cache = (0, 0)
         g._rw_user_perms = {}
+        g._rw_user_perms_temp = set()
         return g._rw_user_cache
 
     try:
@@ -217,6 +218,7 @@ def get_current_user():
                 )
                 g._rw_user_cache = (0, 0)
                 g._rw_user_perms = {}
+                g._rw_user_perms_temp = set()
                 return g._rw_user_cache
             role_id = int(row.get('role_id') or 0)
 
@@ -226,8 +228,54 @@ def get_current_user():
             prow = cur.fetchone() or {}
             perms = {k: bool(v) for k, v in prow.items() if k != 'user_id'}
 
+            # ══ LES PERMISSIONS TEMPORAIRES, QUE LES DEUX PORTAILS ACCEPTENT ═
+            #
+            # `legacy/auth/functions.php:296` et `laravel/.../Droits.php:64`
+            # accordent l'acces si la permission PERMANENTE est absente mais
+            # qu'un octroi TEMPORAIRE non expire existe. Le backend ne lisait
+            # que la premiere table : une page s'ouvrait et chacun de ses
+            # boutons prenait 403, sans que rien a l'ecran ne l'explique.
+            #
+            # Cet ecart etait deja NOMME dans `routes/ssh.py` le 2026-08-27, sur
+            # le choix de garder `role(2)` plutot qu'une permission sur
+            # `/deploy` : « un compte dont la permission est temporaire
+            # passerait la page et serait refuse ici ». Les 33 routes d'E-149 et
+            # E-152 ont reproduit exactement ce que ce commentaire refusait.
+            #
+            # LA REGLE EST DERIVEE DU LEGACY, PAS REINVENTEE : un octroi
+            # temporaire AJOUTE un droit, il n'en retire jamais, et le filtre
+            # est `expires_at > NOW()` — la meme borne, evaluee par la meme base.
+            # `machine_id` de cette table est volontairement IGNORE ici, parce
+            # que les portails l'ignorent : le backend ne doit pas etre plus
+            # strict que la page qu'il sert, c'est tout l'objet du correctif.
+            #
+            # ══ ET SON MODE D'ECHEC EST DELIBERE ════════════════════════════
+            #
+            # Cette requete a son PROPRE `try`. Sans lui, une table absente ou
+            # une erreur SQL remonterait au `except` englobant, qui rend
+            # `(0, 0)` — c'est-a-dire qu'un incident sur les permissions
+            # TEMPORAIRES refuserait TOUTE authentification, y compris
+            # permanente. Le repli retenu est l'ancien comportement : les
+            # temporaires ne comptent pas. Degrader vers ce qu'on faisait hier
+            # vaut mieux que fermer la porte a tout le monde.
+            temporaires = set()
+            try:
+                cur.execute(
+                    "SELECT permission FROM temporary_permissions "
+                    "WHERE user_id = %s AND expires_at > NOW()", (user_id,))
+                for trow in cur.fetchall() or []:
+                    nom = trow.get('permission')
+                    if nom:
+                        perms[nom] = True      # ajoute seulement, ne retire jamais
+                        temporaires.add(nom)
+            except Exception as e:
+                logger.warning("get_current_user: permissions temporaires illisibles "
+                               "pour user_id=%d (%s) - seules les permanentes comptent",
+                               user_id, e)
+
             g._rw_user_cache = (user_id, role_id)
             g._rw_user_perms = perms
+            g._rw_user_perms_temp = temporaires
             return g._rw_user_cache
         finally:
             conn.close()
@@ -235,6 +283,7 @@ def get_current_user():
         logger.error("get_current_user: erreur DB pour user_id=%d : %s", user_id, e)
         g._rw_user_cache = (0, 0)
         g._rw_user_perms = {}
+        g._rw_user_perms_temp = set()
         return g._rw_user_cache
 
 
@@ -270,8 +319,17 @@ def get_user_permissions():
 
 def require_permission(permission):
     """Decorateur : verifie que l'utilisateur possede la permission specifique.
-    Les permissions sont transmises par le proxy PHP via X-User-Permissions (JSON).
-    Superadmin (role_id >= 3) bypass la verification."""
+
+    Superadmin (role_id >= 3) court-circuite la verification.
+
+    ⚠ La phrase precedente disait « les permissions sont transmises par le proxy
+    PHP via X-User-Permissions (JSON) ». C'ETAIT PERIME, et cette docstring
+    contredisait celle de `get_user_permissions`, six lignes plus haut, qui dit
+    juste : les en-tetes ont ete abandonnes au durcissement A01-01 parce qu'ils
+    permettaient de FORGER n'importe quel droit. La source est la base.
+
+    La verification couvre les permissions PERMANENTES et les TEMPORAIRES non
+    expirees, comme les deux portails (`get_current_user`)."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -286,6 +344,13 @@ def require_permission(permission):
                     permission, user_id, role_id, request.path, request.remote_addr
                 )
                 return jsonify({'success': False, 'message': 'Permission insuffisante'}), 403
+            # Un droit accorde par un octroi TEMPORAIRE se trace : c'est une
+            # elevation bornee dans le temps, et la seule facon de savoir apres
+            # coup qu'un geste l'a employee est de le dire au moment ou il passe.
+            from flask import g as _g
+            if permission in (getattr(_g, '_rw_user_perms_temp', None) or set()):
+                logger.info("Permission TEMPORAIRE employee (%s) par user_id=%d "
+                            "role=%d sur %s", permission, user_id, role_id, request.path)
             return func(*args, **kwargs)
         return wrapper
     return decorator

@@ -421,14 +421,31 @@ def deploy():
 
     ══ POURQUOI `role(2)` ET PAS `@require_permission('can_deploy_keys')` ═══
 
-    La permission serait le miroir exact de la page — et elle CASSERAIT un
-    chemin legitime. La page accepte les permissions TEMPORAIRES
-    (`checkPermissionFromDB` interroge `temporary_permissions`), tandis que le
-    backend lit `X-User-Permissions`, que la passerelle remplit depuis la
-    session, c'est-a-dire les PERMANENTES seules. Un compte dont la permission
-    est temporaire passerait la page et serait refuse ici.
+    La permission serait le miroir exact de la page. `role(2)` ferme l'ecart
+    mesure, et il le fait sans dependre d'une colonne de permission.
 
-    `role(2)` ferme l'ecart mesure sans rencontrer ce probleme.
+    ⚠ CE PARAGRAPHE PORTAIT UNE OBJECTION QUI N'EST PLUS VRAIE, ET DONT LE
+    MECANISME ETAIT DEJA FAUX QUAND ELLE A ETE ECRITE.
+
+    Il disait : « la page accepte les permissions TEMPORAIRES, tandis que le
+    backend lit `X-User-Permissions` — les PERMANENTES seules. Un compte dont la
+    permission est temporaire passerait la page et serait refuse ici. »
+
+    Deux corrections :
+
+    1. le backend ne lisait DEJA plus les en-tetes au moment ou c'etait ecrit —
+       le durcissement A01-01 les avait abandonnes parce qu'ils permettaient de
+       FORGER un droit. Il lisait la table `permissions`. La conclusion tenait
+       quand meme, par un autre chemin : cette table ne porte que le permanent ;
+    2. l'ecart LUI-MEME est ferme depuis le 2026-08-28 :
+       `helpers.get_current_user` charge desormais les octrois temporaires non
+       expires, comme les deux portails. **L'objection est sans objet.**
+
+    On garde `role(2)` — mais parce que c'est la garde mesuree comme suffisante,
+    plus parce qu'une permission casserait un chemin legitime.
+
+    *Une trouvaille juste peut etre expliquee faux, et l'explication est ce qu'on
+    reutilise* : celle-ci a servi d'argument pendant une journee entiere.
 
     ══ CE QUE CELA RETIRE : RIEN, ET C'EST MESURE ═══════════════════════════
 
