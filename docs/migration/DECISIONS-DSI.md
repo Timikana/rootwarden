@@ -78,6 +78,26 @@ proposait de bien est repris ici sans son coût : un compte qui ne voit qu'une m
 forme retenue : *« 1 de vos machines · 3 au parc »*. Un nombre qui décrit un ensemble qu'on ne peut pas
 détailler n'est pas une fuite ; un nombre présenté comme le total de ce qu'on voit, si.
 
+> **⚠ DEUX RAFFINEMENTS QUE MA BORNE NE DISAIT PAS, imposés par la mesure de la session 3 au portage
+> (2026-08-28, `572316c`). Ils sont adoptés :**
+>
+> 1. **la réserve ne s'affiche QUE si la borne mord.** Un rôle ≥ 2 voit le parc entier : lui montrer
+>    « vous ne voyez que vos machines » serait une **réserve sans objet**, et *une réserve sans objet
+>    devient un décor qu'on ne lit plus* — donc elle affaiblit celles qui en ont un. Le second nombre
+>    disparaît avec elle : « 3 · 3 » n'apprend rien ;
+> 2. **une base injoignable n'est pas un parc vide.** Ma forme suppose **deux nombres lisibles**. Sur un
+>    échec de lecture, rendre `0 · 0` se lirait comme un **fait** : l'écran doit **dire** qu'il n'a pas
+>    su lire. C'est exactement le défaut d'E-217 pris par l'autre bout — *« je ne sais pas » déguisé en
+>    « c'est vrai »*.
+>
+> **La seconde est celle que j'aurais dû écrire moi-même** : j'ai passé la matinée à mesurer que
+> `[].every()` est vrai sur l'ensemble vide et qu'une énumération vide satisfait toute propriété
+> universelle, **et j'ai proposé une forme d'affichage qui prend un zéro pour une mesure.**
+>
+> **Et le bornage lui-même est REPRIS, pas réécrit** — le prédicat vient de `pourMisesAJour`,
+> `Iptables::machines` et `Fail2ban::machines`. *Trois implémentations d'une même règle finiraient par
+> diverger* : c'est la règle du chantier appliquée au moment où elle coûte le moins.
+
 **Et les douze tuiles de raccourci ne dépendent pas de cet arbitrage** — elles reprennent les gardes du
 menu. Elles se posent sans attendre quoi que ce soit de ce document.
 

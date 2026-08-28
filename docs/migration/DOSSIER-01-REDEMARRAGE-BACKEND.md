@@ -7,12 +7,36 @@ UTC. C'est le dossier le plus urgent : **six autres décisions n'ont d'effet qu'
 
 ## 1. Recommandation
 
-**Redémarrer — mais pas aujourd'hui en l'état.** Deux préalables, et un seul est bloquant.
+> ## ✅ RÉVISION DU 2026-08-28, 08:03 UTC — LE PRÉALABLE BLOQUANT EST LEVÉ
+>
+> Ce dossier a été écrit à 06:55 UTC avec **un** préalable bloquant : la divergence
+> `temporary_permissions`. **Elle a été fermée à 07:59 UTC** — `72b0518`, commité, mesuré par moi :
+>
+>     helpers.py:264   SELECT permission FROM temporary_permissions WHERE user_id = %s AND expires_at > NOW()
+>     :269             perms[nom] = True      # ajoute seulement, ne retire jamais
+>     git status -- backend/routes/helpers.py   ->  vide (commite)
+>
+> **Le backend lit désormais la troisième source, comme les deux portails.** Il ne reste donc **aucun
+> préalable bloquant** : la recommandation devient *redémarrer*, sous les seuls contrôles du §3.
+>
+> **Et deux sessions me l'ont annoncé en se contredisant** — l'une disant « le trou existe », l'autre
+> « le remède n'est pas protégé ». **Les deux étaient vraies à leur instant et périmées au mien.**
+> *Combinées telles quelles, elles auraient produit une exposition doublement fausse.* C'est ce qui a
+> fait remesurer plutôt que relayer.
+
+**Redémarrer.** Un seul préalable subsiste, et c'est une vérification, pas un travail.
 
 | # | préalable | pourquoi | bloquant ? |
 |---|---|---|---|
-| 1 | **fermer la divergence `temporary_permissions`** | 33 routes vont exiger une permission que les deux pages accordent depuis une table que le backend ne lit pas | **oui** |
-| 2 | contrôler l'**arbre de travail** à l'instant du geste | un redémarrage publie l'arbre, pas l'historique | oui, mais c'est une vérification, pas un travail |
+| ~~1~~ | ~~fermer la divergence `temporary_permissions`~~ | **FAIT** — `72b0518`, 2026-08-28 07:59 UTC | levé |
+| 2 | contrôler l'**arbre de travail** à l'instant du geste | un redémarrage publie l'arbre, pas l'historique | oui, mais c'est une vérification |
+
+**Un résiduel, non bloquant et qui doit être dit** : le repli du correctif, **sur erreur SQL**, dégrade
+vers « les temporaires ne comptent pas » et journalise un avertissement. Le porteur perd alors son accès
+**pendant l'incident**, et son 403 ne distingue pas *« vous ne l'avez pas »* de *« je n'ai pas pu lire
+si vous l'aviez »* — **un refus d'accès déguisé en incapacité de lecture**, la classe exacte d'E-217.
+*C'est un cas d'incident, pas un cas nominal*, et le repli qui n'ajoute jamais est le bon choix par
+défaut : il ne peut pas accorder à tort.
 
 **Ce que je n'ai PAS retenu, et il faut le dire** : *accorder les quatre permissions avant de
 redémarrer.* C'était la tâche annoncée. **Mesuré, elle n'a pas d'objet** — voir `DECISIONS-DSI.md` §2 :
