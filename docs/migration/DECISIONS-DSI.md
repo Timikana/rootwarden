@@ -852,3 +852,54 @@ formulation, elle, change :
 blanche qui autorise par préfixe n'est pas une liste blanche, c'est une liste de FAMILLES* — personne ne
 peut dire de mémoire ce qu'elle contient, et la prochaine route Python nommée `/searchall` entrerait
 sans décision. **Mesurable, non resserré, raison écrite.**
+
+---
+
+## 10 — E-237 : `/wazuh/uninstall` — **nommer l'état avant de choisir sa valeur**
+
+**Décidée le 2026-08-28, 14:15 UTC.** Assignée par le Lead, qui note que c'est la même forme que
+`sudoers_orphelin` — et il a raison, c'est ce qui la rend courte.
+
+### Le constat
+
+Le verdict d'`uninstall` a été corrigé (il ne peut plus annoncer une réussite sur un paquet resté
+installé, `wazuh.py:808-812`, `exit 7`). **L'état persisté, lui, est laissé.** Et le correctif évident
+est faux **dans les deux sens** :
+
+| ce qu'on écrirait | pourquoi c'est faux |
+|---|---|
+| « désinstallé » | le paquet est peut-être resté (famille RHEL/SUSE, `apt-get purge` absent) |
+| « installé » | `/var/ossec` a été détruit — l'agent ne fonctionne plus, quoi qu'en dise le paquet |
+
+> **Aucune des deux écritures n'est juste, parce que le vocabulaire n'a pas de mot pour « partiellement
+> désinstallé ».** *Choisir une valeur avant d'avoir un mot pour l'état, c'est écrire une valeur fausse
+> dans les deux sens.*
+
+### La décision : un état NOMMÉ, et le drapeau cesse d'être binaire
+
+**Même remède que `sudoers_orphelin`, et pour la même raison** — *un nom porte la raison, un booléen
+porte une couleur* :
+
+    reponse de /wazuh/uninstall :  desinstalle_partiel: true   (paquet subsistant, donnees detruites)
+    et l etat persiste porte le MEME nom, pas un booleen retourne
+
+**Trois conditions, celles du chantier, et la troisième est celle qu'on oublie :**
+
+1. **le backend RENSEIGNE le drapeau, il n'OMET pas un champ** — présent même à `false`. Si
+   l'information est portée par l'absence, l'écran ne peut pas la distinguer de « rien à dire » ;
+2. **l'écran AFFICHE le motif**, pas une infobulle : l'exploitant doit pouvoir distinguer « le paquet est
+   resté » de « je n'ai pas su lire » ;
+3. **l'objet sort des comptages qui appellent une décision** — une machine « partiellement
+   désinstallée » ne doit pas gonfler ni le compte des installées ni celui des désinstallées. *Mais elle
+   doit rester dans le compteur qui appelle un travail*, parce que ce nombre-là **demande** une action au
+   lieu d'en interdire une.
+
+### Pourquoi c'est délégué
+
+**Aucune écriture distante nouvelle.** Le geste fait déjà ce qu'il fait ; on nomme ce qu'il laisse. *La
+moitié qui écrirait sur des machines réelles — rendre `uninstall` multi-famille — reste au `DOSSIER-04`*,
+et cette décision ne la précède ni ne la remplace : **elle rend son absence visible**, ce qui est
+exactement ce que la colonne fait pour l'auto-réparation du sudoers.
+
+**Porteur mesuré : aucun.** `wazuh_agents` porte **0 ligne** — le module n'a jamais servi. *Écrire un nom
+d'état quand aucune machine ne l'occupe est la seule fenêtre où se tromper ne coûte rien.*
