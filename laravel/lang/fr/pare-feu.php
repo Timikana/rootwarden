@@ -102,4 +102,21 @@ return [
     'histo_auteur_inconnu' => 'Auteur non enregistré',
     'histo_auteur_supprime' => 'Compte supprimé (n° :id)',
     'histo_sans_motif' => 'Aucun motif indiqué',
+
+    // ── I4 : la validation à blanc ──────────────────────────────────────
+    'valid_titre' => 'Validation à blanc',
+    'valid_intro' => 'Le serveur peut vérifier qu\'un jeu de règles est syntaxiquement applicable, sans l\'appliquer.',
+    'valid_bouton' => 'Valider la copie à blanc',
+    'valid_avant' => 'Ce contrôle OUVRE une session SSH sur la machine et y écrit un fichier temporaire. Il ne modifie aucune table du pare-feu.',
+    'valid_limite' => 'La validation ne porte QUE sur les règles IPv4. Une copie dont l\'IPv6 est mal formé passerait ce contrôle et échouerait à l\'application.',
+    'valid_v4_vide' => 'Cette copie ne porte aucune règle IPv4. Il n\'y a rien à valider : la validation ne connaît que l\'IPv4, et refuse une copie vide.',
+    'valid_sans_copie' => 'Chargez d\'abord la copie en base : c\'est elle qui est validée.',
+    'valid_en_cours' => 'Validation en cours sur la machine…',
+    'valid_ok' => 'Le serveur déclare ces règles applicables.',
+    'valid_invalide_court' => 'Le serveur declare ces regles invalides — verdict a relire ci-dessous.',
+    'valid_invalide_titre' => 'Déclarées invalides — verdict à relire',
+    'valid_invalide' => 'Le serveur déclare ces règles invalides. Ce verdict N\'EST PAS FIABLE sur une sortie longue : la détection du code de sortie le cherche dans des fragments de 4096 octets, et un jeu de règles VALIDE peut être déclaré invalide lorsque le marqueur tombe à cheval. Lisez la sortie avant de conclure.',
+    'valid_echec_titre' => 'Contrôle non abouti',
+    'valid_echec' => 'Le contrôle n\'a pas abouti. Ce n\'est ni « valide » ni « invalide » : rien n\'a été vérifié.',
+    'valid_sortie' => 'Sortie du serveur',
 ];

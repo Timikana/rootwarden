@@ -73,6 +73,10 @@ class PareFeuController extends Controller
             'histo_chargement', 'histo_vide_titre', 'histo_vide',
             'histo_echec_titre', 'histo_echec', 'histo_tout', 'histo_tronque',
             'histo_auteur_inconnu', 'histo_auteur_supprime', 'histo_sans_motif',
+            // I4
+            'valid_sans_copie', 'valid_v4_vide', 'valid_en_cours', 'valid_ok',
+            'valid_invalide_titre', 'valid_invalide', 'valid_invalide_court',
+            'valid_echec_titre', 'valid_echec', 'valid_sortie',
         ] as $cle) {
             $textes[$cle] = __('pare-feu.' . $cle);
         }

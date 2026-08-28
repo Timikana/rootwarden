@@ -125,6 +125,36 @@
 </div>
 
 {{--
+    ══ I4 : LA VALIDATION A BLANC ═══════════════════════════════════════════
+
+    Elle porte sur LA COPIE EN BASE, et c'est la chaine coherente : I2
+    enregistre, I4 valide ce qui est enregistre, I5 appliquera la meme chose.
+    Le legacy validait le contenu d'une zone d'edition ; le portage n'en offre
+    pas, donc il valide l'objet qui existe.
+
+    CE GESTE JOINT LA MACHINE. C'est le seul de I1 a I4 dans ce cas : il ouvre
+    une session SSH et ecrit dans `/tmp`. Il ne modifie aucune table — mais
+    « ne modifie rien » n'est pas « ne fait rien », et l'ecran le dit AVANT.
+--}}
+<div class="rw-section" data-rw="ipt-valid" hidden>
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.valid_titre') }}</p>
+    <p class="rw-aide rw-prose">{{ __('pare-feu.valid_intro') }}</p>
+
+    {{-- Les deux faits AVANT le geste : ce qu'il touche, et ce qu'il ne couvre pas. --}}
+    <p class="rw-aide">{{ __('pare-feu.valid_avant') }}</p>
+    <p class="rw-aide">{{ __('pare-feu.valid_limite') }}</p>
+
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton" data-rw="ipt-valid-lancer" disabled>
+            {{ __('pare-feu.valid_bouton') }}
+        </button>
+    </div>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-valid-annonce"></p>
+    <div data-rw="ipt-valid-etat"></div>
+</div>
+
+{{--
     ══ I3 : L'HISTORIQUE DES VERSIONS ARCHIVEES ═════════════════════════════
 
     Il se charge au CHOIX de la machine, PAS apres un releve reussi. Le legacy

@@ -61,6 +61,12 @@
     var annonceCopie  = document.querySelector('[data-rw="ipt-copie-annonce"]');
     var blocsCopie    = document.querySelector('[data-rw="ipt-copie-blocs"]');
 
+    // I4 — meme raison.
+    var sectionValid   = document.querySelector('[data-rw="ipt-valid"]');
+    var boutonValid    = document.querySelector('[data-rw="ipt-valid-lancer"]');
+    var annonceValid   = document.querySelector('[data-rw="ipt-valid-annonce"]');
+    var etatValidZone  = document.querySelector('[data-rw="ipt-valid-etat"]');
+
     // I3 — declares ici pour la meme raison que ceux d'I2.
     var sectionHisto   = document.querySelector('[data-rw="ipt-histo"]');
     var annonceHisto   = document.querySelector('[data-rw="ipt-histo-annonce"]');
@@ -76,6 +82,16 @@
      * lit donc AVANT le geste, au lieu d'etre un refus apres le clic.
      */
     var dernierReleve = null;
+
+    /*
+     * CE QUE LA DERNIERE LECTURE DE LA COPIE A RENDU — l'objet que I4 valide.
+     *
+     * Distinct de `dernierReleve` a dessein : le releve vient de LA MACHINE, la
+     * copie vient de LA BASE, et les deux peuvent differer — c'est meme la
+     * situation que ce module existe pour rendre visible. Valider le releve
+     * reviendrait a demander a la machine de se valider elle-meme.
+     */
+    var derniereCopie = null;
 
     if (!selecteur || !bouton || !blocs) { return; }
 
@@ -160,6 +176,14 @@
         if (etatHistoZone) { etatHistoZone.replaceChildren(); }
         annonceHistoDire('');
         if (id) { chargeHistorique(); }
+        // I4 : la validation porte sur la copie de CETTE machine. Changer de
+        // cible la perime — comme `dernierReleve` plus haut, et pour la meme
+        // raison (E-162 : enregistrer sous une machine ce qui vient d'une autre).
+        derniereCopie = null;
+        if (sectionValid) { sectionValid.hidden = !id; }
+        if (boutonValid) { boutonValid.disabled = true; }
+        if (etatValidZone) { etatValidZone.replaceChildren(); }
+        annonceValidDire('');
 
         if (!id || !opt) {
             bouton.disabled = true;
@@ -372,6 +396,16 @@
             boutonCharger.disabled = false;
             boutonCharger.textContent = repos;
 
+            /*
+             * TOUTE SORTIE QUI N'EST PAS UNE COPIE LUE PERIME `derniereCopie`.
+             *
+             * Sans ces deux lignes, un chargement en echec laisserait en place
+             * la copie de l'appel PRECEDENT et le bouton de validation resterait
+             * actif : on validerait un objet que l'ecran ne montre plus.
+             */
+            derniereCopie = null;
+            if (boutonValid) { boutonValid.disabled = true; }
+
             if (r.statut === 0) { annonceCopieDire(t('echec_reseau'), 'echec'); return; }
             if (!r.ok || r.corps.success !== true) {
                 // `aucune_copie` n'est PAS un echec : c'est un etat normal, et il
@@ -381,6 +415,23 @@
                 annonceCopieDire(String(r.corps.message || t('echec')),
                                  r.corps.aucune_copie ? '' : 'echec');
                 return;
+            }
+
+            derniereCopie = r.corps;
+            /*
+             * LE BOUTON DE VALIDATION SUIT LE CONTENU, PAS LA PRESENCE.
+             *
+             * `/iptables-validate` refuse une copie dont `rules_v4` est vide
+             * (400, « Regles IPv4 vides. »). Une copie ecrite par le legacy
+             * peut l'etre : c'est le portage qui interdit d'en enregistrer une,
+             * pas la table. Plutot que d'envoyer une requete qu'on sait
+             * refusee, la regle se lit ICI — et AVEC SA RAISON : un bouton
+             * desactive sans explication est le defaut qu'on repare ailleurs.
+             */
+            if (boutonValid) {
+                var aDuV4 = String(r.corps.rules_v4 || '').trim() !== '';
+                boutonValid.disabled = !aDuV4;
+                if (!aDuV4) { annonceValidDire(t('valid_v4_vide'), 'attention'); }
             }
 
             blocsCopie.replaceChildren();
@@ -428,6 +479,16 @@
         }).then(function (r) {
             boutonEnreg.disabled = false;
             boutonEnreg.textContent = repos;
+
+            /*
+             * TOUTE SORTIE QUI N'EST PAS UNE COPIE LUE PERIME `derniereCopie`.
+             *
+             * Sans ces deux lignes, un chargement en echec laisserait en place
+             * la copie de l'appel PRECEDENT et le bouton de validation resterait
+             * actif : on validerait un objet que l'ecran ne montre plus.
+             */
+            derniereCopie = null;
+            if (boutonValid) { boutonValid.disabled = true; }
 
             if (r.statut === 0) { annonceCopieDire(t('echec_reseau'), 'echec'); return; }
             if (!r.ok || r.corps.success !== true) {
@@ -541,6 +602,160 @@
                     : t('histo_tout', { nb: total }));
         });
     }
+
+
+    // ════════════════════════════════════════════════════════════════════
+    //  SOUS-LOT I4 — LA VALIDATION A BLANC
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // ══ CE QUE CE GESTE TOUCHE ══════════════════════════════════════════
+    //
+    // C'est le PREMIER geste du portage de ce module qui joint une machine
+    // pour y ECRIRE : il ouvre une session SSH, depose `/tmp/_ipt_test.rules`
+    // et lance `iptables-restore --test` dessus. Aucune table du pare-feu
+    // n'est modifiee — mais « ne modifie rien » n'est pas « ne fait rien »,
+    // et l'ecran l'annonce AVANT le clic, pas dans le compte rendu.
+    //
+    // La passerelle ne protege PAS ce chemin en particulier : `/iptables-`
+    // est une entree a PREFIXE dans la liste blanche (dernier caractere `-`
+    // => `str_starts_with`), donc le meme prefixe ouvre `/iptables-validate`,
+    // `/iptables-apply` et `/iptables-rollback` sans les distinguer. Ce qui
+    // tient ici, ce sont la garde du backend (`can_manage_iptables` +
+    // `require_machine_access`) et le fait que ce script ne compose aucune
+    // autre requete. La fermeture reste PAR L'ABSENCE, comme en I1.
+    //
+    // ══ CE QU'ON VALIDE : LA COPIE, PAS LE RELEVE ═══════════════════════
+    //
+    // Le legacy valide le contenu de sa zone d'edition. Le portage n'en offre
+    // pas — c'est justement sa fermeture — alors il valide l'objet qui existe :
+    // la copie en base. La chaine devient lisible : I2 enregistre, I4 valide
+    // ce qui est enregistre, et un futur I5 appliquerait le meme objet.
+    //
+    // Valider `dernierReleve` reviendrait a demander a la machine de valider
+    // ce qu'elle vient elle-meme de rendre.
+    //
+    // ══ TROIS ISSUES, ET LA TROISIEME PORTE UN DOUTE ════════════════════
+    //
+    // `/iptables-validate` rend `success: false` pour QUATRE situations : des
+    // identifiants irresolus (400), des regles vides (400), une erreur interne
+    // (500), et « erreur de syntaxe » (200). Se fier a `success` seul
+    // confondrait « vos regles sont invalides » avec « je n'ai rien pu
+    // verifier » — deux verdicts qui appellent des gestes opposes : corriger
+    // les regles, ou reessayer.
+    //
+    // Le discriminant est donc le STATUT : seul un 200 porte un verdict sur
+    // les regles. Tout le reste est un contrôle qui n'a pas abouti, et l'ecran
+    // le dit ainsi.
+    //
+    // Et ce verdict de 200 lui-meme n'est pas sur. Le backend le calcule par
+    //     exit_code = 0 if any('EXIT_CODE=0' in l for l in output_lines) else 1
+    // sur des fragments de 4096 octets rendus par `execute_as_root_stream`.
+    // Un marqueur `EXIT_CODE=0` a cheval sur deux fragments n'est retrouve
+    // dans AUCUN des deux, et un jeu de regles VALIDE est alors declare
+    // invalide. Le portage ne repare pas le backend : il cesse de presenter
+    // cette incertitude comme un verdict, et le dit a qui lit l'ecran.
+    //
+    // ══ CE QUE LA VALIDATION NE COUVRE PAS ══════════════════════════════
+    //
+    // `rules_v6` n'est ni envoye ni lu : la route ne connait que `rules_v4`.
+    // Une copie dont l'IPv6 est mal forme passe ce controle et echoue a
+    // l'application. C'est ecrit sur la page, avant le geste.
+
+    function annonceValidDire(texte, variante) {
+        if (!annonceValid) { return; }
+        annonceValid.textContent = texte || '';
+        annonceValid.className = 'rw-annonce' + (variante ? ' rw-annonce--' + variante : '');
+    }
+
+    /** Le bloc de detail : un etat nomme, puis la sortie brute si elle existe. */
+    function detailValid(titre, texte, sortie) {
+        if (!etatValidZone) { return; }
+        etatValidZone.replaceChildren();
+        if (titre) { etatValidZone.appendChild(etatVide(titre, texte)); }
+
+        var brut = String(sortie == null ? '' : sortie);
+        if (brut.trim() === '') { return; }
+
+        var h = document.createElement('p');
+        h.className = 'rw-sous-titre-fort';
+        h.textContent = t('valid_sortie');
+
+        /*
+         * `textContent`, jamais d'interpolation : cette sortie vient d'un
+         * pseudo-terminal distant, qui ECHOTE la commande envoyee. Meme regle
+         * que `blocDeTexte`, et pour la meme raison.
+         */
+        var pre = document.createElement('pre');
+        pre.className = 'rw-fichier';
+        pre.textContent = brut;
+
+        etatValidZone.append(h, pre);
+    }
+
+    function valideAblanc() {
+        var id = selecteur.value;
+        if (!id) { annonceValidDire(t('aucune_machine_choisie'), 'echec'); return; }
+        // La regle se lit avant le geste — le bouton naît desactive — mais on la
+        // tient aussi ici : l'etat d'un bouton n'est pas une garde.
+        if (!derniereCopie) { annonceValidDire(t('valid_sans_copie'), 'echec'); return; }
+        var v4 = String(derniereCopie.rules_v4 || '');
+        if (v4.trim() === '') { annonceValidDire(t('valid_v4_vide'), 'attention'); return; }
+
+        var repos = boutonValid.textContent;
+        boutonValid.disabled = true;
+        boutonValid.textContent = t('valid_en_cours');
+        annonceValidDire(t('valid_en_cours'));
+        if (etatValidZone) { etatValidZone.replaceChildren(); }
+
+        appelle('/iptables-validate', {
+            machine_id: Number(id),
+            rules_v4: v4
+        }).then(function (r) {
+            // Rendu dans le meme bloc synchrone que le verdict, comme le releve.
+            boutonValid.disabled = false;
+            boutonValid.textContent = repos;
+
+            var corps = r.corps || {};
+
+            // 1. La requete n'est pas partie. Ni valide, ni invalide : rien n'a
+            //    ete verifie, et rien n'a ete touche sur la machine.
+            if (r.statut === 0) {
+                annonceValidDire(t('echec_reseau'), 'echec');
+                detailValid(t('valid_echec_titre'), t('valid_echec'), '');
+                return;
+            }
+
+            // 2. Elle est partie et n'a pas rendu 200 : refus, regles vides,
+            //    identifiants irresolus, erreur interne. Toujours pas un verdict
+            //    sur les regles — on ne l'affiche donc pas comme tel.
+            if (r.statut !== 200) {
+                annonceValidDire(String(corps.message || t('echec')), 'echec');
+                detailValid(t('valid_echec_titre'), t('valid_echec'), corps.output);
+                return;
+            }
+
+            // 3. Un verdict, enfin — et le seul cas ou `success` veut dire
+            //    quelque chose sur les regles.
+            if (corps.success === true) {
+                annonceValidDire(t('valid_ok'), 'ok');
+                detailValid('', '', corps.output);
+                return;
+            }
+
+            /*
+             * 4. DECLAREES INVALIDES — en `attention`, pas en `echec`.
+             *
+             * La nuance n'est pas cosmetique : la detection du code de sortie
+             * est faillible sur une sortie longue (voir l'en-tete). Peindre en
+             * rouge un verdict qui peut etre faux ferait corriger des regles
+             * saines. L'ecran affiche la sortie et dit de la lire.
+             */
+            annonceValidDire(t('valid_invalide_court'), 'attention');
+            detailValid(t('valid_invalide_titre'), t('valid_invalide'), corps.output);
+        });
+    }
+
+    if (boutonValid) { boutonValid.addEventListener('click', valideAblanc); }
 
     surChoix();
 }());
