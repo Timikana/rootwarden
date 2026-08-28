@@ -2171,6 +2171,48 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.93 — les catalogues `wazuh`, portés avant la page pour que rien ne s'affiche en clair
+
+Premier morceau du portage `wazuh`. **La page suit ; ce commit ne pose que les catalogues**, et c'est
+délibéré : la clé `status_unknown` devait exister **avant** la première capture, pas après.
+
+#### Ce que le Lead craignait n'avait pas lieu d'être — et la mesure le dit
+
+Il m'a signalé qu'aucun `laravel/lang/{fr,en}/wazuh.php` n'existait, que le DSI avait adopté `unknown`
+comme statut (E-237), et qu'il fallait créer la clé sous peine de voir son identifiant à l'écran —
+*quatrième occurrence du motif, et la seule évitable avant la première capture.*
+
+**Mesuré : `wazuh.status_unknown` existait déjà dans le legacy**, ligne 47 des **deux** catalogues,
+`'Inconnu'` / `'Unknown'`. Le statut que le DSI a adopté n'a donc rien à inventer — il suffisait de
+porter fidèlement. *Une clé qu'on croit manquante et qui existe se crée en double si on ne regarde
+pas.*
+
+#### Les 76 clés, portées et non recopiées à la main
+
+    legacy/lang/fr/wazuh.php   76 cles
+    legacy/lang/en/wazuh.php   76 cles
+    employees par la page + son JS : 71
+
+Transformation mécanique, avec **une** modification de forme : le préfixe `wazuh.` est **retiré**.
+Laravel nomme par fichier, donc `__('wazuh.title')` résout `title` dans ce fichier — le garder aurait
+donné `wazuh.wazuh.title`, c'est-à-dire une clé morte sur chacune des 76.
+
+**Vérifié après pose** : lint des deux fichiers, **76 = 76**, jeux de clés identiques,
+`status_unknown` présent des deux côtés, et **aucune clé ne conserve le préfixe**.
+
+#### Pourquoi les catalogues avant la page
+
+Le portage de `wazuh` demande six panneaux de décision — cinq `confirm()` et un `prompt()` dans
+`legacy/wazuh/js/wazuh.js` — sur des gestes qui écrivent. C'est la même situation que `services`, et
+elle est plus longue que les catalogues. Les poser d'abord évite qu'ils soient perdus si le lot est
+interrompu, et donne à la page une base vérifiée au lieu d'un catalogue écrit en même temps que ce qui
+le consomme.
+
+**Cinq clés seront donc déclarées et non employées jusqu'au commit de la page.** C'est dit ici pour
+qu'un croisement clés-employées / clés-déclarées ne le lise pas comme un défaut.
+
+---
+
 ### v1.38.92 — E-241 : j'avais inscrit « la page est mesuree saine », c'est une REGRESSION REELLE
 
 **La session 7 renverse son propre verdict, et ma note portait le mauvais.** `go-page-graylog-g1`
