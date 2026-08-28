@@ -40,6 +40,7 @@ vérification omise ne se corrige qu'en refaisant le geste, et rien ne signale s
 | **9** | E-233 — le proxy legacy autorise par préfixe | **ne rien resserrer** ; le portage l'a déjà fait, mesuré | rien : surface d'accident **nulle**, et le défaut meurt avec le legacy |
 | **10** | E-237 — l'état persisté d'`uninstall` Wazuh | **lire `code_v`, écrire `unknown`** — ⚠ ma 1re version demandait une migration, retirée | rien : la valeur est déjà au schéma et déjà rendue |
 | — | E-234 — porter la console d'API du legacy | **NON** — elle ne se porte pas | la page ferme par l'**archivage**, pas par un correctif |
+| **11** | E-242 — le troisième état de `supervision_agents` | **écrire la colonne**, la joindre à 063, **une seule signature** | rien : la table est **vide**, et la fenêtre se ferme au premier agent |
 
 ---
 
@@ -646,6 +647,14 @@ demandées à la session 4**, et elles alimentent des décisions bloquées :
 **Et pas de nouvelle migration non plus** : 063 attend déjà une signature, et une file de migrations non
 appliquées est le même défaut que le lot de correctifs inertes, sur une autre couche.
 
+> **⚠ CETTE DERNIÈRE PHRASE ÉTAIT TROP LARGE — révisée le 2026-08-28 à 14:55 UTC, voir la décision
+> n°11.** Le parallèle avec le lot de correctifs ne tient pas jusqu'au bout : *un redémarrage met 20
+> modules en service d'un coup, alors que le runner applique les migrations une par une, dans l'ordre,
+> et il est idempotent.* Ce qui reste vrai du parallèle est qu'**une migration non appliquée est un
+> changement de schéma dont le comportement n'a jamais été observé** ; ce qui est faux est d'en déduire
+> qu'il ne faut pas l'écrire. **L'interdiction devient : ne pas écrire une migration dont la fenêtre
+> n'est pas en train de se fermer.**
+
 ---
 
 ## Ce que ces décisions ne font pas
@@ -989,3 +998,76 @@ conditionnelle**, qu'aucun motif de ce genre ne voit.
 **Quatrième fois aujourd'hui que je reprends un fait sans le mesurer** — et la première où cela a produit
 **une décision**, pas seulement une phrase. *Un fait faux dans un compte rendu se corrige au tour
 suivant ; un fait faux dans une décision fait faire un geste.*
+
+
+---
+
+## 11 — E-242 : le troisième état de `supervision_agents`, et **une seule signature pour deux migrations**
+
+**Décidée le 2026-08-28, 14:55 UTC**, sur la mesure du Lead qui *dissout* un arbitrage au lieu de le
+trancher — et c'est la meilleure forme de réponse à une question de conception.
+
+### Ce que la mesure établit, et je l'ai revérifiée en base
+
+    supervision_agents   machine_id · platform · agent_version · installed_at · config_deployed
+                         -> AUCUNE colonne de statut        · 0 ligne
+    wazuh_agents.status  ENUM(... ,'unknown')                · 0 ligne
+    machines.service_account_deployed   tinyint(1)           · binaire pour une realite ternaire
+
+> **Les deux modules ne se contredisent pas en jugement : ils divergent en VOCABULAIRE.**
+> `supervision_agents` est un inventaire **par présence** — « je ne sais pas » n'y est pas exprimable, et
+> les deux seules écritures possibles **affirment** toutes deux quelque chose.
+
+**Donc `supervision` fait le mieux que sa table permette, et `wazuh` faisait pire que la sienne ne
+permettait.** C'est exactement la scission qu'E-237 corrige, et il n'y avait rien à arbitrer entre les
+deux règles.
+
+### C'est la TROISIÈME occurrence, et trois font une classe
+
+| porteur | l'état qu'il ne peut pas exprimer | coût |
+|---|---|---|
+| `machines.service_account_deployed` | « sudoers orphelin » | une colonne — `DOSSIER-05` |
+| `wazuh_agents.status` | « je n'ai pas pu vérifier » | **aucun** — `unknown` existe déjà |
+| **`supervision_agents`** | « l'agent est peut-être encore là » | **une colonne** |
+
+> **Un champ face à une réalité qui a gagné un état qu'il ne peut pas exprimer.** Trois fois, dans trois
+> modules, sur trois schémas différents — *et à chaque fois le code choisit la moins fausse des deux
+> valeurs disponibles au lieu de dire qu'il ne sait pas.*
+
+### La décision
+
+**Écrire la colonne, et la joindre à la migration 063 — une seule signature pour les deux.**
+
+Trois raisons :
+
+1. **la fenêtre est ouverte et elle se ferme au premier agent.** `supervision_agents` porte **0 ligne**.
+   C'est l'argument que j'ai déjà accepté pour E-222, et il vaut ici pour la même raison : *une colonne
+   posée sur une table vide est une décision technique ; posée sur une table peuplée, c'est un arbitrage
+   sur des données* ;
+2. **deux migrations appliquées ensemble se contrôlent mieux que deux appliquées à des moments
+   différents.** Le runner est idempotent et applique dans l'ordre ; ce qui coûte n'est pas le nombre de
+   fichiers, c'est le nombre de **fenêtres de signature** ;
+3. **et l'écrire maintenant ne grossit aucun lot** — contrairement aux correctifs backend, une migration
+   n'attend pas un redémarrage : elle attend une commande, et elle est **visible** dans
+   `schema_migrations`.
+
+**Ce que je ne décide pas : l'application.** Elle reste au `DOSSIER-06`, qui devient **le dossier des
+deux migrations** au lieu d'une.
+
+### ⚠ Et je révise ma propre décision n°8 plutôt que de la contredire en silence
+
+J'y avais écrit *« pas de nouvelle migration non plus — une file de migrations non appliquées est le
+même défaut que le lot de correctifs inertes »*. **Le parallèle ne tient pas jusqu'au bout** : un
+redémarrage met 20 modules en service **d'un coup**, le runner applique les migrations **une par une,
+dans l'ordre, et il est idempotent**.
+
+**Ce qui reste vrai du parallèle** : une migration non appliquée est un changement de schéma dont le
+comportement n'a jamais été observé. **Ce qui était faux** : en déduire qu'il ne faut pas l'écrire.
+
+> **L'interdiction devient : ne pas écrire une migration dont la fenêtre n'est pas en train de se
+> fermer.** Ici elle l'est — la table est vide et le module `supervision` est porté, donc son premier
+> agent est à un clic.
+
+*Une décision trop large protège d'un défaut et en interdit le remède.* C'est le motif d'E-224 pris par
+l'autre bout, et c'est la deuxième fois aujourd'hui que je resserre une de mes décisions plutôt que de
+la laisser mordre au-delà de son objet.
