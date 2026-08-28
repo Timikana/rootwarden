@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.50** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.51** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,50 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.51 — finir chaque onglet : les manques que le portage DECLARE, et le tableau de bord qui est RETENU sur une question de droits
+
+**Demande de l'exploitant : « finir integralement chaque onglet ; le tableau de bord n'est pas fini. »**
+Mesure plutot que suppose — **le portage annonce lui-meme ses manques** :
+
+| onglet | ce qu'il declare manquant | ce qui le retient |
+|---|---|---|
+| **`accueil`** | « Le parc n'est pas encore affiche ici » | **une question de SECURITE** |
+| `bashrc` | « les gestes de deploiement ne sont pas encore portes » | **B4**, deux arbitrages |
+| `cve` | le suivi et le declenchement d'un scan « restent sur l'ancien portail » | **S7b** — le scan envoie un vrai courriel |
+| `profil` | « les sessions ouvertes ne sont pas encore listees ici » | **E-203** |
+| `services` | « les gestes sur les services ne sont pas encore portes » | **⚠ encart probablement PERIME** — module archive le 2026-08-27 |
+| `nav` | un libelle generique « ancien portail » | les **7** entrees encore en `'legacy' =>` |
+
+**Ce releve ne couvre QUE ce que le portage declare.** *Un texte peut devenir faux sans qu'aucun test ne le
+voie — et l'inverse est vrai aussi : un manque non ecrit ne se voit nulle part.*
+
+#### ⚠ Le tableau de bord n'est pas inacheve par negligence : il est RETENU
+
+`accueil.php:33-34` : *« Le tableau de bord de l'ancien portail montre l'etat du parc a tout le monde, sans
+filtrer selon… »* **Meme famille qu'E-208** — trois pages legacy sur cinq ne bornent pas le parc au perimetre
+du compte.
+
+Le legacy y montre `park_status`, `cve_detected`, `cve_trends`, `agents_deployed`, `not_scanned`, `overdue`,
+`remediations` et **douze tuiles de raccourci**. Le portage : rien de tout cela.
+
+> **Porter ce tableau de bord fidelement, c'est porter la fuite de perimetre. Le porter borne, c'est retirer
+> une visibilite que des comptes ont aujourd'hui.** *Un portage fidele ne peut pas trancher une incoherence de
+> l'original : il la reproduit et la nomme* — ici il a choisi de **ne pas la reproduire**, troisieme voie qu'il
+> faut assumer explicitement. **Arbitrage de l'exploitant**, et il commande le reste de l'onglet.
+
+**Les douze tuiles, elles, ne dependent d'aucun arbitrage** — elles reprennent les gardes du menu. **C'est la
+moitie de l'onglet qui se finit tout de suite**, et **c'est la reponse a une demande de l'exploitant** :
+*« quand on ajoute un serveur, les menus ou aller ensuite sont Cle SSH plateforme puis Utilisateurs distants,
+et un nouvel utilisateur ne le sait pas. »* **Les tuiles disent la sequence a l'endroit ou l'on arrive.**
+
+#### La regle qui gouverne cette vague, payee trois fois
+
+> **Un onglet n'est « fini » que quand ce qu'il AFFICHE est vrai.** Trois pages ont ete livrees « finies » en
+> affichant un texte faux : E-209, E-212, et P4 avant sa relecture (E-226).
+
+*Compléter un onglet dont l'affichage ment produit un onglet complet et faux.* **L'ordre est donc : mesurer ce
+que le legacy fait -> ecrire ce qui est VRAI -> et seulement ensuite completer.**
+
 ### v1.38.50 — ma garde du runner empechait TOUTE suite neuve de naitre, et annoncait « LOT conforme » sur zero execution
 
 **Relevee par la session 7 en ecrivant la suite P1 (`go-page-cle-plateforme.mjs`). La garde est de moi, posee
@@ -4278,7 +4322,8 @@ correspondance reelle :**
 | v1.38.45 | `feeb1ec` | un refus d'acces deguise en incapacite de lecture ; la rotation, seul remede |
 | **v1.38.47** | `043f414` | **mon amplificateur d'E-220 etait faux** ; ma demi-mesure aurait casse des machines saines ; **E-222** |
 | **v1.38.48** | `b12835f` | **E-226 : la rotation ne revoque pas la cle compromise** ; E-223 ; E-224 ; E-225 |
-| v1.38.50 | (ce commit) | ma garde du runner empechait toute suite neuve, et disait « conforme » sur zero execution |
+| v1.38.50 | `e41e18c` | ma garde du runner empechait toute suite neuve, et disait « conforme » sur zero execution |
+| v1.38.51 | (ce commit) | finir chaque onglet : les manques declares, et le tableau de bord RETENU |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est

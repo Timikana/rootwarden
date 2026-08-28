@@ -913,6 +913,87 @@ de conseils contextuels, et le portage ne l'a pas reprise.** FEAT-001 (l'indicat
 quatre états) a été conçu sans savoir que ces deux chaînes existaient : elles sont un **acquis à
 reprendre**, pas un doublon à écarter — et elles nomment la séquence dans le bon ordre.
 
+### 4.6 FINIR CHAQUE ONGLET — les manques que le portage DÉCLARE lui-même (2026-08-28)
+
+**Demande de l'exploitant : « finir intégralement chaque onglet ; le tableau de bord n'est pas fini. »**
+Mesuré plutôt que supposé — **le portage annonce lui-même ses manques**, et le relevé est court :
+
+    grep -hoE "'[^']*' *=> *'[^']*(non port|pas encore|ancien portail)[^']*'" laravel/lang/fr/*.php
+
+| onglet | ce que le portage déclare manquant | ce qui le retient |
+|---|---|---|
+| **`accueil`** | *« Le parc n'est pas encore affiché ici »* + un bloc « Ancien portail » | **une question de SÉCURITÉ, pas un reste à faire** — voir ci-dessous |
+| `bashrc` | *« Les gestes de déploiement ne sont pas encore portés »* | **B4**, suspendu sur deux arbitrages |
+| `cve` | *« Le suivi d'une vulnérabilité reste sur l'ancien portail »* · *« Déclencher un scan reste sur l'ancien portail »* | **S7b** — le scan qui aboutit **envoie un vrai courriel** |
+| `profil` | *« Les sessions ouvertes et les connexions mémorisées ne sont pas encore listées ici »* | **E-203** — le portage n'a aucune révocation de session côté serveur |
+| `services` | *« Les gestes sur les services ne sont pas encore portés »* | **⚠ à vérifier** : le module est réputé porté en entier depuis `v1.37.98` et archivé le 2026-08-27 |
+| `nav` | un libellé générique « ancien portail » | les **7** entrées encore en `'legacy' =>` |
+
+**Ce relevé ne couvre QUE ce que le portage déclare.** Un manque **non déclaré** n'y figure pas — et c'est
+précisément la classe que ce chantier a payée six fois : *un texte peut devenir faux sans qu'aucun test ne le
+voie*, et **l'inverse est vrai aussi : un manque non écrit ne se voit nulle part.**
+
+#### ⚠ Le tableau de bord n'est pas inachevé par négligence : il est RETENU sur une question de droits
+
+`laravel/lang/fr/accueil.php:33-34` dit pourquoi, et la raison est mesurable :
+
+> *« Le tableau de bord de l'ancien portail montre l'état du parc à tout le monde, sans filtrer selon… »*
+
+**C'est la même famille qu'E-208** — trois pages legacy sur cinq ne bornent pas le parc au périmètre du
+compte, et celle qui expose le plus n'était pas surveillée. **Le legacy est incohérent avec lui-même, donc il
+n'existe aucune règle du produit à reprendre.**
+
+Ce que le legacy affiche et que le portage ne reprend pas : `park_status`, `cve_detected`, `cve_trends`,
+`agents_deployed`, `not_scanned`, `overdue`, `remediations`, plus **douze tuiles de raccourci**.
+
+> **Porter ce tableau de bord fidèlement, c'est porter la fuite de périmètre. Le porter borné, c'est retirer
+> une visibilité que des comptes ont aujourd'hui.** *Un portage fidèle ne peut pas trancher une incohérence de
+> l'original : il la reproduit et la nomme* — et ici il a choisi de **ne pas la reproduire**, ce qui est une
+> troisième voie qu'il faut assumer explicitement.
+
+**Arbitrage de l'exploitant (§7), et il commande le reste de l'onglet.** Trois issues :
+
+1. **borné au périmètre** — chaque compte voit ses machines. Cohérent avec `fail2ban/` et `iptables/`, **et
+   retire une visibilité aux rôles 1** ;
+2. **fidèle au legacy** — tout le parc à tout le monde. Reproduit la fuite, et **contredit deux pages du
+   produit** ;
+3. **deux vues** — un compteur global sans détail, et le détail borné. Plus de code, aucune décision de droits.
+
+**Tant que ce n'est pas tranché, l'onglet `accueil` ne peut pas être « fini » : la question n'est pas
+d'écrire du code, c'est de savoir quoi montrer et à qui.**
+
+#### Les tuiles de raccourci, qui ne dépendent d'aucun arbitrage
+
+**Douze tuiles** dans `legacy/index.php`, **zéro** dans le portage. Elles ne posent aucune question de droits —
+elles reprennent les gardes du menu. **C'est la moitié de l'onglet qui peut se finir tout de suite.**
+
+**Et elles sont la réponse à une demande de l'exploitant** : *« quand on ajoute un serveur, les menus où il
+faut aller ensuite sont Clé SSH plateforme puis Utilisateurs distants, et un nouvel utilisateur ne le sait
+pas. »* **Les tuiles disent la séquence à l'endroit où l'on arrive.** C'est FEAT-001 sous une forme que le
+legacy portait déjà — et le comptage des `tip.*` a montré que **le portage n'a repris aucun panneau pas-à-pas
+sur 26 pages qui en portaient un.**
+
+#### La règle qui gouverne cette vague, et elle vient d'être payée trois fois
+
+> **Un onglet n'est « fini » que quand ce qu'il AFFICHE est vrai.** Trois pages ont été livrées « finies » et
+> affichaient un texte faux : `platform_key` (E-209, un guide qui enseigne un durcissement inexistant),
+> `graylog` (E-212, tout ce que le portail en dit décrit un autre produit), et P4 avant sa relecture (E-226, la
+> rotation présentée comme le remède à une clé compromise).
+
+**Donc, pour chaque onglet, l'ordre est : mesurer ce que le legacy fait → écrire ce qui est VRAI → et
+seulement ensuite compléter ce qui manque.** *Compléter un onglet dont l'affichage ment produit un onglet
+complet et faux.*
+
+#### L'ordre de travail
+
+1. **`accueil` — les douze tuiles**, sans attendre l'arbitrage. Elles répondent à la demande de séquence ;
+2. **`services`** — vérifier si son encart est **périmé** ; le module est archivé et réputé porté en entier ;
+3. **`profil`** — E-203 ne demande **aucune migration**, `active_sessions` a déjà les colonnes exactes. **Et le
+   bouton « Révoquer » y était inerte** : la moitié la plus urgente est de cesser de promettre ;
+4. **`cve` et `bashrc`** — bloqués par S7b et B4, tous deux chez l'exploitant. **Rien à faire d'autre que de
+   vérifier que leurs encarts disent vrai** ;
+5. **`nav`** — se ferme tout seul quand les 7 entrées basculent.
+
 ## 5. La méthode, neuf temps
 
 `METHODE-SOUS-LOT.md`. Inventaire → **lire le `MODULE-*.md` existant** → caractérisation **verte sur le
