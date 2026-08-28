@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.81** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.82** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,50 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.82 — E-233 reconcilie : mon 171 etait FAUX sur ses propres termes, et la mesure qui decide etait 8
+
+    la regle du PHP (api_proxy.php:154-156) :  $path === $prefix || strpos($path,$prefix) === 0
+
+    A  ce que le PHP FAIT           (startswith sur les 63)                     **199**
+    B  ce que la liste SEMBLE dire  (exact sur 48 nommes, startswith sur 15 NS)  **191**
+    C  la lecture du Lead                                                        171   <- FAUSSE
+    surface d'ACCIDENT (A - B)                                                     **8**
+
+**Mon `171` n'etait pas « une autre question » : c'etait B, mal executee.** J'ai detecte les espaces de noms
+par **`endswith('/')` seul — 13 au lieu de 15** — et manque **`/cve_`** et **`/iptables-`**, qui en sont, avec
+un `_` et un `-` pour separateur. **Les 20 routes d'ecart sont exactement celles-la.**
+
+> **Meme classe de faute que les deux orthographes de la spec d'API, et que « on compare des segments, pas des
+> sous-chaines » : une hypothese sur la FORME du separateur.** *Une sonde qui suppose un separateur ne mesure
+> que ce separateur* — et j'ai signe cette regle trois fois aujourd'hui avant de la commettre.
+
+#### ⚠⚠ Et la mesure qui manquait renverse la lecture
+
+**Les huit routes de la surface d'accident sont TOUTES des sous-chemins legitimes de la ressource nommee** —
+`/approvals/stats`, `/approvals/{x}/approve`, `/groups/{x}/run`… **`/approvals` couvrant `/approvals/stats`
+est le comportement qu'on attend d'un prefixe de ressource. Il n'existe AUCUNE collision accidentelle de type
+`/search` → `/searchall`.**
+
+**Le 151 est donc domine par les 15 espaces de noms, qui sont DELIBERES.** Le DSI l'ecrit contre lui-meme :
+*« j'ai publie l'agregat sans separer les deux populations, et l'agregat vaut vingt fois la population qui
+inquiete. C'est la sonde ecrite pour accuser — celle que je reproche depuis ce matin — appliquee a ma propre
+decision. »*
+
+> **Sa phrase « une route nouvelle devient atteignable sans que personne ne l'ait decidee » reste vraie comme
+> MECANISME et fausse comme AMPLEUR : zero occurrence.**
+
+*Un agregat qui melange une population deliberee et une population accidentelle mesure la premiere et alarme
+sur la seconde.* **La mesure qui decide n'etait ni 151 ni 171 : c'etait 8, puis leur lecture.**
+
+#### Ce qui reste non explique est dit comme tel
+
+Le DSI ne savait pas d'ou venait mon 171, et **a refuse d'inventer** : *« j'ai failli publier que ta sonde
+n'appliquait pas `startswith` aux prefixes nommes, et la mesure a montre que `/admin/backups` passe par
+`/admin/`. Mon hypothese etait fausse. »* **Refuser d'inventer a laisse la place a la mesure qui a trouve.**
+
+**La decision ne bouge pas : ne rien resserrer** — et **avec la surface d'accident a ZERO, resserrer devient un
+travail a risque contre un gain nul.**
 
 ### v1.38.81 — quatre chiffres de mon propre §2 etaient perimes, et c'est UNE erreur quatre fois
 
