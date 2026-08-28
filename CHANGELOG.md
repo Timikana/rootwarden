@@ -2171,6 +2171,71 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.85 — E-235 : `/wazuh/` passait la passerelle pour un rôle 1, et deux de mes mesures étaient fausses
+
+#### Le rempart manquant
+
+`/wazuh/` est dans `LISTE_BLANCHE` et **absent** de `ADMIN_SEULEMENT` : la passerelle le laissait donc
+passer pour un rôle 1 porteur de `can_manage_wazuh`.
+
+**Ce n'est pas un trou** : les 15 routes du module portent `@require_role(2)` côté backend, donc
+l'appel était refusé. C'est **un rempart manquant sur deux** — et la page exige `role:2` des **deux**
+côtés (`wazuh/index.php:25` fait `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`). Personne de légitime ne
+perd un accès en l'ajoutant.
+
+Même démonstration que pour `/supervision/`, et même conclusion : *on ne dépend jamais d'un seul
+rempart.* **Divergence déclarée** : `ADMIN_ONLY_PREFIXES` du legacy ne le porte pas, donc cette liste
+cesse d'en être le relevé fidèle sur une entrée de plus — dit ici plutôt que laissé à la lecture
+suivante.
+
+#### ⚠ Deux de mes mesures sur `documentation` étaient fausses, et la cause est nommable
+
+J'avais annoncé « **trois** clés i18n, et le legacy ne traduit pas cette page ». Les deux sont faux :
+
+    grep -oE "t\('[a-z_.]+'\)"      -> 3 cles     <- mon motif
+    grep -oE "t\('[a-z0-9_.]+'\)"   -> 22 cles    <- le meme, avec les chiffres
+
+**Ma classe de caractères excluait les chiffres.** Les 19 clés invisibles étaient
+`guide.sec_1`…`guide.sec_5`, `guide.step1_text`… — celles qui portent un numéro. Et elles sont
+**traduites dans les deux langues**, en vraie prose anglaise, dans `tips.php` — pas dans un `guide.php`
+que j'avais supposé.
+
+**Ma conclusion a survécu sans être confirmée** : les 22 clés couvrent 1 746 caractères sur 48 393,
+soit **96,4 %** de prose en dur — mon « 98 % » était juste en ordre de grandeur. Mais si ces clés
+avaient couvert 40 % du texte, la recommandation aurait changé et mon raisonnement ne l'aurait pas vu.
+
+> **Quatrième occurrence du jour d'un motif qui suppose une forme** : mon `grep` sur `/services/`
+> (chemin concaténé), un `'route' =>` qui suppose l'espacement, un nom de fichier `guide.php` supposé,
+> et ma classe de caractères sans chiffres. *Une conclusion juste posée sur des preuves fausses n'est
+> pas confirmée — elle a survécu.*
+
+#### Et une distinction que je confondais
+
+J'avais écrit que porter la prose en français seul « viole la règle de parité ». **Non** : le legacy
+sert 96 % de cette page en français à un anglophone aussi, donc porter en français seul serait la
+**parité exacte**. Ce que ça violerait, c'est la **règle i18n du portage** (FR+EN obligatoires).
+
+**Deux obligations distinctes du chantier, qui pointent ici en sens opposés.** Les confondre faisait
+croire qu'un seul choix était légitime alors qu'il faut arbitrer entre deux règles.
+
+#### Et une réserve de moi, levée par la mesure d'autrui
+
+J'avais annoncé que `/wazuh/install_all` « sélectionne le parc côté backend, donc `srv-zabbix` est dans
+sa portée par construction », et que mon panneau ne tiendrait donc pas. **Faux.** Mesuré :
+`wazuh.py:465` exige `machine_ids` — absent ou vide → **400, aucune machine touchée**, et sa docstring
+la nomme « la seule route de parc du produit qui se borne ».
+
+**La portée est donc exactement la liste que l'écran envoie**, ce qui rend le panneau *décisif* au lieu
+d'inutile. Ma réserve était plus pessimiste que la réalité, et je l'avais transmise comme un fait.
+
+#### Vérifications
+
+**Pas de lint PHP ni de compilation Blade : le LOT complet tourne** (PID 690188), et aucune charge sur
+les conteneurs n'est permise. Contrôlé sans PHP : apostrophes paires, accolades et crochets
+équilibrés, et l'entrée bien placée **dans** `ADMIN_SEULEMENT` et non dans une liste voisine.
+
+---
+
 ### v1.38.84 — E-234 et E-235 : la page qui promet de ne rien faire porte une console d'API, et ma premiere liste de dangers etait fausse sur deux entrees
 
 #### E-234 — `documentation.php` est un client HTTP generique vers la passerelle
