@@ -2792,6 +2792,88 @@ ses variables locales ; `ssh_audit`, `services` et `fail2ban` que par leur chaî
 **C'est E-204 avant l'incident** — quatre `_validate_username` dont une avait pris du retard. *Elles étaient
 d'accord aussi, jusqu'à ce qu'une bouge.*
 
+### ⚠ TRENTE-ET-UNE ROUTES PEUVENT RENDRE `200 + success:false`, ET LEURS APPELANTS SONT INVISIBLES AU DIFF (2026-08-28)
+
+**Première moitié de la jointure appelant → route, mesurée sur 230 routes.**
+
+| famille | n | forme |
+|---|---|---|
+| **`dur`** | **11** | `return jsonify({'success': False})` **sans statut** → 200 |
+| **`conditionnel`** | **20** | un `success` **calculé** (`rc == 0`) → 200 quoi qu'il arrive |
+| `jamais` | 199 | tout refus porte un statut non-200 |
+
+**Le cas `conditionnel` est le moins visible et le plus nombreux.** *Une lecture rapide n'y voit pas de refus ;
+un appelant qui teste `.ok` n'en voit pas davantage.* Même classe de risque, sans la forme — **et c'est celui
+qu'aucun relevé n'aurait trouvé à l'œil.**
+
+> **Quand une route REJOINT cette famille, ses appelants doivent être relus — et rien ne change chez eux : ils
+> sont invisibles au diff du correctif.**
+
+C'est la règle qui rend la liste utile, et elle explique le constat qui l'a motivée : *aujourd'hui aucun
+appelant ne présente un refus comme une réussite — mais pas parce qu'ils lisent tous `success` : parce que
+tout refus porte encore un statut non-200. Ils sont couplés à une COÏNCIDENCE*, que trois correctifs ont déjà
+rompue. **Le dédouanement tient désormais pour une raison mesurée, plus par accident.**
+
+#### Les résultats NÉGATIFS de ce relevé ne valent rien, et son autrice le dit
+
+Le premier croisement, par `grep` du chemin littéral dans le JavaScript, rendait **« aucun appelant » pour
+cinq routes.** **Deux ont été résolues en une commande sur la couche PHP** : `supervision.js` n'écrit jamais
+`/supervision/zabbix/version`, il lit `url_version`, fabriqué par `SupervisionController.php:725`.
+
+> **Les résultats positifs sont solides ; les résultats négatifs sont une absence de preuve.** Trois routes
+> restent sans appelant trouvé — *« je n'affirme pas qu'elles n'en ont pas, je dis que ni le JS ni les
+> contrôleurs ne nomment leur chemin. »*
+
+**Et une part n'est pas statiquement résoluble** — `url("/api/gateway/supervision/{$plateforme}/version")`.
+Le relevé restera donc **partiel**, et *il devra dire lequel de ses silences est mesuré.* C'est la forme
+honnête d'un instrument incomplet, et l'inverse du « 0 défaut » qui ne déclenche aucune vérification.
+
+### MUTER CE QUE L'INSTRUMENT LAISSE PASSER, PAS SEULEMENT CE QU'IL ATTRAPE (2026-08-28)
+
+**Question posée par la session 7 sur son propre invariant, reprise par la session 6 sur son analyseur
+d'appelants — et elle y a trouvé un trou en une lecture :**
+
+> *« J'avais muté ce que mon instrument ATTRAPE, jamais ce qu'il LAISSE PASSER. »*
+
+Résultat : **un fichier JavaScript illisible exonérait tous ses appelants en silence**, et **son propre
+commentaire affirmait le contraire.** Mesuré : **59 appels devenaient 54, sans un mot.**
+
+> **C'est la forme des cinq en-têtes du chantier qui annoncent un accès plus strict que leur code — sauf que
+> celui-là était le sien, dans l'instrument qui sert à trouver les autres.**
+
+*Une mutation qui rend l'instrument bruyant prouve qu'il parle ; seule une mutation qui devrait le rendre
+bruyant et ne le rend pas prouve qu'il écoute.* Corrigé par un **plancher** (l'instrument a-t-il vu assez ?)
+et une **reconstitution de total** — les deux emprunts croisés entre deux sessions, chacune appliquant à son
+outil la parade de l'autre.
+
+### CINQUIÈME CORRECTION DE MA CONSIGNE DE COMMIT : `git rm` STAGE AUSSI (2026-08-28)
+
+**Incident déclaré par son autrice.** La suppression de `bump-version.sh` est partie dans le commit **d'une
+autre session**, dont le message ne la mentionne pas. Rien n'est perdu et la suppression est bonne — mais :
+
+> *« J'avais écrit "ne jamais laisser un fichier INDEXÉ entre deux appels d'outil", en pensant à `git add`.*
+> **`git rm` stage aussi — immédiatement, et silencieusement.** *J'ai ensuite fait six appels d'outil avant de
+> committer. »*
+
+**La règle corrigée** : *tout geste qui touche l'index — `git add` comme `git rm` — doit être dans la MÊME
+commande que son `git commit`.* Et une conséquence pratique : **`git commit -- <chemin>` ÉCHOUE après un
+`git rm`** (le chemin ne correspond plus à rien) — il faut les enchaîner, ou supprimer d'abord dans l'arbre
+de travail seul.
+
+**Historique de cette consigne, cinq énoncés en deux jours :**
+
+| énoncé | ce qui l'a corrigé |
+|---|---|
+| « relire `git diff --cached --stat` avant de commiter » | *la relecture n'était pas la protection, elle en donnait l'apparence* |
+| « employer `git commit -F - -- <chemins>` » | **ne marche pas sur une CRÉATION** — un pathspec ne désigne que des fichiers suivis |
+| « le pathspec protège » | **faux pour les fichiers qu'on nomme** et qu'un autre a touchés |
+| « contrôler le diff avant de commiter » | *protège LES AUTRES de moi ; rien ne protège MON travail non commité d'eux* |
+| « ne pas laisser un fichier indexé entre deux appels » | **`git rm` stage aussi**, immédiatement et silencieusement |
+
+*Une consigne corrigée cinq fois n'est pas une mauvaise consigne : c'est une consigne dont chaque énoncé
+couvrait le cas qui l'avait motivée.* **Et les cinq corrections sont venues des sessions, jamais du Lead qui
+l'avait écrite.**
+
 ### Base et shell
 
 - **MySQL ne déclenche `ON UPDATE CURRENT_TIMESTAMP` que si la valeur change.**
