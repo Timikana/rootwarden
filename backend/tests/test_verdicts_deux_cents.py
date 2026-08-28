@@ -215,6 +215,50 @@ FLUX_CONNUS = {
 }
 
 
+# ── LA FAMILLE CONDITIONNELLE, FIGEE A SON TOUR — mesure du 2026-08-28 ─────
+#
+# ══ ET MON REFUS DE LA FIGER ETAIT UNE ERREUR DE RAISONNEMENT ══════════════
+#
+# J'avais ecrit : « on ne les fige pas une par une — elles bougent a chaque
+# correctif de la famille "une reussite se verifie" ». C'etait traiter le
+# MOUVEMENT comme une raison de ne pas mesurer, alors que le mouvement EST
+# l'evenement dont je veux etre prevenue : une route qui rejoint cette famille
+# est une route dont les appelants doivent etre relus, exactement comme pour
+# `dur`.
+#
+# La preuve est arrivee en vingt-quatre heures : la famille est passee de 20 a
+# 21 — `ssh.py:sshd_allow_user` l'a rejointe en corrigeant E-214 — et **rien ici
+# ne l'a dit**. C'est le Lead qui me l'a signale.
+#
+# *Une liste de routes est une photographie, et le chantier la perime lui-meme.*
+# La reponse a cela n'est pas « ne pas figer » : c'est figer, et RELIRE a chaque
+# changement.
+VERDICT_CONDITIONNEL_CONNU = {
+    ('cve.py', 'cve_test_connection'),
+    ('fail2ban.py', 'fail2ban_ban_all_servers'),
+    ('fail2ban.py', 'fail2ban_install_all'),
+    ('fail2ban.py', 'fail2ban_install_route'),
+    ('fail2ban.py', 'fail2ban_restart'),
+    ('graylog.py', 'delete_template'),
+    ('graylog.py', 'deploy'),
+    ('graylog.py', 'test_forward'),
+    ('services.py', 'services_disable'),
+    ('services.py', 'services_enable'),
+    ('services.py', 'services_restart'),
+    ('services.py', 'services_start'),
+    ('services.py', 'services_stop'),
+    ('ssh.py', 'deploy_platform_key'),
+    ('ssh.py', 'deploy_service_account'),
+    ('ssh.py', 'revoke_service_account'),
+    # Arrivee le 2026-08-27 en corrigeant E-214, et personne ne l'a vue entrer.
+    ('ssh.py', 'sshd_allow_user'),
+    ('wazuh.py', 'delete_rule'),
+    ('wazuh.py', 'install_all'),
+    ('wazuh.py', 'restart_agent'),
+    ('wazuh.py', 'uninstall'),
+}
+
+
 def test_l_analyse_a_bien_vu_le_backend(routes):
     """L'INSTRUMENT D'ABORD. Une enumeration vide rend toute propriete
     universelle vraie."""
@@ -281,25 +325,38 @@ def test_les_connues_sont_TOUJOURS_dans_la_famille(routes):
           "    forme de retour, et elle en manque alors d autres.")
 
 
-def test_la_famille_CONDITIONNELLE_est_relevee_et_non_ignoree(routes):
-    """LE CAS LE MOINS VISIBLE DES TROIS, ET IL EST LE PLUS NOMBREUX.
+def test_aucune_route_NEUVE_ne_rejoint_la_famille_CONDITIONNELLE(routes):
+    """`return jsonify({'success': rc == 0})` rend **200 quoi qu'il arrive**.
 
-    `return jsonify({'success': rc == 0})` rend **200 quoi qu'il arrive**. Une
-    lecture rapide n'y voit pas de refus ; un appelant qui teste `.ok` n'en voit
-    pas davantage. Ces routes appartiennent donc a la meme classe de risque que
-    les douze ci-dessus, sans en avoir la forme.
-
-    On ne les fige pas une par une — elles bougent a chaque correctif de la
-    famille « une reussite se verifie ». On asserte qu'elles restent RELEVEES :
-    un compte tombe a zero voudrait dire que `_famille` ne les distingue plus, et
-    l'invariant du dessus cesserait alors d'etre lu comme partiel.
+    Une lecture rapide n'y voit pas de refus ; un appelant qui teste `.ok` n'en
+    voit pas davantage. C'est la meme classe de risque que `dur`, sans en avoir
+    la forme — et c'est la plus nombreuse des deux.
     """
-    conditionnelles = [r for r in routes if r['famille'] == 'conditionnel']
+    reelles = {(r['fichier'], r['nom']) for r in routes if r['famille'] == 'conditionnel'}
+    nouvelles = sorted(reelles - VERDICT_CONDITIONNEL_CONNU)
 
-    assert conditionnelles, (
-        "Aucune route conditionnelle relevee — `_famille` ne distingue plus le cas "
-        "`'success': <expression>`, et l'invariant du dessus ne couvre alors qu'une "
-        'partie de la classe sans le dire.')
+    assert not nouvelles, (
+        'Des routes rendent DESORMAIS un `success` calcule a 200 :\n  '
+        + '\n  '.join(f'{f}:{n}' for f, n in nouvelles)
+        + "\n\nRelire leurs appelants : ceux qui ne testent que `reponse.ok`\n"
+          'presenteront un refus comme une reussite.')
+
+
+def test_les_CONDITIONNELLES_connues_le_sont_toujours(routes):
+    """La garde symetrique, quatrieme fois dans ce depot.
+
+    Une sortie a deux causes opposees : la route a ete corrigee (son refus porte
+    un statut), ou `_famille` a cesse de reconnaitre une forme — et elle en manque
+    alors d'autres. Les deux se distinguent en LISANT.
+    """
+    reelles = {(r['fichier'], r['nom']) for r in routes if r['famille'] == 'conditionnel'}
+    disparues = sorted(VERDICT_CONDITIONNEL_CONNU - reelles)
+
+    assert not disparues, (
+        'Des routes connues ne rendent plus un `success` calcule a 200 :\n  '
+        + '\n  '.join(f'{f}:{n}' for f, n in disparues)
+        + '\nCorrigee, ou instrument devenu aveugle : lire pour trancher.')
+
 
 
 def test_aucune_route_NEUVE_ne_rend_un_flux_sans_etre_relevee(routes):
