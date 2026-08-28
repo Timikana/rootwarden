@@ -261,6 +261,41 @@ function panneauVisible(page, nom) {
     }, C.panneau(nom));
 }
 
+/*
+ * ══ OUVRIR UN ONGLET, ET S'ASSURER QU'IL EST OUVERT ══════════════════════
+ *
+ * Une attente FIXE apres un clic d'onglet tient quand la suite tourne seule et
+ * lache autrement. Mesure du LOT du 2026-08-28 : deux etapes GABARIT en
+ * « Node is either not clickable » — l'onglet n'etait pas ouvert, donc le champ
+ * existait sans etre atteignable.
+ *
+ * CE QUI A ETE ECARTE PAR LA MESURE, et qu'il faut savoir pour ne pas y revenir :
+ *   - la charge — la suite echoue AUSSI machine au repos ;
+ *   - le pied de page neuf — mesure `position: static`, y=1317, il ne recouvre rien ;
+ *   - une erreur JS — aucune ;
+ *   - le contrat DOM — `data-rw` ET `data-onglet` poses, panneau `id` correspondant ;
+ *   - la page elle-meme — sonde isolee : le clic fait passer `hidden` a `false`,
+ *     le champ prend 45 px. **La page est SAINE.**
+ * L'ouverture echoue seulement APRES l'enregistrement de configuration.
+ *
+ * On n'attend donc pas une DUREE mais la PROPRIETE — le panneau est visible —
+ * et l'on RE-CLIQUE tant qu'elle n'est pas obtenue : c'est le GESTE qui peut
+ * avoir ete perdu, pas seulement son effet. Et l'ouverture devient une
+ * assertion a part entiere : un onglet qui ne s'ouvre pas doit se voir comme
+ * tel, jamais se deguiser en « element non cliquable » vingt lignes plus loin.
+ */
+async function ouvreOnglet(page, nom, borneMs = 8000) {
+    const limite = Date.now() + borneMs;
+    let visible = await panneauVisible(page, nom);
+    while (! visible && Date.now() < limite) {
+        try { await page.click(C.onglet(nom)); } catch { /* pas encore cliquable */ }
+        await dors(250);
+        visible = await panneauVisible(page, nom);
+    }
+
+    return visible === true;
+}
+
 /** Attendre qu'un conteneur cesse d'afficher « chargement » ET se stabilise. */
 async function attendCharge(page, selecteur) {
     let precedent = null;
@@ -388,8 +423,9 @@ try {
     });
 
     await etape('GABARIT : creation par clics, puis verifiee EN BASE', async () => {
-        await s.page.click(C.onglet('templates'));
-        await dors(900);
+        verifie('l\'onglet des gabarits s\'ouvre', await ouvreOnglet(s.page, 'templates'),
+            'le panneau des gabarits ne s\'affiche pas — tout clic suivant echouerait '
+            + 'en « not clickable », vingt lignes plus loin et sans dire pourquoi');
         const nom = await s.page.$(C.gabaritNom);
         await nom.click({ clickCount: 3 });
         await nom.type(GABARIT, { delay: 15 });
@@ -412,6 +448,16 @@ try {
     });
 
     await etape('GABARIT : suppression par clics, et il disparait vraiment', async () => {
+        /*
+         * Le bouton vit DANS le panneau des gabarits : si l'onglet s'est referme
+         * entre-temps, le clic echoue en « not clickable » — et l'echec de cette
+         * etape n'etait qu'une CONSEQUENCE de celui de la creation. On reouvre
+         * par la propriete plutot que de supposer l'etat laisse par l'etape
+         * precedente : **une suite ne doit pas dependre d'un etat qu'elle n'a
+         * pas verifie.**
+         */
+        verifie('l\'onglet des gabarits est encore ouvert', await ouvreOnglet(s.page, 'templates'),
+            'le panneau s\'est referme depuis la creation');
         if (CIBLE === 'laravel') {
             await s.page.click(C.gabaritSupprimer);
             await s.page.waitForSelector(C.gabaritConfirmer, { visible: true, timeout: 8000 });
