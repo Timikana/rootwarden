@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.72** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.73** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,74 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.73 — E-231 : la specification d'API porte les DEUX orthographes du meme module, et DERIVER l'emporte sur porter
+
+#### La question n'etait pas COMMENT porter `api_docs`, mais QUOI porter
+
+**40 lignes de coquille Swagger plus un YAML statique de 91 Ko date du 2026-08-20 — et rien ne le tient en
+phase.**
+
+    chemins declares : 146        routes reelles : 203
+    apres NORMALISATION des parametres de chemin :
+      documentes ET reels : 139 · fantomes : 7 · reels NON documentes : **64**
+
+**Les sept fantomes ont tous le meme motif, et la spec porte LES DEUX orthographes** — verifie :
+`/ssh_audit/config`, `/fix`, `/fleet`, `/history`, `/policies`, `/scan`, `/scan_all` en **souligne** ;
+`/ssh-audit/backups`, `/fleet`, `/reload`, `/restore`, `/save-config` en **tiret**. **Le backend ne sert que le
+tiret.** `/ssh_audit/fleet` et `/ssh-audit/fleet` sont tous deux declares : *la meme route, deux orthographes,
+une fausse.* Et `/ssh_audit/history` n'existe sous aucun separateur.
+
+> **Qui lit cette documentation ne peut pas savoir quelle moitie est reelle.**
+
+**⚠ Et la premiere mesure annoncait 22 fantomes — trois fois trop** : elle comparait `{id}` d'OpenAPI a
+`<int:id>` de Flask, deux notations pour la meme chose. *Huitieme « une sonde ecrite pour accuser se trompe du
+cote qui alarme »* — **et la seule de la journee ou le faux positif n'a pas quitte son auteur.**
+
+#### ✅ DECISION : DERIVER, et non porter le YAML
+
+1. **ce n'est pas une incoherence de l'original, c'est un CACHE PERIME.** La regle du chantier — *un portage
+   fidele reproduit une incoherence et la nomme* — **ne s'applique pas** : reproduire un artefact fige que rien
+   ne regenere n'est pas de la fidelite a un comportement, **c'est recopier un cache** ;
+2. **l'exploitant a demande la depreciation COMPLETE du legacy** : un YAML du 2026-08-20 porte dans la 2.0
+   serait *un artefact legacy survivant a l'interieur du nouveau portail* ;
+3. **+33 routes ont gagne une garde en deux jours.** Aucun document fige ne peut suivre ce rythme ; **seul un
+   document derive peut.**
+
+**La forme : TROIS enonces distincts plutot qu'un seul faux** — ce que **la passerelle** autorise (derive de
+`RoutesBackend`, donc toujours juste) · ce que **le releve** dit des decorateurs (**date**, regime nomme :
+*arbre de travail, pas service*) · **et la ou les deux divergent**, le plus utile des trois.
+
+**⚠ Trois bornes, et la premiere n'etait pas dans la proposition** :
+- **chaque enonce NOMME SA COUCHE.** Deriver de `RoutesBackend` dit ce que la **passerelle** laisse passer, pas
+  ce que le **backend** accepte — et E-230 vient de montrer **trois couches qui divergent** sur cette question.
+  *Une page qui les melange refait le defaut qu'elle documente* ;
+- **les 64 routes non documentees sont COMPTEES ET NOMMEES.** Sinon la page derivee **herite du silence du
+  YAML** : *un document qui omet ce qu'il ne sait pas est plus trompeur qu'un document date* ;
+- **la page ne se presente pas comme une reference d'API** : elle derive des **autorisations**, pas des
+  contrats. *Un titre qui promet plus que le contenu est la meme faute, un etage plus haut.*
+
+#### Deux ecarts mineurs, et une fausse alerte levee par son auteur
+
+`legacy/api/docs.php:4` annonce « accessible uniquement aux admins et superadmins » quand `:9` fait
+`checkAuth([ROLE_SUPERADMIN])` — **le commentaire promet un acces PLUS LARGE que le code**, direction inverse
+d'E-36. Sans consequence de surete, **a ne pas transporter.**
+
+Et `documentation.php:1743` embarque une console appelant un point d'acces **arbitraire** sur une page ouverte
+aux trois roles. **Soupcon legitime, et FAUX** : elle est dans un `if ($isAdmin)` avec `$isAdmin = $role >= 2`
+(`:16`). *La regle qui a arrete l'accusation est celle de la journee : lire la fonction qui decide avant de
+conclure* — **troisieme fausse alerte du jour levee par son auteur avant transmission.**
+
+#### ✅ `services` est FINI, et il y avait TROIS defauts
+
+`244c840` : l'encart declarait non porte ce qui **est** porte — *les cinq gestes passent par
+`/services/<geste>` **concatene**, ce qui dedouanait l'encart au `grep` litteral* ; son bouton **principal**
+menait a `/services/`, **archive**, donc **404** ; et **un `window.confirm()`** sur les cinq gestes qui
+ecrivent, *les seuls gestes du module qu'aucune suite ne pouvait exercer.*
+
+> **⚠ Et la ligne « verifier l'encart `services` » a ete transmise DEUX fois a son autrice APRES son commit**,
+> par le Lead puis par le DSI. *Une tache faite qu'un document annonce encore ouverte se redemande — et c'est
+> le meme cout qu'une tache oubliee.* Le §4.6 est corrige.
 
 ### v1.38.72 — ⚠ un chiffre FAUX que j'avais inscrit DANS LE CODE, et la fin d'une fausse attestation
 

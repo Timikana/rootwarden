@@ -10561,3 +10561,91 @@ transmette pas les permissions temporaires**, pas que les routes les exigent. De
 **La première est la bonne**, et sa raison est celle du §8 : *un drapeau de moins vaut mieux qu'une règle en
 double* — ici, **une source de moins vaut mieux que trois lectures qui divergent.** Arbitrage de l'exploitant :
 la passerelle est le chemin d'authentification.
+
+---
+
+## E-231 — ⚠ La spécification d'API porte les DEUX orthographes du même module, dont sept fausses — et elle se taît sur 64 routes
+
+**Mesuré par la session 3 avant de porter `api_docs`. Vérifié par le Lead.** Le module fait **40 lignes de
+coquille Swagger** plus **un YAML statique de 91 Ko daté du 2026-08-20** — et **rien ne le tient en phase.**
+
+    chemins declares dans la spec : 146        routes reelles du backend : 203
+    apres NORMALISATION des parametres de chemin :
+      documentes ET reels     : 139
+      documentes INEXISTANTS  :   7
+      reels NON documentes    :  64
+
+### Les sept fantômes ont tous le même motif, et la spec porte les DEUX orthographes
+
+    la spec declare  /ssh_audit/config  /ssh_audit/fix  /ssh_audit/fleet  /ssh_audit/history
+                     /ssh_audit/policies  /ssh_audit/scan  /ssh_audit/scan_all      (souligne)
+    la spec declare AUSSI  /ssh-audit/backups  /ssh-audit/fleet  /ssh-audit/reload
+                           /ssh-audit/restore  /ssh-audit/save-config  …            (tiret)
+    le backend ne sert QUE le tiret — 14 routes, dont `/ssh-audit/results` que la spec ignore
+
+**`/ssh_audit/fleet` et `/ssh-audit/fleet` sont tous deux déclarés : la même route, deux orthographes, une
+fausse.** Et **`/ssh_audit/history` n'existe sous aucun séparateur.**
+
+> **Qui lit cette documentation ne peut pas savoir quelle moitié est réelle.** Dix routes du module y sont
+> justes, sept rendent 404, et rien ne les distingue.
+
+### ⚠ La première mesure annonçait 22 fantômes — trois fois trop
+
+**Elle comparait `{id}` d'OpenAPI à `<int:id>` de Flask : deux notations pour la même chose.** La normalisation
+a divisé les fantômes par **trois** et les non-documentés de 79 à 64.
+
+*Huitième occurrence de « une sonde écrite pour accuser se trompe du côté qui alarme »* — et la session l'a
+levée elle-même avant de transmettre. **C'est la seule de la journée où le faux positif n'a pas quitté son
+auteur.**
+
+### La question n'est pas COMMENT porter, c'est QUOI porter
+
+**Servir ce YAML dans le nouveau portail y installe un document qui se trompe sur les chemins d'un module
+entier et se taît sur 64 routes — et c'est un document qui AFFIRME DES AUTORISATIONS.** Cinquième forme du
+motif de ce chantier, la plus grave : *celle qui trompe pendant un incident.*
+
+**✅ DÉCISION DU LEAD : DÉRIVER, et non porter le YAML.** Trois raisons, dans l'ordre de poids :
+
+1. **ce n'est pas une incohérence de l'original, c'est un CACHE PÉRIMÉ.** La règle du chantier — *un portage
+   fidèle ne peut pas trancher une incohérence de l'original : il la reproduit et la nomme* — **ne s'applique
+   pas** : reproduire un artefact figé que rien ne régénère n'est pas de la fidélité à un comportement, **c'est
+   recopier un cache** ;
+2. **l'exploitant a demandé la dépréciation COMPLÈTE du legacy.** Un YAML daté du 2026-08-20 porté dans la 2.0
+   serait *un artefact legacy survivant à l'intérieur du nouveau portail* — exactement ce qu'on retire ;
+3. **+33 routes ont gagné une garde en deux jours.** Aucun document figé ne peut suivre ce rythme ; **seul un
+   document dérivé peut.**
+
+### La forme retenue : TROIS énoncés distincts plutôt qu'un seul faux
+
+| ce que la page dit | d'où ça vient | régime |
+|---|---|---|
+| ce que **la passerelle** autorise | `RoutesBackend::LISTE_BLANCHE` et `ADMIN_SEULEMENT` — **dérivé** | toujours juste |
+| ce que le **relevé** dit des décorateurs | `RELEVE-GARDES-BACKEND.md` | **daté**, et son régime nommé : *arbre de travail, pas service* |
+| **là où les deux divergent** | la comparaison | le plus utile des trois |
+
+**⚠ Trois bornes, et la première n'était pas dans la proposition :**
+
+1. **chaque énoncé NOMME SA COUCHE.** Dériver depuis `RoutesBackend` dit ce que **la passerelle laisse
+   passer**, pas ce que **le backend accepte** — et E-230 vient de montrer **trois couches qui divergent** sur
+   la même question. *Une page qui mélange les trois refait le défaut qu'elle documente* ;
+2. **les 64 routes non documentées sont COMPTÉES ET NOMMÉES comme telles.** Sinon la page dérivée **hérite du
+   silence du YAML** : *un document qui omet ce qu'il ne sait pas est plus trompeur qu'un document daté* ;
+3. **la page ne se présente pas comme une référence d'API.** Elle dérive des **autorisations**, pas des
+   contrats. *Un titre qui promet plus que le contenu est la même faute, un étage plus haut.*
+
+### Un écart mineur du même fichier, à ne pas recopier
+
+    legacy/api/docs.php:4   « Accessible uniquement aux admins et superadmins »
+    legacy/api/docs.php:9   checkAuth([ROLE_SUPERADMIN])
+
+**Le commentaire promet un accès PLUS LARGE que le code** — direction inverse d'E-36 et de `platform_keys`.
+Aucune conséquence de sûreté ; **à ne pas transporter dans le portage.**
+
+### Et une fausse alerte levée par son auteur, qui mérite d'être dite
+
+`documentation.php:1743` embarque une console appelant un point d'accès **arbitraire**
+(`fetch('/api_proxy.php' + endpoint)`) sur une page ouverte aux **trois** rôles. **Soupçon légitime, et faux** :
+elle est dans un `if ($isAdmin)` avec `$isAdmin = $role >= 2` (`:16`). **Le rôle 1 ne la voit pas.**
+
+*La règle qui a arrêté l'accusation est celle de la journée : lire la fonction qui décide avant de conclure.*
+**Et le dire compte** — c'est la troisième fausse alerte de la journée levée par son auteur avant transmission.
