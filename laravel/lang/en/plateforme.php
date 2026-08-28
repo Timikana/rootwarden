@@ -62,9 +62,9 @@ return [
     'sensible' => "Production",
     'vide_titre' => "No machine in the fleet",
     'vide_texte' => "No machine is registered. The platform key has nothing to protect while the fleet is empty.",
-    'non_porte_titre' => "Only one action is not ported: key rotation",
-    'non_porte_texte' => "Rotating the platform key — regenerating it — is still done from the legacy portal. It is the broadest action in the portal: it acts on the whole fleet at once, without targeting any machine, and it destroys the current private key. Every other action on this page is ported here.",
-    'non_porte_lien' => "Open the platform key in the legacy portal",
+    'comparer_titre' => "Compare with the legacy portal",
+    'comparer_texte' => "Every action on this page is ported here, key rotation included. The legacy portal stays reachable for the duration of the migration, so the two screens can be compared on the same fleet — several of its labels turned out to be false, and this link is there to check that yourself.",
+    'comparer_lien' => "Open the same page in the legacy portal",
 
     // ── Sous-lot P2 : le test de connexion ───────────────────────────────
     // QUATRE situations, et le legacy les replie sur un rouge unique. « Cle non
@@ -157,6 +157,17 @@ return [
                 "« Re-enter » gives back only the SSH password: the root password can only be rewritten from the Servers page",
             ],
         ],
+        'rotation' => [
+            'titre' => "Rotate the platform key",
+            'texte' => "This is the broadest action in the portal. It targets NO machine: it acts on the whole fleet at once, and destroys the private key currently in use.",
+            'effets' => [
+                "generates a new pair and destroys the one in use today",
+                "resets « key deployed » to false on all :total machines, without distinction — a single UPDATE, with no restricting clause",
+                "the machines keep the OLD public key in their authorized_keys: after this action RootWarden can no longer connect to them by key until the new one is deployed there",
+                "reversible for :jours days from the timestamped archive — AND ONLY if the volume holding it survives: the archive lives in the SAME volume as the current key, so losing the volume takes both",
+                "the action requires a second administrator's approval",
+            ],
+        ],
         'revoquer' => [
             'titre' => "Take back the root administration access",
             'texte' => "This action opens an SSH session and DELETES the administration account on the machine. It is the counterpart of the deployment, and it cannot be undone without deploying again.",
@@ -199,6 +210,7 @@ return [
     // Stated INSIDE the decision panel, not in a log: a warning that arrives
     // after the click has not warned.
     'bornes' => [
+        'rotation' => "Two limits, and the second often cancels the first. The destroyed key stays replayable from a timestamped archive for a number of days the screen reads from the effective settings — never hardcoded here. BUT that archive lives in the SAME Docker volume as the current key: losing the volume takes both, and RootWarden does not back that volume up. « Reversible for N days » therefore holds only if the volume survives, and that second condition does not depend on the product.",
         'revoquer' => "Reservation LIFTED by the backend fix: this action now connects using the administration account itself when it is deployed, and elevates without a password. One residual case remains: if that connection fails — the known case is a hardened server whose sshd configuration does not allow that account — it falls back to the nominal account, whose root password was erased on a migrated machine, and elevation then fails. This is not a risk to the machine: the sudoers file is removed last, a partial failure leaves at worst an inert orphan file, and the revocation stays replayable.",
         'compte_service' => "This retry may FAIL on a machine whose administration account was deleted AFTER the passwords were erased: since the account no longer exists, the connection uses the nominal account, whose root password is empty — nothing is then left to elevate through. The « delete then redeploy » round trip is therefore not symmetric. Reservation STILL VALID after the backend fix, which could not lift it: it does not come from a forgotten parameter but from the absence of the account itself. Reported.",
     ],
@@ -210,11 +222,43 @@ return [
     // rule. It ASKS instead, and displays THREE states.
     'credential_titre' => "What the holder of the key answers",
     'credential_aide' => "The counters and the « Password » column above are computed from the presence of bytes in the encrypted column. That is not the same question as « is this secret empty ». The backend, the only holder of the key, is asked and its answer annotates the table.",
-    'credential_borne_root' => "This answer covers the SSH password only. The root password is not covered by the predicate: its displayed state is still computed from the column, with the same approximation. Yet it is the one with no rewrite path from this page — reported.",
-    'credential_divergence' => ":n machine(s) where the column announces a password and the secret decrypts to EMPTY: :noms. For those, the counters above overstate.",
-    'credential_indetermine' => ":n machine(s) whose secret COULD NOT be decrypted: :noms. This is neither « empty » nor « present » — the question stays unanswered, and no counter should settle it.",
+    'credential_borne_root' => "This answer now covers BOTH passwords — the SSH user's and root's. It only covered the first until the backend fix, and that was the less consequential half: the root password is the one with no rewrite path from this page.",
+    'credential_divergence' => ":n machine(s) where the column announces an SSH password and the secret decrypts to EMPTY: :noms. For those, the counters above overstate.",
+    'credential_indetermine' => ":n machine(s) whose SSH password COULD NOT be decrypted: :noms. This is neither « empty » nor « present » — the question stays unanswered, and no counter should settle it.",
     'credential_accord' => "The holder of the key confirms the column on every machine: no divergence, no indeterminate case.",
     'credential_echec' => "The holder of the key did not answer. The counters remain those of the column, with their known approximation — they are not corrected, and it is not claimed that they are right.",
     'badge_mdp_vide_reel' => "actually empty",
     'badge_mdp_illisible' => "unreadable",
+    // ══ P4 — ROTATION: INTERFACE PORTED, NEVER EXERCISED ═════════════════
+    'rotation_titre' => "Rotate the key",
+    'rotation_aide' => "This action has no target: it acts on the whole fleet at once. It is restricted to role 3 and requires a second administrator's approval.",
+    'btn_rotation' => "Rotate the platform key",
+    'rotation_remede' => "This action replaces the key RootWarden uses. It does NOT remove the old one from the machines: the deployment appends it to the authorized-keys file of the nominal account AND of root, and rotation touches neither file. After a rotation followed by a redeployment, those two accounts hold BOTH keys. Answering a compromised key therefore ALSO requires removing the old one, account by account and machine by machine.",
+    'rotation_remede_ou' => "That action DOES exist: the « server_user_remove_key » route backs the file up, recomputes each line's fingerprint instead of filtering on a word, and refuses by default to remove the platform key itself — that refusal is a protection, not a failure. It has no interface here yet: today it is done from the legacy portal, remote accounts page, key by key.",
+    'rotation_remede_parc' => "There is deliberately no fleet-wide action for that removal: applied everywhere at once to the platform key, it would lock the entire fleet out of RootWarden's reach.",
+    'rotation_jamais_exercee' => "This action has never been executed, on any bench. There is only one key, in a single file, and no setting relocates it: there is therefore no way to exercise it without acting on the real fleet. What the screen promises here is read from the code and from the effective settings, not observed in use.",
+    'rotation_sans_retour' => "⚠ :n machine(s) have only this key left for access — RootWarden holds no password for them any more: :noms. For those, rotation is strictly irreversible: if deploying the new key fails, no other way in exists.",
+    'rotation_sans_retour_aucune' => "No machine depends on this key alone: all of them keep a password known to RootWarden. This number is computed, not assumed — it will change as soon as a password is erased.",
+    'rotation_jours_inconnus' => "The period during which the archive stays replayable could not be read. It is not hardcoded here: while it is unknown, treat this action as irreversible.",
+    // The predicate covers BOTH columns since the backend fix. The messages are
+    // split PER COLUMN rather than parameterised: « root » and « SSH » do not
+    // call for the same repair, and the root password has no rewrite path from
+    // this page.
+    'credential_divergence_root' => ":n machine(s) where the column announces a ROOT password and the secret decrypts to EMPTY: :noms. That is the column with no rewrite path here — it can only be re-entered from the Servers page.",
+    'credential_indetermine_root' => ":n machine(s) whose ROOT password COULD NOT be decrypted: :noms. Without an answer on that column, the elevation state of those machines is unknown.",
+    'badge_root_vide_reel' => "root actually empty",
+    'badge_root_illisible' => "root unreadable",
+
+    // ── E-220: AN ORPHAN PRIVILEGE, AND IT HAS A NAME ────────────────────
+    // The backend returns `sudoers_orphelin`, always present even when false.
+    // So NO string is compared: a state that only a sentence distinguishes is
+    // not a state, it is a coincidence of wording.
+    'geste_sudoers_orphelin' => "⚠ :machine: the account was indeed deleted, but the sudo rights file REMAINS on the machine. It grants « NOPASSWD: ALL » to a name that no longer exists — inert today, and live the moment anything recreates an account by that name. Replay the action to finish it.",
+    // ── THE RETYPE: THE SECOND HALF OF THE LESSON ────────────────────────
+    // The port took the first half — a panel that names things, rather than two
+    // `confirm()` that name nothing — and left the second: the legacy REQUIRED
+    // two actions. Rotation was the only one of the six actions to require a
+    // single click, while being the broadest.
+    'champ_recopie' => "To confirm, retype the number of machines concerned",
+    'champ_recopie_aide' => "That number is shown above. The button stays inactive until the retyped value matches exactly.",
 ];
