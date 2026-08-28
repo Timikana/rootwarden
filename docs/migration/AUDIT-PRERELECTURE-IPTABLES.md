@@ -197,3 +197,115 @@ un flux vide qui a l'air vivant.
   dur, déjà mesuré par l'inventaire ;
 - **je n'ai pas mesuré si `iptables_rules` admet des lignes multiples** faute de contrainte
   d'unicité (`MODULE-FILTRAGE.md` §7). C'est une question de schéma, elle appartient à la session 4.
+
+---
+
+# 6. E-240 — LE DIFF, PRÉPARÉ ET NON APPLIQUÉ (2026-08-28)
+
+Pour la session 4. **Rien n'est appliqué** : `backend/` est le sien, et le process en service date
+d'hier (E-238) — un correctif posé aujourd'hui serait inerte, et un écran qui annoncerait la
+protection mentirait sur l'état réel.
+
+## 6.1 L'état actuel
+
+`backend/routes/iptables.py:77-80` :
+
+```python
+test_cmd = f"… iptables-restore --test /tmp/_ipt_test.rules 2>&1; echo EXIT_CODE=$?"
+output_lines = list(execute_as_root_stream(client, test_cmd, root_password, logger=logger))
+output = '\n'.join(output_lines)
+exit_code = 0 if any('EXIT_CODE=0' in l for l in output_lines) else 1
+```
+
+`execute_as_root_stream` rend des **fragments de 4096 octets**, pas des lignes. Trois défauts en
+quatre lignes :
+
+1. **le marqueur est cherché dans chaque FRAGMENT** — à cheval sur une frontière, aucun ne le
+   contient, et un jeu de règles **valide** est déclaré invalide ;
+2. **`'\n'.join` insère un saut de ligne** tous les 4096 octets dans la sortie affichée ;
+3. **le marqueur est cherché par INCLUSION** — `'EXIT_CODE=0' in l`. L'écho PTY renvoie la commande,
+   qui porte `echo EXIT_CODE=$?` : le littéral `$?` ne correspond pas aujourd'hui, mais la protection
+   tient à ce détail. Le jour où une branche écrirait `echo EXIT_CODE=0`, **l'écho suffirait à
+   déclarer le succès**. C'est le piège de `v1.37.11`, sous une troisième forme.
+
+## 6.2 Le diff
+
+**Un helper, à poser près des autres en tête de module :**
+
+```python
+_MARQUEUR_CODE = re.compile(r'^EXIT_CODE=(\d+)\s*$', re.M)
+
+
+def _code_de_sortie(sortie: str):
+    """Le code de sortie porté par le flux, ou `None` s'il n'y en a pas.
+
+    ══ RECOMPOSER D'ABORD, PARSER ENSUITE, ET PAR LIGNE ═════════════════
+
+    `execute_as_root_stream` rend des fragments de 4096 octets, pas des lignes.
+    Chercher le marqueur DANS chaque fragment le perd des qu'il chevauche une
+    frontiere — et un jeu de regles VALIDE est alors declare invalide. Reproduit
+    hors SSH : a 4102, 4104 et 4107 octets de sortie, le verdict s'inverse.
+
+    ══ ET LA COMPARAISON EST D'EGALITE DE LIGNE, PAS D'INCLUSION ════════
+
+    Le canal echote la commande. Chercher `'EXIT_CODE=0' in …` ferait donc du
+    TEXTE ENVOYE une source de verdict le jour ou une branche ecrirait
+    `echo EXIT_CODE=0` en clair — troisieme forme du piege de l'echo PTY, apres
+    le faux « visudo refuse » permanent et le `isdigit()` global.
+    Une ligne qui EST le marqueur ne peut pas etre l'echo d'une commande.
+
+    ══ LE DERNIER, ET `None` PLUTOT QU'UN REPLI ════════════════════════
+
+    Le dernier marqueur gagne : ce qui suit la commande la decrit, ce qui la
+    precede peut l'echoter. Et l'absence rend `None` — « je n'ai pas pu lire le
+    verdict » n'est pas « le verdict est mauvais », et l'appelant doit pouvoir
+    les distinguer. Rendre 1 par defaut ferait passer une incertitude pour un
+    refus.
+    """
+    trouves = _MARQUEUR_CODE.findall(sortie or '')
+    return int(trouves[-1]) if trouves else None
+```
+
+**Et les quatre lignes de la route :**
+
+```python
+            fragments = list(execute_as_root_stream(client, test_cmd, root_password, logger=logger))
+            # Concatener, PAS joindre : les fragments sont contigus, et `'\n'.join`
+            # inserait un saut de ligne tous les 4096 octets dans ce qui est affiche.
+            output = ''.join(fragments)
+            exit_code = _code_de_sortie(output)
+            if exit_code is None:
+                return jsonify({
+                    "success": False,
+                    "verdict_illisible": True,
+                    "message": "Le verdict de validation n'a pas pu etre lu. "
+                               "Ce n'est PAS « les regles sont invalides » : "
+                               "la commande n'a pas rendu son code de sortie.",
+                    "output": output,
+                })
+            if exit_code == 0:
+                return jsonify({"success": True, "message": "Regles valides.", "output": output})
+            return jsonify({"success": False, "message": "Erreur de syntaxe.",
+                            "exit_code": exit_code, "output": output})
+```
+
+## 6.3 Ce que le correctif ferme, et ce qu'il n'ouvre pas
+
+**Ferme** : le chevauchement, les sauts de ligne insérés, et la dépendance à l'écho.
+
+**Ce qu'il CASSERAIT : rien.** La valeur cherchée est la même, l'ensemble balayé est un sur-ensemble
+strict, et le champ `verdict_illisible` est **additif** — un appelant qui ne le lit pas voit
+exactement ce qu'il voyait, `success: false`.
+
+**Et il n'arme aucun geste** — c'est la question que ce chantier pose à chaque correctif. Cette route
+écrit dans `/tmp` et n'applique **rien** : `iptables-restore --test` ne modifie aucune table. Le
+correctif ne rend donc pas un geste plus efficace ; **il rend un verdict plus juste**. Il ne
+rencontre pas le piège d'E-215.
+
+## 6.4 Un résidu que ce diff ne traite pas
+
+`execute_as_root_stream` fait `if text.strip(): yield text` : **un fragment entièrement blanc est
+jeté**. La sortie affichée peut donc être amputée d'une portion d'espaces, quelle que soit la
+recomposition. Sans conséquence sur le verdict — le marqueur n'est pas blanc — mais la sortie
+affichée n'est pas *exactement* celle de la machine. **C'est dans `ssh_utils.py`, hors du périmètre
+de ce diff, et je ne le corrige pas dans le même geste** : ce fichier sert des dizaines d'appelants.
