@@ -111,7 +111,16 @@ $routes = [
     ['Update (dry)',            'POST', '/update', ['machine_id' => $mutId], t('health.route_update')],
     ['Security Updates',       'POST', '/security_updates', ['machine_id' => $mutId], t('health.route_security_updates')],
     ['Dry Run Update',         'POST', '/dry_run_update', ['machine_id' => $mutId], t('health.route_dry_run')],
-    ['Pending Packages',       'POST', '/pending_packages', ['machine_id' => $machineId], t('health.route_pending_packages')],
+    // ⚠ `$mutId` et non `$machineId` : HUITIEME route mutante, manquee par E-227.
+    // Elle execute `apt-get update -qq` EN ROOT — reecriture des listes de paquets —
+    // et visait `srv-zabbix` A CHAQUE CHARGEMENT de la page. Classee parmi les
+    // lectures parce que son NOM dit « pending » ; sa commande dit `update`.
+    //
+    // E-227 a corrige « les sept routes mutantes ». Il en restait une huitieme, et
+    // c'est le commentaire de ce fichier qui dit pourquoi ca compte : « un correctif
+    // applique a certains porteurs et pas a tous laisse le defaut intact la ou il
+    // coute le plus, ET fait croire qu'il est ferme. » Ca valait aussi pour E-227.
+    ['Pending Packages',       'POST', '/pending_packages', ['machine_id' => $mutId], t('health.route_pending_packages')],
     ['Apt Check Lock',         'POST', '/apt_check_lock', ['machine_id' => $machineId], t('health.route_apt_check_lock')],
     ['Dpkg Repair',            'POST', '/dpkg_repair', ['machine_id' => $mutId], t('health.route_dpkg_repair')],
     ['Update Zabbix (redirect)','POST', '/update_zabbix', ['machine_ids' => []], 'Redirect vers /supervision/zabbix/deploy'],

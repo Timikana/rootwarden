@@ -10380,3 +10380,130 @@ d'E-224**, et c'est l'ordre qui compte : *le SQL seul serait plus dangereux que 
 la production pour les **lectures** distantes — dix-sept entrées ouvrent une session SSH vers `srv-zabbix` au
 chargement. C'est une lecture, mais *la règle du chantier ne distingue pas lecture et écriture sur la
 production*, et **une page de diagnostic n'a pas à choisir la machine la plus critique par accident de tri.**
+
+---
+
+## E-228 — E-227 avait laissé une HUITIÈME route mutante, et deux entrées de diagnostic visent des routes qui n'existent pas
+
+**Trouvé par la session 4 en instruisant la question de la cible. Elle a retourné contre E-227 le commentaire
+que le Lead avait écrit dans ce fichier même.**
+
+### La huitième
+
+    health_check.php:114   ['Pending Packages', 'POST', '/pending_packages', ['machine_id' => $machineId], …]
+    updates.py             pending_packages -> `apt-get update -qq` en ROOT
+
+**`apt-get update` réécrit les listes de paquets.** La route visait `$machineId` — donc **`srv-zabbix`, la
+production — à chaque chargement de la page.**
+
+> **E-227 a corrigé « les sept routes mutantes ». Il en restait une huitième, classée parmi les lectures.**
+
+**Et c'est le commentaire posé par E-227 qui dit pourquoi ça compte** : *« un correctif appliqué à certains
+porteurs et pas à tous laisse le défaut intact là où il coûte le plus, ET fait croire qu'il est fermé. »*
+**Ça valait aussi pour E-227.** Corrigé : `$mutId`.
+
+**Pourquoi elle avait échappé** : *son NOM dit « pending », sa commande dit `update`.* Septième occurrence du
+motif « le libellé n'est pas le geste » — et la première où c'est un **nom de route** qui trompe, non un
+commentaire ni un en-tête.
+
+### Le balayage exhaustif des quinze restantes, et le faux positif de la sonde du Lead
+
+Cette fois les quinze ont été vérifiées **par leur COMMANDE, pas par leur nom** : `server_status`,
+`linux_version`, `preflight_check`, `test_platform_key`, `apt_check_lock`, `supervision/zabbix/config/read`,
+`supervision/zabbix/backups`, `wazuh/detect`, `ssh-audit/backups`, `services/list`, `services/status`,
+`services/logs` → **lectures confirmées.**
+
+**⚠ Et la sonde du Lead a produit un faux positif, dans le sens qui ALARME** : elle a signalé
+`supervision/zabbix/version` comme mutante (`apt-get install`, `systemctl restart`). **Faux** — `version_cmd`
+(`supervision.py:138-144`) fait `command -v zabbix_agent2 && zabbix_agent2 -V | head -1`, une lecture pure. Les
+motifs venaient d'`install_cmd` et `uninstall_cmd`, **dans le même bloc `AGENT_REGISTRY`** que la plage de la
+sonde englobait.
+
+*Levé en lisant le corps.* **Septième occurrence de « une sonde écrite pour accuser se trompe du côté qui
+alarme »** — et la troisième fois que c'est celle du Lead.
+
+### ⚠ Deux entrées de diagnostic mesurent RIEN et paraissent VERTES
+
+    health_check.php appelle  /ssh_audit/scan    et  /ssh_audit/config     (tiret bas)
+    le backend enregistre     /ssh-audit/scan    et  /ssh-audit/config     (TRAIT D'UNION)
+
+**Les deux chemins appelés n'existent pas** — vérifié, aucun `@bp.route` ne les porte.
+
+**Et le Lead a d'abord écrit que « le 404 s'affiche en vert ». Faux, mesuré** — il faut distinguer deux
+choses dans ce fichier :
+
+    health_check.php:45   return [$code >= 200 && $code < 500, …]   <- le VERDICT : un 404 compte comme REUSSI
+    health_check.php:351  $r['code'] >= 200 && < 400 ? green : yellow  <- la COULEUR : un 404 s'affiche JAUNE
+
+**Donc la ligne est jaune, et l'entrée compte quand même comme passante.** *La couleur et le verdict ne
+viennent pas de la même condition* — un lecteur voit un avertissement, l'agrégat voit une réussite.
+
+> **Deux entrées de la page de diagnostic n'ont jamais rien diagnostiqué. Le jaune le suggérait ; le verdict
+> le niait.** Même famille que le « LOT conforme » sur zéro exécution : *un verdict de réussite sur une mesure
+> qui n'a pas eu lieu est un silence, pas un verdict* — et **un jaune noyé parmi les jaunes légitimes** (tous
+> les `$mutId = 0` rendent 404 par conception) **ne se distingue pas.** C'est ce qui l'a rendu invisible :
+> *le signal existait, il était indiscernable du bruit voulu.*
+
+**À corriger avec la cible** (ci-dessous) : ce sont les deux seules entrées du fichier dont le chemin est
+faux, et elles sont vertes depuis leur écriture.
+
+### La proposition de cible, et pourquoi ce n'est pas « id 2 »
+
+**La question du Lead mélangeait deux outils.** `health_check.php` diagnostique **le portail** — il affiche un
+code HTTP et une durée, et *une réponse « machine introuvable » y est VERTE*, c'est déjà le principe de
+`$mutId = 0`. **Il ne rend aucun verdict sur l'état d'un serveur ; diagnostiquer le parc est un autre outil.**
+
+    HEALTH_CHECK_MACHINE_ID=      (vide -> 0)
+
+1. **vide vaut 0** — le repli déjà éprouvé dans ce fichier : aucune machine jointe, page fonctionnelle, **et
+   aucune valeur par défaut ne désigne une victime** ;
+2. **viser la production redevient une DÉCISION** — écrire `1` et l'assumer. *Un diagnostic peut viser la
+   production ; ça doit être une décision, pas un accident de `LIMIT 1`* ;
+3. c'est le motif du produit — 80 variables dans `srv-docker.env.example`, récupérées automatiquement.
+
+**Trois options écartées avec leur raison** : `WHERE environment <> 'PROD'` — la colonne existe et est juste
+aujourd'hui, mais **une machine ajoutée sans étiquette deviendrait la cible en silence** ; *une étiquette
+d'inventaire n'est pas un garde-fou*, même raison qu'E-224. `2` en dur — marche ici et nulle part ailleurs.
+`ORDER BY id DESC` — **déplace l'accident sans le supprimer.**
+
+**La valeur par défaut est le seul vrai arbitrage : elle est à l'exploitant** (§7).
+
+---
+
+## E-229 — Elles sont VINGT-ET-UNE, et la vingt-et-unième vient d'être créée par un correctif du chantier
+
+**Le classificateur de la session 6 rejoué sur l'arbre actuel donne 21, non 20.** L'écart est
+**`/sshd_allow_user`**, qui rendait `'success': True` **en dur** et rend `'success': atteste` **depuis le
+correctif d'E-214 du même soir.**
+
+> **Le chantier a ajouté une route à cette famille — et la session 6 l'avait annoncé quelques heures plus
+> tôt** : *« quand tu fais rendre 200 + success:false à une route qui rendait toujours true, tu changes un
+> contrat. »*
+
+**Deux mesures justes qui divergent parce qu'elles datent de deux moments.** *Une liste de routes n'est pas une
+donnée : c'est une photographie, et le chantier la périme lui-même.* C'est la troisième liste figée à rancir en
+deux jours — et la seule dont la péremption ait été **prédite avant de se produire.**
+
+### Vingt sur vingt-et-une sont ATTEIGNABLES
+
+`rc == 0` (**8**) · `all_ok` (**4**) · `ok == len(results)` (**2**) · `deleted > 0` (**2**) · le reste.
+
+### Et la vingt-et-unième est inatteignable PAR UN DÉFAUT
+
+**`/wazuh/install_all` ne rend jamais son `jsonify`** : `AND a.id IS NULL`, aucun `try`, donc **500 avant le
+verdict** (E-224).
+
+> **Elle redeviendra atteignable au moment exact où E-224 sera corrigé.**
+
+**Argument de plus pour la borne `machine_ids`** : le correctif d'E-224 n'ouvre pas seulement une route de parc
+vers la production — **il ouvre aussi un verdict que personne n'a jamais vu se produire.** *Troisième
+occurrence de « un défaut qui protège par accident cesse de protéger quand on le corrige », et la première où
+elle se cumule avec une autre.*
+
+### Une note donnée comme une note
+
+`/fail2ban/install` fait `success = rc == 0 or 'is already the newest version' in out`, et **sa commande ne
+pose pas `LC_ALL`** alors que ses homologues d'`updates.py` posent `LC_ALL=C.UTF-8`. **Ce n'est pas un défaut
+aujourd'hui** : `apt-get install -y` rend `rc = 0` quand le paquet est déjà là, donc le premier terme couvre le
+cas et la sous-chaîne est **redondante**. *Ce qui mérite signalement est l'incohérence avec les commandes
+voisines* — et une sous-chaîne redondante devient décisive le jour où le premier terme change.

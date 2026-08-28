@@ -363,7 +363,17 @@ declare -A REF_LARAVEL=(
   # garde n'est donc pas exercable sur ce banc ; sont mesures le refus au role 1
   # (403, AU STATUT) et le contournement du role 3. Ecrit comme un trou et non
   # comme une couverture — sinon quelqu'un le comblera en deplacant un droit.
-  [go-page-cle-plateforme]=18
+  # 18 -> 21 le 2026-08-28 : la suite couvre desormais P1, P2, P3 et le REFUS de P4.
+  #
+  # ⚠ P1 TEL QU'ENONCE N'AVAIT AUCUN OBJET. « L'ecran nomme les machines qui
+  # deviendraient injoignables » : les trois machines du parc portent un mot de
+  # passe, donc `sans_retour` vaut ZERO — l'assertion serait passee PAR ABSENCE
+  # D'OBJET. Remplacee par « l'ecran concorde-t-il avec la base ? », qui a un objet
+  # dans les deux cas (nommer quand il y en a, ENONCER L'ABSENCE sinon) et qui
+  # bascule d'elle-meme au premier effacement de mot de passe, sans reecriture.
+  # La liste attendue est DERIVEE avec le predicat du portage : coder `srv-zabbix`
+  # aurait mesure le presse-papier de l'auteur, pas le parc.
+  [go-page-cle-plateforme]=21
   # `adm/` sous-lot D9a : droits sudo par compte distant.
   # 18 sur le portage contre 12 sur le legacy, et les six d'ecart portent tous
   # sur les deux defauts corriges : le prereglage par defaut qui ne donne plus

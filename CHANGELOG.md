@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.60** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.62** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,86 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.62 — E-227 avait laisse une HUITIEME route mutante, et ma sonde a produit un faux positif de plus
+
+#### ⚠ La huitieme, et c'est mon propre commentaire qui condamne mon correctif
+
+    health_check.php:114   ['Pending Packages', 'POST', '/pending_packages', ['machine_id' => $machineId], …]
+    updates.py             pending_packages -> `apt-get update -qq` en ROOT
+
+**`apt-get update` reecrit les listes de paquets**, et la route visait **`srv-zabbix`, la production, a chaque
+chargement de la page.** E-227 a corrige « les sept routes mutantes » ; **il en restait une huitieme, classee
+parmi les lectures.**
+
+> Et c'est le commentaire pose par E-227 qui dit pourquoi ca compte : *« un correctif applique a certains
+> porteurs et pas a tous laisse le defaut intact la ou il coute le plus, ET fait croire qu'il est ferme. »*
+> **Ca valait aussi pour E-227.**
+
+**Pourquoi elle avait echappe** : *son NOM dit « pending », sa commande dit `update`.* Septieme occurrence de
+« le libelle n'est pas le geste » — **et la premiere ou c'est un nom de ROUTE qui trompe**, non un commentaire
+ni un en-tete.
+
+#### Le balayage exhaustif, cette fois par la COMMANDE et pas par le nom
+
+Les quinze restantes verifiees une par une : **lectures confirmees.**
+
+**⚠ Et ma sonde a produit un faux positif, dans le sens qui ALARME** : elle signalait
+`supervision/zabbix/version` comme mutante (`apt-get install`, `systemctl restart`). **Faux** — `version_cmd`
+(`supervision.py:138-144`) fait `command -v zabbix_agent2 && zabbix_agent2 -V | head -1`, une lecture pure. Les
+motifs venaient d'`install_cmd` et `uninstall_cmd`, **dans le meme bloc `AGENT_REGISTRY`** que la plage de ma
+sonde englobait. **Leve en lisant le corps.** *Septieme occurrence de « une sonde ecrite pour accuser se trompe
+du cote qui alarme », et la troisieme fois que c'est la mienne.*
+
+#### ⚠ Deux entrees de diagnostic n'ont jamais rien diagnostique
+
+    health_check appelle  /ssh_audit/scan   /ssh_audit/config      (tiret bas)
+    le backend enregistre /ssh-audit/scan   /ssh-audit/config      (TRAIT D'UNION)
+
+**Aucun `@bp.route` ne porte les chemins appeles.** Et il faut distinguer deux conditions de ce fichier, parce
+que **j'avais d'abord ecrit que le 404 s'affichait en vert — c'est faux** :
+
+    :45   return [$code >= 200 && $code < 500, …]        <- le VERDICT : un 404 compte comme REUSSI
+    :351  code >= 200 && < 400 ? green : yellow          <- la COULEUR : un 404 s'affiche JAUNE
+
+**La ligne est jaune, et l'entree compte quand meme comme passante.** *La couleur et le verdict ne viennent pas
+de la meme condition* — un lecteur voit un avertissement, l'agregat voit une reussite.
+
+> **Le signal existait, il etait indiscernable du bruit voulu** : tous les `$mutId = 0` rendent 404 **par
+> conception**, donc deux jaunes fautifs se noient parmi les jaunes legitimes.
+
+#### La cible : `HEALTH_CHECK_MACHINE_ID=` (vide -> 0), et la valeur par defaut est un arbitrage
+
+**Ma question melangeait deux outils.** `health_check.php` diagnostique **le portail** — code HTTP et duree, et
+*une reponse « machine introuvable » y est passante*, c'est deja le principe de `$mutId = 0`. **Diagnostiquer le
+parc est un autre outil.**
+
+**Vide vaut 0** — aucune machine jointe, page fonctionnelle, **et aucune valeur par defaut ne designe une
+victime**. *Viser la production redevient une DECISION : ecrire `1` et l'assumer, au lieu d'un accident de
+`LIMIT 1`.*
+
+**Trois options ecartees avec leur raison** : `WHERE environment <> 'PROD'` — **une machine ajoutee sans
+etiquette deviendrait la cible en silence**, et *une etiquette d'inventaire n'est pas un garde-fou* ; `2` en
+dur — marche ici et nulle part ailleurs ; `ORDER BY id DESC` — **deplace l'accident sans le supprimer.**
+
+#### E-229 — elles sont VINGT-ET-UNE, et la 21e vient d'etre creee par un correctif du chantier
+
+Le classificateur rejoue sur l'arbre actuel donne **21**, non 20. L'ecart est **`/sshd_allow_user`**, qui
+rendait `'success': True` en dur et rend `'success': atteste` **depuis le correctif d'E-214 du meme soir.**
+
+> **Le chantier a ajoute une route a cette famille — et la session 6 l'avait annonce quelques heures plus
+> tot** : *« quand tu fais rendre 200 + success:false a une route qui rendait toujours true, tu changes un
+> contrat. »*
+
+*Une liste de routes n'est pas une donnee : c'est une photographie, et le chantier la perime lui-meme.*
+Troisieme liste figee a rancir en deux jours — **et la seule dont la peremption ait ete predite avant de se
+produire.**
+
+**Vingt sur vingt-et-une sont atteignables** — `rc == 0` (8), `all_ok` (4), `ok == len(results)` (2),
+`deleted > 0` (2). **Et la vingt-et-unieme est inatteignable PAR UN DEFAUT** : `/wazuh/install_all` ne rend
+jamais son `jsonify` (500 avant le verdict, E-224). **Elle redeviendra atteignable au moment exact ou E-224
+sera corrige** — le correctif n'ouvre donc pas seulement une route de parc vers la production, **il ouvre aussi
+un verdict que personne n'a jamais vu se produire.**
 
 ### v1.38.61 — deux causes pour un même symptôme, et un « scan terminé » qui n'avait rien lu
 
@@ -4946,7 +5026,8 @@ correspondance reelle :**
 | v1.38.55 | `6f6ed4f` | `platform_key` P1 mesuree — 18 laravel / 15 legacy, le filet n'a rien eu a bloquer |
 | v1.38.56 | `c7d9f5d` | la charte du DSI delegue : 7 arbitrages delegues, 8 qui ne peuvent pas l'etre |
 | v1.38.59 | `caaaa3c` | E-215 et E-214 corriges ; 31 routes `200 + success:false` ; `git rm` stage aussi |
-| v1.38.60 | (ce commit) | ma 5e correction visait la mauvaise moitie ; j'ai redemande une tache faite |
+| v1.38.60 | `79bc8a5` | ma 5e correction visait la mauvaise moitie ; j'ai redemande une tache faite |
+| **v1.38.62** | (ce commit) | **E-228 : une HUITIEME route mutante** ; deux diagnostics fantomes ; E-229 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
