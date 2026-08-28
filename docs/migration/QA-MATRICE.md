@@ -387,6 +387,67 @@ comportement ne doit pas vivre dans un module qu'on remplace pour tester* — vu
 l'autre bout : **mon `conftest.py` décide de ce qui est mesurable**, et chacun de ses
 neuf remplacements est un angle mort que personne ne relit.
 
+## 2 sexies. QA-009 — un invariant remis par une autre session, et repris
+
+`backend/tests/test_invariant_machine_id.py` · **4 PASS**
+
+La session 7 a écrit ce fichier dans mon périmètre sur la foi d'un « poste vacant »,
+l'a signalé d'elle-même et me l'a remis. **Il est bon, et je l'ai gardé** — mais le
+reprendre voulait dire le mesurer, pas le relire.
+
+L'invariant : *sur une route portant `@require_machine_access`, l'identifiant doit être
+obligatoire ; s'il est facultatif, la route doit porter une autorisation propre.*
+`helpers.py` fait `denied = [mid for mid in ids if not check_machine_access(mid)]` —
+**`ids` vide ⇒ `denied` vide ⇒ le garde passe**, silencieusement.
+
+### Ce que la mesure a trouvé, et qu'une relecture n'aurait pas donné
+
+**Sa liste d'état connu portait trois entrées ; l'instrument n'en trouvait plus que
+UNE.** Deux disparitions, **deux causes opposées**, et rien ne les distinguait :
+
+| entrée | ce qui s'était passé |
+|---|---|
+| `ssh_audit_policies_get` | **corrigée** — elle porte maintenant `@require_permission`. L'entrée était un résidu |
+| `docker_results` | **non corrigée** — c'est l'**instrument** qui l'exonérait à tort |
+
+`docker_results` a un `machine_id` **optionnel**, et le `return` que la règle voyait vit
+dans la branche **positive** : il traite un identifiant *présent et mal formé*. Absent,
+la route continue. La règle mesurait *la présence d'un `return` sous un `if` qui
+mentionne l'identifiant* ; la propriété est que ce `return` soit **sur le chemin de
+l'absence**. Un faux PASS, **du côté qui exonère** — donc du côté qui ne se relit pas.
+
+### Le resserrement a été mesuré avant d'être écrit
+
+Une première tentative exigeait un test d'absence explicite : **62 routes basculaient**,
+parce que la forme `if err:` — l'erreur rendue par un résolveur — est un test de
+**présence**. On n'écarte donc que la forme fautive : `if <identifiant>:` en polarité
+positive, où seul un `return` dans le `else` vaudrait refus.
+
+> Le sens de l'erreur résiduelle est celui qui coûte le moins : l'instrument peut encore
+> **accuser** à tort — ce qui se relit — mais il ne peut plus **exonérer** une route dont
+> l'identifiant est facultatif.
+
+### La garde qui manquait, et c'est la même que la mienne
+
+L'invariant assertait que rien de **neuf** n'entre dans la classe. Rien n'assertait que
+les entrées **connues** y sont encore : une liste qui ne peut plus correspondre passe au
+vert en ne mesurant plus rien. C'est mot pour mot la contrepartie que j'avais écrite
+pour le relevé des appelants — *une liste qui se raccourcit se relit aussi attentivement
+qu'une liste qui s'allonge* — et elle manquait ici.
+
+### Preuve d'échec
+
+| mutation | rouges |
+|---|---|
+| le refus retiré d'une route gardée | **1** — l'invariant, qui **nomme** la route |
+| **l'instrument revient à la règle large** | **1** — la garde symétrique, et elle seule |
+| le répertoire des routes n'est plus vu | **3** |
+
+La deuxième est la décisive : elle prouve que l'ancienne règle exonérait, et que **seule
+la garde neuve** l'attrape. Une quatrième mutation — la route corrigée, donc l'entrée à
+retirer — **n'a pas pu être appliquée** (le motif ne correspondait pas à l'ordre réel des
+décorateurs) : elle n'est pas comptée.
+
 ## 3. QA-002 — les gardes du portage, côté PHP
 
 `laravel/tests/` · **232 PASS, 764 assertions, 0 FAIL**
@@ -773,6 +834,7 @@ la seule réparation qui ne coûte rien à personne.
 | 2026-08-27 | QA-008 — E-201 / E-205 (porte à quatre yeux) | **30 passed** ; 5 mutations → **16, 3, 5, 1 et 5 rouges** — la quatrième après correction de l'instrument |
 | 2026-08-27 | l'analyseur d'appelants pris en défaut **deux fois** par `pare-feu.js` | `JSON.parse` ignoré : faux dédouanement, puis fausse accusation sur la branche jumelle |
 | 2026-08-27 | suites après la vague `cle-plateforme` + `pare-feu` | **540 pytest**, **268 PHPUnit / 858 assertions** |
+| 2026-08-28 | QA-009 — invariant `@require_machine_access` repris | **4 passed** ; suite complète **544 pytest** ; 3 mutations → **1, 1 et 3 rouges** |
 
 Chaque chiffre porte sa commande de remesure :
 

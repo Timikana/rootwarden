@@ -68,14 +68,17 @@ FACULTATIVES_CONNUES = {
     # `updates.py`, PAS `supervision.py` : le nom recopie du releve etait faux,
     # et c'est le troisieme test de ce fichier qui l'a attrape.
     ('updates.py', 'update_zabbix'),
-    # ⚠ E-211, LE SEUL ECART REEL — et plus etroit que la premiere redaction du
-    # releve ne le disait. Sans `machine_id`, la requete rend `WHERE machine_id
-    # IS NULL` : les politiques GLOBALES du portail, PAS celles des machines
-    # d'autrui. Il n'y a aucune lecture transverse du parc. L'ecart reel : ces
-    # politiques globales sont lisibles par tout porteur de la cle d'API, sans
-    # `can_audit_ssh`. Corrige depuis (`@require_permission('can_audit_ssh')`) —
-    # l'entree reste tant que la mesure ne l'a pas confirme EN SERVICE.
-    ('ssh_audit.py', 'ssh_audit_policies_get'),
+    # ── E-211 (`ssh_audit.py`, `ssh_audit_policies_get`) EST RETIREE ─────────
+    #
+    # Elle porte desormais `@require_permission('can_audit_ssh')` : la route a
+    # une autorisation PROPRE, donc elle sort de la classe mesuree ici. La garder
+    # « tant que la mesure ne l'a pas confirme EN SERVICE » etait une intention
+    # juste et un mecanisme faux : cette liste ne mesure pas le service, elle
+    # mesure le DISQUE. Une entree qui ne peut plus jamais correspondre est un
+    # residu — et un residu masque une regression du meme nom.
+    #
+    # Ce que le service doit confirmer se mesure ailleurs : au navigateur, ou par
+    # un rejeu apres redemarrage. Pas ici.
 }
 
 # En dessous de ce seuil, l'analyse n'a rien vu : c'est l'INSTRUMENT qui est
@@ -105,63 +108,102 @@ def _lit_un_identifiant(fn):
 def _refuse_si_absent(fn):
     """La fonction REFUSE-t-elle quand l'identifiant manque ?
 
-    ══ QUATRE FORMES, ET J'AI DU LES TROUVER PAR LA MESURE ══════════════════
+    ══ QUATRE FORMES, TROUVEES PAR LA MESURE ════════════════════════════════
 
-    Ma premiere redaction ne cherchait que `if not <var>` et accusait **18**
+    Une premiere redaction ne cherchait que `if not <var>` et accusait **18**
     routes la ou le releve en compte 3. Chaque elargissement est venu d'une
     lecture, jamais d'une supposition :
 
       1. `if not machine_id: return 400`                    — le refus explicite ;
-      2. `validate_machine_id(data.get('machine_id'))`      — mesure dans le
-         conteneur : `None`, `''` et `0` levent `ValueError` ;
-      3. `..., err = resolve_ssh_creds(data)` puis `if err:` — mesure :
-         `resolve_ssh_creds({})` rend `err = 'machine_id requis.'` ;
-      4. `if not machine_id or not username:`               — un `BoolOp`, que
-         les trois premieres formes ne voyaient pas.
+      2. `validate_machine_id(data.get('machine_id'))`      — `None`, `''` et `0`
+         levent `ValueError` ;
+      3. `..., err = resolve_ssh_creds(data)` puis `if err:` — `resolve_ssh_creds({})`
+         rend `err = 'machine_id requis.'` ;
+      4. `if not machine_id or not username:`               — un `BoolOp`.
 
-    **Enumerer des formes est sans fin.** On generalise donc : toute variable
-    NOURRIE par une lecture d'identifiant — y compris par deballage du tuple
-    d'un resolveur — et qui apparait dans un `if` dont une branche REND ou LEVE,
-    vaut refus.
+    **Enumerer des formes est sans fin.** On generalise : toute variable NOURRIE
+    par une lecture d'identifiant — deballage du tuple d'un resolveur compris —
+    mentionnee dans un `if` dont une branche REND ou LEVE, vaut refus.
+
+    ══ ET CETTE GENERALISATION EXONERE A TORT — MESURE LE 2026-08-28 ═════════
+
+    `docker.py:docker_results` etait classee « exige l'identifiant ». Elle ne
+    l'exige pas : son `machine_id` est OPTIONNEL, et le `return` que la regle
+    voyait vit dans la branche **POSITIVE** —
+
+        if machine_id:
+            try:    params.append(int(machine_id))
+            except: return jsonify(...), 400     <-- le `return` que la regle voyait
+        else:
+            ...    # identifiant ABSENT : la route CONTINUE
+
+    Le `return` y traite un identifiant **present et mal forme**. Absent, la
+    route poursuit. La regle mesurait la presence d'un `return` sous un `if` qui
+    MENTIONNE l'identifiant ; la propriete est que ce `return` soit sur le chemin
+    de l'**ABSENCE**. C'est un faux PASS, et du cote qui EXONERE — donc du cote
+    qui ne se relit pas.
+
+    LA PARADE EST ETROITE, ET C'EST DELIBERE. Resserrer en exigeant un test
+    d'absence explicite a ete mesure : **62 routes** basculaient, parce que la
+    troisieme forme (`if err:`) est un test de PRESENCE — d'une erreur, pas d'un
+    identifiant. On n'ecarte donc QUE la forme fautive : `if <identifiant>:` en
+    polarite positive, ou seul un `return` dans le `else` vaudrait refus.
 
     ⚠ CE QUE `resolve_ssh_creds` PROUVE, ET CE QU'IL NE PROUVE PAS. Il EXIGE
-    l'identifiant — c'est la propriete que cet invariant mesure. Il n'AUTORISE
-    rien : il fait `SELECT ... WHERE id = %s`, sans `check_machine_access`. Les
-    deux sont vrais et compatibles, et il faut les tenir separes : s'appuyer sur
-    lui pour l'exigence est juste, s'appuyer sur lui pour l'acces serait compter
-    une lecture pour une garde.
+    l'identifiant — la propriete mesuree ici. Il n'AUTORISE rien : il fait
+    `SELECT ... WHERE id = %s`, sans `check_machine_access`. S'appuyer sur lui
+    pour l'exigence est juste ; pour l'acces, ce serait compter une lecture pour
+    une garde.
+
+    Le sens de l'erreur residuelle est celui qui coute le moins : cette fonction
+    peut encore rendre `False` sur une route qui exige bien l'identifiant — donc
+    ACCUSER a tort, ce qui se relit — mais elle ne peut plus EXONERER une route
+    dont l'identifiant est facultatif.
     """
     # FORME 2 : le validateur partage leve quand l'identifiant manque.
     for n in ast.walk(fn):
         if isinstance(n, ast.Call) and _nom_decorateur(n) == 'validate_machine_id':
             return True
 
-    # Les variables nourries par une lecture d'identifiant, directement ou par
-    # le deballage du tuple d'un resolveur.
-    nourries = set()
+    # Deux familles de variables, et elles ne se testent PAS dans la meme
+    # polarite : l'identifiant se teste par son ABSENCE, l'erreur d'un resolveur
+    # par sa PRESENCE.
+    identifiants, erreurs = set(), set()
     for n in ast.walk(fn):
         if not isinstance(n, ast.Assign):
             continue
-        alimente = _lit_un_identifiant(n.value) or (
-            isinstance(n.value, ast.Call)
-            and _nom_decorateur(n.value).endswith('resolve_ssh_creds'))
-        if not alimente:
+        par_resolveur = (isinstance(n.value, ast.Call)
+                         and _nom_decorateur(n.value).endswith('resolve_ssh_creds'))
+        if not (par_resolveur or _lit_un_identifiant(n.value)):
             continue
+        cible = erreurs if par_resolveur else identifiants
         for c in n.targets:
             for x in ast.walk(c):
                 if isinstance(x, ast.Name):
-                    nourries.add(x.id)
+                    cible.add(x.id)
+
+    nourries = identifiants | erreurs
     if not nourries:
         return False
 
-    # Tout `if` qui MENTIONNE une de ces variables et dont une branche rend ou
-    # leve : c'est un chemin de sortie quand l'identifiant manque.
     for n in ast.walk(fn):
         if not isinstance(n, ast.If):
             continue
         mentionnees = {x.id for x in ast.walk(n.test) if isinstance(x, ast.Name)}
         if not (mentionnees & nourries):
             continue
+
+        # `if <identifiant>:` — le corps traite l'identifiant PRESENT. Seul un
+        # `return` dans le `else` porterait sur son absence.
+        polarite_positive = (isinstance(n.test, ast.Name)
+                             and n.test.id in identifiants
+                             and n.test.id not in erreurs)
+        if polarite_positive:
+            if any(isinstance(x, (ast.Return, ast.Raise))
+                   for b in n.orelse for x in ast.walk(b)):
+                return True
+            continue
+
         if any(isinstance(x, (ast.Return, ast.Raise)) for x in ast.walk(n)):
             return True
     return False
@@ -247,3 +289,42 @@ def test_les_connues_sont_toujours_des_routes_reelles(routes):
         'Entrees de `FACULTATIVES_CONNUES` qui ne designent plus aucune route :\n  '
         + '\n  '.join(f'{f}:{n}' for f, n in fantomes)
         + '\nRetirer l entree, ou corriger le nom.')
+
+
+def test_les_connues_sont_TOUJOURS_TROUVEES(routes):
+    """LA GARDE SYMETRIQUE, ET ELLE MANQUAIT.
+
+    L'invariant asserte que rien de NEUF n'entre dans la classe. Rien n'assertait
+    que les entrees CONNUES y sont encore. Une liste qui ne peut plus correspondre
+    passe donc au vert en ne mesurant plus rien — et c'est dans cet etat que ce
+    fichier a ete remis : **deux de ses trois entrees n'etaient plus trouvees**,
+    pour deux raisons OPPOSEES.
+
+      `ssh_audit_policies_get`  CORRIGEE — elle porte une autorisation propre.
+                                L'entree etait un residu : retiree.
+      `docker_results`          NON corrigee — c'est l'INSTRUMENT qui l'exonerait
+                                a tort. Corrige dans `_refuse_si_absent`.
+
+    **Une seule des deux disparitions etait une bonne nouvelle**, et rien ne les
+    distinguait. C'est exactement pourquoi il faut regarder : une liste qui se
+    raccourcit se relit aussi attentivement qu'une liste qui s'allonge.
+    """
+    trouvees = set()
+    for r in routes:
+        if 'require_machine_access' not in r['decorateurs']:
+            continue
+        if r['refuse']:
+            continue
+        if any(d in ('require_role', 'require_permission') for d in r['decorateurs']):
+            continue
+        trouvees.add((r['fichier'], r['nom']))
+
+    disparues = sorted(FACULTATIVES_CONNUES - trouvees)
+    assert not disparues, (
+        "Des entrees connues ne sont plus trouvees par l'invariant :\n  "
+        + '\n  '.join(f'{f}:{n}' for f, n in disparues)
+        + "\n\nDEUX causes opposees, et il faut trancher laquelle :\n"
+          "  - la route a ete CORRIGEE (autorisation propre, ou identifiant\n"
+          "    desormais exige) : retirer l entree, en ecrivant la raison ;\n"
+          "  - l INSTRUMENT ne la voit plus : `_refuse_si_absent` exonere a tort,\n"
+          "    et il exonere alors aussi tout ce qui lui ressemble.")
