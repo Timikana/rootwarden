@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.54** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.55** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,59 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.55 — `platform_key` P1 mesuree : le filet n'a RIEN eu a bloquer, et c'est plus fort qu'un avortement reussi
+
+    REF_LARAVEL[go-page-cle-plateforme] = **18**
+    REF_LEGACY [go-page-cle-plateforme] = **15**      0 FAIL des deux cotes
+
+**Premiere suite a naitre depuis le correctif du runner**, et ses deux moities ont servi :
+
+    NEUVE     laravel/go-page-cle-plateforme - aucune reference : elle TOURNE, son compte est a inscrire.
+    NEUVE     legacy/go-page-cle-plateforme  - idem
+    LOT conforme — **2 execution(s).**
+
+*Hier le meme rejeu affichait « LOT conforme » sur zero execution.* **Le mot « NEUVE » et le compte
+d'executions font tout le travail** : la ligne dit ce qui s'est passe **et** ce qu'il reste a faire.
+
+#### La mesure de surete, et c'est elle qui compte
+
+    requetes AVORTEES : (aucune)
+    laissees passer   : 6 GET de lecture (laravel) · 4 (legacy)
+    PASS  aucun geste interdit n'a abouti · aucune requete n'a vise la production
+    PASS  srv-zabbix intacte · l'etat de deploiement du parc intact
+
+> **Le filet n'a rien eu a bloquer — c'est plus fort qu'un avortement reussi** : le clic sur le bouton de
+> rotation **n'emet rien**, mesure **au RESEAU** et pas au DOM. *Un panneau peut s'ouvrir et l'appel partir
+> quand meme.*
+
+**Et la suite relit l'ETAT DE DEPLOIEMENT DU PARC, pas seulement `srv-zabbix`** — c'est LUI que la rotation
+remettrait a zero. *Prouver qu'un geste n'a pas eu lieu se fait sur ce qu'il aurait CHANGE, pas sur ce qu'on
+craint qu'il detruise.* Le filet lui-meme est assere en fin de suite : **un filet non mesure est une croyance.**
+
+#### Elle ne cherche que le REFUS, pour DEUX raisons, ecrites separement
+
+1. **aucune cible sure n'existe** — pas de `machine_id`, `UPDATE` sans clause de restriction : la portee **EST**
+   le parc ;
+2. **la porte a quatre yeux est branchee** (E-201) — viser la reussite mesurerait un **202 « en attente
+   d'approbation »** et l'appellerait un echec. **Elle mesurerait LA PORTE, pas le geste.**
+
+#### Un trou ECRIT COMME UN TROU
+
+Aucun compte d'epreuve ne detient `can_manage_platform_key` — **mesure en base au debut de la suite, pas
+suppose**, avec une assertion qui **rougit si un compte venait a l'obtenir**. Le chemin **nominal** de la garde
+n'est donc pas exercable sur ce banc ; sont mesures le refus au role 1 (**403, au statut**) et le contournement
+du role 3.
+
+> *Ecrit comme un trou assume et non comme une couverture — sinon quelqu'un le comblera un jour en deplacant
+> un droit.*
+
+#### Deux informations perimees, corrigees par lecture
+
+La rotation ne fait plus `unlink()` mais `_archive_platform_key()` : le risque « secret non reproductible »
+est **leve**. **Mais elle ne REVOQUE rien** (E-226) : `authorized_keys` est en **append** pour `root` et le
+compte nominal. **RootWarden perd l'USAGE, l'ancienne cle reste AUTORISEE** — deux faits distincts tenus
+ensemble dans l'en-tete. *Une conclusion juste dont la raison a change se reecrit, elle ne se recopie pas.*
 
 ### v1.38.54 — j'avais attribue E-215 a la mauvaise fonction, et j'ai confirme une consigne qui visait a cote
 
@@ -4538,7 +4591,8 @@ correspondance reelle :**
 | v1.38.51 | `4920acd` | finir chaque onglet : les manques declares, et le tableau de bord RETENU |
 | **v1.38.52** | `a354902` | **E-227 : ouvrir le diagnostic deployait un NOPASSWD: ALL sur la production** |
 | v1.38.53 | `737320d` | `platform_key` P4 porte, les deux points bloquants corriges |
-| v1.38.54 | (ce commit) | j'avais attribue E-215 a la mauvaise fonction |
+| v1.38.54 | `93ae130` | j'avais attribue E-215 a la mauvaise fonction |
+| v1.38.55 | (ce commit) | `platform_key` P1 mesuree — 18 laravel / 15 legacy, le filet n'a rien eu a bloquer |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
