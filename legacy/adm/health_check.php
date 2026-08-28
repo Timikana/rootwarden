@@ -46,6 +46,20 @@ function testRoute(string $url, string $method, string $api_key, ?array $body = 
 }
 
 // Machine ID for tests that need one (routes en LECTURE seule)
+//
+// ⚠ 2026-08-28 — `LIMIT 1` SANS `ORDER BY` REND LA PREMIERE LIGNE, c'est-a-dire
+// `id = 1` : `srv-zabbix`, la PRODUCTION, criticite CRITIQUE. Ce n'est donc pas
+// « une machine quelconque » : c'est toujours la meme, et c'est la pire.
+//
+// Le patch ci-dessous pointait deja les routes mutantes sur `$mutId = 0` — mais
+// SIX y avaient echappe et visaient `$machineId`, donc la production, AU SIMPLE
+// CHARGEMENT DE LA PAGE : `/deploy_platform_key`, `/deploy_service_account`
+// (qui cree `rootwarden` avec NOPASSWD: ALL), `/sshd_allow_user` (qui reecrit
+// `sshd_config` et recharge `sshd`), `/server_user_remove_key`, `/last_reboot`
+// et `/dry_run_update`. Elles visent `$mutId` desormais, comme leurs voisines.
+//
+// « Un correctif applique a certains porteurs et pas a tous laisse le defaut
+// intact la ou il coute le plus, ET fait croire qu'il est ferme. »
 $stmt = $pdo->query("SELECT id FROM machines LIMIT 1");
 $machineId = $stmt->fetchColumn() ?: 0;
 
@@ -68,20 +82,25 @@ $routes = [
     ['CVE Trends',             'GET',  '/cve_trends', null, t('health.route_cve_trends')],
     ['Server Status',          'POST', '/server_status', ['machine_id' => $machineId], t('health.route_server_status')],
     ['Linux Version',          'POST', '/linux_version', ['machine_id' => $machineId], t('health.route_linux_version')],
-    ['Last Reboot',            'POST', '/last_reboot', ['machine_id' => $machineId], t('health.route_last_reboot')],
+    ['Last Reboot',            'POST', '/last_reboot', ['machine_id' => $mutId], t('health.route_last_reboot')],
     ['Reboot Server (dry)',    'POST', '/reboot_server', ['machine_id' => 0, 'delay_minutes' => 0], 'Redemarre le serveur (machine_id=0 -> 404)'],
 
     // ── SSH / Deploiement ───────────────────────────────────────────────
     ['Deploy (dry)',            'POST', '/deploy', ['machines' => []], t('health.route_deploy')],
     ['Preflight Check',        'POST', '/preflight_check', ['machine_id' => $machineId], t('health.route_preflight')],
     ['Platform Key Info',      'GET',  '/platform_key', null, t('health.route_platform_key')],
-    ['Deploy Platform Key',    'POST', '/deploy_platform_key', ['machine_id' => $machineId], t('health.route_deploy_platform_key')],
+    ['Deploy Platform Key',    'POST', '/deploy_platform_key', ['machine_id' => $mutId], t('health.route_deploy_platform_key')],
     ['Test Platform Key',      'POST', '/test_platform_key', ['machine_id' => $machineId], t('health.route_test_platform_key')],
-    ['Deploy Service Account', 'POST', '/deploy_service_account', ['machine_id' => $machineId], t('health.route_deploy_service_account')],
-    ['Scan Server Users',      'POST', '/scan_server_users', ['machine_id' => $machineId], t('health.route_scan_server_users')],
+    ['Deploy Service Account', 'POST', '/deploy_service_account', ['machine_id' => $mutId], t('health.route_deploy_service_account')],
+    ['Scan Server Users',      'POST', '/scan_server_users', ['machine_id' => $mutId], t('health.route_scan_server_users')],
+    // ⚠ `$mutId` et non `$machineId` : cette route est classee « lecture » PARTOUT
+    // et elle ECRIT — `UPDATE` de l'inventaire, `INSERT` d'un compte neuf avec
+    // AUTO-CLASSEMENT, dont le statut `pending_review` que la page des comptes
+    // distants documente comme SANS RETOUR (E-213). « Sans effet » se lit dans
+    // la commande, pas dans le libelle.
     ['Server User Keys',       'GET',  "/server_user_keys?machine_id=$machineId&username=root", null, 'Liste cles SSH detaillees (v1.19.0)'],
-    ['Server User Remove Key', 'POST', '/server_user_remove_key', ['machine_id' => $machineId, 'username' => 'nope', 'fingerprint_sha256' => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'], 'Supprime UNE cle precise (v1.19.0)'],
-    ['Sshd Allow User',        'POST', '/sshd_allow_user', ['machine_id' => $machineId, 'username' => 'rootwarden'], 'Patche AllowUsers idempotent (v1.19.x)'],
+    ['Server User Remove Key', 'POST', '/server_user_remove_key', ['machine_id' => $mutId, 'username' => 'nope', 'fingerprint_sha256' => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'], 'Supprime UNE cle precise (v1.19.0)'],
+    ['Sshd Allow User',        'POST', '/sshd_allow_user', ['machine_id' => $mutId, 'username' => 'rootwarden'], 'Patche AllowUsers idempotent (v1.19.x)'],
     ['Logs SSE',               'GET',  '/logs', null, t('health.route_logs_sse'), true],
 
     // ── Politiques sudo + SFTP par utilisateur (v1.22.0) ───────────────
@@ -91,7 +110,7 @@ $routes = [
     // ── Mises a jour ────────────────────────────────────────────────────
     ['Update (dry)',            'POST', '/update', ['machine_id' => $mutId], t('health.route_update')],
     ['Security Updates',       'POST', '/security_updates', ['machine_id' => $mutId], t('health.route_security_updates')],
-    ['Dry Run Update',         'POST', '/dry_run_update', ['machine_id' => $machineId], t('health.route_dry_run')],
+    ['Dry Run Update',         'POST', '/dry_run_update', ['machine_id' => $mutId], t('health.route_dry_run')],
     ['Pending Packages',       'POST', '/pending_packages', ['machine_id' => $machineId], t('health.route_pending_packages')],
     ['Apt Check Lock',         'POST', '/apt_check_lock', ['machine_id' => $machineId], t('health.route_apt_check_lock')],
     ['Dpkg Repair',            'POST', '/dpkg_repair', ['machine_id' => $mutId], t('health.route_dpkg_repair')],
@@ -126,7 +145,22 @@ $routes = [
     ['Fail2ban Templates',     'GET',  '/fail2ban/templates', null, t('health.route_f2b_templates')],
     ['Fail2ban Logs',          'POST', '/fail2ban/logs', $sshDry + ['lines' => 10], t('health.route_f2b_logs')],
     ['Fail2ban Stats',         'GET',  "/fail2ban/stats?server_id=$machineId&days=7", null, t('health.route_f2b_stats')],
-    ['Fail2ban Install All',   'POST', '/fail2ban/install_all', [], t('health.route_f2b_install_all')],
+    // ⚠⚠ RETIREE le 2026-08-28 — CELLE-CI ETAIT VIVANTE, contrairement a sa voisine Wazuh.
+    //
+    //   ['Fail2ban Install All', 'POST', '/fail2ban/install_all', [], t('health.route_f2b_install_all')],
+    //
+    // `/fail2ban/install_all` fait `SELECT … FROM machines m … WHERE f.installed
+    // IS NULL OR f.installed = 0` — AUCUN `machine_ids`, aucun filtre, aucune
+    // portee par utilisateur — puis `for m in machines: ssh_session(…)` et
+    // INSTALLE le paquet. `testRoute()` fait un vrai `curl` POST a corps vide.
+    //
+    // Donc OUVRIR CETTE PAGE INSTALLAIT FAIL2BAN SUR TOUT LE PARC, `srv-zabbix`
+    // (la PRODUCTION) comprise, sans que personne ait clique « installer ».
+    // Sa jumelle Wazuh ne le faisait pas — mais seulement parce que sa requete
+    // est CASSEE (E-224). Celle-ci n'a pas cet accident.
+    //
+    // Le module se pilote depuis sa propre page, qui connait la liste des
+    // machines sans fail2ban. Une entree de DIAGNOSTIC n'a pas a MUTER le parc.
     ['Fail2ban GeoIP',         'POST', '/fail2ban/geoip', ['ip' => '8.8.8.8'], t('health.route_f2b_geoip')],
 
     // ── Supervision ─────────────────────────────────────────────────────
@@ -151,7 +185,23 @@ $routes = [
     ['Wazuh Config',           'GET',  '/wazuh/config', null, 'Config Wazuh manager'],
     ['Wazuh Servers',          'GET',  '/wazuh/servers', null, 'Liste agents'],
     ['Wazuh Detect',           'POST', '/wazuh/detect', ['machine_id' => $machineId], 'Detecte agent existant (v1.19.0)'],
-    ['Wazuh Install All (dry)', 'POST', '/wazuh/install_all', [], 'Install Wazuh sur tous (v1.19.0) - dry, vide la liste'],
+    // ⚠ RETIREE le 2026-08-28 — cette entree n'etait « dry » que PAR ACCIDENT.
+    //
+    //   ['Wazuh Install All (dry)', 'POST', '/wazuh/install_all', [], '… - dry, vide la liste'],
+    //
+    // `testRoute()` fait un VRAI `curl` POST : ouvrir cette page DECLENCHAIT l'appel.
+    // La liste revenait vide parce que la requete ECHOUE — `wazuh.py:467` fait
+    // `AND a.id IS NULL` alors que `wazuh_agents` n'a aucune colonne `id` (E-224).
+    // Le mot « dry » decrivait donc un accident, pas une conception, et plus
+    // personne n'a regarde : « une conclusion ecrite fait renoncer a mesurer ».
+    //
+    // Le jour ou E-224 est corrige, la requete rend TOUT le parc — et son
+    // `ORDER BY … CASE WHEN criticality = 'CRITIQUE'` place `srv-zabbix`, la
+    // PRODUCTION, en PREMIER. Ouvrir une page de diagnostic aurait installe un
+    // paquet sur la production, sans que personne ait clique « installer ».
+    //
+    // Retiree AVANT le correctif SQL, et c'est l'ordre qui compte : le SQL seul
+    // serait plus dangereux que le defaut qu'il corrige.
     ['Wazuh Rules',            'GET',  '/wazuh/rules', null, 'Rules/decoders/CDB'],
 
     // ── SSH Audit ────────────────────────────────────────────────────────

@@ -10298,3 +10298,69 @@ relu — jamais « le premier bouton », jamais un balayage.*
 
 **Dédouanement** : l'en-tête de ce fichier est **honnête**, conforme au code — après quatre en-têtes menteurs
 dans les modules voisins.
+
+---
+
+## E-227 — ⚠⚠⚠ OUVRIR LA PAGE DE DIAGNOSTIC DÉPLOIE UN `NOPASSWD: ALL` SUR LA PRODUCTION
+
+**Trouvé en retirant l'entrée d'E-224 : la ligne voisine était vivante, et la mesure a montré bien pire.**
+`legacy/adm/health_check.php` est **servi en production**.
+
+### La cible n'est pas « une machine quelconque » : c'est toujours la pire
+
+    health_check.php:49-50
+    $stmt = $pdo->query("SELECT id FROM machines LIMIT 1");   -- SANS `ORDER BY`
+    $machineId = $stmt->fetchColumn() ?: 0;
+
+**Mesuré : rend `id = 1` — `srv-zabbix`, criticité `CRITIQUE`, LA PRODUCTION.** La machine que tout le
+chantier a l'interdiction de joindre.
+
+### `testRoute()` fait un VRAI `curl`, et la page boucle dessus au chargement
+
+**Le fichier porte déjà un correctif** (`:52-57`) qui pointe les routes mutantes sur `$mutId = 0` — « ne
+doivent JAMAIS s'exécuter sur un vrai serveur au simple chargement de la page ». **Sept y avaient échappé :**
+
+| entrée | ce qu'elle fait sur `srv-zabbix`, au chargement |
+|---|---|
+| `/deploy_service_account` | **crée le compte `rootwarden` avec `NOPASSWD: ALL`** |
+| `/deploy_platform_key` | déploie la clé publique sur le compte nominal **et sur `root`** |
+| `/sshd_allow_user` | **réécrit `sshd_config`** et recharge `sshd` |
+| `/server_user_remove_key` | tente une suppression de clé |
+| `/scan_server_users` | **écrit et DÉCIDE** — `INSERT` avec auto-classement (E-213) |
+| `/last_reboot`, `/dry_run_update` | lectures distantes |
+
+> **Ouvrir une page d'administration accordait un accès root permanent et sans mot de passe sur la
+> production.** Aucun clic, aucune confirmation, aucune trace de décision.
+
+### Ce qui le rend pire qu'un défaut : le correctif existait et était incomplet
+
+*Un correctif appliqué à certains porteurs et pas à tous laisse le défaut intact là où il coûte le plus, ET
+fait croire qu'il est fermé.* Le commentaire de `:52-57` énumère consciencieusement les routes protégées —
+`services start/stop`, `ssh-audit fix/save/toggle/reload`, `dpkg_repair`, `update`… — **et sa liste ne contient
+aucune des quatre plus destructrices.** Quiconque relisait ce fichier lisait une intention de protection et
+concluait qu'elle était tenue.
+
+**C'est aussi la sixième occurrence de « fermer un défaut sans chercher ses autres implémentations, c'est le
+fermer à moitié »** — et la première où la moitié oubliée est la plus grave.
+
+### Et deux entrées de diagnostic MUTAIENT le parc entier
+
+- **`/fail2ban/install_all` — VIVANTE.** `SELECT … FROM machines m … WHERE f.installed IS NULL OR f.installed
+  = 0`, **aucun `machine_ids`, aucune portée**, puis `for m in machines: ssh_session(…)` et **installe le
+  paquet**. Corps vide au `curl` → **ouvrir la page installait fail2ban sur tout le parc, production
+  comprise** ;
+- **`/wazuh/install_all` — inerte PAR ACCIDENT**, sa requête étant cassée (E-224). Son libellé disait
+  « dry, vide la liste » : **le mot décrivait un accident, pas une conception**, et *une conclusion écrite fait
+  renoncer à mesurer.* **Le jour où E-224 est corrigé, elle devient la jumelle vivante de la précédente** — et
+  son `ORDER BY … CASE WHEN criticality = 'CRITIQUE'` place `srv-zabbix` **en premier**.
+
+### Corrigé, et dans l'ordre qui compte
+
+**Les deux entrées `install_all` sont retirées** — *une entrée de DIAGNOSTIC n'a pas à MUTER le parc* — et les
+**sept** routes ci-dessus visent désormais `$mutId = 0`, comme leurs voisines. **Retiré AVANT le correctif SQL
+d'E-224**, et c'est l'ordre qui compte : *le SQL seul serait plus dangereux que le défaut qu'il corrige.*
+
+**Ce qui n'est PAS corrigé, et reste à l'exploitant** : la requête `LIMIT 1` sans `ORDER BY` désigne toujours
+la production pour les **lectures** distantes — dix-sept entrées ouvrent une session SSH vers `srv-zabbix` au
+chargement. C'est une lecture, mais *la règle du chantier ne distingue pas lecture et écriture sur la
+production*, et **une page de diagnostic n'a pas à choisir la machine la plus critique par accident de tri.**

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.51** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.52** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,53 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.52 — ⚠⚠⚠ E-227 : ouvrir la page de diagnostic deployait un `NOPASSWD: ALL` sur la PRODUCTION
+
+**Trouve en retirant l'entree d'E-224 : la ligne voisine etait vivante, et la mesure a montre bien pire.**
+`legacy/adm/health_check.php` est **servi en production**.
+
+    health_check.php:49-50
+    SELECT id FROM machines LIMIT 1      -- SANS `ORDER BY`
+    -> mesure : id = 1, `srv-zabbix`, criticite CRITIQUE, LA PRODUCTION
+
+**Le fichier portait deja un correctif** (`:52-57`) pointant les routes mutantes sur `$mutId = 0` — « ne
+doivent JAMAIS s'executer sur un vrai serveur au simple chargement ». **Sept y avaient echappe**, dont :
+
+    /deploy_service_account   cree le compte `rootwarden` avec **NOPASSWD: ALL**
+    /deploy_platform_key      deploie la cle sur le compte nominal ET sur `root`
+    /sshd_allow_user          reecrit `sshd_config` et recharge `sshd`
+    /server_user_remove_key   tente une suppression de cle
+    /scan_server_users        ECRIT et DECIDE — auto-classement, `pending_review` (E-213)
+
+> **Ouvrir une page d'administration accordait un acces root permanent et sans mot de passe sur la
+> production.** Aucun clic, aucune confirmation, aucune trace de decision. `testRoute()` fait un vrai `curl`,
+> et la page boucle dessus au chargement.
+
+**Ce qui le rend pire qu'un defaut : le correctif existait et etait incomplet.** Son commentaire enumere
+consciencieusement les routes protegees — `services start/stop`, `ssh-audit fix/save/toggle/reload`,
+`dpkg_repair`, `update` — **et sa liste ne contient aucune des quatre plus destructrices.** *Un correctif
+applique a certains porteurs et pas a tous laisse le defaut intact la ou il coute le plus, ET fait croire
+qu'il est ferme.* **Sixieme occurrence de « fermer un defaut sans chercher ses autres implementations », et la
+premiere ou la moitie oubliee est la plus grave.**
+
+#### Deux entrees de DIAGNOSTIC mutaient le parc entier
+
+- **`/fail2ban/install_all` — VIVANTE** : `SELECT … FROM machines m … WHERE f.installed IS NULL`, **aucune
+  portee**, puis `for m in machines: ssh_session(…)` et **installe le paquet**. Corps vide au `curl` →
+  **ouvrir la page installait fail2ban sur tout le parc, production comprise** ;
+- **`/wazuh/install_all` — inerte PAR ACCIDENT** (E-224). Son libelle disait « dry, vide la liste » : **le mot
+  decrivait un accident, pas une conception**, et *une conclusion ecrite fait renoncer a mesurer.* Corrigee,
+  elle devient la jumelle vivante de la precedente — et son `ORDER BY … CASE WHEN criticality = 'CRITIQUE'`
+  place `srv-zabbix` **en premier**.
+
+**Les deux entrees sont retirees**, les sept routes visent `$mutId`, **et l'ordre compte** : retire **AVANT**
+le correctif SQL d'E-224, *le SQL seul etant plus dangereux que le defaut qu'il corrige.*
+
+**Ce qui reste a l'exploitant** : le `LIMIT 1` sans `ORDER BY` designe toujours la production pour les
+**lectures** — dix-sept entrees ouvrent une session SSH vers `srv-zabbix` au chargement. *La regle du chantier
+ne distingue pas lecture et ecriture sur la production*, et **une page de diagnostic n'a pas a choisir la
+machine la plus critique par accident de tri.**
+
 ### v1.38.51 — finir chaque onglet : les manques que le portage DECLARE, et le tableau de bord qui est RETENU sur une question de droits
 
 **Demande de l'exploitant : « finir integralement chaque onglet ; le tableau de bord n'est pas fini. »**
@@ -4323,7 +4370,8 @@ correspondance reelle :**
 | **v1.38.47** | `043f414` | **mon amplificateur d'E-220 etait faux** ; ma demi-mesure aurait casse des machines saines ; **E-222** |
 | **v1.38.48** | `b12835f` | **E-226 : la rotation ne revoque pas la cle compromise** ; E-223 ; E-224 ; E-225 |
 | v1.38.50 | `e41e18c` | ma garde du runner empechait toute suite neuve, et disait « conforme » sur zero execution |
-| v1.38.51 | (ce commit) | finir chaque onglet : les manques declares, et le tableau de bord RETENU |
+| v1.38.51 | `4920acd` | finir chaque onglet : les manques declares, et le tableau de bord RETENU |
+| **v1.38.52** | (ce commit) | **E-227 : ouvrir le diagnostic deployait un NOPASSWD: ALL sur la production** |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
