@@ -11347,3 +11347,87 @@ ecran qui annoncerait la protection mentirait sur l'etat reel.
 validation echoue, distinguer *« les regles sont invalides »* de *« je n'ai pas pu lire le verdict »* —
 les deux memes issues que I3 vient de separer sur l'historique. *Le portage ne repare pas le backend ;
 il cesse de presenter une incertitude comme un verdict.*
+
+
+## E-241 — REGRESSION REELLE : apres un enregistrement refuse, les onglets de `graylog` cessent de repondre — et j'avais inscrit « la page est mesuree saine »
+
+**Caracterise par la session 7 le 2026-08-28 vers 17:20 CEST. Le Lead avait inscrit l'inverse deux
+heures plus tot, et c'est la faute a lire d'abord.**
+
+### ⚠ MA PROPRE NOTE DISAIT « MESUREE SAINE »
+
+`v1.38.87` et le §2 du plan portaient : *« la page est mesuree saine — le clic ouvre le panneau,
+champ a 45 px, contrat DOM intact, zero erreur JS ; le defaut est dans l'enchainement de la suite »*.
+
+**Deux fautes, et la seconde est la mienne seule :**
+
+1. la sonde citee mesurait le clic **au chargement de la page**, pas **apres** la sequence qui casse.
+   *Une sonde qui ne rejoue pas la sequence ne mesure pas le defaut de la sequence* ;
+2. **j'ai recopie une conclusion rassurante d'un compte rendu qui s'annonçait lui-meme comme NON
+   ISOLE.** La session 7 avait ecrit « non isole et non pretendu tel » — **je l'ai inscrit comme un
+   dedouanement.** *Une prudence dans un compte rendu ne survit pas a la recopie : elle devient un
+   verdict.*
+
+Troisieme fois du jour qu'une conclusion rassurante de ma main s'est reveleee fausse — apres
+« aucun lien entrant » et « la page est saine » ici. **Et c'est la premiere ou j'ai transforme la
+reserve d'un pair en certitude.**
+
+### La sequence, mesuree, et 8 secondes de re-clics n'y changent rien
+
+    1. au chargement          panneau cache,   onglet actif = config
+    2. clic « templates »     panneau VISIBLE, actif = templates       <- les onglets MARCHENT
+    3. clic « config », champ hote VIDE, clic « enregistrer »
+    4. re-clic « templates »  RIEN NE CHANGE — hidden reste true, actif reste config
+    erreurs JS : AUCUNE       legacy : 27/0
+
+**Consequence pour un exploitant** : apres avoir enregistre une configuration Graylog, **il ne peut
+plus changer d'onglet sans recharger la page, et rien ne le lui dit.**
+
+### Ce que la session 7 a ECARTE, et qui vaut autant que ce qu'elle a trouve
+
+htmx / re-rendu de fragment (aucun `hx-*`, aucun `innerHTML` sur les onglets) · `annonce()` (elle ne
+fait que `textContent` et `className`) · **l'appel reseau — avec un hote vide, `enregistreConfig`
+fait `return` AVANT tout envoi.** *Donc le defaut survient sans qu'aucune requete ne parte : ce n'est
+pas la reponse du serveur qui casse les onglets.*
+
+### CE QUE LE LEAD AJOUTE : LA PISTE CITABLE, ET ELLE EXPLIQUE L'ERREUR D'ORIGINE
+
+Verifie dans l'arbre :
+
+    laravel/resources/views/graylog.blade.php:99   <p class="rw-annonce" data-rw="graylog-config-etat">   VIDE au chargement
+    laravel/public/css/rw.css:1076                 .rw-annonce:empty { display: none; }
+
+**Au premier echec, cet element passe de `display: none` a un bloc : il GAGNE une hauteur.** C'est un
+**decalage de mise en page**, declenche exactement a l'etape 3 — et c'est la signature de l'erreur
+d'origine, *« Node is either not clickable or not an Element »*, qui survient quand la mise en page
+bouge entre le calcul des coordonnees et l'arrivee du clic.
+
+**Ce que le Lead a verifie et ECARTE en plus** : aucun `<form>` dans la vue et **tous les boutons en
+`type="button"`** — donc aucune navigation ; `ouvreOnglet` et `enregistreConfig` sont corrects a la
+lecture ; les quatre panneaux portent bien un `data-rw` concordant.
+
+**Non localise, et le Lead ne le pretend pas** : la piste explique le *« not clickable »* d'origine,
+pas le *« le clic n'a plus d'effet »* d'apres correction. `graylog.js` et `graylog.blade.php`
+appartiennent a la session 3.
+
+### Et arbre et service concordent ici — verifie
+
+    graylog.js  mtime 2026-08-26 16:37     StartedAt  2026-08-27 14:28
+
+**Ce defaut n'est PAS un artefact d'E-238** : le code servi est bien celui de l'arbre.
+
+### La regle que la session 7 en tire, et qui corrige la mienne
+
+> **Une suite qui echoue merite qu'on se demande d'abord si c'est ELLE qui a tort — mais la reponse
+> peut etre non, et il faut alors le dire aussi fort.**
+
+Ce chantier a passe la journee a se corriger dans le sens *« ce n'est pas un defaut »*. **Celui-ci va
+dans l'autre sens, et il etait deja inscrit comme dedouane.** Et c'est la correction de la suite —
+attendre la **propriete** plutot qu'une **duree** — qui a transforme un echec opaque en defaut
+localise : *un `dors(900)` fixe ne cache pas seulement une lenteur, il cache la NATURE du defaut.*
+
+### Reference : ROUGE, et c'est JUSTE
+
+`REF_LARAVEL[go-page-graylog-g1]` **n'est pas inscrite** tant que le defaut vit. *Une reference posee
+sur un rouge legitime transforme le defaut en etat normal.* **`REF_LEGACY = 27`** (de 25 : les deux
+assertions d'ouverture d'onglet y passent).
