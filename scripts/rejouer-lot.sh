@@ -338,6 +338,32 @@ declare -A REF_LARAVEL=(
   # raison, pas parce que la fonctionnalite est absente.
   # ⚠ MESUREE CONTRE L'ANCIEN BACKEND : E-187 n'etait pas en service. A reconfirmer.
   [go-adm-comptes-distants]=18
+  # `platform_key` P1 : la cle de plateforme, sa rotation et le parc. 18 sur le portage.
+  #
+  # ⚠ SUITE DE SURETE, ET SON FILET N'A RIEN EU A BLOQUER — c'est plus fort qu'un
+  # avortement reussi : le clic sur le bouton de rotation N'EMET RIEN, mesure AU
+  # RESEAU et pas au DOM. Un panneau peut s'ouvrir et l'appel partir quand meme.
+  #     requetes AVORTEES : (aucune)
+  #     laissees passer   : 6 GET de lecture
+  # Et elle relit L'ETAT DE DEPLOIEMENT DU PARC, pas seulement `srv-zabbix` : c'est
+  # LUI que la rotation remettrait a zero. Prouver qu'un geste n'a pas eu lieu se
+  # fait sur ce qu'il aurait CHANGE, pas sur ce qu'on craint qu'il detruise.
+  # Le filet lui-meme est assere en fin de suite — un filet non mesure est une croyance.
+  #
+  # ELLE NE CHERCHE QUE LE REFUS, pour DEUX raisons ecrites separement :
+  #   1. aucune cible sure n'existe — pas de `machine_id`, `UPDATE` sans clause de
+  #      restriction : la portee EST le parc ;
+  #   2. la porte a quatre yeux est branchee (E-201) — viser la reussite mesurerait
+  #      un 202 « en attente d'approbation » et l'appellerait un echec. Elle
+  #      mesurerait LA PORTE, pas le geste.
+  #
+  # TROU ASSUME, ecrit comme tel : aucun compte d'epreuve ne detient
+  # `can_manage_platform_key` — mesure EN BASE au debut de la suite, avec une
+  # assertion qui rougit si un compte venait a l'obtenir. Le chemin NOMINAL de la
+  # garde n'est donc pas exercable sur ce banc ; sont mesures le refus au role 1
+  # (403, AU STATUT) et le contournement du role 3. Ecrit comme un trou et non
+  # comme une couverture — sinon quelqu'un le comblera en deplacant un droit.
+  [go-page-cle-plateforme]=18
   # `adm/` sous-lot D9a : droits sudo par compte distant.
   # 18 sur le portage contre 12 sur le legacy, et les six d'ecart portent tous
   # sur les deux defauts corriges : le prereglage par defaut qui ne donne plus
@@ -622,6 +648,10 @@ declare -A REF_LEGACY=(
   [go-adm-cycle-connexion]=12
   # 11 -> 12 le 2026-08-27 : la meme scission, double cible. Meme reserve E-187.
   [go-adm-comptes-distants]=12
+  # `platform_key` P1 sur le legacy : 15. L'ecart avec les 18 du portage porte sur
+  # ce que le portage DIT en plus — la rotation ne revoque rien (E-226), les deux
+  # bornes de reversibilite, et le geste nomme AVEC sa protection.
+  [go-page-cle-plateforme]=15
   [go-adm-politiques]=12
   [go-adm-sftp]=12
   [go-bashrc-b1]=17
@@ -886,6 +916,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
+  go-page-cle-plateforme
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-fail2ban-f6
@@ -902,6 +933,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-auth-totp-croise go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
+  go-page-cle-plateforme
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5 go-fail2ban-f6
   go-page-graylog-g1 go-page-graylog-g2
