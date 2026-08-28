@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.96** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.98** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,81 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.98 — E-241 est CLOS (trois de mes quatre hypotheses etaient fausses), et E-243 : une alerte sur une requete qui ne peut pas s'executer
+
+#### E-241 CLOS — les onglets n'ont JAMAIS ete casses
+
+    elementFromPoint(centre du bouton)  ->  rw-entete    (la page avait defile de 480 px)
+
+`.rw-entete` est `position: sticky; top: 0; z-index: 5`. **Le clic atterrissait sur l'en-tete.** Le JS
+de la page etait sain depuis le debut. *L'experience proposee par la session 3 et jouee par la session
+7 — deux lignes — a tranche ce qu'aucune des quatre lectures n'avait tranche.*
+
+**Le defaut reel est E-241b, corrige dans le socle** (`24fa8af`, `922d671`) : **12 `scrollIntoView`
+dont 8 en `block: 'nearest'`**, qui defile du minimum necessaire et depose donc sa cible **sous**
+l'en-tete. Consequence a l'ecran : *le panneau de decision qu'on vient d'ouvrir arrive a moitie cache.*
+Corrige par une **REGLE** — `scroll-padding-top` — et non par une enumeration de selecteurs : *un oubli
+ne se verrait pas.* **C'est la lecon d'E-235c appliquee au CSS avant que je la formule.**
+
+Et la marge etait **courte d'un pixel** : 64 estimes **en lisant** le CSS, **65 rendu**. Trouve par la
+session 7 *precisement parce que son assertion etait ecrite pour NE PAS dependre de cette regle*.
+Retenu a **88 px pour un en-tete de 65** — un nombre dont la justesse ne depend pas de la precision de
+la mesure.
+
+> **Un test qui depend d'une propriete la mesure mal ; un test qui la mesure n'en depend pas.**
+
+**Trois des quatre mecanismes faux etaient les miens, et tous EXPLIQUAIENT le symptome** — dont un qui
+en expliquait **deux** (le symptome et l'erreur d'origine « not clickable »). *Une hypothese qui
+explique deux choses est deux fois plus seduisante et pas plus vraie.* **Ce qui a ferme la question
+n'est aucune lecture : c'est une mesure qui a nomme l'objet recevant le clic.**
+
+#### E-243 — une alerte « production en premier » sur une requete qui ne peut pas s'executer
+
+La session 3 a signale en urgence que `/wazuh/install_all` **en service** prendrait tout le parc,
+`srv-zabbix` d'abord. **Sa lecture du SQL etait exacte ; la colonne n'existe pas :**
+
+    wazuh_agents : machine_id PRIMARY KEY, agent_id, agent_name, version, group_name,
+                   status, last_keep_alive, installed_at   ->  AUCUN `id`
+    en service   : ... AND a.id IS NULL ...   et le `cur.execute` est HORS de tout `try`
+
+**Erreur 1054, l'exception traverse, la route rend 500.** `targets` n'est jamais atteint : ni
+l'`ORDER BY … CRITIQUE`, ni la boucle. **Cette route n'a jamais rien installe et ne peut pas.**
+
+*Une requete se lit ; qu'elle s'execute se mesure contre le SCHEMA* — **deuxieme fois du jour que le
+schema tranche une question que le code seul rendait insoluble**, apres E-242.
+
+Et ce qu'elle decrit **est** l'etat qu'E-224 a empeche deliberement : sa docstring dit que corriger le
+SQL seul aurait rendu tout le parc, production d'abord. **Son releve est CONTREFACTUEL, pas faux.**
+
+#### ⚠ Et la faute de cadrage est la mienne
+
+> **Une correction qui cite l'ARBRE refute une observation du SERVICE sans le dire.**
+
+En lui ecrivant « c'est faux, `machine_ids` est obligatoire », je citais l'arbre contre une observation
+qui pouvait porter sur le service, **sans nommer lequel je mesurais** — et elle a retracte une
+affirmation juste du service. **Mon propre releve des gardes porte en tete « aucune ligne de ce tableau
+ne decrit ce qui tourne » : je l'ai ecrit et ne l'ai pas applique a ma correction.**
+
+**Sixieme faux desaccord, et le premier ou les deux parties avaient raison sur des OBJETS differents**
+— pas a des heures differentes. Les cinq precedents venaient d'un chiffre sans son heure ; celui-la
+d'une affirmation **sans son regime**. *Sous E-238, tout enonce sur `wazuh`, `ssh` ou `ssh_audit` doit
+nommer s'il decrit l'arbre ou le service.*
+
+#### pytest : 606 passed · 1 skipped · 1 xfailed, a 16:47 CEST
+
+Commit `e7e6fab`, **+40 depuis les 566 de 16:28**. `php artisan test` **non rejoue** et c'est le bon
+geste : rien de PHP n'a bouge depuis les **277 / 888** de 16:29. *Un chiffre date qu'on n'a pas refait
+vaut mieux qu'un chiffre refait qui dirait la meme chose.*
+
+Et **les trois premiers rouges de la QA etaient son instrument** : `conftest` remplace `packaging` par
+un `MagicMock`, le `>=` **levait**, la route sortait par `Exception:` — donc sans `SUCCESS_MACHINE::`,
+donc sans ecriture d'inventaire, **donc verte sur les trois proprietes qu'elle croyait mesurer.**
+
+> **Un test d'echec passe toujours quand la route ne s'execute pas. Seul un contre-cas qui exige la
+> REUSSITE distingue « le correctif marche » de « rien ne tourne ».**
+
+*C'est le contre-cas « tout a zero doit encore aboutir » qui l'a vu, pas son autrice — deuxieme prise.*
 
 ### v1.38.97 — la marge de défilement était courte d'un pixel, et le pixel n'est pas le sujet
 
