@@ -666,6 +666,47 @@ vérification. Mêler les deux aurait produit deux demi-corrections.
 déploiement `bashrc`. Une suite qui l'annoncerait comme couvert mentirait, et une
 assertion qui « passerait » sur ce geste passerait **par absence**.
 
+## 3 quinquies. Une mesure que je n'ai PAS réussie, et pourquoi je la publie
+
+La session qui tient `laravel/` a laissé une propriété **dite et non mesurée** : un
+serveur qui **ferme proprement** un flux avant la fin est indiscernable d'un serveur qui
+a fini, faute de marqueur terminal côté backend. Elle a choisi de **remonter le marqueur
+manquant plutôt que d'inventer une détection**. J'ai voulu mesurer combien des 15 routes
+de flux annoncent leur propre fin.
+
+**Je n'y suis pas arrivée proprement, et c'est le résultat que je publie.**
+
+### Le premier instrument rendait 15 sur 15 — et c'est ce qui l'a trahi
+
+Il annonçait « pas de boucle » pour **les quinze**, uniformément. Sur quinze routes
+écrites dans six fichiers par plusieurs mains, **un résultat parfaitement uniforme est
+une alarme, pas une conclusion.**
+
+La cause : `ast.walk()` **descend dans les `def` imbriquées**, si bien que toute route
+contenant un générateur passait elle-même pour un générateur. Je mesurais la route, pas
+le générateur.
+
+> **Un résultat uniforme sur un ensemble hétérogène est un défaut d'instrument jusqu'à
+> preuve du contraire.** Même famille que « une valeur hors de toute plage physique est
+> un défaut d'instrument, jamais un résultat » — le contraste : là c'était une valeur
+> absurde, ici c'est une valeur *plausible*, ce qui la rend plus difficile à voir.
+
+### L'instrument corrigé ne décide pas la question, et je ne force pas
+
+Il différencie enfin (4 « NON », 11 « sans boucle » — le générateur n'a pas de boucle de
+premier niveau, donc mon critère « un `yield` après la boucle » ne s'applique pas). **Ce
+n'est pas une réponse à la question posée.** Répondre demanderait de décider ce qu'est un
+*marqueur terminal* dans six conventions différentes — `type: 'done'` par machine chez
+l'un, du texte libre chez l'autre — c'est-à-dire d'inventer la convention que le backend
+n'a pas.
+
+**La propriété reste donc dite et non mesurée, et la décision de la session 3 tient** :
+remonter le marqueur manquant vaut mieux qu'une détection devinée. C'est une question de
+**contrat backend**, donc de la session qui tient `backend/` — pas une question de test.
+
+> Publier « je n'ai pas su mesurer » coûte une ligne ; publier un demi-résultat coûte la
+> confiance dans tous les autres.
+
 ## 4. Ce que la mesure a trouvé — à arbitrer par le Lead
 
 Aucun de ces points n'a été corrigé : la session QA qualifie et transmet.
