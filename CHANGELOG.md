@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.73** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.75** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,76 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.75 — `api_docs` derive et BASCULE (26 portees / 6 restantes), et archiver `legacy/api/` retire la seule reference d'API du produit
+
+#### ✅ Les trois bornes sont tenues, et la troisieme disqualifie la page comme reference
+
+`Navigation.php:133` porte desormais `'route' => 'autorisations-passerelle'` — **le menu passe a 26 portees /
+6 restantes.** Verifie.
+
+**Et la troisieme couche est declaree INVISIBLE plutot que devinee** : la page ne monte pas `backend/`, donc elle
+ne voit pas les decorateurs — **et le releve n'a PAS ete embarque en copie**, *ce qui aurait recree le cache
+qu'on venait de retirer*, sur un document qui dit lui-meme decrire l'arbre et non le service. Les trois couches
+sont enoncees **avant** les tableaux.
+
+#### ⚠ E-232 — la page derivee ne remplace pas ce qu'on archive, et il faut le dire AVANT
+
+    laravel/lang/fr/autorisations.php   'pas_reference_titre' · 'pas_reference_texte'
+
+**Elle annonce avant son contenu qu'elle n'est pas une reference d'API — c'est exactement ce qui a ete demande,
+et exactement pourquoi elle ne remplace pas `legacy/api/`.** Elle decrit **des autorisations**, pas des
+**contrats** : ni schemas de requete, ni codes de reponse, ni exemples.
+
+`legacy/api/` porte `docs.php`, `openapi.php`, `openapi.yaml` (**92 Ko**) et `swagger/`. **En l'archivant, le
+produit n'a plus de reference d'API du tout.** *Re-siter une capacite et la retirer se ressemblent dans un
+journal de commits ; elles ne se ressemblent pas pour l'utilisateur* — et ici c'est un **retrait**, assume.
+
+**L'argument qui le rend defendable, et sa limite** : le YAML etait faux a **32 %** — 7 fantomes, **64 routes
+sur 203 non documentees**, les deux orthographes du meme module. *Une reference fausse a ce point n'est pas une
+reference : c'est un piege date.* **Mais « le remplacement etait faux » ne rend pas « aucun remplacement »
+suffisant.**
+
+**Arbitrage delegable, trois issues dont aucune ne detruit** — accepter le retrait (et l'ecrire dans
+`DEPRECIATION.md` comme une capacite **RETIREE**, jamais portee) · **regenerer une specification DEPUIS les
+routes** · garder `legacy/api/` hors archivage jusque-la. **Recommandation du Lead : la seconde** — *le
+mecanisme est deja ecrit et eprouve deux fois aujourd'hui, les douze tuiles derivees du menu et cette page
+derivee de la liste blanche. Deriver un catalogue de routes est le meme geste, sur une autre source.*
+
+**⚠ Et l'archivage ne part pas avant cette decision** : *savoir si l'on archive une capacite portee ou une
+capacite retiree change ce qu'on ecrit dans `DEPRECIATION.md`* — le seul endroit ou la difference restera
+lisible dans six mois.
+
+#### ⚠ Interroger l'ENTREE au lieu du CHEMIN — et l'ordre de grandeur en PREMIERE alarme
+
+Le premier jet interrogeait **chaque entree** de la liste blanche. Les compteurs ont rendu **`step_up = 0` alors
+que deux motifs existent**, et **`flux = 3` pour sept chemins.** Cause : `correspond()` compare **par segment**,
+et **15 des 66 entrees sont des espaces de noms** — `/supervision/` autorise `/supervision/zabbix/deploy` sans
+etre elle-meme un flux.
+
+> **Interroger l'ENTREE au lieu du CHEMIN rendait « aucune route n'exige de re-authentification » — faux, et du
+> cote rassurant.** Et c'est **le defaut qu'elle allait documenter, un etage plus bas** : elle aurait publie une
+> page derivee qui se trompe sur **la couche qu'elle pretend etre la seule a connaitre.**
+
+**Ce qui l'a attrapee** : *« zero re-authentification sur un produit qui en a deux, c'etait trop propre. »*
+
+**Le §8 disait le contraire il y a deux jours** — *l'ordre de grandeur est le DERNIER filet, pas le premier.*
+**La regle se precise et ne s'inverse pas** : comme **dernier filet** il est mince et a laisse passer une erreur
+rassurante ; comme **premiere alarme** il est bon, *parce qu'il ne conclut rien — il fait OUVRIR le code.* **Et
+un nombre trop PROPRE est aussi invraisemblable qu'un nombre trop gros.**
+
+#### La parade « regarder le diff avant » vaut aussi pour un fichier qu'on croit CREER
+
+Elle a cree son catalogue sous le nom `passerelle.php` — **le fichier existait** et portait les **six messages
+de refus** consommes par `PasserelleController`. **Son `cat >` les a ecrases.** Restaure depuis `HEAD`,
+catalogue reloge en `autorisations.php`, **et les six cles verifiees comme SE RESOLVANT** — pas seulement comme
+revenues. *Un fichier restaure n'est pas un fichier fonctionnel.* Verifie par le Lead : les six resolvent.
+
+> **Ce qui l'a attrapee : avoir LU `git status` au lieu de le survoler** — `M` et non `??`.
+
+**Septieme correction de la consigne de commit, et elle en elargit la portee** : *« regarder le diff avant »
+s'appliquait aux fichiers qu'on modifie ; elle s'applique aussi a ceux qu'on croit creer.* **Un `cat >` sur un
+chemin non lu est une suppression deguisee en creation.**
 
 ### v1.38.74 — `api_docs` : la description d'API n'est plus servie, elle est DÉRIVÉE
 

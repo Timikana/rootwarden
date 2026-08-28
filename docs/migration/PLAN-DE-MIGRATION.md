@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **218** — numérotés jusqu'à **E-231** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **219** — numérotés jusqu'à **E-232** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **391** — mesuré 2026-08-28, amont `origin/Migration-Laravel`, **0 de retard**. ⚠ Ce chiffre a dit **69** du 2026-08-22 au 2026-08-28 et a été **répété six fois** : *une figure qui porte sa commande de remesure ne se remesure pas toute seule.* `git fetch -q origin && git rev-list --left-right --count origin/Migration-Laravel...HEAD` |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -4575,3 +4575,62 @@ fixture qui échoue ouvert sur un état partagé casserait treize suites avec un
 fixture de permission temporaire **abandonnée**, parce qu'elle ferait rougir la garde qu'une autre session
 vient de poser sur cette même table. ***On ne fabrique pas un état qu'une autre suite est chargée
 d'interdire.***
+
+### INTERROGER L'ENTRÉE AU LIEU DU CHEMIN, ET L'ORDRE DE GRANDEUR EMPLOYÉ COMME PREMIÈRE ALARME (2026-08-28)
+
+**Défaut du premier jet de la page dérivée, trouvé par son autrice avant commit — et la manière dont elle l'a
+trouvé vaut plus que le défaut.**
+
+Le service parcourait la liste blanche en demandant **pour chaque entrée** : réservée ? en flux ? exige une
+re-authentification ? Les compteurs ont rendu :
+
+    step_up = 0     alors que DEUX motifs existent
+    flux    = 3     pour SEPT chemins
+
+**Cause** : `correspond()` compare **par segment**, et **15 des 66 entrées sont des espaces de noms.**
+`/supervision/` autorise `/supervision/zabbix/deploy` **sans être elle-même un flux** ; `/policy/` autorise
+`/policy/sudo/deploy` **sans exiger elle-même une re-authentification.**
+
+> **Interroger l'ENTRÉE au lieu du CHEMIN rendait « aucune route n'exige de re-authentification » — faux, et du
+> côté rassurant.**
+
+**Et c'est le défaut qu'elle allait documenter, un étage plus bas** : elle aurait publié une page dérivée qui se
+trompe sur **la couche qu'elle prétend être la seule à connaître.** Corrigé : chaque liste est énumérée **depuis
+sa propre source**, aucun produit croisé. Après correction — 66 entrées (15 espaces de noms), 27 réservées
+(**0 sans objet, calculé**), 7 en flux (**0 hors liste**), 2 motifs.
+
+#### ⚠ Ce qui l'a attrapé : l'ordre de grandeur en PREMIÈRE alarme, pas en dernier filet
+
+> *« Zéro re-authentification sur un produit qui en a deux, c'était trop propre. »*
+
+**Le §8 disait le contraire il y a deux jours** — *une intuition sur l'ordre de grandeur est le DERNIER filet,
+pas le premier* — après trois occurrences où elle avait rattrapé ce qu'aucune assertion ne voyait. **La règle
+se précise et ne s'inverse pas :**
+
+| l'ordre de grandeur comme… | verdict |
+|---|---|
+| **dernier filet** — seule chose qui vous arrête | ✗ *mince, et il a laissé passer une erreur rassurante* |
+| **première alarme** — ce qui déclenche la lecture | ✓ **bon usage** : il ne conclut rien, il fait ouvrir le code |
+
+*Un nombre invraisemblable n'est pas une preuve ; c'est une raison de lire.* **Et un nombre trop PROPRE est
+aussi invraisemblable qu'un nombre trop gros** — c'est la troisième fois en deux jours qu'un zéro ou un chiffre
+rond déclenche la relecture qui trouve le défaut.
+
+### LA PARADE « REGARDER LE DIFF AVANT » VAUT AUSSI POUR UN FICHIER QU'ON CROIT CRÉER (2026-08-28)
+
+**Incident rattrapé avant commit, déclaré par son autrice.** Elle a créé son catalogue sous le nom
+`passerelle.php` — **le fichier existait déjà** et portait les **six messages de refus de la passerelle**,
+consommés par `PasserelleController`. **Son `cat >` les a écrasés.**
+
+**Restauré depuis `HEAD`, catalogue relogé en `autorisations.php` — et elle a vérifié que les six clés SE
+RÉSOLVENT**, pas seulement que le fichier était revenu. *Un fichier restauré n'est pas un fichier fonctionnel :
+la première propriété se voit au `git status`, la seconde demande de résoudre les clés.* **Vérifié par le
+Lead : les six résolvent.**
+
+> **Ce qui l'a attrapée : avoir LU `git status` au lieu de le survoler** — `M` et non `??` sur deux fichiers
+> qu'elle croyait neufs.
+
+**Septième correction de la consigne de commit, et elle en élargit la portée** : *« regarder le diff avant »
+s'appliquait aux fichiers qu'on modifie ; elle s'applique aussi à ceux qu'on croit créer.* **Un `cat >` sur un
+chemin non lu est une suppression déguisée en création** — et `git status` la signale, à condition de lire la
+lettre.
