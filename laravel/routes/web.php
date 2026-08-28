@@ -724,6 +724,33 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::get('/pare-feu', PareFeuController::class)
         ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu');
 
+    /*
+     * I2 — LA COPIE EN BASE. Declarations posees pour la session 5.
+     *
+     * MEME GARDE QUE LA PAGE, mot pour mot. Ce n'est pas une commodite : ces
+     * deux routes ne passent PAS par la passerelle, elles sont servies par le
+     * portage lui-meme. `RoutesBackend` ne les voit donc jamais, et la seule
+     * garde qui existe est celle qui est ecrite ici. Une garde presente sur la
+     * page et absente d'une route que la page appelle est le motif que ce
+     * chantier a paye trois fois — la garde vit DANS LA ROUTE, et nulle part
+     * ailleurs.
+     *
+     * `POST` pour les DEUX, y compris la lecture. `charger` prend un
+     * `machine_id` dans le CORPS et le controleur le resout en machine avant de
+     * decider : le verbe suit ce que fait le controleur, pas la semantique
+     * theorique du geste. Un `GET` porterait l'identifiant dans l'URL, donc
+     * dans les journaux d'acces et l'historique du navigateur.
+     *
+     * La falsification de requete est deja geree : `PreventRequestForgery` est
+     * dans le groupe `web`. On n'ajoute rien par-dessus — le faire a ete tente
+     * ailleurs et double le controle sans le renforcer.
+     */
+    Route::post('/pare-feu/copie', [PareFeuController::class, 'charger'])
+        ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.copie');
+
+    Route::post('/pare-feu/copie/enregistrer', [PareFeuController::class, 'enregistrer'])
+        ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.copie.enregistrer');
+
     Route::get('/fail2ban', Fail2banController::class)
         ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
 

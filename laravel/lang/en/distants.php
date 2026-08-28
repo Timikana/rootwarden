@@ -65,7 +65,7 @@ return [
     'confirmer' => 'Confirm',
     'geste_sans_compte' => 'Pick an account first.',
     'geste_en_cours' => 'Action running…',
-    'geste_fait' => 'The action completed.',
+    'geste_fait' => "The request went out and the server accepted it. That is not proof the action took effect on the machine: for « Erase its keys », the backend does not check its own effect and answers « succeeded » without looking. Run a scan again to read the real state.",
     'geste_echec' => 'The action did not complete.',
     'cles_titre' => 'Keys of :nom',
     'cles_desc' => 'Only fingerprints are kept: the database does not store the keys themselves.',

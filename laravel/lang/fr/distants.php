@@ -65,7 +65,7 @@ return [
     'confirmer' => 'Confirmer',
     'geste_sans_compte' => "Choisissez d'abord un compte.",
     'geste_en_cours' => 'Geste en cours…',
-    'geste_fait' => 'Le geste a abouti.',
+    'geste_fait' => "La demande est partie et le serveur l'a acceptée. Ce n'est pas la preuve que le geste a abouti sur la machine : pour « Effacer ses clés », le backend ne vérifie pas son propre effet et répond « réussi » sans regarder. Relance un scan pour lire l'état réel.",
     'geste_echec' => "Le geste n'a pas abouti.",
     'cles_titre' => 'Clés de :nom',
     'cles_desc' => 'Seules les empreintes sont conservées : la base ne stocke pas les clés elles-mêmes.',
