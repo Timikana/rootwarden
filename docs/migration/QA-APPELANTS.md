@@ -153,12 +153,33 @@ syntaxique sur les **230 routes** :
 | famille | n | ce que ça veut dire |
 |---|---|---|
 | `dur` | **11** | un `return jsonify({'success': False})` **sans statut** — donc 200 |
-| `conditionnel` | **20** | un `success` **calculé** (`rc == 0`) : il rend 200 quoi qu'il arrive |
+| `conditionnel` | **21** | un `success` **calculé** (`rc == 0`) : il rend 200 quoi qu'il arrive |
 | `jamais` | 199 | tout refus porte un statut non-200 |
 
 **Le cas `conditionnel` est le moins visible et le plus nombreux.** Une lecture rapide
 n'y voit pas de refus ; un appelant qui teste `.ok` n'en voit pas davantage. Il
 appartient à la même classe de risque sans en avoir la forme.
+
+### La famille CONDITIONNELLE est figée à son tour — et mon refus était un raisonnement faux
+
+J'avais écrit : *« on ne les fige pas une par une — elles bougent à chaque correctif de la
+famille "une réussite se vérifie" »*. C'était traiter le **mouvement** comme une raison de
+ne pas mesurer, alors que **le mouvement EST l'événement dont je veux être prévenue** :
+une route qui rejoint cette famille est une route dont les appelants doivent être relus,
+exactement comme pour `dur`.
+
+**La preuve est arrivée en vingt-quatre heures.** La famille est passée de **20 à 21** —
+`ssh.py:sshd_allow_user` l'a rejointe en corrigeant E-214 — et **rien dans ma suite ne
+l'a dit**. C'est le Lead qui me l'a signalé.
+
+> *Une liste de routes est une photographie, et le chantier la périme lui-même.* La
+> réponse à cela n'est pas « ne pas figer » : c'est **figer, et relire à chaque
+> changement**. Une liste qui rancit en silence est pire qu'une liste absente ; une liste
+> qui rougit trop souvent est simplement une liste qui fait son travail.
+
+Les trois familles portent désormais le même couple de gardes — *rien de neuf n'entre
+sans qu'on regarde*, et *rien de connu ne sort sans qu'on lise laquelle des deux causes
+l'explique*.
 
 ### La règle qui rend cette liste utile
 
