@@ -716,10 +716,26 @@ La lui accorder détruirait ce moyen de mesure la veille du portage d'`iptables`
 
 **Mesuré colonne par colonne, et le relevé transmis est incomplet** :
 
-| id | compte | rôle | iptables | fail2ban | services | audit_ssh |
-|---|---|---|---|---|---|---|
-| 15 | `rw-test-admin` | 2 | **0** | 1 | 1 | 1 |
-| **77** | **un compte RÉEL, rôle 2** | 2 | **0** | **0** | **0** | **0** |
+| id | compte | rôle | ligne dans `permissions` | iptables | fail2ban | services | audit_ssh |
+|---|---|---|---|---|---|---|---|
+| 15 | `rw-test-admin` | 2 | **présente** | **0** | 1 | 1 | 1 |
+| **77** | **un compte RÉEL, rôle 2** | 2 | **AUCUNE** | — | — | — | — |
+
+> **⚠ Ma première rédaction de ce tableau affichait quatre `0` explicites pour le compte
+> 77. C'était mon `COALESCE(p.can_manage_iptables, 0)` qui parlait, pas la base :** il
+> rend `0` aussi bien pour *« la colonne vaut 0 »* que pour *« il n'y a pas de ligne »*.
+> Remesuré sans lui : le compte 77 **n'a aucune ligne** dans `permissions`.
+>
+> **`COALESCE` dans une requête de mesure aplatit la distinction qu'on mesure.** C'est la
+> version SQL du travers que ce document reproche partout ailleurs — et la première fois
+> qu'il vient de mon propre outillage plutôt que du code audité.
+>
+> **Ce que la distinction change, et ce qu'elle ne change pas.** Elle ne change **rien**
+> au comportement mesuré : `Droits::permissions()` rend `[]` sur une ligne absente comme
+> sur une ligne de zéros, et le garde refuse dans les deux cas — le compte 77
+> discriminerait bien la garde. Elle change **la spécification du compte à créer** : une
+> ligne de zéros explicites se relit comme une intention, une absence de ligne se relit
+> comme un oubli.
 
 > On m'annonçait que « les trois autres gardes restent inmesurables ». **C'est faux au
 > niveau du schéma** : le compte 77 est un rôle 2 sans aucune des quatre permissions —
