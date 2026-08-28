@@ -68,29 +68,52 @@ Parmi ces neuf, combien détiennent déjà la permission qui deviendra nécessai
 > pas un défaut du correctif — c'est son effet voulu, et c'est exactement pourquoi il doit être
 > annoncé avant et non constaté après. *Un durcissement non annoncé est indiscernable d'une panne.*
 
-### ⚠ CORRECTION — CETTE LIGNE EST LA PLUS SPECTACULAIRE ET LA MOINS COÛTEUSE
+### ⚠⚠ DEUX CORRECTIONS SUCCESSIVES, ET LA PREMIERE ETAIT FAUSSE DU COTE QUI FAIT AGIR
 
-Le tableau ci-dessus classe le risque par **l'écart de permission**. Mesuré le 2026-08-28 sur
-`user_logs` — **2855 lignes** émises par des comptes de rôle < 3 — le classement par **usage réel**
-l'inverse :
+**Première correction (le 2026-08-28, matin) — et elle était FAUSSE.** Elle affirmait, sur un décompte
+de `user_logs`, que `fail2ban` et `services` avaient **30 actions historiques** d'un compte de rôle < 3
+et que « le redémarrage retire une capacité à un compte qui s'en servait la veille ». Elle en tirait
+une recommandation : **attribuer deux permissions à ce compte avant le redémarrage.**
 
-| page | détenteurs | actions historiques d'un compte rôle < 3 |
-|---|---|---|
-| `iptables` | **0 / 9** | **0** ← personne ne s'en est jamais servi |
-| `ssh-audit` | 1 / 9 | **0** |
-| `fail2ban` | 1 / 9 | **22** |
-| `services` | 1 / 9 | **8** |
+**Ce que disent réellement ces 30 lignes, lues et non comptées :**
 
-Et les 30 actions `fail2ban` + `services` viennent d'**un seul compte, qui ne détient ni l'une ni
-l'autre permission** — sa dernière action de ce type date du **2026-08-27 à 16 h 23**.
+```
+Permission refusee : can_manage_fail2ban    22
+Permission refusee : can_manage_services     8
+```
 
-> **Le redémarrage retire donc une capacité à un compte qui s'en servait la veille.** Ce n'est pas le
-> pare-feu, dont le chiffre alarmant décrit une capacité que personne n'a jamais exercée. *Un écart se
-> classe par ce qu'il coûte, pas par l'ampleur du nombre qui le décrit.*
+**Ce sont 30 REFUS.** Pas une seule action réussie. Ce sont les lignes que le contrôle de permission
+écrit **quand il refuse**. Et le compte est **`rw-test-user` (id 14)** — rôle 1, aucune permission,
+**la fixture que le plan interdit de toucher** : celle dont la privation de droits *est* le dispositif
+de mesure, employée par plusieurs suites pour vérifier qu'un rôle 1 reçoit bien un 403.
 
-**Deux permissions attribuées avant le redémarrage suffisent à supprimer tout l'impact observable** —
-`can_manage_fail2ban` et `can_manage_services`, sur ce compte. Les deux autres restent à faire, mais
-elles ne rattrapent aucun usage.
+> **La recommandation aurait fait accorder deux permissions à la fixture qui sert à mesurer leur
+> absence.** Les suites seraient restées vertes en cessant de mesurer quoi que ce soit — le faux vert
+> exact que ce chantier combat.
+
+**Le mécanisme de la faute** : un `COUNT(*)` sur des lignes contenant « fail2ban » **ne distingue pas
+un geste d'un refus**. *Un observable ne dit jamais par quel chemin il a été produit.* Et il s'est
+trompé **du côté qui alarme, c'est-à-dire du côté qui fait agir** — une erreur dans un compte rendu se
+corrige au tour suivant ; celle-ci proposait un geste sur un compte protégé.
+
+### Ce que la même méthode donne sur la BONNE donnée
+
+En excluant les refus, sur les comptes de rôle < 3 :
+
+| page | usages RÉELS |
+|---|---|
+| `iptables` | **0** |
+| `fail2ban` | **0** |
+| `services` | **0** |
+| `ssh-audit` | **0** |
+
+**Zéro sur les quatre.** C'est plus fort que ce que la première correction annonçait, et dans l'autre
+sens : **le durcissement ne retire aucun usage.** Il déplace un refus déjà en vigueur de la page vers
+la route.
+
+> Et les 30 lignes, une fois lues, **prouvent que la garde fonctionne** au lieu de la contredire.
+
+*Le classement par usage réel restait la bonne méthode. C'est sa donnée d'entrée qui était fausse.*
 
 ### Et un précédent qui rassure, mesuré aussi
 
@@ -127,11 +150,16 @@ conséquence, et qu'il n'en est pas une **sur cette installation**.
 
 ## 3. Ce que je recommande, et ce qui ne m'appartient pas
 
-1. **Attribuer les quatre permissions aux comptes qui en ont l'usage, AVANT le redémarrage.** Sinon
-   neuf comptes perdront des pages du jour au lendemain, et `iptables` pour la totalité d'entre eux.
+1. **N'attribuer aucune permission au titre de ce redémarrage.** ⚠ Ce point disait l'inverse —
+   *« attribuer les quatre permissions avant le redémarrage, sinon neuf comptes perdront des pages »*.
+   **La mesure ne le soutient pas** : aucun compte de rôle < 3 n'a jamais exercé ces quatre
+   capacités, et le seul candidat apparent était la fixture de test. Une permission accordée « au cas
+   où » sur un compte qu'on n'a pas identifié est une élévation sans demandeur.
 2. **Redémarrer hors d'un rejeu du LOT** — `backend/**.py` est lu au démarrage, un redémarrage en
    cours de suite invalide la mesure en cours.
-3. **Observer ensuite les 19 modules**, pas seulement le correctif qu'on attendait.
+3. **Observer ensuite les 20 modules**, pas seulement le correctif qu'on attendait.
+4. **Ne pas attendre pour réduire le risque : attendre l'augmente.** C'est la seule chose que les deux
+   relevés du §0 démontrent, et elle n'a pas bougé sous les deux corrections ci-dessus.
 
 **La décision de redémarrer n'est pas la mienne**, et le moment non plus. Ce document existe pour
 qu'elle soit prise en sachant ce qu'elle déclenche.
