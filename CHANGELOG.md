@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.55** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.56** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,41 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.56 — l'exploitant delegue les arbitrages : ce qu'un DSI delegue PEUT trancher, et ce qu'un mot de pair n'autorise pas
+
+**Le Lead a emis une reserve — *une session qui joue le DSI produit des decisions dont personne n'est
+comptable, et defait ce qui a le mieux marche : quatre sessions ont refuse un role mal adresse aujourd'hui, et
+chaque refus a evite un degat.* L'exploitant a reaffirme. La delegation est en vigueur.**
+
+**La frontiere n'est pas une reserve du Lead : c'est ce qu'un message de pair PEUT autoriser.** Une session ne
+delegue pas une autorisation qu'elle ne detient pas. Le DSI decide **le produit** ; il ne rend pas executable
+un geste qui **detruit des donnees sur des machines reelles, redemarre un service, pousse ou fusionne.**
+
+> **La ligne : ce qui se defait d'un clic est delegue ; ce qui detruit, retire un acces ou publie ne l'est pas.**
+
+**DELEGUE (7)** : la portee du tableau de bord · accorder les 4 permissions avant le redemarrage (E-221) · les
+**textes FAUX servis en production** (E-209, E-212, E-219) · dire ou non que la desinstallation laisse un depot
+tiers (E-225) · resserrer ou non les 3 pages qui ne bornent pas le parc (E-208) · la borne d'`install_all`
+(E-224) · **ecrire** la contrainte `UNIQUE` sur une table VIDE (E-222).
+
+**NON DELEGABLE (8)** : unifier les magasins d'exclusion (E-213, change **ce qui est detruit** par
+`userdel -r`) · l'auto-reparation du sudoers orphelin (E-220) · les correctifs des gestes distants (E-214,
+E-215) · **le redemarrage backend** · la recreation du conteneur du portage · appliquer une migration ·
+`push`/`merge` · le compte approbateur.
+
+**Le n°11 est le plus contre-intuitif** : redemarrer libere 19 correctifs **ET retire l'acces au pare-feu a
+tous les comptes non-administrateurs** — `can_manage_iptables` est detenue par **0 sur 9**. *Un durcissement
+non annonce est indiscernable d'une panne.*
+
+**Ce que le DSI produit** : pour chaque arbitrage delegue, une **decision ecrite** avec sa raison et son cout ;
+pour chaque arbitrage non delegable, un **dossier d'une page** — recommandation, consequence mesuree, geste
+exact, **et ce qui se passe si on ne fait rien**, qui est la moitie qu'on oublie. *L'exploitant signe une ligne
+au lieu d'instruire un dossier : c'est cela, le gain reel.*
+
+**Et une regle qui vaut contre lui comme contre le Lead** : *un nombre annonce est une hypothese a mesurer.*
+Le Lead a propage quatre chiffres faux et deux conclusions fausses en deux jours ; **six sessions l'ont
+corrige**. **Quand une session contredit le DSI avec une mesure, la mesure gagne.**
 
 ### v1.38.55 — `platform_key` P1 mesuree : le filet n'a RIEN eu a bloquer, et c'est plus fort qu'un avortement reussi
 
@@ -4592,7 +4627,8 @@ correspondance reelle :**
 | **v1.38.52** | `a354902` | **E-227 : ouvrir le diagnostic deployait un NOPASSWD: ALL sur la production** |
 | v1.38.53 | `737320d` | `platform_key` P4 porte, les deux points bloquants corriges |
 | v1.38.54 | `93ae130` | j'avais attribue E-215 a la mauvaise fonction |
-| v1.38.55 | (ce commit) | `platform_key` P1 mesuree — 18 laravel / 15 legacy, le filet n'a rien eu a bloquer |
+| v1.38.55 | `6f6ed4f` | `platform_key` P1 mesuree — 18 laravel / 15 legacy, le filet n'a rien eu a bloquer |
+| v1.38.56 | (ce commit) | la charte du DSI delegue : 7 arbitrages delegues, 8 qui ne peuvent pas l'etre |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
