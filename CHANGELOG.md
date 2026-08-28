@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.87** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.88** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,56 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.88 — le vocabulaire d'un champ c'est le SCHEMA, et la portee d'E-236 est UN compte reel
+
+#### ⚠ E-237 : ma liste de statuts etait courte d'un, et c'est celui qui resout
+
+J'avais ecrit que *« le vocabulaire n'a pas de mot pour l'etat atteint »* et interdit a la session 4
+de deplacer l'ecriture. **L'enumeration en porte CINQ :**
+
+    034_wazuh.sql:48   ENUM('active','disconnected','never_connected','pending','unknown')
+
+**`unknown` existe de bout en bout** — ecrit par le backend (`wazuh.py:742`), rendu en badge gris
+avec un repli pour tout statut non mappe (`wazuh.js:102-105`), libelle present. **Et c'est la
+valeur juste** : il ne dit pas « partiellement desinstalle », il dit *« je ne sais pas ce qu'il y a
+sur cette machine »*. Mes deux options **affirmaient** toutes deux quelque chose de faux ;
+celle-ci **n'affirme rien**. Consigne retiree, geste disponible, **aucune migration**.
+
+> **Le vocabulaire d'un champ, c'est le SCHEMA — pas ce que le code ecrit.**
+
+Ma liste de quatre venait d'un motif sur les litteraux `status='…'`. **`unknown` est ecrit par une
+expression conditionnelle** — `'active' if … else ('disconnected' if … else 'unknown')` — qu'aucun
+motif sur une affectation litterale ne voit. *Meme famille que `'route' =>` rendant 0 sur un fichier
+qui aligne ses fleches, et que mon `guide.php` cherche par nom de fichier quand les cles vivaient
+dans `tips.php` : **un motif suppose une forme d'ecriture**, et c'est la troisieme fois aujourd'hui.*
+
+**Reserve** : aucun `laravel/lang/{fr,en}/wazuh.php` n'existe — si `unknown` est retenu, le libelle
+doit exister **au moment du portage**, sinon l'ecran affiche `wazuh.status_unknown` en clair.
+
+#### E-236 : la portee est UN compte reel, et c'est un ecart de CAPACITE
+
+    role 3   3 comptes                       ouvrent ET appellent  (legitime, court-circuit des deux cotes)
+    role 2   1 REEL sans can_audit_ssh      **n'ouvre PAS la page, APPELLE la route**
+    role 1   7, aucun avec la permission     ni l'un ni l'autre
+
+**Ni theorique ni massif : un compte, reel, actif.** Et la borne qui change la gravite : ce compte
+est **deja role 2**, donc il a deja tout le parc. **Ce qu'il gagne est une CAPACITE — lancer l'audit
+SSH de toute la flotte — pas un acces.** *Un ecart de capacite, pas de confidentialite.*
+
+#### Trois tables vides confirmees, et une troisieme que personne n'avait citee
+
+    wazuh_agents 0 · machine_groups 0 · machine_group_members 0
+
+**`machine_group_members`** manquait a tous nos releves : *un groupe vide et un groupe **sans
+membres** ne se distinguent pas dans une suite qui ne regarde que `machine_groups`.*
+
+#### Et un desaccord qui n'en est peut-etre pas un
+
+Le compte pytest — 462, 509, 549 — pourrait n'etre qu'un melange de **fonctions** et de **cas
+collectes a deux dates**. Si c'est ca, **les trois sont justes** et le seul chiffre faux est celui
+qui ne mesure pas la meme chose. *Ce serait le quatrieme desaccord du jour qui n'en est pas un* —
+apres `iptables` 369/870, les cles Graylog 5 et 5, et `/wazuh/uninstall`.
 
 ### v1.38.87 — nouvelle ligne de base du LOT, le gel est leve, et les deux passerelles ne divergent nulle part dans la direction dangereuse
 
