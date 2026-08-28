@@ -78,7 +78,9 @@ return [
     'geste_fait' => ':service: :message',
     'geste_echec' => 'The gesture on :service failed: :message',
 
-    'non_porte_titre' => 'The service gestures are not ported yet',
-    'non_porte_texte' => 'Listing, starting, stopping and restarting a service are done from the legacy portal for now. This page carries the inventory and the access guards; the gestures follow.',
-    'non_porte_lien' => 'Open service management in the legacy portal',
+    'portage_titre' => 'Every action on this page is ported here',
+    'portage_texte' => "Listing, starting, stopping, restarting, enabling and disabling a service are all done from this page. The legacy services page was archived on 27 August 2026: there is nothing left to compare with, and the link that led there was removed because it returned a 404.",
+    'panneau_aide' => "The action reaches the machine as soon as you confirm. A protected service is refused by the backend, not merely hidden on screen.",
+    'annuler' => 'Cancel',
+    'confirmer' => 'Confirm',
 ];

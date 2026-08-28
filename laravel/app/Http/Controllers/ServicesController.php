@@ -50,6 +50,10 @@ class ServicesController extends Controller
             'act_demarrer', 'act_arreter', 'act_redemarrer', 'act_activer', 'act_desactiver',
             'confirmer_arreter', 'confirmer_redemarrer', 'confirmer_demarrer',
             'confirmer_activer', 'confirmer_desactiver', 'geste_fait', 'geste_echec',
+            // Le panneau de decision qui remplace `window.confirm()` : la boite
+            // native bloquait Puppeteer, donc les cinq gestes qui ECRIVENT
+            // etaient les seuls du module qu'aucune suite ne pouvait exercer.
+            'panneau_aide',
         ] as $cle) {
             $textes[$cle] = __('services.' . $cle);
         }

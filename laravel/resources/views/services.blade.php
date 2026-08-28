@@ -123,16 +123,53 @@
 </div>
 
 {{--
-    Une capacite non portee n'est pas un bouton inerte : le panneau dit ce que le
-    geste engage, et son action principale est un lien MARQUE vers l'ancien
-    portail. Les lectures sont S2, les ecritures S3.
+    ═══ LE PANNEAU DE DECISION, A LA PLACE D'UN `confirm()` NATIF ═══════════
+
+    `services.js` posait `window.confirm()`. Trois raisons de le retirer, et la
+    troisieme est celle qui coute :
+
+      - il recouvre la ligne sur laquelle on decide ;
+      - il ne se style pas, donc il ne peut pas distinguer un arret d'un
+        redemarrage ni marquer un service protege ;
+      - **il BLOQUE Puppeteer.** Les cinq gestes qui ECRIVENT sur une machine
+        etaient donc les seuls du module qu'aucune suite ne pouvait exercer.
+        Un dialogue natif ne rend pas un geste dangereux : il le rend
+        INTESTABLE, ce qui est pire.
+
+    Le panneau NOMME le service ET la machine, comme le faisait le texte du
+    `confirm()` : c'est de la parite, elle est conservee.
 --}}
-<div class="rw-encart" data-rw="services-non-porte">
-    <p class="rw-sous-titre-fort">{{ __('services.non_porte_titre') }}</p>
-    <p class="rw-prose">{{ __('services.non_porte_texte') }}</p>
-    <a class="rw-bouton" data-rw="services-lien-legacy"
-       href="{{ rtrim(config('app.url_legacy'), '/') }}/services/"
-       target="_blank" rel="noopener">{{ __('services.non_porte_lien') }} ↗</a>
+<div class="rw-panneau-decision" data-rw="services-panneau" hidden>
+    <p class="rw-panneau-decision__texte" data-rw="services-panneau-titre"></p>
+    <p class="rw-prose" data-rw="services-panneau-texte"></p>
+    <div class="rw-panneau-decision__actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="services-panneau-annuler">{{ __('services.annuler') }}</button>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="services-panneau-confirmer">{{ __('services.confirmer') }}</button>
+    </div>
+</div>
+
+{{--
+    ── CE QUE CET ENCART DISAIT, ET POURQUOI C'ETAIT FAUX ───────────────────
+
+    Il annoncait « les gestes sur les services ne sont pas encore portes » et
+    offrait un bouton PRINCIPAL vers `/services/` de l'ancien portail.
+
+    Les deux etaient faux, et mesures :
+      - les cinq gestes SONT portes. `pilote()` appelle `/services/<geste>` par
+        concatenation — ce qui explique qu'une recherche du chemin litteral ne
+        trouve que `/services/list` et laisse croire au contraire ;
+      - `legacy/services/` est ARCHIVE depuis le 2026-08-27 (`_deprecated/`).
+        Le bouton menait donc a un 404, en action PRINCIPALE.
+
+    *Une donnee qui ment le plus longtemps est celle que personne ne remet en
+    question.* Le lien est retire plutot que reetiquete : il n'y a plus rien au
+    bout.
+--}}
+<div class="rw-encart" data-rw="services-etat-portage">
+    <p class="rw-sous-titre-fort">{{ __('services.portage_titre') }}</p>
+    <p class="rw-prose">{{ __('services.portage_texte') }}</p>
 </div>
 @endif
 
