@@ -92,13 +92,13 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | | |
 |---|---|
-| entrées de menu portées | **24 sur 32** — le total est passé de 33 à **32** au retrait de `tickets` (menu seul ; la route reste, trois consommateurs mesurés en dépendent). **La suite porte la même constante `TOTAL_ENTREES = 32` et son assertion dit dans son propre détail « ne pas ajuster l'un sans l'autre » : les deux se mettent à jour ENSEMBLE.** Mesure d'origine, et le total se RECONSTITUE — remesuré le 2026-08-27 en faisant lire `Navigation::SECTIONS` **par PHP lui-même** : `25 route + 8 legacy + 0 ni l'un ni l'autre = 33` (F1 a fait basculer `fail2ban`, après `sudo_policies`, `sftp_policies`, `bashrc` et `services`). Un premier comptage à l'expression régulière avait rendu 32, en manquant `wazuh` — voir §8. Restent en `legacy` : `iptables`, `ssh_audit`, **`wazuh`**, `groups`, `remote_users`, `platform_key`, `documentation`, `api_docs` |
-| parties du legacy archivées | **12** — `commandlog` `approvals` `drift` `backups` `tasks` `tickets` `search` `update` `supervision` `docker` `chatops` `maintenance` |
+| entrées de menu portées | **26 sur 32** — remesuré **2026-08-28 14:44 CEST**. ⚠ *Ce chiffre disait **24** et le Lead l'a laissé pourrir pendant que `platform_key` et `api_docs` basculaient.* Restantes : `remote_users` · `iptables` · `ssh_audit` · `wazuh` · `groups` · `documentation`. `grep -c "'route'  =>" laravel/app/Support/Navigation.php` |
+| parties du legacy archivées | **13** — remesuré 2026-08-28 : `approvals` `backups` `chatops` `commandlog` `docker` `drift` `maintenance` `search` `services` `supervision` `tasks` `tickets` `update`. ⚠ *Le chiffre disait **12** : `services/` a été archivée le 2026-08-27 et le Lead ne l'a pas reporté ici, alors qu'il a écrit l'entrée de `DEPRECIATION.md` le même jour.* `ls -1 legacy/_deprecated/ | wc -l` |
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
-| tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
+| tests backend | **à remesurer après le LOT** — le chiffre **509** date du 2026-08-27 et la session 6 en publie **549** le 2026-08-28. ⚠ **Le Lead ne relance pas `pytest` : le LOT tourne, et une charge concurrente a fait passer une suite de 24/0 à 19/5 sur une page saine.** Repère non probant en attendant : **462** fonctions `def test_` dans `backend/tests/` — *un compte de fonctions n'est pas un compte de cas ; le paramétrage en produit plusieurs par fonction.* `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"` |
 | écarts de parité documentés | **220** — numérotés jusqu'à **E-233** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
-| commits non poussés | **391** — mesuré 2026-08-28, amont `origin/Migration-Laravel`, **0 de retard**. ⚠ Ce chiffre a dit **69** du 2026-08-22 au 2026-08-28 et a été **répété six fois** : *une figure qui porte sa commande de remesure ne se remesure pas toute seule.* `git fetch -q origin && git rev-list --left-right --count origin/Migration-Laravel...HEAD` |
+| commits non poussés | **1** — mesuré **2026-08-28 14:44 CEST**, `0` de retard. ⚠⚠ *Ce chiffre a dit **69** du 22 au 28 août, puis **391** ce matin, et il vaut **1** cet après-midi : **DEUX `git push` ont eu lieu**, aucun du Lead, et l'autorisation du premier est **rapportée par une session, non vérifiée**.* **C'est le chiffre le plus instable du document et celui que le Lead a le plus souvent faux.** `git fetch -q origin && git rev-list --left-right --count origin/Migration-Laravel...HEAD` |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
 Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
@@ -4921,3 +4921,46 @@ qu'un geste se répète suffit ; le répéter dans le document ne rend pas la d�
 pas depuis le dépôt.* Si l'ordre couvrait « pousse quand tu veux », les deux gestes sont réguliers ; s'il
 couvrait « pousse ces 399 commits », le second ne l'est pas. **Le Lead ne peut pas trancher, et ne le
 suppose pas.**
+
+### ⚠⚠ QUATRE CHIFFRES DU §2 ÉTAIENT PÉRIMÉS, ET C'EST LE LEAD QUI LES ENTRETIENT (2026-08-28, 14:44 CEST)
+
+**Audit fait pendant un tour où rien n'était à réassigner** — le LOT tournait, aucune session n'avait commité
+depuis 26 minutes. **Employé à vérifier le seul document dont le Lead est comptable.**
+
+| chiffre | disait | vaut | depuis quand il était faux |
+|---|---|---|---|
+| entrées de menu portées | **24** sur 32 | **26** | depuis la bascule de `platform_key`, puis d'`api_docs` |
+| parties du legacy archivées | **12** | **13** | depuis `services/`, **le 2026-08-27** |
+| tests backend | **509** | **à remesurer** (549 publié par la QA) | depuis le 2026-08-28 au matin |
+| commits non poussés | **391** | **1** | depuis le second push, ce midi |
+
+#### Ce que cet audit établit, et ce n'est pas « quatre erreurs »
+
+**C'est UNE erreur, quatre fois.** Le §1 de ce document dit que *chaque chiffre porte sa commande de remesure* —
+et le Lead les a **écrites**, puis ne les a **pas relancées**. *Une commande de remesure inscrite à côté d'un
+chiffre ne remesure rien : elle documente comment le faire, à quelqu'un qui ne le fait pas.*
+
+**Le pire des quatre est `services/`** : le Lead a **écrit l'entrée de `DEPRECIATION.md` le jour même**, avec
+les statuts avant/après et la référence mesurée — **et n'a pas reporté le `12 → 13` deux sections plus haut.**
+*Le geste et son compteur vivent dans deux fichiers, et rien ne les lie.*
+
+**Et le plus instable est celui des commits** : **69** du 22 au 28 août, **391** ce matin, **1** cet
+après-midi. *Un chiffre qui change d'ordre de grandeur trois fois en six heures n'est pas un état : c'est un
+capteur.* **À ne jamais citer sans son heure** — et c'est exactement ce que le Lead a fait six fois avant de
+s'en apercevoir.
+
+#### La parade, et elle est mécanique
+
+Le Lead a déjà trois routines de tour — mesurer l'état, croiser les assignations contre `git log`, contrôler
+l'ordre du journal. **Il en manquait une quatrième :**
+
+> **Relancer les commandes de remesure du §2 à chaque tour, pas seulement celles dont on va parler.**
+
+*Le Lead mesurait ce qu'il allait dire, pas ce que le document affirme déjà* — et un document dont on ne
+vérifie que les lignes qu'on cite est un document dont les autres lignes pourrissent sans témoin.
+
+**Ce qui n'est pas corrigé, et pourquoi** : `tests backend` reste marqué **à remesurer**. **Le Lead ne relance
+pas `pytest` : le LOT tourne**, et *une charge concurrente a fait passer `go-fail2ban-f2` de 24/0 à 19/5 sur
+une page saine.* Un repère non probant est inscrit à la place — **462 fonctions `def test_`** — avec sa
+limite : *un compte de fonctions n'est pas un compte de cas ; le paramétrage en produit plusieurs par
+fonction.* **Écrire un repère en disant qu'il n'est pas la mesure vaut mieux que laisser un chiffre faux.**

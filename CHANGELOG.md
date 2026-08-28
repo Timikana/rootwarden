@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.80** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.81** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,45 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.81 — quatre chiffres de mon propre §2 etaient perimes, et c'est UNE erreur quatre fois
+
+**Audit fait pendant un tour ou rien n'etait a reassigner** — le LOT tournait, aucune session n'avait commite
+depuis 26 minutes. **Employe a verifier le seul document dont le Lead est comptable.**
+
+| chiffre | disait | vaut | faux depuis |
+|---|---|---|---|
+| entrees de menu portees | **24** sur 32 | **26** | la bascule de `platform_key`, puis d'`api_docs` |
+| parties du legacy archivees | **12** | **13** | `services/`, **le 2026-08-27** |
+| tests backend | **509** | **a remesurer** (549 publie par la QA) | ce matin |
+| commits non pousses | **391** | **1** | le second push, ce midi |
+
+#### Ce n'est pas « quatre erreurs », c'est UNE erreur quatre fois
+
+Le §1 dit que *chaque chiffre porte sa commande de remesure* — **et le Lead les a ecrites, puis ne les a pas
+relancees.** *Une commande de remesure inscrite a cote d'un chiffre ne remesure rien : elle documente comment
+le faire, a quelqu'un qui ne le fait pas.*
+
+**Le pire des quatre est `services/`** : le Lead a **ecrit l'entree de `DEPRECIATION.md` le jour meme**, avec
+les statuts avant/apres et la reference mesuree — **et n'a pas reporte le `12 → 13` deux sections plus haut.**
+*Le geste et son compteur vivent dans deux fichiers, et rien ne les lie.*
+
+**Et le plus instable est celui des commits** : **69** du 22 au 28 aout, **391** ce matin, **1** cet
+apres-midi. *Un chiffre qui change d'ordre de grandeur trois fois en six heures n'est pas un etat : c'est un
+capteur.* **A ne jamais citer sans son heure** — ce que le Lead a fait six fois avant de s'en apercevoir.
+
+#### La parade, mecanique, et c'est la quatrieme routine de tour
+
+> **Relancer les commandes de remesure du §2 a chaque tour, pas seulement celles dont on va parler.**
+
+*Le Lead mesurait ce qu'il allait DIRE, pas ce que le document AFFIRME deja* — et un document dont on ne
+verifie que les lignes qu'on cite est un document dont les autres lignes pourrissent sans temoin.
+
+**Ce qui n'est pas corrige, et pourquoi** : `tests backend` reste **a remesurer**. **Le Lead ne relance pas
+`pytest` : le LOT tourne**, et *une charge concurrente a fait passer une suite de 24/0 a 19/5 sur une page
+saine.* Repere non probant inscrit a la place — **462** fonctions `def test_` — **avec sa limite** : *un compte
+de fonctions n'est pas un compte de cas ; le parametrage en produit plusieurs par fonction.* **Ecrire un repere
+en disant qu'il n'est pas la mesure vaut mieux que laisser un chiffre faux.**
 
 ### v1.38.80 — E-233 : le proxy legacy autorise par ESPACE DE NOMS, et deux mesures divergent — ce qui est le resultat
 
