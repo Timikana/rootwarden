@@ -14,7 +14,7 @@
 | | **A — le secret 2FA de la production** | **B — la console d'API du portail** |
 |---|---|---|
 | **ce qu'il faut pour l'atteindre** | **un mot de passe** | **un compte de rôle ≥ 2** |
-| où | `origin/main` — **la production** | les deux portails ? **non : le legacy seul** |
+| où | `origin/main` — **la production** | **le portail legacy seul** — le portage n'a pas de console |
 | ce qu'on obtient | le **secret TOTP en clair** + le QR, codes valides indéfiniment | une **requête libre** vers le backend, dont un scan SSH de **toute la flotte** |
 | combien de comptes concernés | **tout compte dont on connaît le mot de passe** | **5** (2 de rôle 2, 3 de rôle 3) |
 | est-ce une escalade ? | **oui** — le second facteur devient dérivable du premier | **non** — un rôle 2 n'atteint rien de plus qu'en cliquant les pages |
