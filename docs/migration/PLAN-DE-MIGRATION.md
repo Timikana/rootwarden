@@ -4772,3 +4772,64 @@ une urgence*, et un correctif écrit sous gel entre dans un lot que personne n'a
 
 **Le Lead lève le gel item par item, jamais en bloc** — et le prend en sachant que **le lot est à 20 modules
 jamais observés.**
+
+### LE MOUVEMENT D'UNE LISTE EST L'ÉVÉNEMENT QU'ON VEUT MESURER, PAS UNE RAISON DE NE PAS LA FIGER (2026-08-28)
+
+**Auto-correction de la QA, et elle porte sur un raisonnement, pas sur un chiffre.**
+
+Elle avait écrit : *« on ne les fige pas une par une — elles bougent à chaque correctif »*. **Sa correction :**
+
+> **« C'était traiter le MOUVEMENT comme une raison de ne pas mesurer, alors que le mouvement est l'ÉVÉNEMENT
+> dont je veux être prévenue. »** Une route qui rejoint la famille `conditionnel` est une route **dont les
+> appelants doivent être relus** — exactement comme pour `dur`. *Rien dans sa suite ne le disait.*
+
+**La réponse à « une liste de routes est une photographie, et le chantier la périme lui-même » n'est donc pas
+« ne pas figer » — c'est « figer, ET relire à chaque changement ».**
+
+> *Une liste qui rancit en silence est pire qu'une liste absente ; une liste qui rougit souvent est simplement
+> une liste qui fait son travail.*
+
+**Mesuré à 13:51 CEST** : la famille `conditionnel` est passée de **20 à 21** — `sshd_allow_user` l'a rejointe
+en corrigeant E-214. **Et ce qui n'a PAS bougé est une mesure aussi** : `dur` (11) et `flux` (15) sont
+identiques à leur figeage, **aucune entrée, aucune sortie.** *Dire lesquelles n'ont pas bougé évite qu'on
+suppose les trois périmées.*
+
+### ⚠ UNE RÈGLE PEUT MATCHER LE BON MOTIF DANS LA MAUVAISE BRANCHE (2026-08-28)
+
+**Trouvé en reprenant l'invariant `@require_machine_access` : deux de ses trois entrées connues n'étaient plus
+trouvées, pour DEUX CAUSES OPPOSÉES.**
+
+    ssh_audit_policies_get   -> CORRIGEE (autorisation propre)         -> entree retiree, a raison
+    docker_results           -> NON corrigee : c'est l'INSTRUMENT qui l'exonerait
+
+    docker.py:159   machine_id = request.args.get('machine_id')     <- OPTIONNEL
+    docker.py:163   if machine_id:
+    docker.py:167       return jsonify({... 'machine_id invalide'}), 400   <- dans la branche POSITIVE
+
+**Le `return` que la règle voyait ne se déclenche que si le paramètre est PRÉSENT et invalide.** La règle
+comptait « cette route refuse sans `machine_id` » ; elle refuse **avec** un `machine_id` mauvais.
+
+**Et la route est bel et bien sûre** — `:175` borne au périmètre dans son corps dès `role < 2` — **mais pour une
+raison que l'instrument ne voyait pas.** *Un dédouanement obtenu par le mauvais motif est un dédouanement qui
+tombera au prochain remaniement.*
+
+**Et le resserrement a été mesuré AVANT d'être écrit** : la première version faisait basculer **62 routes**,
+parce que `if err:` est un test de **présence** et non de refus. **Plus la garde qui manquait — que les entrées
+connues soient TOUJOURS trouvées.** *C'est la garde qui a rendu cette reprise possible : sans elle, une liste
+se vide en silence.*
+
+### ⚠ TROISIÈME FOIS QUE LE LEAD REDEMANDE DU TRAVAIL FAIT — ET SA PARADE NE COUVRAIT PAS CE CAS (2026-08-28)
+
+    la seconde moitie de la jointure : commitee a 08:59 CEST  (bbb0321)
+    l'invariant repris               : commite a 08:26 CEST  (59484cb)
+    le Lead les a demandes           :          13:48 CEST
+
+**Cinq heures.** Et sa parade — *`git log -S` sur le symbole avant d'assigner* — **ne couvre pas ce cas** :
+elle cherche un symbole nommé, pas une tâche accomplie.
+
+**Parade élargie, et elle est déjà dans la routine du tour** : *lire `git log` depuis la dernière mesure
+**avant** de dispatcher, et croiser ce qu'on va assigner contre ce qui vient d'être commité.* Le Lead lit déjà
+ce journal pour établir l'état — **il ne le croisait pas contre ses propres assignations.**
+
+*Une tâche redemandée est aussi coûteuse qu'une tâche oubliée* — et c'est la troisième, après l'unification des
+résolveurs et l'encart `services`.

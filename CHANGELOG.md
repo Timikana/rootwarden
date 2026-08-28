@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.77** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.78** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,70 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.78 — le mouvement d'une liste est l'evenement qu'on veut mesurer, et une regle peut matcher le bon motif dans la MAUVAISE BRANCHE
+
+#### La QA se corrige sur un raisonnement, pas sur un chiffre
+
+Elle avait ecrit : *« on ne les fige pas une par une — elles bougent a chaque correctif »*. **Correction :**
+
+> **« C'etait traiter le MOUVEMENT comme une raison de ne pas mesurer, alors que le mouvement est l'EVENEMENT
+> dont je veux etre prevenue. »**
+
+*La reponse a « une liste de routes est une photographie » n'est pas « ne pas figer » — c'est « figer ET relire
+a chaque changement ».* **Une liste qui rancit en silence est pire qu'une liste absente ; une liste qui rougit
+souvent est simplement une liste qui fait son travail.**
+
+**Mesure a 13:51 CEST** : `conditionnel` passe de **20 a 21** (`sshd_allow_user`, entree en corrigeant E-214).
+**Et ce qui n'a PAS bouge est une mesure aussi** : `dur` (11) et `flux` (15) identiques, aucune entree, aucune
+sortie. *Dire lesquelles n'ont pas bouge evite qu'on suppose les trois perimees.*
+
+#### ⚠ Une regle peut matcher le bon motif dans la mauvaise branche
+
+Deux des trois entrees connues de l'invariant n'etaient plus trouvees, **pour deux causes opposees** :
+
+    ssh_audit_policies_get  ->  CORRIGEE (autorisation propre)      -> retiree, a raison
+    docker_results          ->  NON corrigee : c'est l'INSTRUMENT qui l'exonerait
+
+    docker.py:159   machine_id = request.args.get('machine_id')          <- OPTIONNEL
+    docker.py:163   if machine_id:
+    docker.py:167       return jsonify({… 'machine_id invalide'}), 400   <- branche POSITIVE
+
+**Le `return` que la regle voyait ne se declenche que si le parametre est PRESENT et invalide.** La regle
+comptait « refuse sans `machine_id` » ; elle refuse **avec** un `machine_id` mauvais.
+
+**Et la route est sure** — `:175` borne au perimetre dans son corps des `role < 2` — **mais pour une raison que
+l'instrument ne voyait pas.** *Un dedouanement obtenu par le mauvais motif est un dedouanement qui tombera au
+prochain remaniement.*
+
+**Resserrement mesure AVANT d'etre ecrit** : la premiere version faisait basculer **62 routes**, `if err:` etant
+un test de **presence**. **Plus la garde qui manquait — que les entrees connues soient TOUJOURS trouvees** :
+*sans elle, une liste se vide en silence.*
+
+#### ⚠ Troisieme fois que le Lead redemande du travail fait
+
+    seconde moitie de la jointure  commitee a 08:59 CEST (bbb0321)
+    invariant repris               commite  a 08:26 CEST (59484cb)
+    le Lead les a demandes                    13:48 CEST
+
+**Cinq heures.** Et sa parade — *`git log -S` sur le symbole avant d'assigner* — **ne couvre pas ce cas** : elle
+cherche un symbole nomme, pas une tache accomplie. **Parade elargie** : *lire `git log` depuis la derniere
+mesure AVANT de dispatcher, et croiser ce qu'on va assigner contre ce qui vient d'etre commite.* Le Lead lit
+deja ce journal pour etablir l'etat — **il ne le croisait pas contre ses propres assignations.**
+
+#### La jointure, etat mesure
+
+**Couverture 22 % → 71 %** (42 sites sur 59), par une **remontee d'un niveau** : les fichiers routent leurs
+appels par un helper, donc le chemin litteral vit chez les **appelants** du helper. **Le silence sur `flux` est
+tombe de 12 a 0** — 3 resolues par l'outil, 6 verifiees par deux methodes concordantes, 3 tracees a la main, 3
+dont **l'absence d'appelant est etablie**.
+
+**Trois langages, trois analyseurs, aucune expression reguliere sur du code** — `acorn`, `token_get_all()`,
+`ast`. Et `absence.mjs` etablit une absence **sur les deux couches** en **nommant son residu** : 8 gabarits
+interpoles, tous prefixes `/supervision/` litteralement, donc **incapables de produire les chemins cherches.**
+
+**Ce qui reste : 13 sites en silence par incapacite, et la forme est NOMMEE** — le helper est tenu dans une
+**variable** et le chemin entre **deux niveaux** au-dessus. *Une limite nommee n'est pas un silence.*
 
 ### v1.38.77 — j'avais ecrit « cet ordre n'a pas ete donne » et je ne pouvais pas le savoir ; et une verification affirmee n'est pas un fait perime
 
