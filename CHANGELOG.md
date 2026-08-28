@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.56** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.57** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,57 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.57 — E-215 : la route faisait sans garde ce que sa voisine bloque et nomme « te locker hors du serveur »
+
+**Symptome.** `remove_user_keys` retirait des cles SSH en **jetant le retour** d'`execute_as_root` sur
+**les deux** branches et en rendant `success: True`. Le `; echo OK` du mode cible **forcait le code de
+sortie a zero** : meme un lecteur futur n'aurait rien pu en tirer. C'etait **E-192 revenu sur une
+revocation d'acces** — une fausse attestation, et personne ne rouvre un dossier de conformite clos.
+
+**Et la selection se faisait par SOUS-CHAINE.** `sed -i '/rootwarden/d'`, plus large que sa propre
+docstring qui annoncait `@rootwarden` ou `rootwarden-platform`. *L'en-tete affirmait plus ETROIT que le
+code — l'inverse du motif habituel, et il se relit aussi mal.*
+
+**Mesure sur trois cles reelles** (hote, repertoire temporaire, aucune machine jointe) : un fichier
+portant une cle personnelle `paul@poste`, une cle personnelle commentee `backup-from-rootwarden-host`
+et la cle de plateforme.
+
+| methode | retirees | ce qui reste |
+|---|---|---|
+| `sed '/rootwarden/d'` | **2** | `paul@poste` seule — **la cle personnelle a saute** |
+| par empreinte SHA256 | **1** | les deux cles personnelles, dont celle au commentaire piegeux |
+
+**⚠ Poser la verification SEULE aurait arme le piege.** Aujourd'hui la route peut echouer en silence,
+et cette non-fiabilite est — **par accident** — ce qui limite les degats. Lui faire lire son code de
+retour rend le geste **effectif a chaque fois**, y compris quand il retire la cle de plateforme.
+**La garde et la verification sont donc dans le meme commit.** *Un correctif qui rend un chemin
+possible doit regarder ce qu'il rend irreversible sur ce meme chemin.*
+
+**Le remede etait 150 lignes plus haut, et il est REMONTE, pas recrit.** `server_user_remove_key`
+refusait deja la cle de plateforme sans `force`, sauvegardait, recalculait les empreintes ligne par
+ligne et distinguait ses codes de sortie. Son script devient
+`_script_retrait_par_empreintes(username, empreintes)` — **une liste**, pour que le meme code serve un
+retrait cible et un retrait multiple. *Une regle appliquee ailleurs se remonte de la ; elle ne se
+recalcule pas* — troisieme fois cette semaine, apres les cinq `_resolve_ssh_creds` et les quatre
+`_validate_username`.
+
+**Trois changements de comportement, assumes :**
+
+1. **la cle de plateforme est protegee**, refus sans `force`, **meme formulation** que la voisine. Le
+   mode `rootwarden_only` ne vise que cette cle : il l'exige donc toujours ;
+2. **sans inventaire, la route REFUSE** (`404`, « relance un scan ») au lieu de balayer au motif. *Ne
+   pas deviner vaut mieux que deviner large* ;
+3. **le code de sortie distingue** : `1` pas de fichier, `2` aucune cle visee trouvee (**fichier
+   intact**), `3` fichier non vide apres vidage. Et `cles_retirees` est **toujours present** — `null`
+   dit « le compte n'a pas ete rendu », pas zero.
+
+**Au passage** : la seule interpolation brute restante du script (`echo "no authorized_keys for
+{username}"`) est desormais citee, alors que `user_q` existait deux lignes plus haut.
+
+**Non-regression verifiee** : le script rendu pour une empreinte unique porte les six proprietes de
+l'original, compare par **egalite exacte** et ne contient ni `grep` ni inclusion de sous-chaine. La
+syntaxe des scripts produits est validee par `sh -n`. **Inerte jusqu'au redemarrage.**
 
 ### v1.38.56 — l'exploitant delegue les arbitrages : ce qu'un DSI delegue PEUT trancher, et ce qu'un mot de pair n'autorise pas
 
