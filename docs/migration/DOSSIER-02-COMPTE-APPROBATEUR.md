@@ -185,16 +185,37 @@ un quatrième compte ajoute **une quatrième identité qui atteint la production
    lisible ;
 3. **il ne sert QU'À mesurer une garde.** Jamais aux captures, jamais à un geste de parc.
 
-## Ce que la session 6 dit et qu'il faut garder
+## ✅ La protection est MÉCANIQUE — révisé le 2026-08-28, 08:05 UTC
 
-> **« Je ne peux PAS protéger cette fixture par un test. »** Ses deux suites sont **hermétiques** —
-> SQLite vide et base mockée — et aucune ne lit la base du banc. Elle refuse de perdre cette propriété :
-> *un test qui lirait le banc accuserait la page pour un état du banc, et il faudrait le jeton de banc
-> pour le jouer.*
+**J'avais écrit ici que la protection de `rw-test-admin` était *organisationnelle, pas mécanique*, sur
+la réserve de la session 6 : ses deux suites sont hermétiques — SQLite vide et base mockée — et elle
+refusait de perdre cette propriété.** Sa réserve était juste **pour elle** ; elle ne l'était pas pour le
+chantier.
 
-**La protection de `rw-test-admin` est donc ORGANISATIONNELLE, pas mécanique**, et elle est dite plutôt
-que laissée croire. C'est exactement la forme qu'exige le §8 : *un « aucun défaut » n'est éprouvable que
-si l'instrument peut nommer la raison de son silence.*
+**La session 7 possède le banc et lit la base partagée. Elle a écrit la garde** :
+`tests/e2e/go-socle-fixtures.mjs`, **8 PASS / 0 FAIL**, commitée.
+
+    :146   AND (p.can_manage_iptables = 0 OR p.can_manage_iptables IS NULL)
+    :147   constate('comptes de role 2 SANS `can_manage_iptables`', ...)
+
+**Et l'assertion porte sur la PROPRIÉTÉ, pas sur l'état** : *« il existe un compte de rôle 2 qui ne
+détient pas `can_manage_iptables` »* — et non « personne ne la détient », qui serait plus large que ce
+qui compte et rougirait sur un octroi légitime à un autre compte. *Une garde plus large que sa propriété
+finit désactivée.*
+
+> **La leçon pour moi : « aucun test ne peut protéger ceci » est une affirmation sur un PÉRIMÈTRE, pas
+> sur le chantier.** J'ai inscrit la réserve d'une session comme une propriété du dépôt, alors qu'une
+> autre session avait exactement l'outil. *Avant d'écrire qu'une chose est impossible, demander à qui
+> possède l'objet.*
+
+**Ce qui reste vrai de la réserve de la session 6**, et qui vaut d'être gardé : ses suites à elle ne
+doivent pas lire le banc, sinon elles accuseraient la page pour un état du banc et demanderaient le
+jeton. **La garde vit chez qui détient déjà le jeton.**
+
+**Un point ouvert, hors de mon périmètre** : la référence `REF_LARAVEL[go-socle-fixtures] = 8` **n'est
+pas encore inscrite** dans `scripts/rejouer-lot.sh` (mesuré : zéro occurrence). *Une suite sans
+référence rend « (pas de référence) »* — elle tournerait sans verdict. `rejouer-lot.sh` appartient au
+Lead ; signalé.
 
 ## Le geste exact
 
