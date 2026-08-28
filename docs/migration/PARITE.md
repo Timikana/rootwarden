@@ -11105,3 +11105,69 @@ echanger un mensonge contre un autre. **Arbitrage exploitant**, comme la colonne
 
 *Et le `purge` reste `apt`-only : le rendre multi-famille est un changement de comportement sur un
 geste destructeur distant — c'est au DOSSIER-04 en attente de signature, ou le DSI a scinde E-225.*
+
+## E-235c — l'ensemble derive est 38 espaces, pas 7 : et la parade n'est pas une liste plus longue
+
+**Mesure du 2026-08-28, 16:30 CEST.** Quatre estimations successives du meme ensemble :
+
+    session 6, 1re fois   2 espaces  (/ssh-audit/, /docker/)
+    Lead                  3 espaces  (+ /fail2ban/, et /wazuh/ deja ferme)
+    session 6, 2e fois    7 espaces
+    ensemble DERIVE      38 espaces
+
+**Chaque correction etait une liste plus longue, et chacune etait encore une liste.** La session 6
+a nomme la parade avant que je la mesure, et sa formule est la bonne :
+
+> **La parade n'est pas une liste plus longue : c'est de DERIVER l'ensemble. Une liste d'exemples
+> se corrige indefiniment ; une enumeration ne se corrige qu'une fois.**
+
+C'est la meme regle que *« compter une structure, c'est la faire lire par son propre
+analyseur »* — appliquee non plus a un langage mais a un **ensemble d'objets**.
+
+*Pourquoi les listes montaient : les trois premieres ne voyaient que les prefixes en forme
+d'espace de noms — ceux qui finissent par `/`. La liste blanche en compte 66, dont 15 seulement
+finissent ainsi ; les autres sont des prefixes en mot nu (`/cve_`, `/iptables-`, `/deploy`,
+`/update`). **C'est le meme angle mort que mon 171 sur le proxy legacy, ou `endswith('/')`
+trouvait 13 des 15 espaces.***
+
+### Ce que la derivation trouve et qu'aucune liste n'avait
+
+    LISTE_BLANCHE = 66   ADMIN_SEULEMENT = 28   ->  38 espaces sans le rempart
+
+Parmi eux, ceux qui portent des routes gardees par **un role SEUL** — ni permission, ni
+`@require_machine_access` :
+
+    /cve_          7 chemins distincts, 11 enregistrements   <- LA PLUS FORTE CONCENTRATION
+    /ssh-audit/    7 chemins distincts,  8 enregistrements
+    /docker/       1     /cron_preview 1     /logs 1     /update 1     /update-logs 1
+
+**`/cve_` n'etait dans aucune de nos quatre listes**, et c'est la plus fournie :
+`cve_scan_all`, `cve_whitelist` (GET/POST), `cve_remediation` (GET/POST), `cve_schedules`
+(GET/POST/PUT/DELETE). *Le module dont l'effet sortant est un arbitrage exploitant depuis des
+semaines — S7b — est celui dont le plus de routes ne portent qu'un role.*
+
+### Deux precisions qui empechent de conclure trop vite
+
+**`/cve_scan_all` est dedouanee sur UNE passerelle et pas sur l'autre.** J'ai mesure plus haut
+qu'elle est **hors** de la liste blanche du proxy **legacy** (`api_proxy.php`) : la console
+d'E-234 ne l'atteint pas. Elle est **dans** celle du portage (`RoutesBackend.php`). **Les deux
+mesures sont justes et repondent a deux questions differentes** — et il y a deux passerelles.
+
+**11 n'est pas un nombre de routes** : c'est un nombre d'enregistrements `@bp.route`, plusieurs
+methodes sur un meme chemin. **7 chemins distincts.** Idem pour `/ssh-audit/` : 8 enregistrements,
+**7 chemins**. *La session 6 avait ecrit 8 et 1 ; les deux etaient des enregistrements. Un compte
+qui melange chemins et methodes gonfle du cote qui alarme.*
+
+### Le rang, mesure et non suppose
+
+La session 6 a raison de refuser le rang unique que je proposais, **et sa raison est mesurable** :
+
+- **consequents** — `/ssh-audit/` et `/cve_` : des routes de parc que **rien** ne garde qu'un
+  role, donc un role 1 qui passe la passerelle n'a **plus qu'une** barriere ;
+- **defense en profondeur** — les 36 autres, dont `/fail2ban/` : **toutes ses routes portent une
+  permission**, mesure a 16:25. *Elle en portait une de moins ce matin* — la session 6 signale
+  que sa propre lecture du matin aurait classe `/fail2ban/` au rang consequent. **C'est pourquoi
+  un releve se publie avec son heure.**
+
+Les traiter au meme rang ferait passer `/ssh-audit/` et ses sept chemins pour l'equivalent de
+`/bashrc/`, qui n'en porte aucun.
