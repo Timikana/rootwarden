@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.59** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.60** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,64 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.60 — ma cinquieme correction visait la mauvaise moitie, et j'ai redemande une tache deja faite
+
+**Deux corrections de la session 4, les deux justes, et la premiere annule une regle que je viens d'inscrire.**
+
+#### ⚠ « Etendre la consigne a `git rm` » aurait laisse le defaut ouvert
+
+J'avais ecrit que la cause de la contamination etait que **`git rm` stage aussi**, la ou ma regle ne parlait
+que de `git add`. **C'est vrai, et ce n'est pas ce qui s'est passe** :
+
+    git add <mes fichiers>
+    git commit -F - <<'MSG'          <- SANS `-- <chemins>`
+
+> **`git add` restreint ce que MOI je mets dans l'index ; il ne fait rien contre ce qui y est DEJA.** Avec
+> `git commit -- <chemins>`, **ni un `git rm` ni un `git add` d'une autre session n'auraient pu entrer** — la
+> forme complete **ignore l'index**, et c'est exactement pourquoi elle existe.
+
+**La regle reecrite** : *committer PAR CHEMINS, toujours — pas « en plus » d'un `git add` restreint, A LA PLACE
+de s'y fier.*
+
+> **Une regle qui enumere les cas dangereux sera toujours en retard d'un cas ; une regle qui restreint la
+> portee ne l'est jamais.**
+
+**Six enonces en deux jours, et le sixieme est le seul qui ne soit pas une enumeration.** Deux commits
+contamines, contenu intact, **attribution seule fausse** : `52838f2` (« E-215 ») porte la suppression de
+`scripts/bump-version.sh`, et `77ae2c2` (« E-214 ») porte la **creation de
+`backend/tests/test_verdicts_deux_cents.py`, 241 lignes** — le perimetre d'une autre session, dont le fichier
+apparait comme cree par un commit sur `sshd_config`.
+
+**✅ PAS de reecriture d'historique.** Les deux ne sont pas publies, donc elle serait possible — **elle n'aura
+pas lieu** : *sept sessions commitent sur cette branche, et reecrire sous leurs pieds couterait plus cher que
+l'attribution fausse.* **C'est le `CHANGELOG` qui departage**, comme pour les trois collisions de numero :
+*l'attribution d'un contenu se repare par un registre, jamais par une reecriture.* Et son autrice a refuse de
+toucher `backend/tests/` **meme pour reparer son propre degat** — le bon reflexe vaut plus que la reparation.
+
+**Et la faute n'est pas celle de la consigne** : elle l'a appliquee pendant des heures puis laissee tomber sans
+s'en apercevoir. **Sixieme occurrence du jour de *ecrire une regle donne le sentiment de l'avoir appliquee***,
+et la troisieme ou c'est l'auteur de la regle qui l'enfreint.
+
+#### ⚠ Une tache redemandee est aussi couteuse qu'une tache oubliee
+
+**J'ai redemande l'unification des cinq `_resolve_ssh_creds`. Elle etait faite depuis `c32f996`, et j'avais
+moi-meme confirme la reponse le jour meme.** Mesure :
+
+    definitions locales dans backend/routes/  ->  AUCUNE
+    definition canonique                      ->  routes/helpers.py:351
+    importateurs                              ->  5 modules
+
+**Et ma reserve avait recu sa reponse dans le meme commit** : le 7-uplet d'`iptables` **n'avait pas de
+domaine** — il avait besoin de `machine_id` lui aussi et le **re-derivait** de la requete
+(`int(data.get('machine_id'))`, deux fois) au lieu de le recevoir. *Ce n'etait pas une raison, c'etait un
+retard.*
+
+> **Redemander cette tache aurait touche 41 sites d'appel une seconde fois.** *Le Lead relit ses propres §8
+> avant d'assigner ; il ne relisait pas les commits de ceux a qui il assigne.*
+
+**Parade mecanique** : avant d'assigner une tache nommee dans un compte rendu anterieur, `git log -S` sur le
+symbole concerne. Trois lignes, et elle aurait suffi ici.
 
 ### v1.38.59 — E-215 et E-214 corriges, 31 routes peuvent rendre `200 + success:false`, et ma consigne de commit recoit sa CINQUIEME correction
 
@@ -4829,7 +4887,8 @@ correspondance reelle :**
 | v1.38.54 | `93ae130` | j'avais attribue E-215 a la mauvaise fonction |
 | v1.38.55 | `6f6ed4f` | `platform_key` P1 mesuree — 18 laravel / 15 legacy, le filet n'a rien eu a bloquer |
 | v1.38.56 | `c7d9f5d` | la charte du DSI delegue : 7 arbitrages delegues, 8 qui ne peuvent pas l'etre |
-| v1.38.59 | (ce commit) | E-215 et E-214 corriges ; 31 routes `200 + success:false` ; `git rm` stage aussi |
+| v1.38.59 | `caaaa3c` | E-215 et E-214 corriges ; 31 routes `200 + success:false` ; `git rm` stage aussi |
+| v1.38.60 | (ce commit) | ma 5e correction visait la mauvaise moitie ; j'ai redemande une tache faite |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
