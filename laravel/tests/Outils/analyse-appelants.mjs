@@ -256,10 +256,23 @@ for (const nom of fichiers) {
     try {
         arbre = acorn.parse(code, { ecmaVersion: 2022, locations: true, sourceType: 'script' });
     } catch (e) {
-        // Un fichier illisible se DIT. Le sauter en silence retirerait ses
-        // appels du relevé, donc les dedouanerait tous.
+        // ── UN FICHIER ILLISIBLE SE DIT — ET IL NE SE DISAIT PAS ────────────
+        //
+        // Ce commentaire affirmait deja cette propriete, et elle etait FAUSSE :
+        // l'entree partait sans `verdict`, donc elle n'entrait ni dans
+        // `a_examiner` ni dans aucun total. Un fichier qui cesse d'etre analysable
+        // voyait donc TOUS ses appelants disparaitre du releve en silence —
+        // c'est-a-dire etre EXONERES.
+        //
+        // Une affirmation de commentaire n'est pas une propriete. Celle-ci en est
+        // une maintenant : le verdict `illisible` entre dans la liste a examiner,
+        // donc il fait rougir le declencheur PHPUnit, qui la fige.
+        //
+        // Trouve le 2026-08-28 en appliquant a mon propre instrument la question
+        // que la session 7 s'est posee sur le sien : *avais-je mute ce qu'il
+        // attrape, ou aussi ce qu'il laisse passer ?*
         appels.push({ fichier: nom, ligne: 0, fonction: '(ILLISIBLE)', cible: e.message,
-                      success: false, ok: false, illisible: true });
+                      success: false, ok: false, verdict: 'illisible' });
         continue;
     }
 
@@ -304,6 +317,23 @@ for (const a of appels) {
 }
 
 const parVerdict = (v) => appels.filter((a) => a.verdict === v);
+
+// ── LE PLANCHER : en dessous, c'est l'INSTRUMENT qui est casse ──────────────
+//
+// Une enumeration qui rend le vide satisfait toutes les proprietes universelles.
+// Si l'analyseur ne trouve presque plus d'appels — chemin change, acorn absent,
+// `glob` qui ne voit plus rien — il doit ECHOUER, pas rendre un releve rassurant.
+//
+// La valeur est un PLANCHER, pas un compte : elle ne se remesure pas a chaque
+// portage. Elle vaut environ la moitie de ce qui est mesure aujourd'hui, de sorte
+// qu'une baisse legitime ne la touche jamais et qu'une panne la traverse.
+const PLANCHER_APPELS = 30;
+if (appels.length < PLANCHER_APPELS) {
+    console.error(`analyse-appelants : ${appels.length} appels trouves, sous le `
+        + `plancher de ${PLANCHER_APPELS}. L'analyseur ne voit plus le portage — `
+        + `ce n'est pas un releve, c'est une panne.`);
+    process.exit(3);
+}
 const sortie = {
     fichiers: fichiers.length,
     appels: appels.length,
@@ -339,10 +369,14 @@ if (process.argv.includes('--instantane')) {
             fichiers: sortie.fichiers, appels: sortie.appels,
             verifie: sortie.verifie, flux: sortie.flux, delegue: sortie.delegue,
             delegue_sans_lecteur: sortie.delegue_sans_lecteur, ignore: sortie.ignore,
+            illisible: parVerdict('illisible').length,
         },
         empreintes,
+        // `illisible` en fait partie : un fichier qu'on ne sait plus lire est le
+        // cas le plus urgent a regarder, pas le plus discret.
         a_examiner: appels.filter((a) => a.verdict === 'ignore'
-                                      || a.verdict === 'delegue_sans_lecteur'),
+                                      || a.verdict === 'delegue_sans_lecteur'
+                                      || a.verdict === 'illisible'),
     }, null, 2));
 } else if (process.argv.includes('--json')) {
     console.log(JSON.stringify(sortie, null, 2));
