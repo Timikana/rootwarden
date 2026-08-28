@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.83** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.84** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,96 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.84 — E-234 et E-235 : la page qui promet de ne rien faire porte une console d'API, et ma premiere liste de dangers etait fausse sur deux entrees
+
+#### E-234 — `documentation.php` est un client HTTP generique vers la passerelle
+
+Releve par la session 2. `legacy/documentation.php` (1756 lignes, aucun JS separe) n'est pas
+statique : son unique appel sortant reel est **arbitraire** — point d'acces en champ libre
+(`:1624`), methode (`:1629`), corps JSON (`:1636`), `fetch('/api_proxy.php' + endpoint)`
+(`:1743`), derriere `if ($isAdmin)` (`:1721`) avec `$isAdmin = $role >= 2` (`:16`) et
+**aucun `checkPermission` sur la page** (`:11`).
+
+**Ce n'est PAS une escalade** : le proxy applique sa liste blanche, le backend ses decorateurs.
+Un role 2 n'atteint rien qu'il n'atteindrait par les pages. **C'est le contournement de
+l'INTERFACE** — tous les panneaux, noms de machine et comptes que les pages affichent.
+
+> C'est l'inverse du motif habituel : d'ordinaire la garde est sur la PAGE et pas sur la
+> REQUETE. **Ici les gardes de requete tiennent toutes, et c'est tout ce que l'interface AJOUTE
+> qui manque.**
+
+#### ⚠ ET MA PREMIERE LISTE DE DANGERS ETAIT FAUSSE SUR DEUX ENTREES SUR QUATRE
+
+Ecrite dix minutes avant d'etre mesuree. **La session 5 m'a contredit, seule contre trois
+lecteurs, et elle avait mesure :**
+
+    /regenerate_platform_key   role=3 + gate()          ->  HORS D'ATTEINTE d'un role 2
+    /wazuh/install_all         machine_ids OBLIGATOIRE  ->  corps vide = 400
+    /cve_scan_all              hors liste blanche       ->  la console n'envoie PAS de courriel
+
+**`install_all` est borne par un correctif que j'ai numerote moi-meme — E-224.** J'ai repete
+« de parc » apres deux sessions sans relire la borne que j'avais inscrite. *Trois lecteurs
+d'accord ne valent pas une mesure.*
+
+**Et la mesure a fait apparaitre les trois que je n'avais pas listees**, les seules en role 2
+**sans aucune permission** : `POST /ssh-audit/scan-all` (SSH sur toute la flotte, dans la liste
+blanche, hors `ADMIN_ONLY`, sans porte) et `POST /docker/scan_all`. *La route dont la consigne
+permanente du chantier dit « ne jamais la lancer » est celle qu'un role 2 atteint sans
+permission depuis la page de documentation.*
+
+**Une sonde ecrite pour accuser se trompe du cote qui alarme** — troisieme fois aujourd'hui,
+et cette fois j'ai alarme sur les mauvaises routes ET manque les bonnes.
+
+#### E-235 — `/wazuh/` passe la passerelle pour un role 1 : un rempart manquant sur deux
+
+Releve par la session 6, **verifie avec un analyseur independant** — un automate distinguant
+chaine, commentaire de ligne et commentaire de bloc, parce qu'un `grep` sur ce fichier rend
+l'INVERSE (les apostrophes de `n'a`, `l'un` ouvrent de fausses chaines, et la premiere
+extraction de la session 6 declarait `/wazuh/` **et** `/groups` hors liste blanche).
+
+    LISTE_BLANCHE      66 entrees   wazuh=['/wazuh/']   groups=['/groups']
+    ADMIN_SEULEMENT    27 entrees   wazuh=-             groups=['/groups']
+
+Le backend refuse — 15 routes sur 15 en `role(2)` + `can_manage_wazuh`, le module le plus
+uniformement garde du chantier. **C'est un rempart manquant sur deux, pas un trou**, et il faut
+le dire dans les deux sens. Precedent : `/supervision/` a ete AJOUTE a `ADMIN_SEULEMENT` contre
+le legacy, *parce qu'on ne depend jamais d'un seul rempart.*
+
+**La session 6 a signale que sa premiere mesure rendait l'inverse, et c'est ce signalement qui
+a permis de la verifier.** *Un releve qui s'annonce comme redresse se controle ; un releve
+silencieux se croit.*
+
+#### Le retroportage : mes DEUX formes proposees etaient inapplicables
+
+Le DSI a lu la cible, moi pas. Verifie :
+
+    git ls-tree origin/main -- legacy/auth/enable_2fa.php   ->  RIEN
+    git ls-tree origin/main -- www/auth/enable_2fa.php      ->  blob 17e77af
+
+`legacy/` **n'existe pas sur `main`** (le renommage `www/` -> `legacy/` vit sur cette branche
+seule). Donc ni le cherry-pick ni la branche mono-commit : **les deux patchent un chemin
+inexistant**, et `23a6063` traine cinq fichiers du chantier (CHANGELOG, PARITE, le runner,
+version.txt, une suite E2E). La forme qui s'applique est une **transposition** ecrite pour
+`www/`.
+
+**Et elle porte TROIS volets, pas quatre** : `origin/main:www/auth/enable_2fa.php:75-76` appelle
+**deja** `checkCsrfToken()` dans la branche POST. Transposer le quatrieme dupliquerait un appel
+existant. *Ma relecture des quatre volets portait sur NOTRE branche ; le remede se dimensionne
+sur la CIBLE.* Le constat ne bouge pas — la vulnerabilite ne tenait jamais au CSRF mais a la
+garde de page (`:33`, `temp_user` seul) : **une garde qui protege l'ECRITURE ne protege pas la
+LECTURE, et c'est la lecture qui divulgue.**
+
+#### Deux corrections a mes propres rappels
+
+- **`security/backend-cve` A ete relue** (session 5, `AUDIT-BRANCHE-BACKEND-CVE.md`) : fusion
+  recommandee, zero divergence, `merge-tree` sans conflit. Je le reclamais encore ce matin. Et
+  le chiffre qui decide n'est pas `rev-list --count` (168, effrayant et trompeur) mais
+  `rev-list --count -- <fichier>`, **par fichier touche** ;
+- **E-90 et `generic_reconfigure` sont deja corriges** (session 4) : `_conclut_geste` n'emet
+  `SUCCESS_MACHINE::` que si la liste d'echecs est vide, et l'upsert n'est atteint qu'a travers
+  `effet_si_reussi`. **Ma liste de correctifs en attente etait en retard sur l'arbre** — ils
+  sont ecrits, complets, et inertes comme les 18 autres modules.
 
 ### v1.38.83 — le correctif de la 2FA etait DEJA sur cette branche, et ma propre note disait « Non corrige »
 
