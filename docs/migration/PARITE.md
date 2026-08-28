@@ -11211,3 +11211,95 @@ La session 6 a raison de refuser le rang unique que je proposais, **et sa raison
 
 Les traiter au meme rang ferait passer `/ssh-audit/` et ses sept chemins pour l'equivalent de
 `/bashrc/`, qui n'en porte aucun.
+
+## E-238 — LE BACKEND EN SERVICE EST CELUI D'HIER : aucun chiffre sur `wazuh`, `ssh` ou `ssh_audit` ne veut dire ce qu'il parait dire
+
+**Releve par la session 2, verifie par le Lead le 2026-08-28 a 17:05 CEST.**
+
+    docker inspect rootwarden_python --format '{{.State.StartedAt}}'
+      ->  2026-08-27T12:28:43Z   =  HIER 14:28 CEST
+    find backend -name '*.py' -newermt '2026-08-27 14:28' | wc -l
+      ->  27
+    wazuh.py 10:11 · ssh.py 10:03 · helpers.py 09:58 · ssh_audit.py 08:14   (tous le 2026-08-28)
+
+Les `.py` sont lus **au demarrage du process**. **Le process a demarre avant que 27 fichiers soient
+modifies.**
+
+### Trois comportements pour une meme route, selon ce qu'on lit
+
+    en SERVICE   `AND a.id IS NULL` sur une table sans colonne `id`   ->  500
+    dans l'ARBRE  machine_ids obligatoire, corps vide                  ->  400
+    ce que le Lead a DIT   « geste de parc »                           ->  faux depuis E-224
+
+Idem `/wazuh/uninstall` : le service rend encore `success = (code == 0)`, pas `paquet_retire`.
+
+> **Une suite ecrite contre l'arbre et jouee contre le service mesure l'ecart entre les deux, et
+> l'attribue a la page.** Le test echoue pour une raison qui n'a rien a voir avec ce qu'il croit
+> mesurer — meme forme que `go-page-ssh-flux`, ou E-196 rotationnait un fichier qu'une suite
+> supposait, sans que rien ne les relie.
+
+### Ce que ce releve change au dossier de REDEMARRAGE
+
+Le Lead le presentait comme **« 27 modules ecrits et inertes »** — un **cout**. *Ce n'en est plus un :*
+**tant que le redemarrage n'a pas eu lieu, aucune mesure sur ces routes n'est interpretable.** Le
+redemarrage cesse d'etre une mise en service et devient un **prealable de justesse**.
+
+*Et le chiffre « 20 modules » que le Lead relayait depuis ce matin etait lui aussi perime : 27.*
+
+## E-235c bis — mon 38 etait 39, et la soustraction annoncait une amelioration qui n'a pas eu lieu
+
+**Session 3, verifie par le Lead a 17:00 CEST.** J'ai derive l'ENSEMBLE puis compte par
+**soustraction** — `66 − 28`. La soustraction suppose une **bijection** entre les deux listes ; elle
+n'existe pas : plusieurs entrees de `ADMIN_SEULEMENT` sont plus specifiques que l'entree de liste
+blanche qui les couvre.
+
+    soustraction naive, ADMIN_SEULEMENT=28  ->  38     (ce que j'ai inscrit)
+    soustraction naive, ADMIN_SEULEMENT=30  ->  36     (apres le correctif de la session 3)
+    DERIVE, reserveeAdmin() par entree     ->  39     AVANT ET APRES
+
+> **La soustraction a BAISSE de 2 pendant que la realite ne bougeait pas** : la session 3 a ajoute
+> deux **routes exactes**, pas deux entrees de liste blanche. **Elle annoncait une amelioration qui
+> n'a pas eu lieu.**
+
+*J'avais derive l'appartenance a l'ensemble, puis reintroduit le raccourci dans l'arithmetique.*
+**Deriver un ensemble et compter ses elements sont deux gestes, et le second peut defaire le
+premier.** Cinquieme nombre du jour venu d'un raccourci plutot que d'une derivation.
+
+### Et deux routes que mon releve n'avait pas nommees
+
+    /cve_trends           @require_api_key SEUL   -- rend des donnees de FLOTTE
+    /cve_test_connection  @require_api_key SEUL
+
+*Mon motif cherchait dans `cve.py` ; `/cve_trends` vit dans `monitoring.py`.* **Un motif qui suppose
+le fichier ne trouve pas ce qui est ailleurs** — quatrieme fois du jour, apres `'route' =>`,
+`guide.php` et les litteraux `status='…'`. **Signalees, non fermees.**
+
+## E-239 — j'ai transpose la CONCLUSION d'un precedent sans verifier sa CONDITION, et le geste aurait casse le role 1
+
+**Session 3 a refuse le perimetre que le Lead lui donnait, et elle avait raison. Verifie.**
+
+J'avais demande de fermer `/ssh-audit/` **et** `/cve_` en entier dans `ADMIN_SEULEMENT`, au motif du
+precedent `/supervision/`. Mesure de la session 3 :
+
+    security/index.php:37    checkAuth([ROLE_USER, …]) + can_scan_cve      <- role 1 admis
+    ssh-audit/index.php:12   checkAuth([ROLE_USER, …]) + can_audit_ssh     <- role 1 admis
+    portage                  /scan-cve en role:1 + perm:can_scan_cve
+
+Un role 1 porteur de la permission atteint `/cve_scan`, `/cve_results`, `/cve_history`,
+`/cve_compare`, `/cve_reprioritize` — **toutes gardees par `@require_machine_access`, la garde qui
+MORD au role 1** et le borne a **ses** machines.
+
+> **Fermer le prefixe entier remplacerait une borne PRECISE — vos machines — par une borne AVEUGLE
+> — personne sous le role 2 — et casserait la page pour les comptes auxquels elle est destinee.**
+
+**Le precedent `/supervision/` ne se transpose pas, et c'est sa CONDITION qui le dit** : la page y
+exigeait le role 2 des deux cotes, donc **personne ne perdait rien**. Ici le role 1 est admis des
+deux cotes.
+
+> **La condition d'un precedent decide, pas sa conclusion.** *Un remede qui resserre un axe peut
+> desserrer la protection reelle* — meme forme qu'E-236, ou une garde plus stricte sur un axe etait
+> plus permissive sur un autre.
+
+**Ferme au bon perimetre** : les **deux routes de parc seulement**, deja en `require_role(2)`, sans
+borne par machine — un role 1 n'y a jamais eu acces. **Les huit routes par machine intactes**,
+verifie apres pose.
