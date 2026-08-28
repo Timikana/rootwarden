@@ -1,16 +1,22 @@
 # Décisions du DSI délégué — session 8
 
 **Ouvert le 2026-08-28.** Charte au **§7.0 de `PLAN-DE-MIGRATION.md`**. Ce document porte les
-**sept arbitrages délégués**, tranchés. Les huit qui ne peuvent pas l'être vivent dans les
-`DOSSIER-*.md`, une page chacun.
+**sept arbitrages délégués**, tranchés, **plus un huitième né d'une mesure**. Les huit qui ne peuvent
+pas l'être vivent dans les `DOSSIER-*.md`, une page chacun.
 
 > **La ligne de la charte :** *ce qui se défait d'un clic est délégué ; ce qui détruit, retire un accès
 > ou publie ne l'est pas.* Aucune décision de ce document n'écrit sur une machine, ne redémarre un
 > service, n'applique une migration, ne pousse ni ne fusionne.
 
-**Toutes les mesures de ce document datent du 2026-08-28, entre 06:40 et 06:55 UTC** (08:40–08:55
-CEST). Chacune porte sa commande de remesure. *Une conclusion écrite sur un état mutable se périme
-sans prévenir* — et deux des mesures ci-dessous ont déjà retourné une prémisse écrite la veille.
+**Les mesures de ce document sont DATÉES INDIVIDUELLEMENT, en UTC.** L'en-tête annonçait d'abord
+« toutes entre 06:40 et 06:55 » — **c'était vrai à l'ouverture et faux deux heures plus tard**, quatre
+révisions ayant suivi. *Un fait sans heure est une opinion sur le passé*, et à sept sessions qui
+commitent en continu, un relevé est une **photographie** et non un état. Les conteneurs sont en **UTC**,
+l'hôte et le navigateur en **CEST** : E-73 a déjà fait mal décider sur ces deux heures.
+
+**Cinq de mes propres écrits ont été retournés par la mesure en une matinée** — quatre par des pairs, un
+par moi. Chacun est marqué à l'endroit où il était faux, jamais effacé : *un document qui efface ses
+erreurs ne permet pas de savoir laquelle des deux versions on a lue.*
 
 ---
 
@@ -25,6 +31,7 @@ sans prévenir* — et deux des mesures ci-dessous ont déjà retourné une pré
 | 5 | E-208 — les 3 pages qui ne bornent pas | **borner dans le PORTAGE, ne pas toucher le legacy** | rien : zéro porteur mesuré |
 | 6 | E-224 — borne d'`install_all` | **`machine_ids` obligatoire**, 400 si absent ou vide | le bouton « installer sur tous » envoie sa liste |
 | 7 | E-222 — `UNIQUE (server_id)` | **écrire la migration**, ne pas l'appliquer | `DOSSIER-06` pour la signature |
+| **8** | **neuve** — écrire d'autres correctifs backend avant le redémarrage | **GEL** jusqu'au redémarrage | vingt items justes attendent ; le lot cesse de grossir |
 
 ---
 
