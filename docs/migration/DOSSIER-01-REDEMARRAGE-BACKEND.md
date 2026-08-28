@@ -28,7 +28,27 @@ passé.* Conteneurs en **UTC**, hôte et navigateur en **CEST**.
 > *Combinées telles quelles, elles auraient produit une exposition doublement fausse.* C'est ce qui a
 > fait remesurer plutôt que relayer.
 
-> ## ⚠ AJOUT DU 2026-08-28, 11:20 UTC — UN PRÉALABLE REVIENT, ET CE N'EST PAS UN CORRECTIF
+> ## ✅ CE PRÉALABLE EST FRANCHI — vérifié par moi le 2026-08-28 à 14:13 UTC
+>
+>     /tmp/rw-lot-jIH6Fh   153 executions · 2298 PASS · 2 FAIL · 2 h 39
+>     ligne de base du 2026-08-27 : 150 executions · 2282 PASS · 3 FAIL
+>     -> +16 PASS, +3 executions, UN FAIL DE MOINS — apres 44 commits
+>
+> **Et les deux écarts ne sont pas des régressions du portage** — les deux disent
+> *« Node is either not clickable or not an Element »* sur la création puis la suppression d'un gabarit :
+> **le motif du bloc replié**, que le §8 a déjà payé quatre fois. Défauts de suite, à la charge de la
+> session 7.
+>
+> > **Il ne reste donc AUCUNE condition technique au redémarrage.** Le dossier attend une signature, et
+> > rien d'autre. **20 modules backend sont écrits, complets et inertes faute d'elle.**
+>
+> **Ce que ce rejeu vient d'acheter, et c'est précisément ce qu'il était censé acheter** : après le
+> geste, toute anomalie se compare à **une ligne de base d'aujourd'hui**, pas à celle d'avant 44
+> commits. *L'explication d'un écart post-redémarrage est désormais disponible.*
+>
+> ---
+>
+> ## ⚠ Ce que ce préalable disait quand il a été posé, à 11:20 UTC — conservé pour la trace
 >
 > **La ligne de base du LOT a 44 commits de retard.** Le point de comparaison du plan est le rejeu du
 > **2026-08-27** — 150 exécutions, 2282 PASS, 3 FAIL expliqués. Depuis :
