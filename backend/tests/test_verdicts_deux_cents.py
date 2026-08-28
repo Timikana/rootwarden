@@ -104,6 +104,43 @@ def _famille(fn):
     return 'conditionnel' if conditionnel else 'jamais'
 
 
+def _rend_un_flux(fn):
+    """La route rend-elle un FLUX plutot qu'un corps JSON ?
+
+    ══ LA TROISIEME FAMILLE, ET ELLE EST PIRE QUE LES DEUX AUTRES ═══════════
+
+    Trouvee le 2026-08-28 par la session BACKEND LARAVEL, sur `/docker/scan_all` :
+
+        return Response(stream(), mimetype='text/plain')
+
+    **Le 200 part AVANT que le travail ne commence.** Il n'y a donc pas de champ
+    `success` du tout — le verdict vit dans les LIGNES du corps.
+
+    Pour les deux autres familles, `reponse.ok` donne le bon verdict par
+    COINCIDENCE, et la coincidence peut se rompre. Ici il n'y a pas de
+    coincidence a rompre : `.ok` est **structurellement denue de sens**, il l'a
+    toujours ete et il le restera.
+
+    Et le defaut se double d'un second, structurel lui aussi : un appelant qui
+    fait `await r.json()` sur du JSON-lines leve a CHAQUE fois. L'exception
+    avalee, son `corps` vaut `null` par construction — le compte rendu par
+    machine n'etait pas mal lu, **il n'etait pas lu du tout**.
+
+    C'est pourquoi cette famille est un ATTRIBUT et non un membre de la partition
+    a trois : une route peut rendre un 400 en JSON puis un flux en 200, et les
+    deux proprietes doivent se dire ensemble.
+    """
+    for r in ast.walk(fn):
+        if not isinstance(r, ast.Return) or r.value is None:
+            continue
+        v = r.value
+        if isinstance(v, ast.Tuple) and v.elts:
+            v = v.elts[0]
+        if isinstance(v, ast.Call) and _nom(v) in ('Response', 'stream_with_context'):
+            return True
+    return False
+
+
 def _routes():
     trouvees = []
     for fichier in sorted(RACINE.glob('*.py')):
@@ -114,7 +151,7 @@ def _routes():
             if not any(_nom(d) == 'route' for d in fn.decorator_list):
                 continue
             trouvees.append({'fichier': fichier.name, 'nom': fn.name,
-                             'famille': _famille(fn)})
+                             'famille': _famille(fn), 'flux': _rend_un_flux(fn)})
     return trouvees
 
 
@@ -151,6 +188,30 @@ VERDICT_A_200_CONNU = {
     ('supervision.py', 'zabbix_version'),
     ('supervision.py', 'generic_version'),
     ('wazuh.py', 'detect'),
+}
+
+
+# ── LES ROUTES QUI RENDENT UN FLUX, mesurees le 2026-08-28 ──────────────────
+#
+# Leur `200` part avant le travail : `reponse.ok` n'y est pas un verdict, et il
+# n'y a aucun champ `success` a lire. Un appelant doit lire le CORPS, ligne par
+# ligne — et un appelant qui fait `r.json()` dessus echoue par construction.
+FLUX_CONNUS = {
+    ('cve.py', 'cve_scan'),
+    ('cve.py', 'cve_scan_all'),
+    ('docker.py', 'docker_scan_all'),
+    ('iptables.py', 'iptables_logs'),
+    ('ssh.py', 'stream_logs'),
+    ('supervision.py', 'zabbix_deploy'),
+    ('supervision.py', 'zabbix_uninstall'),
+    ('supervision.py', 'zabbix_reconfigure'),
+    ('supervision.py', 'generic_deploy'),
+    ('supervision.py', 'generic_uninstall'),
+    ('supervision.py', 'generic_reconfigure'),
+    ('updates.py', 'update_server'),
+    ('updates.py', 'apply_security_updates'),
+    ('updates.py', 'stream_update_logs'),
+    ('updates.py', 'dry_run_update'),
 }
 
 
@@ -239,3 +300,37 @@ def test_la_famille_CONDITIONNELLE_est_relevee_et_non_ignoree(routes):
         "Aucune route conditionnelle relevee — `_famille` ne distingue plus le cas "
         "`'success': <expression>`, et l'invariant du dessus ne couvre alors qu'une "
         'partie de la classe sans le dire.')
+
+
+def test_aucune_route_NEUVE_ne_rend_un_flux_sans_etre_relevee(routes):
+    """UNE ROUTE QUI DEVIENT UN FLUX CHANGE DE CONTRAT PLUS FORT QUE LES AUTRES.
+
+    Ses appelants ne doivent pas seulement lire `success` — **ils doivent cesser
+    d'appeler `r.json()`**, qui leve sur du JSON-lines. Un appelant inchange ne
+    lit alors plus rien du tout, et son ecran l'annonce comme une reussite.
+    """
+    reelles = {(r['fichier'], r['nom']) for r in routes if r['flux']}
+    nouvelles = sorted(reelles - FLUX_CONNUS)
+
+    assert not nouvelles, (
+        'Des routes rendent DESORMAIS un flux :\n  '
+        + '\n  '.join(f'{f}:{n}' for f, n in nouvelles)
+        + "\n\nLeurs appelants doivent lire le CORPS ligne par ligne. Un `r.json()`\n"
+          "sur du JSON-lines leve a chaque fois, l exception est avalee, et le compte\n"
+          "rendu n est pas mal lu : il n est pas lu du tout.")
+
+
+def test_les_flux_connus_en_sont_TOUJOURS(routes):
+    """LA GARDE SYMETRIQUE, troisieme fois dans ce depot.
+
+    Une route qui quitte la famille l a quittee pour une raison — ou l instrument
+    ne la voit plus. Les deux se distinguent en LISANT, jamais en supposant.
+    """
+    reelles = {(r['fichier'], r['nom']) for r in routes if r['flux']}
+    disparues = sorted(FLUX_CONNUS - reelles)
+
+    assert not disparues, (
+        'Des routes connues ne rendent plus un flux :\n  '
+        + '\n  '.join(f'{f}:{n}' for f, n in disparues)
+        + "\n\nDEUX causes opposees : la route a change de forme, ou `_rend_un_flux`\n"
+          'a cesse de reconnaitre la sienne — et elle en manque alors d autres.')

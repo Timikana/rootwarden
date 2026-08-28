@@ -227,6 +227,39 @@ littéral existe, mais chez les **appelants du helper**. C'est la même discipli
 **Aucun appelant à risque** : aucune route de la famille « 200 menteuse » n'est consommée
 par un appelant qui ne lit pas le verdict.
 
+### Une TROISIÈME famille, trouvée par la session 3 — et elle est pire que les deux autres
+
+Mon relevé comptait deux familles de verdict. Il en manquait une, et c'est celle où
+`reponse.ok` n'est **pas** trompeur par coïncidence :
+
+    return Response(stream(), mimetype='text/plain')      docker.py:150
+
+**Le 200 part avant que le travail ne commence.** Il n'y a donc aucun champ `success` à
+lire — le verdict vit dans les **lignes du corps**.
+
+| famille | pourquoi `.ok` ment |
+|---|---|
+| `dur` / `conditionnel` | par **coïncidence**, et la coïncidence peut se rompre |
+| **`flux`** | **structurellement** — il n'y a pas de coïncidence à rompre |
+
+Et le défaut s'en double d'un second, structurel lui aussi : un appelant qui fait
+`await r.json()` sur du **JSON-lines** lève à chaque fois. L'exception avalée, son
+`corps` vaut `null` **par construction** — le compte rendu par machine n'était pas mal
+lu, **il n'était pas lu du tout**.
+
+**Mesuré : 15 routes rendent un flux.** Elles sont figées dans
+`test_verdicts_deux_cents.py`, avec leur invariant et leur garde symétrique — deux
+mutations, un rouge chacune.
+
+**Le croisement avec les appelants** : trois des quinze sont résolues à un appelant, et
+**les trois sont classées `flux`** côté JavaScript — donc elles lisent bien le corps.
+Les douze autres ne sont pas résolues (clés PHP interpolées, helpers) : **silence
+mesuré**, pas dédouanement.
+
+> Cette famille est un **attribut**, pas un membre de la partition à trois : une route
+> peut rendre un `400` en JSON puis un flux en `200`, et les deux propriétés doivent se
+> dire ensemble.
+
 ### L'outil produit des CANDIDATS, jamais des verdicts — trois fois de suite
 
 | ce qu'il a annoncé | ce que la lecture a montré |
