@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.91** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.92** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,69 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.92 — E-241 : j'avais inscrit « la page est mesuree saine », c'est une REGRESSION REELLE
+
+**La session 7 renverse son propre verdict, et ma note portait le mauvais.** `go-page-graylog-g1`
+n'est pas un defaut de suite : **apres un enregistrement de configuration refuse, les onglets de
+`graylog` cessent de repondre.** Le legacy rend **27/0**.
+
+    1. clic « templates »     panneau VISIBLE            <- les onglets MARCHENT
+    2. clic « config », hote VIDE, clic « enregistrer »
+    3. re-clic « templates »  RIEN NE CHANGE, 8 s de re-clics n'y changent rien
+    erreurs JS : AUCUNE
+
+**Un exploitant qui enregistre une configuration Graylog ne peut plus changer d'onglet sans
+recharger la page, et rien ne le lui dit.**
+
+#### ⚠ MA FAUTE, ET C'EST LA PREMIERE DE CETTE FORME AUJOURD'HUI
+
+`v1.38.87` disait *« la page est mesuree saine »*. Deux causes :
+
+1. la sonde citee mesurait le clic **au chargement**, pas **apres** la sequence qui casse. *Une sonde
+   qui ne rejoue pas la sequence ne mesure pas le defaut de la sequence* ;
+2. **j'ai recopie une conclusion rassurante d'un compte rendu qui s'annonçait NON ISOLE.** La session
+   7 avait ecrit « non isole et non pretendu tel » — **je l'ai inscrit comme un dedouanement.**
+
+> **Une prudence dans un compte rendu ne survit pas a la recopie : elle devient un verdict.**
+
+Ce chantier a passe la journee a se corriger dans le sens *« ce n'est pas un defaut »* — cinq faux
+desaccords, trois sondes trop alarmistes. **Celui-ci va dans l'autre sens, et il etait deja inscrit
+comme dedouane.** C'est la forme la plus couteuse, et c'est celle de la 2FA de ce matin : *personne ne
+remesure une bonne nouvelle non plus.*
+
+#### La piste citable que le Lead ajoute, et ce qu'il ECARTE
+
+    graylog.blade.php:99   <p class="rw-annonce" data-rw="graylog-config-etat">   VIDE au chargement
+    rw.css:1076            .rw-annonce:empty { display: none; }
+
+**Au premier echec l'element passe de `display: none` a un bloc : il gagne une hauteur.** Decalage de
+mise en page a l'etape exacte — **et c'est la signature de l'erreur d'origine**, *« Node is either not
+clickable »*, qui survient quand la mise en page bouge entre le calcul des coordonnees et le clic.
+
+**Ecarte et verifie** : aucun `<form>`, tous les boutons en `type="button"` (aucune navigation) ;
+`ouvreOnglet` et `enregistreConfig` corrects a la lecture ; les quatre panneaux portent un `data-rw`
+concordant. **Non localise, et je ne le pretends pas** — la piste explique le « not clickable »
+d'origine, pas le « le clic n'a plus d'effet » d'apres correction.
+
+**Et ce n'est PAS un artefact d'E-238** : `graylog.js` date du 2026-08-26 16:37, le process a demarre
+le 2026-08-27 14:28. **Arbre et service concordent ici**, verifie.
+
+#### `go-page-ssh-flux` corrigee — 10 / 8, et la suite allait casser ce qu'elle mesure
+
+`deployment.log` est recree s'il manque, **avec son proprietaire repose** : `docker exec` tourne en
+**root**, et un `touch` nu aurait laisse un `root:root` dans un repertoire que l'application possede
+— **le prochain deploiement n'aurait plus pu y ecrire.** Verifie apres coup :
+`-rw-r----- rootwarden rootwarden`. *Une suite qui repare son decor peut casser la fonctionnalite
+qu'elle mesure.*
+
+#### La regle de la session 7, qui corrige la mienne
+
+> **Une suite qui echoue merite qu'on se demande d'abord si c'est ELLE qui a tort — mais la reponse
+> peut etre non, et il faut alors le dire aussi fort.**
+
+Et le moyen : *un `dors(900)` fixe ne cache pas seulement une lenteur, il cache la NATURE du defaut.*
+Attendre la **propriete** plutot qu'une **duree** a transforme un echec opaque en defaut localise.
 
 ### v1.38.91 — E-240 : un jeu de regles VALIDE declare invalide, et l'echo PTY rend la frontiere atteignable
 
