@@ -707,6 +707,63 @@ remonter le marqueur manquant vaut mieux qu'une détection devinée. C'est une q
 > Publier « je n'ai pas su mesurer » coûte une ligne ; publier un demi-résultat coûte la
 > confiance dans tous les autres.
 
+## 3 sexies. La FIXTURE qui discrimine une garde — mesurée, et le relevé qu'on m'a donné est à corriger
+
+On m'a demandé de protéger une fixture du banc : `rw-test-admin` (id 15, rôle 2) porte
+`can_manage_iptables = 0`, ce qui en fait **le seul compte capable de montrer qu'une
+garde « permission OU rôle ≥ 3 » mord** — le chemin *rôle 2 sans la permission → 403*.
+La lui accorder détruirait ce moyen de mesure la veille du portage d'`iptables`.
+
+**Mesuré colonne par colonne, et le relevé transmis est incomplet** :
+
+| id | compte | rôle | iptables | fail2ban | services | audit_ssh |
+|---|---|---|---|---|---|---|
+| 15 | `rw-test-admin` | 2 | **0** | 1 | 1 | 1 |
+| **77** | **un compte RÉEL, rôle 2** | 2 | **0** | **0** | **0** | **0** |
+
+> On m'annonçait que « les trois autres gardes restent inmesurables ». **C'est faux au
+> niveau du schéma** : le compte 77 est un rôle 2 sans aucune des quatre permissions —
+> la fixture existe pour les quatre.
+
+**Mais la conclusion opérationnelle tient, pour une autre raison** : le compte 77 est un
+compte **réel**, celui d'une personne. Aucune suite ne peut s'en servir — son secret TOTP
+est inconnu, et **on n'invente jamais un secret TOTP**. Le fixer serait toucher au compte
+d'un tiers.
+
+La distinction n'est pas cosmétique : elle change ce qu'il faut faire. *« Le schéma n'a
+pas cette ligne »* appellerait à créer une ligne ; *« la ligne existe mais son compte est
+inutilisable »* appelle à créer un **quatrième compte d'épreuve** de rôle 2 sans
+permission — ce qui est une décision de banc, pas une correction.
+
+### Cette fixture ne peut PAS être protégée par un test, et il faut le dire
+
+Mes deux suites sont **hermétiques** : `laravel/tests/` tourne sur un SQLite vide,
+`backend/tests/` sur une base mockée. **Aucune ne lit la base du banc**, et c'est une
+propriété que je ne veux pas perdre — un test qui la lirait accuserait la page pour un
+état du banc, et il faudrait le jeton de banc pour le jouer.
+
+> **La protection est donc organisationnelle, pas mécanique.** Je le dis plutôt que de
+> laisser croire qu'un vert la garantit. Sa remesure :
+
+```bash
+P=$(grep -oP '^MYSQL_ROOT_PASSWORD=\K.*' srv-docker.env)
+sudo -n docker exec rootwarden_db mysql -uroot -p"$P" rootwarden -e "
+SELECT u.id, u.name, u.role_id, COALESCE(p.can_manage_iptables,0) AS iptables
+FROM users u LEFT JOIN permissions p ON p.user_id = u.id WHERE u.active = 1;"
+```
+
+### Deux autres affirmations vérifiées, et elles tiennent
+
+- **le backend ne lit PAS `temporary_permissions`.** `get_current_user` remplit son cache
+  depuis `permissions` seule ; la table n'apparaît que dans le **planificateur**, qui la
+  purge. Les deux portails, eux, la lisent. Après le redémarrage, un porteur de
+  permission temporaire ouvrira la page et prendra 403 sur toutes les routes. **Zéro
+  porteur aujourd'hui** (table vide, mesuré) — donc aucune suite ne peut le voir sans
+  qu'on fabrique la fixture ;
+- **`clean_up_users` n'a aucun appelant** : sa seule autre occurrence est une mention
+  dans une docstring. Une suite qui supposerait qu'un déploiement fait `userdel -r`
+  mesurerait une branche morte.
+
 ## 4. Ce que la mesure a trouvé — à arbitrer par le Lead
 
 Aucun de ces points n'a été corrigé : la session QA qualifie et transmet.
