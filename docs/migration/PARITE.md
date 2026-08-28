@@ -11218,8 +11218,10 @@ Les traiter au meme rang ferait passer `/ssh-audit/` et ses sept chemins pour l'
 
     docker inspect rootwarden_python --format '{{.State.StartedAt}}'
       ->  2026-08-27T12:28:43Z   =  HIER 14:28 CEST
-    find backend -name '*.py' -newermt '2026-08-27 14:28' | wc -l
-      ->  27
+    find backend -name '*.py' -newermt '2026-08-27 14:28' | wc -l                    ->  27
+    idem, -not -path 'backend/tests/*'                                               ->  20
+    idem, backend/routes/ seul                                                       ->  10
+    backend/tests/ seul                                                              ->   7
     wazuh.py 10:11 · ssh.py 10:03 · helpers.py 09:58 · ssh_audit.py 08:14   (tous le 2026-08-28)
 
 Les `.py` sont lus **au demarrage du process**. **Le process a demarre avant que 27 fichiers soient
@@ -11244,7 +11246,20 @@ Le Lead le presentait comme **« 27 modules ecrits et inertes »** — un **cout
 **tant que le redemarrage n'a pas eu lieu, aucune mesure sur ces routes n'est interpretable.** Le
 redemarrage cesse d'etre une mise en service et devient un **prealable de justesse**.
 
-*Et le chiffre « 20 modules » que le Lead relayait depuis ce matin etait lui aussi perime : 27.*
+### Et le « 27 » contre le « 20 » du DSI est le CINQUIEME faux desaccord du jour
+
+**27 = 20 hors tests + 7 tests**, dont **10 modules de routes**. Les deux chiffres sont justes ; le
+DSI comptait hors tests, moi tout. **Le nombre qui decide est 20** — les fichiers de tests ne sont
+pas charges par le process — et plus precisement **10 modules de routes**.
+
+*Cinquieme fois du jour que deux mesures justes ont ete prises pour un desaccord*, apres `iptables`
+369/870, les cles Graylog 5 et 5, `/wazuh/uninstall`, et pytest 462/509/549/566. **La cause est
+chaque fois la meme : un chiffre voyage sans son ETIQUETTE.** Et le DSI a fait la seule chose qui
+ferme ce genre d'ecart en un tour — *donner son chiffre avec sa methode plutot que reprendre le
+mien.*
+
+*Le chiffre « 20 modules » que le Lead relayait depuis ce matin etait donc juste par accident : il
+designait autre chose, et coincidait.*
 
 ## E-235c bis — mon 38 etait 39, et la soustraction annoncait une amelioration qui n'a pas eu lieu
 
