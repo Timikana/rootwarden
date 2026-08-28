@@ -206,6 +206,21 @@ declare -A REF_LARAVEL=(
   # ENTREE SE FAIT AU PORTAGE, PAS A L'ARCHIVAGE : deux gestes separes de plusieurs
   # jours, et l'effet du premier a ete attribue au second. Ne jamais predire un
   # mouvement de cette reference depuis un archivage.
+  # `go-socle-fixtures` : LES INVARIANTS DU BANC, et rien d'autre. Elle ne mesure
+  # aucune page — elle mesure CE SUR QUOI LES AUTRES SUITES S'APPUIENT SANS LE
+  # VERIFIER : les droits des trois comptes d'epreuve et la composition du parc.
+  #
+  # Pourquoi elle existe : le plan annoncait UNE permission pour `rw-test-admin`,
+  # il en porte NEUF. Plusieurs suites mesurent une garde en s'appuyant sur « ce
+  # compte n'a PAS telle permission » — concevoir un tel test sur une ligne fausse
+  # produit UN VERT QUI NE MESURE RIEN. Le chiffre a ete corrige a la main une
+  # fois, et une permission s'accorde par un geste d'administration ordinaire.
+  #
+  # ⚠ UNE SEULE CIBLE, deliberement : la base est PARTAGEE par les deux portails,
+  # donc la jouer en legacy mesurerait deux fois la meme chose. C'est le cas
+  # « restriction voulue » que la garde du runner distingue d'une suite jamais
+  # mesuree — elle sera donc IGNOREE en legacy, et c'est correct.
+  [go-socle-fixtures]=8
   [go-socle-navigation]=64 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   # `go-page-search` 12 -> 13 le 2026-08-27 : +1 pour la propriete `LiensLegacy`.
@@ -917,6 +932,7 @@ declare -A REF_LEGACY=(
 # decisions dont D6c est bloque.
 # Elle s'inscrit le jour ou l'exploitant tranche, avec sa reference mesuree.
 SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-auth
+  go-socle-fixtures
   go-page-commandlog go-page-approvals go-page-drift go-page-backups go-page-tasks
   go-page-tickets go-page-search go-page-cve-export go-page-conformite
   go-page-conformite-csv go-page-conformite-pdf go-page-cve-consultation
