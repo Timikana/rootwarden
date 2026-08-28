@@ -10993,3 +10993,115 @@ permission**, et c'est la route dont la consigne permanente du chantier dit « n
 
 Ajouter les **trois** espaces a `ADMIN_SEULEMENT`, divergence declaree, precedent `/supervision/`
 — *on ne depend jamais d'un seul rempart.* Fichier de la session 3.
+
+## E-236 — `/ssh-audit/scan-all` : un role 2 a qui le portail REFUSE d'afficher le module peut appeler la route la plus dangereuse du chantier
+
+**Releve par la session 4, verifie par le Lead le 2026-08-28 a 16:15 CEST.**
+
+    legacy/ssh-audit/index.php:12   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+                              :13   checkPermission('can_audit_ssh')
+    Navigation.php:101              'garde' => 'can_audit_ssh'
+    /ssh-audit/scan-all             @require_api_key + @require_role(2)   -- AUCUNE permission
+    api_proxy.php                   /ssh-audit/ en liste blanche, ABSENT d'ADMIN_ONLY
+
+`can_audit_ssh` **existe** — c'est la permission qu'E-211 vient d'ajouter a `/ssh-audit/policies`.
+Il n'y avait donc rien a creer.
+
+### ⚠ CE N'EST PAS « LA ROUTE EST PLUS FAIBLE QUE LA PAGE » — LES DEUX GARDES NE S'ORDONNENT PAS
+
+La page est plus **souple** sur le role (elle admet un role 1) et plus **stricte** sur la
+permission. La route est plus **stricte** sur le role et n'a **aucune** permission. Deux
+consequences symetriques :
+
+1. un role 1 portant `can_audit_ssh` **passe la page et est refuse par la route** — famille d'E-230 ;
+2. **un role 2 SANS `can_audit_ssh` ne peut pas ouvrir la page, et peut appeler la route.**
+
+> **La route que la consigne permanente du chantier designe comme « a ne jamais lancer »
+> (`go-ssh-audit-scanall.mjs`) est atteignable par un compte a qui le portail refuse d'afficher
+> le module.** SSH sur toute la flotte, sans permission, sans porte d'approbation.
+
+### La forme est NEUVE, et c'est ce qui l'a rendue invisible
+
+Ce chantier a numerote six occurrences de *la garde est sur la PAGE, pas sur la REQUETE*.
+**Les six comparaient un seul axe.** Ici la route a l'air **plus stricte** — elle exige un role
+superieur — et c'est precisement ce qui l'a dedouanee dans tous les releves precedents.
+
+> **Une garde plus stricte sur un axe peut etre plus permissive sur un autre, et un
+> rapprochement qui ne compare qu'un axe conclut a l'envers.**
+
+*Il faut croiser role ET permission, pas les additionner en un « niveau ».*
+
+### Verdict : OUBLI pour `ssh-audit`, CONCEPTION pour `docker`
+
+La session 4 separe les deux cas, et la separation tient a une mesure :
+
+- **`/docker/scan_all`** — role 2 sans permission, **et aucune colonne `can_manage_docker`
+  n'existe** : il n'y a rien a exiger. Le voisin immediat le prouve — `/graylog`, deux lignes
+  plus haut dans `web.php`, porte `['role:2', 'perm:can_manage_graylog']`. **L'auteur a decide
+  par module**, il a mis une permission la ou elle existe. **Rien a corriger** ;
+- **`/ssh-audit/scan-all`** — `can_audit_ssh` existe et est exigee ailleurs dans le meme module.
+  C'est un oubli.
+
+*Deux routes au meme releve brut — role 2, aucune permission — et deux verdicts opposes, que
+seule l'existence de la colonne separe. Un tableau de conformite qui ne regarde que les
+decorateurs les aurait comptees pareilles.*
+
+### ARBITRAGE, pas un correctif
+
+Aligner la route sur la page demanderait d'**abaisser** son role a 1 tout en **ajoutant** la
+permission : elargir un axe pour en resserrer un autre, **sur la route la plus dangereuse du
+module**. La session 4 refuse de le proposer comme diff, et elle a raison.
+
+### Ce qui reste INCONNU, et se dit plutot que s'estimer
+
+**Combien de comptes sont role 2 sans `can_audit_ssh`** — la base n'est joignable que par
+`docker exec`, interdit pendant le LOT. **L'ecart est structurel et n'en depend pas ; sa PORTEE
+si.** A mesurer au calme, et en **lisant** ce que les lignes disent : c'est exactement la que la
+session 4 s'est trompee ce matin, en comptant 30 « usages » qui etaient 30 refus.
+
+## E-237 — `/wazuh/uninstall` : le verdict est corrige, l'ETAT PERSISTE ne l'est pas — et le correctif evident est faux dans l'autre sens
+
+**Releve par la session 5, verifie par le Lead le 2026-08-28 a 16:20 CEST.** La session 4
+rapportait « deja corrige, rien a relever » ; la session 5 rapportait un defaut subsistant.
+**Les deux ont raison, sur des moities differentes** — et il faut dire laquelle repond a quoi
+plutot que de relayer une seule.
+
+**Ce qui EST corrige** (session 4, verifie) : `success` ne vaut plus `code == 0` mais
+`paquet_retire`, mesure **par l'effet** en lecture seule (`dpkg-query -W`, puis `rpm -q`), et la
+reponse **nomme les vestiges**. Sur RHEL/SUSE la route dit desormais que le paquet est reste.
+
+**Ce qui ne l'est PAS** (session 5, verifie) — l'ordre des lignes :
+
+    :57   _, err_out, code = execute_as_root(client, cmd, …)
+    :58   _, _, code_v     = execute_as_root(client, verif_cmd, …)
+    :59   _upsert_agent(row['id'], status='never_connected', …)   <- INCONDITIONNEL
+          …
+          paquet_retire = (code_v == 0)                           <- le verdict vient APRES
+
+**L'inventaire est ecrit avant que le verdict existe, et sans le consulter.** Sur RHEL ou SUSE la
+route repond correctement `success: false` **et a deja inscrit « jamais connecte »**. Etat reel :
+**paquet installe, `/var/ossec` supprime, inventaire disant qu'il n'y a rien** — faux **dans la
+direction qui masque le probleme**, personne n'ira chercher le paquet reste en place.
+
+**C'est E-90 / E-183 a l'identique : le verdict corrige, l'etat persiste laisse.**
+
+### ⚠ ET LE CORRECTIF EVIDENT EST FAUX DANS L'AUTRE SENS
+
+N'ecrire qu'en cas de reussite laisserait l'ancien etat — `active`, avec identifiant et version —
+sur une machine dont `/var/ossec` vient d'etre supprime : **un agent mort annonce comme
+fonctionnel**, pire pour un exploitant.
+
+> **Aucune des deux ecritures n'est juste, parce que le vocabulaire n'a pas de mot pour l'etat
+> atteint.** Statuts releves : `pending`, `active`, `disconnected`, `never_connected`. **Aucun ne
+> dit « partiellement desinstalle ».**
+
+**Meme forme que `sudoers_orphelin`** : un champ enumere face a une realite qui a gagne un etat
+qu'il ne peut pas exprimer. Meme remede : **nommer l'etat AVANT de choisir une valeur.** Tant
+qu'il n'a pas de nom, aucune autre route ne peut en tenir compte.
+
+**Ne pas deplacer `_upsert_agent` sous une condition tant que l'etat n'a pas de nom** — ce serait
+echanger un mensonge contre un autre. **Arbitrage exploitant**, comme la colonne pour
+`sudoers_orphelin`.
+
+*Et le `purge` reste `apt`-only : le rendre multi-famille est un changement de comportement sur un
+geste destructeur distant — c'est au DOSSIER-04 en attente de signature, ou le DSI a scinde E-225.*
