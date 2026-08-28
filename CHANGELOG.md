@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.58** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.59** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,97 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.59 — E-215 et E-214 corriges, 31 routes peuvent rendre `200 + success:false`, et ma consigne de commit recoit sa CINQUIEME correction
+
+#### E-215 — la sous-chaine DEMONTREE plutot qu'affirmee
+
+Trois vraies cles dans un fichier, **sur l'hote, aucune machine jointe** : une personnelle `paul@poste`, une
+personnelle commentee **`backup-from-rootwarden-host`**, et la cle de plateforme.
+
+    sed '/rootwarden/d'   -> retire 2 cles, dont la PERSONNELLE
+    par empreinte SHA256  -> retire 1 cle, la bonne
+
+**Le `sed` emportait une cle personnelle dont le seul tort etait son commentaire.** *Un defaut demontre sur
+trois lignes vaut mieux qu'un defaut deduit d'un motif.*
+
+**L'implementation a ete REMONTEE, pas reecrite** : le script de `server_user_remove_key` devient
+`_script_retrait_par_empreintes(username, empreintes)` — **une liste**, pour servir le retrait cible comme le
+multiple. Verifie : plus aucun `sed` par sous-chaine dans le code executable, et le script rendu pour une
+empreinte unique porte les six proprietes de l'original, **par egalite exacte**.
+
+**Et la garde est dans le MEME commit que la verification**, comme pose : *aujourd'hui la route echoue en
+silence, et cette non-fiabilite est ce qui limite les degats* — la rendre fiable sans la garder aurait arme le
+piege. Trois changements assumes : refus sans `force` (**meme formulation** que la voisine), **refus** en
+l'absence d'inventaire plutot qu'un balayage au motif, et un code qui distingue — dont **`2 = fichier INTACT`**.
+
+#### E-214 — et le point 2 changeait le correctif
+
+Corriger le `|| true` seul aurait **elargi** le defaut : les rollbacks des etapes 2 et 3 etaient deja vivants
+et jetaient leurs retours. Ils passent par `_restaure_sshd`, qui lit ses codes et **dit** que le fichier est
+reste modifie quand la copie echoue.
+
+**L'attestation par `sshd -T` referme du meme coup la borne laissee ouverte** — celle du `.conf` inclus qui
+prime : plus besoin de la mesurer, `sshd -T` rend la configuration **effective, includes resolus**. Si un
+`sshd_config.d/*.conf` gagne, **le verdict est `5` et la route le dit**, au lieu d'annoncer une reussite inerte.
+
+Le verdict est un **code de sortie**, pas un texte — *rien a parser, donc rien qu'un echo de terminal ne
+puisse falsifier* (le piege PTY de `v1.37.11`). Eprouve sur cinq sorties, dont celle qui compte :
+
+    allowusers alice rootwarden bob      -> 0  atteste
+    allowusers alice rootwarden-bis bob  -> 5  ABSENT   <- pas de faux positif
+    allowusers alice bob                 -> 5  absent
+
+**Un TROISIEME etat**, parce que deux ne suffisaient pas : `(modifie, atteste, message)` — *le fichier peut
+avoir change sans que l'effet soit confirme.* Sur le code `4` (`sshd -T` indisponible), **aucun retour arriere
+sur une modification valide** : seul le refus de la declarer effective.
+
+**Et un point qui n'etait pas dans ma qualification** : l'auto-reparation interne **retentait la connexion sur
+`modified`** — or un fichier patche dont `sshd -T` ne montre pas l'effet ne changera rien a l'essai suivant.
+
+#### ⚠ 31 routes peuvent rendre `200 + success:false`, et leurs appelants sont invisibles au diff
+
+Jointure appelant -> route, sur **230** routes : **11 `dur`** (`jsonify({'success': False})` sans statut) et
+**20 `conditionnel`** (un `success` **calcule**, 200 quoi qu'il arrive), contre 199 dont tout refus porte un
+statut non-200.
+
+**Le cas `conditionnel` est le moins visible et le plus nombreux** — *une lecture rapide n'y voit pas de refus,
+un appelant qui teste `.ok` n'en voit pas davantage.*
+
+> **Quand une route REJOINT cette famille, ses appelants doivent etre relus — et rien ne change chez eux : ils
+> sont invisibles au diff du correctif.**
+
+**Et les resultats NEGATIFS de ce releve ne valent rien, son autrice le dit** : le `grep` du chemin litteral
+rendait « aucun appelant » pour cinq routes ; **deux ont ete resolues sur la couche PHP** (`supervision.js` lit
+`url_version`, fabrique par `SupervisionController.php:725`). *Les resultats positifs sont solides ; les
+negatifs sont une absence de preuve* — et une part n'est pas statiquement resoluble, donc **le releve doit dire
+lequel de ses silences est mesure.**
+
+#### Muter ce que l'instrument LAISSE PASSER, pas seulement ce qu'il attrape
+
+Question posee par une session sur son propre invariant, reprise par une autre sur son analyseur — **et elle y
+a trouve un trou en une lecture** : *un fichier JavaScript illisible exonerait tous ses appelants en silence*,
+et **son propre commentaire affirmait le contraire.** 59 appels devenaient 54, sans un mot.
+
+> **C'est la forme des cinq en-tetes du chantier qui annoncent un acces plus strict que leur code — sauf que
+> celui-la etait dans l'instrument qui sert a trouver les autres.**
+
+*Une mutation qui rend l'instrument bruyant prouve qu'il parle ; seule une mutation qui DEVRAIT le rendre
+bruyant et ne le rend pas prouve qu'il ecoute.*
+
+#### CINQUIEME correction de ma consigne de commit : `git rm` stage aussi
+
+> *« J'avais ecrit "ne jamais laisser un fichier INDEXE entre deux appels d'outil", en pensant a `git add`.*
+> **`git rm` stage aussi — immediatement, et silencieusement.** *J'ai ensuite fait six appels d'outil avant de
+> committer. »*
+
+**Regle corrigee** : *tout geste qui touche l'index — `git add` comme `git rm` — doit etre dans la MEME
+commande que son `git commit`.* Et **`git commit -- <chemin>` ECHOUE apres un `git rm`** : il faut les
+enchainer, ou supprimer d'abord dans l'arbre de travail seul.
+
+*Une consigne corrigee cinq fois n'est pas une mauvaise consigne : c'est une consigne dont chaque enonce
+couvrait le cas qui l'avait motivee.* **Et les cinq corrections sont venues des sessions, jamais du Lead qui
+l'avait ecrite.**
 
 ### v1.38.58 — E-214 : un `|| true` rendait une branche de retour arriere litteralement inatteignable
 
@@ -4737,7 +4828,8 @@ correspondance reelle :**
 | v1.38.53 | `737320d` | `platform_key` P4 porte, les deux points bloquants corriges |
 | v1.38.54 | `93ae130` | j'avais attribue E-215 a la mauvaise fonction |
 | v1.38.55 | `6f6ed4f` | `platform_key` P1 mesuree — 18 laravel / 15 legacy, le filet n'a rien eu a bloquer |
-| v1.38.56 | (ce commit) | la charte du DSI delegue : 7 arbitrages delegues, 8 qui ne peuvent pas l'etre |
+| v1.38.56 | `c7d9f5d` | la charte du DSI delegue : 7 arbitrages delegues, 8 qui ne peuvent pas l'etre |
+| v1.38.59 | (ce commit) | E-215 et E-214 corriges ; 31 routes `200 + success:false` ; `git rm` stage aussi |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
