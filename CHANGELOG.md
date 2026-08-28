@@ -2171,6 +2171,74 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.95 — E-241b : le défaut que la suite corrigée cessait de voir, et il n'était pas dans `graylog`
+
+E-241 est tranché : **mon JS était sain.** La sonde de la session 7 a nommé le coupable avec
+`elementFromPoint` :
+
+    AVANT la sequence   rect.y = 473   scroll =   0   recu = « templates »
+    APRES la sequence   rect.y =  -7   scroll = 480   recu = « rw-entete »
+    clic PAR COORDONNEES  -> panneau reste cache
+    clic PAR EVALUATE     -> panneau OUVERT
+    erreurs JS : aucune
+
+La séquence fait défiler de 480 px ; le bouton remonte à `y = -7`, **sous l'en-tête collant**, qui
+intercepte le clic. Les deux pistes du Lead — une levée dans `chargeGabarits`, un décalage de mise en
+page — étaient réfutées avant la mesure, et la mesure l'a confirmé.
+
+#### Mais la suite corrigée cessait de voir le défaut qu'elle avait révélé
+
+La session 7 a fait recentrer son clic, et l'a **signalé** plutôt que de laisser le défaut disparaître
+avec son correctif. Elle proposait deux issues. **Mesuré : la première n'adressait pas le cas décrit.**
+
+`scroll-margin-top` n'agit que sur `scrollIntoView` et la navigation par ancre — **pas** sur un
+défilement à la molette. Elle corrigeait donc le cas de la suite, pas celui de l'exploitant.
+
+#### Et le vrai cas est ailleurs, chez moi, huit fois
+
+    pages du portage naviguant par ANCRE        : aucune
+    appels a scrollIntoView dans mon JS         : 12
+      dont block: 'nearest'                     : 8
+      dont block: 'center'                      : 4
+
+**`'nearest'` défile du minimum nécessaire** : si l'élément est juste au-dessus de la fenêtre, il le
+pose **au bord haut**, c'est-à-dire sous l'en-tête. Le panneau de décision qu'on vient d'ouvrir, ou le
+journal qu'on vient d'alimenter, **arrive à moitié caché** — et rien ne le signale.
+
+`'center'` n'a pas ce défaut, ce qui explique qu'il n'ait jamais été vu : quatre appels sur douze le
+masquaient.
+
+**En revanche, le défilement manuel sous un en-tête collant n'est pas un défaut** : c'est le
+comportement voulu d'un en-tête collant, et le recours de l'exploitant est immédiat. Rendre la barre
+d'onglets collante à son tour aurait changé toutes les pages qui emploient `.rw-onglets` et mangé de la
+hauteur sur petit écran, pour un cas dont on sort en remontant.
+
+#### Une règle, pas une énumération de cibles
+
+`scroll-padding-top` sur le conteneur de défilement corrige les **douze** appels d'un coup, et couvrira
+la navigation par ancre le jour où une page en aura — `documentation.php` en porte **54**, et son
+portage les héritera.
+
+Énumérer les sélecteurs concernés aurait demandé de les tenir à jour à chaque panneau ajouté, **et un
+oubli ne se voit pas** : le panneau s'ouvre, il est simplement à moitié sous l'en-tête.
+
+**Le nombre est un plancher, pas une égalité, et c'est écrit dans le fichier.** `.rw-entete` n'a pas de
+hauteur explicite — elle vient de son contenu, soit ~44 px lus dans le CSS et non mesurés au rendu. Le
+jeton vaut 64 px : assez pour dégager avec une marge visible, sans prétendre valoir la hauteur exacte.
+**Les deux ne sont pas liés par le code**, et le commentaire le dit plutôt que de laisser croire à une
+dérivation.
+
+**`rw.css` est un fichier partagé** — un jeton et une règle ajoutés, signalé.
+
+#### Ce que je n'explore pas, et pourquoi
+
+J'avais nommé un troisième candidat : « qui écrit `hidden` après la bascule », en précisant que je
+n'avais pas fait ce croisement. **La sonde le ferme** : le panneau ne bascule **jamais** au clic par
+coordonnées, `panneauHidden` reste `true`. Il n'y a pas de bascule suivie d'un retour, donc rien à
+croiser. *Dire qu'une lecture n'est pas exhaustive permet à la mesure de fermer la bonne porte.*
+
+---
+
 ### v1.38.94 — le compte est tranche a 566, et la discipline de remesure a EVITE une mesure pour la premiere fois
 
 **`566 passed · 1 skipped · 1 xfailed`** (pytest) et **`277 passed · 888 assertions`** (`php artisan

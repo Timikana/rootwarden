@@ -2436,3 +2436,38 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     font-weight: 400;
     color: var(--rw-texte-doux);
 }
+
+/* ── E-241b : CE QUI EST AMENE A L'ECRAN NE DOIT PAS FINIR SOUS L'EN-TETE ──
+ *
+ * `.rw-entete` est `position: sticky; top: 0; z-index: 5`. Tout ce qui defile
+ * passe donc DESSOUS — c'est le comportement voulu d'un en-tete collant, et un
+ * exploitant qui defile a la molette s'en sort en remontant.
+ *
+ * CE QUI N'EST PAS VOULU, c'est qu'un defilement PROGRAMMATIQUE y depose sa
+ * cible. Mesure du portage : 12 appels a `scrollIntoView`, dont **8 en
+ * `block: 'nearest'`**. Or `'nearest'` defile du MINIMUM necessaire : si
+ * l'element est juste au-dessus de la fenetre, il le pose au bord haut —
+ * c'est-a-dire SOUS l'en-tete. Le panneau de decision qu'on vient d'ouvrir, ou
+ * le journal qu'on vient d'alimenter, arrive donc a moitie cache.
+ *
+ * `scroll-padding-top` sur le conteneur de defilement corrige les DOUZE d'un
+ * coup, et couvrira la navigation par ancre le jour ou une page en aura — le
+ * portage n'en a aucune aujourd'hui (mesure), mais `documentation.php` en porte
+ * 54 et son portage les heritera.
+ *
+ * UNE REGLE PLUTOT QU'UNE ENUMERATION DE CIBLES : enumerer les selecteurs
+ * concernes aurait demande de les tenir a jour a chaque panneau ajoute, et un
+ * oubli ne se voit pas — le panneau s'ouvre, il est simplement a moitie sous
+ * l'en-tete.
+ *
+ * ⚠ LE NOMBRE EST UN PLANCHER, PAS UNE EGALITE, et c'est dit parce que le
+ * commentaire ne doit pas affirmer plus que le code. `.rw-entete` n'a pas de
+ * hauteur explicite : elle vient de son contenu (`padding: 11px`, texte de
+ * 15px, plus une bordure), soit ~44 px mesures a la lecture et non au rendu. Le
+ * jeton vaut donc 64 px — assez pour degager l'en-tete avec une marge visible,
+ * et sans pretendre valoir sa hauteur exacte. Si l'en-tete grandit, ce nombre
+ * doit suivre : les deux ne sont PAS lies par le code.
+ */
+:root { --rw-defilement-marge: 64px; }
+
+html { scroll-padding-top: var(--rw-defilement-marge); }
