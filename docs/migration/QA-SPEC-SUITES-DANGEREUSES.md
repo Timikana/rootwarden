@@ -56,11 +56,47 @@ raisonnement que ce projet a déjà appliqué à `/supervision/` — ajouté à
 `ADMIN_SEULEMENT` alors que le legacy ne l'y avait pas, avec sa divergence déclarée,
 *parce qu'on ne dépend jamais d'un seul rempart*.
 
-**`/wazuh/` mérite le même traitement**, et pour une raison plus forte : `install_all`
-est un geste de **parc** qui installe un paquet. Non corrigé ici — `RoutesBackend` n'est
-pas mon fichier. **Transmis.**
+**`/wazuh/` mérite le même traitement.** Non corrigé ici — `RoutesBackend` n'est pas mon
+fichier. **Transmis** (E-235).
+
+> ⚠ **Et je corrige ma propre phrase** : j'avais écrit *« `install_all` est un geste de
+> parc »*. **C'est faux depuis E-224** — `machine_ids` y est **obligatoire**, corps vide
+> → 400, et c'est moi qui l'ai verrouillé ce matin. J'ai relayé le cadrage de la demande
+> sans le confronter à ma propre mesure, faite quatre heures plus tôt.
+>
+> **Une mesure qu'on a faite soi-même ne protège pas d'un cadrage qu'on reprend.**
 
 ---
+
+## 2 bis. ⚠ LA FAMILLE LA PLUS EXPOSÉE — et ce n'est pas `install_all`
+
+Mesuré indépendamment (décorateurs backend par AST, listes de la passerelle après
+retrait des commentaires, contrôle de vraisemblance passé) :
+
+| route | gardes backend | passerelle : réservé admin ? | portée |
+|---|---|---|---|
+| **`POST /ssh-audit/scan-all`** | `require_role(2)` — **aucune permission** | **NON** | **tout le parc** |
+| **`POST /docker/scan_all`** | `require_role(2)` — **aucune permission** | **NON** | **tout le parc** |
+| `POST /wazuh/install_all` | `require_role(2)` **+ `can_manage_wazuh`** | non | **bornée** par `machine_ids` |
+
+**Les deux premières sont plus exposées que celle qui m'avait été signalée comme
+dangereuse** : elles n'ont **ni permission**, **ni réserve administration à la
+passerelle**, **ni porte d'approbation** — et leur portée est *tout le parc*, sans
+argument qui la borne.
+
+`/ssh-audit/scan-all` est la route dont la consigne permanente du chantier dit **« ne
+jamais lancer `go-ssh-audit-scanall.mjs` »** : elle ouvre une session SSH **par machine**,
+`srv-zabbix` comprise, qui porte les deux clés — **la session aboutirait**.
+
+> **Une fixture borne un ARGUMENT ; elle ne borne pas une route dont la portée est le
+> parc.** Pour ces deux-là, il n'existe aucune fixture sûre : la seule mesure possible est
+> **l'interception et l'avortement**, et la propriété est *« le clic a émis la requête, et
+> elle a été abattue avant de partir »*.
+
+**Corollaire pour toute suite écrite sur ces pages** : ne cliquer que des éléments visés
+**par identifiant relu**. Jamais « le premier bouton », jamais un balayage. Un clic
+malheureux sur ces deux pages n'est pas une mesure ratée — c'est un geste sur la
+production.
 
 ## 3. Les quatre gestes, et OÙ la condition doit vivre
 
@@ -70,7 +106,7 @@ pas mon fichier. **Transmis.**
 
 | geste | ce qu'il fait vraiment | comment l'exercer |
 |---|---|---|
-| `/wazuh/install_all` | installe un paquet sur **les machines nommées** | **jamais déclenché.** Interception + avortement |
+| `/wazuh/install_all` | installe un paquet sur **les machines nommées** — portée **bornée** | la propriété n'est PAS « il ne touche pas la production » mais **« la liste envoyée est celle que le panneau a nommée »**, mesurée au réseau |
 | `/wazuh/uninstall` | désinstalle l'agent d'**une** machine | cible `Test-Server-Debian` **uniquement**, retour dans un `finally` |
 | `/groups/<id>/run` | scan réel **par membre**, `cve_scan` **envoie un courriel** | **jamais déclenché.** Groupe fixture **statique**, machine 2 seule |
 | `/delete_remote_user` | supprime un **compte Unix** sur une machine réelle | **jamais déclenché.** Interception + avortement |
@@ -110,19 +146,42 @@ aveugle sur les trois autres.
 colonne : `rw-test-admin` détient `can_manage_wazuh`… — donc *« rôle 2 sans la
 permission → 403 »* **n'est pas exerçable** sur ces modules avec les comptes actuels.
 
-> **Une suite qui écrirait cette assertion la verrait passer sans rien mesurer.** Il faut
-> soit le quatrième compte d'épreuve (rôle 2, zéro permission — en dossier de signature),
-> soit un **FAIL explicite disant que la mesure n'a pas eu lieu**. *Un `else` qui ne fait
-> rien est un PASS déguisé.*
+> **Une suite qui écrirait cette assertion la verrait passer sans rien mesurer.**
+
+**L'attendu est le FAIL explicite**, et c'est une décision, pas un pis-aller :
+
+```js
+// La fixture qui discriminerait cette garde n'existe pas : `rw-test-admin`
+// détient la permission. On ne peut donc PAS mesurer « rôle 2 sans la
+// permission → 403 ».
+verifie('role 2 SANS la permission -> 403', false,
+        'MESURE IMPOSSIBLE : aucun compte de role 2 ne manque cette permission. '
+        + 'Ce FAIL n est pas une regression — il dit que la garde n est pas mesuree.');
+```
+
+**Pourquoi le FAIL et non un quatrième compte d'épreuve** : un compte est un objet à
+créer, à garder, à enrôler, et à ne pas oublier de supprimer. **Un FAIL qui dit « la
+mesure n'a pas eu lieu » ne se périme pas, et il ne peut pas être confondu avec un
+succès.** Le jour où le compte existe, ce FAIL est la ligne exacte à remplacer — il
+désigne son propre remède.
+
+*Un `else` qui ne fait rien est un PASS déguisé.*
 
 ---
 
 ## 5. Deux pièges de banc qui s'appliquent ici
 
-- **`/wazuh/` n'a jamais servi** : la table `wazuh_agents` porte **zéro ligne**. Toute
-  assertion sur un tableau peuplé passera **par absence** — c'est le cas qui a coûté
-  200 assertions sur un écran vide et trois FAIL « bouton introuvable ». **Fixture, ou
-  FAIL explicite** ;
+- **`/wazuh/` n'a jamais servi** : la table `wazuh_agents` porte **zéro ligne**.
+
+  **C'est le piège de l'assertion-par-absence, et il est le plus coûteux du chantier** :
+  *« la colonne Par nomme une personne »* passait faute de la moindre ligne à lire ; *« la
+  hauteur est proportionnelle »* se calculait sur un ensemble vide, où `Math.max(...[])`
+  rend `-Infinity`, qui est bien `<= 5`. **Une assertion sans objet n'est pas une
+  assertion satisfaite.**
+
+  Toute propriété qui pourrait se vérifier sur un tableau vide doit **inclure l'existence
+  de son objet** : `lignes.length > 0 && <propriété>`, jamais `<propriété>` seule.
+  À défaut : **FAIL explicite**, même forme que ci-dessus ;
 - **`groups` : zéro groupe en base.** Toute suite doit créer le sien, **statique**, et ne
   contenant que la machine 2. Un groupe **dynamique** résout ses membres **au moment du
   clic** : l'ensemble visé n'est pas lisible dans la ligne du groupe, et rien n'empêche
