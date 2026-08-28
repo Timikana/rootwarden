@@ -37,6 +37,10 @@ class TableDesGardes
             ['GET', 'api/gateway/{chemin?}', []],
             ['GET', 'approbations', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'bashrc', ['role:2', 'perm:can_manage_bashrc']],
+            // `role:3` SEUL, et c'est la garde du CODE legacy et non celle de son
+            // commentaire — E-231. Pas de permission : le legacy n'en exige aucune,
+            // et en inventer une resserrerait sans mandat.
+            ['GET', 'autorisations-passerelle', ['role:3']],
             ['GET', 'cgu', []],
             ['POST', 'cgu', []],
             ['GET', 'chatops', ['role:2', 'perm:can_admin_portal']],
