@@ -11052,12 +11052,25 @@ Aligner la route sur la page demanderait d'**abaisser** son role a 1 tout en **a
 permission : elargir un axe pour en resserrer un autre, **sur la route la plus dangereuse du
 module**. La session 4 refuse de le proposer comme diff, et elle a raison.
 
-### Ce qui reste INCONNU, et se dit plutot que s'estimer
+### LA PORTEE EST MESUREE : UN COMPTE, REEL, ACTIF — releve du 2026-08-28 16:50 CEST
 
-**Combien de comptes sont role 2 sans `can_audit_ssh`** — la base n'est joignable que par
-`docker exec`, interdit pendant le LOT. **L'ecart est structurel et n'en depend pas ; sa PORTEE
-si.** A mesurer au calme, et en **lisant** ce que les lignes disent : c'est exactement la que la
-session 4 s'est trompee ce matin, en comptant 30 « usages » qui etaient 30 refus.
+Le gel leve, la session 4 a mesure en base ce qui restait inconnu :
+
+    role 3   3 comptes                        ouvrent la page ET appellent la route  (legitime)
+    role 2   1 fixture AVEC la permission     ouvre et appelle
+    role 2   1 compte REEL sans              **n'ouvre PAS la page, APPELLE la route**  <- l'ecart
+    role 1   6 reels + 1 fixture, aucun avec  n'ouvrent pas, n'appellent pas (role 2 exige)
+
+**Verifie : `checkPermissionFromDB` court-circuite au role 3** (`if ($roleId === 3) return true;`),
+exactement comme `require_permission` cote backend — les roles 3 ne sont donc pas dans le perimetre.
+
+**Ce n'est ni theorique ni massif : un compte, reel, actif.** C'est le chiffre sur lequel
+l'exploitant arbitre.
+
+**Et une borne qui change la gravite, donnee par la session 4** : ce compte est **deja role 2**,
+donc `check_machine_access` lui rend `True` sur tout le parc. **Ce qu'il gagne n'est pas un acces a
+des machines — c'est une CAPACITE** : lancer l'audit SSH de toute la flotte, la route dont la
+consigne permanente dit « ne jamais la lancer ». *Un ecart de capacite, pas de confidentialite.*
 
 ## E-237 — `/wazuh/uninstall` : le verdict est corrige, l'ETAT PERSISTE ne l'est pas — et le correctif evident est faux dans l'autre sens
 
@@ -11091,17 +11104,44 @@ N'ecrire qu'en cas de reussite laisserait l'ancien etat — `active`, avec ident
 sur une machine dont `/var/ossec` vient d'etre supprime : **un agent mort annonce comme
 fonctionnel**, pire pour un exploitant.
 
-> **Aucune des deux ecritures n'est juste, parce que le vocabulaire n'a pas de mot pour l'etat
-> atteint.** Statuts releves : `pending`, `active`, `disconnected`, `never_connected`. **Aucun ne
-> dit « partiellement desinstalle ».**
+### ⚠ RECTIFICATION DU 2026-08-28 16:55 — MA LISTE DE STATUTS ETAIT COURTE D'UN, ET C'EST CELUI QUI RESOUT
+
+J'avais ecrit : *« le vocabulaire n'a pas de mot pour l'etat atteint — `pending`, `active`,
+`disconnected`, `never_connected`, aucun ne dit partiellement desinstalle. »* **L'enumeration en
+porte CINQ**, releve par la session 4 :
+
+    034_wazuh.sql:48   status ENUM('active','disconnected','never_connected','pending','unknown')
+
+**`unknown` existe, et de bout en bout** : le backend l'ecrit (`wazuh.py:742`), l'interface le rend
+en badge gris (`wazuh.js:102`) avec un **repli** pour tout statut non mappe (`:105`), et le libelle
+existe.
+
+**Et c'est la valeur juste** : il ne dit pas « partiellement desinstalle », il dit *« je ne sais pas
+ce qu'il y a sur cette machine »* — **ce qui est exactement la verite de l'etat atteint.** Mes deux
+options **affirmaient** l'une et l'autre quelque chose de faux ; celle-ci **n'affirme rien**.
+Ecrire `unknown` apres l'echec de la verification n'echange donc pas un mensonge contre un autre :
+c'est la seule des trois ecritures honnete, et **elle ne demande aucune migration.**
+
+> **Le vocabulaire d'un champ, c'est le SCHEMA — pas ce que le code ecrit.** Ma liste de quatre
+> venait d'un motif sur les litteraux `status='…'` ; `unknown` est ecrit par une **expression
+> conditionnelle** (`'active' if … else ('disconnected' if … else 'unknown')`), qu'aucun motif sur
+> une affectation litterale ne peut voir. *C'est la meme famille que `'route' =>` rendant 0 sur un
+> fichier qui aligne ses fleches : un motif suppose une forme d'ecriture.*
+
+**Reserve a porter avec le geste** : **il n'existe aucun `laravel/lang/{fr,en}/wazuh.php`** —
+verifie, wazuh n'est pas encore porte. Si `unknown` est retenu, le libelle devra exister **au
+moment du portage**, sinon l'ecran affichera `wazuh.status_unknown` en clair.
+
+**Ce qui RESTE un arbitrage** : le `purge` `apt`-only, au DOSSIER-04. *Le verdict et le vocabulaire
+sont resolus ; le geste distant multi-famille ne l'est pas.*
 
 **Meme forme que `sudoers_orphelin`** : un champ enumere face a une realite qui a gagne un etat
 qu'il ne peut pas exprimer. Meme remede : **nommer l'etat AVANT de choisir une valeur.** Tant
 qu'il n'a pas de nom, aucune autre route ne peut en tenir compte.
 
-**Ne pas deplacer `_upsert_agent` sous une condition tant que l'etat n'a pas de nom** — ce serait
-echanger un mensonge contre un autre. **Arbitrage exploitant**, comme la colonne pour
-`sudoers_orphelin`.
+**~~Ne pas deplacer `_upsert_agent` sous une condition tant que l'etat n'a pas de nom.~~** —
+*consigne RETIREE : l'etat a un nom, voir la rectification ci-dessus.* Le geste est desormais
+disponible et sans migration.
 
 *Et le `purge` reste `apt`-only : le rendre multi-famille est un changement de comportement sur un
 geste destructeur distant — c'est au DOSSIER-04 en attente de signature, ou le DSI a scinde E-225.*
