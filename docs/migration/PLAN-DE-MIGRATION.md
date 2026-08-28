@@ -3082,6 +3082,76 @@ sauvegardé. *Son affirmation était trop optimiste, et du côté qui rassure.*
 relecture. *Un instrument qui tronque doit se relever par règle, pas quand son résultat surprend* — sinon il ne
 protège que contre les surprises multiples.
 
+### ✅ CE QUI PROTÈGE D'UNE VÉRIFICATION AFFIRMÉE ET NON FAITE : CITER LA COMMANDE ET SA SORTIE (2026-08-28)
+
+**La règle du jour était à moitié écrite. La session 2 en donne l'autre moitié, apprise en se faisant corriger
+sur `srv-zabbix` le matin même :**
+
+| le défaut | la parade |
+|---|---|
+| **un fait périmé** — une mesure vraie qui a vieilli | **dater** le fait |
+| **une vérification affirmée et non faite** | **citer la COMMANDE et sa SORTIE**, pas dire « vérifié » |
+
+> *« J'avais écrit "mesuré en base" pour un fait que je reprenais de mon propre document. »*
+
+**Dater ne protège que du premier.** Le second — celui du DSI, *« revérifié depuis »* sans avoir relancé la
+commande — **ne se distingue d'une vraie vérification par aucune date.** Seule la sortie le distingue.
+
+**Adopté pour tous les comptes rendus** : un fait transmis porte **son heure**, une vérification annoncée porte
+**sa commande**.
+
+### ⚠ SIXIÈME EN-TÊTE QUI MENT, ET LE PREMIER DANS L'AUTRE SENS (2026-08-28)
+
+    legacy/api/docs.php:4   « Accessible uniquement aux admins et superadmins »
+    legacy/api/docs.php:9   checkAuth([ROLE_SUPERADMIN])      <- role 3 SEUL, verifie
+    legacy/api/openapi.php:8  idem
+
+**Les cinq occurrences connues annonçaient toutes un accès PLUS STRICT que le code** — donc une relecture
+rassurée à tort, et c'est ce qui les rendait dangereuses. **Celle-ci l'annonce plus LARGE** : un rôle 2 qui lit
+l'en-tête croit pouvoir entrer et reçoit un **403**.
+
+> **Défaut de documentation, pas de sécurité — et le dire évite qu'on la range avec les cinq autres, qui n'ont
+> pas la même conséquence.** *Un motif compté sans son sens produit un chiffre qui alarme à tort.*
+
+**Et le portage l'avait relevé de lui-même** : trois commentaires distincts le citent.
+
+#### Deux dédouanements, dits aussi nettement
+
+**`legacy/api/` est la partie la plus strictement gardée du legacy** : `docs.php` et `openapi.php` exigent le
+**rôle 3 seul**, et le YAML brut est **refusé par Apache** (`.htaccess`) — son contenu n'est servi que par un
+script qui exige ce rôle. **Protection à deux couches, correcte, rien à redresser.** Et **aucun CDN** : Swagger
+UI est vendorisé localement.
+
+### ✅ E-232 — LA NUANCE QUI EN EST LA SUBSTANCE (2026-08-28)
+
+La spec **déclare** deux serveurs (`openapi.yaml:15-19`) — mais ce sont des adresses qu'elle **DÉCRIT**, pas un
+point d'entrée qu'elle **EXPOSE**. **C'est l'inverse exact de `chatops/webhook.php`, que Slack appelait :
+archiver ne casse aucun appelant extérieur.**
+
+> **La réserve honnête, et c'est la substance de l'écart** : qui a importé cette spec dans Postman ou généré un
+> client en détient une **copie**. L'archivage ne casse pas son outil — **il supprime la SOURCE qu'il ne pourra
+> plus régénérer.** *C'est ce qui distingue « retirer » de « re-siter », et c'est pourquoi l'étape 0 bloque.*
+
+**Et une question qui n'est pas de la lecture de code** : *aucun outil extérieur ne consomme-t-il
+`/api/openapi.php` ?* **Invérifiable depuis le dépôt** — seuls les journaux Apache le diraient. **Question pour
+l'exploitant**, et elle change la réponse à E-232.
+
+#### ✅ Ambiguïté de la référence, tranchée par le Lead : `1 + 5 + 2 = 8`
+
+**Les deux fichiers vendorisés COMPTENT dans N.** Mesuré à 13:58 CEST :
+
+    /api/swagger/swagger-ui-bundle.js   200      /api/openapi.yaml   403
+    /api/swagger/swagger-ui.css         200      /api/                403
+
+**Les quatre changent après le `git mv`** — les deux `200` deviennent 404, et les deux `403` aussi. *Le constat
+d'archivage mesure « ce chemin a-t-il quitté la racine documentaire », et deux fichiers réellement servis y
+répondent.* **Les exclure ferait taire le constat sur les seuls fichiers dont le service était prouvé par un
+`200`.** Référence **8**, à remesurer par la session 7.
+
+**Et les deux `403` sont ce qui rend ce constat MESURANT** : ils sont expliqués — refus d'indexation
+(`.htaccess:4`), refus d'extension (`:7-9`) — **et ils changent.** *Contrairement à `/commandlog/`, où le 404
+préexistait et où l'assertion passait sans rien mesurer.*
+
 ### Base et shell
 
 - **MySQL ne déclenche `ON UPDATE CURRENT_TIMESTAMP` que si la valeur change.**
