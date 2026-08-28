@@ -141,6 +141,42 @@ def _parse_authorized_keys_dump(dump: str):
     return result
 
 
+# Sans `|| true` : ce suffixe forcait le code de sortie a zero et rendait la
+# branche de retour arriere de l'etape 4 litteralement INATTEIGNABLE (E-214).
+_RELOAD_SSHD = "systemctl reload sshd 2>&1 || systemctl reload ssh 2>&1"
+
+
+def _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=False):
+    """Restaure `sshd_config` depuis sa sauvegarde et VERIFIE que la copie a eu lieu.
+
+    ══ E-214 : LE RETOUR ARRIERE MENTAIT DEJA, SUR DEUX CHEMINS VIVANTS ═════
+
+    Les trois branches de rollback faisaient `cp -a` — et parfois un rechargement
+    — en **jetant les deux retours**, puis annoncaient « rollback effectue ». Si
+    la copie echouait, **le fichier restait patche** et l'appelant l'ignorait.
+
+    Les rollbacks des etapes 2 et 3 portent deja ce defaut et sont **vivants** :
+    corriger le `|| true` de l'etape 4 sans corriger ceux-la aurait elargi un
+    defaut existant au lieu de le fermer.
+
+    Rend `(restaure: bool, message: str)`. Quand `restaure` vaut False, le
+    message DIT que le fichier est reste modifie — c'est l'information que
+    l'ancienne version supprimait.
+    """
+    _, err_c, code_c = execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
+    if code_c != 0:
+        return False, (f"RETOUR ARRIERE ECHOUE ({(err_c or '').strip()[:120]}) - "
+                       f"le fichier sshd_config est RESTE MODIFIE")
+    if not recharger:
+        return True, "retour arriere effectue (fichier restaure)"
+    _, err_r, code_r = execute_as_root(client, _RELOAD_SSHD, root_pass, logger=logger)
+    if code_r != 0:
+        return False, (f"fichier restaure mais RECHARGEMENT ECHOUE "
+                       f"({(err_r or '').strip()[:120]}) - sshd tourne sur l'ancienne "
+                       f"configuration, ce qui est l'etat voulu, mais rien ne l'atteste")
+    return True, "retour arriere effectue et recharge"
+
+
 def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     """Patche sshd_config pour ajouter sa_name a AllowUsers si necessaire.
 
@@ -160,19 +196,19 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     )
     out, _, _ = execute_as_root(client, grep_cmd, root_pass, logger=logger)
     if not out or not out.strip():
-        return False, "AllowUsers absent - pas de patch necessaire"
+        return False, True, "AllowUsers absent - pas de patch necessaire"
 
     # Format : /path/to/file:AllowUsers user1 user2 ...
     first_line = out.strip().split('\n')[0]
     if ':' not in first_line:
-        return False, "Parse grep AllowUsers ambigu, skip"
+        return False, True, "Parse grep AllowUsers ambigu, skip"
     file_path, raw = first_line.split(':', 1)
     tokens = raw.strip().split()
     if not tokens or tokens[0].lower() != 'allowusers' or len(tokens) < 2:
-        return False, "Format AllowUsers inattendu, skip"
+        return False, True, "Format AllowUsers inattendu, skip"
     users_listed = tokens[1:]
     if sa_name in users_listed:
-        return False, f"{sa_name} deja dans AllowUsers"
+        return False, True, f"{sa_name} deja dans AllowUsers"
 
     fp_q = shlex.quote(file_path)
     bak_q = shlex.quote(file_path + '.bak.rw')
@@ -181,7 +217,7 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     # 1. Backup
     _, err_b, code_b = execute_as_root(client, f"cp -a {fp_q} {bak_q}", root_pass, logger=logger)
     if code_b != 0:
-        return False, f"Backup echoue : {(err_b or '')[:200]}"
+        return False, False, f"Backup echoue : {(err_b or '')[:200]}"
 
     # 2. Patch via awk : ajoute sa_name a la fin de la 1re ligne AllowUsers
     patch_cmd = (
@@ -192,26 +228,64 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     )
     _, err_p, code_p = execute_as_root(client, patch_cmd, root_pass, logger=logger)
     if code_p != 0:
-        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
-        return False, f"Patch awk echoue : {(err_p or '')[:200]}"
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger)
+        return False, False, f"Patch awk echoue : {(err_p or '')[:200]} - {m_r}"
 
     # 3. Validation sshd -t
     _, err_t, code_t = execute_as_root(client, "sshd -t 2>&1", root_pass, logger=logger)
     if code_t != 0:
-        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
-        return False, f"sshd -t a refuse le patch : {(err_t or '')[:200]}"
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger)
+        return False, False, f"sshd -t a refuse le patch : {(err_t or '')[:200]} - {m_r}"
 
-    # 4. Reload sshd (different selon distrib : sshd vs ssh)
-    reload_cmd = "systemctl reload sshd 2>&1 || systemctl reload ssh 2>&1 || true"
-    _, err_r, code_r = execute_as_root(client, reload_cmd, root_pass, logger=logger)
+    # 4. Rechargement — SANS `|| true`, qui rendait `code_r` toujours nul
+    _, err_r, code_r = execute_as_root(client, _RELOAD_SSHD, root_pass, logger=logger)
     if code_r != 0:
-        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
-        execute_as_root(client, reload_cmd, root_pass, logger=logger)
-        return False, f"reload sshd echoue, rollback effectue : {(err_r or '')[:200]}"
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=True)
+        return False, False, f"rechargement sshd echoue : {(err_r or '')[:200]} - {m_r}"
 
-    logger.info("sshd AllowUsers patche : ajoute '%s' dans %s (backup %s.bak.rw)",
-                sa_name, file_path, file_path)
-    return True, f"AllowUsers patche : {sa_name} ajoute dans {file_path}"
+    # 5. ATTESTATION PAR L'EFFET, pas par le code de sortie du rechargement.
+    #
+    # `sshd -T` rend la configuration EFFECTIVE, tous les `Include` resolus, en
+    # LECTURE. C'est le seul controle honnete — et il repond du meme coup a une
+    # borne qui restait ouverte : ce helper ne patche que la PREMIERE ligne
+    # `AllowUsers` trouvee, or sur Debian recente `Include sshd_config.d/*.conf`
+    # est en tete du fichier. Si un `.conf` inclus porte un `AllowUsers`, c'est
+    # LUI qui gagne, et patcher le fichier principal est inerte MEME apres un
+    # rechargement reussi. `sshd -T` le voit ; le code de sortie du rechargement,
+    # non.
+    #
+    # Le verdict est un CODE DE SORTIE et non un texte : rien a parser, donc rien
+    # qu'un echo de terminal puisse falsifier.
+    atteste_cmd = (
+        f"sshd -T 2>/dev/null > /tmp/rw_sshd_t.out || exit 4; "
+        f"if awk 'tolower($1)==\"allowusers\"' /tmp/rw_sshd_t.out "
+        f"| tr ' ' '\\n' | grep -Fxq -- {sa_q}; "
+        f"then rm -f /tmp/rw_sshd_t.out; exit 0; fi; "
+        f"rm -f /tmp/rw_sshd_t.out; exit 5"
+    )
+    _, err_a, code_a = execute_as_root(client, atteste_cmd, root_pass, logger=logger)
+    if code_a == 0:
+        logger.info("sshd AllowUsers patche ET ATTESTE : '%s' figure dans la configuration "
+                    "effective (%s, sauvegarde %s.bak.rw)", sa_name, file_path, file_path)
+        return True, True, f"AllowUsers patche et atteste : {sa_name} est dans la configuration effective"
+
+    if code_a == 5:
+        # Le fichier est patche, sshd a recharge, et le compte n'apparait
+        # TOUJOURS pas : une autre directive prime. Annoncer une reussite ici
+        # serait le defaut meme qu'E-214 corrige.
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=True)
+        return True, False, (f"{sa_name} n'apparait PAS dans `sshd -T` apres rechargement - "
+                             f"une autre directive AllowUsers prime (probablement un "
+                             f"sshd_config.d/*.conf). Le patch de {file_path} est sans effet. "
+                             f"{m_r}")
+
+    # code 4 : `sshd -T` n'a pas pu s'executer. Le patch est ecrit et valide par
+    # `sshd -t`, mais rien ne l'atteste. On ne revient PAS en arriere sur une
+    # modification valide — on refuse simplement de la declarer effective.
+    logger.warning("sshd AllowUsers patche mais NON ATTESTE sur %s : `sshd -T` a echoue (%s)",
+                   file_path, (err_a or '').strip()[:120])
+    return True, False, (f"AllowUsers patche dans {file_path} et valide par `sshd -t`, "
+                         f"mais `sshd -T` n'a pas pu confirmer l'effet - etat NON ATTESTE")
 
 
 def _validate_username(username: str) -> bool:
@@ -839,10 +913,13 @@ def deploy_platform_key():
                             except paramiko.AuthenticationException:
                                 # Auto-fix : sshd refuse peut-etre rootwarden via
                                 # AllowUsers. On tente de patcher + retry.
-                                modified, patch_msg = _ensure_sshd_allows_user(
+                                modified, atteste, patch_msg = _ensure_sshd_allows_user(
                                     client, root_pass, sa_name, logger)
                                 logger.info("Service account auth fail, patch sshd : %s", patch_msg)
-                                if modified:
+                                # E-214 : on retente sur l'ATTESTATION, pas sur la
+                                # modification. Un fichier patche dont `sshd -T` ne
+                                # montre pas l'effet ne changera rien a l'essai suivant.
+                                if modified and atteste:
                                     try:
                                         whoami = _try_sa_login()
                                     except paramiko.AuthenticationException:
@@ -2094,7 +2171,7 @@ def sshd_allow_user():
     try:
         with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
                          service_account=m.get('service_account_deployed', False)) as client:
-            modified, msg = _ensure_sshd_allows_user(client, root_pass, username, logger)
+            modified, atteste, msg = _ensure_sshd_allows_user(client, root_pass, username, logger)
 
         try:
             conn_a = get_db_connection()
@@ -2107,9 +2184,15 @@ def sshd_allow_user():
         except Exception:
             pass
 
+        # E-214 : le verdict suit l'EFFET, pas le geste. L'ancienne version
+        # rendait `success: True` quoi qu'ait dit le helper — y compris apres un
+        # retour arriere. Les deux champs sont TOUJOURS presents : `modified` dit
+        # si le fichier a change, `atteste` si `sshd -T` le confirme, et ils
+        # peuvent diverger.
         return jsonify({
-            'success': True,
+            'success': atteste,
             'modified': modified,
+            'atteste': atteste,
             'message': f"{m['name']}: {msg}",
         })
     except Exception as e:
