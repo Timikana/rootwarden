@@ -51,7 +51,14 @@ return [
     'scanning'             => 'Scan Docker en cours…',
     'scanning_all'         => 'Scan Docker de tous les serveurs…',
     'scan_done'            => 'Scan Docker terminé.',
-    'scan_all_done_simple' => 'Scan de tous les serveurs terminé.',
+    // ── LE BILAN EST CHIFFRE, ET IL NOMME LES ECHECS ─────────────────
+    // `POST /docker/scan_all` rend un FLUX JSON-lines en `text/plain` : le 200
+    // part AVANT que le premier scan ne tourne. Un verdict tire du statut HTTP
+    // annonce donc une reussite meme si toutes les machines ont echoue.
+    'scan_all_done_simple' => 'Scan de tous les serveurs terminé : :ok réussi(s) sur :total.',
+    'scan_all_echecs'      => ':n serveur(s) en échec : :noms',
+    'scan_all_illisible'   => "Le scan a été lancé, mais son compte rendu n'a pas pu être lu : impossible de dire combien de serveurs ont abouti. Recharge la page pour lire l'état réel.",
+    'scan_all_aucun'       => "Le scan n'a rendu aucun compte rendu — aucun serveur n'a été traité, ou le flux s'est interrompu avant la première réponse.",
     'no_docker'            => 'Docker n\'est pas installé sur ce serveur.',
     'err_load'             => 'Impossible de charger l\'inventaire.',
     'err_scan'             => 'Le scan Docker a échoué.',
