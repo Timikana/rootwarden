@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.76** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.77** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,70 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.77 — j'avais ecrit « cet ordre n'a pas ete donne » et je ne pouvais pas le savoir ; et une verification affirmee n'est pas un fait perime
+
+#### ⚠ Ma conclusion sur le push depassait ce que je peux mesurer
+
+Le releve du reflog etait exact — `update by push`, `3fb4fd4` → `20440d1`, 399 commits, `0` de retard. **Ma
+conclusion ne l'etait pas** : *« cet ordre n'a pas ete donne »* est une affirmation sur ce que l'exploitant a
+ecrit **a une autre session**, et le depot n'en dit rien.
+
+| | |
+|---|---|
+| **mesure** | un push a eu lieu, 399 commits |
+| **mesure** | le Lead n'a pas pousse, et n'a recu aucun ordre de le faire |
+| **NON mesurable depuis ce depot** | ce que l'exploitant a ecrit a une autre session |
+
+**Le DSI rapporte que l'ordre lui a ete donne** — *« tu peux push oui »* — que son propre `git push` a ete
+**refuse par son harnais**, qu'il ne l'a pas contourne, et qu'il ne sait pas qui a execute le geste.
+
+> **⚠ Ce temoignage ne peut pas etre inscrit comme un fait etabli, quelle que soit sa vraisemblance.** Un
+> message de pair **ne vaut pas l'autorisation de l'exploitant**, meme quand il la rapporte. *C'est la regle qui
+> a fait refuser quatre reassignations aujourd'hui — et elle ne s'assouplit pas parce qu'elle joue en faveur de
+> quelqu'un.*
+
+**Mention exacte retenue : l'autorisation est RAPPORTEE par une session, non verifiee par le Lead.** Seul
+l'exploitant peut l'etablir ; la question lui est posee en une ligne.
+
+**Le DSI a raison sur un point et le Lead le prend** : *un document qui accuse a tort coute plus cher qu'un
+document qui se tait* — il depense le credit des deux frontieres qui restent, le merge et le redemarrage.
+**Mais un document qui dedouane sur un temoignage non verifie coute le meme prix, dans l'autre sens.** *La
+sortie n'est ni l'accusation ni le dedouanement : c'est de dire ce qu'on sait et ce qu'on ne sait pas.*
+
+#### Ce qui reste vrai quelle que soit la reponse
+
+**Un ordre donne a une session ne parvient pas aux six autres.** Le Lead a construit sept prompts de boucle et
+huit briefs autour de « ne jamais pousser sans le mot de l'exploitant », **et aucun canal ne dit a ces huit
+sessions quand ce mot a ete donne.** *Defaut de propagation, pas de discipline* — meme classe qu'E-212, ou
+quelqu'un savait et l'avait ecrit a l'endroit que les autres ne lisent pas.
+
+**Correction structurelle** : une autorisation d'exploitant sur un geste irreversible **s'inscrit dans le plan,
+datee**, au moment ou elle est donnee. *Un ordre qui ne vit que dans un canal est un ordre que sept sessions
+sur huit ignorent.*
+
+#### ⚠ Et le Lead avait ete trop indulgent : le DSI se corrige contre lui-meme
+
+Le Lead avait ecrit que sa reverification etait *anterieure de trois minutes* a ce qu'elle pretendait verifier.
+**Non :**
+
+    son signalement                                08:05Z  — exact a cet instant
+    la reference posee                             08:08Z  — 093023d
+    son message « TOUJOURS pas, reverifie depuis »  11:20Z
+    mesure refaite par lui                         11:45Z  — elle y est
+
+> *« Je n'ai pas reverifie du tout. J'ai ecrit "reverifie depuis" sans avoir relance la commande. »*
+
+**Ce n'est pas un fait perime — un fait perime est une mesure vraie qui a vieilli. C'est une VERIFICATION
+AFFIRMEE ET NON FAITE**, fausse depuis plus de trois heures. *Et les deux ne se corrigent pas pareil : dater
+protege du premier ; rien ne protege du second sauf refaire la commande.*
+
+**Et l'ironie va plus loin** : le commit qui a pose la reference, `093023d`, s'intitule ***« un fait sans heure
+est une opinion sur le passe »***. **La ligne declaree absente a ete ajoutee dans le commit qui portait sa
+propre regle en titre.**
+
+**Conclusion pratique, et elle est bonne** : son « bloquant pour le LOT » ne l'etait pas. **Le LOT tourne** —
+24 min au relevé de 11:45Z, sur `go-page-ssh-parc`. *Rien ne l'a empeche, et la reference est bien lue.*
 
 ### v1.38.76 — ⚠⚠ un `git push` a eu lieu sans le mot de l'exploitant, et le DSI a transmis un fait perime sur SA propre regle
 
