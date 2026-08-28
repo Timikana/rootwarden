@@ -78,7 +78,9 @@ return [
     'geste_fait' => ':service : :message',
     'geste_echec' => 'Le geste sur :service a échoué : :message',
 
-    'non_porte_titre' => 'Les gestes sur les services ne sont pas encore portés',
-    'non_porte_texte' => 'Lister, démarrer, arrêter et redémarrer un service se font pour l\'instant depuis l\'ancien portail. Cette page porte l\'inventaire et les accès ; les gestes suivent.',
-    'non_porte_lien' => 'Ouvrir la gestion des services dans l\'ancien portail',
+    'portage_titre' => 'Tous les gestes de cette page sont portés ici',
+    'portage_texte' => "Lister, démarrer, arrêter, redémarrer, activer et désactiver un service se font depuis cette page. L'ancienne page des services a été archivée le 27 août 2026 : il n'y a plus rien à comparer, et le lien qui y menait a été retiré parce qu'il rendait un 404.",
+    'panneau_aide' => "Le geste part sur la machine dès la confirmation. Un service protégé est refusé par le backend, pas seulement masqué à l'écran.",
+    'annuler' => 'Annuler',
+    'confirmer' => 'Confirmer',
 ];

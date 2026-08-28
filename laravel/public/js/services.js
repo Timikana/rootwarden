@@ -249,13 +249,69 @@
      * Une confirmation qui ne dit pas sur quoi elle porte ne fait que ralentir
      * le clic.
      */
+    var panneau = document.querySelector('[data-rw="services-panneau"]');
+    var pTitre = document.querySelector('[data-rw="services-panneau-titre"]');
+    var pTexte = document.querySelector('[data-rw="services-panneau-texte"]');
+    var pOui = document.querySelector('[data-rw="services-panneau-confirmer"]');
+    var pNon = document.querySelector('[data-rw="services-panneau-annuler"]');
+    var enAttente = null;
+
+    function fermePanneau() {
+        if (panneau) { panneau.hidden = true; }
+        enAttente = null;
+    }
+
+    if (pNon) { pNon.addEventListener('click', fermePanneau); }
+    if (pOui) {
+        pOui.addEventListener('click', function () {
+            if (! enAttente) { return; }
+            var g = enAttente;
+            fermePanneau();
+            execute(g.geste, g.nom, g.texte, g.machine);
+        });
+    }
+
+    /**
+     * Demande la decision DANS LA PAGE, jamais par `window.confirm()`.
+     *
+     * ══ POURQUOI CE N'EST PAS UN DETAIL DE PRESENTATION ══════════════════
+     *
+     * Le jet precedent faisait `if (! window.confirm(texte)) return;`. Le
+     * commentaire disait « le legacy le fait aussi, c'est de la parite » — et la
+     * parite du TEXTE est conservee ici, il nomme toujours le service et la
+     * machine. Ce qui ne se garde pas, c'est la BOITE :
+     *
+     *   - elle recouvre la ligne sur laquelle on decide ;
+     *   - elle ne se style pas, donc elle ne distingue pas un arret d'un
+     *     redemarrage ;
+     *   - **elle BLOQUE Puppeteer.** Les cinq gestes qui ecrivent sur une
+     *     machine etaient les seuls du module qu'aucune suite ne pouvait
+     *     exercer. Un dialogue natif ne rend pas un geste dangereux : il le rend
+     *     INTESTABLE, ce qui est pire — le geste part quand meme, sans filet.
+     *
+     * Le panneau est le meme motif que `cle-plateforme` et `comptes-distants` :
+     * il NOMME sa cible, et il n'agit qu'au second clic.
+     */
     function pilote(geste, nom, question) {
         var o = machineChoisie();
         if (! o) { return; }
         var texte = (question || '').replace(':service', nom)
             .replace(':machine', o.dataset.nom || '');
-        if (! window.confirm(texte)) { return; }
 
+        // SANS PANNEAU, ON N'AGIT PAS. Retomber sur un envoi direct
+        // transformerait un gabarit incomplet en geste sans confirmation — le
+        // contraire de ce que ce bloc existe pour garantir.
+        if (! panneau || ! pOui) { return; }
+
+        enAttente = { geste: geste, nom: nom, texte: texte, machine: o };
+        if (pTitre) { pTitre.textContent = texte; }
+        if (pTexte) { pTexte.textContent = textes.panneau_aide || ''; }
+        panneau.hidden = false;
+        panneau.scrollIntoView({ block: 'nearest' });
+        if (pOui.focus) { pOui.focus(); }
+    }
+
+    function execute(geste, nom, texte, o) {
         journalise(texte);
         lit('/services/' + geste, {
             machine_id: parseInt(o.value, 10),

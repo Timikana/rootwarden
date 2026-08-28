@@ -2171,6 +2171,63 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.63 — `services` : un encart qui mentait, un lien vers un 404, et un `confirm()` qui rendait cinq gestes INTESTABLES
+
+Vérification demandée avant de compléter l'onglet — *un onglet n'est « fini » que quand ce qu'il
+affiche est vrai.* Elle a trouvé trois choses, dont une que je ne cherchais pas.
+
+#### L'encart déclarait non porté ce qui est porté
+
+Il annonçait « les gestes sur les services ne sont pas encore portés » et offrait un bouton
+**principal** vers `/services/` de l'ancien portail. Les deux étaient faux :
+
+- **les cinq gestes sont portés.** `pilote()` appelle `/services/<geste>` par **concaténation** — ce qui
+  explique qu'une recherche du chemin littéral ne rende que `/services/list` et laisse croire au
+  contraire. J'ai moi-même conclu trop vite dans ce sens avant de lire la fonction ;
+- **`legacy/services/` est archivé** depuis le 2026-08-27 (`_deprecated/`). Le bouton menait donc à un
+  **404**, en action principale.
+
+Le lien est **retiré** plutôt que réétiqueté : il n'y a plus rien au bout. Même famille qu'E-223, où
+une entrée de menu pointait vers un module désactivé.
+
+#### ⚠ Et un `window.confirm()` qui rendait les cinq gestes intestables
+
+Trouvé par un balayage de mes 22 fichiers de script. Presque toutes les mentions de `confirm` y sont
+des **commentaires** attestant que le portage évite les boîtes natives — **deux appels réels
+subsistaient** : `services.js:257` et `bashrc.js:387`.
+
+Le commentaire du premier disait *« le legacy le fait aussi, c'est de la parité »*. La parité du
+**texte** se garde — le panneau nomme toujours le service et la machine. Ce qui ne se garde pas, c'est
+la boîte :
+
+- elle recouvre la ligne sur laquelle on décide ;
+- elle ne se style pas, donc elle ne distingue pas un arrêt d'un redémarrage ;
+- **elle bloque Puppeteer.** Les cinq gestes qui ÉCRIVENT sur une machine étaient donc les seuls du
+  module qu'aucune suite ne pouvait exercer.
+
+> **Un dialogue natif ne rend pas un geste dangereux : il le rend INTESTABLE, ce qui est pire** — le
+> geste part quand même, sans filet.
+
+Remplacé par le panneau de décision, même motif que `cle-plateforme` et `comptes-distants`. Et
+**sans repli** : en l'absence de panneau le geste ne part pas, là où retomber sur un envoi direct
+transformerait un gabarit incomplet en geste sans confirmation.
+
+**`bashrc.js:387` est signalé et NON corrigé** : le module est bloqué par B4 chez l'exploitant, et le
+corriger demanderait un panneau et des clés dans un module dont l'encart attend lui aussi
+vérification. Le mélanger à ce lot aurait produit deux demi-corrections.
+
+#### Les six routes de flux de supervision, vérifiées à la demande
+
+La session 6 ne peut pas résoudre ces appelants automatiquement (clés PHP interpolées). Mesuré :
+`supervision.js` lit les six par `reponse.text()` puis tire son verdict du **contenu** —
+`verdictDesinstallation`, `verdictDuFlux`, `verdictDeploiement`, jusqu'à **cinq issues** dont
+« il n'y avait rien à purger », et le code numérique parsé plutôt que la phrase française. **Zéro
+occurrence** de `reponse.ok ? … : …` comme verdict. Rien à corriger.
+
+Parité i18n comparée : `services` 68 = 68, zéro clé morte, zéro clé orpheline.
+
+---
+
 ### v1.38.62 — E-227 avait laisse une HUITIEME route mutante, et ma sonde a produit un faux positif de plus
 
 #### ⚠ La huitieme, et c'est mon propre commentaire qui condamne mon correctif
