@@ -97,7 +97,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **214** — numérotés jusqu'à **E-227** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| écarts de parité documentés | **216** — numérotés jusqu'à **E-229** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
 | commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
@@ -1281,6 +1281,19 @@ Plus une purge, dont le délai reste à fixer — un secret archivé sans date d
 permanent qui a seulement changé de nom.
 
 #### ⚠ « Non sauvegardé » change la gravité, pas seulement l'urgence
+
+> **⚠ ÉTAT DÉPASSÉ — LU AVANT LE CORRECTIF `01c04b2`, ET IL A ÉTÉ POSÉ.** `_archive_platform_key()` **déplace**
+> la paire dans `platform_ssh/archive/` au lieu de l'effacer, avec purge à `PLATFORM_KEY_ARCHIVE_DAYS`. Le
+> corps ci-dessous est **conservé** : c'est la mesure qui a motivé le geste, et *un constat effacé ne
+> s'apprend pas.*
+>
+> **Mais le risque n'est pas LEVÉ : il est DÉPLACÉ.** L'archive vit dans **le MÊME volume Docker** que la clé
+> courante, et **ce volume n'est sauvegardé nulle part** — l'exploitant l'a confirmé. Donc *« réversible
+> pendant N jours » ne vaut que si le volume survit, et cette seconde condition ne dépend pas du produit.*
+>
+> **Trois formulations en deux jours** — `unlink` → archive → **archive dans un volume non sauvegardé** — et
+> les deux réécritures intermédiaires étaient trop optimistes. *Une conclusion juste dont la raison a changé se
+> réécrit, et **la réécriture peut être fausse à son tour**.*
 
 La question décidait si la rotation était *irréversible* ou *seulement pénible*. **La réponse est
 irréversible.** Trois conséquences à tenir :
@@ -2925,6 +2938,49 @@ retard.*
 
 **La parade est mécanique** : avant d'assigner une tâche nommée dans un compte rendu antérieur, `git log -S`
 sur le symbole concerné. Trois lignes, et elle aurait suffi ici.
+
+### FORMULER LA PROPRIÉTÉ POUR QU'ELLE AIT UN OBJET DANS LES DEUX CAS (2026-08-28)
+
+**La suite P1 devait vérifier que « l'écran nomme les machines qui deviendraient injoignables ». Mesuré : les
+trois machines du parc portent un mot de passe, donc `sans_retour` vaut ZÉRO.** Écrite ainsi, **l'assertion
+serait passée par absence d'objet** — la cinquième fois en deux jours qu'une mesure allait se vérifier sur le
+vide.
+
+**La propriété retenue à la place ne peut pas être creuse** :
+
+> **« L'écran concorde-t-il avec la base ? »** — elle a un objet dans les **deux** cas : nommer quand il y en
+> a, **énoncer l'absence** quand il n'y en a pas. **Et elle bascule d'elle-même au premier effacement de mot
+> de passe, sans réécriture.**
+
+*Une assertion dont l'objet dépend de l'état du parc se périme avec le parc ; une assertion sur la CONCORDANCE
+de deux sources ne se périme jamais.* C'est la généralisation de « une propriété qui tient par l'état du parc
+n'est pas une propriété », appliquée non au produit mais **à la mesure**.
+
+**Et la liste attendue est DÉRIVÉE avec le prédicat du portage, jamais codée** : *coder `srv-zabbix` aurait
+mesuré le presse-papier de l'auteur, pas le parc.*
+
+### UN INSTRUMENT QUI TRONQUE SE RELÈVE AVANT DE CONCLURE DE CE QU'IL MONTRE (2026-08-28)
+
+**Quatrième occurrence en deux jours.** Le journal d'une suite tronque les effets à 60 caractères, et **deux
+fragments semblaient fautifs d'un coup** :
+
+- **« réversible pendant `?` jours »** — pris pour un jeton non substitué. **Faux** : la page rend
+  délibérément `rotation_jours_inconnus`, *« la durée n'a pas pu être lue ; elle n'est pas écrite en dur
+  ici : tant qu'elle est inconnue, considère que ce geste est sans retour »*. **C'est la bonne conception** —
+  elle refuse d'écrire une durée en dur et se rabat sur le pire cas ;
+- **« détruit celle qui sert aujourd'hui »** — pris pour une contradiction avec l'archivage. **Le texte entier
+  qualifie immédiatement**, et il portait une nuance que l'en-tête de la suite n'avait pas.
+
+**Et c'est en lisant le texte entier que l'autrice a trouvé sa PROPRE erreur** : elle avait écrit que le risque
+« secret non reproductible » était **LEVÉ**. Il est **déplacé**, et conditionné à la survie d'un volume non
+sauvegardé. *Son affirmation était trop optimiste, et du côté qui rassure.*
+
+> **Ce qui l'a arrêtée n'est pas la prudence : c'est que DEUX fragments semblaient fautifs d'un coup.** *« Un
+> seul, je l'aurais peut-être rapporté. »*
+
+**C'est la limite de ce garde-fou et il faut la dire** : une seule fausse accusation ne déclenche pas la
+relecture. *Un instrument qui tronque doit se relever par règle, pas quand son résultat surprend* — sinon il ne
+protège que contre les surprises multiples.
 
 ### Base et shell
 
