@@ -204,7 +204,7 @@ désigne son propre remède.
 
 ---
 
-## 5. Deux pièges de banc qui s'appliquent ici
+## 5. Trois pièges de banc qui s'appliquent ici
 
 - **`/wazuh/` n'a jamais servi** : la table `wazuh_agents` porte **zéro ligne**.
 
@@ -220,7 +220,49 @@ désigne son propre remède.
 - **`groups` : zéro groupe en base.** Toute suite doit créer le sien, **statique**, et ne
   contenant que la machine 2. Un groupe **dynamique** résout ses membres **au moment du
   clic** : l'ensemble visé n'est pas lisible dans la ligne du groupe, et rien n'empêche
-  la production d'y tomber.
+  la production d'y tomber ;
+- **Le clic sur un onglet ou un panneau se mesure en GÉOMÉTRIE, pas dans l'arbre DOM.**
+
+  Leçon E-241, rapportée par la session 7 : deux entrées de menu (`graylog`, puis `wazuh`
+  derrière) sont restées bloquées parce que la suite attendait par **délai fixe**. Le vrai
+  défaut réapparaissait vingt lignes plus loin sous la forme « élément non cliquable » —
+  **un délai fixe ne masque pas seulement l'échec, il en déguise la NATURE**, et on
+  diagnostique alors la ligne où le symptôme est apparu au lieu de celle où il est né.
+
+  La forme à écrire :
+
+  1. **une assertion d'ouverture** — que le panneau visé est bien celui qui s'est ouvert,
+     avant toute autre mesure ;
+  2. **une attente de PROPRIÉTÉ, avec re-clic** — attendre que la propriété devienne
+     vraie, et re-cliquer si elle ne l'est pas, plutôt que d'attendre une durée ;
+  3. **la mesure au pixel** — `getBoundingClientRect` pour la position, `elementFromPoint`
+     pour la question qui est réellement posée : **qui reçoit ce clic ?**
+
+  Ce n'est pas une préférence de style. C'est la troisième occurrence sur ce chantier d'un
+  défaut **qu'aucune assertion DOM ne pouvait voir** : la pastille KEV à 1,06:1 de
+  contraste avait un HTML parfaitement juste. Ce qui est faux, là, n'est pas dans l'arbre.
+
+  Et le cas limite, qui est le plus important : **`elementFromPoint` à `null` n'est pas un
+  échec de mesure — c'est une réponse.** Le point est hors fenêtre, donc il faut défiler.
+  Une sonde qui traite son `null` comme « je n'ai pas pu mesurer » **jette exactement le
+  cas qu'elle cherchait**.
+
+  Deux hypothèses ont été réfutées **par lecture** avant cette sonde, et elles méritent
+  d'être gardées parce qu'elles « expliquaient » toutes deux parfaitement le symptôme :
+
+  > Une hypothèse qui rend compte du symptôme se croit plus qu'une qui n'explique rien —
+  > c'est ce qui la rend dangereuse quand on ne la mesure pas.
+
+  Enfin, la conclusion d'une lecture qui ne trouve rien s'écrit du côté du **constat**, pas
+  du **statut** :
+
+  > Ce n'est pas « la page est saine » — c'est « je n'ai pas trouvé de mécanisme par la
+  > lecture ». La première ferme, la seconde invite à chercher.
+
+  C'est la même règle que l'INCONNU qui ne se referme jamais tout seul, et j'ai fait la
+  faute inverse il y a deux jours en publiant « le backend ne lit pas
+  `temporary_permissions` » comme **CONFIRMÉ** : vrai à 09:55, faux à 10:01. Ce qui a nui
+  n'était pas la mesure — c'était le mot, qui a dispensé tout le monde de re-regarder.
 
 ---
 
