@@ -49,11 +49,21 @@ durcissement ne retire aucun chemin d'interface.**
 
 ### Ce que le redémarrage met en service
 
-    StartedAt rootwarden_python   2026-08-27T12:28:43Z        (inchange, remesure)
-    maintenant                    2026-08-28T06:47Z
-    commits touchant backend/     28
-    fichiers .py hors tests modifies depuis   19
-    fichiers de tests modifies                 5   (sans effet sur le service)
+    StartedAt rootwarden_python   2026-08-27T12:28:43Z        (inchange, remesure 3 fois)
+    mesure de 06:47Z              28 commits · 19 fichiers .py hors tests
+    REMESURE de 08:12Z            36 commits · 20 fichiers .py hors tests
+
+> **⚠ LE LOT GROSSIT PENDANT QUE LE DOSSIER ATTEND, ET C'EST MAINTENANT MESURÉ.** En **85 minutes** :
+> **+8 commits, +1 module.** Ce n'est pas une projection — ce sont deux relevés du même dossier, à
+> 85 minutes d'écart.
+>
+> *Attendre ne réduit pas le risque du redémarrage : il le fait croître, et le seul risque réel de ce
+> lot est sa taille.* **Chaque heure d'attente ajoute au nombre de modules qui prendront effet ensemble
+> sans avoir jamais été observés.**
+
+**Les routes qui gagnent une garde n'ont PAS bougé** : recomptées à 08:12Z, toujours **+33**
+(iptables +6, fail2ban +18, services +8, ssh_audit +1). *Un chiffre qui ne bouge pas se dit aussi, sinon
+on ne sait pas s'il a été repris ou remesuré.*
 
 Les **19**, nommés — parce qu'un lot qu'on ne peut pas nommer ne s'observe pas :
 
