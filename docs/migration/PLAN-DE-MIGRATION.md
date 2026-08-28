@@ -97,8 +97,8 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | **LIGNE DE BASE ÉTABLIE le 2026-08-27** — le LOT complet a tourné pour la première fois depuis le 2026-08-26 au soir, après **86 commits** et **huit correctifs backend** : **150 exécutions · 2282 PASS · 3 FAIL · 2 h 44** (journaux `/tmp/rw-lot-gej4fP`). **147 sur 150 conformes du premier coup.** **Et les trois écarts sont expliqués — AUCUN n'est une régression de l'application** : deux venaient des suites elles-mêmes, un est une **bonne nouvelle**. (a) `go-socle-navigation` 47/1 — un compte bloqué sur le second facteur, donc ses assertions **jamais jouées** ; **transitoire**, 63/0 au repos, et c'est la deuxième fois du jour qu'un rejeu au repos sépare un artefact d'un défaut. (b) `go-bashrc-b4` 14/1 — sa mesure comptait les journaux des **quinze dernières minutes**, et `go-bashrc-b3` la précède immédiatement dans la liste : **elle accusait la page d'un geste que sa suite sœur venait de produire légitimement**, et l'aurait refait à **chaque** LOT complet. Corrigée par une borne en **DELTA**, et **éprouvée sur le cas qui la mettait en défaut** — la rejouer seule n'aurait rien prouvé, elle était déjà verte seule. (c) `go-page-supervision-deploiement` — voir E-90 ci-dessous. Remesure : `./scripts/rejouer-lot.sh`, **~2 h 44 et non ~100 min**.
 | tests backend | **509 pytest, 1 xfailed** — remesuré par le Lead le 2026-08-27 : `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"`. Le « 341 » du suivi était **hérité** ; le vrai départ de la journée était 348. Et **`laravel/tests/` est passé de 3 gabarits d'origine à 236 tests / 776 assertions**, dont un relevé des gardes qui **rougit de lui-même** quand une route neuve entre sans être regardée — c'est ainsi que `GET /fail2ban/portee` a été vue quelques heures après son écriture |
-| écarts de parité documentés | **216** — numérotés jusqu'à **E-229** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
-| commits non poussés | **à remesurer** (`git rev-list --left-right --count @{u}...HEAD`) — 0 de retard sur `origin/Migration-Laravel`. Le nombre n'est pas stocké : tout commit qui le corrigerait le périmerait, y compris celui-là |
+| écarts de parité documentés | **217** — numérotés jusqu'à **E-230** : dix numéros, **E-23 à E-32**, n'ont jamais été utilisés, et **E-205 à E-208 sont neufs du 2026-08-27** (`Fail2ban::machines()` sans filtre de rôle · `/search/` absente de la table depuis neuf jours · la pastille verte fausse sur `srv-zabbix` · **trois pages legacy sur cinq ne bornent pas le parc** · **E-209, EN PRODUCTION : un guide enseigne qu'un geste durcit la machine alors qu'il retire le seul filet de RootWarden, et dit « plus sécurisé »** · E-210, le panneau pas-à-pas jamais porté — 26 pages, 148 clés, aucun rendu). Le dernier numéro n'est donc pas un compte. `grep -c '^## E-' docs/migration/PARITE.md` |
+| commits non poussés | **391** — mesuré 2026-08-28, amont `origin/Migration-Laravel`, **0 de retard**. ⚠ Ce chiffre a dit **69** du 2026-08-22 au 2026-08-28 et a été **répété six fois** : *une figure qui porte sa commande de remesure ne se remesure pas toute seule.* `git fetch -q origin && git rev-list --left-right --count origin/Migration-Laravel...HEAD` |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
 Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
@@ -633,7 +633,12 @@ Quatre dossiers suivront `services/` par le même chemin ; `security/` et `ssh/`
 - **S7b** (`security/`) — le scan CVE qui aboutit **envoie un vrai courriel** (`send_cve_report` part
   dès que l'état passe à `done` avec des résultats). Prérequis techniques faits.
 - **K4** (`ssh/`) — le déploiement de clés. Bloqué par l'arbitrage du repli `NOPASSWD: ALL`, et un
-  déploiement lancé en l'état **révoquerait** des accès. **⚠ Et depuis E-213 le blocage est PROTECTEUR** :
+  déploiement lancé en l'état **révoquerait** des accès — **c'est vivant** : `configure_servers.py:908` fait
+  `revoked = managed_users - comptes_traites` puis `rm -f authorized_keys`.
+  **⚠⚠ EN REVANCHE « le blocage est PROTECTEUR contre E-213 » ÉTAIT FAUX, et c'est le Lead qui l'a écrit.**
+  Mesuré par le DSI : **`clean_up_users` n'a AUCUN APPELANT** — `configure_servers.py:703` est une **docstring**
+  et `:780` sa définition ; `configure()` appelle `configure_users` seule et le dit en clair. **Donc aucun
+  déploiement n'exécute `userdel -r`**, et le raisonnement ci-dessous est sans objet :
   la décision de suppression ne lit que `user_exclusions`, jamais `server_user_inventory.status`, donc un
   déploiement exécuterait **`userdel -r`** — le compte **et son `$HOME`** — sur tout compte qu'un
   exploitant croit protégé par le statut `excluded`. Le blocage sur `NOPASSWD` couvre incidemment
@@ -1842,6 +1847,101 @@ la fuite du mot de passe dans `deployment.log` · OpenCVE TLS désactivée · le
 du scan CVE par processus · **les deux défauts de `manage_roles.php`**.
 
 ---
+
+### 7.1 ⚠ LE DSI A TRANCHÉ, ET IL A CORRIGÉ DEUX PRÉMISSES DU LEAD (2026-08-28)
+
+**Sept arbitrages tranchés, huit dossiers écrits — `DECISIONS-DSI.md` + `DOSSIER-01..08`, commit `b327ae0`.**
+Et **deux phrases du Lead étaient fausses, mesurées** :
+
+#### ⚠ 1. « Le durcissement frappera des pages qui marchaient le matin » — FAUX
+
+    legacy/fail2ban/index.php:11 · iptables/index.php:46 · ssh-audit/index.php:13   checkPermission(...)
+    laravel/routes/web.php:725,755,777                                              perm:can_manage_*
+    legacy/auth/verify.php:322   if ($roleId === 3) return true;   <- contournement au ROLE 3 SEUL
+
+**Sur les DEUX portails, la page exige déjà exactement la permission que la route s'apprête à demander.** Un
+compte de rôle < 3 sans la permission **n'ouvre aucune de ces pages aujourd'hui.**
+
+> **Le durcissement ne retire aucun chemin d'interface : il FERME l'écart page/route**, c'est-à-dire le trou
+> d'E-149 et E-152.
+
+**Les quatre chiffres du Lead sont exacts** — 0/1/1/1 sur 9, recomptés colonne par colonne. **C'est la phrase
+qu'ils soutenaient qui ne l'était pas.** *Un chiffre juste peut porter une conclusion fausse, et c'est plus
+difficile à voir qu'un chiffre faux.*
+
+**DÉCISION : aucune permission accordée.** Et **surtout pas `can_manage_iptables` à `rw-test-admin`** — *c'est
+le geste que la formulation du Lead rendait le plus naturel, et il coûterait le plus* : rôle 2 sans la
+permission est **la seule fixture discriminante du parc**, et `iptables` est le module en cours de portage.
+
+#### ⚠ 2. « Un déploiement exécuterait `userdel -r` » — FAUX
+
+    grep -rn "clean_up_users" (hors _deprecated)  ->  :703 une DOCSTRING · :780 sa definition
+                                                      AUCUN APPELANT
+    configure() appelle `configure_users` seule, et le dit en clair l.770-774
+
+**Donc « K4 reste bloqué, et ce blocage est désormais PROTECTEUR » est sans objet.** K4 tient sur ses autres
+fondements — **dont la révocation de clés, elle VIVANTE** : `configure_servers.py:908`,
+`revoked = managed_users - comptes_traites` puis `rm -f authorized_keys` sur `Timikana` et `claude-agent`.
+
+**Le défaut d'E-213 survit sous une forme plus étroite et réelle** : `delete_remote_user`, **le seul chemin
+vivant**, ne consulte **ni `user_exclusions` ni `status`.** *`excluded` ne protège d'aucun chemin.*
+
+> **⚠ Et le vrai risque est le TEXTE** : la docstring `:703` annonce encore `clean_up_users` dans la séquence —
+> **elle invite à rétablir l'appel.** `user_exclusions` étant **vide** (0 ligne, 69 `excluded` en face), ce
+> jour-là la seule protection restante serait la liste des six noms système. *Un texte qui décrit une étape
+> retirée est une instruction de la remettre.*
+
+#### Quatre recomptages du Lead, tous faux
+
+| annoncé | mesuré | écart |
+|---|---|---|
+| 26 + 1 routes gagnant une garde | **+33** (iptables +6, fail2ban +18, services +8, ssh_audit +1) | sous-estimé |
+| **69 commits non poussés** | **391** — amont `origin/Migration-Laravel`, `0 391` | **facteur 5,7** |
+| E-214 et E-215 « non corrigés » au §7 | **déjà corrigés** (`77ae2c2`, `52838f2`) | périmé |
+| migrations « 052-061 à appliquer » | **62 fichiers, 62 appliquées, aucune en attente** | périmé |
+
+*Le chiffre des commits non poussés vivait dans ce document depuis le 2026-08-22 et le Lead l'a répété six
+fois.* **Chaque figure de ce plan porte sa commande de remesure précisément pour ça, et celle-là n'a pas été
+relancée.**
+
+#### Le DSI a corrigé DEUX de ses propres mesures, et il le déclare
+
+**a) 52 comptes menacés → 2 → 0.** Le script bâtit sa liste **depuis la machine** (`awk $3 >= 1001`), pas
+depuis l'inventaire : les 69 `excluded` sont à 67 des comptes système, et les 2 restants sont `nobody`, **déjà
+protégé**. **Facteur 26, dans le sens qui alarme.**
+
+**b) « Aucune machine n'est orpheline, les trois portent `sa=1` »** — écrit sans mesure, **faux** : **seule
+`srv-zabbix` porte `sa=1`**. Corrigé dans le fichier avec la raison — *le drapeau est binaire pour une réalité
+ternaire, donc la base ne PEUT pas répondre à cette question.*
+
+*Un poste neuf reproduit les fautes du chantier dans son premier tour* — et les déclare, ce qui est la seule
+chose qui compte.
+
+#### Les sept décisions
+
+1. **tableau de bord borné au périmètre.** Coût **mesuré** : `opsuser` voit **1** machine au lieu de 3, les six
+   autres rôles 1 en voient **0** (5 résidus e2e + la fixture D-5) ;
+2. **E-221 : aucune permission accordée** ;
+3. **E-209 / E-212 / E-219 : corriger** — et **E-219 AVEC son remplacement**, en nommant
+   `server_user_remove_key` et **jamais** `remove_user_keys` ; **E-212 : `perms.desc_graylog` EN PREMIER**,
+   *c'est celui qu'on lit en accordant un droit* ;
+4. **E-225 : le DIRE, pas le retirer** ;
+5. **E-208 : borner le PORTAGE, ne pas toucher le legacy** — zéro porteur non-admin mesuré pour les trois
+   permissions concernées ;
+6. **E-224 : `machine_ids` obligatoire, SQL et borne dans le MÊME commit** ;
+7. **E-222 : migration écrite** (forme dans `DOSSIER-06`, **sans `;`**), **appliquée seulement sur signature**.
+
+#### ⚠ Et l'exploitant a parlé pendant le tour du DSI
+
+> *« Il faut déprécier complètement le legacy, il ne doit plus exister, donc il faut tout migrer : dashboard,
+> fonction, api, documentation. »*
+
+**Deux conséquences** : ça **ferme l'issue « deux vues »** du tableau de bord — *elle reportait au lieu de
+décider* — et ça **remet `documentation` et `api_docs` dans le chemin critique**, eux que le §4.6 rangeait en
+dernier.
+
+**Ça n'autorise aucun geste sortant** : S7b, K4 et le scan réel restent exactement où ils sont. *« Tout
+migrer » décrit une cible, pas une permission.*
 
 ## 8. Principes et pièges
 

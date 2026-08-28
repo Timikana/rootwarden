@@ -10507,3 +10507,57 @@ pose pas `LC_ALL`** alors que ses homologues d'`updates.py` posent `LC_ALL=C.UTF
 aujourd'hui** : `apt-get install -y` rend `rc = 0` quand le paquet est déjà là, donc le premier terme couvre le
 cas et la sous-chaîne est **redondante**. *Ce qui mérite signalement est l'incohérence avec les commandes
 voisines* — et une sous-chaîne redondante devient décisive le jour où le premier terme change.
+
+---
+
+## E-230 — ⚠⚠ Les pages acceptent une permission TEMPORAIRE, le backend ne la voit pas — et `/deploy` avait REFUSÉ `@require_permission` pour cette raison exacte
+
+**Trouvé par le DSI en instruisant E-221. C'est ce que le redémarrage casse vraiment — et ce n'est pas ce que
+le Lead avait annoncé.**
+
+    legacy/auth/verify.php:333          SELECT 1 FROM temporary_permissions …   -> la page ACCEPTE
+    laravel/app/Services/Permissions.php:155,174                                -> le portage ACCEPTE
+    backend/scheduler.py:400,787,792    la PURGE et la notifie                  -> jamais pour AUTORISER
+
+**Le backend ne consulte `temporary_permissions` sur aucun chemin d'autorisation.** Il lit
+`X-User-Permissions`, que la passerelle remplit depuis la session — **les permanentes seules.**
+
+> **Après le redémarrage, un porteur de permission temporaire ouvre la page et prend 403 sur les 18 routes :
+> page affichée, tous les boutons en échec, et rien à l'écran qui l'explique.**
+
+### ⚠ Et l'auteur de `/deploy` avait refusé ce durcissement POUR CETTE RAISON, en l'écrivant
+
+    ssh.py:422-431
+    ══ POURQUOI `role(2)` ET PAS `@require_permission('can_deploy_keys')` ═══
+    La permission serait le miroir exact de la page — et elle CASSERAIT un chemin legitime.
+    La page accepte les permissions TEMPORAIRES (`checkPermissionFromDB` interroge
+    `temporary_permissions`), tandis que le backend lit `X-User-Permissions`, que la
+    passerelle remplit depuis la session, c'est-a-dire les PERMANENTES seules. Un compte
+    dont la permission est temporaire passerait la page et serait refuse ici.
+    `role(2)` ferme l'ecart mesure sans rencontrer ce probleme.
+
+> **Les 33 routes d'E-149 et E-152 reproduisent exactement ce que l'auteur de `/deploy` a refusé de créer, et
+> il avait écrit pourquoi.**
+
+*Une réserve écrite dans le code n'est lue que par qui ouvre ce fichier* — et les correctifs d'E-149/E-152 ont
+été posés dans d'autres fichiers, par d'autres sessions, sans jamais croiser ce commentaire. **C'est le
+symétrique du motif que ce chantier suit depuis deux jours** : là, un texte affirmait plus que le code ; ici,
+**un texte savait plus que le chantier**, et personne ne l'a lu.
+
+**Porteur aujourd'hui : AUCUN** — `temporary_permissions` est **vide**. L'écart est donc **réel et sans
+porteur**, comme E-205 et E-217, et il s'ouvre à la **première permission temporaire accordée** — un geste
+d'administration ordinaire.
+
+### La correction n'est pas de retirer les gardes
+
+Les 33 routes ferment un écart page/route mesuré (E-149, E-152). **Le défaut est que la passerelle ne
+transmette pas les permissions temporaires**, pas que les routes les exigent. Deux issues :
+
+1. **la passerelle inclut les temporaires dans `X-User-Permissions`** — aligne les trois couches, et rend
+   `@require_permission` équivalent à ce que la page décide déjà ;
+2. **les routes gardent `role(2)`** comme `/deploy` — ferme l'écart sans rencontrer le problème, au prix d'une
+   granularité perdue.
+
+**La première est la bonne**, et sa raison est celle du §8 : *un drapeau de moins vaut mieux qu'une règle en
+double* — ici, **une source de moins vaut mieux que trois lectures qui divergent.** Arbitrage de l'exploitant :
+la passerelle est le chemin d'authentification.

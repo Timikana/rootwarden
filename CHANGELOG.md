@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.62** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.64** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,97 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.64 — le DSI a tranche les sept arbitrages, et il a corrige DEUX premisses du Lead
+
+**Sept decisions, huit dossiers — `DECISIONS-DSI.md` + `DOSSIER-01..08`, commit `b327ae0`. Et deux phrases du
+Lead etaient fausses, mesurees.**
+
+#### ⚠ « Le durcissement frappera des pages qui marchaient le matin » — FAUX
+
+Sur les **deux** portails, la page exige **deja** exactement la permission que la route s'apprete a demander
+(`fail2ban/index.php:11`, `iptables/index.php:46`, `ssh-audit/index.php:13`, `web.php:725,755,777`), et le
+contournement de `verify.php:322` ne vaut **qu'au role 3**. **Un compte de role < 3 sans la permission n'ouvre
+aucune de ces pages aujourd'hui.**
+
+> **Le durcissement ne retire aucun chemin d'interface : il FERME l'ecart page/route** — le trou d'E-149 et
+> E-152.
+
+**Les quatre chiffres du Lead etaient exacts** (0/1/1/1 sur 9, recomptes colonne par colonne). **C'est la
+phrase qu'ils soutenaient qui ne l'etait pas.** *Un chiffre juste peut porter une conclusion fausse, et c'est
+plus difficile a voir qu'un chiffre faux.*
+
+**DECISION : aucune permission accordee** — et **surtout pas `can_manage_iptables` a `rw-test-admin`** : *c'est
+le geste que la formulation du Lead rendait le plus naturel, et il couterait le plus*, role 2 sans la
+permission etant **la seule fixture discriminante du parc**.
+
+#### ⚠ « Un deploiement executerait `userdel -r` » — FAUX
+
+**`clean_up_users` n'a AUCUN APPELANT** : `configure_servers.py:703` est une **docstring**, `:780` sa
+definition, et `configure()` appelle `configure_users` seule en le disant en clair. **Donc « K4 reste bloque, et
+ce blocage est desormais PROTECTEUR » est sans objet.**
+
+K4 tient sur ses autres fondements — **dont la revocation de cles, elle VIVANTE** (`configure_servers.py:908`,
+`revoked = managed_users - comptes_traites` puis `rm -f authorized_keys`).
+
+**Le defaut d'E-213 survit sous une forme plus etroite et reelle** : `delete_remote_user`, le seul chemin
+vivant, ne consulte **ni `user_exclusions` ni `status`**. *`excluded` ne protege d'aucun chemin.*
+
+> **⚠ Et le vrai risque est le TEXTE** : la docstring `:703` annonce encore `clean_up_users` dans la sequence —
+> **elle invite a retablir l'appel.** `user_exclusions` etant **vide**, ce jour-la la seule protection restante
+> serait la liste des six noms systeme. *Un texte qui decrit une etape retiree est une instruction de la
+> remettre.*
+
+#### ⚠⚠ E-230 — ce que le redemarrage casse VRAIMENT
+
+    verify.php:333 · Permissions.php:155,174   les pages ACCEPTENT une permission TEMPORAIRE
+    backend                                     ne la consulte sur AUCUN chemin d'autorisation
+                                                (scheduler.py la purge et la notifie, jamais pour autoriser)
+
+**Apres le redemarrage, un porteur de permission temporaire ouvre la page et prend 403 sur les 18 routes :
+page affichee, tous les boutons en echec, rien a l'ecran qui l'explique.**
+
+**Et l'auteur de `/deploy` avait REFUSE ce durcissement pour cette raison, en l'ecrivant** (`ssh.py:422-431`) :
+*« la permission serait le miroir exact de la page — et elle CASSERAIT un chemin legitime … `role(2)` ferme
+l'ecart mesure sans rencontrer ce probleme. »*
+
+> **Les 33 routes d'E-149 et E-152 reproduisent exactement ce que l'auteur de `/deploy` a refuse de creer, et
+> il avait ecrit pourquoi.**
+
+*Une reserve ecrite dans le code n'est lue que par qui ouvre ce fichier.* **C'est le symetrique du motif de ces
+deux jours** : la, un texte affirmait plus que le code ; ici, **un texte savait plus que le chantier**, et
+personne ne l'a lu. **Porteur aujourd'hui : aucun** — la table est vide.
+
+**La correction n'est pas de retirer les gardes** : le defaut est que **la passerelle ne transmette pas les
+temporaires.** *Une source de moins vaut mieux que trois lectures qui divergent.*
+
+#### Quatre recomptages du Lead, tous faux
+
+    26 + 1 routes gagnant une garde   ->  **+33**  (iptables +6, fail2ban +18, services +8, ssh_audit +1)
+    **69 commits non pousses**        ->  **391**  amont `origin/Migration-Laravel`, `0 391`
+    E-214 / E-215 « non corriges »    ->  **deja corriges** (77ae2c2, 52838f2)
+    migrations « 052-061 a appliquer» ->  **62 fichiers, 62 appliquees, aucune en attente**
+
+**Le chiffre des commits vivait dans le plan depuis le 2026-08-22 et le Lead l'a repete six fois.** *Chaque
+figure de ce plan porte sa commande de remesure precisement pour ca — et celle-la n'a pas ete relancee.*
+**Facteur 5,7.**
+
+#### Le DSI a corrige DEUX de ses propres mesures, et il le declare
+
+**52 comptes menaces -> 2 -> 0** : le script batit sa liste **depuis la machine** (`awk $3 >= 1001`), pas depuis
+l'inventaire — **facteur 26, dans le sens qui alarme.** Et **« les trois machines portent `sa=1` »**, ecrit sans
+mesure : **faux, seule `srv-zabbix` le porte.** *Un poste neuf reproduit les fautes du chantier dans son
+premier tour — et les declare, ce qui est la seule chose qui compte.*
+
+#### ⚠ Et l'exploitant a parle pendant ce tour
+
+> *« Il faut deprecier completement le legacy, il ne doit plus exister, donc il faut tout migrer : dashboard,
+> fonction, api, documentation. »*
+
+**Ca ferme l'issue « deux vues » du tableau de bord** — *elle reportait au lieu de decider* — et **ca remet
+`documentation` et `api_docs` dans le chemin critique**, eux que le §4.6 rangeait en dernier. **Ca n'autorise
+aucun geste sortant** : S7b, K4 et le scan reel restent ou ils sont. *« Tout migrer » decrit une cible, pas une
+permission.*
 
 ### v1.38.63 — `services` : un encart qui mentait, un lien vers un 404, et un `confirm()` qui rendait cinq gestes INTESTABLES
 
@@ -5084,7 +5175,8 @@ correspondance reelle :**
 | v1.38.56 | `c7d9f5d` | la charte du DSI delegue : 7 arbitrages delegues, 8 qui ne peuvent pas l'etre |
 | v1.38.59 | `caaaa3c` | E-215 et E-214 corriges ; 31 routes `200 + success:false` ; `git rm` stage aussi |
 | v1.38.60 | `79bc8a5` | ma 5e correction visait la mauvaise moitie ; j'ai redemande une tache faite |
-| **v1.38.62** | (ce commit) | **E-228 : une HUITIEME route mutante** ; deux diagnostics fantomes ; E-229 |
+| **v1.38.62** | `056b3be` | **E-228 : une HUITIEME route mutante** ; deux diagnostics fantomes ; E-229 |
+| **v1.38.64** | (ce commit) | **le DSI tranche les 7 arbitrages, et corrige DEUX premisses du Lead** ; E-230 |
 
 **La cause est exactement celle du defaut d'index : un controle juste, separe de son usage par un
 DELAI.** Un numero distribue par message est valide au moment ou il est ecrit et plus au moment ou il est
