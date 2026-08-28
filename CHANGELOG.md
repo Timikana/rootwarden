@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.82** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.83** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,72 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.83 — le correctif de la 2FA etait DEJA sur cette branche, et ma propre note disait « Non corrige »
+
+**L'exploitant a demande d'integrer ici le correctif de la divulgation des secrets TOTP.
+Mesure : il y est depuis le 2026-08-23 (`23a6063`, v1.37.48). Il n'y avait rien a integrer en
+code — il y avait une note a corriger, et c'est elle qui avait rendu le correctif invisible.**
+
+**Les QUATRE defauts, verifies ligne par ligne dans `legacy/auth/enable_2fa.php` :**
+
+| defaut | correctif present | ligne |
+|---|---|---|
+| secret divulgue au mot de passe seul | `if (!empty($existingSecret))` -> renvoi vers `verify_2fa.php` | `:65-67` |
+| aucune limitation de debit | 5 / session / 60 s **et** 10 / IP / 10 min, table `login_attempts` | `:113-134` |
+| anti-rejeu inerte (motif E-01) | `$dejaVu` compare le hash **avant** verification | `:149-150` |
+| ecriture en base sur un GET sans CSRF | l'ecriture est **dans** la branche POST, et `checkCsrfToken()` est **APPELEE** | `:104-105`, ecriture `:170` |
+
+Le quatrieme a ete verifie contre le piege du chantier : **un jeton CSRF emis n'est pas un
+jeton valide.** `:239` l'emet, `:105` le valide. Les deux sont necessaires, seule la seconde
+protege.
+
+**Ce qui reste, et que le Lead ne fera pas :** `git merge-base --is-ancestor 23a6063
+origin/main` rend **NON**. `origin/main` est a **v1.37.15**, il lui manque **79 versions**.
+**La production est vulnerable depuis cinq jours avec son correctif a une branche de
+distance** — et le retroportage attend le mot de l'exploitant.
+
+#### `ROADMAP.md` reecrit : six chiffres perimes de cinq jours et une section fausse de neuf entrees
+
+- la premiere section disait **« Non corrige »** d'une chose corrigee, en affirmant le fichier
+  **identique a la production** — les empreintes divergent (`6278a7d7…` ici, `be0bfda6…` sur
+  `main`). **C'est cette phrase qui a laisse le correctif cinq jours sans etre remarque** ;
+- **« Ce qui reste a porter » annoncait 15 entrees de menu** et listait `services/`
+  `chatops/` `docker/` `maintenance/` `graylog/` `fail2ban/` `bashrc/` — tous portes, la
+  plupart **archives**. Elle contredisait le tableau d'etat **du meme fichier**. Recensee a la
+  source : **6 restantes sur 32** ;
+- tableau d'etat remesure : **26/32** entrees (disait 18/33), **13** archivees (12), **220**
+  ecarts (97), LOT **150** executions (93), pytest **a remesurer** (341) ;
+- ajoute : **le blocage v2.0 et la vulnerabilite sont LE MEME FICHIER**, et *corriger, porter,
+  retroporter sont trois gestes distincts dont aucun ne rend les deux autres inutiles.*
+
+#### Deux commandes de remesure de ce fichier etaient elles-memes a reparer
+
+- `grep -c "'route'" Navigation.php` **« moins 2 lignes de commentaire »** : le `-2` compte les
+  commentaires qui mentionnent le mot. Il tombait juste ce jour-la et **devient faux au premier
+  commentaire ajoute**. *Un facteur d'ajustement a la main, c'est un chiffre perime cache a
+  l'interieur d'une commande.* Remplace par un motif ancre sur la ligne d'entree, sans facteur :
+  rend **32 / 6 / 26** ;
+- et `grep -c "'route' =>"` rend **0** : le fichier aligne ses `=>` sur deux espaces, ce qui
+  defait tout motif a espace unique — **la meme cause qui avait fait rendre « aucun lien
+  entrant » pour quatre modules qui en avaient** ;
+- **la boucle d'attente du LOT etait auto-bloquante.** `pgrep -f "[r]ejouer-lot"` a rendu
+  **trois** PID dont celui du shell qui posait la question : la classe de caracteres empeche le
+  motif de matcher **son propre texte**, elle n'empeche pas qu'une **autre** mention du nom sur
+  la meme ligne reamorce l'auto-capture. *Necessaire, pas suffisant* — et le cout est
+  asymetrique : pas une erreur, une **attente infinie**. Remplacee par l'attente d'un **PID
+  enregistre**, qui ne matche aucun texte.
+
+#### Lecon, et elle est d'une forme neuve
+
+Ce chantier a numerote **six** occurrences de *un texte qui affirme PLUS que le code ne fait*.
+**Celle-ci affirme MOINS.**
+
+> **Un texte qui dit « non corrige » d'une chose corrigee ne rend pas le defaut visible : il
+> rend le CORRECTIF invisible.** Personne ne cherche un correctif qu'un document declare
+> absent — et le Lead a recite « il manque `v1.37.48` » dans son propre §2 pendant deux jours
+> **sans jamais regarder ce que `v1.37.48` etait.** *Un numero de version cite sans son contenu
+> est une etiquette, pas une information.*
 
 ### v1.38.82 — E-233 reconcilie : mon 171 etait FAUX sur ses propres termes, et la mesure qui decide etait 8
 
