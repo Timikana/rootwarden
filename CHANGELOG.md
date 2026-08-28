@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.78** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.79** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,74 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.79 — la regle du jour etait a moitie ecrite, et le sixieme en-tete qui mente est le premier dans l'AUTRE sens
+
+#### ✅ Ce qui protege d'une verification affirmee et non faite : citer la COMMANDE et sa SORTIE
+
+| le defaut | la parade |
+|---|---|
+| **un fait perime** — une mesure vraie qui a vieilli | **dater** le fait |
+| **une verification affirmee et non faite** | **citer la COMMANDE et sa SORTIE**, pas dire « verifie » |
+
+> *« J'avais ecrit "mesure en base" pour un fait que je reprenais de mon propre document. »* (session 2)
+
+**Dater ne protege que du premier.** Le second — *« reverifie depuis »* sans avoir relance la commande — **ne se
+distingue d'une vraie verification par aucune date.** Seule la sortie le distingue. **Adopte** : un fait
+transmis porte son heure, une verification annoncee porte sa commande.
+
+#### ⚠ Sixieme en-tete qui mente, et le PREMIER dans l'autre sens
+
+    legacy/api/docs.php:4    « Accessible uniquement aux admins et superadmins »
+    legacy/api/docs.php:9    checkAuth([ROLE_SUPERADMIN])    <- role 3 SEUL, verifie
+    legacy/api/openapi.php:8 idem
+
+**Les cinq occurrences connues annoncaient toutes un acces PLUS STRICT que le code** — donc une relecture
+rassuree a tort. **Celle-ci l'annonce plus LARGE** : un role 2 qui lit l'en-tete croit pouvoir entrer et recoit
+un **403**.
+
+> **Defaut de documentation, pas de securite — et le dire evite qu'on la range avec les cinq autres, qui n'ont
+> pas la meme consequence.** *Un motif compte sans son sens produit un chiffre qui alarme a tort.*
+
+**Deux dedouanements** : `legacy/api/` est **la partie la plus strictement gardee du legacy** — role 3 seul, et
+le YAML brut **refuse par Apache**, son contenu servi uniquement par un script qui exige ce role. **Deux
+couches, correctes.** Et **aucun CDN** : Swagger UI est vendorise localement.
+
+#### ✅ E-232 — la nuance qui en est la substance
+
+La spec **declare** deux serveurs mais ce sont des adresses qu'elle **DECRIT**, pas un point d'entree qu'elle
+**EXPOSE** — **l'inverse exact de `chatops/webhook.php`, que Slack appelait. Archiver ne casse aucun appelant
+exterieur.**
+
+> **Qui a importe cette spec dans Postman en detient une COPIE. L'archivage ne casse pas son outil — il supprime
+> la SOURCE qu'il ne pourra plus regenerer.** *C'est ce qui distingue « retirer » de « re-siter ».*
+
+**Et une question qui n'est pas de la lecture de code** : *aucun outil exterieur ne consomme-t-il
+`/api/openapi.php` ?* **Invérifiable depuis le depot** — seuls les journaux Apache le diraient. **Question pour
+l'exploitant, et elle change la reponse a E-232.**
+
+#### ✅ Reference d'archivage tranchee : `1 + 5 + 2 = 8`
+
+**Les deux fichiers vendorises COMPTENT dans N.** Mesure a 13:58 CEST — `swagger-ui-bundle.js` **200**,
+`swagger-ui.css` **200**, `openapi.yaml` **403**, `/api/` **403**. **Les quatre changent apres le `git mv`.**
+
+*Le constat mesure « ce chemin a-t-il quitte la racine documentaire », et deux fichiers reellement servis y
+repondent.* **Les exclure ferait taire le constat sur les seuls fichiers dont le service etait prouve par un
+`200`.**
+
+**Et les deux `403` sont ce qui rend ce constat MESURANT** : expliques (`.htaccess:4` et `:7-9`) **et ils
+changent** — contrairement a `/commandlog/`, ou le 404 preexistait et ou l'assertion passait sans rien mesurer.
+
+#### Les neuf etapes, pretes — et 1/0/0/0, la couverture la plus faible du parc
+
+Points d'entree : **barre laterale seule** (`menu.php:163`), a egalite avec `groups/`. **Les trois zeros sont
+ecrits** — *une seule ligne a basculer, et rien qui ressemble a une etape sautee.* `Navigation` a **deja**
+bascule. Etape 9 : **clefs de conseil ZERO**, et le zero est ecrit — **premiere partie du chantier qui n'en
+porte aucune.** Etape 8 : **pas contrainte dans l'ordre**, contrairement a `remote_users`.
+
+**Et ce qui n'est pas mesure est declare** : le YAML de 2 850 lignes n'a pas ete lu, et **le chiffre « faux a
+32 % » n'est pas repris a son compte** — il est cite comme celui du Lead, date de son releve. *Ne pas reprendre
+a son compte un chiffre qu'on n'a pas mesure est exactement ce que ce chantier a mis deux jours a apprendre.*
 
 ### v1.38.78 — le mouvement d'une liste est l'evenement qu'on veut mesurer, et une regle peut matcher le bon motif dans la MAUVAISE BRANCHE
 
