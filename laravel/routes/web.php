@@ -71,7 +71,26 @@ Route::post('/deconnexion', [ConnexionController::class, 'deconnexion'])->name('
 Route::get('/deconnexion', [ConnexionController::class, 'deconnexion']);
 
 // ── Authentifie ──────────────────────────────────────────────────────────────
-Route::middleware('session.authentifiee')->group(function () {
+/*
+ * ══ LE GARDE DU CHANGEMENT DE MOT DE PASSE S'APPLIQUE AU GROUPE ══════════
+ *
+ * `legacy/auth/verify.php:169-183` relit la base a CHAQUE requete et redirige si
+ * `force_password_change = 1`. Le portage ne lisait ce drapeau nulle part :
+ * l'exigence n'y etait qu'un bandeau. Correction de PARITE — le legacy exerce
+ * deja ce controle, le portage etait le chemin plus permissif des deux.
+ *
+ * POSE SUR CE GROUPE ET PAS SUR `web`, et c'est ce qui evite le piege : la
+ * deconnexion (`web.php:70-71`) vit HORS du groupe, donc elle reste atteignable
+ * **par construction**. Une pose sur `web` aurait exige de l'exempter — et
+ * `GET /deconnexion` **n'a aucun nom de route**, donc une exemption par nom
+ * l'aurait manquee et aurait enferme le compte.
+ *
+ * Mesure du 2026-09-01 : huit comptes actifs portent le drapeau, dont TROIS
+ * au-dessus du role 1 — `id 1` et `id 78` en role 3, `id 77` en role 2. Pour un
+ * role 3, ce drapeau est le SEUL frein : le role 3 court-circuite chaque `perm:`
+ * et chaque `role:`.
+ */
+Route::middleware(['session.authentifiee', 'mot.de.passe.a.changer'])->group(function () {
     Route::get('/cgu', [PortailController::class, 'cgu'])->name('cgu');
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');

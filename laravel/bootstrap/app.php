@@ -66,6 +66,11 @@ return Application::configure(basePath: dirname(__DIR__))
             // « cette permission OU superadmin », comme partout ailleurs.
             'role' => \App\Http\Middleware\ExigeRole::class,
             'perm' => \App\Http\Middleware\ExigePermission::class,
+            // Un compte marque « doit changer son mot de passe » ne va nulle
+            // part d'autre. Applique au GROUPE authentifie et non au groupe
+            // `web` : la deconnexion vit hors du groupe, donc elle reste
+            // atteignable PAR CONSTRUCTION et non par exemption.
+            'mot.de.passe.a.changer' => \App\Http\Middleware\ChangementMotDePasseExige::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

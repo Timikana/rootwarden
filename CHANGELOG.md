@@ -2171,6 +2171,88 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.105 — l'exigence de changement de mot de passe était un bandeau, pas un verrou
+
+`legacy/auth/verify.php:169-183` relit la base **à chaque requête** et redirige si
+`force_password_change = 1`. Le portage ne lisait ce drapeau **nulle part** :
+`SessionAuthentifiee` ne teste que la présence d'`utilisateur_id`.
+
+**Correction de parité, pas politique nouvelle** : le legacy exerce déjà ce contrôle, donc le porteur du
+drapeau y est déjà arrêté. **Le portage était le chemin plus permissif des deux** — le coût n'est pas
+une friction nouvelle, c'est le retrait d'un contournement.
+
+#### Trois comptes au-dessus du rôle 1, et non deux
+
+    huit comptes actifs portent le drapeau
+    id  1  role 3      <- absent du releve qui m'a ete transmis
+    id 78  role 3
+    id 77  role 2
+    ids 3, 4, 5, 10, 12  role 1
+
+`id 1` manquait au relevé, et c'est le compte le plus conséquent du système. **Pour un rôle 3 il n'y a
+pas « des chemins à garder »** : le rôle 3 court-circuite chaque `perm:` et chaque `role:`. Ce drapeau
+est le **seul** frein entre son détenteur et l'administration complète.
+
+#### ⚠ Posé sur le GROUPE et non sur `web` — et c'est ce qui évite le piège
+
+*Un garde-fou qui se déclenche à tort ne protège plus : il empêche.* Le legacy exempte cinq pages, dont
+sa propre cible. Le portage n'en exempte que **deux**, et c'est un effet de la **structure** :
+
+    profil                l'ecran qui PORTE le formulaire
+    profil.mot-de-passe   le geste qui le soumet
+
+**La déconnexion n'a besoin d'aucune exemption** : elle vit **hors** du groupe `session.authentifiee`
+(middleware `[web]` seul, mesuré). Elle reste atteignable **par construction**.
+
+**Et c'est ce qui évite un enfermement** : `GET /deconnexion` **n'a aucun nom de route**
+(`web.php:71`). Une exemption par nom incluant `'deconnexion'` aurait couvert le POST et **manqué le
+GET** — un compte marqué, cliquant un lien de déconnexion, aurait été renvoyé vers son profil au lieu
+de sortir. *Une liste d'exemptions par nom dépend de ce que quelqu'un a pensé à nommer.*
+
+Le sélecteur de langue ne demande rien non plus : il conserve la page courante et n'ajoute que
+`?lang=`, donc il reste sur l'écran exempté.
+
+#### Fail-OPEN, à l'inverse de la règle habituelle, et motivé
+
+Si la lecture du drapeau échoue, la requête **passe**. Ce garde n'impose pas une protection de donnée
+mais une hygiène : refuser par défaut transformerait une panne de lecture en **indisponibilité totale
+pour tous les comptes**, pour un gain nul — le porteur du drapeau ne peut de toute façon rien lire si
+la base est morte. **La panne est journalisée** : un fail-open muet serait une garde qui disparaît sans
+trace.
+
+#### ⚠ CE QUI N'EST PAS PORTÉ, et ne doit pas passer pour fermé
+
+**Le legacy vérifie DEUX choses, pas une.** Après le drapeau, il calcule l'**expiration** du mot de
+passe (`password_updated_at`, `password_expiry_override`) et redirige vers
+`profile.php?password_expired=1`.
+
+**Ce second garde n'est pas porté**, parce qu'il dépend de la politique de mot de passe que le portage
+déclare non portée. Mesuré : aucun compte n'a de `password_updated_at` nul ni d'`override`, donc la
+politique par défaut s'appliquerait — mais elle n'existe pas encore ici.
+
+*Porter le drapeau seul ferme la moitié de l'écart. Le dire évite que « parité restaurée » soit inscrit
+pour les deux.*
+
+#### Mesuré, six cas — le comportement, pas le contenu de la liste
+
+    compte a drapeau, route gardee        302 -> /profil?force_change=1
+    compte a drapeau, profil (exempte)    200 passe
+    compte a drapeau, POST (exempte)      200 passe
+    compte SANS drapeau                   200 passe
+    sans session                          200 passe   (SessionAuthentifiee a deja tranche)
+    route SANS NOM, compte a drapeau      302         <- une route non nommee reste GARDEE
+
+Et la portée réelle, sur les routes résolues : **91 gardées, 25 hors garde**, `deconnexion` et
+`connexion` étant hors garde.
+
+#### Un fichier touché qui mérite une relecture
+
+**`laravel/bootstrap/app.php`** reçoit une ligne d'alias. Il n'existe aucun autre moyen d'enregistrer
+un middleware. S'il fait partie des fichiers de tête qui ne doivent pas bouger, la ligne est isolée et
+se relit en dix secondes — **signalé plutôt que glissé.**
+
+---
+
 ### v1.38.104 — E-247 : tout le protocole de concurrence protege la CHARGE, aucune precaution ne voit une ecriture dans l'ARBRE
 
 Trois references posees sur mesure isolee (`navigation`=66, `graylog-g1` laravel=28, legacy=27),
