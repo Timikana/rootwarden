@@ -80,6 +80,10 @@ class TableDesGardes
             ['GET', 'pare-feu', ['role:1', 'perm:can_manage_iptables']],
             ['POST', 'pare-feu/copie', ['role:1', 'perm:can_manage_iptables']],
             ['POST', 'pare-feu/copie/enregistrer', ['role:1', 'perm:can_manage_iptables']],
+            // Meme garde que la page et que ses deux voisines. `POST` malgre la
+            // lecture : l'identifiant voyage dans le CORPS, pas dans l'URL ni dans
+            // les journaux d'acces. Le controle porte sur l'objet RESOLU.
+            ['POST', 'pare-feu/historique', ['role:1', 'perm:can_manage_iptables']],
             ['GET', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/tout-lire', ['role:1']],
