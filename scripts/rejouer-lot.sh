@@ -1146,6 +1146,32 @@ joue() {
   pass=$(grep -c '^PASS' "$journal")
   fail=$(grep -c '^FAIL' "$journal")
 
+  # ══ ABATTAGE DU LOT — une suite peut laisser le banc INUTILISABLE ═══════════
+  #
+  # La regle habituelle est qu'un echec de suite N'ARRETE PAS le lot. Une seule
+  # situation la renverse : quand la suite a laisse le banc dans un etat qui fera
+  # echouer les suivantes. Mesure du 2026-09-01 : `force_password_change` sur
+  # `rw-test-admin` garde TOUTE page du portage, et **61 suites du LOT emploient ce
+  # compte** — une restauration ratee ne fait donc pas echouer UNE suite, elle en
+  # fait echouer ~61, en cascade, sur un lot de 2 h 40. Continuer produit 61 faux
+  # rouges a rediagnostiquer un par un.
+  #
+  # ON CONCLUT SUR LE JOURNAL **ET** SUR LE CODE, parce que l'un ou l'autre se perd :
+  # un `timeout` tue avec 124 sans avoir imprime de marqueur, et un plantage apres
+  # l'impression laisse le marqueur sans le code. Les deux signaux, pas un.
+  #
+  # LE REMEDE EST LU DANS LE JOURNAL, jamais recopie ici : la suite nomme le compte
+  # et la colonne, et une commande figee dans ce fichier mentirait le jour ou elle
+  # change de cible.
+  if [ "$code" -eq 99 ] || grep -q 'LOT-ABATTRE' "$journal"; then
+    LOT_ABATTU="$suite ($cible)"
+    # Motif LARGE volontairement : teste le 2026-09-01 sur un journal forge, la
+    # variante `REMEDE::` (sans espace) faisait PERDRE LA LIGNE EN SILENCE — et le
+    # commentaire ci-dessus promet que le remede vient du journal. Un motif qui
+    # suppose un espacement exact est la meme faute que `'route' =>` rendant 0.
+    LOT_REMEDE=$(grep -m1 'REMEDE' "$journal" || true)
+  fi
+
   if [ "$cible" = legacy ]; then attendu="${REF_LEGACY[$suite]-}"
   else                          attendu="${REF_LARAVEL[$suite]-}" ; fi
 
@@ -1174,7 +1200,7 @@ while [ $# -gt 0 ]; do
 done
 
 echo "journaux : $JOURNAUX"
-ecarts=0 ; premiere=1 ; jouees=0
+ecarts=0 ; premiere=1 ; jouees=0 ; LOT_ABATTU='' ; LOT_REMEDE=''
 for cible in "${CIBLES[@]}"; do
   if [ ${#NOMMEES[@]} -gt 0 ]; then
     suites=("${NOMMEES[@]}")
@@ -1236,6 +1262,24 @@ for cible in "${CIBLES[@]}"; do
     premiere=0
     jouees=$((jouees + 1))
     joue "$cible" "$suite" || ecarts=$((ecarts + 1))
+
+    # L'ARRET EST ICI, PAS DANS LA SUITE. Une suite ne peut que SIGNALER ; seul le
+    # runner peut cesser d'enchainer. Dire l'inverse ferait de cette regle une garde
+    # qui n'existe pas.
+    if [ -n "$LOT_ABATTU" ]; then
+      echo
+      echo "════════════════════════════════════════════════════════════════════"
+      echo "LOT ABATTU apres $LOT_ABATTU — le banc est laisse dans un etat qui"
+      echo "ferait echouer les suites suivantes. RIEN N'EST ENCHAINE."
+      echo
+      [ -n "$LOT_REMEDE" ] && echo "  $LOT_REMEDE"
+      echo "  journal : $JOURNAUX/${cible}-${suite}.log"
+      echo
+      echo "Applique le remede, puis relance. Les $jouees execution(s) deja jouees"
+      echo "sont dans $JOURNAUX et restent valides."
+      echo "════════════════════════════════════════════════════════════════════"
+      exit 99
+    fi
   done
 done
 
