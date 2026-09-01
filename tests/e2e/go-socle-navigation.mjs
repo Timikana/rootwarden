@@ -196,6 +196,60 @@ try {
         const menu = await releveMenu(page);
         vus.push({ compte, menu });
 
+        /*
+         * ══ LA MARGE DE DEFILEMENT COUVRE-T-ELLE L'EN-TETE COLLANT ? ═══════
+         *
+         * Propriete du SOCLE, mesuree une seule fois — sur le premier compte,
+         * puisque `.rw-entete` et `html` ne dependent pas du role.
+         *
+         * VENUE D'E-241 : un bouton amene par `scrollIntoView` arrivait SOUS
+         * l'en-tete collant, et le clic atteignait l'en-tete. `elementFromPoint`
+         * l'a nomme. Le correctif est `scroll-padding-top`, et il couvre les
+         * DOUZE `scrollIntoView` du portage — dont huit en `block: 'nearest'`,
+         * qui posent l'element au bord haut.
+         *
+         * POURQUOI CETTE MESURE EXISTE : le jeton est un NOMBRE, `.rw-entete`
+         * n'a pas de hauteur explicite, et **rien dans le CSS ne relie les
+         * deux** — le commentaire du socle le dit. La premiere valeur posee,
+         * 64 px, etait deduite d'une lecture (~44 px estimes) et **ne couvrait
+         * pas les 65 px reellement rendus**. L'ecart etait d'un pixel ; ce qui
+         * comptait est que *la valeur n'etait pas derivee*, et qu'aucun oeil ne
+         * remesure un nombre qui a l'air juste. **La derivation vit donc ICI, et
+         * nulle part ailleurs.**
+         *
+         * Une hauteur explicite sur l'en-tete ne fermerait rien : `min-height`
+         * l'empeche de RAPETISSER, pas de GRANDIR — or c'est grandir qui rend la
+         * marge courte. Et la contraindre couperait un titre long, `$titre`
+         * dependant de la page.
+         */
+        if (vus.length === 1) {
+            const geo = await page.evaluate(() => {
+                const e = document.querySelector('.rw-entete');
+
+                return {
+                    entete: e ? Math.round(e.getBoundingClientRect().height) : null,
+                    collant: e ? getComputedStyle(e).position : null,
+                    marge: parseInt(getComputedStyle(document.documentElement).scrollPaddingTop, 10) || 0,
+                };
+            });
+            constate('en-tete collante', geo.entete === null ? '(absente)'
+                : `hauteur RENDUE ${geo.entete}px · position ${geo.collant}`);
+            constate('marge de defilement du socle', `${geo.marge}px`);
+            // La propriete porte sa precondition : sans en-tete collante elle
+            // n'aurait aucun objet et se verifierait sur rien.
+            const couvre = geo.entete !== null && /sticky|fixed/.test(geo.collant || '')
+                && geo.marge >= geo.entete;
+            verifie('la marge de defilement couvre la hauteur de l\'en-tete',
+                couvre,
+                couvre ? `marge ${geo.marge}px >= en-tete ${geo.entete}px`
+                    : geo.entete === null
+                        ? 'aucune `.rw-entete` rendue — la mesure n\'a pas eu lieu'
+                        : ! /sticky|fixed/.test(geo.collant || '')
+                            ? `en-tete en \`${geo.collant}\` : elle ne recouvre rien`
+                            : `marge ${geo.marge}px < en-tete ${geo.entete}px — tout element amene `
+                              + 'par `scrollIntoView` arrivera SOUS l\'en-tete, a moitie cache');
+        }
+
         // ── Le menu est rendu DEUX FOIS mais depuis UNE SEULE source ────────
         // On compare les ENTREES, pas leur geometrie : le tiroir est ferme
         // (display:none), donc de largeur nulle. Comparer la geometrie, ce
