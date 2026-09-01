@@ -2173,6 +2173,14 @@ portage**.
 
 ### v1.38.109 — E-248 : un correctif issu d'une LECTURE se refute par une lecture, et l'abattage du LOT existe enfin
 
+> **⚠ Le message du commit qui porte cette entree (`3358b96`) annonce « v1.38.108 ». C'est faux : le
+> numero libre etait 109 — une autre session avait pris 108 pendant que je redigeais.** L'historique ne
+> se reecrit pas tant qu'une session peut travailler, donc la correction vit ici, dans l'entree qu'il
+> decrit. *Un numero calcule a l'instant de l'ecriture reste juste ; un numero recopie dans un message
+> redige AVANT l'ecriture ne l'est pas — et c'est le meme defaut que ce fichier documente sur les
+> chiffres, applique a mon propre message.*
+
+
 #### E-248 — mon reproche etait faux, et la chronologie le prouve
 
     9422ab5   09-01 14:59   le correctif de cascade
