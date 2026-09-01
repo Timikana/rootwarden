@@ -1556,3 +1556,69 @@ postérieur » et contredire une mesure juste.
 > **Un zéro PLAUSIBLE ne se signale pas de lui-même**, contrairement à une valeur hors de toute plage
 > physique. *L'ordre de grandeur invraisemblable est le dernier filet — et il ne se déclenche pas quand
 > le faux résultat est crédible.*
+
+---
+
+## Deux leçons de méthode du 2026-09-01, et la première porte sur MON geste
+
+### 1. ⚠ J'ai clôturé un travail sur une AFFIRMATION
+
+J'ai écrit à la session 2 : *« rien de plus ne t'est demandé, les six modules ont leur inventaire »*.
+**Elle l'avait affirmé, je ne l'ai pas vérifié.** `MODULE-WAZUH.md` **n'existait pas** — toutes ses mesures
+sur `wazuh` (le drapeau et ses six lecteurs, les 15 routes gardées, `install_all` cassé, le dépôt tiers,
+l'inventaire à zéro ligne) **ne vivaient que dans ses messages.**
+
+> **Une mesure qui ne vit que dans un compte rendu ne vit nulle part.** Au tour suivant personne ne la
+> retrouve : ni dans le dépôt, ni indexée, ni relisable par la session qui portera le module.
+
+**Réparé par elle** — 18 fichiers d'inventaire, et **les six entrées sont maintenant réellement
+couvertes**, vérifié fichier par fichier à 12:35Z.
+
+**Ce que ça dit de moi, et c'est le même défaut que je corrige chez les autres depuis deux jours** : *un
+état affirmé pris pour un état mesuré* — **appliqué à mon acte de clôturer.** Et une clôture est pire
+qu'un constat faux : *elle retire l'objet du champ de ce qu'on vérifie encore.* Sa phrase est la juste :
+**ma clôture l'aurait scellé.**
+
+**La parade est de la même forme que celle du chiffre écrit deux fois** : *ne pas clôturer sur ce qu'on
+me dit, clôturer sur ce que je peux voir.* Un `ls` coûte une seconde ; la clôture coûtait un module.
+
+### 2. Le validateur de version de `wazuh` — `match` là où il faut `fullmatch`
+
+**Relevé en suivant son point ouvert sur `_validate_xml`, et trouvé à côté.** Mesuré :
+
+    re.match(r'^[0-9]+(\.[0-9]+){1,3}(-[0-9]+)?$', '4.14.5\n')   ->  ACCEPTE
+    re.fullmatch(meme motif sans ancres,           '4.14.5\n')    ->  refuse
+
+    wazuh.py:370   pkg_deb, pkg_rpm = _wazuh_pkg_specs(cfg.get('agent_version') or 'latest')
+           :388    {env_vars} apt-get install -y {pkg_deb}
+           :401    {env_vars} dnf install -y {pkg_rpm}
+           :416    {env_vars} zypper -n install {pkg_rpm}
+
+**La valeur validée est interpolée dans trois lignes de commande shell.**
+
+### ⚠ ET JE BORNE CE QUE C'EST, PARCE QUE C'EST LA LEÇON DU JOUR
+
+**Ce n'est PAS une injection de commande.** `$` en Python ne matche que devant un saut de ligne **final** :
+l'appelant peut ajouter un `\n`, **il ne peut rien mettre après.** `MULTILINE` n'est pas posé — vérifié.
+
+    agent_version = "4.14.5\n"   ->  apt-get install -y wazuh-agent=4.14.5
+                                     -1                                      <- ligne parasite, echoue
+
+**Ce que c'est réellement** : un validateur qui laisse un saut de ligne atteindre une ligne de commande,
+et qui produit **une seconde commande parasite** — laquelle échoue, et selon la présence de `set -e`
+avorte la chaîne ou la laisse continuer avec un paquet installé sans épinglage.
+
+> **Gravité : faible. Classe : celle du catalogue.** *33 validateurs et `fullmatch` nulle part* — et
+> celui-ci est sur un chemin qui **compose une commande**. C'est l'écart le plus étroit de sa famille, et
+> je le dis étroit **parce que j'ai publié ce matin un 151 qui valait 8.**
+
+**Et le porteur est borné** : `agent_version` vient de la configuration du module, écrite au **rôle 2 avec
+`can_manage_wazuh`** — pas un vecteur anonyme. **Zéro ligne dans `wazuh_agents`** : le module n'a jamais
+servi.
+
+**Qualification et correctif : session 5 puis 4.** Je ne l'écris pas, et **je ne le sors pas du gel** — il
+n'y a aucun porteur, et le lot du redémarrage ne doit pas grossir pour un saut de ligne.
+
+**Et le point qu'elle laissait ouvert reste ouvert** : `_validate_xml` valide par `xmllint`, et *un
+validateur XML mérite la question XXE.* **Je ne l'ai pas posée non plus** — je suis tombé sur le voisin en
+la cherchant. À qualifier avec le reste.
