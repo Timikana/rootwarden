@@ -415,8 +415,20 @@ try {
             reglagesEnBase() === 2, `${reglagesEnBase()} ligne(s)`);
         verifie('enregistrer n\'a joint AUCUNE machine',
             appels.length === 0, appels.join(' | ') || 'aucune requete');
+        /*
+         * ⚠ CELLE-CI N'EST PAS COMME LES QUATRE AUTRES. Elle asserte une
+         * CONFIRMATION — `/Test-Server-Debian/` sur le message — pas la presence
+         * d'un message. Avec l'ancre partagee `-message`, **un message d'ERREUR
+         * qui nomme la machine la fait passer au VERT**, et les messages
+         * d'erreur de ce module nomment la machine : la suite l'exige d'eux
+         * ailleurs. Le dedoublement d'E-250 ne preserve donc pas cette
+         * assertion, il la REPARE — a condition de viser le SUCCES, jamais les
+         * deux. `-message` reste le temps de la transition, et se retire apres.
+         */
         const confirme = await page.evaluate(() =>
-            document.querySelector('[data-rw="superv-reglages-message"]')?.textContent.trim() || '');
+            document.querySelector(
+                '[data-rw="superv-reglages-succes"], [data-rw="superv-reglages-message"]'
+            )?.textContent.trim() || '');
         verifie('l\'enregistrement est CONFIRME a l\'ecran, en nommant la machine',
             /Test-Server-Debian/.test(confirme), `« ${confirme.slice(0, 80)} »`);
 
