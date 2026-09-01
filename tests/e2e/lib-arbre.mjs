@@ -72,6 +72,7 @@
  * rendre un PASS : « je n'ai pas pu regarder » n'est pas « rien a signaler ».
  */
 import { readdirSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const RACINE = new URL('../../', import.meta.url).pathname;
@@ -93,12 +94,68 @@ export const CHEMINS_SERVIS = {
  * que de rejouer 82 secondes pour rien.
  */
 const JAMAIS_SERVI = [
-    /\/tests?\//, /\/node_modules\//, /\/vendor\//, /\/storage\//,
-    /\/\.git\//, /\/screenshots\//, /\.log(\.\d+)?$/, /\.result\.cache$/,
+    /\/tests?\//, /\/node_modules\//, /\/vendor\//, /\/\.git\//, /\/screenshots\//,
 ];
 
 function pertinent(chemin) {
     return ! JAMAIS_SERVI.some((m) => m.test(chemin));
+}
+
+/*
+ * ══ CODE SOURCE CONTRE ETAT D'EXECUTION — LE CRITERE, PAS UNE LISTE ═══════
+ *
+ * Premiere redaction : j'excluais `laravel/storage/` et les `.log` **par leur
+ * nom**. Insuffisant, et la surveillance du Lead l'a mesure pendant un LOT :
+ *
+ *     backend/logs/deployment.log   ecrit par MA PROPRE `assureJournal()`
+ *     backend/__pycache__/          ecrit a chaque import Python
+ *     backend/.pytest_cache/ .ruff_cache/   ecrits par les outils
+ *     legacy/logs/                  journaux du portail
+ *
+ * Le module aurait signale « fenetre sale » sur toute suite declenchant un
+ * deploiement, tout redemarrage backend, tout `pytest`. **C'est exactement la
+ * classe que j'ai fait corriger au Lead deux heures plus tot**, commise dans
+ * mon propre garde.
+ *
+ * **Allonger la liste serait se preparer au prochain repertoire de cache qu'un
+ * outil creera.** La distinction reelle n'est pas « servi / non servi », c'est :
+ *
+ *     code source        ecrit par un DEVELOPPEUR  -> la mesure devient fausse
+ *     etat d'execution   ecrit par le SYSTEME      -> c'est le fonctionnement normal
+ *
+ * La question posee est « quelqu'un a-t-il change le CODE sous mes pieds »,
+ * jamais « un octet a-t-il change ». Et `.gitignore` porte deja cette
+ * distinction, par construction : personne ne versionne son etat d'execution.
+ * On la DERIVE donc de `git check-ignore` plutot que de la reecrire — mesure
+ * du 2026-09-01 : **779 fichiers ignores sur 1420** sous `backend/ legacy/
+ * laravel/`, et le classement est correct sur les six cas eprouves.
+ *
+ * ⚠ L'ANGLE MORT REEL EST L'INVERSE DE CELUI QU'ON M'AVAIT ANNONCE. On m'a dit
+ * qu'un fichier de code **non encore suivi** serait classe « etat » — mesure :
+ * un `.blade.php` neuf non suivi et non ignore est classe **CODE**, donc il n'y
+ * a pas d'angle mort de ce cote. Le vrai est le symetrique : un fichier de code
+ * qui figurerait dans `.gitignore` serait classe « etat » et passerait
+ * inaperçu. C'est rare et c'est ecrit ici plutot que corrige.
+ */
+let CACHE_IGNORES = null;
+
+function ignoresParGit(chemins) {
+    if (chemins.length === 0) return new Set();
+    try {
+        const sortie = execFileSync('git', ['check-ignore', '--stdin'], {
+            cwd: RACINE, input: chemins.join('\n'), encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'ignore'],
+        });
+
+        return new Set(sortie.split('\n').filter(Boolean));
+    } catch (e) {
+        // `git check-ignore` sort en 1 quand AUCUN chemin n'est ignore : ce
+        // n'est pas une erreur. Toute autre sortie rend `null` -> l'appelant
+        // s'abstient plutot que de classer tout en « code » et d'alarmer.
+        if (e && e.status === 1) return new Set();
+
+        return null;
+    }
 }
 
 function parcourt(dossier, sortie) {
@@ -221,13 +278,14 @@ export function verdictFenetre(cible, avant, departMs) {
     const ecart = ecartServi(avant, apres);
     if (ecart.total === -1) {
         return { mesurable: false,
-            // `null` informe, `abattre: false` DECIDE — voir l'en-tete : on
-            // n'abat pas un LOT sur une absence de mesure.
+            // `null` informe ; les BOOLEENS decident, et ils valent `false`
+            // quand la mesure n'a pas eu lieu — voir l'en-tete du contrat.
             propre: null,
-            abattre: false,
+            ecritureCode: false,
             fichiers: [],
+            fichiersEtat: [],
             toujours: '',
-            libelle: `l'arbre servi de ${cible} n'a pas bouge pendant la mesure`,
+            libelle: `le CODE servi de ${cible} n'a pas bouge pendant la mesure`,
             detail: 'SANS OBJET — le chemin servi n\'a pas pu etre lu, ni au depart ni a l\'arrivee' };
     }
     const bouges = [...ecart.modifies, ...ecart.apparus, ...ecart.disparus];
@@ -237,16 +295,43 @@ export function verdictFenetre(cible, avant, departMs) {
     // 2026-09-01, que l'empreinte seule aurait manque.
     const tous = [...new Set([...bouges, ...recents])];
 
+    /*
+     * On SEPARE le code de l'etat d'execution. Sans cette separation, une suite
+     * qui declenche un deploiement se signalerait elle-meme — sa propre
+     * `assureJournal()` ecrit `backend/logs/deployment.log`.
+     */
+    const ignores = ignoresParGit(tous);
+    if (ignores === null) {
+        return { mesurable: false, propre: null, ecritureCode: false,
+            fichiers: [], fichiersEtat: [], toujours: '',
+            libelle: `le CODE servi de ${cible} n'a pas bouge pendant la mesure`,
+            detail: 'SANS OBJET — `git check-ignore` a echoue : impossible de'
+                + ' separer le code de l\'etat d\'execution, on ne conclut pas' };
+    }
+    const code = tous.filter((f) => ! ignores.has(f));
+    const etat = tous.filter((f) => ignores.has(f));
+
     return {
         mesurable: true,
-        propre: tous.length === 0,
-        // La DECISION, jamais derivee par l'appelant.
-        abattre: tous.length > 0,
-        libelle: `l'arbre servi de ${cible} n'a pas bouge pendant la mesure`,
-        detail: `${tous.length} fichier(s) ecrit(s) pendant la fenetre : `
-            + `${tous.slice(0, 5).join(', ')}${tous.length > 5 ? ' …' : ''}`
-            + ' — la mesure ne veut rien dire, elle est a REJOUER',
-        toujours: tous.length === 0 ? 'aucun' : '',
-        fichiers: tous,
+        propre: code.length === 0,
+        /*
+         * LE FAIT, PAS LA DECISION — et c'est deliberement l'inverse du choix
+         * fait pour le drapeau residuel. Abattre depend de ce que la suite LIT,
+         * ce que ce module ne peut pas savoir : il a failli tuer 158 executions
+         * sur un `legacy/version.txt` qu'aucune suite ne lit. Le runner decide,
+         * et l'arbitrage rendu est « FENETRE SALE — a rejouer », SANS abattage :
+         * l'ecriture est PASSEE, les suites suivantes sont saines.
+         */
+        ecritureCode: code.length > 0,
+        libelle: `le CODE servi de ${cible} n'a pas bouge pendant la mesure`,
+        detail: code.length === 0 ? ''
+            : `${code.length} fichier(s) de CODE ecrit(s) pendant la fenetre : `
+              + `${code.slice(0, 5).join(', ')}${code.length > 5 ? ' …' : ''}`
+              + ' — cette mesure n\'est pas interpretable, elle est A REJOUER',
+        toujours: code.length === 0
+            ? `aucun${etat.length ? ` (${etat.length} ecriture(s) d'etat d'execution, normales)` : ''}`
+            : '',
+        fichiers: code,
+        fichiersEtat: etat,
     };
 }
