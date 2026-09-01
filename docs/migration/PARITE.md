@@ -13027,3 +13027,73 @@ dernier scan » presente une machine comme un parc.*
 La session 3 a touche l'un des neuf indicateurs malgre la consigne « pas de retouche aux neuf ».
 **Motif donne : elle publiait ce nombre EN ROUGE.** *Un nombre qu'on promeut en alerte cesse d'etre un
 indicateur parmi d'autres — la consigne le couvrait, la promotion ne la couvrait plus.*
+
+## E-268 — MON GARDE DE FENETRE ECHOUAIT OUVERT, EN SILENCE — et il perdait la regle ecrite dans l'en-tete du module qu'il consomme
+
+**Trouve par la session 7 le 2026-09-02 vers 00:10 CEST, verifie et corrige par le Lead.**
+
+### Defaut 1 — `2>/dev/null || true` faisait echouer le garde OUVERT
+
+    module rendu injoignable, avec 2>/dev/null || true   ->  sortie VIDE  ->  verdict « conforme »
+    le meme sans silence                                 ->  ERR_MODULE_NOT_FOUND
+
+**Si `lib-arbre.mjs` casse, disparait, ou qu'une version de Node refuse `--input-type=module`, le LOT
+continuait comme si la fenetre etait propre.**
+
+> **C'est le motif que j'avais reproche a la session 7 une heure plus tot** sur son `find … 2>/dev/null`.
+> **Elle l'avait commis dans un CONSTAT ; je l'ai commis dans un GARDE.** *Un garde qui echoue ouvert est
+> pire qu'un constat muet : on compte dessus, donc son silence n'invite personne a regarder.*
+
+### Defaut 2 — l'appel ignorait `mesurable`, et c'est la regle de l'en-tete du module
+
+`ecritureCode` vaut **`false` quand la mesure n'a PAS eu lieu** — delibere, pour ne pas abattre sur un
+silence (E-255). **Mais sans consulter `mesurable`, les deux cas se confondaient :**
+
+    aucune ecriture      ->  ''  ->  conforme   correct
+    chemin illisible     ->  ''  ->  conforme   FAUX : « je n'ai pas pu regarder »
+
+**C'est litteralement la phrase de l'en-tete du module** — *« si elle ne peut pas mesurer, elle doit
+s'abstenir EN LE DISANT, jamais rendre un PASS »*. **Le module la respectait ; mon appel la perdait.**
+
+> *Consommer un contrat sans lire l'invariant que son auteur a ecrit en tete, c'est reconstruire le defaut
+> que le contrat existait pour fermer.*
+
+### CINQUIEME VERDICT, et non un alias de « FENETRE SALE »
+
+    GARDE INDISPO — <motif>      la mesure n'a pas pu avoir lieu
+    FENETRE SALE — a rejouer     la mesure a eu lieu et ne veut rien dire
+
+**Les deux remedes DIFFERENT : une fenetre sale se REJOUE, un garde indisponible se REPARE.** *Les
+confondre ferait passer un garde casse pour une serie de fenetres sales — c'est-a-dire pour le bruit de
+fond qu'on apprend a ignorer.* **Un motif distinct merite un verdict distinct quand le geste qui suit
+differe.**
+
+### EPROUVE DANS LES TROIS ETATS avant d'etre commite
+
+    fenetre de 1 s        ->  vide                                  PROPRE
+    fenetre de 1 h        ->  SALE:: rw.css, accueil.blade.php, …   SALE
+    module injoignable    ->  INDISPO:: + ERR_MODULE_NOT_FOUND      ECHOUE FERME
+                              sur stderr, VISIBLE
+
+*Le bruit de `stderr` est voulu : c'est le temoin que je silencais.*
+
+### Et ce que la session 7 a dedouane dans le meme message
+
+**`$cible` est plus fin que sa porte manuelle.** Elle balayait `laravel legacy backend` et fermait sur
+`legacy/version.txt` pour une suite *laravel* ; l'appel du runner ne surveille que **le chemin servi de la
+cible mesuree**. *C'est pourquoi son lot A n'a rien signale alors que `version.txt` a bouge a 23:55:06
+pendant — et c'etait juste.*
+
+**Un dedouanement se dit aussi fort qu'une accusation**, et celui-la vaut : la granularite par cible est
+ce qui empeche ce garde de devenir le bruit de fond qu'on redoute.
+
+### E-250, lot A : trois conformes, et `reglages` n'est plus « fenetre sale »
+
+    go-auth-mot-de-passe          27 · 0   conforme
+    go-page-mot-de-passe          16 · 0   conforme
+    go-page-supervision-reglages  32 · 0   conforme
+
+**Les huit ancres dedoublees verifiees une a une, aucun ancien nom residuel.** *La valeur 32 etait deja
+juste sous « fenetre sale » — le verdict avait dit « non interpretable », pas « faux », et la reprise en
+arbre stable le confirme.* **C'est la premiere fois qu'un verdict de non-interpretabilite est leve par une
+remesure et non par un correctif.**
