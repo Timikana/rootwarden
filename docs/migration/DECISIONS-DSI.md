@@ -1364,3 +1364,110 @@ faible*.
 
 > **Classer par « ça ressemble à un compteur de sécurité » mettrait `noKey` au rôle 3 et laisserait passer
 > le prochain compteur qui n'en a pas l'air.** *Un critère qui trie par ressemblance ne trie pas.*
+
+---
+
+## 14 — E-232 : la référence d'API **ne se porte pas comme de la prose. Elle se dérive, ou elle n'existe pas.**
+
+**Décidée le 2026-09-01, 12:27 UTC**, sur la mesure de la session 2 — celle que j'attendais pour trancher.
+
+### La mesure qui décide, et elle est sans ambiguïté
+
+    grep -c '$pdo' legacy/documentation.php   ->  0
+
+**Zéro requête.** La page `require` pourtant `/db.php` et **ne s'en sert jamais**. Elle n'interroge pas
+non plus le backend pour se construire.
+
+> **Tout ce que `documentation.php` affirme sur les routes, les rôles et les permissions est du HTML
+> écrit à la main. Il n'existe aucun mécanisme pour rester vrai.**
+
+### La décision
+
+**La référence d'API se DÉRIVE de ses sources, ou elle n'est pas portée.** Aucune troisième voie :
+recopier de la prose sur des autorisations est ce qui a produit l'objet qu'on remplace.
+
+**Et le précédent existe déjà dans le portage** — `autorisations-passerelle` est **dérivée**. *Il n'y a
+donc pas de forme à inventer, seulement une à ne pas répéter.*
+
+### Ce que la dérivation doit lire, et ce n'est pas une source mais trois
+
+Le relevé de la session 4 et celui de la session 2 se rejoignent :
+
+    1. les decorateurs backend            @require_role · @require_permission · @require_machine_access
+    2. la liste blanche du proxy          $ALLOWED_PROXY_PREFIXES  — autorise par PREFIXE (E-233)
+    3. la liste administration            $ADMIN_ONLY_PREFIXES     — et elle diverge de la 2
+
+**Trois faits qui interdisent de dériver d'un seul niveau :**
+
+- **`platform_key` a deux routes en liste blanche et ABSENTES de la liste administration** ;
+- **`@require_machine_access` mord sur 5 routes de `ssh_audit` et est inerte sur 5 autres**, *sans aucun
+  signe qui distingue les deux cas* ;
+- **« pas de décorateur » ne veut pas dire « pas de garde »** — `/update_security_exec` s'authentifie
+  **dans son corps**, par un jeton HMAC lié au `machine_id`, fail-closed en 401.
+
+> **Une affirmation d'autorisation dérivée d'un seul niveau est un ÉCART, pas une source.**
+
+### Et une borne de temps, parce qu'elle rend la page fausse le jour où elle est écrite
+
+**34 routes changent de garde au redémarrage**, qui n'a pas eu lieu. Donc toute affirmation d'autorisation
+décrit **soit l'arbre, soit le service**, et les deux diffèrent.
+
+**La page doit donc porter, comme `RELEVE-GARDES-BACKEND.md` le fait déjà pour `POST /deploy` : les DEUX
+états quand ils diffèrent, et la date de sa dérivation.** *Une page qui affirme des autorisations sans
+dire de quand elle les tient est périmée avant d'être lue.*
+
+### Ce que ça débloque, et ce que ça ne débloque pas
+
+**Ça débloque l'étape 0 de l'archivage de `legacy/api/`** : il n'y a rien à porter *de cette page* — il y
+a une page à **construire autrement**. *Un blocage qui attendait une décision de portage attendait en
+réalité une décision sur la MÉTHODE.*
+
+**Ça ne débloque pas le volume de prose** : il reste hors de mon périmètre, et la session 2 a eu raison de
+ne pas le compter. **Ce qu'elle a mesuré à la place est ce qui sert** — voir ci-dessous.
+
+### La mesure qui rend le travail faisable, et elle va dans le sens rassurant
+
+Onze sections décrivent une partie **déjà archivée**, citées **23 fois**. *Un relevé qui s'arrêterait là
+annoncerait « 23 références mortes ».* Séparation faite :
+
+    chemin de PAGE   (/drift/, /docker/…)                 10   PERIME — 404 aujourd hui
+    route de BACKEND (/drift/scan, POST /docker/scan…)     13   VIVANTE — toujours vraie
+
+**Les blueprints des parties archivées restent enregistrés** : leurs routes répondent, et la page portée
+les appelle. *Tout `/partie/` n'est pas une page* — la distinction qui protège déjà `LiensLegacy`
+d'écraser `/maintenance/check`.
+
+> **La péremption est LOCALISÉE : dix lignes fausses et onze sections à re-situer, pas un quart à
+> réécrire.** Et c'est la deuxième fois aujourd'hui qu'un compte brut alarme d'un facteur deux ou plus —
+> après mes 151 qui étaient 8.
+
+**Et le critère que j'avais donné se vérifie** : les 13 routes décrivent un **comportement** — chacune se
+sonde. Les 10 chemins décrivaient un **emplacement**, qui a bougé : *périmés, pas faux.* Les sections
+d'architecture décrivent des **choix** — elles ne peuvent qu'être périmées, et **elles n'ont pas été
+vérifiées**, ce qui est dit.
+
+---
+
+## ⚠ Et un chiffre de mon `DOSSIER-01` mis en cause, départagé : **nous mesurions deux ensembles**
+
+La session 2 mesure **29 modules** postérieurs au démarrage là où mon dossier signable dit **20**.
+Remesuré par moi à 12:26Z, dans les deux formes de date :
+
+    -newermt '2026-08-27T12:28:43Z'      hors tests -> 20      tout -> 29
+    -newermt '2026-08-27 14:28:43'       hors tests -> 20      tout -> 29
+
+> **Ni l'un ni l'autre ne se trompe : l'écart est le filtre `-not -path '*/tests/*'`, pas le fuseau.**
+> **20 hors tests, 29 tout compris.** Et c'est **20** qui appartient au dossier, parce que *les tests
+> n'ont aucun effet sur le service* — c'est la question que le dossier pose.
+
+**Quatrième fois aujourd'hui que deux chiffres répondent à deux questions** — après 33/34,
+151/123 et 3 861/6 883. *La question à poser devant un désaccord de comptage n'est pas « lequel est
+juste » mais « que compte chacun ».*
+
+**Et son défaut d'instrument mérite d'être gardé, parce qu'il est de la variante coûteuse** : sa première
+commande portait un suffixe `UTC` mal interprété et a rendu **0**. Elle a failli conclure « aucun module
+postérieur » et contredire une mesure juste.
+
+> **Un zéro PLAUSIBLE ne se signale pas de lui-même**, contrairement à une valeur hors de toute plage
+> physique. *L'ordre de grandeur invraisemblable est le dernier filet — et il ne se déclenche pas quand
+> le faux résultat est crédible.*
