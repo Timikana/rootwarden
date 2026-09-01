@@ -31,7 +31,7 @@
     "mises-a-jour.js": "e42c7cf10d5af4bf",
     "notifications-reglages.js": "8c2d9cc6c4a819d0",
     "notifications.js": "7b87f6a075247b8d",
-    "pare-feu.js": "5c4fcfe43053ebfc",
+    "pare-feu.js": "b02d82e5896ea8cf",
     "permissions.js": "235d89f13fc92fb3",
     "planification-cve.js": "c79107cc1487417b",
     "politiques.js": "8e61ae3bbe5db4c8",
@@ -58,6 +58,7 @@
         "/journal-audit/sceller?simulation=1",
         "/journal-audit/verifier"
       ],
+      "origine": null,
       "fichier_consulte_success": false
     },
     {
@@ -69,6 +70,7 @@
       "ok": true,
       "verdict": "ignore",
       "chemins_appelants": [],
+      "origine": null,
       "fichier_consulte_success": false
     },
     {
@@ -80,6 +82,7 @@
       "ok": true,
       "verdict": "delegue_sans_lecteur",
       "chemins_appelants": [],
+      "origine": null,
       "fichier_consulte_success": false
     },
     {
@@ -91,6 +94,7 @@
       "ok": true,
       "verdict": "ignore",
       "chemins_appelants": [],
+      "origine": null,
       "fichier_consulte_success": true
     }
   ]
