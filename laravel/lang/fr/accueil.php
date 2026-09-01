@@ -68,4 +68,34 @@ return [
     'parc_total' => '{1}1 au parc|[2,*]:count au parc',
     'parc_borne_aide' => "Vous ne voyez ici que les machines qui vous sont attribuées. Le second nombre est la taille réelle du parc : il est affiché pour que la borne soit visible, et non devinée.",
     'parc_illisible' => "Le parc n'a pas pu être lu. Ce n'est pas « aucune machine » : la base n'a pas répondu, et aucun nombre affiché ici ne serait fiable.",
+    // ══ LES NEUF INDICATEURS DU LEGACY, BORNES ═══════════════════════════
+    'ind_parc_titre' => 'Votre parc',
+    'ind_machines' => 'machines',
+    'ind_en_ligne' => 'en ligne',
+    'ind_hors_ligne' => 'hors ligne',
+    // TROIS ETATS, PAS DEUX. Le legacy compte « != ONLINE » et range donc les
+    // machines d'etat INCONNU parmi les hors ligne. Les deux compteurs somment
+    // au total, ce qui les fait paraitre coherents — et c'est ce qui rendait le
+    // defaut invisible.
+    'ind_inconnu' => 'état inconnu',
+    'ind_inconnu_aide' => "Ces machines ne sont ni en ligne ni hors ligne : le produit n'a pas d'information à jour sur elles. L'ancien portail les comptait comme hors ligne, ce qui affirmait un état que la donnée ne porte pas.",
+    'ind_cle' => 'avec la clé de plateforme',
+
+    'ind_cve_titre' => 'Vulnérabilités connues',
+    'ind_cve_date' => 'dernier scan',
+    'ind_cve_nombre' => 'CVE au dernier scan',
+    'ind_cve_critiques' => 'critiques, tous scans',
+    'ind_cve_aucun_scan' => "Aucun scan de vulnérabilités n'a été fait sur les machines de votre périmètre. Ce n'est pas « zéro CVE » : c'est l'absence de mesure.",
+    'ind_cve_illisible' => "L'historique des scans n'a pas pu être lu. Ce n'est pas « aucune CVE » — aucun nombre affiché ici ne serait fiable.",
+
+    'ind_comptes_titre' => 'Comptes du portail',
+    'ind_actifs' => 'comptes actifs',
+    'ind_sans_cle' => 'sans clé SSH enregistrée',
+    'ind_sans_cle_sature' => "Cet indicateur vaut aujourd'hui 100 % : aucun compte n'a de clé SSH enregistrée. Il est porté quand même — un indicateur saturé est le seul moyen de voir qu'il cesse de l'être.",
+    'ind_sans_2fa' => 'sans second facteur',
+    'ind_sans_2fa_aide' => "Ce nombre est réservé au rôle 3. Il dit quelle part des comptes du portail s'ouvre avec un mot de passe seul — une information utile pour agir, et une carte de cibles pour qui n'a pas à agir. Votre propre état de second facteur est affiché plus haut.",
+    'ind_comptes_reserve' => "Les compteurs de comptes ne sont pas affichés à votre rôle. Ils ne portent pas sur vos machines : un périmètre de machines ne borne pas une population d'utilisateurs, donc ils se bornent par rôle.",
+
+    'ind_illisible' => "Ces valeurs n'ont pas pu être lues. Ce n'est pas « zéro » : la base n'a pas répondu.",
+    'ind_borne' => "Ces nombres ne portent que sur les machines qui vous sont attribuées.",
 ];

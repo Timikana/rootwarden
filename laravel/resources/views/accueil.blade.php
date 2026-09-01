@@ -75,6 +75,137 @@
     </div>{{-- fin de la grille des tuiles d'etat --}}
 
     {{--
+        ═══ LES NEUF INDICATEURS DU LEGACY, BORNES ═════════════════════════
+
+        `legacy/index.php:78-104` les calcule SANS borne : un compte qui n'a
+        acces a aucune machine y lit la taille du parc, le nombre de CVE
+        critiques et la date du dernier scan. C'est la fuite tranchee par
+        l'arbitrage, et la raison pour laquelle ces neuf-la n'avaient pas suivi
+        les tuiles.
+
+        TROIS FAMILLES, TROIS BORNES — et c'est la moitie que l'arbitrage ne
+        couvrait pas : un perimetre de MACHINES ne borne pas une population
+        d'UTILISATEURS.
+    --}}
+    <h2 class="rw-section__entete rw-titre--espace">{{ __('accueil.ind_parc_titre') }}</h2>
+
+    @if (! $indicateurs['lisible'])
+        {{-- UNE LECTURE ECHOUEE N'EST PAS UN PARC VIDE. Afficher des zeros les
+             ferait lire comme des faits. --}}
+        <p class="rw-annonce rw-annonce--attention" data-rw="accueil-ind-illisible">
+            {{ __('accueil.ind_illisible') }}
+        </p>
+    @else
+        <div class="rw-grille" data-rw="accueil-indicateurs">
+            @foreach ([
+                ['machines', $indicateurs['machines'], 'ind_machines', null],
+                ['en-ligne', $indicateurs['en_ligne'], 'ind_en_ligne', null],
+                ['hors-ligne', $indicateurs['hors_ligne'], 'ind_hors_ligne', null],
+                ['inconnu', $indicateurs['inconnu'], 'ind_inconnu', 'ind_inconnu_aide'],
+                ['cle', $indicateurs['cle'], 'ind_cle', null],
+            ] as [$cle, $valeur, $libelle, $aide])
+                <div class="rw-tuile" data-rw="accueil-ind-{{ $cle }}">
+                    <span class="rw-tuile__valeur">{{ $valeur }}</span>
+                    <p class="rw-tuile__texte">{{ __('accueil.' . $libelle) }}</p>
+                    @if ($aide)
+                        {{-- L'ETAT INCONNU PORTE SON EXPLICATION. Un compteur
+                             nomme « etat inconnu » sans dire ce que l'ancien
+                             portail en faisait laisserait croire a un ajout
+                             cosmetique. --}}
+                        <p class="rw-aide" data-rw="accueil-ind-{{ $cle }}-aide">{{ __('accueil.' . $aide) }}</p>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+
+        @if ($indicateurs['borne'])
+            {{-- LA RESERVE NE S'AFFICHE QUE SI LA BORNE MORD. Un role >= 2 voit
+                 le parc : lui dire « seulement vos machines » serait une reserve
+                 sans objet, et celles-la deviennent un decor qu'on ne lit plus. --}}
+            <p class="rw-aide rw-prose" data-rw="accueil-ind-borne">{{ __('accueil.ind_borne') }}</p>
+        @endif
+    @endif
+
+    {{-- ── LES VULNERABILITES : TROIS ISSUES, PAS DEUX ─────────────────────
+
+         `cve_scans` porte `machine_id` (mesure) : ces trois valeurs se bornent
+         donc au perimetre, contrairement a ce qu'annoncait l'arbitrage. La seule
+         ligne de cette installation porte 1458 CVE sur la production — un role 1
+         qui n'a pas cette machine ne doit pas la lire.
+
+         « Aucun scan » n'est ni « zero CVE » ni « je n'ai pas su lire », et les
+         trois se disent separement. --}}
+    <h2 class="rw-section__entete rw-titre--espace">{{ __('accueil.ind_cve_titre') }}</h2>
+
+    @if (! $cve['lisible'])
+        <p class="rw-annonce rw-annonce--attention" data-rw="accueil-cve-illisible">
+            {{ __('accueil.ind_cve_illisible') }}
+        </p>
+    @elseif ($cve['aucun_scan'])
+        <p class="rw-aide rw-prose" data-rw="accueil-cve-aucun-scan">
+            {{ __('accueil.ind_cve_aucun_scan') }}
+        </p>
+    @else
+        <div class="rw-grille" data-rw="accueil-cve">
+            <div class="rw-tuile" data-rw="accueil-cve-date">
+                <span class="rw-tuile__valeur">{{ $cve['date'] }}</span>
+                <p class="rw-tuile__texte">{{ __('accueil.ind_cve_date') }}</p>
+            </div>
+            <div class="rw-tuile" data-rw="accueil-cve-nombre">
+                <span class="rw-tuile__valeur">{{ $cve['cve'] }}</span>
+                <p class="rw-tuile__texte">{{ __('accueil.ind_cve_nombre') }}</p>
+            </div>
+            <div class="rw-tuile" data-rw="accueil-cve-critiques">
+                <span class="rw-tuile__valeur">{{ $cve['critiques'] }}</span>
+                <p class="rw-tuile__texte">{{ __('accueil.ind_cve_critiques') }}</p>
+            </div>
+        </div>
+    @endif
+
+    {{-- ── LES COMPTES : BORNES PAR ROLE, ET LE GEL EST DIT ────────────────
+
+         `null` veut dire « pas montre a ce role », jamais « zero ». Le gel vit
+         dans le service, pas ici : une garde posee dans la vue serait a
+         reecrire a chaque vue. --}}
+    <h2 class="rw-section__entete rw-titre--espace">{{ __('accueil.ind_comptes_titre') }}</h2>
+
+    @if (! $comptes['lisible'])
+        <p class="rw-annonce rw-annonce--attention" data-rw="accueil-comptes-illisible">
+            {{ __('accueil.ind_illisible') }}
+        </p>
+    @elseif ($comptes['actifs'] === null)
+        {{-- LE GEL SE DIT, AVEC SA RAISON. Un compteur absent sans explication
+             se lit comme un defaut d'affichage. --}}
+        <p class="rw-aide rw-prose" data-rw="accueil-comptes-reserve">
+            {{ __('accueil.ind_comptes_reserve') }}
+        </p>
+    @else
+        <div class="rw-grille" data-rw="accueil-comptes">
+            <div class="rw-tuile" data-rw="accueil-comptes-actifs">
+                <span class="rw-tuile__valeur">{{ $comptes['actifs'] }}</span>
+                <p class="rw-tuile__texte">{{ __('accueil.ind_actifs') }}</p>
+            </div>
+            <div class="rw-tuile" data-rw="accueil-comptes-sans-cle">
+                <span class="rw-tuile__valeur">{{ $comptes['sans_cle'] }}</span>
+                <p class="rw-tuile__texte">{{ __('accueil.ind_sans_cle') }}</p>
+                @if ($comptes['actifs'] > 0 && $comptes['sans_cle'] === $comptes['actifs'])
+                    {{-- UN INDICATEUR SATURE SE DIT, sinon on le prend pour un
+                         defaut de lecture. Il est porte quand meme : c'est le
+                         seul moyen de voir qu'il cesse de l'etre. --}}
+                    <p class="rw-aide" data-rw="accueil-comptes-sans-cle-sature">{{ __('accueil.ind_sans_cle_sature') }}</p>
+                @endif
+            </div>
+            @if ($comptes['sans_2fa'] !== null)
+                <div class="rw-tuile" data-rw="accueil-comptes-sans-2fa">
+                    <span class="rw-tuile__valeur">{{ $comptes['sans_2fa'] }}</span>
+                    <p class="rw-tuile__texte">{{ __('accueil.ind_sans_2fa') }}</p>
+                    <p class="rw-aide" data-rw="accueil-comptes-sans-2fa-aide">{{ __('accueil.ind_sans_2fa_aide') }}</p>
+                </div>
+            @endif
+        </div>
+    @endif
+
+    {{--
         ═══ LES DOUZE RACCOURCIS ═══════════════════════════════════════════
 
         Portes de `legacy/index.php:363-385`, dans le MEME ORDRE — un exploitant

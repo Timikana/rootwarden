@@ -109,10 +109,7 @@ class Machines
      */
     public function compteursPerimetre(int $roleId, int $userId): array
     {
-        $actives = function ($q) {
-            $q->whereNull('m.lifecycle_status')
-              ->orWhere('m.lifecycle_status', '!=', 'archived');
-        };
+        $actives = $this->predicatActives();
 
         try {
             $parc = DB::table('machines as m')->where($actives)->count();
@@ -124,11 +121,7 @@ class Machines
                 return ['perimetre' => $parc, 'parc' => $parc, 'borne' => false, 'lisible' => true];
             }
 
-            $perimetre = DB::table('machines as m')
-                ->join('user_machine_access as uma', 'm.id', '=', 'uma.machine_id')
-                ->where('uma.user_id', $userId)
-                ->where($actives)
-                ->count();
+            $perimetre = $this->requeteBornee($roleId, $userId)->count();
 
             return [
                 'perimetre' => $perimetre,
@@ -145,6 +138,173 @@ class Machines
             Log::error('[Machines::compteursPerimetre] parc illisible : ' . $e->getMessage());
 
             return ['perimetre' => 0, 'parc' => 0, 'borne' => false, 'lisible' => false];
+        }
+    }
+
+    /**
+     * Le predicat « machine active », en UN seul endroit.
+     *
+     * Il etait ecrit deux fois dans ce fichier et quatre fois dans le portage.
+     * Factorise ICI plutot que recopie une cinquieme fois : *trois
+     * implementations d'une meme regle finiront par diverger.*
+     */
+    private function predicatActives(): callable
+    {
+        return function ($q) {
+            $q->whereNull('m.lifecycle_status')
+              ->orWhere('m.lifecycle_status', '!=', 'archived');
+        };
+    }
+
+    /**
+     * Une requete sur `machines` DEJA BORNEE au perimetre du compte.
+     *
+     * Role >= 2 : le perimetre EST le parc, aucune jointure. Role 1 : jointure
+     * sur `user_machine_access`. C'est le meme predicat que `pourMisesAJour`,
+     * `Iptables::machines` et `Fail2ban::machines` — repris, pas reecrit.
+     *
+     * Tous les indicateurs de `indicateurs()` partent de cette requete : c'est
+     * ce qui garantit qu'aucun d'eux ne peut oublier la borne. Un indicateur
+     * ajoute plus tard l'hérite sans y penser.
+     */
+    private function requeteBornee(int $roleId, int $userId)
+    {
+        $requete = DB::table('machines as m')->where($this->predicatActives());
+
+        if ($roleId < 2) {
+            $requete->join('user_machine_access as uma', 'm.id', '=', 'uma.machine_id')
+                    ->where('uma.user_id', $userId);
+        }
+
+        return $requete;
+    }
+
+    /**
+     * Les indicateurs de parc du tableau de bord, TOUS bornes au perimetre.
+     *
+     * ══ CE QUE LE LEGACY COMPTE, ET CE QU'IL EN DIT DE FAUX ══════════════
+     *
+     * `legacy/index.php:78-104` calcule ces valeurs SANS aucune borne : un
+     * compte qui n'a acces a aucune machine lit quand meme la taille du parc,
+     * son nombre de CVE critiques et la date du dernier scan. C'est la fuite que
+     * `DECISIONS-DSI.md` §1 a tranchee — borner dans le portage, et DIRE le
+     * total quand la borne mord.
+     *
+     * ══ TROIS ETATS D'ETAT RESEAU, PAS DEUX ══════════════════════════════
+     *
+     * Le legacy compte `= 'Online'` d'un cote et `!= 'ONLINE'` de l'autre.
+     * Mesure du 2026-09-01 : la colonne contient `ONLINE` (1 machine) et
+     * `Inconnu` (2). La collation est `utf8mb4_0900_ai_ci`, donc la difference
+     * de casse n'a AUCUN effet en SQL — `'ONLINE' = 'Online'` rend vrai.
+     *
+     * **Ce que la casse masquait, c'est que `!= 'ONLINE'` compte les machines
+     * d'etat INCONNU comme hors ligne.** Les deux compteurs somment au total, ce
+     * qui les fait PARAITRE coherents — et c'est ce qui rend le defaut
+     * invisible. Deux machines sur trois etaient annoncees « hors ligne » alors
+     * que le produit ne sait pas.
+     *
+     * `Inconnu` existe DEJA dans la donnee : ce troisieme compteur n'ajoute donc
+     * rien, il cesse de sommer ce que la colonne distingue.
+     *
+     * ⚠ ET LA COMPARAISON RESTE EN SQL. La porter en PHP avec `===` la rendrait
+     * sensible a la casse et donnerait un resultat different du legacy — le
+     * piege est la, pas dans la requete.
+     *
+     * ══ « ZERO MESURE » ET « RIEN LU » NE SONT PAS LE MEME ETAT ══════════
+     *
+     * `lisible` a faux quand la lecture echoue. Sans ca, un `cve_scans`
+     * injoignable se rendrait « aucune CVE » — la direction rassurante, celle
+     * que personne ne remesure.
+     *
+     * @return array{lisible:bool,borne:bool,machines:int,en_ligne:int,hors_ligne:int,inconnu:int,cle:int}
+     */
+    public function indicateurs(int $roleId, int $userId): array
+    {
+        try {
+            $base = fn () => $this->requeteBornee($roleId, $userId);
+
+            return [
+                'lisible'    => true,
+                'borne'      => $roleId < 2,
+                'machines'   => $base()->count(),
+                // LA CASSE EST CELLE DE LA DONNEE, pas celle du legacy : on
+                // compare a ce que la colonne contient reellement.
+                'en_ligne'   => $base()->where('m.online_status', 'ONLINE')->count(),
+                'hors_ligne' => $base()->where('m.online_status', 'OFFLINE')->count(),
+                // TOUT LE RESTE EST INCONNU, y compris `NULL`. Ecrire la liste
+                // des valeurs « inconnues » aurait demande de la tenir a jour ;
+                // le complement ne se perime pas.
+                'inconnu'    => $base()
+                    ->where(function ($q) {
+                        $q->whereNull('m.online_status')
+                          ->orWhereNotIn('m.online_status', ['ONLINE', 'OFFLINE']);
+                    })->count(),
+                'cle'        => $base()->where('m.platform_key_deployed', 1)->count(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('[Machines::indicateurs] parc illisible : ' . $e->getMessage());
+
+            return ['lisible' => false, 'borne' => false, 'machines' => 0,
+                'en_ligne' => 0, 'hors_ligne' => 0, 'inconnu' => 0, 'cle' => 0];
+        }
+    }
+
+    /**
+     * Les indicateurs de vulnerabilites, BORNES au perimetre.
+     *
+     * ══ LE DSI LES DONNAIT POUR NON BORNABLES ; LA DONNEE DIT LE CONTRAIRE ══
+     *
+     * `SHOW COLUMNS FROM cve_scans` rend `machine_id`. Les trois valeurs se
+     * bornent donc avec le prédicat existant. Elles n'etaient pas « non
+     * bornees » : elles etaient non bornees DANS LA REQUETE DU LEGACY, ce qui
+     * n'est pas la meme chose.
+     *
+     * L'enjeu est concret : la seule ligne de `cve_scans` de cette installation
+     * porte 1458 CVE sur `srv-zabbix`. Un role 1 qui n'a pas cette machine ne
+     * doit pas lire son compte.
+     *
+     * ══ TROIS ISSUES, PAS DEUX ══════════════════════════════════════════
+     *
+     * `aucun_scan` distingue « aucun scan dans mon perimetre » de « je n'ai pas
+     * su lire ». Un `null` rendu comme zero se lirait « aucune CVE », et un parc
+     * sans vulnerabilite connue est exactement ce qu'on aimerait croire.
+     *
+     * @return array{lisible:bool,aucun_scan:bool,date:string,cve:int,critiques:int}
+     */
+    public function indicateursCve(int $roleId, int $userId): array
+    {
+        try {
+            // Les identifiants du perimetre, une fois — puis deux agregats
+            // dessus. Refaire la jointure dans chaque requete marcherait, mais
+            // la borne serait ecrite deux fois de plus.
+            $ids = $this->requeteBornee($roleId, $userId)->pluck('m.id')->all();
+
+            if ($ids === []) {
+                // AUCUNE MACHINE AU PERIMETRE : ce n'est pas « aucun scan », et
+                // ce n'est pas une erreur. L'ecran le dira comme tel.
+                return ['lisible' => true, 'aucun_scan' => true, 'date' => '', 'cve' => 0, 'critiques' => 0];
+            }
+
+            $dernier = DB::table('cve_scans')
+                ->whereIn('machine_id', $ids)
+                ->orderByDesc('scan_date')
+                ->first(['scan_date', 'cve_count']);
+
+            $critiques = DB::table('cve_scans')
+                ->whereIn('machine_id', $ids)
+                ->sum('critical_count');
+
+            return [
+                'lisible'    => true,
+                'aucun_scan' => $dernier === null,
+                'date'       => (string) ($dernier->scan_date ?? ''),
+                'cve'        => (int) ($dernier->cve_count ?? 0),
+                'critiques'  => (int) $critiques,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('[Machines::indicateursCve] lecture impossible : ' . $e->getMessage());
+
+            return ['lisible' => false, 'aucun_scan' => false, 'date' => '', 'cve' => 0, 'critiques' => 0];
         }
     }
 

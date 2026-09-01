@@ -299,6 +299,93 @@ class Comptes
         DB::table('users')->where('id', $id)->update(['totp_secret' => null]);
     }
 
+    /**
+     * Les trois indicateurs de COMPTES du tableau de bord, bornes par ROLE.
+     *
+     * ══ POURQUOI PAR ROLE ET NON PAR PERIMETRE ═══════════════════════════
+     *
+     * L'arbitrage `DECISIONS-DSI.md` §1 borne cette page « au perimetre du
+     * compte ». **Cette borne n'a aucun sens pour un compteur de comptes** : un
+     * perimetre de MACHINES ne borne pas une population d'utilisateurs. Ces
+     * trois-la se bornent donc par role, et l'arbitrage ne le disait pas —
+     * decision n°12.
+     *
+     * ══ `sans_2fa` EST RESERVE AU ROLE 3, ET CE N'EST PAS DE LA PUDEUR ═══
+     *
+     * Mesure du 2026-09-01 : **8 comptes actifs sur 12 sont sans second
+     * facteur.** Le legacy affiche ce nombre des le role 1.
+     *
+     * Ce n'est pas un chiffre genant, c'est **une carte de la surface
+     * d'attaque** : un role 1 compromis apprend que les deux tiers des comptes
+     * s'attaquent sans second facteur. Directement actionnable pour un
+     * attaquant, d'aucune utilite pour lui-meme.
+     *
+     * **Et le geler ne coute rien** : la page porte deja une tuile qui dit a
+     * chaque compte SON PROPRE etat (`accueil.securite_*`). *Une information sur
+     * ses propres limites n'est pas une information sur des objets.* « Votre
+     * compte n'a pas de second facteur » est actionnable et ne fuit rien ;
+     * « 8 comptes n'en ont pas » est une liste de cibles.
+     *
+     * ══ `null` N'EST PAS `0` ═════════════════════════════════════════════
+     *
+     * Une valeur `null` veut dire « pas montre a ce role », jamais « zero ». Le
+     * gel vit ICI, avec la donnee, pour qu'un second appelant ne puisse pas
+     * l'oublier — une garde posee dans la vue serait a reecrire a chaque vue.
+     *
+     * ══ LA REGLE DU SECOND FACTEUR EST REPRISE, PAS REECRITE ═════════════
+     *
+     * `porteUnSecondFacteur()` ci-dessous decide par `!== null && !== ''`. Le
+     * predicat SQL est le meme, ecrit une fois.
+     *
+     * RESERVE MESUREE : ce test porte sur les OCTETS de la colonne. Les colonnes
+     * chiffrees de ce produit ont deja rendu « non vide » pour une valeur
+     * reellement vide (PHP chiffre `''` en `sodium:…`). Verifie le 2026-09-01
+     * **par les seules longueurs, sans dechiffrer aucun secret vivant** : 136
+     * (x3) et 204 (x1), aucune proche d'un chiffre de chaine vide (~63 octets
+     * sur la meme famille). Le compte est donc exact aujourd'hui. **Le jour ou
+     * une longueur courte apparaitra, il SOUS-ESTIMERA** — la mauvaise direction
+     * pour un indicateur de securite.
+     *
+     * @return array{lisible:bool,actifs:?int,sans_cle:?int,sans_2fa:?int}
+     */
+    public function indicateursComptes(int $roleId): array
+    {
+        if ($roleId < 2) {
+            // Rien n'est lu : un role 1 ne declenche meme pas la requete.
+            return ['lisible' => true, 'actifs' => null, 'sans_cle' => null, 'sans_2fa' => null];
+        }
+
+        try {
+            $actifs = DB::table('users')->where('active', 1);
+
+            $sansCle = DB::table('users')->where('active', 1)
+                ->where(function ($q) {
+                    $q->whereNull('ssh_key')->orWhere('ssh_key', '');
+                })->count();
+
+            return [
+                'lisible'  => true,
+                'actifs'   => (clone $actifs)->count(),
+                'sans_cle' => $sansCle,
+                'sans_2fa' => $roleId >= 3
+                    ? DB::table('users')->where('active', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('totp_secret')->orWhere('totp_secret', '');
+                        })->count()
+                    : null,
+            ];
+        } catch (\Throwable $e) {
+            // UNE LECTURE ECHOUEE N'EST PAS « AUCUN COMPTE ». Zero se lirait
+            // comme un fait, et « 0 compte sans second facteur » est exactement
+            // ce qu'on aimerait croire.
+            \Illuminate\Support\Facades\Log::error(
+                '[Comptes::indicateursComptes] lecture impossible : ' . $e->getMessage()
+            );
+
+            return ['lisible' => false, 'actifs' => null, 'sans_cle' => null, 'sans_2fa' => null];
+        }
+    }
+
     public function porteUnSecondFacteur(int $id): bool
     {
         $secret = DB::table('users')->where('id', $id)->value('totp_secret');
