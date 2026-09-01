@@ -457,6 +457,27 @@ class TestReleveDesEcrituresDInventaire:
     def test_aucune_fonction_nouvelle_n_ecrit_l_inventaire(self):
         trouves = _appelants_qualifies(sup, '_upsert_agent')
 
+        # ══ LA GARDE D'OBJET, ET ELLE MANQUAIT ══════════════════════════════
+        #
+        # « aucun X ne fait Y » est une universelle NEGATIVE : elle est VRAIE A
+        # VIDE. Si l'analyseur ne rend rien — module renomme, source illisible,
+        # `inspect.getsource` qui change — `inconnus` est vide et ce test PASSE
+        # en annoncant « aucun appelant nouveau », c'est-a-dire la plus
+        # rassurante des conclusions, sans avoir rien regarde.
+        #
+        # Mesure du 2026-09-01 : mutation vidant l'analyseur -> ce test EST
+        # RESTE VERT. Ses deux jumeaux ont rougi, donc le FICHIER etait protege
+        # — mais un test vert par vacuite reste faux joue seul, cite seul, ou
+        # separe de son jumeau. *Un `assert` dans une suite verte ne se relit
+        # jamais.*
+        #
+        # C'est la regle SANS OBJET appliquee ici : une assertion doit inclure
+        # l'existence de sa FENETRE D'OBSERVATION, pas seulement celle de son
+        # objet.
+        assert trouves, ("l'analyseur n'a rien rendu : ce test ne mesure RIEN. "
+                         "Ce n'est pas « aucun appelant nouveau », c'est « je "
+                         "n'ai pas pu regarder ».")
+
         inconnus = set(trouves) - set(APPELANTS_UPSERT_GELES)
         assert not inconnus, (
             f"nouvel appelant de `_upsert_agent` : {sorted(inconnus)}. "
@@ -476,7 +497,15 @@ class TestReleveDesEcrituresDInventaire:
     def test_le_compte_des_appels_se_reconstitue(self):
         """Un appelant peut ecrire l'inventaire DEUX fois — une seule des deux
         etant conditionnee. Le releve nomme les fonctions ; ce compte dit qu'il
-        n'y a pas d'ecriture supplementaire cachee dans une deja connue."""
+        n'y a pas d'ecriture supplementaire cachee dans une deja connue.
+
+        CE QU'IL NE VOIT PAS, ET C'EST MESURE : il est AVEUGLE A UN RENOMMAGE.
+        Mutation du 2026-09-01 renommant `zabbix_deploy` — trois tests de la
+        classe ont rougi, celui-ci est reste VERT, parce que le nombre d'appels
+        n'avait pas change. C'est correct pour ce qu'il annonce, et il faut le
+        dire : je le citais comme le filet contre le vide, et il n'est que le
+        filet contre le NOMBRE. C'est `aucune_fonction_nouvelle` qui attrape les
+        renommages."""
         trouves = _appelants_qualifies(sup, '_upsert_agent')
 
         assert sum(trouves.values()) == len(APPELANTS_UPSERT_GELES), (
