@@ -135,6 +135,42 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # Regle ajoutee au cycle de portage : si l'entree bascule, rejouer
 # `go-socle-navigation` et reinscrire sa reference DANS LE MEME COMMIT.
 #
+# ══ ARBITRAGE DU LEAD : `go-page-mot-de-passe` ENTRE AU LOT ════════════════
+#
+# La session 7 a demande un arbitrage avant de l'inscrire : sa suite POSE
+# `force_password_change = 1` sur `rw-test-admin` (id 15) puis le retire, et « une
+# suite mutante dans un corpus de non-regression demande un arbitrage qui n'est pas
+# le mien ». Elle avait raison de demander. **Le precedent existe deja, et il est
+# PLUS fort :**
+#
+#     go-auth-mot-de-passe.mjs   DEJA dans le LOT, et elle mutate le MEME compte :
+#       le HACHAGE du mot de passe, `force_password_change`, et `password_history`
+#       -> sauvegardes, restaures dans un `finally`, etat rendu RELU
+#       -> admise « sur arbitrage de l'exploitant » (ligne 36 du fichier)
+#
+# Un booleen est moins consequent qu'un hachage. **Le precedent couvre donc le cas,
+# et l'exploitant l'a deja tranche dans le sens de l'admission.** Les gardes de la
+# nouvelle egalent ou depassent : precondition qui REFUSE de tourner si le drapeau
+# n'est pas a 0 au depart (*restaurer un etat qu'on n'a pas cree l'effacerait*),
+# restauration ASSERTEE et pas seulement tentee, jamais `rw-test-user` (id 14), et
+# un mot de passe que la politique REFUSE — *la propriete mesuree est que la route
+# est ATTEIGNABLE, jamais que le geste aboutit.*
+#
+# UNE CONDITION QUE LE PRECEDENT N'A PAS, ET LA MESURE LA JUSTIFIE :
+#
+#     suites du LOT utilisant rw-test-admin  ->  61   (mesure 2026-09-01 15:20)
+#
+# Ce drapeau garde TOUTE page du portage. Une restauration ratee ne fait donc pas
+# echouer UNE suite : elle en fait echouer ~61, en cascade, sur un LOT de 2 h 40.
+# **La restauration ratee doit ABATTRE LE LOT, pas le laisser continuer** — c'est
+# l'inverse de la regle habituelle (un echec de suite n'arrete pas le lot), et
+# l'asymetrie du cout la justifie. Et comme `go-auth-mot-de-passe`, elle joue **en
+# SEQUENCE** : jamais en parallele d'une suite qui emploie ce compte.
+#
+# La commande de secours est en tete du fichier de la suite, sur exigence du DSI :
+# *un `finally` protege contre l'echec du test, pas contre la mort du processus ;
+# ce qui protege alors est que le prochain sache quoi taper.*
+#
 # ══ TROIS REFERENCES POSEES — mesurees le 2026-09-01, session 7 ═════════════
 #
 #     go-socle-navigation  laravel  PASS=66 FAIL=0  82s   14:17:44 -> 14:19:08 CEST
@@ -612,6 +648,15 @@ declare -A REF_LARAVEL=(
   # un journal qui inscrivait la page portee.
   # `POST /pare-feu/historique -> 200` est mesure AU RESEAU, pas au DOM.
   [go-page-pare-feu]=23
+  # go-page-accueil — les neuf indicateurs, mesures AUX TROIS ROLES parce que les
+  # trois familles de bornes ont trois seuils differents (`parc` et `indicateurs`
+  # a role < 2, `comptes.actifs` a < 2, `comptes.sans_2fa` a < 3) : UN SEUL ROLE
+  # N'EN AURAIT VU AUCUNE. Seule au repos, 15:10:36 -> 15:12:02 CEST (d537d28),
+  # prediction posee AVANT lancement et exacte.
+  # ⚠ CETTE REFERENCE NE CERTIFIE PAS L'ONGLET « BORNE » : la region d'alertes du
+  # legacy n'est pas commencee. *Une reference posee sur un etat incomplet
+  # transforme un manque en etat normal.*
+  [go-page-accueil]=41
   # `graylog/` sous-lot G2 : les trois gestes qui ouvrent une session SSH reelle.
   # 30 sur le portage contre 21 sur le legacy. L'ecart de NEUF se decompose
   # entierement, et chaque ligne est une correction :
@@ -951,6 +996,8 @@ declare -A REF_LEGACY=(
   # `textContent`. Elle mesurait l'instrument. `17 · 0` ne doit donc PAS se lire comme
   # un defaut repare.
   [go-page-pare-feu]=17
+  # go-page-accueil, cible legacy : 16 PASS / 0 FAIL, 15:08:22 -> 15:09:47 CEST.
+  [go-page-accueil]=16
   # 21 sur le legacy. Il n'a ni panneau de decision ni message en page : ses trois
   # boutons emettent au clic, `glTest` sans meme un `confirm()`.
   [go-page-graylog-g2]=21
@@ -1002,7 +1049,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-page-cle-plateforme go-page-pare-feu
+  go-page-cle-plateforme go-page-pare-feu go-page-accueil
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-fail2ban-f6
@@ -1026,7 +1073,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
-  go-page-update-u6 go-page-update-u6b go-page-pare-feu)
+  go-page-update-u6 go-page-update-u6b go-page-pare-feu go-page-accueil)
 
 # Le secret TOTP de `rw-test-super`, LU dans la suite ou il vit deja — il ne se
 # recopie pas ici. Meme regle que `tests/e2e/code-totp.mjs`.
