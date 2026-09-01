@@ -71,7 +71,11 @@
                           @if ($rwNonLues === 0) hidden @endif>{{ $rwNonLues }}</span>
                 </a>
                 @include('composants.langue')
-                <span>{{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong></span>
+                {{-- UNE CLASSE, PARCE QUE C'EST CE LIBELLE-LA QU'ON MASQUE SUR
+                     PETIT ECRAN. La regle visait `.rw-entete__compte span` et
+                     attrapait AUSSI la pastille de notification et la langue
+                     active — trois elements caches la ou un seul devait l'etre. --}}
+                <span class="rw-entete__nom">{{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong></span>
                 <form class="rw-inline" method="POST" action="{{ route('deconnexion') }}">
                     @csrf
                     <button class="rw-bouton rw-bouton--discret" type="submit">{{ __('nav.logout') }}</button>
