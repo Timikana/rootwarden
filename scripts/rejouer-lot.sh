@@ -604,6 +604,14 @@ declare -A REF_LARAVEL=(
   # n'a pas de `confirm()` et ouvrirait une session SSH sur la machine de la
   # ligne, et `srv-zabbix` figure dans ce tableau. Les gestes mutants sont G2.
   [go-page-graylog-g1]=28
+  # go-page-pare-feu — PREMIERE couverture navigateur de cette page. Mesuree seule
+  # au repos le 2026-09-01 : 23 PASS / 0 FAIL, 14:49:18 -> 14:50:43 CEST (commit 2d191a3).
+  # AVANT elle, ZERO suite ne visait /pare-feu : `git grep -l '/pare-feu' 2d191a3^ --
+  # 'tests/e2e/*.mjs'` rend RIEN. 23 ancres `data-rw`, 3 routes POST, 5 appels reseau,
+  # aucune assertion — c'est ce qui a laisse un 404 vivre quatre jours (E-244) derriere
+  # un journal qui inscrivait la page portee.
+  # `POST /pare-feu/historique -> 200` est mesure AU RESEAU, pas au DOM.
+  [go-page-pare-feu]=23
   # `graylog/` sous-lot G2 : les trois gestes qui ouvrent une session SSH reelle.
   # 30 sur le portage contre 21 sur le legacy. L'ecart de NEUF se decompose
   # entierement, et chaque ligne est une correction :
@@ -936,6 +944,13 @@ declare -A REF_LEGACY=(
   # bouton de ligne — `glTest` (js:100) n'a pas de `confirm()` et ouvrirait une
   # session SSH sur la machine de la ligne, `srv-zabbix` comprise.
   [go-page-graylog-g1]=27
+  # go-page-pare-feu, cible legacy : 17 PASS / 0 FAIL, 14:47:11 -> 14:48:36 CEST.
+  # UN FAUX ROUGE a ete eteint EN CORRIGEANT LA MESURE, pas l'objet : l'assertion
+  # exigeait un conteneur d'historique vide au repos, or `#iptables-history` vit dans
+  # `#rules-container` masque, et `innerText` d'un element non rendu retombe sur
+  # `textContent`. Elle mesurait l'instrument. `17 · 0` ne doit donc PAS se lire comme
+  # un defaut repare.
+  [go-page-pare-feu]=17
   # 21 sur le legacy. Il n'a ni panneau de decision ni message en page : ses trois
   # boutons emettent au clic, `glTest` sans meme un `confirm()`.
   [go-page-graylog-g2]=21
@@ -987,7 +1002,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-page-cle-plateforme
+  go-page-cle-plateforme go-page-pare-feu
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-fail2ban-f6
@@ -1011,7 +1026,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-vague0-legacy
   go-page-update-u1
   go-page-update-u2 go-page-update-u3 go-page-update-u4 go-page-update-u5
-  go-page-update-u6 go-page-update-u6b)
+  go-page-update-u6 go-page-update-u6b go-page-pare-feu)
 
 # Le secret TOTP de `rw-test-super`, LU dans la suite ou il vit deja — il ne se
 # recopie pas ici. Meme regle que `tests/e2e/code-totp.mjs`.
