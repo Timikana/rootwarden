@@ -87,7 +87,9 @@ const C = CIBLE === 'laravel'
     ? { connexion: '/connexion', profil: '/profil', ailleurs: '/cles-ssh',
         formulaire: '[data-rw="profil-mdp-form"]',
         soumettre: '[data-rw="profil-mdp-enregistrer"]',
-        message: '[data-rw="profil-mdp-message"]',
+        // TRANSITION E-250 : les deux noms — cette suite mesure qu'UN
+        // message est rendu, jamais lequel, donc il lui faut les trois.
+        message: '[data-rw="profil-mdp-message"], [data-rw="profil-mdp-succes"], [data-rw="profil-mdp-erreur"]',
         deconnexion: 'form[action$="/deconnexion"] button',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', profil: '/profile.php', ailleurs: '/iptables/',
