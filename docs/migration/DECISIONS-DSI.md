@@ -2036,3 +2036,109 @@ resserre, et sa version est meilleure** :
 > d'établir que le nommage de cette famille ne dit pas ce que le code fait.
 
 *Le succès d'une mesure sur un objet est un argument CONTRE la confiance dans ses voisins, pas pour.*
+
+---
+
+## 16 — Le libellé du compteur de parc : **ma spécification produit un cadrage faux au rôle 3**
+
+**Trouvé par la session 7 en lisant l'écran, pas le code. Vérifié par moi à 13:06 UTC.**
+
+    lang/fr/accueil.php:67   'parc_perimetre' => '… :count de vos machines'   <- TOUJOURS possessif
+    accueil.blade.php:65     l appoint « · N au parc »  @if ($parc['borne'])
+                    :69      la reserve                 @if ($parc['borne'])
+
+    role 1     « 3 de vos machines · 3 au parc »  +  la reserve qui explique
+    role 2/3   « 3 de vos machines »  SEUL — aucune mention du parc
+
+> **Au rôle 3, l'écran annonce « 3 de vos machines » alors que ce sont TOUTES les machines du parc.** Le
+> nombre est juste ; **le cadrage suggère un sous-ensemble là où il n'y en a pas.**
+
+### ⚠ Et ce défaut est la COMPOSITION de deux raffinements corrects
+
+| | |
+|---|---|
+| **ma borne** | le second nombre accompagne le premier, *« sinon le tableau de bord ment par omission »* |
+| **le raffinement de la session 3**, que j'ai adopté | la réserve et l'appoint **ne s'affichent que si la borne mord** |
+
+**Aucun des deux n'est faux. Leur composition l'est** — parce que le libellé, lui, n'a jamais eu de
+variante. *Deux corrections justes appliquées au même écran peuvent produire un troisième défaut que ni
+l'une ni l'autre ne contenait.*
+
+**Et la vue nomme elle-même la classe** : son commentaire dit qu'un compteur *« sans dire ce que l'ancien
+portail en faisait laisserait croire à un ajout cosmétique »*. **Le même raisonnement s'applique au
+possessif**, et personne ne l'y a appliqué.
+
+### DÉCISION : deux variantes de libellé, pas une
+
+    borne mord      -> « :count de vos machines · :total au parc »   + la reserve
+    borne ne mord pas -> « :count machines au parc »                  (NEUTRE, sans possessif)
+
+**Le possessif est ce qui porte le mensonge, pas le nombre manquant.** *Un compte qui voit tout ne doit
+pas lire « vos machines » — non parce que c'est faux au sens strict, mais parce que la formulation existe
+pour signaler une restriction.*
+
+> **Le compte le mieux informé était celui à qui l'écran en disait le moins sur sa propre portée.** La
+> formule est de la session 7 et elle est le résumé de la décision.
+
+**Session 3 écrit**, i18n FR/EN dans le même commit. **Et la session 7 a eu raison de ne PAS l'asserter** :
+ce serait un FAIL permanent sur une décision de rédaction qui n'était pas la sienne.
+
+---
+
+## 17 — La fixture du middleware : **approuvée, et pas pour la raison qu'on attendrait**
+
+**La session 7 demande à poser `force_password_change` sur un compte de banc puis à le retirer.** Aucun
+compte d'épreuve ne le porte — la mesure de l'enfermement l'exige donc.
+
+**Sa cible : `rw-test-admin`** (jamais `rw-test-user`, lecture seule par consigne), drapeau restauré dans
+le `finally`, **restauration assertée**, et **une précondition qui refuse de tourner si le drapeau n'est
+pas à 0 au départ** — pour ne pas restaurer un état qu'elle n'a pas créé.
+
+### ⚠ Pourquoi ça ressemble à ce que j'ai REFUSÉ, et pourquoi ce n'est pas la même chose
+
+**J'ai rejeté la révocation temporaire de `can_manage_fail2ban` sur ce même compte**, au motif que *« une
+fixture qui échoue ouvert sur un état partagé casserait treize suites avec un symptôme de régression »*.
+**Le mode d'échec est identique** : processus tué entre la pose et la restauration.
+
+**Ce qui diffère est la LISIBILITÉ de l'échec, et c'est ce qui décide :**
+
+| état résiduel | ce que le banc rend | comment ça se lit |
+|---|---|---|
+| une permission **manquante** | **403** sur les routes du module | **indiscernable d'une garde légitime** — donc d'une vraie régression |
+| le drapeau **posé** | **redirection vers `profil`** sur *toute* route | **impossible à confondre** — uniforme, et auto-diagnostique |
+
+> **Un état résiduel qui s'annonce ne coûte pas ce que coûte un état résiduel qui se déguise.** Le premier
+> se répare par un `UPDATE` d'une ligne ; le second se cherche une demi-journée dans le code de la page
+> qu'il accuse.
+
+**C'est le même critère que j'ai employé toute la journée sur les sondes** — *une erreur qui alarme fait
+agir, une erreur qui rassure ne fait rien* — appliqué non à une mesure mais à **un dégât**.
+
+### La condition que j'ajoute, et elle coûte une ligne
+
+**La commande de restauration écrite EN TÊTE DU FICHIER de suite**, pas seulement dans le `finally` :
+
+    -- si le banc reste enferme : UPDATE users SET force_password_change = 0 WHERE id = 15
+
+*Un `finally` protège contre l'échec du test ; il ne protège pas contre la mort du processus.* **Ce qui
+protège alors est que le prochain sache quoi taper** — et ce chantier a déjà payé une demi-journée pour un
+état résiduel dont personne ne connaissait le remède.
+
+**Suite séparée : accordé.** Les deux propriétés n'ont rien à voir avec les indicateurs, et *une suite qui
+mesure deux choses sans rapport rend un verdict qu'on ne sait pas attribuer.*
+
+---
+
+## Et une trouvaille de la session 7 qui change ce qu'un chiffre VEUT DIRE
+
+**Cinq des huit porteurs du drapeau sont des résidus de banc** — `e2e_test_*`, rôle 1, actifs, sans second
+facteur, créés entre le 2026-07-25 et le 2026-08-12 par une suite qui ne nettoie pas dans un `finally`.
+
+> **Ils comptent dans les « 12 comptes actifs » et dans les « 12 sans clé SSH » que l'onglet affiche.**
+> Donc l'indicateur saturé `12/12` est **saturé en partie par du déchet de banc.** La saturation reste
+> vraie ; **sa cause n'est pas celle qu'un exploitant lirait.**
+
+**Ça ne change rien à la justesse du portage** — l'indicateur compte ce qu'il dit compter. **Ça change ce
+que le chiffre signifie**, et c'est une raison de plus pour l'arbitrage qui dort au §7 depuis le
+2026-08-26 : *supprimer ou non les cinq comptes `e2e_test_*`*. **Il n'est pas urgent ; il vient de cesser
+d'être seulement cosmétique.**
