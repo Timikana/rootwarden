@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.109** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.110** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,48 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.110 — E-249 : il y a deux gardes, et le premier est dans le navigateur
+
+    profil.blade.php:54          minlength="{{ $longueurMinimale }}"  sur new_password
+    PortailController.php:136    longueurMinimale = 15 par defaut
+
+Une suite voulait mesurer un refus **serveur** et soumettait `new_password = 'court'`. **Le navigateur
+a refuse la soumission avant l'envoi** — aucun POST n'est jamais parti, et l'assertion concluait
+« la soumission atteint la route » de ce que l'URL valait `/profil`.
+
+> **Rester sur `/profil` et y etre redirige produisent exactement la meme URL.** Un observable ne dit
+> jamais par quel chemin il a ete produit — et celui-la avait ete choisi comme preuve par l'auteur meme
+> de la suite.
+
+> **Il y a deux gardes, et le premier est dans le navigateur. Une suite qui veut mesurer un refus
+> SERVEUR doit d'abord SATISFAIRE le garde CLIENT, sinon elle ne mesure que lui.**
+
+**Correction** : `minlength` satisfait, et le refus porte par le **mot de passe courant FAUX** — *la
+seule des trois erreurs qui ne peut en aucun cas modifier le secret du compte.* Plus une assertion sur
+`form.checkValidity()` **avant** le clic : *sinon l'absence de requete serait imputee au middleware a
+tort.*
+
+#### Ce qui l'a revele : une CLE MORTE dans la table de selecteurs
+
+`C.message` declaree et **jamais lue**. **Une cle morte signale presque toujours une mesure absente, pas
+un oubli de menage** — posee, elle a rougi : aucun message de refus n'est rendu. *Et la meme cle morte
+avait ete rencontree le matin sur `pare-feu`, ou elle avait ete RETIREE au lieu d'etre lue : le menage
+avait efface le signal.*
+
+#### Et le detail d'echec avait nomme la cause
+
+Son propre message de FAIL disait *« le clic n'a pas soumis le formulaire, **ou le navigateur l'a refuse
+avant l'envoi** »*. **La bonne hypothese etait ecrite dans le detail, non reconnue.** Ce chantier a
+numerote cinq occurrences d'un detail d'echec affiche sur un PASS ; **en voici la reciproque : un detail
+d'echec ne sert que si on le lit.**
+
+#### La methode change pour les deux FAIL du LOT
+
+Plutot que de chercher le defaut qu'une assertion rouge accuse, **etablir d'abord que l'assertion mesure
+ce qu'elle nomme.** **Trois fois aujourd'hui le defaut etait dans l'instrument et pointait un objet
+innocent** : `innerText` hors rendu retombant sur `textContent` · un journal affirmant une verification
+qu'il ne faisait pas · un garde client pris pour un garde serveur.
 
 ### v1.38.109 — E-248 : un correctif issu d'une LECTURE se refute par une lecture, et l'abattage du LOT existe enfin
 

@@ -12004,3 +12004,61 @@ En ecrivant l'abattage du LOT (ci-dessous), mon extraction du remede portait le 
 **Teste sur un journal forge : la variante `REMEDE::` sans espace faisait PERDRE LA LIGNE EN SILENCE**
 — alors que mon propre commentaire promet que le remede vient du journal. **Cinquieme motif du jour qui
 suppose une forme d'ecriture**, et le premier dans un garde que je venais d'ecrire. Elargi.
+
+## E-249 — il y a DEUX gardes, et le premier est dans le navigateur : une suite qui veut mesurer un refus SERVEUR doit d'abord SATISFAIRE le garde CLIENT
+
+**Releve par la session 7 le 2026-09-01, verifie par le Lead a 15:50 CEST.**
+
+    laravel/resources/views/profil.blade.php:54   minlength="{{ $longueurMinimale }}"  sur new_password
+    PortailController.php:136                     longueurMinimale = 15 par defaut
+
+La suite voulait mesurer un refus **serveur** et soumettait `new_password = 'court'`. **Le navigateur a
+refuse la soumission avant l'envoi** — aucun POST n'est jamais parti.
+
+### Ce qui a rendu le faux vert INDISCERNABLE
+
+L'assertion concluait *« la soumission atteint la route »* de ce que l'URL valait `/profil` sans
+`force_change=1`. Or **rester sur `/profil` et y etre redirige produisent exactement la meme URL.**
+
+> **Un observable ne dit jamais par quel chemin il a ete produit** — et celui-la avait ete choisi comme
+> preuve par l'auteur meme de la suite.
+
+**La regle generale :**
+
+> **Il y a deux gardes, et le premier est dans le navigateur. Une suite qui veut mesurer un refus
+> SERVEUR doit d'abord SATISFAIRE le garde CLIENT, sinon elle ne mesure que lui.**
+
+**Correction posee** : `minlength` satisfait, confirmation identique, et le refus porte par le **mot de
+passe courant FAUX** — *la seule des trois erreurs qui ne peut en aucun cas modifier le secret du
+compte.* Plus une assertion qui mesure `form.checkValidity()` **avant** le clic : *si le garde client
+refuse, l'absence de requete serait imputee au middleware a tort.*
+
+### Ce qui l'a revele : une CLE MORTE dans la table de selecteurs
+
+`C.message` etait declaree et **jamais lue**.
+
+> **Une cle morte signale presque toujours une mesure absente, pas un oubli de menage.**
+
+Posee, elle a **rougi** : aucun message de refus n'est rendu. *Et la meme cle morte avait ete rencontree
+le matin sur `pare-feu`, ou elle avait ete **retiree** au lieu d'etre lue — le menage avait efface le
+signal.*
+
+### Et le detail d'echec avait nomme la cause
+
+Le message de son propre FAIL disait : *« le clic n'a pas soumis le formulaire, **ou le navigateur l'a
+refuse avant l'envoi** »*. **La bonne hypothese etait ecrite dans le detail, non reconnue.**
+
+*Ce chantier a numerote cinq occurrences d'un detail d'echec affiche sur un PASS. En voici la
+reciproque : **un detail d'echec ne sert que si on le lit**, et il portait ici la reponse.*
+
+### La consequence pour les DEUX FAIL du LOT, et elle change la methode
+
+La session 7 change son approche : plutot que de chercher le defaut qu'une assertion rouge accuse,
+**etablir d'abord que l'assertion mesure ce qu'elle nomme.**
+
+**Trois fois aujourd'hui le defaut etait dans l'instrument et pointait un objet innocent** : le
+conteneur legacy dont `innerText` hors rendu retombe sur `textContent` · le journal qui affirmait une
+verification qu'il ne faisait pas · et un garde client pris pour un garde serveur.
+
+> **Les deux FAIL sont peut-etre reels ; ils sont peut-etre deux assertions qui mesurent leur propre
+> outillage. La question se tranche AVANT de proposer un correctif.**
