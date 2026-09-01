@@ -1818,8 +1818,9 @@ moitiés sont fausses** — remesuré par AST : **58** `.match()` sur motif ancr
 > mesure, et personne, elle comprise, ne le remesurait avant de s'appuyer dessus.
 
 **Et le chiffre que je demandais — combien composent une ligne de commande — vaut 2**, contre 10 au relevé
-automatique et 58 au relevé par motif. **28 des 58 `.strip()`ent avant de valider**, 10 sont du journal ou
-de l'affichage, et le quoting (`shlex.quote`, guillemets simples) referme presque tout le reste.
+automatique et 58 au relevé par motif. **27 des 58 `.strip()`ent avant de valider** — *et non 28 : voir la correction ci-dessous* —, 10 sont du
+journal ou de l'affichage, et le quoting (`shlex.quote`, guillemets simples) referme presque tout le
+reste.
 
 **Les deux survivants, aucune injection** : `bashrc.py:528` (`chown {uname}` non quoté → le déploiement
 échoue) et **`graylog.py:334`** — un nom à `\n` final ferait écrire un fichier **sans son suffixe
@@ -1834,3 +1835,58 @@ mesurable), et aligner `graylog.py:334` sur le `.strip()` que sa propre route d'
 **Sa franchise mérite d'être notée** : son relevé automatique s'est trompé **des deux côtés** — 8 faux
 positifs sur 10 candidats, **et il a manqué mon cas**, la validation vivant dans un helper et l'exécution
 chez l'appelant. *Son « 10 qui valait 2 » et mon « 151 qui valait 8 » sont le même geste.*
+
+
+---
+
+## ⚠ LA RÈGLE QUI COMPLÈTE CELLE DU CATALOGUE — et je l'ai éprouvée sur MON propre chiffre
+
+**Formulée par la session 5 le 2026-09-01, en corrigeant son propre relevé de 28 à 27** : son filtre
+`.strip()` cherchait dans une **fenêtre de 40 lignes** et attrapait le `.strip()` d'une fonction
+**voisine**. Un seul site dédouané à tort (`graylog.py:556`), sans conséquence vérifiée — le nom ne part
+que dans un placeholder SQL et un journal.
+
+> **Une sonde écrite pour ACCUSER se trompe du côté qui alarme.** Le §8 le dit depuis deux jours.
+> **Une sonde écrite pour BORNER se trompe du côté qui DÉDOUANE — et personne ne remesure un
+> dédouanement.**
+
+**C'est le jour dont le §8 disait qu'il viendrait** : *« le jour où l'une se trompera dans l'autre sens,
+personne ne le verra »*. Il est venu, il a été vu, **et seulement parce qu'elle est allée vérifier une
+phrase qu'elle avait déjà publiée.**
+
+*Et « une fenêtre de lignes ne connaît pas les frontières de fonction » — l'AST, toujours.*
+
+### ⚠ Ce que cette règle m'oblige à faire sur MON « 151 qui valait 8 »
+
+**Mon « surface d'accident = 8 » est un chiffre de BORNAGE.** Par sa règle, c'est exactement la catégorie
+qui se trompe **du côté rassurant** — et je l'ai publié en le présentant comme la correction d'une
+alarme, donc dans la posture où l'on remesure le moins.
+
+**Contre-épreuve faite à 12:53 UTC, sur quatre témoins d'accident SYNTHÉTIQUES :**
+
+    /searchall        impl=True  intent=False  ->  ACCIDENT DETECTE
+    /command_logger   impl=True  intent=False  ->  ACCIDENT DETECTE
+    /updateXYZ        impl=True  intent=False  ->  ACCIDENT DETECTE
+    /testZZZ          impl=True  intent=False  ->  ACCIDENT DETECTE
+
+> **Mon instrument POUVAIT rendre le positif.** Les quatre collisions du type `/search` → `/searchall`
+> sont détectées. Donc le **8** n'est pas un silence d'instrument : c'est un compte, et *il n'y a
+> aujourd'hui aucune collision accidentelle réelle.*
+
+**Première fois de la journée que j'applique la discipline du témoin à MON propre chiffre de bornage**, et
+non à l'alarme de quelqu'un d'autre. *Le témoin ne coûte rien quand on l'écrit avec la mesure ; il coûte
+une remesure complète quand on l'écrit après.*
+
+### La forme du témoin, généralisée — et c'est elle qui se réutilise
+
+**Deux moitiés, et la seconde manque presque toujours :**
+
+1. **le témoin qui DOIT échouer** — un chemin inexistant, une route qui n'existe pas, un cas hors domaine.
+   *Sans lui, « rien ne s'est passé » et « je n'ai rien mesuré » sont la MÊME sortie* ;
+2. **la contre-épreuve** — faire rendre le **positif** à l'instrument en changeant une seule condition.
+   `--xinclude` ajouté pour l'XXE ; quatre chemins synthétiques pour mon bornage. *Donc il pouvait le
+   rendre.*
+
+**Trois questions ont été fermées aujourd'hui par cette forme, et aucune ne l'aurait été sans elle** : le
+fourre-tout CORS qui faisait rendre 405 au lieu de 404 (session 2), l'absence de résolution d'entités
+externes (session 5), et mon propre 8.
