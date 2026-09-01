@@ -144,3 +144,79 @@ elle ne peut donc pas fabriquer un chiffré de chaîne vide.**
 
 `no2fa` est fiable. *(Le préfixe est `totp:` et non `sodium:` — schéma distinct
 d'`encryptPassword`, cohérent avec la note existante.)*
+
+---
+
+## 5. Addendum du 2026-09-01 — j'ai éprouvé mes propres BORNAGES
+
+Ayant écrit que *« une sonde écrite pour BORNER se trompe du côté qui DÉDOUANE, et
+personne ne remesure un dédouanement »*, j'ai appliqué la règle à mes propres
+chiffres rassurants de ce document. **Trois éprouvés, deux corrigés dans leur
+support, aucun dans sa conclusion.**
+
+### 5.1 « `require_role(3)` met deux routes hors de portée » — tenait, mais je ne l'avais pas lu
+
+J'avais écrit ce bornage **sans lire `require_role`**, alors que
+`require_machine_access` s'était révélé un non-garde dès le rôle 2 dans ce même
+document. Lu : `if role_id < min_role: return 403`, sans contournement. Et
+`role_id` est **rechargé en base** par `get_current_user`
+(`SELECT id, role_id, active FROM users WHERE id = %s`), donc non forgeable —
+seul `X-User-ID` vient d'un en-tête, et sa borne est `@require_api_key`.
+
+**Le bornage tient, et maintenant pour la bonne raison.**
+
+### 5.2 « Aucune permission temporaire non expirée » — le vide n'était pas un négatif
+
+Le résultat était vide. **Un vide rendu par une requête que j'ai écrite est
+indiscernable d'une requête cassée**, et je l'avais publié comme un fait.
+
+Témoin : `temporary_permissions` porte **0 ligne au total** — la table n'a jamais
+servi. Donc ma requête n'a jamais eu l'occasion de rendre un positif.
+
+Contre-épreuve, sur des lignes synthétiques et **sans rien écrire dans la
+table** — le prédicat rend exactement ce qu'il doit :
+
+| ligne synthétique | attendu | rendu |
+|---|---|---|
+| `can_audit_ssh`, expire dans 1 jour | retenue | **retenue** |
+| `can_deploy_keys`, expire dans 1 h | retenue | **retenue** |
+| `can_scan_cve`, **expirée** | exclue | **exclue** |
+| `can_manage_wazuh`, hors liste | exclue | **exclue** |
+
+**L'instrument peut rendre le positif : le vide réel est donc un négatif.** Et il
+porte une nuance que je n'avais pas dite — il vient d'un **mécanisme jamais
+exercé**, pas d'un contrôle d'expiration.
+
+### 5.3 « Les TROIS écrivains de `totp_secret` » — il y en a SIX, et le portage manquait
+
+C'est la correction qui vaut. J'avais énuméré trois écrivains et écrit « les
+trois », sur la foi d'un **grep filtré** (`update|insert|SET |encryptTotp`). Ce
+filtre ne pouvait pas voir la forme Laravel, où la clé et le verbe sont sur des
+lignes différentes. Recensement non filtré — **62 occurrences, six écrivains** :
+
+| écrivain | écrit |
+|---|---|
+| `legacy/auth/enable_2fa.php:170` | chiffré `totp:` réel |
+| `legacy/auth/migrate_totp.php:78` | ré-chiffrement (exclut les vides, cf. plus haut) |
+| `legacy/auth/reset_totp.php:26` | `NULL` |
+| `legacy/adm/includes/manage_roles.php:115` | `NULL` |
+| `laravel/app/Services/Comptes.php:299` | `null` |
+| `laravel/app/Services/Comptes.php:492` | `null` |
+| `…/Auth/SecondFacteurController.php:136` | chiffré réel — **absent de mon relevé** |
+
+**La conclusion ne bouge pas**, et le portage la soutient explicitement :
+
+```php
+$secret = (string) $requete->session()->get('enrolement_secret', '');
+if ($secret === '' || (int) $requete->session()->get('enrolement_compte') !== $idCompte) {
+    return redirect()->route('second-facteur.enrolement');
+}
+```
+
+Un secret vide **ne peut pas être chiffré ni écrit** — et l'écriture n'arrive
+qu'après `$verdict === 'ok'`, donc après un code vérifié contre ce secret.
+
+> **Ce que je corrige n'est pas le verdict, c'est sa portée.** J'avais prouvé
+> « fiable » sur le legacy et l'avais annoncé pour le produit. Un bornage publié
+> comme EXHAUSTIF et reposant sur un grep filtré est exactement la forme qui
+> dédouane : personne ne va rouvrir un « vérifié négatif ».
