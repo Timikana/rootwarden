@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.114** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.115** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,55 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.115 — la contre-epreuve d'E-251, et `propre: null` n'aurait rien protege
+
+#### E-254 — meme suite, meme reference : 64/2 en fenetre sale contre 66/0 en arbre stable
+
+    LOT 1 (15:29:58, fenetre SALE)   go-socle-navigation  64 PASS · 2 FAIL   500 /supervision x2 roles
+    LOT 2 (15:37:23, arbre STABLE)   go-socle-navigation  66 PASS · 0 FAIL   conforme
+
+**Ecart entierement explique par l'ecriture de 15:30:15. Aucune regression du portage.**
+
+> **C'est la contre-epreuve qui transforme E-251 d'une explication plausible en un fait etabli.** Sans
+> LOT 2, « le FAIL venait de la fenetre » restait une hypothese — la plus vraisemblable, et rien de plus.
+> *Et une hypothese vraisemblable est exactement ce qu'il fallait eviter : celle qui accusait
+> `Machines.php` l'etait aussi.*
+
+#### E-255 — ma parade etait inerte, et elle reproduisait ce que je refusais
+
+J'avais signale que `propre` manquait a la branche `mesurable: false`, donc
+`if (! v.propre) abattre()` recevait `undefined` et **abattait 156 executions sur une absence de
+mesure.** J'avais propose `propre: null`.
+
+    { mesurable:false, propre:null }    if (!v.propre)  ->  ABAT ENCORE
+
+**`null` est falsy.** *Un champ absent, un champ faux et un champ nul se lisent pareil chez l'appelant* —
+la famille d'E-217, que je cite depuis deux jours. **Et ma premiere option reproduisait exactement ce
+que je refusais dans ma seconde**, sans que je le voie.
+
+> **Une parade qui rend l'intention lisible sans rendre l'erreur impossible deplace la surete vers la
+> memoire du prochain.**
+
+**Correctif de la session 7** (`d31c5bd`) : le module rend **`abattre`** — *la DECISION, pas la donnee
+dont on la derive* — toujours booleen, dans les deux branches, `false` quand la mesure n'a pas eu lieu.
+`propre` informe et **ne doit jamais servir a decider**. **Verifie** : les **sept** champs de decision
+sont dans les deux branches ; le huitieme differe (`tete` / `fenetre`), sans effet sur la decision, *mais
+un affichage qui lirait `v.fenetre` inconditionnellement rendrait `undefined`* — signale au
+consommateur, qui est moi.
+
+*Principe general : **quand une donnee sert a decider, exporter la decision** — sinon chaque appelant
+reimplemente la derivation, et le premier qui se trompe le fait en silence.*
+
+#### Et une fausse piste ecartee, qui compte autant que la trouvaille
+
+J'avais cru `libelle` en cause — constant dans les deux branches, annonçant « l'arbre n'a pas bouge »
+meme quand il a bouge. **Verifie : c'est le bon style de la maison**, l'etiquette nomme la propriete et
+le verdict dit si elle tient. **J'ai failli signaler un defaut qui n'en etait pas un, et je l'ai dit avec
+la trouvaille.**
+
+> **Un signalement qui nomme ce qu'il a ECARTE vaut deux fois celui qui n'enonce que sa trouvaille** —
+> le lecteur suivant ne refait pas la fausse piste.
 
 ### v1.38.114 — le LOT a capture la preuve d'E-251, et elle aurait ete indiscernable d'une regression
 

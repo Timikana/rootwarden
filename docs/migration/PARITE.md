@@ -12368,3 +12368,67 @@ savait pourquoi on ne savait pas.* Le tableau disait 4 et 13 ; **il aurait du di
 
 > **Un silence etiquete « mesure » qui ne porte pas sa mesure est un silence par incapacite sous un
 > meilleur nom.**
+
+## E-254 — la CONTRE-EPREUVE d'E-251 : meme suite, meme reference, 64/2 en fenetre sale contre 66/0 en arbre stable
+
+**Mesure de la session 7 le 2026-09-01, verifiee par le Lead a 16:05 CEST.**
+
+    LOT 1 (15:29:58, fenetre SALE)   go-socle-navigation  PASS=64  FAIL=2   ECHEC
+                                       500 /supervision aux DEUX roles
+    LOT 2 (15:37:23, arbre STABLE)   go-socle-navigation  PASS=66  FAIL=0   conforme
+
+**Meme suite, meme reference, ecart entierement explique par l'ecriture de 15:30:15.** *Aucune
+regression du portage sur `/supervision`* — et `curl` rendait deja **302** apres le rangement.
+
+> **C'est la contre-epreuve qui transforme E-251 d'une explication plausible en un fait etabli.** Sans
+> LOT 2, « le FAIL venait de la fenetre » restait une hypothese — la plus vraisemblable, et rien de plus.
+
+*Et une hypothese vraisemblable est exactement ce qu'il fallait eviter ici : celle qui accusait
+`Machines.php` l'etait aussi.*
+
+## E-255 — `propre: null` n'aurait rien protege : `null` est FALSY, et ma parade deplaçait la surete vers la memoire du prochain
+
+**Ma proposition, refutee par la session 7 avant d'etre ecrite (`d31c5bd`).**
+
+J'avais releve un trou de contrat : `propre` absent de la branche `mesurable: false`, donc
+`if (! v.propre) abattre()` recevait `undefined` et **abattait 156 executions sur une absence de
+mesure.** J'avais propose `propre: null` pour rendre l'intention explicite. **Mesure :**
+
+    { mesurable:false }                 if (!v.propre)  -> ABAT      (le trou signale)
+    { mesurable:false, propre:null }    if (!v.propre)  -> ABAT ENCORE
+    { mesurable:false, abattre:false }  if (v.abattre)  -> n'abat pas
+
+> **`null` est falsy. Rendre l'intention lisible ne rend pas la consommation sure.**
+
+**C'est la famille que je nomme moi-meme depuis deux jours** — *un champ absent, un champ faux et un
+champ nul se lisent pareil chez l'appelant*, comme `''` chiffre en `sodium:…` lu comme un secret
+present (E-217). **Ma premiere option reproduisait exactement ce que je refusais dans ma seconde**, et
+je ne l'avais pas vu.
+
+> **Une parade qui rend l'intention lisible sans rendre l'erreur impossible deplace la surete vers la
+> memoire du prochain.**
+
+### Le correctif : rendre LA DECISION, pas la donnee dont on la derive
+
+    abattre   toujours BOOLEEN, dans les DEUX branches, `false` quand la mesure n'a pas eu lieu
+    propre    true / false / null — INFORME, et ne doit JAMAIS servir a decider
+
+**Verifie par le Lead** : les **sept** champs de decision sont bien dans les deux branches (`abattre`,
+`detail`, `fichiers`, `libelle`, `mesurable`, `propre`, `toujours`). *Le huitieme differe — `tete` d'un
+cote, `fenetre` de l'autre* : sans effet sur la decision, **mais un affichage qui lirait `v.fenetre`
+inconditionnellement rendrait `undefined` sur la branche non mesurable.** Signale au consommateur, qui
+est moi.
+
+*Le principe general vaut au-dela de ce module : **quand une donnee sert a decider, exporter la
+decision** — sinon chaque appelant reimplemente la derivation, et le premier qui se trompe le fait en
+silence.*
+
+### Et une fausse piste ecartee, qui compte autant que la trouvaille
+
+J'avais d'abord cru que `libelle` etait en cause — il est **constant dans les deux branches** et annonce
+*« l'arbre n'a pas bouge »* meme quand il a bouge. **Verifie : c'est le bon style de la maison** —
+l'etiquette nomme la propriete, le verdict dit si elle tient, comme `verifie('label', condition)`.
+**J'ai failli signaler un defaut qui n'en etait pas un**, et je l'ai dit avec la trouvaille.
+
+> **Un signalement qui nomme ce qu'il a ECARTE vaut deux fois celui qui n'enonce que sa trouvaille** —
+> parce que le lecteur suivant ne refait pas la fausse piste.
