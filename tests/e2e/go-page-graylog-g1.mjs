@@ -516,56 +516,19 @@ try {
             + 'rendre le resultat — la boite recouvre la ligne, ne se style pas, et BLOQUE Puppeteer');
     });
 
-    // ══ LE SOCLE : LA MARGE DE DEFILEMENT COUVRE-T-ELLE L'EN-TETE ? ══════
-    await etape('la marge de defilement couvre l\'en-tete collant', async () => {
-        /*
-         * PROPRIETE DU SOCLE, mesuree ICI parce que c'est ici que le defaut a
-         * ete trouve (E-241) — mais elle vaut pour les DOUZE `scrollIntoView`
-         * du portage, dont huit en `block: 'nearest'` qui posent l'element au
-         * bord haut, donc SOUS l'en-tete.
-         *
-         * MON GESTE NE DEPEND PAS DE CETTE REGLE : `ouvreOnglet` recentre
-         * explicitement. **Une suite dont le geste depend d'une regle CSS
-         * echoue de facon obscure le jour ou la regle bouge** — elle rendrait
-         * « element non cliquable », ce qui a deja coute une demi-journee ici.
-         * On separe donc : le geste est robuste, et la regle est MESUREE a part,
-         * pour que sa disparition se voie comme telle.
-         *
-         * ET LA HAUTEUR EST MESUREE AU RENDU, PAS LUE DANS LE CSS. Le jeton vaut
-         * 64 px et `.rw-entete` n'a pas de hauteur explicite : elle vient de son
-         * contenu. Les deux ne sont liees par aucun code — le commentaire du CSS
-         * le dit. C'est donc a la mesure de faire ce que la declaration ne fait
-         * pas : comparer la marge effective a la hauteur REELLE.
-         */
-        const vu = await s.page.evaluate(() => {
-            const e = document.querySelector('.rw-entete');
-            const marge = getComputedStyle(document.documentElement).scrollPaddingTop;
-            return {
-                entete: e ? Math.round(e.getBoundingClientRect().height) : null,
-                collant: e ? getComputedStyle(e).position : null,
-                marge: parseInt(marge, 10) || 0,
-                brute: marge,
-            };
-        });
-        constate('en-tete', vu.entete === null ? '(absente)'
-            : `hauteur RENDUE ${vu.entete}px · position ${vu.collant}`);
-        constate('marge de defilement', vu.brute);
-
-        // La propriete porte sa precondition : sans en-tete collante, elle n'a
-        // pas d'objet et se verifierait sur rien.
-        const couvre = vu.entete !== null && /sticky|fixed/.test(vu.collant || '')
-            && vu.marge >= vu.entete;
-        verifiePortage('la marge de defilement couvre la hauteur de l\'en-tete',
-            couvre,
-            couvre ? `marge ${vu.marge}px >= en-tete ${vu.entete}px`
-                : vu.entete === null ? 'aucune `.rw-entete` rendue — la mesure n\'a pas eu lieu'
-                : ! /sticky|fixed/.test(vu.collant || '')
-                    ? `en-tete en \`${vu.collant}\` : elle ne recouvre rien, propriete sans objet`
-                    : `marge ${vu.marge}px < en-tete ${vu.entete}px — tout element amene par `
-                      + '`scrollIntoView` arrivera SOUS l\'en-tete, a moitie cache et sans que '
-                      + 'rien ne le signale');
-    });
-
+    /*
+     * LA PROPRIETE DE LA MARGE DE DEFILEMENT A ETE DEPLACEE VERS
+     * `go-socle-navigation`. Elle mesure `.rw-entete` et `html`, qui sont
+     * GLOBAUX : la loger ici etait un accident de decouverte — E-241 l'a
+     * revelee sur cette page — pas un choix. **Une assertion appartient a la
+     * couche qu'elle mesure, pas a celle ou on l'a trouvee.**
+     *
+     * Et elle y est moins fragile : `graylog/` peut etre archive, et cette suite
+     * ne rendrait plus que son constat d'archivage — c'est arrive a `services/`,
+     * dont les trois suites sont passees de 19/14/18 a 5 sans qu'aucun rouge ne
+     * le signale. Aucun emplacement n'est permanent ; une suite du socle est
+     * seulement beaucoup moins susceptible de disparaitre.
+     */
     await etape('aucune erreur JS', async () => {
         verifie('aucune erreur JS pendant la sequence', s.erreursJs.length === 0,
             s.erreursJs.join(' | ') || 'aucune');
