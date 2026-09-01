@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.121** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.122** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,62 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.122 — E-263 : `find` n'est pas findutils, et E-264 : `FENETRE SALE` a mordu a sa premiere utilisation
+
+#### E-263 — la forme RELATIVE de `-newermt` plante, et `2>/dev/null` la rend invisible
+
+    type find                        ->  « find est une fonction »  (enveloppe bfs)
+    find … -newermt '-10 minutes'    ->  bfs: error: Invalid timestamp
+    find … -newermt '2026-09-01 …'   ->  fonctionne
+
+**Les deux formes coexistent dans mes tours d'aujourd'hui**, et la relative a servi dans **la porte de
+relance du LOT** : j'ai ecrit *« aucune ecriture depuis 10 minutes »* sur une commande qui n'avait rien
+execute.
+
+> **Le silence par incapacite, et l'auteur en est celui qui a supprime le temoin** — `2>/dev/null` ne
+> cachait pas du bruit, il cachait **la seule ligne qui disait que la mesure n'avait pas eu lieu.**
+
+*Ce qui a sauve la porte : j'avais AUSSI lance `git status --porcelain`, fiable.* **Une porte a deux
+verrous dont un est factice s'ouvre quand meme, et personne ne sait lequel a tenu.**
+
+**⚠ Et ma premiere rectification etait fausse aussi** : j'avais ecrit que le code de sortie restait 0.
+Mesure — `find … >/dev/null 2>&1 ; echo $?` rend **1**. **Mon `| head -3` faisait rendre `$?` par
+`head`.** *Le code ne mentait pas ; ma mesure du code mentait* — **le piege du tube que la session 7 a
+paye cet apres-midi, refait en mesurant ce piege-la.**
+
+**Parade** : forme **absolue** pour `-newermt`, et **ne pas silencer `stderr`** sur une commande de
+constat — *c'est la seule sortie qui distingue « rien trouve » de « rien execute ».*
+
+#### E-264 — le quatrieme verdict a mordu a sa premiere utilisation reelle
+
+    go-page-supervision-reglages  32 · 0   FENETRE SALE — a rejouer
+        accueil.blade.php · lang/{en,fr}/accueil.php   ecrits a 23:43:10, DANS la fenetre
+
+**La valeur 32 EST la reference** — la suite n'a rien mesure de faux, et c'est exactement ce que ce
+verdict doit dire. **Sans lui, `reglages 32` aurait ete inscrit comme mesure propre : elle l'etait PAR
+CHANCE**, la session 3 ecrivant dans des fichiers que cette suite ne lit pas. *La prochaine fois ce sera
+dans un fichier qu'elle lit, et rien ne le dira.*
+
+**Et le garde a eu raison contre son propre auteur** : la session 7 a d'abord cru a un faux positif, avec
+**deux instruments faux qui dedouanaient tous les deux** — le `find` silencieux, et un calcul de fenetre
+qui additionnait les durees **en oubliant les attentes entre suites**. *Un seul aurait suffi a faire
+ecarter l'alerte.*
+
+**Le cout, nomme par son auteur** : la session 3 ecrit, donc toute mesure est marquee sale, et *le verdict
+deviendrait un bruit de fond qu'on apprend a ignorer.* **Ce n'est pas un defaut du garde : on ne peut pas
+mesurer et ecrire en meme temps.** Les fenetres se demandent, elles ne se prennent pas.
+
+#### Et son comptage d'E-250 corrige le mien : QUATRE + UNE
+
+`go-page-supervision-reglages` asserte une **confirmation**, et *avec l'ancre partagee un message
+d'ERREUR nommant la machine la fait deja passer au vert* — ce module exigeant de ses erreurs qu'elles
+nomment la machine. **Le patch ne PRESERVE pas cette assertion, il la REPARE** — a condition qu'elle vise
+le succes et **non les deux**.
+
+*J'avais transmis « trois sur cinq, donc les deux selecteurs ». C'est vrai des quatre ; la cinquieme est
+l'inverse.* **Une consigne uniforme sur cinq objets dont un est l'inverse des autres casse le
+cinquieme.**
 
 ### v1.38.121 — E-262 : le quatrieme verdict `FENETRE SALE — a rejouer` est pose et EPROUVE
 

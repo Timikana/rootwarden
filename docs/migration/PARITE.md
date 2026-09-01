@@ -12808,3 +12808,97 @@ un fichier de code figurant dans `.gitignore` — et il est ecrit dans son en-te
 > **Deuxieme fois du jour qu'un de mes signalements vise la mauvaise branche ; les deux fois la
 > trouvaille etait reelle et le perimetre faux.** *Un signalement juste sur un perimetre faux fait
 > construire une parade qui protege ce qui n'etait pas menace.*
+
+## E-263 — `find` n'est pas GNU findutils : la forme RELATIVE de `-newermt` plante, et `2>/dev/null` transforme le plantage en ABSENCE
+
+**Trouve par la session 7 le 2026-09-01 vers 23:44 CEST, verifie par le Lead a 23:46 — et il invalide
+une de MES conclusions.**
+
+    type find                                   ->  « find est une fonction »  (enveloppe `bfs`)
+    find … -newermt '-10 minutes'               ->  bfs: error: Invalid timestamp
+    find … -newermt '2026-09-01 23:00'          ->  fonctionne
+
+**Les deux formes coexistent dans mes propres tours d'aujourd'hui.** Et la forme relative a servi dans
+**la porte de relance du LOT** : j'ai ecrit *« aucune ecriture sous `laravel/` depuis 10 minutes »* sur
+une commande **qui n'avait rien execute.**
+
+> **Le silence par incapacite, et l'auteur en est celui qui a supprime le temoin.** `2>/dev/null` ne
+> cachait pas du bruit : il cachait **la seule ligne qui disait que la mesure n'avait pas eu lieu.**
+
+*Ce qui a sauve cette porte, c'est que j'avais AUSSI lance `git status --porcelain laravel/`, qui est
+fiable — la conclusion etait juste, et une de ses deux moities etait vide.* **Une porte a deux verrous
+dont un est factice s'ouvre quand meme, et personne ne sait lequel a tenu.**
+
+### ⚠ ET MA PREMIERE RECTIFICATION ETAIT FAUSSE AUSSI — le tube, encore
+
+J'ai d'abord ecrit que **le code de sortie restait 0 malgre le plantage**. Mesure :
+
+    find laravel -newermt '-1 hour' >/dev/null 2>&1 ; echo $?    ->  1     LE CODE EST JUSTE
+    find laravel -newermt '-10 minutes' … | head -3 ; echo $?    ->  0     <- c'est `head`
+
+**Mon `| head -3` faisait rendre `$?` par `head`.** *Le code de sortie ne mentait pas ; ma mesure du code
+de sortie mentait.* **C'est exactement le piege que la session 7 a paye cet apres-midi** avec
+`| tail -20` sur son epreuve d'abattage — *un code de sortie qui traverse un tube n'est pas celui de la
+commande* — et je viens de le refaire **en mesurant ce piege-la**.
+
+**La parade tient donc en deux points, et aucun n'est « lire le code de sortie » :**
+1. **forme ABSOLUE pour `-newermt`**, jamais relative ;
+2. **ne pas silencer `stderr`** sur une commande de constat — *c'est la seule sortie qui distingue « rien
+   trouve » de « rien execute »*.
+
+### Ce que la session 7 a fait de juste, et qui vaut la note
+
+**Elle a failli publier une troisieme erreur et l'a verifiee avant** : `readlink -f "$(command -v find)"`
+rendait `…/Gestion_SSH_KEY/find`, *ce qui ressemblait a un binaire detourne dans le depot.* Verifie :
+`find` est une **fonction shell**, `command -v` rend son nom nu, et `readlink -f` d'un nom non resolu rend
+`cwd/nom`. **Aucun binaire, aucun `.` dans le `PATH`.**
+
+*Une sonde ecrite pour accuser se trompe du cote qui alarme — et cette fois l'alarme aurait porte sur une
+compromission du depot. Elle a mesure avant d'envoyer.*
+
+### Et ses DEUX instruments faux pointaient du meme cote
+
+Le `find` silencieux **et** son calcul de fenetre — qui additionnait les durees des suites **en oubliant
+les attentes entre elles**, le runner laissant basculer la fenetre TOTP. Fenetre estimee 23:41:45 →
+23:42:25 ; fenetre reelle ~23:42:43 → 23:43:23 ; les trois fichiers datent de **23:43:10**. **Dedans.**
+
+> **Ses deux instruments faux dedouanaient, et un seul aurait suffi a faire ecarter l'alerte.**
+
+## E-264 — `FENETRE SALE` a mordu a sa PREMIERE utilisation reelle, et le garde a eu raison contre son propre auteur
+
+**2026-09-01, ~23:44 CEST.**
+
+    go-auth-mot-de-passe          27 · 0   conforme
+    go-page-mot-de-passe          16 · 0   conforme
+    go-page-supervision-reglages  32 · 0   FENETRE SALE — a rejouer
+        accueil.blade.php · lang/en/accueil.php · lang/fr/accueil.php   ecrits a 23:43:10
+
+**La valeur 32 EST la reference.** *La suite n'a rien mesure de faux* — et c'est precisement ce que le
+quatrieme verdict doit dire : **le resultat n'est pas interpretable, sans le declarer faux et sans
+abattre.**
+
+> **Sans ce verdict, `reglages 32` aurait ete inscrit comme mesure propre. Elle l'etait PAR CHANCE** — la
+> session 3 ecrivait dans `accueil.*`, que cette suite ne lit pas. **La prochaine fois ce sera dans un
+> fichier qu'elle lit, et rien ne le dira.**
+
+### Le cout, et il est nomme par son auteur avant que je le voie
+
+**La session 3 a reprisses ecritures, donc toute mesure faite maintenant est marquee sale.** Si ça dure,
+*le verdict devient un bruit de fond qu'on apprend a ignorer* — la mort decrite deux fois aujourd'hui.
+
+> **Ce n'est pas un defaut du garde : c'est qu'on ne peut pas mesurer et ecrire en meme temps.**
+
+**Arbitrage** : les fenetres se demandent, elles ne se prennent pas. Voir la consigne au §8.
+
+### Et son comptage d'E-250 corrige le mien : QUATRE + UNE, pas trois sur cinq
+
+`go-page-supervision-reglages` asserte une **confirmation** (`/Test-Server-Debian/` sur le message).
+**Avec l'ancre partagee, un message d'ERREUR nommant la machine la fait deja passer au vert** — et ce
+module *exige* de ses erreurs qu'elles nomment la machine.
+
+> **Le patch de la session 3 ne PRESERVE pas cette assertion : il la REPARE** — a condition qu'elle vise
+> le succes et non les deux ancres.
+
+*J'avais transmis « trois des cinq cherchent le message quel qu'il soit, donc les deux selecteurs ».
+C'est vrai des quatre ; la cinquieme est l'inverse — elle doit viser UNE seule ancre, celle du succes.*
+**Une consigne uniforme sur cinq objets dont un est l'inverse des autres casse le cinquieme.**
