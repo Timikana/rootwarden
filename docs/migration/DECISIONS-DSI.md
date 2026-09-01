@@ -1890,3 +1890,68 @@ une remesure complète quand on l'écrit après.*
 **Trois questions ont été fermées aujourd'hui par cette forme, et aucune ne l'aurait été sans elle** : le
 fourre-tout CORS qui faisait rendre 405 au lieu de 404 (session 2), l'absence de résolution d'entités
 externes (session 5), et mon propre 8.
+
+---
+
+## ⚠ Trois auto-corrections de la session 5, et **pourquoi ma reprise a survécu à la troisième**
+
+**2026-09-01, 12:57 UTC.** Elle a éprouvé trois de ses propres chiffres **rassurants** — en application de
+sa règle de l'après-midi — et **deux de leurs supports étaient faux, sans qu'aucune conclusion change.**
+Celle qui me concerne est la troisième, et elle m'avait été transmise **comme un négatif vérifié**.
+
+### Ce qu'elle corrige : « les TROIS écrivains de `totp_secret` » sont **SIX**
+
+Son énumération venait d'un **grep filtré** (`update|insert|SET |encryptTotp`), qui **ne pouvait pas voir
+la forme Laravel** où la clé et le verbe vivent sur deux lignes. Recensement non filtré : **six**
+écrivains, et **le manquant est `SecondFacteurController.php:136`** — l'enrôlement du portage, qui écrit
+un chiffré réel.
+
+> **Elle avait prouvé « fiable » sur le LEGACY et me l'a annoncé pour le PRODUIT.** *Un bornage publié
+> comme exhaustif et reposant sur un grep filtré est la forme même qui dédouane* — et je ne l'aurais pas
+> rouvert, puisqu'elle me l'avait donné comme vérifié.
+
+### ✅ Et ma reprise survit — **parce qu'elle ne reposait pas sur son énumération**
+
+**Ce que mon document affirme** (§`no2fa`) : *« un secret TOTP est GÉNÉRÉ, jamais saisi ; le scénario qui
+rend E-217 réel pour un mot de passe — un champ soumis vide — ne peut pas se produire sur cette
+colonne. »*
+
+**Vérifié par moi sur le sixième écrivain, celui qui manquait à son relevé :**
+
+    :75    session()->put('enrolement_secret', OtpHp::generate()->getSecret())   <- GENERE
+    :107   if ($secret === '' || …) return redirect(…)                            <- vide REFUSE
+    :130   if ($verdict !== 'ok') { … }                                           <- avant l ecriture
+    :136   'totp_secret' => TotpCrypto::chiffre($secret)
+
+**L'argument de mécanisme tient sur les six.** Et c'est la leçon :
+
+> **Une affirmation fondée sur un MÉCANISME survit à une correction de l'INVENTAIRE. Une affirmation
+> fondée sur une ÉNUMÉRATION n'y survit pas.**
+
+*Ce n'est pas de la chance : j'avais retenu la moitié structurelle de sa mesure d'hier en écartant la
+moitié comptable*, et j'avais écrit à l'époque que *« sa mesure confirmait, c'est le raisonnement qui
+prouve »*. **Le raisonnement a prouvé une seconde fois, contre son propre inventaire.**
+
+**Le corollaire pratique, et il n'est pas esthétique** : quand les deux fondements sont disponibles,
+**fonder sur le mécanisme** — non parce que c'est plus élégant, mais parce que c'est **robuste à
+l'incomplétude de l'inventaire, qui est l'état normal d'un inventaire.**
+
+### Ses deux autres auto-corrections, et le motif commun
+
+- **`require_role(3)` « met deux routes hors de portée »** — elle ne l'avait **pas lu**, et l'a écrit dans
+  le document même où `require_machine_access` se révélait un non-garde dès le rôle 2. *Dans un seul
+  texte : un décorateur démonté sur mesure, son voisin cru sur son nom.* **Lu : le bornage tient**, et
+  `role_id` est **rechargé en base**, donc non forgeable ;
+- **« aucune permission temporaire non expirée »** — un **vide publié comme un fait**. La table porte
+  **0 ligne au total**, donc sa requête n'a jamais eu l'occasion de rendre un positif : *le témoin était
+  inconclusif.* Contre-épreuve sur lignes synthétiques, **sans rien écrire** : les quatre cas attendus
+  rendus. **Le vide réel est un négatif** — et il vient d'un **mécanisme jamais exercé**, pas d'un
+  contrôle d'expiration qui aurait travaillé.
+
+> **Aucune des trois n'était une erreur de mesure. Les trois étaient des mesures JUSTES sur un objet TROP
+> PETIT** — un décorateur jugé sur son nom, un prédicat jugé sur une table vide, un ensemble d'écrivains
+> jugé sur un grep aveugle à la moitié du produit.
+
+**C'est mon huitième défaut d'instrument transposé** : *mesurer le MOTIF n'est pas mesurer le CHEMIN*
+devient **mesurer l'INSTANCE n'est pas mesurer l'ENSEMBLE**. *Et dans les deux cas la sortie a l'air d'une
+mesure, parce qu'elle en est une.*
