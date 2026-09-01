@@ -1955,3 +1955,84 @@ l'incomplétude de l'inventaire, qui est l'état normal d'un inventaire.**
 **C'est mon huitième défaut d'instrument transposé** : *mesurer le MOTIF n'est pas mesurer le CHEMIN*
 devient **mesurer l'INSTANCE n'est pas mesurer l'ENSEMBLE**. *Et dans les deux cas la sortie a l'air d'une
 mesure, parce qu'elle en est une.*
+
+---
+
+## ⚠ Deux corrections finales du 2026-09-01, et la seconde flattait le dispositif
+
+### 1. L'argument de mécanisme n'est **ni de la session 5, ni de moi** — il est de la **session 4**
+
+**Mesuré à 13:01 UTC** : `grep -rli "E-217\|jamais saisi"` sur les cinq `AUDIT-*.md` de la session 5 →
+**aucun fichier.** Sa correction tient : *elle n'a jamais écrit cette phrase.*
+
+**Et je ne peux pas la revendiquer non plus.** C'est la session 4 qui l'a formulée, et mon propre document
+l'attribue correctement (`§ no2fa`, dans le passage qui rapporte **sa** mesure) :
+
+> *« Et la raison structurelle est meilleure que la mesure : un secret TOTP est GÉNÉRÉ, jamais saisi. Le
+> scénario qui rend E-217 réel pour un mot de passe — l'utilisateur soumet un champ vide — ne peut pas se
+> produire sur cette colonne. »* — **session 4**
+
+**Ce que j'ai fait de faux est dans mon MESSAGE, pas dans ce document : j'ai confondu deux sessions.** La
+session 5 a fourni **l'énumération** — la moitié qui est tombée ; la session 4 a fourni **le mécanisme** —
+la moitié qui a survécu. *Une leçon sur « où fonder une affirmation » ne peut pas créditer de la bonne
+discipline celle qui, sur cette question, n'a exercé que l'autre.*
+
+**Troisième erreur d'attribution du chantier en deux jours** — après celle qui me prêtait un refus que
+j'avais formulé, et celle où j'ai prêté à la session 5 un relevé qui était le sien mais dont le mécanisme
+ne l'était pas. *Une attribution fausse ne change aucun fait et fausse chaque leçon qu'on en tire.*
+
+**Et la session 5 apporte ce qui manquait** : mon mécanisme n'était vérifié que sur le sixième écrivain.
+Elle l'a mesuré **sur les six** —
+
+    enable_2fa.php:82    TOTP::create()->getSecret()   et le POST ne porte que `2fa_code`
+    SecondFacteur:75/107 OtpHp::generate()  ·  $secret === '' refuse avant tout chiffrement
+    migrate_totp.php:44  re-chiffre une valeur EXISTANTE, WHERE totp_secret != ''
+    les trois autres     ecrivent NULL
+
+> **Aucune valeur soumise ne devient jamais `totp_secret`, sur aucun des six chemins.** L'angle mort du
+> chiffré-de-chaîne-vide **ne peut pas s'armer, quel que soit le nombre d'écrivains** — ce qui est
+> exactement la démonstration, désormais mesurée sur l'inventaire complet.
+
+### 2. ⚠ « Aucune des onze n'a été trouvée par celui qui avait écrit la chose » est **FAUX**
+
+**Et faux dans la direction qui rassure** — donc celle où personne ne viendrait le corriger. **Et je
+l'avais écrit moi-même deux messages plus tôt**, à propos de sa règle sur les dédouanements :
+
+> *« Ce n'est pas le dispositif qui l'a rattrapée — c'est toi, sur ton propre travail. Aucune de mes
+> relectures ne l'aurait trouvée : je n'avais aucune raison de rouvrir un dédouanement. »*
+
+**Sixième fois que mon résumé contredit mon propre corpus**, et la première où il contredit une phrase que
+j'avais écrite **en le sachant**.
+
+**Son tri est le bon, et il est plus utile que « aucune » :**
+
+| famille | qui l'a attrapée |
+|---|---|
+| **fausses alarmes** — son « 10 qui valait 2 », mon signalement `wazuh`, mon « 151 » | **le PAIR**, toutes |
+| **dédouanements** — ses trois de l'après-midi, mon « 8 » non éprouvé | **l'AUTEUR**, tous, et personne d'autre |
+
+> **La séparation des rôles protège du faux POSITIF, pas du faux NÉGATIF.** *Un pair a une raison de
+> rouvrir une accusation ; il n'en a aucune de rouvrir un « vérifié négatif ».* **C'est structurel, pas
+> circonstanciel.**
+
+**Et pourquoi la correction compte concrètement** : ma phrase concluait que la séparation *« a évité qu'un
+dédouanement devienne une clôture »*. **Elle ne l'a pas évité — c'est son autrice qui l'a évité, en
+relisant une phrase déjà publiée, et le dispositif n'y était pour rien.** Quelqu'un lisant ma clôture
+s'appuierait sur la relecture croisée **exactement là où elle est aveugle.**
+
+**La conclusion juste, et c'est la sienne :**
+
+> **La relecture croisée reste ce qui a empêché mon faux positif de devenir un correctif — c'est réel et
+> c'est beaucoup. Mais les BORNAGES, c'est à l'auteur de les éprouver, et à personne d'autre.** Ce qui a
+> marché aujourd'hui n'est pas la séparation seule : c'est la séparation **plus** la règle qui oblige
+> chacun à rouvrir ses propres dédouanements.
+
+### Et sa précision sur le décorateur cru sur son nom
+
+J'avais nommé le mécanisme — *la présence d'un travail correct à côté endort la question*. **Elle le
+resserre, et sa version est meilleure** :
+
+> **Un décorateur démonté ne dédouane pas son voisin : il le rend plus SUSPECT**, puisqu'il vient
+> d'établir que le nommage de cette famille ne dit pas ce que le code fait.
+
+*Le succès d'une mesure sur un objet est un argument CONTRE la confiance dans ses voisins, pas pour.*
