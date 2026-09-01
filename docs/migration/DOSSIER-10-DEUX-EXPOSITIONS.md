@@ -13,7 +13,7 @@
 
 | | **A — le secret 2FA de la production** | **B — la console d'API du portail** |
 |---|---|---|
-| **ce qu'il faut pour l'atteindre** | **un mot de passe** | **un compte de rôle ≥ 2** |
+| **ce qu'il faut pour l'atteindre** | **un mot de passe** | **un compte de rôle ≥ 2** — la console est enclose dans `if ($isAdmin)`, et `$isAdmin = $role >= 2` (`:16`, `:1721`) |
 | où | `origin/main` — **la production** | **le portail legacy seul** — le portage n'a pas de console |
 | ce qu'on obtient | le **secret TOTP en clair** + le QR, codes valides indéfiniment | une **requête libre** vers le backend, dont un scan SSH de **toute la flotte** |
 | combien de comptes concernés | **tout compte dont on connaît le mot de passe** | **5** (2 de rôle 2, 3 de rôle 3) |
@@ -48,8 +48,9 @@ la production **appelle déjà** `checkCsrfToken()` — la transposition porte *
 ### La chaîne, vérifiée maillon par maillon
 
     1. legacy/documentation.php:11    checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
-                                      -> TOUS les comptes connectes, des le ROLE 1.
-                                         AUCUN checkPermission sur la page.
+                                      -> la PAGE est ouverte des le ROLE 1, sans checkPermission
+       legacy/documentation.php:16    $isAdmin = $role >= 2
+                            :1721     <?php if ($isAdmin): ?>   <- la CONSOLE est enclose ici
     2. :1624   <input type="text" id="api-endpoint" value="/cve_test_connection">   <- CHAMP LIBRE
        :1629   <select id="api-method">
        :1636   <textarea id="api-payload">{"machines": [1]}</textarea>
@@ -97,9 +98,19 @@ n'atteint **rien** qu'il n'atteindrait par les pages — et E-226 établit que l
 > confirmation n'est pas une garde ; il n'en est pas moins la seule chose qui empêche un geste de masse
 > d'être involontaire.*
 
+> **⚠ CORRECTION DU 2026-09-01, 12:17 UTC — relevée par la session 2, vérifiée par moi.** Ce dossier
+> écrivait que la console est *« ouverte à tout compte connecté dès le rôle 1 »*. **C'est vrai de la PAGE
+> et faux de la CONSOLE** : elle est enclose dans `<?php if ($isAdmin): ?>` (`:1721`), et `:16` pose
+> `$isAdmin = $role >= 2`.
+>
+> **Ça ne change rien à la décision** — un rôle 2 **sans aucune permission** obtient toujours un client
+> HTTP générique vers la passerelle, champ de chemin libre, concaténé brut. **Mais un interdit qui repose
+> sur quatre fondements dont un est faux se fait démolir sur le faux**, et celui-là se vérifiait en dix
+> secondes par quiconque voulait contester le dossier.
+
 **Et la portée réelle est de 5 comptes**, mesurée : 2 de rôle 2, 3 de rôle 3. Les **7** comptes de rôle 1
-ouvrent la console et sont refusés par `@require_role(2)` — *la page est plus permissive que la route,
-et c'est cette fois dans le bon sens.*
+ouvrent la **page** — pas la console — et seraient de toute façon refusés par `@require_role(2)`. *Deux
+gardes concordantes, ce qui est rare dans ce dépôt.*
 
 ### Les deux décisions que B demande, et je n'en tranche qu'une
 
