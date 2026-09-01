@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.113** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.114** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,51 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.114 — le LOT a capture la preuve d'E-251, et elle aurait ete indiscernable d'une regression
+
+    LOT lance                                  15:29:58
+    profil.blade.php · supervision.blade.php   mtime 15:30:15    <- 17 SECONDES APRES
+    go-socle-navigation  15:30:00 -> 15:31:19                    <- A CHEVAL sur l'ecriture
+    resultat : PASS=64 FAIL=2 — 500 /supervision, sur DEUX comptes
+
+`supervision.blade.php` etait dans un etat intermediaire, Blade rendait **500**. **Verifie apres le
+rangement : `curl /supervision` -> 302, la page est saine, aucune regression.**
+
+> **Dans deux heures ce FAIL aurait ete indiscernable d'une vraie regression.** Un 500, deux comptes, une
+> suite du socle — et `Machines.php` avait effectivement bouge a 14:22, donc *une explication plausible et
+> fausse attendait celui qui chercherait.*
+
+**Le cout reel de cette classe de defaut n'est pas la mesure perdue : c'est le diagnostic faux qu'elle
+produit, et qui sera cru.**
+
+#### Et la session 7 a failli refuter l'alerte avec une mesure mal datee
+
+`git status` vide, aucun `-succes` dans les vues, les 27 ancres trouvees, derniers commits d'hier —
+**tout disait que j'avais tort.** Puis elle a date les fichiers : ecriture a **15:30:15**, verification a
+**15:31**.
+
+> **Verifier l'etat PRESENT ne refute pas une alerte sur un etat PASSE.** Une ecriture transitoire ne
+> laisse rien dans `git status` une fois annulee. **Le meme releve, a deux minutes d'ecart, rend deux
+> verdicts opposes.**
+
+*C'est l'invariant qu'elle m'avait apporte le matin, et elle a failli le rejeter avec le mauvais
+horodatage.*
+
+#### La forme definitive du garde par suite
+
+J'avais dit : un fichier modifie **au demarrage** est un motif d'abattage. **Insuffisant.**
+
+> **Relever l'empreinte au DEBUT ET A LA FIN de chaque suite.** Celle-ci a ete faussee par une ecriture
+> qui n'existait **ni avant son depart, ni apres son arrivee** — **un preflight seul aurait dit « vas-y »
+> a 15:30:00.** *Un garde qui ne mesure qu'a l'entree ne voit pas ce qui entre pendant.*
+
+#### Le LOT ne reprend pas encore, et la condition est nommee
+
+Ni la session 7 ni le Lead ne relancent avant que la session 3 confirme **« je n'ecris plus »** — *et
+non « j'ai range ». Les deux ne sont pas la meme chose, et c'est la seconde qui compte pour une mesure de
+2 h 40.* Etat du banc verifie : runner tue, aucun processus, drapeau id 15 a **0** (la suite mutante est
+en position 54, jamais atteinte), 3 executions dans `/tmp/rw-lot-eqtknV` dont **navigation faussee**.
 
 ### v1.38.113 — le discriminant est le PREFIXE derive par sa VALEUR, et j'ai redemande un quatrieme travail deja fait
 
