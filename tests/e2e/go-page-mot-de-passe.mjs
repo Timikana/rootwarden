@@ -519,9 +519,14 @@ note(echecs === 0 ? '=== TOUT OK ===' : '=== DES ECHECS ===');
  * echouer ~61 en cascade sur un LOT de 2 h 40. Continuer produit alors 61 faux
  * rouges a rediagnostiquer un par un.
  *
- * **99 signifie « n'enchaine pas ».** Le runner appartient a une autre session :
- * ce code ne l'arrete pas tout seul, mais il rend l'arret POSSIBLE sans avoir a
- * relire un journal — et le marqueur ci-dessous le rend lisible a l'oeil.
+ * **99 signifie « n'enchaine pas », et le runner l'applique** :
+ * `rejouer-lot.sh:1180` detecte le code 99 **OU** le marqueur `LOT-ABATTRE` dans
+ * le journal, et `:1295` sort en 99 **dans la boucle**, avant la suite suivante.
+ * Les deux voies sont necessaires : un `timeout` tue avec 124 sans laisser de
+ * marqueur, un plantage apres l'impression laisse le marqueur sans le code.
+ *
+ * Le remede est **lu dans ce journal**, jamais recopie dans le runner : une
+ * commande figee la-bas mentirait le jour ou cette suite change de cible.
  */
 if (bancEnferme) {
     note('=== LOT-ABATTRE :: le banc reste ENFERME, ne pas enchainer ===');
