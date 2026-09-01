@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.130** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.131** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,37 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.131 — E-274 : un groupe sans filtre vise le parc entier, presente comme une LIGNE BLANCHE
+
+    groups.py:17   where = (' AND '.join(clauses)) if clauses else '1=1'
+    main.js:21     filtersSummary({})  ->  chaine VIDE
+
+**Zero critere coche donne `WHERE 1=1`** — le parc entier, `srv-zabbix` comprise — **et l'ecran le
+presente sous la forme d'une ligne blanche.** *Le seul indice restant est un compteur qui ne se distingue
+en rien de celui d'un groupe voulu.*
+
+**Ce qui rend ce defaut consequent est ce qui est branche dessus** : `POST /groups/<id>/run` avec
+`cve_scan` produit **trois effets sortants PAR MACHINE**. *Un groupe sans filtre est le chemin le plus
+court vers N courriels, et il ne se signale par rien.*
+
+#### ⚠ Et une seconde definition du « parc » dans le meme produit
+
+`_resolve_dynamic` **ne filtre pas `lifecycle_status`** — aucune clause de cycle de vie dans la requete.
+Une machine `archived` entre donc dans un groupe sans filtre, quand le portage l'exclut partout par
+`predicatActives()`. **L'asymetrie est piegeuse** : `filtersSummary` liste `lifecycle_status` parmi les
+cles, *donc on peut filtrer dessus, mais la resolution n'exclut pas les archivees par defaut.*
+
+**Signale, non corrige** — *changer la resolution du backend n'est pas un geste de portage*, et sous
+E-238 il serait inerte. **A arbitrer** : qui aligne sa definition sur l'autre ? *Les deux sont
+defendables ; ce qui ne l'est pas, c'est qu'elles different sans que personne ne l'ait decide.*
+
+#### Et le refus de livrer un bouton inerte
+
+Le decoupage rangeait le **rendu** du formulaire de creation en R1 et son `POST` en R2. **Refus** : *un
+formulaire dont « Enregistrer » ne fait rien est exactement le bouton inerte que la convention
+interdit.* **Dit plutot que redecoupe en silence** — *un decoupage qu'on ajuste sans le dire devient une
+divergence entre le plan et l'artefact, et c'est ce qu'E-244 a coute.*
 
 ### v1.38.130 — E-273 : j'ai EXECUTE le runner en voulant compter ses tableaux, et mon garde de ce soir l'a rendu lisible
 

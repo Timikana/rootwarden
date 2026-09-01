@@ -13338,3 +13338,61 @@ utilitaires). **Son 40 et mon 46 sont la MEME mesure sur des populations distant
 
 *Septieme « faux desaccord » du chantier, meme cause : un nombre sans son etiquette.* **Et sa population
 est la bonne** — un utilitaire importe n'est pas une suite qu'on aurait pu jouer.
+
+## E-274 — un groupe dynamique SANS filtre vise le parc entier, et l'ecran le presente comme une LIGNE BLANCHE
+
+**Releve par la session 3 le 2026-09-02, verifie par le Lead a 01:45 CEST.**
+
+    backend/routes/groups.py:17   where = (' AND '.join(clauses)) if clauses else '1=1'
+                            :18   cur.execute(f"SELECT m.id FROM machines m WHERE {where}", params)
+
+    legacy/groups/js/main.js:21   function filtersSummary(f) { … return parts.join(' · '); }
+                                  -> tableau vide  ->  chaine VIDE
+
+**Zero critere coche donne `WHERE 1=1`, donc le parc entier, `srv-zabbix` comprise.** Et le resume de
+filtres rend **une chaine vide** : l'ecran presente « toutes les machines » sous la forme d'**une ligne
+blanche**.
+
+> **Le seul indice restant est un compteur qui ne se distingue en RIEN de celui d'un groupe voulu.**
+> *Un groupe qui vise tout ressemble a un groupe qui ne vise rien de particulier.*
+
+**Et ce qui rend ce defaut consequent, c'est ce qui est branche dessus** : `POST /groups/<id>/run` avec
+`action: cve_scan` produit **trois effets sortants PAR MACHINE** — courriel, notification, webhook. *Un
+groupe sans filtre est donc le chemin le plus court vers N courriels, et il ne se signale par rien.*
+
+**Le portage ecrira « aucun filtre — toutes les machines du parc ».** *C'est la moitie du defaut visible
+sans ecrire une ligne ; l'autre moitie — l'etat par defaut du formulaire qui cree ce groupe-la en deux
+gestes — appartient au sous-lot qui portera le formulaire.*
+
+### ⚠ ET UNE SECONDE DEFINITION DU « PARC » DANS LE MEME PRODUIT
+
+`_resolve_dynamic` **ne filtre pas `lifecycle_status`** — verifie ligne par ligne, il n'y a aucune clause
+de cycle de vie dans la requete. **Une machine `archived` entre donc dans un groupe sans filtre**, alors
+que le portage l'exclut partout :
+
+    laravel/app/Services/Machines.php:166   predicatActives()
+      whereNull('m.lifecycle_status')->orWhere('m.lifecycle_status', '!=', 'archived')
+
+> **Deux definitions du « parc » coexistent dans le meme produit** — et l'asymetrie est piegeuse :
+> `filtersSummary` liste bien `lifecycle_status` parmi les cles de filtre, **donc l'utilisateur peut
+> filtrer dessus, mais la resolution n'exclut pas les archivees par defaut.**
+
+**Signale, NON corrige** : *changer la resolution du backend n'est pas un geste de portage* — et sous
+E-238 il serait de toute façon inerte. **A arbitrer** : le portage aligne-t-il sa definition sur celle du
+backend, ou l'inverse ? *Les deux sont defendables ; ce qui ne l'est pas, c'est qu'elles different sans
+que personne ne l'ait decide.*
+
+### Et le refus de livrer un bouton inerte, qui est la bonne lecture de la convention
+
+Le decoupage rangeait le **rendu** du formulaire de creation en R1 et son `POST` en R2. **La session 3
+refuse** : *un formulaire dont « Enregistrer » ne fait rien est exactement le bouton inerte que la
+convention interdit.* Le formulaire viendra **avec** sa route.
+
+> **Elle l'a dit plutot que de redecouper en silence** — et c'est ce qui permet de l'arbitrer. *Un
+> decoupage qu'on ajuste sans le dire devient une divergence entre le plan et l'artefact, et c'est ce
+> qu'E-244 a coute.*
+
+**Ce qui EST porte en R1** : la page, ses gardes aux trois couches, la liste, le depliage des membres,
+l'etat vide, l'i18n, l'entree de menu. **Aucune ecriture, aucun effet distant.** Les gestes non portes
+ouvrent un panneau qui **explique ce que le geste engage**, avec le lien vers l'ancien portail et son
+marqueur `↗` — la convention deja en place.
