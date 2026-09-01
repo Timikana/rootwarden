@@ -104,7 +104,7 @@ class Navigation
 
         'admin' => [
             ['cle' => 'admin',          'garde' => 'can_admin_portal',        'route'  => 'comptes'],
-            ['cle' => 'groups',         'garde' => 'can_admin_portal',        'legacy' => '/groups/index.php'],
+            ['cle' => 'groups',         'garde' => 'can_admin_portal',        'route'  => 'groupes'],
             ['cle' => 'approvals',      'garde' => 'can_admin_portal',        'route'  => 'approbations'],
             ['cle' => 'maintenance',    'garde' => 'can_admin_portal',        'route'  => 'maintenance'],
             ['cle' => 'tasks',          'garde' => 'can_admin_portal',        'route'  => 'taches'],
