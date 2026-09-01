@@ -12504,3 +12504,62 @@ lue — et c'est la meme fin qu'un garde contourne.*
 `docs/` et `CHANGELOG.md` ne sont montes nulle part — **mais le fichier de version est servi, et son
 bump se groupe apres la mesure.** *Le cout est nul : un numero calcule a l'instant de l'ecriture reste
 juste quelle que soit l'heure de cette ecriture.*
+
+## E-257 — MA REGLE D'ABATTAGE ETAIT TROP LARGE : le garde aurait tue ce LOT sur mon propre bump de version
+
+**Mesure de la session 7 le 2026-09-01, verifiee independamment par le Lead a 16:12 CEST.**
+
+J'avais ecrit : *un fichier modifie dans l'arbre au moment ou la suite demarre est un motif d'abattage,
+pas un avertissement.* **Elle a mesure ce que ça donne :**
+
+    depart du LOT 2          15:37:23
+    plusNeufsQue('legacy')   ->  1 fichier : legacy/version.txt
+    verdictFenetre('legacy') ->  mesurable=true  propre=false  ABATTRE=TRUE
+
+**156 executions tuees pour un bump de version dont j'avais moi-meme mesure qu'il etait sans
+consequence.** Verifie de mon cote, independamment : `legacy: ['legacy']` est bien dans
+`CHEMINS_SERVIS`, **et aucune suite ne lit `version.txt` ni un bandeau de version** — les deux seules
+ancres « version » de `tests/e2e/` sont `superv-detecter-version` et `superv-version-message`, qui
+visent des **agents de supervision**.
+
+> **Un garde qui alarme sur ce qui va bien finit desactive, et il emporte les vrais cas avec lui.**
+
+*C'est exactement l'argument qu'elle m'avait donne contre un preflight indexe sur la fraicheur — 337
+`.php` plus neufs, aucune divergence — et je l'ai reproduit dans la regle que j'ai ecrite ensuite.*
+
+### LE PRINCIPE QUI CORRIGE MA REGLE, et il n'est pas celui qu'on avait ecrit
+
+**Les deux situations n'ont pas la meme forme, et je les avais confondues :**
+
+    drapeau non restaure   l'etat PERSISTE        -> les 61 suites suivantes echouent
+                                                  -> ABATTRE : continuer coute 61 faux rouges
+    fenetre sale           l'ecriture EST PASSEE  -> les suites suivantes sont saines
+                                                  -> MARQUER cette suite, CONTINUER
+                                                  -> abattre couterait 155 executions pour UNE suite
+
+> **Le remede doit etre proportionne a ce qui SURVIT au defaut, pas a sa gravite au moment ou il se
+> produit.**
+
+*Le drapeau vit en BASE : il traverse la suite. Une ecriture dans l'arbre est PASSEE : les suivantes
+lisent l'etat final, qui est coherent.* **La gravite instantanee est identique — une mesure fausse dans
+les deux cas — et le remede est opposé.**
+
+### Le geste, arbitre : QUATRIEME VERDICT, PAS D'ABATTAGE
+
+`FENETRE SALE — a rejouer` entre comme quatrieme valeur de verdict a cote de `conforme`, `ECART` et
+`ECHEC`. **Le LOT continue**, la suite est marquee **non interpretable**, et **elle seule** se rejoue a
+la fin. **L'abattage reste reserve a l'etat residuel** — le seul cas ou continuer coute plus que
+s'arreter.
+
+*Et le module ne peut pas trancher ça : la decision depend de ce que la suite LIT, ce qu'il ne sait pas.*
+**Il rendra le FAIT — une ecriture a eu lieu dans le chemin servi pendant la fenetre — et le nom des
+fichiers. La decision reste au runner**, pour le seul cas qu'il peut juger. Meme forme qu'E-255 par
+l'autre bout : *la ou une decision est derivable, le producteur l'exporte ; la ou elle depend de
+l'appelant, il n'exporte que le fait.*
+
+### Et son exclusion etait juste alors que sa decision etait fausse
+
+Son module exclut correctement `laravel/storage/` — c'est pourquoi il n'a rendu que `version.txt` au
+lieu de 87 fichiers. **Mais il l'a rendu comme un motif d'abattage.** Sa formule : *l'un ne rachete pas
+l'autre.* **Un filtre juste et un seuil faux produisent une alarme precise et destructrice** — plus
+dangereuse qu'une alarme bruyante, parce qu'elle est credible.

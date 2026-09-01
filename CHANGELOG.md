@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.116** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.117** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,49 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.117 — E-257 : ma regle d'abattage aurait tue ce LOT sur mon propre bump de version
+
+    depart du LOT 2          15:37:23
+    plusNeufsQue('legacy')   ->  legacy/version.txt
+    verdictFenetre('legacy') ->  ABATTRE = TRUE       ->  156 executions tuees
+
+J'avais ecrit qu'*un fichier modifie dans l'arbre au demarrage d'une suite est un motif d'abattage*. La
+session 7 l'a mesure : **son garde aurait tue ce LOT sur un bump de version dont j'avais moi-meme etabli
+l'innocuite.** Verifie independamment : aucune suite ne lit `version.txt` ni un bandeau de version — les
+deux ancres « version » de `tests/e2e/` visent des **agents de supervision**.
+
+> **Un garde qui alarme sur ce qui va bien finit desactive, et il emporte les vrais cas avec lui.**
+
+*C'est l'argument qu'elle m'avait donne contre un preflight indexe sur la fraicheur — 337 `.php` plus
+neufs, aucune divergence — et je l'ai reproduit dans la regle que j'ai ecrite ensuite.*
+
+#### Le principe qui corrige ma regle
+
+    drapeau non restaure   l'etat PERSISTE        -> 61 suites echouent  -> ABATTRE
+    fenetre sale           l'ecriture EST PASSEE  -> les suivantes sont saines
+                                                  -> abattre couterait 155 pour UNE suite
+
+> **Le remede doit etre proportionne a ce qui SURVIT au defaut, pas a sa gravite au moment ou il se
+> produit.**
+
+*La gravite instantanee est identique — une mesure fausse dans les deux cas — et le remede est oppose.*
+
+**Arbitre** : `FENETRE SALE — a rejouer` entre comme **quatrieme verdict**, le LOT **continue**, la suite
+est marquee non interpretable et **elle seule** se rejoue. **L'abattage reste reserve a l'etat
+residuel.**
+
+Et le module n'exportera que **le FAIT** — une ecriture a eu lieu, et lesquels — *parce que la decision
+depend de ce que la suite LIT, ce qu'il ne peut pas savoir.* **Meme forme qu'E-255 par l'autre bout :
+la ou une decision est derivable, le producteur l'exporte ; la ou elle depend de l'appelant, il n'exporte
+que le fait.**
+
+#### Son filtre etait juste alors que sa decision etait fausse
+
+Le module exclut correctement `laravel/storage/` — d'ou `version.txt` seul au lieu de 87 fichiers. **Mais
+il l'a rendu comme un motif d'abattage.** *L'un ne rachete pas l'autre* : **un filtre juste et un seuil
+faux produisent une alarme precise et destructrice — plus dangereuse qu'une alarme bruyante, parce
+qu'elle est credible.**
 
 ### v1.38.116 — E-256 : j'ecris aussi dans l'arbre servi pendant la mesure, et je ne l'avais pas declare
 
