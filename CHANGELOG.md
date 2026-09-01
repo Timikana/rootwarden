@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.118** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.119** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,56 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.119 — ✅ NOUVELLE LIGNE DE BASE : 158 executions · 2439 PASS · ZERO FAIL · 2 h 50
+
+    depart 15:37:23   ->   dernier journal 18:27:32        journaux /tmp/rw-lot-j8Li6h
+    laravel   80 executions   1574 PASS   0 FAIL
+    legacy    78 executions    865 PASS   0 FAIL
+    TOTAL    158 executions   2439 PASS   0 FAIL
+
+**+141 PASS et 2 FAIL de moins que la ligne de base du 2026-08-28** (153 · 2298 · 2), apres **67 commits
+dont trois fichiers globaux** — le socle CSS, le gabarit, et un middleware applique sur le groupe.
+
+**Les trois references neuves sont confirmees a l'unite par le LOT complet** : `go-page-pare-feu` **23 /
+17**, `go-page-accueil` **41 / 16**, `go-page-mot-de-passe` **16** (laravel seul, elle n'a pas de cible
+legacy). *Elles avaient ete posees sur mesure isolee ; le LOT complet les valide dans le contexte ou
+elles serviront.*
+
+**Premier LOT contenant une suite qui ECRIT en base** (`go-page-mot-de-passe`, admise sur le precedent
+`go-auth-mot-de-passe`) : **la restauration a tenu, l'abattage n'a pas eu a se declencher.**
+
+#### ⚠ Et je n'ai inscrit ce verdict que CINQ HEURES apres la fin
+
+Le LOT s'est termine a **18:27:32**. Je l'ai releve a **23:29**. Pendant cinq heures, **un LOT vert
+existait et aucun document ne le portait** — le suivi annonçait encore « 39/156, en cours ».
+
+> **Un resultat qu'on ne releve pas ne vaut pas mieux qu'un resultat qu'on n'a pas mesure.** C'est la
+> famille de la conclusion ecrite qu'on ne remesure pas, par l'autre bout : *ici la mesure existait et
+> c'est le releve qui manquait.*
+
+#### Et ma surveillance a lu une TRONCATURE comme une absence
+
+J'avais ecrit a deux sessions *« rien n'est venu de toi depuis 45 minutes »*. **Mesure :**
+
+    git log --since='14:13' --until='15:19'   ->   54 commits
+    ma commande portait                        ->   | head -22
+
+**Mon `head -22` coupait a 15:19**, donc les 54 commits de la fenetre etaient invisibles et j'ai conclu
+« il n'y a que moi ». **La session 2 avait cinq commits dans cette fenetre**, et 49 dans
+`docs/migration/` depuis 14:20.
+
+> **Une troncature d'affichage n'est pas une absence de donnee.** *Huitieme fois du jour qu'un de mes
+> instruments m'a fait conclure a l'envers — et celle-ci, la session 4 me l'avait enseignee le matin
+> meme, sur ce mot exact.*
+
+**Et le cout n'est pas l'erreur : c'est le dispatch qu'elle produit.** J'ai relance deux sessions sur du
+travail deja livre — la session 2 avait **le graphe des 20** et **l'inventaire de `documentation`**
+commites depuis 14:20. *Sixieme travail redemande.*
+
+#### `legacy/version.txt` rattrape
+
+Bump differe depuis 15:42 pendant le LOT (E-256), **repris ici** : `1.38.115` -> `1.38.119`.
 
 ### v1.38.118 — « I4 n'est pas porte » etait FAUX, et E-259 : ma fenetre de croisement etait trop etroite
 
