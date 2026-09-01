@@ -6,6 +6,26 @@
  *
  * Auto-validant (headless, exit 0/1). L'audit SSH est en lecture seule sur les
  * cibles (lecture sshd_config) - aucune action mutante.
+ *
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠ NE PAS AJOUTER AU LOT. Cette suite JOINT LA PRODUCTION.               ║
+ * ║                                                                          ║
+ * ║  « Tout scanner » porte sur LE PARC ENTIER : `srv-zabbix` (machine 1,    ║
+ * ║  production) est jointe par SSH a chaque execution.                      ║
+ * ║                                                                          ║
+ * ║  La phrase ci-dessus — « aucune action mutante » — est VRAIE et ne suffit ║
+ * ║  pas : elle ecarte la MUTATION, pas la PORTEE. Une lecture distante reste ║
+ * ║  une connexion sortante vers des machines reelles, et un LOT la rejouerait ║
+ * ║  a chaque passage. **Une condition formulee sur ce qui est typique plutot ║
+ * ║  que sur ce qui rend le geste grave laisse ouvert le cas qu'elle voulait  ║
+ * ║  fermer.**                                                               ║
+ * ║                                                                          ║
+ * ║  `rejouer-lot.sh` ne mentionne PAS cette suite : rien, aujourd'hui,      ║
+ * ║  n'empeche quelqu'un de « completer » le LOT avec les 24 suites qui n'y   ║
+ * ║  sont pas. Ce cadre est la pour que la lecture de ce fichier suffise a    ║
+ * ║  l'en dissuader — c'est le seul endroit que lira forcement celui qui      ║
+ * ║  voudra l'ajouter.                                                       ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
