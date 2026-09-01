@@ -816,8 +816,47 @@ def uninstall():
         with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
             _, err_out, code = execute_as_root(client, cmd, root_pwd, logger=logger, timeout=180)
             _, _, code_v = execute_as_root(client, verif_cmd, root_pwd, logger=logger, timeout=30)
-        _upsert_agent(row['id'], status='never_connected', agent_id=None, version=None)
-        _audit(user_id, 'uninstall', f"machine_id={row['id']} code={code}")
+        # ══ E-237 : L'INVENTAIRE SUIT LE VERDICT, PLUS L'INTENTION ══════════
+        #
+        # Cette ligne ecrivait `never_connected` INCONDITIONNELLEMENT, treize
+        # lignes avant que `paquet_retire` n'existe. Sur RHEL et SUSE — ou
+        # `apt-get purge` n'existe pas, ou le `|| true` avale l'echec et ou seul
+        # `rm -rf /var/ossec` agit — l'etat reel est : paquet installe,
+        # configuration partie, et un inventaire annoncant qu'il n'y a rien.
+        # **Faux du cote qui MASQUE** : personne ne va chercher un paquet dont
+        # l'inventaire dit qu'il n'existe pas.
+        #
+        # E-225 avait corrige le VERDICT et laisse l'ETAT PERSISTE. Les deux se
+        # contredisaient donc — la reponse disait « echec », l'inventaire disait
+        # « rien ici ». *Un correctif partiel ne laisse pas le systeme a
+        # mi-chemin : il le rend INCOHERENT*, et une incoherence interne coute
+        # plus cher qu'un mensonge unanime, parce qu'elle fait douter de la piece
+        # qui dit vrai.
+        #
+        # ══ POURQUOI `unknown` ET PAS L'UNE DES DEUX AUTRES ════════════════
+        #
+        # Ecrire seulement en cas de reussite laisserait `active`, avec
+        # identifiant et version, sur une machine videe — un agent mort annonce
+        # comme fonctionnel, pire. Les deux options AFFIRMENT quelque chose de
+        # faux : `never_connected` affirme « il n'y a rien », `active` affirme
+        # « ca marche ». **`unknown` n'affirme RIEN**, et c'est la seule des
+        # trois qui ne mente pas quand on ne sait effectivement pas.
+        #
+        # Ce n'est pas une valeur inventee : l'ENUM la porte (034_wazuh.sql:48),
+        # le backend l'ecrit deja quand un statut systemd n'est pas reconnu
+        # (:742), et l'interface la rend en badge gris avec un repli pour tout
+        # statut non mappe (`legacy/wazuh/js/wazuh.js:102` et `:105`).
+        #
+        # ⚠ ELLE EST HONNETE MAIS FAIBLE, et il faut le savoir : elle ne dit pas
+        # QU'UN PAQUET DEMEURE. Aucune autre route ne peut agir dessus, seulement
+        # s'abstenir de conclure — et s'abstenir de conclure vaut mieux que
+        # conclure faux. Le nom complet demande une colonne, et c'est un
+        # arbitrage d'exploitant.
+        _upsert_agent(row['id'],
+                      status='never_connected' if code_v == 0 else 'unknown',
+                      agent_id=None, version=None)
+        _audit(user_id, 'uninstall',
+               f"machine_id={row['id']} code={code} paquet_retire={code_v == 0}")
         # E-225 : la reponse NOMME ce qui subsiste. Aucun changement de
         # comportement — on ne retire pas le depot, on cesse de faire croire
         # qu'il est parti. Un geste reversible qui ne rend pas tout ce qu'il a
