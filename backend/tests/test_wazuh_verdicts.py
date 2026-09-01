@@ -373,6 +373,87 @@ APPELANTS_UPSERT_GELES = {
 }
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# E-237 — la desinstallation ecrit un etat qu'elle n'a pas constate
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestUninstallEtatPersiste:
+    """DECRIT L'ATTENDU, PAS L'OBSERVE — decision DSI n°10, corrigee.
+
+    `uninstall` appelle `_upsert_agent(status='never_connected', …)` AVANT de
+    calculer `paquet_retire = (code_v == 0)`, et sans jamais s'y conditionner.
+    `code_v == 7` veut dire « le paquet est TOUJOURS installe » : la base efface
+    alors l'identite d'un agent qui tourne peut-etre encore. Le cas est nomme par
+    le code lui-meme — sa commande de purge est `apt`-only, donc RHEL et SUSE.
+
+    ┌─ ECRIT EN `xfail(strict)`, RETIRE DANS LA MINUTE — ET C'EST L'OUTIL QUI ┐
+    │ A PARLE. La consigne recue decrivait le correctif comme A POSER. Il      │
+    │ etait DEJA POSE : `b6896e3`, `status='never_connected' if code_v == 0    │
+    │ else 'unknown'`. Le marqueur est sorti en **XPASS(strict)** — c'est-a-   │
+    │ dire « la propriete que tu annonces absente est la ».                    │
+    │                                                                          │
+    │ Deuxieme fois que ce mecanisme rattrape une premisse perimee, apres      │
+    │ E-224 ou il m'avait dit que mon test passait pour la mauvaise raison.    │
+    │ *Un `xfail(strict)` est le seul test qui se plaint d'avoir raison* — et  │
+    │ c'est precisement ce qui le rend utile quand plusieurs sessions ecrivent │
+    │ sur le meme arbre.                                                       │
+    │                                                                          │
+    │ Le marqueur est donc retire : le geste est pose, ceci est un VERROU.     │
+    │ Ce que ce vert ne dit pas reste vrai — le process en service ne porte    │
+    │ pas ce code (E-238).                                                     │
+    └──────────────────────────────────────────────────────────────────────────┘
+
+    `unknown` EXISTE DEJA dans l'ENUM (`034_wazuh.sql:48`) : aucune migration.
+    C'est ce qui separe cet ecart de celui de `supervision`, dont la table n'a
+    aucune colonne de statut — E-242. *Les deux modules ne divergent pas en
+    jugement, ils divergent en vocabulaire.*
+    """
+
+    def _desinstalle(self, client, admin_headers):
+        return client.post('/wazuh/uninstall', json={'machine_id': 2},
+                           headers=entetes(admin_headers))
+
+    @pytest.fixture
+    def paquet_toujours_installe(self, banc):
+        """La purge rend 0 — son `|| true` l'y oblige — et la VERIFICATION rend 7.
+
+        Les deux codes sont necessaires : c'est tout l'ecart. Un scenario qui
+        ferait echouer la purge elle-meme mesurerait un cas que la commande ne
+        peut pas produire.
+        """
+        banc['root'].regle = lambda cmd: ('', '', 7) if 'exit 7' in cmd else ('', '', 0)
+        return banc
+
+    def test_le_verdict_rendu_a_l_ecran_est_deja_juste(self, client_wazuh, admin_headers,
+                                                       mock_db, paquet_toujours_installe):
+        """LE RELEVE DU BON COTE, et il change la nature de l'ecart : ce n'est
+        PAS une fausse attestation a l'ecran. E-225 a deja fait suivre `success`
+        a l'effet mesure. Ce qui diverge est la ligne d'inventaire, juste
+        au-dessous."""
+        corps = self._desinstalle(client_wazuh, admin_headers).get_json()
+
+        assert corps['success'] is False
+        assert corps['paquet_retire'] is False
+
+    def test_un_paquet_encore_installe_s_inscrit_unknown(self, client_wazuh, admin_headers,
+                                                         mock_db, paquet_toujours_installe):
+        """`never_connected` AFFIRME quelque chose de faux ; `unknown` dit ce
+        qu'on sait — c'est-a-dire qu'on ne sait pas."""
+        self._desinstalle(client_wazuh, admin_headers)
+
+        assert len(paquet_toujours_installe['inventaire'].ecritures) == 1
+        assert paquet_toujours_installe['inventaire'].ecritures[0]['status'] == 'unknown'
+
+    def test_un_paquet_reellement_retire_s_inscrit_never_connected(
+            self, client_wazuh, admin_headers, mock_db, banc):
+        """LE CONTRE-CAS, et il n'est PAS en `xfail` : il passe deja, et il doit
+        continuer. Un correctif qui ecrirait `unknown` dans les deux cas
+        satisferait le test precedent en perdant l'information juste."""
+        self._desinstalle(client_wazuh, admin_headers)
+
+        assert banc['inventaire'].ecritures[0]['status'] == 'never_connected'
+
+
 # ══ UNE QUESTION OUVERTE, RELEVEE EN ECRIVANT CE FICHIER — NON TRANCHEE ICI ══
 #
 # `uninstall` appelle `_upsert_agent(status='never_connected', agent_id=None,
