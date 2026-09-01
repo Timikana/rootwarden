@@ -1622,3 +1622,52 @@ n'y a aucun porteur, et le lot du redémarrage ne doit pas grossir pour un saut 
 **Et le point qu'elle laissait ouvert reste ouvert** : `_validate_xml` valide par `xmllint`, et *un
 validateur XML mérite la question XXE.* **Je ne l'ai pas posée non plus** — je suis tombé sur le voisin en
 la cherchant. À qualifier avec le reste.
+
+---
+
+## ✅ Dédouanement : le middleware du portage mord SANS redémarrage — et la propriété tient par un RÉGLAGE
+
+**Mesuré le 2026-09-01 à 12:39 UTC**, sur une affirmation de la session 7 que j'ai voulu vérifier avant
+de la relayer : *« PHP relit à chaque requête, donc ton middleware et `bootstrap/app.php` prendront effet
+immédiatement, sans redémarrage. »*
+
+**C'est vrai. Et le chemin pour l'établir passe par trois caches, pas un.**
+
+    1. bootstrap/cache/     packages.php · services.php SEULEMENT
+                            -> AUCUN config.php, AUCUN routes-v7.php : ni `config:cache` ni `route:cache`
+    2. storage/framework/views/   147 vues compilees, les deux plus recentes de 12:34 et 12:35
+                            -> `accueil.blade.php` modifie a 12:25 a bien ete RECOMPILE depuis
+    3. OPcache              enable = 1 · validate_timestamps = 1 · revalidate_freq = 2 s
+
+> **Le troisième est celui qui décide, et c'est le seul que personne n'avait nommé.** OPcache met en
+> cache le **bytecode**, pas la source. Avec `validate_timestamps = 0` — réglage courant en production —
+> **un fichier PHP modifié ne serait jamais relu**, et tout correctif du portage serait **inerte sans que
+> rien ne le dise.**
+
+### La distinction que ça ajoute au tableau des régimes de lecture
+
+Le plan écrit : *`laravel/**` et `legacy/**` sont relus à CHAQUE REQUÊTE.* **C'est vrai de la SOURCE.**
+
+| ce qu'on touche | ce qui est relu | ce qui pourrait ne pas l'être |
+|---|---|---|
+| `backend/**.py` | au **démarrage du processus** | — c'est la règle connue |
+| `laravel/**`, `legacy/**` | la **source**, à chaque requête | le **bytecode**, si OPcache ne revalide pas |
+
+> **« Relu à chaque requête » est une propriété du serveur, pas du langage.** Ici elle tient parce que
+> `validate_timestamps` vaut 1 — *une propriété qui tient par un réglage n'est pas une propriété par
+> construction*, et celle-ci gouverne la totalité des correctifs du portage et du legacy.
+
+### La borne de MA mesure, et je la déclare
+
+**J'ai lu ces valeurs par `docker exec php -r`, c'est-à-dire dans la SAPI CLI.** Le réglage qui gouverne
+les requêtes est celui de la SAPI du serveur, et ma seconde commande n'a trouvé **aucun** fichier de
+configuration dans `conf.d/` qui le fixerait.
+
+> **Donc : mesure favorable, régime déclaré.** *Une mesure prise dans un processus qui n'est pas celui
+> qui sert est une inférence* — la même réserve qui vaut pour `docker exec python -c` sur le backend, et
+> que le §8 a déjà payée.
+
+**Ce que ça change pratiquement : rien aujourd'hui.** Le middleware mord, les neuf indicateurs sont
+servis, les vues se recompilent. **Ce que ça change en connaissance : un réglage d'une ligne, posé un
+jour pour « durcir la production », rendrait inerte tout le travail du portage — et le symptôme serait
+« le correctif ne marche pas », pas « le cache ne revalide plus ».**
