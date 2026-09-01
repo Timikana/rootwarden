@@ -680,7 +680,7 @@ bloquant plusieurs centaines.
 | voie | modules | pourquoi cette session |
 |---|---|---|
 | session 3 | `platform_key`, `remote_users`, `ssh_audit`, `wazuh`, `groups` | garde les modules à gestes, et **pose seule** les routes et le menu |
-| session 5 | `iptables` (I1→I5) | a qualifié les 33 validateurs ancrés et E-152 ; **ne prend jamais le banc**, donc hors contention |
+| session 5 | `iptables` (I1→I5) | a qualifié les validateurs ancrés — **le « 33 » était un chiffre HÉRITÉ, remesuré à 58 le 2026-09-01** (`.match()` sur motif ancré par `$`, AST sur `backend/`), et **`fullmatch` n'est pas « nulle part » : il y en a 1**. Sur ces 58, **28 `.strip()`ent avant de valider** et le piège ne peut pas s'armer ; **2 seuls survivent** aux filtres quoting/journal/constante, aucun n'est une injection — `AUDIT-WAZUH-VALIDATEURS-ET-XXE.md`. Et E-152 ; **ne prend jamais le banc**, donc hors contention |
 | ~~session 4~~ | ~~`documentation`, `api_docs`~~ | **VOIE ANNULÉE le 2026-08-27** — voir ci-dessous |
 
 **La règle qui rend le découpage sûr** : une session qui porte un module **envoie sa déclaration de
