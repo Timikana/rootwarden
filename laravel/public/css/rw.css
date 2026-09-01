@@ -2581,3 +2581,97 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 }
 
 html { scroll-padding-top: var(--rw-defilement-marge); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * LA REGION D'ALERTES DE L'ACCUEIL — E-264
+ *
+ * Bloc NEUF : aucune regle existante n'est touchee. Il n'emploie que des
+ * jetons deja definis, donc le theme sombre suit sans regle en plus.
+ *
+ * Contrastes mesures AVANT d'ecrire, dans les DEUX themes — clair puis
+ * sombre : 5.91 / 4.76 / 5.82 et 9.02 / 10.72 / 4.60. Tous >= 4.5 (AA).
+ * Aucune assertion DOM ne voit un contraste, et la pastille KEV a 1,06:1 a
+ * coute une vague entiere en etant juste dans le HTML.
+ * ══════════════════════════════════════════════════════════════════════════ */
+.rw-alertes {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 24px;
+}
+
+.rw-alertes__titre {
+    margin: 0 0 2px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.rw-alerte {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 14px;
+    border: 1px solid;
+    border-radius: 10px;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.rw-alerte--grave     { color: var(--rw-danger);        background: var(--rw-danger-fond); border-color: var(--rw-danger); }
+.rw-alerte--attention { color: var(--rw-avertissement); background: var(--rw-avert-fond);  border-color: var(--rw-avertissement); }
+.rw-alerte--info      { color: var(--rw-accent);        background: var(--rw-accent-doux); border-color: var(--rw-accent); }
+
+/* LA COULEUR N'EST PAS LE SEUL CANAL. Une personne qui ne distingue pas le
+ * rouge du jaune doit pouvoir lire la gravite : la FORME du marqueur change
+ * aussi, et le texte de l'alerte nomme le fait sans dependre du ton. */
+.rw-alerte__marque { flex-shrink: 0; font-size: 14px; line-height: 1; }
+
+/* LE NOMBRE PORTE L'INFORMATION : c'est le texte qui cede, jamais lui. */
+.rw-alerte__nombre {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+}
+
+.rw-alerte__texte {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rw-alerte__lien {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: 12px;
+    opacity: .75;
+}
+
+a.rw-alerte:hover { filter: brightness(.97); }
+a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
+
+/* UNE VERIFICATION QUI N'A PAS TOURNE N'EST PAS UN CALME. Ce bandeau porte le
+ * ton « attention » parce que son sujet est l'ignorance, pas la panne. */
+.rw-alertes__illisible {
+    padding: 10px 14px;
+    border: 1px dashed var(--rw-avertissement);
+    border-radius: 10px;
+    background: var(--rw-avert-fond);
+    color: var(--rw-avertissement);
+    font-size: 13px;
+}
+
+.rw-alertes__vide {
+    margin: 0;
+    color: var(--rw-texte-doux);
+    font-size: 14px;
+}
+
+/* Sur un ecran etroit le texte passe a la ligne plutot que de se tronquer :
+ * la place verticale ne manque pas, la place laterale si. */
+@media (max-width: 640px) {
+    .rw-alerte { flex-wrap: wrap; }
+    .rw-alerte__texte { overflow: visible; white-space: normal; }
+    .rw-alerte__lien { margin-left: 0; }
+}

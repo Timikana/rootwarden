@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AlertesAccueil;
 use App\Services\Droits;
 use App\Services\Comptes;
 use App\Services\Machines;
@@ -26,6 +27,7 @@ class PortailController extends Controller
         private readonly Droits $droits,
         private readonly Machines $machines,
         private readonly Comptes $comptes,
+        private readonly AlertesAccueil $alertes,
     )
     {
     }
@@ -92,6 +94,46 @@ class PortailController extends Controller
         $role = (int) $requete->session()->get('role_id', 0);
         $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
 
+        // Calcules UNE fois : les tuiles les affichent, la region d'alertes les
+        // derive. Deux appels donneraient deux nombres a un instant different.
+        $indicateurs = $this->machines->indicateurs($role, $idCompte);
+        $cve = $this->machines->indicateursCve($role, $idCompte);
+        $comptesInd = $this->comptes->indicateursComptes($role);
+
+        /*
+         * ══ LE LIEN D'UNE ALERTE SE RESOUT PAR LE MENU ══════════════════
+         *
+         * Le service ne rend qu'une CLE de navigation ; la destination et le
+         * DROIT d'y aller se lisent ici, dans `$parCle`, exactement comme pour
+         * les tuiles. Deux consequences, toutes deux voulues :
+         *
+         *  - `ssh_audit` n'est pas porte : son entree porte `legacy`, donc
+         *    l'alerte pointe l'ancien portail avec le marqueur, comme le menu ;
+         *  - une personne SANS le droit correspondant n'a pas l'entree, donc
+         *    l'alerte s'affiche SANS lien. Le fait reste dit — on ne cache pas
+         *    un probleme parce que sa page est fermee — mais on n'offre pas une
+         *    porte qui refusera. Aucune garde n'est recopiee ici.
+         */
+        $alertes = $this->alertes->pour($role, $idCompte, $indicateurs, $cve, $comptesInd);
+
+        $alertes['alertes'] = array_map(function (array $a) use ($parCle) {
+            $entree = $a['nav'] !== null ? $parCle->get($a['nav']) : null;
+
+            $a['lien'] = null;
+            $a['externe'] = false;
+
+            if ($entree !== null) {
+                if (isset($entree['route'])) {
+                    $a['lien'] = route($entree['route']);
+                } else {
+                    $a['lien'] = rtrim((string) config('app.url_legacy'), '/') . $entree['legacy'];
+                    $a['externe'] = true;
+                }
+            }
+
+            return $a;
+        }, $alertes['alertes']);
+
         return view('accueil', [
             'modulesAccessibles' => $entrees->count(),
             'modulesPortes'      => $entrees->filter(fn ($e) => isset($e['route']))->count(),
@@ -115,9 +157,24 @@ class PortailController extends Controller
              * une garde posee dans le controleur serait a reecrire au second
              * appelant.
              */
-            'indicateurs'        => $this->machines->indicateurs($role, $idCompte),
-            'cve'                => $this->machines->indicateursCve($role, $idCompte),
-            'comptes'            => $this->comptes->indicateursComptes($role),
+            'indicateurs'        => $indicateurs,
+            'cve'                => $cve,
+            'comptes'            => $comptesInd,
+            /*
+             * ══ LA REGION D'ALERTES SE DERIVE, ELLE NE RELIT PAS ══════════
+             *
+             * E-264. Cinq des huit alertes du legacy comptent un fait deja
+             * affiche par les tuiles ci-dessus — et le legacy les relit sans
+             * borne. Les passer ici, plutot que de les recalculer, garantit que
+             * l'alerte et la tuile portent LE MEME NOMBRE : la coherence n'est
+             * plus une propriete a surveiller, elle est structurelle.
+             *
+             * Le service ajoute les trois faits qu'aucune tuile ne montre, et
+             * NOMME les familles qu'il n'a pas su lire — une region vide se lit
+             * « tout va bien », et c'est le mensonge le plus couteux d'un
+             * tableau de bord de securite.
+             */
+            'alertes'            => $alertes,
             // E-208 : borne au perimetre, ET le total du parc avec.
             'parc'               => $this->machines->compteursPerimetre(
                 (int) $requete->session()->get('role_id', 0),

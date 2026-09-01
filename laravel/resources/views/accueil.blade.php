@@ -4,6 +4,72 @@
     <h1 class="rw-titre">{{ __('accueil.bienvenue', ['nom' => session('utilisateur_nom')]) }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('accueil.orientation') }}</p>
 
+    {{--
+        ═══ E-264 — CE QUI DEMANDE L'ATTENTION ══════════════════════════════
+
+        En TETE de page, avant les tuiles : une alerte placee sous douze tuiles
+        n'est plus une alerte. Le legacy la met au meme endroit, c'est le seul
+        point ou son ecran a raison sur cette region.
+
+        TROIS CHOSES QUE LE LEGACY NE FAIT PAS :
+
+        1. LE NOMBRE EST CELUI DES TUILES. Cinq des huit alertes sont derivees
+           des indicateurs affiches plus bas, et non relues : le legacy relit
+           sans borne, si bien que sa tuile et son alerte pouvaient annoncer
+           deux nombres differents pour le meme fait.
+
+        2. AUCUN NOM. `legacy/index.php:125` nomme jusqu'a cinq comptes et l'age
+           de leur cle, dans le message ET dans le `title=` du rendu (`:213`).
+           Une alerte n'a pas besoin de nommer pour etre actionnable — le lien
+           mene a la page, qui a ses propres droits.
+
+        3. « RIEN » NE SE DIT QUE SI TOUT A ETE LU. Le legacy avale trois de ses
+           lectures dans des `catch` vides : sur une base muette sa region est
+           vide, et une region vide se lit « tout va bien ». Sur un tableau de
+           bord de securite c'est le mensonge le plus couteux qui soit.
+
+        La COULEUR n'est pas le seul canal : la forme du marqueur change avec le
+        ton, et le texte nomme le fait sans dependre de la teinte.
+    --}}
+    <section class="rw-alertes" data-rw="accueil-alertes" aria-labelledby="rw-alertes-titre">
+        <h2 class="rw-alertes__titre" id="rw-alertes-titre">{{ __('accueil.alertes_titre') }}</h2>
+
+        @if ($alertes['illisibles'] !== [])
+            <p class="rw-alertes__illisible" data-rw="accueil-alertes-illisible">
+                {{ __('accueil.alertes_illisible') }}
+                {{ __('accueil.alertes_illisible_familles', ['familles' => implode(', ', array_map(fn ($f) => __('accueil.alertes_famille_' . $f), $alertes['illisibles']))]) }}
+            </p>
+        @endif
+
+        @forelse ($alertes['alertes'] as $a)
+            @php
+                // Une balise et non deux blocs recopies : le contenu est le meme,
+                // seule la nature de l'element change selon qu'il y a une porte.
+                $balise = $a['lien'] !== null ? 'a' : 'div';
+                $marque = ['grave' => '✕', 'attention' => '⚠', 'info' => 'ℹ'][$a['ton']];
+            @endphp
+            <{{ $balise }} class="rw-alerte rw-alerte--{{ $a['ton'] }}"
+                data-rw="accueil-alerte-{{ $a['cle'] }}"
+                @if ($a['lien'] !== null) href="{{ $a['lien'] }}" @endif
+                @if ($a['externe']) target="_blank" rel="noopener" @endif>
+                <span class="rw-alerte__marque" aria-hidden="true">{{ $marque }}</span>
+                <span class="rw-alerte__nombre">{{ $a['nombre'] }}</span>
+                <span class="rw-alerte__texte">{{ trans_choice('accueil.alerte_' . $a['cle'], $a['nombre']) }}</span>
+                @if ($a['lien'] !== null)
+                    {{-- MEME MARQUEUR QUE LE MENU : `↗` quand la page n'est pas
+                         encore portee et qu'on change de portail. --}}
+                    <span class="rw-alerte__lien">{{ __('accueil.alertes_voir') }} {{ $a['externe'] ? '↗' : '→' }}</span>
+                @endif
+            </{{ $balise }}>
+        @empty
+            @if ($alertes['illisibles'] === [])
+                {{-- Le calme ne s'annonce QUE si rien n'a manque a la lecture. --}}
+                <p class="rw-alertes__vide" data-rw="accueil-alertes-aucune">{{ __('accueil.alertes_aucune') }}</p>
+                <p class="rw-alertes__vide">{{ __('accueil.alertes_aucune_aide') }}</p>
+            @endif
+        @endforelse
+    </section>
+
     {{-- La grille remplit la largeur disponible : `auto-fit` avec un minimum de
          280 px donne 2 colonnes sur un ecran moyen, 4 ou 5 sur un grand. --}}
     <div class="rw-grille">
@@ -54,19 +120,35 @@
         reserve sans objet — celles-la deviennent un decor qu'on ne lit plus.
     --}}
     <div class="rw-tuile" data-rw="accueil-parc">
-        <span class="rw-tuile__titre">{{ __('accueil.parc_compteur_titre') }}</span>
+        {{-- Le titre suit le MEME discriminant que la valeur : le corriger en bas
+             et laisser « Vos machines » en haut ne ferait que remonter le
+             possessif d'une ligne. --}}
+        <span class="rw-tuile__titre" data-rw="accueil-parc-titre">{{ __($parc['mord'] ? 'accueil.parc_compteur_titre' : 'accueil.parc_compteur_titre_neutre') }}</span>
         @if (! $parc['lisible'])
             {{-- UNE BASE INJOIGNABLE N'EST PAS UN PARC VIDE. Afficher « 0 · 0 »
                  se lirait comme un fait. --}}
             <p class="rw-tuile__texte" data-rw="accueil-parc-illisible">{{ __('accueil.parc_illisible') }}</p>
         @else
+            {{-- ══ E-263 : LE DISCRIMINANT EST « MORD », PAS « BORNE » ══════════
+                 Le possessif et la reserve existent pour SIGNALER une
+                 restriction. Les rendre quand rien n'est retire les fait
+                 signaler une restriction qui n'existe pas — au role >= 2 le
+                 possessif mentait (« 3 de vos machines » alors que ce sont
+                 TOUTES les machines), au role 1 tout-attribue c'est la reserve
+                 qui mentait, avec le nombre affiche deux fois par-dessus.
+
+                 Deux ancres POSITIVES et exclusives : une suite qui ne viserait
+                 que `accueil-parc-valeur` ne saurait pas laquelle des deux
+                 variantes a ete rendue, et passerait au vert par absence. --}}
             <span class="rw-tuile__valeur" data-rw="accueil-parc-valeur">
-                {{ trans_choice('accueil.parc_perimetre', $parc['perimetre']) }}
-                @if ($parc['borne'])
-                    <span class="rw-tuile__appoint">· {{ trans_choice('accueil.parc_total', $parc['parc']) }}</span>
+                @if ($parc['mord'])
+                    <span data-rw="accueil-parc-possessif">{{ trans_choice('accueil.parc_perimetre', $parc['perimetre']) }}</span>
+                    <span class="rw-tuile__appoint" data-rw="accueil-parc-appoint">· {{ trans_choice('accueil.parc_total', $parc['parc']) }}</span>
+                @else
+                    <span data-rw="accueil-parc-neutre">{{ trans_choice('accueil.parc_neutre', $parc['parc']) }}</span>
                 @endif
             </span>
-            @if ($parc['borne'])
+            @if ($parc['mord'])
                 <p class="rw-tuile__texte" data-rw="accueil-parc-borne">{{ __('accueil.parc_borne_aide') }}</p>
             @endif
         @endif
@@ -87,7 +169,7 @@
         couvrait pas : un perimetre de MACHINES ne borne pas une population
         d'UTILISATEURS.
     --}}
-    <h2 class="rw-section__entete rw-titre--espace">{{ __('accueil.ind_parc_titre') }}</h2>
+    <h2 class="rw-section__entete rw-titre--espace" data-rw="accueil-ind-parc-titre">{{ __($indicateurs['borne'] ? 'accueil.ind_parc_titre' : 'accueil.ind_parc_titre_neutre') }}</h2>
 
     @if (! $indicateurs['lisible'])
         {{-- UNE LECTURE ECHOUEE N'EST PAS UN PARC VIDE. Afficher des zeros les

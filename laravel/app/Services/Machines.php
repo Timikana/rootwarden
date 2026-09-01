@@ -118,7 +118,7 @@ class Machines
                 // Pas de jointure : le perimetre EST le parc. Le dire ainsi
                 // evite un compte redondant et rend `borne` faux, ce qui permet
                 // a l'ecran de ne pas afficher une reserve sans objet.
-                return ['perimetre' => $parc, 'parc' => $parc, 'borne' => false, 'lisible' => true];
+                return ['perimetre' => $parc, 'parc' => $parc, 'borne' => false, 'mord' => false, 'lisible' => true];
             }
 
             $perimetre = $this->requeteBornee($roleId, $userId)->count();
@@ -127,6 +127,21 @@ class Machines
                 'perimetre' => $perimetre,
                 'parc'      => $parc,
                 'borne'     => true,
+                /*
+                 * ══ « LA BORNE EXISTE » N'EST PAS « LA BORNE MORD » ═══════════
+                 *
+                 * E-263. `borne` dit qu'un perimetre s'applique (role 1) ;
+                 * `mord` dit qu'il RETIRE quelque chose. Les deux ne coincident
+                 * pas : un role 1 a qui TOUTES les machines sont attribuees est
+                 * borne sans rien perdre, et l'ecran lui affichait alors
+                 * « 3 de vos machines · 3 au parc » suivi d'une reserve
+                 * annoncant une restriction qui ne restreint rien.
+                 *
+                 * C'est le meme defaut que celui du role >= 2, par l'autre bout :
+                 * la-bas le possessif mentait, ici c'est la reserve. Un seul
+                 * discriminant les couvre tous les deux.
+                 */
+                'mord'      => $perimetre < $parc,
                 'lisible'   => true,
             ];
         } catch (\Throwable $e) {
@@ -137,7 +152,7 @@ class Machines
             // signale juste au-dessus, et qu'on ne refait pas ici.
             Log::error('[Machines::compteursPerimetre] parc illisible : ' . $e->getMessage());
 
-            return ['perimetre' => 0, 'parc' => 0, 'borne' => false, 'lisible' => false];
+            return ['perimetre' => 0, 'parc' => 0, 'borne' => false, 'mord' => false, 'lisible' => false];
         }
     }
 
@@ -290,9 +305,35 @@ class Machines
                 ->orderByDesc('scan_date')
                 ->first(['scan_date', 'cve_count']);
 
-            $critiques = DB::table('cve_scans')
+            /*
+             * ══ LE DERNIER SCAN COMPLETE PAR MACHINE, PAS TOUS LES SCANS ═════
+             *
+             * E-265. Cette somme portait sur TOUTES les lignes de `cve_scans`
+             * du perimetre, sans filtre de statut. Deux ecarts avec le legacy
+             * (`legacy/index.php:102-106`), qui joint sur
+             * `MAX(id) … WHERE status='completed' GROUP BY machine_id` :
+             *
+             *  1. un second scan de la meme machine s'AJOUTAIT au premier, au
+             *     lieu de le remplacer — le nombre gonflait a chaque passage ;
+             *  2. un scan `running` ou `failed` etait compte comme un constat.
+             *
+             * Les deux etaient INVISIBLES sur ce banc, et pour une raison qu'il
+             * faut ecrire : la base ne contient qu'UNE ligne de scan
+             * (`id=2, machine=1, completed`). Les deux definitions rendent donc
+             * 103 toutes les deux, et la coincidence tenait a la donnee, pas au
+             * code. Mesure du 2026-09-01, en vertu de « un nombre trop propre
+             * est le premier signe » — releve en portant ce nombre dans une
+             * alerte rouge, ou une somme gonflee ne serait pas restee un detail.
+             */
+            $derniersComplets = DB::table('cve_scans')
+                ->selectRaw('MAX(id) as id')
                 ->whereIn('machine_id', $ids)
-                ->sum('critical_count');
+                ->where('status', 'completed')
+                ->groupBy('machine_id');
+
+            $critiques = DB::table('cve_scans as s')
+                ->joinSub($derniersComplets, 'l', 's.id', '=', 'l.id')
+                ->sum('s.critical_count');
 
             return [
                 'lisible'    => true,
@@ -305,6 +346,68 @@ class Machines
             Log::error('[Machines::indicateursCve] lecture impossible : ' . $e->getMessage());
 
             return ['lisible' => false, 'aucun_scan' => false, 'date' => '', 'cve' => 0, 'critiques' => 0];
+        }
+    }
+
+    /*
+     * ══ LES DEUX FAITS DE SUIVI QU'AUCUNE TUILE N'AFFICHE ═══════════════
+     *
+     * E-264. Les autres alertes de machines se DERIVENT de `indicateurs()` et
+     * `indicateursCve()` : elles sont deja a l'ecran, borner deux fois
+     * n'apporterait rien et divergerait un jour. Ces deux-la, non — il faut
+     * les lire, donc il faut les borner.
+     *
+     * `legacy/index.php:111` et `:133` les lisent sur le PARC ENTIER, et le
+     * second dans un `catch (\Exception $e) {}` vide : sur une base muette
+     * l'alerte disparait en silence.
+     */
+    public function alertesParc(int $roleId, int $userId): array
+    {
+        try {
+            $ids = $this->requeteBornee($roleId, $userId)->pluck('m.id')->all();
+
+            if ($ids === []) {
+                // Aucune machine au perimetre : pas d'alerte, et ce n'est pas
+                // une erreur non plus.
+                return ['lisible' => true, 'maj_ancienne' => 0, 'ssh_faible' => 0];
+            }
+
+            // `last_checked IS NOT NULL` est dans le predicat du legacy et on le
+            // garde : une machine jamais relevee n'est pas « relevee il y a
+            // longtemps ». C'est un fait different, et il n'a pas d'alerte.
+            $majAncienne = DB::table('machines')
+                ->whereIn('id', $ids)
+                ->whereNotNull('last_checked')
+                ->where('last_checked', '<', now()->subDays(30))
+                ->count();
+
+            /*
+             * Le dernier audit PAR machine, puis le predicat sur son score.
+             * `MAX(id)` et non `MAX(date)` : c'est ce que fait le legacy, et
+             * changer la definition d'un « dernier » en meme temps qu'on borne
+             * la requete rendrait un ecart de nombre inexplicable.
+             */
+            $dernierParMachine = DB::table('ssh_audit_results')
+                ->selectRaw('MAX(id) as id')
+                ->whereIn('machine_id', $ids)
+                ->groupBy('machine_id');
+
+            $sshFaible = DB::table('ssh_audit_results as r')
+                ->joinSub($dernierParMachine, 'l', 'r.id', '=', 'l.id')
+                ->where('r.score', '<', 50)
+                ->count();
+
+            return [
+                'lisible'      => true,
+                'maj_ancienne' => $majAncienne,
+                'ssh_faible'   => $sshFaible,
+            ];
+        } catch (\Throwable $e) {
+            // PAS de catch vide. Une lecture ratee remonte comme illisible, et
+            // l'ecran DIT qu'il n'a pas su lire plutot que de rester muet.
+            Log::error('[Machines::alertesParc] lecture impossible : ' . $e->getMessage());
+
+            return ['lisible' => false, 'maj_ancienne' => 0, 'ssh_faible' => 0];
         }
     }
 
