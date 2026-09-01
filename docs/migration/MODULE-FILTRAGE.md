@@ -511,12 +511,34 @@ Aucune unité systemd ordinaire ne commence par un tiret. Ce que cela casserait 
 Recensement sur tout `backend/` :
 
 ```bash
-grep -rnE "re\.compile\(r?['\"]\^.*\\\$['\"]\)" backend/*.py backend/routes/*.py   # 33 validateurs ancres
+grep -rnE "re\.compile\(r?['\"]\^.*\\\$['\"]\)" backend/ --include=*.py | grep -v /tests/   # 31 au 2026-09-01
+grep -rE  "re\.(match|search|fullmatch)\(r?['\"]\^"    backend/ --include=*.py | grep -v /tests/   # 7 de plus, EN LIGNE
 grep -rnE "_RE\.fullmatch\(" backend/*.py backend/routes/*.py                      # 0
 ```
 
-> **33 validateurs ancrés `^…$`. `.fullmatch()` n'est employé NULLE PART — les 51 appels sont des
-> `.match()`.** En Python, `$` correspond aussi **juste avant un saut de ligne final** : chacun de
+> ### ⚠ LES TROIS CHIFFRES DE CE PARAGRAPHE ÉTAIENT PÉRIMÉS — remesurés le 2026-09-01 à 16:26 CEST
+>
+> Ce paragraphe annonçait **« 33 validateurs, `.fullmatch()` nulle part, 51 appels »**. Les trois ont
+> bougé, et **pour trois raisons différentes** :
+>
+> | affirmation | état | cause de l'écart |
+> |---|---|---|
+> | « 33 validateurs ancrés » | **31** par mon motif, **38** en y ajoutant les formes en ligne | **mon motif supposait une forme** : `re.compile` sur UNE ligne. Il ne voyait pas les sept `re.match(r'^…')` posés en ligne |
+> | « `.fullmatch()` nulle part » | **employé UNE fois** — `fail2ban_manager.py:318` | **c'est le fail-closed du correctif d'E-174**, celui que ce document a motivé |
+> | « 51 appels `.match()` » | **50** | le code a bougé |
+>
+> **Un relevé indépendant porté au plan rend 58**, par un motif que je n'ai pas vu. *Deux chiffres,
+> deux questions* : je ne prétends pas que 38 soit juste et 58 faux, ni l'inverse — **la différence est
+> le motif, pas le code**, et aucun des deux relevés ne portait le sien. C'est la faute que ce chantier
+> a payée quatre fois en un jour sur un même ensemble (2, puis 3, puis 7, puis 38).
+>
+> **La conclusion de fond, elle, ne dépend pas du compte** et elle tient : *l'écart `.match()` /
+> `.fullmatch()` n'est pas exploitable* — `$` n'admet qu'un saut de ligne, en toute fin, et rien après.
+> Le §8.3 le mesure valeur par valeur, et **c'est lui qui fait foi**, pas le nombre de validateurs.
+>
+> **Et la boucle mérite d'être écrite** : l'unique `fullmatch` du dépôt existe **parce que** ce
+> document a signalé E-174. *Mon propre constat a été falsifié par le correctif qu'il a produit* — et
+> rien ne me l'aurait dit sans une remesure. En Python, `$` correspond aussi **juste avant un saut de ligne final** : chacun de
 > ces 33 accepte donc une valeur terminée par `\n`.
 
 Mesuré dans `rootwarden_python`, six d'entre eux, `.match()` contre `.fullmatch()` sur `valeur + LF` :
@@ -634,7 +656,7 @@ enlevé. **Ce qui referme doit être documenté là où il referme**, exactement
 
 | question | état |
 |---|---|
-| les 33 validateurs acceptent un `\n` final | **mesuré** — et **non exploitable**, `$` n'admet rien après |
+| les validateurs ancrés acceptent un `\n` final *(compte : voir l'encadré du §8.2)* | **mesuré** — et **non exploitable**, `$` n'admet rien après |
 | `_SAFE_VALUE_RE`, contexte multiligne | **qualifié : refermé deux fois** — l'argument sur `$`, et le base64 |
 | `_SERVICE_RE`, injection d'argument | **qualifié : sans effet utile** — déjà root, et un seul jeton |
 | **`-.mount` / `-.slice`** | **NON TRANCHÉ, et délibérément** — voir §8.1 quater, ne pas tester |
