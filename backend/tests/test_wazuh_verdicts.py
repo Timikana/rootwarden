@@ -508,7 +508,30 @@ class TestReleveDesEcrituresDInventaire:
         return trouves
 
     def test_aucune_route_nouvelle_n_ecrit_l_inventaire(self):
-        inconnus = set(self._appelants()) - set(APPELANTS_UPSERT_GELES)
+        trouves = self._appelants()
+
+        # ══ LA GARDE D'OBJET, ET ELLE MANQUAIT ══════════════════════════════
+        #
+        # « aucun X ne fait Y » est une universelle NEGATIVE : elle est VRAIE A
+        # VIDE. Si l'analyseur ne rend rien — module renomme, source illisible,
+        # `inspect.getsource` qui change — `inconnus` est vide et ce test PASSE
+        # en annoncant « aucun route nouvelle », c'est-a-dire la plus
+        # rassurante des conclusions, sans avoir rien regarde.
+        #
+        # Mesure du 2026-09-01 : mutation vidant l'analyseur -> ce test EST
+        # RESTE VERT. Ses deux jumeaux ont rougi, donc le FICHIER etait protege
+        # — mais un test vert par vacuite reste faux joue seul, cite seul, ou
+        # separe de son jumeau. *Un `assert` dans une suite verte ne se relit
+        # jamais.*
+        #
+        # C'est la regle SANS OBJET appliquee ici : une assertion doit inclure
+        # l'existence de sa FENETRE D'OBSERVATION, pas seulement celle de son
+        # objet.
+        assert trouves, ("l'analyseur n'a rien rendu : ce test ne mesure RIEN. "
+                         "Ce n'est pas « aucun route nouvelle », c'est « je "
+                         "n'ai pas pu regarder ».")
+
+        inconnus = set(trouves) - set(APPELANTS_UPSERT_GELES)
 
         assert not inconnus, (
             f"nouvel ecrivain de l'inventaire Wazuh : {sorted(inconnus)}. "
