@@ -1241,3 +1241,126 @@ prendra, et un agent qui vient d'être installé n'a effectivement pas encore re
 > **Si le défaut avait été `unknown`, tout déploiement réussi aurait commencé par « je ne sais pas ».**
 > *Choisir la valeur par défaut d'une colonne neuve est une décision de conception, pas un détail de
 > migration* — et personne ne l'avait demandée.
+
+---
+
+## 13 — ⚠⚠ Le portage ne verrouille pas `force_password_change` : **le middleware manquant, et il passe devant les 39 croisements**
+
+**Décidée le 2026-09-01, 12:24 UTC.** Trouvée par la session 5, **vérifiée par moi maillon par maillon —
+et elle est plus large que ce qu'elle annonçait.**
+
+### Ce que j'avais écrit, et qui était faux
+
+J'ai qualifié le porteur d'E-236 de **« porteur inutilisable »** — sans second facteur et sous
+`force_password_change`, donc jamais connecté. **La seconde moitié ne tient pas.**
+
+> **La qualification juste est : porteur DORMANT À RÉVEIL AUTONOME.** Son armement ne demande aucun
+> tiers — seulement que son détenteur légitime se connecte une fois.
+
+### La chaîne, vérifiée
+
+    legacy/auth/verify.php:172-181   relit la BASE a chaque requete, pose le drapeau, REDIRIGE
+                                     -> controle PAR REQUETE, et `api_proxy.php` l exige aussi
+
+    laravel/app/Http/Middleware/     ExigePermission · ExigeRole · Langue · SessionAuthentifiee
+      SessionAuthentifiee:24         if (! session()->has('utilisateur_id'))  -> et RIEN d autre
+      grep changement_mot_de_passe_requis|force_password_change  sur les 4  ->  ZERO
+
+> **Le legacy exerce le contrôle à chaque requête. Le portage ne le lit nulle part.** L'exigence de
+> changement de mot de passe y est **un bandeau, pas un verrou** — et la session est ouverte **avec son
+> `role_id`** avant la redirection.
+
+**Septième occurrence de « la garde est sur la PAGE, pas sur la REQUÊTE »** — et la première qui porte sur
+l'exigence de mot de passe elle-même.
+
+### ⚠ ET LA POPULATION EST PLUS LARGE QUE « UN PORTEUR » — mesuré
+
+    comptes actifs avec force_password_change = 1  ->  HUIT
+
+    id  1  role 3   2FA oui   superadmin, mot de passe inconnu de nos notes
+    id 78  role 3   2FA NON   <- role 3 : contourne TOUTE permission et TOUT require_role
+    id 77  role 2   2FA NON   <- le porteur qu'E-236 avait identifie
+    id  3,4,5,10,12  role 1   2FA NON   residus e2e
+
+> **Le compte 78 est de rôle 3.** Pour lui, il n'y a pas « 32 chemins » : le rôle 3 court-circuite chaque
+> `require_permission` et chaque `require_role`. **Le drapeau est le SEUL frein entre son détenteur et
+> l'administration complète du portage — et aucun middleware ne le lit.**
+
+*La session 5 avait mesuré un porteur de rôle 2 ; il y en a deux au-dessus du rôle 1, et le second est
+celui pour qui la borne ne s'applique nulle part ailleurs.*
+
+### DÉCISION : le middleware s'écrit. **C'est une correction de PARITÉ, pas une politique.**
+
+Le legacy exerce ce contrôle ; le portage ne l'exerce pas. **Restaurer la parité est le mandat du
+chantier**, pas un arbitrage de produit — et c'est ce qui rend la décision déléguée. Même classe qu'E-224 :
+une borne **fail-closed** qui n'ajoute qu'un refus ne peut pas détruire davantage.
+
+**Et c'est la fermeture la moins chère de tout le paquet.** La session 5 le dit et je le retiens : elle
+neutralise le porteur **sans toucher aux trois modules**, là où réconcilier les 39 croisements demande de
+trancher `cve_` — qui attend S7b. **L'ordre est donc : le middleware d'abord, la réconciliation ensuite,
+calmement.**
+
+### ⚠ LA CONDITION SANS LAQUELLE CE MIDDLEWARE DEVIENT `stopped_at_tamper`
+
+    laravel/routes/web.php:84   Route::post('/profil/mot-de-passe', ...)   <- POST SEUL
+
+**Le formulaire vit sur une page GET.** Un middleware qui redirige *tout* bloquerait donc **l'écran qui
+débloque** — et le compte serait enfermé.
+
+> ***Un garde-fou qui se déclenche à tort ne protège plus : il empêche.*** `stopped_at_tamper` a rendu le
+> seul remède au trou d'audit **définitivement inerte** tout en écrivant une alarme à chaque appel. **Ce
+> middleware doit exempter, explicitement et par une liste FERMÉE :** l'écran qui porte le formulaire,
+> `POST /profil/mot-de-passe`, et la déconnexion.
+
+**Et le legacy montre la forme** : il redirige vers `/profile.php?force_change=1`, donc **il exempte sa
+propre cible** — sinon boucle infinie. *La parade existe déjà dans le produit ; il n'y a rien à inventer.*
+
+### Ce que ça coûte, dit plutôt que découvert
+
+**Huit comptes devront changer leur mot de passe avant d'utiliser le portage**, dont les **deux** de
+l'exploitant. **C'est une friction, pas un verrouillage** — le geste est en libre-service et le
+changement de mot de passe est porté depuis `v1.37.49`. **Mais cela ne vaut QUE si l'exemption est
+posée** : sans elle, c'est un verrouillage, et de la classe E-201 / E-202 — *un chemin sans retour*.
+
+**Qui écrit** : `laravel/app/Http/Middleware/` est le périmètre de la **session 3**. La session 5 refuse
+de l'écrire, et elle a raison — *qui qualifie ne corrige pas seul.*
+
+---
+
+## ⚠ Amendement aux décisions n°1 et n°12 — **borner trois compteurs aurait été enregistré comme « tableau de bord borné »**
+
+**La session 5 relève ce que mes deux décisions ne couvrent pas, et c'est le principal.**
+
+    legacy/index.php:192 et :197   le bloc d alertes est rendu sous `if (!empty($alerts))`  ET RIEN D AUTRE
+    alors que la MEME page borne par role a :161, :228, :288, :394, :461
+
+**Neuf alertes au rôle 1**, dont six touchent la flotte ou la surface d'attaque — machines encore en mot
+de passe **avec leur lien**, score SSH < 50 **avec le lien vers `/ssh-audit/`**, CVE critiques.
+
+**Et la pire n'est pas un compteur** : `$oldKeys` **NOMME jusqu'à cinq comptes** et l'âge de leur clé,
+dans le message **et dans l'attribut `title=`**. *Strictement plus identifiant que n'importe lequel des
+trois compteurs que je bornais.*
+
+> **J'ai borné trois nombres et laissé ouverte la région qui nomme des personnes.** Et le résultat aurait
+> été inscrit comme *« tableau de bord borné »* — **la pire forme du motif** : non pas un texte qui
+> affirme plus que le code, mais **une mesure de sûreté qui certifie une région qu'elle n'a pas
+> couverte.**
+
+**DÉCISION : borner la RÉGION, en trois classes plutôt que neuf décisions**, comme elle le propose —
+exploitation (rôle 1) · population et flotte (rôle 2) · surface d'attaque (rôle 3). **Et `$oldKeys` perd
+sa liste nominative quel que soit le rôle retenu** : *une alerte n'a pas besoin de nommer pour être
+actionnable.*
+
+### Et son discriminant sur `noKey` remplace le mien
+
+Ma conclusion était juste, **ma raison ne l'était pas** :
+
+    no2fa  ->  combien de comptes tombent avec un mot de passe seul   = taille d une liste de cibles
+    noKey  ->  combien de comptes n ouvrent RIEN sur la flotte        = les moins rentables a prendre
+
+**Vecteurs opposés, pas deux intensités du même.** `users.ssh_key` est la clé publique **du compte
+lui-même**, déployée sur les machines — « pas de clé » veut donc dire *aucun accès*, pas *un facteur plus
+faible*.
+
+> **Classer par « ça ressemble à un compteur de sécurité » mettrait `noKey` au rôle 3 et laisserait passer
+> le prochain compteur qui n'en a pas l'air.** *Un critère qui trie par ressemblance ne trie pas.*
