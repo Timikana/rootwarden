@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.132** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.133** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,111 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.133 — `groups` R1 : la page en LECTURE, et E-274 pose a l'ecran
+
+**Premier sous-lot de `groups/`. Aucune ecriture, aucun effet distant, aucune requete autre que `GET`.**
+
+#### Ce qui est porte
+
+La page, ses gardes aux trois couches, la liste (`GET /groups`), le depliage des membres
+(`GET /groups/<id>/members`), l'etat vide, l'i18n, l'entree de menu — qui passe de `legacy` a `route`.
+
+**Rien a ajouter a la passerelle** : `/groups` etait deja dans la liste blanche ET dans la reserve
+d'administration de `RoutesBackend`. Verifie, pas suppose.
+
+**Et c'est le premier module non porte du chantier dont l'audit de gardes ne rend rien** :
+`legacy/groups/index.php:15-16` pose `checkAuth([2,3])` + `checkPermission('can_admin_portal')`,
+`api_proxy.php` place `/groups` dans la reserve d'administration, et les **six** routes backend
+portent `@require_role(2)` + `@require_permission('can_admin_portal')`. Le motif « la garde est sur
+la PAGE, pas sur la REQUETE » est **absent** ici.
+
+#### Ce qui n'est PAS porte, et qui est DECLARE plutot qu'omis
+
+Creation, suppression et les deux actions de masse. **Aucun bouton inerte** : chacun ouvre un panneau
+qui dit ce que le geste engage, avec pour action principale le lien vers l'ancien portail.
+
+**Le formulaire de creation n'est pas rendu du tout.** L'inventaire rangeait son rendu en R1 et son
+`POST` en R2 ; un formulaire dont « Enregistrer » ne ferait rien serait exactement le bouton inerte
+que la convention interdit. Il viendra AVEC sa route.
+
+#### E-274 pose a l'ecran — le groupe le plus large possible s'affichait comme une ligne VIDE
+
+`_resolve_dynamic` (`backend/routes/groups.py:77`) termine par :
+
+    where = (' AND '.join(clauses)) if clauses else '1=1'
+
+**Zero critere coche ⇒ `WHERE 1=1` ⇒ le parc entier, `srv-zabbix` comprise.** Et
+`filtersSummary({})` (`legacy/groups/js/main.js:21-28`) rend **la chaine vide** : l'ancien portail
+presente donc ce groupe-la par une ligne de resume **blanche**, dont le seul indice est un compteur
+qui ne se distingue en rien de celui d'un groupe voulu.
+
+Le portage ecrit **« aucun filtre — toutes les machines du parc »**. *Une absence de critere n'est
+pas une absence de portee : c'est la portee maximale.*
+
+#### Le panneau de decision remplace le `confirm()` natif — et dit ce qu'il taisait
+
+Le legacy confirme les deux actions de masse et la suppression par des boites natives, proscrites
+ici. Et son texte ne dit **ni** le nombre de machines, **ni** leur identite, **ni** si la production
+en fait partie, **ni** la difference de nature entre les deux actions — le meme texte sert pour un
+geste sans effet distant et pour un geste qui ouvre N sessions SSH et envoie N courriels.
+
+Le panneau du scan CVE **resout les membres avant de demander quoi que ce soit**, puis annonce :
+
+    Groupe vise : Parc entier (sans filtre)
+    Ce geste ouvre une session SSH reelle sur CHAQUE membre … un rapport par courriel
+    Ce groupe resout 3 serveur(s) aujourd'hui.
+    ⚠ La production en fait partie : srv-zabbix.
+    Le nombre affiche est celui d'aujourd'hui — un groupe dynamique est RE-RESOLU au lancement.
+
+C'est la lecture que le legacy ne fait pas avant de demander un consentement.
+
+#### ⚠ Un defaut de ma propre ecriture, vu a l'image et corrige avant commit
+
+**Le panneau vit au niveau de la PAGE** — lecon de F5 : un element partage par plusieurs cartes ne
+vit dans aucune d'elles. Mais il servait quatre boutons appartenant a des cartes differentes **sans
+nommer le groupe vise**. Il decrivait donc un geste sans dire sur quoi il portait — *pire qu'une
+boite native, qui au moins s'ouvre a l'endroit du clic*. Corrige : `np_sur_groupe` en premiere ligne
+des quatre ouvertures.
+
+#### Numerotation — et une collision SEMANTIQUE evitee de justesse
+
+Redige sous **E-278**, apres avoir releve le maximum des deux registres. **Mais E-274 portait deja
+cet ecart** (`278f99c`, entree v1.38.131) : le Lead l'avait inscrit depuis mon annonce de R1, une
+heure plus tot. *Un maximum libre ne dit pas qu'un ecart est neuf* — la collision n'etait pas sur le
+numero, elle etait sur le FAIT, et deux numeros pour un meme defaut est pire que l'inverse.
+Renumerote **E-274** avant le commit, references comprises.
+
+La seconde definition du « parc » (`_resolve_dynamic` ne filtre pas `lifecycle_status`) et le refus
+de rendre un formulaire inerte sont deja portes par l'entree v1.38.131 : **non repetes ici**.
+*Un resume qui renvoie ne peut pas contredire le corps.*
+
+#### Mesures
+
+    go-socle-navigation   67 PASS / 0 FAIL   — « Groupes & masse » resout 200 /groupes
+    menu au role 3        total=32  route=27  legacy=5   (0 entree portant les DEUX)
+    routes du menu        aucune entree ne vise une route inexistante
+    parite i18n groups    FR=39  EN=39  ecarts=0 dans les deux sens
+    cles                  aucune morte, aucune manquante — les 39 sont consommees
+    requetes mutantes     0 dans `groupes.js` (`confirm(` n'y apparait que dans deux commentaires)
+    middlewares           web · session.authentifiee · mot.de.passe.a.changer · role:2 · perm:can_admin_portal
+
+**Les trois chemins sont exercables sans toucher aux droits d'aucun compte** : `rw-test-user` (role 1)
+refuse sur le ROLE, `rw-test-admin` (role 2, `can_admin_portal = 0`) refuse sur la PERMISSION,
+`rw-test-super` passe.
+
+#### Captures : 12, aux trois largeurs, REGARDEES
+
+La base ne porte **aucun** groupe (`machine_groups` : 0 ligne), donc le seul rendu reel est l'etat
+vide. Les cartes et les panneaux ont ete captures sur une charge **forgee, interceptee dans le
+navigateur** : aucune requete n'a atteint le backend, aucune ligne n'a ete ecrite. **Ce qui est
+mesure la est la MISE EN PAGE, pas le chemin de donnee**, et c'est dit.
+
+**Et l'outil de capture a d'abord rendu trois images de l'ecran de CONNEXION** sans que rien ne le
+signale : trois connexions du meme compte dans la meme fenetre de 30 s, et l'anti-rejeu TOTP — qui
+est **par compte et EN BASE** — a refuse les suivantes. Corrige en attendant le BASCULEMENT de la
+fenetre, et double d'un temoin qui verifie l'URL servie avant de capturer. *Une capture de l'ecran de
+connexion ressemble a une capture reussie.*
 
 ### v1.38.132 — SEC-013 : l'ECRITURE moins gardee que la LECTURE sur la meme URL, et deux de mes affirmations refutees
 

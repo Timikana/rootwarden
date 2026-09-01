@@ -16,6 +16,7 @@ use App\Http\Controllers\AccesSftpController;
 use App\Http\Controllers\PolitiquesController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
+use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\GraylogController;
 use App\Http\Controllers\ExportConformiteController;
 use App\Http\Controllers\ExportConformitePdfController;
@@ -127,6 +128,27 @@ Route::middleware(['session.authentifiee', 'mot.de.passe.a.changer'])->group(fun
     Route::get('/approbations', ApprobationsController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('approbations');
+
+    /*
+     * Groupes de machines et actions de masse — sous-lot R1, LECTURE SEULE.
+     *
+     * Meme garde que le legacy aux trois couches, et c'est le premier module
+     * non porte du chantier dont l'audit de gardes ne rend rien :
+     * `legacy/groups/index.php:15-16` pose `checkAuth([2,3])` +
+     * `checkPermission('can_admin_portal')`, `api_proxy.php` place `/groups`
+     * dans la reserve d'administration, et les SIX routes backend portent
+     * `@require_role(2)` + `@require_permission('can_admin_portal')`.
+     *
+     * Rien a ajouter a `RoutesBackend` : `/groups` y est deja, dans la liste
+     * blanche ET dans la reserve d'administration.
+     *
+     * Aucune route d'ecriture ici : creation, suppression et actions de masse
+     * ne sont pas portees en R1, et leurs boutons ouvrent un panneau qui dit
+     * ce qu'ils engagent plutot que de ne rien faire.
+     */
+    Route::get('/groupes', GroupesController::class)
+        ->middleware(['role:2', 'perm:can_admin_portal'])
+        ->name('groupes');
 
     /*
      * Derive de configuration. Seule page portee a ce jour dont la garde
@@ -922,6 +944,7 @@ Route::get('/terms.php', fn () => redirect()->route('cgu'));
 Route::get('/adm/admin_page.php', fn () => redirect()->route('accueil'));
 Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
 Route::get('/approvals/', fn () => redirect()->route('approbations'));
+Route::get('/groups/', fn () => redirect()->route('groupes'));
 Route::get('/drift/', fn () => redirect()->route('derive-config'));
 Route::get('/backups/', fn () => redirect()->route('sauvegardes'));
 Route::get('/tasks/', fn () => redirect()->route('taches'));
