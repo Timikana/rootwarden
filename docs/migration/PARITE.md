@@ -12563,3 +12563,48 @@ Son module exclut correctement `laravel/storage/` — c'est pourquoi il n'a rend
 lieu de 87 fichiers. **Mais il l'a rendu comme un motif d'abattage.** Sa formule : *l'un ne rachete pas
 l'autre.* **Un filtre juste et un seuil faux produisent une alarme precise et destructrice** — plus
 dangereuse qu'une alarme bruyante, parce qu'elle est credible.
+
+## E-258 — le garde de fenetre signalerait les ecritures du LOT LUI-MEME : la distinction n'est pas « servi », c'est CODE contre ETAT D'EXECUTION
+
+**Trouve par le Lead le 2026-09-01 a 16:21:32 CEST, en LANÇANT la surveillance plutot qu'en la
+relisant.**
+
+    fenetre depuis 15:37:23, chemins servis, `laravel/storage/` exclu :
+      legacy/version.txt            15:42:17   <- le Lead (E-256, corrige)
+      backend/logs/deployment.log   16:05:10   <- LE LOT, via `assureJournal()` de go-page-ssh-flux
+
+**Et ce n'est pas un fichier, ce sont cinq categories** sous les chemins surveilles :
+
+    backend/logs/           server.log · iptables.log · deployment.log · update_servers.log
+    backend/__pycache__/    ecrit a chaque import Python
+    backend/.pytest_cache/  ecrit par pytest
+    backend/.ruff_cache/    ecrit par ruff
+    legacy/logs/            les journaux du portail legacy
+
+**`verdictFenetre('backend')` rendrait donc « fenetre sale » sur toute suite qui declenche un
+deploiement, tout redemarrage backend, et tout `pytest`.** *C'est exactement la classe qu'E-257 vient de
+corriger, et l'exclusion de `laravel/storage/` etait juste sans couvrir celles-la.*
+
+### LA DISTINCTION JUSTE, et elle n'est pas « servi / non servi »
+
+    code source        ecrit par un DEVELOPPEUR         -> la mesure devient non interpretable
+    etat d'execution   ecrit par le SYSTEME qui tourne  -> c'est le fonctionnement normal
+
+> **La question du garde est « quelqu'un a-t-il change le code sous mes pieds », pas « un octet a-t-il
+> change ».**
+
+**Et allonger la liste d'exclusions reproduirait le defaut qu'E-246 bis a nomme** : *une liste se perime
+au premier repertoire de cache qu'un outil cree.* **Deriver plutot qu'enumerer** — `git check-ignore`
+suit `.gitignore` sans maintenance, parce que **l'etat d'execution y est par construction : personne ne
+versionne ce que personne ne modifie comme du code.**
+
+**Angle mort a NOMMER plutot qu'a corriger** : un fichier de **code non encore suivi** serait classe
+comme etat — `?? tests/e2e/lib-arbre.mjs` ce matin l'etait. *Sans consequence la, parce que `tests/e2e/`
+n'est pas servi ; un `wazuh.blade.php` neuf le serait.* Meme traitement que l'angle mort du
+cree-puis-supprime : **ecrit dans l'en-tete, pas colmate.**
+
+### Et c'est l'EXECUTION qui l'a trouve
+
+*Le Lead portait cette consigne de surveillance depuis trois tours sans la lancer.* **Meme forme que
+l'epreuve d'abattage de la session 7** — c'est le geste, pas la relecture, qui a trouve la limite. Et
+meme forme que le §1 du plan : *une commande de remesure ecrite a cote d'un chiffre ne remesure rien.*
