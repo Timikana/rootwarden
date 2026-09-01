@@ -41,8 +41,19 @@ foreach (glob($argv[1] . '/*.php') as $fichier) {
             // Chaine INTERPOLEE : `url("/api/gateway/supervision/{$plateforme}/version")`.
             // Elle n'est PAS statiquement resoluble, et c'est un SILENCE MESURE,
             // pas un silence par incapacite de l'outil : on le dit.
+            //
+            // ══ LE GABARIT ETAIT VIDE, ET LE LIBELLE PROMETTAIT LE CONTRAIRE ══
+            //
+            // `$k = $j` partait SUR le guillemet ouvrant, et la boucle s'arrete
+            // au premier `"` : elle ne tournait jamais. Les huit entrees
+            // interpolees sortaient donc avec une cible VIDE, pendant que le
+            // libelle « silence MESURE » affirmait qu'on savait pourquoi on ne
+            // savait pas. On ne le savait pas : on n'avait rien retenu.
+            //
+            // *Un silence etiquete « mesure » qui ne porte pas sa mesure est un
+            // silence par incapacite avec un meilleur nom.*
             $morceaux = '';
-            $k = $j;
+            $k = $j + 1;
             while ($k < $n && $jetons[$k] !== '"') {
                 if (is_array($jetons[$k]) && $jetons[$k][0] === T_ENCAPSED_AND_WHITESPACE) $morceaux .= $jetons[$k][1];
                 elseif (is_array($jetons[$k]) && $jetons[$k][0] === T_VARIABLE) $morceaux .= '{' . $jetons[$k][1] . '}';

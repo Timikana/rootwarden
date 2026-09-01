@@ -237,13 +237,60 @@ Presque chaque fichier route ses appels par un helper — `lit(chemin)`, `appell
 littéral existe, mais chez les **appelants du helper**. C'est la même discipline que
 *remonter du champ à son `form`* plutôt que de prendre le premier bouton.
 
-| | |
-|---|---|
-| sites résolus **directement** | 13 |
-| sites résolus **par remontée** | 29 |
-| **silences mesurés** (clé PHP interpolée) | 4 |
-| **silences par incapacité** (cible variable) | 13 |
-| **couverture** | **71 %** — 42 sites sur 59, 75 chemins |
+| | 28/08 matin | **01/09 — remesuré** |
+|---|---|---|
+| sites résolus **directement** | 13 | **21** |
+| sites résolus **par remontée** | 29 | 29 |
+| **silences mesurés** (clé PHP interpolée) | 4 | 4 |
+| **silences par incapacité** (cible variable) | 13 | **4** |
+| **hors passerelle** (chemin du portage) | *pas distingué* | **2** |
+| **couverture** | 71 % — 42/59 | **86 % — 50 sur 58 interrogeables, 84 chemins** |
+
+**Neuf des treize « silences par incapacité » n'en étaient pas.** La cible n'était ni
+inconnaissable ni variable au sens fort : elle était une **constante du fichier** ou une
+**clé passée à un helper local**. Deux passes d'analyse les nomment maintenant, et la
+distinction compte — *compter comme de l'ignorance ce qu'on n'a pas regardé mélange deux
+choses qui ne se ressemblent que dans un tableau.*
+
+    var PORTEE = '/fail2ban/portee';        …  fetch(PORTEE)
+    var route  = routeCourante('version');  …  fetch(route)
+
+**Et une ambiguïté mesurée à la mauvaise échelle ressemble à une incapacité.** Premier
+jet : je cherchais la liaison dans **tout le fichier**, et `supervision.js` déclare
+**cinq fois** `var route = routeCourante(…)`, une par gestionnaire. Cinq liaisons →
+ambigu → rejeté : l'outil rendait **2 des 7** sites, et j'aurais pu conclure que les cinq
+autres étaient hors de portée. Chaque liaison est **seule dans sa fonction** : on cherche
+donc d'abord dans la fonction englobante, et on ne retombe sur le fichier entier que pour
+les constantes de module.
+
+#### Le silence « mesuré » ne portait PAS sa mesure — et c'est le pire des deux défauts
+
+`extrait-urls.php` partait **sur** le guillemet ouvrant (`$k = $j`) et sa boucle s'arrête
+au premier `"` : elle ne tournait **jamais**. Les huit entrées interpolées sortaient donc
+avec une cible **vide**, pendant que le libellé « silence MESURÉ » affirmait qu'on savait
+pourquoi on ne savait pas.
+
+> **Un silence étiqueté « mesuré » qui ne porte pas sa mesure est un silence par
+> incapacité sous un meilleur nom.** Le tableau disait 4 et 13 ; il aurait dû dire 0 et 17.
+
+Corrigé, les huit gabarits sortent en clair — `/api/gateway/supervision/{$plateforme}/version`
+— et **sept sites se résolvent complètement** : le gabarit PHP et la route Flask
+`/supervision/<platform>/version` décrivent le même ensemble de chemins, et les apparier
+segment à segment en traitant `{$…}` et `<…>` comme un joker est un appariement de
+**forme**, pas une supposition sur la valeur. Résolution retenue seulement si **une seule**
+route du backend correspond.
+
+#### Une cible littérale hors passerelle n'est pas un silence
+
+`/fail2ban/portee` et `/notifications/preferences` sont des chemins **du portage**. La
+cible est entièrement connue : la question « cette route peut-elle rendre `200` en
+mentant ? » ne leur est pas posée, donc ils sortent du **dénominateur** — les compter
+comme non couverts ferait baisser une couverture qui n'a rien à couvrir là.
+
+**Ce que cette mesure ne dit pas est nommé** : si le contrôleur Laravel derrière relaie
+vers le backend, la question se repose sur la couche PHP. Vérifié à la main pour ces deux
+sites — `Fail2ban::portee()` lit `DB::select`, et `Notifications.php` ne mentionne la
+passerelle **nulle part**. Aucun des deux ne relaie.
 
 **Aucun appelant à risque** : aucune route de la famille « 200 menteuse » n'est consommée
 par un appelant qui ne lit pas le verdict.
