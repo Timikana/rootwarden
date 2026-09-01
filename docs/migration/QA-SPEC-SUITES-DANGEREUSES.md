@@ -372,6 +372,64 @@ désigne son propre remède.
 
 ---
 
+## 5 bis. Le protocole de la PRÉDICTION SCELLÉE — comment juger une mutation à deux
+
+Éprouvé le 2026-09-01 sur les relevés gelés de `supervision` et `wazuh`. Il tient en une
+phrase : **une mutation ne se juge pas au rouge qu'elle produit, mais à la liste de ce qui
+est resté vert** — et cette liste ne se lit honnêtement qu'à l'aveugle.
+
+    1. celui qui mute SCELLE sa prédiction avant de jouer, et donne
+       l'empreinte SHA-256 du fichier scellé à l'autre ;
+    2. il joue, puis envoie LA SEULE LISTE DES VERTS — pas les rouges,
+       pas le nom de ce qui a été muté, aucun commentaire ;
+    3. l'autre désigne celle qu'il aurait attendue rouge, ou répond
+       « aucune, et voici pourquoi je ne peux pas trancher » ;
+    4. publication dans l'ordre : sa désignation, la prédiction scellée,
+       le résultat.
+
+**Pourquoi le scellement, et pourquoi de chaque côté.** Le premier jet du protocole
+demandait la désignation à l'aveugle d'un seul des deux — donc *l'autre prédisait après
+avoir vu*, et **une prédiction post-hoc a toujours raison**. Le scellement rend la
+prédiction réfutable ; l'empreinte rend le scellement vérifiable.
+
+**Pourquoi ne pas nommer la mutation.** Dire « j'ai vidé l'analyseur AST » donne la
+réponse : l'autre sait quoi chercher. Les libellés seuls suffisent — et le fait qu'on
+puisse raisonner dessus *sans le code* est en soi une mesure de leur qualité.
+
+### Ce que le protocole a produit, et ce n'est pas un score
+
+La désignation reçue était **fausse sur le mécanisme** et pourtant la plus utile des deux
+contributions : elle visait un test que **la mutation n'exerçait pas**. Son vert ne disait
+donc rien — ni dans un sens ni dans l'autre — alors que la prédiction scellée l'avait
+qualifié de *« vert légitimement, pas de trou »*. **Ce mot n'était pas dû** : il déclarait
+sain ce qui n'avait pas été mesuré. Deux mutations supplémentaires, que la prédiction juste
+rendait inutiles, ont été nécessaires pour l'établir.
+
+> **Une désignation erronée qui pointe un angle mort de l'instrument vaut mieux qu'une
+> désignation juste qui confirme ce qu'on savait.**
+
+Et la trouvaille finale n'était prévue par aucun des deux : sur un **renommage**, le test
+« le compte se reconstitue » reste **vert**, parce que le *nombre* n'a pas changé. Il était
+cité comme le filet contre le vide ; il n'est que le filet contre le nombre.
+
+> **Un filet dont on se croit couvert est pire qu'un filet absent : il occupe la place où
+> l'on aurait cherché.** Une limite ne survit à la relecture que si elle est écrite dans le
+> test, avec la mesure qui l'a trouvée.
+
+### La garde d'instrument que ce protocole exige
+
+Le premier passage du harnais a rendu **zéro rouge et zéro vert** — `-q` à côté de `-v`,
+donc aucune ligne de test à lire — et il en a conclu *« toute la classe mord sur le vide »*,
+la plus flatteuse des sorties possibles sur une mesure inexistante.
+
+> **Zéro vert ET zéro rouge, c'est `LA MESURE N'A PAS EU LIEU`, jamais un verdict.**
+
+Elle complète la garde du filet réseau : l'une surveille *« le filet n'a rien vu passer »*,
+l'autre *« l'instrument n'a rien produit »*. Deux fenêtres d'observation distinctes, et il
+faut les deux.
+
+---
+
 ## 6. Ce que ce document ne dit pas
 
 Il ne dit **rien** de ce que les pages portées afficheront : elles sont en cours
