@@ -2142,3 +2142,58 @@ facteur, créés entre le 2026-07-25 et le 2026-08-12 par une suite qui ne netto
 que le chiffre signifie**, et c'est une raison de plus pour l'arbitrage qui dort au §7 depuis le
 2026-08-26 : *supprimer ou non les cinq comptes `e2e_test_*`*. **Il n'est pas urgent ; il vient de cesser
 d'être seulement cosmétique.**
+
+---
+
+## La classe « deux corrections justes qui composent un défaut » a un TROISIÈME lieu : le JOURNAL
+
+**Session 7, 2026-09-01, appliquant la classe à son propre travail. Ses deux instances sont vérifiées par
+moi à 13:09 UTC — et la première la situe où je ne l'avais pas cherchée.**
+
+### Instance 1 — 25 lignes affirmaient une vérification qui n'avait pas eu lieu
+
+    grep -c "data-rw" legacy/index.php   ->   0
+
+**Deux pièces correctes** : `verifiePortage` asserte sur le portage et *constate* sur le legacy — juste ;
+et les assertions d'**absence** d'ancre — justes. **Leur composition produisait :**
+
+    INFO  rw-test-user (role 1) · compteur sans-2FA ABSENTE : verifie sur le legacy aussi
+
+> **L'assertion était VRAIE sans avoir rien regardé** — la page ne porte aucune ancre — **et la phrase
+> affirmait une vérification.** Vingt-cinq lignes du journal disaient le contraire de la vérité.
+
+**⚠ Et ce qui les rendait invisibles est ce qui les rendait inoffensives** : ce sont des **INFO**, donc
+**aucun compte n'était gonflé**, donc **aucune comparaison de référence ne pouvait les attraper.**
+
+> **Un journal qui mente coûte plus qu'un compte faux.** Un compte faux se fait prendre par sa référence
+> — c'est mécanique. **Une ligne d'INFO fausse n'a aucun garde**, et elle sert de preuve à un examen qui
+> n'a pas eu lieu. *C'est « une capture mal étiquetée est pire qu'une capture absente », transposé au
+> texte d'un verdict.*
+
+**Le troisième lieu de la classe est donc identifié** : deux corrections peuvent composer un défaut dans
+le **code**, dans l'**affichage** (mon libellé possessif), **et dans le COMPTE RENDU de la mesure** — et
+c'est ce dernier que rien ne surveille.
+
+### Instance 2 — un motif qui suppose le nommage de sa cible
+
+    portage :  __('accueil.  ·  __('auth.  ·  __('nav.
+    legacy  :  t('common.    ·  t('dashboard.
+
+Elle cherchait des jetons `accueil.*` **dans le legacy**, dont le catalogue ne les nomme pas ainsi. **Zéro
+trouvé, donc vert.** *Un motif qui suppose une forme d'appel ne mesure que cette forme* — septième
+occurrence du chantier, et la première où la forme supposée est un **espace de noms** plutôt qu'une
+syntaxe.
+
+**Corrigé avec la bonne borne** : la mesure emploie désormais **le motif de sa cible**, et *un jeton non
+substitué est un défaut des DEUX côtés, pas un écart assumé.*
+
+**Prédiction posée avant lancement** : legacy **13 → 16**, laravel **41 inchangé**. *L'attente écrite
+avant la mesure est ce qui rend l'écart lisible* — et c'est la deuxième fois aujourd'hui qu'elle la pose
+avant plutôt qu'après.
+
+### Ce que ça dit du critère que j'ai employé pour la fixture
+
+Elle note que je raisonnais *« et s'il ne tient pas, combien coûte la trace »* là où elle raisonnait
+*« mon `finally` tient »*. **Les deux instances ci-dessus valident le critère par un autre chemin** : dans
+les deux cas le garde-fou tenait — les assertions étaient vraies, les comptes justes — **et le coût était
+dans ce qui restait après.** *La solidité d'un mécanisme ne dit rien du prix de son silence.*
