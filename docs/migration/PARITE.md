@@ -12809,7 +12809,20 @@ un fichier de code figurant dans `.gitignore` — et il est ecrit dans son en-te
 > trouvaille etait reelle et le perimetre faux.** *Un signalement juste sur un perimetre faux fait
 > construire une parade qui protege ce qui n'etait pas menace.*
 
-## E-263 — `find` n'est pas GNU findutils : la forme RELATIVE de `-newermt` plante, et `2>/dev/null` transforme le plantage en ABSENCE
+> **⚠ CES DEUX ECARTS ONT D'ABORD PORTE LES NUMEROS E-263 ET E-264, et c'est MOI qui les ai deplaces.**
+> La session 3 avait ecrit ses trois defauts de l'accueil sous ces numeros au meme moment, apres avoir
+> deja renumerote une fois pour eviter mes E-260 a E-262 — **17 references dans 8 fichiers.**
+>
+> **Ce qui a decide n'est pas l'anteriorite** : mesure des references, ses numeros vivent dans **6 et 9
+> fichiers**, dont des **commentaires de code dans l'arbre SERVI** (`accueil.blade.php`, les deux
+> catalogues, `Machines.php`, `Comptes.php`, `PortailController.php`, `AlertesAccueil.php`) ; les miens
+> dans **deux fichiers, tous deux a moi**.
+>
+> **Et l'argument operationnel emporte le reste : renumeroter les siens aurait demande d'ECRIRE DANS
+> L'ARBRE SERVI**, au moment ou la session 7 attend une fenetre propre pour ses cinq suites. *Le cout
+> d'un renommage se mesure a ce qu'il touche, pas a qui a ecrit le premier.*
+
+## E-266 — `find` n'est pas GNU findutils : la forme RELATIVE de `-newermt` plante, et `2>/dev/null` transforme le plantage en ABSENCE
 
 **Trouve par la session 7 le 2026-09-01 vers 23:44 CEST, verifie par le Lead a 23:46 — et il invalide
 une de MES conclusions.**
@@ -12898,7 +12911,7 @@ les attentes entre elles**, le runner laissant basculer la fenetre TOTP. Fenetre
 
 > **Ses deux instruments faux dedouanaient, et un seul aurait suffi a faire ecarter l'alerte.**
 
-## E-264 — `FENETRE SALE` a mordu a sa PREMIERE utilisation reelle, et le garde a eu raison contre son propre auteur
+## E-267 — `FENETRE SALE` a mordu a sa PREMIERE utilisation reelle, et le garde a eu raison contre son propre auteur
 
 **2026-09-01, ~23:44 CEST.**
 
@@ -12936,3 +12949,81 @@ module *exige* de ses erreurs qu'elles nomment la machine.
 *J'avais transmis « trois des cinq cherchent le message quel qu'il soit, donc les deux selecteurs ».
 C'est vrai des quatre ; la cinquieme est l'inverse — elle doit viser UNE seule ancre, celle du succes.*
 **Une consigne uniforme sur cinq objets dont un est l'inverse des autres casse le cinquieme.**
+
+## E-263 — le possessif mentait a TROIS endroits, et les deux derniers ne se voient qu'a l'image
+
+**Releve et corrige par la session 3 le 2026-09-01 (`053e108`), verifie par le Lead a 23:55 CEST.**
+
+La valeur, puis le **TITRE de la tuile** (« Vos machines »), puis le **titre de SECTION** (« Votre parc »)
+au-dessus des cinq indicateurs. **Corriger la valeur seule aurait remonte le possessif d'une ligne.**
+
+> **Aucune assertion ne lit un titre de section.** *Quatrieme defaut visuel du chantier qu'aucune
+> assertion DOM ne voit*, apres la pastille KEV a 1,06:1, la frise `h-32` purgee et l'en-tete perdu au
+> changement de page d'un PDF.
+
+**Et le correctif est meilleur que « retirer le possessif »** — verifie :
+
+    lang/fr/accueil.php:66   'parc_compteur_titre'        => 'Vos machines'
+    lang/fr/accueil.php:70   'parc_compteur_titre_neutre' => 'Le parc'
+    accueil.blade.php:126    __($parc['mord'] ? '…parc_compteur_titre' : '…parc_compteur_titre_neutre')
+
+**Les deux clefs existent et la vue CHOISIT selon que la borne MORD.** *Le possessif n'est pas faux : il
+est faux quand le perimetre est le parc entier.* **Un libelle conditionne a la borne qu'il decrit ne peut
+plus se desynchroniser d'elle.**
+
+*Note de methode : mon `grep "Vos machines"` a rendu deux occurrences et j'ai failli signaler que le
+correctif n'etait pas pose. L'une etait un COMMENTAIRE decrivant le defaut, l'autre la variante
+conditionnee.* **Huitieme fois du jour qu'un de mes motifs conclut sans son contexte.**
+
+## E-264 — `$oldKeys` : retirer les noms corrige AUSSI le nombre, et les deux defauts n'en font qu'un
+
+**Session 3, `laravel/app/Services/Comptes.php`.**
+
+Sa requete porte `LIMIT 5`, **pose pour recuperer cinq noms** — puis le code compte
+`count($oldKeysData)`. **Le nombre annonce est donc plafonne a 5** : quarante comptes concernes
+s'affichaient « 5 ».
+
+> **Deux defauts qui n'en font qu'un** : la borne posee pour un usage (afficher quelques noms) devient
+> silencieusement la borne de l'autre (compter). *Un `LIMIT` pose pour l'affichage ne se voit pas dans un
+> compteur — le nombre reste plausible.*
+
+Meme famille que le `20 lignes sans annoncer de total` de l'historique du pare-feu (I3) : **une troncature
+qui ne se declare pas se lit comme un total.**
+
+## E-265 — `indicateursCve` sommait TOUS les scans, et la coincidence tenait a la DONNEE
+
+**Session 3, verifie par le Lead a 23:55 CEST.**
+
+`indicateursCve` sommait `critical_count` sur **toutes** les lignes de `cve_scans`, **sans filtre de
+statut**, la ou le legacy joint sur `MAX(id) … WHERE status='completed' GROUP BY machine_id`. **Un second
+scan s'AJOUTAIT au premier.**
+
+**Corrige, verifie dans l'arbre :**
+
+    $derniersComplets = DB::table('cve_scans')->selectRaw('MAX(id) as id')
+        ->whereIn('machine_id', $ids)->where('status','completed')->groupBy('machine_id');
+    $critiques = DB::table('cve_scans as s')->joinSub($derniersComplets,'l','s.id','=','l.id')
+        ->sum('s.critical_count');
+
+### ⚠ ET LA RAISON POUR LAQUELLE C'ETAIT INVISIBLE EST LA PARTIE QUI COMPTE
+
+**La base ne contient qu'UNE ligne de scan.** Les deux definitions rendent **103** toutes les deux.
+
+> **La coincidence tenait a la DONNEE, pas au code.** Une suite, une capture, une relecture d'ecran :
+> toutes auraient confirme. *Le defaut n'etait pas cache — il etait indiscernable.*
+
+**Ce qui l'a trouve** : *« 103 etait identique pour un perimetre d'UNE machine et pour le parc de TROIS.
+Un nombre trop propre. »* **Ce n'est pas une mesure, c'est une invraisemblance** — et c'est le seul signal
+que la donnee de banc pouvait offrir.
+
+**Et le libelle DECRIVAIT le defaut** : `ind_cve_critiques` disait « critiques, **tous scans** » — *exact
+tant que la somme etait fausse.* **Un libelle juste peut documenter un defaut au lieu de le signaler.**
+
+*Reste NON corrige et declare : `date` et `cve` sont encore sans filtre de statut, et « 1458 CVE au
+dernier scan » presente une machine comme un parc.*
+
+### Le geste hors consigne, et son motif
+
+La session 3 a touche l'un des neuf indicateurs malgre la consigne « pas de retouche aux neuf ».
+**Motif donne : elle publiait ce nombre EN ROUGE.** *Un nombre qu'on promeut en alerte cesse d'etre un
+indicateur parmi d'autres — la consigne le couvrait, la promotion ne la couvrait plus.*

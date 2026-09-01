@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.123** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.124** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2171,6 +2171,64 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.124 — la region d'alertes : HUIT et non neuf, cinq DERIVEES, et mes deux ecarts renumerotes
+
+#### Le compte est 8, et la neuvieme etait un COMMENTAIRE compte comme du code
+
+    grep -c '$alerts\[\] *=' legacy/index.php   ->   8
+    legacy/index.php:147-148   // Fail2ban alerts (calculees apres le query dashboard)
+                               // Seront evaluees plus bas apres les queries fail2ban_status
+
+**La neuvieme est PROMISE par deux lignes de commentaire et n'a jamais eu de code.** *Le « neuf » venait
+de la promesse, pas du fichier.* **Meme motif que les commentaires qui affirmaient un acces plus strict
+que le code, et que le `# Ecrit le groupe dans ossec.conf` de `wazuh` (E-260).**
+
+#### CINQ des huit etaient DEJA a l'ecran — derivees, pas requetees
+
+`hors ligne`, `sans cle plateforme`, `CVE critiques`, `comptes sans 2FA`, `comptes sans cle` : **le legacy
+les relit SANS borne.** Les porter comme huit requetes neuves aurait mis **deux nombres differents pour le
+meme fait sur un seul ecran** — la tuile « 1 hors ligne » (bornee) et l'alerte « 3 machines hors ligne »
+(parc entier).
+
+> **Derivees des tableaux deja calcules : zero requete de plus, et la coherence n'est plus une propriete
+> a surveiller — elle est STRUCTURELLE.** Mesure a l'image : 103, 8 et 12 apparaissent deux fois chacun,
+> identiques.
+
+**Trois seulement sont neuves** — releve > 30 j, score SSH < 50, cle de compte > 90 j.
+
+#### Et la session 3 a REFUSE une partie de l'arbitrage du DSI, avec sa mesure
+
+Le DSI decidait de borner la region en **trois classes de role**. **Ces classes existent deja dans les
+services, sous forme de bornes** — `indicateursComptes` rend `null` (et non `0`) pour ce qu'un role n'a pas
+a voir. Mesure decisive sur `opsuser` (role 1, **1 machine sur 3**) :
+
+    un gel « surface d'attaque = role 3 »  ->  ZERO alerte
+    pendant que la tuile CVE affiche       ->  103 sur SA propre machine
+
+> **Une alerte derivee suit la borne de SON indicateur, jamais une seconde.** *Poser un gel de role
+> par-dessus aurait masque une alerte dont le nombre reste affiche deux tuiles au-dessus.*
+
+#### ⚠ Un etat partage qui peut salir un LOT entier
+
+Sa premiere execution rendait **4 FAIL au role 2** — « ancres `accueil-*` rendues : 0 ». Cause :
+**`rw-test-admin` portait `force_password_change = 1`**, et `accueil` n'est pas exempte du middleware.
+**La suite mesurait le formulaire de mot de passe en croyant mesurer l'accueil.**
+
+> **Un `data-rw` absent peut etre une REDIRECTION, pas une regression de rendu.** Un compte de test laisse
+> marque la produit sur *toutes* les suites qui s'authentifient a ce role — et le verdict ressemblerait a
+> **une regression du module ecrit en dernier.**
+
+**Il en reste un : `superadmin` (id 1) porte encore le drapeau** — le compte des identifiants de dev arrive
+sur le formulaire de mot de passe.
+
+#### Et mes deux ecarts sont renumerotes E-266 / E-267
+
+Ils portaient E-263 et E-264, ecrits au meme moment que les siens. **Ce n'est pas l'anteriorite qui a
+decide, c'est la mesure des references** : ses numeros vivent dans **6 et 9 fichiers**, dont des
+commentaires de code dans l'**arbre servi** ; les miens dans **deux fichiers, tous deux a moi**. *Et
+renumeroter les siens aurait demande d'ecrire dans l'arbre servi au moment ou la session 7 attend une
+fenetre propre.* **Le cout d'un renommage se mesure a ce qu'il touche, pas a qui a ecrit le premier.**
+
 ### v1.38.123 — E-250 : une ancre unique pour le succes ET l'echec, sur quatre ecrans
 
 **Quatre vues rendaient succes et erreur sous le MEME `data-rw="…-message"`.** Une suite qui y
@@ -2199,9 +2257,9 @@ le 27/08 pour ne pas rougir cinq suites pendant un LOT.
 Mesure : `/profil` et `/supervision` rendent **302** (la garde), pas 500 ; compilation Blade propre ;
 les quatre anciennes ancres sont a **0** occurrence, les huit neuves a **1** chacune.
 
-### v1.38.122 — E-263 : `find` n'est pas findutils, et E-264 : `FENETRE SALE` a mordu a sa premiere utilisation
+### v1.38.122 — E-266 : `find` n'est pas findutils, et E-267 : `FENETRE SALE` a mordu a sa premiere utilisation
 
-#### E-263 — la forme RELATIVE de `-newermt` plante, et `2>/dev/null` la rend invisible
+#### E-266 — la forme RELATIVE de `-newermt` plante, et `2>/dev/null` la rend invisible
 
     type find                        ->  « find est une fonction »  (enveloppe bfs)
     find … -newermt '-10 minutes'    ->  bfs: error: Invalid timestamp
@@ -2225,7 +2283,7 @@ paye cet apres-midi, refait en mesurant ce piege-la.**
 **Parade** : forme **absolue** pour `-newermt`, et **ne pas silencer `stderr`** sur une commande de
 constat — *c'est la seule sortie qui distingue « rien trouve » de « rien execute ».*
 
-#### E-264 — le quatrieme verdict a mordu a sa premiere utilisation reelle
+#### E-267 — le quatrieme verdict a mordu a sa premiere utilisation reelle
 
     go-page-supervision-reglages  32 · 0   FENETRE SALE — a rejouer
         accueil.blade.php · lang/{en,fr}/accueil.php   ecrits a 23:43:10, DANS la fenetre
