@@ -11866,3 +11866,64 @@ l'orphelin ait pu vivre quatre jours sans temoin.
 **A generaliser cote QA** : la sonde doit s'ancrer sur **l'ensemble des helpers qui visent une route
 Laravel**, derive du code et non liste — sinon elle se perime au premier module qui nomme le sien
 autrement. *Deriver l'ensemble des helpers, pas enumerer leurs noms.*
+
+## E-247 — tout le protocole de concurrence protege la CHARGE ; aucune de ses precautions ne voit une ecriture dans l'ARBRE
+
+**Releve par la session 7 le 2026-09-01, verifie par le Lead a 14:35 CEST.**
+
+Trois references ont ete mesurees seules au repos, banc rendu explicitement. **L'arbre a bouge pendant
+deux des trois :**
+
+    laravel/tests/Support/TableDesGardes.php   14:18:43   pendant go-socle-navigation  (14:17:44 -> 14:19:08)
+    laravel/app/Services/Machines.php          14:22:37   pendant graylog-g1 LEGACY    (14:22:21 -> 14:23:10)
+
+> **Rendre le banc ne protege que la CHARGE. L'arbre est un etat partage, et une ecriture pendant la
+> fenetre fausse la mesure sans apparaitre nulle part** — ni dans `ps`, ni dans une duree, ni dans un
+> `StartedAt`.
+
+**Le chantier a bati tout un protocole sur la charge** : rendre le banc, exiger un mot explicite, ne
+pas lancer `pytest` pendant un LOT, attendre un PID enregistre. *Aucune de ces precautions ne voit une
+ecriture dans l'arbre* — et la session 7 ne l'a su qu'en le cherchant, apres qu'un pair le lui a
+signale.
+
+### Ici les deux sont sans effet, et c'est PROUVE — pas affirme
+
+    laravel/composer.json   autoload      ->  App\, Database\Factories\, Database\Seeders\
+                            autoload-dev  ->  Tests\ : tests/
+    TableDesGardes reference par          ->  deux fichiers de tests, RIEN d'autre
+    BASE_LEGACY=https://localhost:8443    BASE_LARAVEL=http://localhost:8444
+
+`Tests\` n'est que dans `autoload-dev` : **aucune requete HTTP ne peut charger ce fichier.** Et
+graylog *legacy* tape le **8443**, un autre serveur, ou `laravel/app/` n'est pas dans le chemin.
+
+**Le rejeu propose (82 s) n'aurait rien etabli que la declaration d'autoload n'etablit deja** — et il
+aurait etabli moins : une absence d'effet observee UNE fois, contre une impossibilite structurelle.
+*Verifier le registre plutot que refaire la mesure, quand le registre repond a la question posee* — et
+la condition compte : ici la question etait « ce fichier peut-il etre charge par une requete », et
+l'autoload y repond exactement.
+
+### Et le meme ecart de dates veut dire DEUX choses opposees selon le regime
+
+    rootwarden_php     demarre 2026-08-20 14:57Z  ->  337 .php plus neufs  ->  AUCUNE divergence
+    rootwarden_python  demarre 2026-08-27 12:28Z  ->   20 .py  hors tests  ->  vraie divergence (E-238)
+                                                         dont 10 sous backend/routes/
+
+**PHP relit a chaque requete ; Python charge au demarrage.** Huit jours de retard sur 337 fichiers ne
+divergent pas ; sept heures de retard sur 20 fichiers divergent. **Le dedouanement PHP compte autant
+que l'alarme Python**, et il faut le dire dans cet ordre.
+
+*Precision d'etiquette : la session 7 annonçait « 12 routes » en listant dix noms — les sept autres
+qu'elle cite (`server`, `scheduler`, `ssh_key_manager`, `sudo_manager`, `ssh_utils`, `approvals`,
+`config`) ne sont pas sous `backend/routes/`. **Sa liste est juste, son etiquette l'est moins** : dix
+routes plus sept modules de support, vingt fichiers au total.*
+
+### Le garde a construire, et son arbitrage est retenu tel quel
+
+**Par SUITE, pas sur le LOT entier** — *bloquer 153 executions pour 20 fichiers que la plupart ne
+touchent pas, c'est fabriquer l'obstacle qu'on contourne*, et **un garde contourne ne garde rien**.
+Deux entrees :
+
+1. **le REGIME et pas seulement la date** — distinguer Python (charge au demarrage) de PHP (relit par
+   requete), sinon le garde crie sur 337 fichiers sans objet ;
+2. **l'arbre pendant la fenetre** : un `mtime` posterieur au debut de la suite, **dans le chemin servi
+   de la cible** — c'est la moitie que le protocole n'avait pas.
