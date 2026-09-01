@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.133** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.134** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,30 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.134 — mon compteur d'écarts comptait des titres, et un scan planifié vise tout le parc par repli
+
+**E-278 — l'instrument du Lead.** La commande de remesure inscrite au §2 du plan, `grep -c '^## E-'`,
+compte des **lignes de titre**, pas des écarts. Six écarts portent un titre de suite (« est CLOS »,
+« est amendé », « bis », « lot A »), E-250 en porte deux : **273 titres pour 266 identifiants**.
+L'erreur *grandissait avec la tenue du registre*. Le dérivé était faux aussi — « dix numéros jamais
+servis » venait d'une soustraction entre deux grandeurs différentes ; par différence d'ensembles il
+y en a **treize**. Commande corrigée : identifiants dédupliqués, toutes profondeurs de titre.
+
+**E-279 — `/ssh-audit/trends`, promise par le contrat, appelée par personne.** Relevée par la
+session 3, vérifiée : deux fichiers nomment ce chemin, sa définition et `legacy/api/openapi.yaml`.
+Une route morte que rien ne documente est un déchet ; une route morte que la spécification promet
+est une promesse fausse.
+
+**E-280 — ⚠ une planification de scan SSH vise tout le parc par REPLI.** `target_type` n'a aucune
+liste fermée côté route ; côté scheduler, trois branches et **une seule échoue fermée**. Une valeur
+non reconnue tombe dans le `else` qui prend le parc entier — une **cron**, donc des sessions SSH
+réelles, répétées, sans personne devant l'écran, `srv-zabbix` comprise. **Et le repli EN SERVICE
+n'a aucun filtre du tout** (`SELECT … FROM machines`, sans exclusion des archivées) : le défaut est
+plus grave que dans l'arbre, où il exclut au moins les archivées. Nommer le régime aggrave ici, au
+lieu d'atténuer. Enfin, `'all'` étant le défaut documenté, la branche « j'ai choisi tout le parc »
+et la branche « je ne t'ai pas compris » **sont la même** — rien ne permet de les distinguer, même
+après coup en base. Aucune écriture backend : gel tenu, correctif = arbitrage exploitant.
 
 ### v1.38.133 — `groups` R1 : la page en LECTURE, et E-274 pose a l'ecran
 

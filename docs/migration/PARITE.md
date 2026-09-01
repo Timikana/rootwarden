@@ -13513,3 +13513,131 @@ Elle ne l'a pas reprise telle quelle — *sa propre sonde avait annonce « 24 ga
 en avait 1.* Verifie : `check_machine_access` rend `True` inconditionnellement des `role_id >= 2`, donc
 les cinq **mordent pour un role 1**. **La nuance porte : c'est elle qui rend A1 dangereux pour les roles 2
 et sans effet pour les roles 1.**
+
+## E-278 — la commande de remesure du §2 compte des TITRES, pas des écarts : 273 contre 266
+
+**C'est mon instrument, et il est faux depuis le début.** Le §2 du plan prescrit :
+
+    grep -c '^## E-' docs/migration/PARITE.md
+
+Ce que ça compte, c'est **le nombre de lignes de titre**. Ce que l'étiquette promet, c'est
+**le nombre d'écarts**. Les deux divergent dès qu'un écart reçoit un titre de suite —
+« est CLOS », « est amendé », « bis », « lot A » — et **six en ont un**, E-250 en a deux :
+
+    E-130   ## …  +  ### E-130 CHAINE avec l'arbitrage K4
+    E-141   ## …  +  ### E-141 est CLOS
+    E-152   ## …  +  ### E-152 est amende
+    E-235c  ## …  +  ## E-235c bis
+    E-246   ## …  +  ## E-246 bis
+    E-250   ## …  +  ### E-250 EST CLOS  +  ### E-250, lot A
+
+    titres ......... 273
+    identifiants ... 266      <- le vrai compte
+    numeros ........ 264      (E-235b et E-235c partagent le numero 235)
+
+**Et l'erreur s'aggrave avec la qualité du registre** : plus je clos et j'amende proprement,
+plus l'écart entre les deux chiffres grandit. *L'instrument punit la tenue du registre.*
+
+**Le dérivé était faux aussi.** Le §2 annonçait « dix numéros jamais servis », obtenu en
+soustrayant le compte de titres du dernier numéro — **une soustraction entre deux grandeurs
+qui ne mesurent pas le même objet**. Par différence d'ensembles, il y en a **treize** :
+
+    E-23 a E-32 (dix d'affilee), E-186, E-196, E-204
+
+**Ce que je reprochais à un pair il y a deux heures** — *un chiffre qui ne recoupe rien n'est
+pas vérifié* — **était vrai de mes deux chiffres de tête.** Ils n'ont jamais recoupé quoi que
+ce soit : ils étaient la source, jamais le résultat d'un croisement.
+
+**Remède, et il ne rallonge aucune liste** : compter des **identifiants dédupliqués**, toutes
+profondeurs de titre confondues, et dériver les manquants par **différence d'ensembles**.
+
+    python3 -c "
+    import re
+    t=re.findall(r'^#{1,6} +(E-\\d+[a-z]*)', open('docs/migration/PARITE.md').read(), re.M)
+    n=sorted({int(re.match(r'E-(\\d+)',x).group(1)) for x in t})
+    print(len(set(t)),'ecarts  max E-%d'%n[-1],' jamais servis:',
+          [x for x in range(n[0],n[-1]+1) if x not in set(n)])"
+
+## E-279 — `/ssh-audit/trends` : promise par le contrat d'API, appelée par personne
+
+Relevé par la session 3, **vérifié** : sur `legacy/`, `tests/`, `laravel/` et `backend/`, deux
+fichiers seulement nomment ce chemin — **sa propre définition** et **`legacy/api/openapi.yaml`**.
+Aucun client. Ni `js/main.js` (19 appels relevés vers `/ssh-audit/`, aucun vers `/trends`), ni
+une suite, ni le portage.
+
+Même famille que `PUT /groups/<id>`, **avec une aggravation** : celle-ci est **publiée dans une
+spécification**. Un consommateur externe la croirait vivante. Une route morte que rien ne
+documente est un déchet ; **une route morte que le contrat promet est une promesse fausse.**
+
+Non portée en A1. **Inscrite** — *un zéro écrit est une mesure, un zéro tu est une étape sautée.*
+
+## E-280 — ⚠ une planification de scan SSH vise TOUT LE PARC par REPLI — et c'est PIRE en service
+
+Relevé par la session 3. **Vérifié dans l'arbre, ligne pour ligne** — puis mesuré **en service**,
+où le défaut est **plus grave**.
+
+### Le mécanisme, dans l'arbre
+
+    ssh_audit.py:767   target_type  = data.get('target_type', 'all')   <- AUCUNE liste fermee
+    ssh_audit.py:768   target_value = data.get('target_value') or None <- AUCUNE validation
+
+    scheduler.py:269   if   'tag'         et target_value  -> par tag
+    scheduler.py:276   elif 'environment' et target_value  -> par environnement
+    scheduler.py:281   elif 'machines'    et target_value  -> ids ; si vide -> WHERE 1=0
+    scheduler.py:296   else:  ... WHERE lifecycle_status IS NULL OR != 'archived'   <- TOUT LE PARC
+
+**Trois branches, et une seule échoue FERMÉE** : celle des identifiants, par `WHERE 1=0`. Un
+`target_type` non reconnu, ou un `target_value` vide sur `tag`/`environment`, tombe dans le `else`.
+
+### ⚠ Et LE MÊME `else`, EN SERVICE, N'A PAS DE FILTRE DU TOUT
+
+Régime mesuré : `StartedAt = 2026-08-27T12:28:43Z`. `scheduler.py` a été modifié le **2026-08-27
+à 19:12**, sept heures après — **le process en service tient donc du code plus ancien**, celui de
+`a33a15b` (v1.37.14) :
+
+    EN SERVICE   scheduler.py:210-211
+        else:
+            cur.execute(f"SELECT {base_cols} FROM machines")        <- AUCUN filtre
+
+    DANS L'ARBRE scheduler.py:296
+        else:
+            ... FROM machines WHERE lifecycle_status IS NULL OR != 'archived'
+
+**Le repli en service vise le parc entier, machines ARCHIVÉES COMPRISES.** La session 3, qui
+mesurait l'arbre, a rapporté la forme **atténuée** du défaut.
+
+> **Nommer le régime n'est pas un procédé de dédouanement.** Je l'emploie le plus souvent pour
+> ramener une alarme à sa portée réelle. **Ici il l'aggrave** — et une distinction qui ne
+> jouerait que dans un sens ne serait pas une mesure, ce serait un réflexe.
+
+### Ce que ça change de la gravité
+
+E-274 et E-280 partagent la cause et **pas les conséquences**. Un groupe dynamique sans filtre
+**attend un clic**. Une planification est une **cron** : sessions SSH réelles sur toutes les
+machines, **répétées, sans personne devant l'écran**. `_run_scheduled_ssh_audit` importe
+`get_sshd_config` et ouvre les sessions — mesuré, pas déduit. **`srv-zabbix` (id 1) est dedans.**
+
+**Atteignable aujourd'hui ?** Depuis l'écran du legacy, non : le `<select>` ne produit `tag:` que
+pour des tags existants, et `machine_tags` est vide. **Par requête forgée, oui.** C'est le motif
+« ne pas offrir d'entrée libre » **déplacé d'un cran** : l'entrée n'est pas libre à l'écran, elle
+l'est **à l'API**.
+
+### Et le défaut n'est pas seulement le repli : c'est qu'on ne peut pas les DISTINGUER
+
+`data.get('target_type', 'all')` — **`'all'` est le défaut documenté**, et il tombe dans le même
+`else` qu'une valeur incomprise. Donc la branche qui signifie *« j'ai choisi tout le parc »* et
+celle qui signifie *« je ne t'ai pas compris »* **sont la même branche**. Rien, ni à l'exécution
+ni après coup en base, ne permet de dire laquelle des deux a produit un scan du parc entier.
+
+### Troisième définition du parc
+
+`_resolve_dynamic` (E-274) n'exclut pas les archivées ; le portage de la session 3 les exclut
+partout ; le scheduler **en service** ne les exclut pas non plus, **et dans l'arbre si**.
+**Trois définitions du « parc » dans un même produit** — c'est l'arbitrage exploitant d'E-274,
+qui vient de grandir.
+
+### Ce qui est fait, et ce qui ne l'est pas
+
+**Aucune écriture backend** : le gel tient, et sous E-238 elle serait inerte de toute façon.
+**A1 ne compose aucune planification** — l'écran dira que « tout le parc » est le défaut, et que
+c'est aussi ce que produit une cible mal formée. **Correctif : arbitrage exploitant.**
