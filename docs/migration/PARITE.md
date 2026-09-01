@@ -11947,3 +11947,60 @@ Deux entrees :
    requete), sinon le garde crie sur 337 fichiers sans objet ;
 2. **l'arbre pendant la fenetre** : un `mtime` posterieur au debut de la suite, **dans le chemin servi
    de la cible** — c'est la moitie que le protocole n'avait pas.
+
+## E-248 — un correctif issu d'une LECTURE se refute par une lecture, pas par une observation posterieure — et mon reproche etait faux
+
+**Formule par la session 3 le 2026-09-01, chronologie mesuree par le Lead a 15:40 CEST.**
+
+J'avais transmis a la session 3 un symptome rapporte (« le selecteur perd `FR` en 390 »), puis la
+rectification de son auteur (« non : le titre long pousse le bouton hors du bandeau »), en ajoutant
+**« ne cherche pas dans une media query, ton correctif aurait vise le mauvais objet »**.
+
+### La chronologie tranche, et elle tranche contre moi
+
+    9422ab5   09-01 14:59   « deux defauts vus a l'image, une cause commune, et un troisieme non releve »
+    observation « FR et EN tous deux visibles »   ~15:30   -> TRENTE ET UNE MINUTES APRES
+
+**La session 7 a mesure l'etat CORRIGE et attribue l'absence de defaut a une autre cause.**
+
+### Et le correctif ne venait pas du symptome que j'avais relaye : il venait de la CASCADE
+
+Verifie dans l'etat **avant** `9422ab5` :
+
+    .rw-entete__compte span   specificite (0,1,1)   { display: none; }   <- dans le bloc @media
+    .rw-langues__actif        specificite (0,1,0)   AUCUN `display` declare
+    .rw-badge                                       AUCUN `display` declare, nulle part
+
+**La regle large battait les deux, et rien ne les rétablissait sauf `.rw-langues` — le CONTENEUR, pas
+son contenu.** A 900 px et moins, `FR` **et** la pastille de notification etaient **necessairement**
+masques. *Ce n'est pas une inference : c'est la cascade.* **Et le troisieme defaut le confirme** — la
+pastille etait masquee, personne ne l'avait signalee, et rien dans le symptome rapporte ne pouvait y
+mener : elle n'a ete trouvee qu'en lisant la regle.
+
+### LA REGLE, ET ELLE EST LA RECIPROQUE DE LA MIENNE
+
+Ma regle du jour : *un defaut vu a l'image se transmet avec sa mesure ou pas du tout.*
+
+> **Sa reciproque : un correctif issu d'une LECTURE se refute par une LECTURE, pas par une observation
+> ulterieure.** Sinon **un correctif juste se fait retirer par la mesure de son propre effet.**
+
+*Quand une affirmation porte sur une CAUSE et que le correctif a deja atterri, aucune observation
+posterieure ne distingue « le correctif a marche » de « la cause etait ailleurs ».* La mesure est
+muette sur cette question-la, et c'est le seul endroit du chantier ou la lecture bat la mesure.
+
+**Et les deux lectures etaient compatibles** : `.rw-entete` est `flex` **sans `flex-wrap`**, et un
+element flex a `min-width: auto` — **il ne peut pas retrecir sous sa largeur de contenu minimale.**
+Selon les largeurs, la meme cause produit *le titre se replie et le bandeau grandit* **ou** *la ligne
+deborde a droite*. **Les deux sessions observaient deux faces d'une seule cause.**
+
+Les quatre proprietes posees par `c85eddb` ferment les deux : **la justesse du correctif ne depend pas
+de savoir lequel a ete vu** — meme forme que la marge de defilement a 88 px pour un en-tete de 65.
+*Un correctif dont la justesse ne depend pas de la precision de la mesure est posable avant que le
+desaccord soit tranche.*
+
+### Et une faute d'instrument dans MON propre garde, attrapee par un test
+
+En ecrivant l'abattage du LOT (ci-dessous), mon extraction du remede portait le motif `'REMEDE ::'`.
+**Teste sur un journal forge : la variante `REMEDE::` sans espace faisait PERDRE LA LIGNE EN SILENCE**
+— alors que mon propre commentaire promet que le remede vient du journal. **Cinquieme motif du jour qui
+suppose une forme d'ecriture**, et le premier dans un garde que je venais d'ecrire. Elargi.
