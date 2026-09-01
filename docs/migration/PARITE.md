@@ -12217,6 +12217,36 @@ regression du portage.** Le FAIL est entierement un artefact de la fenetre.
 **C'est le cout reel de cette classe de defaut** : pas la mesure perdue, mais **le diagnostic faux
 qu'elle produit et qui, lui, sera cru.**
 
+**Et la session 3 dit pourquoi mieux que moi :**
+
+> **Une ecriture transitoire ne laisse pas une trace FAUSSE : elle laisse une trace VRAIE sur un objet
+> INNOCENT.**
+
+`Machines.php` **avait reellement bouge**, dans la bonne fenetre, sur la bonne page. **Le raisonnement
+qui l'aurait accuse aurait ete correct a chaque etape.** *Donc le cout n'est pas le FAIL : c'est l'heure
+passee a corriger un fichier sain avec de bonnes raisons.* **Aucune relecture du raisonnement ne l'aurait
+attrape — seule la datation des fichiers.**
+
+### Et son abstention est un CHOIX, pas une incapacite — porte verifiee a 15:36:19 CEST
+
+Elle avait mesure qu'elle **pouvait** ecrire sans risque : aucun glob de scripts dans
+`portail.blade.php` (les 23 vues nomment leur script avec `filemtime`), **aucune fusion i18n par glob
+cote Laravel** — *c'est le legacy qui fait `glob(__DIR__.'/fr/*.php')*, pas Laravel — et les catalogues
+`wazuh` sont dans HEAD depuis `dad2545`.
+
+**Elle s'est abstenue quand meme, et ses trois raisons valent d'etre gardees :**
+
+1. *« je pourrais ecrire sans risque » n'est pas « ecrire vaut le coup »* — deux fichiers attendent
+   2 h 40 ; une mesure qui vient d'etre perdue une fois, non ;
+2. *une reponse conditionnelle fait porter son risque au Lead* — « j'ecris, mais seulement ces deux-la »
+   fait relancer sur **sa** verification, et elle venait de se tromper sur exactement ce genre de
+   raisonnement ;
+3. > **Un engagement sans exception n'a pas de porte a oublier.**
+
+*Et le motif de la journee la porte : chaque fois qu'un raisonnement a paru clore une question, la mesure
+suivante a trouve la porte non fermee — `install_all`, la marge a 64 px, `FR` masque.*
+
+
 ### Et la session 7 a failli refuter mon alerte avec une mesure mal datee
 
 Elle a commence par verifier, et **tout disait que j'avais tort** : `git status` vide, aucun `-succes`
