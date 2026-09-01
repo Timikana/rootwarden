@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.117** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.118** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,47 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.118 — « I4 n'est pas porte » etait FAUX, et E-259 : ma fenetre de croisement etait trop etroite
+
+#### La rectification : I1 a I4 sont tous portes, `iptables` attend I5 SEUL
+
+    git log --all --oneline | grep -oE "I[1-5] —"
+      I1 · I2 · I3 · I4      ->  c42fe48, 2026-08-28 16:32
+
+J'avais inscrit dans E-244 que **« I4 n'est pas porte — le CHANGELOG n'en porte aucune trace »**, en
+contredisant l'hypothese du DSI. **Il avait raison.** I4 n'a besoin d'aucune route : il passe par la
+passerelle, deja declaree.
+
+**La cause est mon motif** : `I[1-5] (PORTE|porte|CARACTERISE)` rendait « I3 porte » seul, les autres
+entrees n'etant pas redigees ainsi. **Septieme fois du jour qu'un de mes motifs suppose une forme
+d'ecriture** — et la plus trompeuse :
+
+> **J'ai employe un motif etroit pour CONTREDIRE l'hypothese de quelqu'un, et l'angle mort du motif m'a
+> donne de l'assurance.** Trouver « seulement I3 » ressemblait a une mesure ; c'etait un silence
+> d'instrument. *Un motif qui rend PEU est aussi suspect qu'un motif qui rend beaucoup — et il ne
+> declenche aucune verification, parce qu'un resultat maigre a l'air precis.*
+
+#### E-259 — cinquieme travail redemande, et cette fois la parade a TOURNE
+
+    c42fe48                      2026-08-28 16:32
+    mon message d'assignation    2026-09-01 16:24   ->  quatre jours apres
+
+**J'avais bien lance le croisement**, contrairement a E-253 : `git log --since='2026-09-01 14:13'`,
+*depuis ma derniere mesure*. **I4 datait du 28 : hors fenetre.**
+
+> **Une tache que je dispatche peut etre plus vieille que ma derniere mesure — et elle l'est d'autant
+> plus qu'elle attend depuis longtemps.** La fenetre du croisement doit couvrir **l'age de la TACHE**,
+> pas l'age de ma derniere lecture.
+
+**Correction** : croiser sur `git log --all --oneline | grep <identifiant du sous-lot>`, **sans borne de
+date**. *Un identifiant se cherche dans tout l'historique ; une date ne borne rien d'utile.*
+
+#### La charge de la session 5 n'a pas bruite le LOT — mesure
+
+Elle a declare des `docker exec` en LECTURE sur les trois conteneurs pendant la fenetre, et m'a laisse
+juger. **Mesure : 42 journaux, ZERO suite avec un FAIL.** *Aucun effet observable.* Et sa facon de le
+declarer — la liste exacte plutot qu'une assurance — est ce qui permet de le trancher.
 
 ### v1.38.117 — E-257 : ma regle d'abattage aurait tue ce LOT sur mon propre bump de version
 

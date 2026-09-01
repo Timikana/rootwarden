@@ -11786,9 +11786,52 @@ est sur la page et pas sur la requete.*
 Il demandait si `iptables` restant `'legacy'` dans `Navigation.php` est **voulu ou un oubli**, I1 a I4
 etant annonces portes. **Ni l'un ni l'autre :**
 
-- **I4 n'est PAS porte** — le CHANGELOG n'en porte aucune trace, et aucune route de validation
-  n'existe. Seuls I1, I2, I3 le sont ;
-- **et I3 lui-meme est incomplet**, par cette route manquante.
+- ~~**I4 n'est PAS porte** — le CHANGELOG n'en porte aucune trace~~ **FAUX, corrige le 2026-09-01 a
+  16:28 CEST** : voir la rectification ci-dessous ;
+- **et I3 lui-meme etait incomplet**, par cette route manquante — **c'etait le seul fait juste des deux.**
+
+### ⚠ RECTIFICATION — « I4 n'est pas porte » ETAIT FAUX, ET LA QUESTION DU DSI AVAIT LA BONNE REPONSE
+
+    git log --all --oneline | grep -oE "I[1-5] —"
+      I1 — la consultation …    I2 — la copie en base …
+      I3 — l'historique suit la MACHINE …    I4 — separer « invalides » de « je n'ai pas pu lire le verdict »
+                                              c42fe48, 2026-08-28 16:32
+
+**I1 a I4 sont tous portes.** I4 n'a besoin d'aucune route — il passe par la passerelle, deja declaree.
+**`iptables` attend donc I5 SEUL**, exactement ce que le DSI proposait et que j'ai contredit.
+
+**La cause est mon motif** : j'avais cherche `I[1-5] (PORTE|porte|CARACTERISE)` et trouve « I3 porte »
+seul, parce que les autres entrees ne sont pas redigees ainsi. **Septieme fois du jour qu'un de mes
+motifs suppose une forme d'ecriture.**
+
+> **Et c'est la forme la plus trompeuse des sept : j'ai employe un motif etroit pour CONTREDIRE
+> l'hypothese de quelqu'un, et l'angle mort du motif m'a donne de l'assurance.** Trouver « seulement
+> I3 » ressemblait a une mesure ; c'etait un silence d'instrument. *Un motif qui rend PEU est aussi
+> suspect qu'un motif qui rend beaucoup — et il ne declenche aucune verification, parce qu'un resultat
+> maigre a l'air precis.*
+
+## E-259 — CINQUIEME travail redemande, et cette fois ma parade a tourne : ma FENETRE de croisement etait trop etroite
+
+**Mesure du 2026-09-01 a 16:26 CEST.**
+
+    c42fe48   2026-08-28 16:32   « I4 — separer invalides de je n'ai pas pu lire le verdict »
+    mon message d'assignation    2026-09-01 16:24   ->  QUATRE JOURS APRES
+
+**Et j'avais bien lance le croisement, contrairement a E-253.** La commande etait
+`git log --since='2026-09-01 14:13'` — *depuis ma derniere mesure*. **I4 datait du 28 aout : hors
+fenetre.**
+
+> **Ma regle disait « croise contre `git log` depuis ta derniere mesure ». Une tache que je dispatche
+> peut etre plus vieille que ma derniere mesure — et elle l'est d'autant plus qu'elle attend depuis
+> longtemps.** La fenetre du croisement doit couvrir **l'age de la tache**, pas l'age de ma derniere
+> lecture.
+
+*Les quatre precedents venaient de ne pas croiser (E-253) ou d'un rappel hors liste (E-245). Celui-la
+vient d'avoir croise **sur la mauvaise borne** — et c'est le premier ou la parade a tourne en donnant un
+faux negatif.* **Correction : croiser sur `git log --all --oneline | grep <identifiant du sous-lot>`,
+sans borne de date.** Un identifiant se cherche dans tout l'historique ; une date ne borne rien
+d'utile.
+
 
 **Donc l'entree doit rester `'legacy'`, et pour une raison plus forte que l'attente d'I5.** *Un compte
 de sous-lots portes ne mesure pas ce qui est joignable.*
