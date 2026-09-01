@@ -386,6 +386,54 @@ class Comptes
         }
     }
 
+    /*
+     * ══ LES CLES DE COMPTE DE PLUS DE 90 JOURS — SANS NOMMER PERSONNE ═══
+     *
+     * E-264. `legacy/index.php:119-126` fait deux choses de trop :
+     *
+     *  1. il NOMME jusqu'a cinq comptes et l'age de leur cle, dans le message
+     *     ET dans l'attribut `title=` du rendu (`:213`) — deux endroits pour la
+     *     meme divulgation. Une alerte n'a pas besoin de nommer pour etre
+     *     actionnable : le lien vers la page des comptes y mene, et cette page
+     *     a ses propres droits ;
+     *
+     *  2. il COMPTE FAUX, et c'est une consequence du point 1. Sa requete porte
+     *     `LIMIT 5` — posee pour ne recuperer que cinq noms — puis il fait
+     *     `$oldKeys = count($oldKeysData)`. Le nombre annonce est donc plafonne
+     *     a 5 : quarante comptes concernes s'affichent « 5 ». Retirer la liste
+     *     nominative retire aussi le `LIMIT`, donc corrige le nombre. Les deux
+     *     defauts n'en font qu'un.
+     *
+     * Meme gel de role que `indicateursComptes` : au-dessous de 2 rien n'est
+     * lu, et `null` dit « ce role n'a pas a le voir » — pas « aucun ».
+     * `ssh_key` est une cle PUBLIQUE, stockee en clair : le test `<> ''` mesure
+     * donc bien une presence ici, contrairement aux colonnes chiffrees.
+     */
+    public function alertesCles(int $roleId): array
+    {
+        if ($roleId < 2) {
+            return ['lisible' => true, 'cles_anciennes' => null];
+        }
+
+        try {
+            $n = DB::table('users')
+                ->where('active', 1)
+                ->whereNotNull('ssh_key')
+                ->where('ssh_key', '<>', '')
+                ->whereNotNull('ssh_key_updated_at')
+                ->where('ssh_key_updated_at', '<', now()->subDays(90))
+                ->count();
+
+            return ['lisible' => true, 'cles_anciennes' => $n];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error(
+                '[Comptes::alertesCles] lecture impossible : ' . $e->getMessage()
+            );
+
+            return ['lisible' => false, 'cles_anciennes' => null];
+        }
+    }
+
     public function porteUnSecondFacteur(int $id): bool
     {
         $secret = DB::table('users')->where('id', $id)->value('totp_secret');

@@ -64,12 +64,40 @@ return [
 
     // ── LE PARC, BORNE AU PERIMETRE DU COMPTE ─────────────────────────────
     'parc_compteur_titre' => 'Vos machines',
+    // E-263 : le TITRE aussi. Corriger la valeur en laissant « Vos machines »
+    // au-dessus deplacait le possessif d'une ligne — vu a l'image, invisible
+    // a toute assertion qui ne lit que la valeur.
+    'parc_compteur_titre_neutre' => 'Le parc',
     'parc_perimetre' => '{0}aucune de vos machines|{1}1 de vos machines|[2,*]:count de vos machines',
     'parc_total' => '{1}1 au parc|[2,*]:count au parc',
+    /*
+     * E-263 : LA VARIANTE NEUTRE. Rendue quand la borne ne MORD pas — role >= 2
+     * (le perimetre est le parc) et role 1 a qui tout est attribue.
+     *
+     * Le possessif porte le mensonge, pas le nombre manquant : « 3 de vos
+     * machines » existe pour SIGNALER une restriction, donc il en signale une
+     * la ou il n'y en a pas.
+     *
+     * Elle porte un cas {0} que `parc_total` n'a pas, et c'est voulu :
+     * `parc_total` n'est rendu que si `mord`, donc `parc >= 1`. Lui ajouter un
+     * {0} laisserait croire qu'il peut etre rendu a zero.
+     */
+    'parc_neutre' => '{0}aucune machine au parc|{1}1 machine au parc|[2,*]:count machines au parc',
     'parc_borne_aide' => "Vous ne voyez ici que les machines qui vous sont attribuées. Le second nombre est la taille réelle du parc : il est affiché pour que la borne soit visible, et non devinée.",
     'parc_illisible' => "Le parc n'a pas pu être lu. Ce n'est pas « aucune machine » : la base n'a pas répondu, et aucun nombre affiché ici ne serait fiable.",
     // ══ LES NEUF INDICATEURS DU LEGACY, BORNES ═══════════════════════════
     'ind_parc_titre' => 'Votre parc',
+    /*
+     * E-263, TROISIEME occurrence du meme possessif — et celle que j'ai vue
+     * en REGARDANT la capture, pas en lisant le code. Le compteur corrige, il
+     * restait « Votre parc » en titre de section au-dessus des cinq
+     * indicateurs, qui au role >= 2 portent le parc entier.
+     *
+     * Discriminant : `indicateurs.borne` (« une borne existe »), et non
+     * `mord`. Au role 1 « Votre parc » est HONNETE — la personne est bornee
+     * par attribution meme si tout lui est attribue.
+     */
+    'ind_parc_titre_neutre' => 'État du parc',
     'ind_machines' => 'machines',
     'ind_en_ligne' => 'en ligne',
     'ind_hors_ligne' => 'hors ligne',
@@ -84,7 +112,7 @@ return [
     'ind_cve_titre' => 'Vulnérabilités connues',
     'ind_cve_date' => 'dernier scan',
     'ind_cve_nombre' => 'CVE au dernier scan',
-    'ind_cve_critiques' => 'critiques, tous scans',
+    'ind_cve_critiques' => 'critiques, dernier scan par machine',
     'ind_cve_aucun_scan' => "Aucun scan de vulnérabilités n'a été fait sur les machines de votre périmètre. Ce n'est pas « zéro CVE » : c'est l'absence de mesure.",
     'ind_cve_illisible' => "L'historique des scans n'a pas pu être lu. Ce n'est pas « aucune CVE » — aucun nombre affiché ici ne serait fiable.",
 
@@ -98,4 +126,46 @@ return [
 
     'ind_illisible' => "Ces valeurs n'ont pas pu être lues. Ce n'est pas « zéro » : la base n'a pas répondu.",
     'ind_borne' => "Ces nombres ne portent que sur les machines qui vous sont attribuées.",
+
+    // ══ E-264 : LA REGION D'ALERTES ══════════════════════════════════════
+    'alertes_titre' => "Ce qui demande votre attention",
+    /*
+     * « Rien » ne se dit QUE si tout a ete lu. Le legacy avale trois de ses
+     * lectures dans des `catch` vides : sa region devient vide, et une region
+     * vide se lit « tout va bien ». Deux messages, jamais un seul.
+     */
+    'alertes_aucune' => "Rien ne demande votre attention pour le moment.",
+    'alertes_aucune_aide' => "Ce constat porte sur les machines de votre périmètre et sur ce que votre rôle permet de lire.",
+    'alertes_illisible' => "Attention : certaines vérifications n'ont pas pu être faites, et leur silence ne veut pas dire qu'il n'y a rien à signaler.",
+    'alertes_illisible_familles' => "Non lu : :familles.",
+    'alertes_voir' => "Voir",
+
+    // Les huit alertes du legacy, bornees. Aucune ne nomme de compte ni de
+    // machine : le lien mene a la page qui a ses propres droits.
+    /*
+     * LE NOMBRE N'EST PAS DANS LE LIBELLE : il vit dans sa propre pastille
+     * (`.rw-alerte__nombre`), pour etre lisible d'un coup d'oeil sur une liste.
+     * `trans_choice` s'en sert quand meme pour choisir la forme — d'ou les
+     * bornes {1} / [2,*] sans `:count`.
+     *
+     * ⚠ CONTRAINTE A CONNAITRE AVANT D'AJOUTER UNE TROISIEME LANGUE : le
+     * gabarit place la pastille AVANT le texte. Le francais et l'anglais
+     * mettent tous deux le nombre en tete, donc la phrase se lit. Une langue
+     * qui le placerait ailleurs demanderait de remettre `:count` dans la cle
+     * et de retirer la pastille — pas de la traduire de travers.
+     */
+    'alerte_hors_ligne' => '{1}machine hors ligne|[2,*]machines hors ligne',
+    'alerte_sans_cle_parc' => '{1}machine sans la clé de plateforme|[2,*]machines sans la clé de plateforme',
+    'alerte_cve_critiques' => '{1}vulnérabilité critique relevée|[2,*]vulnérabilités critiques relevées',
+    'alerte_sans_2fa' => '{1}compte actif sans second facteur|[2,*]comptes actifs sans second facteur',
+    'alerte_sans_cle_compte' => '{1}compte actif sans clé SSH|[2,*]comptes actifs sans clé SSH',
+    'alerte_maj_ancienne' => '{1}machine non relevée depuis plus de 30 jours|[2,*]machines non relevées depuis plus de 30 jours',
+    'alerte_ssh_faible' => '{1}machine dont le score SSH est sous 50|[2,*]machines dont le score SSH est sous 50',
+    'alerte_cles_anciennes' => '{1}compte dont la clé SSH a plus de 90 jours|[2,*]comptes dont la clé SSH a plus de 90 jours',
+
+    'alertes_famille_parc' => "état du parc",
+    'alertes_famille_cve' => "vulnérabilités",
+    'alertes_famille_comptes' => "comptes",
+    'alertes_famille_parc_suivi' => "suivi des machines",
+    'alertes_famille_cles_comptes' => "âge des clés de compte",
 ];

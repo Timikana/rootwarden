@@ -2227,6 +2227,122 @@ le succes et **non les deux**.
 l'inverse.* **Une consigne uniforme sur cinq objets dont un est l'inverse des autres casse le
 cinquieme.**
 
+### v1.38.122 — E-263 : le possessif mentait a TROIS endroits, et E-264 : la region d'alertes borne ce que le legacy divulgue
+
+**Deux arbitrages de l'exploitant sur l'accueil, poses. Et trois defauts trouves en les posant.**
+
+#### E-263 — « la borne EXISTE » n'est pas « la borne MORD »
+
+`compteursPerimetre` rendait `borne` a vrai des le role 1. L'ecran s'en servait pour DEUX
+decisions differentes, et se trompait dans les deux sens :
+
+| cas | avant | apres |
+|---|---|---|
+| role >= 2 (perimetre == parc) | « **3 de vos machines** » — ce sont TOUTES les machines | « 3 machines au parc » |
+| role 1, tout attribue | « 3 de vos machines · 3 au parc » + reserve | « 3 machines au parc » |
+| role 1, borne reelle | « 1 de vos machines · 3 au parc » + reserve | inchange, correct |
+
+**Le possessif porte le mensonge, pas le nombre manquant** : la formulation existe pour signaler
+une restriction, donc elle en signale une la ou il n'y en a pas. Un seul discriminant neuf
+(`mord` = `perimetre < parc`) couvre les deux bouts.
+
+**Le defaut vivait a TROIS endroits, et les deux derniers n'ont ete vus qu'a l'image** :
+la valeur, puis le TITRE de la tuile (« Vos machines »), puis le titre de SECTION (« Votre
+parc ») au-dessus des cinq indicateurs. Corriger la valeur seule aurait remonte le possessif
+d'une ligne. Le titre de section suit `indicateurs.borne` et non `mord` : au role 1
+« Votre parc » est honnete, la personne est bornee par attribution meme si tout lui est attribue.
+
+#### E-264 — la region d'alertes : HUIT alertes, pas neuf
+
+Le compte transmis etait faux. `grep -c '$alerts\[\] *=' legacy/index.php` -> **8**. La neuvieme
+est promise par un commentaire (`:147` « Fail2ban alerts … Seront evaluees plus bas ») qui n'a
+jamais eu de code. **Un commentaire qui annonce du code absent se compte comme du code.**
+
+**CINQ des huit comptent un fait qui a DEJA un indicateur borne sur le meme ecran** — et le
+legacy les relit **sans borne**. Les porter comme des requetes neuves aurait mis deux nombres
+differents pour le meme fait sur un seul ecran. Elles sont donc **derivees** des tableaux deja
+calcules : zero requete de plus, et la coherence n'est plus une propriete a surveiller, elle est
+structurelle. Mesure : alerte et tuile affichent 103, 8 et 12 — les memes.
+
+**Aucun second gel de role.** L'arbitrage demandait trois classes (exploitation / population et
+flotte / surface d'attaque) : elles EXISTENT DEJA dans les services, sous forme de bornes
+(`indicateursComptes` rend `null` — et non 0 — pour ce qu'un role n'a pas a voir, `sans_2fa` au
+role 3 seul). Poser un gel par-dessus aurait masque une alerte dont le nombre reste affiche deux
+tuiles au-dessus. Verifie aux trois roles : role 1 borne -> 1 alerte, role 2 -> 4, role 3 -> 5.
+
+**`$oldKeys` perd sa liste nominative — et le nombre devient juste par la meme occasion.**
+`legacy/index.php:119-126` nomme jusqu'a cinq comptes et l'age de leur cle, dans le message ET
+dans le `title=` du rendu (`:213`). Sa requete porte `LIMIT 5`, pose pour recuperer ces cinq
+noms, puis il compte `count($oldKeysData)` : **le nombre annonce est plafonne a 5** — quarante
+comptes concernes s'affichaient « 5 ». Retirer la liste retire le `LIMIT`, donc corrige le
+compte. Les deux defauts n'en font qu'un.
+
+**« Rien » ne se dit QUE si tout a ete lu.** Le legacy avale trois de ses lectures dans des
+`catch (\Exception $e) {}` **vides** : sur une base muette sa region devient vide, et une region
+vide se lit « tout va bien ». Sur un tableau de bord de securite c'est le mensonge le plus
+couteux qui soit. Ici une famille illisible est **nommee**.
+
+**Le lien d'une alerte se resout par le MENU**, pas par une URL recopiee : `ssh_audit` n'etant
+pas porte, son alerte pointe l'ancien portail avec le marqueur `↗` ; une personne sans le droit
+correspondant n'a pas l'entree, donc l'alerte s'affiche **sans lien** — le fait reste dit, la
+porte n'est pas offerte, et aucune garde n'est recopiee.
+
+**L'etat INCONNU ne leve pas d'alerte**, deliberement : le legacy comptait `!= ONLINE` et rangeait
+l'inconnu parmi les pannes, alarmant sur un fait que la donnee ne porte pas.
+
+#### E-265 — le compte des CVE critiques sommait TOUS les scans
+
+Trouve en portant ce nombre dans une alerte rouge. `indicateursCve` sommait `critical_count` sur
+**toutes** les lignes de `cve_scans` du perimetre, **sans filtre de statut** — la ou le legacy
+joint sur `MAX(id) … WHERE status='completed' GROUP BY machine_id`. Deux ecarts : un second scan
+de la meme machine s'**ajoutait** au premier au lieu de le remplacer, et un scan `running` ou
+`failed` comptait comme un constat.
+
+**Invisible sur ce banc, et la raison merite d'etre ecrite** : la base ne contient qu'**UNE** ligne
+de scan (`id=2, machine=1, completed`). Les deux definitions rendent donc 103 toutes les deux —
+la coincidence tenait a la donnee, pas au code. Releve en vertu de « un nombre trop propre est le
+premier signe ».
+
+**Et le libelle DECRIVAIT le defaut** : `ind_cve_critiques` disait « critiques, **tous scans** ».
+Exact tant que la somme portait sur toutes les lignes, faux depuis la correction — vu a l'image.
+
+#### Contrastes mesures AVANT d'ecrire, dans les DEUX themes
+
+    clair   grave 5.91:1   attention 4.76:1   info 5.82:1
+    sombre  grave 9.02:1   attention 10.72:1  info 4.60:1
+
+Tous >= 4.5 (AA). Aucune assertion DOM ne voit un contraste, et les trois tons sont ici le seul
+canal qui distingue une alerte grave d'un appoint — la couleur n'est donc pas seule : la forme du
+marqueur change, et le texte nomme le fait sans dependre de la teinte.
+
+#### Ce qui n'a PAS ete touche, et pourquoi c'est dit
+
+- `indicateursCve` rend encore `date` et `cve` **sans filtre de statut** : un scan echoue
+  deviendrait « le dernier scan ». Signale, non corrige — l'arbitrage disait « pas de retouche
+  aux neuf », et seul le nombre que je publie en rouge justifiait l'exception ;
+- « 1458 CVE au dernier scan » presente le scan d'**une** machine comme un total de parc ;
+- `superadmin` (id 1) porte `force_password_change = 1` : le compte des identifiants de dev
+  arrive sur le formulaire de mot de passe, pas sur l'accueil.
+
+#### Mesures
+
+    go-page-accueil       41 PASS / 0 FAIL   (3 roles, captures 1920/1400/390 REGARDEES)
+    parite i18n accueil   FR=84  EN=84  ecarts=0  (dans les deux sens)
+    php -l                4 fichiers, aucune erreur
+
+**Un FAIL transitoire elucide en cours de route** : la premiere execution rendait 4 FAIL au role 2
+avec « ancres accueil-* rendues : 0 ». Cause mesuree : `rw-test-admin` portait
+`force_password_change = 1`, pose par une mesure du middleware d'une autre session. `accueil`
+n'etant pas dans les exemptes, la page redirigeait vers le profil — **la suite mesurait le
+formulaire de mot de passe en croyant mesurer l'accueil**. Le drapeau est retombe a 0 entre deux
+executions, ce qui a confirme la cause. **Un etat de compte partage peut faire echouer une suite
+sans qu'aucun code n'ait bouge.**
+
+#### Renumerotation
+
+E-260, E-261 et E-262 etaient **deja pris** (wazuh, autorite du journal, quatrieme verdict). Les
+trois ecarts de ce lot sont **E-263, E-264, E-265** — 17 references corrigees dans 8 fichiers.
+
 ### v1.38.121 — E-262 : le quatrieme verdict `FENETRE SALE — a rejouer` est pose et EPROUVE
 
     depart dans le FUTUR   ->  vide                                temoin NEGATIF, joue EN PREMIER

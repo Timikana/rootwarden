@@ -64,12 +64,19 @@ return [
 
     // ── THE FLEET, BOUNDED TO THE ACCOUNT'S SCOPE ────────────────────────
     'parc_compteur_titre' => 'Your machines',
+    // E-263: the TITLE too — see fr.
+    'parc_compteur_titre_neutre' => 'The fleet',
     'parc_perimetre' => '{0}none of your machines|{1}1 of your machines|[2,*]:count of your machines',
     'parc_total' => '{1}1 in the fleet|[2,*]:count in the fleet',
+    // E-263: the NEUTRAL variant. Rendered when the boundary does not BITE.
+    // Carries a {0} case that `parc_total` deliberately lacks — see fr.
+    'parc_neutre' => '{0}no machine in the fleet|{1}1 machine in the fleet|[2,*]:count machines in the fleet',
     'parc_borne_aide' => "You only see the machines assigned to you here. The second number is the real size of the fleet: it is shown so the boundary is visible rather than guessed.",
     'parc_illisible' => "The fleet could not be read. This is not « no machines »: the database did not answer, and no number shown here would be reliable.",
     // ══ THE LEGACY'S NINE INDICATORS, BOUNDED ════════════════════════════
     'ind_parc_titre' => 'Your fleet',
+    // E-263, third occurrence of the same possessive — see fr.
+    'ind_parc_titre_neutre' => 'Fleet state',
     'ind_machines' => 'machines',
     'ind_en_ligne' => 'online',
     'ind_hors_ligne' => 'offline',
@@ -84,7 +91,7 @@ return [
     'ind_cve_titre' => 'Known vulnerabilities',
     'ind_cve_date' => 'last scan',
     'ind_cve_nombre' => 'CVE at the last scan',
-    'ind_cve_critiques' => 'critical, all scans',
+    'ind_cve_critiques' => 'critical, latest scan per machine',
     'ind_cve_aucun_scan' => "No vulnerability scan has been run on the machines in your scope. This is not « zero CVE »: it is the absence of measurement.",
     'ind_cve_illisible' => "The scan history could not be read. This is not « no CVE » — no number shown here would be reliable.",
 
@@ -98,4 +105,28 @@ return [
 
     'ind_illisible' => "These values could not be read. This is not « zero »: the database did not answer.",
     'ind_borne' => "These numbers only cover the machines assigned to you.",
+
+    // ══ E-264: THE ALERT REGION ══════════════════════════════════════════
+    'alertes_titre' => "What needs your attention",
+    // "Nothing" is said ONLY if everything was read — see fr for why.
+    'alertes_aucune' => "Nothing needs your attention right now.",
+    'alertes_aucune_aide' => "This covers the machines in your perimeter and what your role is allowed to read.",
+    'alertes_illisible' => "Careful: some checks could not be run, and their silence does not mean there is nothing to report.",
+    'alertes_illisible_familles' => "Not read: :familles.",
+    'alertes_voir' => "View",
+
+    'alerte_hors_ligne' => '{1}machine offline|[2,*]machines offline',
+    'alerte_sans_cle_parc' => '{1}machine without the platform key|[2,*]machines without the platform key',
+    'alerte_cve_critiques' => '{1}critical vulnerability reported|[2,*]critical vulnerabilities reported',
+    'alerte_sans_2fa' => '{1}active account without a second factor|[2,*]active accounts without a second factor',
+    'alerte_sans_cle_compte' => '{1}active account without an SSH key|[2,*]active accounts without an SSH key',
+    'alerte_maj_ancienne' => '{1}machine not checked for over 30 days|[2,*]machines not checked for over 30 days',
+    'alerte_ssh_faible' => '{1}machine with an SSH score below 50|[2,*]machines with an SSH score below 50',
+    'alerte_cles_anciennes' => '{1}account whose SSH key is over 90 days old|[2,*]accounts whose SSH key is over 90 days old',
+
+    'alertes_famille_parc' => "fleet state",
+    'alertes_famille_cve' => "vulnerabilities",
+    'alertes_famille_comptes' => "accounts",
+    'alertes_famille_parc_suivi' => "machine follow-up",
+    'alertes_famille_cles_comptes' => "account key age",
 ];
