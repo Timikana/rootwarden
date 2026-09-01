@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.106** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.109** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,69 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.109 — E-248 : un correctif issu d'une LECTURE se refute par une lecture, et l'abattage du LOT existe enfin
+
+#### E-248 — mon reproche etait faux, et la chronologie le prouve
+
+    9422ab5   09-01 14:59   le correctif de cascade
+    observation « FR et EN tous deux visibles »   ~15:30   ->  31 MINUTES APRES
+
+J'avais ecrit a la session 3 *« ne cherche pas dans une media query, ton correctif aurait vise le
+mauvais objet »*. **Son correctif ne venait pas du symptome que j'avais relaye : il venait de la
+CASCADE**, verifiable dans l'etat d'avant :
+
+    .rw-entete__compte span   (0,1,1)   display: none    dans le bloc @media
+    .rw-langues__actif        (0,1,0)   AUCUN display declare
+    .rw-badge                           AUCUN display, nulle part
+
+A 900 px et moins, `FR` **et** la pastille etaient **necessairement** masques. *Ce n'est pas une
+inference, c'est la cascade* — et le troisieme defaut le confirme : la pastille etait masquee, personne
+ne l'avait signalee, et **rien dans le symptome rapporte ne pouvait y mener.**
+
+> **Un correctif issu d'une LECTURE se refute par une LECTURE, pas par une observation ulterieure** —
+> sinon **un correctif juste se fait retirer par la mesure de son propre effet.**
+
+*Quand une affirmation porte sur une CAUSE et que le correctif a deja atterri, aucune observation
+posterieure ne distingue « le correctif a marche » de « la cause etait ailleurs ».* **C'est le seul
+endroit de ce chantier ou la lecture bat la mesure**, et c'est la reciproque exacte de ma regle du jour
+(*un defaut vu a l'image se transmet avec sa mesure ou pas du tout*).
+
+**Et les deux lectures etaient compatibles** : `.rw-entete` est `flex` **sans `flex-wrap`**, et un
+element flex a `min-width: auto` — il ne peut pas retrecir sous sa largeur de contenu minimale. Selon
+la largeur, la meme cause replie le titre **ou** fait deborder la ligne a droite. **Deux faces d'une
+seule cause.** Les quatre proprietes de `c85eddb` ferment les deux : *un correctif dont la justesse ne
+depend pas de la precision de la mesure est posable avant que le desaccord soit tranche.*
+
+#### L'ABATTAGE DU LOT EXISTE MAINTENANT — il n'existait pas quand je l'ai decrete
+
+La session 7 a nomme la limite plutot que de me laisser croire le contraire : *son code 99 n'arrete
+rien tout seul — `rejouer-lot.sh` traite `code -ne 0` comme ECHEC et poursuit.* **Elle rend l'arret
+possible ; seul le runner le rend effectif.** Le dire autrement aurait fait de ma regle **une garde qui
+n'existe pas** — la classe de defaut que ce chantier traque depuis trois jours, et j'en aurais ete
+l'auteur.
+
+Pose : detection sur **le journal ET le code**, *parce que l'un ou l'autre se perd* — un `timeout` tue
+avec 124 sans marqueur, un plantage apres l'impression laisse le marqueur sans le code. Arret **dans la
+boucle**, `exit 99`, remede **lu dans le journal** et jamais recopie.
+
+**Et mon propre garde portait une faute d'instrument, attrapee par un test sur journal forge** : le
+motif `'REMEDE ::'` faisait **perdre la ligne en silence** sur la variante sans espace — alors que mon
+commentaire promet que le remede vient du journal. **Cinquieme motif du jour qui suppose une forme
+d'ecriture, et le premier dans un garde que je venais d'ecrire.**
+
+#### Et le `13 · 0` de `go-page-mot-de-passe` n'est PAS inscrit
+
+La session 7 l'a retire elle-meme : *l'assertion concluait « la soumission atteint la route » de ce que
+l'URL valait `/profil` sans `force_change=1` — or **rester sur `/profil` et y etre redirige produisent
+exactement la meme URL.*** Verte, et ne mesurant rien.
+
+> **Un observable ne dit jamais par quel chemin il a ete produit** — et celui-la avait ete choisi comme
+> preuve par l'auteur meme de la suite.
+
+*Ce qui l'a revele : une cle de sa table de selecteurs declaree et **jamais lue**.* **Une cle morte
+signale presque toujours une mesure absente, pas un oubli de menage** — posee, elle a rougi : aucun
+message de refus n'est rendu. La mesure decisive est passee **au reseau**.
 
 ### v1.38.108 — un titre long poussait le contenu hors du bandeau, et deux diagnostics divergeaient sur le symptôme
 
