@@ -99,15 +99,19 @@ Les onze parties archivées sont citées **23 fois**. Un relevé qui s'arrêtera
 | nature | compte | état |
 |---|---|---|
 | **chemin de PAGE** (`/drift/`, `/docker/`…) | **10** | **périmé** — chacun rend 404 aujourd'hui |
-| **route de BACKEND** (`/drift/scan`, `POST /docker/scan`, `/tasks/list`…) | **13** | **VIVANTE — toujours vraie** |
+| **route de BACKEND** (`/drift/scan`, `POST /docker/scan`, `/tasks/list`…) | **10 vivantes + 2 mortes** | **corrigé par sondage — voir §3 bis** |
 
 > *Tout `/partie/` n'est pas une page.* Les blueprints des parties archivées sont **toujours
-> enregistrés** : leurs routes répondent, et la page portée les appelle. **Treize des vingt-trois
-> citations restent exactes.**
+> enregistrés** : leurs routes répondent, et la page portée les appelle.
 
-**Ce que ça donne pour l'arbitrage** : le document est **moins périmé que son âge ne le suggère**, et
-sa péremption est **localisée** — dix chemins de page, dans onze sections dont le sujet a déménagé.
-Ce n'est pas « un quart à réécrire », c'est « dix lignes fausses et onze sections à re-situer ».
+**⚠ Ce tableau annonçait « 13 vivantes » avant le sondage du §3 bis, et c'était une INFÉRENCE.**
+Mesuré : **12 routes distinctes** (le 13 sommait les occurrences par partie), dont **10 existent** et
+**2 n'existent pas**. **La séparation réelle est donc 12 périmés / 10 vivants**, pas 10/13.
+
+**Ce que ça donne pour l'arbitrage** : le document reste **moins périmé que son âge ne le suggère**,
+et sa péremption reste **localisée** — mais elle est **d'un cran plus large** que mon premier compte.
+Ce n'est toujours pas « un quart à réécrire » ; c'est **douze lignes fausses et onze sections à
+re-situer**.
 
 ### 3 bis — ⚠ Les routes SONDÉES, et l'inférence tombe sur deux d'entre elles
 
