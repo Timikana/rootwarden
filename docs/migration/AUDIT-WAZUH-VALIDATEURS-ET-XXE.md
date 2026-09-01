@@ -48,10 +48,27 @@ ajouter un saut de ligne, il ne peut rien mettre après.
 
 ### 1.3 Le tri, en trois filtres
 
-**Filtre 1 — 28 des 58 sont `.strip()`és avant la validation.** Le `\n` final ne
+**Filtre 1 — 27 des 58 sont `.strip()`és avant la validation.** Le `\n` final ne
 survit pas jusqu'au motif. Le piège ne peut pas s'armer.
 
-**Filtre 2 — parmi les 30 restants, la valeur doit être suivie de texte dans une
+> ⚠ **Ce chiffre a d'abord été publié à 28, et il était faux dans la direction
+> RASSURANTE.** Ma première détection cherchait un `.strip()` dans une fenêtre de
+> 40 lignes ; elle attrapait donc celui d'une fonction **voisine**. Remesuré en
+> scopant la recherche à la fonction contenante (AST) : **27 / 31**, et **un seul
+> site** avait été dédouané à tort — `graylog.py:556` (`delete_template`), dont le
+> `name` vient du **chemin d'URL** et n'est pas `.strip()`é.
+>
+> **Sans conséquence, vérifié** : ce nom ne part que dans un
+> `DELETE … WHERE name = %s` (placeholder) et dans une chaîne de journal. Un `\n`
+> final ne matche aucune ligne — 404 ou `deleted=0`. Le verdict des §1.4 et §1.5
+> ne bouge pas.
+>
+> Mais la leçon vaut plus que le chiffre : **une fenêtre de lignes ne connaît pas
+> les frontières de fonction**, et l'erreur qu'elle produit DÉDOUANE. C'est la
+> direction dangereuse, et c'est la troisième fois de la journée que mon propre
+> instrument se trompe.
+
+**Filtre 2 — parmi les 31 restants, la valeur doit être suivie de texte dans une
 chaîne EXÉCUTÉE.** Le relevé automatique sort 21 chaînes ; à la lecture, **10
 sont des messages de journal, d'erreur ou d'affichage** (`ssh_audit.py:248/251/463`,
 `bashrc.py:421/570/643`, `wazuh.py:1166`…), où un `\n` final est cosmétique.
