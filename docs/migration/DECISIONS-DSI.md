@@ -1282,12 +1282,30 @@ l'exigence de mot de passe elle-même.
     id 77  role 2   2FA NON   <- le porteur qu'E-236 avait identifie
     id  3,4,5,10,12  role 1   2FA NON   residus e2e
 
-> **Le compte 78 est de rôle 3.** Pour lui, il n'y a pas « 32 chemins » : le rôle 3 court-circuite chaque
-> `require_permission` et chaque `require_role`. **Le drapeau est le SEUL frein entre son détenteur et
-> l'administration complète du portage — et aucun middleware ne le lit.**
+> **Deux comptes de rôle 3 portent le drapeau — `id 1` et `id 78`.** Pour eux il n'y a pas « 32
+> chemins » : le rôle 3 court-circuite chaque `require_permission` et chaque `require_role`. **Le drapeau
+> est le SEUL frein entre leur détenteur et l'administration complète du portage — et aucun middleware ne
+> le lit.**
 
-*La session 5 avait mesuré un porteur de rôle 2 ; il y en a deux au-dessus du rôle 1, et le second est
-celui pour qui la borne ne s'applique nulle part ailleurs.*
+> **⚠ CORRECTION DE MA PROPRE PHRASE, 2026-09-01 12:33 UTC, relevée par la session 3.** J'avais écrit
+> *« deux au-dessus du rôle 1 »* **trois lignes sous un tableau qui en liste TROIS** — `id 1`, `id 78`,
+> `id 77`. **`id 1` est `superadmin`, rôle 3 : le compte le plus conséquent du système.**
+>
+> *C'est la cinquième fois aujourd'hui que mon résumé contredit mon propre corps* — et la première depuis
+> que j'ai écrit à une autre session que la parade est **de ne pas écrire deux fois le même chiffre**. Un
+> résumé qui *renvoie* au tableau ne peut pas le contredire ; un résumé qui le *répète* le contredira.
+
+### ⚠ ET LE COÛT QUE J'ANNONÇAIS EST FAUX DANS LE SENS ALARMANT
+
+J'ai écrit : *« huit comptes devront changer leur mot de passe avant d'utiliser le portage »*. **La
+session 3 corrige, et sa formulation est la juste** — elle découle de ma propre qualification :
+
+> **C'est une correction de PARITÉ. Le legacy exerce déjà ce contrôle, donc ces huit comptes y sont DÉJÀ
+> arrêtés.** Le portage était le chemin **plus permissif** des deux. *La friction n'est pas nouvelle :
+> c'est le retrait d'un contournement.*
+
+**À dire à l'exploitant sous cette forme**, et pas sous la mienne. *Annoncer une friction nouvelle là où
+on retire un contournement fait payer à une correction le prix d'une régression.*
 
 ### DÉCISION : le middleware s'écrit. **C'est une correction de PARITÉ, pas une politique.**
 
@@ -1324,6 +1342,41 @@ posée** : sans elle, c'est un verrouillage, et de la classe E-201 / E-202 — *
 
 **Qui écrit** : `laravel/app/Http/Middleware/` est le périmètre de la **session 3**. La session 5 refuse
 de l'écrire, et elle a raison — *qui qualifie ne corrige pas seul.*
+
+### ⚠ ET JE LUI AI FAIT PORTER LA MOITIÉ D'UN CONTRÔLE — relevé par elle, 12:33 UTC
+
+`verify.php` vérifie **deux** choses, pas une : le drapeau, **puis l'EXPIRATION** du mot de passe
+(`password_updated_at`, `password_expiry_override`), avec sa propre redirection.
+
+**Le second garde n'est pas porté, et il ne peut pas l'être** : il dépend de la politique de mot de passe,
+que le portage déclare **non portée**.
+
+> **Ma demande disait « restaure la parité » et ne couvrait qu'une moitié.** Sans son signalement, *« parité
+> restaurée »* aurait été inscrit **pour les deux** — et c'est mot pour mot le motif que je venais de lui
+> faire éviter sur l'onglet : **une mesure de sûreté qui certifie une région qu'elle n'a pas couverte.**
+
+**Elle l'a écrit dans le code ET dans le journal.** C'est la bonne place : *un manque déclaré dans le code
+survit au message qui l'a signalé.*
+
+### Son exemption est plus simple que ma condition, et elle évite un piège que je ne voyais pas
+
+Je demandais **trois** exemptions. **Il en faut deux**, par un effet de structure : **la déconnexion vit
+hors du groupe `session.authentifiee`**, donc poser le garde sur le **groupe** la laisse atteignable **par
+construction**, sans figurer dans aucune liste.
+
+    web.php:71   GET /deconnexion   ->  AUCUN nom de route
+
+> **Une exemption par NOM aurait couvert le POST et manqué le GET.** Un compte marqué, cliquant un lien de
+> déconnexion, aurait été renvoyé vers son profil au lieu de sortir. ***Une liste d'exemptions par nom
+> dépend de ce que quelqu'un a pensé à nommer.***
+
+**Et elle a mesuré le COMPORTEMENT, pas le contenu de la liste** — six cas, dont celui qui décide : une
+route **sans nom** dans le groupe reste **gardée**. *Mesurer l'effet d'une garde, pas sa forme.*
+
+**Son fail-open est délibéré et journalisé**, et je le retiens : refuser sur une panne de lecture
+transformerait un incident en indisponibilité **totale pour tous**, pour un gain nul — *le porteur du
+drapeau ne peut rien lire non plus si la base est morte.* **Un fail-open muet serait une garde qui
+disparaît sans trace ; journalisé, c'en est un choix.**
 
 ---
 
