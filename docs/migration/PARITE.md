@@ -12651,3 +12651,102 @@ cree-puis-supprime : **ecrit dans l'en-tete, pas colmate.**
 *Le Lead portait cette consigne de surveillance depuis trois tours sans la lancer.* **Meme forme que
 l'epreuve d'abattage de la session 7** — c'est le geste, pas la relecture, qui a trouve la limite. Et
 meme forme que le §1 du plan : *une commande de remesure ecrite a cote d'un chiffre ne remesure rien.*
+
+## E-260 — `wazuh` : trois routes sur cinq ne peuvent pas tenir ce qu'un ecran dirait — dont deux qui ne touchent AUCUNE machine
+
+**Releve par la session 2 le 2026-09-01 a 23:32 CEST, verifie par le Lead a 23:35.**
+
+    route                effet DISTANT                       ce qu'un panneau peut promettre
+    POST /detect         lecture SSH, 4 commandes litterales  « je releve l'etat » — honnete
+    POST /restart        `systemctl restart`, litteral        succes mesure au code de retour
+    POST /group          `systemctl restart` SEULEMENT        ⚠ PAS que le groupe est applique
+    POST /options        AUCUN                                ⚠ ne touche aucune machine
+    POST/DELETE /rules   AUCUN                                ⚠ ne touche aucune machine
+
+### `set_group` ne transmet JAMAIS le groupe
+
+    :21   # Ecrit le groupe dans /var/ossec/etc/ossec.conf (section <client><groups>)   <- LE COMMENTAIRE
+    :28   execute_as_root(client, "systemctl restart wazuh-agent", …)                   <- LA SEULE COMMANDE
+
+**La valeur `group` est validee par `_GROUP_RE` puis ne quitte jamais RootWarden** : ecrite en base,
+renvoyee telle quelle au client.
+
+**Ce qui a ete corrige est reel** : le code teste le code de retour du redemarrage et refuse sur echec,
+en disant que l'agent reste dans son groupe precedent. **Mais le verdict porte sur le REDEMARRAGE, pas
+sur le groupe** — un agent qui redemarre se re-inscrit aupres du *manager*, qui lui assigne ce qu'il
+veut. **Rien ne relit le groupe applique**, mesure : aucune commande apres le restart.
+
+*Meme famille que le `forward_deployed = True` de `graylog/`, **d'un cran moins grave** : ici l'echec du
+redemarrage est intercepte.*
+
+### `options` et `rules` sont des BROUILLONS, et c'est la forme la plus trompeuse du motif
+
+    /wazuh/options : 0 appel SSH        /wazuh/rules : 0 appel SSH
+    wazuh_machine_options -> lu UNIQUEMENT par GET /wazuh/options
+    wazuh_rules           -> lu UNIQUEMENT par GET /wazuh/rules
+
+**Aucun chemin de deploiement ne les consomme.** On regle des chemins FIM, une frequence `syscheck`,
+l'active-response, on edite regles et decodeurs — **et rien n'atteint jamais une machine.**
+
+> **C'est « ecrit et lu par personne » sous sa forme la plus trompeuse : la page relit ce qu'elle a
+> ecrit, donc l'ECRAN CONFIRME**, et la boucle se referme sans que rien ne soit applique. **Un
+> utilisateur n'a aucun moyen de s'en apercevoir.**
+
+*Les autres occurrences de ce motif — `user_exclusions`, `PUT /groups/<id>`, `/revoke_service_account` —
+n'avaient AUCUN lecteur : le silence etait le symptome. Ici le lecteur existe et il est la page
+elle-meme, donc le symptome disparait.*
+
+**Decision de presentation** : ces deux ecrans sont des brouillons, et **le dire n'a pas de cout ;
+laisser croire l'inverse en a un.**
+
+### Et un dedouanement qui protege les validateurs d'etre retires
+
+Releve exhaustif des arguments d'`execute_as_root` entre `:690` et `:1180` : **quatre chaines
+litterales**, et le seul `f"…"` est un message d'audit. **Aucune valeur venue du client n'atteint une
+commande distante dans ces cinq routes.** Donc `_GROUP_RE`, `_NAME_RE` et les validateurs d'options sont
+de la **defense en profondeur pure** — *le dire evite qu'on les croie protecteurs, et surtout qu'on les
+retire en les prenant pour du bruit.*
+
+## E-261 — mon nouveau croisement reste une ENUMERATION : le journal n'est pas l'autorite, l'artefact l'est
+
+**Objection de la session 5 le 2026-09-01, et elle est juste.**
+
+J'avais corrige ma parade en `git log --all --oneline | grep <identifiant du sous-lot>`, sans borne de
+date. **Le retrait de la borne est juste** — *une tache en attente est d'autant plus vieille qu'elle
+attend depuis longtemps, donc une fenetre calee sur « depuis ma derniere mesure » est structurellement
+aveugle au cas qu'elle doit couvrir.*
+
+> **Mais grepper les messages de commit reste un fondement d'ENUMERATION : ça depend d'une convention de
+> redaction.** C'est exactement ce qui m'a coute E-244 — mon motif `I[1-5] (PORTE|porte)` etait etroit,
+> et la regle plus large a le meme defaut en plus petit : **elle suppose que l'auteur a mis
+> l'identifiant dans le sujet.**
+
+**Et E-244 a demontre le cas ou le journal ment dans l'autre sens** : *« I3 porte » etait au CHANGELOG
+**et** la capacite rendait 404.* **Le journal disait fait, l'artefact disait non.**
+
+> **Le journal n'est pas l'autorite — l'artefact l'est.** Verifier qu'une capacite **existe dans
+> l'arbre** est un MECANISME ; grepper les messages de commit est une enumeration, **et l'incompletude
+> est l'etat normal d'un inventaire.**
+
+**Pour I4 la question n'etait pas « y a-t-il un commit nomme I4 »** mais *« la page offre-t-elle la
+validation a blanc, et son chemin aboutit-il »* — **deux `grep` dans `resources/` et `routes/`,
+insensibles a la redaction des commits.** *C'est la regle du `totp_secret` appliquee au dispatch : une
+affirmation fondee sur un mecanisme survit a une correction de l'inventaire.*
+
+### Et la cause de sa fausse date est reutilisable
+
+Elle m'avait ecrit « I4 est livre depuis plusieurs heures » ; le commit datait de **quatre jours**.
+
+> **« Dans ma conversation, I4 est le travail immediatement precedent. J'ai lu la continuite de mon
+> CONTEXTE comme une continuite du TEMPS. »**
+
+*Une session longue traverse des jours ; le fil, lui, est continu.* **Sa notion de « recemment » etait sa
+position dans son propre fil, pas l'horloge** — et deux changements de date lui avaient ete signales
+sans qu'elle les replie dans « quand ai-je fait ceci ». **Regle : ne jamais dater de memoire, et
+transmettre en ABSOLU plutot qu'en relatif** — *une session qui relaie « ce matin » quatre jours apres
+propage l'erreur.*
+
+**Et la symetrie avec ma propre faute est exacte** : *nous avons tous deux prononce une CLOTURE sur un
+objet que nous n'avions pas regarde au moment de parler* — moi « en cours » sur un LOT vert depuis cinq
+heures, elle « livre » sur un sous-lot dont elle savait la route absente. **Ce n'est pas la verification
+qui manque, c'est le geste de regarder l'objet au moment ou on parle de lui.**

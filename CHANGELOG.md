@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.119** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.120** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,59 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.120 — E-260 : deux ecrans `wazuh` ne touchent AUCUNE machine, et E-261 : le journal n'est pas l'autorite
+
+#### E-260 — trois routes sur cinq ne peuvent pas tenir ce qu'un ecran dirait
+
+    POST /group          `systemctl restart` SEULEMENT   ->  PAS que le groupe est applique
+    POST /options        AUCUN effet distant             ->  ne touche aucune machine
+    POST/DELETE /rules   AUCUN effet distant             ->  ne touche aucune machine
+
+**`set_group` ne transmet jamais le groupe** : le commentaire annonce « Ecrit le groupe dans
+`/var/ossec/etc/ossec.conf` », **la seule commande est `systemctl restart wazuh-agent`**, littérale. La
+valeur est validee puis ecrite en base et renvoyee au client. *Le correctif recent teste bien le code de
+retour — mais **le verdict porte sur le REDEMARRAGE, pas sur le groupe** : un agent qui redemarre se
+re-inscrit aupres du manager, et **rien ne relit le groupe applique**.*
+
+**`options` et `rules` : 0 appel SSH, et leurs seuls lecteurs sont les `GET` de la meme page.**
+
+> **« Ecrit et lu par personne » sous sa forme la plus trompeuse : la page relit ce qu'elle a ecrit, donc
+> l'ECRAN CONFIRME.** *Les autres occurrences du motif n'avaient AUCUN lecteur — le silence etait le
+> symptome. Ici le lecteur est la page elle-meme, donc le symptome disparait.*
+
+**Ces deux ecrans sont des brouillons. Le dire n'a pas de cout ; laisser croire l'inverse en a un.**
+
+**Et un dedouanement** : aucune valeur venue du client n'atteint une commande distante dans ces cinq
+routes — quatre chaines litterales, et le seul `f"…"` est un message d'audit. **`_GROUP_RE` et les
+validateurs d'options sont de la defense en profondeur PURE** — *le dire evite qu'on les retire en les
+prenant pour du bruit.*
+
+#### E-261 — mon croisement corrige reste une ENUMERATION
+
+Le retrait de la borne de date etait juste : *une tache en attente est d'autant plus vieille qu'elle
+attend, donc une fenetre « depuis ma derniere mesure » est structurellement aveugle au cas qu'elle doit
+couvrir.* **Mais grepper les messages de commit depend d'une convention de redaction** — le defaut
+d'E-244 en plus petit.
+
+> **Le journal n'est pas l'autorite — l'artefact l'est.** *« I3 porte » etait au CHANGELOG et la
+> capacite rendait 404 : le journal disait fait, l'artefact disait non.* Verifier qu'une capacite existe
+> dans l'arbre est un MECANISME ; grepper les commits est une enumeration, **et l'incompletude est
+> l'etat normal d'un inventaire.**
+
+Pour I4, la question etait *« la page offre-t-elle la validation, et son chemin aboutit-il »* — **deux
+`grep` insensibles a la redaction des commits.**
+
+**Et la cause de sa fausse date est reutilisable** : *« dans ma conversation, I4 est le travail
+immediatement precedent — j'ai lu la continuite de mon CONTEXTE comme une continuite du TEMPS. »* **Sa
+notion de « recemment » etait sa position dans son fil, pas l'horloge.** Regle : **ne jamais dater de
+memoire, transmettre en ABSOLU** — *une session qui relaie « ce matin » quatre jours apres propage
+l'erreur.*
+
+**Et la symetrie avec ma faute du jour est exacte** : nous avons tous deux prononce une **cloture** sur
+un objet que nous n'avions pas regarde au moment de parler — moi « en cours » sur un LOT vert depuis cinq
+heures, elle « livre » sur un sous-lot dont elle savait la route absente. **Ce n'est pas la verification
+qui manque, c'est le geste de regarder l'objet au moment ou on parle de lui.**
 
 ### v1.38.119 — ✅ NOUVELLE LIGNE DE BASE : 158 executions · 2439 PASS · ZERO FAIL · 2 h 50
 
