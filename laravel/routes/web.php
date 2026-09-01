@@ -752,6 +752,36 @@ Route::middleware('session.authentifiee')->group(function () {
     Route::post('/pare-feu/copie/enregistrer', [PareFeuController::class, 'enregistrer'])
         ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.copie.enregistrer');
 
+    /*
+     * I3 — L'HISTORIQUE. Declaration qui ATTENDAIT depuis quatre jours (E-244).
+     *
+     * `PareFeuController::historique()` existait et `pare-feu.js:548` l'appelait
+     * deja : sans cette ligne, l'appel rendait 404 et la methode etait du code
+     * mort. Le sous-lot s'etait declare porte, et la suite restait verte parce
+     * qu'elle ne descend pas jusqu'a l'historique.
+     *
+     * *« La garde est sur la page, pas sur la requete », retourne : ici c'est la
+     * CAPACITE qui etait sur la page et pas sur la requete.*
+     *
+     * MEME GARDE QUE LA PAGE ET QUE SES DEUX VOISINES, et ce n'est pas une
+     * commodite. J'ai verifie la methode avant de poser plutot que de recopier
+     * le texte qu'on me transmettait :
+     *
+     *   - `machineDeLaRequete()` lit `machine_id` dans le CORPS, puis resout par
+     *     `machineAccessible($idCompte, $role, $id)`. **Le controle porte sur
+     *     l'objet RESOLU**, et rend 403 si la machine n'est pas accessible — pas
+     *     sur le parametre recu ;
+     *   - la methode ne joint AUCUNE machine et n'appelle pas la passerelle :
+     *     elle lit `iptables_rules_history` en base. `POST` malgre la lecture,
+     *     pour la meme raison que `/pare-feu/copie` : l'identifiant voyage dans
+     *     le corps, pas dans l'URL ni dans les journaux d'acces.
+     *
+     * `role:1` + la permission : identique a la page, donc aucun compte legitime
+     * ne gagne ni ne perd un acces par cette ligne.
+     */
+    Route::post('/pare-feu/historique', [PareFeuController::class, 'historique'])
+        ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.historique');
+
     Route::get('/fail2ban', Fail2banController::class)
         ->middleware(['role:1', 'perm:can_manage_fail2ban'])->name('fail2ban');
 
