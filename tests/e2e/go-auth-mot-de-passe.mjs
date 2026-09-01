@@ -255,10 +255,11 @@ async function essaie(page, actuel, nouveau, confirmation) {
          * passaient en le lisant, sans jamais voir le vrai message. Le portage
          * porte donc un `data-rw` dedie, et le legacy a son propre bloc.
          */
-        /* TRANSITION E-250 : les deux noms, le temps que la vue dedouble
-           l'ancre. Vert avant ET apres le patch. */
+        /* E-250 : la vue porte DEUX ancres, une par etat. Cette lecture
+           prend le message QUEL QU'IL SOIT — elle rend le texte, elle ne
+           juge pas — donc il lui faut les deux. */
         const n = document.querySelector(
-            '[data-rw="profil-mdp-message"], [data-rw="profil-mdp-succes"], [data-rw="profil-mdp-erreur"]')
+            '[data-rw="profil-mdp-succes"], [data-rw="profil-mdp-erreur"]')
             || document.querySelector('div[class*="bg-green-50"], div[class*="bg-red-50"]');
 
         return n ? n.textContent.replace(/\s+/g, ' ').trim().slice(0, 120) : '';

@@ -268,9 +268,9 @@ async function texteMessages(page) {
         const bloc = [...document.querySelectorAll('[id^="config-"], [data-rw^="panneau-config"]')]
             .find((e) => e.offsetParent !== null);
         if (bloc) morceaux.push(bloc.innerText);
-        // TRANSITION E-250 : les deux noms d'ancre, cette collecte prend le
-        // message QUEL QU'IL SOIT.
-        for (const sel of ['#toast-container', '[data-rw="superv-config-message"]',
+        // E-250 : les DEUX ancres — cette collecte prend le message quel
+        // qu'il soit, pour le donner a une recherche textuelle.
+        for (const sel of ['#toast-container',
                            '[data-rw="superv-config-succes"]', '[data-rw="superv-config-erreur"]']) {
             const e = document.querySelector(sel);
             if (e) morceaux.push(e.innerText);
