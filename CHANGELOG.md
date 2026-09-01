@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.115** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.116** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,41 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.116 — E-256 : j'ecris aussi dans l'arbre servi pendant la mesure, et je ne l'avais pas declare
+
+    docker-compose.yml:76                    - ./legacy/version.txt:/var/www/html/version.txt:ro
+    ecritures sous legacy/ depuis 15:37:23   legacy/version.txt  15:42:17   <- MOI
+
+**`legacy/version.txt` est monte dans le conteneur legacy : il EST servi.** Et je le bumpe a chaque
+entree de CHANGELOG — donc j'ai ecrit dans l'arbre servi **deux fois pendant les 2 h 40**, apres avoir
+exige de deux sessions qu'elles declarent leurs ecritures et fait ranger un correctif a l'une d'elles.
+
+**Verifie : sans consequence aujourd'hui.** Aucune suite n'asserte sur la version du portail — les
+occurrences de « version » dans `tests/e2e/` visent l'agent Zabbix. *Dit aussi net que l'inverse
+l'aurait ete.*
+
+> **Mais le regime est celui que je fais respecter** : *un garde qui mesure les ecritures d'autrui doit
+> annoncer les siennes.*
+
+**Ce qui l'a rendue invisible a mes yeux** : je surveillais `laravel/`, parce que l'incident venait de
+la. **`legacy/` est dans la liste du garde, pas dans ma commande.** *Une surveillance calquee sur
+l'incident precedent ne couvre que l'incident precedent.*
+
+#### Et ma surveillance est plus BRUYANTE que le garde qu'elle double
+
+    find laravel -type f -newermt …   ->  87 fichiers, dont 86 sous laravel/storage/
+
+**`laravel/storage/` est ecrit en continu par l'application** — vues compilees, sessions, cache,
+journaux. **Le garde de la session 7 exclut correctement `storage` : sa liste est juste, ma commande
+etait naive.** *Une surveillance qui rend 87 lignes dont 86 de bruit ne sera pas lue — meme fin qu'un
+garde contourne.*
+
+#### Le geste
+
+**Pendant un LOT, le bump de `legacy/version.txt` attend.** `docs/` et `CHANGELOG.md` ne sont montes
+nulle part et peuvent s'ecrire ; **le fichier de version est servi.** *Cout nul : un numero calcule a
+l'instant de l'ecriture reste juste quelle que soit l'heure de cette ecriture.*
 
 ### v1.38.115 — la contre-epreuve d'E-251, et `propre: null` n'aurait rien protege
 

@@ -12432,3 +12432,43 @@ l'etiquette nomme la propriete, le verdict dit si elle tient, comme `verifie('la
 
 > **Un signalement qui nomme ce qu'il a ECARTE vaut deux fois celui qui n'enonce que sa trouvaille** —
 > parce que le lecteur suivant ne refait pas la fausse piste.
+
+## E-256 — J'ECRIS AUSSI DANS L'ARBRE SERVI PENDANT LA MESURE, et je ne l'avais pas declare
+
+**Mesure du 2026-09-01 a 15:43 CEST, pendant le LOT 2, en appliquant enfin ma propre consigne de
+surveillance.**
+
+    docker-compose.yml:76   - ./legacy/version.txt:/var/www/html/version.txt:ro
+    ecritures sous legacy/ depuis 15:37:23   ->   legacy/version.txt   15:42:17   <- MOI
+
+**`legacy/version.txt` est monte dans le conteneur legacy : il EST servi.** Et je le bumpe **a chaque
+entree de CHANGELOG** — donc j'ai ecrit dans l'arbre servi deux fois pendant les 2 h 40, apres avoir
+exige de deux sessions qu'elles declarent leurs ecritures et fait ranger un correctif a l'une d'elles.
+
+**Verifie : sans consequence AUJOURD'HUI.** Aucune suite n'asserte sur la version du portail — les
+occurrences de « version » dans `tests/e2e/` visent l'agent Zabbix (`7.0`, `7.0.99-faux-v11`), pas le
+numero du produit. *Je le dis aussi net que j'aurais dit l'inverse.*
+
+> **Mais le regime est le meme que celui que je fais respecter** : *un garde qui mesure les ecritures
+> d'autrui doit annoncer les siennes* — la formule est de la session 7, et je ne l'appliquais pas a moi.
+
+**Ce qui a rendu ma propre ecriture invisible a mes yeux** : je surveillais `laravel/`, parce que
+l'incident venait de la. **`legacy/` est dans `CHEMINS_SERVIS` du garde, et pas dans ma commande de
+surveillance.** *Une surveillance calquee sur l'incident precedent ne couvre que l'incident precedent.*
+
+### Et ma commande de surveillance est plus BRUYANTE que le garde qu'elle double
+
+    find laravel -type f -newermt '2026-09-01 15:37:23'   ->  87 fichiers
+    dont laravel/storage/framework/{views,sessions,cache}  ->  86
+
+**`laravel/storage/` est ecrit en continu par l'application elle-meme** — vues compilees, sessions,
+cache, journaux. **Le garde de la session 7 exclut correctement `storage`** ; sa liste est juste, et
+c'est ma commande qui etait naive. *Une surveillance qui rend 87 lignes dont 86 de bruit ne sera pas
+lue — et c'est la meme fin qu'un garde contourne.*
+
+### Le geste, et il est a moi
+
+**Pendant un LOT, le bump de `legacy/version.txt` attend.** Les entrees de CHANGELOG peuvent s'ecrire —
+`docs/` et `CHANGELOG.md` ne sont montes nulle part — **mais le fichier de version est servi, et son
+bump se groupe apres la mesure.** *Le cout est nul : un numero calcule a l'instant de l'ecriture reste
+juste quelle que soit l'heure de cette ecriture.*
