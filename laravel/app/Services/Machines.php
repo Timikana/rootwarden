@@ -297,13 +297,38 @@ class Machines
             if ($ids === []) {
                 // AUCUNE MACHINE AU PERIMETRE : ce n'est pas « aucun scan », et
                 // ce n'est pas une erreur. L'ecran le dira comme tel.
-                return ['lisible' => true, 'aucun_scan' => true, 'date' => '', 'cve' => 0, 'critiques' => 0];
+                return ['lisible' => true, 'aucun_scan' => true, 'date' => '', 'cve' => 0, 'critiques' => 0, 'machine' => ''];
             }
 
-            $dernier = DB::table('cve_scans')
-                ->whereIn('machine_id', $ids)
-                ->orderByDesc('scan_date')
-                ->first(['scan_date', 'cve_count']);
+            /*
+             * ══ UN « DERNIER SCAN » QUI PEUT AVOIR ECHOUE N'EST PAS UNE DATE ══
+             *
+             * E-269. Ces deux valeurs n'avaient AUCUN filtre de statut : un scan
+             * `running` ou `failed` devenait « le dernier scan », avec sa date et
+             * son `cve_count` (souvent 0). L'ecran annoncait alors un constat la
+             * ou il n'y avait qu'une TENTATIVE.
+             *
+             * ── ET LA FAUTE D'ECHELLE, QUI EST PLUS LARGE QUE SA CONDITION ────
+             *
+             * `date` et `cve` viennent d'UNE ligne de scan, donc d'UNE machine.
+             * Le titre de section porte le parc : « 1458 CVE au dernier scan »
+             * se lit comme un total de parc alors que c'est le compte d'une
+             * seule machine. L'arbitrage demandait de nommer la machine « quand
+             * le perimetre en compte une seule » ; on la nomme DES QU'ON LA
+             * CONNAIT, parce que le motif invoque — la faute d'echelle — est
+             * PIRE quand le perimetre est grand, pas quand il vaut un. La
+             * condition contredisait sa propre raison.
+             *
+             * `critiques`, lui, somme le dernier scan complete de CHAQUE machine :
+             * c'est le seul des trois qui porte reellement sur le perimetre, et
+             * il ne nomme donc personne.
+             */
+            $dernier = DB::table('cve_scans as s')
+                ->leftJoin('machines as m', 'm.id', '=', 's.machine_id')
+                ->whereIn('s.machine_id', $ids)
+                ->where('s.status', 'completed')
+                ->orderByDesc('s.scan_date')
+                ->first(['s.scan_date', 's.cve_count', 'm.name as machine']);
 
             /*
              * ══ LE DERNIER SCAN COMPLETE PAR MACHINE, PAS TOUS LES SCANS ═════
@@ -340,12 +365,16 @@ class Machines
                 'aucun_scan' => $dernier === null,
                 'date'       => (string) ($dernier->scan_date ?? ''),
                 'cve'        => (int) ($dernier->cve_count ?? 0),
+                // Le NOM de la machine dont vient ce scan. Vide si inconnu : le
+                // libelle retombe alors sur sa forme sans nom, il ne rend pas
+                // « de  » avec un trou.
+                'machine'    => (string) ($dernier->machine ?? ''),
                 'critiques'  => (int) $critiques,
             ];
         } catch (\Throwable $e) {
             Log::error('[Machines::indicateursCve] lecture impossible : ' . $e->getMessage());
 
-            return ['lisible' => false, 'aucun_scan' => false, 'date' => '', 'cve' => 0, 'critiques' => 0];
+            return ['lisible' => false, 'aucun_scan' => false, 'date' => '', 'cve' => 0, 'critiques' => 0, 'machine' => ''];
         }
     }
 

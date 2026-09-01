@@ -2670,8 +2670,14 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 
 /* Sur un ecran etroit le texte passe a la ligne plutot que de se tronquer :
  * la place verticale ne manque pas, la place laterale si. */
+/* A 390 px, `flex-wrap` renvoyait le TEXTE a la ligne suivante des qu'il ne
+ * tenait pas — « ⚠ 1 » restait seul sur sa ligne, et un nombre separe de son
+ * libelle se lit comme un marqueur egare. `flex: 1 1 0` le laisse RETRECIR et
+ * se replier sur place : il reste a cote du nombre, seul le lien passe dessous.
+ * Vu a l'image a 390 px ; aucune assertion DOM ne distingue ces deux mises en
+ * page, elles ont exactement les memes noeuds. */
 @media (max-width: 640px) {
     .rw-alerte { flex-wrap: wrap; }
-    .rw-alerte__texte { overflow: visible; white-space: normal; }
+    .rw-alerte__texte { flex: 1 1 0; overflow: visible; white-space: normal; }
     .rw-alerte__lien { margin-left: 0; }
 }

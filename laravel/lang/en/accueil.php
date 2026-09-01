@@ -90,7 +90,10 @@ return [
 
     'ind_cve_titre' => 'Known vulnerabilities',
     'ind_cve_date' => 'last scan',
+    // E-269: see fr — both come from ONE machine.
+    'ind_cve_date_machine' => 'last scan of :machine',
     'ind_cve_nombre' => 'CVE at the last scan',
+    'ind_cve_nombre_machine' => 'CVE at the last scan of :machine',
     'ind_cve_critiques' => 'critical, latest scan per machine',
     'ind_cve_aucun_scan' => "No vulnerability scan has been run on the machines in your scope. This is not « zero CVE »: it is the absence of measurement.",
     'ind_cve_illisible' => "The scan history could not be read. This is not « no CVE » — no number shown here would be reliable.",
