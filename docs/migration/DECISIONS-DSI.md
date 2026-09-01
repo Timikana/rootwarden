@@ -2197,3 +2197,55 @@ Elle note que je raisonnais *« et s'il ne tient pas, combien coûte la trace »
 *« mon `finally` tient »*. **Les deux instances ci-dessus valident le critère par un autre chemin** : dans
 les deux cas le garde-fou tenait — les assertions étaient vraies, les comptes justes — **et le coût était
 dans ce qui restait après.** *La solidité d'un mécanisme ne dit rien du prix de son silence.*
+
+---
+
+## L'extension du critère, et elle est de la session 7 : **« que vaut le succès »**, pas seulement « que coûte l'échec »
+
+**2026-09-01, 13:12 UTC. Troisième instance de la classe, et la première ANTÉRIEURE à la mesure.**
+
+J'avais approuvé sa fixture sur *la lisibilité du dégât si le garde-fou lâche*. **Elle a relu sa propre
+suite sous cet angle et trouvé pire : un cas où le garde-fou TIENT et où le geste part pour rien.**
+
+    legacy/profile.php   grep -c "data-rw"  ->  0        (verifie par moi)
+    -> le selecteur devenait  "null input[type=password]"
+    -> erreur captee proprement, verdict lisible, `finally` declenche, restauration faite
+
+> **Le mécanisme tenait entièrement. Et le geste mutant serait parti pour rien** — un banc
+> potentiellement enfermé en échange d'**aucune** mesure.
+
+**Son extension du critère, et elle est meilleure que le critère :**
+
+> **Non pas « que coûte l'échec », mais « que vaut le succès ».** *Un geste dont la réussite ne mesure
+> rien ne se justifie pas par la propreté de son échec.*
+
+**C'est le pendant amont de ma propre règle**, et il manquait : j'évaluais le prix d'un dégât sans
+demander ce que le geste achetait. **Sur une fixture mutante, les deux questions se posent — et celle
+d'amont se pose en premier**, parce qu'elle peut supprimer le geste au lieu de le border.
+
+### Et la clause qui rend son abstention utilisable
+
+    INFO  cible : legacy — SANS OBJET : les ancres du formulaire ne sont pas relevees,
+          et le drapeau N'A PAS ETE POSE
+
+> **Un `SANS OBJET` qui ne dit pas ce qui n'a PAS eu lieu laisse chercher.** Sans la dernière clause, un
+> lecteur ne saurait pas si l'abstention est arrivée **avant ou après** l'`UPDATE` — donc s'il doit aller
+> vérifier l'état du banc.
+
+**C'est la règle du §8 — *un « aucun défaut » n'est éprouvable que si l'instrument peut NOMMER LA RAISON DE
+SON SILENCE* — appliquée à une ABSTENTION DE GESTE plutôt qu'à une absence de trouvaille.** Le silence n'y
+porte pas seulement sa raison : **il porte l'état du monde qu'il laisse derrière lui.**
+
+### Précondition vérifiée par moi avant tout lancement
+
+    id 14 rw-test-user   fpc = 0
+    id 15 rw-test-admin  fpc = 0
+    id 16 rw-test-super  fpc = 0
+
+**La précondition tient**, la commande de restauration est en tête du fichier, et la restauration est
+**assertée** — pas seulement tentée. *Les trois conditions que j'avais posées sont remplies avant le
+geste, et non constatées après.*
+
+**Et la prédiction du legacy est tombée juste** : **16 PASS / 0 FAIL**, exactement la valeur posée avant
+lancement. *Troisième fois aujourd'hui qu'elle l'écrit avant de mesurer, et la première où l'attente et la
+mesure concordent sans qu'il faille départager laquelle a tort.*
