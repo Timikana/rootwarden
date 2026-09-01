@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.131** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.132** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,58 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.132 — SEC-013 : l'ECRITURE moins gardee que la LECTURE sur la meme URL, et deux de mes affirmations refutees
+
+#### E-275 — `GET` et `POST /ssh-audit/policies` : deux vocabulaires sur un seul chemin
+
+    GET   ->  require_permission('can_audit_ssh') + require_machine_access
+    POST  ->  require_role(2)   seul
+
+**Un role 2 sans la permission ne peut PAS LIRE une politique et PEUT en ECRIRE une**, sur n'importe
+quelle machine. *Les croisements precedents (E-236) opposaient une PAGE a une ROUTE ; celui-ci oppose
+deux METHODES du meme chemin* — **et `RoutesBackend::correspond` compare des chemins, jamais des
+methodes : la borne ne peut pas etre posee a la passerelle.** Structurel, pas un oubli.
+
+**Consigne pour A1** : page en `role:1` + `perm:can_audit_ssh` (*surtout pas `role:2`, qui reproduirait le
+croisement*), et **aucun appel compose vers le POST** tant que SEC-013 vit — fermeture **par l'absence**.
+
+#### E-276 — « porteur inutilisable » etait refute depuis trois jours, et je le reconduisais
+
+Sa conclusion est **juste**, par un mecanisme **oppose** au sien. Elle avance que le portage *« controle
+une fois, a la connexion »* — **faux** : `ChangementMotDePasseExige.php:116-120` relit la base **a chaque
+requete**, applique sur le groupe (`web.php:93`).
+
+**Le vrai mecanisme** : `EXEMPTES = ['profil', 'profil.mot-de-passe']`, et **c'est la que vit le
+formulaire qui efface le drapeau.** *Le porteur efface son propre drapeau, sans administrateur.*
+
+> **Ce n'est pas que la garde ne verifie pas : c'est que sa propre exemption est ce qui rend le porteur
+> auto-armant.** Et l'exemption est **correcte** — sans elle la redirection bouclerait.
+
+Le middleware le dit lui-meme : *« ce garde ne protege pas une donnee : il impose une hygiene. »*
+**`force_password_change` n'a jamais ete une barriere de securite** — la lire comme telle etait l'erreur,
+la mienne comme la sienne, par deux chemins.
+
+**Qualification juste : porteur DORMANT A REVEIL AUTONOME.**
+
+> **Une conclusion refutee circulait trois jours apres dans la consigne de travail qui cadre le portage.
+> Elle ne voyage pas comme une hypothese : elle voyage comme un ETAT.** *Troisieme fois du jour qu'une de
+> mes affirmations non mesurees se reconduit par ma propre consigne de boucle — le vecteur n'est pas
+> l'oubli, c'est le texte que je recopie a chaque tour pour ne rien oublier.*
+
+#### E-277 — le decoupage d'`ssh_audit` EXISTAIT
+
+`MODULE-SSH-AUDIT.md:192` porte « ## 5. Le decoupage propose », A1 a A4 en tableau. Mes deux mesures
+etaient justes — 0 route, 0 commit — **et la conclusion portait sur le mauvais objet.**
+
+> **Mesurer les traces d'un decoupage n'est pas mesurer le decoupage.** Ce qui n'existait pas, c'est
+> l'**execution**.
+
+**Et l'axe qu'elle ajoute renverse l'ordre apparent du danger** : le §5 pese ce que chaque sous-lot
+TOUCHE ; le croisement de gardes pese **qui peut l'atteindre**. `A1` **7 croisements**, `A3` 5, `A4` 1.
+**A1 en porte plus qu'A3 et A4 reunis — le sous-lot qui ne touche rien est celui que le plus de comptes
+peuvent atteindre.** *L'ordre ne change pas ; ce qui change est qu'A1 n'est pas « le sous-lot sur », c'est
+celui ou la garde demande le plus de soin.*
 
 ### v1.38.131 — E-274 : un groupe sans filtre vise le parc entier, presente comme une LIGNE BLANCHE
 

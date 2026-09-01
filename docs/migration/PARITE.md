@@ -13396,3 +13396,120 @@ convention interdit.* Le formulaire viendra **avec** sa route.
 l'etat vide, l'i18n, l'entree de menu. **Aucune ecriture, aucun effet distant.** Les gestes non portes
 ouvrent un panneau qui **explique ce que le geste engage**, avec le lien vers l'ancien portail et son
 marqueur `↗` — la convention deja en place.
+
+## E-275 — SEC-013 : sur la MEME URL, l'ECRITURE est moins gardee que la LECTURE, et la passerelle ne peut pas les separer
+
+**Releve par la session 5 (`776d6db`), verifie par le Lead a 01:50 CEST.**
+
+    GET  /ssh-audit/policies  ->  require_api_key, require_permission('can_audit_ssh'), require_machine_access
+    POST /ssh-audit/policies  ->  require_api_key, require_role(2)
+
+**Un role 2 sans `can_audit_ssh` ne peut PAS LIRE une politique, et PEUT en ECRIRE une**, sur n'importe
+quelle machine — `require_machine_access` etant de surcroit inerte des le role 2.
+
+> **L'ecriture est moins gardee que la lecture, sur la meme URL.** *C'est la forme la plus nette du
+> croisement de gardes rencontree dans ce depot* — les precedentes (E-236) opposaient une PAGE a une
+> ROUTE ; celle-ci oppose deux METHODES du meme chemin.
+
+### Et la passerelle ne peut pas poser la borne — verifie
+
+`RoutesBackend::correspond` compare des **chemins**, jamais des methodes : **une seule entree de liste
+blanche couvre les deux.** *La borne ne peut donc pas etre posee la, et c'est structurel — pas un
+oubli de configuration.*
+
+**Correctif propose** : aligner le POST sur le GET. **Ce qu'il casse** : un role 2 sans la permission
+perdrait une ecriture *qu'il n'aurait jamais du avoir et qu'il ne peut pas relire*. **Session 4 applique,
+sous le gel — donc prepare, pas applique.**
+
+### Consigne pour le portage d'A1, et elle ferme PAR L'ABSENCE
+
+- **la garde de la page en `role:1` + `perm:can_audit_ssh`**, comme le legacy — *surtout pas `role:2`,
+  qui reproduirait le croisement cote portage* ;
+- **ne composer aucun appel vers `POST /ssh-audit/policies`** tant que SEC-013 n'est pas referme —
+  fermeture **par l'absence**, comme I1 sur `iptables` ;
+- **`/results` ne porte ni role ni permission** : sa seule borne est `require_machine_access`, inerte des
+  le role 2.
+
+## E-276 — « porteur inutilisable » etait REFUTE depuis trois jours, et je le reconduisais dans ma consigne de travail
+
+**Signale par la session 5, et sa conclusion est JUSTE — par un mecanisme OPPOSE a celui qu'elle donne.**
+
+Ma consigne portait, sur le compte de role 2 sans `can_audit_ssh` (id 77) : *« ecart reel, porteur
+inutilisable […] il devient utilisable au premier enrolement 2FA »*.
+
+**Ce qu'elle avance, et qui est FAUX** : *« `force_password_change` n'est pas une barriere sur le portage
+[…] le portage controle UNE FOIS, a la connexion. »* **Mesure :**
+
+    ChangementMotDePasseExige.php:116-120   DB::table('users')->where('id',$id)->where('active',1)
+                                              ->value('force_password_change')      A CHAQUE REQUETE
+    web.php:93                              applique SUR LE GROUPE
+
+**Le portage relit la base a chaque requete, exactement comme le legacy.** Sa caracterisation est
+inversee.
+
+### MAIS SA CONCLUSION TIENT, ET LE VRAI MECANISME EST PLUS INTERESSANT
+
+    ChangementMotDePasseExige.php:20   private const EXEMPTES = ['profil', 'profil.mot-de-passe'];
+    profil.blade.php                   8 ancres du formulaire de changement
+
+**Le middleware redirige vers `/profil`, qui est EXEMPT, et c'est la que vit le formulaire qui efface le
+drapeau.** *Le porteur efface donc son propre drapeau, sans aucun administrateur.*
+
+> **Ce n'est pas que la garde ne verifie pas : c'est que sa propre exemption est ce qui rend le porteur
+> auto-armant.** *Et l'exemption est CORRECTE — sans elle la redirection bouclerait et personne ne
+> pourrait jamais satisfaire l'exigence.*
+
+**Le middleware le dit lui-meme** : *« ce garde ne protege pas une donnee : il impose une hygiene. »*
+**Donc `force_password_change` n'a jamais ete une barriere de securite**, et le lire comme telle etait
+l'erreur — la mienne comme la sienne, par deux chemins differents.
+
+**Qualification juste : porteur DORMANT A REVEIL AUTONOME.** Ni occupe — `login_history` porte **0
+tentative** — ni inutilisable : son armement demande seulement que le detenteur legitime se connecte une
+fois et change son mot de passe, ce que le portail l'oblige a faire.
+
+### Le mode de propagation est le fait a retenir
+
+> **Une conclusion refutee circulait encore trois jours apres, dans la consigne de travail qui cadre le
+> portage. Elle ne voyage pas comme une hypothese : elle voyage comme un ETAT.**
+
+*C'est la troisieme fois du jour qu'une de mes affirmations non mesurees se reconduit par ma propre
+consigne de boucle* — apres « A1 a A3 portes » et « la page graylog est saine ». **Le vecteur n'est pas
+l'oubli : c'est le texte que je recopie a chaque tour pour ne rien oublier.**
+
+## E-277 — le decoupage d'`ssh_audit` EXISTAIT : j'avais mesure les traces d'EXECUTION
+
+**Correction de la session 5, verifiee : `MODULE-SSH-AUDIT.md:192`, « ## 5. Le decoupage propose », avec
+A1 a A4 en tableau, la reserve d'A3 et l'inexecutabilite d'A4.**
+
+Mes deux mesures etaient justes — **0 route Laravel, 0 commit « A1 — »** — et **la conclusion portait sur
+le mauvais objet.**
+
+> **Mesurer les traces d'un decoupage n'est pas mesurer le decoupage.** *Ce qui n'existait pas, c'est
+> l'EXECUTION.*
+
+**Meme forme que ma datation d'hier et que mon motif etroit d'E-244** : un instrument qui cherche l'effet
+d'une chose conclut sur la chose. **Et la session 5 n'a pas refait le §5** — sa propre regle le lui
+interdisait : *un inventaire refait de zero a deja contredit `MODULE-AUTH.md` sur deux points.*
+
+### L'axe qu'elle AJOUTE, et il renverse l'ordre apparent du danger
+
+Le §5 pese **ce que chaque sous-lot TOUCHE** — base, machine, parc. Le croisement de gardes est sur un axe
+**independant** : non pas *ce que le geste touche*, mais *qui peut l'atteindre*. **Mesures opposees :**
+
+    A1  base seule ........... 7 croisements       A3  ecrit sshd_config .... 5
+    A2  SSH lecture seule .... 0                   A4  tout le parc ......... 1
+                                                                    13 sur 18 entrees
+
+> **A1 en porte plus qu'A3 et A4 reunis. Le sous-lot qui ne touche rien est celui que le plus de comptes
+> peuvent atteindre.**
+
+**L'ordre ne change pas** — A1 reste le bon premier, pour la raison du §5 : *le seul endroit ou le chemin
+nominal de la garde est mesurable.* **Ce qui change est ce qu'A1 doit produire** : non pas « le sous-lot
+sur qu'on fait pour commencer », mais **celui ou la garde demande le plus de soin.**
+
+### Et la formule exacte des « cinq decorateurs inertes » est « inerte AU-DESSUS du role 1 »
+
+Elle ne l'a pas reprise telle quelle — *sa propre sonde avait annonce « 24 gardes sans objet » la ou il y
+en avait 1.* Verifie : `check_machine_access` rend `True` inconditionnellement des `role_id >= 2`, donc
+les cinq **mordent pour un role 1**. **La nuance porte : c'est elle qui rend A1 dangereux pour les roles 2
+et sans effet pour les roles 1.**
