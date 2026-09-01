@@ -170,13 +170,76 @@ questions : les tests n'ont aucun effet sur le service*).
 
 ---
 
-## 7. Ce que je n'ai PAS mesuré
+## 7. ⚠ Les cinq corps, LUS — et trois des cinq ne touchent AUCUNE machine
 
-- **les corps de `/detect`, `/restart`, `/group`, `/options`, `/rules`** : j'ai leurs gardes et la
-  nature de leur effet, pas leur composition de commande. C'est le premier travail du sous-lot qui les
-  portera, avec la question d'E-174 — *la valeur venue du client est-elle citée à l'INTÉRIEUR de la
-  commande ?* ;
-- **`_validate_xml`** (`wazuh.py:164`) : relevé, non mesuré. Un validateur XML mérite la question XXE,
-  et je ne l'ai pas posée ;
+Mesuré le **2026-09-01 à 23:32 CEST**, pour les panneaux de décision du portage : *ce qu'un panneau
+peut promettre est borné par ce que la route fait réellement.*
+
+| route | effet DISTANT | effet LOCAL | ce que le panneau peut promettre |
+|---|---|---|---|
+| `POST /detect` | **lecture SSH** — 4 commandes littérales (`test -x`, `wazuh-control info`, `grep` sur `client.keys`, `systemctl is-active`) | écrit `wazuh_agents` | « je relève l'état » — **honnête** |
+| `POST /restart` | `systemctl restart wazuh-agent` — **littéral** | audit | « l'agent redémarre » — **succès mesuré au code de retour** |
+| `POST /group` | **`systemctl restart` SEULEMENT** | écrit `group_name` en base | ⚠ **ne peut PAS promettre que le groupe est appliqué** |
+| `POST /options` | **AUCUN** | `wazuh_machine_options` | ⚠ **ne touche aucune machine** |
+| `POST`/`DELETE /rules` | **AUCUN** | `wazuh_rules` | ⚠ **ne touche aucune machine** |
+
+### 7.1 `set_group` — le groupe n'est JAMAIS transmis à la machine
+
+Les commentaires annoncent « Écrit le groupe dans `/var/ossec/etc/ossec.conf` ». **La seule commande
+exécutée est `systemctl restart wazuh-agent`**, un littéral. La valeur `group` ne quitte jamais
+RootWarden : elle est écrite en base par `_upsert_agent(group_name=group)` et **renvoyée telle quelle**
+au client (`{'success': True, 'group': group}`).
+
+**Ce qui a été corrigé, et c'est réel** : le code teste désormais le code de retour du redémarrage, et
+sur échec il refuse en disant *« le groupe n'a pas été appliqué, l'agent reste dans son groupe
+précédent »*. L'état persisté suit donc un verdict.
+
+> **Mais le verdict porte sur le REDÉMARRAGE, pas sur le groupe.** Un redémarrage réussi ne dit rien
+> de la classe où l'agent a atterri : il se ré-inscrit auprès du *manager*, qui lui assigne ce qu'il
+> veut. **Rien ne relit le groupe appliqué** — mesuré : aucune commande après le restart.
+>
+> **Le panneau de décision ne doit donc pas dire « le groupe sera X ».** Il peut dire « l'agent va
+> redémarrer et se ré-inscrire », et que RootWarden enregistrera X **comme intention**. Même famille
+> que le `forward_deployed = True` de `graylog/` — un état local écrit sur un geste dont l'effet
+> distant n'est pas vérifié — mais **d'un cran moins grave** : ici l'échec du redémarrage est
+> intercepté, là il ne l'était pas.
+
+### 7.2 `options` et `rules` — écrits par la page, lus par la page, appliqués nulle part
+
+Ni l'un ni l'autre n'ouvre de session SSH. Et **leurs seuls lecteurs sont les `GET` de la même page** :
+
+```
+wazuh_machine_options   ->  lu UNIQUEMENT par GET /wazuh/options   (:992)
+wazuh_rules             ->  lu UNIQUEMENT par GET /wazuh/rules     (:1080, :1098)
+```
+
+**Aucun chemin de déploiement ne les consomme.** Un exploitant règle des chemins FIM, une fréquence
+`syscheck`, l'active-response, édite des règles et des décodeurs — **et rien n'atteint jamais une
+machine.** C'est le motif « écrit et lu par personne » sous sa forme la plus visible : la page relit
+ce qu'elle a écrit, donc **l'écran confirme**, et la boucle se referme sans que rien ne soit appliqué.
+
+> Pour le portage : ces deux écrans sont des **brouillons**, pas des réglages. Le dire est une décision
+> de présentation, et elle n'a pas de coût — ce qui n'en a pas, c'est de laisser croire l'inverse.
+
+### 7.3 La question d'E-174 : fermée, et proprement
+
+**Aucune valeur venue du client n'atteint une commande distante dans ces cinq routes.** Relevé
+exhaustif des arguments d'`execute_as_root` entre `:690` et `:1180` : **quatre chaînes littérales**, et
+le seul `f"…"` est un **message d'audit**, pas une commande.
+
+`_GROUP_RE`, `_NAME_RE` et les validateurs d'options sont donc de la **défense en profondeur pure** —
+ils ne gardent aucun chemin d'injection, parce qu'il n'y en a pas. *Le dire évite qu'on les croie
+protecteurs*, et évite surtout qu'on les retire en les prenant pour du bruit.
+
+*(`_GROUP_RE` accepte un saut de ligne final, comme les autres validateurs ancrés du dépôt — §8 de
+`MODULE-FILTRAGE.md`. Sans objet ici : la valeur n'atteint aucune commande.)*
+
+---
+
+## 8. Ce que je n'ai PAS mesuré
+
+- **`_validate_xml`** (`wazuh.py:164`) : je ne l'ai pas mesuré. **Une autre session l'a fait depuis** —
+  `f6c3c84 docs(audit): wazuh — le cas du DSI est un faux positif, et XXE se referme`. Je le cite
+  comme sien et ne le reprends pas à mon compte ;
 - **la page n'a pas été ouverte**, ni au navigateur ni en HTTP ;
 - **aucune machine n'a été jointe**, aucun geste déclenché.
