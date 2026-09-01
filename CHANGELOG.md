@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.122** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.123** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,34 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.123 — E-250 : une ancre unique pour le succes ET l'echec, sur quatre ecrans
+
+**Quatre vues rendaient succes et erreur sous le MEME `data-rw="…-message"`.** Une suite qui y
+cherche « un message est-il rendu » passe donc au vert sur un echec.
+
+    profil.blade.php        profil-mdp-message      -> profil-mdp-succes    + profil-mdp-erreur
+    supervision.blade.php   superv-config-message   -> superv-config-succes + superv-config-erreur
+                            superv-profil-message   -> superv-profil-succes + superv-profil-erreur
+                            superv-reglages-message -> superv-reglages-succes + superv-reglages-erreur
+
+**Ancres separees plutot qu'une assertion sur la classe** : une suite qui doit lire une classe de
+PRESENTATION pour connaitre un etat METIER depend d'une decision de style. Ce depot l'a paye trois
+fois sur des classes purgees — dont une pastille a 1,06:1 dont le HTML etait juste.
+
+**Et sur la cinquieme suite, le correctif ne PRESERVE pas l'assertion : il la REPARE.**
+`go-page-supervision-reglages` asserte une **confirmation** (`/Test-Server-Debian/`). Avec l'ancre
+partagee, un message d'ERREUR nommant la machine la faisait deja passer au vert — et ce module
+exige de ses erreurs qu'elles nomment la machine. Elle doit donc viser le **succes seul**, pas les
+deux ancres : *une consigne uniforme sur cinq objets dont un est l'inverse des autres casse le
+cinquieme.*
+
+**Coordination** : les cinq suites appartiennent aux sessions 6 et 7, qui les avaient prealablement
+mises a viser les deux noms — vertes avant et apres. Le patch etait tenu **hors du depot** depuis
+le 27/08 pour ne pas rougir cinq suites pendant un LOT.
+
+Mesure : `/profil` et `/supervision` rendent **302** (la garde), pas 500 ; compilation Blade propre ;
+les quatre anciennes ancres sont a **0** occurrence, les huit neuves a **1** chacune.
 
 ### v1.38.122 — E-263 : `find` n'est pas findutils, et E-264 : `FENETRE SALE` a mordu a sa premiere utilisation
 

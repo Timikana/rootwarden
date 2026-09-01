@@ -20,11 +20,25 @@
     <section class="rw-note" data-rw="profil-mot-de-passe">
         <h2 class="rw-sous-titre">{{ __('profil.mdp_titre') }}</h2>
 
-        @if (session('mdp_message'))
-            <p class="rw-confirmation" data-rw="profil-mdp-message">{{ session('mdp_message') }}</p>
+{{-- ⚠ DEUX ANCRES, PARCE QUE DEUX ETATS OPPOSES ────────────────────────
+
+                 La confirmation et l'erreur partageaient `profil-mdp-message`.
+                 Les deux `@if` etant exclusifs, un seul `<p>` existe a la fois —
+                 donc l'etat EST mesurable, mais l'ancre ne le DISCRIMINE pas :
+                 une assertion sur « le geste a reussi » serait **verte sur un
+                 echec**.
+
+                 Ancres separees plutot qu'assertion sur la classe : *une suite
+                 qui doit lire une classe de PRESENTATION pour connaitre un etat
+                 METIER depend d'une decision de style*, et ce depot a paye trois
+                 fois une classe renommee ou purgee. Le jour ou `rw-erreur`
+                 change de nom, l'assertion passerait au vert sur un echec sans
+                 que rien ne bouge dans la page. --}}
+                    @if (session('mdp_message'))
+            <p class="rw-confirmation" data-rw="profil-mdp-succes">{{ session('mdp_message') }}</p>
         @endif
         @if (session('mdp_erreur'))
-            <p class="rw-erreur" data-rw="profil-mdp-message">{{ session('mdp_erreur') }}</p>
+            <p class="rw-erreur" data-rw="profil-mdp-erreur">{{ session('mdp_erreur') }}</p>
         @endif
 
         {{-- L'ENONCE DE LA POLITIQUE EST UN ENCART, PAS UNE AIDE EN PETITS
