@@ -657,6 +657,20 @@ declare -A REF_LARAVEL=(
   # legacy n'est pas commencee. *Une reference posee sur un etat incomplet
   # transforme un manque en etat normal.*
   [go-page-accueil]=41
+  # go-page-mot-de-passe — l'exigence de changement : un VERROU, pas un bandeau.
+  # 16 PASS / 0 FAIL, seule au repos, 15:21:41 -> 15:22:37 CEST (commit 4688259).
+  # Le POST est MESURE : `POST /profil/mot-de-passe -> 302`, message « Mot de passe
+  # actuel incorrect. », drapeau relu a 0 par la suite ET depuis l'exterieur.
+  # ⚠ CETTE SUITE ECRIT EN BASE — admise sur le precedent `go-auth-mot-de-passe`
+  # (qui mute le HACHAGE du meme compte, sur arbitrage de l'exploitant). Elle joue
+  # EN SEQUENCE, jamais en parallele d'une suite employant `rw-test-admin` : 61
+  # suites du LOT sont concernees, soit presque tout le lot. L'abattage est pose
+  # plus haut dans ce fichier.
+  # La prediction annonçait 15 : l'ecart d'une unite vient de l'assertion
+  # `form.checkValidity()` ajoutee dans le meme geste puis non comptee — *une
+  # prediction se fait sur l'etat mesure au moment de predire, et cette fois l'etat
+  # non relu etait le SIEN, ecrit trois minutes plus tot.*
+  [go-page-mot-de-passe]=16
   # `graylog/` sous-lot G2 : les trois gestes qui ouvrent une session SSH reelle.
   # 30 sur le portage contre 21 sur le legacy. L'ecart de NEUF se decompose
   # entierement, et chaque ligne est une correction :
@@ -1049,7 +1063,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-page-supervision-version go-page-supervision-editeur go-page-supervision-releve go-page-supervision-ecriture go-page-supervision-reglages go-page-supervision-reconf go-page-supervision-desinst go-page-supervision-deploiement go-auth-enrolement go-auth-mot-de-passe go-auth-step-up go-page-docker go-page-chatops go-page-maintenance
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
-  go-page-cle-plateforme go-page-pare-feu go-page-accueil
+  go-page-cle-plateforme go-page-pare-feu go-page-accueil go-page-mot-de-passe
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-fail2ban-f6

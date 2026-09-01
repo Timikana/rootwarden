@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.110** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.111** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,40 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.111 — E-250 : deux etats opposes sous la meme ancre, et `go-page-mot-de-passe` inscrite sur un POST MESURE
+
+#### E-250 — `profil-mdp-message` sert la confirmation ET l'erreur
+
+    profil.blade.php:24   class="rw-confirmation"  data-rw="profil-mdp-message"
+    profil.blade.php:27   class="rw-erreur"        data-rw="profil-mdp-message"
+
+Une assertion sur cette ancre ne peut mesurer qu'« un message est rendu », **jamais lequel** : une
+assertion sur « le changement a reussi » **serait verte sur un echec.** Classe d'E-244 et du trio
+`''`/`None`/`never_connected` — *un seul symbole pour deux etats opposes*, sauf qu'ici **c'est le point
+d'accroche du test qui ne discrimine pas.**
+
+**Precision que le releve n'avait pas** : les deux `@if` sont **mutuellement exclusifs**, donc un seul
+`<p>` existe a la fois et les classes **discriminent**. **C'est donc un defaut de NOMMAGE, pas un etat
+immesurable.** Deux issues, et la premiere est la bonne : dedoubler l'ancre, ou asserter sur la classe —
+*une suite qui doit lire une classe de presentation pour connaitre un etat metier depend d'une decision
+de style*, et ce chantier a deja paye ça sur les classes purgees.
+
+#### `go-page-mot-de-passe` : 16 PASS / 0 FAIL, et le POST est MESURE
+
+    POST /profil/mot-de-passe  ->  302
+    message rendu              ->  « Mot de passe actuel incorrect. »
+    drapeau apres              ->  0   relu par la suite ET depuis l'exterieur
+
+**Le middleware n'enferme pas** : le compte marque atteint le formulaire, le soumet, et sort par les
+deux chemins de deconnexion. Inscrite avec ses deux reserves : **elle ecrit en base** (admise sur le
+precedent `go-auth-mot-de-passe`, qui mute le hachage du meme compte) et **joue en sequence** — 61
+suites du LOT emploient ce compte.
+
+**Ecart de prediction assume : 15 annonce, 16 mesure.** L'assertion `form.checkValidity()` avait ete
+ajoutee dans le meme geste puis non comptee. *Deuxieme fois du jour pour cette forme, et cette fois
+l'etat non relu etait le SIEN, ecrit trois minutes plus tot.* **Un ecart signale ne destabilise pas une
+reference ; un ecart tu la rend suspecte.**
 
 ### v1.38.110 — E-249 : il y a deux gardes, et le premier est dans le navigateur
 
