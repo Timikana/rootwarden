@@ -109,6 +109,48 @@ Les onze parties archivées sont citées **23 fois**. Un relevé qui s'arrêtera
 sa péremption est **localisée** — dix chemins de page, dans onze sections dont le sujet a déménagé.
 Ce n'est pas « un quart à réécrire », c'est « dix lignes fausses et onze sections à re-situer ».
 
+### 3 bis — ⚠ Les routes SONDÉES, et l'inférence tombe sur deux d'entre elles
+
+*Une route comptée vivante sur l'enregistrement de son blueprint est une inférence, pas une
+observation.* Sondées le **2026-09-01 à 14:29 CEST**, **sur le service qui tourne**.
+
+**Le protocole, et pourquoi il n'exécute rien** : `@require_api_key` est le décorateur **le plus
+externe** de ces routes (vérifié fichier par fichier). Une requête **sans clé** est donc refusée
+**avant que le corps ne s'exécute**. Aucun `scan_all` n'a été déclenché.
+
+**⚠ Et le premier instrument était faux.** En `GET`, **aucune** route ne rendait 404 — pas même une
+que je croyais absente. Cause : `server.py:142` déclare `@app.route('/<path:path>', methods=['OPTIONS'])`
+pour le CORS. **Ce fourre-tout fait correspondre TOUT chemin**, donc une méthode non-OPTIONS rend
+**405 et jamais 404**. Un témoin l'a établi : `POST /inexistant_temoin` → **405**.
+
+> **Sans le témoin, j'aurais lu chaque 405 comme « enregistrée » et confirmé mon inférence.**
+> *Un instrument qui ne peut pas rendre le verdict négatif ne mesure rien* — et il l'aurait fait en
+> rendant exactement ce que j'attendais.
+
+**Résultat, témoin calibré** — `401`/`403` = la route existe, `405` = absente (seul le fourre-tout
+a répondu) :
+
+| route citée par la page | verdict |
+|---|---|
+| `/docker/results` · `/docker/scan` · `/docker/scan_all` | **existent** |
+| `/drift/results` · `/drift/scan` · `/drift/scan_all` | **existent** |
+| `/tasks/list` · `/tasks/stats` · `/maintenance/check` | **existent** |
+| `/chatops/command` | **existe** — et rend **403**, pas 401 |
+| **`/chatops/webhook`** | **N'EXISTE PAS** — 405, comme le témoin |
+| **`/backups/restore`** | **N'EXISTE PAS** — la vraie route est `/admin/backups/restore` (`admin.py:62`), qui existe |
+
+**Deux corrections à mon propre relevé :**
+
+1. **le compte était 12 routes distinctes, pas 13** — mon chiffre sommait les occurrences par partie ;
+2. **deux des douze n'existent pas.** `/chatops/webhook` désignait le passthrough PHP
+   (`legacy/chatops/webhook.php`, **archivé**), pas une route de backend ; et `/backups/restore` a
+   perdu son préfixe `/admin`. **La séparation devient donc 12 périmés / 10 vivants**, pas 10/13.
+
+**Et `/chatops/command` rend 403 au lieu de 401** — donc son garde **n'est pas** `require_api_key`.
+C'est la confirmation empirique du fait établi ailleurs : *« pas de décorateur » ne veut pas dire
+« pas de garde »* — cette route s'authentifie **dans son corps**, par signature. **Une affirmation
+d'autorisation dérivée des seuls décorateurs l'aurait déclarée non gardée.**
+
 ### La distinction que le DSI demandait
 
 *Une doc qui décrit un comportement peut être fausse ; une doc qui décrit une intention ne peut
@@ -177,8 +219,8 @@ plausible et fausse ne se signale pas d'elle-même.* Converti en heure locale, l
 - **les sections d'architecture** (`stack`, `crypto`, `session`, `reverse-proxy`, `ssl`, `migrations`,
   `hardening-v1-14`, `branding`, `preprod`, `troubleshooting`) : **non vérifiées**. Elles décrivent des
   choix, donc leur péremption ne se lit pas dans un `grep` ;
-- **les 13 routes backend citées** : je les compte vivantes parce que leurs blueprints sont
-  enregistrés, **pas parce que je les ai sondées** ;
+- ~~**les 13 routes backend citées**~~ — **SONDÉES le 2026-09-01 à 14:29 CEST, et deux étaient
+  fausses.** Voir §3 bis ;
 - **l'écart des 49 ancrages contre 48 sections** : relevé, non expliqué ;
 - **les clés `tip.*` de cette page** : non comptées — `documentation.php` n'inclut pas `howto_tip.php`
   (`grep -c` → **0**), donc il n'y a probablement rien, mais je ne l'ai pas établi par le catalogue ;
