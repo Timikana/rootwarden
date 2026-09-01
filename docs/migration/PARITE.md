@@ -12413,11 +12413,43 @@ je ne l'avais pas vu.
     abattre   toujours BOOLEEN, dans les DEUX branches, `false` quand la mesure n'a pas eu lieu
     propre    true / false / null — INFORME, et ne doit JAMAIS servir a decider
 
-**Verifie par le Lead** : les **sept** champs de decision sont bien dans les deux branches (`abattre`,
-`detail`, `fichiers`, `libelle`, `mesurable`, `propre`, `toujours`). *Le huitieme differe — `tete` d'un
-cote, `fenetre` de l'autre* : sans effet sur la decision, **mais un affichage qui lirait `v.fenetre`
-inconditionnellement rendrait `undefined` sur la branche non mesurable.** Signale au consommateur, qui
-est moi.
+**Verifie** : les **sept** champs sont bien dans les deux branches (`abattre`, `detail`, `fichiers`,
+`libelle`, `mesurable`, `propre`, `toujours`). **Il n'y a pas de huitieme.**
+
+### ⚠ ET MON « HUITIEME CHAMP » N'EXISTAIT PAS — deux sondes fausses de suite sur le meme fichier
+
+J'avais annonce un huitieme champ asymetrique, `tete` d'un cote et `fenetre` de l'autre, et propose de le
+gerer « chez moi ». **Mesure :**
+
+    grep -cE "^\s+tete:"     ->  0        grep -cE "^\s+fenetre:"  ->  0
+    l'origine de mes faux positifs :
+      :224   // `null` informe, `abattre: false` DECIDE — voir l'en-tete : on
+      :246   detail: `${tous.length} fichier(s) ecrit(s) pendant la fenetre : `
+
+**Mon motif `(\w+)\s*:` a capte un deux-points dans un COMMENTAIRE et un autre dans une CHAINE DE
+GABARIT.** *Sixieme fois du jour qu'une sonde a moi ne distingue pas le code du texte qui parle de code*
+— et la parade, retirer commentaires et chaines avant d'analyser, je l'avais appliquee **deux fois
+aujourd'hui sur des fichiers PHP** et pas ici sur du JS.
+
+**Ma seconde sonde etait fausse aussi** : `^\s+mesurable:` rend **1** au lieu de 2, parce qu'une branche
+ecrit `return { mesurable: false,` sur la meme ligne que l'accolade. *Deux motifs de suite, deux erreurs,
+sur le meme objet.*
+
+> **La consequence est pire que celle que j'avais decrite, et c'est la session 7 qui l'a nommee :
+> `v.fenetre` rendrait `undefined` dans les DEUX branches. Mon garde local aurait donc masque un
+> affichage systematiquement vide — et il l'aurait masque AVEC SUCCES.** J'aurais eu la colonne, elle
+> aurait ete blanche, et rien n'aurait alarme.
+
+> **Un signalement qui nomme la mauvaise branche fait construire une parade qui FONCTIONNE — et masque
+> le vrai defaut au lieu de le montrer.**
+
+**Troisieme relais imprecis de la journee a faire viser un objet innocent**, apres « debordement quand le
+titre est long » et « Version inconnue tronque ». *Les trois viennent des deux memes sessions, et les
+trois auraient declenche un correctif juste sur un objet sain.*
+
+**Consigne du proprietaire, retenue telle quelle** : `abattre` pour DECIDER, `detail` pour AFFICHER,
+**ne deriver rien**. Et j'arrete de sonder ce fichier : *apres deux sondes fausses sur le meme objet, une
+troisieme est de l'obstination — l'auteur l'a mesure, sa mesure est coherente.*
 
 *Le principe general vaut au-dela de ce module : **quand une donnee sert a decider, exporter la
 decision** — sinon chaque appelant reimplemente la derivation, et le premier qui se trompe le fait en
