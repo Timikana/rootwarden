@@ -50,11 +50,25 @@
              LE SECRET N'EST PAS LU EN BASE : le service rend un booleen de
              presence, et le champ part VIDE. Vide veut dire « ne change rien ». --}}
         <div id="panneau-config" data-rw="panneau-config" role="tabpanel">
-            @if (session('superv_message'))
-                <p class="rw-confirmation" data-rw="superv-config-message"
+{{-- ⚠ DEUX ANCRES, PARCE QUE DEUX ETATS OPPOSES ────────────────────────
+
+                 La confirmation et l'erreur partageaient `superv-config-message`.
+                 Les deux `@if` etant exclusifs, un seul `<p>` existe a la fois —
+                 donc l'etat EST mesurable, mais l'ancre ne le DISCRIMINE pas :
+                 une assertion sur « le geste a reussi » serait **verte sur un
+                 echec**.
+
+                 Ancres separees plutot qu'assertion sur la classe : *une suite
+                 qui doit lire une classe de PRESENTATION pour connaitre un etat
+                 METIER depend d'une decision de style*, et ce depot a paye trois
+                 fois une classe renommee ou purgee. Le jour ou `rw-erreur`
+                 change de nom, l'assertion passerait au vert sur un echec sans
+                 que rien ne bouge dans la page. --}}
+                        @if (session('superv_message'))
+                <p class="rw-confirmation" data-rw="superv-config-succes"
                    role="status">{{ session('superv_message') }}</p>
             @elseif (session('superv_erreur'))
-                <p class="rw-erreur" data-rw="superv-config-message"
+                <p class="rw-erreur" data-rw="superv-config-erreur"
                    role="alert">{{ session('superv_erreur') }}</p>
             @endif
 
@@ -179,10 +193,10 @@
              bascule — et la bascule en emet QUATRE, dont deux identiques. --}}
         <div id="panneau-profiles" data-rw="panneau-profiles" role="tabpanel" hidden>
             @if (session('superv_profil_message'))
-                <p class="rw-confirmation" data-rw="superv-profil-message"
+                <p class="rw-confirmation" data-rw="superv-profil-succes"
                    role="status">{{ session('superv_profil_message') }}</p>
             @elseif (session('superv_profil_erreur'))
-                <p class="rw-erreur" data-rw="superv-profil-message"
+                <p class="rw-erreur" data-rw="superv-profil-erreur"
                    role="alert">{{ session('superv_profil_erreur') }}</p>
             @endif
 
@@ -727,10 +741,10 @@
                         <p class="rw-aide rw-prose">{{ __('superv.reglages_description') }}</p>
 
                         @if (session('superv_reglages_message'))
-                            <p class="rw-confirmation" data-rw="superv-reglages-message"
+                            <p class="rw-confirmation" data-rw="superv-reglages-succes"
                                role="status">{{ session('superv_reglages_message') }}</p>
                         @elseif (session('superv_reglages_erreur'))
-                            <p class="rw-erreur" data-rw="superv-reglages-message"
+                            <p class="rw-erreur" data-rw="superv-reglages-erreur"
                                role="alert">{{ session('superv_reglages_erreur') }}</p>
                         @endif
 
