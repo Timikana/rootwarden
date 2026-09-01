@@ -178,6 +178,31 @@ export function plusNeufsQue(cible, depuisMs) {
  * Rend le verdict PRET A IMPRIMER pour une suite, sous la forme convenue :
  * ni PASS ni FAIL quand la mesure n'a pas eu lieu.
  *
+ * ══ LE CONTRAT DE RETOUR, ET POURQUOI IL PORTE `abattre` ══════════════════
+ *
+ * Premiere redaction : `propre` n'existait **que** dans la branche mesurable.
+ * Un appelant ecrivant `if (! v.propre) abattre()` recevait `undefined`, donc
+ * faux, **donc il abattait sur une ABSENCE de mesure** — 156 executions tuees
+ * parce que le chemin servi n'avait pas pu etre lu. Trou signale par le Lead
+ * avant de le consommer, et il avait raison.
+ *
+ * **Mais rendre `propre: null` NE SUFFIT PAS, et c'est mesure :**
+ *
+ *     { mesurable:false }                 if (!v.propre) -> ABAT   (faux positif)
+ *     { mesurable:false, propre:null }    if (!v.propre) -> ABAT ENCORE
+ *     { mesurable:false, abattre:false }  if (v.abattre) -> n'abat pas
+ *
+ * `null` est falsy : rendre l'intention explicite ne rend pas la consommation
+ * sure. C'est la meme famille que `''` chiffre en `sodium:…` et que `None` lu
+ * comme « absent » — *un champ absent, un champ faux et un champ nul se lisent
+ * pareil chez l'appelant.*
+ *
+ * D'ou **`abattre`** : le module rend LA DECISION, pas la donnee dont on la
+ * derive. Il est present dans les deux branches, toujours booleen, et il vaut
+ * **`false` quand la mesure n'a pas eu lieu** — on n'abat pas sur un silence.
+ * `propre` reste pour l'information (`true` / `false` / `null`), et ne doit
+ * jamais servir a decider.
+ *
  * Usage dans une suite :
  *
  *     const t0 = Date.now();
@@ -186,12 +211,22 @@ export function plusNeufsQue(cible, depuisMs) {
  *     const v = verdictFenetre(CIBLE, av, t0);
  *     if (v.mesurable) verifie(v.libelle, v.propre, v.detail, v.toujours);
  *     else             constate(v.libelle, v.detail);
+ *
+ * Usage dans un runner :
+ *
+ *     if (v.abattre) { … }        // JAMAIS `if (! v.propre)`
  */
 export function verdictFenetre(cible, avant, departMs) {
     const apres = empreinteServie(cible);
     const ecart = ecartServi(avant, apres);
     if (ecart.total === -1) {
         return { mesurable: false,
+            // `null` informe, `abattre: false` DECIDE — voir l'en-tete : on
+            // n'abat pas un LOT sur une absence de mesure.
+            propre: null,
+            abattre: false,
+            fichiers: [],
+            toujours: '',
             libelle: `l'arbre servi de ${cible} n'a pas bouge pendant la mesure`,
             detail: 'SANS OBJET — le chemin servi n\'a pas pu etre lu, ni au depart ni a l\'arrivee' };
     }
@@ -205,6 +240,8 @@ export function verdictFenetre(cible, avant, departMs) {
     return {
         mesurable: true,
         propre: tous.length === 0,
+        // La DECISION, jamais derivee par l'appelant.
+        abattre: tous.length > 0,
         libelle: `l'arbre servi de ${cible} n'a pas bouge pendant la mesure`,
         detail: `${tous.length} fichier(s) ecrit(s) pendant la fenetre : `
             + `${tous.slice(0, 5).join(', ')}${tous.length > 5 ? ' …' : ''}`
