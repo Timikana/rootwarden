@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.98** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.99** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,70 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.99 — nommer l'etat avant de choisir une valeur : migration 064 et le geste d'E-237
+
+**Deux livraisons d'une meme decision**, et une seule fenetre de signature : *ce qui coute n'est pas le
+nombre de fichiers, c'est le nombre de fenetres.*
+
+## Migration 064 — un troisieme etat pour `supervision_agents` (ECRITE, NON APPLIQUEE)
+
+`supervision_agents` est un inventaire **par presence** : une ligne existe, ou elle n'existe pas.
+Apres un geste partiel, les deux seules ecritures possibles **affirment** quelque chose de faux —
+garder la ligne affirme un agent present, la supprimer affirme qu'il n'y a rien. **Troisieme
+occurrence du motif**, apres `machines.service_account_deployed` et `wazuh_agents.status`.
+
+**Mesure du 2026-09-01** : aucune colonne de statut, **0 ligne**. La fenetre se ferme au premier agent
+enregistre — meme argument qu'E-222 pour 063.
+
+**Le vocabulaire est DERIVE, pas invente.** `wazuh_agents.status` porte deja les cinq valeurs qui
+decrivent un agent sur une machine, et `unknown` y dit exactement « je ne sais pas ce qu'il y a sur
+cette machine ». On reprend la **meme enumeration** et le **meme defaut** : *deux tables soeurs qui
+decrivent le meme objet ne doivent pas avoir deux vocabulaires.*
+
+Et `never_connected` comme defaut est juste ici : le seul `INSERT` de `supervision.py` **ne pose pas
+cette colonne**, donc chaque deploiement prendra le defaut, et un agent qui vient d'etre installe n'a
+effectivement pas encore rendu compte.
+
+**Elle ne change aucun comportement** — rien n'ecrit `unknown` aujourd'hui. *Nommer l'etat avant de
+choisir une valeur*, et une colonne posee sur une table vide ne casse rien.
+
+**Controles** : 0 point-virgule dans le fichier (commentaires compris), une seule instruction a plat,
+syntaxe validee par `PREPARE`/`DEALLOCATE` qui analyse **sans executer**, idempotence par la tolerance
+errno 1060. **Verifie apres ecriture** : la colonne est absente de la base, et ni 063 ni 064 ne
+figurent dans `schema_migrations`.
+
+## E-237 — l'inventaire de `wazuh/uninstall` suit le verdict, plus l'intention
+
+`_upsert_agent(status='never_connected')` s'executait **inconditionnellement, treize lignes avant que
+`paquet_retire` n'existe**. Sur RHEL et SUSE — ou `apt-get purge` n'existe pas — l'etat reel est
+**paquet installe, configuration partie, et un inventaire annoncant qu'il n'y a rien**. Faux **du cote
+qui masque** : personne ne va chercher un paquet dont l'inventaire nie l'existence.
+
+**E-225 avait corrige le verdict et laisse l'etat persiste**, si bien que les deux se contredisaient.
+*Un correctif partiel ne laisse pas le systeme a mi-chemin : il le rend INCOHERENT* — et une
+incoherence interne coute plus cher qu'un mensonge unanime, parce qu'elle fait douter de la piece qui
+dit vrai.
+
+**Pourquoi `unknown` et pas l'une des deux autres.** Ecrire seulement en cas de reussite laisserait
+`active`, avec identifiant et version, sur une machine videe — **un agent mort annonce comme
+fonctionnel**, pire. Les deux options **affirment** quelque chose de faux ; **`unknown` n'affirme
+rien**, et c'est la seule des trois qui ne mente pas.
+
+Ce n'est pas une valeur inventee : l'ENUM la porte, le backend l'ecrit deja quand un statut systemd
+n'est pas reconnu, et l'interface la rend en badge gris **avec un repli** pour tout statut non mappe.
+
+**Elle est honnete mais FAIBLE, et il faut le savoir** : elle ne dit pas *qu'un paquet demeure*. Aucune
+autre route ne peut agir dessus, seulement s'abstenir de conclure — et *s'abstenir de conclure vaut
+mieux que conclure faux*. Le nom complet demande une colonne : arbitrage d'exploitant.
+
+**⚠ SON EFFET EST NUL JUSQU'AU REDEMARRAGE.** `backend/**.py` est lu au demarrage du processus, et le
+conteneur tourne depuis le **2026-08-27 · 12:28 UTC**. Qui poserait ce correctif puis mesurerait le
+comportement actuel conclurait qu'il ne marche pas — c'est le piege d'E-152, cinq suites vertes.
+
+**Reserve pour le portage** : il n'existe **aucun `laravel/lang/*/wazuh.php`**, ni `fr` ni `en`. Le
+libellé `status_unknown` devra etre cree au moment du portage, sinon l'ecran affichera son identifiant
+en clair.
 
 ### v1.38.98 — E-241 est CLOS (trois de mes quatre hypotheses etaient fausses), et E-243 : une alerte sur une requete qui ne peut pas s'executer
 
