@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-09-01** (23:30 CEST), version `1.38.119`.
+Dernière mise à jour : **2026-09-02** (01:50 CEST), version `1.38.133`.
 
 ---
 
@@ -96,14 +96,28 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 | entrée | inventaire | routes Laravel | ce qui reste | **bloqué par** |
 |---|---|---|---|---|
+| ~~`groups`~~ | `MODULE-GROUPS.md` | **`/groupes`** — R1 livré `8cf1d26` | R2 : création, suppression, actions de masse | ✅ **ENTRÉE BASCULÉE** |
 | `remote_users` | `MODULE-REMOTE-USERS.md` | **4** (`/comptes-distants`) | les **5 gestes distants** | **RIEN — portable** |
-| `iptables` | `MODULE-FILTRAGE.md` | **4** (`/pare-feu`), I1→I4 livrés | **I5** seul | **arbitrage du port SSH** |
-| `ssh_audit` | `MODULE-SSH-AUDIT.md` | **0** | tout | **RIEN — portable** |
+| `iptables` | `MODULE-FILTRAGE.md` | **4** (`/pare-feu`), I1→I4 | **I5** seul | **arbitrage du port SSH** |
+| `ssh_audit` | `MODULE-SSH-AUDIT.md` §5 (A1→A4) | **0** | A1 est prêt | **RIEN — portable** |
 | `wazuh` | `MODULE-WAZUH.md` | 0 — *catalogues posés* | vue, script, route | **E-238** pour *mesurer* |
-| `groups` | `MODULE-GROUPS.md` | **0** | tout | **RIEN — portable** |
-| `documentation` | `MODULE-DOCUMENTATION.md` | **0** | structure + dérivations | **RIEN** — console arbitrée non portée |
+| `documentation` | `MODULE-DOCUMENTATION.md` | **0** | structure + dérivations | **RIEN — portable** |
 
-### ⚠ QUATRE DES SIX SONT PORTABLES MAINTENANT, SANS AUCUNE SIGNATURE
+### ✅ `groups` EST PORTÉ — 27/32, et R1 a fermé la moitié visible d'E-274
+
+    Navigation.php:107   'cle' => 'groups' … 'route' => 'groupes'      <- BASCULEE
+    GET /groupes         role:2 + perm:can_admin_portal
+    i18n                 FR 39 / EN 39, parite
+    8cf1d26  01:28       « R1 — la page en LECTURE, et le parc entier n'est plus une ligne blanche »
+
+**R1 ne porte aucune écriture ni aucun effet distant.** Les gestes non portés — création, suppression,
+les deux actions de masse — **ouvrent un panneau qui explique ce que le geste engage**, avec le lien vers
+l'ancien portail et son marqueur `↗`. *Aucun bouton inerte : le formulaire de création viendra AVEC sa
+route, en R2.*
+
+### ⚠ TROIS DES CINQ RESTANTES SONT PORTABLES MAINTENANT
+
+ SANS AUCUNE SIGNATURE
 
 **Seuls `iptables` (I5) et `wazuh` sont réellement bloqués** — et `wazuh` ne l'est que pour *mesurer* :
 la vue et le script peuvent s'écrire, c'est leur vérification qui attend le redémarrage.
