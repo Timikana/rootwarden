@@ -1430,16 +1430,48 @@ ne pas le compter. **Ce qu'elle a mesuré à la place est ce qui sert** — voir
 Onze sections décrivent une partie **déjà archivée**, citées **23 fois**. *Un relevé qui s'arrêterait là
 annoncerait « 23 références mortes ».* Séparation faite :
 
-    chemin de PAGE   (/drift/, /docker/…)                 10   PERIME — 404 aujourd hui
-    route de BACKEND (/drift/scan, POST /docker/scan…)     13   VIVANTE — toujours vraie
+    chemin de PAGE   (/drift/, /docker/…)                 12   PERIME
+    route de BACKEND (/drift/scan, POST /docker/scan…)     10   VIVANTE — sondee, pas inferee
 
 **Les blueprints des parties archivées restent enregistrés** : leurs routes répondent, et la page portée
 les appelle. *Tout `/partie/` n'est pas une page* — la distinction qui protège déjà `LiensLegacy`
 d'écraser `/maintenance/check`.
 
-> **La péremption est LOCALISÉE : dix lignes fausses et onze sections à re-situer, pas un quart à
+> **La péremption est LOCALISÉE : douze lignes fausses et onze sections à re-situer, pas un quart à
 > réécrire.** Et c'est la deuxième fois aujourd'hui qu'un compte brut alarme d'un facteur deux ou plus —
 > après mes 151 qui étaient 8.
+
+> **⚠ CHIFFRE CORRIGÉ le 2026-09-01 à 12:31 UTC.** J'avais inscrit **10 / 13** sur une inférence — « les
+> blueprints sont enregistrés, donc les routes répondent ». **Sondé, c'est 12 / 10** : deux des douze
+> n'existent pas (`/chatops/webhook` désignait un passthrough PHP archivé, `/backups/restore` avait perdu
+> son préfixe — la vraie est `/admin/backups/restore`, `admin.py:62`), et le compte de 13 sommait des
+> occurrences au lieu de routes distinctes.
+>
+> **La conclusion tient et elle est d'un cran plus large** : douze lignes fausses, pas dix. *Une inférence
+> qui va dans le sens rassurant se corrige vers le haut.*
+
+### ✅ ET LA BORNE DES TROIS COUCHES A MAINTENANT UN CAS, TROUVÉ PAR ACCIDENT
+
+    POST /chatops/command   ->  403, PAS 401
+    backend/routes/chatops.py:28   la route existe ; sa docstring dit « commande Slack »
+                                   -> elle s authentifie DANS SON CORPS, par signature
+
+> **Une référence d'API dérivée des SEULS décorateurs aurait déclaré `/chatops/command` non gardée.**
+> La borne que j'ai posée n'est pas théorique : **elle a un cas, et il est dans le fichier qu'on
+> remplace.**
+
+**Et le défaut d'instrument qui a failli valider l'inférence mérite d'être gardé** :
+
+    server.py:142   @app.route('/<path:path>', methods=['OPTIONS'])   <- fourre-tout CORS
+                    -> TOUT chemin correspond, donc une methode non-OPTIONS rend 405, JAMAIS 404
+
+**En `GET`, aucune route ne rendait 404 — pas même les absentes.** *Un instrument qui ne peut pas rendre
+le verdict négatif ne mesure rien*, et celui-là rendait **exactement ce qu'on attendait**.
+
+**Ce qui l'a attrapé est un TÉMOIN** — `POST /inexistant_temoin` → 405 — **et non de la vigilance.**
+*Une sonde qui rend « aucun défaut » doit être éprouvée sur un cas où elle devrait en trouver un* : c'est
+la règle du §8, et c'est la première fois aujourd'hui qu'elle est appliquée **avant** de conclure plutôt
+qu'après avoir été prise en défaut.
 
 **Et le critère que j'avais donné se vérifie** : les 13 routes décrivent un **comportement** — chacune se
 sonde. Les 10 chemins décrivaient un **emplacement**, qui a bougé : *périmés, pas faux.* Les sections
