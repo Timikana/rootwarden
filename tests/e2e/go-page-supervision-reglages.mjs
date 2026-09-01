@@ -423,12 +423,19 @@ try {
          * d'erreur de ce module nomment la machine : la suite l'exige d'eux
          * ailleurs. Le dedoublement d'E-250 ne preserve donc pas cette
          * assertion, il la REPARE — a condition de viser le SUCCES, jamais les
-         * deux. `-message` reste le temps de la transition, et se retire apres.
+         * deux.
+         *
+         * ⚠ **`superv-reglages-erreur` N'EST VISEE PAR AUCUNE SUITE, ET C'EST
+         * VOULU.** Si vous trouvez cette ancre « non couverte » dans un
+         * inventaire, ce n'est pas un trou : lui donner un lecteur ICI rendrait
+         * a cette assertion la capacite de passer au vert sur un echec. **Le
+         * defaut reviendrait par la porte du soin.** Un zero qui n'explique pas
+         * pourquoi il est zero se fait completer par quelqu'un de bien
+         * intentionne — d'ou cette phrase, a cote du selecteur, qui est le seul
+         * endroit que lira forcement celui qui voudra completer.
          */
         const confirme = await page.evaluate(() =>
-            document.querySelector(
-                '[data-rw="superv-reglages-succes"], [data-rw="superv-reglages-message"]'
-            )?.textContent.trim() || '');
+            document.querySelector('[data-rw="superv-reglages-succes"]')?.textContent.trim() || '');
         verifie('l\'enregistrement est CONFIRME a l\'ecran, en nommant la machine',
             /Test-Server-Debian/.test(confirme), `« ${confirme.slice(0, 80)} »`);
 

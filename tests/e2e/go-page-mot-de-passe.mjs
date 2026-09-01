@@ -87,9 +87,10 @@ const C = CIBLE === 'laravel'
     ? { connexion: '/connexion', profil: '/profil', ailleurs: '/cles-ssh',
         formulaire: '[data-rw="profil-mdp-form"]',
         soumettre: '[data-rw="profil-mdp-enregistrer"]',
-        // TRANSITION E-250 : les deux noms — cette suite mesure qu'UN
-        // message est rendu, jamais lequel, donc il lui faut les trois.
-        message: '[data-rw="profil-mdp-message"], [data-rw="profil-mdp-succes"], [data-rw="profil-mdp-erreur"]',
+        // E-250 : LES DEUX ancres. Cette suite mesure qu'UN message est
+        // rendu — jamais lequel — parce que ce qu'elle etablit est que le
+        // controleur a ete ATTEINT, pas qu'il a accepte.
+        message: '[data-rw="profil-mdp-succes"], [data-rw="profil-mdp-erreur"]',
         deconnexion: 'form[action$="/deconnexion"] button',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', profil: '/profile.php', ailleurs: '/iptables/',
@@ -383,12 +384,19 @@ try {
          * message n'est pas un defaut de l'ecran — il n'y a rien a afficher.
          * Une assertion qui accuserait l'ecran ici viserait le mauvais objet.
          *
-         * ⚠ ET L'ANCRE EST AMBIGUE, ce qui borne ce qu'on peut en conclure :
-         * `profil.blade.php:24` et `:27` portent TOUTES DEUX
-         * `data-rw="profil-mdp-message"` — l'une pour la confirmation, l'autre
-         * pour l'erreur. Deux etats OPPOSES sous la meme ancre : on mesure donc
-         * qu'un message est rendu, jamais LEQUEL. C'est la classe d'E-244, et
-         * c'est signale plutot que contourne.
+         * ⚠ ON MESURE QU'UN MESSAGE EST RENDU, JAMAIS LEQUEL — ET C'EST VOULU
+         * ICI. Ce que cette assertion etablit est que le controleur a ete
+         * ATTEINT, pas qu'il a accepte : le refus est justement ce qu'on
+         * attend. D'ou les DEUX ancres.
+         *
+         * L'ancre etait AMBIGUE jusqu'a E-250 : `profil.blade.php` portait
+         * `profil-mdp-message` sur la confirmation ET sur l'erreur — deux etats
+         * opposes sous un nom commun, la classe d'E-244. Elle est dedoublee
+         * depuis (`succes` / `erreur`), et cette suite prend les deux DELIBEREMENT.
+         * **Une suite qui asserterait une REUSSITE ne le pourrait pas** : voir
+         * `go-page-supervision-reglages`, ou le meme dedoublement a fait passer
+         * l'assertion du couple d'ancres au succes SEUL, parce qu'elle jugeait
+         * au lieu de constater.
          */
         if (posts.length === 0) {
             constate('message de refus',
