@@ -221,6 +221,37 @@ désigne son propre remède.
   contenant que la machine 2. Un groupe **dynamique** résout ses membres **au moment du
   clic** : l'ensemble visé n'est pas lisible dans la ligne du groupe, et rien n'empêche
   la production d'y tomber ;
+- **Une mutation ne se juge pas au rouge qu'elle produit, mais à la LISTE DE CE QUI EST
+  RESTÉ VERT.**
+
+  Mesuré par la session 7 le 2026-09-01, sur une sonde qui rendait la route d'historique
+  injoignable. Premier temps : deux FAIL, code de sortie 1 — *la suite mord sur le défaut
+  qu'elle prétend couvrir*, et **c'était assez pour se rassurer**. Second temps, en
+  regardant ce qui n'avait pas bougé :
+
+      PASS  un etat d'historique est rendu  — 141 caracteres
+      PASS  le message ne porte aucun jeton non substitue
+      PASS  table vide : aucune ligne d'historique n'est rendue
+      INFO  panneau : « Historique illisible — L'historique n'a pas pu etre lu… »
+
+  Le panneau annonçait **l'échec de lecture** et les trois assertions le trouvaient
+  conforme : non vide, sans jeton, sans ligne. **Seul le réseau rougissait.** Une route
+  rendant `200` avec `success: false` aurait donc laissé la suite **entièrement verte sur
+  un défaut** — et c'est la famille la plus peuplée du backend, pas une hypothèse d'école.
+
+  **Et l'en-tête du fichier annonçait déjà la distinction**, écrite avant le code : *« les
+  deux issues rendent un panneau non vide ; seul leur titre les sépare »*. Elle a été
+  refaite quinze lignes plus bas, dans un fichier relu trois fois.
+
+  > **Une intention écrite en commentaire n'est pas une mesure.** La relecture ne l'avait
+  > pas vue ; la mutation, oui — mais seulement en lisant les verts.
+
+  Conséquence sur la forme des preuves : un rapport de mutation qui dit « N FAILED » ne
+  prouve rien. Il doit **énumérer les assertions restées vertes** et, pour chacune,
+  répondre à *pourquoi celle-ci n'aurait-elle pas dû tomber ?* — c'est le même défaut que
+  compter des `def test_` en croyant compter des cas : **un nombre qui ressemble à une
+  couverture** ;
+
 - **Une assertion doit inclure l'existence de sa FENÊTRE D'OBSERVATION, pas seulement
   celle de son objet.**
 
