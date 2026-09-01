@@ -2171,6 +2171,57 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.108 — un titre long poussait le contenu hors du bandeau, et deux diagnostics divergeaient sur le symptôme
+
+On m'avait transmis « le sélecteur de langue perd `FR` en 390 », puis la rectification « non : `FR` et
+`EN` sont visibles, c'est le titre qui passe sur deux lignes et pousse le bouton hors du bandeau », avec
+la consigne de **ne pas chercher dans une media query**.
+
+#### La cause, et pourquoi elle rend les deux observations compatibles
+
+    .rw-entete          display: flex, SANS flex-wrap, sans overflow
+    .rw-entete__titre   ni min-width: 0, ni gestion de debordement
+
+Un élément flex a `min-width: auto` par défaut : **il ne peut pas rétrécir sous sa largeur de contenu
+minimale.** Selon les largeurs, la même cause produit **deux symptômes différents** :
+
+- le titre se replie sur deux lignes, le bandeau grandit, et ce qui est centré verticalement se décale ;
+- ou la ligne flex **déborde à droite**, et le contenu le plus à droite sort de l'écran.
+
+**C'est ce qui a fait diverger deux diagnostics sur un seul défaut.** Les quatre propriétés posées
+ferment les deux : le titre peut rétrécir, ne se replie plus, et se termine par des points de
+suspension. **La justesse du correctif ne dépend donc pas de savoir lequel des deux symptômes on a
+observé** — c'est ce qui le rend posable avant que le désaccord soit tranché.
+
+#### Et ma correction précédente n'était pas au mauvais endroit
+
+Le message de rectification disait de ne pas chercher dans une media query. **Mon correctif d'il y a une
+heure ne venait pas du symptôme mais d'une lecture du CSS**, et cette lecture tient. Vérifié dans
+l'état **avant** `9422ab5` :
+
+    .rw-entete__compte span          -> specificite (0,1,1)
+    .rw-langues__actif               -> (0,1,0)   aucun `display` declare
+    .rw-badge                        -> aucun `display` declare, nulle part
+
+La règle large **battait** donc les deux, et rien ne les rétablissait sauf `.rw-langues` (le conteneur,
+pas son contenu). À ≤ 900 px, `FR` **et** la pastille de notification étaient nécessairement masqués.
+
+**Que les deux boutons soient visibles aujourd'hui est ce que le correctif a produit**, et non la preuve
+qu'il n'y avait rien. *Une observation faite après un correctif ne réfute pas le correctif.* Les deux
+défauts sont réels et distincts : l'un vient d'un sélecteur trop large, l'autre d'un élément flex qui ne
+peut pas rétrécir.
+
+#### Ce que je ne touche pas
+
+« Version inconnue » **reste en attente d'une seconde mesure**, comme demandé — sur un titre court, pour
+savoir si son débordement vient de la même cause ou de la marge du pied que j'ai déjà corrigée. *Deux
+mesures évitent deux correctifs mal ciblés.*
+
+`rw.css` est partagé — signalé. **Le rendu n'a pas été regardé** : le banc est tenu par une autre
+session, et ces corrections se jugent à l'image.
+
+---
+
 ### v1.38.107 — deux défauts vus à l'image, une cause commune, et un troisième que personne n'avait relevé
 
 Signalés sur captures par la session 7 : « Version inconnue » **collé au bord droit** en 1920 et 1400, et

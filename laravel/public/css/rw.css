@@ -446,7 +446,38 @@ body {
     z-index: 5;
 }
 
-.rw-entete__titre { font-weight: 600; font-size: 15px; }
+/* ── UN TITRE LONG NE POUSSE PLUS RIEN HORS DU BANDEAU ────────────────────
+ *
+ * `.rw-entete` est `display: flex` SANS `flex-wrap` et sans `overflow`, et
+ * `.rw-entete__titre` n'avait ni `min-width: 0` ni gestion de debordement. Or un
+ * element flex a `min-width: auto` par defaut : **il ne peut pas rétrécir sous
+ * sa largeur de contenu minimale.**
+ *
+ * Selon les largeurs, la meme cause produit DEUX symptomes differents — et c'est
+ * ce qui a fait diverger deux diagnostics sur ce defaut :
+ *
+ *   - le titre se replie sur deux lignes, le bandeau grandit, et ce qui est
+ *     centre verticalement se decale ;
+ *   - ou la ligne flex DEBORDE a droite, et le contenu le plus a droite
+ *     (deconnexion, selecteur de langue) sort de l'ecran.
+ *
+ * Les trois proprietes ci-dessous ferment les deux : le titre peut retrecir, il
+ * ne se replie plus, et il se termine par des points de suspension. **La
+ * justesse du correctif ne depend donc pas de savoir lequel des deux symptomes
+ * on a observe** — c'est ce qui le rend posable avant que le desaccord soit
+ * tranche.
+ *
+ * `title` n'est pas ajoute sur l'element : le titre tronque est deja celui de
+ * l'onglet du navigateur, donc l'information n'est pas perdue.
+ */
+.rw-entete__titre {
+    font-weight: 600;
+    font-size: 15px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 /* Le compte et la deconnexion vivent DANS L'EN-TETE, la ou on les cherche —
    et non en pied de barre laterale, ou ils bornaient la liste. */
