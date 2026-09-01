@@ -91,8 +91,7 @@ d'une couche plus courte, **pas un trou**.
 | `/wazuh/install` | **session SSH** : ajoute `packages.wazuh.com` en dépôt APT/YUM **sur la machine**, importe sa clé GPG dans `/usr/share/keyrings/wazuh.gpg`, `apt-get install` | partiellement — voir E-225 |
 | `/wazuh/install_all` | même geste, **sur plusieurs machines** | idem |
 | `/wazuh/uninstall` | `apt-get purge -y wazuh-agent \|\| true && rm -rf /var/ossec` | — |
-| `/wazuh/detect`, `/restart`, `/group`, `/options` | sessions SSH, lectures et réglages | — |
-| `/wazuh/rules*` | base seule | — |
+| `/wazuh/detect`, `/restart`, `/group`, `/options`, `/rules*` | **voir le §7** — trois des cinq ne touchent aucune machine | — |
 
 > **`install` fait émettre CHAQUE MACHINE GÉRÉE vers Internet**, et lui fait faire confiance à un
 > dépôt tiers de façon permanente. C'est un effet sortant d'une nature que le chantier n'avait pas
