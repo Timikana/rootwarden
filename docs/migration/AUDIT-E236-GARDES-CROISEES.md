@@ -189,7 +189,7 @@ base pendant ce contrôle laisse passer un compte sous
 `force_password_change`. Classe connue : *le commentaire affirme plus que le
 code.*
 
-**`no2fa` est fiable — vérifié, pas supposé.** J'ai cherché mon propre angle mort
+**`no2fa` est fiable — vérifié, pas supposé.** *(⚠ Corrigé le 2026-09-01 : j'écrivais « les trois écrivains » sur la foi d'un grep filtré ; il y en a **six**, et le PORTAGE manquait à mon relevé. Le verdict tient — `SecondFacteurController` refuse un secret vide avant de chiffrer — mais sa portée était surévaluée. Voir `AUDIT-TABLEAU-DE-BORD-COMPTEURS.md` §5.3.)* J'ai cherché mon propre angle mort
 (`''` chiffré rendant `<> ''` faux). Les trois écrivains de `totp_secret`
 écrivent `NULL` (`reset_totp.php`, `manage_roles.php`) ou un vrai chiffré
 `totp:` (`enable_2fa.php`), et `migrate_totp.php:44` sélectionne
