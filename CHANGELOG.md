@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.100** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.102** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,64 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.102 — E-245 : un rappel accroche a un ordre n'est jamais reverifie, il voyage ; et E-246 : ma sonde a rendu 28 orphelins la ou il y en a zero
+
+#### E-245 — troisieme travail redemande en un jour, et le deuxieme sur le meme point
+
+    dad2545  2026-08-28 16:34   la cle 'wazuh.status_unknown' est posee dans les DEUX catalogues
+    legacy/lang/{fr,en}/wazuh.php:47   elle existait deja cote legacy
+
+**Posee quatre jours avant ma consigne, et la session 3 me l'avait deja dit** — ma consigne est revenue
+identique.
+
+**Ma parade ne pouvait pas l'attraper** : la regle est *« croise ce que tu vas assigner contre `git
+log` AVANT de dispatcher »*, et je l'applique a la **liste des taches**. `status_unknown` n'etait pas
+une tache : **c'etait un rappel accroche a la fin d'un ordre.**
+
+> **Un rappel accroche a un ordre n'est jamais reverifie : il voyage.** Une tache se croise parce
+> qu'elle figure dans une liste ; un rappel n'est dans aucune liste — il est reconduit par habitude et
+> **survit a sa propre resolution.** *Un document se relit ; un rappel se recopie.*
+
+**Contrepartie exacte d'E-244, formulee par la session 3** : *si un sous-lot en attente doit le
+declarer, un point TRAITE doit cesser d'etre relaye — sinon on paie l'inverse.* **Regle §8** : tout
+rappel reconduit dans un ordre se remesure comme un chiffre, ou se retire ; **un rappel qui a survecu
+a deux tours sans etre mesure est presume traite.**
+
+#### E-246 — la parade qui ne depend d'aucune transmission, et ma premiere version etait inutilisable
+
+La session 3 observe qu'E-244 ne couvre **qu'un cote** : *ma regle demande a l'EMETTEUR de marquer
+l'attente, mais rien ne dit au DESTINATAIRE ce qui l'attend — et une declaration cote emetteur se perd
+exactement la ou celle-ci s'est perdue, au relais.* Sa parade : croiser les chemins appeles par le JS
+contre les routes declarees.
+
+**J'ai implemente et rendu 28 orphelins. Il y en a ZERO.** Les 28 etaient des chemins **backend**
+appeles a travers la passerelle. Le discriminant n'est pas la forme du chemin :
+
+    fail2ban.js:1018   agit('/fail2ban/ban', …)               -> la PASSERELLE
+    pare-feu.js:548    appellePortage('/pare-feu/historique')  -> une ROUTE LARAVELLE
+
+*J'avais suppose que le vocabulaire suffisait — francais pour Laravel, anglais pour le backend.
+`graylog`, `docker`, `services`, `maintenance` sont identiques des deux cotes.* **Quatrieme sonde a
+moi en trois jours qui se trompe du cote qui alarme — premiere que j'attrape avant de la
+transmettre.**
+
+La sonde juste rend **trois** sites d'appel, tous declares depuis `4d25926` : **zero orphelin.** Et
+`appellePortage` n'existe que dans `pare-feu.js` — *le portage n'appelle ses propres routes qu'a un
+seul endroit, ce qui explique qu'un orphelin ait pu vivre quatre jours sans temoin.*
+
+**A generaliser cote QA** : ancrer la sonde sur **l'ensemble derive des helpers** qui visent une route
+Laravel, non sur une liste de noms — sinon elle se perime au premier module qui nomme le sien
+autrement.
+
+#### La route d'E-244 est posee, et verifiee sur la route RESOLUE
+
+`4d25926`, `web.php:782`. La session 3 a controle avant de poser plutot que de recopier le texte d'un
+tiers : `machineDeLaRequete()` lit `machine_id` dans le **corps** puis resout par
+`machineAccessible()` — **le controle porte sur l'objet resolu**, pas sur le parametre reçu. Garde
+identique aux trois voisines. *Et la methode rendait deja `total` ET `affichees`, parce que la route
+backend rend 20 lignes au plus sans annoncer de total : le sous-lot etait soigne, il lui manquait une
+ligne chez quelqu'un d'autre.*
 
 ### v1.38.101 — E-244 : une capacité déclarée portée depuis quatre jours, et injoignable
 

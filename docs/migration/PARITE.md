@@ -11785,3 +11785,84 @@ d'acces sur la machine **resolue**.
 **Tout sous-lot dont une piece atterrit dans le fichier d'une autre session porte, dans son compte
 rendu ET dans le plan, la ligne « EN ATTENTE DE : <session> / <fichier> / <geste> » — et ne se declare
 pas porte avant.** *Le Lead est le seul point ou cette attente peut se perdre, et elle s'y est perdue.*
+
+## E-245 — un RAPPEL accroche a un ordre n'est jamais reverifie : il voyage. Troisieme travail redemande en un jour, et le deuxieme sur le meme point
+
+**Releve par la session 3 le 2026-09-01, verifie par le Lead a 14:30 CEST.**
+
+    dad2545   2026-08-28 16:34   « les catalogues portes AVANT la page »
+    laravel/lang/{fr,en}/wazuh.php   'wazuh.status_unknown'  : present, 2 occurrences chacun
+    legacy/lang/{fr,en}/wazuh.php:47 'Inconnu' / 'Unknown'   : la cle EXISTAIT deja cote legacy
+
+**La cle etait posee quatre jours avant ma consigne**, et le statut `unknown` adopte par le DSI
+n'avait rien a inventer. **Pire : la session 3 me l'avait deja dit, et ma consigne est revenue
+identique.**
+
+### Ma parade existait et ne pouvait pas attraper ca
+
+La regle du chantier est *« croise ce que tu vas assigner contre `git log` depuis ta derniere mesure
+AVANT de dispatcher »*. Je l'applique au **niveau du tour**, a la liste des taches. **Or
+`status_unknown` n'etait pas une tache : c'etait un RAPPEL accroche a la fin d'un ordre.**
+
+> **Un rappel accroche a un ordre n'est jamais reverifie : il voyage.** Une tache se croise contre le
+> journal parce qu'elle figure dans une liste ; un rappel n'est dans aucune liste — il est reconduit
+> de message en message par habitude, et il survit a sa propre resolution.
+
+*C'est la meme mecanique que le fait perime dans un document, a ceci pres qu'un document se relit et
+qu'un rappel ne se relit jamais : il se recopie.*
+
+### La contrepartie exacte d'E-244, formulee par la session 3
+
+E-244 exige qu'une piece en attente porte **« EN ATTENTE DE : session / fichier / geste »**. Sa
+remarque : *si un sous-lot en attente doit le declarer, un point TRAITE doit cesser d'etre relaye —
+sinon on paie l'inverse.*
+
+**Regle §8, les deux moities ensemble :**
+- **emetteur** — une piece en attente chez autrui se declare et le sous-lot ne se dit pas porte ;
+- **Lead** — **tout rappel reconduit dans un ordre se remesure comme un chiffre, ou se retire.** Un
+  rappel qui a survecu a deux tours sans etre mesure est presume traite.
+
+*Le cout des deux est le meme : une tache oubliee et une tache redemandee coutent un tour chacune.*
+
+## E-246 — le controle croise « chemins appeles par le JS / routes declarees » : la bonne parade, et sa difficulte n'est PAS ou on la cherche
+
+**Propose par la session 3 le 2026-09-01, implemente et mesure par le Lead a 14:25 CEST.**
+
+Elle observe qu'E-244 ne couvre qu'un cote : *ma regle demande a l'EMETTEUR de marquer l'attente, mais
+rien ne dit au DESTINATAIRE ce qui l'attend — et une declaration cote emetteur se perd exactement la
+ou celle-ci s'est perdue, au relais.* **Sa parade ne depend d'aucune transmission** : croiser les
+chemins appeles par `laravel/public/js/*.js` contre les routes declarees. `/pare-feu/historique`
+aurait rougi le 2026-08-28.
+
+### ⚠ MA PREMIERE IMPLEMENTATION A RENDU 28 ORPHELINS. IL Y EN A ZERO.
+
+    routes Laravel declarees          : 100
+    chemins litteraux trouves dans le JS : 42
+    « orphelins » annonces            : 28      <- TOUS FAUX
+
+Les 28 etaient des chemins **BACKEND** appeles a travers la passerelle — `fail2ban/ban`,
+`graylog/config`, `docker/scan` — et non des routes Laravel. **Ma sonde melangeait deux espaces de
+noms.**
+
+**Le discriminant n'est pas la FORME du chemin, c'est le HELPER qui l'appelle :**
+
+    fail2ban.js:1018   agit('/fail2ban/ban', …)              -> la PASSERELLE  (chemin backend)
+    pare-feu.js:548    appellePortage('/pare-feu/historique') -> une ROUTE LARAVELLE
+
+*J'avais suppose que le vocabulaire suffisait — routes Laravel en francais, chemins backend en
+anglais. `graylog`, `docker`, `services` et `maintenance` sont identiques dans les deux.* **Quatrieme
+fois en trois jours qu'une sonde a moi se trompe du cote qui ALARME — et la premiere ou je l'ai
+attrapee avant de la transmettre.** C'est la seule difference qui compte.
+
+### La sonde juste, et son resultat
+
+    grep -rhoE "appellePortage\(\s*'[^']+'" laravel/public/js/*.js
+      -> /pare-feu/copie · /pare-feu/copie/enregistrer · /pare-feu/historique
+
+**Trois sites d'appel, tous declares depuis `4d25926`. Zero orphelin.** `appellePortage` n'existe que
+dans `pare-feu.js` : le portage n'appelle ses propres routes qu'a un seul endroit, ce qui explique que
+l'orphelin ait pu vivre quatre jours sans temoin.
+
+**A generaliser cote QA** : la sonde doit s'ancrer sur **l'ensemble des helpers qui visent une route
+Laravel**, derive du code et non liste — sinon elle se perime au premier module qui nomme le sien
+autrement. *Deriver l'ensemble des helpers, pas enumerer leurs noms.*
