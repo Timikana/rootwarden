@@ -13127,3 +13127,72 @@ controleur a ete **atteint**, pas qu'il a accepte. *Lui donner les deux ancres e
 juste sous « fenetre sale » — le verdict avait dit « non interpretable », pas « faux », et la reprise en
 arbre stable le confirme.* **C'est la premiere fois qu'un verdict de non-interpretabilite est leve par une
 remesure et non par un correctif.**
+
+## E-269 — le filtre de statut manquait aussi sur `date` et `cve` : un scan ECHOUE devient « le dernier scan »
+
+**Releve et corrige par la session 3 (`61134c9`), inscrit au registre par le Lead le 2026-09-02.**
+
+E-265 avait corrige le filtre `status='completed'` **pour `critical_count` seul**. `date` et `cve`
+restaient sans filtre : **un scan `running` ou `failed` devenait « le dernier scan »**.
+
+> **Et un `cve_count` de 0 issu d'un scan ECHOUE s'affiche exactement comme un parc sain.** *La valeur la
+> plus rassurante du tableau est celle que produit l'echec.*
+
+### La condition du DSI a ete ELARGIE, et la raison vaut plus que le correctif
+
+Il demandait de nommer la machine **« quand le perimetre en compte une seule »**. Or ces deux valeurs
+viennent d'**UNE ligne de scan**, donc d'**une machine**, quel que soit le perimetre :
+
+    avant   « 1458 CVE au dernier scan »
+    apres   « 1458 CVE au dernier scan de srv-zabbix »
+
+> **La faute d'echelle est PIRE quand le perimetre est grand** — sa condition protegeait le cas sur.
+
+*Le DSI l'a retenue en notant que c'etait la deuxieme fois de la journee qu'une de ses conditions etait
+formulee sur le cas TYPIQUE plutot que sur ce qui rend le defaut GRAVE.* **Une borne posee sur le cas
+frequent laisse dehors le cas couteux.**
+
+### Deux choses qui ont manque de passer, et le geste qui les a prises
+
+**Le correctif oubliait la vue** : quatre variantes de libelle posees, **rien ne les rendait**. *Catalogue
+juste, service juste, ecran inchange* — des cles mortes. **Rattrape par un controle explicite**, et les
+cinq variantes des deux jours sont desormais verifiees **comme RENDUES**, pas comme presentes.
+
+**Et le patch a ete repete A BLANC sur des copies avant application** : une de ses ancres etait
+`'CVE at the last scan'` et non `'CVEs in the last scan'`. *Il aurait echoue sur sa propre assertion,
+dans l'arbre servi, pendant la fenetre que la session 7 lui avait accordee.*
+
+## E-270 — TROIS defauts que seule l'IMAGE montre : le rendu est un observable que nos suites ne couvrent PAS
+
+**Formule par la session 3 le 2026-09-02, et c'est un constat de couverture, pas un ecart de page.**
+
+    les deux titres possessifs (E-263)   memes noeuds, meme texte, sens inverse
+    « ⚠ 1 » seul sur sa ligne a 390 px   memes noeuds, meme texte, mise en page cassee
+
+**Aucune assertion DOM ne distingue ces mises en page** — et le troisieme cas est le plus net :
+`flex-wrap` renvoyait le libelle a la ligne suivante, laissant le nombre orphelin. *Le DOM est
+identique.*
+
+> **C'est un TAUX, pas une serie d'accidents.** *Le rendu est un observable que nos suites ne couvrent
+> pas du tout* — elles verifient qu'un noeud existe, jamais ce qu'un exploitant voit.
+
+**Et le chantier en porte deja quatre autres** : la pastille KEV a **1,06:1** de contraste (HTML juste),
+la frise `h-32` purgee (100 % de zero fait zero), l'en-tete perdu au changement de page d'un PDF, et les
+cinq regles `color-mix` du socle a 3,60–3,96:1. **Sept en tout, tous invisibles a une assertion de
+presence.**
+
+### Ce qui a marche, et que la session 3 fait maintenant SANS qu'on le demande
+
+**Calculer le contraste AVANT d'ecrire** — quatrieme fois : `5.91` / `4.76` / `5.82` en clair, `9.02` /
+`10.72` / `4.60` en sombre, tous AA. *Et le point qui decide : les trois tons sont le SEUL canal qui
+distingue une alerte grave d'un appoint.*
+
+**Et regarder les captures**, aux trois largeurs. *C'est ce qui a trouve les trois defauts ci-dessus — pas
+une assertion.*
+
+### Ce qui manque, et je ne le tranche pas ici
+
+Une suite ne peut pas « regarder ». Ce qu'elle peut mesurer : **le style CALCULE** (`getComputedStyle`),
+**la geometrie rendue** (`getBoundingClientRect`), et **le recouvrement** (`elementFromPoint` — c'est lui
+qui a ferme E-241). *Trois observables mecaniques qui couvrent une partie du rendu, aucun qui couvre le
+« ca se lit mal ».* **A instruire cote QA, avec la limite ecrite plutot que devinee.**

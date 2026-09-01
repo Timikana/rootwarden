@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.126** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.128** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,56 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.128 — E-269 : un scan ECHOUE devient « le dernier scan », et E-270 : le rendu n'est couvert par aucune suite
+
+#### E-269 — le filtre de statut manquait aussi sur `date` et `cve`
+
+E-265 l'avait corrige **pour `critical_count` seul**. Un scan `running` ou `failed` devenait « le dernier
+scan » — **et un `cve_count` de 0 issu d'un scan ECHOUE s'affiche exactement comme un parc sain.** *La
+valeur la plus rassurante du tableau est celle que produit l'echec.*
+
+**La condition du DSI a ete elargie** : il demandait de nommer la machine « quand le perimetre en compte
+une seule », or ces valeurs viennent d'**une ligne de scan** quel que soit le perimetre. **La faute
+d'echelle est PIRE quand le perimetre est grand** — sa condition protegeait le cas sur. *Deuxieme fois du
+jour qu'une condition est formulee sur le cas TYPIQUE plutot que sur ce qui rend le defaut GRAVE.*
+
+**Deux choses ont manque de passer** : le correctif **oubliait la vue** — quatre variantes posees, rien ne
+les rendait, *catalogue juste, service juste, ecran inchange* ; et le patch **repete a blanc sur copies**
+a revele une ancre fausse (`'CVE at the last scan'`) qui aurait echoue **dans l'arbre servi, pendant la
+fenetre accordee.**
+
+#### E-270 — trois defauts que seule l'IMAGE montre, et c'est un TAUX
+
+    les deux titres possessifs        memes noeuds, meme texte, sens inverse
+    « ⚠ 1 » seul sur sa ligne a 390   memes noeuds, meme texte, mise en page cassee
+
+**Aucune assertion DOM ne les distingue.** *Le rendu est un observable que nos suites ne couvrent pas du
+tout — elles verifient qu'un noeud existe, jamais ce qu'un exploitant voit.*
+
+**Le chantier en porte quatre autres** : la pastille KEV a 1,06:1, la frise `h-32` purgee, l'en-tete perdu
+au changement de page d'un PDF, les cinq `color-mix` a 3,60–3,96:1. **Sept, tous invisibles a une
+assertion de presence.**
+
+**Ce qu'une suite PEUT mesurer** : le style **calcule**, la **geometrie** rendue, et le **recouvrement**
+(`elementFromPoint` — c'est lui qui a ferme E-241). *Trois observables mecaniques qui couvrent une partie
+du rendu, aucun qui couvre le « ca se lit mal ».* **A instruire cote QA, la limite ecrite plutot que
+devinee.**
+
+#### Et le doublon de version est resolu par un critere neuf
+
+Deux entrees portaient `v1.38.122`. **Ni l'anteriorite ni la surface ne tranchaient** — la mesure, si :
+
+    git log -S'1.38.122' -- legacy/version.txt   ->  053e108 · b4fb0d6   (session 3)
+    mon commit 682ec2a                            ->  n'a PAS bumpe
+
+**Ses commits ont ecrit le numero ; le mien non** — je differais pendant le LOT. **Le critere est : QUEL
+COMMIT A ECRIT LE NUMERO**, et il est propre aux versions *parce qu'elles ont un consommateur externe* —
+`ci.yml:459` tag depuis `version.txt`. **D'ou `122b`** : cette entree n'a pas de bump, donc pas de tag, et
+un numero entier laisserait croire l'inverse. *Un suffixe dit ce qu'un numero cacherait.*
+
+*Note : mon propre controle de doublon rendait un FAUX positif sur `122b` — `[0-9]+` coupe le suffixe.
+Huitieme motif du jour qui ignore la forme de ce qu'il mesure.*
 
 ### v1.38.127 — E-269 : un « dernier scan » qui peut avoir echoue n'est pas une date
 
