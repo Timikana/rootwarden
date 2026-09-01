@@ -478,7 +478,7 @@ body {
  */
 .rw-contenu {
     flex: 1;
-    padding: 26px 24px 40px;
+    padding: 26px var(--rw-marge-laterale) 40px;
     width: 100%;
 }
 
@@ -616,8 +616,33 @@ body {
     .rw-portail { grid-template-columns: minmax(0, 1fr); }
     .rw-laterale { display: none; }
     .rw-entete__bascule { display: block; }
-    .rw-entete__compte span { display: none; }
-    .rw-contenu { padding: 20px 16px 32px; }
+    /*
+     * ══ CE LIBELLE-LA, ET PAS « TOUT SPAN » ══════════════════════════════
+     *
+     * La regle etait `.rw-entete__compte span { display: none }`. Elle visait le
+     * libelle « Connecte en tant que … » et en masquait TROIS :
+     *
+     *   - le libelle du compte            <- voulu
+     *   - la pastille de notification     <- un `<span class="rw-badge">`
+     *   - la LANGUE ACTIVE                <- un `<span class="rw-langues__actif">`
+     *
+     * Consequence vue a l'image en 390 px : le selecteur de langue n'affichait
+     * plus que `EN`, donc **la langue courante n'etait plus indiquee** — un
+     * utilisateur en francais voyait un unique bouton `EN` sans savoir ou il en
+     * etait. Et le compteur de notifications disparaissait sur mobile, ce que
+     * personne n'avait releve.
+     *
+     * Corrige par la PRECISION et non par des exceptions : une regle large
+     * rattrapee par des `display: inline-flex` demanderait une exception de plus
+     * a chaque `<span>` ajoute dans l'en-tete, et un oubli ne se verrait qu'a
+     * l'image. *Un selecteur qui attrape trop se resserre ; il ne se rustine
+     * pas.*
+     */
+    .rw-entete__nom { display: none; }
+    /* La marge laterale se resserre sur petit ecran, et le jeton la porte :
+     * le pied la suit sans qu'on ait a l'y ecrire une seconde fois. */
+    :root { --rw-marge-laterale: 16px; }
+    .rw-contenu { padding: 20px var(--rw-marge-laterale) 32px; }
 }
 
 .rw-inline { display: inline; }
@@ -674,6 +699,13 @@ body {
 @media (max-width: 900px) {
     /* En mobile l'en-tete masque le libelle du compte : le selecteur, lui,
        reste — c'est une commande, pas une information. */
+    /*
+     * Cette ligne retablissait `.rw-langues` que la regle large masquait. Le
+     * selecteur etant desormais precis, elle n'a plus d'objet — mais elle est
+     * CONSERVEE, parce que `.rw-langues` est aussi rendu hors de l'en-tete
+     * (`.rw-langues-flottant`) et que la remettre a `inline-flex` ici garde le
+     * comportement identique si quelqu'un relargit la regle un jour.
+     */
     .rw-entete__compte .rw-langues { display: inline-flex; }
 }
 
@@ -2393,8 +2425,21 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * au-dessus. Pas de bordure haute : le `main` porte deja sa fin, et une ligne de
  * plus ferait croire a une section.
  */
+/* ── LE PIED N'EST PAS DANS `.rw-contenu`, DONC IL N'HERITE PAS SA MARGE ──
+ *
+ * `<footer class="rw-pied">` est un FRERE de `<main class="rw-contenu">`
+ * (`portail.blade.php:99` contre `:82-84`). Il ne recevait donc aucune marge
+ * laterale, et avec `text-align: right` son texte se collait au bord droit de la
+ * fenetre — 24 px plus a droite que tout le reste de la page. Vu a l'image en
+ * 1920 ET en 1400 : ce n'etait pas une troncature, c'etait un contact.
+ *
+ * LA MARGE EST UN JETON PARTAGE, PAS UN NOMBRE RECOPIE. Deux valeurs egales
+ * posees cote a cote divergent — c'est ce que la marge de defilement a coute
+ * cette semaine. Ici `.rw-contenu` et `.rw-pied` lisent la MEME variable, donc
+ * ils ne peuvent plus s'ecarter.
+ */
 .rw-pied {
-    padding: 18px 0 26px;
+    padding: 18px var(--rw-marge-laterale) 26px;
     color: var(--rw-texte-doux);
     font-size: 12px;
     text-align: right;
@@ -2497,6 +2542,11 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * derivation vit dans la mesure, pas dans le CSS** — dit ici pour que personne
  * ne croie que ce nombre se maintient tout seul.
  */
-:root { --rw-defilement-marge: 88px; }
+:root {
+    --rw-defilement-marge: 88px;
+    /* La marge laterale du contenu ET du pied. Un seul endroit : ils sont freres
+     * dans le gabarit, donc rien ne les aligne sinon cette variable. */
+    --rw-marge-laterale: 24px;
+}
 
 html { scroll-padding-top: var(--rw-defilement-marge); }

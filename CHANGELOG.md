@@ -2171,6 +2171,66 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.107 — deux défauts vus à l'image, une cause commune, et un troisième que personne n'avait relevé
+
+Signalés sur captures par la session 7 : « Version inconnue » **collé au bord droit** en 1920 et 1400, et
+le sélecteur de langue **perdant `FR`** en 390. Aucune assertion DOM ne les voit — **quatrième fois** que
+ce chantier trouve un défaut visuel qu'aucune ne rattrape.
+
+#### Le sélecteur de langue : une règle trop large, et elle masquait TROIS choses
+
+    @media (max-width: 900px) { .rw-entete__compte span { display: none; } }
+
+Elle visait le libellé « Connecté en tant que … ». Elle attrapait aussi :
+
+| élément | ce que c'est | conséquence |
+|---|---|---|
+| le libellé du compte | `<span>` | **voulu** |
+| la langue **active** | `<span class="rw-langues__actif">` | seul `EN` restait, **la langue courante n'était plus indiquée** |
+| la pastille de notification | `<span class="rw-badge">` | **le compteur disparaissait sur mobile** |
+
+**Le troisième n'était pas signalé.** Une ligne plus bas dans la même media query rétablissait
+`.rw-langues` — donc le **conteneur** revenait, et son `<span>` intérieur restait caché : c'est ce qui
+faisait qu'`EN` s'affichait et `FR` non.
+
+**Corrigé par la précision, pas par des exceptions.** Le libellé reçoit une classe
+(`.rw-entete__nom`) et la règle ne vise plus que lui. Rattraper une règle large par des
+`display: inline-flex` aurait demandé **une exception de plus à chaque `<span>` ajouté dans l'en-tête**,
+et un oubli ne se serait vu qu'à l'image. *Un sélecteur qui attrape trop se resserre ; il ne se rustine
+pas.*
+
+#### La version : ce n'était pas une troncature, c'était un contact
+
+`<footer class="rw-pied">` est un **frère** de `<main class="rw-contenu">`
+(`portail.blade.php:99` contre `:82-84`), et son `padding` était `18px 0 26px` — **zéro marge
+latérale**, contre 24 px pour le contenu. Avec `text-align: right`, le texte se collait au bord droit de
+la fenêtre, 24 px plus à droite que tout le reste. **Rien n'était coupé** : il touchait.
+
+**La marge est désormais un jeton partagé, pas un nombre recopié.** `.rw-contenu` et `.rw-pied` lisent
+la **même** variable, y compris son resserrement à 16 px sous 900 px. Deux valeurs égales posées côte à
+côte divergent — c'est ce que la marge de défilement a coûté cette semaine, et la parade est la même :
+*une seule source, ou une mesure qui les compare.* Ici une seule source suffit, parce que le CSS peut
+la porter.
+
+#### Ce que je ne corrige PAS, et pourquoi
+
+Le texte affiche « version inconnue » **parce que la version l'est** : le montage de `version.txt` dans
+le conteneur du portage demande une **recréation**, pas un `restart`, et elle n'a pas eu lieu. Le repli
+est le comportement correct d'ici là — et il **dit** qu'il n'a pas su lire plutôt que de rendre un vide.
+
+*Le débordement était un défaut ; le texte n'en est pas un.* Les deux étaient dans le même signalement.
+
+#### Contrôles
+
+`rw.css` et `layouts/portail.blade.php` sont **partagés** — signalé. Vérifié : accolades équilibrées,
+la règle large **retirée** (sa seule trace restante est dans le commentaire qui l'explique),
+`.rw-entete__nom` bien **dans** la media query 900 px, gabarit compilé en isolation.
+
+**Non vérifié** : le rendu. Ces trois corrections sont visuelles et le banc est tenu par une autre
+session — *elles se jugent à l'image, et je ne les ai pas regardées.*
+
+---
+
 ### v1.38.106 — E-244 rectifie : il n'y avait AUCUNE suite sur `/pare-feu`, et une mutation se juge a ce qui reste VERT
 
 #### La page n'avait aucune couverture navigateur, et j'avais ecrit le contraire
