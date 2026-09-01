@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.120** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.121** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.121 — E-262 : le quatrieme verdict `FENETRE SALE — a rejouer` est pose et EPROUVE
+
+    depart dans le FUTUR   ->  vide                                temoin NEGATIF, joue EN PREMIER
+    depart il y a 24 h     ->  SALE:: trois fichiers de code nommes
+    cible legacy, 24 h     ->  SALE:: legacy/version.txt
+
+**Le temoin negatif avant le positif** — *un garde teste sur le seul cas facile rend « propre » et se
+croit bon.*
+
+**La fenetre sale passe EN TETE de la chaine** (`FENETRE SALE -> ECHEC -> pas de reference -> conforme ->
+ECART`) : *elle ne dit pas que la suite a echoue, elle dit que son resultat ne veut rien dire.* Un ECART
+annonce sur une mesure non interpretable enverrait chercher un defaut inexistant. Elle compte **a
+rejouer** : *un LOT qui se declare conforme en portant une mesure non interpretable est pire qu'un LOT
+rouge.*
+
+**Pas d'abattage** — E-257 : le remede se dimensionne sur ce qui SURVIT au defaut.
+
+#### ⚠ Il signalera mes propres bumps de version, et je le dis plutot que de le colmater
+
+`legacy/version.txt` est **suivi**, donc classe **CODE**, donc il declenche — le temoin l'a nomme.
+**Juste selon le critere, fausse alarme en pratique.** *Le remede est mon comportement (E-256), pas une
+exception dans le garde* : ajouter `version.txt` a une liste referait l'enumeration qu'E-258 vient de
+retirer — **et la premiere exception est celle qui rend la deuxieme naturelle.**
+
+#### Ce que cet appel n'emploie pas
+
+`verdictFenetre` unit **empreintes** et **`mtime`**. Le shell ne peut pas transporter l'empreinte
+d'avant, donc **seul le `mtime` decide** — *c'est la moitie qui a attrape le cas du 2026-09-01, mais
+c'est une degradation du contrat, et la dire vaut mieux que la taire.*
+
+#### Et mon angle mort annonce etait le symetrique du vrai
+
+J'avais prevenu qu'un fichier de code **non suivi** serait classe « etat ». **Mesure : un `.blade.php`
+neuf non suivi et non ignore est classe CODE.** Le vrai angle mort est un fichier de code **dans
+`.gitignore`**.
+
+> **Deuxieme fois du jour qu'un de mes signalements vise la mauvaise branche ; les deux fois la
+> trouvaille etait reelle et le perimetre faux.** *Un signalement juste sur un perimetre faux fait
+> construire une parade qui protege ce qui n'etait pas menace.*
 
 ### v1.38.120 — E-260 : deux ecrans `wazuh` ne touchent AUCUNE machine, et E-261 : le journal n'est pas l'autorite
 

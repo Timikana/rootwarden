@@ -1152,13 +1152,68 @@ joue() {
     unset E2E_USER E2E_PASS E2E_TOTP_SECRET
   fi
 
-  local t0 t1 code pass fail attendu verdict
+  local t0 t1 code pass fail attendu verdict fenetre
   t0=$(date +%s)
+  local departMs=$(( t0 * 1000 ))
   ( cd "$E2E" && timeout "${LOT_TIMEOUT:-900}" node "${suite}.mjs" ) > "$journal" 2>&1
   code=$?
   t1=$(date +%s)
   pass=$(grep -c '^PASS' "$journal")
   fail=$(grep -c '^FAIL' "$journal")
+
+  # ══ QUATRIEME VERDICT : « FENETRE SALE » ═════════════════════════════════════
+  #
+  # Une ecriture dans le chemin SERVI pendant la fenetre rend la mesure non
+  # interpretable — le cas du 2026-09-01 : une vue renommee 17 s apres le depart
+  # a fait rendre 64/2 a `go-socle-navigation` avec deux 500, et la contre-epreuve
+  # en arbre stable a rendu 66/0. **Aucune regression : l'ecart etait la fenetre.**
+  #
+  # ⚠ PAS D'ABATTAGE ICI, ET C'EST MESURE. Ma premiere regle disait « un fichier
+  # modifie au demarrage est un motif d'abattage » : elle aurait tue les 156
+  # executions sur un bump de `legacy/version.txt` dont l'innocuite etait etablie.
+  # **Le remede se dimensionne sur ce qui SURVIT au defaut** — une ecriture est
+  # PASSEE, donc les suites suivantes sont saines et seule celle-ci se rejoue ;
+  # un drapeau non restaure PERSISTE et fait echouer 61 suites, d'ou l'abattage
+  # reserve a ce seul cas.
+  #
+  # LA DISCRIMINATION EST « CODE contre ETAT D'EXECUTION », pas « servi ou non » :
+  # `laravel/storage/`, `backend/logs/`, `__pycache__`, les caches d'outils sont
+  # ecrits PAR le systeme qui tourne. Le module la DERIVE de `git check-ignore`
+  # (779 ignores sur 1420) plutot que d'enumerer des chemins — une liste se perime
+  # au premier repertoire de cache qu'un outil cree.
+  #
+  # ⚠ ET CET APPEL N'EMPLOIE QUE LA MOITIE `mtime` DU CONTRAT. `verdictFenetre`
+  # unit deux detections : la comparaison d'EMPREINTES (contenu change) et le
+  # `mtime` (ecrit PUIS REMIS EN ETAT). D'ici je ne peux pas transporter
+  # l'empreinte d'avant a travers le shell, donc je passe l'empreinte COURANTE :
+  # la comparaison rend vide, et seul le `mtime` decide. **C'est la moitie qui a
+  # attrape le cas du 2026-09-01** — l'autre n'ajoute rien qu'un `mtime` ne montre
+  # deja. Le dire plutot que laisser croire au contrat complet.
+  #
+  # ══ EPROUVE DANS LES DEUX SENS le 2026-09-01 a 23:40 CEST ══════════════════
+  #
+  #   depart dans le FUTUR    ->  vide          temoin NEGATIF, propre
+  #   depart il y a 24 h      ->  SALE:: nommant ChangementMotDePasseExige.php,
+  #                               routes/web.php, bootstrap/app.php
+  #   cible legacy, 24 h      ->  SALE:: legacy/version.txt
+  #
+  # Le temoin negatif a ete joue AVANT le positif : un garde teste sur le seul cas
+  # facile rend `propre=true` et se croit bon — la session 7 l'a paye sur son
+  # premier temoin, et c'est ce qui a trouve son angle mort du cree-puis-supprime.
+  #
+  # ⚠ ET IL SIGNALERA MES PROPRES BUMPS DE VERSION. `legacy/version.txt` est SUIVI
+  # par git, donc classe CODE, donc il declenche — c'est JUSTE selon le critere et
+  # ça reste une fausse alarme en pratique. **Le remede est mon comportement
+  # (E-256 : ne pas bumper pendant un LOT), PAS une exception dans le garde** :
+  # ajouter `version.txt` a une liste d'exclusions referait l'enumeration qu'E-258
+  # vient de retirer. Et depuis E-257 le cout est proportionne — une suite rejouee,
+  # pas 156 tuees.
+  fenetre=$(cd "$E2E" && node --input-type=module -e "
+    import { empreinteServie, verdictFenetre } from './lib-arbre.mjs';
+    const c = process.argv[1], d = Number(process.argv[2]);
+    const v = verdictFenetre(c, empreinteServie(c), d);
+    process.stdout.write(v.ecritureCode ? 'SALE::' + (v.fichiers || []).slice(0,3).join(', ') : '');
+  " "$cible" "$departMs" 2>/dev/null || true)
 
   # ══ ABATTAGE DU LOT — une suite peut laisser le banc INUTILISABLE ═══════════
   #
@@ -1189,7 +1244,13 @@ joue() {
   if [ "$cible" = legacy ]; then attendu="${REF_LEGACY[$suite]-}"
   else                          attendu="${REF_LARAVEL[$suite]-}" ; fi
 
-  if [ "$fail" -gt 0 ] || [ "$code" -ne 0 ]; then verdict="ECHEC"
+  # La fenetre sale passe EN TETE : elle ne dit pas que la suite a echoue, elle
+  # dit que son resultat ne veut rien dire. Un ECART annonce sur une mesure non
+  # interpretable enverrait chercher un defaut inexistant — c'est precisement le
+  # cout du 2026-09-01, ou `Machines.php` avait REELLEMENT bouge dans la bonne
+  # fenetre et aurait ete accuse par un raisonnement correct a chaque etape.
+  if [ -n "$fenetre" ];                      then verdict="FENETRE SALE — a rejouer (${fenetre#SALE::})"
+  elif [ "$fail" -gt 0 ] || [ "$code" -ne 0 ]; then verdict="ECHEC"
   elif [ -z "$attendu" ];                    then verdict="(pas de reference)"
   elif [ "$pass" -eq "$attendu" ];           then verdict="conforme"
   else                                            verdict="ECART attendu=$attendu"
@@ -1197,7 +1258,7 @@ joue() {
 
   printf '%-24s %-8s PASS=%-4s FAIL=%-3s %4ss  %s\n' \
     "$suite" "$cible" "$pass" "$fail" "$((t1-t0))" "$verdict"
-  [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] && return 1
+  [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] || [ "${verdict:0:12}" = "FENETRE SALE" ] && return 1
   return 0
 }
 
