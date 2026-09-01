@@ -13267,3 +13267,74 @@ gestes distants** (`scan_server_users`, `server_user_keys`, `server_user_remove_
 
 **Pas de suite — mais le compte reste 26/32.** *Une conclusion juste tiree d'une premisse fausse se
 corrige quand meme : la premisse ressert ailleurs.*
+
+## E-273 — J'AI EXECUTE LE RUNNER EN VOULANT COMPTER SES TABLEAUX : une plage `sed` qui ne trouve jamais sa borne va jusqu'a la fin du fichier
+
+**Incident du Lead, 2026-09-02 vers 00:10 CEST. Aucun degat — et ce qui l'a rendu lisible est le garde
+pose deux heures plus tot.**
+
+    eval "$(sed -n '/^SUITES_LARAVEL=(/,/^)/p' scripts/rejouer-lot.sh)"
+
+**Il n'existe AUCUNE ligne commençant par `)` dans ce fichier** — le tableau se ferme par
+`go-page-update-u6b)` **en fin de ligne 1072**. *Une plage `sed` dont la borne de fin ne correspond
+jamais s'etend jusqu'a la fin du fichier* : **352 lignes capturees, corps de la boucle principale
+compris, et passees a `eval`.**
+
+**Le runner a demarre.** Il a tente de lever le profil compose, a echoue sur les droits docker, puis a
+« joue » quatre suites.
+
+### Ce qui n'a PAS eu lieu, verifie point par point
+
+    StartedAt rootwarden_python   2026-08-27T12:28:43Z    INCHANGE  <- le backend n'a PAS redemarre
+    git status --porcelain        0 fichier                          l'arbre est intact
+    suites reellement jouees      0 — PASS= vide, FAIL= vide, 0 s
+    machines jointes              aucune
+    conteneurs                    tous « Up 12 days » / « Up 5 days » — aucun redemarrage
+
+*Le mur des droits docker a fait l'essentiel du travail, et je ne me l'attribue pas.*
+
+### CE QUE LE GARDE A FAIT, ET C'ETAIT SON PREMIER USAGE NON PREVU
+
+    go-socle-navigation  laravel  PASS=  FAIL=  0s  GARDE INDISPO — le garde de fenetre n a pas pu s executer
+
+Le chemin relatif `./lib-arbre.mjs` se resolvait depuis la racine du depot au lieu de `tests/e2e/`.
+**Le garde a echoue FERME et a nomme son propre motif**, au lieu de rendre une chaine vide qui se serait
+lue « conforme ».
+
+> **Le cinquieme verdict `GARDE INDISPO`, pose deux heures plus tot pour un cas theorique, a attrape le
+> premier accident reel — et c'etait le mien.** *Sans lui, quatre suites qui n'ont jamais tourne seraient
+> apparues comme conformes.*
+
+### LA LEÇON, ET ELLE EST PLUS EMBARRASSANTE QUE L'ACCIDENT
+
+Je voulais appliquer ma propre regle — *faire lire une structure par son propre analyseur* — et
+**l'implementation de cette regle a EXECUTE le programme.**
+
+> **Une regle juste appliquee par un instrument non mesure produit le geste qu'elle voulait empecher.**
+
+*Neuvieme fois du jour qu'un de mes motifs ignore la forme de ce qu'il mesure ; la premiere ou le motif
+n'observe pas, il AGIT.* **Et `eval` est ce qui transforme une erreur de lecture en erreur d'execution.**
+
+**Parade** : compter par un analyseur a **parentheses appariees**, jamais par une plage de motifs, et
+**jamais `eval`** sur un fragment de script — extraire, compter, ne rien executer.
+
+### Et le compte, enfin, RECOUPE
+
+    SUITES_LARAVEL 80  +  SUITES_LEGACY 78  =  158     <- les 158 journaux du LOT mesure
+    suites distinctes dans le LOT : 83
+
+> **C'est le recoupement qui valide, pas la confiance dans la commande.** *Mes deux comptages precedents
+> ne recoupaient rien* : le premier (25) grepait le fichier entier, donc comptait les suites **citees en
+> commentaire** ; le second rendait 0 parce que ma plage etait fausse.
+
+### L'ecart avec la session 7 est une POPULATION, pas un comptage
+
+    population go-*.mjs   109 fichiers   ->  26 hors LOT     (Lead)
+    population *.mjs      129 fichiers   ->  46 hors LOT     (Lead)
+    sa population         123 fichiers   ->  40 hors LOT     (session 7)
+
+**Les six qu'elle exclut ne sont pas des suites** (`lib-arbre.mjs`, `code-totp.mjs`, et quatre autres
+utilitaires). **Son 40 et mon 46 sont la MEME mesure sur des populations distantes de six.**
+
+*Septieme « faux desaccord » du chantier, meme cause : un nombre sans son etiquette.* **Et sa population
+est la bonne** — un utilitaire importe n'est pas une suite qu'on aurait pu jouer.
