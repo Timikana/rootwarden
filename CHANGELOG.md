@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.104** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.106** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,57 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.106 — E-244 rectifie : il n'y avait AUCUNE suite sur `/pare-feu`, et une mutation se juge a ce qui reste VERT
+
+#### La page n'avait aucune couverture navigateur, et j'avais ecrit le contraire
+
+    git grep -l '/pare-feu' 2d191a3^ -- 'tests/e2e/*.mjs'   ->  RIEN
+
+23 ancres `data-rw`, 3 routes POST, 5 appels reseau, **zero assertion**. J'avais ecrit *« la suite
+reste verte, elle ne descend pas jusqu'a l'historique »*.
+
+> **« La suite ne descend pas assez bas » se corrige par une assertion ; « il n'y a pas de suite » veut
+> dire que la capacite n'a JAMAIS ete exercee par personne.**
+
+*Ma formulation supposait une couverture partielle.* **Une explication qui suppose l'existence de
+l'instrument est plus rassurante que l'absence d'instrument.**
+
+**Couverture posee** — `go-page-pare-feu`, chaque cible seule au repos : **23 PASS / 0 FAIL** laravel
+(14:49:18 -> 14:50:43) et **17 / 0** legacy (14:47:11 -> 14:48:36). `POST /pare-feu/historique -> 200`
+mesure **au reseau**. Inscrite dans les deux listes du runner — **elle n'y etait pas non plus.**
+
+#### La lecon de la mutation, et c'est la plus transposable du tour
+
+La sonde `E2E_SONDE_E244=1` rend la route injoignable : la suite **doit** rougir, et elle rougit (3
+FAIL, code 1). **Au premier essai elle ne rendait que 2 FAIL, et trois assertions restaient VERTES**
+alors que la page affichait « Historique illisible » — panneau non vide, sans jeton, sans ligne.
+
+> **Une mutation ne se juge pas au rouge qu'elle produit, mais a la liste de ce qui est reste VERT.**
+
+*Une route rendant `200` avec `success: false` aurait laisse la suite entierement verte sur un defaut.*
+Et l'auteur note que son propre en-tete annonçait cette distinction, **ecrite avant le code** : *une
+intention en commentaire n'est pas une mesure.*
+
+#### Trois defauts d'instrument, dont un qui aurait fige un defaut comme etat normal
+
+- une assertion **tautologique** : `avant` et `apres` etaient le meme `SELECT` joue deux fois ;
+- **deux PASS decernes a un controle sans objet** : docker injoignable, la suite tombe a la premiere
+  ligne, et le filet annonce « aucun geste interdit n'a abouti » — vrai, et entierement vide. La
+  mecanique venait de `go-page-cle-plateforme.mjs`, corrige aussi ;
+- **la sonde ecrivait ses captures dans le dossier de REFERENCE** : « Historique illisible » a failli
+  etre livre comme etat normal. *L'assertion « les trois captures sont ecrites » etait verte et avait
+  raison — une assertion sur la PRODUCTION d'un artefact ne dit rien de son CONTENU.* **Vu en regardant
+  l'image.**
+
+#### Et un FAUX ROUGE eteint en corrigeant la MESURE, pas l'objet
+
+L'assertion legacy exigeait un conteneur d'historique vide au repos. Elle a rougi **sur une page
+saine** : `#iptables-history` vit dans `#rules-container` masque, et `innerText` d'un element non rendu
+retombe sur `textContent`. **`17 · 0` ne doit pas se lire comme un defaut repare** — c'est inscrit dans
+le runner a cote de la reference.
+
+*Un faux rouge coute autant qu'un faux vert : il fait corriger un objet sain.*
 
 ### v1.38.105 — l'exigence de changement de mot de passe était un bandeau, pas un verrou
 

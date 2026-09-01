@@ -11754,9 +11754,29 @@ concernant I4 sans transmettre la route.** Elle ne pouvait pas la poser elle-mem
 son fichier — et la session 3 n'a jamais su qu'elle l'attendait.
 
 > **Une livraison qui depend d'un geste dans le fichier d'une AUTRE session n'est pas finie : elle est
-> en attente, et rien ne le signale.** Le sous-lot se declare porte, la suite est verte (elle ne
-> descend pas jusqu'a l'historique), et le seul temoin est un `fetch` qui rend 404 dans une console que
-> personne n'ouvre.
+> en attente, et rien ne le signale.** Le sous-lot se declare porte, et le seul temoin est un `fetch`
+> qui rend 404 dans une console que personne n'ouvre.
+
+### ⚠ RECTIFICATION DU 2026-09-01 15:00 — C'ETAIT PIRE QUE « LA SUITE NE DESCEND PAS ASSEZ BAS »
+
+J'avais ecrit que la suite restait verte parce qu'elle ne descendait pas jusqu'a l'historique.
+**Mesure de la session 7, verifiee :**
+
+    git grep -l '/pare-feu' 2d191a3^ -- 'tests/e2e/*.mjs'   ->  RIEN
+
+**Il n'y avait AUCUNE suite sur cette page.** 23 ancres `data-rw`, 3 routes POST, 5 appels reseau,
+**zero couverture navigateur** — et les six suites `fail2ban` visent une autre page.
+
+> **« La suite ne descend pas assez bas » se corrige par une assertion ; « il n'y a pas de suite » veut
+> dire que la capacite n'a JAMAIS ete exercee par personne.** C'est ce qui a permis a un 404 de vivre
+> quatre jours derriere un journal qui l'inscrivait portee.
+
+*Ma formulation supposait une couverture partielle ; il n'y en avait aucune. **Une explication qui
+suppose l'existence de l'instrument est plus rassurante que l'absence d'instrument**, et c'est la
+troisieme fois du jour qu'une de mes phrases dedouane par sa forme.*
+
+**Couverture posee** : `go-page-pare-feu`, **23 PASS laravel / 17 legacy**, inscrite dans les deux
+listes du runner — elle n'y etait pas non plus, meme forme, meme fichier.
 
 *C'est le motif « la garde est sur la page, pas sur la requete » retourne : ici c'est la CAPACITE qui
 est sur la page et pas sur la requete.*
