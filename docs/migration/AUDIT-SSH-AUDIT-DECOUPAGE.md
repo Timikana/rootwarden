@@ -161,3 +161,123 @@ pair ne le lui étend pas non plus.
   « identifiant lu sans cible » n'est **pas** écarté ;
 - **rien n'a été déclenché** — aucune machine jointe, aucune suite, aucun
   conteneur chargé pour ce document.
+
+---
+
+## 7. Priorisation demandée : E-280 **au-dessus** de SEC-013 — et pas pour la raison proposée
+
+**Mesuré le 2026-09-02.** Le Lead oppose *« SEC-013 atteignable par un rôle 2
+légitime »* à *« E-280 atteignable seulement par requête forgée »* et demande le
+classement. **La prémisse ne tient pas ; le classement tient quand même, pour
+d'autres raisons.**
+
+### 7.1 La reachability est IDENTIQUE, pas différente
+
+```
+POST /ssh-audit/policies    @require_api_key + @require_role(2)      <- SEC-013
+POST /ssh-audit/schedules   @require_api_key + @require_role(2)      <- E-280
+```
+
+**Même garde, même population, même chemin de passerelle.** Aucune permission,
+aucune borne par machine, ni sur l'une ni sur l'autre.
+
+**Et E-280 ne demande aucune valeur forgée** :
+
+```python
+target_type = data.get('target_type', 'all')     # ssh_audit.py:767
+```
+
+**`'all'` est le DÉFAUT.** Il ne faut pas *forger* un champ — il faut **l'omettre**.
+Un client qui ne connaît pas le paramètre vise le parc entier sans le savoir.
+
+> *« Ne pas offrir d'entrée libre »* est bien déplacé d'un cran, comme le Lead
+> l'écrit — mais d'un cran de plus encore : **ce n'est pas une entrée libre à
+> l'API, c'est un DÉFAUT permissif.** Le formulaire ne l'offre pas ; l'absence du
+> champ suffit. Un repli qui atterrit du côté permissif, cinquième classe de la
+> mission.
+
+### 7.2 Ce que chacune fait — et c'est là que le classement se décide
+
+**E-280 agit sur des machines.** Mesuré dans `scheduler.py`, la boucle du job :
+
+```python
+with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, service_account=svc) as client:
+    config  = get_sshd_config(client, root_pass)     # root sur la cible
+    ssh_ver = get_ssh_version(client, root_pass)
+```
+
+**Une vraie session SSH par machine, à chaque tic de cron**, avec un intervalle
+minimum de **10 minutes** (`ssh_audit.py`, refus au-delà). Le parc entier, et le
+scheduler tourne dans un **thread invisible à `ps`**.
+
+**SEC-013 agit sur un verdict.** Une politique n'est consommée qu'ici :
+
+```python
+policies = _load_policies(mid)                       # ssh_audit.py:138
+result   = audit_sshd_config(config_text, policies)  # :139
+```
+
+**`/fix` ne consomme AUCUNE politique** — vérifié : il prend `directive` et
+`value` de la requête, contre `ALLOWED_DIRECTIVES` (liste fermée) et `VALUE_RE`.
+Écrire une politique ne déclenche donc **aucune** action distante ; ça change ce
+que l'audit **rapporte**.
+
+### 7.3 Le classement, et ses quatre appuis
+
+**E-280 d'abord.**
+
+| | E-280 | SEC-013 |
+|---|---|---|
+| population | rôle 2, sans permission | **identique** |
+| effet | **session SSH root sur tout le parc**, répétée | une ligne en base qui change un rapport |
+| réversibilité | les connexions faites ne se défont pas | un `DELETE`, effet confiné au rapport |
+| observabilité | thread **invisible à `ps`** | ligne lisible par le GET |
+
+**Mais ils ne se disputent pas la même place** : E-280 est un risque
+d'**incident**, SEC-013 un risque de **confiance dans le contrôle**. Si les deux
+restent ouverts, *SEC-013 est ce qui ferait douter des traces qu'E-280 laisse.*
+**Premier et second, pas premier et plus tard.**
+
+### 7.4 ⚠ SEC-014 — le même audit rend deux verdicts selon qui le lance
+
+Trouvé en mesurant le précédent, et il **réduit** la portée de SEC-013 tout en
+ouvrant autre chose :
+
+```python
+route      :139   audit_sshd_config(config_text, policies)   # AVEC les politiques
+scheduler         audit_sshd_config(config)                  # SANS
+```
+
+**Le scan planifié ignore les politiques ; le scan à la demande les applique.**
+Une directive marquée `ignore` disparaît du rapport d'un humain et reste dans
+celui du scheduler — sur la **même machine**, la **même configuration**, la même
+journée.
+
+**Conséquence sur SEC-013** : son effet d'aveuglement ne porte **pas** sur les
+scans planifiés. Sa portée est plus étroite que je ne l'aurais dit sans cette
+mesure. **Conséquence propre** : deux chemins du même contrôle de sécurité
+produisent des scores différents, et rien à l'écran ne dit lequel on regarde.
+
+**Non qualifié plus loin** : je n'ai pas mesuré si `audit_sshd_config` a une
+valeur par défaut pour son second paramètre, ni ce que la table contient
+aujourd'hui.
+
+### 7.5 Sur l'arbre et le service — le Lead a raison, et il faut le nommer
+
+Le Lead écrit que « en service c'est pire », le `else` de `a33a15b` étant
+`SELECT … FROM machines` **sans filtre**. **Dans l'ARBRE d'aujourd'hui, le filtre
+existe** :
+
+```sql
+FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'
+```
+
+**Ce n'est pas une contradiction, ce sont deux systèmes.** Les `.py` sont lus au
+**démarrage** : le processus en service précède la modification de l'arbre. Le
+Lead décrit le service, je lis l'arbre, et **les deux affirmations sont vraies en
+même temps**. La seule chose qui manquerait serait de ne pas dire lequel on
+mesure — *une affirmation sans son régime est invérifiable.*
+
+**Et le régime aggrave bien ici** : jusqu'au prochain redémarrage, la portée du
+repli inclut les machines **archivées**. Le redémarrage — déjà en tête des
+signatures attendues — est donc aussi un correctif partiel d'E-280.
