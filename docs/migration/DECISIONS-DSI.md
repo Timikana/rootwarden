@@ -2249,3 +2249,67 @@ geste, et non constatées après.*
 **Et la prédiction du legacy est tombée juste** : **16 PASS / 0 FAIL**, exactement la valeur posée avant
 lancement. *Troisième fois aujourd'hui qu'elle l'écrit avant de mesurer, et la première où l'attente et la
 mesure concordent sans qu'il faille départager laquelle a tort.*
+
+---
+
+## ✅ La décision 13 passe d'ÉCRITE à MESURÉE — et mon étiquette de mesure était fausse
+
+**Session 7, 2026-09-01 : `13 PASS · 0 FAIL`, prédiction posée avant lancement et exacte.**
+
+    depart   /cles-ssh
+    arrivee  /profil?force_change=1              <- l enfermement a bien lieu : c est le but
+    profil   200 · formulaire visible · 3 champs · bouton present
+    POST     arrivee /profil SANS force_change=1 <- le middleware n a PAS intercepte
+    POST /deconnexion (clic bandeau)   ->  /connexion
+    GET  /deconnexion (route SANS nom) ->  /connexion
+
+> **Le compte marqué atteint le formulaire, le soumet, et sort par les deux chemins.** La condition que
+> j'avais posée — *ce middleware ne doit pas bloquer l'écran qui débloque* — est **mesurée au navigateur**,
+> plus déduite d'une liste d'exemptions.
+
+**Et la raison du garde posé au GROUPE est vérifiée** : le `GET` **sans nom de route** sort aussi bien que
+le `POST` nommé, parce que les deux vivent hors du groupe. *Une exemption nominale aurait couvert l'un et
+manqué l'autre* — c'était l'hypothèse, c'est maintenant un fait.
+
+### ⚠ Et mon propre relevé portait une étiquette fausse
+
+J'ai lancé une vérification indépendante du drapeau en l'intitulant **« après la fin du processus »**.
+**Mesuré à 13:15 UTC :**
+
+    id 15 rw-test-admin   fpc = 1
+    ps  ->  go-page-mot-de-passe.mjs EN COURS (PID 3868447, la version a 14 assertions)
+
+> **Le `fpc = 1` est la fixture EN VOL, pas un résidu.** Ma mesure était juste ; **mon étiquette
+> affirmait un moment qui n'était pas celui de la mesure.**
+
+**Ce qui m'a évité de publier une alerte fausse est d'avoir mesuré les deux dans le même appel** — l'état
+du drapeau **et** la liste des processus. *Un observable à deux causes candidates ne se lit pas seul :
+`fpc = 1` signifie « résidu » ou « fixture active », et le discriminant n'est pas dans la table.*
+
+**Neuvième défaut d'instrument de ma journée, et le premier qui ne soit ni dans la mesure ni dans le
+motif : il est dans la LÉGENDE.** *Une mesure juste sous une étiquette fausse se relit comme une mesure
+fausse* — et c'est la troisième forme, après « mesurer le motif pour le chemin » et « mesurer l'instance
+pour l'ensemble ».
+
+**La vérification définitive de la restauration reste donc à faire APRÈS la fin du rejeu**, et la
+commande est en tête du fichier de suite. *La session 7 l'a assertée dans son `finally` et vérifiée de
+l'extérieur pour son premier passage ; le second est en vol.*
+
+### La mesure manquante qu'elle a trouvée après avoir publié — et c'est la cinquième de la journée
+
+`C.message` était **déclaré dans sa table de sélecteurs et jamais lu.**
+
+> **Une clé morte dans une table de sélecteurs ne signale presque jamais un oubli de ménage : elle
+> signale une MESURE ABSENTE.**
+
+Et celle-ci comblait un trou réel : *arriver sur `/profil` sans `force_change=1` prouve que le middleware
+n'a pas intercepté ; **ça ne prouve pas que `POST /profil/mot-de-passe` a été atteint*** — une redirection
+vers le profil peut venir d'ailleurs. **Le message de refus, lui, n'existe que si le contrôleur a lu les
+trois champs et appliqué la politique.**
+
+*C'est « un observable ne dit jamais par quel chemin il a été produit », appliqué à un observable qu'elle
+avait elle-même choisi comme preuve.* Prédiction : **13 → 14**.
+
+**Et elle avait rencontré la même clé morte sur `pare-feu`** — où elle l'avait **retirée** au lieu de s'en
+servir. *La même trouvaille, lue deux fois de deux façons : la première comme du désordre, la seconde
+comme un indice.*
