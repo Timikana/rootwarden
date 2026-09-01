@@ -221,6 +221,45 @@ désigne son propre remède.
   contenant que la machine 2. Un groupe **dynamique** résout ses membres **au moment du
   clic** : l'ensemble visé n'est pas lisible dans la ligne du groupe, et rien n'empêche
   la production d'y tomber ;
+- **Un instrument qui écrit dans l'espace du LIVRABLE contamine le livrable — et aucune
+  assertion de l'instrument ne le voit.**
+
+  Mesuré le 2026-09-01 : une sonde de mutation écrivait ses captures dans le **même
+  dossier** que la référence. L'état forgé par la sonde — une page annonçant « Historique
+  illisible » — a failli être livré comme **état normal** de la page.
+
+  L'assertion en place disait `les trois captures sont ecrites`. Elle était **verte, et
+  elle avait raison** : elles étaient écrites. Elles montraient autre chose que ce qu'elles
+  prétendaient montrer.
+
+  > **Une assertion sur la PRODUCTION d'un artefact ne dit rien de son CONTENU**, et c'est
+  > précisément l'écart qu'un livrable binaire rend invisible : le défaut ne s'est pas vu
+  > en relisant le code, il s'est vu **en regardant l'image**.
+
+  Deux règles : toute sortie d'un instrument va dans un espace **distinct** de celle du
+  livrable (`…/<cible>-sonde`), et une capture se **regarde** avant d'être envoyée, jamais
+  seulement comptée ;
+
+- **`innerText` sur un élément NON RENDU retombe sur `textContent` — l'assertion mesure
+  alors l'instrument, pas la page.**
+
+  Un conteneur `hidden` au chargement portait un texte d'attente, **invisible à l'écran**
+  et pourtant lu comme du contenu : l'assertion « le conteneur est vide au repos » a rougi
+  **sur une page qui se comporte correctement**.
+
+  La propriété juste n'était pas « le conteneur est vide » mais « **il n'est pas affiché et
+  ne porte aucune entrée** » — visibilité et **comptage d'entrées**, jamais le texte. Même
+  famille que la mesure de géométrie plus bas : *ce que le DOM contient n'est pas ce que
+  l'écran montre*, et un faux rouge coûte autant qu'un faux vert — il fait corriger une
+  page saine ;
+
+- **Un détail qui ne vaut que pour UN verdict se conditionne à ce verdict — dans les DEUX
+  sens.** La spec connaissait le détail d'échec imprimé à côté d'un PASS (cinq
+  occurrences). La sixième est le **miroir** : un paramètre inconditionnel a fait imprimer
+  `conteneur present, vide au repos` sur un **FAIL qui niait exactement cela**, en
+  masquant le vrai détail d'échec. *Un PASS qui se contredit fait douter ; un FAIL qui
+  affirme la propriété qu'il vient de réfuter fait chercher au mauvais endroit* ;
+
 - **Une mutation ne se juge pas au rouge qu'elle produit, mais à la LISTE DE CE QUI EST
   RESTÉ VERT.**
 
