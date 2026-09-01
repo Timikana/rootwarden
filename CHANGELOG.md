@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.129** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.130** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,53 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.130 — E-273 : j'ai EXECUTE le runner en voulant compter ses tableaux, et mon garde de ce soir l'a rendu lisible
+
+    eval "$(sed -n '/^SUITES_LARAVEL=(/,/^)/p' scripts/rejouer-lot.sh)"
+
+**Aucune ligne ne commence par `)` dans ce fichier** — le tableau se ferme par `go-page-update-u6b)` en
+**fin** de ligne. *Une plage `sed` dont la borne de fin ne correspond jamais va jusqu'a la fin du
+fichier* : **352 lignes, corps de la boucle compris, passees a `eval`.** Le runner a demarre.
+
+**Aucun degat, verifie point par point** : `StartedAt` **inchange** (le backend n'a PAS redemarre),
+`git status` vide, **0 suite reellement jouee**, aucune machine jointe, conteneurs « Up 12 days ».
+*Le mur des droits docker a fait l'essentiel, et je ne me l'attribue pas.*
+
+#### Le cinquieme verdict a attrape le premier accident reel — et c'etait le mien
+
+    go-socle-navigation  laravel  PASS=  FAIL=  0s  GARDE INDISPO — le garde n a pas pu s executer
+
+Le chemin relatif se resolvait depuis la racine. **Le garde a echoue FERME et a nomme son motif**, au
+lieu d'une chaine vide qui se serait lue « conforme ». *Pose deux heures plus tot pour un cas theorique.*
+**Sans lui, quatre suites qui n'ont jamais tourne seraient apparues conformes.**
+
+#### La leçon est plus embarrassante que l'accident
+
+Je voulais appliquer ma propre regle — *faire lire une structure par son propre analyseur* — et
+**l'implementation de cette regle a EXECUTE le programme.**
+
+> **Une regle juste appliquee par un instrument non mesure produit le geste qu'elle voulait empecher.**
+
+*Neuvieme fois du jour qu'un motif a moi ignore la forme de ce qu'il mesure ; **la premiere ou le motif
+n'observe pas, il AGIT**.* **`eval` transforme une erreur de lecture en erreur d'execution.**
+
+**Parade** : analyseur a **parentheses appariees**, jamais de plage de motifs, et **jamais `eval`** sur un
+fragment de script.
+
+#### Et le compte RECOUPE enfin
+
+    SUITES_LARAVEL 80 + SUITES_LEGACY 78 = 158   <- les 158 journaux du LOT mesure
+    83 suites distinctes
+
+> **C'est le recoupement qui valide, pas la confiance dans la commande.** Mes deux comptages precedents
+> ne recoupaient rien : le premier (25) grepait le fichier entier et comptait les suites **citees en
+> commentaire**.
+
+**L'ecart avec la session 7 est une POPULATION** : `go-*.mjs` 109 -> **26 hors LOT** · tous les `*.mjs`
+129 -> **46** · sa population 123 -> **40**. *Les six qu'elle exclut ne sont pas des suites.* **Son 40 et
+mon 46 sont la meme mesure sur des populations distantes de six** — septieme faux desaccord, meme cause :
+un nombre sans son etiquette. **Et sa population est la bonne.**
 
 ### v1.38.129 — E-271 : 22 % du corpus n'est jamais joue, et l'une des exclues joint la PRODUCTION
 
