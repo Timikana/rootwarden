@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Droits;
+use App\Services\Comptes;
 use App\Services\Machines;
 use App\Services\MotDePasse;
 use App\Services\StepUp;
@@ -24,6 +25,7 @@ class PortailController extends Controller
     public function __construct(
         private readonly Droits $droits,
         private readonly Machines $machines,
+        private readonly Comptes $comptes,
     )
     {
     }
@@ -87,11 +89,35 @@ class PortailController extends Controller
             ->values()
             ->all();
 
+        $role = (int) $requete->session()->get('role_id', 0);
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+
         return view('accueil', [
             'modulesAccessibles' => $entrees->count(),
             'modulesPortes'      => $entrees->filter(fn ($e) => isset($e['route']))->count(),
             'libelleRole'        => $this->libelleRole((int) $requete->session()->get('role_id', 0)),
             'raccourcis'         => $raccourcis,
+            /*
+             * ══ LES NEUF INDICATEURS DU LEGACY, TOUS BORNES ══════════════
+             *
+             * `legacy/index.php:78-104` les calcule SANS borne. Trois familles,
+             * trois bornes differentes, et c'est ce que l'arbitrage §1 ne
+             * couvrait qu'a moitie :
+             *
+             *   - les indicateurs de MACHINES  -> bornes au perimetre ;
+             *   - ceux de VULNERABILITES       -> bornes au perimetre aussi,
+             *     parce que `cve_scans` porte `machine_id` (mesure) — le DSI
+             *     les donnait pour non bornables, la donnee dit le contraire ;
+             *   - ceux de COMPTES              -> bornes par ROLE, parce qu'un
+             *     perimetre de machines ne borne pas une population d'usagers.
+             *
+             * Le gel de role des trois derniers vit DANS le service, pas ici :
+             * une garde posee dans le controleur serait a reecrire au second
+             * appelant.
+             */
+            'indicateurs'        => $this->machines->indicateurs($role, $idCompte),
+            'cve'                => $this->machines->indicateursCve($role, $idCompte),
+            'comptes'            => $this->comptes->indicateursComptes($role),
             // E-208 : borne au perimetre, ET le total du parc avec.
             'parc'               => $this->machines->compteursPerimetre(
                 (int) $requete->session()->get('role_id', 0),

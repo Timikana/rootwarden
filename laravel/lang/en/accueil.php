@@ -68,4 +68,34 @@ return [
     'parc_total' => '{1}1 in the fleet|[2,*]:count in the fleet',
     'parc_borne_aide' => "You only see the machines assigned to you here. The second number is the real size of the fleet: it is shown so the boundary is visible rather than guessed.",
     'parc_illisible' => "The fleet could not be read. This is not « no machines »: the database did not answer, and no number shown here would be reliable.",
+    // ══ THE LEGACY'S NINE INDICATORS, BOUNDED ════════════════════════════
+    'ind_parc_titre' => 'Your fleet',
+    'ind_machines' => 'machines',
+    'ind_en_ligne' => 'online',
+    'ind_hors_ligne' => 'offline',
+    // THREE STATES, NOT TWO. The legacy counts « != ONLINE » and therefore files
+    // machines of UNKNOWN state among the offline ones. Both counters add up to
+    // the total, which makes them look consistent — and that is what kept the
+    // defect invisible.
+    'ind_inconnu' => 'state unknown',
+    'ind_inconnu_aide' => "These machines are neither online nor offline: the product has no up-to-date information about them. The legacy portal counted them as offline, which asserted a state the data does not carry.",
+    'ind_cle' => 'with the platform key',
+
+    'ind_cve_titre' => 'Known vulnerabilities',
+    'ind_cve_date' => 'last scan',
+    'ind_cve_nombre' => 'CVE at the last scan',
+    'ind_cve_critiques' => 'critical, all scans',
+    'ind_cve_aucun_scan' => "No vulnerability scan has been run on the machines in your scope. This is not « zero CVE »: it is the absence of measurement.",
+    'ind_cve_illisible' => "The scan history could not be read. This is not « no CVE » — no number shown here would be reliable.",
+
+    'ind_comptes_titre' => 'Portal accounts',
+    'ind_actifs' => 'active accounts',
+    'ind_sans_cle' => 'with no SSH key stored',
+    'ind_sans_cle_sature' => "This indicator is at 100% today: no account has an SSH key stored. It is ported anyway — a saturated indicator is the only way to see it stop being saturated.",
+    'ind_sans_2fa' => 'with no second factor',
+    'ind_sans_2fa_aide' => "This number is restricted to role 3. It says what share of the portal's accounts opens with a password alone — useful information for acting on it, and a map of targets for anyone who has no acting to do. Your own second-factor state is shown above.",
+    'ind_comptes_reserve' => "Account counters are not shown to your role. They do not concern your machines: a scope of machines does not bound a population of users, so they are bounded by role instead.",
+
+    'ind_illisible' => "These values could not be read. This is not « zero »: the database did not answer.",
+    'ind_borne' => "These numbers only cover the machines assigned to you.",
 ];

@@ -2171,6 +2171,103 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.103 — les neuf indicateurs du legacy, bornés — et trois familles, trois bornes
+
+`legacy/index.php:78-104` calcule neuf valeurs **sans aucune borne** : un compte qui n'a accès à aucune
+machine y lit la taille du parc, le nombre de CVE critiques et la date du dernier scan. C'est pourquoi
+elles n'avaient pas suivi les tuiles.
+
+#### La moitié que l'arbitrage ne couvrait pas
+
+L'arbitrage disait « borné au périmètre du compte ». **Trois familles, trois bornes différentes :**
+
+| famille | borne | pourquoi |
+|---|---|---|
+| machines (5) | périmètre | le prédicat existant |
+| vulnérabilités (3) | **périmètre aussi** | `cve_scans` porte `machine_id` — mesuré |
+| comptes (3) | **rôle** | *un périmètre de machines ne borne pas une population d'utilisateurs* |
+
+**Les trois indicateurs CVE étaient donnés pour non bornables. `SHOW COLUMNS FROM cve_scans` rend
+`machine_id`.** Ils ne l'étaient pas : ils étaient non bornés **dans la requête du legacy**, ce qui
+n'est pas la même chose. Mesuré : la seule ligne de l'installation porte **1458 CVE, 103 critiques, sur
+la production** — un rôle 1 qui n'a pas cette machine ne les lit plus.
+
+#### ⚠ Trois états de réseau, pas deux — et la casse masquait le vrai défaut
+
+Le legacy compte `= 'Online'` d'un côté et `!= 'ONLINE'` de l'autre. On m'avait signalé la différence
+de casse comme le piège. **Mesuré : la collation est `utf8mb4_0900_ai_ci` et `'ONLINE' = 'Online'` rend
+1 — la casse n'a aucun effet en SQL.** L'avertissement était juste en effet et faux en cause : le piège
+serait de porter cette comparaison en PHP avec `===`.
+
+**Et ce que la casse masquait est plus grave** : la colonne contient `ONLINE` (1 machine) et `Inconnu`
+(2). Donc `!= 'ONLINE'` **range les machines d'état inconnu parmi les hors ligne**. Deux machines sur
+trois étaient annoncées hors ligne alors que le produit ne sait pas — **et les deux compteurs sommaient
+au total, ce qui les faisait paraître cohérents.** C'est ce qui rendait le défaut invisible.
+
+Trois compteurs désormais. **Ce n'est pas un indicateur ajouté** : `Inconnu` existe déjà dans la donnée,
+le legacy manquait de l'affichage, pas de l'état. *Décomposer un compteur qui confond deux états, c'est
+cesser d'affirmer ce que la donnée ne dit pas.* Et le compteur « inconnu » porte son explication à
+l'écran, sinon il se lirait comme un ajout cosmétique.
+
+Le complément est écrit **par exclusion** (`NULL` ou hors de `ONLINE`/`OFFLINE`) plutôt que par une
+liste des valeurs « inconnues » : une liste demanderait d'être tenue à jour, le complément ne se périme
+pas.
+
+#### `no2fa` au rôle 3, et le geler ne coûte rien
+
+**8 comptes actifs sur 12 sont sans second facteur.** Le legacy l'affiche dès le rôle 1. Ce n'est pas un
+chiffre gênant, c'est **une carte de la surface d'attaque** : un rôle 1 compromis apprend que les deux
+tiers des comptes s'attaquent sans second facteur.
+
+**Et le geler ne retire rien d'actionnable** : la page porte déjà une tuile qui dit à chaque compte
+**son propre** état. *Une information sur ses propres limites n'est pas une information sur des
+objets.*
+
+**Une réserve mesurée, que personne n'avait demandée.** Ce test porte sur les **octets** de
+`totp_secret`, et les colonnes chiffrées de ce produit ont déjà rendu « non vide » pour une valeur
+réellement vide. Vérifié **par les seules longueurs, sans déchiffrer aucun secret vivant** : 136 (×3) et
+204 (×1), aucune proche d'un chiffré de chaîne vide (~63 octets sur la même famille). Le compte est
+exact aujourd'hui — **et s'il se trompait un jour, il sous-estimerait**, la mauvaise direction pour un
+indicateur de sécurité.
+
+#### Le prédicat de bornage : une copie de moins, pas une de plus
+
+Il était écrit **deux fois** dans `Machines.php` et quatre fois dans le portage. **Factorisé en
+`predicatActives()` et `requeteBornee()`** : tous les indicateurs partent de la requête déjà bornée,
+donc **aucun ne peut oublier la borne**, et un indicateur ajouté plus tard l'hérite sans y penser.
+
+#### « Zéro mesuré » et « rien lu » se disent séparément, partout
+
+- parc illisible → l'écran le dit, il n'affiche pas des zéros ;
+- `cve_scans` illisible → dit aussi. Sans ça, une lecture échouée se rendrait « aucune CVE » : la
+  direction rassurante, celle que personne ne remesure ;
+- **aucune machine au périmètre** → `aucun_scan`, qui n'est ni « zéro CVE » ni « je n'ai pas su lire ».
+  Trois issues distinctes ;
+- compteurs de comptes non montrés → `null`, jamais `0`, et **le gel se dit avec sa raison** ;
+- `sans_cle` vaut **12 sur 12** : l'indicateur est **saturé**, et l'écran le dit — sinon on le prend
+  pour un défaut de lecture. Porté quand même : *un indicateur saturé est le seul moyen de voir qu'il
+  cesse de l'être.*
+
+La réserve de borne ne s'affiche **que si la borne mord**.
+
+#### Mesuré sur les trois régimes
+
+    role 1 / compte  2   machines=1  en_ligne=1 hors_ligne=0 inconnu=0  cle=1  borne=true
+                         cve 1458 / 103 critiques (sa machine)
+    role 1 / compte 14   machines=0  ...  aucun_scan=true   (et non « 0 CVE »)
+    role 2               machines=3  en_ligne=1 hors_ligne=0 inconnu=2  borne=false
+                         comptes: actifs=12 sans_cle=12 sans_2fa=NULL
+    role 3               idem + sans_2fa=8
+
+#### Ce qui n'est PAS fait, et c'est un livrable manquant
+
+**Les captures à 1920 / 1400 / 390 ne sont pas prises.** Elles demandent le banc, qui est tenu par une
+autre session. Vérifié en revanche : lint des 3 PHP, vue compilée en isolation, parité i18n **62 = 62**,
+zéro clé morte, zéro clé inemployée, dix classes CSS présentes, balises équilibrées, et les indicateurs
+mesurés sur les quatre régimes de rôle. **Le rendu, lui, n'a pas été regardé.**
+
+---
+
 ### v1.38.102 — E-245 : un rappel accroche a un ordre n'est jamais reverifie, il voyage ; et E-246 : ma sonde a rendu 28 orphelins la ou il y en a zero
 
 #### E-245 — troisieme travail redemande en un jour, et le deuxieme sur le meme point
