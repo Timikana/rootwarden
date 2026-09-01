@@ -13196,3 +13196,74 @@ Une suite ne peut pas « regarder ». Ce qu'elle peut mesurer : **le style CALCU
 **la geometrie rendue** (`getBoundingClientRect`), et **le recouvrement** (`elementFromPoint` — c'est lui
 qui a ferme E-241). *Trois observables mecaniques qui couvrent une partie du rendu, aucun qui couvre le
 « ca se lit mal ».* **A instruire cote QA, avec la limite ecrite plutot que devinee.**
+
+## E-271 — 25 suites sur 109 ne sont JAMAIS jouees, et rien ne distingue « exclue a bon droit » d'« oubliee »
+
+**Releve par la session 7 le 2026-09-02, verifie par le Lead : 109 fichiers `go-*.mjs`, 25 hors LOT.**
+
+    5   `go-captures-*`   PORTAGE, aout 2026 — a REGARDER, pas a asserter : hors LOT a bon droit
+    19  anciennes         avril a juillet 2026, anterieures au chantier
+    1   `go-ssh-audit-scanall`                                        <- voir ci-dessous
+
+> **Le LOT annonce 158 executions comme une couverture. 22 % du corpus n'est jamais joue, et le silence
+> ne dit pas lequel des deux c'est.** *C'est un zero qui n'explique pas pourquoi il est zero* — la classe
+> fermee trois fois aujourd'hui, appliquee cette fois au corpus lui-meme.
+
+**Geste arbitre : un REGISTRE date, pas un garde.** La liste, ce que chaque en-tete dit d'elle-meme, sa
+date, et **la commande qui la refait en tete**.
+
+> **Une enumeration dans un REGISTRE date n'est pas un garde : un registre a le droit de se perimer tant
+> qu'il porte sa date et sa commande de remesure ; un garde, non.**
+
+### ⚠⚠ ET L'UNE D'ELLES JOINT LA PRODUCTION, avec une condition formulee sur le mauvais axe
+
+`go-ssh-audit-scanall` n'est pas dans le LOT, et **`rejouer-lot.sh` ne la mentionne pas une seule fois**
+(verifie : 0 occurrence). Son propre en-tete affirme :
+
+> *« L'audit SSH est en lecture seule sur les cibles (lecture sshd_config) — aucune action mutante. »*
+
+**C'est VRAI, et c'est la mauvaise condition : elle ecarte la MUTATION, pas la PORTEE.** « Tout scanner »
+porte sur le parc **entier** — `srv-zabbix`, machine 1, production — jointe par SSH a chaque execution.
+*Un lecteur qui s'arrete a cette phrase conclut qu'elle est sure a ajouter au LOT.*
+
+> **Une condition formulee sur ce qui est TYPIQUE plutot que sur ce qui rend le geste GRAVE laisse
+> ouvert le cas qu'elle voulait fermer.**
+
+**C'est la DEUXIEME occurrence de ce motif en une heure, sur deux objets sans rapport** — la premiere est
+l'objection de la session 3 au DSI sur la condition « nommer la machine quand le perimetre en compte une
+seule », alors que *la faute d'echelle est pire quand le perimetre est grand* (E-269). **Deux fois en une
+heure, c'est un motif, pas une coincidence.**
+
+**Reserve posee en EN-TETE du fichier** (`78e570d`, session 7), *le seul endroit que lira forcement celui
+qui voudra l'ajouter.* **Pas de liste d'exclusions dans le runner** : ce serait une **enumeration dans un
+GARDE**, donc qui se perime sans le dire — le runner renverra au registre.
+
+## E-272 — pas de suites qui mesurent le LEGACY pour les trois modules non portes
+
+**Question posee par la session 7, arbitree par le Lead le 2026-09-02.** Elle a verifie avant d'ecrire que
+les quatre suites demandees avaient l'objet qu'on leur pretait — **trois sur quatre ne l'ont pas.**
+
+    remote_users    la moitie lecture/classement est portee sous /comptes-distants
+                    et DEJA couverte par `go-adm-comptes-distants` (18 laravel / 12 legacy)
+    groups          NON PORTE       documentation  NON PORTE       wazuh  NON PORTE
+
+**Decision : non.** Deux raisons mesurables :
+
+1. **une reference posee sur le legacy sera jetee au portage du module** — on paierait le banc deux fois
+   pour un chiffre dont la duree de vie est celle du sous-lot ;
+2. **`go-socle-navigation` couvre deja la seule propriete qui compte** : `total=32 route=24 legacy=8`, et
+   pour chaque entree non portee — *vise le legacy, en nouvel onglet, marqueur visible, et le lien
+   RESOUT*. **C'est ce qu'un exploitant peut constater ; le reste appartient au module quand il sera
+   porte.**
+
+### Et `remote_users` n'est PAS porte — la conclusion etait juste, la raison non
+
+`Navigation.php:77` porte encore `'legacy' => '/adm/server_users.php'`, et `MODULE-REMOTE-USERS.md:51`
+le dit : **« ce n'est pas un oubli : c'est la coupure VOULUE »**. La charge restante est **celle des cinq
+gestes distants** (`scan_server_users`, `server_user_keys`, `server_user_remove_key`,
+`delete_remote_user`, l'inventaire).
+
+> **Une capacite a moitie portee dont l'entree de menu pointe encore le legacy n'est pas « portee ».**
+
+**Pas de suite — mais le compte reste 26/32.** *Une conclusion juste tiree d'une premisse fausse se
+corrige quand meme : la premisse ressert ailleurs.*

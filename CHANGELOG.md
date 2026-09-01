@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.128** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.129** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.129 — E-271 : 22 % du corpus n'est jamais joue, et l'une des exclues joint la PRODUCTION
+
+    109 fichiers `go-*.mjs`   ->   25 hors LOT
+      5 `go-captures-*`  a REGARDER, pas a asserter        1 `go-ssh-audit-scanall`
+     19 anciennes, avril a juillet 2026
+
+> **Le LOT annonce 158 executions comme une couverture. Rien ne distingue « exclue a bon droit »
+> d'« oubliee ».** *Un zero qui n'explique pas pourquoi il est zero* — la classe fermee trois fois
+> aujourd'hui, appliquee au corpus lui-meme.
+
+**Geste arbitre : un REGISTRE date, pas un garde.** *Une enumeration dans un registre date n'est pas un
+garde — un registre a le droit de se perimer tant qu'il porte sa date et sa commande de remesure ; un
+garde, non.*
+
+#### ⚠⚠ `go-ssh-audit-scanall` joint la production, et sa condition porte sur le mauvais axe
+
+Verifie : **`rejouer-lot.sh` ne la mentionne pas une seule fois.** Son en-tete dit *« lecture seule sur
+les cibles — aucune action mutante »*. **C'est vrai, et c'est la mauvaise condition : elle ecarte la
+MUTATION, pas la PORTEE.** « Tout scanner » joint le parc entier par SSH, `srv-zabbix` comprise.
+
+> **Une condition formulee sur ce qui est TYPIQUE plutot que sur ce qui rend le geste GRAVE laisse ouvert
+> le cas qu'elle voulait fermer.**
+
+**Deuxieme occurrence en une heure, sur deux objets sans rapport** — la premiere est l'objection de la
+session 3 au DSI (E-269) : *la faute d'echelle est pire quand le perimetre est grand.* **Deux fois en une
+heure, c'est un motif.**
+
+#### E-272 — pas de suites qui mesurent le LEGACY pour les trois modules non portes
+
+La session 7 a verifie **avant d'ecrire** que les quatre suites demandees avaient l'objet qu'on leur
+pretait : **trois sur quatre ne l'ont pas.** Decision : **non** — *une reference posee sur le legacy sera
+jetee au portage*, et `go-socle-navigation` couvre deja la seule propriete constatable aujourd'hui
+(l'entree vise le legacy, en nouvel onglet, marqueur visible, **et le lien resout**).
+
+**Et `remote_users` n'est PAS porte** : `Navigation.php:77` pointe le legacy, et
+`MODULE-REMOTE-USERS.md:51` dit *« ce n'est pas un oubli : c'est la coupure voulue »* — la charge restante
+est celle des **cinq gestes distants**. **Une capacite a moitie portee dont l'entree de menu pointe encore
+le legacy n'est pas « portee ».** *Sa conclusion — pas de suite — tenait ; sa premisse non, et une
+premisse ressert ailleurs.* **26/32 inchange.**
 
 ### v1.38.128 — E-269 : un scan ECHOUE devient « le dernier scan », et E-270 : le rendu n'est couvert par aucune suite
 
