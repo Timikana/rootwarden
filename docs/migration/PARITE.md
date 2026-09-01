@@ -12215,3 +12215,80 @@ Famille du « ne jamais ancrer un test sur le premier bouton submit », deja pay
 
 **Onze ancres, deux pages, et les suites concernees ne sont pas celles de la session 3. Signale, pas
 fait** — *et ca reste un defaut meme si personne ne l'a encore paye.*
+
+## E-246 bis — une liste de HELPERS a le meme defaut qu'une liste de noms : le discriminant est le PREFIXE, derive par sa VALEUR
+
+**Propose et implemente par la session 6 (`17307e3`, 15:31), verifie par le Lead a 15:35 CEST.**
+**Il supersede la recommandation du Lead.**
+
+J'avais dit : *ancre la sonde sur l'ensemble DERIVE des helpers, pas sur une liste de noms.* Sa
+reponse va un cran plus loin, et elle a raison :
+
+> **Une liste de helpers a le meme defaut qu'une liste de noms.** `appellePortage` n'existe que dans
+> `pare-feu.js` : **un helper non liste rendrait « zero orphelin » sur un module entier** — la plus
+> rassurante des sorties, **par omission**.
+
+**Le discriminant retenu est le PREFIXE que le site d'appel ajoute devant le chemin, derive PAR LA
+VALEUR de la constante et jamais par son nom :**
+
+    fetch(X + chemin), X vaut '/api/gateway'   ->  prefixe '/api/gateway'   (passerelle)
+    fetch(chemin), chemin etant un PARAMETRE   ->  prefixe ''               (l'appelant fournit tout)
+    fetch('/x/y')                              ->  prefixe '/x/y'
+
+> **L'absence de prefixe EST le discriminant du portage.**
+
+**Verifie** : `PASSERELLE` porte ce nom dans **23** fichiers JS et vaut partout `'/api/gateway'`.
+*C'est exactement ce qui rendrait un tri par NOM confortable et faux* — il marcherait sur les 23, et
+tomberait au premier fichier qui nomme sa constante autrement.
+
+**Resultat intermediaire : 10 chemins du portage appeles par le JS, 0 orphelin.**
+
+### Et son propre defaut d'instrument, le premier des siens qui ALARME
+
+Premier jet : elle parcourait `[prefixe] + chemins` comme une **liste** de chemins. `/docker/scan` etait
+donc juge **sans** son prefixe et tombait en « indetermine » — **39 chemins parfaitement determines
+classes comme douteux.**
+
+> **Le prefixe se concatene, il ne s'enumere pas.**
+
+*Cinquieme defaut d'instrument qu'elle trouve chez elle en un jour, et le premier qui se trompe du cote
+qui alarme — les quatre autres rassuraient.* **Et il produisait exactement la liste de faux orphelins
+qu'E-246 corrige : elle aurait reproduit le defaut en ecrivant sa parade.**
+
+### Ce qui manque, et elle le nomme
+
+**Le croisement definitif doit lire LE ROUTEUR, pas son releve gele.** Le releve est verifie contre le
+routeur par `InventaireDesGardesTest`, donc la chaine tient pour l'interimaire — *mais une suite ancree
+sur lui mesurerait son propre releve.* `php artisan route:list` demande le conteneur : differe jusqu'a
+la fin du LOT.
+
+## E-253 — QUATRIEME travail redemande : j'ai assigne a 15:25 une tache finie a 14:14, et ma propre regle l'aurait attrapee
+
+**Mesure du 2026-09-01 a 15:35 CEST.**
+
+    271ba70   2026-09-01 14:14   « les silences par incapacite tombent de 13 a 4 »
+    mon message « ta fenetre »   ~15:25            -> UNE HEURE ET DEMIE APRES
+
+**Ma regle dit : « croise ce que tu vas assigner contre `git log` depuis ta derniere mesure AVANT de
+dispatcher ».** Je ne l'ai pas lancee. **Quatrieme travail redemande en deux jours** — apres l'unification
+du resolveur, l'encart `services` deux fois, et la cle `wazuh.status_unknown`.
+
+**Et la cause est differente des trois precedentes.** Celles-la etaient des RAPPELS accroches a un ordre
+(E-245), qui voyagent sans se remesurer. **Celle-ci etait une TACHE, dans une liste, exactement l'objet
+que ma regle couvre** — et je l'ai assignee dans un message dont le sujet etait *« voici ta fenetre
+pendant le LOT »*, donc en pensant occupation et non contenu.
+
+> **Une tache assignee pour REMPLIR une fenetre echappe au controle qu'on applique aux taches assignees
+> pour AVANCER.** Le geste se juge a son objet, pas a son motif.
+
+*Et le cout est le meme dans les deux sens : la session 6 a du m'ecrire « c'est fait depuis 14:0x » au
+lieu de travailler — ce qui est exactement ce que la regle du §1 economise quand on l'applique.*
+
+### Ce qu'elle a trouve dans son propre libelle, et qui vaut plus que le compte
+
+`extrait-urls.php` partait sur le guillemet ouvrant, **sa boucle ne tournait jamais**, et les huit
+entrees interpolees sortaient **vides** — *pendant que l'etiquette « silence MESURE » affirmait qu'on
+savait pourquoi on ne savait pas.* Le tableau disait 4 et 13 ; **il aurait du dire 0 et 17.**
+
+> **Un silence etiquete « mesure » qui ne porte pas sa mesure est un silence par incapacite sous un
+> meilleur nom.**
