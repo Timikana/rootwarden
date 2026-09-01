@@ -2313,3 +2313,107 @@ avait elle-même choisi comme preuve.* Prédiction : **13 → 14**.
 **Et elle avait rencontré la même clé morte sur `pare-feu`** — où elle l'avait **retirée** au lieu de s'en
 servir. *La même trouvaille, lue deux fois de deux façons : la première comme du désordre, la seconde
 comme un indice.*
+
+---
+
+## 18 — L'onglet `accueil` est FINI, et la session 3 a refusé la moitié d'une de mes décisions — **avec raison**
+
+**2026-09-01, 21:54 UTC.** Vérifications faites par moi, une par une.
+
+### Ce que j'avais faux, et qui venait d'un chiffre relayé
+
+    grep -c '$alerts\[\] *=' legacy/index.php   ->   8
+
+**J'annonçais NEUF alertes. Il y en a HUIT.** La neuvième est **une promesse sans code** :
+
+    legacy/index.php:147-148
+    // Fail2ban alerts (calculees apres le query dashboard)
+    // Seront evaluees plus bas apres les queries fail2ban_status
+    ?>                                    <- et le fichier passe au HTML
+
+> **Le « neuf » venait de la promesse, pas du fichier.** *Un commentaire qui annonce un calcul se compte
+> comme le calcul* — dixième forme de « l'en-tête qui ment », et la première où il ment **par
+> anticipation** plutôt que par péremption.
+
+**Et je l'avais relayé sans le mesurer**, comme j'ai relayé « 33 validateurs » et « 6 883 mots ».
+
+### ✅ Sa trouvaille qui rend ma décision meilleure que je ne la savais
+
+    legacy/index.php:120   … ORDER BY ssh_key_updated_at LIMIT 5
+                    :122   $oldKeys = count($oldKeysData);
+
+> **Le `LIMIT 5` était posé pour récupérer les cinq NOMS. Et le nombre annoncé est `count()` de ce même
+> tableau — donc PLAFONNÉ À CINQ.** Quarante comptes concernés s'afficheraient « 5 ».
+
+**Les deux défauts n'en font qu'un : la divulgation payait le faux compte.** J'avais décidé de retirer la
+liste nominative pour une raison de confidentialité ; **le même geste corrige un compteur faux**, et je ne
+le savais pas. *Une décision peut être juste pour une raison, et meilleure pour une autre qu'on n'avait pas
+vue.*
+
+### ⚠ SON REFUS EST FONDÉ — et une de ses clauses ne l'est pas
+
+**Elle refuse de poser un gel de rôle par-dessus les cinq alertes DÉRIVÉES.** Sa mesure :
+
+    role 1 borne  ->  1 alerte  « 103 vulnerabilites critiques »
+    role 2        ->  4
+    role 3        ->  5
+
+**Son argument tient** : un gel « surface d'attaque = rôle 3 » aurait montré **zéro alerte** à `opsuser`
+pendant que **sa propre tuile CVE affiche 103 — sur SA machine.** *Deux nombres contradictoires sur un
+seul écran, et le silence du côté qui rassure.* C'est E-235c par l'autre bout.
+
+**Et c'est vérifiable** : `opsuser` a **une** machine, `srv-zabbix`, et **l'unique ligne de `cve_scans` de
+l'installation est sur cette machine.** Son indicateur borné montre donc bien un fait qui le concerne.
+
+> **⚠ Mais sa clause « et alors qu'il a `can_scan_cve` » est FAUSSE.** Mesuré : `opsuser` n'a **aucune
+> ligne** dans `permissions` — `COALESCE(can_scan_cve, -1)` rend **-1**.
+>
+> **Ça n'affaiblit pas son refus, ça retire un renfort** : l'incohérence sur un seul écran est l'argument,
+> pas le droit d'agir. **Mais je le corrige parce qu'un refus qui repose sur une clause fausse se fait
+> démolir sur la clause** — c'est ce que j'ai écrit à la session 2 sur mon propre dossier, et ça vaut
+> ici.
+
+**DÉCISION : son refus est retenu.** Les cinq dérivées suivent la borne de **leur** indicateur, jamais une
+seconde ; seules les trois neuves reçoivent une classe. **Mon découpage en trois classes était juste et il
+était déjà appliqué** — *le réécrire l'aurait cassé.*
+
+### Et le possessif vivait à TROIS endroits, dont deux que seule l'image a montrés
+
+    la VALEUR              « 3 de vos machines »   <- ce que j avais releve
+    le TITRE de la tuile   « Vos machines »
+    le TITRE de SECTION    « Votre parc »
+
+> **Corriger la valeur seule aurait remonté le possessif d'une ligne.** *Aucune assertion ne lit un titre
+> de section* — c'est la capture, et rien d'autre, qui les a montrés.
+
+**Et le triplet de rôles a révélé un second cas que ma décision ne couvrait pas** : au rôle 1 à qui **tout**
+est attribué, ce n'est pas le possessif qui ment — il est honnête — **c'est la réserve**, qui annonce une
+restriction ne restreignant rien. **Son discriminant `mord` (`perimetre < parc`) couvre les deux bouts avec
+un seul test**, là où mon `borne` n'en couvrait qu'un.
+
+### Elle a touché un des neuf contre ma consigne, et elle a eu raison
+
+`indicateursCve` sommait `critical_count` sur **toutes** les lignes du périmètre, **sans filtre de
+statut**, là où le legacy joint sur `MAX(id) … WHERE status='completed'`. Un second scan **s'ajoutait** ;
+un scan `running` comptait comme un constat.
+
+> **Ma consigne « pas de retouche aux neuf » visait la dérive de périmètre. Elle ne peut pas couvrir un
+> nombre faux qu'on s'apprête à publier en rouge.** *Une instruction de ne pas toucher est suspendue par
+> un défaut qu'on est sur le point de mettre à l'écran.*
+
+**Et la raison pour laquelle c'était invisible mérite d'être gardée** : la base ne contient qu'**une** ligne
+de scan, donc les deux définitions rendent 103. **La coïncidence tenait à la donnée, pas au code.** Elle
+l'a vu parce que *103 était identique pour un périmètre d'une machine et pour le parc de trois* — **un
+nombre trop propre**, le même signal qui a rattrapé trois mesures de ce chantier.
+
+### Ce qu'elle me laisse à arbitrer, et je le prends
+
+**`date` et `cve` sont encore lus sans filtre de statut** — un scan **échoué** deviendrait « le dernier
+scan ». Et **« 1458 CVE au dernier scan » présente le scan d'UNE machine comme un total de parc.**
+
+**DÉCIDÉ : même traitement que `critical_count`** — filtre de statut sur les trois, et le libellé nomme la
+**machine** quand le périmètre en compte une seule. *Un « dernier scan » qui peut être un scan échoué n'est
+pas une date, c'est une tentative* ; et un total de parc calculé sur une machine est la faute d'échelle
+qu'E-207 a déjà coûtée.
+
+**Session 3, même commit que ses autres corrections d'indicateur.**
