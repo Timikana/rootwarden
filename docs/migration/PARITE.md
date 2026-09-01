@@ -12825,9 +12825,43 @@ une commande **qui n'avait rien execute.**
 > **Le silence par incapacite, et l'auteur en est celui qui a supprime le temoin.** `2>/dev/null` ne
 > cachait pas du bruit : il cachait **la seule ligne qui disait que la mesure n'avait pas eu lieu.**
 
-*Ce qui a sauve cette porte, c'est que j'avais AUSSI lance `git status --porcelain laravel/`, qui est
-fiable — la conclusion etait juste, et une de ses deux moities etait vide.* **Une porte a deux verrous
-dont un est factice s'ouvre quand meme, et personne ne sait lequel a tenu.**
+*Ce qui a sauve cette porte, c'est que j'avais AUSSI lance `git status --porcelain laravel/`.* **Une porte
+a deux verrous dont un est factice s'ouvre quand meme, et personne ne sait lequel a tenu.**
+
+### ⚠ ET LE SECOND VERROU N'EST PAS FIABLE NON PLUS — correction de la session 7
+
+J'avais ecrit que `git status --porcelain` etait fiable. **Il est AVEUGLE au cas exact qui a fauche le
+premier LOT :**
+
+    cas                            git status   lib-arbre (mtime)
+    modifie, non commite           VOIT         voit
+    modifie PUIS REMIS             AVEUGLE      voit          <- LE CAS DU 15:30:15
+    cree PUIS supprime             aveugle      aveugle       <- angle mort declare
+    ecriture d'etat (logs, cache)  aveugle      ecarte volontairement
+
+**Le 15:30:15 etait le deuxieme cas** — deux vues modifiees puis remises a l'identique. **A 15:31,
+`git status` etait vide**, et c'est precisement ce qui a fait croire a la session 7 que mon alerte etait
+fausse.
+
+> **Ma porte n'avait donc pas un verrou factice et un bon : elle avait un verrou factice et un verrou qui
+> ne voit pas la classe d'incident qu'il est cense prevenir.** *Ce n'est pas plus grave — c'est moins
+> visible, parce que le verrou fiable A L'AIR de suffire.*
+
+**Et l'instance est vivante, mesuree a 23:50:44 :** `profil.blade.php` et `supervision.blade.php` portent
+un `mtime` de **23:49:30** — le patch E-250 vient d'y dedoubler les ancres — **et `git status` est
+VIDE** (le patch est commite). *Qui mesurerait maintenant en se fiant a `git status` conclurait
+« propre », sur des fichiers dont cinq suites lisent les ancres et qui ont change il y a une minute.*
+
+**La porte adoptee**, eprouvee dans les deux sens avant d'etre inscrite — fenetre de 10 min : ferme en
+nommant onze fichiers, code **1** ; fenetre de 1 s : **silence** :
+
+    node -e "import('./tests/e2e/lib-arbre.mjs').then(m=>{
+      const r=['laravel','legacy','backend'].flatMap(c=>m.plusNeufsQue(c,Date.now()-600000)||[]);
+      if(r.length){console.error('PORTE FERMEE :',r.map(x=>x.fichier).join(', '));process.exit(1)}
+    })"
+
+*Sans tube, sans `stderr` silence, date absolue calculee en JS, et l'etat d'execution ecarte par
+`git check-ignore`.* **`git status` se garde EN PLUS, jamais A LA PLACE.**
 
 ### ⚠ ET MA PREMIERE RECTIFICATION ETAIT FAUSSE AUSSI — le tube, encore
 
