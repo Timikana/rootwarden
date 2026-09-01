@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.111** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.112** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,49 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.112 — E-251 : ne pas commiter protege l'HISTORIQUE, pas l'ETAT SERVI — le LOT mesurait des vues renommees
+
+    git status --porcelain laravel/resources/views/   ->  M profil.blade.php  M supervision.blade.php
+    dans les VUES    profil-mdp-succes · superv-*-succes          (renommes, NON commites)
+    dans les SUITES  profil-mdp-message · superv-*-message        (les anciens noms)
+    pgrep rejouer-lot -> 3879508                                  LE LOT TOURNAIT
+
+**PHP relit a chaque requete : l'arbre de travail EST servi.** Le LOT complet — commande dix minutes
+plus tot — servait les vues renommees a **cinq suites** qui cherchent les anciennes ancres, dont
+`go-page-mot-de-passe`, livree a 16 PASS trente minutes avant.
+
+> **Ne pas commiter protege l'HISTORIQUE, pas l'ETAT SERVI. La branche est un registre ; l'arbre est le
+> systeme.**
+
+**La session 3 avait fait le bon geste** — refuser de commiter pour ne pas imposer cinq rouges — et elle
+avait declare l'attente dans la forme exacte que j'exige. **Ma regle E-244 dit de DECLARER l'attente ;
+elle ne dit pas de RETIRER LE GESTE de l'arbre.** Incomplete, et c'est ce qui a rendu l'incident
+possible. **Corrigee : une piece en attente se declare ET se retire de l'arbre** — *sinon la declaration
+protege le lecteur du journal et pas le processus qui tourne.*
+
+**Et c'est E-247 avec un EFFET** : les deux cas de la session 7 etaient sans consequence — un fichier
+hors autoload servi, un autre sur l'autre serveur. *Une regle etablie sur des cas sans consequence ne se
+sent pas urgente ; le premier cas consequent arrive apres.*
+
+**Le garde par suite gagne son cas d'usage le plus net** : un `git status --porcelain` sur le chemin
+servi, au demarrage de chaque suite. **Avec une asymetrie** — un fichier modifie a cet instant n'est pas
+un avertissement mais **un motif d'abattage pour cette suite** : la mesure ne veut rien dire, et un
+rouge inexplicable coute plus qu'une execution sautee.
+
+#### Le balayage de la session 3 : quatre occurrences pour une signalee
+
+Derivees par la regle « meme ancre litterale deux fois dans un fichier », pas relayees. **Et
+l'asymetrie du remplacement est le point qui compte** : trois des cinq suites cherchent le message *quel
+qu'il soit* — **pour celles-la il faut les DEUX selecteurs**, sinon elles cessent de voir la moitie des
+cas et **passent au vert par absence.**
+
+#### E-252 — `tuile-valeur` x6 et x5 : pas de faux vert, mais une assertion par POSITION
+
+**Ce n'est pas la classe d'E-250** : pas deux etats opposes mais cinq ou six **valeurs distinctes** sous
+une ancre generique — donc **aucun faux vert sur un etat inverse**, et il faut le dire aussi net. Ce que
+c'est : une assertion **par position**, qu'*une tuile inseree decale*. Famille du « premier bouton
+submit ». **Signale, pas fait** — *et ca reste un defaut meme si personne ne l'a encore paye.*
 
 ### v1.38.111 — E-250 : deux etats opposes sous la meme ancre, et `go-page-mot-de-passe` inscrite sur un POST MESURE
 

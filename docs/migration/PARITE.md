@@ -12101,3 +12101,84 @@ formulaire, le soumet, et sort par les deux chemins de deconnexion.*
 ajoutee dans le meme geste que la correction, puis la prediction posee **sans la compter**. *Deuxieme
 fois du jour pour cette forme — et cette fois l'etat non relu etait le SIEN, ecrit trois minutes plus
 tot.* **Un ecart signale ne desatbilise pas une reference ; un ecart tu la rend suspecte.**
+
+## E-251 — ne pas commiter protege l'HISTORIQUE, pas l'ETAT SERVI : cinq suites du LOT mesuraient des vues renommees dans l'arbre
+
+**Detecte par le Lead le 2026-09-01 a 16:20 CEST, dix minutes apres avoir commande le LOT complet.**
+
+    git status --porcelain laravel/resources/views/
+       M profil.blade.php        M supervision.blade.php      <- NON commites
+
+    dans les VUES     profil-mdp-succes · superv-config-succes · superv-profil-succes · superv-reglages-succes
+    dans les SUITES   profil-mdp-message · superv-*-message                    <- les ANCIENS noms
+    pgrep rejouer-lot -> 3879508                                              <- LE LOT TOURNAIT
+
+**PHP relit a chaque requete**, donc l'arbre de travail EST servi. Le LOT servait les vues renommees a
+**cinq suites** qui cherchent les anciennes ancres, et les cinq sont dans le LOT :
+`go-auth-mot-de-passe`, `go-page-mot-de-passe`, `go-page-supervision-config-ecriture`,
+`go-page-supervision-profils-crud`, `go-page-supervision-reglages`.
+
+**Dont `go-page-mot-de-passe`, livree a 16 PASS trente minutes plus tot.**
+
+### LA REGLE, ET C'EST LA MOITIE QUI MANQUAIT A E-244
+
+> **Ne pas commiter protege l'HISTORIQUE, pas l'ETAT SERVI. La branche est un registre ; l'arbre est le
+> systeme.**
+
+La session 3 avait fait **le bon geste** — refuser de commiter pour ne pas imposer cinq rouges a
+d'autres sessions — et elle avait declare l'attente dans la forme exacte que j'avais exigee. **Ma regle
+E-244 dit de DECLARER l'attente ; elle ne dit pas de RETIRER LE GESTE de l'arbre.** Elle etait
+incomplete, et c'est ce qui a rendu l'incident possible.
+
+**E-244 corrige, les deux moities :** une piece en attente chez autrui **se declare ET se retire de
+l'arbre** (`git stash`, ou remise a HEAD) tant que l'attente dure — *sinon la declaration protege le
+lecteur du journal et pas le processus qui tourne.*
+
+### C'est E-247 avec un EFFET, la ou les deux premiers cas n'en avaient pas
+
+La session 7 avait etabli que *rendre le banc ne protege que la charge, et qu'une ecriture dans l'arbre
+fausse une mesure sans apparaitre nulle part.* **Ses deux exemples etaient sans effet** — un fichier de
+test hors de l'autoload servi, un autre sur l'autre serveur. **Celui-ci a un effet direct sur cinq
+suites, pendant une mesure de 2 h 40 commandee dix minutes plus tot.**
+
+*Une regle etablie sur des cas sans consequence ne se sent pas urgente. Le premier cas consequent
+arrive apres.*
+
+### Le garde par suite gagne son cas d'usage le plus net
+
+Un `git status --porcelain` sur le chemin servi de la cible, **au demarrage de chaque suite**, aurait
+rendu ceci visible a la premiere execution au lieu de la 130e. **Et avec une asymetrie** : un fichier
+modifie dans l'arbre au moment ou la suite demarre n'est pas un avertissement, **c'est un motif
+d'abattage pour cette suite-la** — la mesure ne veut rien dire, et un rouge inexplicable coute plus
+qu'une execution sautee.
+
+### Ce que le balayage de la session 3 a trouve, et qui reste a faire ENSEMBLE apres le LOT
+
+**Quatre occurrences pour une signalee**, derivees par la regle « meme ancre litterale deux fois dans un
+fichier » et non relayees. Les quatre ont la meme forme : `rw-confirmation` et `rw-erreur` sous une
+ancre unique.
+
+**Et l'asymetrie du remplacement est le point qui compte** : trois des cinq suites cherchent le message
+*quel qu'il soit*. **Pour celles-la il faut les DEUX selecteurs, pas un** — sinon elles cessent de voir
+la moitie des cas et **passent au vert par absence.** *Ce qui reste vert compte plus que ce qui rougit.*
+
+**Ordre arbitre** : le LOT reprend depuis le debut · pendant, la session 3 ecrit `wazuh` et les sessions
+6 et 7 preparent les selecteurs · apres, les quatre renommages et les cinq suites dans une **fenetre
+unique**, puis un LOT cible sur les cinq.
+
+## E-252 — `tuile-valeur` employee six fois puis cinq : pas de faux vert, mais une assertion par POSITION
+
+**Releve par la session 3, non corrige, inscrit le 2026-09-01.**
+
+    rapport-conformite.blade.php   tuile-valeur   x6
+    scan-cve.blade.php             tuile-valeur   x5
+
+**Ce n'est PAS la classe d'E-250** : pas deux etats opposes mais **cinq ou six valeurs distinctes** —
+serveurs scannes, total, critiques, hautes, moyennes — sous une ancre generique. **Donc aucun faux vert
+sur un etat inverse**, et il faut le dire aussi net.
+
+**Ce que c'est** : une suite ne peut y asserter que **par position**, et *une tuile inseree decale tout*.
+Famille du « ne jamais ancrer un test sur le premier bouton submit », deja payee par ce depot.
+
+**Onze ancres, deux pages, et les suites concernees ne sont pas celles de la session 3. Signale, pas
+fait** — *et ca reste un defaut meme si personne ne l'a encore paye.*
