@@ -151,6 +151,14 @@ function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
 
 const avortees = [];
 const passees = [];
+/*
+ * REQUETES VUES PAR L'INTERCEPTEUR, avortees et passees confondues. C'est le
+ * temoin que le filet a eu un OBJET : sans lui, une suite tombee avant
+ * d'ouvrir une page decerne « aucun geste interdit n'a abouti » — vrai, et
+ * entierement vide. Ni `passees` ni `avortees` ne suffisent : une page qui
+ * n'appelle aucune route filtree les laisse vides alors que le trafic a eu lieu.
+ */
+let vues = 0;
 const boites = [];
 
 const navigateur = await puppeteer.launch({
@@ -178,6 +186,7 @@ async function connecte(compte) {
 
     await page.setRequestInterception(true);
     page.on('request', (r) => {
+        vues += 1;
         const url = r.url();
         const chemin = url.replace(/^https?:\/\/[^/]+/, '');
         let corps = '';
@@ -529,13 +538,19 @@ try {
         constate('boites natives ouvertes', boites.length
             ? boites.map((b) => `${b.type} « ${b.message.slice(0, 60)} »`).join(' | ') : '(aucune)');
 
-        verifie('AUCUN geste interdit n\'a abouti',
-            ! passees.some((p) => INTERDITS.test(p.route)),
-            passees.filter((p) => INTERDITS.test(p.route)).map((p) => p.route).join(' '),
-            `${passees.length} requete(s) laissee(s) passer`);
-        verifie('AUCUNE requete n\'a vise la production',
-            ! passees.some((p) => new RegExp(`[?&](machine_id|server_id)=${MACHINE_PRODUCTION}\\b`).test(p.route)),
-            'une requete a vise `srv-zabbix`');
+        // Un filet qui n'a rien vu passer ne certifie rien : il s'abstient en
+        // le disant, plutot que de decerner deux PASS a un controle sans objet.
+        if (vues === 0) {
+            constate('controle de surete', 'SANS OBJET — aucune requete vue, le filet n\'a rien eu a filtrer');
+        } else {
+            verifie('AUCUN geste interdit n\'a abouti',
+                ! passees.some((p) => INTERDITS.test(p.route)),
+                passees.filter((p) => INTERDITS.test(p.route)).map((p) => p.route).join(' '),
+                `${passees.length} requete(s) laissee(s) passer`);
+            verifie('AUCUNE requete n\'a vise la production',
+                ! passees.some((p) => new RegExp(`[?&](machine_id|server_id)=${MACHINE_PRODUCTION}\\b`).test(p.route)),
+                'une requete a vise `srv-zabbix`');
+        }
     } catch (e) { note(`FAIL  controle de surete : ${e.message}`); echecs += 1; }
     try {
         const zabbix = litEnBase("SELECT CONCAT(name,'|',ip) FROM rootwarden.machines WHERE id = 1");
