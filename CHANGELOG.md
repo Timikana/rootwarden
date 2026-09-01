@@ -2171,6 +2171,72 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.127 — E-269 : un « dernier scan » qui peut avoir echoue n'est pas une date
+
+**Arbitrage du DSI, pose — avec une objection sur sa condition, retenue.**
+
+#### Le filtre de statut manquait sur deux des trois nombres
+
+`indicateursCve` lisait `date` et `cve` **sans filtre de statut** : un scan `running` ou `failed`
+devenait « le dernier scan », avec sa date et son `cve_count` — souvent 0. **Un `cve_count` de 0
+issu d'un scan echoue s'affiche exactement comme un parc sain.**
+
+*Un « dernier scan » qui peut avoir echoue n'est pas une date, c'est une tentative.*
+`critical_count` avait ete corrige a E-265 ; les deux autres restaient.
+
+#### La condition de l'arbitrage etait inversee, et l'elargir etait le seul moyen de la servir
+
+L'arbitrage demandait de nommer la machine **« quand le perimetre en compte une seule »**, au motif
+de la faute d'echelle. Or `date` et `cve` viennent d'**UNE ligne de scan**, donc d'une machine,
+**quel que soit le perimetre** — la faute d'echelle est donc **PIRE quand le perimetre est GRAND**.
+
+**La condition protegeait exactement le cas ou l'ambiguite est nulle** (perimetre de 1 : on sait de
+quelle machine il s'agit) **et laissait sans nom le cas qu'elle voulait fermer.** Elargi apres
+accord : on nomme la machine **des qu'on la connait**, avec repli sans nom si elle ne l'est pas —
+*un libelle ne doit pas rendre « de » suivi d'un trou*.
+
+    avant   « 1458 CVE au dernier scan »              <- lu comme un total de parc
+    apres   « 1458 CVE au dernier scan de srv-zabbix » <- le compte d'UNE machine, dit comme tel
+
+`critiques` ne nomme personne : il somme le dernier scan complete de CHAQUE machine, c'est le seul
+des trois qui porte reellement sur le perimetre. **Deux natures, pas trois.**
+
+#### E-269b — a 390 px, le nombre etait orphelin de son libelle
+
+Vu a l'image, sur la capture mobile de la region d'alertes ecrite la veille. `flex-wrap` renvoyait
+le TEXTE a la ligne suivante des qu'il ne tenait pas : **« ⚠ 1 » restait seul sur sa ligne**, et un
+nombre separe de son libelle se lit comme un marqueur egare. `flex: 1 1 0` le laisse retrecir et se
+replier sur place.
+
+**Aucune assertion DOM ne distingue ces deux mises en page** — elles ont exactement les memes
+noeuds. Troisieme defaut de ce chantier que seule l'image montre, apres les deux titres possessifs.
+
+#### Les cles auraient pu rester MORTES
+
+Le correctif redige hors du depot posait les quatre variantes de libelle **et oubliait la vue**.
+Les cles existaient, rien ne les rendait. Rattrape par un controle explicite avant commit : les
+cinq variantes ajoutees en deux jours (`parc_neutre`, `parc_compteur_titre_neutre`,
+`ind_parc_titre_neutre`, `ind_cve_date_machine`, `ind_cve_nombre_machine`) sont **toutes rendues
+par une vue**. *Trois pieces justes peuvent donner un ecran inerte.*
+
+#### Mesures
+
+    go-page-accueil    41 PASS / 0 FAIL   (3 roles, captures REGARDEES aux 3 largeurs)
+    parite i18n        FR=86  EN=86  ecarts=0 dans les deux sens
+    requete reelle     date=2026-07-25 15:56:44  cve=1458  machine='srv-zabbix'
+
+**Repetition a blanc avant d'ecrire** : le correctif a ete joue sur des COPIES hors du depot, ses 8
+assertions verifiees et le PHP produit passe au lint, avant d'etre applique. Une de ses ancres etait
+`'CVE at the last scan'` et non `'CVEs in the last scan'` — **il aurait echoue sur sa propre
+assertion.** *Un correctif redige sans relire sa cible est un correctif qui suppose.*
+
+#### Numerotation
+
+Annonce sous E-268, **deja pris** (`712268b`, une heure plus tot). Renumerote **E-269** avant le
+commit — 4 references, contre 17 la veille. La cause est structurelle : le numero est reserve au
+moment de l'ECRITURE, pas de la decision, et deux sessions redigent long entre les deux.
+**Convention adoptee des deux cotes : annoncer le numero AVANT de rediger.**
+
 ### v1.38.126 — E-250 clos cote suites : une valeur inchangee n'atteste rien si l'instrument accepte les deux etats
 
     go-auth-mot-de-passe                 27 · 0     go-page-supervision-config-ecriture  16 · 0

@@ -229,13 +229,21 @@
         </p>
     @else
         <div class="rw-grille" data-rw="accueil-cve">
+            {{-- ══ E-269 : CES DEUX-LA VIENNENT D'UNE SEULE MACHINE ═══════════
+                 `date` et `cve` sont lus sur UNE ligne de scan, donc sur une
+                 machine — quel que soit le perimetre. Sous un titre de section
+                 qui porte le parc, « 1458 CVE au dernier scan » se lit comme un
+                 total de parc. On nomme donc la machine DES QU'ON LA CONNAIT,
+                 avec repli sans nom : un libelle ne doit pas rendre « de »
+                 suivi d'un trou. `critiques`, lui, agrege le perimetre et ne
+                 nomme personne. --}}
             <div class="rw-tuile" data-rw="accueil-cve-date">
                 <span class="rw-tuile__valeur">{{ $cve['date'] }}</span>
-                <p class="rw-tuile__texte">{{ __('accueil.ind_cve_date') }}</p>
+                <p class="rw-tuile__texte" data-rw="accueil-cve-date-libelle">{{ $cve['machine'] !== '' ? __('accueil.ind_cve_date_machine', ['machine' => $cve['machine']]) : __('accueil.ind_cve_date') }}</p>
             </div>
             <div class="rw-tuile" data-rw="accueil-cve-nombre">
                 <span class="rw-tuile__valeur">{{ $cve['cve'] }}</span>
-                <p class="rw-tuile__texte">{{ __('accueil.ind_cve_nombre') }}</p>
+                <p class="rw-tuile__texte" data-rw="accueil-cve-nombre-libelle">{{ $cve['machine'] !== '' ? __('accueil.ind_cve_nombre_machine', ['machine' => $cve['machine']]) : __('accueil.ind_cve_nombre') }}</p>
             </div>
             <div class="rw-tuile" data-rw="accueil-cve-critiques">
                 <span class="rw-tuile__valeur">{{ $cve['critiques'] }}</span>

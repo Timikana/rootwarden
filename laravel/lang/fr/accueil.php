@@ -111,7 +111,11 @@ return [
 
     'ind_cve_titre' => 'Vulnérabilités connues',
     'ind_cve_date' => 'dernier scan',
+    // E-269 : `date` et `cve` viennent d'UNE machine. Les nommer evite de
+    // lire le compte d'une machine comme un total de parc.
+    'ind_cve_date_machine' => 'dernier scan de :machine',
     'ind_cve_nombre' => 'CVE au dernier scan',
+    'ind_cve_nombre_machine' => 'CVE au dernier scan de :machine',
     'ind_cve_critiques' => 'critiques, dernier scan par machine',
     'ind_cve_aucun_scan' => "Aucun scan de vulnérabilités n'a été fait sur les machines de votre périmètre. Ce n'est pas « zéro CVE » : c'est l'absence de mesure.",
     'ind_cve_illisible' => "L'historique des scans n'a pas pu être lu. Ce n'est pas « aucune CVE » — aucun nombre affiché ici ne serait fiable.",
