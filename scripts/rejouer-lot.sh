@@ -135,6 +135,36 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # Regle ajoutee au cycle de portage : si l'entree bascule, rejouer
 # `go-socle-navigation` et reinscrire sa reference DANS LE MEME COMMIT.
 #
+# ══ TROIS REFERENCES EN ATTENTE — inscrit le 2026-09-01 a 14:20 CEST ═════════
+#
+# La regle ci-dessus n'a PAS ete suivie sur trois references, et le LOT complet
+# suivant affichera donc TROIS ECARTS QUI NE SONT PAS DES REGRESSIONS. Le
+# diagnostic a deja ete paye une fois par la session 7 ; il est inscrit ici pour
+# que personne ne le refasse :
+#
+#     :224  [go-socle-navigation]=64          -> valeur annoncee 66, NON POSEE
+#     :561  [go-page-graylog-g1]=26 laravel   -> valeur annoncee 28, NON POSEE
+#     :893  [go-page-graylog-g1]=25 legacy    -> valeur annoncee 27, NON POSEE
+#
+# `go-page-ssh-flux` (=10 laravel, =8 legacy) EST deja inscrite — releve par le
+# DSI a 12:13Z contre un signalement de CINQ ecarts : il y en avait TROIS.
+# *Un chiffre relaye dans un message urgent se propage plus vite qu'il ne se
+# verifie.*
+#
+# CE QUE JE N'ECRIS PAS, ET POURQUOI. Les valeurs 66 / 28 / 27 sont des
+# RESULTATS DE SUITE : aucune lecture de fichier ne les etablit. Les poser sur
+# relais ferait de la reference une autorite sans mesure — et **une reference
+# posee sur une valeur fausse transforme un defaut reel en etat normal**, ce qui
+# est exactement ce que la session 7 a refuse de faire tant qu'E-241 vivait.
+# Elles s'inscrivent contre un releve MESURE, chaque suite jouee SEULE AU REPOS,
+# avec son heure — comme la ligne 183 le documente deja pour navigation.
+#
+# LE DETAIL DU +2 SUR NAVIGATION, qui vaut d'etre garde : 64 -> 65 parce
+# qu'`api_docs` a bascule `legacy` -> `route` avec la garde `'sa'`, donc **+1
+# pour le seul role 3** ; puis 65 -> 66 par une assertion de socle remontee.
+# **C'est « +1 par ROLE qui voit l'entree », pas « +2 par entree »** —
+# cinquieme verification de la formule.
+#
 # Et le SENS POSITIF d'un ecart demande la meme discipline que le negatif. La regle
 # ecrite — « un ecart a zero FAIL veut dire qu'une assertion a cesse de s'executer »
 # — ne couvrait que le sens negatif. Ici quatre assertions se sont AJOUTEES
