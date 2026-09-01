@@ -2417,3 +2417,60 @@ pas une date, c'est une tentative* ; et un total de parc calculé sur une machin
 qu'E-207 a déjà coûtée.
 
 **Session 3, même commit que ses autres corrections d'indicateur.**
+
+---
+
+## ⚠ CORRECTION de ma condition sur `date` et `cve` — **elle protégeait le cas sûr et laissait le dangereux**
+
+**Objection de la session 3, vérifiée par moi à 21:59 UTC. Elle a raison, et ma condition était inversée.**
+
+    :81  $lastScan     = SELECT scan_date FROM cve_scans ORDER BY scan_date DESC LIMIT 1
+    :82  $lastCveCount = SELECT cve_count FROM cve_scans ORDER BY scan_date DESC LIMIT 1
+    :104 $critCves     = SUM(s.critical_count) … INNER JOIN (MAX(id) … GROUP BY machine_id)
+
+**Deux natures, pas trois** :
+
+| | source | ce que c'est |
+|---|---|---|
+| `date`, `cve` | **`LIMIT 1`** — une seule ligne | **un fait d'UNE machine**, quel que soit le périmètre |
+| `critical_count` | `SUM` sur le dernier scan **de chaque** machine | **un agrégat de périmètre**, le seul des trois |
+
+**J'avais décidé** : *« le libellé nomme la MACHINE quand le périmètre en compte une seule »*.
+
+> **La faute d'échelle est PIRE quand le périmètre est GRAND** — c'est là qu'un compte d'une machine se lit
+> comme un total de parc. **Ma condition protégeait exactement le cas où l'ambiguïté est nulle** (périmètre
+> de 1 : on sait de quelle machine il s'agit) **et laissait sans nom le cas que je voulais fermer.**
+
+**DÉCISION CORRIGÉE : nommer la machine dès qu'on la connaît**, sans condition de périmètre. Repli sans
+nom si elle est inconnue — *un libellé ne doit pas rendre « de » suivi d'un trou.* **Et `critiques` ne
+nomme personne** : il porte réellement sur le périmètre.
+
+**Deuxième fois aujourd'hui qu'une de mes conditions est à l'envers** — après le gel dont j'avais compté le
+coût **par ligne** au lieu de **par module**. *Les deux fois, la condition était formulée sur ce qui me
+venait à l'esprit comme cas typique, et pas sur ce qui rendait le défaut grave.*
+
+### Et sa vérification pousse son propre refus plus loin que sa mesure ne l'avait fait
+
+**Mon démenti l'a fait exercer une branche que sa mesure laissait vide** :
+
+    menu d opsuser (role 1, zero permission) : dashboard · profil · documentation
+    cve_scan present ?  NON   ->  l alerte s affiche SANS lien
+
+> **`opsuser` verra « 103 vulnérabilités critiques » sans aucune porte.** Et c'est le cas le plus fort, pas
+> le plus faible : **une personne qui ne PEUT PAS aller voir est celle à qui il importe le plus qu'on ne
+> lui cache pas le fait.** Un gel de rôle l'aurait laissée avec un « 103 » muet dans une tuile, et rien
+> pour le qualifier.
+
+*Une réfutation qui échoue peut couvrir une branche que la thèse n'avait pas exercée.* **Ma clause fausse a
+produit une mesure juste qui manquait.**
+
+### Et elle tient le banc, ce qui est le bon geste
+
+**Vérifié : `go-page-supervision-profils-crud.mjs` tourne** (11 s au relevé). Son correctif est rédigé
+**hors du dépôt** et attend que la session 7 rende le banc — *écrire dans `laravel/` maintenant marquerait
+sa mesure « fenêtre sale »*, et c'est le verdict qu'on a mis trois jours à rendre crédible.
+
+**Et elle a relu le registre avant de numéroter** (E-268, après avoir dû corriger 17 références la veille),
+**et vérifié que les quatre libellés visés existent sous la forme exacte** — l'un était `'CVE at the last
+scan'` et non `'CVEs in the last scan'`. *Un correctif rédigé sans relire sa cible est un correctif qui
+suppose.*
