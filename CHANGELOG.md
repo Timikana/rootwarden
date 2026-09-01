@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.112** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.113** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,53 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.113 — le discriminant est le PREFIXE derive par sa VALEUR, et j'ai redemande un quatrieme travail deja fait
+
+#### E-246 bis — une liste de HELPERS a le meme defaut qu'une liste de noms
+
+J'avais recommande d'ancrer la sonde sur l'ensemble **derive des helpers**. La session 6 va un cran plus
+loin, et elle a raison : **`appellePortage` n'existe que dans `pare-feu.js`, donc un helper non liste
+rendrait « zero orphelin » sur un module entier — la plus rassurante des sorties, par omission.**
+
+    fetch(X + chemin), X vaut '/api/gateway'   ->  prefixe '/api/gateway'
+    fetch(chemin), chemin etant un PARAMETRE   ->  prefixe ''
+    fetch('/x/y')                              ->  prefixe '/x/y'
+
+> **L'absence de prefixe EST le discriminant du portage** — derive **par la VALEUR** de la constante,
+> jamais par son nom.
+
+**Verifie** : `PASSERELLE` porte ce nom dans **23** fichiers et vaut partout `'/api/gateway'`. *C'est
+exactement ce qui rendrait un tri par nom confortable et faux.* **10 chemins du portage, 0 orphelin.**
+
+**Et son propre defaut d'instrument, le premier des siens qui ALARME** : elle parcourait
+`[prefixe] + chemins` comme une **liste**, donc `/docker/scan` etait juge sans son prefixe — **39 chemins
+determines classes comme douteux.** *Le prefixe se concatene, il ne s'enumere pas.* **Elle aurait
+reproduit le defaut en ecrivant sa parade.**
+
+**Ce qui manque, et elle le nomme** : le croisement definitif doit lire **le routeur**, pas son releve
+gele — *une suite ancree sur lui mesurerait son propre releve.*
+
+#### E-253 — quatrieme travail redemande, et ma propre regle l'aurait attrape
+
+    271ba70   2026-09-01 14:14   « les silences par incapacite tombent de 13 a 4 »
+    mon message « ta fenetre »   ~15:25   ->  UNE HEURE ET DEMIE APRES
+
+**La cause differe des trois precedentes.** Celles-la etaient des RAPPELS accroches a un ordre (E-245),
+qui voyagent sans se remesurer. **Celle-ci etait une TACHE, dans une liste — exactement l'objet que ma
+regle couvre** — et je l'ai assignee dans un message dont le sujet etait *« voici ta fenetre pendant le
+LOT »*, donc **en pensant occupation et non contenu.**
+
+> **Une tache assignee pour REMPLIR une fenetre echappe au controle qu'on applique aux taches assignees
+> pour AVANCER. Le geste se juge a son objet, pas a son motif.**
+
+**Et ce qu'elle a trouve dans son propre libelle vaut plus que le compte** : `extrait-urls.php` partait
+sur le guillemet ouvrant, **sa boucle ne tournait jamais**, les huit entrees interpolees sortaient
+**vides** — *pendant que l'etiquette « silence MESURE » affirmait qu'on savait pourquoi on ne savait
+pas.* Le tableau disait 4 et 13 ; **il aurait du dire 0 et 17.**
+
+> **Un silence etiquete « mesure » qui ne porte pas sa mesure est un silence par incapacite sous un
+> meilleur nom.**
 
 ### v1.38.112 — E-251 : ne pas commiter protege l'HISTORIQUE, pas l'ETAT SERVI — le LOT mesurait des vues renommees
 
