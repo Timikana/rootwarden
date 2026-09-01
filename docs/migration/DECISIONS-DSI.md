@@ -1638,6 +1638,7 @@ immédiatement, sans redémarrage. »*
     2. storage/framework/views/   147 vues compilees, les deux plus recentes de 12:34 et 12:35
                             -> `accueil.blade.php` modifie a 12:25 a bien ete RECOMPILE depuis
     3. OPcache              enable = 1 · validate_timestamps = 1 · revalidate_freq = 2 s
+                            ^^^^ CES TROIS VALEURS N ONT JAMAIS ETE MESUREES — voir la correction ci-dessous
 
 > **Le troisième est celui qui décide, et c'est le seul que personne n'avait nommé.** OPcache met en
 > cache le **bytecode**, pas la source. Avec `validate_timestamps = 0` — réglage courant en production —
@@ -1671,3 +1672,57 @@ configuration dans `conf.d/` qui le fixerait.
 servis, les vues se recompilent. **Ce que ça change en connaissance : un réglage d'une ligne, posé un
 jour pour « durcir la production », rendrait inerte tout le travail du portage — et le symptôme serait
 « le correctif ne marche pas », pas « le cache ne revalide plus ».**
+
+### ⚠⚠ CORRECTION, 2026-09-01 12:44 UTC — **MES TROIS VALEURS OPCACHE N'ÉTAIENT PAS DES MESURES**
+
+**Relevé par la session 7, vérifié par moi, et c'est pire que ce qu'elle annonçait.**
+
+    sudo docker exec rootwarden_laravel php -r 'var_dump(ini_get_all("Zend OPcache"));'
+      Warning: ini_get_all(): Extension "Zend OPcache" cannot be found
+      bool(false)
+
+    php --ini  ->  Loaded Configuration File: (none)
+
+> **`ini_get` a rendu `1`, `1` et `2` pour des noms dont l'extension n'enregistre AUCUNE entrée dans cette
+> SAPI.** Ce ne sont pas des lectures de configuration : ce sont des **défauts compilés rendus faute de
+> mieux.** *Les trois valeurs sur lesquelles j'ai bâti un dédouanement ont été fabriquées par
+> l'instrument.*
+
+**Septième défaut d'instrument de la journée, et le plus complet** — les autres rendaient une valeur
+fausse ; celui-ci a rendu **trois** valeurs fausses, **toutes plausibles**, et **exactement celles qui
+confirmaient ce que je voulais établir.** *Rien n'alarme quand l'instrument rend ce qu'on attend.*
+
+**Et ma réserve était mal placée.** J'avais écrit *« mesure prise en SAPI CLI, pas dans celle qui sert »* —
+la session 7 mesure que **mod_php et la CLI lisent le même `php.ini` et le même `conf.d`**, sans surcharge
+Apache. **L'écart de SAPI n'était pas le problème : l'instrument l'était.** *Une réserve juste posée au
+mauvais endroit protège moins qu'elle ne rassure.*
+
+### ✅ LA CONCLUSION TIENT — par une preuve empirique, et elle est meilleure
+
+    4d25926   pose `Route::post('/pare-feu/historique')`   a 14:17:52
+    la suite  mesure au RESEAU, dans un navigateur          a 14:35
+              POST /pare-feu/historique -> 200
+    sur un conteneur rootwarden_laravel demarre le 2026-08-20 a 10:09
+
+> **Un fichier PHP écrit à 14:17 était servi à 14:35 par un processus vieux de douze jours** — sans
+> redémarrage, sans vidage de cache, sans que personne touche OPcache. **Mesuré sur la SAPI qui sert, par
+> le chemin qu'un utilisateur emprunte.**
+
+**Aucune lecture de `.ini` n'établit ça aussi bien**, et la forme de preuve est ce qu'il faut retenir :
+
+> **La ligne « relu à chaque requête » ne se prouve ni par le langage, ni par un `ini_get`. Elle se prouve
+> par UN CORRECTIF DATÉ SERVI PAR UN PROCESSUS PLUS ANCIEN QUE LUI.** C'est reproductible, et **un LOT le
+> produit gratuitement à condition de noter les heures.**
+
+### Deux faits qui restent, et le second est un risque ouvert
+
+**`rootwarden_laravel` n'a AUCUN `php.ini`** — `Loaded Configuration File: (none)`. Le portage tourne sur
+les défauts PHP plus cinq `conf.d/*.ini` d'extensions. **Ma phrase devient plus vraie que je ne l'avais
+écrite** : *une propriété qui tient par un réglage n'est pas une propriété par construction* — **ici elle
+tient par l'ABSENCE de réglage**, ce qui est plus fragile encore : rien à modifier, seulement à ajouter.
+
+**⚠ Et le legacy, lui, porte `opcache.revalidate_freq = 60` dans son `php.ini`.** *Non établi qu'il
+s'applique* — la session 7 refuse de l'affirmer, précisément parce qu'elle vient de montrer qu'on ne sait
+pas lire ce chiffre de façon fiable. **Mais s'il s'applique, un correctif PHP du legacy met jusqu'à une
+minute à prendre effet, et une suite qui écrit puis mesure dans la foulée mesurerait l'ancien code.**
+**Mesurable par le même chemin empirique**, et à faire si un sous-lot legacy en dépend.
