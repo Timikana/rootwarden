@@ -1181,3 +1181,63 @@ compteur SOUS-ESTIMERA**, ce qui est la mauvaise direction pour un indicateur de
 
 `nbUsers` et `noKey` : **rôle 2**, sans enthousiasme — ni l'un ni l'autre n'est une carte de cibles, ni
 utile en dessous.
+
+### ⚠ `no2fa` — deux sessions en désaccord, et l'objection détruit MA RAISON sans détruire la décision
+
+**2026-09-01, 12:16 UTC.** La session 3 recommandait le **rôle 3**, j'ai tranché rôle 3. **La session 4
+recommande le rôle 1**, et son argument est bon :
+
+> *« C'est un AGRÉGAT, il ne nomme personne, et le legacy l'affiche déjà dès le rôle 1 — le porter au
+> rôle 1 ne change donc rien à l'exposition existante. Ce qui changerait tout, c'est de le transformer en
+> LISTE : un compte dit "il y a des comptes faibles", une liste dit LESQUELS attaquer. »*
+
+**Sa gradation est juste et je l'adopte : un agrégat et une liste ne sont pas la même exposition.** Ma
+formulation — *« une carte de la surface d'attaque »* — était **trop forte pour un chiffre qui ne nomme
+personne.** Il dit que les chances sont bonnes ; il ne dit pas sur qui.
+
+**La décision ne bouge pas, et sa raison change** :
+
+| ce que j'invoquais | ce qui décide en réalité |
+|---|---|
+| ~~c'est une carte de cibles~~ | **trop fort pour un agrégat** — la session 4 a raison |
+| ~~le legacy l'expose déjà~~ | **vrai, et temporaire** : le legacy meurt, le portage survit |
+| — | **l'utilité pour un rôle 1 est NULLE, et la page lui donne déjà ce sur quoi il peut agir** |
+
+> **Un indicateur dont l'utilité est nulle et l'exposition non nulle n'a pas de place défendable au rôle
+> 1**, quelle que soit la taille de l'exposition. *C'est le rapport des deux qui décide, pas la
+> magnitude de l'une.*
+
+**Et l'argument « le legacy l'expose déjà » ne peut pas fonder un choix de portage** — c'est exactement ce
+que j'ai refusé pour E-208 : *ne pas resserrer le legacy parce qu'il meurt, mais borner le portage parce
+qu'il survit.* **Reproduire une exposition parce qu'elle existe déjà, c'est la faire survivre à ce qui la
+portait.**
+
+**La contrainte prospective de la session 4 est retenue et transmise** : *si l'indicateur devient une
+LISTE, la borne cesse d'être une préférence et devient nécessaire.* À dire dans la mission de la
+session 3.
+
+### Et son dédouanement du prédicat vaut d'être écrit aussi fort qu'une accusation
+
+Le prédicat de `no2fa` est **celui d'E-217** — `totp_secret = ''` mesure des **octets**, et un secret vide
+chiffré rendrait la colonne non vide, donc **sous-estimerait** les comptes sans second facteur, du côté
+rassurant.
+
+**Mesuré : ça ne se produit pas.** 12 comptes actifs — **8 `NULL`, 0 chaîne vide, 0 préfixe `sodium:`**,
+4 cryptogrammes cohérents. **Et la raison structurelle est meilleure que la mesure** : *un secret TOTP
+est GÉNÉRÉ, jamais saisi.* Le scénario qui rend E-217 réel pour un mot de passe — un champ soumis vide —
+**ne peut pas se produire sur cette colonne.**
+
+> **Deux sessions ont vérifié ce même prédicat indépendamment, par deux moyens différents** — la 3 par
+> les longueurs, la 4 par les valeurs et le chemin d'écriture — **et les deux ont conclu au
+> dédouanement.** *Un relevé qui ne dédouane pas se lit comme un réquisitoire, et on cesse de le croire.*
+
+### Un détail de la migration 064 que je n'avais pas demandé et qui la rend juste
+
+La session 4 a dérivé le vocabulaire de `wazuh_agents` **au lieu de l'inventer** — *deux tables sœurs qui
+décrivent le même objet ne doivent pas avoir deux vocabulaires* — **et a vérifié que `never_connected` est
+le bon DÉFAUT** : le seul `INSERT` de `supervision.py` ne pose pas la colonne, donc chaque déploiement le
+prendra, et un agent qui vient d'être installé n'a effectivement pas encore rendu compte.
+
+> **Si le défaut avait été `unknown`, tout déploiement réussi aurait commencé par « je ne sais pas ».**
+> *Choisir la valeur par défaut d'une colonne neuve est une décision de conception, pas un détail de
+> migration* — et personne ne l'avait demandée.
