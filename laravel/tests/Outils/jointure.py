@@ -88,7 +88,35 @@ for f in sorted(R.glob('*.py')):
                 cond = True
         familles[ch] = 'dur' if dur else ('conditionnel' if cond else 'jamais')
 
-def resout(cible):
+# Le gabarit interpole d'une cle PHP : `/api/gateway/supervision/{$plateforme}/version`
+gabarits = {e['cle']: e['cible'].replace('/api/gateway', '', 1)
+            for e in carte['interpolees'] if e['cible'].startswith('/api/gateway/')}
+
+
+def motif(chemin):
+    """Rend le chemin avec ses segments VARIABLES neutralises.
+
+    `/supervision/{$plateforme}/version` cote PHP et `/supervision/<platform>/version`
+    cote Flask decrivent le MEME ensemble de chemins. Les comparer segment a
+    segment, en traitant les deux formes de variable comme un joker, est un
+    appariement de FORME — pas une supposition sur la valeur.
+    """
+    return tuple('*' if (seg.startswith('{') or seg.startswith('<')) else seg
+                 for seg in chemin.split('/'))
+
+
+def route_du_gabarit(gabarit):
+    """La route du backend qui accepte ce gabarit — s'il n'y en a QU'UNE.
+
+    Plusieurs correspondances veut dire que le gabarit ne designe pas une route
+    mais une famille : on ne tranche pas, on le dit.
+    """
+    cible = motif(gabarit)
+    candidates = [k for k in familles if motif(k) == cible]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def resout(cible, origine=None):
     m = re.match(r"^PASSERELLE \+ '(/[^']+)'$", cible)
     if m:
         return m.group(1), 'resolu'
@@ -103,6 +131,36 @@ def resout(cible):
         if c in interpolees:
             return None, 'silence MESURE : cle PHP interpolee'
         return None, 'silence MESURE : cle absente de la carte PHP'
+
+    # ══ CE QUE LA CIBLE EST VRAIMENT, QUAND ELLE N'EST PAS LITTERALE SUR PLACE
+    #
+    # Dix des treize « silences par incapacite » n'en etaient pas : la cible
+    # etait une constante du fichier, ou une cle passee a un helper local.
+    # L'analyseur JS les nomme maintenant (`origine`), et les deux formes se
+    # resolvent ici. *Compter comme de l'ignorance ce qu'on n'a pas regarde
+    # melange deux choses qui ne se ressemblent que dans un tableau.*
+    if origine:
+        forme = origine.get('forme')
+        if forme in ('litteral', 'constante'):
+            chemin = origine['valeur']
+            if chemin.startswith('/api/gateway/'):
+                return chemin.replace('/api/gateway', '', 1), 'resolu'
+            # Chemin du PORTAGE lui-meme, pas de la passerelle. Ce n'est PAS un
+            # silence : la cible est entierement connue. Ce que cette mesure ne
+            # dit pas, c'est si le controleur Laravel derriere relaie vers le
+            # backend — question de la couche PHP, et elle est nommee.
+            return None, f'PORTAGE : {chemin}'
+        if forme == 'cle_indirecte':
+            cle = origine['cle']
+            if cle in vers_passerelle:
+                return vers_passerelle[cle], 'resolu'
+            if cle in gabarits:
+                route = route_du_gabarit(gabarits[cle])
+                if route:
+                    return route, 'resolu'
+                return None, f'silence MESURE : gabarit {gabarits[cle]}'
+            return None, f"silence MESURE : cle indirecte '{cle}' absente de la carte PHP"
+
     return None, 'silence PAR INCAPACITE : cible variable'
 
 def famille_de(ch):
@@ -115,9 +173,10 @@ def famille_de(ch):
             return v
     return '(route inconnue)'
 
-lignes, compte, risque = [], {'resolu': 0, 'remonte': 0, 'mesure': 0, 'incapacite': 0}, []
+lignes, risque, silences = [], [], []
+compte = {'resolu': 0, 'remonte': 0, 'portage': 0, 'mesure': 0, 'incapacite': 0}
 for a in appels:
-    ch, motif = resout(a['cible'])
+    ch, cause = resout(a['cible'], a.get('origine'))
     cibles = []
     if ch:
         compte['resolu'] += 1
@@ -125,8 +184,12 @@ for a in appels:
     elif a.get('chemins_appelants'):
         compte['remonte'] += 1
         cibles = [(c, 'remontee') for c in a['chemins_appelants']]
+    elif cause.startswith('PORTAGE'):
+        compte['portage'] += 1
+        silences.append((f"{a['fichier']}:{a['ligne']}", cause))
     else:
-        compte['mesure' if 'MESURE' in motif else 'incapacite'] += 1
+        compte['mesure' if 'MESURE' in cause else 'incapacite'] += 1
+        silences.append((f"{a['fichier']}:{a['ligne']}", cause))
 
     for c, voie in cibles:
         fam = famille_de(c)
@@ -139,9 +202,20 @@ for l in sorted(interessantes):
     print(f'{l[0]:32} {l[1]:12} {l[2]:36} {l[3]:16} {l[4]}')
 print()
 couverts = compte['resolu'] + compte['remonte']
+# `portage` sort du DENOMINATEUR : ces sites ne visent pas la passerelle, donc la
+# question « cette route peut-elle rendre 200 en mentant ? » ne se leur pose pas.
+# Les compter comme non couverts ferait baisser une couverture qui n'a rien a
+# couvrir la — et les compter comme couverts la ferait monter sans mesure.
+interrogeables = len(appels) - compte['portage']
 print(f"sites resolus DIRECTEMENT {compte['resolu']} | par REMONTEE {compte['remonte']} | "
-      f"silences MESURES {compte['mesure']} | par INCAPACITE {compte['incapacite']} | total {len(appels)}")
-print(f"couverture : {100*couverts//len(appels)} %  ({couverts}/{len(appels)} sites, {len(lignes)} chemins)")
+      f"silences MESURES {compte['mesure']} | par INCAPACITE {compte['incapacite']} | "
+      f"hors passerelle (PORTAGE) {compte['portage']} | total {len(appels)}")
+print(f"couverture : {100*couverts//interrogeables} %  ({couverts}/{interrogeables} sites "
+      f"interrogeables, {len(lignes)} chemins)")
+print()
+print('== CE QUI RESTE NON RESOLU, ET POURQUOI ==')
+for site, cause in sorted(set(silences)):
+    print(f'   {site:32} {cause}')
 print()
 print('== A RISQUE : route de la famille 200-menteuse, appelant qui ne VERIFIE pas ==')
 for r in sorted(set(risque)):

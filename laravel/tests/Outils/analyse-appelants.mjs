@@ -300,6 +300,80 @@ function cheminsDesAppelants(arbre, fonction, expressionCible) {
     return [...new Set(chemins)].sort();
 }
 
+/**
+ * D'OU VIENT LA CIBLE quand ce n'est ni un litteral ni un parametre du helper ?
+ *
+ * ── POURQUOI CETTE PASSE EXISTE ─────────────────────────────────────────────
+ *
+ * La jointure comptait **13 « silences par incapacite »** : la cible est une
+ * variable, et on ne devine pas. C'etait vrai de l'outil, pas du code — deux
+ * formes tres regulieres s'y cachaient, et les compter comme de l'ignorance
+ * melangeait « je ne peux pas savoir » avec « je n'ai pas regarde » :
+ *
+ *   `var PORTEE = '/fail2ban/portee'; … fetch(PORTEE)`
+ *        une CONSTANTE de module. Le chemin est litteral, une ligne plus haut ;
+ *
+ *   `var route = routeCourante('version'); … fetch(route)`
+ *        une CLE INDIRECTE. Le chemin n'est pas ici, mais l'ARGUMENT l'est, et
+ *        c'est lui qui nomme l'entree cote PHP.
+ *
+ * ── LA CONDITION QUI REND CE PLIAGE SUR ─────────────────────────────────────
+ *
+ * On ne plie QUE les noms lies **une seule fois** et **jamais reaffectes**. Un
+ * nom reaffecte ailleurs rendrait un chemin qui n'est pas celui du site mesure —
+ * et une resolution fausse est pire qu'un silence, parce qu'elle sort du tableau
+ * des choses a verifier.
+ */
+function origineDeLaCible(arbre, englobante, cible) {
+    if (cible.type === 'Literal' && typeof cible.value === 'string') {
+        return { forme: 'litteral', valeur: cible.value };
+    }
+    if (cible.type !== 'Identifier') return null;
+
+    // ── LA PORTEE DE RECHERCHE, ET ELLE A COUTE CINQ SITES ──────────────────
+    //
+    // Premier jet : je cherchais la liaison dans TOUT le fichier, et
+    // `supervision.js` declare CINQ fois `var route = routeCourante(…)`, une par
+    // gestionnaire. Cinq liaisons -> ambigu -> rejete : l'outil rendait 2 des 7
+    // sites et j'aurais pu conclure que les cinq autres etaient hors de portee.
+    //
+    // Ils ne l'etaient pas : chaque liaison est SEULE dans sa fonction. On
+    // cherche donc d'abord dans la fonction englobante, et on ne retombe sur le
+    // fichier entier que pour les constantes de module (`var PORTEE = …`).
+    // *Une ambiguite mesuree a la mauvaise echelle ressemble a une incapacite.*
+    const liaisonsDe = (racine) => {
+        const trouvees = [];
+        let reaffecte = 0;
+        parcours(racine, (n) => {
+            if (n.type === 'VariableDeclarator' && n.id?.type === 'Identifier'
+                && n.id.name === cible.name && n.init) {
+                trouvees.push(n.init);
+            }
+            if (n.type === 'AssignmentExpression' && n.left?.type === 'Identifier'
+                && n.left.name === cible.name) {
+                reaffecte++;
+            }
+        });
+        return (trouvees.length === 1 && reaffecte === 0) ? trouvees[0] : null;
+    };
+
+    const init = (englobante && liaisonsDe(englobante)) || liaisonsDe(arbre);
+    if (!init) return null;
+    if (init.type === 'Literal' && typeof init.value === 'string') {
+        return { forme: 'constante', nom: cible.name, valeur: init.value };
+    }
+    // `routeCourante('version')` : l'argument litteral EST la cle.
+    if (init.type === 'CallExpression' && init.callee.type === 'Identifier'
+        && init.arguments.length >= 1
+        && init.arguments[0].type === 'Literal'
+        && typeof init.arguments[0].value === 'string') {
+        return { forme: 'cle_indirecte', helper: init.callee.name,
+                 cle: init.arguments[0].value };
+    }
+    return null;
+}
+
+
 /** Le texte source d'un noeud, tronque. */
 function source(code, noeud, max = 70) {
     const t = code.slice(noeud.start, noeud.end).replace(/\s+/g, ' ');
@@ -361,6 +435,10 @@ for (const nom of fichiers) {
             // Vide quand la cible est deja litterale, ou quand rien ne se resout.
             chemins_appelants: n.arguments[0]
                 ? cheminsDesAppelants(arbre, englobante, n.arguments[0]) : [],
+            // Ce que la cible est VRAIMENT quand elle n'est pas litterale sur
+            // place : une constante du fichier, ou une cle passee a un helper.
+            // `null` = ni l'une ni l'autre, et c'est alors un vrai silence.
+            origine: n.arguments[0] ? origineDeLaCible(arbre, englobante, n.arguments[0]) : null,
         });
     });
 }
