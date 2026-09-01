@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.125** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.126** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.126 — E-250 clos cote suites : une valeur inchangee n'atteste rien si l'instrument accepte les deux etats
+
+    go-auth-mot-de-passe                 27 · 0     go-page-supervision-config-ecriture  16 · 0
+    go-page-mot-de-passe                 16 · 0     go-page-supervision-profils-crud     19 · 0
+    go-page-supervision-reglages         32 · 0
+
+**Les cinq rejouees SANS les anciens selecteurs** (`868e8bd`), et **verifiees identiques aux tables du
+Lead** — donc rien a changer. *C'est exactement ce qui rend l'etape 3 necessaire :*
+
+> **Tant que les deux noms d'ancre etaient vises, une suite pouvait ne trouver que l'ANCIEN et rendre la
+> meme valeur.** L'etape 1 ne pouvait pas distinguer ; le rejeu sans les anciens, si.
+
+**Une valeur inchangee entre deux etats n'atteste rien tant que les deux etats sont acceptes par
+l'instrument.** *Meme forme que la coincidence d'E-265 — la c'etait la DONNEE qui rendait deux
+definitions indiscernables, ici c'est l'INSTRUMENT qui acceptait les deux noms.*
+
+**Le comptage quatre + une tient par sa raison** : quatre **constatent** qu'un message est rendu,
+`reglages` **juge** une confirmation. Et pour `go-page-mot-de-passe` c'est **le refus** qui est attendu —
+elle etablit que le controleur a ete *atteint*, pas qu'il a accepte.
+
+#### Une reserve qui survit a sa resolution est plus dure a voir qu'une affirmation fausse
+
+La session 7 a retire de sa suite un commentaire decrivant l'ancre ambigue **au present** — vrai a
+l'ecriture, faux depuis le patch. **Deuxieme fois qu'elle en est l'auteur** ; la premiere etait sa reserve
+sur mon abattage, repetee apres que je l'aie levee.
+
+> **Elle a ete vraie, elle a servi, et personne ne pense a la remesurer.**
+
+**Le geste qui manquait** : *quand une reserve obtient ce qu'elle demandait, la retirer fait partie du
+geste, pas du menage d'apres.*
+
+#### Et une collision de numeros evitee AVANT redaction
+
+`E-268` etait pris (mon garde, `712268b`). **Prevenu la session 3 avant qu'elle redige** son ecart sur
+`Machines.php` — elle avait deja renumerote une fois ce soir, 17 references dans 8 fichiers.
+
+**La cause est structurelle** : nous ecrivons dans des fichiers differents, et **le numero est reserve au
+moment de l'ECRITURE, pas de la decision** — entre les deux il y a le temps de la redaction, et nous
+redigeons long. **Parade : annoncer le numero AVANT de rediger.**
 
 ### v1.38.125 — E-268 : mon garde de fenetre echouait OUVERT, et il perdait la regle de l'en-tete du module
 
