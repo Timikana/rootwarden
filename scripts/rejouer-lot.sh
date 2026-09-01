@@ -135,29 +135,44 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 # Regle ajoutee au cycle de portage : si l'entree bascule, rejouer
 # `go-socle-navigation` et reinscrire sa reference DANS LE MEME COMMIT.
 #
-# ══ TROIS REFERENCES EN ATTENTE — inscrit le 2026-09-01 a 14:20 CEST ═════════
+# ══ TROIS REFERENCES POSEES — mesurees le 2026-09-01, session 7 ═════════════
 #
-# La regle ci-dessus n'a PAS ete suivie sur trois references, et le LOT complet
-# suivant affichera donc TROIS ECARTS QUI NE SONT PAS DES REGRESSIONS. Le
-# diagnostic a deja ete paye une fois par la session 7 ; il est inscrit ici pour
-# que personne ne le refasse :
+#     go-socle-navigation  laravel  PASS=66 FAIL=0  82s   14:17:44 -> 14:19:08 CEST
+#     go-page-graylog-g1   laravel  PASS=28 FAIL=0  48s   14:21:22 -> 14:22:11 CEST
+#     go-page-graylog-g1   legacy   PASS=27 FAIL=0  48s   14:22:21 -> 14:23:10 CEST
 #
-#     :224  [go-socle-navigation]=64          -> valeur annoncee 66, NON POSEE
-#     :561  [go-page-graylog-g1]=26 laravel   -> valeur annoncee 28, NON POSEE
-#     :893  [go-page-graylog-g1]=25 legacy    -> valeur annoncee 27, NON POSEE
+# UNE COMMANDE PAR LIGNE, chaque suite SEULE AU REPOS, rien d'autre sur le banc.
+# `go-page-ssh-flux` (=10 laravel, =8 legacy) etait deja inscrite : le signalement
+# initial parlait de CINQ ecarts, il y en avait TROIS.
 #
-# `go-page-ssh-flux` (=10 laravel, =8 legacy) EST deja inscrite — releve par le
-# DSI a 12:13Z contre un signalement de CINQ ecarts : il y en avait TROIS.
-# *Un chiffre relaye dans un message urgent se propage plus vite qu'il ne se
-# verifie.*
+# POURQUOI CES VALEURS N'ONT PAS ETE POSEES SUR RELAIS. La session 7 a signale que
+# sa valeur precedente venait d'une commande COMBINEE et qu'elle l'aurait donnee
+# comme une mesure isolee. Une reference est une autorite : posee sur une valeur
+# annoncee, elle **transforme un defaut reel en etat normal** — c'est ce qu'elle
+# avait elle-meme refuse de faire tant qu'E-241 vivait.
 #
-# CE QUE JE N'ECRIS PAS, ET POURQUOI. Les valeurs 66 / 28 / 27 sont des
-# RESULTATS DE SUITE : aucune lecture de fichier ne les etablit. Les poser sur
-# relais ferait de la reference une autorite sans mesure — et **une reference
-# posee sur une valeur fausse transforme un defaut reel en etat normal**, ce qui
-# est exactement ce que la session 7 a refuse de faire tant qu'E-241 vivait.
-# Elles s'inscrivent contre un releve MESURE, chaque suite jouee SEULE AU REPOS,
-# avec son heure — comme la ligne 183 le documente deja pour navigation.
+# ══ L'ARBRE A BOUGE PENDANT DEUX DES TROIS MESURES ══════════════════════════
+#
+#     laravel/tests/Support/TableDesGardes.php   14:18:43   pendant navigation
+#     laravel/app/Services/Machines.php          14:22:37   pendant graylog LEGACY
+#
+# **Rendre le banc ne protege que la CHARGE. L'arbre est un etat partage, et une
+# ecriture pendant la fenetre fausse la mesure sans apparaitre nulle part** — ni
+# dans `ps`, ni dans une duree, ni dans un `StartedAt`.
+#
+# Ici les deux sont sans effet, et c'est PROUVE et non affirme :
+#
+#     laravel/composer.json : autoload      -> App, Database/Factories, Database/Seeders
+#                             autoload-dev  -> Tests: tests/
+#     TableDesGardes reference par : deux fichiers de tests, RIEN d'autre
+#       -> hors de l'autoload servi, aucune requete HTTP ne peut le charger
+#
+#     BASE_LEGACY=https://localhost:8443   BASE_LARAVEL=http://localhost:8444
+#       -> graylog LEGACY tape un AUTRE serveur : `laravel/app/` n'est pas dans son chemin
+#
+# Le rejeu propose (82 s) n'aurait rien etabli que la declaration d'autoload
+# n'etablit deja. *Verifier le REGISTRE plutot que refaire la mesure, quand le
+# registre repond a la question posee.*
 #
 # LE DETAIL DU +2 SUR NAVIGATION, qui vaut d'etre garde : 64 -> 65 parce
 # qu'`api_docs` a bascule `legacy` -> `route` avec la garde `'sa'`, donc **+1
@@ -251,7 +266,7 @@ declare -A REF_LARAVEL=(
   # « restriction voulue » que la garde du runner distingue d'une suite jamais
   # mesuree — elle sera donc IGNOREE en legacy, et c'est correct.
   [go-socle-fixtures]=8
-  [go-socle-navigation]=64 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=66 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   # `go-page-search` 12 -> 13 le 2026-08-27 : +1 pour la propriete `LiensLegacy`.
   # Elle DERIVE la liste attendue de `legacy/_deprecated/*` et la compare a la table
@@ -588,7 +603,7 @@ declare -A REF_LARAVEL=(
   # G1 ne clique AUCUN bouton de ligne du tableau des machines : `glTest` (js:100)
   # n'a pas de `confirm()` et ouvrirait une session SSH sur la machine de la
   # ligne, et `srv-zabbix` figure dans ce tableau. Les gestes mutants sont G2.
-  [go-page-graylog-g1]=26
+  [go-page-graylog-g1]=28
   # `graylog/` sous-lot G2 : les trois gestes qui ouvrent une session SSH reelle.
   # 30 sur le portage contre 21 sur le legacy. L'ecart de NEUF se decompose
   # entierement, et chaque ligne est une correction :
@@ -920,7 +935,7 @@ declare -A REF_LEGACY=(
   # suite ouvre l'onglet des machines et LIT le tableau, sans cliquer aucun
   # bouton de ligne — `glTest` (js:100) n'a pas de `confirm()` et ouvrirait une
   # session SSH sur la machine de la ligne, `srv-zabbix` comprise.
-  [go-page-graylog-g1]=25
+  [go-page-graylog-g1]=27
   # 21 sur le legacy. Il n'a ni panneau de decision ni message en page : ses trois
   # boutons emettent au clic, `glTest` sans meme un `confirm()`.
   [go-page-graylog-g2]=21
