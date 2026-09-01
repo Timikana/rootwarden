@@ -167,6 +167,40 @@ qu'être périmée.* Appliquée ici :
 
 ---
 
+## 3 ter — Ce que la page rend à un compte SANS permission
+
+Mesuré le **2026-09-02 à 02:00 CEST**. La question était : *sa garde est `'tous'` — le legacy en
+pose-t-il une malgré tout ?*
+
+**Réponse : une seule, et ce n'est pas une permission.** `documentation.php` n'a **aucun
+`checkPermission`** — la seule occurrence, `:295`, est **dans un exemple de code**. Le seul gating est
+`$isAdmin = $role >= 2` (`:16`), qui enclôt **six blocs**.
+
+**Un compte de rôle 1 voit donc 43 des 48 sections.** Les cinq réservées, dérivées en suivant la
+profondeur des `if/endif` plutôt qu'en les cherchant à la main :
+
+| section | ligne | ce qu'elle décrit |
+|---|---|---|
+| `api` | `:1505` | la référence d'API |
+| `proxy` | `:1567` | le fonctionnement de `api_proxy.php` |
+| `healthcheck` | `:1590` | le diagnostic |
+| `preprod` | `:1600` | l'environnement de préproduction |
+| **`api-test`** | `:1618` | **la console** — §1 |
+
+> **Le rôle 1 est donc borné à de la documentation fonctionnelle**, et privé de tout ce qui décrit
+> l'infrastructure et la surface d'API. **C'est cohérent**, et c'est la seule chose de cette page qui
+> soit gardée par une décision plutôt que par l'oubli.
+
+**Ce que ça change pour le portage** : la page portée devra reproduire **un seuil de rôle, pas une
+permission** — et le déclarer, parce qu'un lecteur qui cherche une permission n'en trouvera pas et
+conclura que la page est ouverte. *La garde existe ; elle n'est simplement pas là où on la cherche.*
+
+**Le compte est croisé** : cinq sections trouvées par le parcours des blocs, et cinq blocs `$isAdmin`
+comptés indépendamment (`:64`, `:1404`, `:1501`, `:1683`, `:1721` — le premier n'enclôt pas de
+`<section>`). **Deux mesures indépendantes, même résultat.**
+
+---
+
 ## 4. L'archivage — les points d'entrée et ce qu'il allège
 
 **Les quatre emplacements, comptés y compris à zéro** (2026-09-01, 14:20) :
