@@ -213,6 +213,53 @@ print(f"sites resolus DIRECTEMENT {compte['resolu']} | par REMONTEE {compte['rem
 print(f"couverture : {100*couverts//interrogeables} %  ({couverts}/{interrogeables} sites "
       f"interrogeables, {len(lignes)} chemins)")
 print()
+# ══ E-246 : LES CHEMINS APPELES, TRIES PAR LEUR BASE — DERIVEE, PAS LISTEE ═══
+#
+# Le discriminant n'est ni la forme du chemin (« francais = portage » a rendu 28
+# orphelins pour zero) ni une liste de noms de helpers (elle se perimerait au
+# premier module qui nomme le sien autrement, en rendant « zero orphelin » sur un
+# module entier). C'est le PREFIXE que le site d'appel ajoute devant le chemin,
+# derive par la VALEUR de la constante et non par son nom.
+#
+#     prefixe '/api/gateway…'  -> la passerelle, donc une route du BACKEND
+#     prefixe ''               -> l'appelant fournit l'URL entiere : son
+#                                 litteral decide, et s'il ne commence pas par
+#                                 `/api/gateway` c'est une route du PORTAGE
+#     prefixe null             -> l'URL vient de la carte PHP, dont toutes les
+#                                 entrees retenues commencent par `/api/gateway`
+# LE PREFIXE SE CONCATENE, IL NE S'ENUMERE PAS. Premier jet : je parcourais
+# `[prefixe] + chemins_appelants` comme une liste de chemins — donc `/docker/scan`
+# etait juge SANS son prefixe `/api/gateway` et tombait en « indetermine ». 39
+# chemins parfaitement determines classes comme douteux, c'est-a-dire un
+# instrument qui se trompe DU COTE QUI ALARME, et une liste de faux orphelins
+# exactement comme celle qu'E-246 corrige.
+bases = {'passerelle': set(), 'portage': set(), 'indetermine': set()}
+for a in appels:
+    prefixe = a.get('prefixe')
+    if prefixe is None:
+        # Resolu par la couche PHP, ou silence : la base est dite ailleurs.
+        continue
+    suffixes = list(a.get('chemins_appelants') or []) or ['']
+    for suffixe in suffixes:
+        complet = prefixe + suffixe
+        if not complet:
+            continue
+        if not complet.startswith('/'):
+            complet = '/' + complet
+        if complet.startswith('/api/gateway'):
+            bases['passerelle'].add(complet.replace('/api/gateway', '', 1) or '/')
+        else:
+            bases['portage'].add(complet)
+
+print('== E-246 : chemins du PORTAGE appeles par le JavaScript (base derivee) ==')
+for c in sorted(bases['portage']):
+    print(f'   {c}')
+print(f"   -> {len(bases['portage'])} chemins, a croiser avec les routes declarees")
+if bases['indetermine']:
+    print('   ⚠ base INDETERMINEE (ni passerelle ni portage) :')
+    for c in sorted(bases['indetermine']):
+        print(f'      {c}')
+print()
 print('== CE QUI RESTE NON RESOLU, ET POURQUOI ==')
 for site, cause in sorted(set(silences)):
     print(f'   {site:32} {cause}')

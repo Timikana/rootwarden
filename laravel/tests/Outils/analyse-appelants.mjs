@@ -374,6 +374,60 @@ function origineDeLaCible(arbre, englobante, cible) {
 }
 
 
+/**
+ * LE PREFIXE de la cible : ce que le site d'appel ajoute DEVANT le chemin.
+ *
+ * ── POURQUOI UN PREFIXE, ET PAS UNE LISTE DE HELPERS ────────────────────────
+ *
+ * E-246 demande de croiser les chemins appelES contre les routes declarEES. Le
+ * discriminant n'est PAS la forme du chemin — un premier tri « francais =
+ * portage, anglais = backend » a rendu 28 orphelins pour zero, et `graylog`,
+ * `docker`, `services`, `maintenance` s'ecrivent pareil des deux cotes.
+ *
+ * Le discriminant est le HELPER : `appelle()` prefixe la passerelle,
+ * `appellePortage()` ne prefixe rien. Mais **une liste de noms de helpers se
+ * perimerait au premier module qui nomme le sien autrement**, et un helper non
+ * liste rendrait « zero orphelin » sur un module entier — c'est-a-dire la plus
+ * rassurante des sorties, par omission.
+ *
+ * On DERIVE donc, et par la VALEUR jamais par le nom :
+ *
+ *     fetch(X + chemin)  ou X vaut '/api/gateway'  ->  prefixe '/api/gateway'
+ *     fetch(chemin)      chemin etant un PARAMETRE ->  prefixe '' (l'appelant
+ *                                                      fournit l'URL entiere)
+ *     fetch('/x/y')                                ->  prefixe '/x/y'
+ *
+ * `PASSERELLE` s'appelle ainsi dans les 31 fichiers, et c'est precisement ce qui
+ * rendrait un tri par nom confortable et faux : ce qui compte est que la
+ * constante VAILLE `/api/gateway`.
+ *
+ * `null` = non derivable, et se dit.
+ */
+function prefixeDeLaCible(arbre, englobante, cible) {
+    const litteralDe = (noeud) => {
+        if (noeud.type === 'Literal' && typeof noeud.value === 'string') return noeud.value;
+        if (noeud.type !== 'Identifier') return null;
+        const o = origineDeLaCible(arbre, englobante, noeud);
+        return (o && (o.forme === 'litteral' || o.forme === 'constante')) ? o.valeur : null;
+    };
+
+    // `A + B + chemin` : acorn imbrique a gauche, donc on descend a gauche.
+    let gauche = cible;
+    while (gauche.type === 'BinaryExpression' && gauche.operator === '+') gauche = gauche.left;
+
+    const litteral = litteralDe(gauche);
+    if (litteral !== null) return litteral;
+
+    // La cible est le PARAMETRE du helper : l'appelant fournit l'URL entiere,
+    // donc le prefixe est vide — ce n'est PAS une absence de mesure.
+    const params = (englobante?.params || [])
+        .filter((x) => x.type === 'Identifier').map((x) => x.name);
+    if (gauche.type === 'Identifier' && params.includes(gauche.name)) return '';
+
+    return null;
+}
+
+
 /** Le texte source d'un noeud, tronque. */
 function source(code, noeud, max = 70) {
     const t = code.slice(noeud.start, noeud.end).replace(/\s+/g, ' ');
@@ -439,6 +493,10 @@ for (const nom of fichiers) {
             // place : une constante du fichier, ou une cle passee a un helper.
             // `null` = ni l'une ni l'autre, et c'est alors un vrai silence.
             origine: n.arguments[0] ? origineDeLaCible(arbre, englobante, n.arguments[0]) : null,
+            // Ce que le site d'appel ajoute DEVANT le chemin. `''` = l'appelant
+            // fournit l'URL entiere ; `null` = non derivable, et se dit.
+            prefixe: n.arguments[0]
+                ? prefixeDeLaCible(arbre, englobante, n.arguments[0]) : null,
         });
     });
 }
