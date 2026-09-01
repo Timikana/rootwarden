@@ -1071,3 +1071,113 @@ comportement n'a jamais été observé. **Ce qui était faux** : en déduire qu'
 *Une décision trop large protège d'un défaut et en interdit le remède.* C'est le motif d'E-224 pris par
 l'autre bout, et c'est la deuxième fois aujourd'hui que je resserre une de mes décisions plutôt que de
 la laisser mordre au-delà de son objet.
+
+---
+
+## 12 — Le tableau de bord : **trois valeurs d'état machine, et ce n'est pas une exception à ma règle**
+
+**Décidée le 2026-09-01, 12:14 UTC**, sur mesure de la session 3 **revérifiée par moi**. Elle bloquait
+son écriture sur ce point, et elle avait raison de bloquer : **deux de mes instructions se
+contredisaient.**
+
+### Le défaut, mesuré
+
+    SELECT online_status, COUNT(*) FROM machines GROUP BY online_status
+      ONLINE    1
+      Inconnu   2
+
+    nbOnline  = COUNT(*) WHERE online_status  = 'Online'   ->  1
+    nbOffline = COUNT(*) WHERE online_status != 'ONLINE'   ->  2      total 3
+
+> **`nbOffline` compte comme HORS LIGNE les machines dont l'état est INCONNU.** Deux machines sur trois
+> sont annoncées hors ligne alors que le produit ne sait pas. **Et les deux compteurs somment à 3, donc
+> ils paraissent cohérents** — c'est exactement ce qui rend le défaut invisible.
+
+### La contradiction entre mes deux instructions, et comment elle se dissout
+
+J'avais écrit : *« n'ajoute aucun indicateur que le legacy n'a pas — compléter un onglet dont l'affichage
+ment produit un onglet complet et faux »*. La session 3 relève, à juste titre, que passer à trois valeurs
+**ajoute** un indicateur.
+
+**La contradiction se dissout sur un fait, pas sur un arbitrage** :
+
+> **`Inconnu` EXISTE DÉJÀ dans la donnée.** Le legacy ne manque pas de l'état — il manque de
+> l'**affichage**. La colonne porte trois valeurs, le tableau de bord en montre deux.
+
+**Donc ce n'est pas une invention, c'est une lecture.** Mon instruction interdit d'ajouter ce que le
+legacy **n'a pas** ; il a `Inconnu`, il le range simplement du mauvais côté. *Décomposer un compteur qui
+confond deux états n'est pas enrichir un écran : c'est cesser d'affirmer ce que la donnée ne dit pas.*
+
+### DÉCISION : trois valeurs — en ligne · hors ligne · **état inconnu**
+
+Et **la réserve de la session 3 est retenue telle quelle** : si l'on s'en tenait à deux, *« moins » et
+« faux » ne se sépareraient pas sans un troisième compteur.* **Il n'y avait pas d'issue « moins plutôt
+que faux » sur ce point** — c'est ce qui rend la décision facile.
+
+### C'est la QUATRIÈME occurrence du même motif aujourd'hui, et la première qui ne coûte rien
+
+| porteur | l'état qu'il ne peut pas exprimer | coût |
+|---|---|---|
+| `machines.service_account_deployed` | « sudoers orphelin » | une colonne — `DOSSIER-05` |
+| `wazuh_agents.status` | « je n'ai pas pu vérifier » | aucun — `unknown` existait |
+| `supervision_agents` | « l'agent est peut-être là » | une colonne — migration 064 |
+| **`online_status` à l'écran** | **« je ne sais pas »** | **aucun — la valeur est déjà en base** |
+
+> **Un champ face à une réalité qui a gagné un état qu'il ne peut pas exprimer.** Trois fois dans un
+> schéma, **une fois dans un AFFICHAGE** — et c'est celle-là qui ne coûte rien, parce qu'il n'y a rien à
+> ajouter : seulement à cesser de sommer deux choses.
+
+---
+
+## Trois corrections que la session 3 apporte à ma mission, et je les adopte
+
+### 1. Trois des six indicateurs machine SONT bornables — j'avais dit le contraire
+
+    SHOW COLUMNS FROM cve_scans -> id · machine_id · scan_date · packages_scanned · cve_count · critical_count · …
+
+**`cve_scans` porte `machine_id`.** Donc `lastScan`, `lastCveCount` et `criticalSum` se bornent **avec le
+prédicat qui existe déjà** — aucune quatrième implémentation.
+
+**J'avais écrit « aucune n'est bornée ».** C'est vrai de **la requête du legacy** et faux de **la
+donnée** — et *ce n'est pas la même chose*. **Elles ne sont donc pas à retirer : elles sont à borner.**
+
+### 2. Mon piège de casse était juste en effet et faux en cause
+
+    collation de online_status : utf8mb4_0900_ai_ci   ("_ci" = insensible a la casse)
+    SELECT 'ONLINE' = 'Online' -> 1
+
+**La casse n'a aucun effet en SQL** — `= 'Online'` trouve bien la ligne `ONLINE`, mesuré. **Mais le piège
+devient réel s'il est porté en PHP avec `===`**, qui est sensible à la casse.
+
+> *L'avertissement était juste, sa cause était fausse — et la parade n'est pas la même* : il n'y a rien à
+> corriger dans la requête legacy, il y a quelque chose à ne pas écrire dans le portage.
+
+**Et c'est cette même casse qui masquait le vrai défaut** : les deux compteurs somment, donc personne ne
+regarde ce qu'ils rangent.
+
+### 3. `noKey` vaut 12 sur 12 — un indicateur à SATURATION
+
+Aucun compte actif n'a de clé SSH, et la colonne est bien écrite (`profile.php:137`) : ce n'est pas une
+colonne morte, c'est un indicateur qui **n'apprendra rien tant qu'il reste à 100 %**. **À porter quand
+même** — *un indicateur saturé aujourd'hui est le seul moyen de voir qu'il cesse de l'être.*
+
+### Et sur `no2fa` : **rôle 3**, et l'argument qui ferme la question n'est pas la sensibilité
+
+    users actifs 12   ·   sans second facteur 8   ·   avec 4
+
+**Huit sur douze.** Ce que le legacy affiche dès le rôle 1 est **une carte de la surface d'attaque** :
+directement actionnable pour un attaquant, d'aucune utilité pour le compte lui-même.
+
+**Et le gel ne coûte rien, ce qui tranche** : la page porte **déjà** une tuile qui dit à chaque compte
+**son propre** état. *Une information sur ses propres limites n'est pas une information sur des objets* —
+« votre compte n'a pas de second facteur » est actionnable et ne fuit rien ; « 8 comptes n'en ont pas »
+est une liste de cibles.
+
+**Et le piège qu'elle a vérifié sans qu'on le lui demande mérite d'être gardé** : les colonnes chiffrées
+de ce produit ont déjà rendu VRAI un test `<> ''` pour une valeur réellement vide. Mesuré **sans
+déchiffrer aucun secret vivant**, par les seules longueurs : aucune n'approche celle d'un chiffré de
+chaîne vide. **`no2fa` = 8 est exact aujourd'hui — et le jour où une longueur courte apparaîtra, le
+compteur SOUS-ESTIMERA**, ce qui est la mauvaise direction pour un indicateur de sécurité.
+
+`nbUsers` et `noKey` : **rôle 2**, sans enthousiasme — ni l'un ni l'autre n'est une carte de cibles, ni
+utile en dessous.
