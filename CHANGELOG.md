@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.102** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.104** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,39 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.104 — E-247 : tout le protocole de concurrence protege la CHARGE, aucune precaution ne voit une ecriture dans l'ARBRE
+
+Trois references posees sur mesure isolee (`navigation`=66, `graylog-g1` laravel=28, legacy=27),
+banc rendu explicitement. **L'arbre a bouge pendant deux des trois.**
+
+> **Rendre le banc ne protege que la CHARGE.** L'arbre est un etat partage, et une ecriture pendant la
+> fenetre fausse la mesure **sans apparaitre nulle part** — ni dans `ps`, ni dans une duree, ni dans un
+> `StartedAt`.
+
+Le chantier a bati tout son protocole sur la charge : rendre le banc, exiger un mot explicite, ne pas
+lancer `pytest` pendant un LOT, attendre un PID enregistre. **Aucune de ces precautions ne voit une
+ecriture dans l'arbre.**
+
+**Ici les deux sont sans effet, et c'est PROUVE** : `Tests\` n'est qu'en `autoload-dev` et
+`TableDesGardes` n'est reference que par deux fichiers de tests — aucune requete HTTP ne peut le
+charger ; et graylog *legacy* tape le **8443**, ou `laravel/app/` n'est pas dans le chemin. *Le rejeu
+propose (82 s) aurait etabli MOINS : une absence d'effet observee une fois, contre une impossibilite
+structurelle.*
+
+#### Et le meme ecart de dates veut dire deux choses opposees selon le regime
+
+    rootwarden_php     2026-08-20 14:57Z  ->  337 .php plus neufs  ->  AUCUNE divergence
+    rootwarden_python  2026-08-27 12:28Z  ->   20 .py  hors tests  ->  divergence (E-238), dont 10 routes
+
+**PHP relit a chaque requete ; Python charge au demarrage.** Huit jours sur 337 fichiers ne divergent
+pas ; sept heures sur 20 divergent. **Le dedouanement PHP compte autant que l'alarme Python.**
+
+#### Le garde par SUITE, et non sur le LOT
+
+*Bloquer 153 executions pour 20 fichiers que la plupart ne touchent pas, c'est fabriquer l'obstacle
+qu'on contourne* — **et un garde contourne ne garde rien.** Il porte le **regime** (pas seulement la
+date) et **l'arbre pendant la fenetre**, dans le chemin servi de la cible.
 
 ### v1.38.103 — les neuf indicateurs du legacy, bornés — et trois familles, trois bornes
 
