@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.124** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.125** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,52 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.125 — E-268 : mon garde de fenetre echouait OUVERT, et il perdait la regle de l'en-tete du module
+
+    module injoignable, avec 2>/dev/null || true  ->  sortie VIDE  ->  verdict « conforme »
+    mesurable=false, ecritureCode=false          ->  ''           ->  verdict « conforme »
+
+**Deux defauts, tous deux miens, trouves par la session 7.**
+
+**1.** `2>/dev/null || true` faisait echouer le garde **ouvert** : si `lib-arbre.mjs` casse ou qu'une
+version de Node refuse `--input-type=module`, le LOT continuait comme si la fenetre etait propre.
+**C'est le motif que j'avais reproche a la session 7 une heure plus tot sur son `find 2>/dev/null` — elle
+dans un CONSTAT, moi dans un GARDE.** *Un garde qui echoue ouvert est pire : on compte dessus, donc son
+silence n'invite personne a regarder.*
+
+**2.** L'appel ignorait **`mesurable`**. `ecritureCode` vaut `false` quand la mesure n'a pas eu lieu —
+delibere (E-255) — donc « aucune ecriture » et « chemin illisible » rendaient tous deux `conforme`.
+**C'est litteralement la phrase de l'en-tete du module** : *« si elle ne peut pas mesurer, elle s'abstient
+EN LE DISANT, jamais un PASS. »* **Le module la respectait ; mon appel la perdait.**
+
+> *Consommer un contrat sans lire l'invariant que son auteur a ecrit en tete, c'est reconstruire le defaut
+> que le contrat existait pour fermer.*
+
+#### Cinquieme verdict, et non un alias
+
+    GARDE INDISPO — <motif>     la mesure n'a pas pu avoir lieu   ->  REPARER
+    FENETRE SALE — a rejouer    la mesure ne veut rien dire       ->  REJOUER
+
+**Les confondre ferait passer un garde casse pour une serie de fenetres sales** — le bruit de fond qu'on
+apprend a ignorer. **Un motif distinct merite un verdict distinct quand le geste qui suit differe.**
+
+**Eprouve dans les TROIS etats avant commit** : 1 s -> vide · 1 h -> `SALE::` nommant les fichiers ·
+module injoignable -> `INDISPO::` **et `ERR_MODULE_NOT_FOUND` visible sur stderr**. *Le bruit de stderr est
+voulu : c'est le temoin que je silencais.*
+
+#### Et un dedouanement de la session 7, qui vaut d'etre dit
+
+**`$cible` est plus fin que sa porte manuelle** : elle balayait les trois cibles et fermait sur
+`legacy/version.txt` pour une suite *laravel* ; l'appel du runner ne surveille que le chemin servi **de la
+cible mesuree**. *C'est pourquoi son lot A n'a rien signale alors que `version.txt` a bouge pendant.*
+**La granularite par cible est ce qui empeche ce garde de devenir le bruit qu'on redoute.**
+
+#### E-250 lot A : trois conformes, et `reglages` n'est plus « fenetre sale »
+
+`27 · 0`, `16 · 0`, `32 · 0`. Les huit ancres dedoublees verifiees une a une. **La valeur 32 etait deja
+juste sous « fenetre sale »** — le verdict avait dit « non interpretable », pas « faux ». **Premiere fois
+qu'un verdict de non-interpretabilite est leve par une REMESURE et non par un correctif.**
 
 ### v1.38.124 — la region d'alertes : HUIT et non neuf, cinq DERIVEES, et mes deux ecarts renumerotes
 

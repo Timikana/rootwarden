@@ -1208,12 +1208,37 @@ joue() {
   # ajouter `version.txt` a une liste d'exclusions referait l'enumeration qu'E-258
   # vient de retirer. Et depuis E-257 le cout est proportionne — une suite rejouee,
   # pas 156 tuees.
+  # ⚠ DEUX DEFAUTS DE CET APPEL, TROUVES PAR LA SESSION 7 ET CORRIGES ICI.
+  #
+  # 1. `2>/dev/null || true` FAISAIT ECHOUER LE GARDE **OUVERT**. Mesure : module
+  #    rendu injoignable -> sortie vide -> `fenetre` vide -> verdict « conforme ».
+  #    Si `lib-arbre.mjs` casse, disparait, ou qu'une version de Node refuse
+  #    `--input-type=module`, le LOT continuait comme si la fenetre etait propre.
+  #    **C'est le motif que j'avais reproche une heure plus tot a un `find
+  #    2>/dev/null` — commis la dans un CONSTAT, ici dans un GARDE. Un garde qui
+  #    echoue ouvert est pire : on compte dessus.**
+  #
+  # 2. L'APPEL IGNORAIT `mesurable`. `ecritureCode` vaut `false` quand la mesure
+  #    n'a PAS eu lieu — c'est delibere, pour ne pas abattre sur un silence. Mais
+  #    sans consulter `mesurable`, les deux cas se confondaient :
+  #        aucune ecriture   -> ''  -> conforme   correct
+  #        chemin illisible  -> ''  -> conforme   FAUX
+  #    C'est litteralement la regle de l'en-tete du module — *si elle ne peut pas
+  #    mesurer, elle s'abstient EN LE DISANT, jamais un PASS*. **Le module la
+  #    respectait ; mon appel la perdait.**
+  #
+  # D'OU UN CINQUIEME VERDICT, ET NON UN ALIAS DE « FENETRE SALE » : les deux
+  # remedes DIFFERENT. Une fenetre sale se rejoue ; un garde indisponible se
+  # REPARE. Les confondre ferait passer un garde casse pour une serie de fenetres
+  # sales — c'est-a-dire pour le bruit de fond qu'on apprend a ignorer.
   fenetre=$(cd "$E2E" && node --input-type=module -e "
     import { empreinteServie, verdictFenetre } from './lib-arbre.mjs';
     const c = process.argv[1], d = Number(process.argv[2]);
     const v = verdictFenetre(c, empreinteServie(c), d);
-    process.stdout.write(v.ecritureCode ? 'SALE::' + (v.fichiers || []).slice(0,3).join(', ') : '');
-  " "$cible" "$departMs" 2>/dev/null || true)
+    process.stdout.write(! v.mesurable ? 'INDISPO::' + (v.detail || 'mesure non effectuee')
+                       : v.ecritureCode ? 'SALE::' + (v.fichiers || []).slice(0,3).join(', ')
+                       : '');
+  " "$cible" "$departMs") || fenetre='INDISPO::le garde de fenetre n a pas pu s executer'
 
   # ══ ABATTAGE DU LOT — une suite peut laisser le banc INUTILISABLE ═══════════
   #
@@ -1249,7 +1274,8 @@ joue() {
   # interpretable enverrait chercher un defaut inexistant — c'est precisement le
   # cout du 2026-09-01, ou `Machines.php` avait REELLEMENT bouge dans la bonne
   # fenetre et aurait ete accuse par un raisonnement correct a chaque etape.
-  if [ -n "$fenetre" ];                      then verdict="FENETRE SALE — a rejouer (${fenetre#SALE::})"
+  if [ "${fenetre:0:9}" = "INDISPO::" ];      then verdict="GARDE INDISPO — ${fenetre#INDISPO::}"
+  elif [ -n "$fenetre" ];                    then verdict="FENETRE SALE — a rejouer (${fenetre#SALE::})"
   elif [ "$fail" -gt 0 ] || [ "$code" -ne 0 ]; then verdict="ECHEC"
   elif [ -z "$attendu" ];                    then verdict="(pas de reference)"
   elif [ "$pass" -eq "$attendu" ];           then verdict="conforme"
@@ -1258,7 +1284,8 @@ joue() {
 
   printf '%-24s %-8s PASS=%-4s FAIL=%-3s %4ss  %s\n' \
     "$suite" "$cible" "$pass" "$fail" "$((t1-t0))" "$verdict"
-  [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] || [ "${verdict:0:12}" = "FENETRE SALE" ] && return 1
+  [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] \
+    || [ "${verdict:0:12}" = "FENETRE SALE" ] || [ "${verdict:0:13}" = "GARDE INDISPO" ] && return 1
   return 0
 }
 
