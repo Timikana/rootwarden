@@ -11733,3 +11733,55 @@ Exposer l'heure de demarrage du process via `GET /settings/announceable` — gar
 seule, **liste fermee** — permettrait a n'importe quelle page de **deriver** si elle parle du meme code
 que le service, au lieu de l'affirmer. **A instruire comme une capacite apres le redemarrage**, pas
 comme un pansement a E-238.
+
+## E-244 — « I3 porte » est declare au CHANGELOG et sa capacite centrale rend 404 : la route n'a jamais ete posee, et c'est le Lead qui ne l'a pas transmise
+
+**Mesure du 2026-09-01 a 14:15 CEST.**
+
+    laravel/public/js/pare-feu.js       appelle  pare-feu/historique
+    laravel/routes/**                   'historique' : AUCUNE occurrence, dans AUCUN fichier
+    PareFeuController::historique()     ligne 237 — INJOIGNABLE
+    CHANGELOG.md:2577                   « I3 porte — et il ferme un defaut heritee du legacy »
+
+**Les trois routes posees sont `/pare-feu`, `/pare-feu/copie` et `/pare-feu/copie/enregistrer`.**
+L'appel du JS rend donc **404**, et la methode du controleur est du code mort.
+
+### La chaine de la faute, et elle passe par le Lead
+
+La session 5 a livre I3 avec, en tete de son compte rendu, la mention explicite **« LA ROUTE, A FAIRE
+POSER PAR LA SESSION 3 »** et le texte exact de la ligne. **Je lui ai repondu sur sa question
+concernant I4 sans transmettre la route.** Elle ne pouvait pas la poser elle-meme — `web.php` n'est pas
+son fichier — et la session 3 n'a jamais su qu'elle l'attendait.
+
+> **Une livraison qui depend d'un geste dans le fichier d'une AUTRE session n'est pas finie : elle est
+> en attente, et rien ne le signale.** Le sous-lot se declare porte, la suite est verte (elle ne
+> descend pas jusqu'a l'historique), et le seul temoin est un `fetch` qui rend 404 dans une console que
+> personne n'ouvre.
+
+*C'est le motif « la garde est sur la page, pas sur la requete » retourne : ici c'est la CAPACITE qui
+est sur la page et pas sur la requete.*
+
+### Ce que ca repond a la question du DSI sur `Navigation`
+
+Il demandait si `iptables` restant `'legacy'` dans `Navigation.php` est **voulu ou un oubli**, I1 a I4
+etant annonces portes. **Ni l'un ni l'autre :**
+
+- **I4 n'est PAS porte** — le CHANGELOG n'en porte aucune trace, et aucune route de validation
+  n'existe. Seuls I1, I2, I3 le sont ;
+- **et I3 lui-meme est incomplet**, par cette route manquante.
+
+**Donc l'entree doit rester `'legacy'`, et pour une raison plus forte que l'attente d'I5.** *Un compte
+de sous-lots portes ne mesure pas ce qui est joignable.*
+
+### Le geste, et pour qui
+
+Une ligne dans `laravel/routes/web.php`, **fichier de la session 3**, texte fourni par la session 5 :
+`Route::post('/pare-feu/historique', [PareFeuController::class, 'historique'])` avec
+`->middleware(['role:1', 'perm:can_manage_iptables'])` — **la meme garde que la page**, et le controle
+d'acces sur la machine **resolue**.
+
+### Regle inscrite au §8
+
+**Tout sous-lot dont une piece atterrit dans le fichier d'une autre session porte, dans son compte
+rendu ET dans le plan, la ligne « EN ATTENTE DE : <session> / <fichier> / <geste> » — et ne se declare
+pas porte avant.** *Le Lead est le seul point ou cette attente peut se perdre, et elle s'y est perdue.*

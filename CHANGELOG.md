@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.99** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.100** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,50 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.100 — E-244 : « I3 porte » est declare et sa capacite centrale rend 404, parce que je n'ai pas transmis la route
+
+    laravel/public/js/pare-feu.js    appelle  pare-feu/historique
+    laravel/routes/**                'historique' : AUCUNE occurrence
+    PareFeuController::historique()  ligne 237 — INJOIGNABLE
+    CHANGELOG.md:2577                « I3 porte »
+
+La session 5 a livre I3 avec, en tete de son compte rendu, **« LA ROUTE, A FAIRE POSER PAR LA SESSION
+3 »** et le texte exact. **J'ai repondu sur sa question concernant I4 sans transmettre la route.** Elle
+ne pouvait pas la poser — `web.php` n'est pas son fichier — et la session 3 n'a jamais su.
+
+> **Une livraison qui depend d'un geste dans le fichier d'une AUTRE session n'est pas finie : elle est
+> en attente, et rien ne le signale.** Le sous-lot se declare porte, la suite reste verte (elle ne
+> descend pas jusqu'a l'historique), et le seul temoin est un `fetch` qui rend 404 dans une console que
+> personne n'ouvre.
+
+*C'est « la garde est sur la page, pas sur la requete » retourne : ici c'est la CAPACITE qui est sur la
+page et pas sur la requete.*
+
+**Et ca repond a la question du DSI** — `iptables` restant `'legacy'` n'est ni voulu-pour-I5 ni un
+oubli : **I4 n'est pas porte** (aucune trace au CHANGELOG, aucune route de validation) **et I3 est
+incomplet**. *Un compte de sous-lots portes ne mesure pas ce qui est joignable.*
+
+**Regle §8** : tout sous-lot dont une piece atterrit dans le fichier d'une autre session porte la ligne
+**« EN ATTENTE DE : <session> / <fichier> / <geste> »** et **ne se declare pas porte avant**. *Le Lead
+est le seul point ou cette attente peut se perdre, et elle s'y est perdue.*
+
+#### Etat remesure le 2026-09-01 a 14:13 CEST, apres un arret de quatre jours
+
+    dernier commit  bdbb284  2026-09-01 14:12   (le travail a REPRIS, minutes avant la mesure)
+    commits depuis le 2026-08-28 17:00 : 1
+    version.txt 1.38.98 · ecarts 233 (dernier numero E-243) · archivees 13
+    dossiers legacy encore servis : 20
+    entrees de menu : 32 total · 26 portees · 6 legacy
+    amont : 0 de retard, 62 d'avance
+    StartedAt backend : 2026-08-27T12:28:43Z — INCHANGE, le gel tient
+
+**Le trou de quatre jours est inscrit plutot que lisse** : *un plan qui ne dit pas qu'il ne s'est rien
+passe laisse croire a une continuite.* Et le « quatre jours d'arret » du DSI, mesure a 12:10Z, **etait
+juste et est deja depasse** — il avait donne son heure, c'est ce qui permet de le dire.
+
+**26/6 est confirme** : le DSI craignait que son compte soit perime par la bascule d'`api_docs`. Il ne
+l'est pas — la bascule precede ma mesure.
 
 ### v1.38.99 — nommer l'etat avant de choisir une valeur : migration 064 et le geste d'E-237
 
