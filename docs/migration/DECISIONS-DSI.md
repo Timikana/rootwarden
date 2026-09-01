@@ -2474,3 +2474,75 @@ sa mesure « fenêtre sale »*, et c'est le verdict qu'on a mis trois jours à r
 **et vérifié que les quatre libellés visés existent sous la forme exacte** — l'un était `'CVE at the last
 scan'` et non `'CVEs in the last scan'`. *Un correctif rédigé sans relire sa cible est un correctif qui
 suppose.*
+
+---
+
+## ⚠⚠ E-280 : le redémarrage **NE CORRIGE PAS** la forme grave — et c'était offert comme raison de signer
+
+**Mesuré par moi le 2026-09-01 à 23:56 UTC**, sur une affirmation du Lead qui allait à l'exploitant.
+
+### Ce qui m'était annoncé
+
+> *« Le repli EN SERVICE n'a aucun filtre : `SELECT … FROM machines`, archivées comprises. **L'arbre exclut
+> au moins les archivées ; le process en service, non.** »*
+>
+> *« Le redémarrage … **corrige au passage la forme grave d'E-280 sans que personne l'ait décidé** — à dire
+> à l'exploitant, parce qu'un effet de bord favorable non annoncé reste un effet de bord. »*
+
+### Ce que la mesure dit — les deux affirmations sont FAUSSES
+
+    git diff 6663e83 -- backend/scheduler.py
+    -> UN SEUL bloc : +10 lignes, purge des cles plateforme archivees
+       AUCUN rapport avec `target_type`, `lifecycle_status`, ni le repli
+
+    lifecycle_status, ARBRE  :  lignes 274 · 279 · 292 · 299 · 457-458
+    lifecycle_status, SERVI  :  lignes 274 · 279 · 292 · 299 · 457-458   <- IDENTIQUES
+
+    le repli de la 1re fonction, dans les DEUX :
+        else:  cur.execute(f"SELECT {base_cols} FROM machines")     <- nu, sans filtre
+
+> **Le fichier servi et le fichier de l'arbre sont identiques sur tout ce qui concerne E-280.** Le repli nu
+> existe des deux côtés ; les filtres d'archivage existent des deux côtés. **Le redémarrage ne change rien
+> à cet écart.**
+
+### Pourquoi je le relève avec cette insistance
+
+**Ce n'était pas une note de compte rendu : c'était une RAISON DE SIGNER**, destinée à l'exploitant, et
+elle allait **dans le sens qui fait agir favorablement**.
+
+> **Un effet de bord favorable ANNONCÉ ET INEXISTANT est pire qu'un effet de bord tu** : le second laisse
+> la décision reposer sur ses vraies raisons, le premier en ajoute une fausse au dossier — *et personne ne
+> remesure une bonne nouvelle.*
+
+**C'est la règle de la session 5, appliquée à un argument au lieu d'une sonde** : *une sonde écrite pour
+borner se trompe du côté qui dédouane.* **Ici c'est un dossier écrit pour convaincre, et il se trompe du
+côté qui décide.**
+
+### Ce que ça ne change pas, et il faut le dire aussi nettement
+
+**Le `DOSSIER-01` garde ses deux raisons, toutes deux mesurées** : vingt modules qui prendront effet
+ensemble sans avoir jamais été observés, et **l'impossibilité d'interpréter une mesure** sur `wazuh`,
+`ssh` ou `ssh_audit` tant que l'arbre et le service diffèrent. *Retirer une raison inventée ne fragilise
+pas un dossier qui en a de vraies — cela l'empêche d'être démoli sur la fausse.*
+
+**Et E-280 lui-même reste entier** : le repli nu vers tout le parc est réel, et **son volet le plus
+instructif tient sans le redémarrage** —
+
+> **`'all'` est le défaut documenté et tombe dans le MÊME `else` qu'une valeur incomprise.** *La branche
+> « j'ai choisi tout le parc » et la branche « je ne t'ai pas compris » sont la même* — et rien, même après
+> coup en base, ne dit laquelle a tiré. **C'est un état sans nom**, la cinquième occurrence du motif après
+> `sudoers_orphelin`, `wazuh_agents`, `supervision_agents` et `online_status`.
+
+**Une branche sur quatre échoue fermée** — `WHERE 1=0`, vérifié ligne 288. *Les trois autres échouent
+ouvert, vers le parc entier, dans une tâche planifiée qui ouvre des sessions SSH réelles sans personne
+devant l'écran.*
+
+### Et le Lead a corrigé son propre instrument dans le même message
+
+Sa commande de remesure du compte d'écarts **comptait des lignes de titre**, et *l'erreur grandissait avec
+la tenue du registre* — un écart clos reçoit un second titre. **Tous les comptes qu'il m'a transmis étaient
+hauts de sept.**
+
+*Une auto-correction sur l'instrument, doublée d'une affirmation fausse dans le même message, dit la même
+chose des deux : ce qui est vérifié est ce qu'on décide de vérifier.* **Il a remesuré son compteur et pas
+son argument.**
