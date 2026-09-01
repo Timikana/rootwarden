@@ -12750,3 +12750,61 @@ propage l'erreur.*
 objet que nous n'avions pas regarde au moment de parler* — moi « en cours » sur un LOT vert depuis cinq
 heures, elle « livre » sur un sous-lot dont elle savait la route absente. **Ce n'est pas la verification
 qui manque, c'est le geste de regarder l'objet au moment ou on parle de lui.**
+
+## E-262 — le quatrieme verdict est pose et EPROUVE : `FENETRE SALE — a rejouer`, sans abattage
+
+**Pose par le Lead dans `scripts/rejouer-lot.sh` le 2026-09-01 a 23:40 CEST**, sur le contrat que la
+session 7 a stabilise (`56f8d8b`) et **eprouve dans les deux sens avant d'etre commite**.
+
+    depart dans le FUTUR   ->  vide                                   temoin NEGATIF
+    depart il y a 24 h     ->  SALE:: ChangementMotDePasseExige.php,
+                                      routes/web.php, bootstrap/app.php
+    cible legacy, 24 h     ->  SALE:: legacy/version.txt
+
+**Le temoin negatif a ete joue AVANT le positif** — *un garde teste sur le seul cas facile rend
+« propre » et se croit bon* : la session 7 l'a paye sur son premier temoin, et c'est ce qui a trouve son
+angle mort du cree-puis-supprime.
+
+### La fenetre sale passe EN TETE de la chaine de verdicts, et ce n'est pas cosmetique
+
+    FENETRE SALE  ->  ECHEC  ->  (pas de reference)  ->  conforme  ->  ECART
+
+**Elle ne dit pas que la suite a echoue : elle dit que son resultat ne veut rien dire.** *Un ECART
+annonce sur une mesure non interpretable enverrait chercher un defaut inexistant* — c'est exactement le
+cout du 2026-09-01, ou `Machines.php` avait REELLEMENT bouge dans la bonne fenetre et aurait ete accuse
+par un raisonnement correct a chaque etape.
+
+Elle compte comme **a rejouer**, donc `return 1` : *un LOT qui se declare conforme en portant une mesure
+non interpretable est pire qu'un LOT rouge.*
+
+### ⚠ ET LE GARDE SIGNALERA MES PROPRES BUMPS DE VERSION — dit plutot que colmate
+
+`legacy/version.txt` est **suivi par git**, donc classe **CODE**, donc il declenche. Le temoin l'a
+nomme. **C'est juste selon le critere et ça reste une fausse alarme en pratique.**
+
+> **Le remede est mon comportement (E-256 : ne pas bumper pendant un LOT), PAS une exception dans le
+> garde.** Ajouter `version.txt` a une liste d'exclusions referait l'enumeration qu'E-258 vient de
+> retirer — *et la premiere exception est celle qui rend la deuxieme naturelle.*
+
+Et depuis E-257 le cout est **proportionne** : une suite rejouee, pas 156 tuees. *C'est ce qui rend
+l'imperfection tolerable — un garde faux et destructeur ne l'aurait pas ete.*
+
+### Ce que cet appel N'EMPLOIE PAS, et pourquoi je l'ecris
+
+`verdictFenetre` unit deux detections : la comparaison d'**empreintes** (contenu change) et le **`mtime`**
+(ecrit puis remis en etat). **Depuis le shell je ne peux pas transporter l'empreinte d'avant**, donc je
+passe l'empreinte COURANTE : la comparaison rend vide, et **seul le `mtime` decide.**
+
+**C'est la moitie qui a attrape le cas du 2026-09-01** — l'autre n'ajoute rien qu'un `mtime` ne montre
+deja. *Mais c'est une degradation du contrat, et la dire vaut mieux que laisser un lecteur croire que les
+deux detections tournent.*
+
+### Et la session 7 a corrige mon angle mort annonce — deuxieme fois dans la journee
+
+Je l'avais prevenue qu'un fichier de code **non encore suivi** serait classe « etat ». **Mesure : un
+`.blade.php` neuf, non suivi et non ignore, est classe CODE.** Le vrai angle mort est le **symetrique** —
+un fichier de code figurant dans `.gitignore` — et il est ecrit dans son en-tete plutot que corrige.
+
+> **Deuxieme fois du jour qu'un de mes signalements vise la mauvaise branche ; les deux fois la
+> trouvaille etait reelle et le perimetre faux.** *Un signalement juste sur un perimetre faux fait
+> construire une parade qui protege ce qui n'etait pas menace.*
