@@ -221,6 +221,42 @@ désigne son propre remède.
   contenant que la machine 2. Un groupe **dynamique** résout ses membres **au moment du
   clic** : l'ensemble visé n'est pas lisible dans la ligne du groupe, et rien n'empêche
   la production d'y tomber ;
+- **Une assertion doit inclure l'existence de sa FENÊTRE D'OBSERVATION, pas seulement
+  celle de son objet.**
+
+  Deuxième forme du piège de l'assertion-par-absence, rapportée par la session 7 le
+  2026-09-01, et elle échappe entièrement à la parade écrite juste au-dessus. Premier
+  lancement d'une suite `pare-feu`, `docker` injoignable, la suite tombe à sa première
+  ligne. Sortie :
+
+      FAIL  deroulement de la suite — lecture en base en echec
+      PASS  AUCUN geste sortant ou ecrivant n'a abouti  — 0 requete(s) laissee(s) passer
+      PASS  AUCUNE requete n'a vise la production
+
+  **Les deux PASS sont littéralement vrais et entièrement vides** : aucun navigateur
+  n'avait été ouvert. `lignes.length > 0 && <propriété>` n'aurait rien changé — il n'y
+  avait pas de tableau vide, il n'y avait pas eu de mesure.
+
+  > Le filet qui compte le trafic sortant mesure une absence. **Quand la suite n'a pas
+  > tourné, l'absence est totale — et le filet décerne son meilleur verdict au pire
+  > moment.**
+
+  La forme à écrire : `SANS OBJET — aucun trafic observé`, **ni PASS ni FAIL**. C'est la
+  même règle que le silence de la jointure, et elle vaut mot pour mot ici :
+
+  > **Un silence étiqueté « mesuré » qui ne porte pas sa mesure est un silence par
+  > incapacité sous un meilleur nom.**
+
+  Et la variante du même jour, dans le même fichier : une comparaison avant/après dont
+  les **deux** relevés sont pris après le geste. `apres === avant` passe toujours, y
+  compris quand l'écriture a abouti. Le relevé initial doit venir du **début de la
+  suite**, et **son absence doit faire échouer la comparaison** au lieu de la taire ;
+
+- **Le défaut voyage avec le gabarit qu'on recopie.** Les deux ci-dessus viennent de
+  `go-page-cle-plateforme.mjs`, la suite dont la mécanique a été copiée. *Corriger
+  l'exemplaire qu'on écrit sans regarder celui dont on l'a tiré laisse le défaut se
+  répandre à la prochaine copie* ;
+
 - **Le clic sur un onglet ou un panneau se mesure en GÉOMÉTRIE, pas dans l'arbre DOM.**
 
   Leçon E-241, rapportée par la session 7 : deux entrées de menu (`graylog`, puis `wazuh`
