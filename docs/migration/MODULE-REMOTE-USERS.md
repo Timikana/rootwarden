@@ -239,3 +239,75 @@ mesurée **au réseau**.
   j'ai ses références au runner, pas le détail de ses assertions ;
 - **aucune machine n'a été jointe, rien n'a été déclenché.** Les seules commandes sont des `SELECT`,
   `grep`, `wc` et des lectures de fichiers.
+
+---
+
+## 8. ⚠ Les CINQ gestes distants, un par un — et ce qui reste si le geste échoue à mi-chemin
+
+Relevé le **2026-09-02 à 01:56 CEST**. **Régime : l'ARBRE.** Le service exécute le code du
+**2026-08-27T12:28:43Z**, et `backend/routes/ssh.py` a été modifié le **2026-08-28 à 10:03**. *Rien de
+ce paragraphe ne décrit ce qui tourne.*
+
+| geste | ce qu'il écrit, et où | droits | **état si échec à mi-chemin** |
+|---|---|---|---|
+| `scan_server_users` | `server_user_inventory` (base) | `execute_as_root` pour lire les `authorized_keys` protégés | **aucun** — lecture distante seule |
+| **`sshd_allow_user`** | `/etc/ssh/sshd_config` **sur la machine** + `user_logs` | root | **AUCUN — restauré, voir §8.1** |
+| `remove_user_keys` | `authorized_keys` d'un compte **sur la machine** | root | ⚠ **indéterminé — pas de sauvegarde, §8.2** |
+| `server_user_remove_key` | idem, **une** clé | root | ⚠ idem |
+| **`delete_remote_user`** | `userdel` **sur la machine** + inventaire | root | **irréversible par construction, §8.3** |
+
+### 8.1 `sshd_allow_user` — le geste distant le mieux construit du chantier
+
+Sa docstring promet « backup + `sshd -t` + rollback complet si une étape rate ». **Vérifié dans
+l'implémentation** (`_ensure_sshd_allows_user`, `ssh.py:180-245`), et **elle tient** :
+
+1. **quatre sorties anticipées avant toute écriture** — `AllowUsers` absent, `grep` ambigu, format
+   inattendu, compte déjà présent : chacune rend « pas de patch nécessaire » **sans toucher au
+   fichier** ;
+2. **sauvegarde d'abord** — `cp -a` vers `.bak.rw`, et **si elle échoue, on s'arrête avant le patch** ;
+3. patch par fichier temporaire puis `mv` ;
+4. **`sshd -t` avant tout rechargement** ;
+5. **rechargement sans `|| true`** — le commentaire signale que ce `|| true` rendait autrefois
+   `code_r` toujours nul, donc un échec de rechargement passait pour un succès ;
+6. **et une ATTESTATION** : la configuration effective est relue pour confirmer que le compte y est.
+
+**`_restaure_sshd` est appelée aux TROIS points d'échec** (`:231`, `:237`, `:243`), le dernier avec
+`recharger=True`.
+
+> **La réponse à « que reste-t-il si ça rate à mi-chemin » est : rien.** Chaque chemin d'échec restaure
+> la sauvegarde. **Et le succès n'est pas déduit d'un code de retour mais relu sur la machine.** C'est
+> le seul geste distant du chantier qui fasse les deux — et le contraste avec `iptables/`, où *aucune*
+> sauvegarde ni validation n'existe avant de réécrire le pare-feu, mérite d'être posé.
+
+### 8.2 Les deux retraits de clé — une garde excellente, et une lacune
+
+**La garde d'abord, parce qu'elle est remarquable** : les deux routes vérifient si la clé visée est
+**la clé de plateforme** et **refusent** —
+
+> *« Suppression bloquée : la clé plateforme RootWarden est parmi les clés visées. Utilise `--force`
+> si tu veux vraiment te locker hors du serveur. »*
+
+**Et le `--force` du message EXISTE** (`force = bool(data.get('force', False))`, garde
+`if empreintes_plateforme and not force`) : le texte ne promet pas un drapeau absent. **C'est la garde
+« se couper la patte » que `iptables/` n'a nulle part** — là, rien n'empêche d'appliquer un jeu de
+règles qui ferme le port SSH.
+
+Le docstring documente aussi un défaut **corrigé** : les deux branches jetaient le code de sortie et
+rendaient `success: True`, et le `; echo OK` du second mode **forçait** le code à zéro.
+
+**La lacune** : mesuré, **aucune sauvegarde n'entoure la réécriture d'`authorized_keys`** — pas de
+`cp`, pas de `.bak`, pas de fichier temporaire dans les commandes de retrait. Donc **si le geste
+échoue à mi-chemin, l'état du fichier est indéterminé et rien ne le restaure.** C'est l'écart exact
+avec `sshd_allow_user`, à trente lignes de distance dans le même fichier : *le cas visible traité, le
+cas voisin pris à l'envers.*
+
+### 8.3 `delete_remote_user` — irréversible, et c'est assumé
+
+Rien à restaurer : `userdel` ne se défait pas. Ce qui compte est ailleurs, et c'est fait —
+**le verdict est `id <username>`, pas le code de sortie de `userdel`.** La parade documentée du dépôt
+(*Debian 12+ rend un code ≠ 0 pour des avertissements non fatals*) est appliquée, et le code distingue
+« déjà absent » d'un échec réel.
+
+**Ce que le portage doit reprendre** : `remove_home` est un paramètre du corps. Un `userdel -r` emporte
+le répertoire personnel — **le panneau doit nommer les deux gestes séparément**, parce qu'ils n'ont pas
+la même réversibilité et que rien dans l'interface ne les distingue aujourd'hui.
