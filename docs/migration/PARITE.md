@@ -13087,6 +13087,36 @@ pendant — et c'etait juste.*
 **Un dedouanement se dit aussi fort qu'une accusation**, et celui-la vaut : la granularite par cible est
 ce qui empeche ce garde de devenir le bruit de fond qu'on redoute.
 
+### E-250 EST CLOS COTE SUITES — les cinq rejouees SANS les anciens selecteurs
+
+**Session 7, `868e8bd`, 2026-09-02. Verifie par le Lead contre ses tables : les cinq identiques.**
+
+    go-auth-mot-de-passe                 27 · 0   conforme
+    go-page-mot-de-passe                 16 · 0   conforme
+    go-page-supervision-reglages         32 · 0   conforme
+    go-page-supervision-config-ecriture  16 · 0   conforme
+    go-page-supervision-profils-crud     19 · 0   conforme
+
+**Rien a changer dans les tables — et c'est precisement ce qui rend l'etape 3 necessaire :**
+
+> **Tant que les deux noms d'ancre etaient vises, une suite pouvait ne trouver que l'ANCIEN et rendre la
+> meme valeur.** *L'etape 1 ne pouvait pas distinguer les deux ; le rejeu SANS les anciens selecteurs,
+> si.*
+
+**Une valeur inchangee entre deux etats n'atteste rien tant que les deux etats sont acceptes par
+l'instrument.** *C'est la meme forme que la coincidence d'E-265, ou une seule ligne de scan en base
+rendait deux definitions indiscernables : ici c'est l'INSTRUMENT qui acceptait les deux, la l'etait la
+DONNEE.*
+
+### Et le comptage quatre + une tient par sa RAISON, pas par son resultat
+
+    quatre CONSTATENT   « un message est rendu », jamais lequel        -> les DEUX ancres
+    reglages JUGE       /Test-Server-Debian/.test(confirme)            -> le SUCCES seul
+
+**Et pour `go-page-mot-de-passe`, c'est le REFUS qui est attendu** : ce qu'elle etablit est que le
+controleur a ete **atteint**, pas qu'il a accepte. *Lui donner les deux ancres est juste ; les donner a
+`reglages` aurait conserve le defaut sous un nom plus propre.*
+
 ### E-250, lot A : trois conformes, et `reglages` n'est plus « fenetre sale »
 
     go-auth-mot-de-passe          27 · 0   conforme
