@@ -12195,6 +12195,52 @@ l'enregistrement.* Et son geste sur `wazuh` en decoule : les fichiers **neufs** 
 existante, donc elle les ecrit ; **la route et l'entree de menu touchent `web.php` et `Navigation.php`,
 servis tous deux — elle les garde hors de l'arbre jusqu'a la fin du LOT.**
 
+### ⚠ LE LOT A CAPTURE LA PREUVE, ET ELLE AURAIT ETE INDISCERNABLE D'UNE REGRESSION
+
+    LOT lance                          15:29:58
+    profil.blade.php · supervision.blade.php   mtime 15:30:15   <- 17 SECONDES APRES
+    go-socle-navigation  15:30:00 -> 15:31:19                   <- A CHEVAL sur l'ecriture
+
+    resultat : PASS=64  FAIL=2
+      FAIL  rw-test-admin  : le lien « Supervision » resout  -> 500 /supervision
+      FAIL  rw-test-super  : idem
+
+`supervision.blade.php` etait dans un **etat intermediaire** et Blade rendait **500**.
+
+**Verifie par le Lead apres le rangement : `curl /supervision` -> 302.** La page est saine, **aucune
+regression du portage.** Le FAIL est entierement un artefact de la fenetre.
+
+> **Et dans deux heures il aurait ete INDISCERNABLE d'une vraie regression** : un 500 sur une page, deux
+> comptes, une suite du socle. La session 7 aurait cherche dans `Machines.php` — **qui avait
+> effectivement bouge a 14:22** — et *elle aurait trouve une explication plausible et fausse.*
+
+**C'est le cout reel de cette classe de defaut** : pas la mesure perdue, mais **le diagnostic faux
+qu'elle produit et qui, lui, sera cru.**
+
+### Et la session 7 a failli refuter mon alerte avec une mesure mal datee
+
+Elle a commence par verifier, et **tout disait que j'avais tort** : `git status` vide, aucun `-succes`
+dans les vues, les 27 ancres des cinq suites toutes trouvees, derniers commits d'hier. **Puis elle a date
+les fichiers**, et l'ecriture etait a 15:30:15 quand sa verification portait sur 15:31.
+
+> **Verifier l'etat PRESENT ne refute pas une alerte sur un etat PASSE. Une ecriture transitoire ne
+> laisse rien dans `git status` une fois annulee.**
+
+*C'est l'invariant qu'elle m'avait apporte le matin — une ecriture dans l'arbre fausse la mesure sans
+apparaitre nulle part — et elle a failli le rejeter avec le mauvais horodatage.* **Le meme releve, a deux
+minutes d'ecart, rend deux verdicts opposes.**
+
+### LA FORME DEFINITIVE DU GARDE PAR SUITE, et elle vient de ce cas
+
+J'avais dit : *un fichier modifie dans l'arbre au demarrage de la suite est un motif d'abattage, pas un
+avertissement.* **Insuffisant.**
+
+> **Il faut relever l'empreinte au DEBUT ET A LA FIN de chaque suite.** Celle-ci a ete faussee par une
+> ecriture qui n'existait **ni avant son depart, ni apres son arrivee**. **Un preflight seul aurait dit
+> « vas-y » a 15:30:00.**
+
+*Un garde qui ne mesure qu'a l'entree ne voit pas ce qui entre pendant.*
+
 **Ordre arbitre** : le LOT reprend depuis le debut · pendant, la session 3 ecrit `wazuh` et les sessions
 6 et 7 preparent les selecteurs · apres, les quatre renommages et les cinq suites dans une **fenetre
 unique**, puis un LOT cible sur les cinq.
