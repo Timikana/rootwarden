@@ -9,7 +9,7 @@ n'existe pas pour le tour suivant.
 - **Conventions** tranchées par l'exploitant, qui prévalent sur tout le reste.
 - **Pièges** accumulés — chacun a coûté quelque chose.
 
-Dernière mise à jour : **2026-08-28** (16:40 CEST), version `1.38.86`. Le chantier tourne désormais à **huit sessions** (le DSI délégué inclus) à propriété disjointe — table au §10 de `PROTOCOLE-SESSIONS.md`.
+Dernière mise à jour : **2026-09-01** (14:20 CEST), version `1.38.100`. Le chantier tourne désormais à **huit sessions** (le DSI délégué inclus) à propriété disjointe — table au §10 de `PROTOCOLE-SESSIONS.md`.
 
 ---
 
@@ -89,6 +89,23 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 ---
 
 ## 2. Où on en est
+
+> ### ⚠ QUATRE JOURS D'ARRÊT — 2026-08-28 16:54 → 2026-09-01 14:12
+>
+> **`git log --since='2026-08-28 17:00' --oneline | wc -l` rend `1`.** Le chantier s'est arrêté
+> quatre jours et **a repris à 14:12**, deux minutes avant la remesure de ce §2.
+>
+> *Un plan qui ne dit pas qu'il ne s'est rien passé laisse croire à une continuité* — et un lecteur
+> qui trouve « LOT vert, 26/32 » sans cette ligne conclut que le chantier avançait.
+>
+> **Le « quatre jours d'arrêt » relevé par le DSI à 12:10Z était juste et est déjà dépassé.** Il avait
+> donné son heure : c'est ce qui permet de le dire sans que ce soit un désaccord. **Sixième
+> illustration en deux jours de la même règle.**
+>
+> Ce que l'arrêt n'a PAS changé, et qu'il faut dire aussi : **`StartedAt` du backend est inchangé**
+> (`2026-08-27T12:28:43Z`, vérifié à 14:13), donc **E-238 tient dans son intégralité** — aucune mesure
+> sur `wazuh`, `ssh` ou `ssh_audit` n'est interprétable, et les 20 modules restent inertes.
+
 
 | | |
 |---|---|
