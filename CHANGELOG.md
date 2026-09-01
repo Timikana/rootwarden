@@ -2409,7 +2409,33 @@ le 27/08 pour ne pas rougir cinq suites pendant un LOT.
 Mesure : `/profil` et `/supervision` rendent **302** (la garde), pas 500 ; compilation Blade propre ;
 les quatre anciennes ancres sont a **0** occurrence, les huit neuves a **1** chacune.
 
-### v1.38.122 — E-266 : `find` n'est pas findutils, et E-267 : `FENETRE SALE` a mordu a sa premiere utilisation
+### v1.38.122b — E-266 : `find` n'est pas findutils, et E-267 : `FENETRE SALE` a mordu a sa premiere utilisation
+
+> **⚠ CETTE ENTREE PORTAIT `v1.38.122`, ET DEUX ENTREES DISTINCTES SE PARTAGEAIENT CE NUMERO.** Releve par
+> la session 3, qui a refuse de renumeroter la mienne — *« la surface, pas l'anteriorite »*, ma propre
+> regle retournee.
+>
+> **Mais la mesure tranche autrement, et mieux :**
+>
+>     git log -S'1.38.122' -- legacy/version.txt
+>       b4fb0d6  23:50   053e108  23:49     <- les commits de la session 3
+>     mon commit 682ec2a  ->  CHANGELOG.md + PARITE.md, PAS version.txt
+>
+> **Ses commits ont REELLEMENT pose `version.txt` a 1.38.122 ; le mien n'a jamais bumpe** — je differais
+> volontairement pendant le LOT (E-256). **Mon entete revendiquait un numero que mon commit n'a pas
+> ecrit.**
+>
+> **Le critere qui decide n'est donc ni l'anteriorite ni la surface : c'est QUEL COMMIT A ECRIT LE
+> NUMERO.** *Et il est propre aux versions parce qu'elles ont un consommateur EXTERNE* —
+> `.github/workflows/ci.yml:459` pose le tag depuis `legacy/version.txt`, **donc un numero jamais ecrit
+> dans ce fichier ne designe aucun contenu taggable.**
+>
+> **D'ou `122b` et non un numero libre** : cette entree n'a **pas** de bump, donc **pas de tag**, et lui
+> donner un numero entier laisserait croire l'inverse. *Un suffixe dit ce qu'un numero cacherait.*
+>
+> **Et la cause est celle des collisions d'ecarts, appliquee aux versions** : on lit `version.txt`, on
+> redige long, on ecrit — entre les deux, l'autre a bumpe. **La regle « annoncer avant de rediger » vaut
+> pour les DEUX compteurs.**
 
 #### E-266 — la forme RELATIVE de `-newermt` plante, et `2>/dev/null` la rend invisible
 
