@@ -12062,3 +12062,42 @@ verification qu'il ne faisait pas · et un garde client pris pour un garde serve
 
 > **Les deux FAIL sont peut-etre reels ; ils sont peut-etre deux assertions qui mesurent leur propre
 > outillage. La question se tranche AVANT de proposer un correctif.**
+
+## E-250 — deux etats OPPOSES sous la meme ancre : `profil-mdp-message` sert la confirmation ET l'erreur
+
+**Releve par la session 7 le 2026-09-01, verifie et precise par le Lead a 16:00 CEST.**
+
+    profil.blade.php:24   <p class="rw-confirmation" data-rw="profil-mdp-message">{{ session('mdp_message') }}</p>
+    profil.blade.php:27   <p class="rw-erreur"       data-rw="profil-mdp-message">{{ session('mdp_erreur') }}</p>
+
+**Une assertion sur `[data-rw="profil-mdp-message"]` ne peut mesurer qu'« un message est rendu », jamais
+LEQUEL.** Si quelqu'un porte un jour une assertion sur « le changement a reussi », **elle sera verte sur
+un echec.**
+
+C'est la classe d'E-244 et du trio `''`/`None`/`never_connected` : *un seul symbole pour deux etats
+opposes.* Ici ce n'est meme pas une valeur ambigue — **c'est le point d'accroche du test qui ne
+discrimine pas.**
+
+### PRECISION QUI REND LE DEFAUT ACTIONNABLE, ET QUE LE RELEVE N'AVAIT PAS
+
+Les deux `<p>` vivent dans des `@if` **mutuellement exclusifs** : **un seul existe dans le DOM a la
+fois.** Donc l'etat *est* mesurable — les classes `rw-confirmation` et `rw-erreur` **discriminent.**
+
+> **C'est un defaut de NOMMAGE, pas un etat immesurable.** Deux issues : dedoubler l'ancre
+> (`profil-mdp-succes` / `profil-mdp-erreur`), ou asserter sur la classe. **La premiere est la bonne** —
+> *une suite qui doit lire une classe de presentation pour connaitre un etat metier depend d'une
+> decision de style*, et le chantier a deja paye ça sur les classes purgees.
+
+**Non asserte par la QA, et c'est le bon choix** : l'ancre appartient a la vue. Transmis a la session 3
+— *ne pas transmettre serait refaire E-244 le jour ou il est numerote.*
+
+### La reference est posee, et le POST est MESURE cette fois
+
+`go-page-mot-de-passe` : **16 PASS / 0 FAIL**, `POST /profil/mot-de-passe -> 302`, drapeau relu a **0**
+par la suite **et depuis l'exterieur**. *Le middleware n'enferme pas : le compte marque atteint le
+formulaire, le soumet, et sort par les deux chemins de deconnexion.*
+
+**Ecart de prediction assume : 15 annonce, 16 mesure.** L'assertion `form.checkValidity()` avait ete
+ajoutee dans le meme geste que la correction, puis la prediction posee **sans la compter**. *Deuxieme
+fois du jour pour cette forme — et cette fois l'etat non relu etait le SIEN, ecrit trois minutes plus
+tot.* **Un ecart signale ne desatbilise pas une reference ; un ecart tu la rend suspecte.**
