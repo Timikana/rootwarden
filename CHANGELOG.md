@@ -2171,6 +2171,56 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
+### v1.38.101 — E-244 : une capacité déclarée portée depuis quatre jours, et injoignable
+
+`pare-feu.js:548` appelle `/pare-feu/historique`. **Aucune route de ce nom n'existait**, dans aucun
+fichier. `PareFeuController::historique()` — 30 lignes, écrite et complète — était donc **du code
+mort**, et l'appel rendait **404**.
+
+Le sous-lot s'était déclaré porté, le journal l'inscrivait, et **la suite restait verte** : elle ne
+descend pas jusqu'à l'historique. Le seul témoin était un `fetch` en échec dans une console que
+personne n'ouvre.
+
+> **« La garde est sur la page, pas sur la requête », retourné : ici c'est la CAPACITÉ qui était sur
+> la page et pas sur la requête.**
+
+La pièce manquante devait être posée dans `routes/web.php`, qui appartient à une autre session que
+celle qui a livré le sous-lot. **Une livraison qui dépend d'un geste dans le fichier d'autrui n'est pas
+finie : elle est en attente, et rien ne le signalait.**
+
+#### Vérifié avant d'être posée, pas recopiée
+
+Le texte de la route m'a été transmis par un tiers. Je l'ai contrôlé contre la méthode plutôt que de le
+reprendre :
+
+- **`machineDeLaRequete()` lit `machine_id` dans le CORPS**, puis résout par
+  `machineAccessible($idCompte, $role, $id)`. **Le contrôle porte sur l'objet résolu**, et rend 403 si
+  la machine n'est pas accessible — pas sur le paramètre reçu. C'est le bon motif ;
+- **la méthode ne joint aucune machine et n'appelle pas la passerelle** : elle lit
+  `iptables_rules_history` en base. Le `POST` malgré la lecture est cohérent avec `/pare-feu/copie` —
+  l'identifiant voyage dans le corps, pas dans l'URL ni dans les journaux d'accès ;
+- **`role:1` + `perm:can_manage_iptables`**, identique à la page et à ses deux voisines : aucun compte
+  légitime ne gagne ni ne perd un accès par cette ligne.
+
+Et la méthode applique déjà une leçon du chantier que la route ne doit pas défaire : elle renvoie
+`total` **et** `affichees`, parce que la route du backend rend 20 lignes au plus sans annoncer de total
+— un écran ne peut alors pas distinguer « il y en a 20 » de « il y en a 200 et vous en voyez 20 ».
+
+**Vérifié sur la route résolue**, pas déduit de la source :
+
+    pare-feu                     GET   [web, session.authentifiee, role:1, perm:can_manage_iptables]
+    pare-feu/copie               POST  [idem]
+    pare-feu/copie/enregistrer   POST  [idem]
+    pare-feu/historique          POST  [idem]
+
+#### Ce que ça change au statut du module
+
+L'entrée de menu reste `'legacy'`, et pour une raison plus forte que l'attente d'I5 : **I3 était
+incomplet** par cette route, et I4 n'est pas porté du tout. *Un compte de sous-lots portés ne mesure
+pas ce qui est joignable.*
+
+---
+
 ### v1.38.100 — E-244 : « I3 porte » est declare et sa capacite centrale rend 404, parce que je n'ai pas transmis la route
 
     laravel/public/js/pare-feu.js    appelle  pare-feu/historique
