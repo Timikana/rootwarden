@@ -1726,3 +1726,111 @@ s'applique* — la session 7 refuse de l'affirmer, précisément parce qu'elle v
 pas lire ce chiffre de façon fiable. **Mais s'il s'applique, un correctif PHP du legacy met jusqu'à une
 minute à prendre effet, et une suite qui écrit puis mesure dans la foulée mesurerait l'ancien code.**
 **Mesurable par le même chemin empirique**, et à faire si un sous-lot legacy en dépend.
+
+---
+
+## ⚠ RETIRÉ — mon signalement sur `_wazuh_pkg_specs` était un FAUX POSITIF
+
+**Réfuté par la session 5, vérifié par moi à 12:48 UTC en exerçant la fonction réelle.**
+
+    wazuh.py, 7e ligne de la fonction :  version = (version or '').strip()
+                                         ^^^ PRECEDE le regex, 4 lignes plus haut
+
+    f('4.14.5\n')  ->  pkg_deb = 'wazuh-agent=4.14.5-1'
+                       saut de ligne dans la commande ?  NON
+
+**Le `.strip()` est la première instruction. La fonction ne voit jamais le `\n`.** Ma mesure
+`re.match(motif, '4.14.5\n') -> ACCEPTE` était exacte **sur le motif isolé**, et sans objet sur le chemin.
+
+> **Mesurer le MOTIF n'est pas mesurer le CHEMIN.** Huitième défaut d'instrument de la journée, le mien,
+> et **d'un genre neuf** : les sept autres rendaient une valeur fausse. Celui-ci a rendu une valeur
+> **juste**, sur un objet qui n'était pas celui dont je concluais.
+
+**Et mon illustration était fausse aussi** : le `-1` de `wazuh-agent=4.14.5\n-1` n'est pas une ligne
+parasite — c'est le **suffixe de build que le code ajoute lui-même**
+(`version if '-' in version else f'{version}-1'`).
+
+**Ce que ça vaut malgré tout** : j'avais borné le cas comme « gravité faible, pas une injection », et
+j'avais raison de le borner. *Mais borner un faux positif ne le rend pas vrai* — le bornage m'a évité
+d'alarmer, il ne m'a pas évité de publier.
+
+### Ce qui reste, et c'est mon inquiétude NON mesurée qui était la bonne
+
+    if not re.match(…, version):
+        return ('wazuh-agent', 'wazuh-agent')   # pas d epinglage, SILENCIEUX
+
+**Toute version invalide — faute de frappe, format inattendu, valeur héritée — installe le dernier paquet
+du dépôt, et rien ne le dit à l'appelant.** Le docstring l'assume, donc c'est une décision ; **mais c'est
+un repli vers le permissif, muet** — la forme de *« un refus silencieux n'est pas un refus »*, déjà
+refermée ailleurs dans ce module et pas ici.
+
+**Reste sous le gel** : porteur au rôle 2 + `can_manage_wazuh`, `wazuh_agents` à 0 ligne.
+
+---
+
+## 15 — XXE sur `_validate_xml` : **négatif vérifié, et j'autorise les deux lignes qui le rendent durable**
+
+**Le négatif est établi par la session 5, par mesure sur l'invocation exacte** — chemin inexistant, HTTP
+sur port fermé, fichier existant : `rc=0`, stderr vide dans les trois cas. **Le chemin inexistant est le
+témoin décisif** : s'il y avait tentative, elle échouerait bruyamment.
+
+### Mais les deux barrières sont ACCIDENTELLES, et une seule ligne suffit à tomber
+
+    ['--noout']                  xi:include vers un chemin inexistant  ->  rc=0, aucune tentative
+    ['--noout','--xinclude']     idem  ->  rc=1  « failed to load external entity "file:///…" »
+
+**`--xinclude` seul ouvre la lecture de fichier local — et le message d'erreur RECOPIE le chemin**, qui
+repartirait par le canal des **500 octets de stderr** rendus à l'appelant.
+
+**Et la seconde barrière est un effet de bord de l'enrobage** : le code écrit
+`f"<root>\n{content}\n</root>\n"`, donc tout `<!DOCTYPE` se retrouve **dans** l'élément racine — XML
+invalide. **Quatre échappements testés, les quatre refusés.** L'enrobage existe *« pour autoriser
+plusieurs éléments de premier niveau »* : **la sécurité en est une conséquence, pas une intention.**
+
+> **Personne n'a décidé cette sécurité, donc personne ne sait qu'il ne faut pas y toucher.** *Ce qui
+> referme doit être documenté LÀ OÙ il referme* — et le prochain qui voudra une validation « plus
+> complète » ajoutera exactement le drapeau qui ouvre la lecture.
+
+### DÉCISION : `--nonet` explicite **et le commentaire qui dit pourquoi les autres sont absents**
+
+**Et j'assume l'exception au gel, avec la raison qui la borne** :
+
+> **Le coût du gel est par MODULE, pas par ligne.** `routes/wazuh.py` est **déjà** dans le lot des 20 —
+> modifié aujourd'hui. Y ajouter deux lignes **n'augmente pas le nombre de modules qui prendront effet
+> ensemble**, qui est le seul risque que le gel protège.
+
+**Et le commentaire compte plus que le drapeau** : `--nonet` ne change aucun comportement mesuré
+aujourd'hui — *c'est de la documentation exécutable.* Ce qui protège réellement est la phrase qui dit
+**pourquoi `--xinclude` et `--noent` sont absents.**
+
+**Session 4 applique.** Zéro changement de comportement, mesuré ; et le verdict de la validation ne bouge
+pas.
+
+---
+
+## Et deux corrections de chiffres que la session 5 apporte, dont une sur le catalogue
+
+**Le suivi porte « 33 validateurs ancrés, `fullmatch` nulle part », et le plan le lui attribue. Les deux
+moitiés sont fausses** — remesuré par AST : **58** `.match()` sur motif ancré (17 fichiers), et
+**1** `.fullmatch()`.
+
+> **Un chiffre hérité se comporte comme une CLÔTURE** — il a survécu parce qu'il *ressemblait* à une
+> mesure, et personne, elle comprise, ne le remesurait avant de s'appuyer dessus.
+
+**Et le chiffre que je demandais — combien composent une ligne de commande — vaut 2**, contre 10 au relevé
+automatique et 58 au relevé par motif. **28 des 58 `.strip()`ent avant de valider**, 10 sont du journal ou
+de l'affichage, et le quoting (`shlex.quote`, guillemets simples) referme presque tout le reste.
+
+**Les deux survivants, aucune injection** : `bashrc.py:528` (`chown {uname}` non quoté → le déploiement
+échoue) et **`graylog.py:334`** — un nom à `\n` final ferait écrire un fichier **sans son suffixe
+`.conf`**, qui **échapperait définitivement** au nettoyage `rm -f …*.conf`. **Non atteignable** : la route
+d'enregistrement strippe. *C'est un écart de cohérence entre l'écriture et la relecture* — un correctif
+posé d'un seul côté.
+
+**Verdict retenu : une passe, pas un correctif.** Et sa forme n'est pas « remplacer 58 `.match()` » :
+`fullmatch` là où le motif est ancré (mécanique), **quoter les deux interpolations nues** (le seul effet
+mesurable), et aligner `graylog.py:334` sur le `.strip()` que sa propre route d'écriture applique déjà.
+
+**Sa franchise mérite d'être notée** : son relevé automatique s'est trompé **des deux côtés** — 8 faux
+positifs sur 10 candidats, **et il a manqué mon cas**, la validation vivant dans un helper et l'exécution
+chez l'appelant. *Son « 10 qui valait 2 » et mon « 151 qui valait 8 » sont le même geste.*
