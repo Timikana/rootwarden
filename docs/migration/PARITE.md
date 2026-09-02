@@ -13823,3 +13823,69 @@ Le croisement est propre : cinq sections par parcours de la **profondeur** des `
 blocs `$isAdmin` comptés séparément (`:64`, `:1404`, `:1501`, `:1683`, `:1721`), **et l'écart 6/5
 s'explique** — le premier bloc n'enclôt aucune `<section>`. *Deux mesures indépendantes, même
 résultat, et la divergence rendue.* **C'est la forme qu'un chiffre vérifié doit avoir** — voir E-278.
+
+## E-281 AFFINÉ — le `else` INTERNE est le décisif, et E-281 passe DEVANT E-280
+
+Deux sessions ont mesuré **séparément**, avec des méthodes différentes — la base d'un côté, la
+lecture du corps de l'autre. **Ça, c'est une confirmation** (par opposition aux deux accords reçus
+sur ma mesure du régime, qui n'étaient que ma propre erreur qui revenait, cf. E-280 CORRIGÉ).
+
+### Ce que j'avais énoncé trop large
+
+J'avais dit « le scan CVE échoue ouvert ». La forme exacte est plus nette, et plus grave :
+
+    elif target_type == 'machines' and target_value:
+        ids = [...]
+        if ids:  SELECT … FROM machines WHERE id IN (…)
+        else:    SELECT … FROM machines          <- LE PARC ENTIER   (else INTERNE)
+    else:        SELECT … FROM machines          <- LE PARC ENTIER   (else externe)
+
+**C'est le `else` INTERNE qui mérite le titre.** Une planification qui dit *« vise CES machines-là »*
+avec une valeur ne rendant **aucun identifiant valide** scanne **tout le parc**.
+
+> Ce n'est pas un défaut d'**absence**, comme le `'all'` d'E-280. C'est **une intention
+> explicitement ÉTROITE qui tombe du côté large.** L'auteur de la planification **croit avoir
+> borné.**
+
+### Troisième volet : les deux tables sœurs n'ont pas la même contrainte
+
+    ssh_audit_schedules.target_type   enum(…)  NOT NULL    <- refuse le vide
+    cve_scan_schedules.target_type    enum(…)  NULLABLE    <- l'accepte
+
+Et `cve.py:490` fait `data.get('target_type', 'all')`. **Sur un `null` JSON explicite, `.get` rend
+`None`** — la clé existe, le défaut ne joue pas. Éprouvé des deux côtés, en transaction annulée :
+
+    Python  d.get('target_type','all')   ->  None
+    MySQL   INSERT … target_type = NULL  ->  1 ligne acceptee
+
+**C'est la table la plus permissive qui porte la tâche dont l'aboutissement envoie un courriel.**
+*Deux tables sœurs, deux contraintes — et personne ne l'a décidé.*
+
+### ⚠ CLASSEMENT RÉVISÉ, ET IL ME CONTREDIT
+
+Même population pour les trois — `@require_role(2)` sans permission ni borne par machine :
+
+                         branche etroite videe   archivees   effet sortant
+    E-281 (CVE)          OUVRE                   incluses    COURRIEL REEL
+    E-280 (audit SSH)    WHERE 1=0 — ferme       exclues     aucun
+    SEC-013 (policies)   —                       —           aucun
+
+**E-281, puis E-280, puis SEC-013.** J'avais classé E-280 en tête ; le défaut que j'ai trouvé **par
+accident en corrigeant mon erreur** le dépasse. E-280 et SEC-013 restent premier et second l'un par
+rapport à l'autre pour la raison retenue de la session 5 : *l'un agit, l'autre ferait douter des
+traces que le premier laisse.*
+
+### Ce qui N'EST PAS mesuré, et pourquoi je ne l'ai pas fait mesurer
+
+**Le courriel part-il sur un scan PLANIFIÉ, ou seulement sur le chemin S7b que l'exploitant n'a pas
+signé ?** C'est la question qui décide si E-281 a un effet sortant **aujourd'hui**. Non tranchée.
+La session 5 a refusé de la prendre d'elle-même — *fouiller le chemin d'envoi de `cve` est le genre
+de geste qui finit par le déclencher* — et elle a raison de demander plutôt que de supposer.
+**Autorisé en LECTURE DE CODE seule**, aucun appel, aucun conteneur, aucune machine jointe.
+
+**Borne** : `cve_scan_schedules` et `ssh_audit_schedules` portent **0 ligne** chacune. Aucune
+planification existante ne change de sort, ni pour E-280 ni pour E-281.
+
+**Et une fausse piste écartée avant d'être annoncée** (session 4) : « aucune branche `environment`
+dans la tâche CVE » — `cve_scan_schedules.target_type` est `enum('all','tag','machines')`,
+`environment` n'y figure pas. *Un écart écarté avant relais vaut un écart trouvé.*
