@@ -60,7 +60,33 @@ return [
     'secret_jamais_affiche' => 'La valeur reste en base : ce portail ne la lit pas.',
     // ── L'enregistrement, sous-lot V4 ─────────────────────────────────────
     'secret_conserve' => 'Laisser vide conserve la cle deja enregistree. Ce portail ne la lit jamais.',
-    'secret_jeton_non_porte' => 'La modification de ce jeton n\'est pas encore portee : elle reste sur l\'ancien portail.',
+    /*
+     * ⚠ CETTE PHRASE PROMETTAIT UN CHEMIN MORT.
+     *
+     * Elle disait « elle reste sur l'ancien portail ». Mesure du 2026-09-03,
+     * avec temoins : `https://…:8443/supervision/` rend **404** ; la racine du
+     * legacy rend 302 et un chemin inexistant rend 404 — donc 404 est bien le
+     * signal « absent », et non une panne du serveur. Le dossier est archive
+     * dans `legacy/_deprecated/supervision`.
+     *
+     * Une page qui renvoie vers un 404 est pire qu'une page qui ne renvoie
+     * nulle part : elle fait CHERCHER.
+     *
+     * ⚠ ET LE MOTIF DU BLOCAGE N'EST PAS ECRIT ICI, DELIBEREMENT. Cette
+     * capacite n'est pas « en retard de portage » : elle est retenue. L'ecrire
+     * a l'ecran indiquerait a qui lit la page ou est le defaut et sur quelle
+     * colonne. La discretion n'est pas de l'opacite quand l'alternative est
+     * une carte.
+     */
+    'secret_jeton_non_porte' => 'La modification de ce jeton n\'est pas encore portee ici.',
+
+    // ══ V13 — LE RATTACHEMENT D'UN SERVEUR A UN PROFIL ════════════════════
+    'profil_colonne' => 'Profil',
+    'profil_aucun'   => 'Aucun profil',
+    'profil_aucun_catalogue' => 'Aucun profil pour cette plateforme',
+    'profil_rattache' => 'Le serveur :nom porte desormais le profil « :profil » sur :plateforme.',
+    'profil_detache'  => 'Le serveur :nom ne porte plus de profil sur :plateforme.',
+    'profil_echec'    => 'Le rattachement n\'a pas pu etre enregistre. :message',
     'enregistrer' => 'Enregistrer',
     // LA PORTEE DE L'ENREGISTREMENT SE DIT. Le legacy ecrit dans la ligne la plus
     // recente SANS filtre de plateforme : enregistrer Zabbix y ecrase une ligne

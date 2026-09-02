@@ -52,6 +52,158 @@
      * qu'une valeur venue d'ailleurs y arrive un jour. On ne parcourt donc que
      * les blocs presents, sans jamais construire de selecteur libre.
      */
+    /*
+     * ══ V13 — LE RATTACHEMENT D'UN SERVEUR A UN PROFIL ═══════════════════
+     *
+     * Le catalogue de profils etait porte et fonctionnel ; son SEUL debouche ne
+     * l'etait pas. Un exploitant pouvait creer un profil qu'aucune machine ne
+     * pourrait jamais porter — et le libelle qui renvoyait vers l'onglet
+     * « Deploiement » ABOUTISSAIT, ce qui rendait le manque plus difficile a
+     * voir qu'un chemin mort : on suivait le lien, la page s'ouvrait, et la
+     * colonne n'existait pas.
+     *
+     * CE GESTE NE JOINT AUCUNE MACHINE. Il ecrit un lien en base
+     * (`machine_supervision_profile`), et c'est le deploiement — pas lui — qui
+     * ouvre une session SSH.
+     *
+     * UNE MACHINE PORTE UN PROFIL *PAR PLATEFORME* : la cle primaire est
+     * `(machine_id, platform)`. Le selecteur se re-remplit donc au changement
+     * de plateforme, et la valeur affichee suit celle de la plateforme
+     * COURANTE. L'oublier montrerait le profil Zabbix sous l'onglet Centreon.
+     */
+    var profilsParPlateforme = {};
+    var assignations = {};
+    try {
+        var blocP = document.getElementById('superv-profils-donnees');
+        var blocA = document.getElementById('superv-assignations-donnees');
+        if (blocP) { profilsParPlateforme = JSON.parse(blocP.textContent || '{}'); }
+        if (blocA) { assignations = JSON.parse(blocA.textContent || '{}'); }
+    } catch (e) { profilsParPlateforme = {}; assignations = {}; }
+
+    /*
+     * ⚠ « superv-affectation- » ET NON « superv-profil- ».
+     *
+     * Le prefixe evident entrait en collision avec SEPT ancres existantes —
+     * `superv-profil-champ-id`, `-confirmer`, `-enregistrer`, `-erreur`,
+     * `-form`, `-nouveau`, `-succes` — et ce code aurait pose des `<option>`
+     * sur un formulaire, un bouton et un paragraphe d'erreur.
+     *
+     * Ce fichier PORTE DEJA l'avertissement, quarante lignes plus bas : « une
+     * liste explicite plutot qu'un selecteur par prefixe — un prefixe
+     * attraperait ce qu'un sous-lot suivant ajoutera ». Je l'ai lu en ecrivant
+     * ce sous-lot, et je l'ai commis quand meme. C'est la sonde qui l'a
+     * rattrape, sur un `s0.options is not iterable` : l'element attrape en
+     * premier etait un `<input>` cache.
+     */
+    var selectsProfil = [].slice.call(document.querySelectorAll('[data-rw^="superv-affectation-"]'));
+    var messageDepl = document.querySelector('[data-rw="superv-depl-message"]');
+
+    function annonceProfil(texte, echec) {
+        if (! messageDepl) { return; }
+        messageDepl.className = 'rw-annonce' + (echec ? ' rw-annonce--echec' : ' rw-annonce--ok');
+        messageDepl.textContent = texte;
+    }
+
+    /*
+     * Remplit les selecteurs pour UNE plateforme. « Aucun profil » est une
+     * valeur OFFERTE et non un vide : la retirer se fait par `DELETE`, et
+     * c'est un geste que l'exploitant doit pouvoir poser sans supprimer le
+     * profil lui-meme.
+     *
+     * Un catalogue VIDE se dit. Un selecteur a une seule ligne blanche se lit
+     * comme une panne, alors que c'est un etat legitime : cette plateforme n'a
+     * pas encore de profil.
+     */
+    function remplitProfils(plateforme) {
+        var catalogue = profilsParPlateforme[plateforme] || [];
+        var poses = assignations[plateforme] || {};
+        selectsProfil.forEach(function (sel) {
+            var mid = sel.getAttribute('data-machine');
+            sel.innerHTML = '';
+            if (! catalogue.length) {
+                var vide = document.createElement('option');
+                vide.value = '';
+                vide.textContent = libelles.profil_aucun_catalogue;
+                sel.appendChild(vide);
+                sel.disabled = true;
+                return;
+            }
+            sel.disabled = false;
+            var aucun = document.createElement('option');
+            aucun.value = '';
+            aucun.textContent = libelles.profil_aucun;
+            sel.appendChild(aucun);
+            catalogue.forEach(function (pr) {
+                var o = document.createElement('option');
+                o.value = String(pr.id);
+                o.textContent = String(pr.name);
+                sel.appendChild(o);
+            });
+            var courant = poses[mid];
+            sel.value = (courant === undefined || courant === null) ? '' : String(courant);
+        });
+    }
+
+    function ecritProfil(sel) {
+        var mid = sel.getAttribute('data-machine');
+        var plateforme = choixPlateforme ? choixPlateforme.value : 'zabbix';
+        var valeur = sel.value;
+        var url = (libelles.url_profil || '').replace('{mid}', encodeURIComponent(mid))
+            + '?platform=' + encodeURIComponent(plateforme);
+        var jeton = document.querySelector('meta[name="csrf-token"]');
+        var ligne = document.querySelector('[data-rw="superv-machine-' + mid + '"]');
+        var nom = ligne ? (ligne.querySelector('td strong') || {}).textContent || mid : mid;
+        var opt = sel.options[sel.selectedIndex];
+
+        sel.disabled = true;
+        fetch(url, {
+            method: valeur === '' ? 'DELETE' : 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': jeton ? jeton.content : '',
+            },
+            body: valeur === '' ? undefined : JSON.stringify({ profile_id: Number(valeur) }),
+        }).then(function (r) {
+            return r.json().then(function (j) { return { ok: r.ok, corps: j }; },
+                function () { return { ok: false, corps: null }; });
+        }).catch(function () { return { ok: false, corps: null }; })
+        .then(function (r) {
+            sel.disabled = false;
+            if (! r.ok || ! r.corps || r.corps.success !== true) {
+                annonceProfil((libelles.profil_echec || '')
+                    .replace('{message}', (r.corps && r.corps.message) || ''), true);
+                return;
+            }
+            // L'ETAT LOCAL SUIT L'ECRITURE : sans cela, changer de plateforme
+            // et revenir reafficherait la valeur d'AVANT le geste.
+            if (! assignations[plateforme]) { assignations[plateforme] = {}; }
+            if (valeur === '') {
+                delete assignations[plateforme][mid];
+                annonceProfil((libelles.profil_detache || '')
+                    .replace('{nom}', nom).replace('{plateforme}', plateforme), false);
+            } else {
+                assignations[plateforme][mid] = Number(valeur);
+                annonceProfil((libelles.profil_rattache || '')
+                    .replace('{nom}', nom)
+                    .replace('{profil}', opt ? opt.textContent : '')
+                    .replace('{plateforme}', plateforme), false);
+            }
+        });
+    }
+
+    selectsProfil.forEach(function (sel) {
+        sel.addEventListener('change', function () { ecritProfil(sel); });
+    });
+    if (selectsProfil.length) {
+        remplitProfils(choixPlateformeInitiale());
+    }
+
+    function choixPlateformeInitiale() {
+        var c = document.querySelector('[data-rw="superv-plateforme"]');
+        return c ? c.value : 'zabbix';
+    }
+
     var choixPlateforme = document.querySelector('[data-rw="superv-plateforme"]');
     if (choixPlateforme) {
         /*
@@ -73,6 +225,11 @@
             blocs.forEach(function (b) {
                 b.bloc.hidden = b.nom !== choixPlateforme.value;
             });
+            // V13 : le profil affiche suit la plateforme. Ajoute DANS le
+            // gestionnaire existant plutot que par un second ecouteur : deux
+            // ecouteurs sur le meme evenement s'executent dans un ordre que
+            // personne ne relit.
+            remplitProfils(choixPlateforme.value);
             /*
              * LE CHEMIN DE L'EDITEUR SUIT LA PLATEFORME. Les quatre valeurs
              * viennent du SERVEUR, donc de la meme source que celle que le

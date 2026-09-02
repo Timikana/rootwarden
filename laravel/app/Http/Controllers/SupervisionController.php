@@ -157,6 +157,19 @@ class SupervisionController extends Controller
             'plateformes' => $this->supervision->plateformes(),
             'machines' => $this->supervision->machines(),
             'profils' => $this->supervision->profilsParPlateforme(),
+            /*
+             * V13 — LE RATTACHEMENT D'UN SERVEUR A UN PROFIL.
+             *
+             * Le catalogue de profils etait porte et fonctionnel ; son SEUL
+             * debouche ne l'etait pas. Un exploitant pouvait creer un profil
+             * qu'aucune machine ne pourrait jamais porter.
+             *
+             * Les deux listes partent DEJA CONSTRUITES : `@json` ne franchit
+             * pas une expression composee, et une vue rend — elle ne faconne
+             * pas la donnee. Lecon de A2, payee par un gabarit entier en
+             * erreur de syntaxe.
+             */
+            'assignations' => $this->supervision->assignationsParPlateforme(),
             'configuration' => $this->supervision->configurationParPlateforme(),
             /*
              * Les champs a rendre, PAR PLATEFORME. Une liste explicite plutot
@@ -721,6 +734,40 @@ class SupervisionController extends Controller
     {
         return [
             'editeur_sans_serveur' => __('superv.editeur_sans_serveur'),
+            /*
+             * ══ V13 — ET CETTE LISTE EST EXPLICITE, DONC ELLE OUBLIE ═════════
+             *
+             * Une cle ABSENTE du catalogue rend son IDENTIFIANT : elle se voit.
+             * Une cle presente au catalogue et absente D'ICI rend du VIDE, et
+             * rien ne la signale — c'est E-353, paye sur `fail2ban` F7 : un
+             * panneau faisait confirmer l'arret d'une protection avec un titre
+             * vide et un texte vide, et la parite i18n passait.
+             *
+             * QUI AJOUTE UN LIBELLE LU PAR LE SCRIPT L'AJOUTE ICI, dans le meme
+             * commit.
+             *
+             * Les jetons sont SUBSTITUES par des accolades, comme les autres :
+             * `__('x')` sans son argument laisse `:nom` en clair a l'ecran, et
+             * aucun controle d'i18n ne le voit — ils cherchent des identifiants
+             * `module.cle`, pas des jetons.
+             */
+            /*
+             * L'URL VIENT DU SERVEUR, comme `url_version` et `url_taches`. Le
+             * script ne compose pas `/api/gateway/...` a la main : une route
+             * ecrite cote client finit par nommer un chemin que le serveur ne
+             * sert plus, et personne ne le voit avant l'appel.
+             */
+            'url_profil' => url('/api/gateway/supervision/machines/{mid}/profile'),
+            'profil_colonne' => __('superv.profil_colonne'),
+            'profil_aucun' => __('superv.profil_aucun'),
+            'profil_aucun_catalogue' => __('superv.profil_aucun_catalogue'),
+            'profil_rattache' => __('superv.profil_rattache', [
+                'nom' => '{nom}', 'profil' => '{profil}', 'plateforme' => '{plateforme}',
+            ]),
+            'profil_detache' => __('superv.profil_detache', [
+                'nom' => '{nom}', 'plateforme' => '{plateforme}',
+            ]),
+            'profil_echec' => __('superv.profil_echec', ['message' => '{message}']),
             // ── Sous-lot V6 : la detection de version ─────────────────────
             'url_version' => url('/api/gateway/supervision/zabbix/version'),
             /*

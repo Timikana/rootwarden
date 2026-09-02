@@ -60,7 +60,19 @@ return [
     'secret_jamais_affiche' => 'The value stays in the database: this portal does not read it.',
     // ── Saving, sub-lot V4 ────────────────────────────────────────────────
     'secret_conserve' => 'Leaving this empty keeps the key already recorded. This portal never reads it.',
-    'secret_jeton_non_porte' => 'Editing this token is not ported yet: it stays on the previous portal.',
+    // This sentence promised a DEAD path: it said "it stays on the legacy
+    // portal", and `/supervision/` returns 404 (the folder is archived). The
+    // REASON for the hold is deliberately NOT written on screen — see the note
+    // in `lang/fr/superv.php`.
+    'secret_jeton_non_porte' => 'Changing this token is not ported here yet.',
+
+    // V13 — attaching a server to a supervision profile.
+    'profil_colonne' => 'Profile',
+    'profil_aucun'   => 'No profile',
+    'profil_aucun_catalogue' => 'No profile for this platform',
+    'profil_rattache' => 'Server :nom now carries profile ":profil" on :plateforme.',
+    'profil_detache'  => 'Server :nom no longer carries a profile on :plateforme.',
+    'profil_echec'    => 'The attachment could not be saved. :message',
     'enregistrer' => 'Save',
     // THE SCOPE OF A SAVE IS STATED. The legacy portal writes to the most recent
     // row with NO platform filter: saving Zabbix overwrites a Centreon row there.

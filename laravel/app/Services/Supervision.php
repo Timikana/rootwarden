@@ -141,6 +141,31 @@ class Supervision
             ->delete();
     }
 
+    /*
+     * Les rattachements en vigueur — sous-lot V13.
+     *
+     * `machine_supervision_profile` a pour cle primaire `(machine_id, platform)` :
+     * une machine porte donc UN profil PAR PLATEFORME, et l'index se fait sur les
+     * deux. Un index sur la seule machine ecraserait Zabbix avec Centreon.
+     *
+     * LECTURE SEULE ICI. L'ecriture passe par la passerelle
+     * (`POST /supervision/machines/<mid>/profile`), qui porte `role(2)`,
+     * `can_manage_supervision` ET `require_machine_access` : trois gardes qu'un
+     * `DB::table(...)->insert()` local n'aurait pas.
+     *
+     * @return array<string, array<int, int>> plateforme => [machine_id => profile_id]
+     */
+    public function assignationsParPlateforme(): array
+    {
+        $par = [];
+        foreach (DB::table('machine_supervision_profile')
+            ->select('machine_id', 'platform', 'profile_id')->get() as $l) {
+            $par[(string) $l->platform][(int) $l->machine_id] = (int) $l->profile_id;
+        }
+
+        return $par;
+    }
+
     /** Combien de machines perdraient leur profil si celui-ci disparaissait. */
     public function machinesAssignees(int $idProfil): int
     {
