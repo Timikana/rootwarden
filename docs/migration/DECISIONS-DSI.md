@@ -2608,7 +2608,7 @@ quatre différences, toutes dans le sens du danger sur la même des deux.*
 | filtre `archived` | **oui**, dans les 4 branches | **nulle part** |
 | repli de la branche `machines` | `WHERE 1=0` — **fermé** | **tout le parc** — ouvert |
 | `NULL` en base | **refusé** (NOT NULL) | **accepté** → parc entier |
-| effet à l'aboutissement | sessions SSH | sessions SSH **+ un vrai courriel par machine** |
+| effet à l'aboutissement | sessions SSH | sessions SSH ~~+ un vrai courriel par machine~~ **← FAUX, RETIRÉ le 2026-09-02, voir la rétractation plus bas : les deux ouvrent des sessions SSH, rien de plus** |
 
 > **La branche `WHERE 1=0` de l'audit SSH prouve que la forme correcte était connue de l'auteur.** *C'est
 > une divergence, pas un oubli* — et le Lead a raison sur ce point-là.
