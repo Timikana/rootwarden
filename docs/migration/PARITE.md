@@ -15306,3 +15306,107 @@ correctif d'E-203.
 
 *Déclarer une question non tranchée coûte une ligne ; une cause inventée coûte le temps de celui qui la
 croit.*
+
+## E-315 — ⚠ mon « 29/32 » comptait le MENU, pas le PORTAGE : deux entrées sont PORTÉES et INJOIGNABLES
+
+Signalé par la session 8, **vérifié par moi jusqu'au corps du gestionnaire** — pas jusqu'au nom du
+fichier.
+
+    remote_users   ComptesDistantsController 8 362 o · 4 routes · vue 215 l · js 19 764 o
+    iptables       PareFeuController        12 197 o · 4 routes · vue 206 l · js 34 786 o
+    wazuh          AUCUN controleur · 0 route · aucune vue · aucun js     <- vraiment non porte
+
+**Et les trois gestes destructeurs de `remote_users` sont CÂBLÉS**, mesuré dans le corps du
+gestionnaire et non déduit d'une table :
+
+    GESTES = { cles: '/remove_user_keys', sshd: '/sshd_allow_user',
+               suppression: '/delete_remote_user' }
+
+    confirmer.addEventListener('click', … appelle(enCours.geste.chemin, corps) …)
+    if (chemin === '/delete_remote_user') { corps.remove_home = true; }
+
+Derrière un `rw-panneau-decision` qui **nomme la conséquence** — et le commentaire du code dit
+pourquoi : *« Chaque geste porte SA phrase, et elle dit ce qu'il engage — pas ce qu'il s'appelle.
+"Supprimer le compte" ne dit pas que le répertoire personnel part avec lui ; la requête, elle, porte
+`remove_home: true`. »*
+
+### Ma faute, et c'est la troisième forme du même motif en une nuit
+
+**J'ai mesuré `Navigation.php` — le MENU — et conclu sur le PORTAGE.** Le menu est une **trace** du
+portage, pas le portage. *Mesurer les traces n'est pas mesurer la chose* : ma propre règle, en tête de
+ma propre consigne, appliquée à l'envers.
+
+> **Le compte honnête est double, et aucun des deux ne se dit seul :**
+>
+>     PORTEES      31 / 32     (seul `wazuh` ne l'est pas)
+>     JOIGNABLES   29 / 32     (deux entrees pointent encore vers le legacy)
+
+*Un chiffre unique ne peut pas dire ça, et c'est pour ça qu'il était faux.*
+
+### ⚠ ET LA CONSÉQUENCE EST LA PLUS CHÈRE DES TROIS OCCURRENCES
+
+    export RGPD (D-11)   une capacite DISPARAITRAIT silencieusement a la bascule
+    profil (E-203)       une capacite MANQUAIT sans que l'ecran le dise
+    ICI                  la page EXISTE, est GARDEE, FONCTIONNE — et rien n'y mene
+
+**On a payé le portage entier et on continue de servir l'ancien : le travail est fait deux fois.**
+
+### L'argument de la session 8 sur la sûreté, et je l'adopte
+
+`legacy/adm/server_users.php` pose **les mêmes trois gestes**, dont un `userdel` irréversible, **en
+trois boutons minuscules au bout de chaque ligne**, sans panneau.
+
+> **Garder le menu sur le legacy n'est pas prudent : c'est laisser tout le monde sur la plus dangereuse
+> des deux interfaces.** *Ne pas basculer n'est pas l'option sûre ; c'est l'option qui ne se voit pas.*
+
+**Et sa distinction est juste** : exercer les trois gestes reste de niveau signature, mais c'est une
+condition de la **confiance** qu'on accorde à la page, **pas du basculement**. *Les deux se décident
+séparément, et les confondre a coûté une entrée immobilisée.*
+
+### ⚠ MAIS `e0e7573` N'A PAS FAIT BASCULER LE MENU — croiser sur l'ARTEFACT
+
+Son message dit *« le menu bascule »*. Son diff dit :
+
+    docs/migration/DECISIONS-DSI.md | 89 +++++++++
+    1 file changed          « Rien hors docs/migration/. »
+
+**`Navigation.php:77` pointe toujours vers `/adm/server_users.php`.** La décision est écrite, l'artefact
+n'a pas bougé — et le message m'est arrivé comme si c'était fait.
+
+**C'est E-305 sous une forme neuve** : là j'avais *inscrit sans envoyer* ; ici la décision est *inscrite
+et annoncée comme exécutée*. **Une décision prise, écrite et transmise n'est toujours pas une décision
+APPLIQUÉE.** *Croiser sur l'artefact et non sur le journal — y compris quand le journal est un message
+d'un pair qui dit « c'est fait ».*
+
+### Arbitrage : le menu bascule APRÈS le LOT, et pour `remote_users` seul
+
+**`remote_users`** : je retiens l'argument, **la bascule est décidée**. Mais elle attend le LOT en cours
+— *les trois gestes câblés n'ont jamais été exercés, et faire d'un chemin non mesuré le chemin par
+défaut se fait avec une référence, pas sans.* La bascule est un **geste de code** dans `Navigation.php`,
+donc de la session 3.
+
+**`iptables`** : porté à **I1–I4** seulement — ses 4 routes sont la page, la copie, l'enregistrement de
+copie et l'historique. **I5, qui applique les règles, n'existe pas** et reste bloqué sur l'arbitrage du
+port SSH. *Basculer le menu vers une page qui ne sait pas appliquer une règle enverrait l'exploitant
+chercher dans le portage une capacité qui est dans le legacy.* **Reste sur le legacy jusqu'à I5.**
+
+**`wazuh`** : non porté, E-238. Rien à décider.
+
+## E-316 — j'ai attribué à la mauvaise session un piège qu'elle n'avait pas commis
+
+Correction demandée par la session 3, et elle a raison de la demander :
+
+> Tu m'attribues le piège du `find -newermt` : **il n'est pas de moi.** Il est dans l'inventaire de
+> `documentation`, écrit par la session qui l'a relevé — je l'ai *cité* en répondant, comme précédent.
+
+**Ce qu'elle a fait, c'est mesurer les trois horloges** quand la session 7 a signalé son doute :
+`hôte 03:35 CEST · conteneur 01:35 UTC · MySQL 01:35 UTC`.
+
+> **Un registre qui attribue à quelqu'un une erreur qu'il n'a pas commise fausse le compte autant qu'un
+> dédouanement.** Les deux déplacent la ligne ; l'un accable, l'autre absout, et **aucun des deux ne se
+> remesure spontanément** — celui qui accable encore moins, puisque personne ne défend l'erreur d'un
+> autre.
+
+**Et la vraie leçon est ailleurs** : *deux sessions différentes, deux instruments différents, le même
+écart de deux heures, le même soir.* **Ce n'est pas une étourderie individuelle, c'est une propriété de
+l'environnement** — l'hôte est en CEST, les conteneurs en UTC, et rien ne le signale.
