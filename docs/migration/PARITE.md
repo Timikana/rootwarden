@@ -14474,3 +14474,80 @@ vérifiée. *Écrit pour que le chiffre ne soit pas repris comme s'il mesurait c
 
 C'est ce que le scellement des prédictions a fourni, et la seule chose qui ait attrapé un mot scellé
 sans avoir été mesuré. **Un énoncé n'attrape rien ; un contradicteur attrape.**
+
+## E-295 CORRIGÉ — ⚠ ma conclusion était EXACTEMENT INVERSÉE : les 216 sont au PORTAGE et SURVIVENT
+
+Réfuté par la session 6, **remesuré par moi sur les deux idiomes et les deux arbres** :
+
+    laravel/public/js   attribut `.hidden =` : 217 dans 24 fichiers | classe 'hidden' :   0
+    legacy              attribut `.hidden =` :   0                  | classe 'hidden' : 159 dans 29
+
+**Deux vocabulaires disjoints.** Le portage masque par l'**attribut HTML** `el.hidden = …` ; le legacy
+masque par la **classe CSS**. J'ai cherché la **classe** dans `laravel/`, trouvé zéro, et conclu *« le
+portage n'emploie pas `hidden` »* puis *« la population de 216 meurt avec le legacy »*.
+
+**C'est l'inverse du fait.** Les 216 sont au portage et **survivent à la v2.0** ; ce sont les 159 qui
+meurent. **La cible de la session 6 était déjà la bonne** — elle n'avait mesuré que
+`laravel/public/js`, et n'avait pas eu à le dire.
+
+*J'ai inscrit cette inversion au registre, au CHANGELOG et à l'exploitant.* Cinquième affirmation
+fausse de la nuit, et la première où je **redirige le travail d'un pair** sur ma foi.
+
+### ⚠ ET MON TÉMOIN A ÉCHOUÉ EN RÉUSSISSANT — c'est le vrai enseignement
+
+J'avais posé un témoin avant de conclure : *« mon motif trouve-t-il quelque chose de connu ? »*.
+`classList` était bien trouvé. **Mon détecteur fonctionnait parfaitement.**
+
+> **Un témoin qui n'exerce que l'idiome qu'on cherche prouve que l'instrument marche — il ne peut pas
+> dire qu'on cherche le MAUVAIS idiome.** Il répond à *« mon motif trouve-t-il ce qu'il vise ? »* et
+> jamais à *« vise-t-il ce qu'il faut ? »*
+
+**C'est une limite de la discipline du témoin que ce registre n'avait pas.** Elle protège contre
+l'instrument aveugle, **pas** contre la question mal posée — et les deux rendent le même `0`.
+
+**Le seul témoin qui l'aurait dit est NÉGATIF et OUVERT** : *« quelque part dans `laravel/`, quelque
+chose masque bien des éléments — par quoi ? »* Question ouverte, pas vérification. Je l'ai lancée
+après coup et elle répond en une ligne :
+
+    .hidden  225   ·  classList.remove 11 · toggle 10 · add 8 · contains 1
+
+**Le rapport 225 contre 30 saute aux yeux.** Il était disponible avant ma conclusion, pour le même
+coût — *je n'ai pas manqué un outil, j'ai manqué une question.*
+
+### Cinquième faux désaccord de la même famille
+
+`temporary_permissions` · les 20/21 routes conditionnelles · `fail2ban_ban_all_servers` · le compte
+pytest · celui-ci. **Second où les deux parties avaient raison sur des OBJETS différents**, et ici la
+cause n'est même pas l'heure : **c'est l'objet non nommé.**
+
+**Et l'écart que je proposais de ne pas trancher portait toute la conclusion.** J'avais écrit : *« 159
+contre 216 est un écart de motif, pas de fait — je ne le tranche pas, il ne porte plus rien maintenant
+que le périmètre est établi. »*
+
+> **Un écart qu'on renonce à trancher parce qu'« il ne porte plus rien » porte parfois toute la
+> conclusion.** Il ne venait pas d'un motif plus fin : il venait de **deux arbres et deux
+> vocabulaires**. Renoncer à l'expliquer, c'est renoncer à découvrir qu'on ne mesurait pas la même
+> chose.
+
+### Ce qui reste vrai, et le vocabulaire complet
+
+Le portage porte **deux** vocabulaires de visibilité, pas un :
+
+    montrer/masquer   el.hidden = …          217 operations, 24 fichiers
+    etat              6 classes rw-*           30 operations
+                      rw-erreur:14 · rw-onglet--actif:6 · rw-journal--vide:6
+                      rw-resultat--externe:2 · progress:1 · rw-notif--non-lue:1
+
+Ma remarque tient pour les **secondes** ; les premières sont la population que la propriété générique
+doit balayer, **et elle survit**. La décision de la session 6 est inchangée : *216 séquences ne se
+sondent pas une à une*, et la propriété — *un panneau qui devient visible reçoit le clic en son centre
+et ne déborde pas* — vise désormais un ensemble **dont on sait qu'il survit**.
+
+### Et elle a nommé sa propre part
+
+> Mon `216/24` était juste mais **incomplet** : je n'avais pas dit que je comptais l'**attribut**.
+> **Ce n'est pas ton motif qui a créé le désaccord, c'est mon étiquette.**
+
+Elle a raison sur les deux moitiés, et la seconde ne l'excuse pas de la mienne : **un nombre sans son
+objet invite au faux désaccord, et un lecteur qui ne demande pas l'objet l'accepte.** Il fallait les
+deux pour produire l'inversion.
