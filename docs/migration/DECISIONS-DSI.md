@@ -3555,3 +3555,40 @@ corrigé ce matin, devient la **seule** chose entre une invocation et une sessio
 > m'appartient est celui-ci : quand il sera autorisé, il doit l'être sur la machine 2 seule, jamais sur
 > un `machines = ['1','2']` comme le 27 août.** *Le journal du 27 montre que la liste par défaut
 > commence par la production.*
+
+### ⚠ Révision de l'arbitrage ci-dessus — la machine 3 est une meilleure cible que la 2
+
+**Corrigé par l'exploitant le 2026-09-02** : j'avais classé `OpenCVE-Test-OnPrem` (id 3, `192.168.0.2`)
+comme *« ton vrai OpenCVE, un service dont le produit dépend — pas une cible pour un geste
+destructeur »*. **Faux.** *C'est un serveur de test dédié, qui ne sert qu'à ça.*
+
+> **Je l'avais déduit du fait que `OPENCVE_URL` du produit pointe dessus.** *Une dépendance de
+> configuration n'est pas une criticité métier* — le produit pointe sur elle **parce qu'**elle est le
+> banc d'essai, pas parce qu'elle est en production. **J'ai lu un lien technique comme un enjeu
+> d'exploitation, et seul l'exploitant pouvait le démentir.**
+
+### ✅ Arbitrage révisé
+
+| cible | pour un test de déploiement |
+|---|---|
+| **id 3** `192.168.0.2` — Debian 13, OpenSSH 10.0, `sa=0` `pk=0` | **la meilleure.** *Machine RÉELLE* : vrai `sshd`, vrais `sudoers`, vrais comptes système |
+| id 2 `10.10.10.10` — conteneur, `sa=0` `pk=0` | acceptable, et **jetable** — mais elle ne reproduit pas les pièges d'un hôte réel |
+| id 1 `srv-zabbix` `192.168.0.244` PROD | **jamais** |
+
+**Pourquoi la 3 vaut mieux que la 2, et c'est le fond de la révision** : *les deux défauts que ce dépôt a
+payés sur le déploiement sont des propriétés d'un hôte réel* — `AllowUsers` dans `sshd_config` qui bloque
+l'authentification du compte de service après son installation, et le conflit lexical de deux fichiers
+`sudoers.d`. **Un conteneur minimal ne les reproduit ni l'un ni l'autre.** *Tester sur la 2 validerait un
+déploiement qui échouerait encore sur une vraie machine.*
+
+**Ni l'une ni l'autre n'a de clé de plateforme ni de compte de service déployé** (`pk=0`, `sa=0`) — **donc
+aucune des deux n'a quoi que ce soit à révoquer.** *C'est ce qui rend l'expérience bornée, pas le choix
+entre les deux.*
+
+### Le risque qui reste, et il faut le nommer une fois
+
+> **Si le déploiement casse l'accès SSH à la machine 3, on perd le seul chemin d'administration à
+> distance vers elle** — c'est exactement le mode du piège `AllowUsers`. **Il faut un accès console (ou
+> l'hyperviseur) disponible avant de lancer, pas après.**
+
+*C'est la seule précondition que je vois, et elle ne dépend pas du produit.*
