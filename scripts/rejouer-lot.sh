@@ -477,7 +477,9 @@ declare -A REF_LARAVEL=(
   # bascule d'elle-meme au premier effacement de mot de passe, sans reecriture.
   # La liste attendue est DERIVEE avec le predicat du portage : coder `srv-zabbix`
   # aurait mesure le presse-papier de l'auteur, pas le parc.
-  [go-page-cle-plateforme]=21
+  # 21 -> 29 le 2026-09-03 00:28 (`b8fbd2a`), meme fenetre relevee aux deux bouts.
+  # legacy INCHANGEE a 15.
+  [go-page-cle-plateforme]=29
   # `adm/` sous-lot D9a : droits sudo par compte distant.
   # 18 sur le portage contre 12 sur le legacy, et les six d'ecart portent tous
   # sur les deux defauts corriges : le prereglage par defaut qui ne donne plus
@@ -763,8 +765,23 @@ declare -A REF_LARAVEL=(
   # dit que ce motif attrape aussi la page `/wazuh/` du legacy, preservee par le seul
   # filtre de methode. *Le mot qui aurait evite de casser `pare-feu` ce matin, ecrit la
   # ou la prochaine session le lira.*
+  # go-fail2ban-f7 : NEUVE, 21 · 0 (00:21:52). ⚠ ELLE A ETE COMMITEE ROUGE A DESSEIN
+  # (17 · 4) parce qu'elle avait trouve un defaut : le panneau qui demande de confirmer
+  # la desactivation d'une jail s'ouvrait avec un TITRE VIDE et un TEXTE VIDE. Le
+  # correctif (E-353, `549151b`) est arrive SIX MINUTES apres son commit, et le rejeu
+  # rend 21 · 0 — le correctif couvre exactement ce qu'elle assertait.
+  # *Un test qui s'accommode du defaut qu'il a trouve cesse d'etre un test* : aucune
+  # assertion n'a ete ajustee pour verdir, c'est le PRODUIT qui a bouge.
+  # ⚠ AUCUNE REFERENCE LEGACY, ET CE N'EST PAS UN OUBLI : le fichier porte ZERO etape
+  # legacy (0 occurrence, mesure). Elle est donc dans SUITES_LARAVEL SEULE. *Une absence
+  # deliberee se DIT, sinon elle ne se distingue pas d'un oubli* — c'est la zone grise du
+  # REGISTRE-HORS-LOT.
+  [go-fail2ban-f7]=21
   [go-page-wazuh]=33
-  [go-page-groupes]=24
+  # 24 -> 35 le 2026-09-03 00:28 (`a2081ab`), arbre releve PROPRE aux deux bouts de la
+  # mesure — meme etat au depart (HEAD a49b885) et a la fin, donc la fenetre n'a pas ete
+  # traversee. legacy INCHANGEE a 15.
+  [go-page-groupes]=35
 )
 declare -A REF_LEGACY=(
   # Les trois pages portees dans la nuit du 2026-09-02, posees a 03:52.
@@ -1149,7 +1166,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-page-cle-plateforme go-page-pare-feu go-page-accueil go-page-mot-de-passe
-  go-page-audit-ssh go-page-documentation go-page-groupes go-page-wazuh
+  go-page-audit-ssh go-page-documentation go-page-groupes go-page-wazuh go-fail2ban-f7
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-fail2ban-f6
