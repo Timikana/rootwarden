@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.166** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.167** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,31 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.167 — une suite indifférente dans ses assertions, sensible dans son compte
+
+**E-321.** `go-socle-navigation` rend **74** au lieu de 66, **zéro FAIL** — la suite est saine, la
+référence est périmée. Mécanisme vérifié dans le code : `for (const e of internes)` à `:293`, et
+`verifie(… le lien porte « X » resout)` à `:296`. **L'assertion est générée par entrée PORTÉE, par compte
+qui y a accès** — 47 au total (31 + 13 + 3). Les cinq bascules de la nuit ajoutent donc **des assertions,
+pas des échecs**.
+
+> **Une suite peut être indifférente à un changement dans ses assertions et sensible dans son compte.**
+> Les invariants ne dépendent pas de la répartition ; le **nombre** d'assertions en dépend.
+
+**Et l'auto-critique qui l'accompagne est du même genre que ma sur-correction sur E-280** : après avoir
+retiré à juste titre un avertissement faux, *« j'ai vérifié les assertions existantes et pas leur
+nombre — j'avais raison de retirer, et tort dans la manière : j'ai remplacé une inquiétude fausse par une
+assurance fausse. »* Là j'avais remplacé une affirmation trop rassurante par une trop alarmante ; ici
+l'inverse. **Deux directions, même cause : une rétractation se mesure avec la même exigence que ce
+qu'elle rétracte.** Et les deux affirmations avaient été données comme équivalentes — *« ma suite ne
+bronchera pas »* et *« mes trois invariants tiennent »* — alors qu'elles portent sur des objets
+différents.
+
+**Référence à poser après le LOT**, sur sa demande : une écriture maintenant ne gênerait pas la mesure (le
+runner s'est copié au démarrage) **mais brouillerait la lecture du journal**. Et le commentaire d'en-tête
+`:67` porte toujours `route=24 legacy=8` — **faux de sept unités** désormais : *un exemple chiffré dans un
+commentaire vieillit d'autant plus vite que le travail avance.*
 
 ### v1.38.166 — une référence sans inscription dans la liste jouée est une COUVERTURE APPARENTE
 
