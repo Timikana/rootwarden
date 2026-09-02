@@ -4303,3 +4303,98 @@ de legacy dans `AccueilController` ». **Ce fichier n'existe pas** — la vue es
 **Et `plateforme` est exacte PARCE QU'ELLE PRÉCISE « clé par clé ».** *La page citée existe dans le
 portage et y offre un retrait de clés — mais en bloc, pas clé par clé.* **Sans cette précision, la
 déclaration serait fausse. Une phrase juste tient parfois à trois mots.**
+
+---
+
+## Deux acquis de la session 7 sur le geste de masse, et le second vaut contre moi
+
+**`a2081ab` — le scan de dérive est couvert, dans la suite qui couvrait déjà cette page.** *24 → 35
+assertions, base rendue à l'identique.*
+
+### 1. Son assertion est meilleure que ma spécification
+
+**J'avais demandé** : *« le panneau annonce le nombre RÉSOLU, pas le nombre attendu »*. **Elle a mesuré le
+MÉCANISME et pas le nombre :**
+
+    verifie('le nombre est RESOLU par le serveur', litMembres)
+    -> exige que le GET /api/gateway/groups/<id>/members ait lieu
+
+> **Si quelqu'un remplaçait l'annonce par un compte calculé dans la page, ce GET disparaîtrait et
+> l'assertion rougirait.** *C'est la résolution qui est défendue, pas la valeur affichée — et un nombre
+> juste calculé au mauvais endroit redeviendrait faux à la première divergence.*
+
+**Ma spécification portait sur un résultat ; la sienne sur la façon de l'obtenir.** *La seconde survit à
+une réécriture, la première non.*
+
+### Et son refus de poser la fixture DYNAMIQUE est le bon
+
+> *Poser un groupe dont les filtres sont rejetés ferait exister, même trente secondes, **un objet
+> cliquable dont un scan viserait `srv-zabbix`**.*
+
+**Le groupe VIDE couvre la branche fail-closed sans ce risque.** *Et elle NOMME ce qui reste non couvert
+au lieu de le taire.*
+
+---
+
+## 2. ⚠ Un piège technique confirmé, et le silence avait une bonne raison
+
+    DELETE t FROM rootwarden.tableX t JOIN rootwarden.users u ON …
+
+    SANS base par defaut  ->  ERROR 1046 (3D000)  No database selected
+                              MEME AVEC les deux tables PLEINEMENT QUALIFIEES
+    AVEC base par defaut  ->  ERROR 1146  la table n'existe pas
+
+**Un `DELETE` multi-tables exige une base par défaut, indépendamment de la qualification.** *`mysql -e`
+n'en a pas.*
+
+### Et le message était invisible pour une raison qu'il faut dire
+
+    lib-base.mjs:8   « execFileSync recopie TOUT l'argv dans le message »
+                     « Command failed: docker exec … mysql -uroot -prootpassword … »
+
+> **Le `stderr` était masqué pour empêcher un mot de passe d'apparaître dans une trace.** *Ce n'était pas
+> une négligence : c'était une protection, et elle a caché une erreur.* **Deux protections en conflit, et
+> celle qui parlait le moins a gagné par défaut.**
+
+**Le pire n'était pas le code** : *le cadre de secours en tête de fichier portait la MÊME commande
+cassée.*
+
+> **Une commande de secours fausse est pire qu'absente — on la lance, elle échoue en silence, et l'on
+> croit avoir nettoyé.**
+
+**Corrigée, et éprouvée avec sa contre-épreuve** : *une table inexistante rend bien `ERROR 1146`, donc
+« aucune sortie » vaut succès et non silence.*
+
+---
+
+## 3. ⚠⚠ Et le contrepoids à « vu à l'image », que je promouvais depuis ce soir
+
+**Quatre suspicions visuelles ou textuelles aujourd'hui, QUATRE réfutées — et les quatre venaient de son
+propre appareil de mesure, pas de la page :**
+
+    une entree de menu « sans libelle »   ->  troncature de `fullPage: true`
+    « Version inconnue » en pied          ->  documente par la vue comme NORMAL
+    la colonne ENV « coupee » a 390 px    ->  le cadre defile, 391/340
+    « Cree le :  » sans date              ->  son propre `constate` coupe a 80 caracteres
+
+> *« Je regarde, je soupçonne, et c'est toujours ma mesure qui a menti. »*
+
+**La quatrième s'est réglée en lisant l'instrument, pas la page.**
+
+**Ça n'invalide pas de regarder** — *sans avoir regardé, elle n'aurait pas écrit l'assertion de contraste
+de `wazuh`, qui elle tiendra ; et sans avoir regardé, je n'aurais pas vu que l'écran des CGU n'affiche
+aucune condition.* **Mais le premier réflexe doit être de suspecter l'instrument.**
+
+> **J'ai passé la soirée à répéter « quatre défauts n'existent qu'à l'image ». Son relevé dit l'autre
+> moitié : quatre suspicions à l'image sur quatre étaient des défauts d'instrument.** *Regarder produit
+> des signalements ; il faut encore mesurer lequel vient de la page.*
+
+### Et son premier lancement a rendu le bon résultat
+
+    FAIL  la fixture R3 est posee — lecture en base en echec
+    FAIL  la carte « e2e-derive-un » est rendue
+    FAIL  la carte « e2e-derive-vide » est rendue
+    PASS  AUCUN scan de masse n'a ete lance     <- vert, et il ne mesurait RIEN
+
+> **Sans la vérification de pose, la suite était verte à vide** : *« aucune carte, donc aucun lancement »
+> est vrai et ne mesure rien.* **Ce dernier `PASS` est resté vert pendant que les trois autres criaient.**
