@@ -172,13 +172,8 @@ return [
     // What V1 does not port yet SAYS SO, rather than leaving a bare panel.
     // The empty state's heading does NOT repeat the panel's own: seen in the
     // capture, the same wording twice in a row reads as a rendering defect.
-    'pas_encore_porte' => 'Not ported to this portal yet',
-    'a_venir_config' => 'Reading and saving this configuration arrive with the following sub-lots. Until then they stay on the previous portal.',
-    'a_venir_profils' => 'The profile catalogue and its assignment arrive with the following sub-lots. Until then they stay on the previous portal.',
     // A TEXT CAN BECOME FALSE WITHOUT ANY TEST SEEING IT: the fleet table is
     // ported as of V6, so the sentence announcing it "for later" no longer was.
-    'a_venir_deploiement' => 'Installing, reconfiguring and uninstalling an agent arrive with the following sub-lots: those acts CHANGE the servers. Until then they stay on the previous portal.',
-    'vers_legacy' => 'Open on the previous portal',
 
     // ── Sub-lot V8: surveying the fleet as a background task ──────────────
     'releve_titre' => 'Survey monitoring agents across the fleet',

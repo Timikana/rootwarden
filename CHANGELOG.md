@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.173** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.174** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,77 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.174 — E-336 : `supervision` declarait absents trois gestes qu'elle porte depuis DIX JOURS
+
+**Cinq declarations auditees, deux fausses, deux mortes, une vraie.** Aucune n'a ete corrigee sur
+relais : chacune est mesuree contre l'artefact.
+
+#### La mesure qui tranche, et elle est OUVERTE
+
+    ce que supervision.js NOMME comme route :
+      deploiement · desinstallation · ecriture · lecture · reconfiguration ·
+      restauration · sauvegardes · version
+    ce que SupervisionController construit en URL : les memes
+
+**Enumeration ouverte, pas recherche ciblee.** Et c'est ce qui a fait la difference :
+
+    uninstall        dans supervision.js -> 0      <- le nom du LEGACY
+    desinstallation  dans supervision.js -> 5      <- le nom du PORTAGE
+
+**Un pair avait mesure `uninstall -> 0` et conclu « je ne sais pas si c'est cable ».** Le portage
+nomme en francais. *La regle qu'il m'a lui-meme donnee — chercher l'artefact, pas le nom du legacy —
+s'appliquait a sa propre mesure.*
+
+#### L'audit des cinq, une par une
+
+| declaration | rendue | verdict |
+|---|---|---|
+| `secret_jeton_non_porte` | 1 | **VRAIE** — le jeton Telegraf s'ecrit par une route a part, et le commentaire de la vue le justifie. **Laissee** |
+| `a_venir_deploiement` | 1 | **FAUSSE** — les trois gestes cables. Bloc retire |
+| `profils_assignation_ailleurs` | 1 | **FAUSSE** dans sa subordonnee — le tableau de deploiement EST porte. Texte corrige |
+| `a_venir_config` | **0** | fausse (`lecture` et `ecriture` cables) ET morte. Retiree |
+| `a_venir_profils` | **0** | fausse (`profils.enregistrer`/`supprimer` routes) ET morte. Retiree |
+
+#### ⚠ POURQUOI ELLE A SURVECU DIX JOURS
+
+    c1041f4  V1   22/08 03:25   ecrit la phrase        -> elle etait VRAIE
+    3e8686a  V12  23/08 13:05   porte le deploiement   -> son diff ne la touche PAS
+
+**Une declaration vraie devient fausse sans que personne ne la touche.** Il n'y a aucun commit a
+incriminer, et **la relecture du diff qui l'a rendue fausse ne la contient pas.** Ni la parite, ni
+une sonde de cles mortes, ni un test ne l'attrapent : la cle etait vivante, rendue, traduite — et
+fausse.
+
+**Et le fait le plus dur** : trois lignes au-dessus, son propre auteur avait ecrit
+
+    // UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE VOIE … Vu a l'image.
+
+*Un avertissement ecrit ne protege pas le texte qu'il precede.* Il a echoue **sur place, a trois
+lignes**, sans meme avoir besoin d'etre recopie.
+
+#### Le cout etait celui d'entretenir le legacy
+
+Le bloc portait un lien vers l'ancien portail, et il s'affichait **a l'ouverture de l'onglet
+« deploiement »** — au moment precis ou il etait le plus faux et le plus couteux. *Une capacite que
+la page declare absente renvoie activement vers le legacy pour un geste qu'elle sait faire : c'est un
+manque perdu sans que rien ne l'ait retire.*
+
+#### Mesures, au DOM et avec temoin
+
+    panneau-deploy ouvert    visible
+    bloc « pas porte »       0    (doit etre 0)
+    identifiants superv.*    0    (aucune reference orpheline apres retrait de 5 cles)
+    bouton reconfigurer      3    un par machine
+    bouton desinstaller      3
+    TEMOIN selecteur faux    0    l'instrument discrimine
+
+    parite i18n superv   FR=260  EN=260  ecarts=0
+    /supervision -> 302 (la garde)
+
+**Ce module n'est pas le mien.** Je tenais le releve des declarations d'absence et j'avais mesure ce
+defaut deux fois ; le portage etait acheve depuis le 23/08 et aucune session n'y travaillait. Le
+correctif est du texte, et il retire un renvoi vers le portail qu'on veut eteindre.
 
 ### v1.38.173 — `wazuh` R1 : **32/32**, le menu n'a plus une seule entree `legacy`
 

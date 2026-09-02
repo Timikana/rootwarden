@@ -104,7 +104,7 @@ return [
     // L'ASSIGNATION N'EST PAS PORTEE, et c'est une decision : son point d'entree
     // est le tableau de deploiement, et l'inverser (choisir des machines pour un
     // profil) serait concevoir, pas migrer.
-    'profils_assignation_ailleurs' => 'Rattacher un serveur a un profil se fait depuis le tableau de deploiement, qui n\'est pas encore porte.',
+    'profils_assignation_ailleurs' => "Rattacher un serveur à un profil se fait depuis le tableau de déploiement, dans l'onglet « Déploiement ».",
     'profil_metadonnees' => 'HostMetadata',
     'profil_serveur' => 'Serveur',
     'profil_mandataire' => 'Mandataire',
@@ -173,14 +173,9 @@ return [
     // Ce que V1 ne porte pas encore le DIT, plutot que de laisser un panneau nu.
     // Le titre de l'etat vide ne REPETE pas celui du panneau : vu a l'image, le
     // meme intitule deux fois de suite se lit comme un defaut d'affichage.
-    'pas_encore_porte' => 'Pas encore porte sur ce portail',
-    'a_venir_config' => 'La lecture et l\'enregistrement de cette configuration arrivent avec les sous-lots suivants. En attendant, ils restent sur l\'ancien portail.',
-    'a_venir_profils' => 'Le catalogue de profils et son assignation arrivent avec les sous-lots suivants. En attendant, ils restent sur l\'ancien portail.',
     // UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE VOIE : le tableau du
     // parc est porte depuis V6, la phrase qui l'annoncait « pour plus tard » ne
     // l'etait plus. Vu a l'image.
-    'a_venir_deploiement' => "Installer, reconfigurer et desinstaller un agent arrivent avec les sous-lots suivants : ces gestes MODIFIENT les serveurs. En attendant, ils restent sur l'ancien portail.",
-    'vers_legacy' => 'Ouvrir sur l\'ancien portail',
 
     // ── Sous-lot V8 : le releve du parc en tache de fond ──────────────────
     'releve_titre' => 'Relever les agents de tout le parc',
