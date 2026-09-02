@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.167** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.168** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,37 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.168 — ligne de base 164 · 2550 · 1, et les quatre corrections d'après-LOT
+
+**E-322.** LOT rendu par la session 7, **lu dans les journaux et non dans le code de sortie** :
+**164 exécutions, 2550 PASS, 1 FAIL** (précédente base complète : 158 · 2439 · 0). Sa prédiction
+scellée disait 2544 — **écart de 6 à la hausse, non expliqué et non habillé.** Deux écarts, aucun
+n'accuse le portage : `go-socle-navigation` 74 contre une référence périmée de 66, et
+`go-page-update-u2 --legacy` 6 · 1 sur une `EXCEPTION ProtocolError`, en rejeu seule au repos.
+
+**Le FAIL unique a révélé un défaut de mon runner** : `grep -c '^FAIL'` rendait **0** quand la synthèse
+de la suite portait **1** — donc `FAIL=0` s'affichait contre un `ECHEC` venu du code de sortie.
+Septième occurrence du motif, **et la ligne 114 de mon propre fichier décrivait déjà le cas** : *une
+leçon inscrite au bon endroit et appliquée à un seul cas.* Corrigé en **`FAIL=?`** — *on ne fabrique
+pas un 1, on dit que le compte n'est pas fiable* — éprouvé sur quatre états.
+
+**⚠ Cause commune aux deux compteurs fautifs** : **il n'y a pas de marqueur de fin unique dans ce
+banc** — trois formats de synthèse coexistent et `vague0-legacy` n'en porte aucun. *Chacun a pris une
+convention locale pour une convention du banc, le même geste que `fleet-scan`.*
+
+**Et mon chiffre d'avancement était faux** : je comptais des **fichiers** (créés au démarrage d'une
+suite) et j'annonçais un avancement. 164 fichiers, **163 suites réellement achevées**. La session 7
+n'a **pas reconstitué** son propre 123 : *un chiffre dont on ne retrouve pas l'objet se jette, il ne se
+rationalise pas.* Son indicateur lui avait rendu « 92 suites restantes » — **« l'absurdité m'a sauvée,
+pas la méthode »**.
+
+**E-323 — les quatre corrections sont faites** : référence 66 → 74 · `FAIL=?` (`5f8dd17`) ·
+`lang/{fr,en}/pare-feu.php` où la validation à blanc **est** portée · commentaire réécrit **en
+symboles** (`6ed78ba`). Le libellé du pare-feu **porte la réserve du backend lui-même** — `iptables.py`
+n'a pas été rechargé, donc l'appel câblé ne prouve pas la réponse. FR et EN ensemble, **76 clés
+chacun**, syntaxe vérifiée dans le conteneur **avec témoin négatif**. La cinquième correction — les cinq
+motifs `INTERDITS` — est chez son autrice, qui prend **la règle générale et non la liste**.
 
 ### v1.38.167 — une suite indifférente dans ses assertions, sensible dans son compte
 

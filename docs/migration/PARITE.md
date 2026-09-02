@@ -15703,3 +15703,101 @@ s'inscrivent ensemble. **Je ne touche à rien.**
 périmé d'E-293, **désormais faux de sept unités**. Elle le corrigera avec la valeur. *Un exemple chiffré
 dans un commentaire vieillit là où l'on vient chercher la vérité sur l'outil* — et il vieillit **d'autant
 plus vite que le travail avance**, ce qui est la signature d'E-278.
+
+## E-322 — LIGNE DE BASE DU 2026-09-02 : 164 exécutions · 2550 PASS · 1 FAIL
+
+Rendue par la session 7, **lue dans les journaux et non dans le code de sortie**.
+
+    executions ..... 164     journaux /tmp/rw-lot-V7ILl4
+    PASS ........... 2550    (precedente ligne de base complete : 158 · 2439 · 0)
+    FAIL ............    1
+    fin ............ entre 07:52:56 et 07:54, PID 246172 disparu
+
+**Sa prédiction scellée disait 2544.** Rendu 2550, **écart de 6 à la hausse**, *« je ne l'explique pas
+encore et je ne l'habille pas »*. La prédiction reste posée comme non expliquée — c'est la forme.
+
+**Deux écarts, et aucun n'accuse le portage** :
+
+    go-socle-navigation  laravel  74 · 0   ECART attendu=66   reference PERIMEE -> posee a 74
+    go-page-update-u2    legacy    6 · 1   ECHEC attendu=8    EXCEPTION ProtocolError, en rejeu
+
+### Ce que le FAIL unique a révélé de MON runner
+
+    grep -c '^FAIL' du runner   ->  0    aucune ligne ne COMMENCE par FAIL
+    synthese de la suite        ->  1    l'exception EST comptee par la suite
+
+**Mon compteur n'était pas seulement aveugle aux `^EXCEPTION` : il était aveugle à un FAIL que la
+suite avait bel et bien compté, et dont le vrai chiffre était disponible dans la ligne d'à côté.**
+Donc `FAIL=0` s'affichait contre un `ECHEC` venu du **code de sortie**. **Septième occurrence** du
+motif « un détail qui affirme le contraire de son verdict ».
+
+> ⚠ **Et la ligne 114 de mon propre fichier décrivait déjà le cas** — *« une régression de deux
+> assertions, sur un rejeu qui affiche pourtant FAIL=0 »*. **La classe était connue, écrite chez moi,
+> et non généralisée au compteur.** *Une leçon inscrite au bon endroit et appliquée à un seul cas.*
+
+**Corrigé en `FAIL=?`** quand le code accuse et que le compte est à zéro — *on ne fabrique pas un 1,
+on dit que le compte n'est pas fiable.* Éprouvé sur les quatre états : `(0,0)→0` · `(0,1)→?` ·
+`(1,1)→1` · `(3,0)→3`.
+
+### ⚠ LA CAUSE COMMUNE À NOS DEUX COMPTEURS FAUTIFS
+
+    « 23 PASS / 0 FAIL »                          format A
+    « 3 etapes, 41 PASS, 0 FAIL » + « TOUT OK »   format B
+    « cible=legacy : 5 PASS / 0 FAIL — archivee » format C
+    `vague0-legacy`                               AUCUNE ligne PASS/FAIL
+
+> **Il n'y a pas de marqueur de fin unique dans ce banc.** Mon compteur ancrait sur `^FAIL`, le sien
+> sur un des trois formats de synthèse — **nous avons chacun pris une convention LOCALE pour une
+> convention du BANC.** *Même geste que `fleet-scan` : supposer une forme au lieu de la relever.*
+
+Et un compteur qui exige le format PASS/FAIL déclarera `vague0-legacy` **éternellement en cours**.
+
+### Mon chiffre d'avancement était faux, et je l'avais rendu à l'exploitant
+
+    fichiers de journal .......... 164    <- MON 158 : cree au DEMARRAGE d'une suite
+    journaux avec synthese ....... 163    <- suites REELLEMENT achevees
+    journaux « N PASS / M FAIL » ..  72    <- ce que rend un marqueur trop etroit
+
+**Je comptais des fichiers et j'annonçais un avancement.** Et la session 7 n'a **pas reconstitué** son
+propre 123 : *« plutôt que d'inventer rétrospectivement une définition qui le rendrait juste »*, elle a
+rendu les trois mesures ci-dessus. **Un chiffre dont on ne retrouve pas l'objet se jette, il ne se
+rationalise pas.**
+
+Son indicateur lui avait rendu *« 92 suites restantes »* sur des journaux pleins et vieux de deux
+heures. **« L'absurdité m'a sauvée, pas la méthode »** — l'ordre de grandeur est le dernier filet, pas
+le premier.
+
+## E-323 — les quatre corrections d'après-LOT sont faites, et la cinquième est chez son autrice
+
+    (a) reference `go-socle-navigation` 66 -> 74                      5f8dd17
+    (b) `lang/{fr,en}/pare-feu.php` : la validation a blanc EST portee 6ed78ba
+    (c) commentaire `go-socle-navigation.mjs:67` reecrit EN SYMBOLES  6ed78ba
+    (d) compteur de FAIL -> `FAIL=?`                                  5f8dd17
+    (e) les cinq motifs `INTERDITS`                                   session 7
+
+**(b) porte la réserve du backend dans le libellé lui-même**, pas seulement au registre : *`iptables.py`
+n'a pas été rechargé par le processus servi, donc que le JS appelle la route ne dit pas qu'elle répond.*
+**Une non-mesure annoncée sur la page, à la personne qui va cliquer.**
+
+**(c) est réécrit en symboles** — `total=N route=R legacy=G`. *Le format se documente, l'état se
+mesure* : un exemple chiffré vieillit à l'endroit exact où l'on vient chercher la vérité sur l'outil.
+
+**FR et EN corrigés ensemble, 76 clés chacun**, syntaxe vérifiée dans le conteneur **avec un témoin
+négatif** — un fichier volontairement cassé EST refusé, donc le linter regarde.
+
+### Et la session 7 a nommé ce que `fleet-scan` complète
+
+    _run_scheduled_scan / _run_scheduled_ssh_audit   deux fonctions au corps identique
+    `$derive`                                        « derive » = participe passe
+    `iptables` / `pare-feu`                          la page portee est nommee en français
+    `fleet-scan`                                     ecrit de MEMOIRE, jamais releve
+
+> **Les quatre viennent du même geste : écrire un nom au lieu de le lire.** Et le quatrième est **le
+> plus silencieux** — les trois premiers ont produit un FAIL ou une contradiction visible. **Une
+> alternative de motif qui ne peut jamais mordre ne se signale par aucun symptôme.**
+
+**Son choix sur les `INTERDITS` est la règle générale, pas la liste** : *« ma suite affirme que la page
+est en lecture seule ; si c'est vrai, TOUTE écriture est un défaut — pas seulement celles que j'ai su
+nommer »*. Elle assume que sa suite rougisse le jour où un sous-lot composera une écriture légitime,
+**parce que ce changement mérite d'être vu.** *Une liste fermée protège contre ce qu'on a prévu ; une
+règle de méthode protège contre ce qu'on n'a pas prévu.*
