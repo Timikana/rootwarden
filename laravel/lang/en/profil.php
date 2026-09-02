@@ -13,7 +13,8 @@ return [
     'second_facteur_texte'  => 'A single-use code is required at every sign-in. There is no access without a second factor.',
 
     'non_porte_titre' => 'Not here yet',
-    'non_porte_texte' => 'Open sessions and remembered logins are not listed here yet: the legacy portal shows them. The password change itself now happens on this page.',
+    // E-203: sessions ARE listed now — see fr.
+    'non_porte_texte' => 'Remembered logins are not listed here yet: the legacy portal shows them. The password change and open sessions are now handled on this page.',
     /*
      * ── SUB-LOT A2: PASSWORD CHANGE ──────────────────────────────────────
      *
@@ -29,7 +30,7 @@ return [
     'mdp_nouveau' => 'New password',
     'mdp_confirmation' => 'Confirm new password',
     'mdp_enregistrer' => 'Change password',
-    'mdp_effet_sessions' => "Your other sessions on the LEGACY portal will be closed — it checks on every request — and remembered logins forgotten. ⚠ On THIS portal, no other session will be closed: it does not consult the sessions table yet.",
+    'mdp_effet_sessions' => "Your other sessions will be closed, on this portal as on the old one — both check on every request — and remembered logins forgotten.",
     'mdp_ok' => 'Password changed successfully.',
     'mdp_erreur_actuel' => 'Current password is incorrect.',
     'mdp_erreur_correspondance' => 'The passwords do not match.',
@@ -37,4 +38,20 @@ return [
     'mdp_erreur_historique' => 'This password has already been used. Choose a different one.',
     'mdp_erreur_fuite' => 'This password appears in a public data breach. Choose a different one.',
     'mdp_erreur_compte' => 'Account not found.',
+
+    // E-203: open sessions.
+    'sessions_titre' => 'Your open sessions',
+    'sessions_aide'  => 'Each login to this portal or the old one opens a session. Closing a session logs it out immediately, on both sides.',
+    'sessions_vide'  => 'No session recorded — not even this one, which is not normal.',
+    'sessions_err'   => 'Your sessions could not be read. This is not "no session": the list did not answer.',
+    'sessions_actuelle' => 'current session',
+    'sessions_depuis' => 'opened on :date',
+    'sessions_vue'    => 'seen on :date',
+    'sessions_bornee' => 'The :n most recent, out of :total recorded.',
+    'sessions_vestiges' => 'The old portal records one row per login and never removes any: the oldest no longer correspond to an open access.',
+    'sessions_revoquer' => 'Close',
+    'sessions_empreinte' => 'fingerprint :valeur',
+    'sessions_revoquee'  => 'Session closed.',
+    'sessions_introuvable' => 'This session no longer exists — it may already have been closed.',
+    'sessions_pas_la_sienne' => 'To close the current session, use "Log out".',
 ];

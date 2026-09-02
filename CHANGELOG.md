@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.160** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.161** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,96 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.161 — E-203 : la revocation de session devient EFFECTIVE, et E-315 : deux horloges
+
+**Le portage offrait une revocation qui ne revoquait rien.** Ses sessions vivent en FICHIERS
+(`SESSION_DRIVER=file`) : supprimer une ligne d'`active_sessions` n'en fermait aucune. **Tant que les
+deux portails coexistent le legacy fait le travail et le manque ne se voit pas** — le jour ou il
+s'eteint, la capacite disparait en silence, et l'ecran continue de l'offrir.
+
+#### Trois volets, et le troisieme est le seul qui ferme le trou
+
+    1. ECRIRE     la ligne a la connexion, APRES `regenerate()`
+    2. LISTER     les sessions dans l'onglet profil, avec fermeture
+    3. CONSULTER  a chaque page protegee — `session.revoquee`
+
+**Sans le troisieme, le bouton « Fermer » ecrirait une suppression que personne ne lit.** C'est E-188
+pris un cran plus haut : la une colonne etait ecrite et jamais lue, ici c'est une DECISION qui ne
+serait jamais consultee.
+
+Le legacy a ete lu pour ce qu'il **DECIDE**, pas pour sa forme : presence de la paire
+(`session_id`, `user_id`), sinon destruction ; `last_activity` touchee **au plus une fois par
+minute** ; et **fail-OPEN** sur erreur de base — un incident deconnecterait sinon tout le monde, et
+les gardes de role restent derriere. `estVivante()` rend donc `null` pour « pas lu » et `false` pour
+« absente », et le garde distingue les deux.
+
+#### ⚠ Un dispositif de securite qui ejecte celui qui vient de se securiser
+
+`PortailController` regenere la session apres un changement de mot de passe. **Sans traitement, la
+ligne devenait perimee et le garde deconnectait la personne au clic suivant.** La regeneration est
+desormais suivie : ancienne ligne retiree, nouvelle posee.
+
+#### L'identifiant de session ne sort pas du serveur
+
+La vue portait deja cette decision d'un sous-lot precedent. **Le mettre dans un champ cache pour
+pouvoir revoquer l'aurait annulee** — le HTML l'aurait publie tout autant. La fermeture vise donc une
+**empreinte** (12 hexadecimaux), resolue par le serveur **parmi les sessions de ce compte** : une
+empreinte est courte, et une collision entre deux comptes ne doit pas fermer la session d'un tiers.
+
+#### ⚠ Un defaut trouve par la MESURE : le profil rendait 2 584 lignes
+
+    active_sessions        4 477 lignes, dont 3 373 de plus de 7 jours
+    rw-test-super          2 583, la plus vieille du 15 aout
+
+Le legacy pose une ligne par connexion et **n'en retire jamais**. Deux consequences, et la seconde
+est la plus importante :
+
+- l'ecran etait inutilisable ;
+- **une ligne de trois semaines n'est PAS une session ouverte.** Les presenter comme telles serait
+  **faux**, pas seulement illisible.
+
+La liste est donc bornee a 20, **la borne est ANNONCEE** (« Les 20 plus recentes, sur 2 584
+enregistrees »), et l'ecran dit que la table n'est pas purgee. *Montrer vingt lignes sur 2 584 sans le
+dire serait le compteur qui ment qu'on corrige partout ailleurs.*
+
+**Et la revocation resout sur TOUTES les sessions**, pas sur la liste affichee : s'en servir aurait
+donne un bouton qui marche pour les vingt premieres et echoue en silence pour les suivantes.
+
+#### Deux chaines du profil sont devenues fausses, et sont corrigees
+
+`non_porte_texte` et `mdp_effet_sessions` **decrivaient le manque** — « il ne consulte pas encore la
+table des sessions ». Combler le defaut rend son libelle faux **sans que rien ne le signale** : c'est
+E-269 dans l'autre sens, et les deux se corrigent par le meme geste.
+
+#### E-315 — le « trou » de deux heures n'existait pas
+
+    hote           2026-09-02 03:35:51 CEST (UTC+0200)
+    conteneur php  2026-09-02 01:35:51 UTC
+    MySQL NOW()    2026-09-02 01:35:52
+
+Une session a conclu que la table n'etait plus alimentee depuis 01:20, ayant lance six executions
+« depuis ». **Ses horodatages etaient en CEST, la colonne en UTC.** Son « 03:18 » EST le `01:18` de
+la base — c'est-a-dire ses propres lignes.
+
+**Deuxieme occurrence de la meme confusion cette nuit** : l'inventaire de `documentation` porte un
+`find -newermt "… UTC"` qui rendait **0** au lieu de 29. *Les deux fois le resultat etait PLAUSIBLE*
+— un zero credible, un silence credible. La parade est bon marche : quand un horodatage de suite est
+compare a une colonne de base, **mesurer les deux horloges dans la meme commande**.
+
+Elle a refuse de fabriquer une explication et me l'a signalee comme une incertitude. **Sans cela,
+j'aurais pu attribuer a mon garde une panne qui n'existait pas.**
+
+#### Mesures
+
+    essai de bout en bout   11 PASS / 0 FAIL, et il se nettoie
+    go-socle-auth laravel   14 PASS / 0 FAIL / 0 ecart   <- l'authentification est intacte
+    logique du service      13 assertions, temoin nettoye a 0
+    parite i18n profil      FR=35  EN=35  ecarts=0
+
+**La propriete qui compte ne se voit pas a la connexion** — elle reussit dans les deux cas. C'est la
+**seconde** page qui separe « la ligne a ete posee » de « elle ne l'a pas ete », et c'est ce que
+l'essai mesure.
 
 ### v1.38.159 — le rôle 2 n'a été exercé que 10 fois en trois semaines
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\SessionsActives;
 use App\Services\Totp;
 use App\Support\TotpCrypto;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -21,8 +22,10 @@ use Illuminate\View\View;
  */
 class SecondFacteurController extends Controller
 {
-    public function __construct(private readonly Totp $totp)
-    {
+    public function __construct(
+        private readonly Totp $totp,
+        private readonly SessionsActives $sessions,
+    ) {
     }
 
     public function formulaire(Request $requete): View|RedirectResponse
@@ -248,6 +251,16 @@ class SecondFacteurController extends Controller
         $requete->session()->regenerate();
         $requete->session()->forget(['compte_temporaire', 'tentatives_2fa']);
         $requete->session()->put('utilisateur_id', (int) $compte->id);
+
+        /*
+         * E-203 — la ligne de revocation, posee APRES `regenerate()`.
+         *
+         * Avant, l'identifiant serait l'ancien, et le garde
+         * `session.revoquee` ne retrouverait pas la session au premier
+         * passage : la personne serait mise dehors immediatement apres
+         * s'etre authentifiee.
+         */
+        $this->sessions->enregistre($requete, (int) $compte->id);
         $requete->session()->put('utilisateur_nom', (string) $compte->name);
         $requete->session()->put('role_id', (int) $compte->role_id);
 
