@@ -14343,3 +14343,60 @@ même sort**.
 
 > Ce n'est plus « du travail qui attend ». C'est **du travail qu'on risque de refaire** — et refaire
 > coûte deux fois : la nuit, **et le conflit de fusion qu'elle crée**.
+
+## E-293 — une LIGNE DE JOURNAL n'est pas une ASSERTION, et un EXEMPLE daté dans un commentaire vieillit seul
+
+La session 7 a averti deux sessions qu'une suite allait rougir après les bascules. **Faux**, et elle
+l'a trouvé elle-même en lisant son propre outil :
+
+    go-socle-navigation.mjs:81   function verifie(libelle, ok, detail)   <- ASSERTION
+    go-socle-navigation.mjs:110  function constate(libelle, valeur)      <- pousse une ligne INFO
+
+Ses trois assertions portent sur des **invariants** — le total vaut 32, chaque entrée porte `route`
+**ou** `legacy` et jamais les deux, la somme se reconstitue. **Aucune ne dépend de la proportion.**
+Une bascule y est **neutre par construction**.
+
+> **Elle a raisonné sur ce que sa suite AFFICHE au lieu de ce qu'elle ASSERTE.** Dans un journal,
+> `INFO entrees declarees : total=32 route=24 legacy=8` ressemble exactement à une mesure qui engage.
+
+**La seule façon de le savoir est de lire l'APPEL, pas la sortie.** C'est le pendant, côté
+instrument, du « marqueur n'est pas le verdict » que ce chantier porte déjà.
+
+### Et le vecteur, cette fois, est un COMMENTAIRE
+
+    go-socle-navigation.mjs:67
+      « Mesure : `Navigation::SECTIONS` lue par PHP lui-meme rend
+        total=32 route=24 legacy=8 ni-l-un-ni-l-autre=0 »
+
+    mesure 2026-09-02 02:27
+        total=32 route=29 legacy=3
+
+**L'exemple est daté du 2026-08-27 et il est faux depuis cinq bascules.** Il n'est pas *incorrect* —
+il documentait le **format** de la ligne — mais il porte des **valeurs** qui se lisent comme un état
+courant, et personne ne remesure un exemple.
+
+> **Un exemple chiffré dans un commentaire est un chiffre non daté qui vieillit sans que rien ne
+> l'annonce** — et il vieillit *à l'endroit exact où quelqu'un vient chercher la vérité sur l'outil.*
+
+Troisième vecteur du même défaut en deux jours : **la consigne que je recopie** (neuf affirmations
+périmées), **le registre** (mon compteur de titres), et maintenant **le commentaire d'un test**.
+*Ce ne sont pas trois négligences : ce sont les trois endroits où l'on écrit pour ne pas oublier.*
+
+**Remède, et il ne rallonge aucune liste** : un exemple chiffré dans un commentaire s'écrit **sans les
+valeurs** (`total=N route=R legacy=G`), ou porte sa date **dans la même phrase**. La forme littérale
+invite à la croire ; la forme symbolique documente ce qu'elle prétend documenter — **le format**.
+
+## E-294 — `documentation` est porté : 29 sur 32
+
+    Navigation.php     'cle' => 'documentation' … 'route' => 'documentation'   (ecrit 02:25:05)
+    web.php:191        Route::get('/documentation', DocumentationController::class)
+    web.php:989        Route::get('/documentation.php', fn () => redirect()->route('documentation'))
+
+**Croisé sur l'artefact** : 29 `route` + 3 `legacy` = 32. **Troisième entrée portée cette nuit**, après
+`groups` (R1) et `ssh_audit` (A1).
+
+La redirection de `/documentation.php` vers la route nommée est un geste que les portages précédents
+n'avaient pas fait — *un signet qui existe chez l'exploitant ne meurt pas avec la page.*
+
+**Restent TROIS entrées** : `remote_users` (portable — les cinq gestes distants, avec E-283 à traiter
+dans le panneau), `iptables` (I5, arbitrage du port SSH), `wazuh` (E-238 pour mesurer).
