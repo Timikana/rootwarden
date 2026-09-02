@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.142** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.143** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,48 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.143 — migration 065 : la contrainte que la fusion ne portera pas
+
+**ECRITE, NON APPLIQUEE.** Meme fenetre de signature que 063 et 064.
+
+**Les deux tables de planification n'ont pas la meme contrainte :**
+
+```
+ssh_audit_schedules.target_type   enum(…)  NOT NULL   <- refuse le vide
+cve_scan_schedules.target_type    enum(…)  NULLABLE   <- l'accepte
+```
+
+**Et c'est la plus permissive qui porte la tache dont l'aboutissement envoie un courriel reel.**
+
+**Le chemin, eprouve des deux cotes** — `data.get('target_type', 'all')` rend `None` sur un `null`
+**JSON explicite** (la cle existe, le defaut ne joue pas), et `INSERT … target_type = NULL` est
+**accepte** (eprouve en transaction annulee, 0 ligne restante). Ce `NULL` retombe ensuite dans le
+`else` du planificateur, c'est-a-dire **sur tout le parc**.
+
+> **`security/backend-cve` corrige l'applicatif, jamais le schema.** Cette contrainte survit donc
+> entierement a la fusion — c'est la seule des trois pieces dont on soit sur qu'elle n'a pas deja ete
+> ecrite ailleurs.
+
+**L'`UPDATE` prealable ne decide rien** : il ecrit `'all'` la ou la valeur est `NULL`, ce qui est le
+comportement que le code avait **deja** pour ces lignes, rendu explicite. Sans lui, l'`ALTER`
+echouerait en mode strict sur une base portant de telles lignes — **et un echec de migration bloque
+toutes les suivantes.**
+
+**Controles** : un seul `;`, en fin d'instruction, **aucun dans un commentaire** — le runner decoupe
+sur `;` **avant** de retirer les commentaires (`db_migrate.py:324` contre `:329`), donc un `;` en
+en-tete couperait une instruction en deux, comme sur 062. Le decoupage simule rend **exactement deux
+instructions propres**. Syntaxe des deux validee par `PREPARE`/`DEALLOCATE`, qui analyse **sans
+executer**. **Verifie apres ecriture** : la colonne est toujours `NULLABLE` et 065 n'est pas dans
+`schema_migrations`.
+
+**Une regle que j'appliquais trop strictement, corrigee** : je tenais « aucun `;` nulle part » comme
+un absolu, et 063 comme 064 en sont depourvues. **C'est plus strict que necessaire** — 062 en porte
+neuf, entre ses instructions. Le vrai enonce est : *le `;` separe les instructions, et un `;` dans un
+commentaire est fatal.*
+
+**Fenetre** : `cve_scan_schedules` porte **0 ligne** (mesure du 2026-09-02). Aucune valeur a
+retro-attribuer, aucun arbitrage sur l'existant.
 
 ### v1.38.142 — une contrainte ecrite la ou elle sera LUE, pas la ou elle a ete dite
 
