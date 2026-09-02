@@ -4520,3 +4520,68 @@ ailleurs ; l'autre est le maillon manquant d'une chaîne dont tout le reste est 
 
 > **« Capacité non portée » les décrivait toutes les deux et n'expliquait ni l'une ni l'autre.** *Le
 > compte de déclarations d'absence, encore une fois, nomme un symptôme et pas une cause.*
+
+---
+
+## ✅ La caractérisation complète d'E-280 : une valeur FAUSSE échoue fermé, seule une valeur VIDE échoue ouvert
+
+**Établi le 2026-09-03 vers 01:45**, à partir des deux cas de frontière que la session 6 a ajoutés **sans
+qu'on les lui demande**. *Personne ne l'avait formulé, et ça change la lecture du défaut.*
+
+    tag = 'XX-INEXISTANT'          ->  JOIN sans correspondance   ->  0 machine
+    environment = 'N-EXISTE-PAS'   ->  WHERE sans correspondance  ->  0 machine
+    machines = '[]'                ->  WHERE 1=0                  ->  0 machine
+    TEMOIN  environment = 'DEV'    ->  2 machines   (l'instrument mord)
+
+    et target_value VIDE           ->  LE PARC ENTIER
+
+> **Toute valeur non reconnue résout vers zéro. Seule l'absence de valeur résout vers tout.**
+
+### Pourquoi, et c'est structurel
+
+    if schedule['target_type'] == 'tag' and schedule.get('target_value'):
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ le test de vacuite
+                                                                        est dans la CONDITION
+
+**Une valeur fausse ENTRE dans sa branche et n'y trouve rien. Une valeur vide n'entre PAS et sort par le
+`else` final.** *L'asymétrie ne vient pas d'une différence de traitement : elle vient de l'endroit où le
+test est posé.*
+
+### Ce que ça change pour la lecture du défaut
+
+**La formulation courante — « une portée corrompue vise tout le parc » — est fausse pour la corruption et
+juste pour l'absence.** *Un `target_value` qui se dégrade en n'importe quelle chaîne non vide devient
+inoffensif ; c'est celui qui se vide qui devient dangereux.*
+
+> **Le geste qui arme le piège n'est pas une corruption : c'est un champ laissé blanc.** *Et la session 6
+> l'a mesuré à un cran plus fin encore — sous mutation, `''` reste VERT parce que `or None` le rattrape ;
+> **seuls les blancs rougissent**.* **Le geste exact est de frapper la barre d'espace.**
+
+**Et sa remarque sur la paramétrisation vaut au-delà** : *un seul cas de « vide » aurait manqué
+exactement celui-là.* **Une classe d'équivalence choisie trop grossièrement ne rate pas un cas au
+hasard — elle rate celui qui diffère du représentant.**
+
+### Et la formule qui décrit la garde
+
+> **La route garde la FORME, pas le SENS.** *Elle refuse une portée hors liste et une portée sans valeur ;
+> elle n'a jamais prétendu confronter la valeur au parc réel — et ce n'est pas son rôle.*
+
+**La session 6 le mesure et l'écrit plutôt que de le compter comme un manque.** *Sans ces tests, qui lit
+le seul cas de refus croit la route capable de juger le contenu.*
+
+---
+
+## Et un défaut d'instrument qui vaut pour toute la flotte
+
+> *Mon harnais porte désormais une garde d'ENTRÉE — empreinte SHA-256 avant/après — parce qu'hier quatre
+> mutations n'avaient jamais été appliquées, dans un conteneur sans `python3`, et rendaient « tout vert ».*
+>
+> **« Je gardais la sortie et pas l'entrée. »**
+
+**Une épreuve par mutation qui ne vérifie pas que sa mutation a été APPLIQUÉE ne mesure rien** — *et son
+échec ressemble exactement à une suite robuste.* **C'est le motif du témoin, appliqué à l'instrument
+lui-même : il faut prouver que l'instrument a bien mordu avant de lire ce qu'il rend.**
+
+**Et sa frontière est écrite EN TÊTE du fichier, pas en note** : *les points « liste fermée offerte à
+l'écran » et « refus visible » vivent au banc — une suite hermétique n'a pas de navigateur.* **Le vert ne
+peut donc pas être lu comme une couverture du formulaire.**
