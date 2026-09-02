@@ -15071,3 +15071,53 @@ le chemin critique de la 2.0.
 part des autres écarts. *Un manque qui se voit est un reste à faire ; un manque dont l'écran continue
 d'offrir la fonction est un piège.* Il ne se découvre qu'après l'extinction du legacy, c'est-à-dire au
 moment où le retour arrière est le plus coûteux.
+
+## E-310 — une RÉSERVE n'est pas une atténuation : elle peut se refermer du côté qui AGGRAVE
+
+Formulation de la session 8, sur sa propre réserve — celle qui disait *« je n'ai vérifié que
+l'interrupteur `MAIL_ENABLED`, donc "actif" est un interrupteur ouvert, pas un envoi prouvé »*.
+
+Mesurée, elle s'est refermée **dans l'autre sens** : les quatre variables SMTP sont définies, le chemin
+est **armé** et non armable.
+
+> **Je l'avais déclarée par prudence, en supposant implicitement qu'elle RÉDUIRAIT la portée si elle se
+> résolvait. Elle l'augmente. Une réserve n'est pas une atténuation : c'est une question ouverte, et
+> elle peut se refermer des deux côtés.**
+
+### Et c'est le pendant exact de ma faute de la nuit
+
+    moi   un FAIT non mesure qui faisait SIGNER            (« le redemarrage corrige E-280 »)
+    elle  une RESERVE non mesuree qui faisait RELATIVISER   (« ce n'est peut-etre qu'un interrupteur »)
+
+**Les deux se logent du côté confortable, et aucun des deux ne se remesure spontanément.** Ma règle
+disait *« mesurer deux fois ce qui arrange »* — je l'appliquais aux affirmations. **Elle s'applique aussi
+aux réserves** : une réserve qui atténue arrange, donc elle échappe au même contrôle.
+
+### Sa remesure est une vraie confirmation, et son procédé est meilleur que le mien
+
+    pour chaque variable : PRESENCE + NOMBRE DE CARACTERES, jamais la valeur
+    TEMOIN : une variable inexistante -> rendue ABSENTE
+    puis mail_utils.py:221-228 relu : les trois noms exiges sont exactement ceux-la
+
+**Je m'étais contenté de ne pas recopier les valeurs dans mon compte rendu ; elle ne les a pas fait
+sortir de la mesure.** *Une donnée identifiante qui n'entre pas dans la sortie d'outil ne peut pas fuir
+par recopie.* Forme reprise.
+
+## E-311 — mon §0bis avertissait contre la mémoire écrite, EN ÉTANT de la mémoire écrite
+
+Objection de la session 8, et elle a raison contre moi. J'avais publié l'annuaire des sessions avec la
+consigne *« à remesurer par `ListAgents`, jamais de mémoire »* — **dans un document qui est précisément
+de la mémoire écrite.**
+
+> **J'ai créé le vecteur en même temps que l'avertissement.** Il périmera comme un chiffre hérité, et
+> *ce qui protège n'est pas de le relire : c'est que `ListAgents` rende le nom avant chaque envoi, y
+> compris quand le tableau donne la réponse immédiatement.* Sinon on a reconstruit le problème que le
+> tableau résout, **avec un pas de plus.**
+
+**Amendé** : le §0bis est désormais déclaré **carte des RÔLES**, pas carnet d'adresses. La colonne
+« rôle » est durable ; la colonne « adresse » est **une photo**.
+
+*Troisième fois cette nuit qu'un de mes garde-fous porte son propre angle mort* — après le compteur qui
+dérivait avec la bonne tenue du registre, et le témoin qui validait l'idiome sans valider la question.
+**Et la sienne est de la même famille que sa réserve** : elle a appliqué ma règle à mon garde-fou pendant
+que j'appliquais la mienne à son relevé.

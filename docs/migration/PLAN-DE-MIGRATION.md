@@ -84,8 +84,20 @@ circule parce qu'on sait à qui.*
 **Le nom EST l'adresse**, à recopier exactement. Les crochets (`[d845b1]`) ne servent qu'à
 désambiguïser si deux lignes partagent un nom.
 
-⚠ **À remesurer par `ListAgents`, jamais de mémoire.** Une session qui redémarre change d'empreinte, et
-**un annuaire périmé est plus nuisible qu'une absence d'annuaire : il fait croire qu'on a envoyé.**
+### ⚠ CE TABLEAU EST UNE CARTE DES RÔLES, PAS UN CARNET D'ADRESSES
+
+**Amendé le 2026-09-02 à 03:30, sur objection de la session 8, et elle a raison contre moi.** J'avais
+écrit *« à remesurer par `ListAgents`, jamais de mémoire »* — **dans un document qui EST de la mémoire
+écrite.** J'ai créé le vecteur en même temps que l'avertissement, et il périmera exactement comme un
+chiffre hérité.
+
+> *Ce qui protège n'est pas de relire ce tableau : c'est que `ListAgents` rende le nom **avant chaque
+> envoi**, y compris quand ce tableau donne la réponse immédiatement.* Sans ça, on a reconstruit le
+> problème que le tableau résout, **avec un pas de plus.**
+
+**Donc : la colonne « rôle » est l'information durable ; la colonne « adresse » est une PHOTO.** Une
+session qui redémarre change d'empreinte, et un annuaire périmé est plus nuisible qu'une absence
+d'annuaire — *il fait croire qu'on a envoyé.*
 
 ### La règle de circulation, tirée d'E-305
 

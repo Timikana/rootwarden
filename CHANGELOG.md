@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.156** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.157** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,27 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.157 — une réserve peut se refermer du côté qui aggrave, et mon annuaire était de la mémoire écrite
+
+**E-310.** Une réserve déclarée par prudence — *« je n'ai vérifié que l'interrupteur, donc "actif" n'est
+pas un envoi prouvé »* — s'est refermée **dans l'autre sens** : les quatre variables SMTP sont définies,
+le chemin est **armé** et non armable. *Une réserve n'est pas une atténuation : c'est une question
+ouverte, et elle peut se refermer des deux côtés.* **Pendant exact de ma faute de la nuit** — un *fait*
+non mesuré qui faisait signer, contre une *réserve* non mesurée qui faisait relativiser : **les deux se
+logent du côté confortable.** Ma règle « mesurer deux fois ce qui arrange » s'appliquait aux
+affirmations ; elle s'applique aussi aux réserves.
+
+**Et le procédé de la remesure est meilleur que le mien** : présence + **nombre de caractères**, jamais
+la valeur, avec un témoin sur une variable inexistante. *Une donnée identifiante qui n'entre pas dans la
+sortie d'outil ne peut pas fuir par recopie.*
+
+**E-311 — mon §0bis avertissait contre la mémoire écrite en étant de la mémoire écrite.** J'ai publié
+l'annuaire des sessions avec la consigne « à remesurer par `ListAgents`, jamais de mémoire » — dans un
+document qui est exactement cela. **J'ai créé le vecteur en même temps que l'avertissement.** Amendé : le
+§0bis est déclaré **carte des rôles**, pas carnet d'adresses — la colonne « rôle » est durable, la colonne
+« adresse » est **une photo**, et `ListAgents` se relance avant chaque envoi même quand le tableau
+répond. *Troisième fois cette nuit qu'un de mes garde-fous porte son propre angle mort.*
 
 ### v1.38.156 — l'état des blocages : trois entrées, cinq onglets, et UNE SEULE chose portable
 
