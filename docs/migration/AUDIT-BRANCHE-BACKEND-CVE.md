@@ -181,13 +181,41 @@ else:    SELECT ... FROM machines      # <- TOUT le parc
 ```
 
 Une planification restreinte à deux serveurs dont le `target_value` se vide ou se corrompt devient un
-scan **complet**. Or un scan CVE ouvre une session SSH **et envoie un vrai courriel par machine** —
-c'est précisément l'effet sortant que §7 du plan réserve au mot de l'exploitant (S7b), atteint ici
-**par une corruption de donnée, sans que personne ne clique**.
+scan **complet**. Ce scan **ouvre une session SSH sur chaque machine** — et `base_cols` porte
+`password, root_password`, déchiffrés dans la boucle : le repli ne fait donc pas « scanner les
+mauvaises machines », il fait **s'authentifier en root sur tout le parc**.
+
+> **⚠ CORRIGÉ le 2026-09-02.** Cette phrase disait *« et envoie un vrai courriel par machine — c'est
+> précisément l'effet sortant que §7 réserve au mot de l'exploitant (S7b) »*. **Les deux clauses
+> étaient fausses sur CE chemin**, et le DSI m'a donné le discriminant plutôt que la correction.
+> Mesuré :
+>
+> | chemin | courriel | repli fail-open |
+> |---|---|---|
+> | route `/cve_scan` | **oui** (`send_cve_report`, `routes/cve.py:77`) | **non** — `machine_id` requis, 400 sur liste vide |
+> | route `/cve_scan_all` | **oui** | **non** — passe `[]` **délibérément**, c'est son objet |
+> | action groupée (`groups.py:278`) | **oui**, même stream | **non** — passe `[mid]`, jamais vide |
+> | **scheduler (planifié)** | **NON** — `notify_cve_scan` → webhook | **OUI** |
+>
+> **Les deux faits ne se recouvrent pas.** Le courriel vit sur les chemins qu'un humain déclenche et
+> regarde ; le repli vit sur le seul qui tourne sans personne. Ma phrase joignait deux vérités qui
+> habitent des chemins différents — *et c'est la forme la plus difficile à repérer, parce que chaque
+> moitié se vérifie séparément.*
+
+**Et le chemin planifié est MUET**, ce qui aggrave au lieu d'atténuer : `notify_cve_scan` appelle
+`send_webhook`, et `WEBHOOK_ENABLED` vaut `'false'` par défaut — mesuré **sans aucune variable
+webhook définie dans le conteneur servi, et aucune table `%webhook%`** (mesure du DSI, pas la
+mienne). Sa seule trace est un `_log.info` dans les journaux du conteneur.
+
+> **Le repli élargit la portée ; le silence retire la détection.** Ce ne sont pas deux défauts, c'est
+> un défaut **et l'absence de son garde-fou**. La formulation est du DSI et elle est meilleure que la
+> mienne : je cherchais un effet sortant et j'ai trouvé un effet **muet**, ce qui est pire pour un
+> geste qu'aucun humain ne regarde.
 
 **C'est la cinquième forme du motif « un repli qui retombe du côté permissif »**, et la plus large :
 les quatre autres (E-144, E-147, `preset`, `sudo`) ouvrent un **droit** ; celle-ci ouvre un
-**périmètre**, et son effet est **sortant et irréversible**.
+**périmètre**. Son effet n'est pas *sortant* au sens de §7 — **il est distant et irréversible** : les
+sessions SSH ouvertes sur des machines qui n'auraient pas dû être jointes ne se défont pas.
 
 Le correctif rend la branche `machines` **fail-closed** — une cible restreinte illisible ne scanne
 **rien** — et journalise en WARNING avec la valeur fautive. La propriété testée est la bonne :
