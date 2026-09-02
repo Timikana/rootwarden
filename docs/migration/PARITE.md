@@ -14927,3 +14927,86 @@ lui demande, et on lui a demandé la mauvaise chose.**
 
 **Remède** : pour un effet sortant, remonter la chaîne **jusqu'aux points d'entrée HTTP**, pas jusqu'au
 premier appelant. Une fonction sans effet propre peut porter l'effet de celle qu'elle importe.
+
+## E-305 — ⚠ un ARBITRAGE rendu au registre et jamais ENVOYÉ : le registre est une trace, pas un canal
+
+**Ma faute, et elle a coûté vingt minutes de blocage à une session.**
+
+J'ai tranché l'arbitrage de `/groupes`, l'ai inscrit (E-301, `64bd15a`), l'ai rendu à l'exploitant — **et
+ne l'ai jamais envoyé à la session qui l'attendait.** Elle m'a relancé une heure plus tard en écrivant
+*« `/groupes` attend toujours ta réponse »*, et sa file portait la ligne `BLOQUEE sur ton arbitrage`.
+
+> **C'est E-289 retourné contre moi.** Cet écart dit *« une réserve écrite dans un message ne survit pas
+> au relais »*. Le symétrique est aussi vrai et je ne l'avais pas vu : **une décision écrite dans le
+> registre et pas dans la main de la personne bloquée ne circule pas du tout.**
+
+**Le registre est une TRACE ; ce n'est pas un CANAL.** Y inscrire une décision la rend vérifiable et
+durable — *et n'informe personne.* Les deux gestes sont distincts et aucun ne remplace l'autre :
+
+    inscrire     rend la decision VERIFIABLE et DURABLE      -> registre
+    envoyer      rend la decision AGISSANTE                  -> le destinataire, nomme
+    rendre       rend la decision ARBITRABLE                 -> l'exploitant
+
+**J'ai fait le premier et le troisième, jamais le second** — et le troisième m'a donné le sentiment
+d'avoir bouclé, parce que rendre compte *ressemble* à transmettre.
+
+**Règle** : une décision qui débloque quelqu'un se **livre à cette personne d'abord**, et le registre
+vient après. *Le blocage se mesure chez le bloqué, pas chez l'arbitre.*
+
+## E-306 — un NOM à deux référents dans le même dépôt : `derive`
+
+    Navigation.php:98    ['cle' => 'drift',    …  'route' => 'derive-config']   <- le MODULE
+    DocumentationController.php:77   $derive = $entrees->firstWhere('cle','api_docs')   <- le PARTICIPE
+
+**`derive-config` est la route du module « dérive de configuration ».** `$derive` et les ancres
+`doc-derive-*` du contrôleur veulent dire *« ce qui est dérivé »*. **Même mot, deux référents, dans le
+même dépôt.**
+
+Une sonde de la session 7 cherchait `/derive-config` et mesurait donc l'entrée `drift`
+(`can_view_compliance`, **présente dès le rôle 2**) au lieu d'`api_docs` (garde `sa`). *Elle allait
+accuser le portage d'une incohérence qui n'existe pas.*
+
+> **Troisième piège par le NOM en vingt-quatre heures** — `_run_scheduled_scan` contre
+> `_run_scheduled_ssh_audit` (deux corps jumeaux), puis un mot à deux sens. **Ce n'est plus la structure
+> qui piège, c'est le vocabulaire.** Et un vocabulaire ambigu ne se corrige pas par une règle de
+> méthode : il se corrige en nommant les choses, ou en ne se fiant jamais au nom seul.
+
+**Ce qui l'a tranché en trois minutes est une construction, pas de la prudence** : l'assertion **nommait
+ce qu'elle comparait** — `pas de lien · entree presente`. *Un détail qui nomme les DEUX termes de la
+comparaison transforme un mystère en lecture.* Sans lui, elle cherchait dans la vue, qui n'avait rien.
+
+### Et ma propre formulation était fausse, corrigée par elle
+
+J'avais dit : *« `doc-derive-lien` n'existe qu'au rôle 3 »*. **Le contrôleur ne dérive pas du rôle, il
+dérive du menu** (`firstWhere('cle','api_docs')`, `:77-78`). Asserter sur le rôle serait **recopier la
+garde une troisième fois — dans le test** ; le commentaire du contrôleur (`:43`) refuse exactement ça
+pour la deuxième copie. **Comparer au menu du même compte est la seule forme qui survive à un changement
+de garde.**
+
+## E-307 — un détail dont la VALEUR est écrite au lieu d'être calculée
+
+    FAIL  la page ne demande RIEN au backend  — 119 requete(s) vue(s), 0 vers le backend
+
+**Le détail affirme ce que le verdict réfute.** Ce registre porte six occurrences de cette faute, toutes
+des détails **mal conditionnés** — affichés du mauvais côté d'un `if`. **Celle-ci est d'une autre
+cause** : le détail est bien conditionné, mais sa **valeur** (`0 vers le backend`) est **écrite en dur**
+au lieu d'être calculée depuis l'état mesuré.
+
+> La règle disait *« un détail qui ne vaut que pour UN verdict se conditionne à ce verdict »*. Elle ne
+> couvrait pas la forme où le conditionnement est correct **et le contenu inventé.**
+
+**Règle élargie** : *un détail se **calcule** à partir de l'état mesuré ; il ne se **rédige** jamais à
+partir de l'intention.* Un FAIL qui affirme la propriété qu'il vient de nier fait chercher au mauvais
+endroit — coût mesuré ici : deux minutes à se demander pourquoi une condition vraie rendait un échec.
+
+## E-308 — `go-page-documentation` est posée, et rejouée APRÈS correction
+
+    go-page-documentation   laravel  24 PASS · 0 FAIL   03:09:49 -> 03:11:32
+                            legacy   13 PASS · 0 FAIL   03:07:42 -> 03:09:01   (acfec36)
+
+**Le laravel a été rejoué parce que le fichier avait changé depuis la première mesure.** *Une référence
+prise sur un fichier qui a bougé depuis n'est plus une mesure* — geste fait sans qu'on le demande.
+
+Troisième occurrence de `verifie` employé là où `verifiePortage` s'impose (après `accueil` et
+`audit-ssh`) : **3 FAIL qui accusaient le legacy d'un manque d'outillage.** *Il ne suffit pas de
+connaître la correction : il faut la chercher à chaque table de sélecteurs qui porte des `null`.*
