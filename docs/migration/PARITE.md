@@ -16103,3 +16103,109 @@ inscrits avec leurs objets :
 
 **Du point de vue de l'exploitant, un arbitrage et une signature sont la même interruption** — le
 compte à lui rendre est **quinze**, et il se rend avec ses quinze objets.
+
+## E-330 — ⚠⚠ LE REDÉMARRAGE N'EST PAS DE L'HYGIÈNE : C'EST LA SEULE CHOSE QUI METTRAIT UNE GARDE DEVANT `POST /deploy`
+
+**Trois faits mesurés, chacun avec son témoin, et c'est leur composition qui compte.**
+
+### 1. Les six secrets du parc sont DÉCHIFFRABLES aujourd'hui
+
+    TEMOIN : aller-retour `encrypt_password` / `decrypt_password`  ->  INSTRUMENT SAIN
+
+    id 1  srv-zabbix             password DECHIFFRABLE   root_password DECHIFFRABLE
+    id 2  Test-Server-Debian     DECHIFFRABLE            DECHIFFRABLE
+    id 3  OpenCVE-Test-OnPrem    DECHIFFRABLE            DECHIFFRABLE
+
+    secrets non vides : 6   DECHIFFRABLES : 6
+
+**Donc la protection ACCIDENTELLE qui a arrêté le déploiement du 27/08 n'existe plus.** Celui-ci était
+tombé à la phase de vérification des mots de passe (E-326) ; **un `POST /deploy` lancé maintenant
+franchirait cette étape.**
+
+> ⚠ **Ma première mesure disait « 0 déchiffrable » — l'inverse.** J'appelais `e.decrypt()`, méthode
+> **inexistante** ; chaque appel levait `AttributeError`, que mon `except Exception` avalait et rendait
+> comme « ECHEC ». **C'est un `|| true` dans un garde, en Python.** *Et le zéro allait dans le sens
+> rassurant : sans le témoin d'aller-retour, j'aurais annoncé que la protection tient.*
+
+### 2. ⚠ EN SERVICE, `POST /deploy` N'A QUE LA CLÉ D'API
+
+    EN SERVICE (47e5f11)              DANS L'ARBRE
+      @bp.route('/deploy', POST)        @bp.route('/deploy', POST)
+      @require_api_key                  @require_api_key
+      @threaded_route                   @require_role(2)          # E-191
+                                        @require_machine_access   # E-191
+
+    TEMOIN : `GET /ssh-audit/policies` porte bien `@require_permission` -> la sonde voit les gardes
+
+**Le correctif d'E-191 est écrit, commité, et INERTE** — parce que le processus n'a pas redémarré.
+
+### 3. La composition, et c'est elle qu'il faut lire
+
+    la cle d'API seule suffit a invoquer POST /deploy        (en service)
+  + les six secrets sont dechiffrables                       (mesure ci-dessus)
+  + le geste ouvre une session SSH ROOT par machine cochee et REVOQUE des cles
+  = un porteur de la cle d'API atteint le parc entier, `srv-zabbix` comprise
+
+> **J'ai présenté le redémarrage comme « ce qui débloque `wazuh` et rend effectifs les correctifs
+> préparés ». C'est vrai et c'est secondaire.** *Le redémarrage est la seule chose qui mettrait un
+> contrôle de rôle devant un déploiement root sur la production.*
+>
+> **Et j'avais retiré cette nuit un argument de signature parce qu'il était faux. En voici un qui est
+> mesuré** — avec ses témoins, et sans effet de bord inventé.
+
+**Réserve dite, parce qu'elle borne le remède** : `require_machine_access` rend `True` sans condition
+dès `role_id >= 2` (relevé antérieur du registre). **Après redémarrage, la garde effective est donc
+`clé d'API + rôle ≥ 2`, pas une borne par machine.** *C'est mieux que la clé seule ; ce n'est pas une
+autorisation par cible.*
+
+## E-331 — `wazuh` n'est PAS bloquée en lecture : troisième fois que la même inférence coûte une page
+
+Relevé par la session 8, **vérifié en ancrant sur les routes** :
+
+    commit servi : c241eb0 (27/08 11:46, avant StartedAt 14:28)
+
+    GET en SERVICE                        GET dans l'ARBRE
+      /wazuh/config                         /wazuh/config
+      /wazuh/servers                        /wazuh/servers
+      /wazuh/options                        /wazuh/options
+      /wazuh/rules                          /wazuh/rules
+      /wazuh/rules/<name>                   /wazuh/rules/<name>
+                        -> IDENTIQUES
+
+    les 3 hunks du diff : `_upsert_agent` · un script d'installation · `uninstall`
+                        -> AUCUN ne touche un GET
+
+**Le backend en service répond déjà à tout ce dont une page en lecture a besoin.** *Nous comptions
+`wazuh` bloquée depuis cinq jours sur une inférence : « le module est postérieur, donc inutilisable ».*
+
+> **Postérieur ne veut pas dire absent : il veut dire DIFFÉRENT, et la différence ne portait pas sur la
+> lecture.**
+
+**Troisième fois cette nuit que le même raisonnement coûte une page** — `comptes-distants` et `pare-feu`
+étaient portées et le menu ne les atteignait pas ; `wazuh` était portable et nous la comptions bloquée.
+**Trois fois, une propriété INFÉRÉE au lieu d'être mesurée sur l'artefact.**
+
+*Note d'exactitude : la session 8 annonçait le commit servi `6663e83` ; ancré sur le fichier, c'est
+`c241eb0`. **Son identifiant était faux, sa conclusion juste** — même forme que sa description de ma
+mémoire il y a deux heures.*
+
+**Dispatché : `wazuh` R1 en lecture seule, les neuf gestes d'écriture déclarés absents**, sur le modèle
+`groupes` R1 / `audit-ssh` A1. **À sa bascule, le menu sera à 32/32 et le legacy n'aura plus une seule
+entrée.**
+
+## E-332 — `OpenCVE-Test-OnPrem` est un banc d'essai, et l'exploitant a démenti la session 8
+
+Elle avait écrit : *« un service dont le produit dépend, pas une cible pour un geste destructeur »*.
+**Faux, et l'exploitant l'a corrigée.**
+
+> *J'avais déduit une criticité MÉTIER d'une dépendance de CONFIGURATION (`OPENCVE_URL` pointe dessus) ;
+> le produit pointe sur elle **parce qu'**elle est le banc d'essai.*
+
+**Conséquence, et elle inverse sa recommandation** : pour un futur test de déploiement, **la machine 3
+vaut mieux que la 2** — `pk=0` et `sa=0` comme elle, donc rien à révoquer, **mais c'est une machine
+RÉELLE**. *Les deux défauts que ce dépôt a payés sur le déploiement — `AllowUsers` et le conflit lexical
+des `sudoers.d` — sont des propriétés d'un hôte réel qu'un conteneur ne reproduit pas.* **Tester sur la 2
+validerait un déploiement qui échouerait encore.**
+
+**Ceci reste un arbitrage, pas une recommandation d'exécution** : aucun test de déploiement n'est lancé
+sans le mot de l'exploitant, et E-330 dit pourquoi c'est plus vrai aujourd'hui qu'hier.
