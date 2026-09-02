@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.147** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.148** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,34 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.148 — couverture du rendu : des paramètres, pas des séquences — et les 216 sont dans le legacy
+
+**E-295.** La question « quelles séquences méritent leur propre sonde » était mal posée : *la plupart
+des candidats ne sont pas des séquences, ce sont des **paramètres**. Une séquence se conçoit, se
+maintient et se périme ; un paramètre se rejoue.* Rejouer les mêmes assertions dans une autre langue,
+à une autre largeur, sous un autre rôle, sur une table vide ne coûte pas une assertion de plus. Le
+meilleur rapport est la **langue** — les libellés changent de longueur, donc la troncature aussi.
+
+**Une seule famille mérite une séquence**, et la règle CSS le prouve : `.rw-annonce:empty { display:
+none; }` (`rw.css:1139`). Une annonce vide n'occupe aucune hauteur ; la remplir en donne une et
+déplace tout ce qui suit — mécanisme d'E-241, qui n'apparaissait **pas au chargement** mais après un
+enregistrement refusé. Aucun paramètre ne le reproduit : il faut provoquer le refus.
+
+**⚠ Et les 216 bascules de `hidden` sont dans le LEGACY** : 159/29 fichiers côté `legacy/` (motif
+simple ; 216/24 par arbre syntaxique), **0 côté `laravel/`**. Le portage emploie un vocabulaire `rw-*`
+(`rw-erreur`, `rw-onglet--actif`, `rw-journal--vide`, `rw-resultat--externe`). *La population de 216
+meurt avec le legacy* — une propriété générique conçue pour elle viserait un ensemble qui n'existera
+pas à la v2.0. Le remède reste bon, sa cible change. **Vérifier le périmètre d'un chiffre avant de
+dimensionner un remède sur lui.**
+
+**Un témoin a évité l'erreur inverse** : mon premier motif rendait `0` sur `laravel/` — sans témoin,
+un `0` juste et un `0` d'instrument aveugle se lisent pareil.
+
+**Douze `scrollIntoView` ne demandent aucune sonde** : *une relation bien choisie remplace douze
+scénarios, seule économie qui ne coûte rien en couverture.* Et la session 6 a déclaré, non sollicitée,
+que son propre dénombrement d'annonces (88 dans 5 fichiers, **dont 76 dans un seul**) est un défaut
+d'instrument jusqu'à preuve du contraire, et **qu'il n'est pas la base de sa décision**.
 
 ### v1.38.147 — 29/32, et un exemple chiffré dans un commentaire vieillit tout seul
 
