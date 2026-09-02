@@ -3958,3 +3958,102 @@ mesure et une clôture — et personne ne rouvre ce qui porte les deux.**
 relecture croisée — ça le déplace.* **Ce qui a effectivement arrêté les trois fautes cette nuit, ce n'est
 aucune de nos disciplines : c'est qu'une session a refusé un ordre, qu'une autre a mesuré autrement, et
 qu'une troisième a relu son propre geste.**
+
+---
+
+## ⚠⚠ E-344 (à numéroter) — l'écran des CGU demande d'accepter des conditions QU'IL N'AFFICHE PAS
+
+**Trouvé en cliquant, le 2026-09-02 à 20:1x**, sur demande de l'exploitant que je pilote Puppeteer
+moi-même plutôt que de lire du code. **Fenêtre de banc accordée par la session 7.**
+
+### Le parcours, cliqué
+
+    /connexion  ->  rw-test-super + mot de passe        ->  /second-facteur
+    /second-facteur  ->  code TOTP                      ->  /cgu
+    /cgu  ->  « J'accepte »                             ->  portail
+
+### Ce que `/cgu` affiche, texte intégral du corps
+
+    « Conditions d'utilisation »
+    « Derniere etape avant l'acces au portail. »
+    1. Identifiants   2. Second facteur   3. Acces
+    [ Refuser et se deconnecter ]   [ J'accepte ]
+
+**152 caractères en tout. Aucune condition.**
+
+> **La page demande un consentement à des termes qu'elle ne montre pas.** *Le bouton s'appelle
+> « J'accepte » et il n'y a rien à accepter.*
+
+### ⚠ Ce n'est PAS ma correction qui a vidé la page — vérifié
+
+    git show c4f1639~1:...cgu.blade.php  |  grep "__('"
+      -> cgu_titre · cgu_sous_titre · cgu_accepter · cgu_refuser
+         etape_identifiants · etape_second_facteur · etape_acces
+         + socle_avertissement
+
+    aujourd'hui : les MEMES, sans socle_avertissement
+
+**Avant ma correction, la page portait exactement les mêmes clés plus l'avertissement de migration.**
+*Il n'y a jamais eu de conditions.* **Ma correction a retiré la seule prose de la page — elle n'a pas
+retiré les conditions, elle a rendu leur absence visible.**
+
+> **Et c'est le seul mérite de cette correction que je n'avais pas prévu** : *l'encart faux servait de
+> remplissage. Il donnait à la page l'apparence d'avoir un contenu, donc personne ne remarquait qu'elle
+> n'en avait pas.* **Une phrase fausse masquait un manque.**
+
+### Aucun de nos dispositifs ne pouvait le voir
+
+**Toutes les clés se rendent correctement**, la parité FR/EN est tenue, aucune clé n'est morte, et une
+assertion DOM sur `cgu-accepter` passe. *Le défaut n'est pas qu'une clé manque : c'est qu'**aucune clé de
+conditions n'a jamais été écrite**.*
+
+> **Quatrième défaut du chantier qui n'existe qu'à l'image** — et le premier que j'aie vu moi-même
+> plutôt que rapporté.
+
+### Ce que je ne tranche pas
+
+**Ce n'est pas un arbitrage de portage : c'est une question de consentement.** *Un écran de CGU sans CGU
+peut être un oubli de contenu, un renvoi manquant vers un document externe, ou une page qui n'aurait pas
+dû exister.* **Aucune de ces trois réponses ne m'appartient**, et le legacy n'offre aucun équivalent à
+comparer — `grep -rln "conditions d'utilisation" legacy/` rend **zéro**.
+
+**Remonté à l'exploitant sans recommandation.**
+
+---
+
+## ✅ `wazuh` R1 — la page la mieux déclarée du chantier, et personne ne la couvre
+
+**Cliquée dans la même fenêtre.** *Réponse à la question de la session 7 : la liste vide s'affiche comme
+un ÉTAT, pas comme un vide.*
+
+    AGENT                 ID   STATUT        VERSION  GROUPE  ENV
+    srv-zabbix            —    aucun agent   —        —       PROD
+    OpenCVE-Test-OnPrem   —    aucun agent   —        —       DEV
+    Test-Server-Debian    —    aucun agent   —        —       DEV
+
+**Les trois machines sont listées avec « aucun agent ».** *`wazuh_agents` porte zéro ligne, et la page ne
+rend pas un tableau vide : elle rend le parc et dit que rien n'y est installé.* **« Zéro mesuré » est
+distingué de « je n'ai pas su lire », sans que personne le lui ait demandé.**
+
+**Et sur les secrets, elle est exemplaire :**
+
+    Mot de passe d'enrolement   « une valeur chiffree est enregistree »
+    Mot de passe API            « aucune valeur enregistree »
+    champs <input> dans le panneau : ZERO
+
+*La présence est décrite, la valeur jamais montrée, et il n'y a rien à soumettre.*
+
+**Sa déclaration de manque nomme les neuf gestes et porte une réserve que je n'attendais pas :**
+
+> *« Trois de ces gestes n'ont pas l'effet que leur nom suggère, **y compris sur l'ancien portail** :
+> changer le groupe ne transmet pas le groupe à la machine, et enregistrer des options ou une règle
+> n'atteint aucun serveur. »*
+
+**Une page portée qui documente les défauts du legacy qu'elle remplace.** *C'est l'inverse exact des six
+déclarations fausses trouvées aujourd'hui.*
+
+**Ancres pour la session 7** : `wazuh-portee` · `wazuh-non-porte` · `wazuh-np-liste` · `wazuh-np-reserve`
+· `wazuh-np-lien` · `wazuh-config` · `wazuh-agents` · `wazuh-agent` (×3) · `wazuh-serveur` ·
+`wazuh-options` · `wazuh-regles` · `wazuh-regle` (×3).
+
+**Rendu à 390 px : correct** — navigation repliée, cartes empilées, aucun débordement horizontal.
