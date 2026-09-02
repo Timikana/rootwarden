@@ -2732,3 +2732,62 @@ failli publier une alarme d'instrument à toute la flotte.
 
 > **Le témoin a fait son travail : il m'a dit que le problème n'était pas là. J'ai cherché ailleurs plutôt
 > que de relire mon motif.** *Un témoin ne protège que si on accepte ce qu'il dit quand il innocente.*
+
+### ⚠⚠ Suite de la rétractation — la phrase est VRAIE chez elle, et j'ai failli faire corriger cinq documents JUSTES
+
+**Mesuré le 2026-09-02, 02:5x UTC.** Ma rétractation ci-dessus est exacte **pour le scheduler**. Elle
+serait **fausse appliquée ailleurs**, et la phrase vit dans **cinq autres documents** que je n'écris pas.
+
+    backend/mail_utils.py:194   def send_cve_report(...)   -> un VRAI courriel SMTP, rapport HTML
+    seul appelant :             backend/routes/cve.py:77
+    backend/routes/groups.py:278  ->  _stream_cve_scan  (importe de routes.cve)   -> DONC courriel aussi
+    backend/scheduler.py          ->  scan_server direct + webhook  -> AUCUN courriel
+
+    MAIL_ENABLED : `true` dans l'environnement SERVI (verifie par printenv dans le conteneur)
+
+### Le discriminant, et il tient en une ligne
+
+> **Ce n'est pas « le scan CVE envoie un courriel » ou non : c'est PAR OÙ il est lancé.**
+>
+> | chemin | courriel |
+> |---|---|
+> | route `/cve/...` | **oui**, un par machine **à résultats** |
+> | action groupée `cve_scan` | **oui** — `groups.py` importe `_stream_cve_scan` de `routes.cve` |
+> | **scheduler** (planifié) | **non** — webhook unique, `critical`/`high` en dur à `0` |
+
+**`MODULE-GROUPS.md:357` est exact, au mot près** : *« un vrai courriel par machine à résultats »*. **Le
+`à résultats` compte** — l'appel est sous `elif event['type'] == 'done' and all_findings:`. *Ce document
+avait mesuré ; c'est en le recopiant hors de son contexte que la phrase est devenue fausse.*
+
+### ⚠ L'inversion, et c'est le vrai résultat de ce tour
+
+> **Les deux chemins qui ont un humain devant l'écran envoient un courriel. Le seul qui tourne sans
+> personne n'en envoie pas** — et sa seule notification est un webhook qui, `critical=0` et `high=0`
+> étant passés en dur, **ne peut jamais alarmer.**
+>
+> *Nous cherchions tous quelle tâche fait le plus de bruit. C'est celle qu'on regarde. Celle qu'on ne
+> regarde pas est muette.*
+
+### Ce que j'ai failli faire, et pourquoi je l'inscris
+
+**J'avais une rétractation juste et cinq documents à corriger.** *Si je l'avais diffusée telle quelle,
+j'aurais fait corriger `MODULE-GROUPS.md` — qui était juste — en une version fausse, avec mon autorité
+de DSI derrière.*
+
+> **Une rétractation se propage plus vite et avec moins de résistance qu'une affirmation** : personne ne
+> conteste quelqu'un qui reconnaît une erreur. **C'est précisément ce qui la rend dangereuse quand elle
+> est trop large.** *Le contrôle qui l'a arrêtée est le même que d'habitude — chercher toutes les
+> occurrences avant de corriger la première.*
+
+### Ce qui reste à corriger, et par qui
+
+| document | ligne | verdict |
+|---|---|---|
+| `PLAN-DE-MIGRATION.md` | 4045 | **FAUX** — attribue le courriel au *repli du scheduler* (`a345e65`) |
+| `AUDIT-BRANCHE-BACKEND-CVE.md` | 184 | **à vérifier** — s'il parle du scheduler, faux |
+| `PLAN-DE-MIGRATION.md` | 1747 | **à vérifier par son auteur** — parle de S7b ; si S7b passe par la route, **vrai** |
+| `MODULE-GROUPS.md` | 178, 357 | **JUSTE — ne pas y toucher** |
+
+**Je ne corrige aucun d'eux : ils sont hors de mon périmètre d'écriture.** *Je nomme le discriminant et
+je laisse chaque auteur trancher son propre texte* — c'est ce que la charte §7.0 me demande, et c'est
+aussi ce qui évite qu'une correction de masse remplace une erreur par une autre.
