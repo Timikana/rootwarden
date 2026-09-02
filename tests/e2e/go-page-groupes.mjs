@@ -10,6 +10,11 @@
  * ║  pas du vide** — c'etait une ligne blanche avant R1, et c'est la seule   ║
  * ║  propriete de cette page qu'un « rend 200 » ne verrait pas.              ║
  * ║                                                                          ║
+ * ║  ⚠ CE CADRE A ETE ECRIT AVANT R2 ET R3. Depuis, cette suite POSE une     ║
+ * ║  fixture — deux groupes STATIQUES et inertes, voir plus bas — et le      ║
+ * ║  refus ci-dessous ne porte plus que sur le cas DYNAMIQUE, qui reste      ║
+ * ║  entier : un groupe dont les filtres sont rejetes resout le PARC.       ║
+ * ║                                                                          ║
  * ║  **Mesure du 2026-09-02 : `machine_groups` porte ZERO ligne.** Il        ║
  * ║  n'existe aucun groupe. Une assertion ecrite ici serait verte sur l'etat ║
  * ║  vide **sans jamais toucher la propriete** — le vert par absence, sur la ║
@@ -90,7 +95,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -132,6 +137,75 @@ const TEMOIN = '/temoin-e2e-inexistant';
  * et quelle suite l'a laisse passer. Un temoin anonyme ne se remonte pas.
  */
 const TEMOIN_NOM = 'e2e-annonce-non-confirmee';
+
+/*
+ * ══ FIXTURE R3 — DEUX GROUPES INERTES, POSES EN BASE ══════════════════════
+ *
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  SI CETTE SUITE MEURT SANS NETTOYER, RETIRER A LA MAIN :                 ║
+ * ║                                                                          ║
+ * ║    DELETE FROM rootwarden.machine_group_members WHERE group_id IN       ║
+ * ║      (SELECT id FROM rootwarden.machine_groups                          ║
+ * ║       WHERE name LIKE 'e2e-derive-%');                                  ║
+ * ║    DELETE FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%';║
+ * ║                                                                          ║
+ * ║  ⚠ CE CADRE A PORTE UNE COMMANDE QUI NE MARCHAIT PAS. La forme           ║
+ * ║    `DELETE m FROM … JOIN …` leve `ERROR 1046: No database selected`      ║
+ * ║    meme avec des tables PLEINEMENT QUALIFIEES — un DELETE multi-tables   ║
+ * ║    exige une base par defaut, et `mysql -e` n'en a pas. **Une commande   ║
+ * ║    de secours fausse est pire qu'absente** : on la lance, elle echoue    ║
+ * ║    en silence si l'on ne lit pas stderr, et l'on croit avoir nettoye.    ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ *
+ * POURQUOI EN BASE ET NON PAR L'INTERFACE : le filet de cette suite avorte
+ * tout non-GET vers `/groups`. Creer la fixture par le formulaire ferait donc
+ * avorter sa propre creation — et l'assouplir pour l'occasion reviendrait a
+ * desarmer le garde qu'on est venu verifier.
+ *
+ * POURQUOI STATIQUES, ET POURQUOI CES DEUX-LA :
+ *
+ *   `_member_ids` resout un groupe STATIQUE par `machine_group_members`, une
+ *   liste explicite. Un groupe DYNAMIQUE passe par `_sanitize_filters`, et un
+ *   filtre entierement rejete se stocke en `{}` — le meme objet qu'un groupe
+ *   sans critere, donc `1=1`, donc LE PARC ENTIER. **Poser une telle fixture
+ *   ferait exister, meme brievement, un groupe dont un scan viserait
+ *   `srv-zabbix`.** On ne la pose pas.
+ *
+ *   UN  : un seul membre, la machine 2 (Test-Server-Debian, DEV). Le panneau
+ *         doit annoncer 1, ne nommer AUCUNE production, et OFFRIR la
+ *         confirmation — qu'on ne prend jamais.
+ *   VIDE: aucun membre. C'est la branche FAIL-CLOSED : le panneau doit dire
+ *         pourquoi et **ne pas offrir** le lancement. Un groupe vide ne peut
+ *         rien scanner : c'est la fixture la plus sure du chantier, et elle
+ *         couvre la propriete qui se perdrait la premiere si quelqu'un
+ *         « simplifiait » le panneau.
+ */
+const FIXTURE_UN = 'e2e-derive-un';
+const FIXTURE_VIDE = 'e2e-derive-vide';
+const MACHINE_SURE = 2;
+
+/**
+ * Un libelle LU dans le catalogue, jamais recopie ici : une chaine recopiee
+ * fige la valeur du jour et l'assertion devient verte sur un ecran qui ne dit
+ * plus rien. Rend `null` si la cle est absente — une assertion qui recoit
+ * `null` s'abstient au lieu de conclure.
+ *
+ * ⚠ LES DEUX FORMES DE GUILLEMETS : `lang/fr/groups.php` melange `'...'` et
+ *   `"..."`. Une version qui ne lit que la premiere rendrait `null` sur la
+ *   moitie des cles, et chaque assertion se declarerait SANS OBJET — un vert
+ *   par abstention, sur la seule chose que l'etape mesure.
+ */
+function libelle(cle) {
+    try {
+        const chemin = new URL('../../laravel/lang/fr/groups.php', import.meta.url).pathname;
+        const texte = readFileSync(chemin, 'utf8');
+        const simple = texte.match(new RegExp(`'${cle}'\\s*=>\\s*'((?:[^'\\\\]|\\\\.)*)'`));
+        if (simple) return simple[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+        const double = texte.match(new RegExp(`'${cle}'\\s*=>\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+
+        return double ? double[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\') : null;
+    } catch { return null; }
+}
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
 
 const C = CIBLE === 'laravel'
@@ -186,6 +260,9 @@ let groupesAvant = null;
  * ANNONCE une couverture. Le drapeau distingue les deux cas.
  */
 let nomSaisi = false;
+/* La fixture R3 a-t-elle ete POSEE ? `false` = rien a retirer, et le nettoyage
+ * doit alors se declarer SANS OBJET plutot que d'annoncer une restauration. */
+let fixturePosee = false;
 function verifiePortage(l, ok, d) {
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
@@ -350,6 +427,68 @@ try {
     verifie('la session a tenu', ! s.surConnexion, s.page.url());
     if (s.surConnexion) throw new Error('session non etablie');
     const page = s.page;
+
+    /*
+     * ══ POSE DE LA FIXTURE R3, AVANT LE PREMIER CHARGEMENT ════════════════
+     *
+     * Deux groupes STATIQUES et inertes — voir le cadre en tete. Ils sont poses
+     * ICI et non plus tot pour que la page les rende des son premier
+     * chargement : creer puis recharger mesurerait le rechargement autant que
+     * la page.
+     *
+     * `CIBLE === 'laravel'` seulement : R3 n'existe pas sur le legacy, et poser
+     * une fixture qu'aucune assertion ne lira serait une ecriture gratuite.
+     */
+    if (CIBLE === 'laravel') {
+        try {
+            /*
+             * ⚠ FIXTURE EN ASCII PUR. Un tiret cadratin ecrit par `mysql -e`
+             *   est ressorti `â€"` a l'ecran (mesure du 2026-09-02 23:47) : la
+             *   chaine part en UTF-8 et la connexion ne l'est pas. Ce n'est PAS
+             *   un defaut de la page — les donnees ecrites par l'application y
+             *   passent par un autre chemin — mais une fixture qui affiche du
+             *   charabia fait suspecter la page qu'elle sert a mesurer.
+             */
+            litEnBase('DELETE FROM rootwarden.machine_group_members WHERE group_id IN '
+                + "(SELECT id FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%')");
+            litEnBase("DELETE FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%'");
+            litEnBase("INSERT INTO rootwarden.machine_groups (name, description, group_type, filters) "
+                + `VALUES ('${FIXTURE_UN}', 'fixture e2e R3 - un seul membre', 'static', '{}')`);
+            litEnBase("INSERT INTO rootwarden.machine_groups (name, description, group_type, filters) "
+                + `VALUES ('${FIXTURE_VIDE}', 'fixture e2e R3 - aucun membre', 'static', '{}')`);
+            litEnBase('INSERT INTO rootwarden.machine_group_members (group_id, machine_id) '
+                + `SELECT id, ${MACHINE_SURE} FROM rootwarden.machine_groups WHERE name = '${FIXTURE_UN}'`);
+            const poses = compteEnBase(
+                "SELECT COUNT(*) FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%'");
+            const membres = compteEnBase(
+                'SELECT COUNT(*) FROM rootwarden.machine_group_members m '
+                + `JOIN rootwarden.machine_groups g ON g.id = m.group_id WHERE g.name = '${FIXTURE_UN}'`);
+            fixturePosee = poses > 0;
+            /*
+             * ON VERIFIE LA POSE PLUTOT QUE DE LA CROIRE. Une fixture absente
+             * rendrait les assertions R3 vertes a vide — « aucune carte, donc
+             * aucun lancement » est vrai et ne mesure rien.
+             */
+            verifie('la fixture R3 est posee : 2 groupes, 1 membre',
+                poses === 2 && membres === 1,
+                `${poses} groupe(s) et ${membres} membre(s) : les assertions R3 seraient vertes a vide`,
+                `${poses} groupe(s), ${membres} membre(s)`);
+            /*
+             * ET LA MACHINE VISEE N'EST PAS LA PRODUCTION. Le `2` est ecrit
+             * dans une constante, mais un identifiant n'est pas une identite :
+             * on relit le NOM avant de s'en servir.
+             */
+            const cible = litEnBase(
+                `SELECT CONCAT(name,'|',COALESCE(environment,'?')) FROM rootwarden.machines WHERE id = ${MACHINE_SURE}`);
+            verifie('la machine de la fixture n\'est PAS la production',
+                cible.length === 1 && ! /^srv-zabbix\|/.test(cible[0]),
+                `machine ${MACHINE_SURE} = ${cible[0] || '(absente)'}`,
+                cible[0] || '(absente)');
+        } catch (e) {
+            verifie('la fixture R3 est posee', false, String(e.message || e).split('\n')[0]);
+        }
+    }
+
     await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
     await dors(1200);
 
@@ -552,6 +691,154 @@ try {
 
     // ══ 4. LE TEMOIN, PUIS LA FERMETURE PAR L'ABSENCE ════════════════════
     let temoinVu = false;
+    await etape('R3 : le scan de masse annonce le RESOLU, et cette suite ne lance pas', async () => {
+        if (CIBLE !== 'laravel') {
+            constate('scan de derive de masse', 'SANS OBJET — R3 n\'existe que sur le portage');
+
+            return;
+        }
+        const nLibelle = libelle('resolu_nombre');
+        const vLibelle = libelle('der_vide');
+        if (nLibelle === null || vLibelle === null) {
+            constate('scan de derive de masse',
+                'SANS OBJET — un libelle du catalogue est illisible ; comparer a une chaine'
+                + ' recopiee ici mesurerait ma prose et non l\'ecran');
+
+            return;
+        }
+        /*
+         * LE NOMBRE, EXTRAIT PAR LE FORMAT DU CATALOGUE. `:n` y est le
+         * marqueur ; on le remplace par une capture plutot que d'ecrire une
+         * expression a la main, pour que l'assertion suive le libelle si sa
+         * formulation change.
+         */
+        const motifNombre = new RegExp(nLibelle
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            .replace(':n', '(\\d+)'));
+
+        const avantR3 = passees.length;
+        const cartes = await page.evaluate(() => [...document.querySelectorAll('[data-rw="groupes-carte"]')]
+            .map((c) => {
+                const t = c.querySelector('h2');
+
+                return (t ? t.innerText : '').trim();
+            }));
+        constate('cartes rendues', cartes.join(' · ') || '(aucune)');
+
+        for (const cas of [
+            { nom: FIXTURE_UN, attendu: 1, confirme: true,
+                dit: 'annonce le nombre RESOLU et offre la confirmation' },
+            { nom: FIXTURE_VIDE, attendu: 0, confirme: false,
+                dit: 'FAIL-CLOSED : dit pourquoi et n\'offre PAS le lancement' },
+        ]) {
+            if (! cartes.includes(cas.nom)) {
+                verifie(`la carte « ${cas.nom} » est rendue`, false,
+                    `fixture absente de l'ecran : ${cartes.join(' · ') || '(aucune carte)'}`);
+                continue;
+            }
+            const n = passees.length;
+            const ouvert = await page.evaluate((nom) => {
+                const carte = [...document.querySelectorAll('[data-rw="groupes-carte"]')]
+                    .find((c) => { const t = c.querySelector('h2'); return t && t.innerText.trim() === nom; });
+                if (! carte) return false;
+                const b = carte.querySelector('[data-rw="groupes-derive"]');
+                if (! b) return false;
+                b.scrollIntoView({ block: 'center' });
+
+                return true;
+            }, cas.nom);
+            if (! ouvert) {
+                verifie(`« ${cas.nom} » offre le geste de scan de derive`, false,
+                    'aucun bouton `groupes-derive` sur la carte');
+                continue;
+            }
+            /*
+             * CLIC SIMULE, pas un appel de fonction : c'est le geste de
+             * l'exploitant qu'on mesure, pas la fonction qu'il declenche.
+             */
+            const cible = await page.$(`[data-rw="groupes-carte"] [data-rw="groupes-derive"]`);
+            const boutons = await page.$$('[data-rw="groupes-derive"]');
+            const idx = cartes.indexOf(cas.nom);
+            const bouton = boutons[idx] || cible;
+            await bouton.click();
+            await dors(1200);
+
+            const vu = await page.evaluate((sel) => {
+                const p = document.querySelector(sel.panneau);
+                const e = document.querySelector(sel.panneauEffets);
+                const c = document.querySelector(sel.panneauConfirmer);
+
+                return {
+                    ouvert: p !== null && p.offsetParent !== null,
+                    texte: e ? (e.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                    confirme: c !== null && c.offsetParent !== null,
+                };
+            }, C);
+            const emises = passees.slice(n);
+            const litMembres = emises.some((p) => p.methode === 'GET' && /\/groups\/\d+\/members/.test(p.route));
+            constate(`« ${cas.nom} »`, `panneau ${vu.ouvert ? 'ouvert' : 'FERME'}, confirmation `
+                + `${vu.confirme ? 'offerte' : 'absente'}, ${emises.length} requete(s)`);
+
+            /*
+             * ⚠ LA PROPRIETE DE FOND : LE NOMBRE VIENT DU SERVEUR.
+             *
+             * Un groupe dont tous les filtres ont ete rejetes se stocke en `{}`,
+             * soit `1=1`, soit LE PARC ENTIER. Un resume de filtres afficherait
+             * « aucun critere » et laisserait croire a une selection. Seule la
+             * RESOLUTION distingue « mes trois serveurs de test » de « tout ».
+             * On mesure donc que l'appel de resolution PART — si quelqu'un
+             * remplaçait l'annonce par un compte calcule dans la page, ce GET
+             * disparaitrait et cette assertion rougirait.
+             */
+            verifie(`« ${cas.nom} » : le nombre est RESOLU par le serveur`,
+                litMembres,
+                'aucun GET /groups/<id>/members : l\'annonce ne vient pas d\'une resolution',
+                emises.map((p) => `${p.methode} ${p.route}`).join(' | ') || 'aucune requete');
+
+            if (cas.attendu > 0) {
+                const m = vu.texte.match(motifNombre);
+                verifie(`« ${cas.nom} » : l'annonce porte ${cas.attendu}`,
+                    m !== null && Number(m[1]) === cas.attendu,
+                    m === null ? `aucun nombre annonce dans « ${vu.texte.slice(0, 80)} »`
+                        : `annonce ${m[1]}, la base en resout ${cas.attendu}`,
+                    m ? `${m[1]} serveur(s)` : '');
+                /*
+                 * ET AUCUNE PRODUCTION NOMMEE : la fixture ne porte que la
+                 * machine 2. Si `srv-zabbix` y apparaissait, ce ne serait pas
+                 * un defaut d'affichage — ce serait que le groupe resout autre
+                 * chose que ce qu'on y a mis.
+                 */
+                verifie(`« ${cas.nom} » : aucune machine de production n'est nommee`,
+                    ! /srv-zabbix/i.test(vu.texte),
+                    `la production est nommee dans l'annonce : « ${vu.texte.slice(0, 120)} »`);
+            } else {
+                verifie(`« ${cas.nom} » : la raison du refus est DITE`,
+                    vu.texte.includes(vLibelle),
+                    `le panneau ne dit pas pourquoi : « ${vu.texte.slice(0, 100)} »`);
+            }
+            verifie(`« ${cas.nom} » : la confirmation est ${cas.confirme ? 'OFFERTE' : 'REFUSEE'}`,
+                vu.confirme === cas.confirme,
+                cas.confirme ? 'aucun bouton de lancement : le geste serait deja parti ou impossible'
+                    : 'le lancement est OFFERT sur une portee que le panneau ne sait pas dire');
+
+            // On referme SANS JAMAIS confirmer.
+            const fermer = await page.$(C.panneauFermer);
+            if (fermer) { await fermer.click(); await dors(400); }
+        }
+
+        /*
+         * AU RESEAU, ET C'EST LE CONTROLE QUI COMPTE : annoncer ne lance pas.
+         * `POST /groups/<id>/run` est le geste de MASSE — il porte `drift_scan`
+         * ici, mais la meme route porte `cve_scan`, qui ouvre une session SSH
+         * PAR MACHINE et envoie un courriel par machine a resultats.
+         */
+        const lancements = passees.slice(avantR3)
+            .filter((p) => p.methode !== 'GET' && /\/groups\/\d+\/run/.test(p.route));
+        verifie('AUCUN scan de masse n\'a ete lance', lancements.length === 0,
+            lancements.map((p) => `${p.methode} ${p.route} ${p.corps || ''}`).join(' | '),
+            'aucun lancement');
+    });
+
     await etape('le collecteur voit un POST (temoin)', async () => {
         await page.evaluate(async (chemin) => {
             try { await fetch(chemin, { method: 'POST', body: 'temoin' }); } catch { /* 404 attendu */ }
@@ -625,6 +912,34 @@ try {
          * qui n'est pas le sien. La propriete a mesurer est « la suite n'a rien
          * ajoute », et elle se mesure par une DIFFERENCE.
          */
+        /*
+         * ══ RETRAIT DE LA FIXTURE R3, AVANT TOUT COMPTAGE ═════════════════
+         *
+         * Dans le `finally`, donc meme si la suite est morte en route. Et le
+         * retrait est VERIFIE : une commande qui rend sans erreur n'a pas
+         * forcement agi. Si la fixture survit, la suite le dit fort — un
+         * groupe `e2e-derive-*` laisse en base est un objet cliquable qui
+         * porte un scan de masse.
+         */
+        if (fixturePosee) {
+            try {
+                litEnBase('DELETE FROM rootwarden.machine_group_members WHERE group_id IN '
+                    + "(SELECT id FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%')");
+                litEnBase("DELETE FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%'");
+            } catch (e) { note(`FAIL  retrait de la fixture : ${e.message}`); echecs += 1; }
+            const reste = compteEnBase(
+                "SELECT COUNT(*) FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%'");
+            verifie('la fixture R3 est RETIREE', reste === 0,
+                `${reste} groupe(s) « e2e-derive-* » subsistent — cliquables, et porteurs`
+                + ' d\'un scan de masse. Retrait a la main : voir le cadre en tete du fichier',
+                `${reste} restant(s)`);
+            if (reste !== 0) {
+                note('=== LOT-ABATTRE :: une fixture de scan de masse survit en base');
+                note("=== REMEDE :: DELETE FROM rootwarden.machine_groups WHERE name LIKE 'e2e-derive-%'");
+            }
+        } else {
+            constate('fixture R3', 'SANS OBJET — jamais posee, il n\'y a rien a retirer');
+        }
         const apres = compteEnBase('SELECT COUNT(*) FROM rootwarden.machine_groups');
         if (groupesAvant === null) {
             constate('aucun groupe cree',
