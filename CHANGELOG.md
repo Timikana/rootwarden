@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.148** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.149** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,78 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.149 — `documentation` : ce qui se derive est derive, ce qui est un CACHE n'est pas recopie
+
+**Troisieme entree de menu qui bascule cette nuit.** Et le premier portage dont la decision centrale
+est de **ne pas recopier**.
+
+#### La mesure qui decide
+
+    grep -c '$pdo' legacy/documentation.php   ->   0
+
+**La page du legacy ne fait aucune requete.** Ses 1 756 lignes affirment des routes, des roles et des
+permissions **ecrits a la main**, qu'aucun mecanisme ne regenere. L'inventaire y a mesure **douze
+chemins de page perimes**, **deux routes citees qui n'existent pas**, et **onze sections decrivant
+des parties deja retirees du produit**.
+
+> **Reproduire un artefact que rien ne regenere n'est pas de la fidelite : c'est recopier un cache.**
+
+La page portee ne le recopie donc pas. Elle **renvoie** vers `autorisations-passerelle`, qui derive
+la meme information de la liste blanche reelle — *la seule forme qui ne puisse pas se perimer en
+silence* — et elle **dit** ce que la reference de l'ancien portail porte de perime.
+
+#### ⚠ La garde est un SEUIL DE ROLE, pas une permission — et c'est declare A L'ECRAN
+
+`legacy/documentation.php:11` pose `checkAuth([1,2,3])` et **aucun** `checkPermission` : sa seule
+occurrence (`:295`) est **dans un exemple de code**. Le seul cloisonnement est `$isAdmin = $role >= 2`
+(`:16`), qui enclot cinq sections — `api`, `proxy`, `healthcheck`, `preprod`, la console.
+
+L'entree de menu porte `'garde' => 'tous'` : **vrai de la PAGE, faux de son CONTENU.** *Un lecteur qui
+cherche une permission n'en trouvera pas et conclura que tout est ouvert.* La page le dit donc
+elle-meme, et la route ne porte **ni `role:` ni `perm:`** — poser `role:2` fermerait la page entiere
+la ou le legacy en ouvre 43 sections sur 48 au role 1.
+
+**Mesure aux trois roles** : `200 / 200 / 200`, et le nombre d'ancres **croit strictement avec les
+droits — 7 < 8 < 9**. Le seuil se voit sans fermer la porte.
+
+#### ⚠ Un defaut que j'avais EVITE ailleurs et REINTRODUIT ici
+
+Le lien vers la page derivee etait conditionne au seuil de CETTE page (`role >= 2`). Or
+`autorisations-passerelle` est gardee **`role:3`** : **un role 2 aurait recu un lien qui refuse.**
+
+C'est exactement ce que `groups` evite par construction — le lien se lit dans le MENU du compte, pas
+dans un seuil recopie. Corrige de la meme facon. **Appliquer une regle dans un module ne la porte pas
+au suivant** ; mesure apres correction : lien offert au role 3 **seul**.
+
+#### Les 22 cles bilingues, portees — et corrigees
+
+Seule partie **traduite** des 1 756 lignes. Deux corrections, toutes deux vues a l'image :
+
+- **le numero sortait deux fois** — l'`<ol>` numerote, et la chaine portait deja « 1. ». Le numero
+  est de la PRESENTATION : il quitte le catalogue, dans les deux langues ;
+- **le francais herite n'a aucun accent** (« securisation », « donnees », « stocke en clair »).
+  Le reste du portage en porte partout : heriter l'absence d'accents aurait rendu cette page
+  visiblement etrangere au produit. **22 chaines accentuees**, et c'est une correction de contenu,
+  donc elle est dite ici plutot que faite en silence.
+
+Le marquage `<strong>` que le legacy place DANS ses chaines est **retire, pas rendu** : l'afficher
+demanderait `{!! !!}`, et on n'ouvre pas une porte a du HTML venu d'un catalogue pour de l'emphase.
+
+#### La console d'API n'est pas reprise, et la page dit pourquoi
+
+Decision deja rendue. **Elle n'eleve aucun privilege** — le proxy applique sa liste blanche, le
+backend ses decorateurs. **Ce qu'elle contourne est l'INTERFACE** : aucun panneau de decision, aucune
+machine nommee, pour des gestes qui en portent un sur leurs pages propres. Annonce au role >= 2
+seulement, parce que la section qu'elle remplace l'etait aussi — *annoncer a un role 1 le retrait
+d'une chose qu'il n'a jamais vue ne lui apprend rien*.
+
+#### Mesures
+
+    go-socle-navigation   72 PASS / 0 FAIL   — « Documentation » resout 200 aux TROIS roles
+    ancres par role       7 (role 1) < 8 (role 2) < 9 (role 3)
+    parite i18n           FR=38  EN=38  ecarts=0 ; aucune cle morte (sonde a temoin)
+    captures              6, aux deux largeurs et aux trois roles, REGARDEES
 
 ### v1.38.148 — couverture du rendu : des paramètres, pas des séquences — et les 216 sont dans le legacy
 

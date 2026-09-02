@@ -17,6 +17,7 @@ use App\Http\Controllers\PolitiquesController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
 use App\Http\Controllers\AuditSshController;
+use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\GraylogController;
 use App\Http\Controllers\ExportConformiteController;
@@ -173,6 +174,21 @@ Route::middleware(['session.authentifiee', 'mot.de.passe.a.changer'])->group(fun
     Route::get('/audit-ssh', AuditSshController::class)
         ->middleware(['role:1', 'perm:can_audit_ssh'])
         ->name('audit-ssh');
+
+    /*
+     * Documentation du portail.
+     *
+     * ⚠ AUCUNE garde de role ni de permission — et c'est FIDELE, pas laxiste.
+     * `legacy/documentation.php:11` pose `checkAuth([1,2,3])` et **aucun**
+     * `checkPermission` (sa seule occurrence, `:295`, est dans un exemple de
+     * code). Le seul cloisonnement est `$isAdmin = $role >= 2`, qui enclot
+     * cinq sections — donc un SEUIL DANS LA PAGE, pas une garde de route.
+     *
+     * Poser `role:2` ici fermerait la page entiere a un role 1, la ou le
+     * legacy lui ouvre 43 de ses 48 sections. La garde vit dans la route pour
+     * tout le reste du portage ; ici l'objet garde n'est pas la page.
+     */
+    Route::get('/documentation', DocumentationController::class)->name('documentation');
 
     /*
      * Derive de configuration. Seule page portee a ce jour dont la garde
@@ -970,6 +986,7 @@ Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
 Route::get('/approvals/', fn () => redirect()->route('approbations'));
 Route::get('/groups/', fn () => redirect()->route('groupes'));
 Route::get('/ssh-audit/', fn () => redirect()->route('audit-ssh'));
+Route::get('/documentation.php', fn () => redirect()->route('documentation'));
 Route::get('/drift/', fn () => redirect()->route('derive-config'));
 Route::get('/backups/', fn () => redirect()->route('sauvegardes'));
 Route::get('/tasks/', fn () => redirect()->route('taches'));
