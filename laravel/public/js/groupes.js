@@ -229,9 +229,20 @@
         if (! cles.length) {
             /*
              * ⚠ LE CAS QUE LE LEGACY CREE EN SILENCE. `'1=1'` => tout le parc.
-             * Et la reserve sur les archivees n'est pas decorative : la
-             * resolution du backend ne les exclut PAS, alors que le portage les
-             * exclut partout ailleurs. Deux definitions du parc.
+             *
+             * Et la reserve sur les archivees n'est pas decorative :
+             * `_resolve_dynamic` (`backend/routes/groups.py:61-77`) ne filtre
+             * pas `lifecycle_status`. Mais c'est DELIBERE, et non une
+             * incoherence : `archived` est une valeur COCHABLE ici comme au
+             * legacy (`groups/index.php:96`) et figure dans la liste blanche
+             * des colonnes filtrables du backend (`groups.py:36`). Un groupe
+             * DOIT pouvoir viser les archivees.
+             *
+             * Ce qui se signale a l'ecran n'est donc pas une contradiction,
+             * c'est qu'un groupe SANS critere en contient sans qu'on l'ait
+             * demande. Il y a une definition du parc et une definition de ce
+             * qu'on accepte de JOINDRE -- les exclusions vues ailleurs sont
+             * dans les chemins qui AGISSENT.
              */
             return [t('portee_aucun_filtre'), t('portee_archivees')];
         }
