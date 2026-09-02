@@ -18,6 +18,7 @@ use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
 use App\Http\Controllers\AuditSshController;
 use App\Http\Controllers\DocumentationController;
+use App\Http\Controllers\WazuhController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\GraylogController;
 use App\Http\Controllers\ExportConformiteController;
@@ -193,6 +194,33 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
      * tout le reste du portage ; ici l'objet garde n'est pas la page.
      */
     Route::get('/documentation', DocumentationController::class)->name('documentation');
+
+    /*
+     * Wazuh — sous-lot R1, LECTURE SEULE.
+     *
+     * Garde du legacy (`legacy/wazuh/index.php:25-26`) : `checkAuth([2,3])` +
+     * `checkPermission('can_manage_wazuh')`. Les cinq routes backend de
+     * lecture exigent la meme paire.
+     *
+     * AUCUNE route d'ecriture. Les neuf gestes du module sont declares absents
+     * A L'ECRAN et nommes un par un — dont trois qui, meme sur l'ancien
+     * portail, n'ont pas l'effet que leur nom suggere.
+     *
+     * ⚠ E-333 — une redirection `/wazuh/` ECRASAIT cette route. Elle se
+     * normalise en `/wazuh`, soit la MEME URI : la derniere enregistree
+     * remplace la premiere, NOM COMPRIS. `Route::has('wazuh')` devenait
+     * faux, la redirection pointait un nom inexistant, et la page rendait
+     * 500. Retiree — contrairement a `/groups/` ou `/documentation.php`, le
+     * chemin du legacy est DEJA celui du portage.
+     *
+     * ⚠ Le discriminant entre ce qui est porte et ce qui ne l'est pas est la
+     * METHODE, pas le chemin : `/wazuh/config`, `/wazuh/options` et
+     * `/wazuh/rules/<name>` portent chacun un GET qui lit ET un non-GET qui
+     * ecrit. Le helper `lis()` du script ne sait faire qu'un GET.
+     */
+    Route::get('/wazuh', WazuhController::class)
+        ->middleware(['role:2', 'perm:can_manage_wazuh'])
+        ->name('wazuh');
 
     /*
      * Derive de configuration. Seule page portee a ce jour dont la garde
