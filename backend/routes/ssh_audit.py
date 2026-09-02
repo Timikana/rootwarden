@@ -764,8 +764,43 @@ def create_ssh_schedule():
         return jsonify({'success': False, 'message': 'Expression cron invalide'}), 400
 
     user_id, _ = get_current_user()
-    target_type = data.get('target_type', 'all')
-    target_value = data.get('target_value') or None
+    # ══ E-280 : UNE PORTEE RESTREINTE SANS SA VALEUR N'EST PAS « TOUT » ═════
+    #
+    # `target_type` est deja un ENUM en base — `enum('all','tag','environment',
+    # 'machines')`, et le mode SQL est STRICT sur InnoDB : une valeur inventee
+    # est REFUSEE (`ERROR 1265`, eprouve). La liste fermee existe donc, et le
+    # trou n'est pas la.
+    #
+    # Il est dans `target_value`, qui est `TEXT NULL` sans contrainte. Le
+    # planificateur exige `and schedule.get('target_value')` sur ses trois
+    # branches restreintes : une portee `tag` dont le champ est reste VIDE
+    # retombait donc dans le `else`, c'est-a-dire SUR TOUT LE PARC. Par une case
+    # laissee blanche, et sur une CRON — sessions SSH reelles, repetees, sans
+    # personne devant l'ecran, `srv-zabbix` compris.
+    #
+    # On refuse ici plutot que de corriger en silence : une planification dont
+    # la portee est vide n'a pas de sens, et la remplacer par « tout » serait
+    # exactement le repli qu'on ferme.
+    #
+    # Le controle du type est REDONDANT avec l'ENUM, et il est garde quand meme :
+    # sans lui la base leve et l'appelant recoit un 500 opaque, la ou un 400
+    # nomme ce qui ne va pas. *Une garde redondante qui ameliore le message n'est
+    # pas une garde inutile.*
+    PORTEES = ('all', 'tag', 'environment', 'machines')
+    target_type = (data.get('target_type') or 'all').strip()
+    target_value = (data.get('target_value') or '').strip() or None
+
+    if target_type not in PORTEES:
+        return jsonify({
+            'success': False,
+            'message': f"target_type doit valoir l'un de : {', '.join(PORTEES)}"
+        }), 400
+    if target_type != 'all' and not target_value:
+        return jsonify({
+            'success': False,
+            'message': (f"Une portee '{target_type}' exige target_value. "
+                        "Sans valeur, la planification viserait tout le parc.")
+        }), 400
 
     try:
         conn = get_db_connection()
