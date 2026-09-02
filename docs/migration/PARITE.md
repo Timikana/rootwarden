@@ -15905,3 +15905,100 @@ tranche**, pas la plausibilité.
 
 *Note de méthode : ses « 14 processus Chrome » redoutés étaient VS Code et les serveurs MCP — son
 `pgrep -f chrome` s'était auto-capturé. **Troisième auto-capture de la nuit**, sur un troisième motif.*
+
+## E-326 — ⚠ `POST /deploy` A ÉTÉ APPELÉ SUR LA PRODUCTION, et le journal ne dit pas PAR QUI
+
+Trouvé par la session 8 en partant du `/deploy` absent des filets, **vérifié par moi dans le conteneur**
+avec témoin positif (le conteneur répond) et témoin de sonde (le mot `machines` est trouvé) :
+
+    /app/logs/deployment.log.1   1037 o   27/08 20:43 UTC = 22:43 CEST
+
+    20:43:07  MAIN INFO   ===== Demarrage de la configuration des serveurs =====
+    20:43:07  MAIN INFO   Machines transmises pour configuration : ['1', '2']
+    20:43:07  MAIN INFO   Verification des mots de passe pour la machine: srv-zabbix (ID: 1)
+    20:43:07  MAIN ERROR  Probleme de dechiffrement pour srv-zabbix
+    20:43:07  MAIN ERROR  Probleme de dechiffrement pour Test-Server-Debian
+    20:43:07  MAIN ERROR  Erreur critique : Echec du dechiffrement: Aucune methode n'a fonctionne
+              ECHEC : code 1. Les gestes deja emis n'ont PAS ete annules.
+
+**La machine 1 est `srv-zabbix` — la production, `active`, dans le parc.**
+
+> **Le geste a échoué par ACCIDENT, pas par une protection.** Il est tombé à la phase de vérification
+> des mots de passe, **avant toute session SSH** — donc rien n'a été émis. *Mais aucune garde ne l'a
+> refusé : il a été accepté, il a démarré, et il s'est cassé.*
+
+### ⚠ ET LE JOURNAL NE CONSIGNE AUCUN APPELANT — mesuré avec témoin
+
+    occurrences de « machines »                          1    <- la sonde MORD
+    occurrences de « user|compte|session|api_key|par »   0
+
+**Un geste qui écrit en root sur la production et qui RÉVOQUE des accès SSH consigne ce qu'il a visé,
+jamais qui l'a demandé.** Ni compte, ni session, ni clé d'API.
+
+*C'est la fausse alerte de 06:52 qui a fait trouver le vrai défaut* — et la session 7 a corrigé **deux**
+points du relevé initial : les horodatages étaient en **UTC lus comme CEST** (+2 h), et la trace vue
+« pendant le LOT » est `legacy-go-page-ssh-flux` qui écrit une sonde dans ce journal **et la restaure**,
+son propre journal le disant en trois lignes. **Aucun `/deploy` pendant le LOT.**
+
+### Et la dernière ligne dit que le geste n'est PAS transactionnel
+
+> `Les gestes deja emis n'ont PAS ete annules.`
+
+**Inerte dans ce cas** — l'échec est antérieur à toute émission. **Mais elle décrit le régime** : un
+échec à mi-chemin laisse ce qui est parti. *C'est la même forme qu'E-283 sur `authorized_keys` : la
+sauvegarde est prise, rien ne la rappelle.*
+
+**À l'exploitant, et c'est une décision, pas une mesure** : faut-il qu'un geste qui révoque des accès en
+root sur la production trace son appelant ? *Je mesure l'absence ; ce que le produit doit faire vous
+revient.*
+
+## E-327 — une alarme réfutée, et l'asymétrie qu'elle révèle
+
+La session 7 a signalé que `go-fail2ban-f5` laissait passer **onze écritures, dont `ban_all_servers` et
+`install_all`**. **Réfuté**, chemins de décision simulés :
+
+    ROUTES_MODULE couvre les 18 routes · HORS_LOT nomme ban_all_servers et install_all
+    defaut apres toutes les branches = ABORT
+
+    ban_all_servers · install_all · ban · restart  ->  ABORT (hors de F5)
+    enable_jail                                    ->  son perimetre declare
+    history                                        ->  lecture, laissee passer
+
+**Elle avait lu une déclaration de motif et déduit le comportement d'un filet dont elle n'avait pas lu
+les branches.** Et sa lecture de sa propre erreur est ce qui compte :
+
+> **Le sens de l'erreur compte : elle allait du côté qui ALARME.** Troisième fois dans ce projet.
+> **Ce qui ne se répète pas, c'est un dédouanement — et celui-là, aucune relecture par un pair ne
+> l'attrape.**
+
+*Personne ne relit une affirmation qui dit « tout va bien ».* C'est pourquoi j'ai mesuré **deux fois**
+avant de la réfuter : **ma réfutation allait dans le sens qui rassure.**
+
+### Ce que le témoin négatif a trouvé à la place
+
+    /fail2ban/inconnu_temoin  ->  CONTINUE (hors module)
+
+**`ROUTES_MODULE` est une énumération portant la même ancre `(\?|$)`.** Une route ajoutée demain ne
+matche pas, prend la **première** branche, et **part pour de vrai**. *L'avortement par défaut ne protège
+que ce qui ENTRE dans le module — et c'est l'énumération qui décide qui entre.* Remède :
+`/\/fail2ban\//` et laisser le défaut travailler.
+
+### Et `b4` est le cas que ni elle ni moi n'avions vu
+
+    b2   ROUTES_MODULE inclut `template`, ni LECTURES ni ECRITURES  ->  defaut = ABORT   ✓
+    b4   AUCUN ROUTES_MODULE · LECTURES inclut `template` · defaut = continue()          ⚠
+
+    bashrc.py:654   GET  /bashrc/template   <- lit
+    bashrc.py:699   POST /bashrc/template
+
+> **`b4` classe par CHEMIN, et ce chemin porte deux verbes de sémantique opposée.** Il ne peut
+> structurellement pas les distinguer, sur un filet dont le défaut est `continue()`.
+
+**Même mécanisme que `POST /iptables` avec `action=="get"`, un cran plus haut** : là c'est le *corps*
+qui discrimine, ici la *méthode*. **Un filet qui classe par chemin est aveugle aux deux.**
+
+**Routage : elle rend la MESURE à l'auteur, pas le correctif** — et son erreur sur `f5` est l'argument :
+*elle a mesuré un filet de l'extérieur et conclu l'inverse de ce qu'il fait, donc l'intention n'est pas
+dans le motif.*
+
+**Trois rejeux rendus, tous conformes** : `audit-ssh` 18 · 0 · `groupes` 20 · 0 · `pare-feu` 23 · 0.

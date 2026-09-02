@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.169** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.170** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,37 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.170 — `POST /deploy` a été appelé sur la production, et le journal ne dit pas par qui
+
+**E-326.** Trouvé par la session 8 en partant du `/deploy` absent des filets, **vérifié dans le conteneur
+avec témoins** : `/app/logs/deployment.log.1`, **27/08 20:43 UTC (22:43 CEST)** —
+`Machines transmises pour configuration : ['1', '2']`, et **la machine 1 est `srv-zabbix`, la
+production**. Le geste a **échoué au déchiffrement**, avant toute session SSH, donc rien n'a été émis.
+*Mais aucune garde ne l'a refusé : il a été accepté, il a démarré, et il s'est cassé.*
+
+**⚠ Et le journal ne consigne aucun appelant** — mesuré avec témoin : « machines » **1** occurrence (la
+sonde mord), « user|compte|session|api_key » **0**. **Un geste qui écrit en root sur la production et
+révoque des accès SSH consigne ce qu'il a visé, jamais qui l'a demandé.** À arbitrer.
+
+Sa dernière ligne — *« Les gestes déjà émis n'ont PAS été annulés »* — est inerte ici mais **décrit le
+régime** : un échec à mi-chemin laisse ce qui est parti. Même forme qu'E-283 sur `authorized_keys`.
+
+Deux corrections au relevé initial : horodatages **UTC lus comme CEST**, et la trace vue « pendant le
+LOT » est une sonde qu'une suite écrit **et restaure**. **Aucun `/deploy` pendant le LOT.**
+
+**E-327 — une alarme réfutée.** `go-fail2ban-f5` ne laisse pas passer `ban_all_servers` ni `install_all` :
+son défaut après toutes les branches est **`abort`**, et `HORS_LOT` les nomme. *Une déclaration de motif
+lue, un comportement de filet déduit sans lire les branches.* **Le sens de l'erreur compte : elle allait
+du côté qui alarme — et ce qui ne se répète pas, c'est un dédouanement, que nulle relecture par un pair
+n'attrape.** J'ai donc mesuré **deux fois** avant de réfuter, ma réfutation allant dans le sens qui
+rassure.
+
+**Le témoin négatif a trouvé le vrai trou** : `/fail2ban/inconnu_temoin` → **CONTINUE**.
+`ROUTES_MODULE` est une énumération, donc l'avortement par défaut **ne protège que ce qui entre dans le
+module**. Et **`b4` est le cas que personne n'avait vu** : défaut `continue()`, et `template` classé en
+lecture alors que le chemin porte **un GET qui lit et un POST** — *un filet qui classe par chemin est
+aveugle à la méthode comme au corps.*
 
 ### v1.38.169 — j'ai validé une généralisation sans la mesurer, et le trou est dans le filet
 
