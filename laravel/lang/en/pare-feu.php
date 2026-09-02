@@ -121,4 +121,8 @@ return [
     'valid_echec_titre' => 'Check did not complete',
     'valid_echec' => 'The check did not complete. This is neither "valid" nor "invalid": nothing was verified.',
     'valid_sortie' => 'Server output',
+
+    // A non-measurement announced in advance is a reserve; announced
+    // afterwards, an excuse. Said above the button — see fr.
+    'copie_jamais_exercee' => "Saving a rule copy has never yet been performed from this interface: the action is wired and confirmed, but its completion has not been observed on a machine. The old portal remains the only proven route.",
 ];
