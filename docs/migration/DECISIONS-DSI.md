@@ -3051,3 +3051,72 @@ les trois gestes n'ont pas encore été exercés sur ce chantier** — dans le m
   que ses gestes atteignent le backend avant le redémarrage* ;
 - **le contenu du panneau de décision** : j'ai vu qu'il existe et qu'il nomme la machine, pas ce qu'il
   dit exactement.
+
+---
+
+## ⚠⚠ 31/32, pas 29/32 — DEUX portages payés que nos propres instruments ne voyaient pas
+
+**Mesuré le 2026-09-02, 04:2x UTC**, en contrôlant un négatif de la session 3 plutôt qu'en le reprenant.
+Elle m'avait écrit : *« `iptables` et `wazuh` : contrôleur=0, vue=0, route=0. Rien de caché de ce côté —
+ta trouvaille sur `remote_users` était un cas isolé, pas un motif. »*
+
+**Son négatif est faux pour `iptables`, et ma conclusion l'était aussi : c'est bien un motif.**
+
+    laravel/app/Http/Controllers/PareFeuController.php
+    laravel/routes/web.php:810-868    4 routes, toutes `role:1` + `perm:can_manage_iptables`
+    laravel/resources/views/pare-feu.blade.php      9 351 o
+    laravel/public/js/pare-feu.js                  34 786 o     <- le plus gros JS porte du chantier
+    dates : 2026-08-28 16:24-16:30
+
+    ET  Navigation.php:99   ['cle' => 'iptables', … 'legacy' => '/iptables/']
+
+### La cause, et elle est la même que celle qui a piégé trois lecteurs cette nuit
+
+> **Les pages portées sont nommées en FRANÇAIS — `comptes-distants`, `pare-feu` — et toutes nos mesures
+> cherchent les noms ANGLAIS du legacy : `remote_users`, `iptables`.** *Un contrôleur `PareFeuController`
+> est invisible à `ls | grep -i iptables`.*
+
+**C'est l'E-306 du Lead — « un nom à deux référents » — mais à l'échelle du chantier**, et son effet n'est
+pas une sonde qui accuse à tort : **c'est deux portages entièrement payés que personne ne compte.**
+
+**Mon témoin est ce qui a rendu la mesure lisible** : j'ai fait chercher le cas **connu** en même temps
+(`ComptesDistants` → 1 contrôleur, 2 vues, 8 routes). *L'instrument trouvait ce qu'il devait trouver,
+donc ses zéros étaient des zéros.* **Sans ce témoin j'aurais lu « 0 » comme la session 3 l'a lu.**
+
+### L'état réel du menu
+
+| entrée | portée ? | menu |
+|---|---|---|
+| `remote_users` | **OUI** — `ComptesDistantsController`, 4 routes, gestes câblés | pointe sur le legacy |
+| `iptables` | **OUI** — `PareFeuController`, 4 routes, 34 ko de JS | pointe sur le legacy |
+| `wazuh` | **NON** — 0 contrôleur, 0 vue, 0 route, **aucun alias français** | pointe sur le legacy |
+
+> **31 des 32 entrées sont portées. Une seule ne l'est pas, et c'est `wazuh`** — *celle dont la mesure
+> est de toute façon impossible avant le redémarrage.*
+
+### ✅ Ce que ça change, et c'est plus qu'un chiffre
+
+**Le chantier est bien plus avancé que sa propre comptabilité.** Trois sessions ont raisonné pendant des
+heures sur « ce qui reste à porter » en comptant deux pages finies comme absentes — et le Lead a
+explicitement écrit *« E-203 est la seule chose portable qui reste »*.
+
+**✅ DÉCISION : les deux entrées basculent.** Même arbitrage que pour `remote_users`, mêmes raisons —
+*ne pas basculer n'est pas l'option sûre, c'est celle qui ne se voit pas.* Délégué, aucun geste
+destructeur.
+
+**Et une contrainte de méthode qui vaut au-delà de ce cas** :
+
+> **Une mesure de portage doit chercher l'ARTEFACT, pas le nom du legacy.** *Compter ce qui existe dans
+> `laravel/` et le rattacher ensuite aux entrées de menu, plutôt que partir des clés du menu et
+> demander « celle-ci est-elle portée ? »* — la seconde forme ne trouve que ce qui porte le même nom des
+> deux côtés, **et le portage a précisément renommé.**
+
+### Ce qui n'est pas mesuré
+
+- **si `pare-feu` fonctionne.** Lu, pas ouvert. Ses routes appellent `backend/routes/iptables.py`,
+  **l'un des vingt modules inertes** — et c'est celui qui gagne **six** gardes au redémarrage ;
+- **le `role:1` de ses quatre routes.** Il est assorti de `perm:can_manage_iptables`, que **seul le
+  compte `superadmin` détient** (mesuré), le rôle 3 court-circuitant de toute façon. *Je note l'écart
+  entre le rôle annoncé et la population réelle sans le trancher : ce n'est pas le sujet de ce tour* ;
+- **s'il existe d'autres portages sous alias français** que je n'ai pas cherchés. *Après deux, je ne
+  parierais pas qu'il n'y en a pas un troisième.*
