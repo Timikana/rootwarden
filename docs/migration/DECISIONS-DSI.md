@@ -3159,3 +3159,62 @@ jamais `route('profil')` littéralement.** *Elle mesurait « cité dans un gabar
 *Elle aurait produit du travail inutile, pas un dédouanement* — la moins coûteuse des deux, et la seule
 qu'une relecture par un pair attrape. **Elle l'a attrapée seule, avant publication, parce que son témoin
 était DANS la mesure.**
+
+---
+
+## ✅ Question close — il n'y a PAS de troisième portage injoignable
+
+**Mesuré le 2026-09-02, 04:1x UTC.** J'avais écrit : *« je ne parierais pas qu'il n'y a pas un troisième
+portage sous alias français »*. **Vérifié par la méthode que j'avais prescrite — partir de l'artefact,
+avec un témoin dans la mesure :**
+
+    candidate = citee ni par Navigation, ni par une vue, ni par un JS
+
+    tickets        nav=0 vues=0 js=2      <- la seule douteuse, tranchee ci-dessous
+    export-cve     nav=0 vues=1
+    notifications  nav=0 vues=2 js=2
+    permissions    nav=0 vues=1 js=1
+    serveurs       nav=0 vues=4
+    cles-api       nav=0 vues=1
+
+    TEMOIN  profil             nav=1 vues=0   <- atteignable, et AUCUNE vue ne la cite
+    TEMOIN  temoin_inexistant  nav=0 vues=0   <- l'instrument rend bien le negatif
+
+**Cinq des six sont citées par au moins une vue : ce sont des sous-pages, pas des orphelines.**
+
+**Et `tickets` est retiré du menu DÉLIBÉRÉMENT**, avec sa raison écrite dans `Navigation.php:44-64` :
+sa route, sa vue et ses catalogues sont conservés parce que `GET /search` émet vraiment
+`link: '/tickets/index.php'` pour chaque ticket trouvé (`backend/routes/search.py:82`), et
+`LiensLegacy` traduit ce chemin vers la route. *Retirer la route ferait pointer la recherche sur une
+route inexistante.*
+
+> **Aucune page portée n'est injoignable. Les deux cas trouvés — `comptes-distants` et `pare-feu` — sont
+> les seuls, et ils sont désormais basculés.**
+
+**Le témoin `profil` est ce qui rend ce négatif lisible** : il est atteignable **et** aucune vue ne le
+cite — *donc « 0 vue » ne signifie pas « injoignable », et une sonde qui l'ignore accuse à tort.* **C'est
+exactement sur ce témoin que la sonde de la session 3 s'était disqualifiée** ; ma seule contribution est
+d'avoir ajouté la moitié qu'elle n'avait pas — `Navigation` — et un second témoin qui doit rendre zéro.
+
+### Ce qui reste, et c'est une seule chose
+
+| | |
+|---|---|
+| entrées de menu | **32** — 31 portées, **1** encore sur le legacy |
+| l'unique restante | **`wazuh`**, et sa mesure est impossible avant le redémarrage |
+| dossiers en attente de l'exploitant | **11**, aucun clos |
+| `security/backend-cve` | **6 commits en avant**, fusion toujours **sans conflit** |
+| commits non poussés | **239** |
+
+> **Le portage n'a plus qu'une page, et elle est derrière la première des onze décisions.** *Tout le
+> reste du chantier attend un mot de l'exploitant — ce n'est plus une phase de travail, c'en est une de
+> décision.*
+
+### Note d'instrument — mon comptage a dérivé dans la même commande
+
+`grep -c "'route' "` sur `Navigation.php` rend **33** pour **32** entrées : le bloc de commentaire en
+tête contient le mot. *Je l'ai vu parce que 33 > 32 et que je connaissais le total* — **le même sauvetage
+que pour la sonde des dossiers : un ordre de grandeur connu, pas une prudence.**
+
+**Le comptage juste s'ancre sur la ligne d'entrée** (`'cle' =>`), pas sur le mot cherché. *C'est E-278 du
+Lead sous une autre forme — un compteur qui compte des occurrences et pas des objets.*
