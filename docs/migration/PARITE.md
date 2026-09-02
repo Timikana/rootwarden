@@ -14551,3 +14551,88 @@ et ne déborde pas* — vise désormais un ensemble **dont on sait qu'il survit*
 Elle a raison sur les deux moitiés, et la seconde ne l'excuse pas de la mienne : **un nombre sans son
 objet invite au faux désaccord, et un lecteur qui ne demande pas l'objet l'accepte.** Il fallait les
 deux pour produire l'inversion.
+
+## E-296 — `/audit-ssh` est la SEULE page où les deux voies d'admission s'exercent séparément
+
+Référence posée par la session 7 : `go-page-audit-ssh` — **18 laravel · 15 legacy · 0 FAIL**
+(`41bbaf4`), les deux prédictions posées avant lancement et exactes.
+
+Et elle a mesuré une propriété qui vaut plus que la référence :
+
+    rw-test-user   role 1  can_audit_ssh=0  ->  403   ni role, ni permission
+    rw-test-admin  role 2  can_audit_ssh=1  ->  200   admis par la PERMISSION
+    rw-test-super  role 3  can_audit_ssh=0  ->  200   admis par le ROLE
+
+### Et le mécanisme est plus fort que « le rôle 3 détient aussi la permission »
+
+    helpers.py:323  « Superadmin (role_id >= 3) court-circuite la verification. »
+    helpers.py:338  if role_id >= 3:
+
+**Le rôle 3 ne détient pas la permission : il ne l'évalue jamais.** Le décorateur sort avant.
+
+> **Conséquence pour toutes nos suites** : sur une page exercée par le seul rôle 3 — ou par un rôle 3
+> et un rôle 2 qui possède la permission — **retirer `perm:can_X` de la garde passerait inaperçu.**
+> Le rôle 3 court-circuite, et le rôle 2 est admis par la permission qu'on vient de retirer… si elle
+> n'est plus exigée, il est admis quand même. **Aucune des deux voies ne rougit.**
+
+Il faut **trois** comptes pour que la garde soit réellement mesurée, et le troisième est le plus
+rare : **un rôle élevé SANS la permission**. C'est lui qui distingue « admis par le rôle » de « admis
+par la permission », et sans lui les deux se lisent `200`.
+
+**`/audit-ssh` est la seule page du portage où les trois cas existent.** À généraliser aux autres
+suites — *une garde à deux voies exercée par une seule voie n'est pas mesurée, elle est supposée.*
+
+Et c'est un **état du banc**, pas une propriété du code : la précondition relit `can_audit_ssh` en base
+et refuse de conclure s'il a bougé. *Sinon les libellés survivraient au changement en mesurant autre
+chose.*
+
+### La fermeture par l'absence est mesurée AVEC son témoin
+
+    temoin      POST /temoin-e2e-inexistant  ->  VU par le collecteur
+    propriete   6 requetes du module         ->  TOUTES en GET
+
+*« Aucun POST n'est parti » et « je ne vois pas les POST » sont la même sortie.* Sans témoin, le
+journal afficherait les deux mêmes lignes et ne prouverait rien ; si le témoin n'apparaît pas, la
+suite rend `SANS OBJET` au lieu d'un vert. **C'est la forme correcte d'une universelle négative**, et
+elle est ici appliquée à la propriété la plus grave du module (SEC-013 : cette écriture est moins
+gardée que sa lecture).
+
+### Deux défauts d'instrument, dont un qui accusait cinq suites saines
+
+**1.** Un `page.$(selecteur)` avec un sélecteur `null` jette `Cannot read properties of null` — **un
+FAIL qui accuse la page alors qu'il décrit la table de la suite**. Le même garde existait déjà dans
+`go-page-mot-de-passe`, posé après le même plantage. *Une correction appliquée à un fichier ne se
+propage pas au suivant ; il a fallu que la faute se reproduise.*
+
+**2.** La sonde qui cherchait ce défaut ailleurs a accusé `cle-plateforme`, `graylog-g1`,
+`graylog-g2`, `maintenance` et `chatops`. Elle cherchait `CIBLE !== 'laravel'` ; **elles gardent en
+positif**, `CIBLE === 'laravel'`. **Les cinq sont conformes sur les deux cibles au dernier LOT.**
+*Une sonde écrite pour trouver un défaut se trompe du côté qui alarme* — et le verdict au LOT a servi
+de dernier filet.
+
+## E-297 — une affirmation qui vit dans les MESSAGES et n'atteint jamais l'ARTEFACT
+
+La session 7 me demande de retirer son diagnostic sur `pare-feu` (« le titre passe sur deux lignes et
+pousse le bouton hors du bandeau »), sa seconde version étant fausse comme la première : **à 390 px le
+bandeau réduit le titre par `text-overflow: ellipsis`** — un choix, pas un débordement — et le `<h1>`
+en dessous porte l'identité de la page.
+
+**Recherche ouverte dans le registre — pas un motif ciblé** : aucun titre ne nomme `pare-feu` sur ce
+sujet, aucune mention de bandeau ou de troncature de titre à 390 px. **Il n'y a rien à retirer :
+ce diagnostic n'est jamais entré.**
+
+> **Deuxième fois cette nuit qu'une affirmation circule entre nous sans jamais atteindre l'artefact** —
+> la première étant un effet de bord que je croyais avoir écrit dans un dossier de signature, et qui
+> n'y était pas.
+
+Et ça complète, par l'autre bout, la note sur ce que le registre ne peut pas dire :
+
+    le registre ne consigne QUE des echecs        -> il sous-estime le travail juste
+    et seulement ceux qui ONT ETE INSCRITS        -> il sous-estime aussi nos erreurs
+
+**Nos messages portent des affirmations que le registre ne voit jamais, dans les deux sens.** Deux
+diagnostics faux ont circulé plusieurs heures entre sept sessions sans laisser une ligne. *Le registre
+mesure ce qu'on a pris la peine d'y écrire — c'est-à-dire ce qu'on jugeait déjà important.*
+
+**Aucune règle nouvelle** — ce serait la cinquième occurrence d'E-290. Le fait est noté pour que le
+compte d'écarts ne soit jamais présenté comme un bilan.
