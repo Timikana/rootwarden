@@ -4193,3 +4193,113 @@ aujourd'hui — mais il est nul à cet instant.**
 workflow existe et est bloquant, mais il ne se déclenche que sur `main`.* **Il n'a donc rien inspecté sur
 ces 33 commits.** *Ce que j'ai réellement vérifié est plus étroit : aucun fichier `.env` n'est suivi par
 git.*
+
+---
+
+## ⚠⚠ « 31 déclarations » ne mesure PAS ce que je disais — deux variantes neuves, et mon compte tombe
+
+**Mesuré par la session 2 le 2026-09-02 à 23:5x, vérifié par moi avec témoins aux deux bornes.**
+*J'ai rapporté ce chiffre à l'exploitant pendant des heures comme un reste à porter. Il ne l'est pas.*
+
+### Sa conclusion, que j'inscris telle quelle
+
+> **Un décompte de déclarations d'absence n'est pas un décompte de capacités manquantes, et n'est même
+> pas un décompte de ce que le produit AFFIRME — tant qu'on n'a pas mesuré, clé par clé, laquelle atteint
+> un écran.**
+
+### Deux raisons, et chacune casse le compte dans un sens opposé
+
+**1. Une clé peut porter PLUSIEURS gestes.** *`wazuh` compte pour 1 dans mon relevé et déclare **neuf**
+gestes dans la seule clé `np_liste`.* **Compter les clés SOUS-ESTIME le périmètre.**
+
+**2. Une clé peut n'atteindre AUCUN écran.** *Vérifié :*
+
+    scan_ancien_portail   vues=0  js=0  controleurs=0    <- orpheline
+    suivi_a_venir         vues=0  js=0  controleurs=1    <- elle VOYAGE et ne s'affiche jamais
+    TEMOIN     cve.titre           vues=1
+    TEMOIN NEG cve.xx_inexistant   vues=0
+
+**Compter les clés SURESTIME ce que le produit dit.** *Les deux erreurs vont en sens contraires, donc
+elles ne se compensent pas : elles rendent le nombre inutilisable, pas approximatif.*
+
+---
+
+## Variante D — une déclaration fausse qui ne trompe PERSONNE
+
+**Les deux gestes de `cve` sont câblés** — `url_scan → /api/gateway/cve_scan`, `url_suivi →` une route
+POST enregistrée — et la page porte **26 clés de scan**, dont un panneau de confirmation et **huit
+messages de résultat**. *`jamais_scanne_aide` dit même « Le bouton Scanner en lance un ».*
+
+> **Mais aucune des deux phrases qui les déclarent absents n'atteint l'écran.**
+>
+> **Elles ne trompent pas l'utilisateur. Elles trompent l'INVENTAIRE.**
+
+**Le correctif n'est ni porter ni corriger la phrase : c'est supprimer une clé morte.**
+
+---
+
+## Variante E — l'inverse exact de la C : le SIGNAL D'ABSENCE a disparu
+
+    Navigation::SECTIONS   32 entrees · 32 avec 'route' · 0 avec 'legacy'
+    pour() FILTRE seulement, n'ajoute rien  ->  isset($r['route']) est TOUJOURS vrai
+    -> la branche qui produit la fleche « pas encore portee » est INATTEIGNABLE
+
+    et la page ANNONCE : « Une fleche signale une page encore servie par l'ancien portail »
+
+> **Le lecteur cherche une flèche, n'en trouve aucune, et ne peut pas distinguer « tout est porté » de
+> « le marqueur est cassé ».**
+
+**En C le renvoi aboutissait là où la capacité n'était pas. En E c'est le signal d'absence qui a disparu,
+pas la sortie.**
+
+**⚠ Et j'avais cette page sous les yeux.** *Mon relevé Puppeteer de 20:1x contient la légende, mot pour
+mot : « ↗ Les entrées marquées d'une flèche ouvrent l'ancien portail dans un nouvel onglet. »* **Je l'ai
+lue et je n'ai pas vérifié qu'elle s'appliquait à quoi que ce soit.** *Regarder l'écran ne suffit pas si
+on lit ce qui est écrit sans chercher ce qui devrait y répondre.*
+
+---
+
+## Et la réponse à ma question sur le taux est meilleure que ma question
+
+**J'avais demandé si le taux de défaut serait plus bas sur les pages légères.**
+
+> *Il n'est pas plus bas : la classe y est **différente**. Sur les lourdes, les fausses déclarations
+> étaient LUES et envoyaient quelqu'un sur un chemin mort. Ici les trois défauts sont INVISIBLES — deux
+> clés que rien n'affiche, une branche que rien n'atteint.*
+
+**Et sa raison de fond explique tout le phénomène :**
+
+> **Une page qui déclare PEU déclare des choses ANCIENNES** — vraies quand on les a écrites, que le
+> portage a rattrapées sans que personne relise la phrase. **Une page qui déclare BEAUCOUP est une page
+> qu'on vient de travailler.**
+
+*Mon biais de volume ne cachait donc pas un taux : il cachait une classe.*
+
+---
+
+## Trois faits de méthode qu'elle a payés et que je reprends
+
+**1. Deux instruments qui ne se recouvrent pas.** *Sa première sonde cherchait « pas encore porté /
+ancien portail » et ratait `wazuh` ENTIÈREMENT — cette page déclare par « ce que cette page ne fait pas
+encore ».* **Un second instrument, par NOM DE CLÉ (`np_*`, `reste_*`), l'a rendue.** *Croiser était la
+mesure, pas une précaution.*
+
+**2. Une quatrième forme de composition d'URL** — après le littéral, le gabarit interpolé et
+`base + chemin` : **un bloc `@json` peint par le contrôleur.** *Sa sonde a rendu zéro DEUX FOIS avant
+qu'elle remonte script → bloc JSON → contrôleur.*
+
+**3. ⚠ Un dédouanement évité de justesse, et il penchait du mauvais côté.** *Sa sonde a rendu « 0 mention
+de legacy dans `AccueilController` ». **Ce fichier n'existe pas** — la vue est rendue par
+`PortailController`.* **Un zéro né d'un chemin faux, qui pointait dans le sens qui l'arrangeait.**
+
+---
+
+## ✅ Ce qui est établi sur les sept pages
+
+    VRAIES (4)   comptes · documentation · wazuh · plateforme
+    FAUSSES (2)  cve — les deux, variante D : cles mortes, a SUPPRIMER
+    CASSEE (1)   accueil + nav, variante E : la fleche est inatteignable
+
+**Et `plateforme` est exacte PARCE QU'ELLE PRÉCISE « clé par clé ».** *La page citée existe dans le
+portage et y offre un retrait de clés — mais en bloc, pas clé par clé.* **Sans cette précision, la
+déclaration serait fausse. Une phrase juste tient parfois à trois mots.**
