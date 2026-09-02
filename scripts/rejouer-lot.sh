@@ -744,11 +744,32 @@ declare -A REF_LARAVEL=(
   # ⚠ La creation passe par la PASSERELLE (`fetch(PASSERELLE + '/groups')`), donc
   # il n'existe AUCUNE route POST Laravel. *Mesurer les routes Laravel n'est pas
   # mesurer les capacites* — 4e fois que ce motif trompe le Lead le meme jour.
+  # go-page-wazuh : suite NEUVE (`5215f86`), 33 laravel / 16 legacy, trois executions
+  # stables par cible avant commit. ⚠ LE MENU EST PASSE A 32/32 AVEC UNE PAGE QU'AUCUNE
+  # SUITE NE CONNAISSAIT — mesure sur les LISTES du runner, pas par un grep global :
+  # `SUITES_LARAVEL | grep -c wazuh` rendait 0, `SUITES_LEGACY` aussi.
+  # ⚠ SEULE PAGE DU BANC ou les DEUX branches du « OU » d'`ExigePermission` sont
+  # exercees, l'une comme ADMISSION et l'autre comme REFUS :
+  #     role 1  wazuh=0 -> 403 refuse par le ROLE
+  #     role 2  wazuh=0 -> 403 refuse par la PERMISSION   <- chemin discriminant
+  #     role 3  wazuh=0 -> 200 admis par le ROLE SEUL
+  # C'est l'INVERSE d'`audit-ssh`, ou le role 2 detient la permission et entre par elle.
+  # ⚠ ET LE PIEGE DE LA METHODE Y EST TRIPLE, dans un seul module :
+  #     /wazuh/config        GET lit · POST ecrit      MEME CHEMIN
+  #     /wazuh/options       GET lit · POST ecrit      MEME CHEMIN
+  #     /wazuh/rules/<name>  GET lit · DELETE detruit  MEME CHEMIN
+  # Un filet qui classe par CHEMIN y classerait l'ecriture en lecture (le defaut de
+  # `go-bashrc-b4`). Son filet porte sur le MODULE et la methode tranche — et le fichier
+  # dit que ce motif attrape aussi la page `/wazuh/` du legacy, preservee par le seul
+  # filtre de methode. *Le mot qui aurait evite de casser `pare-feu` ce matin, ecrit la
+  # ou la prochaine session le lira.*
+  [go-page-wazuh]=33
   [go-page-groupes]=24
 )
 declare -A REF_LEGACY=(
   # Les trois pages portees dans la nuit du 2026-09-02, posees a 03:52.
   [go-page-audit-ssh]=15 [go-page-documentation]=13 [go-page-groupes]=15
+  [go-page-wazuh]=16
   [go-socle-auth]=13
   [go-page-commandlog]=5 [go-page-approvals]=5 [go-page-drift]=5 [go-page-backups]=5
   [go-page-tasks]=5 [go-page-tickets]=5 [go-page-search]=5
@@ -1128,7 +1149,7 @@ SUITES_LARAVEL=(go-socle-navigation go-socle-i18n go-socle-passerelle go-socle-a
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-page-cle-plateforme go-page-pare-feu go-page-accueil go-page-mot-de-passe
-  go-page-audit-ssh go-page-documentation go-page-groupes
+  go-page-audit-ssh go-page-documentation go-page-groupes go-page-wazuh
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5
   go-fail2ban-f6
@@ -1146,7 +1167,7 @@ SUITES_LEGACY=(go-socle-auth go-page-commandlog go-page-approvals go-page-drift
   go-adm-audit go-adm-notifications go-adm-comptes go-adm-suppression go-adm-permissions
   go-adm-serveurs go-adm-etiquettes-notes go-adm-cycle-connexion go-adm-cles-api
   go-page-cle-plateforme
-  go-page-audit-ssh go-page-documentation go-page-groupes
+  go-page-audit-ssh go-page-documentation go-page-groupes go-page-wazuh
   go-adm-comptes-distants go-adm-politiques go-adm-sftp go-bashrc-b1 go-bashrc-b2 go-bashrc-b3 go-bashrc-b4
   go-services-s1 go-services-s2 go-services-s3 go-fail2ban-f1 go-fail2ban-f2 go-fail2ban-f3 go-fail2ban-f4 go-fail2ban-f5 go-fail2ban-f6
   go-page-graylog-g1 go-page-graylog-g2
