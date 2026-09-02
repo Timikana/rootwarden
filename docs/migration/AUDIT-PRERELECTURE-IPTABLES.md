@@ -430,3 +430,99 @@ pas la date.
 Aucune conséquence de sécurité, aucune sur le rendu. **Signalé, non corrigé** :
 ce sont des résidus d'I1 et d'I2, et les toucher depuis I4 mélangerait les
 sous-lots. À la session qui reprendra ce module.
+
+---
+
+## 8. Ce qui reste mesurable SANS l'arbitrage — et qui devrait le précéder
+
+**Mesuré le 2026-09-02, lecture de fichiers seule.** Le Lead demande s'il reste
+quelque chose de mesurable sur `iptables` sans l'arbitrage du port SSH.
+**Oui — et c'est un fait qui change ce que signer cet arbitrage autorise.**
+
+### 8.1 SEC-015 — `_write_rules_safe` a DEUX régimes de sûreté, et un seul est par construction
+
+```python
+def _write_rules_safe(client, root_password, rules, dest_path):
+    encoded = base64.b64encode(rules.encode('utf-8')).decode('ascii')
+    execute_as_root(client,
+        f"printf '%s' '{encoded}' | base64 -d > {dest_path}",
+        root_password)
+```
+
+| paramètre | régime | pourquoi |
+|---|---|---|
+| `rules` | **sûr PAR CONSTRUCTION** | base64 → alphabet `[A-Za-z0-9+/=]`, ne peut pas sortir des guillemets simples |
+| `dest_path` | **sûr PAR CONVENTION** | `> {dest_path}` — interpolé **nu**, sans guillemets, sans validation |
+
+**Et il n'y a pas de seconde barrière** : `execute_as_root` compose
+`sudo -S -p '' sh -c {shlex.quote(command)}` — il cite **la commande entière**,
+ce qui ne protège **aucune** valeur interpolée à l'intérieur.
+
+**Le docstring ne dit que la première moitié** :
+
+> *« L'encodage base64 garantit qu'aucun caractère spécial contenu dans **les
+> règles** ne peut être interprété comme une commande shell (anti-injection). »*
+
+**C'est vrai, et c'est muet sur le chemin.** Un lecteur généralise la phrase à la
+fonction — c'est la troisième classe de la mission (*le commentaire affirme plus
+que le code*), ici **par omission** plutôt que par excès.
+
+### 8.2 L'invariant tient AUJOURD'HUI, et j'ai compté les appelants
+
+```
+iptables_manager.py:156   _write_rules_safe(…, rules_v4, "/etc/iptables/rules.v4")
+iptables_manager.py:160   _write_rules_safe(…, rules_v6, "/etc/iptables/rules.v6")
+```
+
+**Deux appelants, deux littéraux.** Aucun chemin dérivé d'une entrée client,
+`/iptables-rollback` compris — il passe par `apply_iptables_rules`, qui passe les
+mêmes littéraux.
+
+**UN COMPTE RÉEL L'OCCUPE-T-IL AUJOURD'HUI : non.** Il n'y a pas de chemin
+d'appel qui atteigne `dest_path` depuis une requête.
+
+### 8.3 Pourquoi ceci doit précéder l'arbitrage, et pas le suivre
+
+**I5 est le sous-lot qui ajouterait des appelants à cette fonction.** Toute
+fonctionnalité qui *dérive* une destination — une sauvegarde nommée, un fichier
+d'attente, un chemin par machine — transforme `dest_path` en **injection de
+commande root**, et le module ne porte alors aucune barrière.
+
+> **Signer l'arbitrage du port SSH autorise l'exécution d'un chemin dont le
+> helper d'écriture a un paramètre de chemin non cité et non validé.** Ce n'est
+> pas une raison de ne pas signer — c'est une chose à savoir en signant.
+
+**CORRECTIF PROPOSÉ, à coût nul et sans changement de comportement** :
+`shlex.quote(dest_path)` dans la f-string, **et une ligne de docstring qui dit
+que le paramètre `dest_path` n'est PAS protégé par le base64.** *Documenter
+l'invariant là où il referme* — la règle est déjà écrite sur cette fonction, elle
+n'y a simplement jamais été appliquée. **Session 4 applique.**
+
+**Ce que le correctif casserait : rien.** `shlex.quote` sur un littéral
+`/etc/iptables/rules.v4` rend la même chaîne.
+
+### 8.4 Auto-contrôle : ma propre affirmation d'I2 est VÉRIFIÉE
+
+I2 refuse d'enregistrer une copie dont `rules_v4` est vide, et **le commentaire
+livré justifie ce refus en invoquant le backend** : *« `iptables-rollback` refuse
+déjà d'appliquer une version dont `rules_v4` est vide […] on REMONTE cette règle
+au lieu d'en inventer une »*.
+
+**Vérifié dans le code, pas de mémoire** :
+
+```python
+# Une version vide n'est pas une version : l'appliquer ecraserait le
+# fichier de regles persistant de la machine par du vide.
+if not (row.get('rules_v4') or '').strip():
+    return jsonify({'success': False, 'message': 'Version vide, restauration refusee'}), 409
+```
+
+**La justification livrée repose sur du code réel.** Je l'avais écrite sans la
+revérifier au moment de la livrer ; elle tient.
+
+### 8.5 Et c'est tout — le reste d'`iptables` est bloqué
+
+Les questions restantes portent toutes sur l'**exécution** : ce que
+`iptables-restore` fait d'un jeu de règles réel, ce qu'un rollback restaure
+vraiment, si la machine reste joignable après. **Aucune ne se mesure par la
+lecture.** Ma marge va donc en pré-relecture, comme le Lead le propose.
