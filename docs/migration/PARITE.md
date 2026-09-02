@@ -13762,3 +13762,64 @@ du planificateur.
 
 **Et ça RÉDUIT la portée de SEC-013** : son effet d'aveuglement ne touche pas les scans planifiés.
 La session 5 l'a signalé **dans ce sens-là** — celui où personne ne vient corriger une exagération.
+
+## E-283 — retrait de clé : la sauvegarde EXISTE, la RESTAURATION n'existe pas — et c'est plus étroit que le relevé
+
+La session 2 a rapporté *« aucune sauvegarde n'entoure la réécriture d'`authorized_keys` — ni `cp`,
+ni `.bak`, ni fichier temporaire »*. **Faux sur les trois** :
+
+    _script_retrait_par_empreintes  (:2329)   tmp=$(mktemp) ; cp "$ak" "${tmp}.bak"
+    _script_vidage_complet          (:2394)   cp -a "$ak" "$ak.bak.rw"
+
+**Le vrai manque est ailleurs, et il est plus intéressant** : la sauvegarde est prise, **rien ne la
+rappelle**. Il n'existe aucun équivalent de `_restaure_sshd` pour `authorized_keys`. Sur le chemin
+« empreinte introuvable », le script fait `rm -f "$tmp" "${tmp}.bak"` et sort — *il détruit sa propre
+sauvegarde en nettoyant*. Et les deux copies n'ont pas la même durée de vie : `${tmp}.bak` vit dans
+un temporaire, `$ak.bak.rw` reste à côté du fichier.
+
+> **Prendre une sauvegarde et savoir la rappeler sont deux gestes distincts, et seul le second
+> protège.** `sshd_allow_user` fait les deux — `_restaure_sshd` est appelée à ses **trois** points
+> d'échec (`:231`, `:237`, `:243`). Ses voisines, à quelques centaines de lignes, font le premier
+> seul.
+
+Et un `|| true` là où il compte : `chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true`
+(`:2388`). Si la restitution du propriétaire échoue, **le fichier peut rester à `root` et l'accès du
+compte tombe** — silencieusement. C'est le motif « jamais `|| true` dans un garde », sur le geste
+final d'une écriture distante.
+
+### Ce que le relevé avait juste, et qui vaut plus que l'erreur
+
+**La garde « se couper la patte » existe ici et nulle part ailleurs** : les deux retraits **refusent**
+si la clé visée est celle de la plateforme, et le `--force` que le message annonce **existe**
+(`force = bool(data.get('force', False))`). *`iptables/` n'a rien de tel.*
+
+**`sshd_allow_user` est le geste distant le mieux construit du chantier** : quatre sorties anticipées
+avant toute écriture · sauvegarde d'abord **avec arrêt si elle échoue** · patch par fichier
+temporaire · `sshd -t` **avant** rechargement · rechargement **sans `|| true`** — le commentaire dit
+que ce `|| true` rendait autrefois le code toujours nul, *donc un échec passait pour un succès* ·
+et une **attestation** qui relit la configuration effective. **Seul geste du chantier dont la
+réussite est relue sur la machine au lieu d'être déduite d'un code de retour.**
+
+**`delete_remote_user`** : verdict par `id <username>`, pas par le code de sortie. Et un point pour
+le panneau de portage — **`remove_home` emporte le répertoire personnel** (`userdel -r`), et rien
+dans l'interface ne distingue les deux réversibilités.
+
+## E-284 — `documentation` : la garde est un SEUIL DE RÔLE, pas une permission — et un lecteur ne la trouvera pas
+
+Relevé par la session 2. Aucun `checkPermission` dans la page : la seule occurrence (`:295`) est
+**dans un exemple de code**. Le seul gating est `$isAdmin = $role >= 2`, sur **six blocs** pour
+**cinq sections**.
+
+**Un rôle 1 voit 43 des 48 sections.** Les cinq réservées — `api`, `proxy`, `healthcheck`, `preprod`,
+**`api-test` (la console)** — bornent le rôle 1 à la documentation **fonctionnelle** et le privent de
+tout ce qui décrit l'infrastructure et la surface d'API. **C'est une décision cohérente, et la seule
+chose de cette page qui soit gardée par une décision plutôt que par l'oubli.**
+
+**Pour le portage** : reproduire un **seuil de rôle**, et le **déclarer**. *Un lecteur qui cherche une
+permission n'en trouvera pas et conclura que la page est ouverte.* L'entrée de menu porte
+`'garde' => 'tous'`, ce qui dit vrai de la page et faux de son contenu.
+
+Le croisement est propre : cinq sections par parcours de la **profondeur** des `if`/`endif`, cinq
+blocs `$isAdmin` comptés séparément (`:64`, `:1404`, `:1501`, `:1683`, `:1721`), **et l'écart 6/5
+s'explique** — le premier bloc n'enclôt aucune `<section>`. *Deux mesures indépendantes, même
+résultat, et la divergence rendue.* **C'est la forme qu'un chiffre vérifié doit avoir** — voir E-278.

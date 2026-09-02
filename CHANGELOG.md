@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.135** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.136** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,33 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.136 — retrait de clé : la sauvegarde existe, la restauration non ; et `documentation` garde par un seuil de rôle
+
+**E-283.** Le relevé annonçait « aucune sauvegarde, ni `cp`, ni `.bak`, ni fichier temporaire » autour
+de la réécriture d'`authorized_keys` : faux sur les trois — `_script_retrait_par_empreintes` fait
+`mktemp` + `cp "$ak" "${tmp}.bak"`, `_script_vidage_complet` fait `cp -a "$ak" "$ak.bak.rw"`. **Le vrai
+manque est plus étroit et plus intéressant : la sauvegarde est prise, rien ne la rappelle.** Aucun
+équivalent de `_restaure_sshd` pour `authorized_keys` ; sur le chemin « empreinte introuvable » le
+script `rm -f` sa propre sauvegarde en nettoyant. *Prendre une sauvegarde et savoir la rappeler sont
+deux gestes distincts, et seul le second protège.* S'ajoute un `|| true` sur le `chown` final : si la
+restitution du propriétaire échoue, le fichier peut rester à `root` et l'accès du compte tombe,
+silencieusement.
+
+Ce que le relevé avait juste : la garde « se couper la patte » (refus si la clé visée est celle de la
+plateforme, avec un `--force` qui existe vraiment) n'a d'équivalent nulle part ailleurs ; et
+`sshd_allow_user` est le geste distant le mieux construit du chantier — quatre sorties anticipées,
+sauvegarde avec arrêt si elle échoue, `sshd -t` avant rechargement, rechargement sans `|| true`, et
+une **attestation** qui relit la configuration effective. Seul geste dont la réussite est relue sur la
+machine plutôt que déduite d'un code de retour.
+
+**E-284 — `documentation` garde par un seuil de rôle, pas par une permission.** Aucun
+`checkPermission` (la seule occurrence est dans un exemple de code) ; le seul gating est
+`$isAdmin = $role >= 2`. Un rôle 1 voit **43 des 48 sections** — les cinq réservées (`api`, `proxy`,
+`healthcheck`, `preprod`, `api-test`) le bornent à la documentation fonctionnelle. Le portage doit
+reproduire un **seuil** et le **déclarer** : un lecteur qui cherche une permission n'en trouvera pas
+et conclura que la page est ouverte. L'entrée de menu porte `'garde' => 'tous'`, vrai de la page et
+faux de son contenu.
 
 ### v1.38.135 — E-280 corrigé sur trois points : j'avais tort, et mon erreur m'est revenue confirmée
 
