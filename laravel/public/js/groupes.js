@@ -157,6 +157,32 @@
     }
 
     /*
+     * ══════════════════════════════════════════════════════════════════════
+     *  A LIRE PAR QUI REMPLACERA CE PANNEAU PAR LE VRAI BOUTON
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * L'action groupee `cve_scan` ENVOIE DE VRAIS COURRIELS — un par machine
+     * a resultats. Ce n'est pas une prudence de principe : c'est une chaine
+     * d'appels lue, et recoupee par deux sessions.
+     *
+     *     backend/routes/groups.py:269   from routes.cve import _stream_cve_scan
+     *     backend/routes/groups.py:278   for _line in _stream_cve_scan([mid], min_cvss)
+     *     backend/routes/cve.py:77       send_cve_report(...)
+     *     srv-docker.env:206             MAIL_ENABLED=true      <- EN SERVICE
+     *
+     * **Ce geste reste sous interdiction de declenchement**, comme les autres
+     * actions de masse : un seul clic produit N sessions SSH et N envois.
+     *
+     * ── POURQUOI CETTE NOTE EST ICI ET PAS SEULEMENT A L'ECRAN ───────────
+     *
+     * Le panneau ci-dessous DIT deja ce fait a l'utilisateur. Mais ce texte
+     * disparaitra avec le panneau — c'est-a-dire au moment exact ou quelqu'un
+     * le remplacera par le bouton reel, donc **au moment ou le fait compte le
+     * plus**.
+     *
+     * **Une reserve qui vit dans l'objet qu'elle protege meurt quand cet objet
+     * est remplace.** Le commentaire, lui, survit a la substitution.
+     *
      * ══ LE PANNEAU LE PLUS IMPORTANT DU MODULE ═══════════════════════════
      *
      * Un clic, N machines, et pour CHACUNE : une session SSH reelle et un
