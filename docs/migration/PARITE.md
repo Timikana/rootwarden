@@ -15550,3 +15550,98 @@ message, la classe de caractères), donc l'auto-exclusion par crochets n'a rien 
 occurrence du même piège dans ce chantier**, et il est en mémoire depuis le 28 août : *attendre un PID
 enregistré, jamais un motif.* Les trois PID rendus se sont révélés être mes propres sous-shells — leur
 `/proc/<pid>/cmdline` avait déjà disparu quand je les ai lus.
+
+## E-319 — une RÉFÉRENCE sans inscription dans la liste jouée : une COUVERTURE APPARENTE
+
+**Ma faute, trouvée par la session 7 pendant que le LOT tournait.** J'avais posé les trois références en
+`REF_LARAVEL` / `REF_LEGACY` — **et jamais les noms dans `SUITES_LARAVEL` / `SUITES_LEGACY`.**
+
+    go-page-audit-ssh       REF=2  SUITES_LARAVEL=0  SUITES_LEGACY=0
+    go-page-documentation   REF=2  SUITES_LARAVEL=0  SUITES_LEGACY=0
+    go-page-groupes         REF=2  SUITES_LARAVEL=0  SUITES_LEGACY=0
+    go-page-pare-feu        REF=2  SUITES_LARAVEL=2  SUITES_LEGACY=1   <- le temoin, l'instrument voit
+
+> **Une référence sans inscription dans la liste n'est pas une couverture manquante : c'est une
+> couverture APPARENTE.** Une suite hors LOT **se voit** par son absence ; celles-ci **apparaissaient**
+> dans le fichier, et leur ligne `[go-page-audit-ssh]=18` disait le contraire de la réalité.
+
+*Nous aurions fabriqué en une nuit ce que son registre des 40 hors-LOT dénonçait quatre heures plus
+tôt — en pire, puisqu'elles se donnaient pour intégrées.*
+
+### La cause : j'ai éprouvé LA TABLE, pas LA LISTE
+
+Mon éprouvage disait vrai : les trois références résolvent, et `go-page-inexistante-temoin` rend
+`(pas de référence)`. **Les deux propositions étaient exactes et ne portaient pas sur l'objet qui
+compte.**
+
+**Cinquième fois cette nuit qu'un témoin mord sur le mauvais objet** — c'est E-295 appliqué à moi-même,
+deux heures après que je l'aie inscrit.
+
+**Corrigé et éprouvé sur la liste jouée**, en la faisant **évaluer par bash lui-même** plutôt qu'en la
+grepant :
+
+    SUITES_LARAVEL  83   (etait 80)     go-page-audit-ssh      laravel=1 legacy=1
+    SUITES_LEGACY   81   (etait 78)     go-page-documentation  laravel=1 legacy=1
+    TOTAL          164   (etait 158)    go-page-groupes        laravel=1 legacy=1
+                                        go-page-pare-feu       1/1   temoin POSITIF
+                                        go-page-temoin-inexistant 0/0 temoin NEGATIF
+
+**La nouvelle ligne de base attendue est 164, pas 158.** Et la session 7 a nommé le contrôle qui rend
+ça détectable : *« un compte qui ne bouge pas est le signe le plus fiable que l'inscription n'a pas eu
+lieu »* — c'est ce qui lui a mis la puce à l'oreille.
+
+### ⚠ ET J'AI SUR-ÉVALUÉ LE COÛT, DANS LE SENS QUI JUSTIFIAIT MA DÉCISION
+
+J'ai écrit *« huit minutes perdues contre une ligne de base qui ment »*. Elle a mesuré :
+
+> **Deux exécutions jouées, deux perdues — pas huit minutes de mesure, deux suites.**
+
+**Le LOT avait huit minutes d'horloge ; il avait produit deux exécutions.** Ma phrase transformait une
+durée en quantité de travail, et **elle le faisait dans le sens qui rendait mon ordre d'arrêt plus
+évident**.
+
+> *Mesurer deux fois ce qui arrange* — je l'ai inscrit cette nuit pour les **affirmations**, puis la
+> session 8 l'a étendu aux **réserves**. Voici la troisième forme : **le coût qu'on cite pour justifier
+> sa propre décision.** Personne ne le vérifie, puisqu'il plaide pour ce qui est déjà fait.
+
+*L'arrêt restait la bonne décision. Mon argument était plus gros que le fait.*
+
+### Le geste de retenue qui rend le mot d'avance possible
+
+**Elle n'a pas arrêté le LOT d'elle-même** alors que l'arrêt était manifestement juste et que chaque
+minute comptait : le mot que je lui avais donné couvrait *lancer*, pas *interrompre*, et `scripts/` est
+mon fichier.
+
+> **Si elle avait élargi mon mandat une fois « parce que c'était évident », je ne pourrais plus lui dire
+> "lance sans me redemander" sans le borner à chaque geste.** Le coût de sa retenue est le prix du mot
+> d'avance — et il est bon marché.
+
+## E-320 — l'auto-capture par motif : DEUX fois, par DEUX sessions, en une nuit
+
+    moi   pgrep -af "[r]ejouer-lot"     -> 3 PID, tous mes propres sous-shells
+          la ligne portait le mot TROIS fois : le motif, l'echo, la classe de caracteres
+
+    elle  pkill -f 'attend-porte'       -> sa ligne portait le mot, elle s'est TUEE ELLE-MEME
+          et pendant 30 s « rien ne tournait alors qu'elle croyait avoir remplace un script »
+
+**La classe de caractères n'empêche que l'auto-capture du motif nu.** Toute autre mention du nom sur la
+ligne — un écho, un chemin de journal, un commentaire — la réamorce.
+
+> **Ce n'est plus une étourderie individuelle : deux lecteurs prudents, deux instruments différents, le
+> même piège à une heure d'écart, sur une règle écrite depuis le 28 août.** *Une règle qu'on connaît et
+> qu'on refait est une règle qui n'a pas de forme applicable.*
+
+**La forme applicable, et elle est de la session 7** : scinder le motif dans la ligne de contrôle
+elle-même — `A='rejouer'; B='-lot'` — **pour que la commande ne contienne jamais le motif contigu**. Et
+pour l'arrêt : **descendre par le PID enregistré**, jamais par le nom.
+
+### Et elle a retourné ma formulation contre son propre outil, sans qu'on le lui demande
+
+> Mon témoin de POST prouve que le collecteur **voit** les POST. Il ne prouve pas que je surveille les
+> **bonnes routes**. *Si j'avais écrit `INTERDITS` sur un chemin qui n'existe pas, le témoin aurait mordu
+> et l'assertion serait restée verte à vide.*
+
+**C'est la même faute que la mienne, trouvée par elle sur elle-même avant qu'elle coûte quoi que ce
+soit.** Non corrigée volontairement — *« un vrai point, pas une urgence, et je ne veux pas toucher deux
+suites pendant qu'un LOT se prépare »*. **À vérifier : que les motifs `INTERDITS` correspondent à des
+routes réellement exposées.**

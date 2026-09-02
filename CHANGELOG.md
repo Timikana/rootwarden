@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.165** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.166** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,36 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.166 — une référence sans inscription dans la liste jouée est une COUVERTURE APPARENTE
+
+**E-319, ma faute**, trouvée pendant que le LOT tournait. J'avais posé les trois références en
+`REF_LARAVEL`/`REF_LEGACY` **et jamais les noms dans `SUITES_LARAVEL`/`SUITES_LEGACY`**. *Une suite hors
+LOT se voit par son absence ; celles-ci **apparaissaient** dans le fichier, et leur ligne disait le
+contraire de la réalité.* Nous aurions fabriqué en une nuit ce que le registre des 40 hors-LOT dénonçait
+quatre heures plus tôt — **en pire, puisqu'elles se donnaient pour intégrées.**
+
+**La cause** : mon éprouvage disait vrai — les références résolvent, le témoin inexistant rend « pas de
+référence » — **mais il portait sur la table, pas sur la liste jouée.** Cinquième fois cette nuit qu'un
+témoin mord sur le mauvais objet. **Corrigé et éprouvé en faisant évaluer les tableaux par bash
+lui-même** : `SUITES_LARAVEL` 83, `SUITES_LEGACY` 81, **total 164 (était 158)**, avec témoin positif
+(`pare-feu` 1/1) et négatif (0/0). *Un compte qui ne bouge pas est le signe le plus fiable que
+l'inscription n'a pas eu lieu.*
+
+**⚠ Et j'ai sur-évalué le coût dans le sens qui justifiait ma décision** : j'ai écrit « huit minutes
+perdues », c'était **deux exécutions**. Le LOT avait huit minutes d'horloge et avait produit deux suites.
+*Mesurer deux fois ce qui arrange* — inscrit pour les affirmations, étendu aux réserves, **et voici la
+troisième forme : le coût qu'on cite pour justifier sa propre décision, que personne ne vérifie
+puisqu'il plaide pour ce qui est déjà fait.* L'arrêt restait juste ; mon argument était plus gros que le
+fait.
+
+**E-320 — l'auto-capture par motif, deux fois, par deux sessions, en une nuit.** `pgrep -af
+"[r]ejouer-lot"` a rendu mes propres sous-shells (ma ligne portait le mot **trois fois**) ; un
+`pkill -f 'attend-porte'` s'est **tué lui-même**, laissant trente secondes où rien ne tournait sans que
+personne le sache. *Deux lecteurs prudents, deux instruments, le même piège à une heure d'écart, sur une
+règle écrite depuis le 28 août — **une règle qu'on connaît et qu'on refait est une règle qui n'a pas de
+forme applicable.*** La forme applicable : **scinder le motif dans la ligne de contrôle**
+(`A='rejouer'; B='-lot'`), et pour l'arrêt **descendre par le PID enregistré**.
 
 ### v1.38.165 — objection retirée sur `iptables`, et la page sous-déclare sa propre capacité
 
