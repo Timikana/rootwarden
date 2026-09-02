@@ -14714,3 +14714,47 @@ n'envoie pas de courriel, **et sa seule notification ne peut pas porter la sév�
 qu'on la regarde.** *Le total est transmis ; ce qui décide de l'alerte ne l'est pas.*
 
 Non corrigé — **arbitrage exploitant**, et de toute façon inerte sous E-238.
+
+## E-300 — la non-mesure déclarée par la session 5 est close : le webhook est bien fermé EN SERVICE
+
+Elle avait écrit, avant que ça serve : *« je lis le **défaut du code**, pas l'environnement. Si un
+exploitant l'a activé, l'effet sortant revient. Cette mesure demande un conteneur, donc je ne l'ai pas
+prise. »* **Prise ce matin, 02:53 :**
+
+    printenv WEBHOOK_ENABLED   ->  (vide — variable NON DEFINIE)
+    printenv WEBHOOK_URL       ->  (vide)
+    printenv MAIL_ENABLED      ->  true                    <- LE TEMOIN
+
+**Le témoin est ce qui rend les deux premières lignes lisibles.** Sans lui, « la variable n'est pas
+définie » et « `printenv` n'a pas tourné » rendent la même sortie vide. `MAIL_ENABLED` revenant avec
+une valeur par la **même commande, dans le même conteneur**, établit que l'instrument a regardé.
+
+Donc `os.getenv('WEBHOOK_ENABLED','false')` retombe sur son défaut et `is_enabled()` rend `False` :
+**le webhook est fermé en service, pas seulement dans le code.**
+
+> Elle avait déclaré cette limite **avant qu'elle serve**, et non après qu'on la lui reproche. *Une
+> non-mesure annoncée à l'avance est un fait ; annoncée après coup, c'est une excuse.* C'est ce qui a
+> permis de la fermer proprement en une commande, six heures plus tard, par quelqu'un d'autre.
+
+### Ce que ça consolide, et ce que ça ne change pas
+
+**Le tableau des effets sortants est maintenant mesuré de bout en bout, dans l'environnement servi :**
+
+    route `/cve/…`        courriel  OUI     MAIL_ENABLED=true
+    action groupee        courriel  OUI     via `groups.py` -> `_stream_cve_scan`
+    scheduler             courriel  NON     webhook seul
+                          webhook   FERME   WEBHOOK_ENABLED non defini
+
+**Le seul chemin qui tourne sans personne devant l'écran n'émet donc RIEN** — ni courriel, ni webhook,
+et sa notification ne pourrait de toute façon jamais porter `critical` ni `high` (E-299).
+
+*Trois mesures indépendantes convergent sur la même conclusion, et aucune ne vient de moi seul :* la
+session 5 a lu les appels, la session 8 a lu l'environnement du courriel, j'ai lu celui du webhook.
+**C'est la première fois cette nuit qu'un accord se forme par trois gestes différents** — au lieu de
+trois répétitions du mien.
+
+### Et le défaut de portée reste entier
+
+Rien de ceci ne touche E-280 ni E-281 : la branche qui échoue ouvert **ouvre toujours une session SSH
+par machine, avec le mot de passe SSH et le mot de passe root déchiffrés dans la boucle**. *Ce qui
+tombe est le bruit, pas le geste* — et un défaut muet est le plus difficile à voir passer.

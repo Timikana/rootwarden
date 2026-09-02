@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.151** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.152** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,33 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.152 — le webhook est fermé EN SERVICE : la non-mesure déclarée est close
+
+**E-300.** La session 5 avait déclaré, **avant que ça serve**, qu'elle lisait le *défaut du code* et non
+l'environnement, et que la mesure demandait un conteneur. Prise ce matin :
+
+    printenv WEBHOOK_ENABLED  ->  (vide, non defini)
+    printenv MAIL_ENABLED     ->  true                <- LE TEMOIN
+
+**Le témoin rend la première ligne lisible** : sans lui, « variable non définie » et « la commande n'a
+pas tourné » rendent la même sortie vide. Donc `is_enabled()` rend `False` — **le webhook est fermé en
+service, pas seulement dans le code**.
+
+*Une non-mesure annoncée à l'avance est un fait ; annoncée après coup, c'est une excuse.* Celle-ci a pu
+être fermée en une commande, six heures plus tard, par quelqu'un d'autre.
+
+**Le tableau des effets sortants est maintenant mesuré de bout en bout dans l'environnement servi** :
+route et action groupée envoient un courriel réel ; le scheduler n'émet **rien** — pas de courriel, un
+webhook fermé, et une notification qui ne pourrait de toute façon jamais porter `critical` ni `high`
+(E-299). **Le seul chemin qui tourne sans personne devant l'écran est totalement muet.**
+
+Trois mesures indépendantes convergent, par **trois gestes différents** — les appels, l'environnement du
+courriel, celui du webhook. *Première fois cette nuit qu'un accord se forme autrement que par répétition
+du même geste.*
+
+**Le défaut de portée reste entier** : la branche qui échoue ouvert ouvre toujours une session SSH par
+machine avec les identifiants root déchiffrés. *Ce qui tombe est le bruit, pas le geste.*
 
 ### v1.38.151 — le courriel CVE : le discriminant est le CHEMIN, et ma rétractation était trop large
 
