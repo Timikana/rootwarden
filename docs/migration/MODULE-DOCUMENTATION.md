@@ -84,7 +84,7 @@ réécriture appartient à l'exploitant. Ce qui est mesurable, et utile :
 | | |
 |---|---|
 | `<section>` | **48** |
-| `doc-anchor` | **49** — un ancrage de plus que de sections, non expliqué |
+| `doc-anchor` | **48 ancrages** — le 49ᵉ `grep` est **la règle CSS** `.doc-anchor { scroll-margin-top: 5rem; }` (`:24`), pas un ancrage. **Écart expliqué : il n'y en a pas.** |
 | sections portant un `id` | **47** |
 
 **Onze sections décrivent une partie DÉJÀ ARCHIVÉE** : `docker`, `backups`, `search`, `tickets`,
