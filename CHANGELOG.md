@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.150** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.151** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,34 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.151 — le courriel CVE : le discriminant est le CHEMIN, et ma rétractation était trop large
+
+**E-298.** Vérifié : `send_cve_report` part de `routes/cve.py:77`, **conditionné à `all_findings`** ; et
+`routes/groups.py:269` **importe `_stream_cve_scan` de `routes.cve`** — donc **l'action groupée envoie
+aussi de vrais courriels**. Le scheduler, lui, appelle `scan_server` directement et n'envoie qu'un
+webhook. `MAIL_ENABLED` vaut **`true`** dans l'environnement servi.
+
+**Ma rétractation était juste pour E-281 (le scheduler) et fausse dès qu'on la sortait de là.** Cinq
+documents allaient être corrigés sur sa foi ; **deux étaient exacts** — `MODULE-GROUPS.md:357` dit « un
+vrai courriel par machine **à résultats** », exact au mot près. *Une rétractation se propage plus vite
+et avec moins de résistance qu'une affirmation : personne ne conteste quelqu'un qui reconnaît une
+erreur, et c'est ce qui la rend dangereuse quand elle est trop large.*
+
+**⚠ L'inversion est le vrai résultat** : *les deux chemins qui ont un humain devant l'écran envoient un
+courriel ; le seul qui tourne sans personne est muet.* Nous cherchions quelle tâche fait le plus de
+bruit — c'est celle qu'on regarde.
+
+**Conséquence pour `groups` R2** : l'action groupée `cve_scan` envoie de vrais courriels. L'interdiction
+permanente sur les actions de masse de `groups/` **reposait sur une prudence, elle repose maintenant sur
+une chaîne d'appels lue.**
+
+**E-299 — un scan planifié ne peut jamais notifier en `critical` ni en `high`.**
+`notify_cve_scan(…, total_findings, 0, 0, 0, scanned)` : les trois sévérités sont passées **en dur à
+`0`**, et `webhooks.py:165` aiguille sur `if critical > 0` puis `elif high > 0`. **Les deux branches
+sont mortes par construction.** Composé avec E-298 : le seul chemin non surveillé n'envoie pas de
+courriel **et** sa notification ne peut pas porter la sévérité qui justifierait qu'on la regarde.
+*Le total est transmis ; ce qui décide de l'alerte ne l'est pas.* Arbitrage exploitant.
 
 ### v1.38.150 — une garde à deux voies exercée par une seule voie n'est pas mesurée, elle est supposée
 
