@@ -94,9 +94,35 @@ return [
     'danger_portee' => 'Cette reconnaissance porte sur huit formes connues. Elle ne verifie ni ce que fait le reste du fichier, ni ce que fera celui-ci une fois deploye — seule sa syntaxe sera controlee a l\'enregistrement.',
     'danger_confirmer' => 'Ce gabarit contient des formes reconnues comme destructrices. L\'enregistrer quand meme ?',
 
+    /*
+     * ⚠ CETTE PHRASE DECLARAIT ABSENTES DEUX CAPACITES QUI SONT PORTEES ICI.
+     *
+     * Elle etait vraie a l'ecriture (B1). Depuis, `chargeComptes()` appelle
+     * `/bashrc/users` et rend une case A COCHER PAR COMPTE, et le bouton
+     * `bashrc-apercu` appelle `/bashrc/preview` puis affiche le diff. La
+     * phrase envoyait donc vers l'ancien portail pour deux gestes que la page
+     * fait -- un manque declare a tort est une capacite perdue sans que rien
+     * ne l'ait retiree.
+     *
+     * L'ENUMERATION EST LA SEULE SOURCE, et elle est apparie aux 7 routes de
+     * `backend/routes/bashrc.py`. Appelees par cette page : `users`,
+     * `preview`, `template`. Appelees par personne, donc absentes :
+     * `deploy`, `prerequisites` (POST, il INSTALLE), `restore`, `backups`.
+     *
+     * Qui porte l'un de ces quatre gestes met a jour CETTE phrase dans le
+     * meme commit.
+     *
+     * ET LA PHRASE N'ANNONCE PAS CE QUI EST PORTE, bien que la correction
+     * l'ait d'abord fait. Vu a l'image : cet encart a pour action PRINCIPALE
+     * un lien vers l'ancien portail, et il tombe juste sous « Cochez une
+     * machine ci-dessus pour lire ses comptes ». Y ecrire « choisir les
+     * comptes est porte ici » faisait dire a l'encart le contraire de ce que
+     * sa place et son bouton disent. Un encart « ce qui manque » n'enonce que
+     * des manques ; le present, la page le MONTRE.
+     */
     'non_porte_titre' => 'Les gestes de deploiement ne sont pas encore portes',
-    'non_porte_texte' => 'Choisir les comptes, previsualiser le fichier et le deployer se font pour '
-                         . 'l\'instant depuis l\'ancien portail. Cette page porte l\'inventaire et '
-                         . 'les acces ; les gestes suivent.',
+    'non_porte_texte' => 'Le deploiement lui-meme, l\'installation des prerequis, la restauration '
+                         . 'd\'une version anterieure et la liste des sauvegardes se font pour '
+                         . 'l\'instant depuis l\'ancien portail.',
     'non_porte_lien'  => 'Ouvrir le deploiement dans l\'ancien portail',
 ];

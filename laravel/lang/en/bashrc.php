@@ -93,9 +93,14 @@ return [
     'danger_portee' => 'This recognition covers eight known forms. It checks neither what the rest of the file does, nor what this one will do once deployed — only its syntax is checked on saving.',
     'danger_confirmer' => 'This template contains forms recognised as destructive. Save it anyway?',
 
+    /* See the note in `lang/fr/bashrc.php`: the enumeration is the single
+     * source, and it is paired against the 7 routes of
+     * `backend/routes/bashrc.py`. Called by this page: `users`, `preview`,
+     * `template`. Called by nobody, hence absent: `deploy`, `prerequisites`
+     * (POST -- it INSTALLS), `restore`, `backups`. */
     'non_porte_titre' => 'The deployment gestures are not ported yet',
-    'non_porte_texte' => 'Choosing accounts, previewing the file and deploying it are done from the '
-                         . 'legacy portal for now. This page carries the inventory and the access '
-                         . 'guards; the gestures follow.',
+    'non_porte_texte' => 'Deploying itself, installing the prerequisites, restoring an earlier '
+                         . 'version and listing the backups are done from the legacy portal for '
+                         . 'now.',
     'non_porte_lien'  => 'Open deployment in the legacy portal',
 ];
