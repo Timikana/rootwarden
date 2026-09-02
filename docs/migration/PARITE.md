@@ -15801,3 +15801,107 @@ est en lecture seule ; si c'est vrai, TOUTE écriture est un défaut — pas seu
 nommer »*. Elle assume que sa suite rougisse le jour où un sous-lot composera une écriture légitime,
 **parce que ce changement mérite d'être vu.** *Une liste fermée protège contre ce qu'on a prévu ; une
 règle de méthode protège contre ce qu'on n'a pas prévu.*
+
+## E-324 — ⚠ J'AI VALIDÉ SA GÉNÉRALISATION SANS LA MESURER, et le vrai défaut est dans le FILET
+
+En E-323 j'ai inscrit son choix de la forme (a) — *« tout ce qui n'est pas GET est interdit »* — comme
+**la bonne règle générale**, sur la seule force de son raisonnement. **Elle l'a retirée elle-même, avec
+des mesures. Vérifié par moi, quatre points sur quatre.**
+
+### 1. Le verdict d'`audit-ssh` n'utilise PAS `INTERDITS` — il était déjà en forme (a)
+
+    go-page-audit-ssh.mjs:381
+      const ecritures = passees.filter(p => p.methode !== 'GET' && /ssh-audit/.test(p.route))
+
+    INTERDITS : ligne 91 (definition) · ligne 175 (r.abort())  ->  AVORTER SEULEMENT
+
+**Donc `fix`, `scan-all`, `restore` étaient couverts par le verdict depuis le début.** Mon
+« si la page composait un appel vers `fix`, la suite resterait verte » — que j'avais annoncé comme
+mesuré — **était faux, et elle l'a corrigé en lisant l'assertion au lieu de la supposer.**
+
+### ⚠ 2. Le trou est dans le FILET, et il est pire autrement
+
+`INTERDITS` ne sert qu'à **avorter**. Donc un `POST /ssh-audit/fix` composé par la page :
+
+    n'est PAS avorte (le motif ne le connait pas)  ->  IL PART POUR DE VRAI
+    est ENSUITE compte comme ecriture              ->  la suite rougit
+
+> **La suite dit vrai. Mais elle laisse le geste s'accomplir avant de le dire.** Sur une page qui vise
+> `Test-Server-Debian`, `fix` réécrit `sshd_config` sur une vraie machine.
+>
+> **Le garde qui EMPÊCHE n'est pas celui qui JUGE — et c'est celui qui empêche qui est troué.**
+
+*Nous avions tous deux regardé le juge et conclu sur le filet.*
+
+### ⚠ 3. L'ANCRE `(\?|$)` est pire que le fantôme — mesuré, 3 attrapées sur 13
+
+    /ssh-audit/scan          ATTRAPE
+    /ssh-audit/scan-all      ECHAPPE     <- alors que « scan » EST dans le motif
+    /ssh-audit/fix           ECHAPPE
+    /ssh-audit/fleet         ECHAPPE
+    /ssh-audit/save-config   ECHAPPE
+    /ssh-audit/policies      ATTRAPE
+
+> **`fleet-scan` avait au moins l'honnêteté d'être visiblement absent. `scan` a l'air de couvrir
+> `scan-all` et ne le couvre pas.** Un fantôme se trouve en confrontant la liste aux routes ; **une
+> ancre trop serrée ne se trouve qu'en exerçant le motif.**
+
+Même défaut sur `groupes` : `/groups/5/run` — *l'exécution groupée, la route la plus dangereuse du
+module* — **échappe**, et `action|scan|delete` y sont trois fantômes.
+
+### ⚠ 4. « NON-GET = ÉCRITURE » EST FAUX SUR CE BACKEND, AUJOURD'HUI
+
+    backend/routes/iptables.py:29   @bp.route('/iptables', methods=['POST'])
+                            :44       if action == "get":
+                            :45           rules = get_iptables_rules(client, root_password)
+
+    backend/routes/ssh_audit.py:360 @bp.route('/ssh-audit/config', methods=['POST'])  -> LIT sshd_config
+
+**Le risque que je signalais n'était pas dans un A2 futur : il est en production.** Sur `iptables`,
+c'est le **corps** qui discrimine, pas la méthode — un garde par méthode y rougirait **sur une lecture
+légitime**.
+
+### La règle qu'elle rend, et elle dépend du RÉGIME du module
+
+> **(a) n'est pas universelle.** La bonne forme dépend de la **discipline de méthode** du module :
+> `ssh-audit` et `groups` l'ont, donc (a) s'y applique ; **`iptables` a un POST surchargé et le legacy
+> PHP n'a aucune discipline** — là, une liste fermée **par chemin, toutes méthodes** est la forme
+> juste, et c'est **déjà** ce que font `pare-feu` et `cle-plateforme`.
+
+**J'avais posé la question comme un choix entre deux formes. La réponse est qu'il n'y a pas de forme
+unique** — c'est la même leçon que le marqueur de fin du banc (E-322) : *une convention locale prise
+pour une convention générale.* **Deux fois dans le même tour, sur deux objets différents.**
+
+### ⚠ ET LES TROIS SUITES OÙ LE VERDICT DÉPEND DU MOTIF N'ONT PAS ÉTÉ REGARDÉES
+
+    suite            filet        verdict
+    audit-ssh        INTERDITS    methode≠GET   <- verdict SAIN
+    groupes          INTERDITS    methode≠GET   <- verdict SAIN
+    accueil          INTERDITS    INTERDITS     <- SUSPENDU AU MOTIF
+    cle-plateforme   INTERDITS    INTERDITS     <- idem
+    pare-feu         INTERDITS    INTERDITS     <- idem
+
+> **Nous avons passé la nuit sur la seule dont le verdict était déjà bon.** Les trois où un fantôme ou
+> une ancre trop serrée rendrait le verdict **vert à vide** sont celles que personne n'a ouvertes.
+
+*Une occurrence trouvée ne dit pas combien il y en a* — je l'avais écrit ; **je ne l'avais pas appliqué
+à la question de savoir laquelle des cinq comptait.**
+
+## E-325 — `go-page-update-u2` : le défaut est de CHARGE, et il reviendra
+
+    sous LOT, en concurrence   6 PASS · 1 FAIL   64 s   EXCEPTION ProtocolError
+    seule, banc au repos       8 PASS · 0 FAIL   10 s   conforme
+
+**La suite est saine.** `Input.dispatchKeyEvent timed out` était un timeout du protocole sous charge, pas
+un refus du portail.
+
+**Mais il est réel et il reviendra au prochain LOT** — et il est arrivé à la **164ᵉ** exécution d'une
+course de trois heures. *Un défaut de charge n'est pas un faux positif : c'est un vrai défaut d'une
+propriété qu'on n'avait pas déclaré mesurer.*
+
+**Et elle a refusé de le déclarer transitoire avant de l'avoir remesuré**, en écrivant *« un état final
+correct ne prouve pas que le geste l'était »*. La contre-épreuve — 10 s contre 64 s — **est ce qui
+tranche**, pas la plausibilité.
+
+*Note de méthode : ses « 14 processus Chrome » redoutés étaient VS Code et les serveurs MCP — son
+`pgrep -f chrome` s'était auto-capturé. **Troisième auto-capture de la nuit**, sur un troisième motif.*
