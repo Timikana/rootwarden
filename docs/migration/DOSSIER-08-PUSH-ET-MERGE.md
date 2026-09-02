@@ -84,7 +84,7 @@ tronc depuis la séparation ; `git merge-tree --write-tree` rend **zéro conflit
 > repli du scheduler qui **ÉLARGIT le périmètre** — une cible dont le `target_value` se corrompt retombe
 > sur *tout le parc*, et un scan CVE ouvre une session SSH par machine. ~~**et envoie un vrai courriel par machine**~~ — **RETIRÉ le 2026-09-02, c'était faux** : `webhooks.py` ne contient aucun envoi de courriel, l'appel est **unique** après la boucle, et `critical`/`high` y sont passés en dur à `0`. Voir la rétractation dans `DECISIONS-DSI.md`.
 > **C'est l'effet sortant que le §7 réserve à votre mot, atteint par une corruption de donnée et sans
-> que personne ne clique.**
+> que personne ne clique.** *Corrigé le 2026-09-02 : l'effet sortant est **la session SSH elle-même** — une connexion réelle, sur des machines réelles, qui a eu lieu et ne se défait pas. Ce n'était pas la notification, qui est un webhook unique. **L'argument tient ; son objet a changé.***
 
 **Une condition avant, et elle n'est pas technique** : le message de `399931a` affirme qu'une route de
 `supervision/` est « désormais couverte, vérifiée par test » alors qu'elle porte aussi `@require_role(2)`
@@ -154,7 +154,7 @@ pour la fermer, c'est laisser une authentification à deux facteurs qui n'en est
 pendant toute la durée du chantier.*
 
 **Sur `security/backend-cve` — l'inaction laisse six failles ouvertes sur le tronc**, dont une dont
-l'effet est **sortant et irréversible**. Et la branche ne diverge pas : *chaque jour d'attente ajoute du
+l'effet est **sortant et irréversible** — *la session SSH, pas la notification* (corrigé le 2026-09-02). Et la branche ne diverge pas : *chaque jour d'attente ajoute du
 risque sans ajouter de difficulté à la fusion.* C'est la définition d'une dette qu'on ne gagne rien à
 porter.
 
