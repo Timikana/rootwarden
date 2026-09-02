@@ -86,4 +86,9 @@ return [
     'panneau_sshd_texte' => 'The `AllowUsers` directive of :machine will be changed and sshd reloaded. A mistake here can cut SSH access to the machine.',
     'panneau_suppr_titre' => 'Delete account :nom?',
     'panneau_suppr_texte' => '`userdel` will run on :machine, AND ITS HOME DIRECTORY WILL BE DELETED WITH IT. This cannot be undone: neither the account, nor its files, nor its keys can be restored from RootWarden.',
+
+    // A non-measurement announced in advance is a fact; announced afterwards,
+    // it is an excuse. Said on the PAGE because the person about to click is
+    // the one who needs it — and they do not read the changelog.
+    'gestes_jamais_exerces' => "These three actions have never yet been performed from this interface. They are wired and confirmed by a panel, but their correct behaviour has not been observed on a machine — the old portal remains the only proven route.",
 ];

@@ -176,6 +176,9 @@
         <section class="rw-carte rw-carte--pleine" data-rw="distants-gestes">
             <p class="rw-etiquette">{{ __('distants.gestes_titre') }}</p>
             <p class="rw-aide rw-prose">{{ __('distants.gestes_aide') }}</p>
+            {{-- Au-DESSUS des boutons, pas en pied : l'information doit etre lue
+                 avant le clic, pas apres. --}}
+            <p class="rw-aide rw-prose" data-rw="distants-jamais-exerces">{{ __('distants.gestes_jamais_exerces') }}</p>
 
             <div class="rw-barre-filtres">
                 <label class="rw-champ">
