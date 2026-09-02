@@ -79,11 +79,15 @@ return [
     'planif_cible_env'  => 'environnement : :valeur',
     'planif_cible_machines' => ':n serveur(s) désigné(s)',
     // ⚠ E-280 : une cible mal formee ou non reconnue tombe sur TOUT LE PARC.
-    'planif_cible_inconnue' => "cible non reconnue — s'exécutera sur TOUT le parc",
+    // E-280, corrige : `target_type` EST une liste fermee
+    // (`enum('all','tag','environment','machines') NOT NULL`), donc une valeur
+    // inventee est refusee par la base. Ce qui reste atteignable est une cible
+    // INCOMPLETE : « par tag » dont le champ est reste blanc.
+    'planif_cible_inconnue' => "cible incomplète — s'exécutera sur TOUT le parc",
     // E-280 : « tout le parc » et « je n'ai pas compris la cible » sont la MEME
     // branche du planificateur. Rien, ni a l'execution ni ensuite en base, ne
     // dit laquelle des deux a produit un relevé du parc entier.
-    'planif_cible_ambigue' => "« Tout le parc » est à la fois la cible proposée par défaut et ce que produit une cible que le serveur n'a pas comprise. Les deux passent par le même chemin, et rien ne permet ensuite de savoir laquelle a été employée.",
+    'planif_cible_ambigue' => "« Tout le parc » est à la fois un choix légitime et ce que produit une cible laissée incomplète — un tag dont le champ est resté blanc. Les deux passent par le même chemin, et rien, même après coup, ne permet de savoir laquelle a été employée.",
 
     // ── CE QUE LA PAGE DIT D'ELLE-MEME ───────────────────────────────────
     'portee_titre' => 'Ce que cette page peut faire aujourd’hui',
@@ -121,5 +125,5 @@ return [
 
     'np_planif_creer' => "La création d'un relevé planifié n'est pas encore portée sur cette interface.",
     // ⚠ E-280 : ce que l'ancien portail ne dit pas au moment de planifier.
-    'np_planif_detail' => "Une planification ouvre des sessions SSH réelles, à répétition, sans personne devant l'écran. Elle vise par défaut tout le parc, production comprise.",
+    'np_planif_detail' => "Une planification ouvre des sessions SSH réelles, à répétition, sans personne devant l'écran. Elle vise par défaut tout le parc, production comprise — et une cible restreinte dont le champ est resté blanc revient au même.",
 ];

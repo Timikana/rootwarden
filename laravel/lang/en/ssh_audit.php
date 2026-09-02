@@ -63,9 +63,11 @@ return [
     'planif_cible_env'  => 'environment: :valeur',
     'planif_cible_machines' => ':n named server(s)',
     // E-280: a malformed or unrecognised target falls back to THE WHOLE FLEET.
-    'planif_cible_inconnue' => 'unrecognised target — will run on THE WHOLE FLEET',
+    // E-280, corrected: `target_type` IS a closed enum, so an invented value is
+    // refused by the database. What remains reachable is an INCOMPLETE target.
+    'planif_cible_inconnue' => 'incomplete target — will run on THE WHOLE FLEET',
     // E-280: "whole fleet" and "target not understood" are the SAME branch.
-    'planif_cible_ambigue' => "'The whole fleet' is both the default target and what a target the server did not understand produces. Both go through the same path, and nothing afterwards tells which one was used.",
+    'planif_cible_ambigue' => "'The whole fleet' is both a legitimate choice and what an incomplete target produces — a tag whose field was left blank. Both go through the same path, and nothing afterwards tells which one was used.",
 
     'portee_titre' => 'What this page can do today',
     'portee_texte' => 'It reads: the readings already taken, the policy applied, the fleet state and the scheduled readings. It joins no machine and writes nothing.',
@@ -91,5 +93,5 @@ return [
     'np_config_detail' => 'Writing to `sshd_config` and reloading the service can cut SSH access to the server — and SSH is the only channel RootWarden has to get back in. A backup exists and restoring is possible.',
 
     'np_planif_creer' => 'Creating a scheduled reading is not ported to this interface yet.',
-    'np_planif_detail' => 'A schedule opens real SSH sessions, repeatedly, with nobody watching. It targets the whole fleet by default, production included.',
+    'np_planif_detail' => 'A schedule opens real SSH sessions, repeatedly, with nobody watching. It targets the whole fleet by default, production included — and a narrow target whose field was left blank comes to the same thing.',
 ];
