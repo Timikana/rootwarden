@@ -119,6 +119,31 @@ class Fail2banController extends Controller
             'parc_envoi', 'parc_resultat_machine',
             'parc_ok', 'parc_echec', 'parc_echec_muet', 'parc_rien',
             'parc_apres_install',
+            /*
+             * ══ F7 — ET POURQUOI CES DEUX LIGNES MANQUAIENT ══════════════
+             *
+             * `conf_titre_desact` et `conf_texte_desact` existaient dans LES
+             * DEUX catalogues et n'etaient pas dans CETTE liste. Le panneau de
+             * confirmation s'ouvrait donc avec un titre VIDE et un texte VIDE :
+             * on demandait de confirmer un geste qui arrete la protection
+             * contre le force brute et ouvre une session SSH, sans qu'un mot
+             * dise lequel ni sur quelle machine.
+             *
+             * ⚠ AUCUN DE NOS CONTROLES NE VOIT CE DEFAUT :
+             *   la parite i18n passe      — les cles existent, FR et EN
+             *   les ancres DOM existent   — `f2b-confirmation-titre`, `-texte`
+             *   le panneau s'ouvre        — il est visible
+             *   une cle ABSENTE rendrait son IDENTIFIANT, donc se verrait
+             *   une cle NON TRANSMISE rend du VIDE, et le vide ne se signale pas
+             *
+             * Et aucune sonde statique ne peut le trouver ici, parce que la cle
+             * est COMPOSEE A L'EXECUTION (`fail2ban.js:376  textes[cleTitre]`) :
+             * `conf_titre_desact` n'apparait litteralement dans aucun `.js`.
+             *
+             * QUI AJOUTE UN PANNEAU AJOUTE SES DEUX CLES ICI, dans le meme
+             * commit que le geste.
+             */
+            'conf_titre_desact', 'conf_texte_desact',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }
