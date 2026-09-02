@@ -1049,7 +1049,7 @@ Mesuré plutôt que supposé — **le portage annonce lui-même ses manques**, e
 | onglet | ce que le portage déclare manquant | ce qui le retient |
 |---|---|---|
 | **`accueil`** | *« Le parc n'est pas encore affiché ici »* + un bloc « Ancien portail » | **une question de SÉCURITÉ, pas un reste à faire** — voir ci-dessous |
-| `bashrc` | *« Les gestes de déploiement ne sont pas encore portés »* | **B4**, suspendu sur deux arbitrages |
+| `bashrc` | *« Les gestes de déploiement ne sont pas encore portés »* — **déclaration CORRIGÉE le 2026-09-02, `e48a821` / E-343** : elle envoyait au legacy pour deux gestes que la page FAIT (`/bashrc/users` rend une case par compte, `bashrc-apercu` appelle `/bashrc/preview`) et taisait trois absences. Énumération désormais appariée aux 7 routes : absents = `deploy`, `prerequisites` (POST, il INSTALLE), `restore`, `backups` | **B4**, suspendu sur deux arbitrages |
 | `cve` | *« Le suivi d'une vulnérabilité reste sur l'ancien portail »* · *« Déclencher un scan reste sur l'ancien portail »* | **S7b** — le scan qui aboutit **envoie un vrai courriel** |
 | `profil` | *« Les sessions ouvertes et les connexions mémorisées ne sont pas encore listées ici »* | **E-203** — le portage n'a aucune révocation de session côté serveur |
 | `services` | ✅ **FAIT** — `244c840`, 2026-08-28 | **TROIS défauts, pas un** : l'encart déclarait non porté ce qui **est** porté (les cinq gestes passent par `/services/<geste>` **concaténé** — ce qui dédouanait l'encart au `grep` littéral) · son bouton **principal** menait à `/services/`, **archivé**, donc **404** · et **un `window.confirm()`** sur les cinq gestes qui écrivent, *les seuls gestes du module qu'aucune suite ne pouvait exercer.* **⚠ Cette ligne a été transmise DEUX fois à son autrice APRÈS son commit**, par le Lead puis par le DSI — *une tâche faite qu'un document annonce encore ouverte se redemande, et c'est le même coût qu'une tâche oubliée.* |
@@ -1058,6 +1058,41 @@ Mesuré plutôt que supposé — **le portage annonce lui-même ses manques**, e
 **Ce relevé ne couvre QUE ce que le portage déclare.** Un manque **non déclaré** n'y figure pas — et c'est
 précisément la classe que ce chantier a payée six fois : *un texte peut devenir faux sans qu'aucun test ne le
 voie*, et **l'inverse est vrai aussi : un manque non écrit ne se voit nulle part.**
+
+#### ✅ L'AUDIT DES DÉCLARATIONS EST TERMINÉ — 2026-09-02, et ce n'est PAS « 9 catalogues sur 9 corrects »
+
+**Six défauts établis, trois catalogues appariés et trouvés justes.** La distinction compte : un catalogue
+« juste » l'est parce qu'il a été apparié route par route, pas parce que personne n'y a rien vu.
+
+| catalogue | verdict | écart |
+|---|---|---|
+| `pare-feu` | défaut | E-318 |
+| `superv` (×3) | défaut | E-336 |
+| CGU | défaut | E-340 |
+| `groups` (`portee_texte`) | défaut — **créé et corrigé dans le même commit** | E-341 |
+| `serveurs` | défaut — un compte faux de deux tiers | E-342 |
+| `bashrc` | défaut — **faux dans les DEUX sens** | E-343 |
+| `fail2ban` | **apparié, JUSTE** — les 4 gestes déclarés absents le sont | — |
+| `politiques` | **apparié, JUSTE** — `/policy/rollback` appelé par personne | — |
+| `sftp` | **apparié, JUSTE** — idem | — |
+
+**La mécanique est la même six fois : une phrase vraie à l'écriture, devenue fausse quand la capacité a été
+portée, sans que rien ne la touche.** Aucun test ne peut voir ça, parce qu'il n'y a pas de régression — il y a
+un énoncé qui a cessé de correspondre.
+
+##### Ce que l'audit a appris sur les SONDES, et qui vaut au-delà de lui
+
+1. **Un chemin CONCATÉNÉ échappe à l'énumération littérale.** `grep -rl "/policy/sftp/deploy"` rend **0**
+   alors que le code écrit `appelle('/policy/sftp/' + geste, envoi)`. Le zéro accusait une capacité manquante
+   qui ne manquait pas. Énumérer la **base** et les **gestes**, jamais le chemin entier.
+2. **Une parité égale ne prouve pas qu'une clé a été ajoutée** — elle prouve que les deux fichiers sont
+   d'accord, y compris pour ne rien contenir. Comparer les **jeux de clés**, pas les comptes.
+3. **Le compte se RETIRE, il ne se corrige pas.** « Quatre gestes » passé à « Trois » pourrit au portage
+   suivant. L'énumération voisine est la seule source.
+4. **Un encart « ce qui manque » n'énonce que des manques.** Y écrire ce qui EST porté contredit sa place et
+   son bouton — *vu à l'image seulement, toutes les mesures DOM étaient vertes.*
+5. **Une justification fausse peut produire un énoncé vrai** (`groupes.js`, `77f7350`) : la réaction naturelle
+   est de retirer les deux, et on retirerait un avertissement juste.
 
 #### ⚠ Le tableau de bord n'est pas inachevé par négligence : il est RETENU sur une question de droits
 
