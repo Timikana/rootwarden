@@ -355,3 +355,140 @@ juste **parce que** le chiffrement manque. Je ne l'ai pas vérifié en base : 0 
 > porter les capacités ou retirer les deux phrases — appartient au DSI.** Ce que la
 > mesure ajoute à sa décision : les deux phrases sont fausses *chacune sur une moitié
 > différente*, et la capacité B a un catalogue vivant qui ne débouche sur rien.
+
+---
+
+## 10. Les sept pages « légères » — le biais de sélection cachait une CLASSE de défaut, pas un taux
+
+L'audit avait traité les pages à forte densité de déclarations. Ces sept-là n'en
+portaient qu'une ou deux. **Le taux de défaut n'y est pas plus bas : il y est
+d'une autre nature.** Sur les pages lourdes, les déclarations fausses étaient
+LUES. Ici, deux des trois défauts sont **invisibles à l'utilisateur** — et ne
+trompent que l'audit lui-même.
+
+### 10.1 Deux corrections au périmètre avant de commencer
+
+**`wazuh` ne porte pas UNE déclaration mais NEUF gestes**, tenus dans une seule
+clé `np_liste` : installer un agent · installer sur tout le parc · relever l'état
+· désinstaller · redémarrer · changer le groupe · enregistrer la configuration ·
+enregistrer les options d'un serveur · créer ou supprimer une règle. **Compter les
+clés sous-estime le périmètre quand une clé porte une énumération.**
+
+**Et mon premier instrument ratait `wazuh` entièrement** : il cherchait « pas
+encore porté / ancien portail », `wazuh` déclare par « **ce que cette page ne fait
+pas encore** ». C'est un second instrument, *par nom de clé* (`np_*`, `reste_*`),
+qui l'a rendu. **Les deux instruments ne se recouvrent pas** — croiser était la
+mesure, pas une précaution.
+
+### 10.2 Le tableau, et le discriminant qui a tout décidé
+
+**Une déclaration peut être fausse sans tromper personne.** Avant d'apparier, j'ai
+mesuré laquelle est seulement AFFICHÉE — vue, contrôleur ou script.
+
+| page | déclaration | affichée ? | verdict |
+|---|---|---|---|
+| `comptes` | l'import CSV vit sur l'ancien portail | oui | **VRAIE** |
+| `documentation` | le reste de la doc vit sur l'ancien portail | oui | **VRAIE** |
+| `plateforme` | `server_user_remove_key` sans interface ici | oui | **VRAIE**, avec une réserve |
+| `wazuh` | les neuf gestes | oui | **VRAIE** |
+| `cve` | « déclencher un scan reste sur l'ancien portail » | **NON — orpheline** | **FAUSSE** |
+| `cve` | « le suivi reste sur l'ancien portail » | **NON — transmise, jamais rendue** | **FAUSSE** |
+| `accueil` + `nav` | « une flèche signale une page servie par l'ancien portail » | oui | **promet un signal INATTEIGNABLE** |
+
+*Témoin de l'instrument d'affichage* : une clé certainement rendue (`cve.titre`,
+1 vue) et une certainement absente (`cve.xx_temoin_absent_xx`, 0). Les deux
+bornes répondent.
+
+### 10.3 Les quatre vraies, et sur quoi elles tiennent
+
+- **`comptes`** — l'heuristique des libellés jouée **à l'envers**, et c'est ce qui
+  la rend concluante : la page porte **UNE seule** clé `csv/import`, la
+  déclaration elle-même. *Contrôle positif* : `serveurs`, où l'import CSV **est**
+  porté, en porte **six** (`imp_titre`, `imp_champ`, `imp_fichier`, `imp_valider`,
+  `imp_secrets`, `imp_bilan_titre`). Aucune route POST d'import côté portage.
+- **`documentation`** — `legacy/documentation.php` **existe toujours** (il n'est
+  pas sous `_deprecated/`). Le chemin annoncé est vivant.
+- **`wazuh`** — le script n'a qu'un helper, `lis()`, et sa docstring le dit : *« GET,
+  et seulement GET. Le helper ne sait pas muter. »* Trois chemins, trois lectures.
+  Et la couche serveur ne rattrape pas : **0 écriture** dans le contrôleur, une
+  seule route `GET /wazuh`.
+- **`plateforme`** — `server_user_remove_key` n'est composé par **aucun script
+  vivant**. ⚠ **Réserve** : la page citée par la phrase — comptes distants —
+  **existe dans le portage et y offre un retrait de clés**, mais c'est
+  `/remove_user_keys` (en bloc), pas `server_user_remove_key` (clé par clé). La
+  déclaration est exacte *parce qu'elle précise « clé par clé »* ; sans cette
+  précision elle serait fausse.
+
+### 10.4 ⚠ `cve` — deux déclarations fausses que PERSONNE NE LIT
+
+Les URL du script ne sont ni littérales ni interpolées : elles arrivent d'un bloc
+`@json` peint par le contrôleur. **Quatrième forme de composition rencontrée**, et
+la sonde a rendu zéro deux fois avant que je remonte la chaîne
+`script → bloc JSON → contrôleur`.
+
+    ScanCveController:164   'url_scan'  => url('/api/gateway/cve_scan')
+    ScanCveController:208   'url_suivi' => route('scan-cve.suivi')
+    web.php:533             Route::post('/scan-cve/suivi', SuiviCveController::store)
+
+**Les deux gestes sont câblés.** Et l'heuristique des libellés le confirme sans
+ambiguïté : la page porte **26 clés de scan**, dont un panneau de confirmation et
+**huit messages de résultat** (`scan_demarre`, `scan_paquet`, `scan_termine`,
+`scan_erreur`, `scan_refuse`, `scan_interrompu`…). `jamais_scanne_aide` dit même :
+*« Le bouton « Scanner » en lance un. »*
+
+**Mais aucune des deux phrases n'atteint l'écran :**
+- `scan_ancien_portail` : **0 emploi** — ni vue, ni contrôleur, ni script ;
+- `suivi_a_venir` : transmise au navigateur par le contrôleur (`:167`) et
+  **jamais employée** par le script — elle voyage et ne s'affiche pas.
+
+> **VARIANTE D — la déclaration est fausse ET jamais affichée.** Elle ne trompe pas
+> l'utilisateur : elle trompe **l'inventaire**. Ces deux-là gonflent le
+> dénominateur de l'audit sans qu'aucun exploitant les ait jamais lues. Le
+> correctif n'est ni « porter » ni « corriger la phrase » : c'est **supprimer une
+> clé morte**.
+
+### 10.5 ⚠ `accueil` + `nav` — la page promet un SIGNAL qui ne peut plus apparaître
+
+`accueil.blade.php` porte deux branches : une tuile normale si l'entrée a une
+`route`, sinon une tuile vers le legacy, marquée `↗` et titrée
+`nav.non_porte_titre`. **La seconde est inatteignable.** Structure lue par PHP,
+pas au motif :
+
+    Navigation::SECTIONS   32 entrees · 32 avec 'route' · 0 avec 'legacy'
+    RACCOURCIS             12 cles, resolues DANS ces 32 entrees
+    Navigation::pour()     FILTRE seulement — n'ajoute aucune cle
+    => isset($r['route']) toujours vrai => la branche @else ne s'execute jamais
+
+Or ce que la page **affiche**, elle, est bien lu : *« Une flèche signale une page
+encore servie par l'ancien portail »* (`raccourcis_aide`), *« ceux qui ne sont pas
+encore portés ouvrent l'ancien portail »* (`orientation`), *« Les autres ouvrent
+l'ancien portail »* (`portes_texte`).
+
+> **VARIANTE E — l'écran promet un marqueur qui ne peut plus se produire.** Le
+> lecteur cherche une flèche, n'en trouve aucune, et **ne peut pas distinguer
+> « tout est porté » de « le marqueur est cassé »**. C'est l'inverse exact de la
+> variante C : là le renvoi aboutissait quelque part où la capacité n'était pas ;
+> ici c'est le SIGNAL d'absence qui a disparu, pas la sortie.
+
+*Et j'ai failli conclure trop tôt* : ma première sonde a rendu « 0 mention de
+`legacy` dans `AccueilController` » — **ce fichier n'existe pas**. Le zéro venait
+d'un chemin faux, et il pointait dans le sens qui m'arrangeait. La vue est rendue
+par `PortailController`. Un `2>/dev/null` de plus et je publiais un dédouanement.
+
+### 10.6 Ce que ces sept pages disent du biais de sélection
+
+**Le taux n'est pas plus bas sur les pages légères — la classe de défaut y est
+différente.** Sur les pages lourdes, les fausses déclarations étaient LUES : elles
+envoyaient un exploitant sur un chemin mort. Ici, **les trois défauts sont
+invisibles** — deux clés que rien n'affiche, une branche que rien n'atteint.
+
+C'est une raison de fond, pas un hasard : **une page qui déclare peu déclare des
+choses anciennes**, écrites au moment où elles étaient vraies, et que le portage a
+rattrapées sans que personne relise la phrase. Une page qui déclare beaucoup est
+une page qu'on a récemment travaillée.
+
+> **Conséquence pour l'inventaire** : sur les 31 déclarations restantes, au moins
+> **deux ne sont vues par aucun utilisateur**. Un décompte de déclarations
+> d'absence n'est PAS un décompte de capacités manquantes, et n'est même pas un
+> décompte de ce que le produit AFFIRME — tant qu'on n'a pas mesuré, clé par clé,
+> laquelle atteint un écran.
