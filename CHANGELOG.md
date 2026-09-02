@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.181** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.182** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,80 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.182 — E-343 : `bashrc` renvoyait au legacy pour DEUX gestes que la page fait
+
+**Troisieme defaut etabli de l'audit des declarations**, et la meme mecanique que les cinq
+precedents : une phrase **vraie a l'ecriture** devenue fausse quand la capacite a ete portee, sans
+que rien ne la touche.
+
+    'non_porte_texte'  AVANT
+      « Choisir les comptes, previsualiser le fichier et le deployer se font pour
+        l'instant depuis l'ancien portail. »
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  deux des trois sont PORTES ICI
+
+#### L'appariement, contre les 7 routes de `backend/routes/bashrc.py`
+
+    route backend            appelee par la page          declaree
+    /bashrc/users            OUI (chargeComptes, une case A COCHER par compte)   absente A TORT
+    /bashrc/preview          OUI (bouton `bashrc-apercu`, rend le diff)          absente A TORT
+    /bashrc/template         OUI (onglet Gabarit)                                --
+    /bashrc/deploy           non                                                 absente, JUSTE
+    /bashrc/prerequisites    non   (POST, il INSTALLE)                           non declaree
+    /bashrc/restore          non                                                 non declaree
+    /bashrc/backups          non                                                 non declaree
+
+La phrase etait donc fausse **dans les deux sens** : elle envoyait au legacy pour deux gestes portes,
+et taisait trois absences. *Un manque declare a tort est une capacite perdue sans que rien ne l'ait
+retiree.*
+
+#### ⚠ ET LA CORRECTION A EU BESOIN D'UN SECOND JET, VU A L'IMAGE
+
+Mon premier jet ajoutait « Choisir les comptes et previsualiser le fichier, eux, sont portes ici ».
+Toutes les mesures DOM etaient vertes. **La capture a 1400 a montre le probleme** : cet encart a pour
+action **principale** un lien vers l'ancien portail, et il tombe juste sous « Cochez une machine
+ci-dessus pour lire ses comptes ». Le texte disait donc le contraire de ce que sa place et son bouton
+disent.
+
+**Un encart « ce qui manque » n'enonce que des manques.** Le present, la page le MONTRE -- et la
+clause positive a ete retiree. *Aucune assertion DOM ne pouvait voir cela : le texte etait rendu, la
+largeur bornee, la page ne debordait pas.*
+
+#### Deux catalogues apparies et trouves JUSTES, ce qui compte autant
+
+    politiques   « l'annulation d'un deploiement n'est pas encore portee »   VRAI
+    sftp         la meme phrase                                             VRAI
+
+`/policy/rollback` n'est appele par aucune des deux pages -- seul un lien legacy
+(`politique-rollback-legacy`, `sftp-rollback-legacy`). `deploy`, `remove` et `audit` sont portes.
+
+#### ⚠ ET C'EST MA SONDE QUI S'EST TROMPEE D'ABORD, DU COTE QUI ACCUSE
+
+    grep -rl "/policy/sftp/deploy" laravel/   ->  0 fichier
+    la forme reelle : appelle('/policy/sftp/' + geste, envoi)
+
+**Le chemin est CONCATENE.** J'ai eu sous les yeux un zero qui disait « le deploiement SFTP n'est pas
+porte alors que la page ne le declare pas absent » -- un signalement de capacite manquante, sur une
+capacite qui ne manque pas. Il a fallu ouvrir le fichier pour voir le bouton `sftp-deployer`.
+
+*Une enumeration ouverte des chemins LITTERAUX ne suffit pas quand le code concatene : il faut
+enumerer la BASE et les gestes.*
+
+#### Mesures
+
+    statut /bashrc            200          (rw-test-super, role 3)
+    texte rendu              oui, avec son TEXTE
+    identifiants bashrc.*    []           (doit etre [])
+    TEMOIN selecteur faux    null         (doit etre null)
+    largeur du paragraphe    605 px dans un parent de 1100   (`.rw-prose`, 68ch)
+    la page deborde          false
+    parite i18n              FR=70  EN=70  JEUX DE CLES COMPARES, identiques
+
+*Les jeux de cles sont compares, pas seulement les comptes : une heure plus tot dans cette session,
+un compte egal m'avait fait prendre une insertion bloquee pour une insertion reussie.*
+
+Captures a 1920 / 1400 / 390 dans `tests/e2e/screenshots/bashrc/`, **regardees** -- c'est la 1400 qui
+a fait retirer la clause positive.
 
 ### v1.38.181 — `fail2ban` F7 : desactiver une jail, et le compte de « quatre » retire
 
