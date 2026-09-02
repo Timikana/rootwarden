@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.154** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.155** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,35 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.155 — un arbitrage rendu au registre et jamais envoyé, et un nom à deux référents
+
+**E-305 — ma faute, vingt minutes de blocage.** J'ai tranché l'arbitrage de `/groupes`, l'ai inscrit au
+registre, l'ai rendu à l'exploitant — **et jamais envoyé à la session qui l'attendait**, dont la file
+portait `BLOQUEE sur ton arbitrage`. *C'est E-289 retourné contre moi* : une décision écrite dans le
+registre et pas dans la main de la personne bloquée **ne circule pas du tout**. **Le registre est une
+trace, pas un canal** — inscrire rend vérifiable, envoyer rend agissant, rendre compte rend arbitrable,
+et *rendre compte ressemble à transmettre*, ce qui donne le sentiment d'avoir bouclé. Une décision qui
+débloque quelqu'un se livre **à cette personne d'abord**.
+
+**E-306 — `derive` a deux référents dans le même dépôt** : `derive-config` est la **route du module**
+« dérive de configuration » (`'cle' => 'drift'`, `can_view_compliance`, dès le rôle 2) ; `$derive` et les
+ancres `doc-derive-*` du contrôleur sont le **participe passé**. Une sonde a mesuré la mauvaise entrée et
+allait accuser le portage d'une incohérence inexistante. **Troisième piège par le nom en 24 h** — ce
+n'est plus la structure qui piège, c'est le **vocabulaire**. Ce qui l'a tranché : l'assertion **nommait
+ce qu'elle comparait**. Et ma formulation était fausse — le contrôleur dérive **du menu**
+(`firstWhere('cle','api_docs')`), pas du rôle ; asserter sur le rôle **recopierait la garde une
+troisième fois, dans le test**.
+
+**E-307 — un détail dont la valeur est écrite au lieu d'être calculée.** `FAIL … — 119 requêtes vues,
+0 vers le backend` : le conditionnement est correct, le **contenu est inventé**. Les six occurrences
+précédentes étaient des détails mal conditionnés ; la règle ne couvrait pas cette forme. **Élargie** :
+*un détail se **calcule** à partir de l'état mesuré, il ne se **rédige** jamais à partir de l'intention.*
+
+**E-308 — `go-page-documentation` posée** : 24 laravel · 13 legacy · 0 FAIL (`acfec36`), le laravel
+**rejoué après correction** parce que le fichier avait bougé — *une référence prise sur un fichier qui a
+changé depuis n'est plus une mesure.* Troisième occurrence de `verifie` employé là où `verifiePortage`
+s'impose : 3 FAIL qui accusaient le legacy d'un manque d'outillage.
 
 ### v1.38.154 — SEC-015 : le base64 protège les règles, `dest_path` est interpolé nu
 
