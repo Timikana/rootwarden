@@ -117,7 +117,7 @@ class Navigation
 
         'autre' => [
             ['cle' => 'profil',         'garde' => 'tous',                    'route'  => 'profil'],
-            ['cle' => 'documentation',  'garde' => 'tous',                    'legacy' => '/documentation.php'],
+            ['cle' => 'documentation',  'garde' => 'tous',                    'route'  => 'documentation'],
             /*
              * `api_docs` BASCULE, et la garde reste `sa`.
              *
