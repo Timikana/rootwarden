@@ -4398,3 +4398,69 @@ aucune condition.* **Mais le premier réflexe doit être de suspecter l'instrume
 
 > **Sans la vérification de pose, la suite était verte à vide** : *« aucune carte, donc aucun lancement »
 > est vrai et ne mesure rien.* **Ce dernier `PASS` est resté vert pendant que les trois autres criaient.**
+
+---
+
+## ⚠⚠ La classe se ferme en énumérant le DOMAINE — et c'est mon troisième compte faux sur le même objet
+
+**Trouvé par la session 7, inscrit par le Lead en E-354, le 2026-09-03 vers 00:30.** *Ça réfute ce que
+j'ai tranché il y a une heure, et la méthode est plus courte que la mienne.*
+
+### Ce que j'avais conclu
+
+> *« La clé est construite à l'exécution. Elle n'existe dans aucun fichier. La seule détection fiable est
+> d'ouvrir chaque panneau. »*
+
+### Ce qui est vrai
+
+> **Une clé construite à l'exécution n'est pas imprévisible : elle est construite à partir de quelque
+> chose, et ce quelque chose s'ÉNUMÈRE.**
+
+**La session 7 a énuméré les douze paires que `demande()` peut recevoir et vérifié qu'elles sont toutes
+transmises.** *La classe est CLOSE pour `fail2ban`, `conf_titre_desact` comprise.*
+
+> **Compter les sites dit combien de fois le risque existe ; énumérer le domaine dit s'il se réalise.**
+> *Je comptais des sites — c'est-à-dire l'exposition — et j'en tirais une conclusion sur la réalisation.*
+
+### ⚠ Mon troisième compte faux sur le même objet en une nuit
+
+    23 sites   ->  j'avais ADDITIONNE deux motifs qui se recouvrent
+    20 sites   ->  juste, mais c'etait l'EXPOSITION et je l'ai lue comme un reste a faire
+     2 sites « alimentant un panneau »  ->  ma sonde ne reconnaissait qu'UNE forme d'affectation
+                                            elle rendait 0 pour `cle-plateforme`,
+                                            ou la session 7 a lu SIX sites
+
+**Les trois portaient sur le même objet, et chacun était faux d'une façon différente.** *Le premier par
+double comptage, le deuxième par confusion entre exposition et travail restant, le troisième par un motif
+trop étroit — et le troisième est celui sur lequel j'ai fondé une instruction.*
+
+### Et ma conclusion « n'ouvre pas `services` et `pare-feu` » était JUSTE PAR ACCIDENT
+
+**J'avais dit non parce que ma sonde comptait 0 panneau. La session 7 dit non pour la vraie raison :**
+
+    services.js   0 site a cle variable — ET `pilote()` porte un garde FAIL-CLOSED :
+                  « SANS PANNEAU, ON N'AGIT PAS ». Il REFUSE d'agir plutot que de
+                  retomber sur un envoi direct.
+    pare-feu.js   1 lecture composee, aucune n'alimente un titre ni un texte
+
+> **Nous sommes arrivés à la même instruction, elle par une mesure et moi par une sonde fausse.** *Un
+> accord entre deux conclusions ne dit rien de la qualité des chemins qui y mènent — et c'est exactement
+> ce que ce registre reproche depuis hier aux confirmations qui refont la même mesure.*
+
+### Et elle a réfuté l'instruction du Lead par la mesure
+
+**Il lui avait dit « oui, fais `services` et `pare-feu` ». Elle ne les fait pas, et elle explique
+pourquoi.** *Deuxième session ce soir à refuser un ordre en donnant sa mesure plutôt qu'en l'exécutant —
+après le refus de la session 4 sur la garde dans le formulaire.*
+
+> **Les deux refus ont porté sur des ordres que leurs auteurs croyaient fondés.** *C'est le seul
+> mécanisme de la nuit qui ait attrapé des erreurs de DIRECTION plutôt que des erreurs de mesure.*
+
+### Ce que je retiens pour ma propre conduite
+
+**Trois comptes faux, et aucun n'a été trouvé par moi.** *Le premier par mon propre ordre de grandeur —
+`div` et `span` dans une liste de traductions —, le deuxième en remesurant après une contradiction, le
+troisième par la session 7.*
+
+> **Un chiffre absurde s'attrape seul ; un chiffre plausible a besoin de quelqu'un d'autre.** *Et j'ai
+> fondé une instruction sur le troisième — c'est le seul des trois qui ait coûté du travail à quelqu'un.*
