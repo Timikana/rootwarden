@@ -225,6 +225,82 @@ class RoutesBackend
          */
         '/ssh-audit/scan-all',
         '/cve_scan_all',
+        /*
+         * ══ E-350 : LE TEST D'E-235c, APPLIQUE AUX DIX-HUIT ROUTES ═══════════
+         *
+         * E-235c pose un test — « aucune borne par machine, et le backend garde
+         * deja par `@require_role(2)` SEUL : un role 1 n'y a jamais eu acces,
+         * donc fermer ne coute rien » — puis le nomme sur DEUX routes. Applique
+         * mecaniquement aux dix-huit routes de `backend/routes/ssh_audit.py`, il
+         * en designe SEPT de plus. Trois entrees suffisent a en couvrir SIX :
+         * `correspond()` traite une entree sans suffixe comme la route exacte
+         * PLUS son sous-arbre (`str_starts_with($chemin, $entree . '/')`), si
+         * bien que `/ssh-audit/schedules` couvre aussi `/schedules/<id>` et
+         * `/schedules/<id>/toggle`. Une quatrieme entree a barre oblique serait
+         * sans effet, et une entree sans effet se relit comme une intention.
+         *
+         * ⚠ LA SEPTIEME NE PEUT PAS ETRE FERMEE PAR LE CHEMIN, et c'est deja su
+         *
+         * `/ssh-audit/policies` porte un GET garde par
+         * `require_permission('can_audit_ssh') + require_machine_access` et un
+         * POST garde par `require_role(2)` SEUL. `correspond()` ne recoit que le
+         * CHEMIN — jamais la methode : l'inscrire fermerait la LECTURE que le
+         * role 1 fait legitimement, bornee a ses machines. C'est SEC-013, et le
+         * portage le traite par « fermeture par l'ABSENCE » : `audit-ssh.js`
+         * n'emet aucune requete autre que `GET` et ne compose jamais ce POST.
+         *
+         * NEUF ROUTES SONT ECARTEES, pour deux raisons distinctes :
+         *
+         *   BORNEES PAR MACHINE OU PAR PERMISSION -> ne pas fermer
+         *     /scan POST · /results GET · /config POST · /backups POST
+         *     /policies GET
+         *   `web.php:180` garde la page en `role:1` + `perm:can_audit_ssh` : un
+         *   role 1 porteur de la permission l'ouvre legitimement et lit
+         *   `/results` et `/policies`, bornes A SES MACHINES. Les fermer
+         *   remplacerait une borne PRECISE par une borne AVEUGLE — l'erreur
+         *   exacte contre laquelle E-235c previent.
+         *
+         *   ROLE *ET* BORNE MACHINE -> neutre
+         *     /fix · /save-config · /toggle · /restore · /reload
+         *   Leur `@require_role` exclut deja le role 1 ; fermer n'ajoute ni ne
+         *   retire rien.
+         *
+         * ⚠⚠ CE QUE CETTE FERMETURE NE FERME PAS — A LIRE AVANT DE LA CROIRE
+         *
+         * `reserveeAdmin()` est teste par `if ($roleId < 2 && …)`
+         * (`PasserelleController.php:69`) : critere de ROLE, pas de PERMISSION.
+         *
+         *     role 1  ->  refus a la PASSERELLE au lieu du backend   gain reel
+         *     role 2  ->  PASSE, avant comme apres                   INCHANGE
+         *
+         * Or le defaut releve est celui du role 2 : **un compte role 2 DEPOURVU
+         * de `can_audit_ssh` atteint `POST /ssh-audit/schedules` par la
+         * passerelle**, et le backend l'accepte puisqu'il ne garde que le role.
+         * Cette route cree une CRON de scan SSH visant TOUT LE PARC par defaut
+         * — l'objet meme d'E-280.
+         *
+         * **Ces trois entrees ne corrigent pas cela**, et « fermeture par
+         * l'ABSENCE » non plus : elle empeche la PAGE de composer l'appel, pas
+         * une requete forgee d'atteindre la route, puisque le prefixe
+         * `/ssh-audit/` est en liste blanche. Ce qui le corrigerait est
+         * `@require_permission('can_audit_ssh')` sur les routes backend, en plus
+         * du role — dans `backend/`, hors de ce perimetre, et route a la session
+         * qui le detient.
+         *
+         * Ecrit ici parce qu'un correctif qui porte une mesure ET une cloture ne
+         * se rouvre jamais : « les routes fermees » se lirait comme « le trou est
+         * ferme ».
+         *
+         * NON MESURE PAR EXECUTION, et delibere : l'eprouver demanderait un
+         * compte role 2 sans `can_audit_ssh`, or `rw-test-admin` porte la
+         * permission — et modifier les droits d'un compte de test changerait
+         * l'etat qu'on veut mesurer. L'argument est de LECTURE, sur trois faits
+         * releves : le prefixe est en liste blanche, ces entrees manquaient a
+         * `ADMIN_SEULEMENT`, et le backend garde en `role(2)`.
+         */
+        '/ssh-audit/fleet',
+        '/ssh-audit/schedules',
+        '/ssh-audit/trends',
     ];
 
     /**

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.183** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.184** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,143 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.184 — E-350 : le test d'E-235c appliquE aux dix-huit routes, et ce qu'il NE ferme PAS
+
+E-235c pose un test — *« aucune borne par machine, et le backend garde deja par `@require_role(2)`
+SEUL : un role 1 n'y a jamais eu acces, donc fermer ne coute rien »* — puis le nomme sur **deux**
+routes. Applique mecaniquement aux **dix-huit** routes de `backend/routes/ssh_audit.py`, il en
+designe **sept** de plus.
+
+    garde `@require_role` SEUL         -> A FERMER (7)
+      /fleet GET · /policies POST · /schedules GET · /schedules POST
+      /schedules/<id> DELETE · /schedules/<id>/toggle POST · /trends GET
+
+    bornees par MACHINE ou PERMISSION  -> ne pas fermer (5)
+      /scan POST · /results GET · /config POST · /backups POST · /policies GET
+
+    ROLE *et* borne machine            -> neutre (5)
+      /fix · /save-config · /toggle · /restore · /reload
+
+**Trois entrees couvrent SIX des sept** : `correspond()` traite une entree sans suffixe comme la
+route exacte **plus son sous-arbre** (`str_starts_with($chemin, $entree . '/')`), donc
+`/ssh-audit/schedules` couvre aussi `/schedules/<id>` et `/schedules/<id>/toggle`. Une quatrieme
+entree a barre oblique aurait ete sans effet — *et une entree sans effet se relit comme une
+intention.*
+
+#### ⚠ LA SEPTIEME NE PEUT PAS ETRE FERMEE PAR LE CHEMIN — et j'ai failli l'ecrire
+
+    /ssh-audit/policies  GET   perm('can_audit_ssh') + machine_access   A GARDER OUVERTE
+    /ssh-audit/policies  POST  require_role(2) SEUL                     a fermer
+    correspond(string $chemin, array $entrees)   <- AUCUNE methode
+
+**Mon premier jet inscrivait `/ssh-audit/policies`.** L'entree aurait ferme la **lecture** qu'un role
+1 porteur de `can_audit_ssh` fait legitimement sur SES machines — l'erreur exacte contre laquelle
+E-235c previent. Le portage traite deja ce cas par **SEC-013, « fermeture par l'ABSENCE »** :
+`audit-ssh.js` n'emet aucune requete autre que `GET` et ne compose jamais ce POST.
+
+**ET CE N'EST PAS UNE SONDE QUI L'A ATTRAPE.** C'est la redaction du commentaire : en ecrivant « le
+GET est borne par machine, donc il doit rester accessible au role 1 », il fallait ecrire la ligne
+d'a cote — « le POST est garde par le role seul » — et les deux portaient la meme URL.
+
+*Un test verifie l'EXECUTION d'une decision, jamais la decision.* Mes assertions listaient `/policies`
+parmi les entrees **a ajouter** : elles en auraient verifie la PRESENCE et l'auraient trouvee. **Un
+test ecrit par celui qui decide ne peut mesurer que sa main.** Troisieme fois de la soiree qu'ecrire
+l'explication trouve le defaut, la ou aucune sonde ne l'a vu.
+
+Et l'arbre n'a jamais ete touche : le script du premier jet a ete **ECRIT, pas lance** — verifie par
+`git status`. *« Defaut attrape avant ecriture » et « defaut attrape et corrige » ne sont pas la meme
+chose.*
+
+#### ⚠⚠ CE QUE CETTE FERMETURE NE FERME PAS
+
+    reserveeAdmin() est teste par  if ($roleId < 2 && …)      PasserelleController.php:69
+    -> critere de ROLE, pas de PERMISSION
+
+    role 1  ->  refus a la PASSERELLE au lieu du backend      gain reel, petit
+    role 2  ->  PASSE, avant comme apres                      LE TROU EST INTACT
+
+Or le defaut releve est celui du role 2 : **un compte role 2 DEPOURVU de `can_audit_ssh` atteint
+`POST /ssh-audit/schedules` par la passerelle**, et le backend l'accepte puisqu'il ne garde que le
+role. Cette route cree une **CRON de scan SSH visant TOUT LE PARC par defaut** — l'objet meme
+d'E-280.
+
+**Ces trois entrees ne corrigent pas cela, et « fermeture par l'ABSENCE » non plus** : elle empeche la
+PAGE de composer l'appel, pas une requete forgee d'atteindre la route, puisque `/ssh-audit/` est en
+liste blanche. `POST /ssh-audit/policies` porte donc **exactement** le trou de `POST /schedules` — et
+il **parait traite** alors qu'il ne l'est pas. *Un defaut qui porte une marque de traitement ne se
+rouvre pas.*
+
+Le correctif est `@require_permission('can_audit_ssh')` sur les routes backend, en plus du role :
+dans `backend/`, hors de ce perimetre. **Route par le DSI a la session qui le detient, les deux
+routes dans le meme lot.** SEC-013 n'est PAS amende ici : recopier ou amender une regle de securite
+ne se fait pas seul.
+
+#### NON MESURE PAR EXECUTION, et delibere
+
+L'eprouver demanderait un compte role 2 **sans** `can_audit_ssh` ; `rw-test-admin` porte la
+permission, et modifier les droits d'un compte de test **changerait l'etat qu'on veut mesurer**.
+L'argument est de LECTURE, sur trois faits releves : `/ssh-audit/` est en liste blanche (l.115), ces
+entrees manquaient a `ADMIN_SEULEMENT`, et le backend garde en `require_role(2)`.
+
+*Trois faits mesures valent mieux qu'une execution qui salit un etat partage* — et la proposition de
+me connecter en `rw-test-user` pour voir OU nait le refus a ete ecartee : ce compte est dans les
+interdits permanents, et une connexion touche `login_attempts` et la fenetre TOTP partagee.
+
+#### ⚠ ET J'AI FAILLI SIGNALER UN DEFAUT QUI N'EN EST PAS UN
+
+    routes ssh_audit sans require_permission :  17 / 18
+
+J'allais le remonter. **E-235c avait deja tranche** (`RoutesBackend.php:181-227`) :
+`require_machine_access` est la garde qui BORNE, et fermer le prefixe entier remplacerait une borne
+precise par une borne aveugle. Le chiffre etait juste, la conclusion aurait ete fausse.
+
+*Un chiffre proche de la totalite decrit une INTENTION, pas une negligence* — et l'ordre de grandeur
+aurait du m'alerter AVANT la lecture, pas servir de dernier filet.
+
+#### Mesure FONCTIONNELLE du predicat, pas seulement de la syntaxe
+
+`reserveeAdmin()` appele sur les dix-sept chemins, avec l'attendu ecrit AVANT :
+
+    admin attendu, admin vu    scan-all · fleet · schedules · schedules/7
+                               schedules/7/toggle · trends
+    libre attendu, libre vu    policies · scan · results · config · backups
+                               fix · save-config · toggle · restore · reload
+    ecarts                     0 / 17
+
+    TEMOIN POSITIF        /ssh-audit/scan-all        -> admin      l'instrument mord
+    TEMOIN non-debordement /ssh-audit/schedulesXYZ   -> libre      segment, pas prefixe
+    TEMOIN hors blanche    /inexistant/xyz           -> refuse     la blanche mord
+    et /ssh-audit/schedules reste EN LISTE BLANCHE               pas de regression
+
+**⚠ MON PREMIER TEMOIN ETAIT FAUX, ET C'EST L'ATTENTE QUI L'ETAIT.** J'avais pose
+`/wazuh/config` en « doit etre libre » : il rend `admin`, parce que `'/wazuh/'` est dans
+`ADMIN_SEULEMENT` **depuis avant ce commit** (`git show HEAD:` le montre ligne 180). Un temoin de
+controle choisi sans etre verifie rend un ecart qui accuse le code — *et j'ai failli lire « 1 ecart
+sur 18 » comme un defaut de ma propre modification.*
+
+#### Ce que ce commit ne peut PAS casser, mesure et non supposee
+
+    tests PHPUnit assertant le contenu d'ADMIN_SEULEMENT   0
+      (TEMOIN : 7 mentions de `RoutesBackend` dans laravel/tests/ — l'instrument voit)
+    suites E2E appelant ces routes                         3
+      go-page-audit-ssh · go-ssh-audit-schedules · smoke-v1.17
+    role de LEURS appels passerelle                        3  (superadmin)
+    predicat                                               $roleId < 2
+    -> neutre pour elles
+    assertions sur un 403 dans go-ssh-audit-schedules      0
+      (TEMOIN : 1 occurrence de 403 dans go-page-audit-ssh)
+
+Les deux dernieres **creent et suppriment des planifications** par la passerelle. Elles ont ete
+**LUES, jamais lancees** : une planification de test peut declencher un vrai scan SSH sur le parc, et
+c'est hors arbitrage.
+
+#### Fenetre d'ecriture
+
+Ecrit sur une fenetre **demandee et accordee** par la session qui tenait le banc, apres qu'elle a
+verifie que ses deux suites traversent la passerelle et que deux de ces trois routes en font partie.
+Neutre pour elles : leurs appels passerelle sont emis en **role 3**, et le predicat est
+`$roleId < 2`. *Le garde de fenetre surveille l'arbre ; ce fichier, lui, decide a chaque requete.*
 
 ### v1.38.183 — E-345 : `serveurs` import CSV (D6e), et le dernier manque de cette page tombe
 
