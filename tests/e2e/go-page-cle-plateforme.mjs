@@ -110,10 +110,39 @@ const COMPTES = {
         admis: false, motif: 'refuse par la PERMISSION, pas par le role' },
 };
 
-/* Les gestes qui ne doivent JAMAIS partir, quelle que soit la cible. */
-const INTERDITS = /\/(regenerate_platform_key|deploy_platform_key|deploy_service_account|remove_ssh_password|reenter_ssh_password)(\?|$)/;
+/*
+ * Les gestes qui ne doivent JAMAIS partir, quelle que soit la cible.
+ *
+ * ⚠ CETTE LISTE EN COMPTAIT CINQ, LE MODULE EN A QUATORZE (2026-09-02).
+ *   `backend/routes/ssh.py` porte 19 routes dont 14 en POST, et **`/deploy`
+ *   n'etait pas surveille** — le deploiement de cles, qui ecrit en root sur
+ *   toutes les machines cochees et REVOQUE des acces. Une enumeration ecrite de
+ *   memoire avait retenu les cinq noms de la page et oublie le geste du module.
+ *
+ * DEUX CLAUSES, parce que ce module a DEUX regimes :
+ *   (1) les chemins destructeurs, avortes QUELLE QUE SOIT LA METHODE — le
+ *       legacy PHP n'a aucune discipline de methode, un GET peut y ecrire ;
+ *   (2) tout non-GET vers la passerelle : cette page est en LECTURE SEULE,
+ *       donc aucune ecriture n'a de raison d'en partir, meme vers un module
+ *       dont le nom ne figure pas ci-dessus.
+ *
+ * La clause (2) est celle qui survit a l'ajout d'une route ; la (1) est celle
+ * qui rattrape le legacy. Aucune des deux ne suffit seule.
+ *
+ * Remesurer : grep -nE "@bp.route" backend/routes/ssh.py
+ */
+const INTERDITS = new RegExp(
+    '/(deploy|preflight_check|deploy_platform_key|revoke_service_account'
+    + '|deploy_service_account|test_platform_key|remove_ssh_password'
+    + '|reenter_ssh_password|regenerate_platform_key|scan_server_users'
+    + '|sshd_allow_user|server_user_remove_key|remove_user_keys'
+    + '|delete_remote_user)(\\?|/|$)');
 /* Ce qui vise le backend, quel que soit le portail. */
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
+/* Le predicat unique : le filet et le VERDICT doivent porter sur la MEME chose.
+ * Les avoir laisses diverger est ce qui a rendu le trou invisible ailleurs. */
+const estInterdit = (route, methode) => INTERDITS.test(route)
+    || (methode !== 'GET' && VERS_BACKEND.test(route));
 
 const C = CIBLE === 'laravel'
     ? { connexion: '/connexion', page: '/cle-plateforme',
@@ -195,7 +224,7 @@ async function connecte(compte) {
         // FAIL-CLOSED, DANS CET ORDRE : les gestes interdits d'abord, la machine
         // de production ensuite. Un geste interdit qui citerait la machine 2
         // serait avorte quand meme.
-        if (INTERDITS.test(url)) {
+        if (estInterdit(chemin, r.method())) {
             avortees.push({ route: chemin, motif: 'geste INTERDIT sur ce module', corps });
             r.abort('blockedbyclient').catch(() => {});
 
@@ -544,8 +573,9 @@ try {
             constate('controle de surete', 'SANS OBJET — aucune requete vue, le filet n\'a rien eu a filtrer');
         } else {
             verifie('AUCUN geste interdit n\'a abouti',
-                ! passees.some((p) => INTERDITS.test(p.route)),
-                passees.filter((p) => INTERDITS.test(p.route)).map((p) => p.route).join(' '),
+                ! passees.some((p) => estInterdit(p.route, p.methode)),
+                passees.filter((p) => estInterdit(p.route, p.methode))
+                    .map((p) => `${p.methode} ${p.route}`).join(' '),
                 `${passees.length} requete(s) laissee(s) passer`);
             verifie('AUCUNE requete n\'a vise la production',
                 ! passees.some((p) => new RegExp(`[?&](machine_id|server_id)=${MACHINE_PRODUCTION}\\b`).test(p.route)),

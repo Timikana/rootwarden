@@ -86,9 +86,36 @@ const COMPTES = {
         motif: 'admis par le ROLE, SANS detenir la permission' },
 };
 
-/* Ce qui ne doit jamais partir : toute ECRITURE du module, et la creation de
- * planification — voir l'en-tete, le repli du scheduler prend le parc entier. */
-const INTERDITS = /\/(ssh-audit\/(policies|schedules|scan|fleet-scan)|audit-ssh\/[a-z-]+)(\?|$)/;
+/*
+ * Ce qui ne doit jamais partir : toute ECRITURE du module, et la creation de
+ * planification — voir l'en-tete, le repli du scheduler prend le parc entier.
+ *
+ * ⚠ CE MOTIF ETAIT UNE ENUMERATION, ET ELLE ETAIT FAUSSE (2026-09-02) :
+ *   — `fleet-scan` n'existe pas. La route est `/ssh-audit/fleet`, en GET.
+ *   — l'ancre `(\?|$)` coupait APRES le nom : `scan` n'attrapait donc PAS
+ *     `scan-all`. Mesure : 3 routes attrapees sur les 13 non-GET du blueprint.
+ *   Un nom absent finit par se voir ; un nom PRESENT qui ne couvre pas se croit
+ *   couvert. Le second defaut est le plus silencieux des deux.
+ *
+ * Le filet n'ENUMERE plus : il porte sur le MODULE, et c'est le garde qui
+ * discrimine par la methode (voir plus bas). Une route ajoutee demain est
+ * couverte sans que personne ait a y penser.
+ *
+ * RESERVE, mesuree : sur ce backend `POST` ne veut pas dire « ecriture »
+ * partout — `/ssh-audit/config` LIT `sshd_config`. Ici la page n'emet que des
+ * GET (6 requetes observees, toutes en GET), donc avorter tout non-GET
+ * n'avorte rien de legitime. Le jour ou elle en composera un, la suite
+ * rougira : c'est le signal qu'on veut, pas un faux positif.
+ *
+ * ⚠ CE MOTIF ATTRAPE AUSSI LA PAGE, servie a `/ssh-audit/` cote legacy. Seul le
+ *   filtre `methode !== 'GET'` du garde l'en preserve. **Ne rendez pas ce garde
+ *   agnostique a la methode sans exclure la page** : c'est exactement ce qui a
+ *   fait avorter la navigation dans go-page-pare-feu le 2026-09-02 (4 FAIL,
+ *   net::ERR_BLOCKED_BY_CLIENT), ou le garde, lui, est agnostique.
+ *
+ * Remesurer : grep -nE "@bp.route\('/ssh-audit/" backend/routes/ssh_audit.py
+ */
+const INTERDITS = /\/(ssh-audit|audit-ssh)\//;
 /* Le temoin : un chemin qui n'existe pas, donc sans effet. */
 const TEMOIN = '/temoin-e2e-inexistant';
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;

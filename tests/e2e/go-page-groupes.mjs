@@ -101,8 +101,20 @@ const COMPTES = {
         motif: 'role 3 ET `can_admin_portal`' },
 };
 
-/* Toute ECRITURE du module, et l'action groupee — voir le cadre en tete. */
-const INTERDITS = /\/groups(\/[0-9]+)?(\/(members|action|scan|delete))?(\?|$)/;
+/*
+ * Toute ECRITURE du module, et l'action groupee — voir le cadre en tete.
+ *
+ * ⚠ L'ENUMERATION ETAIT FAUSSE (2026-09-02) : `action`, `scan` et `delete` sont
+ *   trois FANTOMES — aucun n'existe comme segment de route. Et surtout
+ *   `/groups/<id>/run`, l'EXECUTION GROUPEE, donc le geste le plus dangereux du
+ *   module, ECHAPPAIT au motif.
+ *   Routes reelles : GET /groups · POST /groups · PUT|DELETE /groups/<id> ·
+ *   GET /groups/<id>/members · POST /groups/<id>/run.
+ *
+ * Le filet porte desormais sur le MODULE ; la methode discrimine (voir plus bas).
+ * Remesurer : grep -nE "@bp.route" backend/routes/groups.py
+ */
+const INTERDITS = /\/groups(\/|\?|$)/;
 const TEMOIN = '/temoin-e2e-inexistant';
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
 

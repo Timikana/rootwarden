@@ -95,9 +95,29 @@ const ATTENDU = {
     3: { parcBorne: false, indBorne: false, comptesReserve: false, sans2fa: true },
 };
 
-/* Un POST vers un chemin d'action ne doit jamais partir de l'accueil. */
-const INTERDITS = /\/(deploy|regenerate|scan|remove|reenter|apply|restore|rotate)[a-z_-]*(\?|$)/i;
+/*
+ * Un geste d'action ne doit jamais partir de l'accueil.
+ *
+ * ⚠ CE MOTIF ETAIT UNE LISTE DE VERBES, et une liste de verbes ne peut pas
+ *   etre complete : l'accueil touche TOUS les modules, donc l'ensemble a
+ *   couvrir est l'union de leurs ecritures, qui bouge a chaque livraison.
+ *   Trois autres suites de ce banc ont ete prises en defaut le meme jour par
+ *   une enumeration (2026-09-02), dont une qui ignorait `/deploy`.
+ *
+ * DEUX CLAUSES :
+ *   (1) les verbes d'action, avortes QUELLE QUE SOIT LA METHODE — le legacy
+ *       PHP n'a aucune discipline de methode, un GET peut y ecrire ;
+ *   (2) tout non-GET vers la passerelle : l'accueil AFFICHE, il n'agit pas.
+ *       Cette clause-la ne s'entretient pas et couvre les modules a venir.
+ *
+ * L'ancre accepte desormais `/` : `scan` n'attrapait pas `scan-all`.
+ */
+const INTERDITS = /\/(deploy|regenerate|scan|remove|reenter|apply|restore|rotate|revoke|uninstall|reconfigure)[a-z_-]*(\?|\/|$)/i;
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
+/* Le filet et le VERDICT portent sur le MEME predicat. Les avoir laisses
+ * diverger est ce qui a rendu le trou invisible dans les suites voisines. */
+const estInterdit = (route, methode) => INTERDITS.test(route)
+    || (methode !== 'GET' && VERS_BACKEND.test(route));
 
 const C = CIBLE === 'laravel'
     ? { connexion: '/connexion', page: '/accueil',
@@ -205,7 +225,7 @@ async function connecte(compte) {
 
         // Le GESTE d'abord, la CIBLE ensuite : un geste interdit visant une
         // machine sure est avorte quand meme.
-        if (r.method() === 'POST' && INTERDITS.test(url)) {
+        if (estInterdit(chemin, r.method())) {
             avortees.push({ route: chemin, motif: 'geste d\'action depuis l\'accueil', corps });
             r.abort('blockedbyclient').catch(() => {});
 
@@ -440,8 +460,9 @@ try {
             constate('controle de surete', 'SANS OBJET — aucune requete vue, le filet n\'a rien eu a filtrer');
         } else {
             verifie('AUCUN geste d\'action n\'est parti de l\'accueil',
-                ! passees.some((p) => p.methode === 'POST' && INTERDITS.test(p.route)),
-                passees.filter((p) => INTERDITS.test(p.route)).map((p) => p.route).join(' '),
+                ! passees.some((p) => estInterdit(p.route, p.methode)),
+                passees.filter((p) => estInterdit(p.route, p.methode))
+                    .map((p) => `${p.methode} ${p.route}`).join(' '),
                 `${vues} requete(s) vue(s)`);
             verifie('AUCUNE requete n\'a vise la production',
                 ! passees.some((p) => new RegExp(`[?&](machine_id|server_id)=${MACHINE_PRODUCTION}\\b`).test(p.route)),
