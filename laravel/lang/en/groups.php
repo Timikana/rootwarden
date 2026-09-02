@@ -40,9 +40,6 @@ return [
     'np_ouvrir'     => 'Open in the old portal',
     'np_fermer'     => 'Close',
 
-    'np_nouveau'    => 'Creating a group is not ported to this interface yet.',
-    'np_nouveau_detail' => 'One thing is worth knowing before creating a group in the old portal: a dynamic group with NO criterion ticked contains every machine in the fleet, production included. The old portal does not say so — its summary line stays blank.',
-
     'np_supprimer'  => 'Deleting a group is not ported to this interface yet.',
     'np_supprimer_detail' => 'Deletion only affects the group: the servers it gathers are not modified.',
 
@@ -56,6 +53,31 @@ return [
     'np_cve_derive' => 'The number shown is today\'s. A dynamic group is re-resolved when the action starts: a machine added to the fleet in between would enter the action without ever having been shown here.',
 
     'portee_titre' => 'What this page can do today',
-    'portee_texte' => 'Reading groups and their members is ported. Creation, deletion and the two bulk actions still go through the old portal — each button explains what it engages before sending you there.',
+    // R2: creation IS ported now — see fr.
+    'portee_texte' => 'Reading groups, their members and creation are ported. Deletion and the two bulk actions still go through the old portal — each button explains what it engages before sending you there.',
     'parc_entier'  => 'An administrator role can target the whole fleet: no machine assignment bounds bulk actions.',
+
+    // R2 — creating a group. E-274 closed by construction: saving goes through
+    // the decision panel, which announces the resolved scope. See fr.
+    'form_titre' => 'New group',
+    'f_nom' => 'Name',
+    'f_desc' => 'Description',
+    'f_type' => 'How members are chosen',
+    'type_dyn_aide' => 'By rule: machines matching the criteria join and leave on their own.',
+    'type_stat_aide' => 'By list: you name the machines one by one.',
+    'f_env' => 'Environment',
+    'f_crit' => 'Criticality',
+    'f_reseau' => 'Network',
+    'f_cycle' => 'Lifecycle',
+    'f_membres' => 'Machines in the group',
+    'btn_enregistrer' => 'Save',
+    'btn_annuler' => 'Cancel',
+    'portee_aucun_filtre' => 'No criterion is ticked: this group will contain EVERY machine in the fleet, production included.',
+    'portee_filtres' => 'Criteria kept: :liste',
+    'portee_statique' => ':n machine(s) named.',
+    'portee_statique_vide' => 'No machine named: the group will be empty.',
+    'portee_archivees' => "The server-side fleet computation does not exclude archived machines: a group with no criterion may contain some.",
+    'err_nom' => 'A name is required.',
+    'cree' => 'Group created.',
+    'err_creation' => 'The group could not be created.',
 ];

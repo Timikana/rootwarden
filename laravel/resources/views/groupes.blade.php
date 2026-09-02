@@ -30,6 +30,102 @@
     </div>
 
     {{--
+        ══ R2 — LE FORMULAIRE DE CREATION ══════════════════════════════════
+
+        ⚠ IL FERME E-274 PAR CONSTRUCTION, ET C'EST SA RAISON D'ETRE.
+
+        `_resolve_dynamic` (`backend/routes/groups.py:77`) termine par `'1=1'`
+        quand aucun critere n'est coche : le groupe contient alors LE PARC
+        ENTIER, production comprise. Et l'etat par DEFAUT du formulaire du
+        legacy est exactement celui-la — saisir un nom et enregistrer suffit,
+        sans qu'aucun ecran ne le dise.
+
+        Ici « Enregistrer » n'enregistre pas : il ouvre le panneau de decision,
+        qui ANNONCE la portee resolue. **On ne peut donc plus creer un groupe
+        sans avoir lu ce qu'il contiendra.** C'est la meme separation que le
+        module impose ailleurs entre verifier et agir.
+
+        Aucun champ de saisie LIBRE pour les criteres : ce sont des cases a
+        cocher sur des valeurs closes. Une entree libre validee se contourne
+        par une requete forgee ; une entree libre absente, non.
+    --}}
+    <div class="rw-carte rw-carte--pleine" data-rw="groupes-formulaire" hidden>
+        <h2 class="rw-sous-titre-fort">{{ __('groups.form_titre') }}</h2>
+
+        <div class="rw-grille-champs">
+            <div class="rw-champ">
+                <label class="rw-champ__etiquette" for="g-nom">{{ __('groups.f_nom') }}</label>
+                <input id="g-nom" type="text" maxlength="100" class="rw-saisie" data-rw="groupes-nom">
+            </div>
+            <div class="rw-champ">
+                <label class="rw-champ__etiquette" for="g-desc">{{ __('groups.f_desc') }}</label>
+                <input id="g-desc" type="text" maxlength="255" class="rw-saisie" data-rw="groupes-desc">
+            </div>
+        </div>
+
+        <div class="rw-champ rw-champ--espace">
+            <span class="rw-champ__etiquette">{{ __('groups.f_type') }}</span>
+            <label class="rw-champ--case">
+                <input type="radio" name="g-type" value="dynamic" checked data-rw="groupes-type-dyn">
+                <span>{{ __('groups.type_dynamique') }}</span>
+            </label>
+            <p class="rw-aide">{{ __('groups.type_dyn_aide') }}</p>
+            <label class="rw-champ--case">
+                <input type="radio" name="g-type" value="static" data-rw="groupes-type-stat">
+                <span>{{ __('groups.type_statique') }}</span>
+            </label>
+            <p class="rw-aide">{{ __('groups.type_stat_aide') }}</p>
+        </div>
+
+        {{-- Les quatre enumerations, en cases a cocher : valeurs CLOSES. --}}
+        <div data-rw="groupes-filtres">
+            <div class="rw-grille-champs">
+                @foreach ([
+                    'environment'      => ['cle' => 'f_env',    'valeurs' => ['PROD', 'DEV', 'TEST', 'OTHER']],
+                    'criticality'      => ['cle' => 'f_crit',   'valeurs' => ['CRITIQUE', 'NON CRITIQUE']],
+                    'network_type'     => ['cle' => 'f_reseau', 'valeurs' => ['INTERNE', 'EXTERNE']],
+                    'lifecycle_status' => ['cle' => 'f_cycle',  'valeurs' => ['active', 'retiring', 'archived']],
+                ] as $colonne => $bloc)
+                    <div class="rw-champ">
+                        <span class="rw-champ__etiquette">{{ __('groups.' . $bloc['cle']) }}</span>
+                        @foreach ($bloc['valeurs'] as $v)
+                            <label class="rw-champ--case">
+                                <input type="checkbox" class="gf" data-col="{{ $colonne }}" value="{{ $v }}">
+                                <span>{{ $v }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        <div data-rw="groupes-membres" hidden>
+            <span class="rw-champ__etiquette">{{ __('groups.f_membres') }}</span>
+            @if (! $parcLisible)
+                <p class="rw-vide__texte">{{ __('groups.err_charge') }}</p>
+            @else
+                <div class="rw-liste-selection">
+                    @foreach ($machines as $m)
+                        <label class="rw-liste-selection__etiquette">
+                            <input type="checkbox" class="gm" value="{{ $m->id }}">
+                            <span class="rw-liste-selection__nom">{{ $m->name }}</span>
+                            <span class="rw-liste-selection__detail">{{ $m->ip }}</span>
+                        </label>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <div class="rw-actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="groupes-annuler">{{ __('groups.btn_annuler') }}</button>
+            <button type="button" class="rw-bouton"
+                    data-rw="groupes-enregistrer">{{ __('groups.btn_enregistrer') }}</button>
+        </div>
+        <p class="rw-annonce" role="status" aria-live="polite" data-rw="groupes-form-message"></p>
+    </div>
+
+    {{--
         ═══ UN SEUL PANNEAU, AU NIVEAU DE LA PAGE ═══════════════════════════
 
         Lecon de F5 : un element partage par plusieurs cartes ne vit dans
@@ -56,6 +152,11 @@
         <div class="rw-panneau-decision__actions">
             <button type="button" class="rw-bouton rw-bouton--discret"
                     data-rw="groupes-panneau-fermer">{{ __('groups.np_fermer') }}</button>
+            {{-- R2 : masque par defaut. Les panneaux des gestes NON portes
+                 n'ont rien a confirmer — seul l'enregistrement d'un groupe
+                 l'affiche, apres avoir annonce la portee resolue. --}}
+            <button type="button" class="rw-bouton rw-bouton--succes"
+                    data-rw="groupes-panneau-confirmer" hidden>{{ __('groups.btn_enregistrer') }}</button>
             {{-- ACTION PRINCIPALE : le lien vers l'ancien portail. Un panneau
                  dont la seule issue serait « Fermer » ne serait pas une
                  decision. Marqueur `↗` comme dans le menu. --}}

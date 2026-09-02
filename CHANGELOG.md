@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.177** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.178** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,72 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.178 — `groups` R2 : creer un groupe, et E-274 ferme PAR CONSTRUCTION
+
+**Ecrit en base, ne joint aucune machine.** C'est ce qui rend ce geste portable sans arbitrage,
+contrairement aux deux actions de masse — dont `cve_scan` envoie de vrais courriels.
+
+#### « Enregistrer » n'enregistre pas : il ANNONCE la portee
+
+`_resolve_dynamic` (`backend/routes/groups.py:77`) termine par `'1=1'` quand aucun critere n'est
+coche : le groupe contient alors **le parc entier, production comprise**. Et l'etat par DEFAUT du
+formulaire du legacy est exactement celui-la — **saisir un nom et enregistrer suffit**, sans qu'aucun
+ecran ne le dise.
+
+Ici « Enregistrer » ouvre le panneau de decision, qui dit ce que le groupe contiendra. **On ne peut
+donc plus creer un groupe sans avoir lu sa portee** — meme separation entre verifier et agir que le
+module impose ailleurs.
+
+    aucun critere  ->  « ce groupe contiendra TOUTES les machines du parc, production comprise »
+                   +   « le calcul du parc cote serveur n'exclut pas les archivees »
+    des criteres   ->  « criteres retenus : … »
+    statique       ->  « :n machine(s) designee(s) » ou « le groupe sera vide »
+
+**Aucun champ de saisie LIBRE pour les criteres** : cases a cocher sur des valeurs closes. *Une
+entree libre validee se contourne par une requete forgee ; une entree libre absente, non.*
+
+#### E-341 — ET J'AI CREE LA MEME DETTE QUE JE CORRIGE DEPUIS CETTE NUIT
+
+    'portee_texte'  « La creation, la suppression et les deux actions de masse
+                      passent encore par l'ancien portail »
+
+**Cette phrase est devenue fausse au moment ou ce commit a porte la creation.** Meme mecanisme que
+`pare-feu` (E-318), `superv` (E-336) et l'encart des CGU (E-340) — et **je l'aurais livre**, apres
+avoir passe la nuit a le diagnostiquer chez les autres.
+
+> **Un libelle se relit avec le code qu'il decrit, dans le MEME commit.** Vu a l'image, pas a
+> l'assertion : c'est la carte de portee de ma propre page qui l'affichait.
+
+Et un second, du meme genre : le panneau offrait **« Ouvrir dans l'ancien portail »** a cote d'un
+« Enregistrer » qui fonctionne. *Offrir le legacy pour un geste porte, c'est entretenir ce qu'on veut
+eteindre.* Le lien se masque desormais sur un geste porte et revient pour les autres.
+
+#### Mesures — 13 assertions, et l'essai se nettoie
+
+    le formulaire est masque au chargement
+    « Nouveau groupe » OUVRE le formulaire
+    sans nom : refus ANNONCE                        et RIEN n'est ecrit
+    « Enregistrer » ouvre le panneau au lieu d'ecrire   le bouton Confirmer apparait
+    AUCUN critere : la portee dit « toutes les machines du parc »
+      et la reserve sur les archivees est dite
+      et TOUJOURS rien en base avant consentement
+    confirmer ECRIT une ligne                       0 -> 1
+      le formulaire se referme                      la liste se recharge
+    la carte dit « aucun filtre — toutes les machines du parc »
+    NETTOYAGE : lignes d'essai restantes = 0
+
+    13 PASS / 0 FAIL   ·   parite i18n FR=58 EN=58 ecarts=0
+    18 classes CSS verifiees dans rw.css AVANT le premier rendu — rw.css non touche
+    6 captures 1920/1400/390, REGARDEES — les 2 defauts ci-dessus viennent de la
+
+**Aucune route Laravel ajoutee** : `POST /groups` passe par la passerelle, deja en liste blanche et
+en reserve d'administration. Et **aucun jeton CSRF pose** : le cadre accepte une requete de meme
+origine, et en ajouter un donnerait l'illusion d'un controle qui vit ailleurs.
+
+⚠ **Pour la session 7** : `machine_groups` peut desormais etre non vide par un geste metier — donc la
+propriete d'E-274 (*un groupe sans filtre doit afficher le parc, pas du vide*) devient **mesurable
+pour la premiere fois**, sans avoir a fabriquer l'objet.
 
 ### v1.38.177 — E-340 : l'ecran des conditions annoncait que le portail n'etait pas porte
 
