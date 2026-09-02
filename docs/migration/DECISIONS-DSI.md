@@ -3517,3 +3517,41 @@ déchiffrement avant toute session SSH, `code 1`. **Seule son heure change.**
 **Et le constat qui compte n'a pas bougé d'un mot** : *`deployment.log` ne consigne ni appelant, ni
 session, ni compte.* **Après que deux sessions ont tout mesuré, personne ne peut répondre à « qui a lancé
 un déploiement sur la production ». C'est le constat, pas la limite de l'enquête.**
+
+### ⚠⚠ L'accident qui a sauvé le 27 août N'EXISTE PLUS — mesuré le 2026-09-02 à 08:2x
+
+**J'avais écrit** : *« ce qui a empêché les dégâts n'est aucune de nos protections : un échec de
+déchiffrement. »* **Vrai du 27/08. Faux aujourd'hui.**
+
+    Encryption().test_decryption()  — la methode de diagnostic du depot lui-meme
+    machine 1  srv-zabbix           password + root_password   DECHIFFRABLE
+    machine 2  Test-Server-Debian   password + root_password   DECHIFFRABLE
+    machine 3  OpenCVE-Test-OnPrem  password + root_password   DECHIFFRABLE
+
+> **Les six secrets se déchiffrent avec la clé actuelle.** *Un `POST /deploy` lancé aujourd'hui
+> franchirait la phase où celui du 27 août s'est arrêté, et passerait aux sessions SSH.*
+
+**C'est un défaut TRANSITOIRE qui s'est refermé, et la leçon du dépôt le dit** : *un état final correct
+ne prouve pas que le geste était correct.* **Ici c'est l'inverse et c'est pire — un état initial cassé
+avait rendu un geste inoffensif, et sa réparation a rendu le geste dangereux sans que personne ne le
+décide.**
+
+**Ce que ça change pour K4 : la marge de sécurité involontaire est retirée.** Le filet de la session 7,
+corrigé ce matin, devient la **seule** chose entre une invocation et une session SSH root sur le parc.
+
+### ✅ Arbitrage — le déploiement se teste sur la machine 2 SEULE
+
+**Mesuré, et c'est ce qui rend l'expérience bornée :**
+
+    id 2  Test-Server-Debian  10.10.10.10  DEV   sa=0  pk=0   port 22 OUVERT
+          banniere : SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u10
+          compte `testuser`, mot de passe en base, dechiffrable
+    id 1  srv-zabbix          192.168.0.244 PROD  sa=1  pk=1   <- INTERDITE
+
+**La machine 2 n'a ni compte de service, ni clé de plateforme déployée.** *Un déploiement dessus n'a rien
+à révoquer* — **c'est la seule cible du parc où le geste le plus dangereux du produit ne détruit rien.**
+
+> **Je ne lance rien** : `POST /deploy` reste un geste d'exploitant. **Mais l'arbitrage produit qui
+> m'appartient est celui-ci : quand il sera autorisé, il doit l'être sur la machine 2 seule, jamais sur
+> un `machines = ['1','2']` comme le 27 août.** *Le journal du 27 montre que la liste par défaut
+> commence par la production.*
