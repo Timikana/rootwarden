@@ -180,3 +180,71 @@ chiffres circulaient.
   reprends de `MODULE-SSH-AUDIT.md`, daté du 2026-08-27 ;
 - **les sondes HTTP** (`/supervision/` 404, `/ssh-audit/` 302, `/groups/index.php` 302, `/fail2ban/`
   302) décrivent **le service** au 2026-09-02 18:30, non authentifiées.
+
+---
+
+## 8. Appariement des cinq catalogues non vérifiés — **une fausse sur cinq**
+
+Relevé le **2026-09-02 à 19:37 CEST**. Méthode : *ce que le catalogue DÉCLARE absent* contre *ce que
+le script de la page APPELLE réellement*, apparié requête par requête. **Aucune route Laravel n'a été
+cherchée** — une capacité qui passe par la passerelle n'en a aucune.
+
+### 8.1 L'instrument, et il a fallu le corriger DEUX fois
+
+La chaîne est **catalogue → vue qui l'emploie → script que la vue charge**, jamais devinée depuis le
+nom : `groups` → `groupes.blade.php` → `groupes.js`, `sftp` → `acces-sftp.blade.php`.
+
+**Témoin posé d'emblée** : un cas connu (`groups`) et un motif absurde, cherchés en même temps.
+
+| correction | ce que le témoin a montré |
+|---|---|
+| **1** — le témoin `groupes` rendait AUCUNE, **comme le motif absurde** | le **catalogue** s'appelle `groups`, le **script** `groupes.js`. Le témoin a échoué **avant** les cinq mesures, et c'est ce qui l'a rendu utile |
+| **2** — `fail2ban` rendait **AUCUN script**, alors que `fail2ban.js` existe | mon motif de chemin était `[a-z-]+\.js` : **il excluait les chiffres**. Le `2` de `fail2ban` |
+
+> **Un témoin ne valide l'instrument que sur la FORME du témoin.** `groups`/`groupes` n'a pas de
+> chiffre, donc il a validé un motif incapable d'en voir un. **Le témoin est nécessaire, il n'est pas
+> suffisant** — et c'est la nuance que je n'avais pas encore payée.
+
+Troisième correction du même ordre : les scripts n'appellent pas des chemins littéraux mais
+`fetch(PASSERELLE + chemin, …)`, le chemin étant une **variable**. Il a fallu remonter aux littéraux
+passés aux appelants.
+
+### 8.2 Le verdict, catalogue par catalogue
+
+| catalogue | ce qu'il déclare absent | ce que le script appelle | verdict |
+|---|---|---|---|
+| `bashrc` | « les gestes de **déploiement** » | `/bashrc/preview`, `/bashrc/template` — **pas** `/bashrc/deploy` | **VRAIE** |
+| `fail2ban` | quatre gestes, dont « **désactiver** une jail » | `/fail2ban/enable_jail` avec `maxretry`, `bantime`, `findtime` — **des réglages d'ACTIVATION**, aucun chemin de désactivation | **VRAIE** |
+| `politiques` | « l'**annulation** d'un déploiement » | `/policy/sudo/` + geste, `/policy/sudo/audit`. **Le rollback est `POST /policy/rollback`** (`policies.py:493`) — **hors du préfixe concaténé** | **VRAIE** |
+| `sftp` | idem | `/policy/sftp/` + geste — même raisonnement | **VRAIE** |
+| **`serveurs`** | « cycle de vie, **test de connexion** et import CSV » | **`POST /server_status` avec `machine_id`, derrière un bouton** | ⚠ **FAUSSE sur une des trois** |
+
+### 8.3 ⚠ `serveurs` — la page fait le test de connexion qu'elle déclare absent
+
+`serveurs.js:111-117` : un bouton se désactive, affiche `libelles.test_en_cours`, et **POSTe
+`/server_status` avec le `machine_id`**. Et le catalogue porte **quatre clés dédiées au geste** :
+
+    test_en_cours     « Test en cours… »
+    test_en_ligne     « La machine répond sur :ip. »
+    test_hors_ligne   « La machine ne répond pas sur :ip. »
+    test_echec        « Le test n'a pas pu être mené. »
+
+**Une page ne rédige pas quatre messages de résultat pour un geste qu'elle n'accomplit pas.**
+
+**Mais la déclaration n'est fausse que sur UN de ses trois éléments**, et c'est ce qui compte pour
+l'assignation : `/server_lifecycle` **n'est pas** dans les chemins du script, et aucun téléversement
+CSV n'y figure. **Cycle de vie et import CSV sont réellement absents.**
+
+> *Une page peut légitimement porter certains gestes et en déclarer d'autres absents.* Le défaut ici
+> n'est pas que la page mente sur sa nature — c'est qu'**une phrase énumère trois éléments dont un est
+> faux**, et qu'aucun lecteur ne peut le savoir sans apparier. **Corriger la phrase suffit ; il n'y a
+> rien à porter.**
+
+### 8.4 Ce que je n'ai PAS mesuré
+
+- **les valeurs que `geste` prend** dans `/policy/sudo/' + geste` : le verdict tient sur le **préfixe**
+  (`/policy/rollback` n'est pas sous `/policy/sudo/`), pas sur l'énumération des gestes. Si un jour un
+  geste nommé `rollback` apparaissait sous ce préfixe, ma conclusion tomberait ;
+- **je n'ai pas vérifié que les quatre déclarations VRAIES le soient sur TOUS leurs éléments** —
+  `fail2ban` en énumère quatre, je n'ai apparié que « désactiver une jail » ;
+- rien n'a été écrit dans `laravel/` ni `backend/`.
