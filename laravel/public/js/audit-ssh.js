@@ -274,10 +274,19 @@
      * ⚠ E-280 — CE QUE LA CIBLE VEUT DIRE, ET CE QU'ELLE NE DIT PAS.
      *
      * `scheduler.py` route sur `target_type` : `tag`, `environment`,
-     * `machines`, et un `else` final. Ce `else` est atteint par « tout le
-     * parc » — la valeur par defaut — ET par toute valeur non reconnue, ET
-     * par un `target_value` vide sur `tag` ou `environment`. Les trois
-     * passent par le MEME chemin.
+     * `machines`, et un `else` final.
+     *
+     * CORRIGE apres remesure : `target_type` EST une liste fermee en base
+     * (`enum('all','tag','environment','machines') NOT NULL DEFAULT 'all'`),
+     * donc une valeur inventee est refusee. Ce qui reste atteignable est une
+     * cible INCOMPLETE — « par tag » dont le champ est reste blanc :
+     * `elif target_type == 'tag' and target_value` est faux, et l'on tombe
+     * dans le `else`.
+     *
+     * **Une garde placee dans la CONDITION D'ENTREE ne garde pas la branche :
+     * elle en detourne.** La branche `machines` fait l'inverse — elle entre,
+     * puis rend `WHERE 1=0` sur une liste vide. Deux facons opposees de
+     * traiter le meme cas, dans la meme fonction.
      *
      * On distingue donc a l'ecran ce que la donnee permet de distinguer, et
      * on nomme le reste « non reconnu » plutot que de le presenter comme un

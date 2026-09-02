@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.138** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.139** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,63 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.139 — E-280 recadre : j'ai RELAYE une mesure du service que je n'avais pas faite
+
+**Trois des affirmations que j'ai inscrites hier sur E-280 sont fausses.** Elles m'avaient ete
+transmises comme des mesures ; **je les ai recopiees dans mon CHANGELOG sans les refaire**, et l'une
+d'elles portait sur le SERVICE — le regime que je ne peux pas lire depuis l'arbre.
+
+#### Ce qui tombe, remesure par moi
+
+| affirmation inscrite | remesure |
+|---|---|
+| « en service, le repli ne filtre meme pas les archivees » | **FAUX** — `md5sum` du fichier dans le conteneur **et** dans l'arbre : `cbf22ff…`, **identiques** |
+| « `target_type` n'a aucune liste fermee » | **FAUX** — `enum('all','tag','environment','machines') NOT NULL DEFAULT 'all'` |
+| « une valeur non reconnue tombe dans le `else` » | **FAUX** — la base la refuse avant d'y arriver |
+
+Et le `WHERE 1=0` **est** atteignable : `target_value = '[]'` est une chaine non vide, donc la
+condition d'entree passe, puis `ids` sort vide.
+
+#### Ce qui RESTE, et c'est le coeur
+
+> Une planification **« scanner les machines du tag X »** dont le champ est reste **blanc** vise le
+> parc entier. Pas une requete forgee — **une case vide**.
+
+    elif target_type == 'tag' and target_value:     <- faux si le champ est blanc
+    ...
+    else:  SELECT … FROM machines                    <- TOUT LE PARC
+
+**Une garde placee dans la CONDITION D'ENTREE ne garde pas la branche : elle en detourne.** La
+branche `machines` fait l'inverse — elle entre, puis rend `WHERE 1=0` sur une liste vide. **Deux
+facons opposees de traiter le meme cas, dans la meme fonction.**
+
+Et la nuance qui rend le defaut non-diagnosticable tient : `'all'` est **un choix legitime** ET le
+repli d'une saisie incomplete. *Rien, meme apres coup en base, ne distingue les deux.* L'ecran le
+dit — `planif_cible_ambigue` — et une cible incomplete est nommee comme telle plutot que presentee
+comme un choix.
+
+#### Ce que je retiens, et ce n'est pas « verifier davantage »
+
+**J'ai relaye.** La mesure du service m'avait ete donnee avec sa commande et son horodatage, et
+c'est exactement ce qui l'a rendue credible : *elle avait la FORME d'une mesure*. Je ne l'ai pas
+refaite parce qu'elle etait deja outillee.
+
+> **Un relevé qui arrive avec sa commande est plus facile a verifier — pas moins necessaire a
+> verifier.** L'outillage d'une affirmation ne la transporte pas ; il rend seulement sa remesure
+> bon marche.
+
+Et une regle qui vaut au-dela d'ici : **un accord ne vaut que si le confirmateur a mesure
+autrement.** Deux sessions avaient confirme ces chiffres en refaisant la meme commande avec le meme
+ancrage. Trois relevés concordants issus du meme geste ne font pas trois mesures.
+
+#### Ce qui est corrige
+
+Catalogue FR et EN (`planif_cible_inconnue`, `planif_cible_ambigue`, `np_planif_detail`) et le
+commentaire d'E-280 dans `audit-ssh.js`. **Aucun changement de comportement** : la page disait deja
+la bonne chose sur le fond, elle la disait avec un motif faux.
+
+    parite i18n   FR=68  EN=68  ecarts=0
 
 ### v1.38.138 — troisième passe sur E-280 : ma correction corrigeait trop, sur les deux points
 
