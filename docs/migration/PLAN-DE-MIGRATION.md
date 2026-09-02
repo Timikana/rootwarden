@@ -150,7 +150,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 |---|---|---|---|---|
 | ~~`groups`~~ | `MODULE-GROUPS.md` | **`/groupes`** — R1 livré `8cf1d26` | R2 : création, suppression, actions de masse | ✅ **ENTRÉE BASCULÉE** |
 | `remote_users` | `MODULE-REMOTE-USERS.md` | **4** (`/comptes-distants`) | les **5 gestes distants** | **RIEN — portable** |
-| `iptables` | `MODULE-FILTRAGE.md` | **4** (`/pare-feu`), I1→I4 | **I5** seul | **arbitrage du port SSH** |
+| ~~`iptables`~~ | `MODULE-FILTRAGE.md` | **`/pare-feu`** — menu basculé `12e83be` (04:06) | **I5** seul (application + retour arrière) | ✅ **ENTRÉE BASCULÉE** — la page déclare son manque et lie l'ancien portail. ⚠ Sa déclaration dit aussi I4 non porté : **faux**, `pare-feu.js:710` câble `/iptables-validate` (E-318) |
 | `ssh_audit` | `MODULE-SSH-AUDIT.md` §5 (A1→A4) | **0** | A1 est prêt | **RIEN — portable** |
 | `wazuh` | `MODULE-WAZUH.md` | 0 — *catalogues posés* | vue, script, route | **E-238** pour *mesurer* |
 | `documentation` | `MODULE-DOCUMENTATION.md` | **0** | structure + dérivations | **RIEN — portable** |

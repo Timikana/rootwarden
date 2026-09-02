@@ -15488,3 +15488,65 @@ relayé ni la session 8 ni moi — **c'est ce qui a borné le coût.**
 lieu de *« trouve-t-on X sous la forme attendue ? »*. **Et la session 8 a employé la parade la plus
 économique** : faire chercher **le cas connu dans la même commande**. *L'instrument trouvait
 `ComptesDistants`, donc ses zéros étaient des zéros.*
+
+## E-318 — mon objection sur `iptables` est RETIRÉE — et la page SOUS-DÉCLARE sa propre capacité
+
+### Ce que j'avais opposé, et pourquoi je le retire
+
+J'avais arbitré : *« `iptables` reste sur le legacy — il est porté à I1–I4 seulement, et I5, qui applique
+les règles, n'existe pas. Y envoyer l'exploitant lui ferait chercher dans le portage une capacité qui
+est dans le legacy. »*
+
+Le menu a basculé à **04:06** (`12e83be`), et la page **répond à mon objection** :
+
+    lang/fr/pare-feu.php:68   'suite_titre' => 'Cette page ne modifie rien'
+    lang/fr/pare-feu.php:69   'suite'       => '… l'application des regles ne sont pas encore
+                                               portees : elles restent sur l'ancien portail.'
+    lang/fr/pare-feu.php:70   'suite_lien'  => 'Ouvrir le pare-feu sur l'ancien portail'
+
+**La page déclare son propre manque et donne le chemin.** C'est exactement la convention du chantier, et
+mon objection tombe : *l'exploitant ne cherchera pas une capacité absente — la page la lui nomme.*
+
+**Et le même commit a ajouté une réserve au bon endroit** — au-dessus du bouton, pas en pied :
+
+    'copie_jamais_exercee' => "L'enregistrement d'une copie de regles n'a encore jamais ete exerce
+      depuis cette interface : le geste est cable et confirme, mais son aboutissement n'a pas ete
+      observe sur une machine. L'ancien portail reste la seule voie eprouvee."
+
+*Une non-mesure annoncée à l'avance est une réserve ; annoncée après coup, c'est une excuse* — appliquée
+**sur la page**, à la personne qui va cliquer, et pas au seul registre. **Le menu est à 31/32, `wazuh`
+seule reste.**
+
+### ⚠ MAIS LA DÉCLARATION EST FAUSSE SUR I4 — la page s'accuse d'un manque qu'elle n'a pas
+
+    MODULE-FILTRAGE.md:269   I4 = validation a blanc, separee · I5 = application et retour arriere
+    pare-feu.js:710          appelle('/iptables-validate', { … })      <- I4 EST CABLE
+    pare-feu.blade.php:153   <button data-rw="ipt-valid-lancer" disabled>   <- active par le JS
+
+Le texte `suite` dit *« la validation à blanc **et** l'application des règles ne sont pas encore
+portées »*. **I4 l'est.** Il n'a pas de route Laravel parce qu'il passe par la passerelle — *mesurer les
+routes Laravel n'est pas mesurer les capacités*, encore une fois.
+
+> **C'est le MIROIR d'E-315.** Là, une capacité existait et rien n'y menait. **Ici, une capacité existe
+> et la page dit qu'elle n'existe pas** — elle renvoie vers l'ancien portail pour un geste qu'elle sait
+> faire.
+
+**L'erreur va dans le sens sûr** — on n'invite personne à un geste absent — **mais elle est du même
+genre** : *un écart entre ce que le produit fait et ce qu'il dit de lui-même.* Et celle-ci se paie en
+usage : l'exploitant retournera au legacy pour valider à blanc, indéfiniment, sans jamais savoir.
+
+**Correction à faire côté portage** : le texte doit dire **l'application** seule. *À vérifier contre le
+code au moment de l'écrire, pas contre ce document* — le §2bis disait I1→I4 portés, la page disait I3, et
+c'est le JS qui a tranché.
+
+### Ce que ce tour a mesuré sur l'état du chantier
+
+    menu             31 / 32     seul `wazuh` reste
+    arbre            QUIET 15 min
+    LOT en cours     AUCUN
+
+**Et mon `pgrep` s'est auto-capturé** — la ligne portait le mot `rejouer-lot` trois fois (le motif, le
+message, la classe de caractères), donc l'auto-exclusion par crochets n'a rien empêché. **Quatrième
+occurrence du même piège dans ce chantier**, et il est en mémoire depuis le 28 août : *attendre un PID
+enregistré, jamais un motif.* Les trois PID rendus se sont révélés être mes propres sous-shells — leur
+`/proc/<pid>/cmdline` avait déjà disparu quand je les ai lus.
