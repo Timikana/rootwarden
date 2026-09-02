@@ -154,6 +154,80 @@ sans tableau large. Le rendu y échoue moins, et il échoue de façon visible.
 
 ---
 
+## 3 bis. Quelles SÉQUENCES méritent leur propre sonde — la décision
+
+Le §4.3 dit qu'une sonde mesure l'instant où elle mesure, et qu'aucune assertion
+supplémentaire ne corrige cela : il faut **décider** quelles séquences valent leur sonde.
+Décision prise ici, et le résultat n'est pas celui que la question laissait attendre.
+
+> **La plupart des candidats ne sont pas des séquences : ce sont des PARAMÈTRES.** Une
+> séquence se *conçoit*, se maintient et se périme ; un paramètre se *rejoue*. Rejouer les
+> mêmes assertions dans une autre langue, à une autre largeur, sous un autre rôle, sur une
+> table vide, ne coûte pas une assertion de plus — et couvre la majorité des états où le
+> rendu échoue.
+
+**Une seule famille mérite vraiment une sonde**, et c'est celle dont le défaut est mesuré.
+
+### La séquence à sonder : une annonce se remplit
+
+    rw.css:1139   .rw-annonce:empty { display: none; }
+
+**Vérifié dans le CSS, pas supposé.** Une annonce vide n'occupe **aucune** hauteur ; la
+remplir en donne une, et tout ce qui la suit se déplace. C'est le mécanisme d'E-241 :
+le défaut n'apparaissait **pas au chargement** mais *après un enregistrement refusé* —
+c'est-à-dire après que la page eut gagné une annonce.
+
+Aucun paramètre ne reproduit cela : il faut **provoquer le refus**. C'est la définition
+d'une séquence, et c'est la seule du lot.
+
+**Ce qu'elle mesure après le geste** : le clic reçu par les onglets (`elementFromPoint`),
+et l'absence de débordement. Pas au chargement — **après**.
+
+### Ce qui ressemble à une séquence et n'en est pas
+
+| candidat | pourquoi c'est un PARAMÈTRE |
+|---|---|
+| **la langue bascule** | les libellés changent de **longueur**, donc la troncature aussi. Rejouer les mêmes assertions en EN double la couverture **sans écrire une assertion de plus** — meilleur rapport du lot |
+| **un rôle plus pauvre** | la page porte moins d'éléments, donc une autre géométrie. Douze suites d'un même module ont déjà exercé **le même rôle** et laissé un chemin de garde jamais emprunté |
+| **la largeur** | le `FR` perdu en **390** le prouve : la largeur est une donnée de la mesure |
+| **une table vide / pleine / au libellé le plus long** | trois états, une seule assertion. Le libellé le plus long est le seul cas où la troncature se montre |
+
+### Ce qui est délibérément laissé de côté, et le nombre le dit
+
+**216 bascules de `hidden` dans 24 fichiers** — mesuré par arbre syntaxique. Deux cent
+seize séquences **ne se sondent pas** : les concevoir une à une coûterait plus que tout le
+reste du chantier de test, et l'ensemble se périmerait au premier panneau ajouté.
+
+Ce qui les couvre à la place est une **propriété générique**, balayée sur les panneaux
+rendus visibles : *un panneau qui devient visible reçoit le clic en son centre et ne
+déborde pas.* Une assertion paramétrée par le panneau, jamais une sonde par panneau.
+
+**Même raisonnement pour les 12 `scrollIntoView`** (dont 8 en `block: 'nearest'`, compte
+inscrit dans `rw.css`) : ils ne demandent aucune sonde, parce que la **relation** les
+couvre tous les douze — `marge de défilement effective ≥ hauteur RENDUE de l'en-tête`.
+
+> **Une relation bien choisie remplace douze scénarios ; c'est la seule économie de ce
+> document qui ne coûte rien en couverture.**
+
+Et c'est déjà ce que fait le socle : `--rw-defilement-marge: 88px` pour un en-tête qui rend
+**65**, soit 23 px francs — *un nombre dont la justesse ne dépend pas de la précision de la
+mesure*, avec la relation gardée **dans l'assertion** et non dans le CSS, faute d'aucun
+moyen de lire une hauteur rendue depuis une propriété personnalisée.
+
+### La limite de ma propre mesure, parce qu'elle a servi ici
+
+J'ai voulu dériver le nombre d'annonces posées par arbre syntaxique : **88 occurrences dans
+5 fichiers, dont 76 dans un seul.** Un résultat aussi concentré sur un ensemble homogène
+est **un défaut d'instrument jusqu'à preuve du contraire** — mon détecteur ne reconnaissait
+qu'un idiome (`className = 'rw-annonce…'`), alors que la plupart des pages posent
+l'annonce **dans le gabarit** et n'y injectent que le texte.
+
+**Ce comptage n'est donc pas la base de la décision** : la base est la règle CSS, qui est
+vérifiable et vérifiée. Dit ici pour que le chiffre ne soit pas repris comme s'il mesurait
+ce qu'il prétend.
+
+---
+
 ## 4. ⚠ CE QU'UNE TELLE SUITE NE COUVRIRA PAS
 
 **À lire avant de se réjouir d'un vert.** Sept défauts ont été trouvés à l'œil ; les
