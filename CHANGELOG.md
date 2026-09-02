@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.178** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.179** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,63 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.179 — E-342 : « Trois capacites » etait faux de DEUX TIERS, et j'ai failli en re-porter une
+
+**On m'a demande de porter le test de connexion de l'onglet `serveurs`. Il l'etait deja depuis sept
+jours.** Troisieme fois que ce chantier decouvre une capacite deja payee — apres `comptes-distants`
+et `pare-feu`.
+
+#### La mesure, par l'ARTEFACT et non par le nom
+
+    9c2c0fd   26/08 09:03   « D6d - cycle de vie et test de connexion portes »
+      + laravel/public/js/serveurs.js        [data-rw="serveur-tester"] -> POST /server_status
+      + laravel/resources/views/serveurs.blade.php   le bouton et sa sortie
+      + laravel/routes/web.php               serveurs.cycle, gardee role:2 + can_admin_portal
+      + tests/e2e/go-adm-cycle-connexion.mjs 466 lignes -> 516 aujourd'hui, 4 refs au LOT
+
+    et l'import CSV :  0 occurrence dans la vue, 0 dans le script  -> celui-la est bien absent
+
+**Des trois capacites declarees absentes, DEUX etaient portees.** Le cycle de vie l'est aussi — et il
+figurait dans la liste des gestes **interdits** qu'on m'a transmise, alors qu'il est en service.
+
+#### ⚠ POURQUOI SEPT JOURS
+
+    60832ed   26/08 06:52   D6a ecrit « Trois capacites … »        -> VRAI ce matin-la
+    9c2c0fd   26/08 09:03   D6d porte deux des trois               -> son diff ne touche PAS le titre
+
+**Deux heures.** La declaration a survecu au commit qui l'invalidait, **par le meme auteur, le meme
+jour** — et personne n'a relu le libelle en portant le code qu'il decrit.
+
+#### Le compte est RETIRE, pas corrige
+
+    avant  « Trois capacites de cet onglet ne sont pas encore portees. »
+           « Cycle de vie, test de connexion et import par fichier CSV … »
+
+    apres  « Ce que cet onglet ne fait pas encore »
+           « L'import de serveurs par fichier CSV se fait encore depuis l'ancien
+             portail. Le cycle de vie et le test de connexion, eux, sont portes ici. »
+
+**Un nombre ecrit a cote d'une enumeration se desynchronise des qu'une capacite est portee.**
+L'arbitrage rendu cette nuit s'applique : *l'enumeration est la seule source.* Corriger « trois » en
+« une » aurait recree la meme dette au prochain portage.
+
+#### Ce que je n'ai PAS fait, et pourquoi c'est le livrable
+
+**Je n'ai porte aucun code.** La capacite demandee existait ; la porter une seconde fois aurait
+produit un doublon, et l'annoncer comme un portage aurait ete faux.
+
+> **Le livrable est le retrait d'une phrase qui envoyait deux fois vers l'ancien portail pour des
+> gestes que le portage possede.** *Un manque declare a tort est une capacite perdue sans que rien ne
+> l'ait retiree* — et celle-ci entretenait le legacy qu'on veut eteindre.
+
+#### Mesures
+
+    parite i18n serveurs   FR=94  EN=94  ecarts=0
+    /serveurs -> 302 (la garde)
+    serveur-tester rendu dans la vue : 1   ·  cable dans le JS : 1
+    serveurs.cycle : route nommee 1, formulaire rendu dans la vue
+    go-adm-cycle-connexion.mjs : 516 lignes, 4 references au LOT
 
 ### v1.38.178 — `groups` R2 : creer un groupe, et E-274 ferme PAR CONSTRUCTION
 

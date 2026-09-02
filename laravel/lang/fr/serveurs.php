@@ -68,8 +68,23 @@ return [
     'vide_aide' => "Tant qu'aucune machine n'est déclarée, ni les scans de vulnérabilités ni les déploiements de clés n'ont de cible.",
 
     // Ce que D6a ne porte pas encore
-    'reste_titre' => "Trois capacités de cet onglet ne sont pas encore portées.",
-    'reste_texte' => "Cycle de vie, test de connexion et import par fichier CSV passent par des points d'entrée distincts de l'ancien portail. Ils y fonctionnent toujours.",
+    /*
+     * ⚠ CE TITRE PORTAIT UN COMPTE, ET LE COMPTE ETAIT FAUX DE DEUX TIERS.
+     *
+     * Ecrit par D6a (`60832ed`, 26/08 06:52) — il etait VRAI. **D6d
+     * (`9c2c0fd`, 26/08 09:03) a porte le cycle de vie ET le test de
+     * connexion**, deux heures plus tard, avec une suite E2E de 516 lignes
+     * au LOT — et n'a pas revisite ce titre. Faux depuis SEPT JOURS.
+     *
+     * Le compte est RETIRE, pas corrige : un nombre ecrit a cote d'une
+     * enumeration se desynchronise des qu'une capacite est portee.
+     * L'enumeration est la seule source.
+     */
+    'reste_titre' => "Ce que cet onglet ne fait pas encore",
+    // Mesure par l'ARTEFACT : `serveurs.cycle` est routee et son formulaire
+    // rendu ; `serveur-tester` appelle `/server_status` par la passerelle.
+    // L'import CSV, lui, rend ZERO occurrence dans la vue et dans le script.
+    'reste_texte' => "L'import de serveurs par fichier CSV se fait encore depuis l'ancien portail. Le cycle de vie et le test de connexion, eux, sont portés ici.",
     'reste_lien' => "Ouvrir l'ancien portail",
 
     // Retours
