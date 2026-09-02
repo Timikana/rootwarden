@@ -14824,3 +14824,106 @@ donnée*, ce qu'elle avait elle-même reproché à une assertion deux heures plu
 **Et elle a vérifié la chaîne d'appels du courriel** que la session 3 lui signalait, plutôt que de la
 relayer. *Un accord ne vaut que si le confirmateur a mesuré autrement* — le sien vaut, c'est la
 troisième lecture indépendante de cette chaîne.
+
+## E-302 (SEC-015) — `_write_rules_safe` protège les RÈGLES, pas le CHEMIN — et rien derrière
+
+Relevé par la session 5, **vérifié ligne par ligne** (`iptables_manager.py`, pas `routes/iptables.py`
+— j'ai cherché au mauvais endroit d'abord, et j'ai posé la question ouverte plutôt que d'insister) :
+
+    :124   encoded = base64.b64encode(rules.encode('utf-8')).decode('ascii')
+    :125   execute_as_root(client, f"printf '%s' '{encoded}' | base64 -d > {dest_path}", …)
+
+    rules      SUR PAR CONSTRUCTION   base64, alphabet [A-Za-z0-9+/=], ne peut pas sortir des quotes
+    dest_path  SUR PAR CONVENTION     `> {dest_path}` interpole NU — sans guillemets, sans validation
+
+**Et il n'y a pas de seconde barrière** : `ssh_utils.py:538,554` composent `sh -c {shlex.quote(command)}`
+— **la commande ENTIÈRE est citée, ce qui ne protège aucune valeur interpolée à l'intérieur.** Citer
+l'enveloppe ne cite pas le contenu.
+
+### Le docstring dit la première moitié, et se tait sur la seconde
+
+> *« L'encodage base64 garantit qu'aucun caractère spécial contenu dans **les règles** ne peut être
+> interprété comme une commande shell (anti-injection). »*
+
+**Vrai, et muet sur `dest_path`** — qui figure pourtant dans la liste des `Args:` juste en dessous. Un
+lecteur généralise la phrase à la fonction. *C'est la forme la plus difficile à voir : rien n'est faux,
+il manque une phrase.*
+
+### L'invariant tient AUJOURD'HUI — compté, pas supposé
+
+    :156   _write_rules_safe(…, "/etc/iptables/rules.v4")   <- LITTERAL
+    :160   _write_rules_safe(…, "/etc/iptables/rules.v6")   <- LITTERAL
+
+**Deux appelants, deux littéraux, aucun chemin dérivé d'une entrée client** — `/iptables-rollback`
+compris, il passe par `apply_iptables_rules` qui passe les mêmes littéraux.
+
+### ⚠ POURQUOI CECI PRÉCÈDE L'ARBITRAGE DU PORT SSH PLUTÔT QU'IL NE LE SUIT
+
+**I5 est le sous-lot qui ajouterait des appelants à cette fonction.** Toute fonctionnalité qui *dérive*
+une destination — une sauvegarde nommée, un fichier d'attente, un chemin par machine — transforme
+`dest_path` en **injection de commande root**, et le module ne porte alors aucune barrière.
+
+> **Ce n'est pas une raison de ne pas signer. C'est une chose à savoir en signant.** L'arbitrage porte
+> sur le port SSH ; il autorise de fait l'écriture d'un chemin dont le helper a un paramètre non cité.
+
+**Correctif à coût nul, sans changement de comportement** : `shlex.quote(dest_path)` — sur
+`/etc/iptables/rules.v4` il rend la même chaîne — **et une ligne de docstring disant que ce paramètre
+n'est PAS protégé par le base64**. Routé à la session 4, non appliqué.
+
+**Et la règle existait déjà, formulée à propos de cette fonction même** : *« une protection que personne
+n'a écrite est aussi fragile qu'un trou, parce que personne ne sait qu'il ne faut pas y toucher »*. La
+moitié `dest_path` est restée dehors. **Une règle écrite au bon endroit et appliquée à la moitié de son
+objet.**
+
+## E-303 — l'inertie d'un correctif a TROIS causes, et une seule est bénigne
+
+La session 5 refuse de recopier *« inerte aujourd'hui »* en *« inutile »*, et demande **lequel** des six
+de `security/backend-cve` est l'inerte, pour qualifier **ce qui** le rend inerte.
+
+> *« Inerte aujourd'hui » et « inutile » ne sont pas la même chose, et **le premier se recopie en
+> second.** Un correctif inerte parce qu'aucun compte ne détient la permission redevient actif au
+> premier `UPDATE` sur `permissions` — c'est littéralement le porteur dormant d'E-236, transposé.*
+
+**Réponse : c'est `399931a`**, qui étend le décorateur d'accès aux paramètres de **chemin**. Sa cause,
+mesurée : les trois routes portant un identifiant de machine dans leur chemin (`supervision.py:1429`,
+`:1443`, `:1537`) portent `require_role(2)` + `require_permission('can_manage_supervision')`, **et pas
+`require_machine_access`**. L'amélioration **n'a aucun site d'appel**.
+
+### Et le critère qui sépare les trois est le TYPE de changement qui les réveille
+
+    cause                        se reveille par        passe par une relecture ?
+    absence de PORTEUR           un UPDATE en base      NON  <- reveil silencieux
+    absence de DONNEES           une ligne inseree      NON  <- reveil silencieux
+    absence de CHEMIN D'APPEL    une modification du code  OUI
+
+**Les deux premières se réveillent sur une DONNÉE**, qui change sans relecture, sans revue, parfois par
+l'interface elle-même. **La troisième se réveille sur du CODE**, qui passe par une relecture où le
+correctif sera là.
+
+> **C'est pour ça que seule l'absence de chemin d'appel est une vraie inertie** — et la session 5 avait
+> raison de le poser avant de connaître la réponse. *Un correctif dormant qu'une donnée réveille n'est
+> pas inerte : il est en attente, et rien ne préviendra le jour où il aurait fallu l'avoir.*
+
+**Conséquence pour le dossier de fusion** : `399931a` est le seul des six qu'on puisse honnêtement
+présenter comme sans effet aujourd'hui, **et il faut le présenter comme un durcissement latent, pas
+comme un correctif inutile.** Les cinq autres ferment des chemins atteignables.
+
+## E-304 — mesurer l'appelant DIRECT n'est pas mesurer le CHEMIN D'APPEL
+
+Auto-relevé de la session 5, non sollicité :
+
+> Je n'avais cherché les appelants de `send_cve_report` que dans `mail_utils` et `routes/cve.py`. **Mon
+> grep couvrait `backend/` en entier et je l'ai lu comme « un seul appelant »** — c'était vrai de
+> `send_cve_report`, et l'action groupée importe **`_stream_cve_scan`, un cran plus haut.** J'ai mesuré
+> la fonction terminale, pas la chaîne.
+
+**Le grep était correct ; la question était d'un cran trop bas.** `send_cve_report` a bien un seul
+appelant direct — et deux chemins d'entrée, parce que `groups.py:269` importe la fonction *qui*
+l'appelle.
+
+*Même famille qu'E-295 (le témoin qui valide l'idiome et pas la question) et qu'E-277 (mesurer les
+traces au lieu de la chose).* **Trois formes d'une seule erreur : l'instrument fait exactement ce qu'on
+lui demande, et on lui a demandé la mauvaise chose.**
+
+**Remède** : pour un effet sortant, remonter la chaîne **jusqu'aux points d'entrée HTTP**, pas jusqu'au
+premier appelant. Une fonction sans effet propre peut porter l'effet de celle qu'elle importe.
