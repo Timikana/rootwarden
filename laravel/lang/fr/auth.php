@@ -59,6 +59,5 @@ return [
     'changement_requis'          => "Votre mot de passe doit être changé. Cette page n'est pas encore portée : effectuez le changement depuis l'ancien portail.",
 
     // Migration
-    'socle_avertissement' => 'Seul le socle d\'authentification est porté. Les pages du portail restent sur l\'ancienne interface.',
     'ouvrir_ancien_portail' => 'Ouvrir l\'ancien portail',
 ];

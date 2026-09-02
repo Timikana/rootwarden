@@ -12,7 +12,32 @@
             <div class="rw-etapes__pas rw-etapes__pas--courant">3. {{ __('auth.etape_acces') }}</div>
         </div>
 
-        <p class="rw-encart">{{ __('auth.socle_avertissement') }}</p>
+        {{--
+            ══ UN ENCART ANNONCAIT L'ETAT DE LA MIGRATION. RETIRE. ══════════
+
+            Il disait « Seul le socle d'authentification est porte. Les pages du
+            portail restent sur l'ancienne interface. »
+
+            Ecrit le 2026-08-17 (`d41d043`), **il etait VRAI ce jour-la**. Le
+            menu est passe a 32 entrees portees sur 32 le 2026-09-02 : la phrase
+            est fausse depuis SEIZE JOURS, sur l'ecran ou l'on invite quelqu'un a
+            accepter des conditions.
+
+            ── POURQUOI ELLE N'EST PAS REMPLACEE PAR SA NEGATION ────────────
+
+            Un ecran n'a pas a annoncer qu'il est porte : une interface qui se
+            felicite d'exister est un decor. La phrase avait un sens parce
+            qu'elle PREVENAIT d'un manque ; il n'y a plus de manque a prevenir,
+            donc plus rien a dire.
+
+            Ecrire « toutes les pages sont portees » recreerait la meme dette —
+            **une affirmation d'etat pourrit au prochain changement**, et c'est
+            precisement le motif que ce chantier a paye quatre fois en une nuit
+            (`pare-feu`, `superv` ×3, et ici).
+
+            Cette page porte les CONDITIONS D'UTILISATION. L'avancement d'un
+            chantier interne n'y a pas sa place.
+        --}}
 
         {{-- Deux actions, donc DEUX formulaires cote a cote — jamais imbriques :
              un formulaire dans un formulaire est invalide et le plus interne
