@@ -683,8 +683,50 @@ declare -A REF_LARAVEL=(
   # Le banc etant un conteneur sans systemd et sans DNS, les deux gestes mutants
   # echouent AVANT toute ecriture : rien n'est installe, rien n'est supprime.
   [go-page-graylog-g2]=30
+  # ══ LES TROIS PAGES PORTEES DANS LA NUIT DU 2026-09-02 ═══════════════════
+  # Posees a 03:52 par le Lead. Les trois avaient tourne SANS reference, donc
+  # « (pas de reference) » : *trois suites de plus dans la zone grise que le
+  # registre des 40 hors-LOT venait de decrire.* Un resultat qu'on ne releve pas
+  # ne vaut pas mieux qu'un resultat non mesure.
+  #
+  # go-page-audit-ssh — 18 PASS / 0 FAIL, seule au repos, 02:36:40 -> 02:38:20 CEST
+  # (41bbaf4). ⚠ SEULE PAGE DU PORTAGE ou les DEUX voies d'admission s'exercent
+  # separement : role 1 sans permission -> 403 · role 2 AVEC la permission -> 200
+  # · role 3 SANS la permission -> 200. `helpers.py:338` court-circuite
+  # `require_permission` des le role 3, donc partout ailleurs un retrait de
+  # `perm:` passerait inapercu (E-296, et E-313 le mesure : le role 2 n'a ete
+  # exerce que 10 fois en trois semaines, TOUTES cette nuit).
+  # La fermeture par l'absence est mesuree AVEC son temoin : `POST /temoin-e2e-
+  # inexistant` VU par le collecteur, puis les 6 requetes du module toutes en GET.
+  # Sans le temoin la suite rend SANS OBJET, jamais un vert.
+  [go-page-audit-ssh]=18
+  # go-page-documentation — 24 PASS / 0 FAIL, 03:09:49 -> 03:11:32 CEST (acfec36).
+  # REJOUEE apres correction : le fichier avait bouge depuis la premiere mesure,
+  # *une reference prise sur un fichier qui a change n'est plus une mesure.*
+  # La garde est un SEUIL DE ROLE (`$role >= 2`), PAS une permission — un role 1
+  # voit 43 des 48 sections (E-284). L'entree de menu porte `'garde' => 'tous'` :
+  # vrai de la page, faux de son contenu.
+  # Le lien derive se compare a L'ENTREE DE MENU du meme compte, jamais a son role :
+  # asserter sur le role recopierait la garde une TROISIEME fois, dans le test.
+  [go-page-documentation]=24
+  # go-page-groupes — 20 PASS / 0 FAIL, seule au repos (998716b).
+  # ⚠ CETTE REFERENCE NE COUVRE PAS E-274, et la suite le DECLARE en tete de
+  # fichier : `machine_groups` et `machine_tags` sont a 0, donc « un groupe sans
+  # filtre doit afficher le PARC, pas du vide » n'a AUCUN OBJET. Une suite ecrite
+  # sur l'etat vide serait VERTE sans jamais toucher la propriete.
+  # La fixture est REFUSEE, pas reportee (E-301) : un groupe sans filtre resout
+  # vers les 3 machines vivantes, `srv-zabbix` COMPRISE, et l'action groupee
+  # `cve_scan` sur ce groupe envoie de VRAIS courriels (`groups.py:269` importe
+  # `_stream_cve_scan` ; les 4 variables SMTP sont definies : chemin ARME).
+  # *Le danger est l'OBJET, pas le geste* — un `finally` protege la session qui
+  # pose la fixture, pas le banc partage, et il ne s'execute pas si le processus
+  # est tue. `machine_groups` relue dans le `finally` ET depuis l'exterieur apres
+  # la fin du processus : toujours 0.
+  [go-page-groupes]=20
 )
 declare -A REF_LEGACY=(
+  # Les trois pages portees dans la nuit du 2026-09-02, posees a 03:52.
+  [go-page-audit-ssh]=15 [go-page-documentation]=13 [go-page-groupes]=15
   [go-socle-auth]=13
   [go-page-commandlog]=5 [go-page-approvals]=5 [go-page-drift]=5 [go-page-backups]=5
   [go-page-tasks]=5 [go-page-tickets]=5 [go-page-search]=5
