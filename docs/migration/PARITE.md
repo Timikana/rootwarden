@@ -16209,3 +16209,90 @@ validerait un déploiement qui échouerait encore.**
 
 **Ceci reste un arbitrage, pas une recommandation d'exécution** : aucun test de déploiement n'est lancé
 sans le mot de l'exploitant, et E-330 dit pourquoi c'est plus vrai aujourd'hui qu'hier.
+
+## E-333 — ⚠ « 31/32 » COMPTAIT LA NAVIGATION, ET JE L'AI LU COMME LA COMPLÉTUDE DU PORTAGE
+
+**Reproche de l'exploitant, relayé par la session 8, et il est juste.** J'ai annoncé *« plus qu'une
+entrée »*, puis *« à sa bascule, 32/32 et le legacy n'aura plus une seule entrée »*. Mesuré :
+
+    fichiers .php metier encore servis (hors vendor, _deprecated) ....... 159
+    dossiers metier encore en place ...................................... 13
+      adm api auth bashrc fail2ban graylog groups iptables profile
+      security ssh ssh-audit wazuh
+    catalogues FR portant une declaration de manque ...................... 21
+
+> **Le menu mesurait la NAVIGATION ; je l'ai lu comme la CAPACITÉ.** *C'est la même faute que mes trois
+> comptes corrigés cette nuit — cinq signatures pour onze, 84 exécutions pour 164, un compteur de
+> titres pour des écarts : **un chiffre qui mesure un objet, lu comme s'il mesurait un autre.***
+
+**Et c'est la quatrième fois en une nuit**, sur quatre objets sans rapport. La régularité dit que ce
+n'est pas de l'inattention : **je ne demande pas systématiquement ce qu'un chiffre compte avant de m'en
+servir.**
+
+### ⚠ ET AUCUN DES TROIS COMPTES DE DÉCLARATIONS NE MESURE LA MÊME CHOSE
+
+    41   annonce par la session 8, motif inconnu de moi
+    16   mon premier motif : « pas encore port » sous une forme
+    94   toutes formes — mais « ancien portail » (69) inclut des LIBELLES DE LIEN
+
+**Je n'ai pas de compte défendable, et je n'en produis pas.** *Un chiffre dont on ne retrouve pas
+l'objet se jette, il ne se rationalise pas.* **Ce qui est établi et suffisant : 159 fichiers, 13
+dossiers, des déclarations dans 21 catalogues.** Le reste demande un inventaire par capacité, dispatché.
+
+## E-334 — les huit candidats au dispatch ont TOUS déjà un contrôleur
+
+Avant d'assigner, mesure par l'artefact — la règle qui nous a coûté cinq jours sur `comptes-distants`
+et `pare-feu` :
+
+    superv      SupervisionController      web.php : 30 mentions
+    serveurs    ServeursController                  24
+    fail2ban    Fail2banController                    7
+    bashrc      BashrcController                      6
+    groups      GroupesController                     5
+    sftp        AccesSftpController                   4
+    politiques  PolitiquesController                  4
+    ssh_audit   AuditSshController                    2
+
+> **Aucun n'est du travail neuf : ils sont tous PARTIELLEMENT portés.** Les assigner comme des modules
+> à porter reproduirait au niveau du sous-lot l'erreur que nous venons de payer au niveau de la page.
+
+### Et j'ai refusé d'assigner une correction que je ne pouvais pas fonder
+
+La session 8 proposait : *« corriger la déclaration fausse de `superv` — trois capacités qu'elle a déjà :
+`reconfigure`, `uninstall`, `deploy` »*. Mesuré :
+
+    reconfigure   2 occurrences dans le JS de supervision
+    deploy        4
+    uninstall     0     <- et un temoin OUVERT sur les chemins appeles rend VIDE
+
+**Je ne sais donc pas lesquelles sont câblées.** Faire corriger trois déclarations dont une est peut-être
+vraie **produirait E-318 en miroir** : une page qui annonce **porté** ce qu'elle ne fait pas.
+
+> **La tâche assignée est donc de MESURER, pas de corriger** : éprouver chaque déclaration contre
+> l'artefact, et ne rectifier que ce qui est mesurablement câblé. *Une consigne qui nomme les trois
+> aurait transporté une erreur que personne n'aurait rouverte.*
+
+**Et `uninstall` à zéro est peut-être un artefact de vocabulaire** — le portage nomme en français, donc
+`desinstaller`. **C'est à la session 3 de le mesurer avec un témoin ouvert, pas à moi de le supposer.**
+
+## E-335 — ce qui est dispatché, et ce qui reste interdit
+
+    S3   auditer les 5 declarations de `superv` FR+EN contre l'artefact, corriger ce qui est cable
+         `groups` R2 : creer un groupe — ecrit en base, AUCUNE machine
+    S2   inventaire PAR CAPACITE des 13 dossiers : ce qu'elle fait · ce qu'elle exige ·
+         ou elle vit deja sous un nom francais
+
+**Et `groups` R2 a une conséquence de mesure** : il rend `machine_groups` non vide, donc **la propriété
+d'E-274 devient mesurable pour la première fois** — celle que la session 7 a refusé de mesurer en créant
+l'objet (E-301). *La livraison crée l'objet pour une raison métier, ce qui est exactement la condition
+que j'avais posée.*
+
+### Interdit sans le mot de l'exploitant, et l'interdiction vient de DURCIR
+
+`wazuh` install/uninstall/restart · `ssh_audit` relever le parc · les scans de masse de `groups` ·
+`fail2ban` installer · les trois gestes d'agent de `superv` · le déploiement de clés.
+
+⚠ **E-330 change la nature de cette liste** : les six secrets sont déchiffrables, `POST /deploy` en
+service n'a que la clé d'API, et le correctif qui exigerait le rôle 2 est **inerte**. *La protection
+accidentelle du 27/08 n'existe plus* — donc ces gestes ne sont plus seulement dangereux en principe,
+**ils aboutiraient.**

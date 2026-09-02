@@ -2272,6 +2272,35 @@ catalogue lui-meme, pour qui voudrait les nettoyer.
        donc rw.css n'a pas ete touche
     3 captures a 1920/1400/390, REGARDEES — 2 defauts corriges grace a elles
 
+### v1.38.173 — « 31/32 » comptait la navigation, pas la capacité
+
+**E-333.** Reproche de l'exploitant, et il est juste : j'ai annoncé « plus qu'une entrée » puis « 32/32 et
+le legacy n'aura plus une seule entrée ». Mesuré : **159 fichiers `.php` métier encore servis**, **13
+dossiers**, des déclarations de manque dans **21 catalogues FR**. *Le menu mesurait la navigation ; je
+l'ai lu comme la capacité* — **quatrième fois en une nuit** qu'un chiffre mesurant un objet est lu comme
+s'il en mesurait un autre, sur quatre objets sans rapport. **La régularité dit que ce n'est pas de
+l'inattention : je ne demande pas systématiquement ce qu'un chiffre compte avant de m'en servir.**
+
+**⚠ Et aucun des trois comptes de déclarations ne mesure la même chose** — 41 (session 8, motif inconnu
+de moi), 16 (mon premier motif), 94 (toutes formes, mais « ancien portail » inclut des libellés de lien).
+*Je n'ai pas de compte défendable et je n'en produis pas.*
+
+**E-334 — les huit candidats au dispatch ont tous déjà un contrôleur** (`Supervision`, `Serveurs`,
+`Fail2ban`, `Bashrc`, `Groupes`, `AccesSftp`, `Politiques`, `AuditSsh`). *Aucun n'est du travail neuf :
+ils sont partiellement portés, et les assigner comme des modules à porter reproduirait au niveau du
+sous-lot l'erreur payée au niveau de la page.*
+
+**Et j'ai refusé d'assigner une correction que je ne pouvais pas fonder** : on me proposait de corriger
+« trois déclarations fausses » de `superv` ; mesuré, `reconfigure` a 2 occurrences JS, `deploy` 4,
+**`uninstall` 0**. *Faire corriger trois déclarations dont une est peut-être vraie produirait E-318 en
+miroir.* **La tâche assignée est donc de mesurer, pas de corriger** — et le zéro est peut-être un
+artefact de vocabulaire, le portage nommant en français.
+
+**E-335 — dispatché** : audit des déclarations de `superv` contre l'artefact · `groups` R2 (créer un
+groupe, écrit en base, aucune machine) · inventaire **par capacité** des 13 dossiers. *R2 rendra
+`machine_groups` non vide, donc **la propriété d'E-274 deviendra mesurable pour la première fois** — par
+une livraison métier, ce qui était exactement la condition posée en E-301.*
+
 ### v1.38.172 — ⚠ le redémarrage n'est pas de l'hygiène : c'est la garde qui manque devant `POST /deploy`
 
 **E-330. Trois faits mesurés, chacun avec son témoin, et c'est leur composition qui compte.**
