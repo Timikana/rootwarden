@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.149** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.150** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,34 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.150 — une garde à deux voies exercée par une seule voie n'est pas mesurée, elle est supposée
+
+**E-296.** Référence `go-page-audit-ssh` posée : **18 laravel · 15 legacy · 0 FAIL**, prédictions
+exactes. Et une propriété qui vaut plus que la référence : `/audit-ssh` est **la seule page du portage
+où les deux voies d'admission s'exercent séparément** — rôle 1 sans permission (403), rôle 2 **avec**
+la permission (200), rôle 3 **sans** la permission (200).
+
+Le mécanisme est plus fort qu'annoncé : `helpers.py:338`, `if role_id >= 3:` — **le rôle 3 ne détient
+pas la permission, il ne l'évalue jamais.** Conséquence pour toutes nos suites : sur une page exercée
+par le seul rôle 3, ou par un rôle 3 et un rôle 2 qui possède la permission, **retirer `perm:can_X` de
+la garde passerait inaperçu — aucune des deux voies ne rougirait.** Il faut trois comptes, et le plus
+rare est **un rôle élevé SANS la permission**. *Une garde à deux voies exercée par une seule voie n'est
+pas mesurée, elle est supposée.*
+
+La fermeture par l'absence est mesurée **avec son témoin** (`POST /temoin-e2e-inexistant` vu par le
+collecteur, puis les 6 requêtes du module toutes en GET) : *« aucun POST n'est parti » et « je ne vois
+pas les POST » sont la même sortie* — sans témoin la suite rend `SANS OBJET`, pas un vert.
+
+**Deux défauts d'instrument**, dont une sonde qui a accusé cinq suites saines (`cle-plateforme`,
+`graylog-g1`, `graylog-g2`, `maintenance`, `chatops`) parce qu'elle cherchait une garde en négatif là
+où elles gardent en positif. *Une sonde écrite pour trouver un défaut se trompe du côté qui alarme.*
+
+**E-297 — une affirmation qui vit dans les messages et n'atteint jamais l'artefact.** Un diagnostic sur
+`pare-feu`, faux dans ses deux versions, m'a été demandé en retrait : recherche **ouverte** dans le
+registre — **il n'y est jamais entré**. Deuxième fois cette nuit. *Le registre ne consigne que des
+échecs, et seulement ceux qu'on a pris la peine d'y écrire* — il sous-estime le travail juste **et** nos
+erreurs. Deux diagnostics faux ont circulé des heures entre sept sessions sans laisser une ligne.
 
 ### v1.38.149 — `documentation` : ce qui se derive est derive, ce qui est un CACHE n'est pas recopie
 
