@@ -262,22 +262,69 @@ produisent des scores différents, et rien à l'écran ne dit lequel on regarde.
 valeur par défaut pour son second paramètre, ni ce que la table contient
 aujourd'hui.
 
-### 7.5 Sur l'arbre et le service — le Lead a raison, et il faut le nommer
+### 7.5 ~~Sur l'arbre et le service~~ — **RETIRÉ : c'était faux, et je l'avais repris sans mesurer**
 
-Le Lead écrit que « en service c'est pire », le `else` de `a33a15b` étant
-`SELECT … FROM machines` **sans filtre**. **Dans l'ARBRE d'aujourd'hui, le filtre
-existe** :
+**Ce paragraphe affirmait** qu'en service le repli d'E-280 ne filtrait pas les
+machines archivées (`a33a15b`) alors que l'arbre le fait, et en tirait que *« le
+redémarrage attendu est aussi un correctif partiel d'E-280 »*.
 
-```sql
-FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'
+**Les deux affirmations sont fausses.** Le Lead s'est rétracté ; **je l'ai vérifié
+moi-même plutôt que d'accepter la rétractation**, en ancrant la comparaison sur la
+FONCTION et non sur un `else:` :
+
+| fonction | `a33a15b` vs arbre | filtre `archived` | branche `WHERE 1=0` |
+|---|---|---|---|
+| `_run_scheduled_ssh_audit` | **IDENTIQUE** (75 lignes) | OUI des deux côtés | OUI des deux côtés |
+| `_run_scheduled_scan` (CVE) | **IDENTIQUE** (85 lignes) | **NON** des deux côtés | **NON** des deux côtés |
+
+**Il n'y a AUCUNE divergence arbre/service dans ce fichier, pour aucune des deux
+tâches.** Le Lead avait grepé `^        else:` et récolté le **premier** du
+fichier — celui du scan CVE. Il opposait donc le CVE d'hier à l'audit SSH
+d'aujourd'hui.
+
+> **Et ma faute est distincte de la sienne.** J'avais lu l'arbre et **accepté sa
+> mesure du service**, puis écrit « tu as raison » — ce qui a transformé son
+> erreur en fait à deux voix, et l'a fait partir en **argument de signature** vers
+> une autre session. *Deux accords sur une mesure fournie par un seul ne font pas
+> deux mesures.* Le nombre de confirmations mesure la **diffusion**, pas la
+> vérité. La règle est du Lead ; l'occurrence est de moi.
+
+**Ce que je retire** : le redémarrage n'est **pas** un correctif partiel d'E-280.
+
+### 7.6 ⚠ E-281 — vérifié par ma propre lecture, et il PRIME E-280
+
+Le Lead le signale ; je l'ai mesuré indépendamment, et la forme est plus nette
+que l'énoncé. `_run_scheduled_scan`, sélection des cibles :
+
+```python
+elif schedule['target_type'] == 'machines' and schedule['target_value']:
+    ids = [...]
+    if ids:
+        cur.execute(f"SELECT {base_cols} FROM machines WHERE id IN ({fmt})", ids)
+    else:
+        cur.execute(f"SELECT {base_cols} FROM machines")      # <- LE PARC ENTIER
+else:
+    cur.execute(f"SELECT {base_cols} FROM machines")          # <- LE PARC ENTIER
 ```
 
-**Ce n'est pas une contradiction, ce sont deux systèmes.** Les `.py` sont lus au
-**démarrage** : le processus en service précède la modification de l'arbre. Le
-Lead décrit le service, je lis l'arbre, et **les deux affirmations sont vraies en
-même temps**. La seule chose qui manquerait serait de ne pas dire lequel on
-mesure — *une affirmation sans son régime est invérifiable.*
+**Le `else` interne est le décisif** : une planification qui dit *« vise CES
+machines-là »* avec une valeur qui ne rend **aucun identifiant valide** scanne
+**tout le parc**. Ce n'est pas un défaut d'absence — c'est une intention
+explicitement ÉTROITE qui tombe du côté large.
 
-**Et le régime aggrave bien ici** : jusqu'au prochain redémarrage, la portée du
-repli inclut les machines **archivées**. Le redémarrage — déjà en tête des
-signatures attendues — est donc aussi un correctif partiel d'E-280.
+**Et la bonne forme était connue de l'auteur** : à la même place, dans le même
+fichier, `_run_scheduled_ssh_audit` écrit `FROM machines WHERE 1=0`. *Divergence,
+pas oubli* — l'observation est du Lead et elle est juste.
+
+**Pourquoi E-281 prime E-280** — même population (`/cve_schedules` porte
+`@require_role(2)` sans permission, mesuré au même titre que les autres) :
+
+| | E-280 (audit SSH) | **E-281 (CVE)** |
+|---|---|---|
+| branche étroite vidée | `WHERE 1=0` — **ferme** | **`FROM machines` — OUVRE** |
+| machines archivées | exclues | **incluses** |
+| effet sortant | aucun | **envoie un vrai courriel** |
+
+**Classement révisé : E-281, puis E-280, puis SEC-013.** Le premier échoue du
+côté large là où le second échoue du côté fermé, et lui seul a un effet hors du
+parc.
