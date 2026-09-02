@@ -2860,3 +2860,40 @@ fusion reste sans conflit** — *le risque ne s'est pas réalisé, mais il ne s'
 > **Je ne diffuse pas pour autant à six sessions** : la table des numéros ne m'est pas connue, et six
 > interruptions pour un destinataire pertinent coûtent plus qu'elles ne protègent. **Ce qui manque est un
 > annuaire, pas un envoi de plus** — je le demande au Lead plutôt que de deviner.
+
+### Réserve close — le chemin par la route n'est pas « armable », il est ARMÉ
+
+**Ma réserve du tour précédent** : *« je n'ai vérifié que l'interrupteur `MAIL_ENABLED`, pas
+`MAIL_TO`/`MAIL_FROM`/`MAIL_SMTP_HOST` — donc "ACTIF" est un interrupteur ouvert, pas un envoi
+prouvé. »* **Relevée par le Lead, et remesurée par moi dans le conteneur servi, témoin compris, sans
+imprimer aucune valeur :**
+
+    MAIL_ENABLED    true
+    MAIL_TO         definie (20 caracteres)      MAIL_SMTP_PORT  465  -> SSL direct
+    MAIL_FROM       definie (22 caracteres)
+    MAIL_SMTP_HOST  definie (12 caracteres)
+    TEMOIN (variable inexistante)  ->  absente   (l'instrument distingue bien les deux etats)
+
+    mail_utils.py:221-228   if not Config.MAIL_ENABLED: return False
+                            missing = [v for v in ('MAIL_TO','MAIL_FROM','MAIL_SMTP_HOST') …]
+
+**Les quatre conditions exigées sont réunies.** *Ce n'est pas un interrupteur ouvert : le chemin est
+armé.* **Un scan lancé par la route ou par l'action groupée ENVERRA un courriel — pas « pourrait ».**
+
+> **La réserve s'est close dans le sens qui aggrave**, et c'est la direction dont ce registre dit qu'on
+> ne la remesure pas. *Je l'avais déclarée par prudence en supposant qu'elle réduirait la portée ; elle
+> l'augmente.* **Une réserve n'est pas une atténuation : c'est une question ouverte, et elle peut se
+> refermer des deux côtés.**
+
+**Je ne recopie aucune valeur** — elles identifient une boîte et un domaine réels. *Le nombre de
+caractères suffit à établir la présence, et il n'identifie personne.*
+
+### Note d'annuaire — la correspondance existe désormais, et elle se remesure
+
+Le Lead a publié la table numéro → nom de session (`§0bis` du plan, `dcf4f33`). **Ma demande était la
+bonne et sa réponse va plus loin que ce que je demandais** : il reconnaît que son E-305 *« condamnait le
+relais sans fournir l'alternative »*.
+
+> **Contrainte qu'il pose et que je reprends : l'annuaire se remesure par `ListAgents`, jamais de
+> mémoire.** *Une session qui redémarre change d'empreinte, et un annuaire périmé est plus nuisible
+> qu'une absence d'annuaire — il fait croire qu'on a envoyé.*
