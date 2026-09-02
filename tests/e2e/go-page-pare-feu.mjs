@@ -95,12 +95,41 @@ const COMPTES = {
 };
 
 /*
- * Les gestes qui ne doivent JAMAIS partir. Ancres a droite : `/iptables` est
- * un prefixe de `/iptables-history`, qui lui est une simple lecture.
+ * Les gestes qui ne doivent JAMAIS partir.
+ *
+ * ⚠ ICI LA METHODE NE DISCRIMINE PAS, et c'est mesure : `POST /iptables` porte
+ *   son verbe dans le CORPS — `action:"get"` LIT les regles, `action:"apply"`
+ *   les ECRIT. Un filet par methode y avorterait une lecture legitime. Le filet
+ *   est donc par CHEMIN, toutes methodes confondues.
+ *
+ * Et il DENIE PAR PREFIXE en n'exemptant que les deux lectures, au lieu
+ * d'enumerer les ecritures : une route `/iptables-*` ajoutee demain est couverte
+ * d'office. L'enumeration inverse a deja trahi trois autres suites de ce banc
+ * (2026-09-02) — un nom present qui ne couvre pas se croit couvert.
+ *
+ * `iptables-save` etait un FANTOME : le nom n'existe que dans un commentaire de
+ * backend/iptables_manager.py (le FORMAT de sortie), jamais comme route.
+ *
+ * Exemptees, les deux seules lectures du module, toutes deux en GET :
+ *   /iptables-history · /iptables-logs
+ *
+ * ⚠ ET LA PAGE ELLE-MEME, servie a `/iptables/` cote legacy. L'ancre `(\?|$)`
+ *   que je viens de retirer ne faisait pas QUE bloquer `scan-all` : elle
+ *   excluait aussi la PAGE, qui porte un `/` final la ou les routes d'API n'en
+ *   ont pas. La retirer sans la remplacer a fait avorter la navigation vers la
+ *   page — `net::ERR_BLOCKED_BY_CLIENT`, 4 FAIL sur la cible legacy, mesure du
+ *   2026-09-02 08:20. **Une ancre fautive peut faire un second travail, juste.**
+ *   (L'auteur de go-bashrc-b2 avait documente ce piege ; je ne l'ai pas lu.)
+ *
+ * Le predicat exact, en une lecture :
+ *   /iptables/      -> la PAGE            passe
+ *   /iptables       -> POST d'API         AVORTE
+ *   /iptables-*     -> ecritures d'API    AVORTE
+ *   /iptables-history · -logs             passe
+ * Remesurer : grep -nE "@bp.route" backend/routes/iptables.py
  */
 const INTERDITS = new RegExp(
-    '/(iptables|iptables-validate|iptables-apply|iptables-restore|iptables-save'
-    + '|iptables-rollback|pare-feu/copie/enregistrer)(\\?|$)');
+    '/(iptables(?!/|-history|-logs)|pare-feu/copie/enregistrer)');
 /* Ce qui vise le backend, quel que soit le portail. */
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
 
