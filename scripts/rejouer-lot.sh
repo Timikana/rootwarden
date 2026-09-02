@@ -730,7 +730,21 @@ declare -A REF_LARAVEL=(
   # pose la fixture, pas le banc partage, et il ne s'execute pas si le processus
   # est tue. `machine_groups` relue dans le `finally` ET depuis l'exterieur apres
   # la fin du processus : toujours 0.
-  [go-page-groupes]=20
+  # go-page-groupes : 20 -> 24 le 2026-09-02, apres R2 (`5a0ff0b`).
+  # ⚠ LA SUITE EST TOMBEE ROUGE, PAS SILENCIEUSEMENT VERTE : 18 · 3 FAIL. Elle
+  # affirmait sous `verifiePortage` que `groupes-nouveau` ouvre le panneau du
+  # « pas encore porte » — R2 a livre la creation DIX HEURES apres son commit.
+  # Et ce n'etait pas acquis : `groupes-panneau` existe toujours. Il n'a pas ete
+  # REAFFECTE, il a ete DEPLACE — `groupes.js:578` l'ouvre sur
+  # `groupes-enregistrer`. *Il ne remplace plus le geste, il le PRECEDE.*
+  # La propriete d'aujourd'hui est PLUS FORTE que celle d'hier : l'ancienne
+  # n'etait qu'un constat d'absence, la nouvelle mesure une garantie — le
+  # portage ANNONCE ce qu'il va ecrire avant de l'ecrire, et l'annonce ne coute
+  # aucune requete.
+  # ⚠ La creation passe par la PASSERELLE (`fetch(PASSERELLE + '/groups')`), donc
+  # il n'existe AUCUNE route POST Laravel. *Mesurer les routes Laravel n'est pas
+  # mesurer les capacites* — 4e fois que ce motif trompe le Lead le meme jour.
+  [go-page-groupes]=24
 )
 declare -A REF_LEGACY=(
   # Les trois pages portees dans la nuit du 2026-09-02, posees a 03:52.
