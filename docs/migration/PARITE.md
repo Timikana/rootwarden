@@ -15645,3 +15645,61 @@ pour l'arrêt : **descendre par le PID enregistré**, jamais par le nom.
 soit.** Non corrigée volontairement — *« un vrai point, pas une urgence, et je ne veux pas toucher deux
 suites pendant qu'un LOT se prépare »*. **À vérifier : que les motifs `INTERDITS` correspondent à des
 routes réellement exposées.**
+
+## E-321 — une suite peut être INDIFFÉRENTE dans ses assertions et SENSIBLE dans son COMPTE
+
+`go-socle-navigation` rend **74** au lieu de **66**, **zéro FAIL**. La suite est saine ; la référence est
+périmée.
+
+    INFO  entrees declarees : total=32 route=31 legacy=1 ni-l-un-ni-l-autre=0
+    PASS  le superadmin voit toutes les entrees declarees   32 sur 32
+    PASS  le total se reconstitue : 31 + 1 = 32
+    PASS  chaque entree porte `route` OU `legacy`
+
+**Les trois invariants tiennent, exactement comme annoncé.** Le mécanisme du +8, vérifié dans le code :
+
+    go-socle-navigation.mjs:293   for (const e of internes) {
+    go-socle-navigation.mjs:296       verifie(`… le lien porte « ${e.libelle} » resout`, …)
+
+    47 assertions « le lien resout »
+       31  rw-test-super      13  rw-test-admin      3  rw-test-user
+
+**L'assertion est générée PAR ENTRÉE PORTÉE, par compte qui y a accès.** Cinq bascules cette nuit —
+`groups`, `ssh_audit`, `documentation`, `remote_users`, `iptables` — ajoutent donc **des assertions, pas
+des échecs**.
+
+> **Une suite peut être indifférente à un changement dans ses ASSERTIONS et sensible dans son COMPTE.**
+> Les invariants ne dépendent pas de la répartition ; **le nombre d'assertions en dépend**, parce
+> qu'elles sont générées par entrée.
+
+### L'auto-critique de la session 7, et elle est du même genre que la mienne
+
+Elle avait d'abord averti deux sessions que sa suite allait rougir (E-293), puis retiré cet avertissement
+après avoir vérifié que la répartition est un `constate` et non une assertion. **Le retrait était juste.
+La manière ne l'était pas :**
+
+> *J'ai vérifié les assertions **existantes** et pas leur **nombre**.* Le `constate` ne compte pas ; les
+> 47 « le lien résout », si. **J'avais raison de retirer mon premier avertissement, et tort dans la
+> manière : j'ai remplacé une inquiétude fausse par une assurance fausse.**
+
+**C'est exactement la sur-correction que j'ai payée sur E-280** — *j'avais corrigé une affirmation trop
+rassurante par une affirmation trop alarmante, et les deux se lisaient comme des mesures.* Ici le sens
+est inverse : une alarme fausse remplacée par une assurance fausse. **Deux occurrences, deux directions,
+même cause — une rétractation se mesure avec la même exigence que ce qu'elle rétracte.**
+
+Et elle a donné les deux affirmations **comme équivalentes** : *« ma suite ne bronchera pas »* à une
+session, *« mes trois invariants tiennent »* à moi. **La seconde est vraie, la première est fausse** — et
+rien dans leur formulation ne disait qu'elles portaient sur des objets différents.
+
+### À poser APRÈS le LOT, sur sa demande, et elle a raison
+
+    go-socle-navigation   laravel   66 -> 74
+
+*Une écriture dans `rejouer-lot.sh` maintenant ne gênerait pas le LOT — le runner s'est copié au
+démarrage — **mais elle brouillerait la lecture du journal**.* Et s'il tombe d'autres écarts, ils
+s'inscrivent ensemble. **Je ne touche à rien.**
+
+**Et le commentaire d'en-tête `:67` de cette suite porte toujours `route=24 legacy=8`** — l'exemple
+périmé d'E-293, **désormais faux de sept unités**. Elle le corrigera avec la valeur. *Un exemple chiffré
+dans un commentaire vieillit là où l'on vient chercher la vérité sur l'outil* — et il vieillit **d'autant
+plus vite que le travail avance**, ce qui est la signature d'E-278.
