@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.180** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.181** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,81 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.181 — `fail2ban` F7 : desactiver une jail, et le compte de « quatre » retire
+
+**Le geste est PORTE, il n'est pas EXERCE.** Desactiver une jail n'est pas destructeur — « Activer »
+le retablit — **mais c'est une baisse de garde** : la machine cesse d'etre protegee contre le force
+brute, et la route backend ouvre une session SSH pour le faire.
+
+#### L'appariement d'abord — les QUATRE, un par un
+
+Une session precedente avait verifie **un** des quatre elements de la phrase « quatre gestes ne sont
+pas encore portes ». *Les trois autres etaient non verifies, pas vrais.* Apparies contre les **19
+routes** du backend :
+
+    declare absent                 route backend               appelee par le portage
+    installer sur UNE machine      /fail2ban/install           NON
+    redemarrer le service          /fail2ban/restart           NON
+    desactiver une jail            /fail2ban/disable_jail      NON  -> PORTE ICI
+    geolocaliser une adresse       /fail2ban/geoip             NON
+
+Et l'autre direction, celle que la phrase affirme portee : `status`, `jail`, `history`, `config`,
+`logs`, `ban`, `whitelist`, `ban_all_servers`, `unban_all` — **toutes appelees.** La declaration
+etait entierement juste.
+
+#### ⚠ ET MA SONDE CIBLEE S'EST TROMPEE, L'OUVERTE NON
+
+    grep -c "'/fail2ban/history'"        ->  0
+    enumeration ouverte des chemins     ->  /fail2ban/history TROUVE
+
+    la forme reelle : litGet('/fail2ban/history?server_id=' + m.id)
+
+**Mon motif exigeait le guillemet fermant apres le chemin.** Une chaine de requete le repoussait, et
+j'aurais conclu que l'historique n'etait pas porte — alors que la phrase l'affirmait avec raison.
+
+#### Le compte est RETIRE, pas reduit
+
+    avant  « Quatre gestes de Fail2ban ne sont pas encore portes »
+    apres  « Ce que cet onglet ne fait pas encore »
+
+Passer a « Trois » l'aurait laisse pourrir au prochain portage. **L'enumeration voisine est la seule
+source.** Et une note du 27/08 disait `jail_desactiver` sans lecteur, « le sera par F7 » : c'est
+fait, et la note est mise a jour **dans le meme commit que le code qu'elle decrit**.
+
+#### ⚠ UN DEFAUT QUE J'AI CREE, ET QUE SEULE LA MESURE AU DOM A RENDU
+
+Mon premier jet posait les libelles avec un garde `assert 'jail_desactiver' not in s` — **la cle
+existait deja**, preparee par une session anterieure. L'assertion a saute, **et rien n'a ete ecrit.**
+J'ai lu l'echec comme portant sur la vue, puis pris `FR=185 EN=185` pour une confirmation alors que
+c'etait le compte **inchange**. L'ecran rendait donc `fail2ban.desact_jamais_exercee`, son
+identifiant.
+
+*Une parite egale ne prouve pas qu'une cle a ete ajoutee : elle prouve que les deux fichiers sont
+d'accord, y compris pour ne rien contenir.*
+
+#### Mesures au DOM, avec temoin
+
+    section detail presente      true
+    bouton desactiver present    true
+    ton « avertissement »        true   (et non « danger » : le geste est reversible)
+    mention « jamais exerce »    rendue avec son TEXTE
+    identifiants non resolus     ["fail2ban.log"] -> et c'est un NOM DE FICHIER,
+                                 pas une cle : ma sonde attrapait /var/log/fail2ban.log
+    requetes parties au clic     []     <- rien ne part avant consentement
+    TEMOIN selecteur faux        0
+    parite i18n                  FR=188  EN=188  ecarts=0
+
+Le geste n'a **jamais** ete exerce, et la page le dit, mesure a l'appui : 0 occurrence dans
+`command_log`, `tasks` et `user_logs`, temoin a 5 920 lignes.
+
+#### ⛔ CE QUI N'A PAS PU ETRE MESURE, ET C'EST DIT A L'AVANCE
+
+`fail2ban_status` porte **une** ligne, `server 2`, `installed=0`. **Fail2ban n'est pas installe sur
+le banc**, donc aucune jail ne s'affiche et le detail ne s'ouvre pas depuis de vraies donnees. Le
+panneau et le bouton sont mesures en forcant l'ouverture du detail — *ce qui mesure mon rendu, pas
+le chemin de donnee.* Et le geste lui-meme n'est pas declenche : il baisse une garde sur une machine
+reelle.
 
 ### v1.38.180 — E-280 : une portee restreinte sans sa valeur visait tout le parc
 
