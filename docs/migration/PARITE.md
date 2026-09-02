@@ -15410,3 +15410,81 @@ Correction demandée par la session 3, et elle a raison de la demander :
 **Et la vraie leçon est ailleurs** : *deux sessions différentes, deux instruments différents, le même
 écart de deux heures, le même soir.* **Ce n'est pas une étourderie individuelle, c'est une propriété de
 l'environnement** — l'hôte est en CEST, les conteneurs en UTC, et rien ne le signale.
+
+## E-317 — la mesure PAR L'ARTEFACT, et le troisième cas existe : `/cgu`
+
+**Contrainte de méthode demandée par la session 8, appliquée, et elle a payé.**
+
+> **Une mesure de portage doit chercher l'ARTEFACT, pas le nom du legacy.** Compter ce qui existe dans
+> `laravel/` et le rattacher **ensuite** aux entrées de menu, plutôt que partir des clés du menu et
+> demander « celle-ci est-elle portée ? ». *La seconde forme ne trouve que ce qui porte le même nom des
+> deux côtés — et le portage a précisément RENOMMÉ.*
+
+`iptables` est porté sous **`pare-feu`**, `remote_users` sous **`comptes-distants`**. **Un
+`PareFeuController` est invisible à un `grep -i iptables`.** C'est E-306 — un nom à deux référents — **à
+l'échelle du chantier**, et son effet n'est pas une sonde qui accuse à tort : **ce sont deux portages
+entièrement payés que personne ne comptait depuis les 27 et 28 août.**
+
+### La mesure, par différence d'ensembles
+
+    routes GET de page declarees cote Laravel      41
+    routes NOMMEES dans le menu                    30
+    routes de page SANS entree de menu             11
+    TEMOIN — entrees de menu sans route             0    <- l'instrument recoupe
+
+**Les onze, classées** — et six le sont légitimement :
+
+    connexion · deconnexion · second-facteur   authentification, hors menu par construction
+    serveurs                                   4 liens entrants
+    cles-api · notifications · permissions     1 lien entrant chacune
+    export-cve                                 LIEE depuis scan-cve.blade.php:234
+    tickets                                    RETIREE du menu a la refonte, documente
+    pare-feu                                   <- le cas connu
+    cgu                                        <- ⚠ LE TROISIEME CAS
+
+### ⚠ `/cgu` : la page existe, l'acceptation existe, RIEN N'Y MÈNE
+
+    web.php:97   Route::get('/cgu',  [PortailController::class, 'cgu'])->name('cgu')
+    web.php:98   Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter')
+    PortailController:44   $requete->session()->put('cgu_acceptees', true);
+
+    references a route('cgu') hors sa propre vue                 0
+    « cgu » dans Middleware/ ou bootstrap/app.php                0   <- aucun intergiciel ne l'impose
+
+**Il y a un mécanisme d'acceptation complet, et aucun chemin ne l'atteint** — ni lien, ni redirection
+forcée. *Le drapeau `cgu_acceptees` est posé par une route que personne ne peut ouvrir.*
+
+**Ce n'est pas la même classe que `pare-feu`** : là une page portée continue d'être servie par le
+legacy ; **ici il n'y a pas de legacy à servir** — la capacité est simplement inatteignable, dans les
+deux portails. **À arbitrer** : est-ce une acceptation de CGU qui *devait* être imposée à la connexion,
+ou une page laissée volontairement en accès direct ? *Je mesure l'écart, je ne décide pas ce que le
+produit doit faire.*
+
+### ⚠ ET DEUX DE MES MESURES ONT IMMOBILISÉ DU TRAVAIL — dans le sens qui fait ARRÊTER
+
+    « les cinq gestes distants n'apparaissent que dans RoutesBackend.php,
+      aucun n'est compose »                       -> QUATRE sur cinq sont composees
+                                                     (comptes-distants.js:300, 343, 344, 345)
+    « E-203 est la seule chose portable qui reste » -> il en restait DEUX, finies,
+                                                     a une ligne de menu pres
+
+> **Mes deux erreurs précédentes allaient dans le sens qui fait SIGNER. Ces deux-là vont dans le sens
+> qui fait ARRÊTER** — et c'est le plus difficile à détecter, parce qu'*une session à qui on dit « il
+> n'y a rien à faire » ne produit rien, et ne rien produire ressemble à ne rien avoir à faire.*
+>
+> **Un faux négatif de disponibilité se confirme tout seul.**
+
+**C'est la seule catégorie d'erreur dont l'effet est invisible dans nos journaux** : elle ne laisse ni
+commit, ni mesure fausse, ni contradiction. *Juste des heures.* La session 3 a vérifié elle-même et n'a
+relayé ni la session 8 ni moi — **c'est ce qui a borné le coût.**
+
+### Trois fois cette nuit, mon instrument a rendu un `0` d'artefact
+
+    `fetch('...')` litteral            -> 0, alors que 3 fetch vivent dans des helpers
+    `route('export-cve')`              -> 0, l'appel etant parametre
+    `grep -i iptables` cote laravel    -> 0, la page s'appelant `pare-feu`
+
+**Les trois fois, le témoin ouvert a rattrapé** — *« quelque chose fait bien X ici : par QUOI ? »* au
+lieu de *« trouve-t-on X sous la forme attendue ? »*. **Et la session 8 a employé la parade la plus
+économique** : faire chercher **le cas connu dans la même commande**. *L'instrument trouvait
+`ComptesDistants`, donc ses zéros étaient des zéros.*

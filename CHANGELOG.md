@@ -2241,6 +2241,37 @@ recuperer.
     /comptes-distants -> 302 (la garde)
     parite i18n      FR=79  EN=79  ecarts=0
 
+### v1.38.163 — la mesure par l'ARTEFACT, et le troisième cas est `/cgu`
+
+**E-317.** Contrainte de méthode appliquée : *une mesure de portage cherche l'**artefact**, pas le nom du
+legacy* — compter ce qui existe dans `laravel/` puis le rattacher aux entrées de menu, jamais l'inverse.
+`iptables` est porté sous **`pare-feu`**, `remote_users` sous **`comptes-distants`** : **un
+`PareFeuController` est invisible à un `grep -i iptables`.** E-306 à l'échelle du chantier — et son effet
+n'est pas une sonde qui accuse à tort, **ce sont deux portages payés que personne ne comptait depuis les
+27 et 28 août.**
+
+Par différence d'ensembles : **41 routes de page**, **30 dans le menu**, **11 orphelines**, témoin à **0**
+(aucune entrée de menu sans route). Six sont légitimes (authentification, liens entrants), `tickets` a été
+retirée du menu à la refonte, `pare-feu` est le cas connu — **et `/cgu` est le troisième.**
+
+**⚠ `/cgu` : la page existe, l'acceptation existe, rien n'y mène.** `GET` et `POST` déclarés,
+`cgu_acceptees` posé en session — et **0 référence à `route('cgu')` hors de sa propre vue, 0 mention dans
+un intergiciel**. Ce n'est pas la classe de `pare-feu` (une page portée que le legacy continue de servir) :
+**ici il n'y a pas de legacy à servir**, la capacité est inatteignable des deux côtés. À arbitrer.
+
+**⚠ Et deux de mes mesures ont immobilisé du travail** : « aucun des cinq gestes distants n'est composé »
+(**quatre le sont**) et « E-203 est la seule chose portable qui reste » (**il en restait deux, finies**).
+*Mes deux erreurs précédentes allaient dans le sens qui fait **signer** ; ces deux-là vont dans le sens
+qui fait **arrêter*** — et c'est le plus difficile à détecter : **une session à qui on dit « il n'y a rien
+à faire » ne produit rien, et ne rien produire ressemble à ne rien avoir à faire. Un faux négatif de
+disponibilité se confirme tout seul.** Seule catégorie d'erreur dont l'effet est invisible dans nos
+journaux : ni commit, ni mesure fausse, ni contradiction — *juste des heures.*
+
+**Trois `0` d'artefact dans le même tour** : `fetch('...')` littéral (3 fetch vivaient dans des helpers),
+`route('export-cve')` (l'appel est paramétré), `grep -i iptables` (la page s'appelle `pare-feu`). Les
+trois rattrapés par un témoin **ouvert** — et la parade la plus économique reste celle de la session 8 :
+**faire chercher le cas connu dans la même commande.**
+
 ### v1.38.162 — mon « 29/32 » comptait le MENU : deux entrées sont portées et injoignables
 
 **E-315.** Signalé par la session 8, vérifié jusqu'au **corps du gestionnaire** : `remote_users`
