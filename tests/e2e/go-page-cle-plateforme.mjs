@@ -150,12 +150,13 @@ const C = CIBLE === 'laravel'
         rotation: '[data-rw="cle-rotation"]', lancer: '[data-rw="cle-rotation-lancer"]',
         jamais: '[data-rw="cle-rotation-jamais"]',
         panneau: '[data-rw="cle-panneau"]', panneauTexte: '[data-rw="cle-panneau-texte"]',
+        panneauTitre: '[data-rw="cle-panneau-titre"]',
         panneauAnnuler: '[data-rw="cle-panneau-annuler"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', page: '/adm/platform_keys.php',
         bloc: '#pubkey-display', valeur: '#pubkey-display',
         rotation: null, lancer: 'button[onclick="regenerateKey()"]',
-        jamais: null, panneau: null, panneauTexte: null, panneauAnnuler: null,
+        jamais: null, panneau: null, panneauTexte: null, panneauTitre: null, panneauAnnuler: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]' };
 
 let echecs = 0;
@@ -520,6 +521,129 @@ try {
     });
 
     // ══ 4. L'ENONCE QUE LE PORTAGE AJOUTE ════════════════════════════════
+    await etape('CHAQUE panneau de decision porte un titre ET un texte', async () => {
+        if (CIBLE !== 'laravel') {
+            constate('panneaux de decision', 'SANS OBJET — le legacy ouvre un `confirm()` natif');
+
+            return;
+        }
+        /*
+         * ══ LA CLASSE TROUVEE SUR `fail2ban` F7, CHERCHEE ICI ════════════
+         *
+         * `ouvre(geste)` lit `(textes.panneaux || {})[geste] || {}` — une cle
+         * COMPOSEE A L'EXECUTION. Si le geste n'a pas d'entree, `p` vaut `{}`
+         * et le panneau s'ouvre avec un titre VIDE et un texte VIDE. C'est
+         * exactement ce qui arrive a `conf_titre_desact` dans fail2ban : la
+         * cle existe au catalogue, le controleur ne la transmet pas, et
+         * **aucune sonde statique ne peut le voir puisque la cle n'apparait
+         * litteralement dans aucun fichier**.
+         *
+         * L'accord des deux ensembles a ete verifie ici — six gestes offerts,
+         * six panneaux au catalogue, aucun manquant. **Mais un accord de cles
+         * ne dit rien du RENDU** : la structure imbriquee (`titre`, `texte`)
+         * peut manquer pour un geste donne. La seule detection est d'OUVRIR.
+         *
+         * L'etape voisine n'ouvre que la ROTATION — un geste sur six.
+         *
+         * ⛔ AUCUNE CONFIRMATION N'EST PRISE. Ces panneaux confirment le
+         *    deploiement et la revocation de cles SSH : le filet avorte leurs
+         *    routes, et cette etape n'appuie que sur « annuler ».
+         */
+        const gestes = await page.$$eval('[data-geste]', (ns) => ns.map((n) => ({
+            geste: n.dataset.geste,
+            desactive: n.disabled === true || n.getAttribute('aria-disabled') === 'true',
+            visible: n.offsetParent !== null,
+        })));
+        constate('gestes offerts', gestes.length
+            ? gestes.map((g) => `${g.geste}${g.visible ? '' : ' (masque)'}${g.desactive ? ' (desactive)' : ''}`).join(' · ')
+            : '(aucun)');
+        if (! gestes.length) {
+            verifie('la page offre au moins un geste a mesurer', false,
+                'aucun `data-geste` : l\'etape ne mesurerait rien');
+
+            return;
+        }
+
+        const vus = new Set();
+        for (const g of gestes) {
+            if (vus.has(g.geste)) continue;
+            vus.add(g.geste);
+            if (! g.visible || g.desactive) {
+                constate(`panneau « ${g.geste} »`,
+                    `SANS OBJET — le bouton est ${g.desactive ? 'desactive' : 'masque'},`
+                    + ' le panneau ne peut pas s\'ouvrir depuis cette page');
+                continue;
+            }
+            /*
+             * ⚠ CHAQUE GESTE EST INDEPENDANT. Au premier jet, une exception sur
+             *   l'un abattait l'etape entiere : `rotation` n'a pas ouvert son
+             *   panneau, le clic d'annulation a leve « Node is either not
+             *   clickable », et les gestes suivants n'ont jamais ete mesures.
+             *   **Une boucle de mesure ne doit pas faire dependre les cas les
+             *   uns des autres** — sinon le premier defaut cache tous ceux qui
+             *   le suivent.
+             */
+            let b = null;
+            try {
+                b = await page.$(`[data-geste="${g.geste}"]`);
+                if (b) { await b.evaluate((n) => n.scrollIntoView({ block: 'center' })); await dors(200); }
+            } catch { b = null; }
+            if (! b) { constate(`panneau « ${g.geste} »`, 'SANS OBJET — bouton introuvable'); continue; }
+            try { await b.click(); } catch (e) {
+                verifie(`« ${g.geste} » : le bouton est cliquable`, false,
+                    String(e.message || e).split('\n')[0]);
+                continue;
+            }
+            await dors(700);
+            const vu = await page.evaluate((sel) => {
+                const p = document.querySelector(sel.panneau);
+                const t = document.querySelector(sel.panneauTitre);
+                const x = document.querySelector(sel.panneauTexte);
+
+                return {
+                    ouvert: p !== null && p.offsetParent !== null,
+                    titre: t ? (t.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                    texte: x ? (x.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                };
+            }, C);
+            if (! vu.ouvert) {
+                constate(`panneau « ${g.geste} »`, 'NON ouvert — le clic n\'a pas produit de panneau');
+            } else {
+                constate(`panneau « ${g.geste} »`,
+                    `titre ${vu.titre.length} car., texte ${vu.texte.length} car.`);
+                /*
+                 * UN PANNEAU VIDE FAIT CONSENTIR A UN GESTE QUE RIEN NE NOMME.
+                 * On exige les DEUX : un titre sans texte dit quoi sans dire
+                 * ce que ça fait, et un texte sans titre l'inverse.
+                 */
+                verifie(`« ${g.geste} » : le panneau porte un titre ET un texte`,
+                    vu.titre.length > 0 && vu.texte.length > 0,
+                    `titre « ${vu.titre.slice(0, 40)} » (${vu.titre.length} car.),`
+                    + ` texte ${vu.texte.length} car. — cle composee non transmise ?`);
+                verifie(`« ${g.geste} » : aucun jeton non substitue`,
+                    vu.titre.length > 0 && vu.texte.length > 0
+                        && ! /:[a-z_]{3,}/.test(`${vu.titre} ${vu.texte}`),
+                    vu.titre.length === 0 || vu.texte.length === 0
+                        ? 'panneau vide : rien a verifier, et un vert ici serait une absence'
+                        : `${vu.titre} | ${vu.texte}`);
+            }
+            try {
+                const annuler = await page.$(C.panneauAnnuler);
+                if (annuler) { await annuler.click(); await dors(400); }
+            } catch { /* panneau deja ferme : rien a annuler */ }
+        }
+        /*
+         * ET CE QUI N'EST PAS RENDU EST DIT. `compte_service` et `ressaisir`
+         * existent dans la vue mais sous condition : ils ne sont pas dans le
+         * DOM a l'etat mesure. **Le taire ferait lire « les six panneaux sont
+         * sains » a une mesure qui n'en a vu que quatre.**
+         */
+        const attendus = ['deployer', 'compte_service', 'effacer', 'revoquer', 'ressaisir', 'rotation'];
+        const absents = attendus.filter((x) => ! vus.has(x));
+        constate('gestes NON rendus a cet etat',
+            absents.length ? `${absents.join(' · ')} — non mesures ici` : 'aucun, les six ont ete vus');
+    });
+
     await etape('le portage dit que le geste n\'est jamais exerce', async () => {
         if (! C.jamais) {
             verifiePortage('la page enonce que la rotation n\'est jamais exercee au banc', false,
