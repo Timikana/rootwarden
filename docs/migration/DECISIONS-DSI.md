@@ -3375,3 +3375,77 @@ prose, un comptage de menu qui incluait un bloc de commentaire.
 > **Aucune n'a été trouvée par une meilleure sonde.** *Elles l'ont été par un témoin dans la mesure, par
 > la lecture des vingt lignes autour, ou par un pair qui rendait un chiffre incompatible.* **Il y a un
 > moment où compter coûte plus cher que regarder.**
+
+---
+
+## ⚠⚠ Un déploiement de clés A ÉTÉ LANCÉ SUR LA PRODUCTION le 2026-08-27 — et il n'a échoué que par accident
+
+**Mesuré le 2026-09-02 à 08:0x UTC**, en partant d'un constat de la session 7 : ses cinq filets de sûreté
+reposaient sur des **listes de noms de routes écrites de mémoire**, et **`POST /deploy` — le déploiement
+de clés, K4 — n'y figurait pas.**
+
+**J'ai voulu savoir si la route laissait une trace. Elle en laisse une.**
+
+    /app/logs/deployment.log     0 octet   Sep  2 04:52    <- pendant le LOT de cette nuit
+    /app/logs/deployment.log.1   1037 o    Aug 27 20:43    <- une execution REELLE
+
+    20:43:07  ===== Demarrage de la configuration des serveurs =====
+    20:43:07  Machines transmises pour configuration : ['1', '2']
+    20:43:07  Verification des mots de passe pour la machine: srv-zabbix (ID: 1)
+    20:43:07  ERROR - Probleme de dechiffrement pour srv-zabbix
+    20:43:07  ERROR - Erreur critique : Echec du dechiffrement: Aucune methode n'a fonctionne
+    [RootWarden] ECHEC : code 1. Les gestes deja emis n'ont PAS ete annules.
+
+> **`POST /deploy` a été invoqué le 27 août à 20:43 avec `machines = ['1', '2']`. La machine 1 est
+> `srv-zabbix` — la production, celle que la consigne permanente du chantier interdit de joindre.**
+
+### Ce qui a empêché les dégâts, et ce n'est aucune de nos protections
+
+**Il a échoué à la phase de déchiffrement des mots de passe, AVANT toute session SSH.** Aucun geste
+distant n'a été émis, aucune clé n'a été révoquée.
+
+> **La seule raison est un échec de déchiffrement sans le moindre rapport avec une garde.** *Ni le filet
+> de sûreté — qui ne couvrait pas cette route — ni un panneau de confirmation, ni un arbitrage : une
+> panne.* **Le geste que le plan décrit comme le plus dangereux du chantier s'est exécuté jusqu'à sa
+> première instruction, et c'est un défaut de configuration qui l'a arrêté.**
+
+### Ce que je ne peux pas dire, et c'est la moitié du sujet
+
+**Je ne sais pas qui l'a lancé.** *Le journal ne consigne ni appelant, ni session, ni compte* — il
+enregistre ce que le sous-processus fait, pas qui l'a demandé.
+
+**20:43 un mercredi est une heure humaine**, et l'exploitant peut parfaitement l'avoir lancé lui-même
+depuis l'ancien portail. **Je ne l'attribue à personne, et surtout pas à une suite** : rien dans ce que
+j'ai mesuré ne le permet.
+
+> **C'est le vrai défaut d'audit, et il est plus grave que l'incident** : *après coup, personne ne peut
+> répondre à « qui a lancé un déploiement sur la production ».* **Le geste le plus destructeur du produit
+> journalise ce qu'il fait et jamais qui le demande.**
+
+### Ce que ça change pour l'arbitrage K4
+
+**Rien sur la recommandation, tout sur sa justification.** Le plan écrit qu'un déploiement lancé
+aujourd'hui *« RÉVOQUERAIT les accès, il ne ferait pas rien »*. **Nous avons désormais la preuve qu'il
+peut être lancé** — pas un raisonnement sur ce qui arriverait, **un journal de ce qui est arrivé.**
+
+*Et il a visé la production au premier essai, avec la machine 1 en tête de liste.*
+
+### Le second fait, que je donne sans le qualifier
+
+    deployment.log   0 octet, mtime Sep 2 04:52     (le LOT a demarre a 04:49:29)
+
+**Quelque chose a ouvert ce chemin en écriture pendant la fenêtre du LOT** — `open(…,"w")` ligne 505 ou
+`open(…,"a")` ligne 387 mettent l'horodatage à jour même sans écrire.
+
+**La lecture bénigne est de loin la plus probable** : un préflight touchant l'ouverture en `a`, et la
+rotation évaluée sans rien déplacer — *`.1` date du 27/08 et n'a pas bougé, donc le garde `size > 0` a
+bien vu un fichier vide.* **Mais la ligne 505 est dans `/deploy`, et c'est la session 7 qui a la liste
+des suites jouées à 04:52.** *Je le lui ai transmis plutôt que de trancher.*
+
+### Ce qui n'est pas mesuré
+
+- **qui a lancé le déploiement du 27/08** — le journal ne le porte pas, et je n'ai pas consulté les
+  journaux d'accès ;
+- **s'il y en a eu d'autres avant.** *La rotation ne garde qu'UNE génération* — `deployment.log.1` est le
+  seul antécédent conservé. **Tout déploiement antérieur au 27/08 est définitivement effacé** ;
+- **ce qui a touché le fichier à 04:52.** Trois lectures possibles, aucune privilégiée.
