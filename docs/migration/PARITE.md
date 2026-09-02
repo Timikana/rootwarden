@@ -14062,3 +14062,94 @@ artefact ou à la mauvaise fenêtre* — `-newermt`, un `GET` contre le fourre-t
 
 **Deux ont été rattrapées par une construction** (un témoin, un garde relu), **une par un pair**.
 *La construction est la seule qui ne dépende de personne.*
+
+## E-286 — ⚠ le correctif d'E-281 EXISTE DEPUIS DOUZE JOURS, et sept sessions viennent de le repayer en une nuit
+
+Trouvé par la session 8, **vérifié par moi**.
+
+    a345e65   2026-08-21 09:17   « les scans CVE se connectaient a des machines archivees »
+                                 branche security/backend-cve
+
+Ses volets sur `_run_scheduled_scan`, mesurés dans le diff :
+
+    + vivantes = "(m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')"   <- les archivees
+    + ids = json.loads(schedule['target_value'] or '')
+    + logger(… "aucun scan lance", …) ; return                                        <- ECHEC FERME
+    - elif schedule['target_type'] == 'machines' and schedule['target_value']:         <- le `and` RETIRE
+
+**Le dernier volet est exactement le mécanisme que nous avons « trouvé » cette nuit** — retirer le
+test de vacuité de la **condition d'entrée** pour qu'il soit traité **dans** la branche. *L'auteur
+l'avait compris le 21 août.* Et il fait **aussi** le filtre `archived` que la session 4 s'était
+correctement interdit de trancher : **la branche résout déjà l'arbitrage qu'elle me déférait.**
+
+### ⚠ Ce qui décide le routage, et c'est immédiat
+
+    git merge-tree --write-tree HEAD security/backend-cve   ->   ZERO conflit    (mesure 2026-09-02)
+
+**Si la session 4 applique son diff, `scheduler.py` porte deux implémentations du même correctif, sur
+les mêmes lignes.** La fusion aujourd'hui propre devient conflictuelle **précisément sur le hunk le
+plus sensible du dépôt**.
+
+> **Le travail refait par-dessus la dette ne fait pas que coûter : il rend la dette plus chère à
+> solder.** Écrire un correctif contre un arbre dont on sait qu'il va bouger, c'est choisir un
+> conflit qu'on aurait pu ne pas avoir.
+
+### Et ce n'est PAS « jeter le travail de la session 4 »
+
+**Son apport est plus strict que la branche** : celle-ci fait tomber une valeur non reconnue dans un
+`else` qui prend **tout le parc filtré** ; elle propose un `else` qui **refuse et journalise**. *C'est
+un gain réel que la branche n'a pas.*
+
+**Arbitrage** — et il ne demande à personne de fusionner quoi que ce soit :
+1. la session 4 **n'applique pas** son diff sur le tronc (elle ne l'avait pas fait : bon réflexe) ;
+2. elle **relit `a345e65`** et réduit son diff à ce que la branche ne fait pas — le `'all'` explicite
+   et l'`else` qui refuse ;
+3. **cet apport se pose APRÈS la fusion**, quand l'exploitant l'aura signée.
+
+### ⚠ Et ce que la fusion NE corrige PAS — à dire en même temps
+
+    a345e65 touche _run_scheduled_ssh_audit :  0 occurrence
+
+**E-280 survit entièrement à la fusion.** Le test de vacuité reste dans la condition du `elif`, donc
+un champ de tag laissé blanc vise toujours le parc entier. *La fusion ferme le pire des deux et laisse
+l'autre entier* — et l'annoncer autrement fabriquerait le même effet de bord imaginaire que j'ai déjà
+adossé à une signature cette nuit.
+
+### Deux de mes mesures sont périmées, remesurées par la session 8
+
+    recoupement  ma mesure du 27/08 disait « aucun n'a bouge ». FAUX aujourd'hui :
+                 helpers.py 2 commits sur le tronc, scheduler.py 1. PLUS NUL.
+                 merge-tree rend toujours 0 conflit — mais l'argument etait
+                 « aucun n'a bouge », pas « 0 conflit ». Les deux ne disent pas la meme chose.
+
+    push         IL A EU LIEU : amont a50b98c (28/08 13:55). Mais 185 commits neufs en
+                 4,5 jours = ~41/jour. Le risque ne s'est pas ferme, il se RECONSTITUE.
+
+**La recommandation sur `security/backend-cve` ne change pas de sens, elle change de poids** : ce n'est
+plus *« six failles comptées »*, c'est **un correctif écrit que sept sessions viennent de repayer en
+une nuit**.
+
+## E-287 — un relevé outillé transporte sa crédibilité, pas sa vérité
+
+La session 3 a inscrit ma mesure fausse du régime **dans son propre CHANGELOG**, comme sienne. Sa
+lecture de son geste :
+
+> Ta mesure m'est arrivée **avec sa commande, son horodatage et son `StartedAt`** — et c'est
+> exactement ce qui l'a rendue crédible : **elle avait la forme d'une mesure.** Je ne l'ai pas refaite
+> parce qu'elle était déjà outillée.
+
+> **Un relevé qui arrive avec sa commande est plus facile à vérifier — pas moins nécessaire à
+> vérifier.** L'outillage d'une affirmation ne la transporte pas ; il rend seulement sa remesure bon
+> marché.
+
+**C'est le pendant exact d'E-278 et de la note sur le registre** : nos garde-fous de méthode
+produisent leur propre angle mort. Ici, *fournir sa commande* — pratique que j'impose à tous — a
+**dispensé** un lecteur prudent de mesurer.
+
+Et sa remesure était une **vraie** confirmation, parce qu'elle a employé un autre geste :
+
+    md5sum /app/scheduler.py   (conteneur)   cbf22ffcfa9c615e414eb86a64c1f824
+    md5sum backend/scheduler.py (arbre)      cbf22ffcfa9c615e414eb86a64c1f824
+
+**Elle a comparé les fichiers, là où j'avais comparé des extraits.** *Un accord ne vaut que si le
+confirmateur a mesuré autrement* — celui-ci vaut.
