@@ -2962,3 +2962,92 @@ comptabilité ; c'est la décision de l'exploitant qui compte.**
 > sous forme de tableau, avec assurance. *Un arriéré sous-déclaré ne se conteste pas : il soulage.*
 > **Personne ne remesure une bonne nouvelle** — c'est la phrase que j'ai opposée au Lead il y a deux
 > heures, et je venais de commettre sa version longue.
+
+---
+
+## ✅ DÉCISION — `remote_users` est PORTÉ et INJOIGNABLE : le menu doit basculer
+
+**Mesuré le 2026-09-02, 04:0x UTC.** Parti de *« quel travail reste-t-il qui ne dépende pas de
+l'exploitant ? »*, en vérifiant le 29/32 du Lead plutôt qu'en le reconduisant.
+
+### Le 29/32 est exact, et il compte mal
+
+    Navigation.php  ->  32 entrees, 3 portent encore 'legacy' =>
+                        remote_users -> /adm/server_users.php
+                        iptables     -> /iptables/
+                        wazuh        -> /wazuh/
+
+**Mais `remote_users` est porté.** Mesuré :
+
+    laravel/app/Http/Controllers/ComptesDistantsController.php   8 362 o, 5 methodes
+    laravel/routes/web.php:922-932   4 routes, toutes `role:2` + `perm:can_manage_remote_users`
+    laravel/resources/views/comptes-distants.blade.php           215 lignes
+    laravel/public/js/comptes-distants.js                        19 764 o
+
+**Les trois gestes destructeurs sont câblés**, pas absents :
+
+    js:343  cles         -> /remove_user_keys
+    js:344  sshd         -> /sshd_allow_user
+    js:345  suppression  -> /delete_remote_user      (+ `corps.remove_home = true`)
+    derriere `rw-panneau-decision`, qui NOMME la consequence avant de confirmer
+
+**Et le seul manque est DÉCLARÉ** — `lang/{fr,en}/plateforme.php:237` : *« `server_user_remove_key` […]
+n'a pas encore d'interface ici : aujourd'hui il se fait depuis l'ancien portail. »*
+
+> **Le portage satisfait déjà la discipline que le `DOSSIER-11` exige** : *ce qui manque est nommé, pas
+> silencieux.* **C'est la première page du chantier qui le fait d'elle-même.**
+
+### ⚠ Troisième occurrence du motif, et la plus coûteuse
+
+`Navigation.php:77` envoie toujours l'entrée vers `/adm/server_users.php`. **La page portée existe, elle
+est gardée, elle fonctionne — et aucun chemin emprunté par un utilisateur n'y mène.**
+
+| # | forme | où |
+|---|---|---|
+| 1 | capacité qui **disparaîtrait** à l'archivage sans que rien ne bouge | export RGPD, `DOSSIER-11` |
+| 2 | page portée **sans** la capacité, l'utilisateur y arrive et rien ne le lui dit | `profil` vs `export.php` |
+| 3 | **page portée que le menu n'atteint pas** | **ici** |
+
+> **Les trois se ressemblent et la troisième est la plus chère** : *on a payé le portage entier et on
+> continue de servir l'ancien.* **Le travail est fait deux fois — une fois pour l'écrire, une fois pour
+> maintenir ce qu'il devait remplacer.**
+
+### ✅ La décision, et sa raison n'est pas celle qu'on attend
+
+**Le menu bascule vers `/comptes-distants`.** *Délégué : c'est un choix de produit, aucun geste
+destructeur, aucun schéma touché.*
+
+**L'objection sérieuse, et je la traite** : les trois gestes distants **n'ont jamais été exercés** — leur
+vérification exige de réécrire un `sshd_config` et de supprimer un compte système sur une machine réelle.
+Le Lead en a sorti la session 3, à raison.
+
+**Ça ne fonde pas de garder le menu sur le legacy, et c'est le cœur de l'arbitrage :**
+
+> **La page legacy pose les mêmes trois gestes — dont un `userdel` irréversible — en trois boutons
+> minuscules au bout de chaque ligne.** *Garder le menu dessus n'est pas prudent : c'est laisser tout le
+> monde sur l'interface la plus dangereuse des deux.* **Ne pas basculer n'est pas l'option sûre ; c'est
+> l'option qui ne se voit pas.**
+
+**Le risque réel du basculement est étroit et il faut le nommer** : un geste destructeur jamais exercé
+peut viser le mauvais compte. *Il n'est pas plus grand que celui qu'on court déjà* — le legacy est
+lui aussi servi, et lui aussi jamais exercé par ce chantier.
+
+### La condition, et elle ne bloque pas la bascule
+
+**Exercer les trois gestes reste un acte de niveau signature** — il détruit sur une machine réelle. *Ce
+n'est pas une condition du basculement, c'est une condition de la CONFIANCE qu'on peut lui accorder*, et
+les deux se décident séparément.
+
+**Ce que je demande à la session 3** : basculer l'entrée, **et ajouter à la page une mention disant que
+les trois gestes n'ont pas encore été exercés sur ce chantier** — dans le même commit, i18n FR/EN.
+*Une page qui déclare déjà son unique manque peut déclarer celui-là aussi.*
+
+### Ce qui n'est pas mesuré
+
+- **`iptables` et `wazuh`** : je n'ai pas cherché s'ils sont dans le même cas. *Vu ce que je viens de
+  trouver, c'est la première chose à faire* — et ce n'est pas mon périmètre d'écriture ;
+- **si la page portée fonctionne** : je l'ai lue, je ne l'ai pas ouverte. **Les routes qu'elle appelle
+  vivent dans `ssh.py`, l'un des vingt modules inertes** — *donc son inventaire se lit, mais rien ne dit
+  que ses gestes atteignent le backend avant le redémarrage* ;
+- **le contenu du panneau de décision** : j'ai vu qu'il existe et qu'il nomme la machine, pas ce qu'il
+  dit exactement.
