@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.145** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.147** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,29 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.147 — 29/32, et un exemple chiffré dans un commentaire vieillit tout seul
+
+**E-294 — `documentation` est porté.** `Navigation.php` écrit à 02:25:05, `Route::get('/documentation')`
+à `web.php:191`, **plus une redirection de `/documentation.php` vers la route nommée** (`:989`) — geste
+que les portages précédents n'avaient pas fait : *un signet qui existe chez l'exploitant ne meurt pas
+avec la page.* Croisé : 29 `route` + 3 `legacy` = 32. **Troisième entrée portée cette nuit.** Restent
+`remote_users`, `iptables`, `wazuh`.
+
+**E-293 — une ligne de journal n'est pas une assertion.** Une suite a été annoncée rouge après les
+bascules ; elle ne l'était pas. Ses trois assertions portent sur des **invariants** (le total vaut 32,
+`route` XOR `legacy`, la somme se reconstitue) et **aucune ne dépend de la proportion** — une bascule y
+est neutre par construction. Ce qui a trompé est un `constate()` qui pousse une ligne `INFO` : dans un
+journal, `INFO … total=32 route=24 legacy=8` ressemble exactement à une mesure qui engage. *La seule
+façon de le savoir est de lire l'appel, pas la sortie.*
+
+**Et le vecteur est un commentaire** : `go-socle-navigation.mjs:67` documente le **format** de cette
+ligne en donnant `route=24 legacy=8` — exact le 2026-08-27, faux depuis cinq bascules. *Un exemple
+chiffré dans un commentaire est un chiffre non daté qui vieillit sans que rien ne l'annonce — et il
+vieillit à l'endroit exact où l'on vient chercher la vérité sur l'outil.* **Troisième vecteur du même
+défaut en deux jours** : la consigne recopiée, le registre, et maintenant le commentaire d'un test —
+*les trois endroits où l'on écrit pour ne pas oublier.* Remède : un exemple chiffré s'écrit **sans les
+valeurs** (`total=N route=R legacy=G`), ou porte sa date dans la même phrase.
 
 ### v1.38.145 — `security/backend-cve` : l'inventaire sur pièces, et le correctif inerte est nommé
 
