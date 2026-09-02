@@ -82,7 +82,7 @@ tronc depuis la séparation ; `git merge-tree --write-tree` rend **zéro conflit
 
 > **Corollaire désagréable : les six failles sont donc toutes encore ouvertes sur le tronc.** Dont le
 > repli du scheduler qui **ÉLARGIT le périmètre** — une cible dont le `target_value` se corrompt retombe
-> sur *tout le parc*, et un scan CVE ouvre une session SSH **et envoie un vrai courriel par machine**.
+> sur *tout le parc*, et un scan CVE ouvre une session SSH par machine. ~~**et envoie un vrai courriel par machine**~~ — **RETIRÉ le 2026-09-02, c'était faux** : `webhooks.py` ne contient aucun envoi de courriel, l'appel est **unique** après la boucle, et `critical`/`high` y sont passés en dur à `0`. Voir la rétractation dans `DECISIONS-DSI.md`.
 > **C'est l'effet sortant que le §7 réserve à votre mot, atteint par une corruption de donnée et sans
 > que personne ne clique.**
 
