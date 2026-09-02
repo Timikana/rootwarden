@@ -3815,3 +3815,78 @@ pas une route sans paramètre de portée.*
 
 **Et 2 à rouvrir, pas à porter** : *elles ne sont pas en retard, elles ont été fermées.* **À inscrire au
 `DOSSIER-11`, qui est le dossier de cette classe.**
+
+---
+
+## ⚠⚠ J'ai PRESCRIT le défaut signature du dépôt — et c'est un refus qui m'a arrêtée
+
+**2026-09-02, 19:40.** *La session 4 a refusé une tâche que je lui avais assignée, avec trois raisons
+mesurées. Les trois étaient justes.* **Vérifiées une par une avant d'être admises.**
+
+### 1. Assignation fausse — j'ai raisonné sur la BASE au lieu de l'ARTEFACT
+
+    ssh_audit.py:739    POST /ssh-audit/schedules   <- la route EXISTE deja
+    audit-ssh.js:123 · :149 · lang/fr/ssh_audit.php:126   <- l'ECRAN est en laravel/
+
+**J'avais écrit *« ça écrit en base, donc c'est ton périmètre »*.** *Ce qui écrit existait ; ce que je
+demandais était un formulaire, ses libellés FR/EN et son JS.* **Le découpage des rôles suit l'artefact à
+produire, pas la couche que le geste finit par toucher.**
+
+### 2. ⚠ J'AI PRESCRIT « la garde sur la PAGE » — septième occurrence, et la première COMMANDÉE
+
+J'ai écrit à la session 4 : *« ne compte pas sur la migration 065, ton garde est dans le formulaire. »*
+
+> **Un garde dans le formulaire ne garde pas la route.** *Quiconque appelle `POST /ssh-audit/schedules`
+> directement passe à côté.* **C'est le défaut le plus répété de ce dépôt — six occurrences comptées
+> cette semaine — et je viens d'en commander la septième.**
+
+**Et la mesure donne entièrement raison au refus :**
+
+    ssh_audit.py:754   `cron_expression`  -> 400 si absente ou invalide
+    ssh_audit.py:~768  target_type  = data.get('target_type', 'all')     <- AUCUNE verification
+                       target_value = data.get('target_value') or None   <- AUCUNE verification
+                       -> INSERT direct
+
+**Un POST légitime avec `target_type: 'tag'` et sans `target_value` insère `NULL`**, et `scheduler.py:286`
+— dont le test de vacuité vit dans la **condition d'entrée** du `elif` — retombe sur le `else` final :
+**le parc entier.** *Aucune requête forgée : une clé d'API de rôle 2 suffit, et c'est le rôle que la route
+exige déjà.*
+
+### 3. Ma précision sur l'enum contredisait mes propres données
+
+    ssh_audit_schedules.target_type   enum(4)  NOT NULL  defaut 'all'   <- il FERME
+    ssh_audit_schedules.target_value  text     YES NULL                 <- le TROU est la
+
+**J'avais écrit *« l'enum ne ferme rien »*.** *Vrai de `cve_scan_schedules` (NULLABLE), faux de celle-ci
+— et j'avais mesuré ce `NOT NULL` moi-même, en transaction annulée, quelques heures plus tôt.*
+**J'ai contredit ma propre mesure au message suivant, et sa distinction dit OÙ poser la garde.**
+
+---
+
+## ✅ Arbitrage — gel levé sur le seul patch E-280
+
+    PORTEES = ('all','tag','environment','machines')
+    target_type absent des PORTEES              -> 400
+    target_type != 'all' et target_value vide   -> 400, motif explicite
+
+**Pourquoi c'est mon arbitrage** : *ne touche ni donnée, ni schéma, ni service.* **Les `.py` sont lus au
+démarrage — le patch est INERTE jusqu'au redémarrage et prendra effet avec lui, sans en exiger un
+second.** *Même argument d'ordre que `security/backend-cve` : une seule fenêtre.*
+
+**Le gel était celui du Lead. Je l'ai informé AVANT, pas après** — *c'est la seule forme qui lui laisse
+la possibilité de me contredire.*
+
+---
+
+## Ce que ce tour dit de la conduite, et c'est le vrai résultat
+
+> **Ce qui m'a arrêtée n'est pas ma vigilance : c'est qu'une session a refusé d'exécuter un ordre mal
+> fondé au lieu de l'appliquer.**
+
+**Une flotte qui obéit proprement aurait posé la garde au mauvais endroit, par la mauvaise session, et
+l'aurait inscrite comme close.** *Le défaut aurait alors porté deux marques de qualité — une assignation
+de DSI et une clôture d'écart — et personne ne l'aurait rouvert.*
+
+**Et l'asymétrie mérite d'être nommée** : *j'ai passé la nuit à cataloguer « la garde est sur la page,
+pas sur la requête », et je l'ai prescrit huit heures plus tard.* **Connaître un défaut ne protège pas
+d'en être l'auteur — ça permet seulement de le reconnaître quand on vous le montre.**
