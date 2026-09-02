@@ -15121,3 +15121,80 @@ de la mémoire écrite.**
 dérivait avec la bonne tenue du registre, et le témoin qui validait l'idiome sans valider la question.
 **Et la sienne est de la même famille que sa réserve** : elle a appliqué ma règle à mon garde-fou pendant
 que j'appliquais la mienne à son relevé.
+
+## E-312 — ⚠ j'annonçais CINQ signatures ; il y a ONZE dossiers ouverts, et mon chiffre SOULAGEAIT
+
+**C'est le chiffre que l'exploitant lit, et je le lui donne faux depuis le début de la nuit.**
+
+Mesuré par moi après la question ouverte à la session 8 :
+
+    ls docs/migration/DOSSIER-*.md   ->  11 fichiers
+    marqueur d'etat, sonde OUVERTE   ->  10 portent « Pour signature », aucun ne porte de cloture
+                                         le 11e (DOSSIER-10) est une remontee, pas une demande
+
+**Mes cinq** — redémarrage · 2FA · migrations · fusion · les deux comptes — recouvrent les dossiers
+**01, 09, 08, 02** et un hors-dossier. **J'omettais 03, 05, 06, 07, 10 et 11 sans jamais dire qu'ils
+étaient clos.** Ils ne le sont pas.
+
+### L'énumération de la session 8, avec ses objets
+
+    1   redemarrer `rootwarden_python`                              01  (absorbe E-214/E-215 du 04)
+    2   recreer `rootwarden_laravel`                                07
+    3   `push`                                                      08
+    4   fusionner `security/backend-cve`                            08
+    5   retroporter v1.37.16 · .17 · .48 (la 2FA) vers `main`       08 + 09   un geste, deux dossiers
+    6   appliquer la migration d'E-222                              06
+    7   migrations 063 + 064 + 065                                  hors dossier
+    8   compte approbateur + 4e compte de test                      02
+    9   retirer `clean_up_users`, faire lire les deux magasins      03
+    10  auto-reparation du sudoers AVEC la colonne                  05
+    11  export RGPD AVANT d'archiver `profile/`                     11
+
+`DOSSIER-04` est le seul qui ne demande rien — deux de ses écarts relèvent du 01, les deux autres sont
+*« ne pas l'écrire »*, tranchés.
+
+### ⚠ LA DIRECTION EST CE QUI REND CECI GRAVE
+
+> **J'ai annoncé à l'exploitant une charge de décision plus de deux fois plus petite qu'elle n'est.**
+> Plusieurs tours de suite. En liste. Avec assurance.
+
+*Un arriéré sous-déclaré ne se conteste pas : il soulage.* **« Personne ne remesure une bonne
+nouvelle »** est la phrase que la session 8 m'a opposée cette nuit et que j'ai inscrite comme règle —
+**je la violais au même moment sur le seul chiffre que l'exploitant lit vraiment.**
+
+### Ce qui a sauvé le chiffre : une ÉNUMÉRATION contre une RÉCITATION
+
+La session 8 disait sept, je disais cinq. **Aucun des deux n'était juste.** Mais :
+
+> **Un compte énuméré se corrige ; un compte récité se propage.** *La différence n'est pas la justesse :
+> c'est de porter ses objets avec soi.*
+
+J'ai listé mes cinq **avec leur objet** en demandant lesquels manquaient. Elle a dû mesurer pour
+répondre — *et c'est ça, le symptôme* : un chiffre qu'on ne peut pas défendre sans le remesurer n'a
+jamais été mesuré. **Le désaccord était corrigible en un message parce que les deux camps portaient des
+objets, pas des nombres.** Sixième faux désaccord du chantier, et **le premier qui se résout en trouvant
+que les DEUX parties avaient tort.**
+
+### Et la sonde de vérification était pire que le chiffre
+
+Elle avait écrit un `grep -oiE "CLOS|SIGNE|APPLIQUE"` sur chaque dossier : **10 sur 11 rendus « clos »**,
+`DOSSIER-01` compris — alors que le redémarrage n'a pas eu lieu. *Elle cherchait des MOTS dans la prose,
+pas un ÉTAT.* **Elle aurait confirmé son chiffre en le réduisant encore.**
+
+> **Elle l'a écartée parce qu'un cas connu la contredisait, pas parce qu'elle avait douté de sa forme.**
+> Le garde-fou n'a pas été sa prudence : *c'est qu'elle connaissait la réponse pour UN cas.* Sans le
+> `DOSSIER-01`, la sonde passait.
+
+C'est la parade que ce registre appelle **témoin** — et la voici sous sa forme la plus économique : **ne
+jamais lancer une sonde sur une population dont on ne connaît la réponse pour aucun élément.**
+
+### Le cadrage que j'adopte, et il vient d'elle
+
+Je distinguais *« un écart se mesure, ce que le produit doit faire s'arbitre »* — et je comptais donc
+les arbitrages à part des signatures.
+
+> **Du point de vue de l'exploitant, un arbitrage qu'il rend et une signature qu'il donne sont la même
+> interruption.** Ma taxonomie sert ma comptabilité ; **c'est sa décision qui compte.**
+
+**Le compte à lui rendre est donc ONZE**, et il se rend **avec les onze objets** — jamais avec un
+nombre nu.
