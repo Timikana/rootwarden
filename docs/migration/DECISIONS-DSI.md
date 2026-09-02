@@ -3890,3 +3890,71 @@ de DSI et une clôture d'écart — et personne ne l'aurait rouvert.*
 **Et l'asymétrie mérite d'être nommée** : *j'ai passé la nuit à cataloguer « la garde est sur la page,
 pas sur la requête », et je l'ai prescrit huit heures plus tard.* **Connaître un défaut ne protège pas
 d'en être l'auteur — ça permet seulement de le reconnaître quand on vous le montre.**
+
+---
+
+## ✅ ARBITRAGE — les machines archivées dans un groupe : ce n'est PAS un écart
+
+**Rendu le 2026-09-02 sur un signalement de la session 6**, qui a eu raison de ne pas le trancher
+elle-même. *Sa prémisse est fausse, et la mesure retourne la conclusion.*
+
+### Ce qui m'était signalé
+
+> `groupes.js:231` — *la résolution du backend n'exclut PAS les machines archivées, alors que le portage
+> les exclut partout ailleurs. Deux définitions du parc.*
+
+### Ce que la mesure dit
+
+    backend/routes/groups.py:36   'lifecycle_status': {'active', 'retiring', 'archived'}
+                                  -> une liste blanche de valeurs FILTRABLES, pas une exclusion
+    legacy/groups/index.php:97    une case a cocher PAR valeur de lifecycle_status
+    legacy/groups/js/main.js:24   lifecycle_status figure parmi les colonnes de filtre
+    GroupesController.php + app/Support/*.php   ->  0 occurrence de lifecycle_status
+    machines archivees en base  ->  0  (les trois sont `active`)
+
+**`lifecycle_status` est une DIMENSION DE FILTRE dans les deux portails.** *Le legacy offrait
+explicitement une case à cocher « archived » ;* **le portage ne l'exclut pas davantage ailleurs dans le
+chemin des groupes — la prémisse « il les exclut partout ailleurs » ne tient pas pour ce module.**
+
+### ✅ La décision, et la distinction qui la fonde
+
+**Ce n'est pas un défaut, et ça ne se corrige pas.**
+
+> **Exclure les archivées est juste pour un GESTE, faux pour une SÉLECTION.** *Ne pas ouvrir de session
+> SSH sur une machine décommissionnée est une protection ; ne pas pouvoir SÉLECTIONNER les machines
+> archivées interdirait de construire le groupe « les archivées » — que le legacy proposait d'un clic.*
+
+**Où l'exclusion existe légitimement** : `scheduler.py` (274, 279, 292, 299), `ssh_audit` — *tous des
+chemins qui **agissent** sur le parc.* **Où elle n'a pas lieu d'être** : la définition d'un groupe, qui
+**décrit** un ensemble.
+
+**Il n'y a donc pas deux définitions du parc : il y a une définition du parc et une définition de ce
+qu'on accepte de joindre.** *Les confondre produirait un correctif qui retire une capacité.*
+
+### Ce que je retiens de la forme
+
+**La session 6 a signalé sans refermer, en disant que c'était un arbitrage et pas un écart de portage.**
+*Si elle l'avait « corrigé », elle aurait ajouté un filtre qui casse une fonctionnalité du legacy, et
+l'aurait inscrit comme une fermeture d'écart.* **Un correctif porte deux marques de qualité — une
+mesure et une clôture — et personne ne rouvre ce qui porte les deux.**
+
+---
+
+## Note de conduite — TROIS sessions, la même observation, la même nuit
+
+**Chacune sur la règle qu'elle venait de donner à quelqu'un d'autre :**
+
+| session | la règle donnée | la faute commise, après |
+|---|---|---|
+| **moi** | « la garde est sur la page, pas sur la requête » — catalogué toute la nuit | **prescrit** une garde dans un formulaire |
+| **Lead** | « cherche l'artefact, pas le nom du legacy » | sonde portant le nom du legacy, **dans le message qui donnait la règle** |
+| **session 6** | « un instrument doit viser ce qu'il faut, pas seulement trouver ce qu'il vise » | compté des assertions **sans message** au lieu de juger **ce qu'elles verrouillent** — *dans l'heure* |
+
+> **Une règle qu'on catalogue protège les autres et pas soi — parce qu'on l'applique en LISANT, jamais en
+> ÉCRIVANT.** *Et les trois ont été trouvées par un tiers ou par l'auteur en relisant, jamais par la
+> règle elle-même.*
+
+**Conséquence pratique, et c'est la seule qui vaille** : *écrire une règle ne réduit pas le besoin de
+relecture croisée — ça le déplace.* **Ce qui a effectivement arrêté les trois fautes cette nuit, ce n'est
+aucune de nos disciplines : c'est qu'une session a refusé un ordre, qu'une autre a mesuré autrement, et
+qu'une troisième a relu son propre geste.**
