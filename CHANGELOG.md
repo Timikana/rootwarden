@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.162** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.163** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,76 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.163 — `remote_users` : le menu rejoint un portage deja paye, et l'inaction avait un cout
+
+**30 entrees portees sur 32.** Restent `iptables` (I5) et `wazuh` (E-238), tous deux sur l'exploitant.
+
+#### Deux pairs, deux mesures OPPOSEES — et il fallait aller lire
+
+Le Lead : *« les cinq gestes distants n'apparaissent cote portage que dans `RoutesBackend.php`.
+Aucun n'est compose. »* Le DSI : *« les trois gestes destructeurs sont cables. »*
+
+    laravel/public/js/comptes-distants.js
+      :300  '/scan_server_users'      :344  '/sshd_allow_user'
+      :343  '/remove_user_keys'       :345  '/delete_remote_user'
+
+**Quatre des cinq sont composees.** Le DSI avait raison. **Relayer l'un ou l'autre aurait produit une
+decision fausse dans les deux sens** — et la session 7 avait deja relaye la mesure du Lead sans la
+verifier, dans un message au Lead lui-meme.
+
+#### ⚠ L'ARGUMENT QUI RENVERSE L'INTUITION, ET IL SE MESURE
+
+    legacy/adm/server_users.php     3 occurrences des memes gestes destructeurs
+    portage : rw-panneau-decision   3
+    portage : confirm() / prompt()  0
+
+> **Le legacy pose les memes gestes — dont un `userdel` irreversible — en boutons minuscules au bout
+> de chaque ligne.** Garder le menu dessus laissait tout le monde sur la plus dangereuse des deux
+> interfaces.
+
+**Ne pas basculer n'etait pas l'option sure ; c'etait l'option qui ne se voit pas.**
+
+*J'avais moi-meme ecarte ce module en invoquant le danger — et je raisonnais sur le danger d'y
+TOUCHER, pas sur celui de laisser les gens ou ils sont. L'inaction avait un cout que je ne comptais
+pas.*
+
+#### La page DIT ce qu'elle n'a pas prouve
+
+    'gestes_jamais_exerces'  rendue AU-DESSUS des boutons, pas en pied
+
+Les trois gestes atteignent une machine reelle et **aucun n'a jamais ete exerce depuis cette
+interface**. La mention le dit sur la PAGE, pas seulement au registre : *c'est la personne qui va
+cliquer qui a besoin de l'information, et elle ne lit pas le CHANGELOG.*
+
+**Une non-mesure annoncee a l'avance est un fait ; annoncee apres coup, c'est une excuse.**
+
+#### Le chemin nominal reste non atteignable, et c'est DIT plutot que FAIT
+
+`can_manage_remote_users` n'est portee que par `superadmin` (role 3, hors service). `rw-test-super`
+atteint la page **par le role**, les deux autres sont refuses **par la permission**. Le chemin
+nominal — un role 2 avec la permission — demanderait de deplacer un droit sur le banc, **ce qui
+changerait l'etat pour toutes les autres suites sans que personne ne sache pourquoi dans trois
+jours**.
+
+Et le releve d'`active_sessions` de la session 7 explique pourquoi personne ne l'avait vu :
+**role 3 → 2 583 connexions, role 2 → 10.** *Une page dont seul le role 3 franchit la garde ne se
+distingue pas, dans un corpus qui n'exerce que le role 3, d'une page correctement gardee.*
+
+#### `iptables` et `wazuh` ne sont PAS dans le meme cas
+
+    iptables   controleur=0  vue=0  route nommee=0
+    wazuh      controleur=0  vue=0  route nommee=0
+
+La trouvaille du DSI etait un cas isole, pas un motif : il n'y a pas d'autre portage deja paye a
+recuperer.
+
+#### Mesures
+
+    menu au role 3   total=32  route=30  legacy=2  (entrees portant les DEUX : 0)
+    routes du menu   aucune entree ne vise une route inexistante
+    /comptes-distants -> 302 (la garde)
+    parite i18n      FR=79  EN=79  ecarts=0
 
 ### v1.38.162 — mon « 29/32 » comptait le MENU : deux entrées sont portées et injoignables
 

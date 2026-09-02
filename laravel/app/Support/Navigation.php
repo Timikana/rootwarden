@@ -74,7 +74,7 @@ class Navigation
         'parc' => [
             ['cle' => 'dashboard',      'garde' => 'tous',                    'route'  => 'accueil'],
             ['cle' => 'platform_key',   'garde' => 'can_manage_platform_key', 'route'  => 'cle-plateforme'],
-            ['cle' => 'remote_users',   'garde' => 'can_manage_remote_users', 'legacy' => '/adm/server_users.php'],
+            ['cle' => 'remote_users',   'garde' => 'can_manage_remote_users', 'route'  => 'comptes-distants'],
             ['cle' => 'ssh_keys',       'garde' => 'can_deploy_keys',         'route'  => 'cles-ssh'],
             ['cle' => 'sudo_policies',  'garde' => 'sa',                      'route'  => 'politiques'],
             ['cle' => 'sftp_policies',  'garde' => 'sa',                      'route'  => 'acces-sftp'],

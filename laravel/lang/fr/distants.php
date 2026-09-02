@@ -86,4 +86,19 @@ return [
     'panneau_sshd_texte' => "La directive `AllowUsers` de :machine sera modifiée et sshd rechargé. Une erreur à cette étape peut couper l'accès SSH à la machine.",
     'panneau_suppr_titre' => 'Supprimer le compte :nom ?',
     'panneau_suppr_texte' => '`userdel` sera exécuté sur :machine, ET SON RÉPERTOIRE PERSONNEL SERA SUPPRIMÉ AVEC LUI. Ce geste ne se défait pas : ni le compte, ni ses fichiers, ni ses clés ne peuvent être restaurés depuis RootWarden.',
+
+    /*
+     * ══ UNE NON-MESURE ANNONCEE A L'AVANCE ══════════════════════════════
+     *
+     * Les trois gestes ci-dessus atteignent une machine reelle : ils
+     * reecrivent des cles d'acces, modifient `sshd_config`, ou suppriment un
+     * compte systeme. **Aucun n'a jamais ete exerce depuis cette interface**
+     * — ni sur le banc, ni ailleurs.
+     *
+     * Le dire sur la PAGE, et pas seulement dans un registre : c'est la
+     * personne qui va cliquer qui a besoin de l'information, et elle ne lit
+     * pas le CHANGELOG. Une non-mesure annoncee a l'avance est un fait ;
+     * annoncee apres coup, c'est une excuse.
+     */
+    'gestes_jamais_exerces' => "Ces trois gestes n'ont encore jamais été exercés depuis cette interface. Ils sont câblés et confirmés par un panneau, mais leur bon fonctionnement n'a pas été observé sur une machine — l'ancien portail reste la seule voie éprouvée.",
 ];
