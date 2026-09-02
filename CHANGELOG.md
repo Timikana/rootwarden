@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.159** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.160** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2186,9 +2186,15 @@ mentions n'est pas mesurer les connexions.*
 Deux facteurs pour deux objets, notés **avant** qu'ils produisent un faux désaccord : **258×** par compte,
 **320×** par rôle.
 
-**Le recoupement a trouvé une session orpheline** (4 478 lignes, 4 477 rattachées) — une session dont
-l'utilisateur n'existe plus, donc **irrévocable par son propriétaire**. À traiter dans E-203 : *« ne rien
-afficher » la rendrait invisible plutôt qu'inoffensive.*
+**⚠ Ma « session orpheline » n'existe pas — corrigé dans la minute.** J'avais conclu d'un écart de 1
+entre deux commandes (4 478 / 4 477). Remesuré : total **4 477**, `user_id NULL` **0**, `LEFT JOIN` sans
+user **0**. Le 4 478 était l'état de la table à l'instant de ma **première** commande — une ligne écrite
+entre les deux, **la session 3 testant un intergiciel d'authentification en ce moment même**. *J'ai
+appliqué « un relevé est une photo d'un système qui bouge » à l'arbre et pas à la base, le jour même où
+je l'ai formulé.* **Et la faute d'écriture est pire que la faute de mesure** : ma requête de vérification
+était dans le même bloc que l'inscription — *j'ai rédigé la conclusion avant d'avoir lu le résultat qui
+devait la fonder.* Ce qui l'a rattrapée : la requête a rendu **vide**, et un vide n'est pas une
+confirmation. La question de conception demeure pour E-203, **posée et non mesurée**.
 
 **E-314 — une question déclarée non tranchée, close par un écart d'horloge.** `MAX(created_at)` semblait
 figé : `created_at` est en **UTC**, les horodatages de suite en **CEST**, deux heures d'écart. Le

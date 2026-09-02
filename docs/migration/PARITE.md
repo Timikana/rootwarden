@@ -15239,16 +15239,45 @@ les mentions n'est pas mesurer les connexions* : le même motif qu'E-277, sur un
 admis par la permission **seule**), `/groupes` (rôle 2 **refusé** faute de permission — le chemin
 discriminant), `/documentation` (rôle 2 = seuil interne).
 
-### Une session ORPHELINE, trouvée par le recoupement
+### ⚠ MA « SESSION ORPHELINE » N'EXISTE PAS — corrigé dans la minute, et la faute est instructive
+
+J'avais écrit, à partir d'un écart de 1 entre deux commandes :
 
     total de la table                   4 478
     somme des connexions par compte     4 477
-    jointure LEFT : user_id sans user       1
+    -> « une session dont l'utilisateur n'existe plus, donc irrevocable »
 
-**Le recoupement a servi.** Une ligne d'`active_sessions` référence un utilisateur qui n'existe plus —
-donc **une session que le portage ne pourra jamais révoquer par son propriétaire**, puisqu'il n'a plus de
-propriétaire. À prendre en compte dans E-203 : *la liste de révocation doit décider quoi faire d'une
-session sans compte, et « ne rien afficher » la rendrait invisible plutôt qu'inoffensive.*
+**Faux.** Remesuré immédiatement, les quatre chiffres ensemble :
+
+    total                    4 477
+    user_id NULL                 0
+    jointure INNER           4 477
+    LEFT JOIN sans user          0
+
+**Il n'y a aucune orpheline.** Le `4 478` était l'état de la table **à l'instant de ma première
+commande** : une ligne a été écrite entre les deux, parce que **la session 3 teste un intergiciel
+d'authentification en ce moment même** et que chaque connexion en insère une.
+
+> **J'ai appliqué « un relevé est une PHOTO d'un système qui bouge » à l'arbre, et pas à la base.** Le
+> même jour où je l'ai formulé, et deux fois : mes relevés d'arbre à 30 s d'écart rendaient 3 puis 4
+> fichiers, et je l'ai dit — puis j'ai traité deux comptes de base séparés par une seconde comme s'ils
+> décrivaient le même instant.
+
+**Et la faute d'écriture est pire que la faute de mesure** : ma requête de vérification était **dans le
+même bloc de commande** que l'inscription. *J'ai rédigé la conclusion avant d'avoir lu le résultat qui
+devait la fonder.* Ce n'est pas une inférence hâtive — c'est une inférence dont l'instrument était déjà
+armé et que je n'ai pas attendu.
+
+**Ce qui l'a rattrapée** : la requête a rendu **vide**, et un vide n'est pas une confirmation. *Sans le
+réflexe de traiter un vide comme une non-réponse, j'aurais lu « pas de contre-exemple » et laissé
+l'écart.*
+
+### Ce qui reste vrai pour E-203, sous une autre forme
+
+La question demeure, **posée et non mesurée** : *que fait la liste de révocation d'une session dont le
+compte a été supprimé ?* Aujourd'hui le cas **n'existe pas** — mais rien n'empêche qu'il se produise, et
+*« ne rien afficher » le rendrait invisible plutôt qu'inoffensif*. **À traiter comme une question de
+conception, pas comme un défaut constaté.**
 
 ## E-314 — une question déclarée NON TRANCHÉE, close par un écart d'horloge
 
