@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.155** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.156** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,33 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.156 — l'état des blocages : trois entrées, cinq onglets, et UNE SEULE chose portable
+
+**E-309.** Première mesure faite **pour décider si le travail restant existe encore**.
+
+**Les trois entrées sont toutes bloquées, par trois causes différentes.** Vérifié pour `remote_users` par
+témoin ouvert : les cinq gestes distants n'apparaissent côté portage **que dans `RoutesBackend.php`**, la
+table de la passerelle — **aucun n'est composé**. Et sa moitié restante tombe dans **la même catégorie
+que `wazuh`** : on peut l'écrire, on ne peut pas la mesurer — vérifier ces gestes demande de réécrire un
+`sshd_config`, de recharger `sshd`, de supprimer un compte système. *Ma consigne interdit d'écrire
+`wazuh` parce que ce serait « du travail invérifiable » ; la même phrase s'applique ici et je ne l'avais
+pas dite.*
+
+**Cinq onglets non finis, quatre retenus sur l'exploitant** (`accueil` §7, `bashrc` B4, `cve` S7b,
+`nav` — dont le compte disait **7** entrées `'legacy'` et elles sont **3**, corrigé).
+
+**⚠ E-203 est la seule chose portable qui reste, et c'est un blocage 2.0.** Les tables
+`active_sessions` (3 930 lignes, **toutes** écrites par le legacy), `remember_tokens` et
+`password_reset_tokens` existent ; **le portage ne tient pas `active_sessions`** — ni écriture ni lecture
+dans son authentification. Le legacy porte une liste de révocation que `verify.php` consulte à chaque
+page protégée. *Le jour où le legacy s'éteint, la capacité disparaît **silencieusement** : l'écran
+continuera d'offrir la révocation, et elle ne révoquera rien.* **Aucune signature nécessaire** — pas de
+migration, pas de geste distant, pas de redémarrage.
+
+**Décision** : la session 3 quitte les gestes distants et prend E-203. *Un manque qui se voit est un
+reste à faire ; un manque dont l'écran continue d'offrir la fonction est un piège* — et il ne se découvre
+qu'après l'extinction du legacy, quand le retour arrière est le plus coûteux.
 
 ### v1.38.155 — un arbitrage rendu au registre et jamais envoyé, et un nom à deux référents
 
