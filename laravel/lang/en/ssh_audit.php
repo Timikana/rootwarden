@@ -91,7 +91,40 @@ return [
 
     'np_config' => 'Viewing and editing `sshd_config` are not ported to this interface yet.',
     'np_config_detail' => 'Writing to `sshd_config` and reloading the service can cut SSH access to the server — and SSH is the only channel RootWarden has to get back in. A backup exists and restoring is possible.',
+    // A2: creating a scheduled reading is PORTED — see the note in
+    // `lang/fr/ssh_audit.php`. `np_planif_detail` does NOT move: it describes
+    // the consequence, and it is the decision panel's text.
+    //
+    // DECLARED REDUCTION: only FOUR periodicities are offered. A free cron
+    // expression cannot be typed here — a schedule triggers real SSH sessions
+    // with nobody watching, and a closed list cannot be bypassed by a forged
+    // request. The legacy portal stays open for another periodicity.
+    'planif_freq_bornee' => "Four periodicities are offered. A free cron expression cannot be typed here: a schedule triggers real SSH sessions with nobody watching, and a closed list cannot be bypassed by a forged request. For another periodicity, the legacy portal stays open.",
 
-    'np_planif_creer' => 'Creating a scheduled reading is not ported to this interface yet.',
+    'planif_form_titre' => 'Schedule a reading',
+    'planif_f_nom'      => 'Schedule name',
+    'planif_f_nom_aide' => 'This name identifies the schedule in the list. 100 characters at most.',
+    'planif_f_freq'     => 'Periodicity',
+    'planif_f_portee'   => 'What the reading covers',
+    'planif_f_valeur'   => 'Scope value',
+    'planif_freq_horaire'    => 'Every hour',
+    'planif_freq_six_heures' => 'Every six hours',
+    'planif_freq_quotidien'  => 'Every day at 02:00',
+    'planif_freq_hebdo'      => 'Every Monday at 03:00',
+    'planif_portee_all'         => 'The whole fleet',
+    'planif_portee_environment' => 'One environment',
+    'planif_portee_tag'         => 'One tag',
+    'planif_portee_machines'    => 'Named servers',
+    'planif_valider'    => 'Save the schedule',
+    'planif_annuler'    => 'Cancel',
+
+    // Without a value, a restricted scope covers the WHOLE fleet — E-280.
+    'planif_valeur_requise' => 'This scope needs a value. Without it, the schedule would cover the whole fleet — production included.',
+    'planif_aucun_tag'      => 'No tag is carried by any machine in the fleet: this scope has nothing to target.',
+    'planif_aucune_machine'  => 'No server is visible from this account: this scope has nothing to target.',
+    'planif_nom_requis'      => 'A name is required.',
+    'planif_creee'           => 'The schedule ":nom" is saved. Next run: :quand.',
+    'planif_echec'           => 'The schedule could not be saved. :message',
+    'planif_conf_titre'      => 'Save this schedule?',
     'np_planif_detail' => 'A schedule opens real SSH sessions, repeatedly, with nobody watching. It targets the whole fleet by default, production included — and a narrow target whose field was left blank comes to the same thing.',
 ];

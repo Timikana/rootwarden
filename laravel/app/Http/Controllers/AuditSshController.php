@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\Machines;
+use App\Services\PlanificationsCve;
+use App\Services\Serveurs;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -38,8 +40,41 @@ use Illuminate\View\View;
  */
 class AuditSshController extends Controller
 {
-    public function __construct(private readonly Machines $machines)
-    {
+    /*
+     * ══ A2 — LES QUATRE PERIODICITES, ET POURQUOI ELLES SONT FERMEES ═══════
+     *
+     * Le legacy offre un champ cron LIBRE. Ici la liste est fermee, et ce
+     * n'est pas de la prudence de principe : une planification declenche des
+     * sessions SSH REELLES, a repetition, sans personne devant l'ecran.
+     *
+     * La borne serveur existe et elle tient (`ssh_audit.py:752-765` : cron
+     * requis, intervalle minimum de DIX MINUTES, `target_type` en liste
+     * fermee, `target_value` exigee des que la portee n'est pas `all`). Ce
+     * n'est donc PAS le formulaire qui garde — c'est le serveur. Le formulaire
+     * porte l'ergonomie : eviter l'erreur plutot que la refuser apres coup.
+     *
+     * ⚠ CAPACITE REDUITE ET DECLAREE : une expression cron arbitraire n'est
+     * pas saisissable ici. `planif_freq_bornee` le dit a l'ecran et renvoie a
+     * l'ancien portail. *Une capacite qui disparait doit etre DECLAREE, jamais
+     * perdue.*
+     *
+     * Les quatre valeurs sont toutes au-dessus du plancher de dix minutes —
+     * la plus frequente est horaire.
+     */
+    public const FREQUENCES = [
+        'planif_freq_horaire'    => '0 * * * *',
+        'planif_freq_six_heures' => '0 */6 * * *',
+        'planif_freq_quotidien'  => '0 2 * * *',
+        'planif_freq_hebdo'      => '0 3 * * 1',
+    ];
+
+    /** Les portees que le backend accepte — sa liste, pas une copie choisie. */
+    public const PORTEES = ['all', 'environment', 'tag', 'machines'];
+
+    public function __construct(
+        private readonly Machines $machines,
+        private readonly PlanificationsCve $planifications,
+    ) {
     }
 
     public function __invoke(Request $requete): View
@@ -66,6 +101,42 @@ class AuditSshController extends Controller
             // au role 1 produirait deux 403 a l'ecran plutot qu'une absence
             // expliquee.
             'administration' => $role >= 2,
+            /*
+             * A2 : les trois listes fermees du formulaire. Elles ne sont
+             * rendues QU'A l'administration — le role 1 n'a pas de formulaire,
+             * et lui envoyer la liste des tags du parc serait une fuite de
+             * perimetre pour un ecran qu'il ne voit pas.
+             *
+             * `tagsDisponibles()` est repris de `PlanificationsCve` plutot que
+             * reecrit : les tags REELLEMENT portes par une machine non
+             * archivee, une seule definition pour les deux modules.
+             */
+            'frequences' => $role >= 2 ? self::FREQUENCES : [],
+            /*
+             * Les trois listes de valeurs de portee, PRETES A L'EMPLOI.
+             *
+             * Construites ici et non dans la vue : `@json` ne franchit pas une
+             * fonction flechee contenant un tableau, et le premier jet a
+             * compile un `json_encode` TRONQUE — gabarit entier en erreur de
+             * syntaxe, pour une expression pourtant sur une seule ligne. La
+             * regle du projet disait « garder `@json` sur une ligne » ; elle
+             * est NECESSAIRE ET PAS SUFFISANTE.
+             *
+             * Et c'est la bonne place de toute facon : une vue rend, elle ne
+             * faconne pas la donnee.
+             *
+             * Les machines sont celles du PERIMETRE deja borne, pas une
+             * seconde requete : deux lectures du parc divergent toujours a la
+             * fin, et c'est celle qui borne le moins qu'on oublie.
+             */
+            'planifListes' => $role >= 2 ? [
+                'environment' => Serveurs::ENVIRONNEMENTS,
+                'tag' => $this->planifications->tagsDisponibles(),
+                'machines' => array_map(
+                    static fn ($m) => ['id' => (int) $m->id, 'nom' => (string) $m->name],
+                    $perimetre['serveurs'],
+                ),
+            ] : ['environment' => [], 'tag' => [], 'machines' => []],
             'libelles' => __('ssh_audit'),
             'lienLegacy' => rtrim((string) config('app.url_legacy'), '/') . '/ssh-audit/',
         ]);

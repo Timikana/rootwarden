@@ -1,5 +1,16 @@
 /**
- * audit-ssh.js — audit de configuration SSH, sous-lot A1 : LECTURE SEULE.
+ * audit-ssh.js — audit de configuration SSH.
+ *
+ * ⚠ CE FICHIER A ETE « LECTURE SEULE » JUSQU'A A2, ET IL NE L'EST PLUS.
+ *
+ * A1 declarait « aucune requete autre que GET ». C'etait vrai, et A2 l'a rendu
+ * FAUX en portant la creation d'un releve planifie. La phrase est corrigee
+ * DANS LE MEME COMMIT que le geste : un en-tete qui affirme une propriete que
+ * le fichier n'a plus est pire qu'un en-tete absent, parce qu'on le croit.
+ *
+ * L'ECRITURE, ET SON PERIMETRE EXACT : `POST /ssh-audit/schedules`, et rien
+ * d'autre. Ni `DELETE /schedules/<id>`, ni `POST /schedules/<id>/toggle`, ni
+ * aucune des routes qui joignent une machine.
  *
  * ══ CE QUE CE SCRIPT N'EMET JAMAIS ═══════════════════════════════════════
  *
@@ -52,6 +63,28 @@
             .catch(function () { return { ok: false, corps: null }; });
     }
 
+    /*
+     * ══ A2 : CE FICHIER ECRIT DESORMAIS, ET LE HEADER LE DIT ═════════════
+     *
+     * UNE SEULE route en ecriture : `POST /ssh-audit/schedules`. Le helper ne
+     * prend pas de methode en parametre — il ne sait faire qu'un POST, sur le
+     * chemin qu'on lui donne. Un helper generique `envoie(methode, chemin)`
+     * ouvrirait DELETE et les deux `toggle` sans qu'aucun code les demande.
+     */
+    function ecris(chemin, corps) {
+        return fetch(PASSERELLE + chemin, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(corps),
+        }).then(function (r) {
+            return r.json().then(
+                function (j) { return { ok: r.ok, corps: j }; },
+                function () { return { ok: false, corps: null }; }
+            );
+        }).catch(function () { return { ok: false, corps: null }; });
+    }
+
     function vide(hote, texte, erreur) {
         hote.textContent = '';
         var d = document.createElement('div');
@@ -69,10 +102,23 @@
     var pTexte = document.querySelector('[data-rw="audit-ssh-panneau-texte"]');
     var pEffets = document.querySelector('[data-rw="audit-ssh-panneau-effets"]');
     var pFermer = document.querySelector('[data-rw="audit-ssh-panneau-fermer"]');
+    var pLegacy = document.querySelector('[data-rw="audit-ssh-panneau-legacy"]');
 
-    function ouvrePanneau(texte, effets) {
+    /*
+     * ⚠ LE TITRE ETAIT FIGE SUR « Pas encore porte », et A2 l'a rendu FAUX.
+     *
+     * Vu a l'image, pas a l'assertion : le panneau de confirmation d'un geste
+     * PORTE s'ouvrait en annoncant « Pas encore porte ». Toutes mes mesures DOM
+     * etaient vertes — le panneau s'ouvrait, ses trois effets etaient rendus,
+     * le bouton de confirmation apparaissait — et le titre disait le contraire
+     * du reste.
+     *
+     * Le troisieme parametre est OPTIONNEL : les quatre panneaux de capacite
+     * non portee gardent `np_titre` sans changer d'appel.
+     */
+    function ouvrePanneau(texte, effets, titre) {
         if (! panneau) { return; }
-        pTitre.textContent = t('np_titre');
+        pTitre.textContent = titre || t('np_titre');
         pTexte.textContent = texte;
 
         pEffets.textContent = '';
@@ -88,13 +134,26 @@
         panneau.scrollIntoView({ block: 'nearest' });
     }
 
-    if (pFermer) {
-        pFermer.addEventListener('click', function () {
-            panneau.hidden = true;
-            pEffets.hidden = true;
-            pEffets.textContent = '';
-        });
+    /*
+     * La fermeture est NOMMEE parce que A2 l'appelle apres son ecriture, et
+     * parce qu'elle DESARME le rappel de confirmation : un bouton partage qui
+     * garde le geste du panneau precedent agit sur autre chose que ce qu'on a
+     * lu — et il suffirait de le demasquer pour le declencher.
+     */
+    function fermePanneau() {
+        if (! panneau) { return; }
+        panneau.hidden = true;
+        pEffets.hidden = true;
+        pEffets.textContent = '';
+        var c = document.querySelector('[data-rw="audit-ssh-panneau-confirmer"]');
+        if (c) { c.hidden = true; c.disabled = false; }
+        // ...et le lien legacy REVIENT : les quatre gestes non portes en ont
+        // besoin, et c'est leur action principale.
+        if (pLegacy) { pLegacy.hidden = false; }
+        gesteConfirme = null;
     }
+
+    if (pFermer) { pFermer.addEventListener('click', fermePanneau); }
 
     var selecteur = document.querySelector('[data-rw="audit-ssh-serveur"]');
 
@@ -120,7 +179,6 @@
     // Celui-la ne nomme AUCUNE cible, et c'est le fait a dire : la route ne
     // prend aucun parametre. Il n'y a rien a viser, donc rien a restreindre.
     brancher('audit-ssh-parc', t('np_parc'), t('np_parc_detail'), false);
-    brancher('audit-ssh-planif-creer', t('np_planif_creer'), t('np_planif_detail'), false);
 
     /*
      * ══ A LIRE PAR QUI PORTERA LA CREATION DE PLANIFICATION ══════════════
@@ -145,11 +203,208 @@
      * Ce n'est pas au correctif backend de le dire : un refus qui n'a pas
      * d'ecran se lit comme une panne.
      */
-    // Le panneau de planification porte en plus l'ambiguite d'E-280.
+    /*
+     * ══ A2 — LA CREATION D'UN RELEVE PLANIFIE ════════════════════════════
+     *
+     * LA CONTRAINTE LAISSEE PAR A1 EST HONOREE, et elle disait ceci : « un
+     * champ de portee vide se refuse A L'ECRAN, avec la raison, avant que la
+     * requete parte. Et pas par un `required` muet — le premier garde vit dans
+     * le NAVIGATEUR, le second dans le serveur, et les deux doivent dire la
+     * MEME chose. »
+     *
+     * Donc AUCUN `required` sur le selecteur de valeur : le refus est un
+     * TEXTE, `planif_valeur_requise`, qui nomme la consequence — sans valeur,
+     * la portee viserait tout le parc, production comprise. Un `required`
+     * seul bloquerait la soumission sans rien dire, ce qui est le meme silence
+     * deplace d'un cran.
+     *
+     * Le rempart, lui, est cote serveur : `400` sur une portee hors liste,
+     * `400` sur une portee non-`all` sans valeur. Ce formulaire evite
+     * l'erreur ; il ne la refuse pas A LA PLACE du backend.
+     */
+    var planifBloc = document.querySelector('[data-rw="audit-ssh-planif-bloc"]');
+    var planifNom = document.querySelector('[data-rw="audit-ssh-planif-nom"]');
+    var planifFreq = document.querySelector('[data-rw="audit-ssh-planif-freq"]');
+    var planifPortee = document.querySelector('[data-rw="audit-ssh-planif-portee"]');
+    var planifValeur = document.querySelector('[data-rw="audit-ssh-planif-valeur"]');
+    var planifValeurBloc = document.querySelector('[data-rw="audit-ssh-planif-valeur-bloc"]');
+    var planifValeurAide = document.querySelector('[data-rw="audit-ssh-planif-valeur-aide"]');
+    var planifMessage = document.querySelector('[data-rw="audit-ssh-planif-message"]');
+    var planifValider = document.querySelector('[data-rw="audit-ssh-planif-valider"]');
+    var planifAnnuler = document.querySelector('[data-rw="audit-ssh-planif-annuler"]');
+    var pConfirmer = document.querySelector('[data-rw="audit-ssh-panneau-confirmer"]');
+
+    var LISTES = { environment: [], tag: [], machines: [] };
+    try {
+        var blocListes = document.getElementById('audit-ssh-planif-listes');
+        if (blocListes) { LISTES = JSON.parse(blocListes.textContent || '{}'); }
+    } catch (e) { LISTES = { environment: [], tag: [], machines: [] }; }
+
+    /** Ce que « Confirmer » executera. Remis a null par la fermeture. */
+    var gesteConfirme = null;
+    if (pConfirmer) {
+        pConfirmer.addEventListener('click', function () {
+            if (typeof gesteConfirme === 'function') { gesteConfirme(); }
+        });
+    }
+
+    /*
+     * Le retour du geste. Meme idiome que `comptes.js` : la CLASSE porte le
+     * verdict, pas seulement le texte — un succes rendu dans un style d'erreur
+     * se lit comme un echec.
+     */
+    function annoncePlanif(texte, echec) {
+        if (! planifMessage) { return; }
+        planifMessage.className = echec ? 'rw-erreur' : 'rw-annonce rw-annonce--ok';
+        planifMessage.textContent = texte;
+        planifMessage.hidden = false;
+    }
+
+    function dis(hote, texte) {
+        if (! hote) { return; }
+        hote.textContent = texte || '';
+        hote.hidden = ! texte;
+    }
+
+    /*
+     * La valeur de portee : une liste FERMEE par type, remplie depuis les
+     * donnees du serveur. `all` n'a pas de valeur — et c'est le seul cas ou
+     * son absence est legitime.
+     *
+     * Une liste VIDE se dit : « aucun tag n'est porte par une machine du
+     * parc » vaut mieux qu'un selecteur vide, qui se lit comme une panne.
+     */
+    function majValeur() {
+        var type = planifPortee ? planifPortee.value : 'all';
+        if (! planifValeur || ! planifValeurBloc) { return; }
+        planifValeur.innerHTML = '';
+        dis(planifValeurAide, '');
+
+        if (type === 'all') {
+            planifValeurBloc.hidden = true;
+            return;
+        }
+        planifValeurBloc.hidden = false;
+        var valeurs = LISTES[type] || [];
+        if (! valeurs.length) {
+            dis(planifValeurAide, type === 'tag' ? t('planif_aucun_tag') : t('planif_aucune_machine'));
+            return;
+        }
+        valeurs.forEach(function (v) {
+            var o = document.createElement('option');
+            if (type === 'machines') {
+                o.value = String(v.id);
+                o.textContent = String(v.nom);
+            } else {
+                o.value = String(v);
+                o.textContent = String(v);
+            }
+            planifValeur.appendChild(o);
+        });
+    }
+
+    if (planifPortee) { planifPortee.addEventListener('change', majValeur); }
+
     var bPlanif = document.querySelector('[data-rw="audit-ssh-planif-creer"]');
-    if (bPlanif) {
+    if (bPlanif && planifBloc) {
         bPlanif.addEventListener('click', function () {
-            ouvrePanneau(t('np_planif_creer'), [t('np_planif_detail'), t('planif_cible_ambigue')]);
+            planifBloc.hidden = ! planifBloc.hidden;
+            if (! planifBloc.hidden) {
+                dis(planifMessage, '');
+                majValeur();
+                planifBloc.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+    if (planifAnnuler && planifBloc) {
+        planifAnnuler.addEventListener('click', function () {
+            planifBloc.hidden = true;
+            dis(planifMessage, '');
+        });
+    }
+
+    /** Ce que la planification VISERA, en clair, pour le panneau. */
+    function porteeAnnoncee(type, valeur) {
+        if (type === 'all') { return t('planif_cible_parc'); }
+        if (type === 'tag') { return t('planif_cible_tag', { valeur: valeur }); }
+        if (type === 'environment') { return t('planif_cible_env', { valeur: valeur }); }
+        return t('planif_cible_machines', { n: 1 });
+    }
+
+    if (planifValider) {
+        planifValider.addEventListener('click', function () {
+            var nom = (planifNom && planifNom.value || '').trim();
+            var type = planifPortee ? planifPortee.value : 'all';
+            var valeur = (type !== 'all' && planifValeur) ? planifValeur.value : '';
+
+            // LES DEUX REFUS SONT DES TEXTES, jamais un blocage muet.
+            if (! nom) {
+                dis(planifMessage, t('planif_nom_requis'));
+                if (planifNom) { planifNom.focus(); }
+                return;
+            }
+            if (type !== 'all' && ! valeur) {
+                dis(planifMessage, t('planif_valeur_requise'));
+                return;
+            }
+            dis(planifMessage, '');
+
+            /*
+             * LE PANNEAU AVANT L'ECRITURE. Ce qu'on arme ouvre des sessions
+             * SSH reelles, a repetition, sans personne devant l'ecran :
+             * `np_planif_detail` le dit, et `planif_cible_ambigue` dit que
+             * « tout le parc » est a la fois un choix legitime et ce que
+             * produit une cible incomplete.
+             */
+            ouvrePanneau(t('np_planif_detail'), [
+                porteeAnnoncee(type, valeur),
+                type === 'all' ? t('planif_cible_ambigue') : '',
+            ], t('planif_conf_titre'));
+            /*
+             * LE LIEN VERS L'ANCIEN PORTAIL N'A AUCUN OBJET ICI : ce geste est
+             * porte. L'offrir a cote d'un « Enregistrer » qui fonctionne
+             * inviterait a aller le faire ailleurs — et a l'image il etait
+             * rendu comme l'action PRINCIPALE, a droite du bouton qui marche.
+             */
+            if (pLegacy) { pLegacy.hidden = true; }
+            if (pConfirmer) {
+                pConfirmer.hidden = false;
+                pConfirmer.disabled = false;
+            }
+            gesteConfirme = function () { enregistrePlanif(nom, type, valeur); };
+        });
+    }
+
+    /*
+     * L'ECRITURE. `cron_expression` part telle que le selecteur la porte —
+     * une des QUATRE valeurs de `AuditSshController::FREQUENCES`. Le backend
+     * la revalide (croniter + plancher de dix minutes) : c'est lui qui garde.
+     */
+    function enregistrePlanif(nom, type, valeur) {
+        if (pConfirmer) { pConfirmer.disabled = true; }
+        var corps = {
+            name: nom,
+            cron_expression: planifFreq ? planifFreq.value : '',
+            target_type: type,
+        };
+        if (type !== 'all') { corps.target_value = valeur; }
+
+        ecris('/ssh-audit/schedules', corps).then(function (r) {
+            var ok = r.ok && r.corps && r.corps.success === true;
+            fermePanneau();
+            if (! ok) {
+                annoncePlanif(t('planif_echec', {
+                    message: (r.corps && r.corps.message) || '',
+                }), true);
+                return;
+            }
+            if (planifBloc) { planifBloc.hidden = true; }
+            dis(planifMessage, '');
+            annoncePlanif(t('planif_creee', {
+                nom: nom,
+                quand: String(r.corps.next_run || '').slice(0, 16),
+            }));
+            chargePlanifs();
         });
     }
 
@@ -330,9 +585,16 @@
         return t('planif_cible_inconnue');
     }
 
-    if (hotePlanifs) {
+    /*
+     * Nommee pour A2 : apres une creation, la liste est RELUE plutot que
+     * completee a la main. Le backend a resolu `next_run` lui-meme, et une
+     * ligne ajoutee au DOM porterait la valeur qu'on croit plutot que celle
+     * qu'il a inscrite.
+     */
+    function chargePlanifs() {
+        if (! hotePlanifs) { return; }
         hotePlanifs.textContent = t('chargement');
-        lis('/ssh-audit/schedules').then(function (r) {
+        return lis('/ssh-audit/schedules').then(function (r) {
             if (! r.ok || ! r.corps || ! r.corps.success) { vide(hotePlanifs, t('planifs_err'), true); return; }
             var planifs = r.corps.schedules || [];
             if (! planifs.length) { vide(hotePlanifs, t('planifs_vide')); return; }
@@ -363,4 +625,6 @@
             hotePlanifs.appendChild(liste);
         });
     }
+
+    chargePlanifs();
 })();

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.186** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.187** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,128 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.187 — E-357 : `ssh_audit` A2, creer un releve planifie — et deux defauts vus a l'IMAGE
+
+**Le geste est porte. Il n'est PAS exerce** : une planification arme des sessions SSH reelles,
+repetees, sans personne devant l'ecran. Mesure du formulaire, de ses refus et du panneau ; **zero
+requete non-GET n'est partie.**
+
+#### Le rempart est cote SERVEUR, le formulaire porte l'ergonomie
+
+    ssh_audit.py:752-800   cron requis · intervalle minimum 10 min (croniter)
+                           target_type en liste fermee · target_value exigee des que != all
+                           -> 400 dans chaque cas
+
+Verifie ligne par ligne plutot que cite de memoire. Le formulaire evite l'erreur ; il ne la refuse
+pas A LA PLACE du backend.
+
+#### LA CONTRAINTE LAISSEE PAR A1 EST HONOREE, mot pour mot
+
+Une note m'attendait dans `audit-ssh.js` : *« un champ de portee vide se refuse A L'ECRAN, avec la
+raison, avant que la requete parte. Et pas par un `required` muet — le premier garde vit dans le
+NAVIGATEUR, le second dans le serveur, et les deux doivent dire la MEME chose. »*
+
+**Aucun `required` sur le selecteur de valeur.** Le refus est un TEXTE qui nomme la consequence :
+
+    « Cette portee demande une valeur. Sans elle, la planification viserait
+      tout le parc — y compris la production. »
+
+#### Quatre listes fermees, et UNE capacite reduite DECLAREE
+
+    periodicite   4 valeurs, toutes au-dessus du plancher de 10 min
+    portee        les 4 de l'ENUM backend, sa liste et pas une copie choisie
+    valeur        3 listes fermees, une par type, remplies par le serveur
+    nom           la seule saisie libre, bornee a 100
+
+**Une expression cron arbitraire n'est PAS saisissable ici**, et `planif_freq_bornee` le dit a
+l'ecran avant le choix. *Une entree libre validee se contourne par une requete forgee, une entree
+libre absente non — et une cron est ce qui declenche des sessions SSH sans personne devant l'ecran.*
+Qui a besoin d'une autre periodicite passe par l'ancien portail.
+
+#### ⚠⚠ DEUX DEFAUTS VUS A L'IMAGE, ET J'AVAIS DEJA CORRIGE LES DEUX AILLEURS
+
+Toutes mes mesures DOM etaient vertes — le panneau s'ouvrait, ses effets etaient rendus, le bouton
+de confirmation apparaissait, zero identifiant a l'ecran.
+
+**1. Le panneau annoncait « Pas encore porte » pour un geste PORTE.**
+`ouvrePanneau()` ne prenait que deux parametres et posait `pTitre.textContent = t('np_titre')` **en
+dur**. Un titre optionnel a ete ajoute ; les quatre panneaux de capacite non portee gardent leur
+defaut sans changer d'appel.
+
+**2. Le lien « Ouvrir dans l'ancien portail ↗ » etait rendu comme l'action PRINCIPALE**, a droite de
+mon « Enregistrer la planification » qui, lui, fonctionne. Il n'a aucun objet sur un geste porte —
+et l'offrir la invite a aller le faire ailleurs.
+
+*Les deux sont exactement ce que j'avais corrige sur `groupes` en R2 puis R3 quelques heures plus
+tot. Je les ai reproduits. Une lecon appliquee sur un module ne voyage pas toute seule vers le
+suivant — et c'est REGARDER qui les a trouves, pas une assertion.*
+
+#### `@json` SUR UNE LIGNE NE SUFFIT PAS — la regle du projet est incomplete
+
+    ecrit    @json(['machines' => collect($serveurs)->map(fn ($m) => [...])->all()])
+    compile  json_encode([... collect($serveurs)->            <-- TRONQUE
+
+Gabarit ENTIER en erreur de syntaxe (« Unclosed '[' does not match ')' »), pour une expression
+**pourtant sur une seule ligne**. L'analyseur d'argument de `@json` ne franchit pas une fonction
+flechee contenant un tableau. Les listes se construisent desormais dans le controleur — ou cette
+donnee appartient de toute facon : *une vue rend, elle ne faconne pas la donnee.*
+
+#### `node --check` NE VOIT PAS UN IDENTIFIANT INEXISTANT
+
+Mon premier jet appelait quatre fonctions qui n'existaient pas — `ecris`, `fermePanneau`,
+`chargePlanifs`, `annoncePlanif` — et `node --check` **passait**. C'est le piege du `ReferenceError`
+deja paye cette nuit sur `jailOuverte`. Les quatre sont ecrites : la fermeture est nommee, la liste
+est relue par une fonction, et `ecris()` **ne sait faire qu'un POST** — un helper
+`envoie(methode, chemin)` ouvrirait `DELETE` et les deux `toggle` sans qu'aucun code les demande.
+
+#### ET LE HEADER DU FICHIER DECLARAIT « LECTURE SEULE »
+
+    « audit-ssh.js — sous-lot A1 : LECTURE SEULE. Aucune requete autre que GET. »
+
+C'etait vrai, et A2 l'a rendu FAUX. **Corrige dans le meme commit que le geste**, avec le perimetre
+exact de l'ecriture : `POST /ssh-audit/schedules`, et rien d'autre — ni `DELETE /schedules/<id>`, ni
+les deux `toggle`, ni aucune route qui joint une machine. *Un en-tete qui affirme une propriete que
+le fichier n'a plus est pire qu'un en-tete absent, parce qu'on le croit.*
+
+#### Mesures — quatre chemins, et ce qui N'EST PAS parti
+
+    GET /audit-ssh                    200   (rw-test-super)
+    marqueur ↗ du bouton              retire avec la raison de l'afficher
+    bloc masque au depart             true
+    periodicites offertes             4
+    portees offertes                  all · environment · tag · machines
+    identifiants a l'ecran            []
+
+    A. nom vide            « Un nom est necessaire. »            aucun panneau
+    B. portee tag sans
+       valeur disponible   le refus NOMME la consequence, + « aucun tag n'est
+                           porte par une machine du parc »       aucun panneau
+    C. « tout le parc »    panneau ouvert, titre « Enregistrer cette
+                           planification ? », lien legacy MASQUE, confirmation
+                           offerte, et l'ambiguite d'E-280 rendue
+
+    requetes non-GET vers /schedules  []    <- RIEN N'EST ARME
+    erreurs JavaScript                []    <- la refactorisation tient
+    parite i18n                       FR=91 EN=91, JEUX DE CLES compares
+
+#### ⛔ CE QUI N'A PAS ETE EXERCE, ET POURQUOI
+
+**La creation elle-meme.** Le bouton de confirmation est mesure visible et actif ; il n'a pas ete
+clique. Une planification creee arme un scan SSH **recurrent** sur le parc, `srv-zabbix` comprise.
+
+**La borne au role 1.** Le formulaire et ses listes sont dans le bloc `@if ($administration)`
+(lignes 137 et 187, entre 105 et 201), et le controleur rend des listes VIDES sous le role 2. Verifie
+par LECTURE : le compte `rw-test-user` est dans les interdits permanents, et l'exercer toucherait
+`login_attempts` et la fenetre TOTP partagee.
+
+#### Deux restes de mon propre premier jet, retires
+
+`environnements` et `tags` etaient passes a la vue et plus lus par personne apres que `planifListes`
+les a remplaces — **et `tagsDisponibles()` etait appele DEUX fois**, donc deux requetes identiques.
+
+*Et le controle qui l'a verifie s'est trompe d'abord : il comptait les occurrences de la CHAINE, dont
+une dans mon propre commentaire. Un appel reel, une mention — la sonde disait deux appels.*
 
 ### v1.38.186 — E-353 : F7 confirmait un geste avec un titre VIDE et un texte VIDE
 
