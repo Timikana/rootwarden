@@ -16377,3 +16377,101 @@ que le rendu n'est couvert par aucune suite ; voici deux défauts que seul le re
 
 *Et ce n'était pas son module* : le portage était achevé depuis le 23/08 et aucune session n'y
 travaillait. **Le correctif est du texte, et il retire un renvoi vers le portail qu'on veut éteindre.**
+
+## E-338 — ⚠ UNE PAGE PORTÉE RENVOIE VERS UN PORTAIL ARCHIVÉ : troisième capacité perdue à l'archivage
+
+Relevé par la session 2, **vérifié avec témoin** :
+
+    legacy/_deprecated/supervision   <- ARCHIVE
+    legacy/wazuh                     <- TEMOIN : un dossier legacy vivant, la sonde discrimine
+
+    superv.php:63  'secret_jeton_non_porte' =>
+      « La modification de ce jeton n'est pas encore portee : elle reste sur l'ancien portail. »
+
+> **Il n'y a plus d'ancien portail pour la supervision.** La page portée dit à l'exploitant d'aller
+> modifier le jeton là où il n'y a rien. *Ce n'est pas une capacité « pas encore portée » : c'est une
+> capacité PERDUE à l'archivage.*
+
+**Troisième occurrence du motif**, après `profile/export.php` (l'export RGPD, DOSSIER-11) et le tableau
+de déploiement : **un archivage emporte une capacité que le portage n'avait pas reprise, et rien ne le
+signale.**
+
+### Et ce cas est le plus retors des trois
+
+    export RGPD          la capacite DISPARAITRAIT a l'archivage      -> prevu, DOSSIER-11
+    revocation (E-203)   la capacite MANQUAIT sans que l'ecran le dise -> corrige
+    ICI                  l'ecran DIT ou aller, et il n'y a rien la-bas
+
+**J'avais inscrit `secret_jeton_non_porte` comme « vraie et bien raisonnée » il y a une heure** — sur la
+foi de son raisonnement : *« le jeton s'écrit par une route à part, et l'inventer ici serait
+concevoir »*. **Ce raisonnement est juste et la déclaration est fausse** : elle est vraie sur *pourquoi
+ce n'est pas porté*, fausse sur *où le faire*.
+
+> **Une déclaration peut être juste sur sa cause et fausse sur son renvoi.** Je l'ai laissée passer
+> parce que j'ai éprouvé la partie argumentée et pas la partie factuelle — *la moitié qui raisonne
+> attire l'œil, la moitié qui pointe ne se vérifie qu'en suivant le lien.*
+
+### La seconde capacité a été corrigée pendant la mesure
+
+    superv.php:107 aujourd'hui : « Rattacher un serveur a un profil se fait depuis le tableau de
+                                   deploiement, dans l'onglet « Deploiement ». »
+
+**Plus « pas encore porté ».** La session 3 l'a corrigée (`eb54230`) pendant que la session 2 mesurait —
+donc **sur les deux capacités annoncées, il n'en reste qu'une.** *Un relevé de quinze minutes sur un
+artefact que trois sessions écrivent est périmé à sa remise, et c'est structurel, pas négligent.*
+
+## E-339 — CINQ NATURES DANS LE MÊME SAC : pourquoi aucun total n'était juste
+
+La session 2 rend **la cause de la divergence sans produire de total** — et c'est la bonne réponse.
+
+    41   session 8, motif inconnu de moi
+    21   mon premier motif
+    24   mon second motif, aujourd'hui
+    26   son motif
+    94   toutes formes, « ancien portail » compris
+
+**Le `grep` ramasse quatre natures que rien ne distingue :**
+
+    des CAPACITES            `np_relever`, `np_cve` …
+    du DECOR de panneau      `np_titre` « Pas encore porte », `np_ouvrir`, `reste_lien`
+    des TEXTES D'AIDE        qui mentionnent l'ancien portail sans declarer un manque
+    de l'i18n MORTE          5 cles de `superv` rendues NULLE PART, residu des sous-lots
+
+> **Aucun total ne peut être juste tant que ces quatre natures sont dans le même sac.** *Et c'est pour
+> ça qu'elle ne m'en donne pas* — après quatre comptes divergents, **la bonne livraison était la cause,
+> pas un cinquième chiffre.**
+
+**Et les cinq clés mortes gonflaient le compte de cinq** — même classe que les 104 clés `tip.*`
+orphelines. *Un résidu d'i18n compté comme un manque transforme un travail fini en dette.*
+
+### Deux corrections à mon dispatch
+
+**1. `superv` n'est pas un des treize dossiers** — c'est un **catalogue**, et `legacy/supervision/` est
+archivé. **Je l'ai nommé parmi « les trois plus lourds des treize »**, en relayant le cadrage de la
+session 8 sans le mesurer. *Un module archivé ne peut pas porter de capacité legacy restante.*
+
+**2. « Porter `groups` » assigne un travail déjà fait.** Les cinq modules ont tous leur contrôleur ; **les
+manques sont DANS les pages** — des gestes absents d'une page qui existe. **Ce qui s'assigne est une
+liste de gestes**, et elle est écrite : `ssh_audit` 4 · `groups` 4 · `serveurs` 3 · `fail2ban` 4.
+
+### Et deux décisions assumées ont été SORTIES du compte
+
+    `politique_lecture_seule` (ssh_audit)  dit elle-meme « ce n'est pas un oubli »
+    `np_nouveau_detail` (groups)           est une MISE EN GARDE, pas une capacite
+
+> **Compter une décision assumée parmi les manques gonfle le reste** — et rend le total indéfendable
+> même s'il était exact. *Une dette qui inclut des choix n'est plus une dette.*
+
+**Et `fail2ban` est la seule des cinq déclarations à borner DES DEUX CÔTÉS** — elle énumère aussi ce qui
+**est** porté. *Une déclaration qui borne des deux côtés est plus utile qu'une qui n'énumère que le
+manque* — c'est la forme à généraliser.
+
+### ⚠ Ce qu'elle n'a PAS fait, déclaré à l'avance
+
+**Elle n'a pas croisé geste par geste avec ce que le JS APPELLE.** Contrôleurs vérifiés, appels
+passerelle comptés par module — **mais pas qu'une capacité déclarée absente ne soit pas déjà câblée.**
+
+**C'est exactement le défaut qui a fait déclarer `pare-feu` incapable d'une validation qu'il câble** —
+et **c'est aussi ma propre faute d'il y a une heure** (`uninstall` mesuré au nom du legacy). *Le laisser
+ouvert plutôt que le supposer fait est la bonne conduite* : c'est le premier travail à reprendre, sur
+les 19 capacités du document.
