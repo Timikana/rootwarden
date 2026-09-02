@@ -295,11 +295,45 @@ règles qui ferme le port SSH.
 Le docstring documente aussi un défaut **corrigé** : les deux branches jetaient le code de sortie et
 rendaient `success: True`, et le `; echo OK` du second mode **forçait** le code à zéro.
 
-**La lacune** : mesuré, **aucune sauvegarde n'entoure la réécriture d'`authorized_keys`** — pas de
-`cp`, pas de `.bak`, pas de fichier temporaire dans les commandes de retrait. Donc **si le geste
-échoue à mi-chemin, l'état du fichier est indéterminé et rien ne le restaure.** C'est l'écart exact
-avec `sshd_allow_user`, à trente lignes de distance dans le même fichier : *le cas visible traité, le
-cas voisin pris à l'envers.*
+**La lacune — et ma première formulation était FAUSSE.**
+
+> ~~« aucune sauvegarde n'entoure la réécriture d'`authorized_keys` — ni `cp`, ni `.bak`, ni fichier
+> temporaire »~~ — **faux sur les trois**, et réfutable en dix secondes :
+>
+> ```
+> _script_retrait_par_empreintes  tmp=$(mktemp) ; cp "$ak" "${tmp}.bak"
+> _script_vidage_complet          cp -a "$ak" "$ak.bak.rw"
+> ```
+>
+> **La cause de mon erreur** : j'ai cherché `cp|bak|tmp` dans une fenêtre de lignes qui contenait le
+> **corps de la route** et non les deux **helpers** qui composent les scripts. Mon `grep` n'a rien
+> trouvé, et j'en ai conclu une absence. *Mesurer une absence par un motif qui ne trouve rien ne
+> mesure que la fenêtre.* Il fallait chercher le **mécanisme** — `mktemp`, `cp`, `>` — et le chercher
+> **là où le script est construit**, pas là où il est envoyé.
+
+**Ce qui est vrai, et qui est plus fin :**
+
+> **La sauvegarde est PRISE ; rien ne la RAPPELLE.** Il n'existe **aucun** équivalent de
+> `_restaure_sshd` pour `authorized_keys` — mesuré : `grep -cE "def _restaure_ak|restaure.*authorized"`
+> → **0**, contre **5** occurrences de `_restaure_sshd`.
+>
+> **Prendre une sauvegarde et savoir la rappeler sont deux gestes distincts, et seul le second
+> protège.** L'opposition avec `sshd_allow_user` tient donc entièrement — mais elle porte sur la
+> **restauration**, pas sur la sauvegarde.
+
+**Et le nettoyage détruit sa propre sauvegarde** : sur le chemin « empreinte introuvable »,
+`_script_retrait_par_empreintes` fait `rm -f "$tmp" "${tmp}.bak"`. La copie de secours part avec le
+temporaire.
+
+**Un troisième point, sur le geste FINAL** : `chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true`.
+**Si la restitution du propriétaire échoue, le fichier peut rester à `root` et l'accès du compte tombe
+— silencieusement.** C'est le motif *« jamais de `|| true` dans un garde »*, ici sur la **dernière**
+instruction d'une écriture distante : celle après laquelle plus rien ne vérifie.
+
+**Ce qui dédouane, en revanche** : `_script_vidage_complet` **atteste son effet** — il compte les
+lignes avant (`avant=$(grep -c . "$ak")`) et signale `authorized_keys non vide apres vidage` si le
+fichier ne s'est pas vidé. Son commentaire dit pourquoi : *« `printf '' >` seul ne prouvait rien — son
+retour n'était même pas lu »*. **Ce geste-là relit son résultat.**
 
 ### 8.3 `delete_remote_user` — irréversible, et c'est assumé
 
