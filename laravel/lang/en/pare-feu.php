@@ -68,7 +68,12 @@ return [
 
     // ── What I1 does not do, said on screen rather than silently absent ──
     'suite_titre' => 'This page changes nothing',
-    'suite' => 'Reading and storing a copy touch no machine. Dry-run validation and applying rules are not ported yet: they remain on the old portal.',
+    /* ⚠ Fixed 2026-09-02 (E-318) — see the FR catalogue for the full note.
+     * Dry-run validation IS ported (`pare-feu.js:710` calls `/iptables-validate`);
+     * only applying rules and its rollback remain on the old portal. The backend
+     * reserve is kept and stated: `iptables.py` has not been reloaded by the
+     * running process, so the call being wired does not mean it answers. */
+    'suite' => 'Reading, storing a copy and dry-run validation touch no machine — validation is ported here. Only applying rules and its rollback remain on the old portal. Validation has not been exercised since the service restarted: if it does not answer, the old portal remains the proven path.',
     'suite_lien' => 'Open the firewall on the old portal',
 
     // ── I2: the database copy ───────────────────────────────────────────

@@ -64,7 +64,15 @@ const COMPTES = [
  * 33 -> 32 le 2026-08-27 : la refonte du menu retire `tickets` et regroupe les
  * entrees en cinq sections (PARC & ACCES, EXPLOITATION, SECURITE,
  * ADMINISTRATION, AUTRE). Mesure : `Navigation::SECTIONS` lue par PHP lui-meme
- * rend `total=32 route=24 legacy=8 ni-l-un-ni-l-autre=0`.
+ * rend `total=N route=R legacy=G ni-l-un-ni-l-autre=0`.
+ *
+ * ⚠ CE COMMENTAIRE PORTAIT LES VALEURS : `route=24 legacy=8`, exact le 2026-08-27
+ * et FAUX de sept unites au 2026-09-02 (31 / 1). Il documente le FORMAT de la
+ * ligne INFO, pas un etat — mais un lecteur lit des valeurs comme un etat, et
+ * celui-ci vieillit A L'ENDROIT EXACT ou l'on vient chercher la verite sur
+ * l'outil. *Un exemple chiffre dans un commentaire est un chiffre non date qui
+ * vieillit sans que rien ne l'annonce — et d'autant plus vite que le travail
+ * avance.* Ecrit en symboles : le format se documente, l'etat se mesure.
  *
  * Le §2 du plan porte le meme total et se met a jour AVEC celui-ci : l'assertion
  * qui echoue le dit dans son propre detail, « ne pas ajuster l'un sans l'autre ».

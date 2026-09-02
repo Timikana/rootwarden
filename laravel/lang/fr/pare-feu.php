@@ -66,7 +66,24 @@ return [
 
     // ── Ce que I1 ne fait pas, dit à l'écran plutôt qu'absent en silence ──
     'suite_titre' => 'Cette page ne modifie rien',
-    'suite' => 'Le relevé et la copie en base ne touchent aucune machine. La validation à blanc et l\'application des règles ne sont pas encore portées : elles restent sur l\'ancien portail.',
+    /*
+     * ⚠ CORRIGE le 2026-09-02 (E-318). Ce libelle declarait la validation a blanc
+     * NON PORTEE. Elle l'est : `pare-feu.js:710` appelle `/iptables-validate`, et
+     * la ligne 106 de CE fichier la documente — le catalogue se contredisait
+     * lui-meme. L'erreur venait d'un reperage par ROUTE LARAVEL : I4 n'y apparait
+     * pas, parce qu'il passe par la PASSERELLE. *Mesurer les routes Laravel n'est
+     * pas mesurer les capacites.*
+     *
+     * Une page qui renvoie vers l'ancien portail pour un geste qu'elle sait faire
+     * ENTRETIENT le legacy qu'on veut eteindre : l'erreur va dans le sens sur UNE
+     * SEULE FOIS, puis se paie a chaque usage. *Un manque declare a tort est une
+     * capacite perdue sans que rien ne la retire.*
+     *
+     * La reserve sur le backend est CONSERVEE et dite : `iptables.py` est l'un des
+     * modules que le processus servi n'a pas recharges, donc que le JS appelle la
+     * route ne dit pas qu'elle repond. A remesurer apres le redemarrage.
+     */
+    'suite' => 'Le relevé, la copie en base et la validation à blanc ne touchent aucune machine — la validation est portée ici. Seules l\'application des règles et son retour arrière restent sur l\'ancien portail. La validation n\'a pas encore été exercée depuis le redémarrage du service : si elle ne répond pas, l\'ancien portail reste la voie éprouvée.',
     'suite_lien' => 'Ouvrir le pare-feu sur l\'ancien portail',
 
     // ── I2 : la copie en base ───────────────────────────────────────────
