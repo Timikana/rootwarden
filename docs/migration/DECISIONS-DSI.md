@@ -2633,3 +2633,22 @@ avant qu'une ligne existe, la correction ne migre aucune donnée et ne change le
 - **E-282** (deux scores pour un même audit, session 5) : relevé, non revérifié par moi ;
 - **si `'environment'` est atteignable côté CVE** malgré l'absence dans l'enum — le code n'a pas de
   branche `environment`, donc la question ne se pose pas ; je le note pour qu'on ne la rouvre pas.
+
+### Note de méthode — le seul cas de la série où la discipline a payé, et il ne se serait jamais su
+
+**L'argument faux du Lead n'est jamais entré dans le `DOSSIER-01`** (`grep -n "E-280\|effet de bord"` →
+aucune occurrence). Non parce qu'il en a été retiré : **parce qu'il a été mesuré avant d'être écrit**, et
+qu'il n'a donc jamais atteint la page que l'exploitant signera.
+
+> **J'allais l'écrire.** Un effet de bord favorable, transmis par le Lead, sur un dossier que je pousse
+> depuis six jours — *les trois conditions qui font recopier sans vérifier*. Ce qui l'a arrêté est une
+> mesure de dix secondes lancée par habitude, pas par soupçon.
+
+**Et voici pourquoi je l'inscris.** *Ce registre ne consigne que des erreurs, parce qu'une erreur laisse
+une trace et une vérification silencieuse n'en laisse aucune.* **Nous mesurons donc notre travail par un
+instrument qui n'enregistre que ses échecs** — le même biais que la sonde de la session 5, appliqué au
+registre lui-même.
+
+**Rectification jointe** : j'ai écrit au Lead *« le `DOSSIER-01` est corrigé »*. **Faux — il n'a jamais
+été atteint.** *Dire « corrigé » revendique une remédiation ; dire « jamais entré » est une preuve que
+mesurer avant d'écrire fonctionne.* La seconde est vraie et vaut plus cher.
