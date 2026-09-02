@@ -304,6 +304,9 @@
                                  « Machines » ci-dessus le rend visible : elle
                                  compte des rattachements qu'on ne peut pas encore
                                  faire d'ici. Le taire laisserait chercher. --}}
+                            {{-- Le tableau de deploiement EST porte : la
+                                 subordonnee « qui n'est pas encore porte » de
+                                 l'ancien libelle etait fausse. --}}
                             <p class="rw-aide rw-prose">{{ __('superv.profils_assignation_ailleurs') }}</p>
                         @endif
                     </div>
@@ -898,15 +901,41 @@
                     </section>
                 @endif
 
-                <div class="rw-vide rw-note">
-                    <p class="rw-vide__titre">{{ __('superv.pas_encore_porte') }}</p>
-                    <p class="rw-vide__texte rw-prose">{{ __('superv.a_venir_deploiement') }}</p>
-                    <div class="rw-vide__action">
-                        <a class="rw-bouton rw-bouton--discret"
-                           href="{{ config('app.url_legacy') }}/supervision/"
-                           target="_blank" rel="noopener">{{ __('superv.vers_legacy') }} ↗</a>
-                    </div>
-                </div>
+                {{--
+                    ══ CE BLOC DISAIT QUE TROIS GESTES N'ETAIENT PAS PORTES ═════
+
+                    Il annoncait « Installer, reconfigurer et desinstaller un
+                    agent … restent sur l'ancien portail », avec un lien vers le
+                    legacy — et il s'affichait a l'ouverture de l'onglet
+                    « deploiement », c'est-a-dire au moment ou il etait le plus
+                    faux.
+
+                    RETIRE. Les trois gestes sont cables, et c'est mesure par
+                    une enumeration OUVERTE — non par une recherche de nom :
+
+                        ce que supervision.js nomme comme route :
+                          deploiement · desinstallation · ecriture · lecture ·
+                          reconfiguration · restauration · sauvegardes · version
+                        ce que SupervisionController construit en URL : les memes
+
+                    ⚠ Et la recherche par nom ANGLAIS ratait : `uninstall` rend
+                    ZERO dans ce fichier, `desinstallation` en rend cinq. Le
+                    portage nomme en francais.
+
+                    ── POURQUOI IL A SURVECU DIX JOURS ──────────────────────
+
+                    V1 (`c1041f4`, 22/08 03:25) a ecrit la phrase — elle etait
+                    VRAIE. V12 (`3e8686a`, 23/08 13:05) a porte le deploiement,
+                    et son diff ne touche PAS cette cle.
+
+                    **Une declaration vraie devient fausse sans que personne ne
+                    la touche** : il n'y a aucun commit a incriminer, et la
+                    relecture du diff qui l'a rendue fausse ne la contient pas.
+                    Trois lignes au-dessus, son propre auteur avait ecrit
+                    « UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE
+                    VOIE » — un avertissement ne protege pas le texte qu'il
+                    precede.
+                --}}
             </article>
         </div>
 
