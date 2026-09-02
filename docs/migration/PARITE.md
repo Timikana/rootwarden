@@ -14271,3 +14271,75 @@ dans la prose (« c est », « l APPLICATIF »). *C'est le motif qui avait coup�
 **Et le témoin a été posé parce qu'un premier contrôle rendait un vide ininterprétable.** *Un « 0 »
 sans témoin ne dit pas si l'instrument a regardé* — **quatrième fois cette nuit**, et la seule parade
 qui ne dépende de personne.
+
+## E-292 — `security/backend-cve` : l'inventaire sur pièces, et ce que la fusion NE ferme PAS
+
+Relecture de la session 4, **vérifiée marqueur par marqueur** — pas au jugé.
+
+### Aucun des six n'a d'équivalent sur le tronc
+
+    _INTERVALLE_MINIMUM    HEAD 0   branche 1
+    _SOURCES_SCAN          HEAD 0   branche 1
+    kev_echoue             HEAD 0   branche 3
+    vivantes_nues          HEAD 0   branche 1
+    _CIBLES                HEAD 0   branche 1
+
+**Les six sont donc tous encore nécessaires.** Et `a345e65` était le seul que nous ayons re-trouvé :
+**les cinq autres dorment sans que personne les ait encore re-payés.**
+
+### Ce que chacun ferme
+
+    3e65ad3   clamp anti-frequence CONTOURNABLE + deux listes fermees
+    8043303   une panne d'enrichissement EFFACAIT le drapeau KEV
+    427306c   `cve_reprioritize` : la seule ecriture CVE sans garde de permission
+    399931a   le decorateur d'acces ne lisait pas les parametres de CHEMIN
+    a345e65   archivees scannees + cible illisible -> tout le parc
+    9ac8456   une CVE blanchie SIGNEE DU NOM DE N'IMPORTE QUI
+
+Plus **321 lignes de tests** absentes du tronc.
+
+**`427306c` vérifié sur `HEAD`** — et c'est notre motif récurrent, la garde sur la PAGE et pas sur la
+REQUÊTE :
+
+    HEAD:backend/routes/cve.py:227   @bp.route('/cve_reprioritize', methods=['POST'])
+                                     @require_api_key
+                                     @require_machine_access      <- inerte des le role 2
+                                     @threaded_route
+                                     def cve_reprioritize():      <- AUCUNE permission
+
+La page `/security/` exige `can_scan_cve` (`documentation.php:696`). **L'écriture ne l'exigeait pas.**
+La branche ajoute `@require_permission('can_scan_cve')`.
+
+### ⚠ ET UN DES SIX EST INERTE AUJOURD'HUI — mesuré, et la session 4 l'a dit elle-même
+
+`399931a` étend le décorateur d'accès aux paramètres de **chemin**. Les trois routes qui portent un
+identifiant de machine dans leur chemin sont dans `supervision.py` (`:1429`, `:1443`, `:1537`), et
+**aucune ne porte `require_machine_access`** — elles portent `require_role(2)` +
+`require_permission('can_manage_supervision')`.
+
+**La fusion ne changerait donc l'issue d'aucune requête d'aujourd'hui de ce fait-là**, et mon relevé
+des trois états de gardes survit intact.
+
+> **La session 4 l'a mesuré et me l'a dit alors que l'inverse était plus vendeur.** *Un dossier qui
+> compte un correctif inerte parmi ses arguments perd la confiance sur les cinq autres.* C'est le
+> troisième signalement de la nuit fait **dans le sens où personne ne vient corriger**.
+
+### Deux recoupements qui dépassent ce dossier
+
+**`8043303` est la plus ancienne occurrence écrite de la famille que ce chantier compte le plus** — un
+*best-effort* qui écrase une donnée vraie par une absence. C'est `sudoers_orphelin`, `unknown` sur
+`wazuh_agents`, le troisième état de `supervision_agents`, et un prédicat à trois valeurs. **Cinq
+occurrences, et l'auteur avait la règle avant nous.**
+
+**`3e65ad3` porte déjà `_CIBLES = ('all','tag','machines')`** — la liste fermée que nous avons
+rediscutée toute la nuit, **pour `cve.py`**. E-280 porte sur `ssh_audit.py`, que la branche ne touche
+pas (0 occurrence) : **il survit entièrement.**
+
+### Ce que ça fait à l'argument du gel
+
+Je remontais le gel comme un état dont **le coût croît**. La relecture le chiffre : **le coût a déjà
+été payé une fois** (une nuit de sept sessions sur `a345e65`), et il reste **cinq pièces exposées au
+même sort**.
+
+> Ce n'est plus « du travail qui attend ». C'est **du travail qu'on risque de refaire** — et refaire
+> coûte deux fois : la nuit, **et le conflit de fusion qu'elle crée**.

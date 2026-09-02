@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.144** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.145** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,34 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.145 — `security/backend-cve` : l'inventaire sur pièces, et le correctif inerte est nommé
+
+**E-292.** Relecture vérifiée **marqueur par marqueur** : `_INTERVALLE_MINIMUM`, `_SOURCES_SCAN`,
+`kev_echoue`, `vivantes_nues`, `_CIBLES` — **aucun n'est sur le tronc**. Les six correctifs sont tous
+encore nécessaires, et `a345e65` était le seul que nous ayons re-trouvé : **les cinq autres dorment
+sans avoir encore été re-payés.**
+
+Ce qu'ils ferment : un clamp anti-fréquence contournable · une panne d'enrichissement qui **effaçait le
+drapeau KEV** · `cve_reprioritize`, **la seule écriture CVE sans garde de permission** alors que la page
+`/security/` exige `can_scan_cve` — notre motif récurrent, la garde sur la PAGE et pas sur la REQUÊTE ·
+un décorateur d'accès aveugle aux paramètres de chemin · les archivées scannées · **une CVE blanchie
+signée du nom de n'importe qui**. Plus 321 lignes de tests.
+
+**⚠ Et l'un des six est inerte aujourd'hui** : `399931a` étend le décorateur aux paramètres de chemin,
+or les trois routes concernées portent `require_role(2)` + `require_permission`, **pas**
+`require_machine_access`. La fusion ne changerait l'issue d'aucune requête de ce fait-là. *La session 4
+l'a mesuré et l'a dit alors que l'inverse était plus vendeur — un dossier qui compte un correctif inerte
+parmi ses arguments perd la confiance sur les cinq autres.*
+
+**Deux recoupements qui dépassent le dossier** : `8043303` est la plus ancienne occurrence écrite de la
+famille que ce chantier compte le plus — *un best-effort qui écrase une donnée vraie par une absence*,
+cinq occurrences, et l'auteur avait la règle avant nous. Et `3e65ad3` porte déjà la liste fermée
+`_CIBLES` **pour `cve.py`** — E-280 porte sur `ssh_audit.py`, que la branche ne touche pas : il survit.
+
+**Ce que ça fait à l'argument du gel** : le coût a **déjà été payé une fois**, et cinq pièces restent
+exposées au même sort. Ce n'est plus du travail qui attend, c'est du travail qu'on risque de refaire —
+et refaire coûte deux fois : la nuit, et le conflit de fusion qu'elle crée.
 
 ### v1.38.144 — 28/32 : `ssh_audit` a basculé, et nos garde-fous produisent leur propre angle mort
 
