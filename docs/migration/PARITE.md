@@ -13889,3 +13889,76 @@ planification existante ne change de sort, ni pour E-280 ni pour E-281.
 **Et une fausse piste écartée avant d'être annoncée** (session 4) : « aucune branche `environment`
 dans la tâche CVE » — `cve_scan_schedules.target_type` est `enum('all','tag','machines')`,
 `environment` n'y figure pas. *Un écart écarté avant relais vaut un écart trouvé.*
+
+## E-280 — TROISIÈME PASSE : ma correction corrigeait trop, sur les deux points
+
+La session 8 avait mesuré la même réfutation que moi **avant** de recevoir la mienne (`1fdd763`
+croisé avec `7614bba`) — **deux mesures indépendantes**, cette fois. Elle m'a ensuite corrigé.
+
+### 1. Le `WHERE 1=0` EST atteignable — la garde est dans la CONDITION, pas dans la branche
+
+    elif target_type == 'machines' and schedule.get('target_value'):   <- test de vacuite ICI
+        …
+        if ids:  … WHERE id IN (…)
+        else:    … WHERE 1=0        <- atteint par '[]' ou '["abc"]', PAS par ''
+    else:        … tout le parc
+
+Une `target_value` **vide** rend le `and` faux : *elle n'entre jamais dans sa propre branche, donc
+n'atteint jamais son `WHERE 1=0`* — elle sort par le `else` final. Le `WHERE 1=0` est bien atteint,
+mais par une valeur **non vide qui ne rend aucun identifiant**.
+
+> **Une garde placée dans la condition d'entrée ne garde pas la branche : elle en détourne.**
+
+Mon « les quatre cas tombent dans le même `else` » est donc **faux comme mécanisme** et vrai comme
+conclusion pratique : la case blanche vise bien le parc entier. *J'avais corrigé une affirmation
+trop rassurante par une affirmation trop alarmante* — et les deux se lisaient comme des mesures.
+
+### 2. ⚠ « La base porte une liste fermée » : vrai d'une table, FAUX de celle qui compte
+
+    cve_scan_schedules.target_type    enum('all','tag','machines')                NULLABLE
+    ssh_audit_schedules.target_type   enum('all','tag','environment','machines')  NOT NULL
+
+    INSERT (name, target_type) VALUES ('__probe', NULL)
+        cve_scan_schedules   ->  ACCEPTE
+        ssh_audit_schedules  ->  ERREUR 1048
+    (deux transactions ANNULEES, survie verifiee a 0 ligne dans les deux tables)
+
+**`NULL` n'est pas une valeur inventée : c'est une valeur que la colonne autorise.** Elle arrive en
+`None`, ne vaut aucune des chaînes testées, sort par le `else`.
+
+J'avais mesuré le **refus d'une chaîne inventée** et conclu *« la base porte une liste fermée »*.
+**C'est notre propre règle qui me condamne : un validateur se mesure par ce qu'il ACCEPTE, jamais par
+ce qu'il refuse.** Et j'ai généralisé d'une table à l'autre sans le dire — *faux sur celle qui porte
+la tâche au courriel.*
+
+**Quatre différences entre deux tables jumelles, toutes dans le sens du danger sur la même** :
+`archived` filtré nulle part · repli de `machines` ouvert · `NULL` accepté · `'environment'` absent
+de l'enum.
+
+### 3. Et la leçon de ma faute est meilleure que celle que j'en avais tirée
+
+J'avais écrit : *un argument de signature se mesure deux fois.* La session 8 :
+
+> **Ce n'est pas d'avoir mal grepé — c'est que l'erreur allait dans le sens qui fait signer, et
+> qu'aucun de nous deux ne remesure une bonne nouvelle.** Le grep se serait trompé dans l'autre sens
+> qu'on l'aurait attrapé en une minute. La leçon transposable est : **mesurer deux fois ce qui
+> arrange.**
+
+C'est plus large et plus juste. Ma version visait un type de message ; la sienne vise une **direction
+d'erreur** — et c'est la direction qui explique pourquoi trois lecteurs prudents l'ont laissée passer.
+
+### 4. Ce que la borne à 0 ligne veut dire — et ce n'est pas « moins urgent »
+
+    ssh_audit_schedules  0 ligne        cve_scan_schedules  0 ligne
+
+**Aucune planification n'existe.** Ce n'est pas un incident : c'est **un piège armé pour la première
+personne qui en créera une**, déclenché par une case laissée blanche.
+
+> *Une correction qui n'a encore aucun utilisateur est la moins chère qu'on puisse écrire.* Avant
+> qu'une ligne existe, elle ne migre aucune donnée et ne change le comportement de rien.
+
+**Donc : à router maintenant, pas à classer urgente.** La distinction compte — l'urgence se dispute
+un tour de rôle, le bon moment se rate.
+
+**Et la migration de schéma (`NOT NULL` sur `cve_scan_schedules.target_type`) demande la signature de
+l'exploitant, qu'elle porte sur zéro ligne ou non.** Aucune exception pour une table vide.

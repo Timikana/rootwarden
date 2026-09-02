@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.137** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.138** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,32 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.138 — troisième passe sur E-280 : ma correction corrigeait trop, sur les deux points
+
+**Le `WHERE 1=0` est atteignable.** Le test de vacuité est dans la **condition** du `elif`, pas dans la
+branche : une `target_value` vide n'entre jamais dans sa propre branche, donc n'atteint jamais son
+`WHERE 1=0` — mais une valeur **non vide sans identifiant valide** (`'[]'`, `'["abc"]'`) l'atteint.
+*Une garde placée dans la condition d'entrée ne garde pas la branche : elle en détourne.* Mon « les
+quatre cas tombent dans le même `else` » est faux comme mécanisme, vrai comme conclusion. **J'avais
+corrigé une affirmation trop rassurante par une affirmation trop alarmante.**
+
+**« La base porte une liste fermée » est vrai d'une table et faux de celle qui compte.**
+`cve_scan_schedules.target_type` est **NULLABLE** ; un `NULL` explicite est **accepté**, arrive en
+`None`, et sort par le `else`. J'avais mesuré le refus d'une chaîne inventée et généralisé — *un
+validateur se mesure par ce qu'il ACCEPTE.* Quatre différences entre deux tables jumelles, toutes dans
+le sens du danger sur la même : `archived` filtré nulle part, repli de `machines` ouvert, `NULL`
+accepté, `'environment'` absent de l'enum.
+
+**Et la leçon est plus large que celle que j'en avais tirée** : pas « un argument de signature se
+mesure deux fois », mais **« mesurer deux fois ce qui arrange »**. L'erreur allait dans le sens qui
+fait signer, et personne ne remesure une bonne nouvelle — dans l'autre sens elle aurait été attrapée
+en une minute.
+
+**Les deux tables portent 0 ligne** : pas un incident, **un piège armé pour la première personne qui
+créera une planification**. Une correction qui n'a encore aucun utilisateur est la moins chère qu'on
+puisse écrire — à router maintenant, pas à classer urgente. La migration `NOT NULL` demande la
+signature de l'exploitant, table vide ou non.
 
 ### v1.38.137 — `ssh_audit` A1 : la page en LECTURE, et deux fermetures par l'ABSENCE
 
