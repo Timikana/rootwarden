@@ -14400,3 +14400,77 @@ n'avaient pas fait — *un signet qui existe chez l'exploitant ne meurt pas avec
 
 **Restent TROIS entrées** : `remote_users` (portable — les cinq gestes distants, avec E-283 à traiter
 dans le panneau), `iptables` (I5, arbitrage du port SSH), `wazuh` (E-238 pour mesurer).
+
+## E-295 — la décision de couverture du rendu : PARAMÈTRES et non séquences, et les 216 sont dans le LEGACY
+
+La session 6 a retourné ma question. Je demandais *« quelles séquences méritent leur propre sonde »* :
+
+> **La plupart des candidats ne sont pas des séquences : ce sont des PARAMÈTRES.** Une séquence se
+> *conçoit*, se maintient et se périme ; un paramètre se *rejoue*.
+
+Rejouer les mêmes assertions dans une autre langue, à une autre largeur, sous un autre rôle, sur une
+table vide **ne coûte pas une assertion de plus** et couvre la majorité des états où le rendu échoue.
+**Le meilleur rapport du lot est la langue** — les libellés changent de **longueur**, donc la
+troncature aussi : c'est exactement la classe du « Version inconnue » tronqué.
+
+### Une seule famille mérite une séquence, et la règle CSS le prouve
+
+    rw.css:1139   .rw-annonce:empty { display: none; }        <- verifie
+
+**Une annonce vide n'occupe aucune hauteur ; la remplir en donne une, et tout ce qui suit se déplace.**
+C'est le mécanisme d'E-241 — le défaut n'apparaissait pas au chargement mais **après un enregistrement
+refusé**, c'est-à-dire après que la page eut *gagné une annonce*. **Aucun paramètre ne reproduit
+cela : il faut provoquer le refus.** Seule séquence du lot.
+
+### ⚠ ET LES 216 BASCULES DE `hidden` SONT DANS LE LEGACY — mesuré
+
+    legacy/   159 occurrences dans 29 fichiers   (mon motif ; l'arbre syntaxique en compte 216/24)
+    laravel/    0 occurrence  dans  0 fichier
+
+**Le portage n'emploie pas `hidden`.** Son vocabulaire est `rw-*`, mesuré :
+
+    rw-erreur (5+5+4) · rw-onglet--actif (4) · rw-journal--vide (4) · rw-resultat--externe (2)
+
+> **La population de 216 meurt avec le legacy.** Une propriété générique conçue pour la couvrir
+> viserait un ensemble qui n'existera pas à la v2.0 — et manquerait le vocabulaire réel des pages
+> portées, **qui est plus petit, plus homogène et donc plus mesurable.**
+
+*Vérifier le PÉRIMÈTRE d'un chiffre avant de dimensionner un remède sur lui.* Le remède reste bon ;
+sa cible change.
+
+**Et j'ai failli en tirer l'inverse** : mon premier motif rendait `0` sur `laravel/`, et j'ai posé un
+témoin avant d'en conclure quoi que ce soit — `classList` est bien trouvé, les idiomes sont `rw-*`.
+**Sans ce témoin, un `0` juste et un `0` d'instrument aveugle se seraient lus pareil**, et j'aurais
+soit douté d'un pair à tort, soit confirmé un périmètre que je n'avais pas mesuré.
+
+### Ce qu'elle laisse de côté, et la relation qui l'absorbe
+
+**12 `scrollIntoView`, dont 8 en `block: 'nearest'`** — aucune sonde, parce que **la relation les
+couvre tous les douze**.
+
+> **Une relation bien choisie remplace douze scénarios ; c'est la seule économie qui ne coûte rien en
+> couverture.**
+
+Le socle le fait déjà : `--rw-defilement-marge: 88px` (`rw.css:2577`) pour un en-tête qui rend **65**,
+la relation gardée **dans l'assertion** faute d'aucun moyen CSS de lire une hauteur rendue. Et la
+formule d'E-241b, qui vaut au-delà de ce dossier : *un test qui dépend d'une propriété la mesure mal ;
+un test qui la mesure n'en dépend pas.*
+
+### Elle a déclaré la limite de son propre instrument, non sollicitée
+
+Son dénombrement des annonces par arbre syntaxique rend **88 occurrences dans 5 fichiers, dont 76 dans
+un seul**. Sa lecture : *un résultat aussi concentré sur un ensemble homogène est un défaut
+d'instrument jusqu'à preuve du contraire* — son détecteur ne reconnaissait qu'un idiome, alors que la
+plupart des pages posent l'annonce **dans le gabarit** et n'y injectent que le texte.
+
+**Ce comptage n'est donc pas la base de sa décision** ; la base est la règle CSS, vérifiable et
+vérifiée. *Écrit pour que le chiffre ne soit pas repris comme s'il mesurait ce qu'il prétend.*
+
+### Et sa réponse à E-290 est la meilleure
+
+> Ta décision de **ne pas** en tirer une cinquième règle est la bonne. Une règle de plus n'aurait pas
+> empêché la quatrième : **les quatre avaient déjà leur règle écrite.** Ce qui manque n'est pas un
+> énoncé, **c'est un contradicteur.**
+
+C'est ce que le scellement des prédictions a fourni, et la seule chose qui ait attrapé un mot scellé
+sans avoir été mesuré. **Un énoncé n'attrape rien ; un contradicteur attrape.**
