@@ -450,6 +450,41 @@ class Machines
      *
      * @return list<string>
      */
+    /*
+     * ══ LE PERIMETRE, EN UNE SEULE DEFINITION ════════════════════════════
+     *
+     * `legacy/ssh-audit/index.php:22-33` refait la borne a la main : une
+     * requete pour le role >= 2, une jointure sur `user_machine_access` pour
+     * le role 1. Le commentaire du legacy dit que c'est un correctif IDOR — le
+     * selecteur listait tout le parc, noms et IP compris, quel que soit le
+     * role.
+     *
+     * On ne recopie pas cette borne : `requeteBornee()` la porte deja pour
+     * tout ce service. Une TROISIEME ecriture de la meme regle finirait par
+     * diverger des deux autres, et c'est le motif que ce portage refuse
+     * partout.
+     *
+     * Le retour distingue « illisible » de « vide » : rendre `[]` sur une
+     * base muette afficherait « aucun serveur ne vous est attribue », ce qui
+     * se lit comme un fait sur les droits.
+     */
+    public function perimetre(int $roleId, int $userId): array
+    {
+        try {
+            $serveurs = $this->requeteBornee($roleId, $userId)
+                ->select('m.id', 'm.name', 'm.ip', 'm.port')
+                ->orderBy('m.name')
+                ->get()
+                ->all();
+
+            return ['lisible' => true, 'serveurs' => $serveurs];
+        } catch (\Throwable $e) {
+            Log::error('[Machines::perimetre] perimetre illisible : ' . $e->getMessage());
+
+            return ['lisible' => false, 'serveurs' => []];
+        }
+    }
+
     public function etiquettes(): array
     {
         try {

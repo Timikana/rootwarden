@@ -16,6 +16,7 @@ use App\Http\Controllers\AccesSftpController;
 use App\Http\Controllers\PolitiquesController;
 use App\Http\Controllers\DeriveConfigController;
 use App\Http\Controllers\DockerController;
+use App\Http\Controllers\AuditSshController;
 use App\Http\Controllers\GroupesController;
 use App\Http\Controllers\GraylogController;
 use App\Http\Controllers\ExportConformiteController;
@@ -149,6 +150,29 @@ Route::middleware(['session.authentifiee', 'mot.de.passe.a.changer'])->group(fun
     Route::get('/groupes', GroupesController::class)
         ->middleware(['role:2', 'perm:can_admin_portal'])
         ->name('groupes');
+
+    /*
+     * Audit de configuration SSH — sous-lot A1, LECTURE SEULE.
+     *
+     * ⚠ `role:1`, PAS `role:2`. C'est la garde du legacy
+     * (`legacy/ssh-audit/index.php:12-13` : `checkAuth([1,2,3])` +
+     * `checkPermission('can_audit_ssh')`), et cinq routes du module sont
+     * reellement concues pour le role 1 — contrairement a `platform_key`.
+     * Passer a `role:2` reproduirait cote portage le croisement de gardes
+     * qu'on reproche au backend.
+     *
+     * La liste de serveurs est bornee au perimetre du compte par
+     * `Machines::perimetre()` : le legacy porte la meme borne, et c'est sa
+     * propre correction d'IDOR.
+     *
+     * AUCUNE route d'ecriture. En particulier, rien ici ne compose un appel
+     * vers `POST /ssh-audit/policies` — SEC-013 : l'ecriture de politique est
+     * moins gardee que sa lecture sur la meme URL, et la passerelle compare
+     * des chemins, jamais des methodes. Fermeture par l'ABSENCE.
+     */
+    Route::get('/audit-ssh', AuditSshController::class)
+        ->middleware(['role:1', 'perm:can_audit_ssh'])
+        ->name('audit-ssh');
 
     /*
      * Derive de configuration. Seule page portee a ce jour dont la garde
@@ -945,6 +969,7 @@ Route::get('/adm/admin_page.php', fn () => redirect()->route('accueil'));
 Route::get('/commandlog/', fn () => redirect()->route('journal-commandes'));
 Route::get('/approvals/', fn () => redirect()->route('approbations'));
 Route::get('/groups/', fn () => redirect()->route('groupes'));
+Route::get('/ssh-audit/', fn () => redirect()->route('audit-ssh'));
 Route::get('/drift/', fn () => redirect()->route('derive-config'));
 Route::get('/backups/', fn () => redirect()->route('sauvegardes'));
 Route::get('/tasks/', fn () => redirect()->route('taches'));
