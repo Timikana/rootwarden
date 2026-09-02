@@ -54,8 +54,17 @@ return [
     'vide_titre' => 'Aucune machine au parc',
     'vide_texte' => 'Aucune machine active n\'est enregistrée. Ajoutez-en depuis l\'administration des serveurs.',
     'vide_action' => 'Ouvrir les serveurs',
-    'non_porte_titre' => "Quatre gestes de Fail2ban ne sont pas encore portés",
-    'non_porte_texte' => "Installer Fail2ban sur UNE machine, redémarrer le service, désactiver une jail et interroger la géolocalisation d'une adresse se font encore depuis l'ancien portail. Tout le reste est ici : l'état, les jails, l'historique, la configuration, les journaux, les bans, la liste blanche et les deux gestes de parc.",
+    /*
+     * ⚠ LE COMPTE EST RETIRE, PAS REDUIT. F7 porte la desactivation d'une
+     * jail : « Quatre » devient faux. Le passer a « Trois » le laisserait
+     * pourrir au prochain portage — l'enumeration est la seule source.
+     *
+     * Et les TROIS restants sont apparies un par un contre les 19 routes du
+     * backend, pas deduits : `install`, `restart` et `geoip` ne sont appeles
+     * par aucun script du portage.
+     */
+    'non_porte_titre' => "Ce que cet onglet ne fait pas encore",
+    'non_porte_texte' => "Installer Fail2ban sur UNE machine, redémarrer le service et interroger la géolocalisation d'une adresse se font encore depuis l'ancien portail. Tout le reste est ici : l'état, les jails et leur désactivation, l'historique, la configuration, les journaux, les bans, la liste blanche et les deux gestes de parc.",
     'non_porte_lien' => 'Ouvrir Fail2ban dans l\'ancien portail',
 
     // ── Sous-lot F2 : historique et frise ────────────────────────────────
@@ -221,10 +230,28 @@ return [
     'parc_apres_install' => "Le relevé n'est pas mis à jour par ce geste : la portée ci-dessus restera la même jusqu'à ce que chaque machine soit relevée.",
     'parc_rien' => "Le backend n'a rapporté aucune machine.",
 
-    // DEUX CLES SANS LECTEUR AUJOURD'HUI, ET C'EST DIT PLUTOT QUE CORRIGE.
-    // `histo_choisir` et `jail_desactiver` ne sont lues ni par la vue ni par le
-    // script (mesure du 2026-08-27 : zero occurrence hors de ces catalogues).
-    // `jail_desactiver` le sera par F7 — `/fail2ban/disable_jail` est l'une de
-    // ses quatre capacites. Les retirer pour les remettre dans deux sous-lots
-    // coute une divergence FR/EN pour rien : arbitrage du 2026-08-27.
+    // UNE CLE SANS LECTEUR AUJOURD'HUI, ET C'EST DIT PLUTOT QUE CORRIGE.
+    // `histo_choisir` n'est lue ni par la vue ni par le script.
+    //
+    // ✅ `jail_desactiver` EN A UN DEPUIS F7 : la note precedente annoncait
+    // « le sera par F7 » et c'est fait — le bouton du detail de jail la rend.
+    // L'arbitrage du 2026-08-27 (garder plutot que retirer-remettre) a donc
+    // tenu, et cette ligne est mise a jour avec le code qu'elle decrit.
+
+    // ══ F7 — DESACTIVER UNE JAIL ═════════════════════════════════════════
+    //
+    // ⚠ CE GESTE BAISSE UNE GARDE. Il n'est pas destructeur — rien n'est
+    // efface, et « Activer la jail » le retablit — mais il ARRETE une
+    // protection contre le force brute sur une machine reelle, et il ouvre une
+    // session SSH pour le faire (`backend/routes/fail2ban.py:418`).
+    //
+    // Le panneau nomme donc la CONSEQUENCE et non le mecanisme : ce qui compte
+    // pour qui decide n'est pas qu'un fichier change, c'est que la machine
+    // cesse d'etre protegee.
+    'conf_titre_desact' => "Désactiver :jail sur :machine ?",
+    'conf_texte_desact' => "La jail :jail cessera de surveiller :machine : les tentatives d'authentification en échec ne seront plus bannies. Le geste ouvre une session SSH sur la machine. Il se rétablit par « Activer », et aucune adresse déjà bannie n'est libérée.",
+    // Mesure du 2026-09-02 : 0 occurrence dans `command_log`, `tasks` et
+    // `user_logs` (temoin : 5 920 lignes au total). Le dire plutot que de
+    // laisser croire que le chemin est eprouve.
+    'desact_jamais_exercee' => "Ce geste n'a encore jamais été exercé depuis cette interface.",
 ];

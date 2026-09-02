@@ -1285,6 +1285,52 @@ window.RW_FAIL2BAN = true;
             });
     }
 
+    /*
+     * ══ F7 — DESACTIVER LA JAIL OUVERTE ══════════════════════════════════
+     *
+     * `POST /fail2ban/disable_jail` ouvre une session SSH reelle
+     * (`backend/routes/fail2ban.py:418`) et arrete la surveillance. **Ce n'est
+     * pas destructeur — « Activer la jail » le retablit — mais c'est une
+     * BAISSE DE GARDE** : la machine cesse d'etre protegee contre le force
+     * brute.
+     *
+     * Le panneau nomme donc la CONSEQUENCE et non le mecanisme. Ce qui compte
+     * pour qui decide n'est pas qu'un fichier change, c'est que la protection
+     * s'arrete — et que les adresses deja bannies, elles, ne sont pas
+     * liberees.
+     *
+     * ⚠ Mesure du 2026-09-02 : ce geste n'a JAMAIS ete exerce — 0 occurrence
+     * dans `command_log`, `tasks` et `user_logs`, temoin a 5 920 lignes. Le
+     * L'ECRAN le dit — dans la vue, a cote du bouton et donc visible AVANT le
+     * clic. Pas dans le panneau : `demande()` ne lit que `bloque` et
+     * `recopie`, et lui passer une option de plus l'aurait fait transmettre
+     * une cle que personne ne lit.
+     */
+    function demandeDesactivation() {
+        var o = machineChoisie();
+        var nom = jailCourante;
+        if (! o || ! nom) { return; }
+        demande('conf_titre_desact', 'conf_texte_desact',
+            { jail: nom, machine: nomMachineChoisie() },
+            function () {
+                ferme();
+                litDistant('/fail2ban/disable_jail', {
+                    machine_id: parseInt(o.value, 10), jail: nom,
+                }).then(function (d) {
+                    journalise(d
+                        ? remplit('geste_reussi', { message: d.message || '' })
+                        : remplit('geste_echoue', { message: textes.lecture_echec || '' }), ! d);
+                    // On RELIT l'etat au lieu de le deduire du code de retour :
+                    // c'est la regle du module, et elle vaut ici autant
+                    // qu'ailleurs.
+                    detecteServices();
+                });
+            });
+    }
+
+    var boutonDesactiver = document.querySelector('[data-rw="f2b-jail-desactiver"]');
+    if (boutonDesactiver) { boutonDesactiver.addEventListener('click', demandeDesactivation); }
+
     if (ajouterBlanche) { ajouterBlanche.addEventListener('click', demandeAjoutBlanche); }
     if (boutonActiver) { boutonActiver.addEventListener('click', demandeActivation); }
     if (reglagesAnnuler) { reglagesAnnuler.addEventListener('click', function () {
