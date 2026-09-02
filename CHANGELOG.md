@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.141** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.142** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,31 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.142 — une contrainte ecrite la ou elle sera LUE, pas la ou elle a ete dite
+
+Un correctif backend en attente fera **refuser** une planification `tag` dont le champ de portee est
+vide, au lieu de la faire tomber sur le parc entier (E-280). C'est la bonne correction.
+
+> **Mais le refus sera SILENCIEUX si l'interface ne le rend pas.** L'exploitant aura demande un
+> relevé par tag, laisse la case blanche, et n'aura **ni relevé ni message**. *Un refus qui n'a pas
+> d'ecran se lit comme une panne.*
+
+La contrainte n'appartient donc pas au correctif backend : **elle appartient a la page**. Et elle ne
+s'applique pas a A1, qui ne porte les planifications qu'en LECTURE — elle s'appliquera au sous-lot
+qui portera l'ecriture.
+
+**C'est exactement le genre de consigne qui se perd** : elle est arrivee dans un fil de messages,
+elle vaut pour un sous-lot qui n'existe pas encore, et son destinataire n'est pas encore la.
+
+Elle est donc inscrite **dans `audit-ssh.js`, contre le panneau qui SERA remplace par ce
+formulaire** — le seul endroit que la session suivante ouvrira forcement. *Une reserve ecrite dans
+un message ne survit pas au premier relais ; ecrite dans le code qu'on remplace, elle est lue par
+qui la remplace.*
+
+Avec la moitie qui est facile a oublier : **pas un `required` muet.** Le premier garde vit dans le
+NAVIGATEUR, le second dans le serveur, et **les deux doivent dire la MEME chose** — une soumission
+bloquee sans texte est le meme silence, deplace d'un cran.
 
 ### v1.38.141 — la fusion retire le `and` sur `machines` et le laisse sur `tag`
 
