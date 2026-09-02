@@ -16475,3 +16475,101 @@ passerelle comptés par module — **mais pas qu'une capacité déclarée absent
 et **c'est aussi ma propre faute d'il y a une heure** (`uninstall` mesuré au nom du legacy). *Le laisser
 ouvert plutôt que le supposer fait est la bonne conduite* : c'est le premier travail à reprendre, sur
 les 19 capacités du document.
+
+## E-344 — une clé de session JAMAIS POSÉE, lue par trois contrôleurs — et le défaut est FAIL-CLOSED
+
+Relevé par la session 3 en cherchant tout autre chose, **vérifié par moi**.
+
+### Le fait établi
+
+    la cle POSEE     SecondFacteurController.php:253   ->put('utilisateur_id', (int) $compte->id)
+    ecritures de SESSION pour 'user_id'                 0
+    ecritures de SESSION pour 'utilisateur_id'          1     <- TEMOIN dans la mesure meme
+
+    lectures de get('user_id', 0) :
+      ClesSshController.php:39 · MisesAJourController.php:33 · SupervisionController.php:272
+
+**Les trois lisent une clé que rien n'écrit : elles valent `0`, toujours.**
+
+*Ma première sonde rendait **9 écritures** pour `user_id` — elle incluait `'user_id' =>`, qui attrape des
+clés de charge et de base, pas des écritures de session. **Cinquième fois du jour qu'un de mes motifs
+mesure le mauvais objet.***
+
+### ⚠ LA CONSÉQUENCE : ni l'une ni l'autre des deux issues envisagées
+
+La session 3 posait deux hypothèses — *« soit la borne par rôle sauve le cas, soit le périmètre est
+faux »* — et **déclarait n'avoir pas mesuré**. Mesuré :
+
+    ParcSsh.php:50   if ($role < 2) {
+    ParcSsh.php:51       ->join('user_machine_access as uma', …)
+    ParcSsh.php:52       ->where('uma.user_id', $idCompte);
+    (idem ScansCve.php:122-124)
+
+    users WHERE id=0                        0     TEMOIN : 12 comptes au total
+    user_machine_access WHERE user_id=0     0     TEMOIN : 2 lignes au total
+
+> **L'identifiant n'est utilisé QUE si `role < 2`.** Donc :
+>
+>     role >= 2   l'identifiant n'est JAMAIS lu        -> la page est CORRECTE
+>     role 1      la jointure ne rend AUCUNE ligne     -> le parc s'affiche VIDE
+>
+> **C'est une troisième issue que ni elle ni moi n'avions posée : le périmètre est faux DANS LE SENS
+> RESTRICTIF.** Un compte de rôle 1 ne voit rien au lieu de voir ses machines attribuées.
+
+**Défaut fonctionnel, pas trou de sécurité.** *Un paramètre nul traverse une fonction de cloisonnement —
+et le cloisonnement se referme au lieu de s'ouvrir.*
+
+### Et il est quasi invisible, ce qui explique cinq jours de silence
+
+    user_machine_access : 2 lignes au total
+
+**Même avec le bon identifiant, un rôle 1 ne verrait au plus que deux machines.** *La fonctionnalité est
+si peu employée que son défaut ne se manifeste presque pas* — et E-313 mesure que le rôle 2 n'a été
+exercé que **dix fois en trois semaines**, le rôle 1 jamais sur ces pages.
+
+### Sa réserve était la bonne, et elle a évité mon erreur d'hier
+
+> *J'ai mesuré que la clé n'est jamais posée, **pas** que les trois pages sont cassées. Une sonde qui
+> trouve 3 défauts là où il y en a peut-être 1 est le motif que j'ai déjà payé — 24 gardes « sans objet »
+> qui étaient 1.*
+
+**Elle a livré le fait et refusé la conséquence.** *C'est exactement ce qui m'a manqué ce matin quand
+j'ai inscrit « pire en service » : j'avais le fait et j'ai livré la conséquence.*
+
+**Et son refus de corriger est fondé** : trois modules distincts, et *un identifiant qui passe de 0 à sa
+vraie valeur CHANGE ce que chaque page montre*. **Ce n'est pas un correctif d'une ligne, c'est un
+changement de périmètre affiché** — mesurable seulement par qui tient la page. **Routé, non corrigé.**
+
+## E-345 — l'import CSV : trois divergences assumées, et une quatrième qui fabriquait une orpheline
+
+Livré par la session 3 (D6e), avec une route annoncée **avant** écriture sur un fichier partagé :
+
+    Route::post('/serveurs/importer', …)->middleware(['role:2', 'perm:can_admin_portal'])
+
+**Même garde que les onze autres routes `serveurs`, et même garde que le legacy** —
+`adm/admin_page.php:40-41` appelle `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])` puis
+`checkPermission('can_admin_portal')`. *Une garde reprise du legacy et mesurée sur lui, pas inférée.*
+
+### Les trois divergences, et chacune refuse un silence
+
+    ligne sans mot de passe          REFUSEE, au lieu d'un `sodium:` de chaine vide
+    `environment` non reconnu        REFUSE la ligne, au lieu d'un OTHER silencieux
+    taille du fichier                BORNEE, ce que le legacy ne fait pas
+
+**La deuxième porte son propre argument** : *coercer un environnement non reconnu en `OTHER` retire une
+machine de production de la population des machines de production.* **Une coercition silencieuse ne
+corrige pas une donnée, elle en change le sens.**
+
+### ⚠ Et la quatrième, non prévue : le legacy fabrique une orpheline que son propre bouton ne rattrape pas
+
+    legacy : INSERT INTO user_logs (user_id, action)   <- NU
+    or `user_logs` porte une chaine de HACHAGE
+    -> l'import fabrique une ligne que « Sceller » ne peut JAMAIS rattraper
+    mesure du soir : 1 385 orphelines sur 5 939
+
+**Elle avait recopié ce geste**, puis l'a retiré et reprise l'idiome scellé de `comptes` et
+`permissions`.
+
+> **Porter n'est pas reproduire** — et ici le legacy ne se contente pas d'omettre le scellement : *il
+> produit activement les orphelines que sa propre fonction de scellement est censée éliminer.* **Un
+> geste qui alimente le défaut que le produit prétend corriger.**
