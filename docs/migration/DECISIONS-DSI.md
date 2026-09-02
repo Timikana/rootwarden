@@ -2546,3 +2546,90 @@ hauts de sept.**
 *Une auto-correction sur l'instrument, doublée d'une affirmation fausse dans le même message, dit la même
 chose des deux : ce qui est vérifié est ce qu'on décide de vérifier.* **Il a remesuré son compteur et pas
 son argument.**
+
+---
+
+## E-280 / E-281 — le départage, et il tombe ENTRE le Lead et moi
+
+**Mesuré le 2026-09-02, 00:1x UTC.** Le Lead a retiré de lui-même l'argument de signature, avec le
+mécanisme de son erreur : son `grep -A3 "^        else:"` rendait le **premier** `else:` du fichier —
+`scheduler.py` porte **deux** tâches qui sélectionnent des machines, et il a opposé le scan CVE d'hier à
+l'audit SSH d'aujourd'hui. *Nos deux mesures concordent : il n'y a aucun écart arbre/servi.*
+
+**Mais sa correction est allée trop loin dans l'autre sens, et ma formulation était imprécise. Voici ce
+que la lecture rend.**
+
+### La branche fermée existe — et elle ne se déclenche pas sur le cas réaliste
+
+    :286  elif schedule['target_type'] == 'machines' and schedule.get('target_value'):
+    :293      if ids:  … WHERE id IN (…) AND lifecycle_status != 'archived'
+    :288      else:    … WHERE 1=0                         <- ELLE EST ATTEIGNABLE
+    :299  else:        … tout le parc, archivees exclues
+
+> **Le test de vacuité est dans la CONDITION du `elif`, pas dans la branche.** Une `target_value`
+> **vide** rend le `and` faux : *elle n'entre jamais dans sa propre branche*, donc **elle n'atteint jamais
+> le `WHERE 1=0` de cette branche** — elle sort par le `else` final, vers le parc entier.
+
+**Le `WHERE 1=0` n'est atteint que par une valeur NON vide qui ne rend aucun identifiant** — `'[]'`,
+`'["abc"]'`. *Il est donc atteignable, et le Lead a tort de dire que les quatre cas tombent dans le même
+`else` ; il est inatteignable par une case blanche, et j'ai eu tort d'écrire « trois branches échouent
+ouvert » comme si la quatrième protégeait le cas courant.*
+
+**Ce mécanisme est plus fort que nos deux formulations, et il explique pourquoi nous nous sommes trompés
+tous les deux** : *une garde placée dans la condition d'entrée ne garde pas la branche — elle en
+détourne.*
+
+### ⚠ Et l'enum ne ferme QUE l'une des deux tables — mesuré par ce qu'il ACCEPTE
+
+    cve_scan_schedules.target_type   enum('all','tag','machines')              NULLABLE  defaut 'all'
+    ssh_audit_schedules.target_type  enum('all','tag','environment','machines') NOT NULL  defaut 'all'
+
+    INSERT … cve_scan_schedules (name, target_type) VALUES ('__dsi_probe', NULL)   -> ACCEPTE
+    INSERT … ssh_audit_schedules(name, target_type) VALUES ('__dsi_probe', NULL)   -> ERREUR 1048
+    (deux transactions ANNULEES, survie verifiee a 0 ligne dans les deux tables)
+
+> **`NULL` n'est pas une valeur inventée : c'est une valeur que la colonne autorise.** Elle arrive en
+> Python comme `None`, ne vaut aucune des trois chaînes testées, et **sort par le `else` final.**
+> *L'enum du scan CVE ne ferme rien ; celui de l'audit SSH ferme.*
+
+**C'est la règle du dépôt appliquée à un schéma** — *un validateur se mesure par ce qu'il ACCEPTE.* Le
+Lead avait mesuré le refus d'une chaîne inventée et conclu « la base porte une liste fermée » : **vrai
+d'une table, faux de l'autre, et faux sur celle qui compte.**
+
+**Deuxième divergence entre les deux enums** : `'environment'` manque au CVE. *Deux tables jumelles,
+quatre différences, toutes dans le sens du danger sur la même des deux.*
+
+### ✅ Ce qui en ressort : E-281 passe devant E-280
+
+**Le scan CVE cumule quatre défauts que l'audit SSH n'a pas** :
+
+| | audit SSH (E-280) | **scan CVE (E-281)** |
+|---|---|---|
+| filtre `archived` | **oui**, dans les 4 branches | **nulle part** |
+| repli de la branche `machines` | `WHERE 1=0` — **fermé** | **tout le parc** — ouvert |
+| `NULL` en base | **refusé** (NOT NULL) | **accepté** → parc entier |
+| effet à l'aboutissement | sessions SSH | sessions SSH **+ un vrai courriel par machine** |
+
+> **La branche `WHERE 1=0` de l'audit SSH prouve que la forme correcte était connue de l'auteur.** *C'est
+> une divergence, pas un oubli* — et le Lead a raison sur ce point-là.
+
+### La borne, et elle change la nature du dossier
+
+    ssh_audit_schedules   0 ligne
+    cve_scan_schedules    0 ligne
+
+> **Aucune planification n'existe. Ce n'est pas un incident : c'est un piège armé pour la première
+> personne qui en créera une** — et le défaut se déclenche par une **case laissée blanche**, pas par une
+> requête forgée. *Le geste qui l'arme est le geste normal d'un exploitant qui découvre l'écran.*
+
+**Conséquence pour l'ordre des travaux** : rien ne brûle, et **c'est exactement le moment de corriger** —
+avant qu'une ligne existe, la correction ne migre aucune donnée et ne change le comportement de rien.
+*Une correction qui n'a encore aucun utilisateur est la moins chère qu'on puisse écrire.*
+
+### Ce qui n'est pas mesuré
+
+- **quel écran crée ces planifications**, et s'il impose un choix. Je mesure le schéma et le code de la
+  tâche ; *une interface qui n'offrirait pas la case blanche réduirait la portée sans fermer le défaut* ;
+- **E-282** (deux scores pour un même audit, session 5) : relevé, non revérifié par moi ;
+- **si `'environment'` est atteignable côté CVE** malgré l'absence dans l'enum — le code n'a pas de
+  branche `environment`, donc la question ne se pose pas ; je le note pour qu'on ne la rouvre pas.
