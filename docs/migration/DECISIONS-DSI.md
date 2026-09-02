@@ -3649,3 +3649,108 @@ module n'a **jamais servi** — `install_all` portait `AND a.id IS NULL` sur une
 c'est l'état normal — à distinguer d'une base injoignable.*
 
 > **Quand elle basculera, le menu sera à 32/32 et le legacy n'aura plus une seule entrée.**
+
+---
+
+# L'ORDRE D'EXÉCUTION DES DÉCISIONS — ils sont DIX, pas onze
+
+**Établi le 2026-09-02 sur demande de l'exploitant.** *Le moins risqué d'abord, avec les deux
+dépendances d'ordre qui existent réellement.*
+
+### ⚠ D'abord, je corrige mon propre compte
+
+**Le `DOSSIER-06` porte la migration `063`** (`uq_iptables_rules_server`), **pas la 062** — le « 062 »
+qu'il mentionne est un incident passé, *un `;` dans un en-tête qui avait coupé cette migration en deux.*
+
+> **Or `063` est déjà dans le lot des trois migrations en attente.** *Je comptais la même décision deux
+> fois : une fois comme « la migration d'E-222 », une fois dans « 063 + 064 + 065 ».*
+
+    schema_migrations : applique jusqu'a 062  (2026-08-27 09:26:52)
+    en attente        : 063 · 064 · 065
+
+**Dix décisions. Et mon « onze » était le troisième compte que je corrige en une nuit** — après « sept
+signatures » (c'était onze) et « 82 exécutions » (c'était 164). *Un compte qu'on récite dérive ; un
+compte qui porte ses objets se corrige.*
+
+---
+
+## Palier 0 — aucun risque, et l'inaction coûte
+
+| # | geste | pourquoi c'est sans risque |
+|---|---|---|
+| **1** | **`git push`** | la branche n'est **servie nulle part**, rien n'atteint la production. **259 commits n'existent que sur cette machine** — pas de miroir, pas de sauvegarde |
+| **2** | **recréer `rootwarden_laravel`** | `DOSSIER-07`, le plus petit. Ne touche ni base, ni backend, ni legacy, et **ne met en service aucun code non observé** : le portage est relu à chaque requête, donc tout ce qu'il contient est déjà en service |
+
+---
+
+## Palier 1 — ⚠ UNE SEULE FENÊTRE, et l'ordre compte
+
+| # | geste |
+|---|---|
+| **3** | **fusionner `security/backend-cve`** — 6 commits, **0 conflit** (`merge-tree` vérifié) |
+| **4** | **redémarrer `rootwarden_python`** — `DOSSIER-01` |
+
+> **⚠ DANS CET ORDRE, et c'est une dépendance mesurée.** *La branche ne touche que `backend/`,
+> `backend/routes/` et `backend/tests/`* — **et les `.py` sont lus au DÉMARRAGE du processus.**
+> **Fusionner après le redémarrage exigerait un SECOND redémarrage.** *Un seul geste au lieu de deux.*
+
+**Ce que la fusion ferme** : E-281, le repli du scan CVE planifié qui visait le parc entier sans filtre
+d'archivage. **Le correctif est écrit depuis le 21/08** et la flotte l'a redécouvert de zéro cette nuit.
+
+**Ce que le redémarrage débloque** : la vérification de `wazuh` (livrée en R1 ce matin), et l'effectivité
+de **34 routes qui gagnent une garde**.
+
+---
+
+## Palier 2 — la production, et c'est le plus GRAVE de la liste
+
+| # | geste |
+|---|---|
+| **5** | **rétroporter v1.37.16 · v1.37.17 · v1.37.48 vers `main`** |
+
+> **`v1.37.48` ferme une vulnérabilité PRÉSENTE en production** : sur `main`, la page qui *établit* le
+> second facteur le **divulgue** — `enable_2fa.php` n'est gardée que par `isset($_SESSION['temp_user'])`,
+> l'état posé **après le mot de passe et avant le 2FA**. *Le second facteur est dérivable du premier.*
+> **Le correctif existe depuis le 23/08.**
+
+**Ce sont des rétroportages CIBLÉS, pas un merge** — ils ne portent pas le portage avec eux. Geste exact
+dans le `DOSSIER-09`, et attention : `origin/main` **n'a aucun dossier `legacy/`** (le fichier y est sous
+`www/`), et la production **appelle déjà** `checkCsrfToken()` — **trois volets, pas quatre.**
+
+---
+
+## Palier 3 — le schéma de production
+
+| # | geste |
+|---|---|
+| **6** | **appliquer `063` + `064` + `065`** |
+
+    063_unicite_iptables_rules      = le DOSSIER-06 / E-222
+    064_statut_supervision_agents   ALTER … ADD COLUMN status ENUM(…)
+    065_target_type_non_nul         ferme le NULL qui defait l'enum du scan CVE
+
+> **⚠ `063` s'applique AVEC l'`UPSERT`, pas avant.** *La contrainte seule ne referme pas E-222 : elle
+> rend seulement l'`UPSERT` possible.* **Vérifier que le code est là avant de poser la contrainte.**
+
+---
+
+## Palier 4 — ce qui élargit ou détruit
+
+| # | geste | ce qu'il faut savoir |
+|---|---|---|
+| **7** | retirer `clean_up_users`, faire lire les deux magasins (`03`) | **code mort — zéro appelant.** Le moins risqué du palier |
+| **8** | les deux comptes : approbateur + 4ᵉ compte de test (`02`) | **chaque compte de rôle ≥ 2 élargit l'exposition de la console d'API** du legacy, joignable tant que `documentation.php` est servi |
+| **9** | auto-réparation du sudoers **avec sa colonne** (`05`) | **écrit un `sudoers` sur des machines réelles.** Les deux moitiés sont complémentaires : *une mesure qui réduit un ensemble ne remplace pas celle qui décrit ce qui reste* |
+| **10** | porter l'export RGPD **puis** archiver `profile/` (`11`) | **obligation réglementaire, art. 20.** *Cet ordre est une contrainte, pas une préférence* : `git mv legacy/profile/` fermerait la portabilité des données **sans qu'aucun test ne rougisse** |
+
+---
+
+## Ce que cette liste ne contient pas, et il faut le dire
+
+**L'archivage de `legacy/` n'y figure pas comme une décision** — *c'est le geste qui TERMINE la
+migration, et il a ses propres préalables* : les **20 dossiers encore servis** (dont `documentation.php`
+et sa console d'API), l'export RGPD du n°10, et les **deux pages qui déclarent absentes des capacités
+qu'elles possèdent** (`superv`, trois capacités testées).
+
+> **Le menu est à 32/32 : plus une seule entrée ne mène à l'ancien portail. Mais les fichiers du legacy
+> répondent encore.** *Le portage est fini ; la bascule ne l'est pas.*
