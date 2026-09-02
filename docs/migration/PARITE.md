@@ -16573,3 +16573,91 @@ corrige pas une donnée, elle en change le sens.**
 > **Porter n'est pas reproduire** — et ici le legacy ne se contente pas d'omettre le scellement : *il
 > produit activement les orphelines que sa propre fonction de scellement est censée éliminer.* **Un
 > geste qui alimente le défaut que le produit prétend corriger.**
+
+<!-- E-346 est RESERVE au marque-place de la DSI (DECISIONS-DSI.md:3964, l'ecran des CGU).
+     Je prends E-347 pour ne pas refaire la collision dont cette entree traite. -->
+
+## E-347 — UNE COLLISION DE NUMÉRO CAUSÉE PAR SA PROPRE DEMANDE, et la parade qui manquait
+
+    20:46  j'inscris E-344 (cle de session) et E-345 (import CSV) dans PARITE.md
+    20:54  son commit `dda67be` sort en annoncant E-344 au CHANGELOG
+    puis   `4e06965` renumerote en E-345, conforme au registre
+
+**Elle n'a pas touché mon entrée** — *« renuméroter celle d'un autre pour sauver la sienne serait
+l'inverse du bon geste, et `PARITE.md` est le registre autoritaire, pas mon CHANGELOG »*.
+
+### ⚠ ET LA PARADE AVAIT ÉTÉ APPLIQUÉE
+
+Elle avait relevé **les deux registres avant de numéroter** — la leçon des deux collisions précédentes.
+**Ça n'a pas suffi, et la cause est circulaire :**
+
+> **Son propre message de 20:46 m'a fait écrire dans le registre, avec son sous-lot dans la même
+> passe.** Elle a donc commité sur un relevé **périmé par sa propre demande.**
+
+    la regle qui manquait : relire le registre JUSTE AVANT LE COMMIT, pas seulement avant la redaction
+    et SURTOUT apres avoir sollicite une inscription de quelqu'un d'autre
+
+**C'est une forme neuve de « un relevé est une photo d'un système qui bouge »** : ici le relevé n'a pas
+été périmé par un tiers, **il l'a été par l'action même qui a suivi le relevé.** *Demander une
+inscription est un geste d'écriture différée — dont on est l'auteur, et qu'on ne compte pas comme
+tel.*
+
+### Et le marque-place de la DSI a tenu, lui
+
+    DECISIONS-DSI.md:3964   ## ⚠⚠ E-344 (à numéroter) — l'écran des CGU demande d'accepter
+                               des conditions QU'IL N'AFFICHE PAS
+
+**« (à numéroter) » l'a protégé** : c'est un marque-place explicite, **pas une revendication**. *La
+prudence qui manquait est écrite dans quatre caractères.* **J'ai laissé E-346 libre pour cette entrée.**
+
+*(Et son contenu recoupe E-317 : `/cgu` n'est atteignable par aucun chemin. Une page inatteignable qui,
+si on l'atteignait, demanderait d'accepter ce qu'elle n'affiche pas.)*
+
+## E-348 — MA LIGNE SUR `POST /ssh-audit/config` ÉTAIT VRAIE ET INCOMPLÈTE
+
+J'ai inscrit ce matin, contre la règle « non-GET = écriture » :
+
+    `POST /ssh-audit/config`  ->  LIT sshd_config
+
+**Vrai. Et incomplet** — mesuré à sa demande :
+
+    ssh_audit.py:372   with ssh_session(ip, port, user, ssh_pass, …, service_account=svc) as client:
+                           config_text = get_sshd_config(client, root_pass)
+
+> **Il lit EN OUVRANT UNE SESSION SSH ROOT sur la machine.** Ce n'est pas une lecture en base : c'est
+> une **lecture distante**, qui joint l'hôte et s'élève.
+>
+> **J'avais opposé « lecture » à « écriture » et laissé croire à une lecture inoffensive.** *La bonne
+> opposition n'était pas lit/écrit mais **local/distant** — et ma phrase, en réfutant une règle fausse,
+> en a suggéré une autre qui l'est aussi.*
+
+**Conséquence, et c'est un arbitrage exploitant** : *afficher `sshd_config`* — l'une des capacités
+restantes — **joint une machine réelle**, et **le sélecteur de cette page inclut `srv-zabbix`.**
+
+**La session 3 portera l'écran et ne joindra pas la production en lecture sans un mot explicite.** *Une
+lecture distante sur la production reste un geste sortant, et « ce n'est qu'une lecture » est
+exactement la phrase qui la ferait passer.*
+
+## E-349 — DEUX COMPTEURS DISTINCTS, ET UN SEUL A BOUGÉ
+
+Un chiffre à moi que la session 7 allait relayer faux, **corrigé entre elles avant transmission** :
+
+    menu                          32 route / 0 legacy     INCHANGE   (`dda67be` ne touche pas Navigation.php)
+    vues portant un `url_legacy`  12 -> 11                A BOUGE
+
+**Ce qui a changé n'est pas la navigation** : c'est le nombre de **vues** portant un lien vers l'ancien
+portail — `/serveurs` n'ayant plus rien de non porté, son encart a disparu.
+
+> **Deux compteurs, deux objets, et je n'en tenais qu'un.** *Le menu dit ce qui est ATTEINT ; les encarts
+> disent ce qui est DÉCLARÉ MANQUANT sur les pages atteintes.* **Un menu à 32/32 avec onze encarts de
+> manque n'est pas une contradiction : ce sont deux mesures d'états différents.**
+
+**C'est exactement ma faute d'E-333** — j'avais lu le menu comme la complétude du portage. **Le second
+compteur est celui qui aurait dû figurer à côté du premier depuis le début**, et il vient d'être trouvé
+par un pair corrigeant un autre pair, sans que je le demande.
+
+**État du périmètre de la session 3** : `serveurs` est **complet** — plus aucun encart, plus aucun lien
+vers l'ancien portail, les trois clés `reste_*` retirées des deux catalogues. Restent de sa liste :
+`ssh_audit` créer un relevé planifié · `ssh_audit` afficher `sshd_config` (arbitrage ci-dessus) ·
+`fail2ban` géolocaliser. **Les quatre absences déclarées de `ssh_audit` sont appariées et toutes
+VRAIES.**
