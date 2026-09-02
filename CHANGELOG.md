@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.136** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.137** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,112 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.137 — `ssh_audit` A1 : la page en LECTURE, et deux fermetures par l'ABSENCE
+
+**Deuxieme entree de menu qui bascule.** A1 ne porte que la lecture en base : aucune session SSH,
+aucune ecriture, aucune requete autre que `GET`.
+
+#### La garde est celle du legacy, et surtout PAS une plus large
+
+    role:1 + perm:can_audit_ssh        comme legacy/ssh-audit/index.php:12-13
+
+**`role:1`, pas `role:2`** : cinq routes du module sont reellement concues pour le role 1, et passer
+a 2 reproduirait cote portage le croisement de gardes qu'on reproche au backend.
+
+**Les TROIS chemins mesures au navigateur**, sans deplacer aucun droit — c'est le premier module de
+la serie ou le chemin NOMINAL est atteignable :
+
+    rw-test-admin  role 2, can_audit_ssh=1   ->  200   chemin NOMINAL
+    rw-test-super  role 3, permission a 0    ->  200   contournement par le ROLE
+    rw-test-user   role 1, permission a 0    ->  403   refus par la PERMISSION
+
+#### Le selecteur est borne, et la borne n'est pas recopiee
+
+`legacy/ssh-audit/index.php:22-33` porte sa propre correction d'IDOR : avant elle, le selecteur
+listait tout le parc — noms ET adresses IP — quel que soit le role. Le portage reprend la borne
+**sans la reecrire** : `Machines::perimetre()` s'appuie sur `requeteBornee()`, deja employee par tout
+le service. *Une TROISIEME ecriture de la meme regle finirait par diverger des deux autres.*
+
+Mesure : role 1 (`opsuser`) -> 1 serveur ; role 1 (`rw-test-user`) -> 0 ; role 3 -> 3.
+
+#### ⚠ SEC-013 — la politique est en LECTURE SEULE, et c'est dit
+
+    GET  /ssh-audit/policies  ->  require_permission('can_audit_ssh') + require_machine_access
+    POST /ssh-audit/policies  ->  require_role(2)  SEUL
+
+**Un role 2 sans la permission ne peut pas LIRE une politique et peut en ECRIRE une**, sur n'importe
+quelle machine. *L'ecriture est moins gardee que la lecture, sur la MEME URL* — et la passerelle ne
+peut pas les separer : `RoutesBackend::correspond` compare des CHEMINS, jamais des methodes.
+Structurel, pas un oubli.
+
+**Fermeture par l'ABSENCE** : aucun appel n'est compose vers cette route. Mesure : `policies`
+apparait 4 fois dans le script, dont **un seul appel reseau**, en `GET`. Et l'ecran DIT pourquoi
+l'ecriture n'est pas offerte — *une capacite absente doit etre declaree, jamais laissee pour un oubli*.
+
+#### E-279 — `/ssh-audit/trends` : decrite par l'API, appelee par PERSONNE
+
+    fichiers appelant /ssh-audit/trends dans legacy/ tests/ laravel/  ->  1
+    et c'est  legacy/api/openapi.yaml  — la SPECIFICATION, pas un client
+
+Aucun des 19 appels de `js/main.js` ne la vise. Meme famille que `PUT /groups/<id>`, **avec une
+aggravation** : *une route morte que rien ne documente est un dechet ; une route morte que la
+specification promet est une promesse fausse.* Non portee, inscrite.
+
+#### E-280 — une planification vise tout le parc par REPLI, pas seulement par choix
+
+    ssh_audit.py:767   target_type = data.get('target_type', 'all')     <- AUCUNE liste fermee
+    ssh_audit.py:768   target_value = data.get('target_value') or None  <- AUCUNE validation
+
+    scheduler.py   if   tag         and valeur  -> par tag
+                   elif environment and valeur  -> par environnement
+                   elif machines    and valeur  -> ids ; si vide -> WHERE 1=0
+                   else                          -> TOUT LE PARC
+
+**Trois branches, et la seule qui echoue FERMEE est celle des identifiants.** Un `target_type` non
+reconnu, ou un `target_value` vide sur `tag`/`environment`, tombe dans le `else`.
+
+**Et le Lead a mesure le SERVICE la ou j'avais mesure l'ARBRE** : le process tourne depuis le
+2026-08-27T12:28Z, `scheduler.py` a ete modifie sept heures apres. **En service, le repli ne filtre
+meme pas les archivees** — ma version est la forme attenuee. *Un releve backend se rend avec son
+regime, meme quand la conclusion ne semble pas en dependre.*
+
+**Le volet qui rend le defaut non-diagnosticable** : `'all'` — le defaut documente — et « je ne t'ai
+pas compris » sont **la meme branche**. Rien, ni a l'execution ni ensuite en base, ne dit laquelle a
+produit un releve du parc entier. **L'ecran le dit** (`planif_cible_ambigue`), et une cible non
+reconnue est nommee comme telle plutot que presentee comme un choix.
+
+Non corrige : le gel backend tient, et sous E-238 ce serait inerte.
+
+#### Quatre defauts de ma propre ecriture, vus a l'IMAGE
+
+1. **trois libelles de bouton etaient des phrases entieres** — le bouton portait « Le releve de tout
+   le parc n'est pas encore porte sur cette interface. ». *Un bouton dit ce qu'il FAIT ;
+   l'explication vit dans le panneau qu'il ouvre* ;
+2. **le `<select>` n'avait pas `rw-saisie`** — rendu natif, incoherent avec le reste ;
+3. **le message « choisissez un serveur » de la POLITIQUE s'affichait sous le titre de
+   l'HISTORIQUE** ;
+4. **le libelle du champ collait au bas de la carte** (`rw-champ--espace` existait deja).
+
+#### Et deux sondes de cles mortes fausses, toutes deux du cote qui ALARME
+
+La premiere cherchait `t('litteral')` et declarait mortes six cles demandees par `t(variable)` depuis
+un tableau. La seconde cherchait `'cle'` la ou Blade ecrit `'ssh_audit.cle'` — elle a declare mortes
+**dix-sept** cles rendues par la vue. **Deux formes d'appel, et il faut les deux.** La sonde finale
+les couvre et porte un TEMOIN : une cle inventee doit ressortir morte, sinon la sonde ne mesure rien.
+
+#### Mesures
+
+    go-socle-navigation   69 PASS / 0 FAIL   — « Audit SSH » resout 200 /audit-ssh
+    trois gardes          200 nominal · 200 par role · 403 par permission
+    parite i18n           FR=68  EN=68  ecarts=0 ; aucune cle morte (sonde a temoin)
+    requetes mutantes     0 ; aucun `confirm()` ni `prompt()` hors commentaire
+    captures              4, REGARDEES — 4 defauts corriges grace a elles
+
+**Hors A1, et chacun ouvre un panneau qui dit ce qu'il engage** : `scan`, `config`, `backups` (A2) ;
+`fix`, `save-config`, `toggle`, `restore`, `reload` (A3) ; `scan-all` (A4). Celui du parc entier ne
+nomme **aucune** cible, et c'est le fait a dire : *la route ne prend aucun parametre — il n'y a rien
+a viser, donc rien a restreindre.*
 
 ### v1.38.136 — retrait de clé : la sauvegarde existe, la restauration non ; et `documentation` garde par un seuil de rôle
 
