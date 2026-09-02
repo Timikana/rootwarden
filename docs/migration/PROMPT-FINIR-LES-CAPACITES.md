@@ -3,6 +3,14 @@
 **À donner telle quelle à une session de portage.** Établi par la session 8 (DSI délégué) le
 **2026-09-02**, sur mesures horodatées.
 
+> **⚠ CE DOCUMENT A DÉJÀ POURRI UNE FOIS, EN QUATRE HEURES.** *Son §2 listait « test de connexion » à
+> porter — il l'était depuis sept jours — et son §3 interdisait le « cycle de vie », porté et joignable
+> depuis le 26 août.* **Les deux ont été trouvés par des sessions qui ont vérifié avant d'exécuter.**
+>
+> **Donc : mesure avant de porter, même ce qui est écrit ici.** *Un document qui liste ce qui reste à
+> faire est exactement le genre d'artefact qui devient faux sans que personne ne le touche — c'est le
+> défaut que ce chantier a payé cinq fois, et celui-ci ne s'en exempte pas.*
+
 ---
 
 ## 0. LIS D'ABORD, DANS CET ORDRE
@@ -18,7 +26,8 @@
 ## 1. L'ÉTAT, MESURÉ — ne le refais pas, il est daté
 
     menu            32 / 32 entrees portees — plus une seule ne mene au legacy
-    capacites       16 inventoriees :  11 portables MAINTENANT
+    capacites       16 inventoriees :  10 portables MAINTENANT (11 - le test de connexion,
+                                   deja porte, mesure le 2026-09-02)
                                         4 exigent l'arbitrage de l'exploitant
                                         1 est une decision deja prise (politique en lecture seule)
     legacy          159 fichiers .php metier encore SERVIS, 13 dossiers en place
@@ -30,7 +39,7 @@
 
 ---
 
-## 2. CE QUE TU PORTES — les 11, par risque croissant
+## 2. CE QUE TU PORTES — **DIX**, par risque croissant
 
 **Aucune n'exige un mot de l'exploitant. Commence par le haut.**
 
@@ -39,7 +48,7 @@
 | 1 | **apparier les 5 catalogues non vérifiés** | `bashrc` `fail2ban` `politiques` `serveurs` `sftp` | **rien** — lecture pure |
 | 2 | **créer un relevé planifié** | `ssh_audit` | écrit en base |
 | 3 | **créer un groupe** | `groups` | écrit en base, **jamais une machine** |
-| 4 | **test de connexion** | `serveurs` | une connexion, aucune écriture |
+| ~~4~~ | ~~**test de connexion**~~ | `serveurs` | ⚠ **DÉJÀ PORTÉ** — `serveur-tester` → `POST /server_status`, suite de 516 lignes. **Rien à porter.** Mesuré le 2026-09-02 |
 | 5 | **import par fichier CSV** | `serveurs` | écrit en base |
 | 6 | **afficher `sshd_config`** | `ssh_audit` | **lecture** SSH distante |
 | 7 | **désactiver une jail** | `fail2ban` | modifie un service distant — *réversible* |
@@ -108,6 +117,10 @@ c'est la seule des trois options qui soit fausse.**
 passe par la passerelle n'a AUCUNE route Laravel* — `pare-feu` a déclaré absente une validation qu'elle
 savait faire, pendant cinq jours, pour cette raison exacte.
 
+**2. Avant de porter, vérifie que ce n'est pas DÉJÀ écrit sous un nom français.** `comptes-distants` et
+`pare-feu` ont dormi cinq jours parce qu'on cherchait `remote_users` et `iptables`. **Cherche l'artefact
+dans `laravel/`, pas la clé du menu.**
+
 **2bis. ⚠ Et cherche aussi la COUCHE, pas seulement le nom.** *Une capacité peut être portée **sans route
 backend et sans route de passerelle** : une simple écriture Laravel en base.* **Le cycle de vie des
 machines a été compté absent parce que `grep /server_lifecycle` sur le JS rendait zéro** — il n'appelle
@@ -118,10 +131,6 @@ pour une capacité entièrement présente.*
 > porte quatre clés de résultat pour le test de connexion — `test_en_cours`, `test_en_ligne`,
 > `test_hors_ligne`, `test_echec`.* **Personne n'écrit quatre messages de résultat pour un geste que sa
 > page n'accomplit pas.**
-
-**2. Avant de porter, vérifie que ce n'est pas DÉJÀ écrit sous un nom français.** `comptes-distants` et
-`pare-feu` ont dormi cinq jours parce qu'on cherchait `remote_users` et `iptables`. **Cherche l'artefact
-dans `laravel/`, pas la clé du menu.**
 
 **3. Ne recopie aucun prédicat de bornage.** `pourMisesAJour`, `Iptables::machines`,
 `Machines::compteursPerimetre` existent — *trois implémentations d'une même règle finiront par diverger.*
