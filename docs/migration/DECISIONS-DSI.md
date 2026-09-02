@@ -3120,3 +3120,42 @@ destructeur.
   entre le rôle annoncé et la population réelle sans le trancher : ce n'est pas le sujet de ce tour* ;
 - **s'il existe d'autres portages sous alias français** que je n'ai pas cherchés. *Après deux, je ne
   parierais pas qu'il n'y en a pas un troisième.*
+
+### `role:1` sur `pare-feu` — la question était bonne, la réponse n'élargit rien
+
+**La session 3 a refusé de basculer seule** tant qu'elle ne savait pas si le portage était plus permissif
+que le legacy sur un écran qui **écrit des règles de pare-feu**. **Mesuré :**
+
+    legacy/iptables/index.php:45   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])   -> role >= 1
+    legacy/iptables/index.php:46   checkPermission('can_manage_iptables')
+    laravel/routes/web.php:811     ['role:1', 'perm:can_manage_iptables']
+    backend/routes/iptables.py     @require_permission + @require_machine_access sur les 4 routes
+
+**Le même couple, à l'identique.** `role:1` traduit `checkAuth([ROLE_USER, …])`, il n'ajoute personne.
+**Population effective mesurée : `can_manage_iptables` n'est détenu que par `superadmin` (id 1)**, et le
+rôle 3 court-circuite — trois comptes. *Basculer ne change rien à qui atteint cet écran.*
+
+> **Le réflexe était juste indépendamment de la réponse.** *Elle ne pouvait pas le savoir avant de
+> mesurer, et elle ne l'a pas supposé* — **le fait qu'une vérification se termine bien ne la rend pas
+> superflue rétrospectivement.**
+
+### ⚠ Six routes candidates que je laisse OUVERTES, et pourquoi
+
+La session 3 a cherché les pages portées qu'aucune entrée de menu ne cite. **Sa sonde s'est disqualifiée
+sur son propre témoin** — `profil` rendait « 0 vue y mène » alors qu'elle est évidemment atteignable :
+les liens se construisent par `route($entree['route'])` depuis `Navigation`, donc **aucune vue n'écrit
+jamais `route('profil')` littéralement.** *Elle mesurait « cité dans un gabarit » en croyant mesurer
+« atteignable ».*
+
+**Restent nommées sans verdict** : `tickets`, `export-cve`, `notifications`, `permissions`, `serveurs`,
+`cles-api`.
+
+> **Un instrument disqualifié ne rend pas ses autres résultats valides parce qu'ils sont plausibles.**
+> *Son abstention est le bon geste, et je ne reprends aucun des six.* **La seule voie qui a établi
+> `pare-feu` est celle qui part de `Navigation.php`** — ce qu'aucune entrée ne cite — pas celle qui part
+> des gabarits.
+
+**Et sa direction d'erreur mérite d'être notée** : cette sonde-là se trompait **du côté qui alarme**.
+*Elle aurait produit du travail inutile, pas un dédouanement* — la moins coûteuse des deux, et la seule
+qu'une relecture par un pair attrape. **Elle l'a attrapée seule, avant publication, parce que son témoin
+était DANS la mesure.**
