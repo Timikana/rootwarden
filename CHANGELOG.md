@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.161** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.162** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,41 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.162 — mon « 29/32 » comptait le MENU : deux entrées sont portées et injoignables
+
+**E-315.** Signalé par la session 8, vérifié jusqu'au **corps du gestionnaire** : `remote_users`
+(contrôleur 8 362 o, 4 routes, vue 215 l, js 19 764 o) et `iptables` (12 197 o, 4 routes, vue 206 l, js
+34 786 o) **sont portés** ; seul `wazuh` ne l'est pas. **Et les trois gestes destructeurs de
+`remote_users` sont câblés** — `appelle(enCours.geste.chemin, corps)` vers `/remove_user_keys`,
+`/sshd_allow_user`, `/delete_remote_user`, derrière un panneau qui **nomme la conséquence**.
+
+**J'ai mesuré le MENU et conclu sur le PORTAGE.** *Le menu est une trace du portage, pas le portage* —
+ma propre règle, en tête de ma propre consigne, appliquée à l'envers. **Le compte honnête est double** :
+**portées 31/32**, **joignables 29/32**. *Un chiffre unique ne peut pas dire ça, et c'est pour ça qu'il
+était faux.*
+
+**Troisième forme du même motif, et la plus chère** : l'export RGPD *disparaîtrait* silencieusement,
+`profil` *manquait* une capacité sans le dire — **ici la page existe, est gardée, fonctionne, et rien
+n'y mène.** *On a payé le portage entier et on continue de servir l'ancien.*
+
+**Argument de sûreté adopté** : le legacy pose les mêmes gestes en **trois boutons minuscules sans
+panneau**. *Ne pas basculer n'est pas l'option sûre ; c'est l'option qui ne se voit pas.*
+
+**⚠ Mais le commit annoncé comme « le menu bascule » ne touche que `docs/`** — `Navigation.php:77`
+pointe toujours vers le legacy. **Une décision prise, écrite et transmise n'est toujours pas une
+décision appliquée.** *Croiser sur l'artefact, y compris quand le journal est un message d'un pair qui
+dit « c'est fait ».*
+
+**Arbitrage** : `remote_users` bascule **après le LOT** (les gestes câblés n'ont jamais été exercés) ;
+`iptables` reste sur le legacy — il est porté à **I1–I4 seulement**, et **I5, qui applique les règles,
+n'existe pas** ; `wazuh` ne bouge pas.
+
+**E-316 — j'ai attribué à la mauvaise session un piège qu'elle n'avait pas commis.** *Un registre qui
+attribue à quelqu'un une erreur qu'il n'a pas commise fausse le compte autant qu'un dédouanement* — et
+celui qui accable se remesure encore moins, puisque personne ne défend l'erreur d'un autre. La vraie
+leçon : **deux sessions, deux instruments, le même écart de deux heures le même soir** — l'hôte est en
+CEST, les conteneurs en UTC, et rien ne le signale.
 
 ### v1.38.161 — E-203 : la revocation de session devient EFFECTIVE, et E-315 : deux horloges
 
