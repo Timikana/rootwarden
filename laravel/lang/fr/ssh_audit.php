@@ -123,7 +123,52 @@ return [
     'np_config' => "L'affichage et la modification de `sshd_config` ne sont pas encore portés sur cette interface.",
     'np_config_detail' => "Écrire dans `sshd_config` et recharger le service peut couper l'accès SSH au serveur — et SSH est le seul canal dont RootWarden dispose pour y revenir. Une sauvegarde existe et la restauration est possible.",
 
-    'np_planif_creer' => "La création d'un relevé planifié n'est pas encore portée sur cette interface.",
+    // ══ A2 — LA CREATION D'UN RELEVE PLANIFIE EST PORTEE ═══════════════════
+    //
+    // `np_planif_creer` est RETIREE : elle declarait une absence qui n'existe
+    // plus. `np_planif_detail`, en revanche, NE BOUGE PAS — elle decrit la
+    // consequence du geste, et c'est le texte du panneau de decision. Une
+    // reserve qui dit ce qu'un geste engage sert autant quand le geste est
+    // porte que quand il ne l'est pas.
+    //
+    // ⚠ CE QUI EST REDUIT, ET QUI EST DECLARE : le formulaire n'offre que
+    // QUATRE frequences. Une expression cron arbitraire n'est pas saisissable
+    // ici. Le legacy en offrait une, et la borne serveur (intervalle minimum
+    // de dix minutes) la validait. Le choix est deliberé : une entree libre
+    // validee se contourne par une requete forgee, une entree libre absente
+    // non — et une cron est ce qui declenche des sessions SSH reelles sans
+    // personne devant l'ecran. Qui a besoin d'une autre periodicite passe par
+    // l'ancien portail, et la phrase ci-dessous le dit.
+    'planif_freq_bornee' => "Quatre périodicités sont proposées. Une expression cron libre n'est pas saisissable ici : une planification déclenche des sessions SSH réelles sans personne devant l'écran, et une liste fermée ne se contourne pas par une requête forgée. Pour une autre périodicité, l'ancien portail reste ouvert.",
+
+    'planif_form_titre' => 'Planifier un relevé',
+    'planif_f_nom'      => 'Nom de la planification',
+    'planif_f_nom_aide' => 'Ce nom identifie la planification dans la liste. 100 caractères au plus.',
+    'planif_f_freq'     => 'Périodicité',
+    'planif_f_portee'   => 'Sur quoi le relevé porte',
+    'planif_f_valeur'   => 'Valeur de la portée',
+    'planif_freq_horaire'    => 'Toutes les heures',
+    'planif_freq_six_heures' => 'Toutes les six heures',
+    'planif_freq_quotidien'  => 'Chaque jour à 02:00',
+    'planif_freq_hebdo'      => 'Chaque lundi à 03:00',
+    'planif_portee_all'         => 'Tout le parc',
+    'planif_portee_environment' => 'Un environnement',
+    'planif_portee_tag'         => 'Un tag',
+    'planif_portee_machines'    => 'Des serveurs désignés',
+    'planif_valider'    => 'Enregistrer la planification',
+    'planif_annuler'    => 'Annuler',
+
+    // ⚠ SANS VALEUR, UNE PORTEE RESTREINTE VISE TOUT LE PARC — E-280. La
+    // garde serveur refuse desormais ce cas (400), et le formulaire ne le
+    // propose pas : le bouton reste inerte tant que la portee n'est pas
+    // complete. Le rempart est cote serveur ; ici c'est l'ergonomie.
+    'planif_valeur_requise' => "Cette portée demande une valeur. Sans elle, la planification viserait tout le parc — y compris la production.",
+    'planif_aucun_tag'      => "Aucun tag n'est porté par une machine du parc : cette portée n'a rien à viser.",
+    'planif_aucune_machine'  => "Aucun serveur n'est visible depuis ce compte : cette portée n'a rien à viser.",
+    'planif_nom_requis'      => 'Un nom est nécessaire.',
+    'planif_creee'           => 'La planification « :nom » est enregistrée. Prochaine exécution : :quand.',
+    'planif_echec'           => "La planification n'a pas pu être enregistrée. :message",
+    'planif_conf_titre'      => 'Enregistrer cette planification ?',
     // ⚠ E-280 : ce que l'ancien portail ne dit pas au moment de planifier.
     'np_planif_detail' => "Une planification ouvre des sessions SSH réelles, à répétition, sans personne devant l'écran. Elle vise par défaut tout le parc, production comprise — et une cible restreinte dont le champ est resté blanc revient au même.",
 ];

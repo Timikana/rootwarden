@@ -65,6 +65,13 @@
         <div class="rw-panneau-decision__actions">
             <button type="button" class="rw-bouton rw-bouton--discret"
                     data-rw="audit-ssh-panneau-fermer">{{ __('ssh_audit.np_fermer') }}</button>
+            {{-- A2 : MASQUE PAR DEFAUT. Les panneaux des gestes NON portes
+                 n'ont rien a confirmer — seule la planification l'affiche,
+                 apres avoir annonce ce qu'elle arme. Et `fermePanneau()`
+                 DESARME le rappel : un bouton partage qui garde le geste du
+                 panneau precedent agit sur autre chose que ce qu'on a lu. --}}
+            <button type="button" class="rw-bouton rw-bouton--avertissement"
+                    data-rw="audit-ssh-panneau-confirmer" hidden>{{ __('ssh_audit.planif_valider') }}</button>
             <a class="rw-bouton" data-rw="audit-ssh-panneau-legacy"
                href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('ssh_audit.np_ouvrir') }} ↗</a>
         </div>
@@ -108,8 +115,85 @@
 
         <h2 class="rw-section__entete rw-titre--espace">{{ __('ssh_audit.planifs_titre') }}</h2>
         <div class="rw-actions">
+            {{-- A2 : LE MARQUEUR `↗` A DISPARU AVEC LA RAISON DE L'AFFICHER.
+                 Il annonçait un lien vers l'ancien portail ; le geste est
+                 porté, et laisser la flèche ferait croire qu'on quitte le
+                 portail. Un marqueur qui survit à sa cause trahit. --}}
             <button type="button" class="rw-bouton rw-bouton--discret"
-                    data-rw="audit-ssh-planif-creer">{{ __('ssh_audit.btn_planif') }} ↗</button>
+                    data-rw="audit-ssh-planif-creer">{{ __('ssh_audit.btn_planif') }}</button>
+        </div>
+
+        {{-- ═══ A2 — LE FORMULAIRE DE PLANIFICATION ══════════════════════════
+
+             Il ne porte AUCUNE saisie libre en dehors du nom : périodicité,
+             portée et valeur de portée sont trois listes fermées. Une entrée
+             libre validée se contourne par une requête forgée ; une entrée
+             libre absente, non — et ce qu'on arme ici déclenche des sessions
+             SSH réelles, répétées, sans personne devant l'écran.
+
+             Le rempart, lui, est côté serveur (`ssh_audit.py:752-800`). Le
+             formulaire évite l'erreur ; il ne la refuse pas à la place du
+             backend. --}}
+        <div class="rw-carte rw-carte--pleine" data-rw="audit-ssh-planif-bloc" hidden>
+            <h3 class="rw-section__entete">{{ __('ssh_audit.planif_form_titre') }}</h3>
+
+            {{-- LA CAPACITÉ RÉDUITE EST DITE AVANT LE CHOIX, pas découverte
+                 après. Quatre périodicités, et l'ancien portail pour le reste. --}}
+            <p class="rw-aide rw-prose" data-rw="audit-ssh-planif-bornee">{{ __('ssh_audit.planif_freq_bornee') }}</p>
+
+            <div class="rw-champ">
+                <label class="rw-champ__etiquette" for="audit-ssh-planif-nom">{{ __('ssh_audit.planif_f_nom') }}</label>
+                <input class="rw-saisie" type="text" id="audit-ssh-planif-nom" maxlength="100"
+                       data-rw="audit-ssh-planif-nom">
+                <p class="rw-aide">{{ __('ssh_audit.planif_f_nom_aide') }}</p>
+            </div>
+
+            <div class="rw-champ">
+                <label class="rw-champ__etiquette" for="audit-ssh-planif-freq">{{ __('ssh_audit.planif_f_freq') }}</label>
+                <select class="rw-saisie" id="audit-ssh-planif-freq" data-rw="audit-ssh-planif-freq">
+                    @foreach ($frequences as $cle => $cron)
+                        <option value="{{ $cron }}">{{ __('ssh_audit.' . $cle) }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="rw-champ">
+                <label class="rw-champ__etiquette" for="audit-ssh-planif-portee">{{ __('ssh_audit.planif_f_portee') }}</label>
+                <select class="rw-saisie" id="audit-ssh-planif-portee" data-rw="audit-ssh-planif-portee">
+                    @foreach (\App\Http\Controllers\AuditSshController::PORTEES as $portee)
+                        <option value="{{ $portee }}">{{ __('ssh_audit.planif_portee_' . $portee) }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- LA VALEUR DE PORTÉE : trois listes fermées, une par type, et
+                 masquées tant que leur type n'est pas choisi. Une portée
+                 restreinte SANS valeur viserait tout le parc — E-280 — et le
+                 bouton reste inerte jusqu'à ce qu'elle soit complète. --}}
+            <div class="rw-champ" data-rw="audit-ssh-planif-valeur-bloc" hidden>
+                <label class="rw-champ__etiquette" for="audit-ssh-planif-valeur">{{ __('ssh_audit.planif_f_valeur') }}</label>
+                <select class="rw-saisie" id="audit-ssh-planif-valeur" data-rw="audit-ssh-planif-valeur"></select>
+                <p class="rw-aide rw-erreur" data-rw="audit-ssh-planif-valeur-aide" hidden></p>
+            </div>
+
+            {{-- ⚠ `@json` NE PREND QU'UNE VARIABLE DEJA CONSTRUITE, et ce
+                 n'est pas une preference de style : son analyseur d'argument
+                 ne franchit pas une fonction flechee contenant un tableau.
+                 Mon premier jet passait `collect($serveurs)->map(fn ($m) => [...])`,
+                 et Blade a compile `json_encode([... collect($serveurs)->` —
+                 TRONQUE en pleine expression, gabarit entier en erreur de
+                 syntaxe. Les listes se construisent donc dans le controleur,
+                 ou cette donnee appartient de toute facon. --}}
+            <script id="audit-ssh-planif-listes" type="application/json">@json($planifListes)</script>
+
+            <p class="rw-erreur" data-rw="audit-ssh-planif-message" role="status" aria-live="polite"></p>
+
+            <div class="rw-actions">
+                <button type="button" class="rw-bouton rw-bouton--discret"
+                        data-rw="audit-ssh-planif-annuler">{{ __('ssh_audit.planif_annuler') }}</button>
+                <button type="button" class="rw-bouton"
+                        data-rw="audit-ssh-planif-valider">{{ __('ssh_audit.planif_valider') }}</button>
+            </div>
         </div>
         <div data-rw="audit-ssh-planifs">
             <p class="rw-vide__texte"></p>
