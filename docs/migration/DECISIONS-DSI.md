@@ -2791,3 +2791,72 @@ de DSI derrière.*
 **Je ne corrige aucun d'eux : ils sont hors de mon périmètre d'écriture.** *Je nomme le discriminant et
 je laisse chaque auteur trancher son propre texte* — c'est ce que la charte §7.0 me demande, et c'est
 aussi ce qui évite qu'une correction de masse remplace une erreur par une autre.
+
+---
+
+## ⚠⚠ Le chemin sans personne devant l'écran est MUET — mesuré, et c'est plus grave que mon écart candidat
+
+**Mesuré le 2026-09-02, 03:1x UTC.** Mon écart candidat du tour précédent disait *« un scan planifié ne
+peut jamais notifier en `critical` »*. **La mesure va plus loin : il ne notifie rien du tout.**
+
+    backend/webhooks.py:27   WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED', 'false') == 'true'
+    backend/webhooks.py:37   if not WEBHOOK_ENABLED or not WEBHOOK_URL: return False
+
+    docker exec rootwarden_python env | grep -iE "webhook|slack|discord|teams"
+        ->  AUCUNE variable                     (donc WEBHOOK_ENABLED prend son defaut : false)
+    SHOW TABLES LIKE '%webhook%'
+        ->  AUCUNE table                        (la configuration n'est nulle part ailleurs)
+
+### Le tableau complet des trois chemins, tous mesurés
+
+| chemin | notification | état **en service** |
+|---|---|---|
+| route `/cve/...` | courriel SMTP, **un par machine à résultats** | **ACTIF** — `MAIL_ENABLED=true` dans le conteneur |
+| action groupée `cve_scan` | idem — `groups.py` importe le même stream | **ACTIF** |
+| **scheduler** (planifié) | webhook unique | **MUET** — `is_enabled()` rend `False` avant tout envoi |
+
+> **Les deux chemins qu'un humain déclenche et regarde envoient un courriel. Le seul qui tourne sans
+> personne n'envoie RIEN.** Sa seule trace est un `_log.info` dans les journaux du conteneur.
+
+### Ce que ça change pour la décision sur E-281
+
+**C'est l'entrée qui manquait au « si on ne fait rien ».** Jusqu'ici le raisonnement était : *un repli
+vers le parc entier serait grave mais visible.* **Il ne le serait pas.**
+
+> **Une planification qui retombe sur tout le parc ouvrirait des sessions SSH sur chaque machine, et
+> personne ne l'apprendrait** — ni par courriel, ni par webhook, ni à l'écran. *Le seul chemin
+> d'exécution qui n'a pas de témoin humain est aussi le seul qui n'a pas de canal d'alerte.*
+
+**Les deux défauts se composent** : le repli élargit la portée, le silence retire la détection. *Ce n'est
+pas deux défauts, c'est un défaut et son absence de garde-fou.*
+
+### Et un piège en dessous du piège
+
+    notify_cve_scan(nom, total_findings, 0, 0, 0, scanned)     <- critical=0, high=0 EN DUR
+
+**Aujourd'hui cette ligne ne s'exécute pas** (le webhook est fermé). **Le jour où quelqu'un pose
+`WEBHOOK_ENABLED=true` en croyant activer la surveillance des scans planifiés, il obtiendra des
+notifications qui ne peuvent jamais dépasser `info`** — y compris pour des CVE critiques.
+
+> *Un correctif de configuration qui donne l'impression d'avoir rétabli une alerte, alors qu'il rétablit
+> une alerte incapable d'alarmer, est pire que l'absence : l'absence, au moins, ne rassure personne.*
+
+### Ce qui n'est pas mesuré
+
+- **si le webhook a jamais été activé** dans une autre installation. Je lis **ce** conteneur ;
+- **si `MAIL_TO` est renseigné.** `MAIL_ENABLED=true` ne suffit pas — `send_cve_report` rend `False`
+  sans `MAIL_TO`/`MAIL_FROM`/`MAIL_SMTP_HOST`. *Je n'ai vérifié que l'interrupteur, pas l'adresse* ;
+- **les journaux du conteneur**, qui restent le seul témoin du chemin planifié. Non consultés.
+
+### Note de conduite — E-305 vise ma position, pas seulement celle du Lead
+
+Le Lead a inscrit un arbitrage au registre **sans l'envoyer à la session bloquée**, qui a attendu vingt
+minutes. *« Le registre est une trace, pas un canal. »*
+
+**J'ai fait la même chose d'un cran** : mon arbitrage *« la session 4 écrit par-dessus la branche, pas à
+côté »* est parti **au Lead**, pas à la session concernée. **Vérifié : le diff n'a pas été appliqué et la
+fusion reste sans conflit** — *le risque ne s'est pas réalisé, mais il ne s'est pas réalisé sans moi.*
+
+> **Je ne diffuse pas pour autant à six sessions** : la table des numéros ne m'est pas connue, et six
+> interruptions pour un destinataire pertinent coûtent plus qu'elles ne protègent. **Ce qui manque est un
+> annuaire, pas un envoi de plus** — je le demande au Lead plutôt que de deviner.
