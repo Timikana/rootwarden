@@ -4464,3 +4464,59 @@ troisième par la session 7.*
 
 > **Un chiffre absurde s'attrape seul ; un chiffre plausible a besoin de quelqu'un d'autre.** *Et j'ai
 > fondé une instruction sur le troisième — c'est le seul des trois qui ait coûté du travail à quelqu'un.*
+
+---
+
+## ✅ ARBITRAGE — les deux capacités « perdues » de `superv` : une se porte, l'autre est BLOQUÉE par un secret
+
+**Rendu le 2026-09-03 vers 01:35**, sur la mesure de la session 2. *Je le devais depuis deux heures.*
+
+### ⛔ A — « modifier le jeton d'API » : NE PAS PORTER, et la raison n'est pas celle qu'on attend
+
+    superv.php:57   'champ_telegraf_jeton' => 'Jeton de sortie'
+    superv.php:63   « La modification de ce jeton n'est pas encore portee :
+                      elle reste sur l'ancien portail. »
+
+    la route qui l'ecrit : POST /supervision/config/<platform> -> save_platform_config
+    -> C'EST LA FONCTION DU DOSSIER-13, celle qui stocke le jeton EN CLAIR
+
+> **Porter cet écran ajouterait une porte d'entrée pour stocker un secret en clair.** *Le legacy en avait
+> une ; le portage n'en a pas ; en porter une avant le correctif de chiffrement serait ajouter le défaut
+> plutôt que le migrer.*
+
+**La capacité devient portable le jour où le correctif du `DOSSIER-13` est appliqué — pas avant.**
+*C'est une dépendance réelle entre un dossier d'exploitant et un sous-lot de portage, et c'est la
+première de la série.*
+
+**Ce qui se corrige MAINTENANT : la seconde moitié de la phrase.** *« Elle reste sur l'ancien portail »
+est faux — `/supervision/` rend 404, le legacy est archivé.* **La première moitié — « pas encore
+portée » — est vraie et le restera.**
+
+    a ecrire : « pas encore portee ici »   (sans promettre un chemin qui n'existe plus)
+    a NE PAS ecrire : le motif du blocage — un ecran n'annonce pas qu'il attend un correctif de securite
+
+### ✅ B — « rattacher un serveur à un profil » : PORTER
+
+    supervision_metadata_profiles :  2 lignes    <- le catalogue est PORTE et fonctionnel
+    machine_supervision_profile   :  0 ligne     <- le rattachement ne l'est pas
+    Supervision.php : 3 occurrences, toutes des `count()` — il LIT, il n'ECRIT jamais
+
+> **Un exploitant peut créer aujourd'hui un profil de supervision qu'aucune machine ne pourra jamais
+> porter.** *La capacité fermée est le seul débouché d'une capacité, elle, bien vivante.*
+
+**Elle écrit un lien en base, ne joint aucune machine, et son absence rend inutilisable un catalogue
+entièrement porté.** *Aucun arbitrage de l'exploitant n'est nécessaire.*
+
+**Et le libellé est faux d'une façon particulière** — *la variante C de la session 2* : il renvoie vers
+l'onglet « Déploiement », **qui existe dans le portage**, et où la colonne manque.
+
+> **Le renvoi ABOUTIT.** *Suivre le lien ne produit aucune erreur — c'est ce qui rend cette variante plus
+> difficile à voir que celle qui pointe vers un chemin mort.*
+
+### Ce que les deux ont en commun, et qui n'était pas visible avant de les mesurer
+
+**Aucune des deux n'est « en retard de portage ».** *L'une est bloquée par un défaut de sécurité qui vit
+ailleurs ; l'autre est le maillon manquant d'une chaîne dont tout le reste est porté.*
+
+> **« Capacité non portée » les décrivait toutes les deux et n'expliquait ni l'une ni l'autre.** *Le
+> compte de déclarations d'absence, encore une fois, nomme un symptôme et pas une cause.*
