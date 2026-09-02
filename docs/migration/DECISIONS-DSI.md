@@ -2652,3 +2652,83 @@ registre lui-même.
 **Rectification jointe** : j'ai écrit au Lead *« le `DOSSIER-01` est corrigé »*. **Faux — il n'a jamais
 été atteint.** *Dire « corrigé » revendique une remédiation ; dire « jamais entré » est une preuve que
 mesurer avant d'écrire fonctionne.* La seconde est vraie et vaut plus cher.
+
+---
+
+## ⚠ Rétractation — « un vrai courriel par machine » est faux, et c'était MON argument de classement
+
+**Mesuré le 2026-09-02, 02:4x UTC**, après que la session Lead a relevé que son fait le plus diffusé
+sur E-281 était une inférence. **Le mien aussi : je l'avais repris.**
+
+### Ce que j'ai écrit, dans DEUX documents destinés à l'exploitant
+
+> *« sessions SSH **+ un vrai courriel par machine** »* — tableau de classement E-280/E-281, et §3 du
+> `DOSSIER-08`.
+
+### Ce que le code fait
+
+    backend/scheduler.py:249-253   # Webhook notification
+        notify_cve_scan(f"Scan planifie: {nom}", total_findings, 0, 0, 0, scanned)
+
+    backend/webhooks.py            grep -niE "smtp|send_email|mail_utils"  ->  AUCUNE occurrence
+
+**Trois erreurs dans une demi-phrase :**
+
+| ce que j'ai écrit | ce que le code fait |
+|---|---|
+| un **courriel** | un **webhook** HTTP — `webhooks.py` ne contient aucun envoi de courriel |
+| **par machine** | **un seul appel**, après la boucle, pour tout le scan |
+| *(implicite : une alerte)* | `critical=0, high=0, medium=0` **passés en dur** → jamais autre chose qu'`info` |
+
+> **Le seul `send_email` de `scheduler.py` est `_check_password_expiry_notifications`** — sans aucun
+> rapport avec les scans. *J'ai transplanté un fait vrai d'un autre module sur celui-ci*, exactement le
+> défaut que ce registre appelle **« une conclusion écrite se recopie et devient un verdict »**.
+
+### Ce que ça fait à mon classement E-281 > E-280 — et il tient, mais pas par où je l'ai plaidé
+
+| | audit SSH (E-280) | scan CVE (E-281) | verdict |
+|---|---|---|---|
+| filtre `archived` | oui, 4/4 | **nulle part** | **tient** |
+| repli de `machines` | `WHERE 1=0` | **tout le parc** | **tient** |
+| `NULL` en base | refusé | **accepté** | **tient** |
+| ~~effet à l'aboutissement~~ | ~~SSH~~ | ~~SSH + courriel~~ | **RETIRÉ — les deux ouvrent des sessions SSH, rien de plus** |
+
+**Le classement survit sur trois cellules sur quatre. Mais la cellule fausse était la plus alarmante**, et
+c'est elle qu'un lecteur pressé retient. *Une case de tableau qui se trompe du côté qui alarme est une
+sonde écrite pour accuser, à l'échelle d'un argument* — et cette fois la sonde était la mienne.
+
+### ✅ Écart candidat, mesuré par moi seule et non recoupé
+
+    notify_cve_scan(nom, total_findings, 0, 0, 0, scanned)
+    webhooks.py:  if critical > 0 … elif high > 0 … elif total_cves > 0 -> 'info'
+
+> **Un scan CVE planifié ne peut JAMAIS émettre une notification `critical` ni `high`**, quel que soit ce
+> qu'il trouve : les deux compteurs sont passés en dur à `0`. *Le canal d'alerte du seul scan qui tourne
+> sans personne devant l'écran est celui qui ne peut pas alarmer.* **À vérifier par un tiers avant d'être
+> inscrit — c'est une lecture, pas une exécution.**
+
+---
+
+## E-288 confirmé — et il corrige mon §4 du `DOSSIER-08`
+
+    if   schedule['target_type'] == 'tag'      and schedule['target_value']:   <- LIGNE DE CONTEXTE, inchangee
+    -    elif ... == 'machines' and schedule['target_value']:
+    +    elif ... == 'machines':
+
+**La fusion retire le `and` sur `machines` et le LAISSE sur `tag`.** Donc, *même après fusion*, une
+planification « scanner le tag X » dont le champ est resté blanc sort par le `else` final : **le parc
+entier** — désormais filtré des archivées, mais entier. *La fusion réduit la portée du défaut ; elle ne
+le ferme pas.*
+
+### Note de méthode — mon témoin a fonctionné et je l'ai mal lu
+
+Une de mes commandes a rendu vide. J'ai posé un témoin (`wc -l` → **59 lignes**), *qui m'a correctement
+dit que le tube était bon*, puis j'ai soupçonné `grep` d'être une fonction shell défaillante — et j'ai
+failli publier une alarme d'instrument à toute la flotte.
+
+    printf 'a\nbeta\n' | grep -n beta     ->  2:beta      (le tube fonctionne)
+    | grep "target_type =="               ->  rien        (motif faux)
+    le texte reel :  target_type'] == 'tag'                (il n'y a jamais "target_type ==")
+
+> **Le témoin a fait son travail : il m'a dit que le problème n'était pas là. J'ai cherché ailleurs plutôt
+> que de relire mon motif.** *Un témoin ne protège que si on accepte ce qu'il dit quand il innocente.*
