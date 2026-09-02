@@ -15010,3 +15010,64 @@ prise sur un fichier qui a bougé depuis n'est plus une mesure* — geste fait s
 Troisième occurrence de `verifie` employé là où `verifiePortage` s'impose (après `accueil` et
 `audit-ssh`) : **3 FAIL qui accusaient le legacy d'un manque d'outillage.** *Il ne suffit pas de
 connaître la correction : il faut la chercher à chaque table de sélecteurs qui porte des `null`.*
+
+## E-309 — l'état des BLOCAGES au 2026-09-02 03:25 : trois entrées, cinq onglets, et UNE SEULE chose portable
+
+Mesuré, et c'est la première fois que je le fais **pour décider si le travail restant existe encore**.
+
+### Les trois entrées restantes sont TOUTES bloquées, par trois causes différentes
+
+    remote_users   les 5 gestes distants   PORTABLE EN CODE, INVERIFIABLE  <- categorie neuve
+    iptables       I5                      arbitrage du port SSH
+    wazuh          la page                 E-238, le redemarrage
+
+**Vérifié pour `remote_users` — témoin ouvert plutôt que motif ciblé** : les cinq gestes n'apparaissent
+côté portage **que dans `RoutesBackend.php`**, la table de classement de la passerelle. **Aucun n'est
+composé** — ni par le contrôleur, ni par le JS. Les quatre routes existantes sont la page, deux
+classements **locaux** en base, et la lecture des clés. *Fermeture par l'absence, exactement comme prévu.*
+
+> **Et sa moitié restante tombe dans la même catégorie que `wazuh`** : on peut l'écrire, on ne peut pas
+> la mesurer. Vérifier `sshd_allow_user` demande de réécrire un `sshd_config` et de recharger `sshd` ;
+> vérifier les retraits de clés demande une écriture dont **E-283 dit que l'état après échec est
+> indéterminé** ; vérifier `delete_remote_user` demande de supprimer un compte système.
+>
+> *Ma propre consigne interdit d'écrire `wazuh` parce que ce serait « du travail invérifiable ». La même
+> phrase s'applique ici, et je ne l'avais pas dite.*
+
+### Les cinq onglets non finis, et quatre sont retenus sur l'exploitant
+
+    accueil   une question de DROITS       arbitrage §7
+    bashrc    B4                           deux arbitrages
+    cve       S7b                          le scan qui aboutit envoie un VRAI courriel
+    profil    E-203                        <- PORTABLE, et personne n'y est
+    nav       les entrees `'legacy'`       le tableau disait 7, elles sont 3
+
+### ⚠ E-203 EST LA SEULE CHOSE PORTABLE QUI RESTE — et c'est un blocage 2.0
+
+    active_sessions        table EXISTE       3 930 lignes, TOUTES ecrites par le legacy
+    remember_tokens        table EXISTE
+    password_reset_tokens  table EXISTE
+
+**Le portage ne tient pas `active_sessions`** : ni écriture, ni lecture dans son authentification, seules
+des suppressions. Le legacy porte une liste de révocation côté serveur que `verify.php` consulte à chaque
+page protégée ; **le portage n'en a pas.**
+
+> **C'est masqué aujourd'hui** parce que les deux portails coexistent. **Le jour où le legacy s'éteint —
+> l'objectif 2.0 — la capacité disparaît SILENCIEUSEMENT : l'écran continuera d'offrir la révocation, et
+> elle ne révoquera rien.**
+
+**Aucune signature n'est nécessaire** : les tables existent, aucune migration, aucun geste distant, aucun
+redémarrage. **C'est du code Laravel, vérifiable par une suite.**
+
+### Ce que cette mesure décide
+
+**La boucle a encore un objet, et il n'en a qu'un.** Tout le reste attend une décision de l'exploitant.
+
+**Redirection** : la session 3 quitte les gestes distants de `remote_users` — *écrire sans pouvoir
+mesurer est ce que nous refusons pour `wazuh`* — et prend **E-203**, qui est portable, mesurable, et sur
+le chemin critique de la 2.0.
+
+**Et une conséquence pour le dossier de bascule** : E-203 est d'une classe qui mérite d'être nommée à
+part des autres écarts. *Un manque qui se voit est un reste à faire ; un manque dont l'écran continue
+d'offrir la fonction est un piège.* Il ne se découvre qu'après l'extinction du legacy, c'est-à-dire au
+moment où le retour arrière est le plus coûteux.

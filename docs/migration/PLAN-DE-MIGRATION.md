@@ -1041,7 +1041,7 @@ Mesuré plutôt que supposé — **le portage annonce lui-même ses manques**, e
 | `cve` | *« Le suivi d'une vulnérabilité reste sur l'ancien portail »* · *« Déclencher un scan reste sur l'ancien portail »* | **S7b** — le scan qui aboutit **envoie un vrai courriel** |
 | `profil` | *« Les sessions ouvertes et les connexions mémorisées ne sont pas encore listées ici »* | **E-203** — le portage n'a aucune révocation de session côté serveur |
 | `services` | ✅ **FAIT** — `244c840`, 2026-08-28 | **TROIS défauts, pas un** : l'encart déclarait non porté ce qui **est** porté (les cinq gestes passent par `/services/<geste>` **concaténé** — ce qui dédouanait l'encart au `grep` littéral) · son bouton **principal** menait à `/services/`, **archivé**, donc **404** · et **un `window.confirm()`** sur les cinq gestes qui écrivent, *les seuls gestes du module qu'aucune suite ne pouvait exercer.* **⚠ Cette ligne a été transmise DEUX fois à son autrice APRÈS son commit**, par le Lead puis par le DSI — *une tâche faite qu'un document annonce encore ouverte se redemande, et c'est le même coût qu'une tâche oubliée.* |
-| `nav` | un libellé générique « ancien portail » | les **7** entrées encore en `'legacy' =>` |
+| `nav` | un libellé générique « ancien portail » | les **3** entrées encore en `'legacy' =>` — *remesuré 2026-09-02 03:25 ; ce tableau disait **7**, et `groups`, `ssh_audit`, `documentation`, `platform_key` ont basculé depuis* |
 
 **Ce relevé ne couvre QUE ce que le portage déclare.** Un manque **non déclaré** n'y figure pas — et c'est
 précisément la classe que ce chantier a payée six fois : *un texte peut devenir faux sans qu'aucun test ne le
