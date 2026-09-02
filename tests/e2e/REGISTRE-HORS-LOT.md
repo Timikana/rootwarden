@@ -129,3 +129,62 @@ chiffre reste juste ; sa signification change.
 `go-adm-import-csv`, dont le nettoyage par NOM EXACT est sain. **La difference
 est structurelle, pas une question de soin** : on ne nettoie pas un nom qu'on ne
 peut pas prevoir.
+
+## §4 — ⚠ `go-wazuh.mjs` ÉCRIT, ET VISE LA MACHINE 1 (PRODUCTION)
+
+**Mesure du 2026-09-02 20:00 CEST.** Remesure :
+`sed -n '/^SUITES_LARAVEL=(/,/^)/p' ../../scripts/rejouer-lot.sh | grep -c wazuh`
+(→ `0`, idem `SUITES_LEGACY` — et **c'est bien cette mesure-là qu'il faut**, pas un
+`grep` sur tout le fichier : voir l'avertissement en tête de ce registre. Ici le
+`grep` global rendait aussi `0`, et un `0` EST concluant parce que ce grep
+SUR-compte — il voit les commentaires. L'erreur ne va que dans un sens.)
+
+Les trois suites `wazuh` datent d'avril, ne visent que `BASE_URL`
+(`helpers.mjs:10` → **`https://localhost:8443` par défaut, sans variable à poser**)
+et ne sont **dans aucune des deux listes du runner**. La page portée
+`laravel/resources/views/wazuh.blade.php` existe depuis R1 ; le menu est passé à
+32/32 avec une page qu'aucune suite ne connaît.
+
+### `go-wazuh.mjs` — À NEUTRALISER, PAS À REPRENDRE
+
+    :49  POST /wazuh/config   (invalid manager)
+    :55  POST /wazuh/config   (valid)            <- ECRIT la configuration
+    :70  POST /wazuh/rules                       <- CREE une regle
+    :92  POST /wazuh/options
+    :99  DELETE rule
+
+    :95  machine_id: 1, fim_paths: ['/etc; rm -rf /']
+
+`machine_id: 1` est **`srv-zabbix`** — la constante `MACHINE_PRODUCTION` de toutes
+les suites de page de ce banc, celle que la consigne permanente interdit de joindre.
+
+> **La charge `'/etc; rm -rf /'` est légitime en soi** : c'est un test défensif qui
+> vérifie que le backend la refuse. **Le défaut n'est pas la charge, c'est la cible.**
+
+**Ce n'est pas un artefact qui a l'air d'une couverture : c'est un artefact qui a
+l'air inoffensif.** Son nom n'annonce rien, son absence de tout lot la rend invisible
+aux relevés, et un `node go-wazuh.mjs` suffit. Elle porte le même danger que
+`go-ssh-audit-scanall.mjs`, que les consignes nomment explicitement — **celle-ci,
+personne ne l'avait nommée.**
+
+⛔ **Ne pas l'enrôler. Ne pas la lancer.** Le retrait n'est PAS pris ici : la suite
+porte peut-être une intention que cette mesure ne lit pas, et le geste revient à son
+auteur ou à l'exploitant. *Une suppression efface le danger ET la trace.*
+
+### Les deux autres
+
+    go-wazuh-toggle.mjs   69 lignes — lit le drapeau WAZUH_ENABLED, « test vivant »
+                          qui asserte sur l'etat courant des conteneurs
+    smoke-wazuh-off.mjs   10 lignes — capture comparative ON/OFF, aucun verdict :
+                          meme classe que les `go-captures-*`, legitimement hors LOT
+
+**Aucune des trois ne se reprend pour couvrir R1** : R1 est en lecture seule
+(5 routes GET), et ces suites soit écrivent, soit ne rendent pas de verdict. La
+couverture de R1 demande une suite NEUVE, double cible.
+
+⚠ **Et `wazuh_agents` porte ZÉRO ligne, ce qui est l'état NORMAL** : `install_all`
+portait `AND a.id IS NULL` sur une table sans colonne `id` et rendait 500 sans `try`
+— le module n'a jamais servi. Une suite qui asserte « la liste est vide » passerait
+donc au vert sur une page cassée : **distinguer « zéro mesuré » de « je n'ai pas su
+lire »**, et mesurer l'URL finale avant de conclure (une redirection rend le même
+observable qu'une vue vide).
