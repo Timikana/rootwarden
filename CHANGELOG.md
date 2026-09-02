@@ -2223,8 +2223,19 @@ chose.*
     reserveeAdmin() est teste par  if ($roleId < 2 && …)      PasserelleController.php:69
     -> critere de ROLE, pas de PERMISSION
 
-    role 1  ->  refus a la PASSERELLE au lieu du backend      gain reel, petit
+    role 1  ->  refus a la PASSERELLE au lieu du backend      voir ci-dessous
     role 2  ->  PASSE, avant comme apres                      LE TROU EST INTACT
+
+Et le gain pour le role 1 est PLUS ETROIT que « refus un rempart plus tot », mesure apres coup :
+`AuditSshController` passe `'administration' => $role >= 2`, la vue conditionne les deux hotes sur
+`@if ($administration)` (l.98) et rend `planifs_reserve` en `@else`, et le JS n'appelle que si l'hote
+existe (`if (hoteFlotte)`). **Pour un role 1, la page ne compose donc JAMAIS ces deux appels** — le
+controleur le dit lui-meme : « les afficher au role 1 produirait deux 403 a l'ecran plutot qu'une
+absence expliquee ».
+
+Le seul cas que ces trois entrees changent est donc une **requete FORGEE** par un compte role 1.
+C'est exactement ce que « on ne depend jamais d'un seul rempart » veut dire — mais l'ecrire « gain
+reel » etait plus vague que la verite.
 
 Or le defaut releve est celui du role 2 : **un compte role 2 DEPOURVU de `can_audit_ssh` atteint
 `POST /ssh-audit/schedules` par la passerelle**, et le backend l'accepte puisqu'il ne garde que le
