@@ -2194,6 +2194,26 @@ methode en une nuit**, apres la contrainte du champ de portee vide dans `audit-s
 ma propre pratique valait mieux que son canal. *Le canal qui dure n'est pas celui qui informe le plus
 vite.*
 
+### v1.38.153 — E-274 ne se mesure qu'en construisant l'objet dangereux : on ne le construit pas
+
+**E-301.** Mesuré : `machine_groups` **0**, `machine_tags` **0**, `machines` **3 toutes vivantes** — et
+**`srv-zabbix` est id 1, `active`, donc dans le parc**. La propriété d'E-274 — *un groupe dynamique sans
+filtre doit afficher le parc, pas du vide* — **n'a aujourd'hui aucun objet**. Une suite écrite maintenant
+asserterait l'état vide et serait **verte sans jamais toucher la propriété**.
+
+**La fixture est refusée, pas reportée.** Créer un groupe sans filtre construit l'objet qui rend le geste
+interdit atteignable en un clic : il résout vers les 3 machines **`srv-zabbix` comprise**, et l'action
+groupée `cve_scan` sur ce groupe ouvre une session SSH **et envoie un courriel réel**. *Le danger est
+l'objet, pas le geste* — un `finally` protège la session qui pose la fixture, pas le banc partagé par
+sept sessions pendant la fenêtre où l'objet existe, et il ne s'exécute pas si le processus est tué. Et le
+substitut évident ne substitue rien : un groupe **avec** filtre mesurerait une autre propriété.
+
+**Décision : référence posée sur l'état vide, et le non-couvert inscrit dans la suite.** La page répond,
+la garde tient, aucun geste ne part — ça entre au LOT à ce titre. *Un zéro qui explique pourquoi il est
+zéro vaut mieux qu'une suite verte qui laisse croire que c'est couvert.* La propriété redeviendra
+mesurable le jour où un groupe existera pour une raison métier, **sans que personne ait construit le
+danger**.
+
 ### v1.38.152 — le webhook est fermé EN SERVICE : la non-mesure déclarée est close
 
 **E-300.** La session 5 avait déclaré, **avant que ça serve**, qu'elle lisait le *défaut du code* et non

@@ -14758,3 +14758,69 @@ trois répétitions du mien.
 Rien de ceci ne touche E-280 ni E-281 : la branche qui échoue ouvert **ouvre toujours une session SSH
 par machine, avec le mot de passe SSH et le mot de passe root déchiffrés dans la boucle**. *Ce qui
 tombe est le bruit, pas le geste* — et un défaut muet est le plus difficile à voir passer.
+
+## E-301 — ⚠ E-274 ne se mesure qu'en CONSTRUISANT l'objet dangereux — arbitrage : on ne le construit pas
+
+La session 7 s'est arrêtée avant d'écrire et a demandé. **Mesuré par moi, lecture seule :**
+
+    machine_groups      0
+    machine_tags        0
+    machines_total      3
+    machines_vivantes   3
+
+    id 1  srv-zabbix            active     <- DANS LE PARC VIVANT
+    id 2  Test-Server-Debian    active
+    id 3  OpenCVE-Test-OnPrem   active
+
+**E-274 — *un groupe dynamique sans filtre doit afficher le PARC, pas du vide* — n'a aujourd'hui aucun
+objet : il n'existe aucun groupe.** Une suite écrite maintenant asserterait l'état vide, serait
+**verte**, et ne toucherait jamais la propriété. *Le vert par absence, sur la seule propriété nommée
+comme celle qui compte.*
+
+### Pourquoi la fixture est REFUSÉE, et pas reportée
+
+Créer un groupe dynamique sans filtre pour mesurer E-274, c'est **construire l'objet qui rend le geste
+interdit atteignable en un clic** :
+
+    groupe sans filtre  ->  resout vers les 3 machines vivantes, `srv-zabbix` COMPRISE
+    action groupee `cve_scan` sur ce groupe
+        -> groups.py:269  _stream_cve_scan  ->  cve.py:77  send_cve_report   (MAIL_ENABLED=true)
+        -> une session SSH + un courriel reel, sur `srv-zabbix`
+
+> **Le danger est l'OBJET, pas le geste.** Une fixture protégée par un `finally` protège la session qui
+> la pose ; elle ne protège pas le banc **partagé par sept sessions** pendant la fenêtre où l'objet
+> existe. Et un `finally` ne s'exécute pas si le processus est tué.
+
+**La session 7 avait vu tout cela seule** et l'a formulé mieux que sa propre proposition : *« ce n'est
+pas une raison de refuser la fixture, c'est une raison de ne pas la poser dans la même session que la
+mesure du geste »*. **Je vais plus loin qu'elle : ce n'est pas une question de session, c'est une
+question d'objet.** Le seul moment où ce groupe peut exister est celui où l'exploitant le décide.
+
+**Et le substitut évident ne substitue rien** : un groupe *avec* un filtre ne visant que
+`Test-Server-Debian` exercerait le chemin de résolution sans jamais toucher `srv-zabbix` — mais E-274
+porte précisément sur **l'absence de filtre**. *Le contournement sûr mesure une autre propriété.*
+
+### Décision : option (2) — poser la référence sur l'état vide, et INSCRIRE le non-couvert
+
+La référence a une valeur réelle sans la propriété : **la page répond, la garde tient, aucun geste ne
+part.** Elle entre au LOT à ce titre.
+
+**Et la suite écrit noir sur blanc qu'E-274 n'est pas couvert, et pourquoi.** *Un zéro qui explique
+pourquoi il est zéro vaut mieux qu'une suite verte qui laisse croire que c'est couvert* — c'est la
+forme d'E-296 (le témoin qui rend `SANS OBJET` plutôt qu'un vert) appliquée à une couverture entière.
+
+**Ce qui la débloquera** : le jour où un groupe existe pour une raison métier, la propriété devient
+mesurable **sans que personne ait construit le danger**. Jusque-là elle reste ouverte, et c'est le bon
+état — *une propriété non couverte et déclarée est un fait ; une propriété non couverte et verte est un
+mensonge.*
+
+### Ce qui a bien fonctionné, et mérite d'être nommé
+
+**Elle s'est arrêtée avant d'écrire**, sur la reconnaissance d'un effet sortant et irréversible, comme
+sa consigne le lui prescrit. **Elle a refusé la voie qui l'aurait sauvée du blocage** — forger une
+charge interceptée dans le navigateur — *parce que ça ne mesure que la mise en page, pas le chemin de
+donnée*, ce qu'elle avait elle-même reproché à une assertion deux heures plus tôt.
+
+**Et elle a vérifié la chaîne d'appels du courriel** que la session 3 lui signalait, plutôt que de la
+relayer. *Un accord ne vaut que si le confirmateur a mesuré autrement* — le sien vaut, c'est la
+troisième lecture indépendante de cette chaîne.
