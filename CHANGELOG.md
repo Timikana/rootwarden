@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.140** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.141** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,36 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.141 — la fusion retire le `and` sur `machines` et le laisse sur `tag`
+
+**E-288.** Mesuré sur `security/backend-cve`, ancré sur `_run_scheduled_scan` : le `and
+schedule['target_value']` a été retiré de la branche `machines` (`:35`) et **laissé sur `tag`**
+(`:27`). Or c'est `tag` qui porte le cas atteignable par le chemin normal — **un champ de tag laissé
+blanc échoue le `and`, n'entre pas dans sa branche, et tombe dans le `else` final : tout le parc
+vivant.**
+
+J'avais annoncé que « la fusion ferme le pire des deux et laisse l'autre entier ». **Encore trop
+favorable** : elle ferme le repli de `machines` sur la tâche CVE et **laisse le chemin de la case
+blanche ouvert sur les deux tâches**. *Quatrième formule de la nuit plus rassurante que la mesure qui
+la fonde, troisième dont l'écart va dans le sens qui fait signer — la règle « mesurer deux fois ce qui
+arrange » était écrite depuis deux heures.*
+
+**Ça renforce l'apport de la session 4** : son `else` qui refuse et journalise est la **seule** pièce
+qui fermerait ce chemin sur la tâche CVE après la fusion. Il ne complète pas la branche, il ferme ce
+qu'elle laisse ouvert sur le cas le plus probable. Il ne suffit pas non plus : `'tag'` + valeur vide
+produira un refus là où un scan était attendu — à rendre visible dans le portage, pas dans le correctif
+backend.
+
+**Migration de schéma routée** : `cve_scan_schedules.target_type` reste `NULLABLE` après la fusion — la
+branche corrige l'applicatif, jamais le schéma. **Écrite maintenant, appliquée jamais sans signature**,
+avec 063 et 064. *Écrire ne coûte rien et se défait ; ne pas écrire fait passer la fusion pour complète.*
+
+**Et un contrôle à nommer** : le diff de l'après-fusion **refuse** sur `HEAD` (`git apply --check`,
+ligne 225) et s'applique sur l'arbre post-fusion. *Ce refus est le contrôle, pas un défaut* — un apport
+qui s'appliquerait aux deux viserait les mauvaises lignes. Le diff périmé a été renommé
+`PERIME-refait-par-a345e65.patch` : *un correctif périmé qui reste nommé comme un correctif est un
+piège posé pour la session suivante.*
 
 ### v1.38.140 — le correctif d'E-281 existe depuis douze jours, et nous venons de le repayer
 
