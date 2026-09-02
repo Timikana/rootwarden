@@ -3218,3 +3218,160 @@ que pour la sonde des dossiers : un ordre de grandeur connu, pas une prudence.**
 
 **Le comptage juste s'ancre sur la ligne d'entrée** (`'cle' =>`), pas sur le mot cherché. *C'est E-278 du
 Lead sous une autre forme — un compteur qui compte des occurrences et pas des objets.*
+
+---
+
+# Nuit du 2026-09-02 — ce que trois heures de banc immobilisé ont produit
+
+**Écrit à 07:58 UTC, banc rendu.** Ces quatre entrées attendaient depuis 05:09 : un LOT de 2 h 40 tenait
+l'arbre, et *rien de ce qui suit ne valait de salir une mesure de 164 exécutions.*
+
+---
+
+## 1. `pare-feu` — une déclaration d'absence FAUSSE, et son attribution corrigée deux fois
+
+    lang/fr/pare-feu.php:69   « La validation à blanc ET l'application des règles ne sont pas
+                                encore portées : elles restent sur l'ancien portail. »
+    public/js/pare-feu.js:710 appelle('/iptables-validate', {          <- un VRAI appel
+
+**La validation à blanc est portée.** Elle n'a pas de route Laravel : elle passe par la passerelle.
+
+### Deux erreurs d'attribution, en sens opposés
+
+**J'ai d'abord écrit que ma consigne en était la cause** — j'avais nommé une route Laravel comme repère à
+la session 3. **Faux** : la chaîne est `3c3fe98` (I1, 27/08) qui écrit la phrase — **vraie alors** — puis
+`c42fe48` (I4, 28/08) qui porte la validation **sans revisiter la phrase**, qui devient fausse.
+
+> **Une déclaration vraie devient fausse sans que personne ne la touche.** *C'est plus difficile à
+> trouver qu'une phrase fausse dès l'écriture : il n'y a aucun commit à incriminer, et la relecture du
+> diff qui l'a rendue fausse ne la contient pas.*
+
+**Puis j'ai failli durcir la faute sur un faux positif.** `git log -S "validation à blanc"` désignait
+`c42fe48`, et j'ai cru qu'il *éditait* la phrase. **`git show --stat` : 283 insertions, 0 suppression** —
+il ajoutait un commentaire contenant les mêmes mots. *`-S` compte une chaîne n'importe où dans le
+fichier.* **Le motif était bien formé et ne décrivait pas l'objet.**
+
+> **S'accuser n'est pas une position sûre : c'est un diagnostic, et il peut être faux.** *En m'attribuant
+> la cause, je désignais la mauvaise réparation.* Si le défaut venait d'une consigne, on corrige une
+> consigne ; il vient d'un libellé que personne ne relit quand le code qu'il décrit change. **Toute la
+> nuit nous avons traqué les erreurs qui rassurent — celle-ci accusait, et coûtait autant.**
+
+---
+
+## 2. `superv` — TROIS capacités déclarées absentes, toutes portées, toutes testées
+
+    supervision.blade.php:902  <div class="rw-vide rw-note">   <- HORS du @if, sa seule
+                                condition est l'onglet « deploiement »
+      « Pas encore porte sur ce portail — Installer, reconfigurer et desinstaller un agent …
+        restent sur l'ancien portail »      + un lien vers le legacy
+
+    supervision.blade.php:455  <button data-rw="superv-reconfigurer" data-machine=…>
+                        :470  <button data-rw="superv-desinstaller"  data-machine=…>
+    SupervisionController:710-713   reconfigure · uninstall · deploy   — les URL resolvent
+    tests/e2e/go-page-supervision-{reconf,desinst,deploiement}.mjs
+        les TROIS visent `laravel`, cliquent les selecteurs, et sont dans le LOT
+
+> **Quatre artefacts produits par trois sessions affirment que la capacité existe. Une chaîne de
+> caractères dit le contraire. Rien ne les compare — et c'est la seule des cinq qu'un utilisateur lit.**
+
+**Le texte apparaît quand on ouvre l'onglet « déploiement »** — *au moment précis où il est le plus faux
+et le plus coûteux.*
+
+### Le détail qui donne sa mesure au problème
+
+**Trois lignes au-dessus de la clé fautive, son propre auteur a écrit :**
+
+    // UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE VOIE : le tableau du
+    // parc est porte depuis V6, la phrase qui l'annoncait « pour plus tard » ne
+    // l'etait plus. Vu a l'image.
+
+> **Il a rencontré ce défaut, l'a diagnostiqué, a écrit l'avertissement — et la clé immédiatement en
+> dessous est celle qui est fausse aujourd'hui.** *Un avertissement écrit ne protège pas le texte qu'il
+> précède ; il a échoué sur place, à trois lignes, sans même avoir besoin d'être recopié.*
+
+**Et le dernier mot explique les 37 : « vu à l'image. »** *Ni test, ni parité, ni sonde de clés mortes —
+la clé est vivante, rendue, traduite, et fausse.* **Aucun de nos contrôles ne regarde ce qu'une phrase
+AFFIRME.**
+
+---
+
+## 3. La sonde de la classe — et son résultat est plus rassurant que son ouverture
+
+**Méthode de la session 3, que j'ai exécutée à la main puis qu'elle a outillée :** croiser les
+déclarations d'absence d'un catalogue avec ce que le JS de la page appelle **réellement**.
+
+| | |
+|---|---|
+| déclarations d'absence | **37**, 17 catalogues — l'**exposition**, pas une dette |
+| défauts établis | **2** — `pare-feu` (1 capacité), `superv` (3) |
+| pages vérifiées **saines** | **3** — `ssh_audit`, `groups`, `ssh` |
+| restant à apparier | **5** |
+
+> **Le taux de défaut BAISSE à mesure qu'on mesure.** *C'est le contraire d'une classe qui s'aggrave, et
+> il faut le dire aussi fort que le reste — on ne publie jamais « j'ai cherché et il n'y avait rien ».*
+
+**`ssh` est l'entrée la plus utile de la série parce qu'elle est propre** : la page déclare le
+déploiement absent, et sa **seule** requête mutante vise le préflight. **Sa déclaration est vraie**, et
+elle montre où passe la frontière — *la classe n'est pas « les déclarations d'absence sont fausses », mais
+« certaines le sont devenues, et seule une comparaison ciblée dit lesquelles ».*
+
+**Deux limites de méthode, payées :**
+
+- **compter les `POST` d'un JS établit l'exposition, pas la cible.** `supervision.js` : 10 POST, **aucune
+  URL littérale** — elles viennent toutes du contrôleur ;
+- **une suite E2E prouve qu'UNE capacité est portée, pas que c'est CELLE que le catalogue nie.**
+  *L'appariement est le travail ; l'instrument le rend seulement possible.*
+
+---
+
+## 4. ✅ Arbitrage — un compte en toutes lettres à côté d'une énumération
+
+**J'allais trancher que « toute déclaration d'absence doit nommer ce qu'elle exclut ».** *Vérifié
+d'abord : elles le font déjà* — le **titre** porte le compte, le **texte** porte l'énumération
+(`fail2ban:57/58`, `serveurs:71/72`). **Une convention imposée à quatorze catalogues pour un défaut qui
+n'existe pas**, évitée en remontant à la source.
+
+**Il reste un point, et il est étroit** : *le compte du titre est un second artefact qui peut pourrir
+seul.* Le jour où l'un des quatre gestes de `fail2ban` sera porté, le texte perdra un élément et le titre
+dira toujours « Quatre » — **le mode de défaillance exact de `superv`.**
+
+> **✅ Pour les futures déclarations : l'énumération est la seule source.** **Aucune réécriture des
+> existantes** — *elles sont justes aujourd'hui, et une réécriture de masse créerait plus de risque
+> qu'elle n'en retire.* **Une règle pour la prochaine, pas une dette.**
+
+---
+
+## 5. ⚠ « LOT = 82 exécutions, 1158 assertions » était périmé de treize jours
+
+    SUITES_LARAVEL 83 · SUITES_LEGACY 81 · executions 164
+    suites DISTINCTES 86      (78 sur deux cibles · 5 laravel · 3 legacy) -> 78x2+5+3 = 164
+    derniere ligne de base COMPLETE : 158 executions · 2439 PASS · 0 FAIL   (2026-09-01)
+    croissance : 82 -> 153 -> 158 -> 164
+
+**La session 7 et moi le portions tous les deux**, et le suivi du Lead probablement aussi.
+
+### Le piège, et il est neuf
+
+**82 est exactement la moitié de 164.** *L'explication « 82 suites × 2 cibles » se referme toute seule.*
+**Elle est fausse** — les distinctes sont **86**.
+
+> **Une coïncidence numérique est le pire indice possible : elle fournit une explication qui n'a besoin
+> d'aucune mesure pour paraître complète.** *Sans le décompte des distinctes, nous aurions inscrit une
+> fausse cohérence — plus solide qu'une erreur ordinaire, parce qu'elle EXPLIQUAIT le chiffre au lieu de
+> le contredire.*
+
+**Ce qui l'a fait sortir n'est pas ma vigilance** : la session 7 m'a donné un nombre qui ne collait pas au
+mien. *La contradiction est venue d'elle.* **Et poser DEUX lectures — dont la plus grave — l'a obligée à
+compter les distinctes** ; un simple « confirme 164 » aurait confirmé 164.
+
+---
+
+## Ce que la nuit dit de nos instruments
+
+**Onze sondes fausses entre trois sessions en une nuit** — dont, chez moi : un `grep` dont le motif ne
+décrivait pas l'objet, un `git log -S` pris pour une édition, un comptage de dossiers par mots dans la
+prose, un comptage de menu qui incluait un bloc de commentaire.
+
+> **Aucune n'a été trouvée par une meilleure sonde.** *Elles l'ont été par un témoin dans la mesure, par
+> la lecture des vingt lignes autour, ou par un pair qui rendait un chiffre incompatible.* **Il y a un
+> moment où compter coûte plus cher que regarder.**
