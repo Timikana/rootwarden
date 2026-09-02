@@ -302,7 +302,15 @@ declare -A REF_LARAVEL=(
   # « restriction voulue » que la garde du runner distingue d'une suite jamais
   # mesuree — elle sera donc IGNOREE en legacy, et c'est correct.
   [go-socle-fixtures]=8
-  [go-socle-navigation]=66 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  # go-socle-navigation : 66 -> 74 le 2026-09-02 apres le LOT de 164 executions.
+  # ⚠ LA SUITE EST SAINE — zero FAIL, et ses TROIS invariants tiennent (total=32,
+  # `route` XOR `legacy`, la somme se reconstitue). Le compte a monte parce que
+  # l'assertion « le lien porte X resout » est generee PAR ENTREE PORTEE, par
+  # compte qui y a acces (47 au total : 31 super + 13 admin + 3 user) — et CINQ
+  # entrees ont bascule dans la nuit : groups, ssh_audit, documentation,
+  # remote_users, iptables. *Une suite peut etre INDIFFERENTE dans ses assertions
+  # et SENSIBLE dans son compte* (E-321).
+  [go-socle-navigation]=74 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   # `go-page-search` 12 -> 13 le 2026-08-27 : +1 pour la propriete `LiensLegacy`.
   # Elle DERIVE la liste attendue de `legacy/_deprecated/*` et la compare a la table
@@ -1203,6 +1211,17 @@ joue() {
   code=$?
   t1=$(date +%s)
   pass=$(grep -c '^PASS' "$journal")
+  # ⚠ `grep -c '^FAIL'` NE VOIT PAS les `^EXCEPTION` — et pas davantage un FAIL que
+  # la suite a compte dans sa propre synthese. Mesure du 2026-09-02 :
+  # `legacy-go-page-update-u2` portait `EXCEPTION ProtocolError` et une synthese
+  # « 6 PASS / 1 FAIL », quand ce compteur rendait 0 — donc `FAIL=0` s'affichait a
+  # cote d'un `ECHEC` venu du CODE DE SORTIE. Septieme occurrence du motif « un
+  # detail qui affirme le contraire de son verdict ».
+  # ⚠ Et la ligne 114 de CE fichier decrivait deja le cas : la classe etait connue,
+  # ecrite ici, et non generalisee au compteur. *Une lecon inscrite au bon endroit
+  # et appliquee a un seul cas.*
+  # On ne FABRIQUE pas un 1 : on dit que le compte n'est pas fiable. *Un detail se
+  # CALCULE a partir de l'etat mesure ; quand l'etat n'est pas mesurable, il le dit.*
   fail=$(grep -c '^FAIL' "$journal")
 
   # ══ QUATRIEME VERDICT : « FENETRE SALE » ═════════════════════════════════════
@@ -1326,8 +1345,18 @@ joue() {
   else                                            verdict="ECART attendu=$attendu"
   fi
 
+  # `FAIL=?` quand le code de sortie accuse et que le compte est a zero : le compte
+  # N'EST PAS FIABLE, et le dire vaut mieux que d'afficher un 0 qui contredit
+  # `ECHEC`. La synthese de la suite, elle, porte souvent le vrai chiffre — trois
+  # formats coexistent dans ce banc (`N PASS / M FAIL`, `N PASS, M FAIL` + `TOUT
+  # OK`, `cible=X : N PASS / M FAIL`) et `vague0-legacy` n'en porte AUCUN.
+  # *Il n'y a pas de marqueur de fin unique ici : deux compteurs ont pris une
+  # convention LOCALE pour une convention du BANC.*
+  affiche_fail="$fail"
+  if [ "$fail" -eq 0 ] && [ "$code" -ne 0 ]; then affiche_fail='?'; fi
+
   printf '%-24s %-8s PASS=%-4s FAIL=%-3s %4ss  %s\n' \
-    "$suite" "$cible" "$pass" "$fail" "$((t1-t0))" "$verdict"
+    "$suite" "$cible" "$pass" "$affiche_fail" "$((t1-t0))" "$verdict"
   [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] \
     || [ "${verdict:0:12}" = "FENETRE SALE" ] || [ "${verdict:0:13}" = "GARDE INDISPO" ] && return 1
   return 0
