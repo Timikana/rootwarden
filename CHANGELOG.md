@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.170** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.171** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,35 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.171 — avant de retirer une contrainte fautive, énumérer tout ce qu'elle excluait
+
+**E-328.** Les cinq motifs `INTERDITS` sont corrigés (`b5be42b`) et **les dix rejeux sont conformes** —
+confrontés un par un aux références, **zéro à poser**. *Le filet s'est élargi de dix routes et n'a rien
+attrapé de légitime : c'est mesurable précisément parce que les comptes n'ont pas bougé d'une unité.*
+
+**Mais le premier passage a rendu 9 · 4 sur `pare-feu legacy`** : le filet **avortait la navigation vers
+la page**. L'ancre `(\?|$)` que nous avions condamnée bloquait `scan-all` **à tort** et excluait la page
+`/iptables/` **à raison** — *traitée comme un pur défaut, elle a emporté son second travail avec elle.*
+
+> **Avant de retirer une contrainte jugée fautive, énumérer tout ce qu'elle excluait.** Une contrainte
+> fausse pour la raison qu'on lui reproche peut être juste pour une autre, **qu'on ne lui a jamais
+> demandée.**
+
+J'avais mesuré l'ancre, montré ce qu'elle laissait échapper, et conclu au retrait. **Je n'ai pas cherché
+ce qu'elle retenait.**
+
+**⚠ Et les quatre autres suites n'ont survécu que par accident** : leur garde filtre
+`methode !== 'GET'`, et une navigation est un GET. `pare-feu` est la seule dont le garde soit agnostique
+à la méthode — **parce que `POST /iptables` y est parfois une lecture**. *La suite qui exigeait la règle
+la plus fine est celle que la règle grossière a cassée.* Le piège reste **dormant dans `audit-ssh`**, et
+l'avertissement a été écrit **dans le code**, pas dans un message.
+
+**E-329 — il ne reste aucun geste d'équipe** : 0 référence à poser, arbre propre, banc au repos, menu
+31/32, base 164 · 2550 · 1. Le reste est **onze décisions et quatre arbitrages** — dont **E-326**, le
+déploiement lancé sur la production le 27/08, arrêté par un échec de déchiffrement et non par une garde,
+sans appelant au journal. *Du point de vue de l'exploitant, un arbitrage et une signature sont la même
+interruption : le compte est **quinze**, rendu avec ses quinze objets.*
 
 ### v1.38.170 — `POST /deploy` a été appelé sur la production, et le journal ne dit pas par qui
 
