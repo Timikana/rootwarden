@@ -95,9 +95,64 @@
             <p class="rw-tuile__texte">{{ __('profil.second_facteur_texte') }}</p>
         </div>
 
-        {{-- La page de profil du legacy publie l'identifiant de session COMPLET
-             de chaque session ouverte. Le portage n'affichera qu'une empreinte :
-             un identifiant de session est un identifiant d'acces. --}}
+        {{--
+            ══ E-203 — LES SESSIONS OUVERTES ════════════════════════════════
+
+            La page de profil du legacy publie l'identifiant de session COMPLET
+            de chaque session ouverte. Le portage n'affiche qu'une EMPREINTE :
+            un identifiant de session est un identifiant d'acces, et le mettre
+            dans un champ cache pour pouvoir revoquer aurait annule la
+            precaution — le HTML l'aurait publie tout autant.
+
+            La fermeture vise donc l'empreinte, et le serveur la resout parmi
+            les sessions DE CE COMPTE.
+        --}}
+        <div class="rw-tuile">
+            <span class="rw-tuile__titre">{{ __('profil.sessions_titre') }}</span>
+            <p class="rw-tuile__texte">{{ __('profil.sessions_aide') }}</p>
+
+            @if (! $sessionsLisibles)
+                {{-- UNE LISTE QUI N'A PAS REPONDU N'EST PAS « AUCUNE SESSION ».
+                     Sur un ecran de securite, rendre le vide affirmerait un
+                     fait qu'on n'a pas mesure. --}}
+                <p class="rw-tuile__texte" data-rw="profil-sessions-illisible">{{ __('profil.sessions_err') }}</p>
+            @elseif (! count($sessions))
+                <p class="rw-tuile__texte" data-rw="profil-sessions-vide">{{ __('profil.sessions_vide') }}</p>
+            @else
+                @if ($sessionsTotal > count($sessions))
+                    {{-- La borne est ANNONCEE. Montrer vingt lignes sur deux
+                         mille cinq cents sans le dire serait exactement le
+                         compteur qui ment qu'on corrige partout ailleurs. --}}
+                    <p class="rw-tuile__texte" data-rw="profil-sessions-bornee">{{ __('profil.sessions_bornee', ['n' => count($sessions), 'total' => $sessionsTotal]) }}</p>
+                @endif
+                <p class="rw-tuile__texte" data-rw="profil-sessions-vestiges">{{ __('profil.sessions_vestiges') }}</p>
+                <div class="rw-liste-etats" data-rw="profil-sessions">
+                    @foreach ($sessions as $s)
+                        <div class="rw-liste-etats__ligne" data-rw="profil-session">
+                            <span class="rw-liste-etats__nom">
+                                {{ __('profil.sessions_empreinte', ['valeur' => $s['empreinte']]) }}
+                                @if ($s['courante'])
+                                    <span class="rw-badge rw-badge--ok" data-rw="profil-session-courante">{{ __('profil.sessions_actuelle') }}</span>
+                                @endif
+                            </span>
+                            <span>
+                                {{ $s['ip'] }} ·
+                                {{ __('profil.sessions_vue', ['date' => substr($s['vue'], 0, 16)]) }}
+                                @if (! $s['courante'])
+                                    <form method="POST" action="{{ route('profil.sessions.fermer') }}" class="rw-actions__gauche">
+                                        @csrf
+                                        <input type="hidden" name="empreinte" value="{{ $s['empreinte'] }}">
+                                        <button type="submit" class="rw-bouton rw-bouton--minuscule rw-bouton--danger"
+                                                data-rw="profil-session-fermer">{{ __('profil.sessions_revoquer') }}</button>
+                                    </form>
+                                @endif
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
         {{-- Ce qui reste non porte sur cette page, et QUOI exactement : le
              changement de mot de passe, lui, l'est desormais (A2). Un intitule
              qui reste vague apres un portage partiel laisse croire que rien n'a

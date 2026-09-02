@@ -93,11 +93,15 @@ Route::get('/deconnexion', [ConnexionController::class, 'deconnexion']);
  * role 3, ce drapeau est le SEUL frein : le role 3 court-circuite chaque `perm:`
  * et chaque `role:`.
  */
-Route::middleware(['session.authentifiee', 'mot.de.passe.a.changer'])->group(function () {
+Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.changer'])->group(function () {
     Route::get('/cgu', [PortailController::class, 'cgu'])->name('cgu');
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
+    // E-203 : fermer une session ouverte. Vise une EMPREINTE, jamais un
+    // identifiant de session — celui-ci ne sort pas du serveur.
+    Route::post('/profil/sessions/fermer', [PortailController::class, 'revoquerSession'])
+        ->name('profil.sessions.fermer');
     /*
      * Le changement de mot de passe — sous-lot A2. Pas de garde de role ni de
      * permission : chacun change SON mot de passe, et l'identifiant du compte

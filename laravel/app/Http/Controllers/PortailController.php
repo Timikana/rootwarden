@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AlertesAccueil;
+use App\Services\SessionsActives;
 use App\Services\Droits;
 use App\Services\Comptes;
 use App\Services\Machines;
@@ -28,6 +29,7 @@ class PortailController extends Controller
         private readonly Machines $machines,
         private readonly Comptes $comptes,
         private readonly AlertesAccueil $alertes,
+        private readonly SessionsActives $sessions,
     )
     {
     }
@@ -185,7 +187,36 @@ class PortailController extends Controller
 
     public function profil(Request $requete): View
     {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        $etat = $this->sessions->pour($idCompte);
+
+        /*
+         * E-203 — l'ecran ne recoit QUE des empreintes.
+         *
+         * La page de profil du legacy publie l'identifiant de session complet.
+         * Un identifiant de session est un identifiant d'acces : il ne sort
+         * pas du serveur, ni en clair ni dans un champ cache. La revocation
+         * vise donc l'empreinte, et le service la resout parmi les sessions
+         * DE CE COMPTE.
+         */
+        $empreinteCourante = $this->sessions->empreinte($requete->session()->getId());
+        $sessions = array_map(function ($ligne) use ($empreinteCourante) {
+            $empreinte = $this->sessions->empreinte((string) $ligne->session_id);
+
+            return [
+                'empreinte' => $empreinte,
+                'courante'  => hash_equals($empreinteCourante, $empreinte),
+                'ip'        => (string) ($ligne->ip_address ?? ''),
+                'agent'     => (string) ($ligne->user_agent ?? ''),
+                'vue'       => (string) ($ligne->last_activity ?? ''),
+                'ouverte'   => (string) ($ligne->created_at ?? ''),
+            ];
+        }, $etat['sessions']);
+
         return view('profil', [
+            'sessions'         => $sessions,
+            'sessionsLisibles' => $etat['lisible'],
+            'sessionsTotal'    => (int) ($etat['total'] ?? 0),
             'changementRequis' => (bool) $requete->session()->get('changement_mot_de_passe_requis', false),
             'libelleRole'      => $this->libelleRole((int) $requete->session()->get('role_id', 0)),
             // La politique s'ANNONCE avant d'etre appliquee : personne ne devrait
@@ -232,9 +263,26 @@ class PortailController extends Controller
          * redirection et le bandeau reapparaitrait sur une exigence satisfaite.
          */
         $requete->session()->forget('changement_mot_de_passe_requis');
+        /*
+         * ⚠ E-203 — SANS LES DEUX LIGNES QUI SUIVENT, CE `regenerate()` MET
+         * DEHORS CELUI QUI VIENT DE CHANGER SON MOT DE PASSE.
+         *
+         * L'identifiant change, la ligne de `active_sessions` reste sur
+         * l'ancien, et `session.revoquee` ne retrouve plus la session au
+         * passage suivant : un dispositif de securite qui ejecte la personne
+         * qui vient de se securiser.
+         */
+        $ancienIdentifiant = $requete->session()->getId();
+
         // La session courante a survecu a la purge ; on la regenere quand meme,
         // un changement de secret etant le bon moment pour changer d'identifiant.
         $requete->session()->regenerate();
+
+        $this->sessions->suitLaRegeneration(
+            $requete,
+            $ancienIdentifiant,
+            (int) $requete->session()->get('utilisateur_id', 0),
+        );
 
         return redirect()->route('profil')->with('mdp_message', __(MotDePasse::OK));
     }
@@ -322,6 +370,38 @@ class PortailController extends Controller
      * Libelle du role. Les identifiants numeriques (1, 2, 3) sont ceux du
      * legacy : ils ne se traduisent pas, ils s'affichent.
      */
+    /**
+     * Ferme UNE session du compte — E-203.
+     *
+     * Vise une EMPREINTE, jamais un identifiant : c'est ce qui permet a
+     * l'identifiant de ne pas figurer dans le HTML. Le service resout parmi
+     * les sessions du compte, donc une empreinte d'un autre compte ne ferme
+     * rien.
+     *
+     * La session COURANTE n'est pas fermable ici : le faire renverrait la
+     * personne a la connexion sans qu'elle l'ait demande, et « Deconnexion »
+     * existe pour ca. Refus explicite plutot que bouton absent — un bouton
+     * qui manque se lit comme un defaut.
+     */
+    public function revoquerSession(Request $requete): RedirectResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        $empreinte = (string) $requete->input('empreinte', '');
+
+        if (hash_equals($this->sessions->empreinte($requete->session()->getId()), $empreinte)) {
+            return redirect()->route('profil')->with('message', __('profil.sessions_pas_la_sienne'));
+        }
+
+        $ferme = $this->sessions->revoqueParEmpreinte($empreinte, $idCompte);
+
+        // On annonce ce qui s'est REELLEMENT passe : `0` ligne supprimee n'est
+        // pas une fermeture, et le dire evite de promettre un effet absent.
+        return redirect()->route('profil')->with(
+            'message',
+            $ferme > 0 ? __('profil.sessions_revoquee') : __('profil.sessions_introuvable'),
+        );
+    }
+
     private function libelleRole(int $roleId): string
     {
         return match (true) {

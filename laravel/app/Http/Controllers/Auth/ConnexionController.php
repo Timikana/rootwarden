@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use App\Services\SessionsActives;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -87,6 +88,11 @@ class ConnexionController extends Controller
 
     public function deconnexion(Request $requete): RedirectResponse
     {
+        // E-203 : retirer la ligne AVANT de detruire la session — apres
+        // `regenerate()` l'identifiant a change, et l'ancienne ligne
+        // resterait en base a decrire une session qui n'existe plus.
+        app(SessionsActives::class)->ferme($requete->session()->getId());
+
         $requete->session()->flush();
         $requete->session()->regenerate();
 
