@@ -148,6 +148,31 @@ function resteFenetre(){return 30 - (Math.floor(Date.now()/1000) % 30)}
 const avortees = [];
 const passees = [];
 const reponsesReleve = [];
+/*
+ * ══ (d) LA JAIL FOURNIE — CE QU'ELLE MESURE, ET CE QU'ELLE NE MESURE PAS ══
+ *
+ * Test-Server-Debian n'a AUCUNE jail, et la mesure dit pourquoi : fail2ban
+ * n'y est meme pas installe (`fail2ban_status`, `installed=0`). Le panneau de
+ * confirmation ne peut donc pas s'ouvrir sur des donnees reelles.
+ *
+ * La propriete non couverte n'est pourtant PAS « une machine a des jails » :
+ * c'est **« le panneau nomme la consequence et offre la confirmation »**, et
+ * ça, c'est du RENDU. On fournit donc la jail dans la DONNEE de la page, en
+ * repondant a la place du serveur — aucune session SSH, aucune mutation.
+ *
+ * ⚠ ET LA RESERVE, QUI EST LA MOITIE DE LA MESURE :
+ *
+ *     MESURE      le RENDU du panneau sur une jail FOURNIE
+ *     NON MESURE  qu'une machine reelle en produise une, et que le releve la lise
+ *
+ * **Une suite qui fabrique son entree mesure sa propre fixture.** Sans cette
+ * reserve dite A L'ECRAN, un vert se lirait « le panneau fonctionne sur des
+ * donnees reelles » — ce que cette etape n'aura pas mesure. C'est la meme
+ * distinction que les trois causes d'« aucune jail » : ce qui n'est pas
+ * distingue se lit comme la lecture la plus favorable.
+ */
+const JAIL_FOURNIE = 'sshd-e2e-fournie';
+let injecte = false;
 let vues = 0;
 
 const navigateur = await puppeteer.launch({
@@ -217,6 +242,48 @@ async function connecte(compte) {
             || /srv-zabbix/.test(corps)) {
             avortees.push({ route: chemin, motif: 'vise la PRODUCTION', corps });
             r.abort('blockedbyclient').catch(() => {});
+
+            return;
+        }
+        // 2 bis. LA JAIL FOURNIE — on repond A LA PLACE du serveur, donc la
+        //        requete ne part pas : aucune session SSH sur cette passe.
+        if (injecte && /\/fail2ban\/status/.test(url)) {
+            r.respond({
+                status: 200, contentType: 'application/json',
+                body: JSON.stringify({ success: true, installed: 1, running: 1,
+                    jails: [{ name: JAIL_FOURNIE, currently_banned: 0 }] }),
+            }).catch(() => {});
+
+            return;
+        }
+        if (injecte && /\/fail2ban\/jail/.test(url)) {
+            r.respond({
+                status: 200, contentType: 'application/json',
+                body: JSON.stringify({ success: true, config: '', banned_ips: [] }),
+            }).catch(() => {});
+
+            return;
+        }
+        /*
+         * ⚠ `services` EST FOURNIE ELLE AUSSI, ET C'EST UNE CORRECTION.
+         *
+         * J'avais ecrit « aucune session SSH sur cette passe » — **c'etait
+         * faux**. Mesure par decoupage sur les decorateurs de `fail2ban.py` :
+         *   status · jail · services  ouvrent `ssh_session`
+         *   history · stats · templates  ne l'ouvrent pas
+         * `services` passait ma liste de lectures et joignait donc la machine 2
+         * pour de vrai. On la fournit, et l'affirmation redevient VRAIE.
+         *
+         * (Ma premiere mesure rendait « pas de SSH » pour les SEPT routes : la
+         * plage `sed` se refermait sur la ligne suivante. **Zero partout = la
+         * mesure n'a pas eu lieu**, et j'ai failli m'en contenter parce qu'elle
+         * allait dans le sens qui rassure.)
+         */
+        if (injecte && /\/fail2ban\/services/.test(url)) {
+            r.respond({
+                status: 200, contentType: 'application/json',
+                body: JSON.stringify({ success: true, services: [] }),
+            }).catch(() => {});
 
             return;
         }
@@ -468,6 +535,129 @@ try {
 
         const annuler = await page.$(C.annuler);
         if (annuler) { await annuler.click(); await dors(500); }
+    });
+
+    // ══ 3. LE PANNEAU, SUR UNE JAIL FOURNIE ══════════════════════════════
+    await etape('sur une jail FOURNIE : le panneau nomme la consequence, et on ne confirme pas', async () => {
+        /*
+         * LA RESERVE EST DITE AVANT LA MESURE, pas apres : un lecteur qui
+         * s'arrete au premier PASS doit deja savoir ce qu'il ne lit pas.
+         */
+        constate('portee de cette etape',
+            `MESURE le RENDU du panneau sur une jail FOURNIE (« ${JAIL_FOURNIE} », injectee dans la`
+            + ' reponse) — NON MESURE qu\'une machine reelle en produise une et que le releve la lise');
+
+        injecte = true;
+        const avant = passees.length;
+        await page.select(C.serveur, String(MACHINE_ID));
+        const rel = await page.$(C.relever);
+        if (rel) { await rel.click(); }
+        await dors(1500);
+
+        const carte = await page.$(`[data-rw="f2b-jail-${JAIL_FOURNIE}"]`);
+        verifie('la jail fournie est RENDUE comme une carte',
+            carte !== null,
+            'la reponse fournie n\'a produit aucune carte : le rendu ne suit pas la donnee');
+        if (! carte) { injecte = false; return; }
+
+        await carte.click();
+        await dors(900);
+        const nom = await page.$eval(C.jailNom, (n) => (n.innerText || '').trim()).catch(() => '');
+        constate('detail ouvert', nom || '(aucun titre)');
+
+        const b = await page.$(C.desactiver);
+        if (! b) {
+            verifie('le bouton de desactivation est atteignable', false,
+                'le bouton n\'est pas rendu alors qu\'une jail est ouverte');
+            injecte = false;
+
+            return;
+        }
+        await b.click();
+        await dors(1000);
+        const vu = await page.evaluate((sel) => {
+            const p = document.querySelector(sel.confirmation);
+            const t = document.querySelector(sel.confTitre);
+            const x = document.querySelector(sel.confTexte);
+            const c = document.querySelector(sel.confirmer);
+
+            return {
+                ouvert: p !== null && p.offsetParent !== null,
+                titre: t ? (t.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                texte: x ? (x.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                confirme: c !== null && c.offsetParent !== null,
+            };
+        }, C);
+        constate('panneau', vu.ouvert ? `« ${vu.titre} » — ${vu.texte.slice(0, 130)}` : 'NON ouvert');
+        verifie('le clic ouvre un panneau de confirmation', vu.ouvert,
+            'aucun panneau : le geste partirait sans reprise de main');
+        if (vu.ouvert) {
+            /*
+             * LA CONSEQUENCE, PAS LE MECANISME — et le libelle est LU dans le
+             * catalogue : le comparer a une chaine recopiee ici mesurerait ma
+             * prose et non l'ecran.
+             */
+            const attendu = libelle('conf_texte_desact');
+            if (attendu === null) {
+                constate('consequence nommee', 'SANS OBJET — `conf_texte_desact` illisible');
+            } else {
+                const mots = attendu.replace(/:[a-z_]+/g, ' ').split(/[^A-Za-zÀ-ÿ']+/)
+                    .filter((m) => m.length > 5).slice(0, 5);
+                verifie('le panneau nomme la CONSEQUENCE, avec les mots du catalogue',
+                    mots.length > 0 && mots.every((m) => vu.texte.includes(m)),
+                    `mots attendus « ${mots.join(' ')} » absents de « ${vu.texte.slice(0, 130)} »`);
+            }
+            verifie('le panneau nomme la jail concernee',
+                vu.texte.includes(JAIL_FOURNIE) || vu.titre.includes(JAIL_FOURNIE),
+                `« ${JAIL_FOURNIE} » n'apparait pas : le panneau ne dit pas SUR QUOI il porte`);
+            /*
+             * ⚠ « AUCUN JETON NON TRADUIT » EST VRAI A VIDE, et cette suite
+             *   l'a decerne sur un panneau ENTIEREMENT VIDE — une universelle
+             *   negative satisfaite par l'absence. On exige donc d'abord qu'il
+             *   y ait quelque chose a lire : c'est le defaut que je traque
+             *   depuis ce matin, commis dans l'assertion que je venais
+             *   d'ecrire contre lui.
+             */
+            verifie('le panneau porte un titre ET un texte, non vides',
+                vu.titre.length > 0 && vu.texte.length > 0,
+                `titre « ${vu.titre} » (${vu.titre.length} car.), texte ${vu.texte.length} car. —`
+                + ' un panneau vide fait consentir a un geste que rien ne nomme');
+            verifie('aucun jeton non traduit dans le panneau',
+                vu.titre.length > 0 && vu.texte.length > 0
+                    && ! /:[a-z_]{3,}/.test(`${vu.titre} ${vu.texte}`),
+                vu.titre.length === 0 || vu.texte.length === 0
+                    ? 'panneau vide : rien a verifier, et un vert ici serait une absence'
+                    : `${vu.titre} | ${vu.texte}`);
+            verifie('la confirmation est OFFERTE, et cette suite ne la prend PAS',
+                vu.confirme, 'aucun bouton de confirmation : le geste serait deja parti');
+        }
+        const parties = passees.slice(avant);
+        /*
+         * ON MESURE CE QUI COMPTE : qu'aucune lecture OUVRANT UNE SESSION SSH
+         * ne soit partie. « Aucune requete du tout » etait a la fois trop fort
+         * et FAUX — `history`, `stats` et `portee` partent legitimement et ne
+         * joignent personne.
+         *
+         * ⚠ Et le `toujours` disait « aucune session SSH ouverte » en
+         *   s'imprimant AUSSI sur le FAIL, affirmant le contraire du verdict
+         *   qu'il accompagnait — septieme occurrence de ce motif sur ce banc,
+         *   et la premiere que je commets en le connaissant. Un detail qui ne
+         *   vaut que pour UN verdict se conditionne a ce verdict.
+         */
+        const ouvreSSH = /\/fail2ban\/(status|jail|services)(\?|$)/;
+        const sessions = parties.filter((p) => ouvreSSH.test(p.route));
+        constate('requetes de l\'etape', parties.length
+            ? parties.map((p) => `${p.methode} ${p.route}`).join(' | ') : '(aucune)');
+        verifie('AUCUNE lecture ouvrant une session SSH n\'est partie',
+            sessions.length === 0,
+            sessions.map((p) => `${p.methode} ${p.route}`).join(' | '),
+            sessions.length === 0
+                ? `0 session SSH — status, jail et services ont ete FOURNIES (${parties.length} autre(s) requete(s), sans SSH)`
+                : '');
+
+        const annuler = await page.$(C.annuler);
+        if (annuler) { await annuler.click(); await dors(400); }
+        injecte = false;
     });
 
     await etape('aucune erreur JavaScript', async () => {
