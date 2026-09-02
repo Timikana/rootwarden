@@ -3380,14 +3380,20 @@ prose, un comptage de menu qui incluait un bloc de commentaire.
 
 ## ⚠⚠ Un déploiement de clés A ÉTÉ LANCÉ SUR LA PRODUCTION le 2026-08-27 — et il n'a échoué que par accident
 
+> **⚠ CORRECTION DU 2026-09-02 08:13 — MES DEUX HORODATAGES ÉTAIENT EN UTC.** Relevé par la session 7,
+> vérifié par moi dans la même commande : **hôte `CEST +0200`, conteneur `UTC +0000`**. Les `mtime`
+> ci-dessous sont ceux du conteneur. **Le déploiement date donc du 27/08 à `22:43:08 CEST`**, et la trace
+> de `04:52 UTC` est `06:52 CEST`. *Le fait principal est intact ; deux de mes inférences ne le sont pas,
+> voir la correction en fin de section.*
+
 **Mesuré le 2026-09-02 à 08:0x UTC**, en partant d'un constat de la session 7 : ses cinq filets de sûreté
 reposaient sur des **listes de noms de routes écrites de mémoire**, et **`POST /deploy` — le déploiement
 de clés, K4 — n'y figurait pas.**
 
 **J'ai voulu savoir si la route laissait une trace. Elle en laisse une.**
 
-    /app/logs/deployment.log     0 octet   Sep  2 04:52    <- pendant le LOT de cette nuit
-    /app/logs/deployment.log.1   1037 o    Aug 27 20:43    <- une execution REELLE
+    /app/logs/deployment.log     0 octet   2026-09-02 04:52:09 UTC  =  06:52:09 CEST
+    /app/logs/deployment.log.1   1037 o    2026-08-27 20:43:08 UTC  =  22:43:08 CEST  <- REELLE
 
     20:43:07  ===== Demarrage de la configuration des serveurs =====
     20:43:07  Machines transmises pour configuration : ['1', '2']
@@ -3396,7 +3402,7 @@ de clés, K4 — n'y figurait pas.**
     20:43:07  ERROR - Erreur critique : Echec du dechiffrement: Aucune methode n'a fonctionne
     [RootWarden] ECHEC : code 1. Les gestes deja emis n'ont PAS ete annules.
 
-> **`POST /deploy` a été invoqué le 27 août à 20:43 avec `machines = ['1', '2']`. La machine 1 est
+> **`POST /deploy` a été invoqué le 27 août à 22:43 CEST avec `machines = ['1', '2']`. La machine 1 est
 > `srv-zabbix` — la production, celle que la consigne permanente du chantier interdit de joindre.**
 
 ### Ce qui a empêché les dégâts, et ce n'est aucune de nos protections
@@ -3414,8 +3420,8 @@ distant n'a été émis, aucune clé n'a été révoquée.
 **Je ne sais pas qui l'a lancé.** *Le journal ne consigne ni appelant, ni session, ni compte* — il
 enregistre ce que le sous-processus fait, pas qui l'a demandé.
 
-**20:43 un mercredi est une heure humaine**, et l'exploitant peut parfaitement l'avoir lancé lui-même
-depuis l'ancien portail. **Je ne l'attribue à personne, et surtout pas à une suite** : rien dans ce que
+**22:43 CEST un jeudi reste une heure humaine**, et l'exploitant peut parfaitement l'avoir lancé
+lui-même depuis l'ancien portail. *(Corrigé : j'avais écrit 20:43, qui est l'heure UTC.)* **Je ne l'attribue à personne, et surtout pas à une suite** : rien dans ce que
 j'ai mesuré ne le permet.
 
 > **C'est le vrai défaut d'audit, et il est plus grave que l'incident** : *après coup, personne ne peut
@@ -3449,3 +3455,65 @@ des suites jouées à 04:52.** *Je le lui ai transmis plutôt que de trancher.*
 - **s'il y en a eu d'autres avant.** *La rotation ne garde qu'UNE génération* — `deployment.log.1` est le
   seul antécédent conservé. **Tout déploiement antérieur au 27/08 est définitivement effacé** ;
 - **ce qui a touché le fichier à 04:52.** Trois lectures possibles, aucune privilégiée.
+
+### ⚠ Correction de la section ci-dessus — deux horloges, et j'avais écrit la note quatre heures plus tôt
+
+**Relevé par la session 7, vérifié par moi dans la même commande le 2026-09-02 à 08:13 :**
+
+    hote      2026-09-02 08:13:00 CEST +0200
+    conteneur 2026-09-02 06:13:00 UTC  +0000        <- DEUX heures d'ecart
+
+    stat -c '%y' :
+      deployment.log     2026-09-02 04:52:09.381 +0000  =  06:52:09 CEST
+      deployment.log.1   2026-08-27 20:43:08.030 +0000  =  22:43:08 CEST
+
+**Trois erreurs, toutes du même défaut : j'ai lu des `mtime` de CONTENEUR contre des heures d'HÔTE.**
+
+| ce que j'avais écrit | juste |
+|---|---|
+| déploiement « le 27 août à **20:43** » | **22:43 CEST** |
+| « 20:43 un **mercredi** est une heure humaine » | le 27/08/2026 est un **jeudi** |
+| trace « à 04:52, juste après le démarrage du LOT à 04:49:29 » | **06:52 CEST** — dans la fenêtre, mais **deux heures plus loin** |
+
+> **La troisième est la plus instructive : la coïncidence que j'ai trouvée frappante — « 04:52, trois
+> minutes après 04:49:29 » — était FABRIQUÉE par le décalage.** *Deux nombres proches issus de deux
+> horloges différentes produisent une proximité qui n'existe pas*, et elle m'a fait proposer comme
+> troisième lecture que quelque chose ait atteint `/deploy` pendant le LOT.
+
+### ✅ Cette lecture est réfutée, et par le journal de la suite elle-même
+
+`legacy-go-page-ssh-flux` était active. **Son propre journal le dit sans qu'on ait à déduire :**
+
+    journal avant la suite : 0 octet(s)
+    journal apres la sonde : 36 octet(s)     <- elle ecrit un temoin SONDE-K3
+    journal restaure       : 0 octet(s)      <- 06:52:09.381 = MA trace
+
+**C'est une fixture qui se nettoie.** *Ni un préflight en `a`, ni une rotation, ni `/deploy` : les trois
+lectures que j'avais proposées étaient fausses toutes les trois, et la vraie était une quatrième que je
+n'avais pas envisagée.* **Aucun `POST /deploy` n'a été invoqué pendant le LOT.**
+
+### Ce que je retiens, et ce n'est pas « faire attention aux fuseaux »
+
+**`feedback_deux_horloges.md` existe dans ma mémoire, écrit à 03:37 ce matin** — *quatre heures et demie
+avant que je commette exactement l'erreur qu'il décrit*, avec le même écart de deux heures et le même
+couple hôte/conteneur.
+
+> **Une leçon écrite n'est pas une leçon appliquée.** *Je ne l'ai pas oubliée : je ne me suis pas demandé
+> si elle s'appliquait.* **Elle parlait de `MySQL NOW()` et d'`active_sessions` ; je lisais des `mtime` de
+> fichiers — et je n'ai pas vu que c'était le même objet sous un autre nom.**
+>
+> **C'est le motif du nom à deux référents, appliqué à mes propres notes** : *une règle rangée sous
+> l'exemple qui l'a produite ne se déclenche que sur cet exemple.*
+
+**La parade n'est pas de mieux mémoriser : c'est de relever les deux horloges dans la même commande dès
+qu'un horodatage de conteneur entre dans un raisonnement** — ce que je viens de faire, et seulement
+parce qu'on m'y a poussée.
+
+### Ce que la correction NE touche pas
+
+**Le déploiement du 27/08 est intact** : `machines = ['1','2']`, `srv-zabbix` en tête, échec au
+déchiffrement avant toute session SSH, `code 1`. **Seule son heure change.**
+
+**Et le constat qui compte n'a pas bougé d'un mot** : *`deployment.log` ne consigne ni appelant, ni
+session, ni compte.* **Après que deux sessions ont tout mesuré, personne ne peut répondre à « qui a lancé
+un déploiement sur la production ». C'est le constat, pas la limite de l'enquête.**
