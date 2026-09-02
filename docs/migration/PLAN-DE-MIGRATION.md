@@ -1743,9 +1743,16 @@ dépôt.**
   Trois de ces six comptent particulièrement :
   **`a345e65` porte le pire, et ce n'est pas l'archivage** — le repli du scheduler **ÉLARGIT le
   périmètre** : une cible `machines` dont le `target_value` se vide ou se corrompt retombe sur
-  `SELECT … FROM machines`, c'est-à-dire **tout le parc**. Or un scan CVE ouvre une session SSH **et
-  envoie un vrai courriel par machine**. C'est l'effet sortant que ce §7 réserve à votre mot (S7b),
-  **atteint par une corruption de donnée et sans que personne ne clique.** Cinquième forme de « un repli
+  `SELECT … FROM machines`, c'est-à-dire **tout le parc**. Un scan CVE **ouvre une session SSH par
+  machine**, avec le mot de passe SSH et le mot de passe root déchiffrés dans la boucle — *« scanner
+  les mauvaises machines » est en réalité « s'authentifier sur toutes les machines du parc »*,
+  **atteint par une corruption de donnée et sans que personne ne clique.**
+  ⚠ **Correction du 2026-09-02 (E-298)** : j'écrivais ici *« et envoie un vrai courriel par machine »*.
+  **Faux pour ce chemin.** `send_cve_report` n'a qu'un appelant, `routes/cve.py:77`, et le scheduler ne
+  l'emprunte pas — il notifie par un webhook, dont les sévérités sont passées **en dur à `0`** (E-299).
+  L'effet sortant que le §7 réserve à votre mot est celui de la **route** et de l'**action groupée**,
+  pas celui du repli. *Le défaut de portée reste entier ; c'est son bruit qui tombe — et un défaut
+  muet est le plus difficile à voir passer.* Cinquième forme de « un repli
   qui retombe du côté permissif », et la plus large : les quatre autres ouvrent un **droit**, celle-ci
   ouvre un **périmètre**, et son effet est sortant et irréversible.
   **`399931a` FERME E-175** — l'écart relevé le matin même sans savoir que son correctif dormait depuis
@@ -4042,7 +4049,7 @@ Les trois formes rencontrées, par gravité croissante de ce qu'ouvre l'omission
 |---|---|
 | E-147 (`render_policy`) | quatre options, **toutes** vers le permissif |
 | E-144 (`sudo_deploy`, **deux** occurrences) | le préréglage que son propre module documente « ÉQUIVALENT ROOT » |
-| repli du scheduler (`a345e65`) | **tout le parc** — et un scan CVE ouvre une session SSH **et envoie un courriel par machine** |
+| repli du scheduler (`a345e65`) | **tout le parc** — et un scan CVE **ouvre une session SSH par machine**, avec les identifiants root déchiffrés (`base_cols`). ⚠ **PAS de courriel** : corrigé le 2026-09-02, le courriel part de `routes/cve.py:77`, jamais du scheduler (E-298) |
 
 Le troisième est le plus large et le seul dont l'effet soit **sortant** : les deux premiers ouvrent un
 **droit**, celui-ci ouvre un **périmètre**. Et il s'atteint par une **corruption de donnée**, sans que
