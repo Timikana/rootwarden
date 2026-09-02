@@ -77,8 +77,14 @@ Dernière mise à jour : **2026-09-02** (01:50 CEST), version `1.38.133`.
 ```bash
 cd /home/utilisateur/Documents/Gestion_SSH_KEY
 # entrees de menu portees / restantes (retirer 2 lignes de commentaire de chaque compte)
-grep -c "'route'"  laravel/app/Support/Navigation.php
-grep -c "'legacy'" laravel/app/Support/Navigation.php
+# E-278 bis : ces deux compteurs comptaient AUSSI les commentaires d'en-tete (30 pour 28).
+# Ancrer sur les lignes d'ENTREE, et croiser : route + legacy DOIT egaler le total.
+python3 -c "
+import re
+L=open('laravel/app/Support/Navigation.php').read().splitlines()
+e=[l for l in L if re.match(r\"\\s*\\['cle'\\s*=>\", l)]
+r=[l for l in e if \"'route'\" in l]; g=[l for l in e if \"'legacy'\" in l]
+print(len(r),'portees /',len(e),'  legacy',len(g),'  recoupe:',len(r)+len(g)==len(e))"
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
 # ecarts = identifiants DEDUPLIQUES, toutes profondeurs de titre (E-278 : `grep -c '^## E-'` comptait des TITRES)
@@ -163,7 +169,7 @@ n'a jamais été fait.*
 
 | | |
 |---|---|
-| entrées de menu portées | **27 sur 32** — remesuré **2026-09-02 01:50 CEST**. `groups` a basculé (R1, `8cf1d26`). Restantes : `remote_users` · `iptables` · `ssh_audit` · `wazuh` · `documentation` — **trois portables sans signature**. `grep -c "'route'" laravel/app/Support/Navigation.php` |
+| entrées de menu portées | **28 sur 32** — remesuré **2026-09-02 02:17 CEST**, et **recoupé** : 28 `route` + 4 `legacy` = 32. `groups` (R1, `8cf1d26`) puis `ssh_audit` (A1, `30c8c6b`) ont basculé cette nuit. Restantes : `remote_users` · `iptables` · `wazuh` · `documentation`. ⚠ **La commande inscrite ici comptait aussi les commentaires d'en-tête** (30 pour 28) — même famille qu'E-278, corrigée au §2. |
 | parties du legacy archivées | **13** — et ⚠ **le compte qui reste n'est PAS 20 archivages** : c'est **11 unités + un socle INDIVISIBLE de 9** (`assets`, `img`, `js`, `lang`, `vendor`, `logs`, `includes`, `auth`, `profile`), dont aucun ne porte d'entrée de menu et qui **font tourner les modules restants**. *Un plan qui vise « 20 archivages » planifie neuf gestes qui n'existent pas.* Les deux qui paraissaient les moins solides (`assets`, `img`) ont été éprouvés : **consommateurs vivants par deux voies indépendantes** — les cinq pages `auth/` n'incluent **pas** `head.php` et lient la feuille et le favicon elles-mêmes. **Le compte ne devient pas 13.** ⚠ **Et la catégorie « porté, archivable, personne ne l'a fait » est VIDE** (relevé `2253785`, `MODULE-ARCHIVAGE-RESTANT.md`) : les cinq modules dont le dossier traîne — `security` S7b, `bashrc` B4, `fail2ban` F7, `graylog` G2, `ssh` K4 — ont **tous** un sous-lot ou un arbitrage nommé. *Le cas `services/`, un `git mv` qui attendait pendant que le dispatch allait ailleurs, ne se reproduit pas — il n'y a pas d'archivage gratuit à ramasser.* **Une seule arête de dépendance dans tout le graphe** : `legacy/ssh/js/main.js:133-136` injecte par `innerHTML` un lien vers `remote_users` **quand le préflight refuse un déploiement** — donc `remote_users` ne s'archive pas avant `ssh/`, **ou son lien se réécrit dans le legacy, et ce n'est plus un `git mv`.** ⚠ **`profile/export.php` est un export RGPD vivant que le profil porté n'offre pas** — et `profile/` étant du socle, son archivage n'aurait **ni sous-lot, ni relecture, ni captures** : *une capacité légale disparaîtrait dans le geste le moins surveillé du chantier.* Ce n'est pas une régression fonctionnelle mais une **non-conformité** — `DOSSIER-11`. `ls -1 legacy/_deprecated/ | wc -l` · `find legacy -maxdepth 1 -type d | wc -l`
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | ✅ **NOUVELLE LIGNE DE BASE — 2026-09-01 : 158 exécutions · 2439 PASS · ZÉRO FAIL · 2 h 50** (journaux `/tmp/rw-lot-j8Li6h`, départ 15:37:23, dernier journal 18:27:32). Répartition : **80 laravel / 1574 PASS** et **78 legacy / 865 PASS**. **+141 PASS et 2 FAIL de moins que la ligne de base du 2026-08-28** (153 · 2298 · 2), après **67 commits dont 3 fichiers globaux**. **Les trois références neuves sont confirmées à l'unité par le LOT complet** : `go-page-pare-feu` 23/17, `go-page-accueil` 41/16, `go-page-mot-de-passe` 16 (laravel seul, elle n'a pas de cible legacy). ⚠ **Ce LOT est le premier à contenir une suite qui ÉCRIT en base** (`go-page-mot-de-passe`) : la restauration a tenu, l'abattage n'a pas eu à se déclencher. ⚠ **Et le Lead n'a inscrit ce verdict que cinq heures après la fin** — un LOT vert que personne ne relève ne sert à rien, et c'est la même famille qu'une conclusion écrite qu'on ne remesure pas. Remesure : `./scripts/rejouer-lot.sh`, attendre un **PID enregistré**, **conclure sur le JOURNAL**.

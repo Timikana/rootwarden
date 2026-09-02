@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.143** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.144** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,31 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.144 — 28/32 : `ssh_audit` a basculé, et nos garde-fous produisent leur propre angle mort
+
+**28 entrées sur 32**, recoupé (28 `route` + 4 `legacy` = 32). `groups` (R1) puis `ssh_audit` (A1) ont
+basculé cette nuit. Restantes : `remote_users`, `iptables`, `wazuh`, `documentation`. ⚠ La commande de
+remesure inscrite au §2 comptait **aussi les commentaires d'en-tête** (30 pour 28) — même famille
+qu'E-278, corrigée et désormais **croisée** : la somme des deux doit égaler le total.
+
+**E-289 — une réserve écrite dans un message ne survit pas au premier relais ; écrite dans le code
+qu'on remplace, elle est lue par qui la remplace.** Une contrainte destinée à un sous-lot qui n'existe
+pas encore a été inscrite dans le panneau que ce sous-lot remplacera, plutôt que dans un compte rendu.
+Première application **avant** la perte plutôt qu'après.
+
+**E-290 — nos garde-fous produisent leur propre angle mort, quatre occurrences en une nuit.** Le motif
+ne se déclenche pas quand un garde-fou échoue : **il se déclenche quand il marche bien.** Compter les
+titres du registre (l'erreur grandit quand le registre est bien tenu) · un registre d'écarts
+n'enregistre que les échecs · fournir sa commande dispense de mesurer, parce que c'est juste
+d'habitude · poser des témoins partout, appliqué à ses propres instruments et pas à ceux des autres.
+*On cesse de vérifier un garde-fou pour la raison même qui le rend utile.* Aucune règle nouvelle ne le
+referme — en ajouter une créerait la cinquième occurrence.
+
+**E-291 — la migration 065 passe le piège du runner**, vérifié par contrôle croisé et **établi par un
+témoin** : zéro commentaire porteur de `;`, deux fragments, et une ligne forgée qui mord. Son auteur
+connaît le piège — l'en-tête est écrit sans une apostrophe ni un `;`, jusque dans la prose. *Un « 0 »
+sans témoin ne dit pas si l'instrument a regardé* — quatrième fois cette nuit.
 
 ### v1.38.143 — migration 065 : la contrainte que la fusion ne portera pas
 
