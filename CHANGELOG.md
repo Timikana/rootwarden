@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.168** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.169** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,39 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.169 — j'ai validé une généralisation sans la mesurer, et le trou est dans le filet
+
+**E-324.** J'avais inscrit la forme (a) — « tout ce qui n'est pas GET est interdit » — comme la bonne
+règle générale, **sur la seule force du raisonnement**. La session 7 l'a retirée elle-même avec des
+mesures ; **vérifié par moi, quatre points sur quatre.**
+
+**Le verdict d'`audit-ssh` n'utilisait pas `INTERDITS`** — il testait déjà `methode !== 'GET'`, donc
+`fix` et `scan-all` étaient couverts. Mon « la suite resterait verte », annoncé comme mesuré, était faux.
+
+**⚠ Le trou est dans le FILET** : `INTERDITS` ne sert qu'à **avorter**. Un `POST /ssh-audit/fix` non
+couvert **part pour de vrai**, puis est compté comme écriture — *la suite dit vrai, mais laisse le geste
+s'accomplir avant de le dire.* **Le garde qui empêche n'est pas celui qui juge, et c'est celui qui
+empêche qui est troué.**
+
+**⚠ Et l'ancre `(\?|$)` est pire que le fantôme** : `/ssh-audit/scan-all` **échappe** à un motif qui
+contient `scan` — 3 attrapées sur 13. *Un fantôme se trouve en confrontant la liste aux routes ; une
+ancre trop serrée ne se trouve qu'en **exerçant** le motif.* Même défaut sur `groupes`, où
+`/groups/5/run` — la route la plus dangereuse du module — échappe.
+
+**⚠ « Non-GET = écriture » est faux sur ce backend, aujourd'hui** : `POST /iptables` avec
+`action == "get"` **lit** les règles (`iptables.py:44-45`), et `POST /ssh-audit/config` lit
+`sshd_config`. Le risque n'était pas dans un A2 futur, **il est en production**. Donc **(a) n'est pas
+universelle** : la forme juste dépend de la **discipline de méthode** du module. *Deux fois dans le même
+tour, une convention locale prise pour une convention générale — après le marqueur de fin du banc.*
+
+**⚠ Et les trois suites où le verdict dépend du motif** (`accueil`, `cle-plateforme`, `pare-feu`)
+**n'ont pas été regardées** : nous avons passé la nuit sur la seule dont le verdict était déjà bon.
+
+**E-325 — `go-page-update-u2` : défaut de CHARGE.** Seule au repos : **8 · 0 · conforme en 10 s**, contre
+6 · 1 et une exception à 64 s sous LOT. La suite est saine — *mais le défaut est réel et reviendra*, et il
+est tombé à la **164ᵉ** exécution d'une course de trois heures. *Un défaut de charge n'est pas un faux
+positif : c'est un vrai défaut d'une propriété qu'on n'avait pas déclaré mesurer.*
 
 ### v1.38.168 — ligne de base 164 · 2550 · 1, et les quatre corrections d'après-LOT
 
