@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.176** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.177** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,52 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.177 — E-340 : l'ecran des conditions annoncait que le portail n'etait pas porte
+
+    laravel/resources/views/cgu.blade.php:15
+      « Seul le socle d'authentification est porte. Les pages du portail restent
+        sur l'ancienne interface. »
+
+    ecrite   2026-08-17 19:32  (`d41d043`, « socle — portage de l'authentification »)
+    fausse   depuis le 2026-09-02, quand le menu est passe a 32/32
+    duree    SEIZE JOURS, sur l'ecran ou l'on invite quelqu'un a accepter des conditions
+
+**Elle etait VRAIE le jour ou elle a ete ecrite.** Quatrieme occurrence du meme mecanisme en une
+nuit — apres `pare-feu` (1 capacite) et `superv` (3) — **mais la premiere qui ne parle pas d'une
+capacite : elle parle de l'ETAT DE LA MIGRATION ENTIERE.**
+
+#### ⚠ ET LE PIRE N'EST PAS LA PHRASE
+
+**Une sonde l'avait signalee.** L'inventaire des declarations d'absence de cette nuit portait
+`auth : 2 declarations` — **et personne n'a ouvert les deux lignes.** Le fichier a ete compte, puis
+la lecture est allee ailleurs.
+
+> **L'instrument a pointe le defaut et personne n'a suivi le pointeur.** C'est plus grave qu'une
+> sonde fausse : *une sonde fausse se corrige, un signal ignore ne laisse aucune trace de l'avoir
+> ete.*
+
+#### RETIREE, PAS REMPLACEE PAR SA NEGATION
+
+**Un ecran n'a pas a annoncer qu'il est porte : une interface qui se felicite d'exister est un
+decor.** La phrase avait un sens parce qu'elle PREVENAIT d'un manque ; il n'y a plus de manque a
+prevenir, donc plus rien a dire.
+
+Ecrire « toutes les pages sont portees » **recreerait la meme dette** — une affirmation d'etat
+pourrit au prochain changement, et c'est exactement le motif paye quatre fois cette nuit. Cette page
+porte les CONDITIONS D'UTILISATION ; l'avancement d'un chantier interne n'y a pas sa place.
+
+**La cle est retiree des deux catalogues** : conservee sans lecteur, elle serait morte.
+
+#### Controles
+
+    occurrences restantes de `socle_avertissement` dans laravel/ et tests/  ->  0
+    suites qui l'asseraient                                                 ->  0
+    parite i18n auth   FR=36  EN=36  ecarts=0
+    /cgu -> 302 (la garde)
+
+**Le second controle comptait** : si une suite avait verifie la presence de cet encart, elle aurait
+rougi — *et ce serait le seul cas ou un test defend une affirmation fausse.* Aucune ne le faisait.
 
 ### v1.38.176 — une page portée renvoie vers un portail archivé, et cinq natures dans le même sac
 
