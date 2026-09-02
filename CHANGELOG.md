@@ -2277,6 +2277,31 @@ les couvre et porte un TEMOIN : une cle inventee doit ressortir morte, sinon la 
 nomme **aucune** cible, et c'est le fait a dire : *la route ne prend aucun parametre — il n'y a rien
 a viser, donc rien a restreindre.*
 
+### v1.38.137 — E-281 affiné : le `else` interne est le décisif, et il passe devant E-280
+
+Deux sessions ont mesuré **séparément**, par la base et par la lecture du corps — une vraie
+confirmation, à l'inverse des deux accords reçus une heure plus tôt sur ma mesure du régime.
+
+**La forme exacte est plus grave que mon énoncé.** Ce n'est pas « le scan CVE échoue ouvert » : c'est
+que le `else` **interne** à la branche `machines` prend le parc entier. Une planification qui dit
+« vise CES machines-là » avec une valeur ne rendant aucun identifiant valide scanne tout le parc.
+**Pas un défaut d'absence comme le `'all'` d'E-280 — une intention explicitement étroite qui tombe du
+côté large.** L'auteur croit avoir borné.
+
+**Troisième volet** : `ssh_audit_schedules.target_type` est `NOT NULL`, `cve_scan_schedules.target_type`
+est **NULLABLE**. Et `.get('target_type','all')` rend `None` sur un `null` JSON explicite — la clé
+existe, le défaut ne joue pas. Éprouvé des deux côtés en transaction annulée. C'est la table la plus
+permissive qui porte la tâche dont l'aboutissement envoie un courriel.
+
+**Classement révisé, et il me contredit** : E-281, puis E-280, puis SEC-013 — même population pour les
+trois, mais seul E-281 échoue du côté large sur une intention étroite, inclut les archivées, et a un
+effet hors du parc. J'avais classé E-280 en tête ; le défaut trouvé par accident en corrigeant mon
+erreur le dépasse.
+
+**Non mesuré** : si le courriel part sur un scan **planifié** ou seulement par le chemin S7b non signé.
+Autorisé en lecture de code seule. `cve_scan_schedules` et `ssh_audit_schedules` portent 0 ligne — aucune
+planification existante ne change de sort.
+
 ### v1.38.136 — retrait de clé : la sauvegarde existe, la restauration non ; et `documentation` garde par un seuil de rôle
 
 **E-283.** Le relevé annonçait « aucune sauvegarde, ni `cp`, ni `.bak`, ni fichier temporaire » autour
