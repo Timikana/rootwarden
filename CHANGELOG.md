@@ -2243,6 +2243,37 @@ d'une chose qu'il n'a jamais vue ne lui apprend rien*.
     parite i18n           FR=38  EN=38  ecarts=0 ; aucune cle morte (sonde a temoin)
     captures              6, aux deux largeurs et aux trois roles, REGARDEES
 
+### v1.38.149 — ma conclusion sur les 216 était inversée, et mon témoin a échoué en réussissant
+
+**Remesuré sur les deux idiomes et les deux arbres** :
+
+    laravel/public/js   attribut `.hidden =` : 217 / 24 fichiers | classe 'hidden' :   0
+    legacy              attribut `.hidden =` :   0               | classe 'hidden' : 159 / 29
+
+**Deux vocabulaires disjoints** : le portage masque par l'**attribut HTML**, le legacy par la **classe
+CSS**. J'ai cherché la classe dans `laravel/`, trouvé zéro, et conclu que le portage n'employait pas
+`hidden` puis que la population de 216 mourait avec le legacy. **C'est l'inverse : les 216 sont au
+portage et survivent ; ce sont les 159 qui meurent.** La cible de la session 6 était déjà la bonne.
+
+**⚠ Et mon témoin a échoué en réussissant.** J'avais vérifié que mon motif trouvait quelque chose de
+connu — il le trouvait, mon détecteur marchait parfaitement. *Un témoin qui n'exerce que l'idiome
+qu'on cherche prouve que l'instrument marche ; il ne peut pas dire qu'on cherche le **mauvais**
+idiome.* C'est une limite de la discipline du témoin que ce registre n'avait pas : elle protège contre
+l'instrument aveugle, pas contre la question mal posée — **et les deux rendent le même `0`**. Le seul
+témoin qui l'aurait dit est **négatif et ouvert** (« quelque chose masque bien des éléments — par
+quoi ? ») ; lancé après coup, il rend `.hidden 225` contre `classList 30`. *Je n'ai pas manqué un
+outil, j'ai manqué une question.*
+
+**Et l'écart que je proposais de ne pas trancher portait toute la conclusion.** J'avais écrit que 159
+contre 216 était « un écart de motif, pas de fait, qui ne porte plus rien ». Il venait de **deux arbres
+et deux vocabulaires**. *Un écart qu'on renonce à trancher parce qu'il ne porte plus rien porte parfois
+toute la conclusion.* Cinquième faux désaccord de cette famille, second où les deux parties avaient
+raison sur des **objets différents** — et ici la cause n'est pas l'heure, c'est **l'objet non nommé**.
+
+**Le portage porte deux vocabulaires de visibilité** : `el.hidden` pour montrer/masquer (217), six
+classes `rw-*` pour l'état (30). La décision de couverture est inchangée et mieux fondée : la propriété
+générique vise un ensemble dont on sait maintenant qu'il survit.
+
 ### v1.38.148 — couverture du rendu : des paramètres, pas des séquences — et les 216 sont dans le legacy
 
 **E-295.** La question « quelles séquences méritent leur propre sonde » était mal posée : *la plupart
