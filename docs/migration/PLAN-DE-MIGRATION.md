@@ -63,6 +63,39 @@ Dernière mise à jour : **2026-09-02** (01:50 CEST), version `1.38.133`.
 
 ---
 
+## 0 bis. ANNUAIRE DES SESSIONS (adresses `SendMessage`) — relevé 2026-09-02 03:15 CEST
+
+⚠ **Ce tableau n'existait pas avant aujourd'hui, et son absence a produit E-305 et sa réplique.**
+J'assigne par **numéro de rôle** et les adresses sont des **empreintes** : personne d'autre que moi ne
+pouvait faire la correspondance. *Une décision ne circule pas parce qu'on décide de l'envoyer : elle
+circule parce qu'on sait à qui.*
+
+| n° | rôle | adresse `SendMessage` |
+|---|---|---|
+| **1** | LEAD / architecte (ce document) | `gestion-ssh-key-4f` |
+| **2** | analyste legacy — inventaires | `gestion-ssh-key-0b` |
+| **3** | portage Laravel — vues et contrôleurs | `gestion-ssh-key-c1` |
+| **4** | backend + migrations — prépare, n'applique pas | `gestion-ssh-key-94` |
+| **5** | sécurité / pré-relecture | `gestion-ssh-key-c6` |
+| **6** | QA / tests — spécifie la couverture | `gestion-ssh-key-5f` |
+| **7** | navigateur / E2E — **tient le banc** | `gestion-ssh-key-ec` |
+| **8** | DSI délégué — dossiers d'arbitrage | `DSI Migration complète du legacy` |
+
+**Le nom EST l'adresse**, à recopier exactement. Les crochets (`[d845b1]`) ne servent qu'à
+désambiguïser si deux lignes partagent un nom.
+
+⚠ **À remesurer par `ListAgents`, jamais de mémoire.** Une session qui redémarre change d'empreinte, et
+**un annuaire périmé est plus nuisible qu'une absence d'annuaire : il fait croire qu'on a envoyé.**
+
+### La règle de circulation, tirée d'E-305
+
+    inscrire       rend la decision VERIFIABLE et DURABLE   -> ce document
+    envoyer        rend la decision AGISSANTE               -> le destinataire, NOMME
+    rendre compte  rend la decision ARBITRABLE              -> l'exploitant
+
+**Les trois sont distincts et aucun ne remplace les autres.** Une décision qui débloque quelqu'un se
+livre **à cette personne d'abord**. *Le blocage se mesure chez le bloqué, pas chez l'arbitre.*
+
 ## 1. Comment se servir de ce document
 
 | moment | geste |
