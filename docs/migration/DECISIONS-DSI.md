@@ -3754,3 +3754,64 @@ qu'elles possèdent** (`superv`, trois capacités testées).
 
 > **Le menu est à 32/32 : plus une seule entrée ne mène à l'ancien portail. Mais les fichiers du legacy
 > répondent encore.** *Le portage est fini ; la bascule ne l'est pas.*
+
+---
+
+## Premier tour de la boucle horaire — la relance a produit, et elle a trouvé DEUX capacités PERDUES
+
+**2026-09-02, ~18:30.** *L'exploitant a repris mon « 32/32 » : il comptait la navigation, pas la
+capacité.* **Il avait raison, et la relance immédiate a rendu en dix minutes :**
+
+    eb54230  fix(supervision): E-336 — trois gestes declares absents et portes depuis DIX JOURS
+    72d8c9b  docs(lead): « 31/32 » comptait la navigation, pas la capacite
+    e7de2f9  docs(migration): MODULE-CAPACITES-RESTANTES.md — 182 lignes
+
+    declarations « pas encore porte » :  41 -> 36
+
+### L'inventaire, et il porte ses objets
+
+    16 capacites enumerees
+        11 n'exigent RIEN — portables maintenant
+         4 exigent un arbitrage ou une autorisation
+         1 n'est pas un manque mais une DECISION deja prise (politique en lecture seule)
+
+> **C'est la forme qui manquait à tous mes comptes** : *chaque ligne dit ce que la capacité fait, ce
+> qu'elle exige, et où elle vit déjà.* **Un compte de 16 qui porte ses objets vaut mieux que mon « 41 »
+> qui n'en portait aucun** — et il est plus petit, ce qui est le contraire de ce qu'on attend d'une
+> mesure plus honnête.
+
+### ⚠⚠ Et la trouvaille : DEUX capacités ne sont pas « pas encore portées », elles sont PERDUES
+
+| capacité | ce que la page dit | ce qui est vrai |
+|---|---|---|
+| **modifier le jeton d'API de supervision** | *« reste sur l'ancien portail »* | **`/supervision/` rend 404** — l'ancien portail ne la sert plus |
+| **rattacher un serveur à un profil** | *« depuis le tableau de déploiement, pas encore porté »* | exact côté portage, **et le tableau du legacy est archivé** |
+
+> **La page renvoie l'utilisateur vers un chemin qui n'existe plus.** *Ce n'est ni « portée » ni « à
+> porter » : c'est fermée, et l'écran continue d'indiquer la sortie.*
+
+**C'est la troisième occurrence du motif de l'export RGPD** — *une capacité qui disparaît à l'archivage
+sans qu'aucun test ne rougisse.* **Mais celle-ci est pire : l'archivage a DÉJÀ eu lieu.** Là où le
+`DOSSIER-11` prévient d'une perte à venir, ici la perte est consommée et **seul le libellé en garde la
+trace.**
+
+### Et cinq déclarations étaient de l'i18n MORTE
+
+*Résidu de l'époque des sous-lots, laissé au catalogue après que la capacité a été portée* — rendues
+**zéro fois**. **C'est ce qui explique 41 → 36 sans qu'aucune capacité n'ait bougé.**
+
+> **Mon « 41 » comptait donc cinq clés que personne ne lit et trois affirmations fausses.** *Une mesure
+> par `grep` sur un catalogue compte ce qui est ÉCRIT, pas ce qui est RENDU* — et la différence est de
+> huit sur quarante-et-un, soit un cinquième.
+
+### ✅ Ce qui reste, et qui décide de quoi
+
+**11 capacités portables sans aucun mot de l'exploitant.** *La relance est faite, l'assignation revient
+au Lead.*
+
+**4 qui exigent son arbitrage** — dont **relever tout le parc** (`ssh_audit`), *la seule dont la route
+n'accepte aucun `machine_id` : sa portée est le parc entier, production comprise, et une fixture ne borne
+pas une route sans paramètre de portée.*
+
+**Et 2 à rouvrir, pas à porter** : *elles ne sont pas en retard, elles ont été fermées.* **À inscrire au
+`DOSSIER-11`, qui est le dossier de cette classe.**
