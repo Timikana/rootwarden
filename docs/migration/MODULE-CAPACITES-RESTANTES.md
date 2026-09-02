@@ -87,8 +87,8 @@ C'est le résultat le plus lourd du relevé, et il n'a pas la forme attendue.
 
 | capacité | ce que la page dit | ce qui est vrai |
 |---|---|---|
-| **modifier le jeton d'API de supervision** | *« reste sur l'ancien portail »* | **`/supervision/` rend 404** — sondé le 2026-09-02. L'ancien portail ne la sert plus |
-| **rattacher un serveur à un profil** | *« se fait depuis le tableau de déploiement, qui n'est pas encore porté »* | **exact** — aucune route `supervision/deploiement` côté portage (`grep -c` → 0). Et le tableau du legacy est archivé |
+| **modifier le jeton d'API de supervision** | *« reste sur l'ancien portail »* | **voir §9** — confirmé, et par une mesure qui ne dépend plus d'un sondage HTTP |
+| **rattacher un serveur à un profil** | *« se fait depuis le tableau de déploiement, dans l'onglet « Déploiement » »* | **voir §9** — j'avais cité ce libellé de mémoire et de travers (« qui n'est pas encore porté »). Il ne dit pas ça, et la différence change le verdict |
 
 > **Ce ne sont pas deux capacités « pas encore portées » : ce sont deux capacités PERDUES à
 > l'archivage.** La page portée renvoie l'exploitant vers un portail qui rend 404, et il n'existe
@@ -248,3 +248,110 @@ CSV n'y figure. **Cycle de vie et import CSV sont réellement absents.**
 - **je n'ai pas vérifié que les quatre déclarations VRAIES le soient sur TOUS leurs éléments** —
   `fail2ban` en énumère quatre, je n'ai apparié que « désactiver une jail » ;
 - rien n'a été écrit dans `laravel/` ni `backend/`.
+
+---
+
+## 9. Les deux capacités « perdues » de `superv` — **fermées toutes les deux**, et pas de la même façon
+
+**D'où je mesure**, parce que la question se pose : je n'ai pas sondé en HTTP. J'ai lu
+le **disque** (arborescence, points d'entrée, absence de règle de réécriture) et la
+**base du banc** depuis le conteneur `rootwarden_db`. Un `404` mesuré depuis un
+conteneur ne vaut pas un `404` mesuré depuis un navigateur authentifié — je me suis
+donc passé du `404`. La base lue est celle du **banc**, pas la production : les
+comptes de lignes ci-dessous ne valent que pour elle.
+
+### 9.1 Le chemin annoncé — mort dans les deux cas
+
+| | `legacy/supervision/` | encore servi ? |
+|---|---|---|
+| emplacement | `legacy/_deprecated/supervision/` | **non** |
+| les 4 points d'entrée | `menu.php` ×2, `head.php`, `index.php` | **tous** vers `LARAVEL_URL . '/supervision'` |
+| lien résiduel vers `/supervision/` legacy | — | **0** |
+| règle de réécriture / alias | — | **0** |
+
+*Témoin* : ma première sonde de liens a rendu 0 sur `serveurs|cles-ssh`, ce qui aurait
+pu passer pour « aucun module porté n'est cité ». Faux : `menu.php` écrit les chemins
+portés **par concaténation** (`LARAVEL_URL` y apparaît **16 fois**). Le zéro venait de
+l'instrument. Refaite sur la forme réelle, la mesure tient.
+
+### 9.2 Capacité A — modifier le jeton d'API : **FERMÉE**, et la phrase envoie vers un portail archivé
+
+- **Seule interface qui l'écrivait** : `legacy/_deprecated/supervision/js/main.js:201`. Archivée.
+- **La route backend, elle, est VIVANTE** : `POST /supervision/config/<platform>`
+  (`backend/routes/supervision.py:2324-2405`) écrit toujours la colonne. *Aucun front
+  vivant ne l'appelle* — l'unique appelant est le script archivé ci-dessus.
+- **Le portage écrit sa configuration en direct** (`enregistreConfiguration`, pas la
+  passerelle — c'est le piège de la couche). Les colonnes `telegraf` qu'il écrit sont
+  `output_url`, `output_org`, `output_bucket`, `inputs`. **`telegraf_output_token`
+  n'y est pas.**
+- *Témoin, et il est fort* : `tls_psk_value` **est** porté, par un argument dédié de
+  `enregistreConfiguration`. L'instrument sait donc voir un secret porté ; le jeton
+  n'en est simplement pas un.
+
+> **La déclaration est donc à moitié vraie.** « Pas encore portée » : **exact**.
+> « Elle reste sur l'ancien portail » : **faux** — l'ancien portail ne la sert plus.
+
+- **Donnée** : `supervision_config` = **0 ligne** sur le banc. La capacité est fermée
+  **sur une table vide** ici — mais c'est la seule chose que ce chiffre autorise à dire.
+
+### 9.3 Capacité B — rattacher un serveur à un profil : **FERMÉE**, et c'est la plus coûteuse des deux
+
+**J'avais mal cité le libellé au §3.** Il ne dit pas « le tableau de déploiement n'est
+pas encore porté ». Il dit :
+
+> *« Rattacher un serveur à un profil se fait depuis le tableau de déploiement, dans
+> l'onglet « Déploiement ». »*
+
+**Or cet onglet EXISTE dans le portage** (`onglet_deploy` = « Deploiement agents »).
+La phrase n'envoie donc pas le lecteur vers le legacy : elle l'envoie vers un onglet
+qu'il peut ouvrir, **où la capacité n'est pas**. C'est pire qu'un renvoi vers une page
+morte — le renvoi aboutit, et c'est la colonne qui manque.
+
+| tableau de déploiement | colonnes |
+|---|---|
+| **legacy** (archivé) | …, `th_profile` — un `<select>` peuplé par `profiles.js:150-175` |
+| **portage** (vivant) | nom, adresse, environnement, agents, actions — **pas de colonne Profil** |
+
+- **Route backend vivante** : `POST /supervision/machines/<mid>/profile`. Unique
+  appelant : `legacy/_deprecated/supervision/js/profiles.js:156`. Archivé.
+- **Le portage ne touche la table que deux fois, et les deux sont des `count()`**
+  (`Supervision.php:147` et `:306`) : il **lit** l'assignation pour afficher « combien
+  de machines perdraient ce profil », il ne l'**écrit** jamais.
+- *Témoin, sur la forme la plus difficile* — le piège de la couche est précisément que
+  Laravel peut écrire sans passer par la passerelle : l'instrument voit bien
+  `DB::table(...)->update(...)` ailleurs dans le portage (`Serveurs.php:536`, `:730`).
+  Le zéro sur `machine_supervision_profile` n'est donc pas un zéro d'instrument.
+
+**Et voici le coût réel, qui ne se lit pas dans le compte de lignes :**
+
+| table | lignes (banc) |
+|---|---|
+| `machine_supervision_profile` — le **lien** | **0** |
+| `supervision_metadata_profiles` — le **catalogue** | **2** (`LinuxInterne`, `LinuxExterne`) |
+
+Le catalogue de profils est **entièrement porté et fonctionnel** — création,
+modification, suppression, avec 36 clés de libellé. Le **rattachement** ne l'est pas.
+Un exploitant peut donc, aujourd'hui, créer un profil de supervision **qu'aucune
+machine ne pourra jamais porter**. La capacité fermée n'est pas isolée : elle est le
+seul débouché d'une capacité, elle, bien vivante.
+
+### 9.4 Hors de ce qui m'était demandé, mais lu en chemin — **le jeton est stocké en clair**
+
+`save_platform_config` porte le commentaire `# Chiffrer le token Telegraf si fourni`.
+**Il n'y a aucun appel de chiffrement dans la fonction** (lignes 2324-2405) :
+`telegraf_token` part tel quel dans l'`UPDATE`.
+
+*Témoin* : le même fichier sait chiffrer — `enc.encrypt_password(psk_value)` à la
+ligne **672**, pour le PSK. Ce n'est donc pas une capacité absente du module, c'est
+un geste absent de cette fonction. **Septième occurrence de l'en-tête qui ment**, et
+la première où elle porte sur un secret.
+
+Conséquence, et elle est ironique : le badge « jeton posé » du portage teste
+`telegraf_output_token <> ''`. Ce test serait **faux** si la colonne était chiffrée
+(PHP chiffre `''` en `sodium:…`, et la comparaison porterait sur des octets). Il est
+juste **parce que** le chiffrement manque. Je ne l'ai pas vérifié en base : 0 ligne.
+
+> Je ne propose pas de correctif et je n'ai touché à aucun libellé. **L'arbitrage —
+> porter les capacités ou retirer les deux phrases — appartient au DSI.** Ce que la
+> mesure ajoute à sa décision : les deux phrases sont fausses *chacune sur une moitié
+> différente*, et la capacité B a un catalogue vivant qui ne débouche sur rien.
