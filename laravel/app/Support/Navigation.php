@@ -99,7 +99,7 @@ class Navigation
             ['cle' => 'iptables',       'garde' => 'can_manage_iptables',     'route'  => 'pare-feu'],
             ['cle' => 'fail2ban',       'garde' => 'can_manage_fail2ban',     'route'  => 'fail2ban'],
             ['cle' => 'ssh_audit',      'garde' => 'can_audit_ssh',           'route'  => 'audit-ssh'],
-            ['cle' => 'wazuh',          'garde' => 'can_manage_wazuh',        'legacy' => '/wazuh/', 'feature' => 'wazuh'],
+            ['cle' => 'wazuh',          'garde' => 'can_manage_wazuh',        'route'  => 'wazuh', 'feature' => 'wazuh'],
         ],
 
         'admin' => [

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.172** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.173** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,107 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.173 — `wazuh` R1 : **32/32**, le menu n'a plus une seule entree `legacy`
+
+**La derniere page bascule.** Menu au role 3, mesure au DOM :
+
+    total=32  route=32  legacy=0     entrees portant les DEUX : 0
+    liens de menu rendus : 64        (barre laterale + tiroir mobile)
+    libelles VIDES : 0               identifiants rendus : 0
+    liens EXTERNES : 0               <- plus une seule fleche vers l'ancien portail
+    entree ACTIVE : "Wazuh"
+
+#### Ce sous-lot n'etait pas bloque par le redemarrage, et c'est ce qui l'a permis
+
+Le backend en service tient `6663e83` (2026-08-27), qui contient DEJA
+`routes/wazuh.py`. **Les cinq routes GET y sont identiques a celles de l'arbre** : les trois seules
+differences vivent dans `_upsert_agent`, `install_all` et `uninstall` — des routes d'ECRITURE que R1
+n'appelle pas.
+
+#### ⚠ Le discriminant est la METHODE, pas le chemin
+
+    /wazuh/config        GET lit  ·  POST ecrit
+    /wazuh/options       GET lit  ·  POST ecrit
+    /wazuh/rules/<name>  GET lit  ·  DELETE supprime
+
+**Trois chemins portent deux methodes.** Un classement par chemin ne peut donc pas separer ce que R1
+porte de ce qu'il declare absent. Le helper `lis()` du script ne sait faire qu'un `GET` : la
+garantie est structurelle, pas documentaire. **Requetes mutantes dans `wazuh.js` : 0.**
+
+#### Les neuf gestes absents sont NOMMES, sans compte
+
+`np_liste` les enumere un par un, et **il n'y a pas de compte a cote** : un nombre ecrit pres d'une
+enumeration se desynchronise des qu'un geste est porte — c'est l'arbitrage de cette nuit.
+
+**Et la reserve qui compte** : trois de ces gestes n'ont pas l'effet que leur nom suggere, **y
+compris sur l'ancien portail** — `group` ne transmet jamais le groupe (la seule commande distante
+est un redemarrage), et les POST de `options` et `rules` n'atteignent AUCUNE machine. *Renvoyer
+quelqu'un vers le legacy sans le dire serait l'envoyer croire un ecran qui se trompe.*
+
+#### E-333 — une redirection qui ECRASAIT la page
+
+    Route::get('/wazuh/', fn () => redirect()->route('wazuh'));
+
+`/wazuh/` **se normalise en `/wazuh`** — la MEME URI que la route nommee. La derniere enregistree
+remplace la premiere, **nom compris** : `Route::has('wazuh')` devenait faux, la redirection pointait
+un nom inexistant, et **la page rendait 500**.
+
+Retiree. *Elle n'avait de toute facon aucun objet : contrairement a `/groups/` ou
+`/documentation.php`, le chemin du legacy est DEJA celui du portage.* **Le geste qui avait servi
+trois fois cette nuit etait nuisible la quatrieme.**
+
+#### E-334 — un titre qui faisait croire a trois agents installes
+
+`GET /wazuh/servers` rend `machines LEFT JOIN wazuh_agents` : **chaque ligne est un SERVEUR**, ses
+colonnes d'agent vides quand il n'en a pas. Titre d'origine : « Agents Wazuh du parc » — sur trois
+lignes, alors que `wazuh_agents` porte **ZERO** ligne.
+
+Corrige en « Les serveurs du parc et leur agent Wazuh », et **chaque ligne sans agent dit
+« aucun agent »** au lieu d'« etat inconnu » — *qui ferait croire a un agent dont on ignore l'etat.*
+
+#### E-335 — une date lue par sa POSITION
+
+`jsonify` de Flask serialise en **RFC 1123** : `« Tue, 26 May 2026 15:49:45 GMT »`. Un
+`slice(0, 10)` rendait **« Tue, 26 Ma »**. Corrige en PARSANT. *Une date qui se lit par sa position
+suppose un format.*
+
+#### Le booleen de mot de passe se dit « valeur chiffree »
+
+Le backend masque correctement — il rend `registration_password_set` et jamais la valeur. **Mais ce
+booleen est calcule par `bool()` sur une colonne chiffree** (`aes:sodium:…`, 83 octets), et le
+chiffrement d'une chaine VIDE est non vide. L'ecran rend donc **« une valeur chiffree est
+enregistree »**, pas « un mot de passe est defini ». *Moins, plutot que faux.*
+
+#### « Zero » et « je n'ai pas su lire » ne sont pas le meme ecran
+
+Quatre messages d'erreur distincts, et chacun dit ce qu'il n'est pas : *« Ce n'est pas aucun
+agent »*, *« Ce n'est pas aucune regle »*. **Une universelle negative est vraie a vide** — une
+assertion « la liste est vide » passerait au vert sur une vue cassee.
+
+#### Un defaut que j'ai cru voir et qui n'existait pas
+
+La capture montrait une bande de menu **vide** a l'emplacement de l'entree active. Mesure au DOM :
+**0 libelle vide, 0 identifiant rendu, entree active « Wazuh »**. C'etait un artefact de capture —
+la barre laterale etait rognee. *Une cle absente rendrait son IDENTIFIANT, jamais du vide : le
+symptome etait impossible.* **Lire les pixels n'est pas mesurer le DOM.**
+
+#### Trente-huit cles ne sont pas rendues, et ce ne sont pas des cles mortes
+
+Elles appartiennent aux neuf gestes d'ecriture et aux sections que R1 ne porte pas. **Une sonde de
+cles mortes les signalera et aura raison sur la forme** — la reserve est donc inscrite dans le
+catalogue lui-meme, pour qui voudrait les nettoyer.
+
+#### Mesures
+
+    /wazuh -> 302 (la garde)   ·   rw-test-super 200   ·   rw-test-admin 403
+    intergiciels : web · session.authentifiee · session.revoquee ·
+                   mot.de.passe.a.changer · role:2 · perm:can_manage_wazuh
+    drapeau `feature` => 'wazuh'  CONSERVE   (seule entree du menu qui en porte un)
+    parite i18n   FR=91  EN=91  ecarts=0
+    19 classes CSS verifiees dans rw.css AVANT le premier rendu — aucune absente,
+       donc rw.css n'a pas ete touche
+    3 captures a 1920/1400/390, REGARDEES — 2 defauts corriges grace a elles
 
 ### v1.38.172 — ⚠ le redémarrage n'est pas de l'hygiène : c'est la garde qui manque devant `POST /deploy`
 

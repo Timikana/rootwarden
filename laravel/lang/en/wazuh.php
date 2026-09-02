@@ -16,14 +16,14 @@
  */
 return [
     'title' => 'Wazuh',
-    'subtitle' => 'Wazuh agent deployment, per-server options, editable rules/decoders.',
+    'subtitle' => 'Manager configuration, agent inventory, per-server options and rules in place.',
     'tab_config' => 'Configuration',
     'tab_deploy' => 'Deployment',
     'tab_options' => 'Options',
     'tab_rules' => 'Rules & Decoders',
     'tab_history' => 'History',
     'config_title' => 'Wazuh manager configuration',
-    'config_desc' => 'Manager, enrollment password and default group used during installation.',
+    'config_desc' => 'Manager, enrolment password and default group, as they will be used at install time.',
     'manager_ip' => 'Manager (IP/FQDN)',
     'manager_port' => 'Manager port',
     'registration_port' => 'Enrollment port',
@@ -37,9 +37,11 @@ return [
     'api_password' => 'API password',
     'unchanged' => 'Leave empty to keep current',
     'save' => 'Save',
-    'deploy_title' => 'Agent deployment',
+    // NOT a list of agents: each row is a SERVER — see fr.
+    'deploy_title' => 'Fleet servers and their Wazuh agent',
     'refresh' => 'Refresh',
-    'no_servers' => 'No server.',
+    'no_servers' => 'No Wazuh agent is registered. This is not an error: the module has never been used on this fleet.',
+    'sans_agent' => 'no agent',
     'col_agent_id' => 'Agent ID',
     'col_status' => 'Status',
     'col_version' => 'Version',
@@ -50,9 +52,9 @@ return [
     'col_environment' => 'Env',
     'status_active' => 'Active',
     'status_disconnected' => 'Disconnected',
-    'status_never' => 'Never connected',
+    'status_never' => 'never connected',
     'status_pending' => 'Pending',
-    'status_unknown' => 'Unknown',
+    'status_unknown' => 'unknown state',
     'btn_install' => 'Install',
     'btn_detect' => 'Scan',
     'btn_detect_tip' => 'Detect an existing Wazuh agent without reinstalling',
@@ -76,7 +78,7 @@ return [
     'active_response' => 'Active Response',
     'sca' => 'SCA (Security Configuration Assessment)',
     'rootcheck' => 'Rootcheck',
-    'rules_list' => 'Rules / Decoders / CDB',
+    'rules_list' => 'Rules, decoders and CDB lists in place',
     'new' => 'New',
     'rule_name' => 'Name (ex: local_rules)',
     'delete' => 'Delete',
@@ -89,6 +91,32 @@ return [
     'loading' => 'Loading…',
     'saving' => 'Saving…',
     'saved' => 'Saved.',
-    'pwd_set' => 'set',
-    'pwd_not_set' => 'not set',
+    'pwd_set' => 'an encrypted value is stored',
+    'pwd_not_set' => 'no value stored',
+
+    // What R1 does not port, named one by one — see fr. No count next to the
+    // enumeration: the enumeration is the only source.
+    'np_titre' => 'What this page cannot do yet',
+    'np_liste' => "Install an agent · install across the fleet · read an agent's state · uninstall · restart · change the group — these six open an SSH session on the machine. And: save the configuration · save a server's options · create or delete a rule.",
+    'np_ouvrir' => 'Open Wazuh on the old portal',
+    'np_reserve' => "Three of these actions do not have the effect their name suggests, even on the old portal: changing the group does not send the group to the machine, and saving options or a rule reaches no server.",
+
+    'err_config'  => 'The manager configuration could not be read. This is not "no configuration".',
+    'err_servers' => 'The agent inventory could not be read. This is not "no agent".',
+    'err_options' => "This server's options could not be read.",
+    'err_rules'   => 'The rule list could not be read. This is not "no rule".',
+    'no_rules'    => 'No rule, no decoder, no CDB list.',
+    'no_config'   => 'No manager configuration is stored.',
+    'no_options'  => 'No specific option for this server: the defaults apply.',
+    'choisir_serveur' => 'Choose a server to see its options.',
+
+    'portee_titre' => 'What this page can do today',
+    'portee_texte' => 'It reads: the manager configuration, registered agents, per-server options and the rules in place. It joins no machine and writes nothing.',
+
+    /*
+     * Thirty-eight keys of this catalogue are NOT rendered by R1. They are not
+     * dead: they belong to the nine write actions and to the sections R1 does
+     * not port. A dead-key probe will flag them and will be right about the
+     * form — they are kept for R2 and R3. See fr.
+     */
 ];
