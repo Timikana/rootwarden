@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.152** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.153** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,29 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.153 — le courriel du scan groupe, ecrit dans le code qui sera remplace
+
+**L'action groupee `cve_scan` envoie de VRAIS courriels** — un par machine a resultats. Chaine
+d'appels lue, recoupee par deux sessions :
+
+    backend/routes/groups.py:269   from routes.cve import _stream_cve_scan
+    backend/routes/groups.py:278   for _line in _stream_cve_scan([mid], min_cvss)
+    backend/routes/cve.py:77       send_cve_report(...)
+    srv-docker.env:206             MAIL_ENABLED=true            <- EN SERVICE
+
+Le panneau R1 **le disait deja a l'ecran**. Ce qui manquait est la trace pour **celui qui remplacera
+ce panneau par le vrai bouton** :
+
+> **Une reserve qui vit dans l'objet qu'elle protege meurt quand cet objet est remplace.** Le texte
+> du panneau disparaitra avec le panneau — c'est-a-dire au moment exact ou le fait compte le plus.
+
+La note vit donc dans `groupes.js`, contre le panneau lui-meme. **Deuxieme application de la meme
+methode en une nuit**, apres la contrainte du champ de portee vide dans `audit-ssh.js`.
+
+**Et c'est le Lead qui me l'a renvoyee** : il m'avait transmis le fait par message, puis a note que
+ma propre pratique valait mieux que son canal. *Le canal qui dure n'est pas celui qui informe le plus
+vite.*
 
 ### v1.38.152 — le webhook est fermé EN SERVICE : la non-mesure déclarée est close
 
