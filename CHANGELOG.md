@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.153** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.154** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,36 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.154 — SEC-015 : le base64 protège les règles, `dest_path` est interpolé nu
+
+**E-302 (SEC-015).** `iptables_manager.py:125` — `f"printf '%s' '{encoded}' | base64 -d > {dest_path}"`.
+Les **règles** sont sûres par construction (base64) ; **`dest_path` est interpolé nu**, sans guillemets
+ni validation. Et il n'y a **pas de seconde barrière** : `execute_as_root` compose
+`sh -c {shlex.quote(command)}` — *citer l'enveloppe ne cite pas le contenu.* Le docstring dit la
+première moitié et se tait sur la seconde : **rien n'est faux, il manque une phrase.**
+
+**L'invariant tient aujourd'hui**, compté : deux appelants, deux **littéraux**, `/iptables-rollback`
+compris. **⚠ Mais I5 est le sous-lot qui ajouterait des appelants** — toute destination *dérivée*
+(sauvegarde nommée, fichier d'attente, chemin par machine) transforme `dest_path` en **injection de
+commande root**. *Ce n'est pas une raison de ne pas signer l'arbitrage du port SSH ; c'est une chose à
+savoir en signant.* Correctif à coût nul routé, non appliqué : `shlex.quote(dest_path)` + la ligne de
+docstring manquante.
+
+**E-303 — l'inertie d'un correctif a trois causes, une seule est bénigne.** L'inerte des six est
+`399931a` (décorateur étendu aux paramètres de chemin) : les trois routes concernées ne portent pas ce
+décorateur, donc l'amélioration **n'a aucun site d'appel**. Le critère qui sépare les trois causes est
+**le type de changement qui les réveille** : absence de *porteur* et absence de *données* se réveillent
+sur une **donnée**, qui change sans relecture ; absence de *chemin d'appel* se réveille sur du **code**,
+qui passe par une relecture où le correctif sera là. *Un correctif dormant qu'une donnée réveille n'est
+pas inerte : il est en attente, et rien ne préviendra le jour où il aurait fallu l'avoir.* À présenter
+comme un **durcissement latent**, jamais comme un correctif inutile.
+
+**E-304 — mesurer l'appelant direct n'est pas mesurer le chemin d'appel.** `send_cve_report` a bien **un
+seul appelant direct**, et **deux chemins d'entrée** : `groups.py:269` importe `_stream_cve_scan`, la
+fonction *qui* l'appelle. Le grep était correct, la question était d'un cran trop bas. *Même famille que
+le témoin qui valide l'idiome et pas la question : l'instrument fait exactement ce qu'on lui demande, et
+on lui a demandé la mauvaise chose.* Pour un effet sortant, remonter jusqu'aux **points d'entrée HTTP**.
 
 ### v1.38.153 — le courriel du scan groupe, ecrit dans le code qui sera remplace
 
