@@ -115,11 +115,15 @@
             <button type="button" class="rw-bouton rw-bouton--discret"
                     data-rw="ipt-copie-charger">{{ __('pare-feu.copie_charger') }}</button>
         </div>
+        {{-- AU-DESSUS du bouton : l'information doit etre lue avant le clic,
+             pas apres. Ce geste ecrit des regles de pare-feu sur une machine
+             reelle et n'a jamais ete exerce depuis cette interface. --}}
         <button type="button" class="rw-bouton" data-rw="ipt-copie-enregistrer" disabled>
             {{ __('pare-feu.copie_enregistrer') }}
         </button>
     </div>
 
+    <p class="rw-aide rw-prose" data-rw="ipt-copie-jamais-exercee">{{ __('pare-feu.copie_jamais_exercee') }}</p>
     <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-copie-annonce"></p>
     <div class="rw-grille" data-rw="ipt-copie-blocs" hidden></div>
 </div>

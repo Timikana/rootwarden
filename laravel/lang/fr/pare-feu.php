@@ -119,4 +119,20 @@ return [
     'valid_echec_titre' => 'Contrôle non abouti',
     'valid_echec' => 'Le contrôle n\'a pas abouti. Ce n\'est ni « valide » ni « invalide » : rien n\'a été vérifié.',
     'valid_sortie' => 'Sortie du serveur',
+
+    /*
+     * ══ UNE NON-MESURE ANNONCEE A L'AVANCE ══════════════════════════════
+     *
+     * `/pare-feu/copie/enregistrer` ecrit des regles de pare-feu sur une
+     * machine reelle. **Ce geste n'a jamais ete exerce** — mesure :
+     * `tests/e2e/go-page-pare-feu.mjs:65` dit que les requetes vers cette
+     * route sont « AVORTEES sans condition ». La suite mesure qu'on peut
+     * CLIQUER, jamais que le geste ABOUTIT.
+     *
+     * Sur la PAGE et au-dessus du bouton, pas en pied ni au seul registre :
+     * c'est la personne qui va cliquer qui a besoin de l'information.
+     * Une non-mesure annoncee a l'avance est une reserve ; annoncee apres
+     * coup, c'est une excuse.
+     */
+    'copie_jamais_exercee' => "L'enregistrement d'une copie de règles n'a encore jamais été exercé depuis cette interface : le geste est câblé et confirmé, mais son aboutissement n'a pas été observé sur une machine. L'ancien portail reste la seule voie éprouvée.",
 ];

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.163** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.164** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,80 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.164 — `pare-feu` : 31/32, et deux portages entiers que personne ne comptait
+
+**Il ne reste qu'une entree `legacy` : `wazuh`.**
+
+#### La cause n'est pas une faute de lecture, c'est le NOM
+
+    grep -i iptables laravel/   ->   0
+    la page s'appelle           ->   PareFeuController, pare-feu.blade.php, pare-feu.js
+
+**Les pages portees sont nommees en FRANCAIS, et nos sondes cherchent les noms ANGLAIS du legacy.**
+`comptes-distants` pour `remote_users`, `pare-feu` pour `iptables`. **Deux portages entierement payes
+— du 28 aout — que personne ne comptait**, parce que chaque mesure partait de la cle du menu.
+
+**Troisieme fois en vingt-quatre heures qu'un nom nous trompe** : `derive` pris pour le module
+« derive de configuration » au lieu du participe de *deriver*, `iptables` cherche sous son nom
+anglais, et un `target_type` bien forme qui ne decrivait pas son objet. *Ce n'est plus la structure
+qui piege, c'est le vocabulaire.*
+
+#### ⚠ CE QUI A SAUVE LE DSI N'EST PAS D'AVOIR MIEUX CHERCHE
+
+Il a fait chercher le cas **CONNU** en meme temps — `ComptesDistants` ressortait, **donc ses zeros
+etaient des zeros**. Ma sonde n'avait pas de temoin, et j'ai rendu « 0 » pour une page qui existe
+depuis cinq jours.
+
+*On verifie ce qu'on soupconne, pas ce qu'on habite* — et j'habitais l'idee qu'un module se cherche
+par son nom.
+
+#### La bascule n'elargit RIEN, mesure avant d'ecrire
+
+    legacy/iptables/index.php:45-46   checkAuth([1,2,3]) + checkPermission('can_manage_iptables')
+    laravel/routes/web.php:811        role:1 + perm:can_manage_iptables
+
+`role:1` n'est pas une permissivite : c'est la **traduction fidele** de `checkAuth([ROLE_USER, …])`.
+Population effective mesuree : `can_manage_iptables` n'est detenu que par `superadmin`, et le role 3
+court-circuite — **trois comptes, avant comme apres.**
+
+*La question valait d'etre posee meme si la reponse est rassurante : on ne pouvait pas le savoir
+avant de mesurer, et on ne l'a pas suppose.*
+
+#### « Jamais exerce » est MESURE, pas deduit d'une seule suite
+
+    command_log  citant iptables/pare-feu   0
+    tasks        citant iptables/pare-feu   0
+    user_logs    18 lignes — et 18 sur 18 sont « Permission refusee »
+    TEMOIN       5 655 lignes au total dans user_logs  -> l'instrument mord
+
+**Aucune trace d'execution nulle part.** La mention est donc rendue **au-dessus du bouton** :
+*ecrire « jamais exerce » sans le verifier serait la meme faute qu'ecrire « exerce » — une non-mesure
+presentee comme une mesure, dans le sens qui rassure.*
+
+#### ⚠ ET UNE SONDE A MOI, FAUSSE, RETIREE AVANT PUBLICATION
+
+Pour chercher d'autres portages orphelins j'ai sonde « quelles vues ecrivent `route('x')` ». Le
+temoin a mordu :
+
+    TEMOIN  profil  ->  0 vue y mene      (devait etre > 0)
+
+**Cause** : `composants/entrees-menu.blade.php:18` construit les liens par
+`route($entree['route'])` **depuis Navigation** — aucune vue n'ecrit jamais `route('profil')`.
+La sonde mesurait « cite dans un gabarit », pas « atteignable ».
+
+**Aucune conclusion n'a ete tiree sur les six autres routes hors menu** (`tickets`, `export-cve`,
+`notifications`, `permissions`, `serveurs`, `cles-api`). *Un instrument disqualifie ne rend pas ses
+autres resultats valides parce qu'ils sont plausibles.* La voie qui a marche est celle qui a etabli
+`pare-feu` : partir de **Navigation**, pas des gabarits.
+
+#### Mesures
+
+    menu role 3   total=32  route=31  legacy=1  (entrees portant les DEUX : 0)
+    encore legacy : wazuh
+    routes du menu : aucune entree ne vise une route inexistante
+    /pare-feu -> 302 (la garde)
+    parite i18n pare-feu   FR=76  EN=76  ecarts=0
 
 ### v1.38.163 — `remote_users` : le menu rejoint un portage deja paye, et l'inaction avait un cout
 
