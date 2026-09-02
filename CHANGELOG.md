@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.139** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.140** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,41 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.140 — le correctif d'E-281 existe depuis douze jours, et nous venons de le repayer
+
+**E-286.** `a345e65` (2026-08-21, branche `security/backend-cve`) porte déjà les trois volets sur
+`_run_scheduled_scan` : archivées exclues, repli de `machines` en **échec fermé** (`return` + journal),
+et **le `and target_value` retiré de la condition d'entrée** — exactement le mécanisme que nous avons
+« trouvé » cette nuit. L'auteur l'avait compris le 21 août, et la branche résout aussi l'arbitrage
+`archived` que la session 4 s'était correctement interdit de trancher.
+
+**Le risque est immédiat** : `git merge-tree` rend **zéro conflit** aujourd'hui. Si le diff est
+appliqué sur le tronc, `scheduler.py` porte deux implémentations du même correctif sur les mêmes
+lignes, et la fusion propre devient conflictuelle sur le hunk le plus sensible du dépôt. *Le travail
+refait par-dessus la dette ne fait pas que coûter : il rend la dette plus chère à solder.*
+
+**Ce n'est pas « jeter » ce travail** : l'apport de la session 4 est **plus strict** que la branche —
+un `else` qui refuse et journalise, là où la branche laisse tomber une valeur non reconnue sur tout le
+parc filtré. Arbitrage : ne rien appliquer sur le tronc, réduire le diff à ce que la branche ne fait
+pas, poser l'apport **après** la fusion signée.
+
+**⚠ Et ce que la fusion ne corrige pas** : `a345e65` ne touche **pas** `_run_scheduled_ssh_audit`
+(0 occurrence). **E-280 lui survit entièrement.** La fusion ferme le pire des deux et laisse l'autre
+entier — l'annoncer autrement fabriquerait le même effet de bord imaginaire déjà adossé à une signature
+cette nuit.
+
+**Deux de mes mesures périmées** : le recoupement n'est **plus nul** (`helpers.py` 2 commits,
+`scheduler.py` 1 — ma mesure du 27/08 disait « aucun n'a bougé ») ; et le push **a eu lieu**
+(a50b98c, 28/08), mais 185 commits neufs en 4,5 jours — le risque ne s'est pas fermé, il se
+**reconstitue**.
+
+**E-287 — un relevé outillé transporte sa crédibilité, pas sa vérité.** La session 3 a inscrit ma
+mesure fausse dans son propre CHANGELOG *parce qu'elle arrivait avec sa commande et son horodatage* :
+elle avait la **forme** d'une mesure. *Un relevé outillé est plus facile à vérifier, pas moins
+nécessaire à vérifier.* Pendant exact d'E-278 : fournir sa commande — pratique imposée à tous — a
+**dispensé** un lecteur prudent de mesurer. Sa remesure, elle, valait : `md5sum` du fichier dans le
+conteneur contre l'arbre, là où j'avais comparé des extraits.
 
 ### v1.38.139 — E-280 recadre : j'ai RELAYE une mesure du service que je n'avais pas faite
 
