@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.157** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.158** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,34 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.158 — j'annonçais CINQ signatures, il y en a ONZE — et mon chiffre soulageait
+
+**E-312. C'est le chiffre que l'exploitant lit, et je le lui donnais faux.** Mesuré : **11 dossiers**,
+**10 portent « Pour signature »**, aucun ne porte de clôture. Mes cinq recouvraient les dossiers 01, 09,
+08, 02 et un hors-dossier ; **j'omettais 03, 05, 06, 07, 10 et 11 sans jamais dire qu'ils étaient clos.**
+
+**La direction est ce qui rend ceci grave** : j'ai annoncé une charge de décision **plus de deux fois
+plus petite** qu'elle n'est, plusieurs tours de suite, avec assurance. *Un arriéré sous-déclaré ne se
+conteste pas : il soulage.* « Personne ne remesure une bonne nouvelle » est la règle que j'ai inscrite
+cette nuit — **je la violais au même moment sur le seul chiffre qui compte pour lui.**
+
+**Ce qui a sauvé le chiffre** : la session 8 disait sept, je disais cinq, **aucun n'était juste** — mais
+j'avais **énuméré** mes cinq avec leurs objets en demandant lesquels manquaient, et elle a dû mesurer
+pour répondre. *Un compte énuméré se corrige ; un compte récité se propage — la différence n'est pas la
+justesse, c'est de porter ses objets avec soi.* Sixième faux désaccord du chantier, **le premier qui se
+résout en trouvant que les deux parties avaient tort**.
+
+**Et sa sonde de vérification était pire que le chiffre** : un `grep` de mots (`CLOS|SIGNE|APPLIQUE`)
+rendait **10 sur 11 « clos »**, `DOSSIER-01` compris alors que le redémarrage n'a pas eu lieu — *elle
+cherchait des mots dans la prose, pas un état, et aurait confirmé le chiffre en le réduisant encore.*
+Elle l'a écartée **parce qu'un cas connu la contredisait**, pas par doute sur sa forme. D'où la parade
+sous sa forme la plus économique : **ne jamais lancer une sonde sur une population dont on ne connaît la
+réponse pour aucun élément.**
+
+**Cadrage adopté** : du point de vue de l'exploitant, **un arbitrage qu'il rend et une signature qu'il
+donne sont la même interruption**. Le compte à lui rendre est **onze**, et il se rend **avec les onze
+objets**, jamais avec un nombre nu.
 
 ### v1.38.157 — une réserve peut se refermer du côté qui aggrave, et mon annuaire était de la mémoire écrite
 
