@@ -56,6 +56,12 @@
         panneau.hidden = true;
         panneauEffets.hidden = true;
         panneauEffets.textContent = '';
+        // Sans cela, le bouton reste visible sur le panneau SUIVANT — celui
+        // d'un geste non porte, qui n'a rien a confirmer.
+        var c = document.querySelector('[data-rw="groupes-panneau-confirmer"]');
+        if (c) { c.hidden = true; }
+        // ...et le lien legacy REVIENT : les gestes non portes en ont besoin.
+        if (panneauLegacy) { panneauLegacy.hidden = false; }
     }
 
     function ouvrePanneau(titre, texte, effets) {
@@ -80,6 +86,11 @@
 
     if (panneauFermer) { panneauFermer.addEventListener('click', fermePanneau); }
 
+    var enCours = null;
+    var panneauConfirmer = document.querySelector('[data-rw="groupes-panneau-confirmer"]');
+    var panneauLegacy = document.querySelector('[data-rw="groupes-panneau-legacy"]');
+    if (panneauConfirmer) { panneauConfirmer.addEventListener('click', enregistre); }
+
     // ── LA PASSERELLE, EN LECTURE SEULE ──────────────────────────────────
     function lis(chemin) {
         return fetch(PASSERELLE + chemin, { headers: { 'Accept': 'application/json' } })
@@ -90,6 +101,31 @@
                 );
             })
             .catch(function () { return { ok: false, corps: null }; });
+    }
+
+    /*
+     * ══ R2 — LE SEUL APPEL MUTANT DE CE FICHIER ══════════════════════════
+     *
+     * `POST /groups` ecrit `machine_groups` et `machine_group_members`. Il ne
+     * joint AUCUNE machine : c'est ce qui le rend portable sans arbitrage,
+     * contrairement aux deux actions de masse.
+     *
+     * Pas de jeton CSRF a poser : `PreventRequestForgery` du cadre accepte une
+     * requete de MEME ORIGINE, et c'en est une. En ajouter un donnerait
+     * l'illusion d'un controle qui vit ailleurs.
+     */
+    function ecris(chemin, corps) {
+        return fetch(PASSERELLE + chemin, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(corps),
+        }).then(function (r) {
+            return r.json().then(
+                function (j) { return { ok: r.ok, corps: j }; },
+                function () { return { ok: false, corps: null }; }
+            );
+        }).catch(function () { return { ok: false, corps: null }; });
     }
 
     // ── LE RESUME DES FILTRES ────────────────────────────────────────────
@@ -123,8 +159,122 @@
     }
 
     // ── LES PANNEAUX DES GESTES NON PORTES ───────────────────────────────
-    function panneauNouveau() {
-        ouvrePanneau(t('np_titre'), t('np_nouveau'), [t('np_nouveau_detail')]);
+    /*
+     * ══ R2 — LE FORMULAIRE, ET LA PORTEE ANNONCEE AVANT D'ECRIRE ═════════
+     *
+     * « Enregistrer » n'enregistre pas : il ouvre le panneau de decision, qui
+     * dit ce que le groupe contiendra. C'est ce qui ferme E-274 — un groupe
+     * dynamique SANS critere vise le parc entier, et le legacy le creait en
+     * deux gestes sans jamais l'ecrire.
+     */
+    var form = document.querySelector('[data-rw="groupes-formulaire"]');
+    var champNom = document.querySelector('[data-rw="groupes-nom"]');
+    var champDesc = document.querySelector('[data-rw="groupes-desc"]');
+    var blocFiltres = document.querySelector('[data-rw="groupes-filtres"]');
+    var blocMembres = document.querySelector('[data-rw="groupes-membres"]');
+    var msgForm = document.querySelector('[data-rw="groupes-form-message"]');
+
+    function typeChoisi() {
+        var r = document.querySelector('input[name="g-type"]:checked');
+        return r ? r.value : 'dynamic';
+    }
+
+    function basculeType() {
+        var dyn = typeChoisi() === 'dynamic';
+        if (blocFiltres) { blocFiltres.hidden = ! dyn; }
+        if (blocMembres) { blocMembres.hidden = dyn; }
+    }
+
+    function filtresCoches() {
+        var f = {};
+        document.querySelectorAll('.gf:checked').forEach(function (cb) {
+            var c = cb.getAttribute('data-col');
+            (f[c] = f[c] || []).push(cb.value);
+        });
+        return f;
+    }
+
+    function membresCoches() {
+        return Array.prototype.map.call(
+            document.querySelectorAll('.gm:checked'),
+            function (cb) { return parseInt(cb.value, 10); }
+        ).filter(function (n) { return ! isNaN(n); });
+    }
+
+    function ouvreFormulaire() {
+        if (! form) { return; }
+        form.hidden = false;
+        basculeType();
+        if (champNom) { champNom.focus(); }
+    }
+
+    function fermeFormulaire() {
+        if (! form) { return; }
+        form.hidden = true;
+        if (champNom) { champNom.value = ''; }
+        if (champDesc) { champDesc.value = ''; }
+        document.querySelectorAll('.gf:checked, .gm:checked').forEach(function (cb) { cb.checked = false; });
+        if (msgForm) { msgForm.textContent = ''; }
+        basculeType();
+    }
+
+    /** Ce que le groupe contiendra, dit AVANT d'ecrire. */
+    function porteeAnnoncee() {
+        if (typeChoisi() === 'static') {
+            var n = membresCoches().length;
+            return [n ? t('portee_statique').split(':n').join(String(n)) : t('portee_statique_vide')];
+        }
+        var f = filtresCoches();
+        var cles = Object.keys(f);
+        if (! cles.length) {
+            /*
+             * ⚠ LE CAS QUE LE LEGACY CREE EN SILENCE. `'1=1'` => tout le parc.
+             * Et la reserve sur les archivees n'est pas decorative : la
+             * resolution du backend ne les exclut PAS, alors que le portage les
+             * exclut partout ailleurs. Deux definitions du parc.
+             */
+            return [t('portee_aucun_filtre'), t('portee_archivees')];
+        }
+        var liste = cles.map(function (c) { return f[c].join(', '); }).join(' · ');
+        return [t('portee_filtres').split(':liste').join(liste)];
+    }
+
+    function demandeEnregistrement() {
+        var nom = (champNom && champNom.value || '').trim();
+        if (! nom) {
+            if (msgForm) { msgForm.textContent = t('err_nom'); }
+            if (champNom) { champNom.focus(); }
+            return;
+        }
+        enCours = { nom: nom };
+        ouvrePanneau(t('form_titre'), nom, porteeAnnoncee());
+        if (panneauConfirmer) { panneauConfirmer.hidden = false; }
+        /*
+         * Le lien vers l'ancien portail n'a AUCUN objet ici : ce geste est
+         * porte. L'offrir a cote d'un « Enregistrer » qui fonctionne inviterait
+         * a aller le faire ailleurs — c'est ce qui entretient le legacy qu'on
+         * veut eteindre.
+         */
+        if (panneauLegacy) { panneauLegacy.hidden = true; }
+    }
+
+    function enregistre() {
+        var corps = {
+            name: (champNom && champNom.value || '').trim(),
+            description: (champDesc && champDesc.value || ''),
+            group_type: typeChoisi(),
+            filters: typeChoisi() === 'dynamic' ? filtresCoches() : {},
+            member_ids: typeChoisi() === 'static' ? membresCoches() : [],
+        };
+        ecris('/groups', corps).then(function (r) {
+            fermePanneau();
+            if (! r.ok || ! r.corps || ! r.corps.success) {
+                if (msgForm) { msgForm.textContent = (r.corps && r.corps.message) || t('err_creation'); }
+                return;
+            }
+            fermeFormulaire();
+            charge();
+        });
     }
 
     /*
@@ -409,7 +559,15 @@
     }
 
     var bNouveau = document.querySelector('[data-rw="groupes-nouveau"]');
-    if (bNouveau) { bNouveau.addEventListener('click', panneauNouveau); }
+    if (bNouveau) { bNouveau.addEventListener('click', ouvreFormulaire); }
+
+    var bAnnuler = document.querySelector('[data-rw="groupes-annuler"]');
+    if (bAnnuler) { bAnnuler.addEventListener('click', fermeFormulaire); }
+    var bEnregistrer = document.querySelector('[data-rw="groupes-enregistrer"]');
+    if (bEnregistrer) { bEnregistrer.addEventListener('click', demandeEnregistrement); }
+    document.querySelectorAll('input[name="g-type"]').forEach(function (r) {
+        r.addEventListener('change', basculeType);
+    });
 
     charge();
 })();

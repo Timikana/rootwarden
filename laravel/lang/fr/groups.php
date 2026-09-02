@@ -50,9 +50,6 @@ return [
     'np_ouvrir'     => "Ouvrir dans l'ancien portail",
     'np_fermer'     => 'Fermer',
 
-    'np_nouveau'    => "La création d'un groupe n'est pas encore portée sur cette interface.",
-    'np_nouveau_detail' => "Un point mérite d'être connu avant de créer un groupe dans l'ancien portail : un groupe dynamique dont AUCUN critère n'est coché contient toutes les machines du parc, production comprise. L'ancien portail ne le signale pas — sa ligne de résumé reste vide.",
-
     'np_supprimer'  => 'La suppression de groupe n’est pas encore portée sur cette interface.',
     'np_supprimer_detail' => "La suppression ne touche que le groupe : les serveurs qu'il rassemble ne sont pas modifiés.",
 
@@ -71,6 +68,45 @@ return [
 
     // ── CE QUE LA PAGE DIT D'ELLE-MEME ────────────────────────────────────
     'portee_titre' => 'Ce que cette page peut faire aujourd’hui',
-    'portee_texte' => "La lecture des groupes et de leurs membres est portée. La création, la suppression et les deux actions de masse passent encore par l'ancien portail — chaque bouton explique ce qu'il engage avant d'y renvoyer.",
+    // ⚠ R2 : cette phrase disait que la CREATION passait par l'ancien portail.
+    // Elle est devenue fausse au moment ou R2 l'a portee — le meme mecanisme
+    // que `pare-feu`, `superv` et l'encart des CGU, et je l'aurais livre.
+    // Un libelle se relit avec le code qu'il decrit, dans le MEME commit.
+    'portee_texte' => "La lecture des groupes, de leurs membres et la création sont portées. La suppression et les deux actions de masse passent encore par l'ancien portail — chaque bouton explique ce qu'il engage avant d'y renvoyer.",
     'parc_entier'  => "Un rôle administrateur peut viser l'ensemble du parc : aucune attribution de machine ne borne les actions de masse.",
+
+    // ══ R2 — LA CREATION D'UN GROUPE ═════════════════════════════════════
+    'form_titre' => 'Nouveau groupe',
+    'f_nom' => 'Nom',
+    'f_desc' => 'Description',
+    'f_type' => 'Comment les membres sont choisis',
+    'type_dyn_aide' => "Par règle : les machines correspondant aux critères entrent et sortent d'elles-mêmes.",
+    'type_stat_aide' => 'Par liste : vous désignez les machines une par une.',
+    'f_env' => 'Environnement',
+    'f_crit' => 'Criticité',
+    'f_reseau' => 'Réseau',
+    'f_cycle' => 'Cycle de vie',
+    'f_membres' => 'Machines du groupe',
+    'btn_enregistrer' => 'Enregistrer',
+    'btn_annuler' => 'Annuler',
+    /*
+     * ⚠ E-274 FERME PAR CONSTRUCTION.
+     *
+     * `_resolve_dynamic` (`groups.py:77`) termine par `'1=1'` quand aucun
+     * critere n'est coche : le groupe contient alors LE PARC ENTIER. Et
+     * l'etat par DEFAUT du formulaire du legacy est exactement celui-la —
+     * saisir un nom et enregistrer suffit, sans qu'aucun ecran ne le dise.
+     *
+     * Ici l'enregistrement passe par le panneau de decision, qui ANNONCE la
+     * portee resolue. On ne peut donc plus creer un groupe sans avoir lu ce
+     * qu'il contiendra.
+     */
+    'portee_aucun_filtre' => "Aucun critère n'est coché : ce groupe contiendra TOUTES les machines du parc, production comprise.",
+    'portee_filtres' => 'Critères retenus : :liste',
+    'portee_statique' => ':n machine(s) désignée(s).',
+    'portee_statique_vide' => "Aucune machine désignée : le groupe sera vide.",
+    'portee_archivees' => "Le calcul du parc côté serveur n'exclut pas les machines archivées : un groupe sans critère peut en contenir.",
+    'err_nom' => 'Un nom est nécessaire.',
+    'cree' => 'Groupe créé.',
+    'err_creation' => "Le groupe n'a pas pu être créé.",
 ];

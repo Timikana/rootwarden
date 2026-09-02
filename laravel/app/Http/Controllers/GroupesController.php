@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Machines;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -36,9 +38,30 @@ use Illuminate\View\View;
  */
 class GroupesController extends Controller
 {
-    public function __invoke(): View
+    public function __construct(private readonly Machines $machines)
     {
+    }
+
+    public function __invoke(Request $requete): View
+    {
+        $role = (int) $requete->session()->get('role_id', 0);
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+
+        /*
+         * R2 — les machines proposees comme membres STATIQUES, et le compte du
+         * parc. On ne recopie aucun predicat : `Machines::perimetre()` porte la
+         * borne pour tout le service.
+         *
+         * ⚠ LE COMPTE DU PARC EST CE QUI FERME E-274. Le formulaire doit
+         * pouvoir dire, AVANT d'enregistrer, combien de machines un groupe
+         * sans filtre contiendrait — c'est le seul moyen que « zero critere »
+         * cesse d'etre un choix invisible.
+         */
+        $perimetre = $this->machines->perimetre($role, $idCompte);
+
         return view('groupes', [
+            'machines' => $perimetre['serveurs'],
+            'parcLisible' => $perimetre['lisible'],
             // Le catalogue part d'un bloc, en une ligne : `@json` multiligne
             // casse le PHP compile.
             'libelles' => __('groups'),
