@@ -328,3 +328,101 @@ pas oubli* — l'observation est du Lead et elle est juste.
 **Classement révisé : E-281, puis E-280, puis SEC-013.** Le premier échoue du
 côté large là où le second échoue du côté fermé, et lui seul a un effet hors du
 parc.
+
+---
+
+## 8. Les trois mesures demandées — et elles DÉFONT mon classement
+
+**Mesuré le 2026-09-02, lecture de fichiers seule.** Aucun appel de route, aucune
+insertion, aucun conteneur chargé, aucune machine jointe. Périmètre accordé
+explicitement par le Lead.
+
+### 8.1 Q1 — le courriel ne part PAS sur un scan planifié
+
+`send_cve_report` (`mail_utils.py:194`) a **exactement un appelant** dans tout
+`backend/` :
+
+```
+backend/routes/cve.py:77     dans _stream_cve_scan   <- la route en flux, le chemin S7b
+```
+
+Et le job planifié ne passe **pas** par là : `scheduler.py:_run_scheduled_scan`
+appelle `scan_server(...)` **directement**, dans sa propre boucle, puis :
+
+```python
+from webhooks import notify_cve_scan
+notify_cve_scan(f"Scan planifie: {schedule['name']}", total_findings, 0, 0, 0, scanned)
+```
+
+**C'est un webhook, pas un courriel.** Le courriel appartient à la route en flux
+— celle que l'arbitrage S7b retient — et **jamais à la planification**.
+
+### 8.2 Et le webhook lui-même est FERMÉ par défaut
+
+```python
+WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED', 'false').lower() == 'true'
+WEBHOOK_URL     = os.getenv('WEBHOOK_URL', '')
+
+def is_enabled(event=''):
+    if not WEBHOOK_ENABLED or not WEBHOOK_URL:
+        return False
+```
+
+Défaut `'false'`, URL vide. **En configuration par défaut, E-281 n'a AUCUN effet
+hors du parc** — ni courriel, ni webhook.
+
+> **⚠ MON CLASSEMENT REPOSAIT SUR CE FAIT, ET IL EST FAUX.** J'avais écrit
+> *« E-281 prime E-280 […] lui seul a un effet hors du parc »*, en signalant que
+> je ne l'avais pas mesuré. Mesuré, **la troisième colonne de mon tableau tombe.**
+
+### 8.3 Q2 — `base_cols` porte les IDENTIFIANTS, et c'est le vrai fait
+
+```python
+base_cols = ("id, name, ip, port, user, password, root_password, "
+             "service_account_deployed")
+```
+
+La branche qui échoue ouvert ne se contente pas d'**énumérer** plus de machines :
+elle **charge le mot de passe SSH et le mot de passe root de chacune**, les
+déchiffre dans la boucle (`encryption.decrypt_password`) et **ouvre une session
+SSH** vers chaque.
+
+> *« Scanner les mauvaises machines »* est en réalité **« s'authentifier sur
+> toutes les machines du parc »**. Cela vaut pour E-280 **comme** pour E-281 —
+> c'est le fait qui domine les deux, et il est plus lourd que l'effet sortant que
+> je cherchais.
+
+### 8.4 Classement révisé — et ma recommandation est de NE PAS les classer
+
+| | E-281 (CVE) | E-280 (audit SSH) |
+|---|---|---|
+| branche étroite vidée | **OUVRE** | `WHERE 1=0` — **ferme** |
+| machines archivées | **incluses** | exclues |
+| effet sortant | **aucun** *(retiré)* | aucun |
+| déclenchement accidentel | valeur malformée requise | **`'all'` par OMISSION — plus facile** |
+| identifiants chargés | tout le parc | tout le parc |
+
+**Chacun gagne sur un axe différent.** E-281 échoue contre une intention
+explicitement étroite — *l'exploitant croit avoir borné, donc personne ne relit*.
+E-280 se déclenche **par simple omission d'un champ**, ce qui est beaucoup plus
+probable.
+
+**Ma recommandation : les traiter comme UN défaut, pas deux rangs.** Même forme,
+mêmes tables sœurs, même population (`@require_role(2)` sans permission), même
+correctif : **liste fermée de `target_type`, repli fail-closed, filtre
+`archived`**. Les classer invite à n'en corriger qu'un — et c'est le motif
+« un défaut revient par une autre porte », déjà payé.
+
+**S'il faut trancher malgré tout : E-281 d'abord**, parce qu'un repli qui trahit
+une intention étroite échappe à la relecture, alors qu'un défaut permissif se
+voit en lisant la planification.
+
+### 8.5 Ce que je n'ai toujours pas mesuré
+
+- **la configuration réelle de `WEBHOOK_ENABLED`** sur les déploiements — je lis
+  le **défaut du code**, pas l'environnement. Si un exploitant l'a activé, l'effet
+  sortant revient, et **cette mesure-là demande un conteneur** ;
+- **les 0 lignes de `cve_scan_schedules` et `ssh_audit_schedules`** sont la mesure
+  **du Lead**, pas la mienne — elle exigerait la base, hors du périmètre accordé.
+  *Je la porte comme sienne, pas comme un fait à deux voix* ;
+- **rien n'a été déclenché.**
