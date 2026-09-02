@@ -66,7 +66,15 @@
                                             PRODUCTION le 27/08 a 22:43, et n'a echoue
                                             qu'a la phase de dechiffrement — panne
                                             depuis REPAREE.
-    serveurs    cycle de vie d'une machine
+    serveurs    ~~cycle de vie d'une machine~~   <- ⚠ CORRIGE le 2026-09-02 : il est
+                DEJA PORTE et JOIGNABLE. `POST /serveurs/{id}/cycle` ->
+                `ServeursController::cycle`, gardee `role:2` + `perm:can_admin_portal`,
+                formulaire rendu PAR MACHINE (serveurs.blade.php:265), transitions
+                calculees cote serveur par `cyclesProposables()` — liste FERMEE.
+                Son propre commentaire dit : « aucun de ces trois gestes n'est
+                destructeur, ils sont reversibles par leur voisin » — SAUF
+                « Retirer du parc », qui NE SE DEFAIT PAS.
+                Rien a porter ; a savoir avant de croire qu'il est hors d'atteinte.
 
 **Et les interdits permanents du chantier, sans exception** : ne joins **jamais** `srv-zabbix` (id 1,
 `192.168.0.244`, PROD) · n'ouvre **jamais** `/adm/health_check.php` · ne touche pas `rw-test-user`
@@ -99,6 +107,17 @@ c'est la seule des trois options qui soit fausse.**
 **1. Déclare tes manques par ce que ton JS APPELLE, jamais par les routes Laravel.** *Une capacité qui
 passe par la passerelle n'a AUCUNE route Laravel* — `pare-feu` a déclaré absente une validation qu'elle
 savait faire, pendant cinq jours, pour cette raison exacte.
+
+**2bis. ⚠ Et cherche aussi la COUCHE, pas seulement le nom.** *Une capacité peut être portée **sans route
+backend et sans route de passerelle** : une simple écriture Laravel en base.* **Le cycle de vie des
+machines a été compté absent parce que `grep /server_lifecycle` sur le JS rendait zéro** — il n'appelle
+pas la passerelle, il fait `DB::table('machines')->update(...)`. *Chercher un chemin backend rend zéro
+pour une capacité entièrement présente.*
+
+> **Et l'artefact le plus fiable n'est ni la route ni le nom : ce sont les LIBELLÉS.** *`serveurs.php`
+> porte quatre clés de résultat pour le test de connexion — `test_en_cours`, `test_en_ligne`,
+> `test_hors_ligne`, `test_echec`.* **Personne n'écrit quatre messages de résultat pour un geste que sa
+> page n'accomplit pas.**
 
 **2. Avant de porter, vérifie que ce n'est pas DÉJÀ écrit sous un nom français.** `comptes-distants` et
 `pare-feu` ont dormi cinq jours parce qu'on cherchait `remote_users` et `iptables`. **Cherche l'artefact
