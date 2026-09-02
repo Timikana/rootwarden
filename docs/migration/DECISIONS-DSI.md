@@ -4133,3 +4133,63 @@ corrige en texte, pas en comportement.*
 
 > **Un jeu d'options engendré depuis son propre périmètre exclut la bonne réponse quand elle est
 > dehors.** *C'est une limite qu'aucune mesure ne révèle — seulement quelqu'un qui regarde d'ailleurs.*
+
+---
+
+## ⚠ Un angle mort de l'audit des déclarations : le BIAIS DE VOLUME
+
+**Mesuré le 2026-09-02 à 23:35.** *L'audit lancé ce soir a trouvé sept défauts sur les déclarations
+d'absence. En relevant ce qui reste, un biais apparaît que personne n'avait nommé.*
+
+    declarations restantes : 31, sur 14 pages
+
+    DEJA APPARIEES     bashrc · politiques · sftp · ssh_audit (8) · groups (5) · superv
+                       pare-feu (2) · ssh (2) · auth      + fail2ban et serveurs, nettoyees
+    JAMAIS APPARIEES   accueil 1 · comptes 1 · cve 2 · documentation 1 · nav 1
+                       plateforme 1 · wazuh 1        ->  SEPT pages, HUIT declarations
+
+> **L'audit a traité les pages les plus LOURDES et jamais celles qui ne portent qu'une ou deux
+> déclarations.** *C'est un biais de sélection par le volume : on a apparié là où il y avait beaucoup à
+> trouver.*
+
+**Et les six défauts confirmés sont tous sur des pages lourdes.** *Rien ne dit que le taux est le même sur
+les légères — **il peut être plus bas, et c'est aussi une information**.* **Ce qu'on ne peut pas dire,
+c'est qu'on a fini.**
+
+### Pourquoi ce biais est de la même famille que tout le reste
+
+**Un audit qui choisit ses cibles par le rendement attendu produit un résultat qui a l'air complet.** *Six
+défauts trouvés, aucun catalogue « en attente » dans le compte rendu — et sept pages jamais regardées.*
+
+> **C'est l'instrument qui dérive avec le soin** : *plus l'audit trouve, plus il paraît exhaustif, et
+> moins on se demande où il n'est pas allé.* **Même forme que le compteur d'écarts du Lead, dont l'erreur
+> grandissait à chaque écart proprement clos.**
+
+**Routé à la session 2**, avec les trois variantes du défaut à distinguer — *portée et déclarée absente*
+(corriger la phrase), *renvoi vers un chemin mort* (arbitrage), et *renvoi vers un endroit qui existe où la
+capacité n'est pas* (le renvoi aboutit, la colonne manque). **La troisième est la sienne, et c'est la plus
+difficile à voir : suivre le lien ne produit aucune erreur.**
+
+---
+
+## ✅ État après la poussée autorisée — 2026-09-02 23:35
+
+    poussee        5a0ff0b..ad200eb   33 commits   ->  retard/avance 0 / 0
+    NON FUSIONNE   security/backend-cve : 6 commits en avant   (l'exploitant l'a exclu explicitement)
+    origin/main    inchange, 99c3874
+
+    declarations d'absence   31   (32 avant R3)
+    dossiers en attente      13
+    migrations en attente     3
+    socle_avertissement       0 fichier · 0 suite
+
+**Ce que la poussée change, et c'est le seul dossier dont l'inaction n'était pas un défaut du produit** :
+*plus rien n'existe uniquement sur cette machine.* **Le risque se reconstituera — il l'a fait deux fois
+aujourd'hui — mais il est nul à cet instant.**
+
+### Une réserve que je corrige sur mon propre compte rendu
+
+**J'avais présenté la porte `gitleaks` comme un contrôle avant poussée.** *C'en est un à moitié : le
+workflow existe et est bloquant, mais il ne se déclenche que sur `main`.* **Il n'a donc rien inspecté sur
+ces 33 commits.** *Ce que j'ai réellement vérifié est plus étroit : aucun fichier `.env` n'est suivi par
+git.*
