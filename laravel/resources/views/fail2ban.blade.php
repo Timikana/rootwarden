@@ -219,9 +219,21 @@
 <div class="rw-section" data-rw="f2b-jail-detail" hidden>
     <div class="rw-section__tete">
         <h2 class="rw-section__entete" data-rw="f2b-jail-nom"></h2>
+        {{-- F7 : ce geste BAISSE UNE GARDE. Ton « avertissement » et non
+             « danger » : rien n'est detruit, et « Activer la jail » le retablit —
+             mais la machine cesse d'etre protegee. Deux rouges pour deux niveaux
+             de consequence ne signalent plus rien, et cette vue reserve deja le
+             rouge aux gestes de parc. --}}
+        <button type="button" class="rw-bouton rw-bouton--avertissement rw-bouton--minuscule"
+                data-rw="f2b-jail-desactiver">{{ __('fail2ban.jail_desactiver') }}</button>
+        {{-- La reserve vit ICI, a cote du bouton, donc lue AVANT le clic — pas
+             dans le panneau qui s'ouvre apres. `demande()` ne lit que `bloque`
+             et `recopie` : lui passer une option de plus aurait transmis une
+             cle que personne ne lit. --}}
         <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule"
                 data-rw="f2b-jail-fermer">{{ __('fail2ban.jail_fermer') }}</button>
     </div>
+    <p class="rw-aide" data-rw="f2b-desact-jamais">{{ __('fail2ban.desact_jamais_exercee') }}</p>
     <dl class="rw-faits" data-rw="f2b-jail-config"></dl>
 
     <h3 class="rw-sous-titre-fort">{{ __('fail2ban.bannies_titre') }}</h3>

@@ -52,8 +52,10 @@ return [
     'vide_titre' => 'No machine in the estate',
     'vide_texte' => 'No active machine is registered. Add one from server administration.',
     'vide_action' => 'Open servers',
-    'non_porte_titre' => "Four Fail2ban actions are not ported yet",
-    'non_porte_texte' => "Installing Fail2ban on ONE machine, restarting the service, disabling a jail and looking up an address's geolocation are still done from the legacy portal. Everything else is here: state, jails, history, configuration, logs, bans, the allowlist and the two fleet actions.",
+    // The count is REMOVED, not reduced — see fr. The three remaining are
+    // appaired one by one against the backend's 19 routes.
+    'non_porte_titre' => "What this tab cannot do yet",
+    'non_porte_texte' => "Installing Fail2ban on ONE machine, restarting the service and looking up an address's geolocation are still done from the legacy portal. Everything else is here: state, jails and disabling them, history, configuration, logs, bans, the allowlist and the two fleet actions.",
     'non_porte_lien' => 'Open Fail2ban in the legacy portal',
 
     // ── Sub-lot F2: history and timeline ─────────────────────────────────
@@ -225,4 +227,12 @@ return [
     // `/fail2ban/disable_jail` is one of its four capabilities. Removing them
     // to put them back two sub-lots later costs an FR/EN divergence for
     // nothing: decided 2026-08-27.
+
+    // F7 — disabling a jail. It LOWERS a guard: nothing is deleted and
+    // « Activer » restores it, but the machine stops being protected against
+    // brute force, and an SSH session is opened to do it. The panel names the
+    // consequence, not the mechanism. See fr.
+    'conf_titre_desact' => "Disable :jail on :machine?",
+    'conf_texte_desact' => "The :jail jail will stop watching :machine: failed authentication attempts will no longer be banned. The action opens an SSH session on the machine. It is restored by « Activer », and no already-banned address is released.",
+    'desact_jamais_exercee' => "This action has never yet been performed from this interface.",
 ];
