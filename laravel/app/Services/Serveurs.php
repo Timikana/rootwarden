@@ -68,6 +68,12 @@ class Serveurs
     /** Liste fermee du backend (`admin.py:103`), reprise telle quelle. */
     public const CYCLES = ['active', 'retiring', 'archived'];
 
+    /** Les colonnes que le CSV DOIT porter — celles du legacy, a l'identique. */
+    public const IMPORT_COLONNES = ['name', 'ip', 'user', 'password', 'root_password'];
+
+    /** Le plafond que le legacy n'a pas. Ce qui depasse est DIT, pas tronque en silence. */
+    public const IMPORT_MAX_LIGNES = 500;
+
     /** Borne reprise du legacy (`manage_servers.php:518`, `LIMIT 5`). */
     public const NOTES_PAR_MACHINE = 5;
 
@@ -306,6 +312,188 @@ class Serveurs
         }
 
         return null;
+    }
+
+    /**
+     * Importe des machines depuis un fichier CSV — sous-lot D6e.
+     *
+     * ══ CE QUI EST REPRIS DU LEGACY, ET CE QUI EST CORRIGE ══════════════════
+     *
+     * Le legacy (`legacy/adm/includes/import_csv.php:40-123`) ecrit en PDO
+     * direct : il n'existe AUCUNE route backend d'import, donc rien a joindre
+     * par la passerelle. Colonnes obligatoires, defauts, decoupage des
+     * etiquettes sur `;` et journalisation sont reprises telles quelles.
+     *
+     * TROIS divergences, toutes dans le sens du refus :
+     *
+     * 1. UNE LIGNE SANS MOT DE PASSE EST REFUSEE. Le legacy appelle
+     *    `encryptPassword('')`, qui rend `sodium:...` : la colonne n'est pas
+     *    vide et la machine PARAIT porter un secret. Ici `ajoute()` refuse,
+     *    parce que `SecretExploitation::chiffre()` rend `null` sur un secret
+     *    vide. Le portage avait deja tranche cela hors import ; l'import ne
+     *    rouvre pas la porte.
+     *
+     * 2. UN `environment` NON RECONNU REFUSE LA LIGNE au lieu d'etre ramene a
+     *    `OTHER`. La coercition silencieuse du legacy classe une faute de
+     *    frappe (« PRODUCTION ») en `OTHER` : la machine cesse d'etre signalee
+     *    comme production, et personne n'a rien vu passer. Un refus bruyant
+     *    vaut mieux qu'un classement faux. Meme regle pour `criticality` et
+     *    `network_type`. Une colonne ABSENTE, elle, garde son defaut.
+     *
+     * 3. LE FICHIER EST BORNE. Le legacy n'a ni borne de taille ni borne de
+     *    lignes : `while (fgetcsv(...))` sur un fichier de 200 000 lignes fait
+     *    200 000 INSERT. Plafond a self::IMPORT_MAX_LIGNES, et ce qui depasse
+     *    est DIT plutot que tronque en silence.
+     *
+     * La validation n'est PAS reecrite : `champsRefuses()` est le seul
+     * predicat, celui du formulaire d'ajout. Le filet et le verdict sur un
+     * seul predicat — deux validations divergent toujours a la fin, et celle
+     * qui garde le moins est celle qu'on oublie.
+     *
+     * PAS DE TRANSACTION GLOBALE, comme le legacy : une ligne fautive ne doit
+     * pas defaire les lignes saines qui la precedent.
+     *
+     * ⚠ CE SERVICE NE JOURNALISE PAS, ET C'EST DELIBERE. `user_logs` porte une
+     * CHAINE DE HACHAGE (`prev_hash` / `self_hash`), et le legacy pose sa
+     * trace d'import par un `INSERT (user_id, action)` nu : il fabrique donc
+     * une des lignes que son propre bouton « Sceller les orphelines » ne peut
+     * jamais sceller. Mesure du 2026-09-02 : 1 385 orphelines sur 5 939.
+     * Reproduire ce geste aurait creuse le trou d'une ligne de plus. Le
+     * scellement vit dans le controleur, comme pour `comptes` et
+     * `permissions` — un seul idiome, celui que D1 verifie.
+     *
+     * @return array{lignes:int, crees:int, manquantes:list<string>, tronque:bool, erreurs:list<array{ligne:int, nom:string, texte:string}>}
+     */
+    public function importeCsv(string $chemin, bool $ignoreDoublons): array
+    {
+        $bilan = ['lignes' => 0, 'crees' => 0, 'manquantes' => [], 'tronque' => false, 'erreurs' => []];
+
+        $flux = @fopen($chemin, 'r');
+        if ($flux === false) {
+            $bilan['erreurs'][] = ['ligne' => 0, 'nom' => '', 'texte' => __('serveurs.imp_err_illisible')];
+
+            return $bilan;
+        }
+
+        try {
+            $entete = fgetcsv($flux);
+            if ($entete === false || $entete === [null]) {
+                $bilan['erreurs'][] = ['ligne' => 0, 'nom' => '', 'texte' => __('serveurs.imp_err_vide')];
+
+                return $bilan;
+            }
+            $entete = array_map(static fn ($c) => mb_strtolower(trim((string) $c)), $entete);
+
+            $manquantes = array_values(array_diff(self::IMPORT_COLONNES, $entete));
+            if ($manquantes !== []) {
+                $bilan['manquantes'] = $manquantes;
+
+                return $bilan;
+            }
+
+            $ligne = 1;
+            while (($brut = fgetcsv($flux)) !== false) {
+                if ($brut === [null]) {          // ligne vide : fgetcsv rend [null]
+                    continue;
+                }
+                $ligne++;
+                if ($bilan['lignes'] >= self::IMPORT_MAX_LIGNES) {
+                    $bilan['tronque'] = true;
+                    break;
+                }
+                $bilan['lignes']++;
+                $this->importeUneLigne($entete, $brut, $ligne, $ignoreDoublons, $bilan);
+            }
+        } finally {
+            fclose($flux);
+        }
+
+        return $bilan;
+    }
+
+    /**
+     * Une ligne du CSV. Ecrit dans `$bilan` par reference.
+     *
+     * @param  list<string>  $entete
+     * @param  list<string|null>  $brut
+     * @param  array{lignes:int, crees:int, manquantes:list<string>, tronque:bool, erreurs:list<array{ligne:int, nom:string, texte:string}>}  $bilan
+     */
+    private function importeUneLigne(array $entete, array $brut, int $ligne, bool $ignoreDoublons, array &$bilan): void
+    {
+        $val = array_combine($entete, array_pad(array_slice($brut, 0, count($entete)), count($entete), ''));
+        $lit = static fn (string $c) => trim((string) ($val[$c] ?? ''));
+        $nom = $lit('name');
+
+        // Une colonne ABSENTE de l'entete garde son defaut ; une colonne
+        // PRESENTE et vide aussi. Une colonne presente et RENSEIGNEE hors liste
+        // fera echouer `champsRefuses()` — c'est la divergence 2.
+        $champs = [
+            'name' => $nom,
+            'ip' => $lit('ip'),
+            'user' => $lit('user'),
+            'port' => $lit('port') !== '' ? $lit('port') : '22',
+            'environment' => $lit('environment') !== '' ? mb_strtoupper($lit('environment')) : 'OTHER',
+            'criticality' => $lit('criticality') !== '' ? mb_strtoupper($lit('criticality')) : 'NON CRITIQUE',
+            'network_type' => $lit('network_type') !== '' ? mb_strtoupper($lit('network_type')) : 'INTERNE',
+        ];
+
+        $refuses = $this->champsRefuses($champs);
+        if ($refuses !== []) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => implode(', ', array_map(
+                static fn (string $cle) => __($cle), $refuses))];
+
+            return;
+        }
+
+        if ($ignoreDoublons && $this->existeDeja($champs['name'], $champs['ip'])) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('serveurs.imp_doublon')];
+
+            return;
+        }
+
+        $champs['password'] = (string) ($val['password'] ?? '');
+        $champs['root_password'] = (string) ($val['root_password'] ?? '');
+
+        $erreur = $this->ajoute($champs);
+        if ($erreur !== null) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __($erreur)];
+
+            return;
+        }
+
+        $bilan['crees']++;
+        $this->poseEtiquettesImportees($champs['name'], $lit('tags'));
+    }
+
+    /** Le doublon que `skip_duplicates` fait IGNORER plutot qu'echouer. */
+    private function existeDeja(string $nom, string $ip): bool
+    {
+        return DB::table('machines')
+            ->where('name', $nom)
+            ->orWhere('ip', $ip)
+            ->exists();
+    }
+
+    /**
+     * Les etiquettes d'une ligne importee, decoupees sur `;` comme le legacy.
+     *
+     * `ajoute()` ne rend pas l'identifiant cree : la machine est relue par son
+     * NOM, qui porte l'index unique ayant deja servi a rejeter les doublons.
+     * Une etiquette refusee n'annule pas la machine — elle est deja creee, et
+     * la perdre pour une etiquette trop longue serait pire.
+     */
+    private function poseEtiquettesImportees(string $nom, string $liste): void
+    {
+        if ($liste === '') {
+            return;
+        }
+        $id = DB::table('machines')->where('name', $nom)->value('id');
+        if ($id === null) {
+            return;
+        }
+        foreach (array_filter(array_map('trim', explode(';', $liste))) as $tag) {
+            $this->poseEtiquette((int) $id, $tag);
+        }
     }
 
     /**

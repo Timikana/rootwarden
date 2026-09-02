@@ -12,18 +12,18 @@
         @if (session('erreur')){{ session('erreur') }}@endif
     </p>
 
-    {{-- UNE CAPACITE NON PORTEE N'EST PAS UN SILENCE. Etiquettes, notes, cycle
-         de vie et test de connexion passent par `server_actions.php` — sous-lot
-         D6b. La page le DIT, plutot que de laisser croire qu'ils ont disparu. --}}
-    <div class="rw-encart" data-rw="serveurs-non-porte">
-        <p><strong>{{ __('serveurs.reste_titre') }}</strong></p>
-        <p class="rw-prose">{{ __('serveurs.reste_texte') }}</p>
-        <p>
-            <a class="rw-bouton rw-bouton--discret" data-rw="serveurs-lien-legacy"
-               href="{{ rtrim(config('app.url_legacy'), '/') }}/adm/admin_page.php"
-               target="_blank" rel="noopener">{{ __('serveurs.reste_lien') }} ↗</a>
-        </p>
-    </div>
+    {{-- L'ENCART « CE QUE CET ONGLET NE FAIT PAS ENCORE » A ETE RETIRE ICI,
+         et son commentaire disait deja le contraire de sa voisine : il citait
+         etiquettes, notes, cycle de vie et test de connexion comme non portes
+         alors que `reste_texte` annoncait les deux derniers PORTES. Les quatre
+         le sont (D6b, D6d), et l'import CSV l'est par ce sous-lot : il ne reste
+         RIEN a declarer.
+
+         Un encart de manque dont l'enumeration est vide ne se vide pas, il
+         DISPARAIT -- sans quoi il envoie encore vers l'ancien portail pour des
+         gestes que la page fait. Les trois cles `reste_*` sont retirees des
+         deux catalogues dans le meme commit : une cle sans lecteur devient une
+         declaration que personne ne relit. --}}
 
     {{-- ═══ Ajout ═══════════════════════════════════════════════════════════ --}}
     <section class="rw-carte rw-carte--pleine">
@@ -101,6 +101,111 @@
                     <button type="submit" class="rw-bouton" data-rw="serveur-ajouter">{{ __('serveurs.btn_ajouter') }}</button>
                 </div>
             </form>
+        </details>
+    </section>
+
+    {{-- ═══ Import CSV — sous-lot D6e ═════════════════════════════════════ --}}
+    <section class="rw-carte rw-carte--pleine">
+        <details data-rw="serveurs-import-bloc">
+            <summary class="rw-section__entete">{{ __('serveurs.imp_titre') }}</summary>
+
+            <p class="rw-prose rw-aide">{{ __('serveurs.imp_aide') }}</p>
+
+            {{-- CE QUE LE FICHIER CONTIENT, DIT AVANT DE LE CHOISIR. Le champ
+                 vient APRES cet avertissement : le lire une fois le fichier
+                 depose serait le lire trop tard. --}}
+            <p class="rw-alerte rw-alerte--attention" data-rw="serveurs-import-secrets">
+                {{ __('serveurs.imp_secrets') }}
+            </p>
+
+            {{-- LES DEUX DIVERGENCES SONT ANNONCEES AVANT L'IMPORT, pas
+                 decouvertes dans le bilan : une ligne refusee que l'ancien
+                 portail aurait creee doit etre PREVUE, sinon le refus passe
+                 pour un defaut du portage. --}}
+            <div class="rw-encart" data-rw="serveurs-import-diverge">
+                <p><strong>{{ __('serveurs.imp_diverge_titre') }}</strong></p>
+                <ul class="rw-liste">
+                    <li class="rw-prose">{{ __('serveurs.imp_diverge_secret') }}</li>
+                    <li class="rw-prose">{{ __('serveurs.imp_diverge_env') }}</li>
+                </ul>
+            </div>
+
+            <form method="POST" action="{{ route('serveurs.importer') }}"
+                  enctype="multipart/form-data" data-rw="serveurs-import-formulaire">
+                @csrf
+                <div class="rw-champ">
+                    <label class="rw-champ__etiquette" for="serveurs-import-fichier">
+                        {{ __('serveurs.imp_fichier') }}
+                    </label>
+                    <input class="rw-saisie" type="file" name="fichier" id="serveurs-import-fichier"
+                           accept=".csv,text/csv,text/plain" required
+                           data-rw="serveurs-import-fichier">
+                    {{-- SUR UNE SEULE LIGNE : une expression `{{ }}` multiligne casse le PHP compile. --}}
+                    <p class="rw-aide">{{ __('serveurs.imp_fichier_aide', ['ko' => \App\Http\Controllers\ServeursController::importMaxKo(), 'lignes' => \App\Services\Serveurs::IMPORT_MAX_LIGNES]) }}</p>
+                </div>
+
+                <label class="rw-champ rw-champ--case" data-rw="serveurs-import-doublons-etiquette">
+                    <input type="checkbox" name="ignore_doublons" value="1"
+                           data-rw="serveurs-import-doublons">
+                    <span>{{ __('serveurs.imp_doublons') }}</span>
+                </label>
+
+                <div class="rw-actions">
+                    <button class="rw-bouton" type="submit"
+                            data-rw="serveurs-import-valider">{{ __('serveurs.imp_valider') }}</button>
+                </div>
+            </form>
+
+            {{-- LE BILAN EST COMPTE, ET IL NOMME LES LIGNES REFUSEES. Un
+                 « import termine » sans compte ni detail laisse croire que tout
+                 est passe : c'est le defaut que `docker/scan_all` a paye. --}}
+            {{-- LE BILAN EST COMPTE, ET IL NOMME LES LIGNES REFUSEES. Un
+                 « import termine » sans compte ni detail laisse croire que tout
+                 est passe : c'est le defaut que `docker/scan_all` a paye.
+
+                 ⚠ AUCUNE DIRECTIVE PHP EN LIGNE ICI, ET C'EST DELIBERE.
+                 `layouts/portail.blade.php` porte l'avertissement : la forme
+                 expression est reconnue par un motif qui ne traverse pas les
+                 sauts de ligne, et la forme bloc s'apparie avec la premiere
+                 forme expression du fichier. Les deux fautes rendent le MEME
+                 message — « unexpected token class » — qui designe le premier
+                 attribut HTML rencontre et non la vraie ligne : j'ai perdu deux
+                 mesures a chercher au mauvais endroit. La session est donc
+                 relue a chaque emploi. Une lecture de plus, aucune mine.
+
+                 Et ce commentaire n'ecrit PAS les jetons de ces directives :
+                 un jeton de fermeture, meme dans un commentaire, s'apparie. --}}
+            @if (session('import'))
+                <div class="rw-encart" data-rw="serveurs-import-bilan">
+                    <p><strong>{{ __('serveurs.imp_bilan_titre') }}</strong></p>
+
+                    @if (session('import')['manquantes'] !== [])
+                        <p class="rw-prose rw-erreur" data-rw="serveurs-import-manquantes">{{ __('serveurs.imp_manquantes', ['noms' => implode(', ', session('import')['manquantes'])]) }}</p>
+                    @else
+                        <p data-rw="serveurs-import-compte">
+                            {{ session('import')['crees'] > 0 ? __('serveurs.imp_crees', ['n' => session('import')['crees']]) : __('serveurs.imp_aucun') }}
+                            {{ __('serveurs.imp_lues', ['n' => session('import')['lignes']]) }}
+                        </p>
+
+                        @if (session('import')['tronque'])
+                            <p class="rw-prose rw-erreur" data-rw="serveurs-import-tronque">{{ __('serveurs.imp_tronque', ['lignes' => \App\Services\Serveurs::IMPORT_MAX_LIGNES]) }}</p>
+                        @endif
+                    @endif
+
+                    @if (session('import')['erreurs'] !== [])
+                        <p><strong data-rw="serveurs-import-erreurs">{{ __('serveurs.imp_erreurs_titre', ['n' => count(session('import')['erreurs'])]) }}</strong></p>
+                        <ul class="rw-liste">
+                            @foreach (session('import')['erreurs'] as $refus)
+                                <li>
+                                    <strong>{{ __('serveurs.imp_ligne', ['n' => $refus['ligne']]) }}</strong>
+                                    @if ($refus['nom'] !== '') — {{ $refus['nom'] }} @endif
+                                    — {{ $refus['texte'] }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            @endif
         </details>
     </section>
 

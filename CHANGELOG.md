@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.182** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.183** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,124 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.183 — E-344 : `serveurs` import CSV (D6e), et le dernier manque de cette page tombe
+
+**L'import CSV etait le dernier geste non porte de `/serveurs`.** L'encart « Ce que cet onglet ne
+fait pas encore » **n'a donc plus d'objet et il est RETIRE**, avec ses trois cles dans les deux
+catalogues : *un encart de manque dont l'enumeration est vide ne se vide pas, il disparait* — sinon
+il envoie encore vers l'ancien portail pour des gestes que la page fait.
+
+Et son propre commentaire disait deja le contraire de sa voisine : il citait etiquettes, notes, cycle
+de vie et test de connexion comme non portes alors que `reste_texte` annoncait les deux derniers
+**portes**. Les quatre le sont (D6b, D6d).
+
+#### Aucune route backend : le legacy ecrit en PDO direct
+
+    grep -rhoE "route\('/[a-z_/]*import[a-z_/]*'" backend/   ->  0
+
+Comme `server_lifecycle`. `Serveurs::importeCsv()` ecrit donc en base, et **la validation n'est pas
+reecrite** : `champsRefuses()` est le seul predicat, celui du formulaire d'ajout. *Le filet et le
+verdict sur un seul predicat — deux validations divergent toujours a la fin, et celle qui garde le
+moins est celle qu'on oublie.*
+
+Benefice mesure de cette reutilisation : `valideIp()` du portage travaille sur la forme **binaire**
+et refuse `::ffff:169.254.169.254`, que le `strpos($ip, '169.254.')` du legacy laissait passer.
+
+#### QUATRE divergences, toutes dans le sens du refus, toutes ANNONCEES A L'ECRAN
+
+| # | le legacy | ici |
+|---|---|---|
+| 1 | `encryptPassword('')` rend `sodium:…` : la machine PARAIT porter un secret | la ligne est **refusee** |
+| 2 | un `environment` inconnu devient `OTHER` **en silence** | la ligne est **refusee** |
+| 3 | aucune borne : `while (fgetcsv(...))` sur 200 000 lignes fait 200 000 `INSERT` | 512 kio, 500 lignes, **et le depassement est DIT** |
+| 4 | la trace part en `INSERT (user_id, action)` **nu** | la trace est **SCELLEE** |
+
+**La (2) ne perd pas une donnee : elle retire une machine de production de la population des machines
+de production.** Une faute de frappe sur `PROD` suffisait.
+
+**La (4) est celle que j'avais recopiee sans la voir.** `user_logs` porte une chaine de hachage
+(`prev_hash` / `self_hash`), et le geste du legacy fabrique une des lignes que son propre bouton
+« Sceller les orphelines » ne peut jamais rattraper — **1 385 orphelines sur 5 939 mesurees ce soir.**
+Retire, et remplace par l'idiome scelle de `comptes` et `permissions`.
+
+Les deux premieres sont **annoncees AVANT l'import**, pas decouvertes dans le bilan : une ligne
+refusee que l'ancien portail aurait creee doit etre PREVUE, sinon le refus passe pour un defaut du
+portage.
+
+#### ⚠ TROIS DE MES PROPRES FAUTES, ET LA TROISIEME A COUTE DEUX MESURES
+
+**1. J'ai devine un chemin, et mon zero mesurait le vide.**
+
+    grep -rn "\['user'\]" backend/utils/ssh*.py   ->  0     et ce repertoire N'EXISTE PAS
+    TEMOIN : 15 fichiers du backend citent ['user']
+
+Le legacy valide `name` par une regex stricte contre une RCE, et **ne valide pas `user`**. Verifie
+sans deviner : `m['user']` part dans `paramiko.connect(username=…)`, un parametre du protocole, et
+`{ssh_user}` rend **0** occurrence en f-string — temoin : 38 interpolations `{mid}` dans ce meme
+code. *Pas d'injection par ce champ.*
+
+**2. Quatre classes CSS inventees.** `rw-encart--avertissement`, `rw-choix`, `rw-bouton--primaire`,
+`rw-texte--danger` : aucune dans `rw.css`. Les vraies sont `rw-alerte--attention`,
+`rw-champ rw-champ--case`, `rw-bouton` **nu** (48 usages : le defaut EST le principal) et `rw-erreur`.
+Controle refait sur les **16** classes de la section, avec un temoin faux qui doit etre detecte.
+
+**3. ⚠ « unexpected token "class" » NE DESIGNE PAS LA LIGNE FAUTIVE.**
+
+    @php($bilan = session('import'))
+    compile en  <?php($bilan = session('import'))     <-- SANS BALISE DE FERMETURE
+
+Tout le HTML suivant devient du PHP, et le message nomme **le premier attribut `class=` rencontre**.
+J'ai cherche deux fois au mauvais endroit — d'abord dans une expression multiligne, ensuite dans un
+espace de noms — avant de lire le PHP **compile**, qui le montre en une ligne.
+
+Puis ma « correction » en forme de bloc a casse l'appariement du `@if` : *`layouts/portail.blade.php`
+documente deja ce piege, message d'erreur compris, depuis le 2026-08-27.* **Ma section n'emploie
+donc plus aucune directive PHP** — la session est relue a chaque emploi.
+
+Et **le commentaire qui l'explique n'ecrit pas les jetons de ces directives** : un jeton de fermeture,
+meme dans un commentaire, s'apparie. C'est mon assertion qui l'a attrape, en refusant d'ecrire.
+
+#### Mesures — les quatre chemins, au DOM et en base
+
+    GET /serveurs                200      (rw-test-super)
+    section, champ, case          true
+    divergences listees           2        (2 attendues)
+    encart « non porte »          false    RETIRE
+    lien vers l'ancien portail    false    RETIRE
+    identifiants serveurs.*       []
+    TEMOIN selecteur faux         false
+    parite i18n                   FR=113 EN=113, JEUX DE CLES compares
+
+    A. colonnes absentes   « absentes : user, password, root_password. Aucune ligne traitee. »
+    B. 4 lignes fautives   4 refusees, chacune avec son motif :
+                             nom invalide · IP reservee · PRODUCTION · mot de passe vide
+    C. 1 ligne saine       1 creee — port 2222, TEST, deux secrets de FORME reconnue,
+                             etiquettes « d6e, temoin »
+       trace               scellee (`self_hash` non nul), auteur 16 et non 0
+       orphelines          1 385 AVANT, 1 385 APRES
+
+**Le parc est rendu a l'identique** : 3 machines avant, 4 pendant, 3 apres ; `machine_tags` a 0. *La
+ligne de journal, elle, est CONSERVEE : elle est scellee, et supprimer un maillon casserait le
+suivant.*
+
+#### ⚠ UNE CLE DE SESSION QUE LE PORTAGE NE POSE JAMAIS — hors de ce sous-lot
+
+    posee par SecondFacteurController.php:253   'utilisateur_id'
+    lectures de 'utilisateur_id'                31
+    lectures de 'user_id'                        3      -> jamais posee, donc TOUJOURS 0
+
+    MisesAJourController.php:33 · ClesSshController.php:39 · SupervisionController.php:272
+
+`ClesSshController:39` passe cet identifiant nul a `machinesVisibles($idCompte, $role)`, une fonction
+de cloisonnement. **J'ai failli commettre la meme faute** : mon premier jet lisait `user_id`.
+
+**NON CORRIGE, et signale au Lead.** Le fait etabli est « la cle n'est jamais posee » ; la
+consequence par page reste a mesurer page par page — trois modules distincts, et un identifiant qui
+passe de 0 a sa vraie valeur CHANGE ce que chaque page montre.
+
+Captures a 1400 et 390 dans `tests/e2e/screenshots/serveurs/`, **regardees**. *Elles montrent la
+machine temoin AVANT son retrait.*
 
 ### v1.38.182 — E-343 : `bashrc` renvoyait au legacy pour DEUX gestes que la page fait
 
