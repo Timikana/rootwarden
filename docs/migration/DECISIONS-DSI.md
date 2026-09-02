@@ -3592,3 +3592,60 @@ entre les deux.*
 > l'hyperviseur) disponible avant de lancer, pas après.**
 
 *C'est la seule précondition que je vois, et elle ne dépend pas du produit.*
+
+---
+
+## ✅ RELANCE — `wazuh` n'était PAS bloquée, et c'est la troisième page perdue au même raisonnement
+
+**Sur demande de l'exploitant, 2026-09-02.** *« Relance la migration, on s'est arrêté. »*
+
+### La mesure qui débloque la dernière page
+
+    commit SERVI = 6663e83   (2026-08-27 14:27:52 CEST)
+    il contient DEJA backend/routes/wazuh.py, 15 routes
+
+    les CINQ routes GET sont IDENTIQUES entre le servi et l'arbre :
+        /wazuh/config · /wazuh/servers · /wazuh/options · /wazuh/rules · /wazuh/rules/<name>
+
+    git diff 6663e83 -- backend/routes/wazuh.py  ->  3 hunks, tous dans
+        `_upsert_agent`, `install_all`, `uninstall`.  AUCUN ne touche un GET.
+
+> **Le backend en service répond déjà à tout ce dont une page en lecture a besoin.** *Le redémarrage ne
+> change que des routes d'écriture, que R1 n'utilise pas.*
+
+### ⚠ Le motif, et c'est sa troisième occurrence en une nuit
+
+**Nous avons compté `wazuh` bloquée pendant cinq jours sur une inférence** : *« le module est postérieur
+au commit servi, donc inutilisable »*.
+
+> **Postérieur ne veut pas dire absent — il veut dire DIFFÉRENT, et la différence ne portait pas sur la
+> lecture.**
+
+| # | ce qu'on croyait | ce qui était vrai |
+|---|---|---|
+| 1 | `remote_users` non portée | portée, le menu ne l'atteignait pas |
+| 2 | `iptables` non portée | portée sous `pare-feu`, même cause |
+| 3 | **`wazuh` bloquée par le redémarrage** | **portable en lecture, backend répondant** |
+
+**Les trois ont la même cause : une propriété INFÉRÉE au lieu d'être mesurée sur l'artefact.** *Et les
+trois inférences allaient dans le sens qui ARRÊTE le travail* — **la seule catégorie d'erreur dont
+l'effet est invisible dans nos journaux : elle ne laisse ni commit, ni contradiction, ni mesure fausse.
+Juste des heures.**
+
+### ✅ Mission dispatchée à la session 3
+
+**`wazuh` en R1 — lecture seule.** 5 GET portées, **9 routes d'écriture déclarées absentes** (`install`,
+`install_all`, `detect`, `uninstall`, `restart`, `group`, et les POST de `config`/`options`/`rules`).
+Modèle `groupes` R1 et `audit-ssh` A1.
+
+**Avec les cinq pièges nommés** : déclarer les manques par ce que le JS **appelle** (pas par les routes
+Laravel — l'erreur de `pare-feu`) · ne recopier aucun prédicat de bornage · **garder le
+`'feature' => 'wazuh'`**, seule entrée du menu qui en porte un · contrôler chaque classe CSS avant le
+premier rendu · annoncer avant d'écrire dans `rw.css`.
+
+**Et un fait de contexte qui évitera un faux diagnostic** : `wazuh_agents` porte **zéro ligne** et le
+module n'a **jamais servi** — `install_all` portait `AND a.id IS NULL` sur une table **sans colonne
+`id`**, rendait `500` sans `try`, et personne ne l'a vu. *La page en lecture rendra une liste vide, et
+c'est l'état normal — à distinguer d'une base injoignable.*
+
+> **Quand elle basculera, le menu sera à 32/32 et le legacy n'aura plus une seule entrée.**
