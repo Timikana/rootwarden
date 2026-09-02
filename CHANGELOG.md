@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.171** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.172** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,46 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.172 — ⚠ le redémarrage n'est pas de l'hygiène : c'est la garde qui manque devant `POST /deploy`
+
+**E-330. Trois faits mesurés, chacun avec son témoin, et c'est leur composition qui compte.**
+
+**1. Les six secrets du parc sont déchiffrables aujourd'hui** — témoin d'aller-retour
+`encrypt_password`/`decrypt_password` : instrument sain, puis **6 non vides / 6 déchiffrables**. *Donc la
+protection accidentelle qui a arrêté le déploiement du 27/08 (E-326) n'existe plus : un `POST /deploy`
+lancé maintenant franchirait l'étape où celui-là est tombé.*
+
+⚠ **Ma première mesure disait « 0 déchiffrable »** — j'appelais `e.decrypt()`, méthode **inexistante**,
+et mon `except Exception` avalait l'`AttributeError` en le rendant comme « ÉCHEC ». **C'est un `|| true`
+dans un garde, en Python** — et le zéro allait dans le sens rassurant. *Sans le témoin, j'aurais annoncé
+que la protection tient.*
+
+**2. En service, `POST /deploy` n'a que `@require_api_key`.** Le correctif E-191 — `@require_role(2)` +
+`@require_machine_access` — est **écrit, commité, et inerte**, parce que le processus n'a pas redémarré.
+
+**3. La composition** : la clé d'API seule suffit à invoquer la route · les secrets se déchiffrent · le
+geste ouvre une session SSH **root** par machine et **révoque des clés**. *Un porteur de la clé d'API
+atteint le parc entier, `srv-zabbix` comprise.*
+
+> **J'ai présenté le redémarrage comme « ce qui débloque `wazuh` ». C'est vrai et secondaire : c'est la
+> seule chose qui mettrait un contrôle de rôle devant un déploiement root sur la production.** J'ai
+> retiré cette nuit un argument de signature parce qu'il était faux ; **en voici un qui est mesuré.**
+
+*Réserve qui borne le remède : `require_machine_access` rend `True` sans condition dès `role_id >= 2`.
+Après redémarrage la garde effective est **clé d'API + rôle ≥ 2**, pas une borne par cible.*
+
+**E-331 — `wazuh` n'est pas bloquée en lecture.** Les **cinq routes GET sont identiques** en service et
+dans l'arbre, et les trois hunks du diff portent sur `_upsert_agent`, un script d'installation et
+`uninstall` — **aucun ne touche un GET**. *Postérieur ne veut pas dire absent : il veut dire différent, et
+la différence ne portait pas sur la lecture.* **Troisième fois que cette inférence coûte une page**, après
+`comptes-distants` et `pare-feu`. Dispatché en R1 lecture seule ; **à sa bascule, 32/32**.
+
+**E-332 — `OpenCVE-Test-OnPrem` est un banc d'essai**, et l'exploitant a démenti la session 8 : *une
+criticité métier déduite d'une dépendance de configuration.* Conséquence inversée — pour un futur test de
+déploiement, **la machine 3 vaut mieux que la 2** : rien à révoquer, mais **une machine réelle**, et les
+deux défauts déjà payés (`AllowUsers`, conflit lexical des `sudoers.d`) sont des propriétés d'un hôte réel
+qu'un conteneur ne reproduit pas.
 
 ### v1.38.171 — avant de retirer une contrainte fautive, énumérer tout ce qu'elle excluait
 
