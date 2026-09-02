@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.184** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.185** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,116 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.185 — E-352 : `groups` R3, le scan de derive de masse — et le nombre annonce est le nombre RESOLU
+
+**Le seul geste de masse du chantier qui n'ouvre AUCUNE session SSH.** Verifie en descendant la
+chaine, pas en croyant l'appelant :
+
+    POST /groups/<id>/run {action:'drift_scan'}   role(2) + perm('can_admin_portal')
+      -> _run_bulk('drift_scan', ids)             groups.py:253
+      -> scan_machine(mid)                        drift.py:110
+      -> _compute_machine_drift + _persist_drift  cursor + commit, RIEN d'autre
+
+    ssh_session | paramiko | exec_command | SSHClient | connect( dans drift.py   ->  0
+    TEMOIN : le meme motif rend 10 occurrences dans ssh_audit.py
+    imports de drift.py : logging, flask, routes.helpers — aucune bibliotheque reseau
+
+*Son voisin `cve_scan` ouvre une session PAR MACHINE et envoie un courriel par machine a resultats.*
+**`np_cve` et ses trois satellites ne bougent pas : cette declaration est vraie et le restera.**
+
+#### ⚠ LE NOMBRE ANNONCE EST LE NOMBRE RESOLU, ET C'EST TOUT L'ENJEU
+
+Un groupe dont **tous** les filtres ont ete rejetes par `_sanitize_filters` se stocke en `{}` — le
+meme objet qu'un groupe sans critere, donc `1=1`, donc **le parc entier**. Un resume de filtres
+afficherait « aucun critere » et laisserait croire a une selection.
+
+    la portee est RESOLUE avant l'affichage, par GET /groups/<id>/members
+    -> seul le nombre resolu distingue « je scanne mes trois serveurs de test »
+       de « je scanne tout »
+
+Le panneau s'ouvre **deux fois** : une premiere sans le nombre pour que le clic ait un retour
+immediat, une seconde quand la resolution rend.
+
+#### ⚠ FAIL-CLOSED, et c'est la propriete la PLUS mesuree de ce sous-lot
+
+**Portee illisible -> le bouton de lancement N'EST PAS OFFERT**, et la raison est dite. *Un panneau
+qui ne sait pas sur combien de machines il porte ne peut pas faire consentir.* Mesure par
+interception d'un `500` sur `/members` :
+
+    effets rendus     « Les membres de ce groupe n'ont pas pu etre lus. »
+                      « La portee n'a pas pu etre lue : impossible de dire sur combien de
+                        serveurs ce scan porterait. Le lancement n'est donc pas propose. »
+    bouton lancement  false      <- la propriete
+    groupe resolvant 0 machine   -> meme traitement, et la raison le dit
+
+#### Un bouton partage qui ne sait pas d'ou il vient agit sur autre chose que ce qu'on a lu
+
+« Confirmer » etait cable **en dur** sur `enregistre` (R2). R3 lui ajoute un second geste, donc un
+dispatch — et `fermePanneau()` **desarme** le rappel. *Sans cela, ouvrir le panneau d'un geste non
+porte apres un geste porte laisserait un rappel arme derriere un bouton masque, et il suffirait de le
+demasquer pour le declencher.*
+
+#### `portee_texte` A ETE CORRIGEE DANS LE MEME COMMIT — la CONJONCTION
+
+    avant  « La suppression et LES DEUX ACTIONS DE MASSE passent encore par l'ancien portail »
+    apres  « La suppression et le scan CVE de masse passent encore par l'ancien portail »
+
+**Porter une des deux rendait cette phrase a MOITIE fausse — et une moitie fausse se lit comme
+entierement vraie.** C'est la septieme forme du motif de la semaine, la conjonction, apres
+`serveurs` (trois capacites, une portee) et `bashrc` (deux portees declarees absentes). *Et cette cle
+portait deja un commentaire disant qu'elle avait ete fausse une fois, pour la creation.*
+
+#### Mesures — les quatre chemins, au DOM et en base
+
+    GET /groupes                       200      (rw-test-super)
+    A. portee ILLISIBLE (500 forge)    bouton lancement false, raison dite
+    B. portee LISIBLE                  « Ce groupe resout 2 serveur(s) aujourd'hui. »
+                                       bouton « Lancer le scan de derive », lien legacy MASQUE
+    C. LANCEMENT                       requetes /run : ["POST"]  — une seule
+                                       « 2 serveur(s) mis en file. » · rw-annonce--ok
+                                       panneau ferme
+    D. branche PRODUCTION              « ⚠ La production en fait partie : srv-zabbix. »
+                                       la machine est NOMMEE · requetes /run : []  (non lance)
+
+    en base, apres le lancement :
+      tasks drift_scan   729 -> 731    exactement 2, une par membre, les deux `success`,
+                                       « Drift groupe - machine 2 » et « machine 3 »
+      config_drift       9 -> 9        aucune derive nouvelle, coherent : le planificateur
+                                       fait le meme travail toutes les heures
+    parite i18n          FR=66 EN=66, JEUX DE CLES compares
+
+**Le nombre annonce correspond a ce qui a REELLEMENT tourne** — deux membres annonces, deux taches
+creees. *C'etait la seule facon de verifier que « resolu » ne veut pas dire « estime ».*
+
+#### L'etat partage est rendu, et ce qui reste est declare
+
+`machine_groups` etait a **0** : il n'existait aucun groupe sur le banc, donc le geste ne pouvait pas
+etre exerce sans en creer. Deux temoins crees **par le chemin porte** (`POST /groups`, R2), puis
+retires — `machine_groups` de retour a 0, aucun membre statique residuel.
+
+**Le retrait a ete fait en SQL, et c'est dit : la suppression d'un groupe n'est PAS portee**
+(`np_supprimer`). Les **deux lignes de `tasks`** restent : ce sont les traces d'une action reelle, et
+une trace qu'on nettoie parce qu'elle gene cesse d'etre une trace.
+
+#### La region live est PRESENTE DES LE CHARGEMENT
+
+`<p class="rw-annonce" role="status" aria-live="polite">`, vide. *Une region `aria-live` ajoutee au
+DOM au moment du message n'est pas annoncee : elle doit etre dans l'arbre AVANT l'insertion.* Idiome
+de `comptes` et de vingt-cinq autres vues, repris tel quel plutot que reinvente — y compris
+`className = 'rw-annonce' + (type ? ' rw-annonce--' + type : '')`, dont les variantes `--ok` et
+`--echec` ont ete verifiees dans `rw.css` avant emploi.
+
+#### ⚠ ET UN DEFAUT VU A L'IMAGE QUI N'EN EST PAS UN
+
+La capture montre l'en-tete et la barre laterale **au milieu de la page**, recouvrant une carte.
+Mecanisme etabli plutot que suppose : les deux sont en `position: sticky; top: 0`, mon panneau appelle
+`scrollIntoView` avant la capture, et en `fullPage` un element collant se peint a l'offset de
+defilement. *Les captures `bashrc` et `serveurs` de la meme session, prises sans defilement, ont leur
+en-tete en haut* — c'est ce contraste qui tranche.
+
+*Trois fausses suspicions tirees d'images ont ete rapportees par une autre session dans la meme
+heure. Regarder produit des hypotheses ; ce sont les mesures qui tranchent.*
 
 ### v1.38.184 — E-350 : le test d'E-235c appliquE aux dix-huit routes, et ce qu'il NE ferme PAS
 

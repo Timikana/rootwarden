@@ -49,6 +49,28 @@
     var panneauTexte = document.querySelector('[data-rw="groupes-panneau-texte"]');
     var panneauEffets = document.querySelector('[data-rw="groupes-panneau-effets"]');
     var panneauFermer = document.querySelector('[data-rw="groupes-panneau-fermer"]');
+    var annonce = document.querySelector('[data-rw="groupes-annonce"]');
+
+    /*
+     * ══ CE QUE « CONFIRMER » EXECUTE DEPEND DU PANNEAU OUVERT ═══════════
+     *
+     * Le bouton etait cable EN DUR sur `enregistre`. R3 lui ajoute un second
+     * geste — le scan de derive de masse — et un bouton partage qui ne sait pas
+     * de quel panneau il vient est la meme faute que le panneau qui ne nommait
+     * pas sa cible : il agit sur autre chose que ce que la personne a lu.
+     *
+     * Remis a `null` par `fermePanneau()`. Sans cela, ouvrir le panneau d'un
+     * geste NON porte apres un geste porte laisserait un rappel armé derriere
+     * un bouton masqué — et il suffirait de le demasquer pour le declencher.
+     */
+    var gesteConfirme = null;
+
+    /** L'annonce du geste. Meme idiome que `comptes.js:34`. */
+    function annonceGeste(texte, type) {
+        if (! annonce) { return; }
+        annonce.className = 'rw-annonce' + (type ? ' rw-annonce--' + type : '');
+        annonce.textContent = texte;
+    }
 
     // ── LE PANNEAU ───────────────────────────────────────────────────────
     function fermePanneau() {
@@ -62,6 +84,12 @@
         if (c) { c.hidden = true; }
         // ...et le lien legacy REVIENT : les gestes non portes en ont besoin.
         if (panneauLegacy) { panneauLegacy.hidden = false; }
+        // DESARMER. Un rappel qui survit a la fermeture est un geste qui attend.
+        gesteConfirme = null;
+        if (c) {
+            c.disabled = false;
+            c.textContent = t('btn_enregistrer');
+        }
     }
 
     function ouvrePanneau(titre, texte, effets) {
@@ -89,7 +117,11 @@
     var enCours = null;
     var panneauConfirmer = document.querySelector('[data-rw="groupes-panneau-confirmer"]');
     var panneauLegacy = document.querySelector('[data-rw="groupes-panneau-legacy"]');
-    if (panneauConfirmer) { panneauConfirmer.addEventListener('click', enregistre); }
+    if (panneauConfirmer) {
+        panneauConfirmer.addEventListener('click', function () {
+            if (typeof gesteConfirme === 'function') { gesteConfirme(); }
+        });
+    }
 
     // ── LA PASSERELLE, EN LECTURE SEULE ──────────────────────────────────
     function lis(chemin) {
@@ -259,7 +291,11 @@
         }
         enCours = { nom: nom };
         ouvrePanneau(t('form_titre'), nom, porteeAnnoncee());
-        if (panneauConfirmer) { panneauConfirmer.hidden = false; }
+        gesteConfirme = enregistre;
+        if (panneauConfirmer) {
+            panneauConfirmer.hidden = false;
+            panneauConfirmer.textContent = t('btn_enregistrer');
+        }
         /*
          * Le lien vers l'ancien portail n'a AUCUN objet ici : ce geste est
          * porte. L'offrir a cote d'un « Enregistrer » qui fonctionne inviterait
@@ -310,11 +346,91 @@
         ]);
     }
 
+    /*
+     * ══ R3 — LE SCAN DE DERIVE DE MASSE ═════════════════════════════════
+     *
+     * LE SEUL GESTE DE MASSE DE CE CHANTIER QUI N'OUVRE AUCUNE SESSION SSH :
+     * `_run_bulk('drift_scan', …)` relit des donnees deja en base. Son voisin
+     * `cve_scan` ouvre une session PAR MACHINE et envoie un courriel par
+     * machine a resultats — il reste hors de cette interface, et son panneau
+     * ne bouge pas.
+     *
+     * ⚠ LE NOMBRE ANNONCE EST LE NOMBRE RESOLU, JAMAIS LE NOMBRE ATTENDU.
+     *
+     * Un groupe dont TOUS les filtres ont ete rejetes par `_sanitize_filters`
+     * se stocke en `{}` — le meme objet qu'un groupe sans critere, donc `1=1`,
+     * donc LE PARC ENTIER. Un resume de filtres afficherait « aucun critere »
+     * et laisserait croire a une selection. Seule la resolution distingue
+     * « je scanne mes trois serveurs de test » de « je scanne tout ».
+     *
+     * On RESOUT donc avant d'afficher — c'est une lecture — et le panneau
+     * s'ouvre DEUX FOIS : une premiere sans le nombre pour que le clic ait un
+     * retour immediat, une seconde quand la resolution rend.
+     *
+     * FAIL-CLOSED : si la portee n'est pas lisible, ou si elle est vide, le
+     * bouton de lancement N'EST PAS OFFERT et la raison est dite. Un panneau
+     * qui ne sait pas sur combien de machines il porte ne peut pas faire
+     * consentir.
+     */
     function panneauDerive(groupe) {
-        ouvrePanneau(t('np_titre'), t('np_derive'), [
-            surGroupe(groupe),
-            t('np_derive_detail'),
-        ]);
+        ouvrePanneau(t('der_titre'), t('der_texte'), [surGroupe(groupe)]);
+        if (panneauLegacy) { panneauLegacy.hidden = true; }
+
+        lis('/groups/' + encodeURIComponent(groupe.id) + '/members').then(function (r) {
+            var membres = (r.ok && r.corps && r.corps.success && Array.isArray(r.corps.members))
+                ? r.corps.members
+                : null;
+
+            if (membres === null) {
+                ouvrePanneau(t('der_titre'), t('der_texte'), [
+                    surGroupe(groupe), t('membres_err'), t('der_illisible'),
+                ]);
+                return;                     // aucun bouton : rien a confirmer
+            }
+            if (! membres.length) {
+                ouvrePanneau(t('der_titre'), t('der_texte'), [
+                    surGroupe(groupe), t('der_vide'),
+                ]);
+                return;
+            }
+
+            var prod = membres.filter(function (m) { return m && m.environment === 'PROD'; })
+                .map(function (m) { return String(m.name == null ? m.id : m.name); });
+
+            var effets = [surGroupe(groupe), t('resolu_nombre', { n: membres.length })];
+            if (prod.length) { effets.push(t('resolu_prod', { noms: prod.join(', ') })); }
+            effets.push(t('resolu_reresolu'));
+
+            ouvrePanneau(t('der_titre'), t('der_texte'), effets);
+            gesteConfirme = function () { lanceDerive(groupe); };
+            if (panneauLegacy) { panneauLegacy.hidden = true; }
+            if (panneauConfirmer) {
+                panneauConfirmer.hidden = false;
+                panneauConfirmer.textContent = t('der_lancer');
+            }
+        });
+    }
+
+    /*
+     * Le lancement. `queued` est le nombre que le BACKEND a resolu au moment
+     * du geste — on l'annonce lui, pas celui qu'on avait affiche : entre les
+     * deux, le parc a pu bouger, et c'est precisement ce que
+     * `resolu_reresolu` previent.
+     */
+    function lanceDerive(groupe) {
+        if (panneauConfirmer) { panneauConfirmer.disabled = true; }
+        ecris('/groups/' + encodeURIComponent(groupe.id) + '/run', { action: 'drift_scan' })
+            .then(function (r) {
+                var ok = r.ok && r.corps && r.corps.success === true;
+                fermePanneau();
+                if (! ok) {
+                    annonceGeste(t('der_echoue', {
+                        message: (r.corps && r.corps.message) || '',
+                    }), 'echec');
+                    return;
+                }
+                annonceGeste(t('der_lance', { n: Number(r.corps.queued || 0) }), 'ok');
+            });
     }
 
     /*
