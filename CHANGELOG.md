@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.175** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.176** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,43 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.176 — une page portée renvoie vers un portail archivé, et cinq natures dans le même sac
+
+**E-338.** Vérifié avec témoin : **`legacy/_deprecated/supervision` est archivé** (témoin : `legacy/wazuh`
+est vivant), et `superv.php:63` dit toujours *« la modification de ce jeton n'est pas encore portée :
+elle reste sur l'ancien portail »*. **Il n'y a plus d'ancien portail pour la supervision.** *Ce n'est pas
+une capacité « pas encore portée » : c'est une capacité **perdue à l'archivage**.*
+
+**Troisième occurrence du motif**, après l'export RGPD et le tableau de déploiement. **Et le plus retors
+des trois** : l'export *disparaîtrait*, la révocation *manquait sans le dire* — **ici l'écran dit où
+aller, et il n'y a rien là-bas.**
+
+**J'avais inscrit cette déclaration comme « vraie et bien raisonnée » il y a une heure**, sur la foi de
+son argument. *Une déclaration peut être juste sur sa cause et fausse sur son renvoi* — j'ai éprouvé la
+partie argumentée et pas la partie factuelle. **La moitié qui raisonne attire l'œil ; la moitié qui
+pointe ne se vérifie qu'en suivant le lien.**
+
+*Et la seconde capacité annoncée a été corrigée pendant la mesure* (`eb54230`) : sur deux, il n'en reste
+qu'une. **Un relevé de quinze minutes sur un artefact que trois sessions écrivent est périmé à sa
+remise — structurellement, pas par négligence.**
+
+**E-339 — cinq comptes divergents (41, 21, 24, 26, 94), et la bonne livraison était la CAUSE.** Le `grep`
+ramasse quatre natures que rien ne distingue : des **capacités**, du **décor de panneau**, des **textes
+d'aide**, et de l'**i18n morte** — cinq clés de `superv` rendues **nulle part**, résidu des sous-lots,
+même classe que les 104 clés `tip.*` orphelines. *Un résidu d'i18n compté comme un manque transforme un
+travail fini en dette.*
+
+**Deux corrections à mon dispatch** : `superv` **n'est pas** un des treize dossiers — c'est un catalogue,
+et son legacy est archivé ; je l'ai nommé parmi « les trois plus lourds » en relayant un cadrage sans le
+mesurer. Et **« porter `groups` » assigne un travail déjà fait** : les cinq modules ont leur contrôleur,
+les manques sont **dans** les pages. *Ce qui s'assigne est une liste de gestes* — `ssh_audit` 4 ·
+`groups` 4 · `serveurs` 3 · `fail2ban` 4.
+
+**Et deux décisions assumées ont été sorties du compte** (`politique_lecture_seule` dit elle-même « ce
+n'est pas un oubli » ; `np_nouveau_detail` est une mise en garde) : *compter un choix parmi les manques
+rend le total indéfendable même s'il était exact.* **`fail2ban` est la seule à borner des deux côtés** —
+elle énumère aussi ce qui **est** porté ; c'est la forme à généraliser.
 
 ### v1.38.175 — une déclaration vraie devient fausse sans qu'aucun commit ne la touche
 
