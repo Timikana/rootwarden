@@ -16296,3 +16296,84 @@ que j'avais posée.*
 service n'a que la clé d'API, et le correctif qui exigerait le rôle 2 est **inerte**. *La protection
 accidentelle du 27/08 n'existe plus* — donc ces gestes ne sont plus seulement dangereux en principe,
 **ils aboutiraient.**
+
+## E-336 — ⚠ MA SONDE PORTAIT LE NOM DU LEGACY, dans le message où je donnais la règle
+
+J'ai écrit à la session 3 : *« cherche l'ARTEFACT, pas le nom du legacy ; le portage nomme en français »*
+— et **dans le même message j'ai fourni une mesure faite avec le nom du legacy** :
+
+    uninstall         dans supervision.js  ->  0     <- le nom du LEGACY, ma sonde
+    desinstallation   dans supervision.js  ->  5     <- le nom du PORTAGE, la sienne
+
+**Les trois gestes sont câblés.** Mon `uninstall → 0` était **vrai et ne mesurait pas ce que je croyais**
+— exactement ce qui nous a coûté `comptes-distants` et `pare-feu`.
+
+> **Ma règle 2 s'appliquait à ma règle 3.** Troisième fois cette nuit qu'une de nos règles nous échappe
+> **au moment de l'appliquer à nous-mêmes** — après mon compteur d'écarts, mon annuaire qui était de la
+> mémoire écrite, et ceci.
+
+*Et ma prudence a quand même servi* : j'avais refusé d'assigner la correction sur relais et demandé une
+mesure. **La mesure a corrigé la mienne.** C'est la seule raison pour laquelle mon erreur n'est pas
+entrée dans le produit.
+
+## E-337 — UNE DÉCLARATION VRAIE DEVIENT FAUSSE SANS QU'AUCUN COMMIT NE LA TOUCHE
+
+Audit rendu par la session 3, **vérifié** : cinq déclarations, **deux vraies, trois fausses**.
+
+    secret_jeton_non_porte        VRAIE et bien raisonnee    -> LAISSEE      FR=1 EN=1
+    profils_assignation_ailleurs  fausse dans sa subordonnee -> corrigee     FR=1 EN=1
+    a_venir_deploiement           FAUSSE                     -> retiree      FR=0 EN=0
+    a_venir_config                fausse ET morte (0 rendu)   -> retiree      FR=0 EN=0
+    a_venir_profils               fausse ET morte (0 rendu)   -> retiree      FR=0 EN=0
+
+    parite : FR=260  EN=260
+
+**`secret_jeton_non_porte` est vraie** — le jeton Telegraf s'écrit par une route à part, *« et l'inventer
+ici serait concevoir »*. **Non touchée.** *C'est le cas qui empêche de lire la classe comme « toutes les
+déclarations mentent »* — même fonction que `services` dans son relevé de filets.
+
+### La chronologie, mesurée, et c'est le fait le plus dur
+
+    c1041f4  V1   22/08 03:25   ecrit la phrase          -> elle etait VRAIE
+    3e8686a  V12  23/08 13:05   porte le deploiement     -> elle devient FAUSSE
+             son diff sur `lang/fr/superv.php` contient `a_venir_deploiement` :  0 fois
+
+> **Aucun commit à incriminer, et la relecture du diff qui l'a rendue fausse ne la contient pas.** Dix
+> jours. *Un texte n'est pas rendu faux par une modification de lui-même : il est rendu faux par une
+> modification d'AILLEURS.*
+
+**C'est pourquoi aucune de nos disciplines ne l'attrape** : nous relisons les diffs, nous mesurons les
+fichiers touchés, nous éprouvons les gardes. **Rien de tout cela ne regarde un fichier que personne n'a
+ouvert.**
+
+### ⚠ ET L'AVERTISSEMENT ADJACENT N'EST PAS UN AVERTISSEMENT : C'EST LE PROCÈS-VERBAL DE L'OCCURRENCE 1
+
+    superv.php:175-177
+      // UN TEXTE PEUT DEVENIR FAUX SANS QU'AUCUN TEST NE LE VOIE : le tableau du
+      // parc est porte depuis V6, la phrase qui l'annoncait « pour plus tard » ne
+      // l'etait plus. Vu a l'image.
+
+**Ce commentaire consigne une PREMIÈRE occurrence du même défaut** — un texte rendu faux par le portage
+de V6. Il a été écrit **après** que quelqu'un s'y soit fait prendre une fois.
+
+> **Et la seconde occurrence s'est produite trois lignes en dessous.**
+>
+> C'est une **limite d'E-289** — *« une réserve s'écrit dans le code qu'on remplace »*. Ici la réserve
+> était dans le code, **adjacente**, et elle a échoué **sur place**. Elle n'a pas eu besoin d'être
+> recopiée pour ne rien protéger : *un avertissement décrit une classe, il ne surveille pas ses
+> instances.*
+
+**Ce qui l'a trouvée est ce que le commentaire lui-même nomme** : « Vu à l'image ». **Deux fois sur deux,
+c'est le RENDU qui a attrapé le défaut** — jamais un test, jamais une relecture de diff. *E-270 disait
+que le rendu n'est couvert par aucune suite ; voici deux défauts que seul le rendu a vus.*
+
+### Mesures du correctif, au DOM et avec témoin
+
+    bloc « pas encore porte »        0    (doit etre 0)
+    identifiants `superv.*` orphelins 0    (apres retrait de 5 cles)
+    bouton « reconfigurer »           3    un par machine
+    bouton « desinstaller »           3
+    TEMOIN : un selecteur faux        0    l'instrument discrimine
+
+*Et ce n'était pas son module* : le portage était achevé depuis le 23/08 et aucune session n'y
+travaillait. **Le correctif est du texte, et il retire un renvoi vers le portail qu'on veut éteindre.**

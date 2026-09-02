@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.174** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.175** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,35 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.175 — une déclaration vraie devient fausse sans qu'aucun commit ne la touche
+
+**E-336, ma faute.** J'ai écrit « cherche l'artefact, pas le nom du legacy ; le portage nomme en
+français » — **et fourni dans le même message une mesure faite avec le nom du legacy** : `uninstall` → 0,
+`desinstallation` → **5**. Les trois gestes sont câblés ; mon zéro était **vrai et ne mesurait pas ce que
+je croyais**. *Ma règle 2 s'appliquait à ma règle 3* — troisième fois cette nuit qu'une règle nous
+échappe au moment de l'appliquer à nous-mêmes. **Ma prudence a quand même servi** : j'avais refusé
+d'assigner sur relais et demandé une mesure, et c'est cette mesure qui a corrigé la mienne.
+
+**E-337.** Audit des cinq déclarations de `superv` : **deux vraies, trois fausses**, parité FR=260 EN=260.
+`secret_jeton_non_porte` est **vraie** et non touchée — *le cas qui empêche de lire la classe comme
+« toutes les déclarations mentent »*.
+
+**La chronologie est le fait le plus dur** : V1 écrit la phrase le 22/08 — **elle était vraie** ; V12
+porte le déploiement le 23/08 — elle devient fausse ; **et le diff de V12 ne contient pas la clé.** Dix
+jours. *Un texte n'est pas rendu faux par une modification de lui-même, mais par une modification
+d'ailleurs* — c'est pourquoi aucune de nos disciplines ne l'attrape : **nous relisons les diffs, et rien
+ne regarde un fichier que personne n'a ouvert.**
+
+**⚠ Et l'avertissement adjacent n'est pas un avertissement : c'est le procès-verbal de l'occurrence 1.**
+`superv.php:175` consigne *« un texte peut devenir faux sans qu'aucun test ne le voie »* à propos d'une
+**première** instance (V6). **La seconde s'est produite trois lignes en dessous.** C'est une **limite
+d'E-289** : la réserve était dans le code, adjacente, et elle a échoué **sur place** — *un avertissement
+décrit une classe, il ne surveille pas ses instances.*
+
+**Et ce qui l'a trouvée, deux fois sur deux, est ce que le commentaire nomme lui-même : « vu à
+l'image ».** Jamais un test, jamais une relecture de diff. *E-270 dit que le rendu n'est couvert par
+aucune suite ; voici deux défauts que seul le rendu a vus.*
 
 ### v1.38.174 — E-336 : `supervision` declarait absents trois gestes qu'elle porte depuis DIX JOURS
 
