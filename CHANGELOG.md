@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.179** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.180** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,50 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.180 — E-280 : une portee restreinte sans sa valeur visait tout le parc
+
+**Le chemin, par l'interface et non par une requete forgee.** `POST /ssh-audit/schedules` acceptait
+`target_type` et `target_value` **sans aucune verification** — `data.get('target_type', 'all')` puis
+`data.get('target_value') or None`, et `INSERT` direct. Or `scheduler.py:286` porte son test de
+vacuite **dans la condition d'entree** :
+
+```python
+elif schedule['target_type'] == 'machines' and schedule.get('target_value'):
+```
+
+> **Une `target_value` vide rend le `and` faux : la planification n'entre jamais dans sa propre
+> branche, donc n'atteint jamais son repli ferme — elle sort par le `else` final, vers le PARC
+> ENTIER.** *Une garde placee dans la condition d'entree ne garde pas la branche : elle en detourne.*
+
+**Une planification « scanner le tag X » dont le champ tag est reste blanc visait donc tout le parc,
+production comprise, dans une tache qui tourne sans personne devant l'ecran.** Aucune requete forgee :
+une cle d'API de role 2 suffit, et c'est le role que la route exige deja.
+
+**Correctif — cote SERVEUR, et c'est le point.** Liste fermee `PORTEES`, refus `400` sur un type hors
+liste, refus `400` sur une portee restreinte sans valeur, **avant l'`INSERT`** (gardes lignes 793 et
+801, `INSERT` ligne 809).
+
+**Un garde dans le formulaire n'aurait pas garde la route** : quiconque appelle `POST
+/ssh-audit/schedules` directement — cle d'API, `curl`, une autre page — passe a cote. C'est le defaut
+le plus repete de ce depot, *la garde est sur la page et pas sur la requete*, et il a failli etre
+prescrit une septieme fois.
+
+**Ce que le correctif ne couvre PAS, et n'a pas a couvrir** : `target_value = '[]'` est une chaine
+**non vide**, donc elle passe la garde. C'est le `else` **interne** de la branche `machines` du
+planificateur qui la rattrape en `WHERE 1=0`. **Les deux couches se lisent ensemble** — je le note
+plutot que d'annoncer une couverture totale.
+
+**Ce qui restait vrai avant ce correctif** : `ssh_audit_schedules.target_type` est **`NOT NULL`** et
+son ENUM ferme deja le type — eprouve, `ERROR 1265` en transaction annulee. **Le trou etait dans
+`target_value`, `TEXT NULL` sans contrainte**, et c'est lui que ce correctif ferme.
+
+**Mesure** : les deux gardes exercees sur huit cas, dont `tag` sans valeur, `tag` avec des espaces,
+`null` JSON explicite et type hors enum. **Inerte jusqu'au redemarrage** — les `.py` sont lus au
+demarrage du processus, et le correctif prendra effet avec lui sans en exiger un second.
+
+**Gel** : leve nommement sur ce patch par la session DSI, qui en a informe le Lead. **Le patch du
+planificateur n'est PAS applique** — il reste dans le gel.
 
 ### v1.38.179 — E-342 : « Trois capacites » etait faux de DEUX TIERS, et j'ai failli en re-porter une
 
