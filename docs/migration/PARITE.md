@@ -13641,3 +13641,124 @@ qui vient de grandir.
 **Aucune écriture backend** : le gel tient, et sous E-238 elle serait inerte de toute façon.
 **A1 ne compose aucune planification** — l'écran dira que « tout le parc » est le défaut, et que
 c'est aussi ce que produit une cible mal formée. **Correctif : arbitrage exploitant.**
+
+## E-280 CORRIGÉ — ⚠ j'avais tort sur TROIS points, et le plus grave m'est revenu comme confirmation
+
+Écrit en v1.38.134, diffusé à **cinq sessions**, et **adossé à une demande de signature**.
+Correction inscrite ici plutôt que substituée : le registre est daté.
+
+### ⚠ 1. « PIRE EN SERVICE » EST FAUX — j'ai comparé DEUX FONCTIONS, pas deux versions
+
+`scheduler.py` porte **deux** tâches qui sélectionnent des machines :
+
+    :171  _run_scheduled_scan        <- scan CVE      son 1er `else:` est a :211
+    :257  _run_scheduled_ssh_audit   <- audit SSH     son `else:` est a :299
+
+Ma commande était `git show … | grep -n -A3 "^        else:"` : elle a rendu **le premier
+`else:` du fichier**, celui de `_run_scheduled_scan`. **J'ai opposé le scan CVE d'hier à
+l'audit SSH d'aujourd'hui et appelé ça deux versions d'un même code.**
+
+Mesuré correctement, en ancrant sur la **fonction** :
+
+    a33a15b:_run_scheduled_ssh_audit   ==   arbre:_run_scheduled_ssh_audit
+    identique, ligne pour ligne, filtre `archived` COMPRIS
+
+**Il n'y a aucune divergence de régime sur E-280.** Et la phrase que j'en avais tirée —
+*« le redémarrage corrigerait la forme grave d'E-280 au passage »* — **est fausse**. Elle est
+partie à la session 8 comme argument de signature : **j'ai attaché un bénéfice inexistant à
+une décision que je demande à l'exploitant de prendre.** C'est la faute la plus lourde des trois.
+
+> Et elle m'est **revenue comme confirmation** : la session 4 a écrit *« ton observation sur le
+> régime est confirmée par la mienne »*. Elle a refait **ma** mesure, avec **mon** ancrage, et
+> m'a renvoyé **mon** erreur sous forme d'accord indépendant.
+>
+> **Une erreur diffusée à sept sessions revient corroborée.** Le nombre de confirmations ne
+> mesure pas la vérité d'une affirmation, il mesure sa **diffusion**. Un accord n'a de valeur
+> que si le confirmateur a mesuré **autrement**.
+
+Et le sens de ma propre leçon de la veille se retourne : j'avais écrit *« nommer le régime
+aggrave aussi »*. **C'était vrai comme principe et faux comme mesure.** Une leçon bien formulée
+sur un fait faux se retient mieux que le fait — c'est précisément ce qui la rend dangereuse.
+
+### 2. « AUCUNE LISTE FERMÉE » EST FAUX — la base en porte une, mesurée par la session 4
+
+    ssh_audit_schedules.target_type
+      enum('all','tag','environment','machines') NOT NULL DEFAULT 'all'
+    sql_mode  … STRICT_TRANS_TABLES …
+
+    INSERT … target_type = 'valeur_inventee'
+      -> ERROR 1265 : Data truncated for column 'target_type'      (transaction annulee)
+
+La **route** n'a pas de liste fermée ; **la base en a une, et elle est appliquée**. Le scénario
+« `target_type` arbitraire → parc entier » **n'est pas atteignable** : l'`INSERT` lève avant.
+*J'ai lu une couche et conclu sur le système.*
+
+### 3. « LA SEULE BRANCHE QUI ÉCHOUE FERMÉE » EST FAUX — les QUATRE cas tombent dans le même `else`
+
+Relevé indépendamment par la session 4 **et** par la session 7. Le `WHERE 1=0` est dans le `else`
+du `try/except` **interne** à la branche `machines` : il ne protège que le cas *valeur présente
+mais illisible*. Une `target_value` **vide** échoue le `and schedule.get('target_value')` et
+**n'entre dans aucune des trois branches restreintes**.
+
+    'tag'          + valeur vide  ->  else  ->  TOUT LE PARC
+    'environment'  + valeur vide  ->  else  ->  TOUT LE PARC
+    'machines'     + valeur vide  ->  else  ->  TOUT LE PARC
+    'all'                         ->  else  ->  TOUT LE PARC
+
+### CE QUI RESTE VRAI, ET C'EST PLUS ATTEIGNABLE QUE CE QUE J'AVAIS ÉCRIT
+
+Le défaut réel n'est **pas** une valeur forgée : c'est **`target_value` vide**, ou le paramètre
+**omis** (`'all'` étant le défaut). `ssh_audit.py:768` fait `data.get('target_value') or None`,
+la colonne est `TEXT NULL` — **rien ne refuse le vide à aucune couche**.
+
+> Une planification « scanner les machines du tag X » dont **le champ tag est resté blanc** vise
+> le parc entier. **Ce n'est pas une requête forgée, c'est une case vide.**
+
+Et la session 5 achève de démonter mon discriminant : `POST /ssh-audit/policies` et
+`POST /ssh-audit/schedules` portent **exactement les mêmes gardes** (`require_api_key` +
+`require_role(2)`, ni permission ni borne par machine). **Même population.** Je séparais deux
+écarts par une atteignabilité qui ne les sépare pas.
+
+**Le classement reste E-280 d'abord**, mais par l'**effet** et non par l'atteignabilité — argument
+de la session 5, que je reprends : E-280 ouvre une **session SSH root par machine à chaque tic**
+(intervalle minimum 10 min), depuis un thread invisible à `ps`, et **les connexions faites ne se
+défont pas** ; SEC-013 change ce qu'un rapport **dit**, et se défait par un `DELETE`. *E-280 est
+un risque d'incident, SEC-013 un risque de confiance dans le contrôle — et si les deux restent
+ouverts, SEC-013 est ce qui ferait douter des traces qu'E-280 laisse.*
+
+**Borne utile** : `ssh_audit_schedules` porte **0 ligne** (session 4). Aucune planification
+existante n'est concernée.
+
+## E-281 — le scan CVE échoue OUVERT là où l'audit SSH échoue fermé, et c'est lui qui envoie le courriel
+
+**Trouvé en corrigeant mon erreur ci-dessus** — c'est la fonction que j'avais lue par accident.
+
+    _run_scheduled_scan  (scan CVE)              _run_scheduled_ssh_audit
+      'machines' + ids illisibles                  'machines' + ids illisibles
+        -> SELECT … FROM machines                    -> WHERE 1=0
+           TOUT LE PARC                                 AUCUNE MACHINE
+      aucun filtre `archived`, nulle part          filtre `archived` sur les 4 branches
+
+**Deux tâches planifiées du même fichier, deux politiques d'échec opposées.** Celle qui échoue
+**ouvert** est celle dont l'aboutissement **envoie un vrai courriel** — l'interdit permanent de ce
+chantier. Et elle ne filtre les archivées **nulle part**, ni en service ni dans l'arbre : mesuré
+sur `a33a15b` et sur l'arbre, **identiques**.
+
+*La branche `WHERE 1=0` prouve que la bonne forme était connue de l'auteur.* **Une règle appliquée
+à un endroit et pas à l'autre n'est pas un oubli de conception : c'est une divergence à remonter.**
+
+## E-282 (SEC-014) — le scan planifié ignore les politiques, le scan à la demande les applique
+
+Relevé par la session 5, **vérifié** :
+
+    backend/routes/ssh_audit.py:139  audit_sshd_config(config_text, policies)   <- AVEC
+    backend/routes/ssh_audit.py:206  audit_sshd_config(config_text, policies)   <- AVEC
+    backend/routes/ssh_audit.py:426  audit_sshd_config(config_text, policies)   <- AVEC
+    backend/scheduler.py:312         audit_sshd_config(config)                  <- SANS
+
+**Même machine, même configuration, même journée, deux scores** — et rien à l'écran ne dit lequel
+on regarde. Une directive marquée `ignore` disparaît du rapport d'un humain et reste dans celui
+du planificateur.
+
+**Et ça RÉDUIT la portée de SEC-013** : son effet d'aveuglement ne touche pas les scans planifiés.
+La session 5 l'a signalé **dans ce sens-là** — celui où personne ne vient corriger une exagération.

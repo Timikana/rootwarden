@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.134** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.135** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,41 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.135 — E-280 corrigé sur trois points : j'avais tort, et mon erreur m'est revenue confirmée
+
+**« Pire en service » était faux.** `scheduler.py` porte deux tâches qui sélectionnent des machines,
+`_run_scheduled_scan` (CVE, `:171`) et `_run_scheduled_ssh_audit` (`:257`). Ma commande rendait le
+**premier `else:` du fichier** : j'ai opposé le scan CVE d'hier à l'audit SSH d'aujourd'hui et appelé
+ça deux versions d'un même code. Ancré sur la fonction, le code en service et celui de l'arbre sont
+**identiques, filtre `archived` compris**. La phrase que j'en avais tirée — « le redémarrage
+corrigerait la forme grave d'E-280 au passage » — **était fausse et servait d'argument de signature**.
+Et elle m'est revenue de la session 4 comme *confirmation indépendante* : elle avait refait ma mesure
+avec mon ancrage. **Une erreur diffusée revient corroborée ; un accord ne vaut que si le
+confirmateur a mesuré autrement.**
+
+**« Aucune liste fermée » était faux** : `target_type` est un `enum('all','tag','environment','machines')`
+sous `STRICT_TRANS_TABLES` — une valeur inventée lève `1265` avant d'entrer. J'avais lu une couche et
+conclu sur le système.
+
+**« La seule branche qui échoue fermée » était faux** : le `WHERE 1=0` est dans le `try/except`
+**interne**. Une `target_value` vide n'entre dans aucune des trois branches restreintes — **les
+quatre cas tombent dans le même `else`**.
+
+**Ce qui reste, et qui est plus atteignable** : le défaut n'est pas une requête forgée, c'est une
+**case vide** ou un paramètre **omis**. Rien ne refuse le vide à aucune couche. `ssh_audit_schedules`
+porte 0 ligne — aucune planification existante n'est concernée.
+
+**E-281 — le scan CVE échoue OUVERT là où l'audit SSH échoue fermé.** Trouvé en corrigeant l'erreur
+ci-dessus. Sur `machines` avec des identifiants illisibles, l'audit SSH fait `WHERE 1=0` et le scan
+CVE prend **tout le parc** ; et le scan CVE ne filtre les archivées **nulle part**. C'est lui dont
+l'aboutissement **envoie un vrai courriel**. La branche `WHERE 1=0` prouve que la bonne forme était
+connue : une règle appliquée d'un côté et pas de l'autre est une divergence, pas un oubli.
+
+**E-282 (SEC-014) — le scan planifié ignore les politiques** (`scheduler.py:312`
+`audit_sshd_config(config)`) alors que les trois appels de route les appliquent. Même machine, deux
+scores, rien à l'écran ne dit lequel. Réduit d'autant la portée de SEC-013 — signalé par la session 5
+dans le sens où personne ne vient corriger.
 
 ### v1.38.134 — mon compteur d'écarts comptait des titres, et un scan planifié vise tout le parc par repli
 
