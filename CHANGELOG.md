@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.164** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.165** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,31 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.165 — objection retirée sur `iptables`, et la page sous-déclare sa propre capacité
+
+**E-318.** J'avais arbitré que `iptables` reste sur le legacy — *« la page est portée à I1–I4, I5
+n'existe pas, y envoyer l'exploitant lui ferait chercher une capacité qui est dans l'ancien »*. **Le menu
+a basculé et la page répond à l'objection** : `'suite_titre' => 'Cette page ne modifie rien'`, le texte
+nomme ce qui manque, et un lien ouvre l'ancien portail. *La page déclare son propre manque et donne le
+chemin* — mon objection tombe. **Menu à 31/32, `wazuh` seule reste.**
+
+Et le même commit pose une réserve **au-dessus du bouton** : l'enregistrement d'une copie *« n'a encore
+jamais été exercé depuis cette interface »*. *Une non-mesure annoncée à l'avance est une réserve* —
+appliquée à la personne qui va cliquer, pas au seul registre.
+
+**⚠ Mais la déclaration est fausse sur I4** : le texte dit que *« la validation à blanc **et**
+l'application »* ne sont pas portées. **I4 l'est** — `pare-feu.js:710` câble `/iptables-validate`, sans
+route Laravel parce qu'il passe par la passerelle (*mesurer les routes Laravel n'est pas mesurer les
+capacités*). **C'est le miroir d'E-315** : là une capacité existait et rien n'y menait ; **ici une
+capacité existe et la page dit qu'elle n'existe pas**, renvoyant vers l'ancien portail pour un geste
+qu'elle sait faire. L'erreur va dans le sens sûr, mais **se paie en usage** — on y retournera
+indéfiniment sans le savoir.
+
+**Et mon `pgrep -f "[r]ejouer-lot"` s'est auto-capturé** : la ligne portait le mot trois fois, donc les
+crochets n'ont rien empêché. **Quatrième occurrence du même piège**, en mémoire depuis le 28 août —
+*attendre un PID enregistré, jamais un motif.* Les trois PID rendus étaient mes propres sous-shells.
+Mesuré proprement : **aucun LOT en cours, arbre calme depuis 15 minutes.**
 
 ### v1.38.164 — `pare-feu` : 31/32, et deux portages entiers que personne ne comptait
 
