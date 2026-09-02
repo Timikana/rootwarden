@@ -16739,3 +16739,93 @@ déclarée `SANS OBJET` — **un vert par abstention, sur la seule chose que l'�
 
 > *Copier une fonction voisine sans vérifier qu'elle s'applique au fichier visé* — **c'est le geste qui
 > lui a coûté dix routes destructrices ce matin**, et le même jour, sur un autre objet.
+
+## E-354 — LE DOMAINE D'UNE CLÉ CONSTRUITE À L'EXÉCUTION EST ÉNUMÉRABLE
+
+**La méthode qui ferme la classe d'E-353, trouvée par la session 7 — et elle est plus courte
+qu'ouvrir chaque panneau.**
+
+Le défaut : une clé de libellé **composée à l'exécution** (`textes[cleTitre]`,
+`textes.panneaux[geste]`) n'apparaît **littéralement dans aucun fichier**. Donc :
+
+    la parite i18n passe · les ancres DOM existent · le panneau s'ouvre ·
+    la confirmation est offerte
+    -> TOUT EST VERT SAUF CE QUI EST ECRIT DEDANS
+
+**Aucune de nos disciplines ne la voit** : ni la parité, ni les ancres, ni les gardes, ni les diffs.
+*Seul le rendu* — **troisième fois aujourd'hui**, après deux textes devenus faux sans qu'aucun commit ne
+les touche.
+
+### La méthode : énumérer l'ENTRÉE, pas compter les SITES
+
+> **Une clé construite à l'exécution n'est pas imprévisible : elle est construite à partir de quelque
+> chose, et ce quelque chose s'énumère.**
+
+    ce qu'elle a fait : les DOUZE paires que `demande()` peut recevoir, toutes verifiees transmises
+    -> la classe est CLOSE pour `fail2ban`, `conf_titre_desact` comprise depuis `549151b`
+
+**Ce n'est pas un compte de motifs, c'est une couverture de domaine.** *Compter les sites dit combien de
+fois le risque existe ; énumérer le domaine dit s'il se réalise.*
+
+### Et elle ferme `services` et `pare-feu` par la mesure, contre ma propre instruction
+
+**J'avais dit « oui, fais-les ».** Elle ne les fait pas, et sa raison tient :
+
+    services.js   0 site de la forme a cle variable — ET `pilote()` porte un garde FAIL-CLOSED :
+                  « SANS PANNEAU, ON N'AGIT PAS ». Il REFUSE d'agir plutot que de retomber
+                  sur un envoi direct.
+    pare-feu.js   1 lecture composee, aucune n'alimente un titre ni un texte de panneau
+
+**Elle rejoint la conclusion de la DSI en réfutant sa mesure** — *la sonde de celle-ci comptait des
+formes d'affectation et rendait `0` pour `cle-plateforme`, où la session 7 a lu **six** sites.*
+
+> **Un accord obtenu par une autre mesure vaut ; ici il vaut ET il corrige l'instrument de celui qu'il
+> confirme.** C'est la forme la plus rare de la nuit.
+
+### Le négatif honnête sur les gestes les plus lourds
+
+**Les quatre panneaux de `cle-plateforme` portent tous un titre et un texte** — vérifiés à l'écran, sur
+des gestes qui confirment **un déploiement et une révocation de clés SSH**. *Un négatif mesuré sur les
+gestes les plus lourds vaut mieux qu'une trouvaille sur un geste mineur.*
+
+## E-355 — MON `DEFAUT CONNU` NE S'ÉCRIT PAS, ET LA RAISON EST CELLE DU TÉMOIN
+
+J'avais proposé un troisième état de verdict — ni `conforme`, ni `ECHEC` — pour qu'une suite ayant
+trouvé un défaut reste lisible pendant que le défaut vit. **Je ne l'ai pas écrit**, et elle a nommé
+pourquoi mieux que moi :
+
+> *Un état de verdict qu'on ne peut pas éprouver dans les deux sens ne s'écrit pas.* **C'est la même
+> règle que le témoin.** Un `DEFAUT CONNU` posé sans cas pour le faire mordre serait un troisième état
+> dont on ne saurait pas s'il rend jamais autre chose que ce qu'on attend — *et il vaudrait exactement
+> ce que valait « aucun jeton non traduit » sur un panneau vide.*
+
+**Un état de verdict est un instrument.** Il obéit à la règle des instruments : *tant qu'il n'a pas rendu
+son négatif au moins une fois, il n'a rien mesuré.*
+
+### Et le raisonnement qui l'aurait justifié reste inscrit, pour quand le cas reviendra
+
+    sortir la suite   -> zone grise : rien ne distingue « exclue a bon droit » d'« oubliee »
+    la garder ECHEC   -> alarme permanente. *Une alarme qui ne s'eteint jamais apprend a etre
+                         ignoree* — et le vrai ECHEC suivant sera dans le bruit.
+
+**Elle n'avait vu ni l'un ni l'autre** et proposait ces deux issues. *Les deux mauvaises options
+paraissaient être les seules parce que la troisième demandait de modifier l'instrument.*
+
+## E-356 — TROIS FOIS, ET LA TROISIÈME DANS LE MÊME PARAGRAPHE
+
+Compte tenu à jour des occurrences du motif *« une règle nous échappe au moment de l'appliquer à
+nous-mêmes »* :
+
+    moi   `uninstall` mesure au nom du LEGACY, dans le message ou je donnais la regle    (2)
+    elle  l'universelle negative, dans l'assertion ecrite contre ce defaut une heure avant
+          « aucune session SSH sur cette passe », FAUX — et ecrit DANS LE FICHIER
+          **ET dans le message qui expliquait pourquoi il fallait verifier**             (3)
+
+> **La phrase et son démenti étaient dans le même paragraphe.**
+
+*Et son troisième défaut porte la vraie leçon* : sa première vérification rendait « pas de SSH » sur les
+**sept** routes, parce que la plage `sed` se refermait sur la ligne suivante. **Zéro partout = la mesure
+n'a pas eu lieu** — et elle a failli s'en contenter *parce que ce zéro allait dans le sens qui rassure*.
+
+**Le témoin `disable_jail`** — dont on **sait** qu'elle ouvre une session SSH — **est ce qui a rendu le
+second relevé lisible.**
