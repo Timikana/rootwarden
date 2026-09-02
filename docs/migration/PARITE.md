@@ -14216,3 +14216,58 @@ reste nommé comme un correctif est un piège posé pour la session suivante.*
 **Sa discipline de mesure était intacte et elle a servi à repayer du travail fait.** Et son corollaire
 sur mon propre geste : *déférer une décision ne dispense pas de chercher si elle a déjà été prise* —
 je lui ai confirmé son réflexe d'arbitrage sans chercher, moi non plus, si l'arbitrage existait.
+
+## E-289 — une réserve écrite dans un MESSAGE ne survit pas ; écrite dans le code qu'on remplace, si
+
+Je transmets à la session 3 une contrainte destinée à **un sous-lot qui n'existe pas encore**, dont le
+destinataire n'est pas là : *un champ de portée vide doit être refusé à l'écran, avec la raison.*
+
+Elle ne l'a pas mise dans un compte rendu. Elle l'a inscrite **dans `audit-ssh.js`, contre le panneau
+que ce formulaire remplacera** — *le seul endroit que cette session future ouvrira forcément.*
+
+> **Une réserve écrite dans un message ne survit pas au premier relais ; écrite dans le code qu'on
+> remplace, elle est lue par qui la remplace.**
+
+C'est la parade au motif que ce registre porte trois fois : E-245 (un rappel accroché à un ordre
+voyage sans se remesurer), la prudence d'un pair devenue verdict à la recopie, et mon propre relais
+d'un état réfuté. **Et c'est la première application AVANT la perte plutôt qu'après.**
+
+Avec la moitié qui s'oublie, et qu'elle a gardée : **pas un `required` muet.** Une soumission bloquée
+sans texte est le même silence déplacé d'un cran — le défaut exact payé sur `/profil` (E-249).
+
+## E-290 — nos garde-fous produisent leur propre angle mort, et QUATRE occurrences en une nuit
+
+Formulation consolidée. Le motif ne se déclenche pas quand un garde-fou échoue : **il se déclenche
+quand un garde-fou MARCHE BIEN.**
+
+    E-278   compter les titres du registre    l'erreur GRANDIT quand le registre est bien tenu
+    (note)  un registre d'ecarts              n'enregistre QUE les echecs, jamais les verifications
+    E-287   fournir sa commande               DISPENSE de mesurer, parce que c'est juste d'habitude
+    (S3)    poser des temoins partout         appliquee a SES instruments, pas a ceux des autres
+
+La quatrième est la lecture qu'un pair fait de son propre geste, et elle referme la série :
+
+> **J'ai posé des témoins partout parce que je me méfie des zéros, et j'ai relayé un chiffre parce
+> qu'il arrivait outillé.** La méfiance que j'applique à mes instruments, je ne l'appliquais pas aux
+> instruments des autres.
+
+**Ce qui rend le motif difficile à voir** : un garde-fou ne devient un angle mort *que parce qu'il est
+fiable*. On cesse de le vérifier pour la raison même qui le rend utile.
+
+**Aucune règle nouvelle ne le referme** — en ajouter une créerait la cinquième occurrence. La seule
+prise est de **demander périodiquement de chaque garde-fou : que fait-il quand le travail va bien ?**
+
+## E-291 — la migration 065 passe le piège du runner, et le témoin l'a établi
+
+Contrôle croisé par la session 3 sur un fichier qui n'est pas le sien :
+
+    commentaires porteurs de ';'        0
+    fragments d'un decoupage sur ';'    2   (l'UPDATE, puis l'ALTER)
+    TEMOIN : ligne forgee '-- … ;'      MORD
+
+Son auteur **connaît le piège** : l'en-tête est écrit sans une seule apostrophe ni un seul `;`, jusque
+dans la prose (« c est », « l APPLICATIF »). *C'est le motif qui avait coupé la 062 en deux le 27/08.*
+
+**Et le témoin a été posé parce qu'un premier contrôle rendait un vide ininterprétable.** *Un « 0 »
+sans témoin ne dit pas si l'instrument a regardé* — **quatrième fois cette nuit**, et la seule parade
+qui ne dépende de personne.
