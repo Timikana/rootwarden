@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.187** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.188** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,113 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.188 — E-358 : `supervision` V13, rattacher un serveur a un profil — le debouche qui manquait
+
+**Le catalogue de profils etait porte et fonctionnel ; son SEUL debouche ne l'etait pas.**
+
+    supervision_metadata_profiles   2 lignes   <- porte, et utilisable
+    machine_supervision_profile     0 ligne    <- aucune ecriture nulle part
+    Supervision.php                 2 lectures, aucune ecriture
+
+*Un exploitant pouvait creer un profil qu'aucune machine ne pourrait jamais porter.*
+
+Et le libelle qui renvoyait vers l'onglet « Deploiement » **ABOUTISSAIT** : on suivait le lien, la
+page s'ouvrait, et la colonne n'existait pas. **Un renvoi qui aboutit est plus difficile a voir qu'un
+chemin mort** — rien ne se casse, il ne se passe simplement rien.
+
+#### Le geste ne joint AUCUNE machine
+
+Il ecrit un lien en base. C'est le deploiement — pas lui — qui ouvre une session SSH. L'ecriture
+passe par la passerelle (`POST`/`DELETE /supervision/machines/<mid>/profile`), qui porte `role(2)`,
+`can_manage_supervision` **et** `require_machine_access` : trois gardes qu'un
+`DB::table(...)->insert()` local n'aurait pas.
+
+**Une machine porte UN profil PAR PLATEFORME** — cle primaire `(machine_id, platform)`. Le selecteur
+se re-remplit au changement de plateforme ; l'oublier montrerait le profil Zabbix sous l'onglet
+Centreon.
+
+#### ⚠⚠ UN DEFAUT QUE CE FICHIER AVERTISSAIT DE NE PAS COMMETTRE
+
+    mon selecteur   [data-rw^="superv-profil-"]
+    il attrape      superv-profil-champ-id · -confirmer · -enregistrer · -erreur
+                    -form · -nouveau · -succes          SEPT ancres existantes
+
+Ce code aurait pose des `<option>` sur un formulaire, un bouton et un paragraphe d'erreur.
+
+**Et `supervision.js` porte l'avertissement quarante lignes plus bas** : *« une liste explicite
+plutot qu'un selecteur par prefixe — un prefixe attraperait ce qu'un sous-lot suivant ajoutera ».*
+**Je l'ai lu en ecrivant ce sous-lot, et je l'ai commis quand meme.**
+
+*C'est la sonde qui l'a rattrape, sur un `s0.options is not iterable` : l'element attrape en premier
+etait un `<input>` cache.* L'ancre est desormais `superv-affectation-`, un mot qui n'existait nulle
+part — verifie avant de le prendre.
+
+#### Les six libelles sont TRANSMIS, et la liste est explicite
+
+`SupervisionController::libelles()` est une **liste explicite** : c'est l'exposition d'E-353, payee
+sur `fail2ban` F7 il y a quatre heures — un panneau faisait confirmer l'arret d'une protection avec
+un titre vide, et la parite i18n passait. Les six cles sont ajoutees a cette liste **dans le meme
+commit**, jetons substitues par accolades comme les autres.
+
+#### Le libelle du jeton d'API PROMETTAIT UN 404
+
+    avant  « La modification de ce jeton n'est pas encore portee :
+             elle reste sur l'ancien portail. »
+
+Mesure, avec temoins : `https://…:8443/supervision/` rend **404** ; la racine du legacy rend 302 et
+un chemin inexistant rend 404 — donc 404 est bien le signal « absent » et non une panne. Le dossier
+est archive dans `legacy/_deprecated/supervision`.
+
+*Une page qui renvoie vers un 404 est pire qu'une page qui ne renvoie nulle part : elle fait
+CHERCHER.* Corrige en « pas encore portee ici ».
+
+**⚠ ET LE MOTIF DU BLOCAGE N'EST PAS ECRIT A L'ECRAN, DELIBEREMENT.** Cette capacite n'est pas « en
+retard de portage » : elle est RETENUE, parce que la route qui l'ecrit est celle qui stocke le jeton
+en clair. **Porter l'ecran ajouterait une porte d'entree pour ce defaut au lieu de le migrer.**
+L'ecrire a l'ecran indiquerait ou est le defaut et sur quelle colonne — *la discretion n'est pas de
+l'opacite quand l'alternative est une carte.*
+
+#### Mesures — lecture, bascule, ecriture, retour
+
+    GET /supervision                   200
+    colonne dans l'entete              Serveur · Adresse · Environnement · Agents
+                                       releves · PROFIL · Actions
+    selecteurs rendus                  3, un par machine
+    options (zabbix)                   « Aucun profil » · LinuxExterne · LinuxInterne
+    bascule vers prometheus            re-remplit avec le catalogue de CETTE plateforme
+    rattachement                       « Le serveur OpenCVE-Test-OnPrem porte desormais
+                                       le profil "…" sur prometheus. »   rw-annonce--ok
+    detachement                        l'annonce le dit, et la ligne est SUPPRIMEE en base
+    jetons non substitues a l'ecran    []
+    erreurs JavaScript                 []
+    parite i18n                        FR=266 EN=266, JEUX DE CLES compares
+
+#### L'etat partage est rendu, et le cloisonnement a ete CHOISI
+
+    profils      2 -> 3 (fixture prometheus) -> 2      dont zabbix : 2, INCHANGE
+    assignations 0 -> 1 -> 0
+
+**La mesure a ete faite sur `prometheus`, pas sur `zabbix`, et ce n'est pas un detail.** Une suite
+d'une autre session releve au demarrage les profils zabbix ET leurs comptes d'assignation, puis
+compare a ce que la page rend : *tout profil zabbix cree entre les deux ajoute une ligne au rendu
+sans etre dans son releve.* Une autre teste le cloisonnement sur `PLATEFORMES_VIDES[0]`, qui est
+`centreon` — d'ou `prometheus` et non `centreon`.
+
+*Le retrait de la fixture n'est PAS ce qui protege : c'est le cloisonnement par plateforme. Un garde
+qui depend d'une coordination cesse d'etre un garde le jour ou l'un des deux oublie.*
+
+**Le profil-fixture a ete pose EN SQL, et c'est dit** : la creation de profil est portee et couverte
+ailleurs ; l'objet de cette mesure etait la colonne, pas elle.
+
+#### Une objection que j'ai failli publier, et qui etait fausse
+
+J'ai signale un `->delete()` sur la table de rattachement, contre un releve qui affirmait que le
+portage n'y ecrit jamais. **La suppression portait sur `supervision_metadata_profiles`, une AUTRE
+table.** J'avais lu le contexte de travers.
+
+*Mesurer avant de relayer, y compris quand ce qu'on relaie est une objection : une objection fausse
+coute plus qu'une affirmation fausse, parce qu'elle fait defendre quelque chose de juste.*
 
 ### v1.38.187 — E-357 : `ssh_audit` A2, creer un releve planifie — et deux defauts vus a l'IMAGE
 

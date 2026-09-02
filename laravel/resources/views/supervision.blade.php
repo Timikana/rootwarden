@@ -387,6 +387,12 @@
              porte de V6, et surtout « tout cocher » embarquerait srv-zabbix,
              qui est en PRODUCTION. --}}
         @php($plateformeInitiale = $plateformes[0] ?? 'zabbix')
+        {{-- Les profils par plateforme et les rattachements en vigueur. `@json`
+             ne recoit qu'une VARIABLE : son analyseur d'argument ne franchit pas
+             une expression composee, et un gabarit entier tombe en erreur de
+             syntaxe pour une expression pourtant sur une ligne. --}}
+        <script id="superv-profils-donnees" type="application/json">@json($profils)</script>
+        <script id="superv-assignations-donnees" type="application/json">@json($assignations)</script>
         <div id="panneau-deploy" data-rw="panneau-deploy" role="tabpanel" hidden>
             <article class="rw-carte rw-carte--pleine">
                 <h3 class="rw-sous-titre">{{ __('superv.deploiement_titre') }}</h3>
@@ -406,6 +412,11 @@
                                     <th>{{ __('superv.machine_adresse') }}</th>
                                     <th>{{ __('superv.machine_environnement') }}</th>
                                     <th>{{ __('superv.machine_agents') }}</th>
+                                    {{-- V13 : LE DEBOUCHE DU CATALOGUE DE PROFILS.
+                                         Il etait porte et fonctionnel ; cette colonne
+                                         manquait, donc un profil cree ne pouvait etre
+                                         porte par aucune machine. --}}
+                                    <th>{{ __('superv.profil_colonne') }}</th>
                                     <th>{{ __('superv.profil_actions') }}</th>
                                 </tr>
                             </thead>
@@ -429,6 +440,24 @@
                                                     <span class="rw-badge">{{ ucfirst($plateforme) }} {{ $version !== '' ? $version : '?' }}</span>
                                                 @endforeach
                                             @endif
+                                        </td>
+                                        {{-- LE SELECTEUR DE PROFIL — une liste
+                                             FERMEE, remplie par le script depuis
+                                             les donnees du serveur, et re-remplie
+                                             quand la plateforme change : une
+                                             machine porte UN profil PAR
+                                             PLATEFORME.
+
+                                             « Aucun profil » est une valeur
+                                             offerte, pas un vide : la retirer se
+                                             fait par `DELETE`, et c'est un geste
+                                             que l'exploitant doit pouvoir poser
+                                             sans supprimer le profil lui-meme. --}}
+                                        <td>
+                                            <select class="rw-saisie rw-saisie--compacte"
+                                                    data-rw="superv-affectation-{{ $m->id }}"
+                                                    data-machine="{{ $m->id }}"
+                                                    aria-label="{{ __('superv.profil_colonne') }}"></select>
                                         </td>
                                         <td class="rw-tableau__actions">
                                             <button type="button" class="rw-bouton rw-bouton--discret"
