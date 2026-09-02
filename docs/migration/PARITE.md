@@ -14153,3 +14153,66 @@ Et sa remesure était une **vraie** confirmation, parce qu'elle a employé un au
 
 **Elle a comparé les fichiers, là où j'avais comparé des extraits.** *Un accord ne vaut que si le
 confirmateur a mesuré autrement* — celui-ci vaut.
+
+## E-288 — ⚠ la fusion retire le `and` sur `machines` et le LAISSE sur `tag` : le cas le PLUS PROBABLE survit
+
+Mesuré sur `security/backend-cve:backend/scheduler.py`, ancré sur `_run_scheduled_scan` :
+
+    :27   if   target_type == 'tag'  and schedule['target_value']:   <- le `and` EST TOUJOURS LA
+    :35   elif target_type == 'machines':                            <- le `and` a ete RETIRE
+    :58   else:  … FROM machines WHERE {vivantes_nues}               <- tout le parc VIVANT
+
+**La branche a corrigé la branche `machines` et pas la branche `tag`.** Or c'est `tag` qui porte le
+cas atteignable par le chemin normal : **un champ de tag laissé blanc échoue le `and`, n'entre pas
+dans sa branche, et tombe dans le `else` final — tout le parc vivant.**
+
+> J'ai dit à l'exploitant que *« la fusion ferme le pire des deux et laisse l'autre entier »*. **C'est
+> encore trop favorable.** La fusion ferme le repli de `machines` sur la tâche CVE, et **laisse le
+> chemin de la case blanche ouvert sur les DEUX tâches** — CVE comprise.
+
+*Quatrième fois cette nuit qu'une de mes formules est plus rassurante que la mesure qui la fonde, et
+la troisième où l'écart va dans le sens qui fait signer.* La règle est écrite depuis deux heures :
+**mesurer deux fois ce qui arrange.** Je l'ai écrite et pas appliquée.
+
+### Ce que ça change du routage — et ça RENFORCE l'apport de la session 4
+
+Son hunk survivant — un `else` final qui **refuse et journalise** au lieu de prendre le parc — est la
+**seule** pièce qui fermerait le chemin de la case blanche sur la tâche CVE après la fusion. Il ne
+« complète » pas la branche : **il ferme ce que la branche laisse ouvert sur le cas le plus probable.**
+
+**Et il ne suffit pas non plus.** Un `else` qui refuse ferme le cas *non reconnu* ; il laisse
+`'tag' + valeur vide` produire un refus là où l'exploitant attendait un scan **par tag** — correct,
+mais silencieux si le refus n'est pas rendu à l'interface. *À traiter dans le portage, pas dans le
+correctif backend.*
+
+### La migration de schéma : routée, et voici pourquoi maintenant
+
+`cve_scan_schedules.target_type` est **NULLABLE** ; `.get('target_type','all')` rend `None` sur un
+`null` explicite, et ce `None` retombe dans le `else` final. **La branche corrige l'applicatif, jamais
+le schéma** — donc cette pièce survit à la fusion quoi qu'il arrive.
+
+**Décision : écrite maintenant, appliquée jamais sans signature**, avec 063 et 064 dans la même
+fenêtre. *Écrire ne coûte rien et se défait ; ne pas écrire fait passer la fusion pour complète alors
+qu'elle ne l'est pas.* **Le risque d'une pièce non écrite est qu'on croie le dossier clos.**
+
+### Et le contrôle que la session 4 a construit mérite d'être nommé
+
+    patch --dry-run  sur l'arbre POST-FUSION  ->  s'applique
+    git apply --check sur HEAD                ->  REFUSE (ligne 225)
+
+> **Ce refus est le contrôle, pas un défaut.** Un apport destiné à l'après-fusion qui s'appliquerait
+> *aussi* sur `HEAD` viserait les mauvaises lignes — c'est-à-dire exactement le conflit qu'on cherche
+> à éviter.
+
+Et elle a **renommé** son diff périmé en `PERIME-refait-par-a345e65.patch` : *un correctif périmé qui
+reste nommé comme un correctif est un piège posé pour la session suivante.*
+
+### Sa lecture de son propre angle mort, qui vaut pour nous tous
+
+> J'ai mesuré le schéma, le mode SQL, la nullabilité, le comportement de `.get` — **et pas une fois
+> `git log --all` sur la fonction que je corrigeais.** Toutes mes vérifications portaient sur l'état
+> **actuel** du code ; aucune ne demandait *« quelqu'un a-t-il déjà écrit ça ? »*.
+
+**Sa discipline de mesure était intacte et elle a servi à repayer du travail fait.** Et son corollaire
+sur mon propre geste : *déférer une décision ne dispense pas de chercher si elle a déjà été prise* —
+je lui ai confirmé son réflexe d'arbitrage sans chercher, moi non plus, si l'arbitrage existait.
