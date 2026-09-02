@@ -169,3 +169,88 @@ porter.
   pas — et les deux totaux connus portent sur des arbres différents ;
 - **si les trois rétroportages s'appliquent proprement sur `main`.** Aucun `cherry-pick` d'essai n'a
   été tenté.
+
+---
+
+# ⚠ RÉVISION DU 2026-09-02 — le `push` a eu lieu, et la branche sécurité contient déjà un correctif que la flotte vient de redécouvrir
+
+## 1. Les chiffres, remesurés — aucun n'est celui du 28/08
+
+    amont  origin/Migration-Laravel   a50b98c   2026-08-28 13:55
+    HEAD                              dfc8e00   2026-09-02 02:06
+    git rev-list --left-right --count @{u}...HEAD   ->   0   185
+    git diff --shortstat @{u}..HEAD                 ->   87 fichiers, +20 818, -174
+    git rev-list --left-right --count origin/main...HEAD  ->  0  658
+
+**✅ Le `push` a été autorisé et exécuté.** Les 378 commits existent désormais chez `origin`. *La
+recommandation n°1 de ce dossier est satisfaite.*
+
+> **Mais le risque ne s'est pas fermé : il se reconstitue.** **185 commits neufs en 4 jours et demi — soit
+> ~41 par jour.** Le `push` n'est pas un geste qu'on pose une fois ; *c'est un geste dont l'absence
+> recommence à coûter le lendemain.* **Il faudra le redemander, et ce dossier ne doit pas laisser croire
+> le contraire.**
+
+## 2. ⚠ Le recoupement de `security/backend-cve` n'est PLUS nul
+
+Le dossier s'appuyait sur une mesure du Lead du **2026-08-27** : *« aucun des six fichiers n'a bougé sur
+le tronc ».* **Remesuré aujourd'hui, 598 commits plus tard :**
+
+    base = 279f5fa  (2026-08-20 23:00)
+    backend/routes/helpers.py       2 commits sur le tronc
+    backend/scheduler.py            1 commit  sur le tronc
+    les quatre autres               0
+
+**`git merge-tree --write-tree` rend toujours ZÉRO conflit** — la fusion reste textuellement propre.
+*Mais l'argument n'était pas « zéro conflit », c'était « aucun fichier n'a bougé », et celui-là est
+périmé.* **Un chiffre de décision se remesure le jour où il décide, pas le jour où il est écrit.**
+
+## 3. ⚠⚠ CE QUI CHANGE TOUT : la branche corrige déjà E-281
+
+**Écrit le 2026-08-21 — il y a douze jours — dans `a345e65`, *« les scans CVE se connectaient à des
+machines archivées »*.** Le correctif porte **trois** volets sur `_run_scheduled_scan` :
+
+    + les archivees exclues des TROIS branches
+    + le repli de `machines` ECHOUE FERME : `return` + journal, il n'interroge meme pas
+    + `elif target_type == 'machines':`   <- le `and target_value` RETIRE de la condition
+
+> **Le troisième volet est exactement le mécanisme que j'ai identifié cette nuit sans savoir qu'il était
+> déjà corrigé** : *le test de vacuité était dans la condition d'entrée, donc une cible vide n'atteignait
+> jamais le repli de sa propre branche.* **L'auteur du correctif l'avait compris il y a douze jours.**
+
+**Et c'est l'argument le plus lourd de ce dossier, plus lourd que les six failles comptées :**
+
+> **La flotte a passé sa nuit à redécouvrir, mesurer, contre-mesurer et arbitrer un défaut dont le
+> correctif dormait dans une branche en attente de signature.** Trois sessions s'y sont contredites, un
+> argument de signature faux en est sorti, et *rien de tout cela n'aurait eu lieu si la branche était
+> entrée.*
+>
+> **Une dette technique ne coûte pas seulement le défaut qu'elle laisse ouvert : elle coûte le travail
+> qu'on refait par-dessus.** Et ce coût-là ne figure dans aucun décompte de failles.
+
+## 4. Ce que la fusion NE corrige PAS — à dire aussi nettement
+
+    la branche touche `_run_scheduled_scan`  (CVE)
+    elle NE TOUCHE PAS `_run_scheduled_ssh_audit`     (0 occurrence dans le diff)
+
+**E-280 survit à la fusion.** L'audit SSH filtre déjà les archivées, mais **son test de vacuité est resté
+dans la condition du `elif`** : *une planification « scanner le tag X » dont le champ est laissé blanc
+vise toujours le parc entier.* **La fusion ferme le pire des deux et laisse l'autre entier.**
+
+## 5. Ce qui se passe si on ne fait rien — révisé
+
+| geste | inaction |
+|---|---|
+| **`push`** | **le risque se reconstitue à ~41 commits/jour**. Il est à redemander |
+| **`merge` vers `main`** | **reste la décision correcte** jusqu'à la 2.0. Inchangé |
+| **`security/backend-cve`** | **E-281 reste ouvert alors que son correctif est écrit depuis douze jours** — et la flotte continuera de payer le travail refait par-dessus |
+| **rétroportages vers `main`** | inchangé : v1.37.48 ferme une vulnérabilité **présente en production** |
+
+## Ce qui n'est pas mesuré, dans cette révision
+
+- **les cinq autres commits de la branche.** J'ai lu `a345e65` ; *j'affirme d'un seul des six ce qu'il
+  contient* ;
+- **si le correctif de la branche passe les suites** après fusion. Il se mesure après, il ne se prédit
+  pas — et ce dossier portait déjà cette réserve ;
+- **la condition posée au §2 initial** (le message de `399931a` qui affirme plus que son code) **reste
+  ouverte**, et sa résolution reste celle qu'a proposée la session 5 : *la réserve va dans le message de
+  fusion.*
