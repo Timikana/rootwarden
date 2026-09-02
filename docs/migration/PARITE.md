@@ -16661,3 +16661,81 @@ vers l'ancien portail, les trois clés `reste_*` retirées des deux catalogues. 
 `ssh_audit` créer un relevé planifié · `ssh_audit` afficher `sshd_config` (arbitrage ci-dessus) ·
 `fail2ban` géolocaliser. **Les quatre absences déclarées de `ssh_audit` sont appariées et toutes
 VRAIES.**
+
+## E-350 — ⚠ `go-wazuh.mjs` : un test de REFUS qui vise la production, hors de tout lot depuis avril
+
+Signalé par la session 7, **mesuré par moi — et sa qualification était plus alarmante que le fait, tandis
+que la raison de ne pas la lancer est plus solide qu'elle ne le dit.**
+
+    tests/e2e/go-wazuh.mjs         2026-04-21   dans AUCUNE liste du runner
+    tests/e2e/go-wazuh-toggle.mjs  2026-04-25   idem
+    (deux fichiers, pas trois)
+
+    :95   machine_id: 1, fim_paths: ['/etc; rm -rf /']
+    BASE_URL par defaut : https://localhost:8443     <- le portail LOCAL, pas un hote distant
+
+### Ce n'est pas « cinq écritures aveugles » : c'est un test de refus
+
+    :47   a(cfg.success === true,  'config load')
+    :53   a(bad.success === false, 'manager invalide rejete')
+
+**Elle asserte les DEUX sens** — la charge d'injection est là pour être **refusée**. *Sa qualification en
+« cinq écritures qui visent la production » exagérait ; le corriger n'affaiblit pas sa conclusion.*
+
+### ⚠ MAIS LA RAISON DE NE PAS LA LANCER EST PLUS DURE QUE LA SIENNE
+
+    machine_id: 1  =  srv-zabbix  =  la production, `active`, dans le parc
+
+> **Un test de refus sur une cible réelle n'est sûr que si le refus précède le geste.** *Et ça, la suite
+> ne le mesure pas* : `success === false` passe aussi bien si le backend refuse **avant** d'exécuter que
+> s'il refuse **après**. **L'assertion protège le verdict, pas la donnée.**
+
+C'est le motif *« un test destructeur : le geste doit être conditionnel »* — et ici la propriété à
+mesurer serait *« aucune requête n'est partie »*, **au réseau**, ce qu'aucune de ces deux suites ne fait.
+
+**Et elle viole structurellement l'interdit permanent du chantier** : *`srv-zabbix` n'est jamais jointe.*
+**Inscrite au `REGISTRE-HORS-LOT.md` : ne pas l'enrôler, ne pas la lancer.**
+
+### Le retrait n'est le geste de personne, et c'est la bonne réponse
+
+**Elle refuse de la retirer** — *« le retrait n'est pas mon geste »*. **Je refuse aussi.** Une suite
+d'avril qui teste une injection est peut-être délibérée ; *supprimer le travail d'un autre sur la foi
+d'une lecture est exactement ce que nous avons refusé six fois aujourd'hui.* **Le registre hors-LOT est
+le bon état : nommée, datée, interdite, non détruite.**
+
+## E-351 — REGARDER N'A RIEN TROUVÉ, ET C'EST CE QUI A PRODUIT L'ASSERTION QUI TIENDRA
+
+Bilan qu'elle rend sur elle-même, non sollicité :
+
+    trois defauts vus dans les captures   ->  les TROIS etaient faux
+      65 entrees de menu toutes au-dessus du seuil AA
+      un « Version inconnue » que la vue documente comme normal
+      une colonne ENV qui defile dans son cadre
+
+    puis deux tentatives de corriger la capture qui l'avait trompee  ->  DEUX ECHECS
+      dont une en ecrivant « hauteur MESUREE » sur son propre plancher,
+      mesure sur le mauvais element au mauvais gabarit
+    -> capture RETIREE, propriete convertie en assertion au style CALCULE
+       5,82:1 en laravel · 6,99:1 en legacy
+
+> **« Regarder ne m'a rien fait trouver aujourd'hui. Mais sans avoir regardé, je n'aurais pas écrit
+> l'assertion qui, elle, tiendra. »**
+
+**C'est le rendement réel d'E-270, mesuré une fois** : le rendu n'a produit **aucun défaut** et **une
+assertion durable**. *Un instrument qui ne trouve rien peut valoir par ce qu'il fait écrire* — et c'est
+l'inverse de ce que j'attendais quand j'ai fait instruire la couverture du rendu.
+
+### Cinq défauts dans sa propre suite, dont deux que le banc seul a vus
+
+    avant   `WHERE archived = 0`      la colonne n'existe pas dans `machines`
+    avant   `apres === 0`             trois lignes sous son commentaire disant l'inverse
+    avant   `wazuh-portee`            declaree et jamais lue : une cle morte
+    banc    `wazuh-np-liste` est un <p>, son selecteur cherchait des <li>
+    banc    `libelle()` copiee de `pare-feu` ne lit que les chaines SIMPLE-quotees
+
+**Le cinquième est le plus instructif** : `lang/fr/wazuh.php` écrit ses valeurs en **guillemets
+doubles**. La fonction aurait rendu `null` sur **toutes** ses clés, et chaque assertion se serait
+déclarée `SANS OBJET` — **un vert par abstention, sur la seule chose que l'étape mesure.**
+
+> *Copier une fonction voisine sans vérifier qu'elle s'applique au fichier visé* — **c'est le geste qui
+> lui a coûté dix routes destructrices ce matin**, et le même jour, sur un autre objet.
