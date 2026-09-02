@@ -2897,3 +2897,68 @@ relais sans fournir l'alternative »*.
 > **Contrainte qu'il pose et que je reprends : l'annuaire se remesure par `ListAgents`, jamais de
 > mémoire.** *Une session qui redémarre change d'empreinte, et un annuaire périmé est plus nuisible
 > qu'une absence d'annuaire — il fait croire qu'on a envoyé.*
+
+---
+
+## ⚠⚠ Mon « sept signatures » était FAUX, et faux du côté qui soulage l'exploitant
+
+**Mesuré le 2026-09-02, 03:5x UTC**, parce que le Lead a demandé *lesquelles* je compte qu'il ne compte
+pas. **Je n'ai pas pu répondre sans mesurer, et c'est le symptôme.**
+
+    ls docs/migration/DOSSIER-*.md | wc -l        ->  11
+    aucun ne porte de cloture : les 11 disent encore « Pour signature de l'exploitant »
+
+**Mon « sept » n'était ni le compte des dossiers, ni un compte dérivé : c'était une liste que je
+récitais.** Elle omettait les dossiers 03, 05 et 07 **sans jamais dire qu'ils étaient clos** — ils ne le
+sont pas. *C'est exactement ce que ma propre consigne de boucle m'interdit : « remesurer les chiffres qui
+se périment plutôt que les reconduire ».* **Je l'ai violée sur le seul chiffre que l'exploitant lit.**
+
+### ⚠ Et la sonde que j'ai écrite pour le vérifier était pire que le chiffre
+
+    grep -oiE "CLOS|CLOTUR|SANS OBJET|SIGNE|APPLIQUE" sur chaque dossier
+    -> rendait 10 dossiers sur 11 « clos »
+
+**Elle cherchait des MOTS dans la prose, pas un ÉTAT.** Elle déclarait le `DOSSIER-01` clos alors que le
+redémarrage n'a pas eu lieu. *Une sonde qui aurait confirmé mon chiffre en le réduisant encore* — et je
+l'ai écartée parce qu'un cas connu la contredisait, pas parce que j'avais douté de sa forme.
+
+> **Le garde-fou n'a pas été ma prudence : c'est que je connaissais la réponse pour UN cas.** *Sans le
+> `DOSSIER-01`, cette sonde passait.*
+
+### Les décisions réellement ouvertes, avec leur objet — c'est l'objet qui manquait
+
+| # | décision | dossier |
+|---|---|---|
+| 1 | redémarrer `rootwarden_python` | 01 — **absorbe** E-214/E-215 du 04 |
+| 2 | recréer `rootwarden_laravel` | 07 |
+| 3 | `push` vers `origin` | 08 |
+| 4 | fusionner `security/backend-cve` | 08 |
+| 5 | rétroporter v1.37.16 · v1.37.17 · **v1.37.48 (= la transposition 2FA)** vers `main` | 08 **+** 09 — *un seul geste, deux dossiers* |
+| 6 | appliquer la migration d'E-222 | 06 |
+| 7 | appliquer les migrations 063 + 064 + 065 | hors dossier |
+| 8 | le compte approbateur + le quatrième compte de test | 02 |
+| 9 | retirer `clean_up_users`, faire lire les deux magasins | 03 |
+| 10 | autoriser l'auto-réparation du sudoers **avec** la colonne | 05 |
+| 11 | porter l'export RGPD **avant** d'archiver `profile/` | 11 |
+
+**Onze.** Le `DOSSIER-04` est le seul qui ne demande **rien** : ses deux écarts corrigés relèvent du 01,
+et les deux autres sont *« ne pas l'écrire »*, **délégués et tranchés par moi.**
+
+### Ce que le Lead a mieux fait que moi, avec un chiffre plus faux
+
+**Il disait cinq. Le vrai est onze. Mais il a énuméré les siennes, et j'ai récité les miennes** — et
+c'est pour ça que le sien était corrigible en un message quand le mien dérivait depuis trois tours.
+
+> **Un compte énuméré se corrige ; un compte récité se propage.** *La différence n'est pas la justesse,
+> c'est de porter ses objets avec soi.*
+
+**Et son cadrage est le bon, je l'adopte** : du point de vue de l'exploitant, *un arbitrage qu'il doit
+rendre et une signature qu'il doit donner sont la même interruption.* **Sa taxonomie sert sa
+comptabilité ; c'est la décision de l'exploitant qui compte.**
+
+### La direction de l'erreur, et c'est ce qui la rend grave
+
+> **J'ai annoncé à l'exploitant une charge de décision PLUS PETITE qu'elle n'est**, trois tours de suite,
+> sous forme de tableau, avec assurance. *Un arriéré sous-déclaré ne se conteste pas : il soulage.*
+> **Personne ne remesure une bonne nouvelle** — c'est la phrase que j'ai opposée au Lead il y a deux
+> heures, et je venais de commettre sa version longue.
