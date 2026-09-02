@@ -67,25 +67,6 @@ return [
     'vide' => 'Aucune machine au parc.',
     'vide_aide' => "Tant qu'aucune machine n'est déclarée, ni les scans de vulnérabilités ni les déploiements de clés n'ont de cible.",
 
-    // Ce que D6a ne porte pas encore
-    /*
-     * ⚠ CE TITRE PORTAIT UN COMPTE, ET LE COMPTE ETAIT FAUX DE DEUX TIERS.
-     *
-     * Ecrit par D6a (`60832ed`, 26/08 06:52) — il etait VRAI. **D6d
-     * (`9c2c0fd`, 26/08 09:03) a porte le cycle de vie ET le test de
-     * connexion**, deux heures plus tard, avec une suite E2E de 516 lignes
-     * au LOT — et n'a pas revisite ce titre. Faux depuis SEPT JOURS.
-     *
-     * Le compte est RETIRE, pas corrige : un nombre ecrit a cote d'une
-     * enumeration se desynchronise des qu'une capacite est portee.
-     * L'enumeration est la seule source.
-     */
-    'reste_titre' => "Ce que cet onglet ne fait pas encore",
-    // Mesure par l'ARTEFACT : `serveurs.cycle` est routee et son formulaire
-    // rendu ; `serveur-tester` appelle `/server_status` par la passerelle.
-    // L'import CSV, lui, rend ZERO occurrence dans la vue et dans le script.
-    'reste_texte' => "L'import de serveurs par fichier CSV se fait encore depuis l'ancien portail. Le cycle de vie et le test de connexion, eux, sont portés ici.",
-    'reste_lien' => "Ouvrir l'ancien portail",
 
     // Retours
     'ajoutee' => 'La machine :nom est ajoutée au parc.',
@@ -139,4 +120,39 @@ return [
     'test_en_ligne' => 'La machine répond sur :ip.',
     'test_hors_ligne' => 'La machine ne répond pas sur :ip.',
     'test_echec' => "Le test n'a pas pu être mené.",
+
+    /* ═══ Import CSV — D6e ═══════════════════════════════════════════════ */
+    'imp_titre' => 'Importer des serveurs depuis un fichier CSV',
+    'imp_aide' => "Le fichier doit porter une ligne d'en-tête. Colonnes obligatoires : name, ip, user, password, root_password. Colonnes optionnelles : port, environment, criticality, network_type, tags.",
+    'imp_champ' => 'fichier CSV',
+    'imp_fichier' => 'Fichier CSV',
+    'imp_fichier_aide' => 'Au plus :ko kio et :lignes lignes de données.',
+    'imp_doublons' => 'Ignorer les serveurs déjà présents plutôt que de les signaler en erreur',
+    'imp_valider' => 'Importer',
+
+    // ⚠ CE QUE LE FICHIER CONTIENT, DIT AVANT DE LE CHOISIR. Les colonnes
+    // `password` et `root_password` sont des secrets EN CLAIR dans le fichier :
+    // ils sont chiffres a l'enregistrement, mais le fichier lui-meme ne l'est
+    // pas. Le legacy ne le disait nulle part.
+    'imp_secrets' => "Ce fichier contient des mots de passe en clair, dont ceux de root. Ils sont chiffrés à l'enregistrement, mais le fichier ne l'est pas : supprimez-le après l'import et ne le laissez pas dans un dossier partagé.",
+
+    'imp_bilan_titre' => "Résultat de l'import",
+    'imp_crees' => ':n serveur(s) créé(s).',
+    'imp_aucun' => "Aucun serveur créé.",
+    'imp_lues' => ':n ligne(s) de données lue(s).',
+    'imp_erreurs_titre' => ':n ligne(s) refusée(s)',
+    'imp_ligne' => 'Ligne :n',
+    'imp_doublon' => 'déjà présent (nom ou adresse), ignoré',
+
+    // Le PLAFOND est DIT, jamais une troncature muette.
+    'imp_tronque' => "Le fichier dépasse :lignes lignes de données : les lignes suivantes n'ont PAS été traitées. Découpez-le et relancez — ce n'est ni un succès complet ni un échec.",
+    'imp_manquantes' => 'Colonnes obligatoires absentes de la ligne d\'en-tête : :noms. Aucune ligne n\'a été traitée.',
+    'imp_err_illisible' => "Le fichier n'a pas pu être ouvert. Aucune ligne n'a été traitée.",
+    'imp_err_vide' => "Le fichier est vide ou n'a pas de ligne d'en-tête. Aucune ligne n'a été traitée.",
+
+    // ⚠ CES DEUX TEXTES DISENT UNE DIVERGENCE ASSUMEE avec l'ancien portail.
+    'imp_diverge_titre' => "Deux différences avec l'ancien portail",
+    'imp_diverge_secret' => "Une ligne dont le mot de passe ou celui de root est vide est REFUSÉE. L'ancien portail la créait, et la machine paraissait alors porter un mot de passe alors qu'elle n'en avait pas.",
+    'imp_diverge_env' => "Une valeur d'environnement, de criticité ou de type de réseau non reconnue REFUSE la ligne. L'ancien portail la remplaçait en silence par « OTHER » : une faute de frappe sur « PROD » retirait la machine de la population des machines de production, sans que rien ne le signale.",
+
 ];

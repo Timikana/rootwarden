@@ -67,12 +67,6 @@ return [
     'vide' => 'No machine in the estate.',
     'vide_aide' => 'Until a machine is declared, neither vulnerability scans nor key deployments have a target.',
 
-    // What D6a does not carry yet
-    // The count was two-thirds wrong for seven days — removed, not
-    // corrected: the enumeration is the only source. See fr.
-    'reste_titre' => "What this tab cannot do yet",
-    'reste_texte' => "Importing servers from a CSV file is still done from the legacy portal. The lifecycle and the connection test are ported here.",
-    'reste_lien' => 'Open the legacy portal',
 
     // Outcomes
     'ajoutee' => 'Machine :nom has been added to the estate.',
@@ -126,4 +120,35 @@ return [
     'test_en_ligne' => 'The machine answers on :ip.',
     'test_hors_ligne' => 'The machine does not answer on :ip.',
     'test_echec' => 'The test could not be run.',
+
+    /* ═══ CSV import — D6e ═══════════════════════════════════════════════ */
+    'imp_titre' => 'Import servers from a CSV file',
+    'imp_aide' => 'The file must have a header row. Required columns: name, ip, user, password, root_password. Optional columns: port, environment, criticality, network_type, tags.',
+    'imp_champ' => 'CSV file',
+    'imp_fichier' => 'CSV file',
+    'imp_fichier_aide' => 'At most :ko KiB and :lignes data rows.',
+    'imp_doublons' => 'Skip servers that already exist instead of reporting them as errors',
+    'imp_valider' => 'Import',
+
+    // See the note in `lang/fr/serveurs.php`: `password` and `root_password` are
+    // PLAINTEXT secrets inside the file. The legacy said this nowhere.
+    'imp_secrets' => 'This file holds plaintext passwords, root ones included. They are encrypted on save, but the file is not: delete it after the import and do not leave it in a shared folder.',
+
+    'imp_bilan_titre' => 'Import result',
+    'imp_crees' => ':n server(s) created.',
+    'imp_aucun' => 'No server created.',
+    'imp_lues' => ':n data row(s) read.',
+    'imp_erreurs_titre' => ':n row(s) rejected',
+    'imp_ligne' => 'Row :n',
+    'imp_doublon' => 'already present (name or address), skipped',
+
+    'imp_tronque' => "The file goes past :lignes data rows: the rows after that were NOT processed. Split it and run again — this is neither a full success nor a failure.",
+    'imp_manquantes' => 'Required columns missing from the header row: :noms. No row was processed.',
+    'imp_err_illisible' => 'The file could not be opened. No row was processed.',
+    'imp_err_vide' => 'The file is empty or has no header row. No row was processed.',
+
+    'imp_diverge_titre' => 'Two differences from the legacy portal',
+    'imp_diverge_secret' => 'A row whose password or root password is empty is REJECTED. The legacy portal created it, and the machine then looked as though it carried a password when it had none.',
+    'imp_diverge_env' => 'An unrecognised environment, criticality or network type REJECTS the row. The legacy portal silently replaced it with "OTHER": a typo on "PROD" removed the machine from the population of production machines, with nothing to signal it.',
+
 ];

@@ -674,6 +674,16 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs');
     Route::post('/serveurs/ajouter', [ServeursController::class, 'ajouter'])
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.ajouter');
+    /*
+     * L'import CSV — D6e. MEME GARDE QUE LE LEGACY, releve fichier par fichier :
+     * `legacy/adm/admin_page.php:40-41` appelle `checkAuth([ROLE_ADMIN,
+     * ROLE_SUPERADMIN])` puis `checkPermission('can_admin_portal')`. L'en-tete du
+     * meme fichier annonce « role superadmin (role_id = 3) » -- le CODE admet le
+     * role 2, et c'est le code qui garde. Un commentaire qui affirme plus strict
+     * que son code ferait porter le portage a la mauvaise hauteur.
+     */
+    Route::post('/serveurs/importer', [ServeursController::class, 'importer'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.importer');
     Route::post('/serveurs/{id}/modifier', [ServeursController::class, 'modifier'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.modifier');
     Route::post('/serveurs/{id}/supprimer', [ServeursController::class, 'supprimer'])

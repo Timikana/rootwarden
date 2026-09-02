@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\JournalAudit;
 use App\Services\Serveurs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -21,7 +23,19 @@ use Illuminate\View\View;
  */
 class ServeursController extends Controller
 {
-    public function __construct(private readonly Serveurs $serveurs) {}
+    /** Plafond de taille du CSV importe, en kio. Le legacy n'en a aucun. */
+    private const IMPORT_MAX_KO = 512;
+
+    /** Le plafond, pour que la vue l'ANNONCE au lieu de le laisser decouvrir au refus. */
+    public static function importMaxKo(): int
+    {
+        return self::IMPORT_MAX_KO;
+    }
+
+    public function __construct(
+        private readonly Serveurs $serveurs,
+        private readonly JournalAudit $journal,
+    ) {}
 
     public function __invoke(): View
     {
@@ -66,6 +80,67 @@ class ServeursController extends Controller
         }
 
         return back()->with('succes', __('serveurs.ajoutee', ['nom' => $brut['name']]));
+    }
+
+    /**
+     * L'import CSV — sous-lot D6e.
+     *
+     * ══ LE FICHIER EST LA SEULE ENTREE LIBRE, ET ELLE EST BORNEE ════════════
+     *
+     * Le formulaire ne porte que deux commandes : un champ fichier et une case
+     * a cocher. Aucun champ de texte : les colonnes du CSV sont connues
+     * d'avance et validees par `champsRefuses()`, le predicat du formulaire
+     * d'ajout. Une entree libre validee se contourne par une requete forgee ;
+     * une entree libre absente, non.
+     *
+     * `mimes:csv,txt` se lit sur le CONTENU par Laravel, pas sur l'extension
+     * envoyee. Un CSV est du texte : `text/plain` et `text/csv` sont tous deux
+     * legitimes, et un `.csv` renomme depuis un binaire est refuse ici plutot
+     * que de finir dans `fgetcsv`.
+     */
+    public function importer(Request $requete): RedirectResponse
+    {
+        $valide = $requete->validate([
+            'fichier' => ['required', 'file', 'mimes:csv,txt', 'max:' . self::IMPORT_MAX_KO],
+        ], [], ['fichier' => __('serveurs.imp_champ')]);
+
+        $bilan = $this->serveurs->importeCsv(
+            $valide['fichier']->getRealPath(),
+            $requete->boolean('ignore_doublons'),
+        );
+
+        if ($bilan['crees'] > 0) {
+            $this->journalise(
+                (int) $requete->session()->get('utilisateur_id', 0),
+                'Import CSV: ' . $bilan['crees'] . ' serveurs importes',
+            );
+        }
+
+        return back()->with('import', $bilan);
+    }
+
+    /**
+     * Journalise dans `user_logs` EN REPRENANT LA CHAINE DE HACHAGE.
+     *
+     * Le legacy pose sa trace d'import par un `INSERT (user_id, action)` nu et
+     * fabrique donc une orpheline — 1 385 sur 5 939 le 2026-09-02, que son
+     * propre bouton « Sceller » ne peut jamais rattraper. Meme idiome que
+     * `comptes` et `permissions` : une ecriture non scellee creuserait le trou
+     * que D1 a mesure.
+     */
+    private function journalise(int $auteur, string $action): void
+    {
+        $action = mb_substr($action, 0, 255);
+        $tete = DB::table('user_logs')->whereNotNull('self_hash')
+            ->orderByDesc('id')->value('self_hash') ?: JournalAudit::GENESE;
+        $ts = time();
+        DB::table('user_logs')->insert([
+            'user_id' => $auteur,
+            'action' => $action,
+            'created_at' => date('Y-m-d H:i:s', $ts),
+            'prev_hash' => $tete,
+            'self_hash' => $this->journal->empreinte($tete, $auteur, $action, $ts),
+        ]);
     }
 
     public function modifier(Request $requete, int $id): RedirectResponse
