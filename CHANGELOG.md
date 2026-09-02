@@ -2228,6 +2228,36 @@ la bonne chose sur le fond, elle la disait avec un motif faux.
 
     parite i18n   FR=68  EN=68  ecarts=0
 
+### v1.38.139 — E-281 n'envoie aucun courriel : mon fait le plus diffusé était une inférence
+
+**L'effet sortant n'existe pas.** `send_cve_report` a **un seul appelant** dans tout `backend/` —
+`routes/cve.py:77`, dans la route en flux, le chemin S7b. Le job planifié appelle `scan_server`
+directement puis `notify_cve_scan`, **un webhook**, lui-même **fermé par défaut**
+(`WEBHOOK_ENABLED` défaut `'false'`). **En configuration par défaut, E-281 n'a aucun effet hors du
+parc.** Ce que j'avais écrit — « c'est la tâche dont l'aboutissement envoie un vrai courriel » — était
+une **inférence du nom de la tâche**, portée au registre, au CHANGELOG, à quatre sessions et à
+l'exploitant en clair.
+
+**⚠ Et le vrai fait est plus lourd, et vaut pour E-280 comme pour E-281** :
+`base_cols = "id, name, ip, port, user, password, root_password, …"`. La branche qui échoue ouvert ne
+se contente pas d'énumérer des machines : elle **charge et déchiffre le mot de passe SSH et le mot de
+passe root de chacune**, et ouvre une session SSH vers chaque. *« Scanner les mauvaises machines » est
+en réalité « s'authentifier sur toutes les machines du parc ».* Trouvé en mesurant autre chose.
+
+**Classement retiré — un seul défaut, pas deux rangs.** Même forme, tables sœurs, même population, et
+**le même correctif referme les deux** ; les classer invite à n'en corriger qu'un. Le correctif doit
+être **applicatif ET schéma**. Deux non-mesures déclarées avant de servir : la configuration réelle de
+`WEBHOOK_ENABLED` (le code dit son défaut, pas l'environnement) et les « 0 ligne », qui restent ma
+mesure et pas celle de la session 5 — elle a refusé de la répéter comme sienne.
+
+**E-285 — trois fausses accusations écartées avant relais**, par la session 2 : le repli de
+`scan_server_users` **est** gardé (`cles_lues` conditionne trois points, un dump échoué n'écrit pas de
+zéro et ne purge rien) · l'écart 49/48 n'existe pas (la 49ᵉ occurrence est **la règle CSS qui déclare
+la classe**) · `_script_vidage_complet` **atteste** son effet en comptant les lignes, deuxième geste du
+chantier à relire son résultat. Cause commune de ses trois erreurs du jour : *un motif appliqué à la
+mauvaise fenêtre*. **Mesurer une absence par un motif qui ne trouve rien ne mesure que la fenêtre** —
+chercher le mécanisme, là où l'objet est construit.
+
 ### v1.38.138 — troisième passe sur E-280 : ma correction corrigeait trop, sur les deux points
 
 **Le `WHERE 1=0` est atteignable.** Le test de vacuité est dans la **condition** du `elif`, pas dans la

@@ -13962,3 +13962,103 @@ un tour de rôle, le bon moment se rate.
 
 **Et la migration de schéma (`NOT NULL` sur `cve_scan_schedules.target_type`) demande la signature de
 l'exploitant, qu'elle porte sur zéro ligne ou non.** Aucune exception pour une table vide.
+
+## E-281 — QUATRIÈME PASSE : l'effet sortant N'EXISTE PAS, et le vrai fait est ailleurs
+
+Mesuré par la session 5 sur ma demande, **vérifié par moi**. Elle avait fondé son classement sur un
+fait qu'elle disait ne pas avoir mesuré ; **mesuré, il la contredit**, et elle l'a rendu comme tel.
+
+### Le courriel n'appartient PAS à la planification
+
+    send_cve_report        1 seul appelant dans tout backend/ : routes/cve.py:77
+                           -> dans _stream_cve_scan, la route en FLUX (chemin S7b)
+
+    _run_scheduled_scan    appelle scan_server(...) directement  (:234)
+                           puis notify_cve_scan(...)             (:252)  <- un WEBHOOK
+
+    webhooks.py:27  WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED','false').lower()=='true'
+    webhooks.py:37  if not WEBHOOK_ENABLED or not WEBHOOK_URL: return False
+
+**En configuration par défaut, E-281 n'a AUCUN effet hors du parc** — ni courriel, ni webhook. Le
+courriel est au chemin S7b, celui que l'arbitrage de l'exploitant retient déjà.
+
+**Ce que j'avais écrit — « c'est la tâche dont l'aboutissement envoie un vrai courriel » — est faux.**
+Je l'ai porté au registre, au CHANGELOG, à quatre sessions et **à l'exploitant en clair**. C'était
+une inférence du nom de la tâche, jamais une mesure de son corps. *Troisième fois dans ce dossier
+que je conclus d'un voisinage plutôt que d'un appel.*
+
+### ⚠ ET LE VRAI FAIT EST PLUS LOURD — il vaut pour E-280 COMME pour E-281
+
+    scheduler.py:188   base_cols = "id, name, ip, port, user, password, root_password,
+                                    service_account_deployed"
+
+La branche qui échoue ouvert **ne se contente pas d'énumérer des machines** : elle **charge le mot de
+passe SSH et le mot de passe root de chacune**, les déchiffre dans la boucle, et **ouvre une session
+SSH** vers chaque.
+
+> *« Scanner les mauvaises machines »* est en réalité **« s'authentifier sur toutes les machines du
+> parc »**.
+
+**C'est plus lourd que l'effet sortant que nous cherchions tous les deux** — et il n'a été trouvé
+qu'en mesurant *autre chose*. *La question qui n'a pas donné la réponse attendue a donné une
+meilleure réponse.*
+
+### ⚠ RECOMMANDATION ADOPTÉE : UN SEUL DÉFAUT, PAS DEUX RANGS
+
+                            E-281 (CVE)              E-280 (audit SSH)
+    branche etroite videe   OUVRE                    WHERE 1=0 — ferme
+    machines archivees      incluses                 exclues
+    effet sortant           AUCUN (retire)           aucun
+    declenchement           valeur malformee         'all' par OMISSION — bien plus facile
+    identifiants charges    tout le parc             tout le parc
+
+**Chacun gagne sur un axe différent** : E-281 trahit une intention **explicitement étroite** — donc
+personne ne relit ; E-280 se déclenche par **simple omission d'un champ** — donc c'est bien plus
+probable.
+
+> **Même forme, tables sœurs, même population, et LE MÊME CORRECTIF REFERME LES DEUX.** Les classer
+> invite à n'en corriger qu'un — motif *« un défaut revient par une autre porte »*, déjà payé sur
+> `supervision/` V7, qui avait corrigé le chemin et pas l'adresse.
+
+**J'avais établi puis révisé un classement ; je le retire.** Les deux se traitent ensemble, et le
+correctif doit être **applicatif ET schéma** — sinon il referme la moitié qui n'en avait pas besoin
+(`ssh_audit_schedules.target_type` est déjà `NOT NULL` ; `cve_scan_schedules.target_type` ne l'est pas).
+
+### Deux non-mesures déclarées AVANT de servir
+
+- **la configuration réelle de `WEBHOOK_ENABLED`** : lu le **défaut du code**, pas l'environnement.
+  Si un exploitant l'a activé, l'effet sortant revient. *Cette mesure demande un conteneur.*
+- **les « 0 ligne » des deux tables sont MA mesure**, pas la sienne — elle a refusé de la répéter
+  comme sienne. **Ne pas fabriquer un fait à deux voix** est désormais appliqué spontanément.
+
+## E-285 — trois fausses accusations évitées le même tour, et deux gardes qui ATTESTENT
+
+La session 2 a vérifié mes trois corrections et en a rapporté **trois défauts qui n'existaient pas** —
+chacun écarté **avant** de m'être relayé comme un fait.
+
+**1. `scan_server_users` : le repli EST gardé.** J'attendais un `keys_count = 0` par **incapacité**,
+indiscernable d'un compte sans clés. Faux : `cles_lues = dump_root_ok or dump_user_ok` conditionne
+**trois** points (`:1911`, `:2040`, `:2145`). **Un dump échoué n'écrit pas de zéro et ne purge rien**,
+et le message le dit en toutes lettres.
+
+**2. L'écart 49 ancrages / 48 sections n'existe pas.** La 49ᵉ occurrence de `doc-anchor` est **la
+règle CSS qui déclare la classe** (`:24`). *Le motif ramenait la définition du terme qu'il cherche* —
+même famille que compter `fetch(` dans une page qui documente `fetch()`. **48 sur 48.**
+
+**3. `_script_vidage_complet` ATTESTE son effet** — il compte les lignes avant (`avant=$(grep -c . "$ak")`)
+et signale `authorized_keys non vide apres vidage`. Son commentaire dit pourquoi : *« `printf '' >`
+seul ne prouvait rien — son retour n'était même pas lu »*. **Deuxième geste du chantier à relire son
+résultat**, après `sshd_allow_user`. E-283 le mentionne désormais.
+
+### Et la cause commune, qui vaut plus que les trois
+
+Ses trois erreurs de la journée viennent du **même mécanisme** : *un motif appliqué au mauvais
+artefact ou à la mauvaise fenêtre* — `-newermt`, un `GET` contre le fourre-tout `OPTIONS`, et un
+`grep` cherchant les sauvegardes **dans le corps de la route** quand le script se compose dans deux
+**helpers**.
+
+> **Mesurer une absence par un motif qui ne trouve rien ne mesure que la fenêtre.** Chercher le
+> **mécanisme** (`mktemp`, `cp`, `>`), et le chercher **là où l'objet est CONSTRUIT**.
+
+**Deux ont été rattrapées par une construction** (un témoin, un garde relu), **une par un pair**.
+*La construction est la seule qui ne dépende de personne.*
