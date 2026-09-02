@@ -3961,7 +3961,7 @@ qu'une troisième a relu son propre geste.**
 
 ---
 
-## ⚠⚠ E-344 (à numéroter) — l'écran des CGU demande d'accepter des conditions QU'IL N'AFFICHE PAS
+## ⚠⚠ E-346 — l'écran des CGU demande d'accepter des conditions QU'IL N'AFFICHE PAS
 
 **Trouvé en cliquant, le 2026-09-02 à 20:1x**, sur demande de l'exploitant que je pilote Puppeteer
 moi-même plutôt que de lire du code. **Fenêtre de banc accordée par la session 7.**
@@ -4057,3 +4057,79 @@ déclarations fausses trouvées aujourd'hui.*
 `wazuh-options` · `wazuh-regles` · `wazuh-regle` (×3).
 
 **Rendu à 390 px : correct** — navigation repliée, cartes empilées, aucun débordement horizontal.
+
+---
+
+## ✅ ARBITRAGE — la géolocalisation `fail2ban` se porte, et le panneau NOMME le tiers
+
+**Rendu le 2026-09-02 vers 21:1x** sur une question de la session 3, qui a refusé d'écrire avant de
+demander. *Elle avait raison : ma description disait « appel sortant, aucune machine touchée » — exact et
+insuffisant, comme ma « lecture distante » pour `sshd_config`.*
+
+### Les faits, mesurés de mon côté
+
+    fail2ban_manager.py:397   f'http://ip-api.com/json/{ip}'          <- HTTP, pas HTTPS
+                    :~382     is_private / is_loopback / is_reserved  -> 'Local', AUCUN appel sortant
+    legacy/fail2ban/js/main.js:592   apiPost('/fail2ban/geoip', { ip })  <- le legacy l'exerce DEJA
+
+    gardes : require_api_key + require_role(2) + require_permission('can_manage_fail2ban')
+             — une des rares routes du parc a porter la permission
+
+**Ne pas porter ne supprime pas l'appel sortant : ça le laisse là où rien ne le nomme.**
+
+### ⚠ La réserve du code est fausse, et la formulation de la session 3 est celle que j'inscris
+
+**Le code porte cette note** : *« l'IP envoyée est déjà publique (IP bannie) → fuite négligeable via
+MITM »*.
+
+> **« L'IP est déjà publique donc la fuite est négligeable » confond deux choses. Ce qui n'est pas
+> public, c'est LE FAIT QUE NOTRE INFRASTRUCTURE L'A BANNIE.**
+>
+> **La réserve mesure la sensibilité de la DONNÉE et pas celle de la RELATION entre les deux.**
+
+*Un observateur du trafic sortant ne lit pas une adresse — il lit, requête par requête, **la carte de ce
+que nous bloquons**.* **Ce n'est pas une fuite de donnée personnelle grave : c'est une fuite de posture
+défensive, et l'absence de TLS la rend lisible par le chemin entier.**
+
+**Et une IP est une donnée personnelle au sens du RGPD, même celle d'un attaquant.** *La transmettre à un
+tiers hors TLS est une décision de traitement, pas un détail d'implémentation.*
+
+### ✅ Décision : porter, câblé et jamais exercé, avec le tiers NOMMÉ
+
+    « cette adresse sera transmise a un service tiers »              <- INSUFFISANT
+    « cette adresse sera transmise a ip-api.com, un service tiers,
+      EN CLAIR (HTTP, sans chiffrement) »                            <- exige
+
+> **Nommer le tiers et nommer l'absence de chiffrement.** *« Un service tiers » laisse croire à une
+> relation contractuelle ; « ip-api.com en clair » dit ce qui se passe.* **Un panneau de décision qui
+> reste vague ne décide rien.**
+
+**Et le panneau porte aussi le fait rassurant**, sur proposition de la session 3 : *les adresses privées,
+de bouclage et réservées ne partent pas.* **Une personne qui décide doit savoir ce qui part ET ce qui ne
+part pas.**
+
+### ⛔ Ce que j'ai refusé : l'exercer une fois « pour prouver que la chaîne aboutit »
+
+> **Une requête sortante vers un tiers PUBLIE quelque chose** — journalisable, corrélable, et **elle ne
+> se retire pas.** *Ce n'est pas un geste de vérification, c'est une émission.*
+
+**Et ce que l'exercice ajouterait — « le tiers répond » — n'est pas une propriété de notre portage.**
+
+### ⚠ Ce qui revient à l'exploitant : une QUATRIÈME option que personne n'avait listée
+
+    ip-api.com en tier gratuit : HTTP seulement (HTTPS = offre payante)
+    -> soit l'offre payante, soit un autre service GeoIP en HTTPS
+
+**Ce n'est pas urgent** — *l'appel a déjà lieu depuis l'ancien portail, et l'option retenue l'améliore
+strictement en le nommant.* **Mais c'est un coût et un changement de dépendance tierce, donc sa
+décision.** *La Note A10 de `fail2ban_manager.py` part au même dossier : une réserve qui justifie mal se
+corrige en texte, pas en comportement.*
+
+### Et l'auto-observation de la session 3 sur son propre cadrage
+
+> *Je n'avais pas listé HTTPS parce que je raisonnais à dépendance constante. **J'ai énuméré ce que je
+> pouvais faire, pas ce qu'il faudrait faire.** Mes trois options se distribuaient toutes sur « porter ou
+> pas », alors que la vraie question est « cet appel doit-il être en clair ».*
+
+> **Un jeu d'options engendré depuis son propre périmètre exclut la bonne réponse quand elle est
+> dehors.** *C'est une limite qu'aucune mesure ne révèle — seulement quelqu'un qui regarde d'ailleurs.*
