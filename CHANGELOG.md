@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.185** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.186** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,88 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.186 — E-353 : F7 confirmait un geste avec un titre VIDE et un texte VIDE
+
+**Defaut de MON sous-lot F7**, trouve par une autre session en exercant le rendu.
+
+    conf_titre_desact / conf_texte_desact   catalogue fr=1 en=1   controleur=0
+    TEMOIN  conf_titre_ban                  catalogue fr=1 en=1   controleur=1
+
+ construit  depuis une **liste explicite**. Les deux cles de F7 n'y
+etaient pas. **On demandait donc de confirmer un geste qui arrete la protection contre le force brute
+et ouvre une session SSH — sans qu'un mot dise lequel, ni sur quelle machine.**
+
+#### ⚠ AUCUN DE NOS CONTROLES NE VOIT CE DEFAUT
+
+    la parite i18n passe        les cles existent, FR et EN
+    les ancres DOM existent     , 
+    le panneau s'ouvre          il est visible
+    -> tout est vert SAUF ce qui est ecrit dedans
+
+**Une cle ABSENTE du catalogue rend son IDENTIFIANT : elle se voit. Une cle NON TRANSMISE rend du
+VIDE : rien ne la signale.** Et aucune sonde statique ne la trouve ici, parce que la cle est
+**composee a l'execution** () :  n'apparait
+litteralement dans aucun .
+
+*Cette lecon etait deja ecrite —  existait dans les deux catalogues et ne voyageait
+pas. Je l'ai recommise dans le meme module.*
+
+#### Verification AU NAVIGATEUR, la seule fiable pour cette classe
+
+    GET /fail2ban                    200
+    cles transmises                  114        (112 avant)
+    conf_titre_desact                presente et NON VIDE
+    conf_texte_desact                presente et NON VIDE
+    TEMOIN conf_titre_ban            presente   (deja la avant le correctif)
+    TEMOIN cle inexistante           ABSENTE    (l'instrument distingue les deux)
+    cles transmises VIDES            []         <- sur TOUT le module
+
+Le texte rendu dit la consequence : *« La jail :jail cessera de surveiller :machine : les tentatives
+d'authentification en echec ne seront plus bannies. Le geste ouvre une session SSH sur la machine. Il
+se retablit par "Activer", et aucune adresse deja bannie n'est liberee. »*
+
+**« Aucune cle transmise n'est vide » est un controle mecanique et reproductible par module** — il
+attrape la MOITIE de la classe. L'autre moitie, la cle *absente du paquet*, demande de connaitre
+l'ensemble des cles que le JS peut lire.
+
+#### ⚠⚠ ET MA SONDE STATIQUE A ECHOUE EXACTEMENT COMME CELLE QU'ON M'AVAIT DECRITE
+
+On m'avait signale, avant que je l'ecrive : *« ma premiere sonde a rendu 44 cles manquantes pour
+, dont , , , ,  — elle attrapait un helper de creation
+d'element. »* **J'ai reproduit la meme faute, apres l'avoir lue.**
+
+    ma sonde rend            comme « cles manquantes »
+    fail2ban           detecte module « ? », « 0 transmises » — dont je venais de lire la liste
+    audit-ssh          detecte module « nav » -> comparee au MAUVAIS catalogue
+    groupes, wazuh     idem
+
+Deux causes, et la seconde m'avait deja mordu une heure plus tot :
+
+1. le module est devine sur le PREMIER  de la vue — qui est une cle de NAVIGATION ;
+2.  la ou il faut  : ** porte DEUX blocs
+   **, ma sonde lisait le premier (36 cles) et manquait le second (3).
+
+**Ces trois cles du second bloc etaient ,  et  — et
+j'ai failli signaler trois defauts fantomes sur le panneau qui confirme un DEPLOIEMENT DE CLES SSH**,
+a la demande explicite de les verifier en priorite.
+
+**La sonde n'est pas livree.** *Un instrument qui rend des noms de balises HTML comme cles manquantes
+ne se corrige pas, il se jette.*
+
+#### Ce qui EST verifie, et par quelle methode
+
+ est **verifie a la main et trouve SAIN** : les quatre lectures composees sont des
+parametres de fonction, donc les cles sont litterales AUX SITES D'APPEL. Enumeration des sites, puis
+comparaison a **tous** les blocs  plus les assignations directes
+(, ) — **28 cles composees, 0 manquante.**
+
+*Et mon enumeration avait d'abord manque deux cles —  et , dans des
+ternaires. Ce sont les appels que l'enumeration NE COUVRAIT PAS, listes a cote, qui les ont rendues.*
+
+Cette methode marche **par fichier, en lisant le code**. Elle ne se generalise pas mecaniquement, et
+c'est le constat a retenir : la detection fiable de cette classe est une fixture au niveau de la
+donnee, panneau ouvert dans un navigateur.
 
 ### v1.38.185 — E-352 : `groups` R3, le scan de derive de masse — et le nombre annonce est le nombre RESOLU
 
