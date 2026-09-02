@@ -2171,7 +2171,7 @@ contournable par un PUT.
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
 
-### v1.38.183 — E-344 : `serveurs` import CSV (D6e), et le dernier manque de cette page tombe
+### v1.38.183 — E-345 : `serveurs` import CSV (D6e), et le dernier manque de cette page tombe
 
 **L'import CSV etait le dernier geste non porte de `/serveurs`.** L'encart « Ce que cet onglet ne
 fait pas encore » **n'a donc plus d'objet et il est RETIRE**, avec ses trois cles dans les deux
@@ -2181,6 +2181,25 @@ il envoie encore vers l'ancien portail pour des gestes que la page fait.
 Et son propre commentaire disait deja le contraire de sa voisine : il citait etiquettes, notes, cycle
 de vie et test de connexion comme non portes alors que `reste_texte` annoncait les deux derniers
 **portes**. Les quatre le sont (D6b, D6d).
+
+#### ⚠ CE SOUS-LOT A D'ABORD ETE NUMEROTE E-344, ET C'ETAIT UNE COLLISION
+
+    20:46  le Lead inscrit E-344 = la cle de session, E-345 = CE sous-lot   (PARITE.md)
+    20:54  mon commit dda67be sort en annoncant E-344                        (CHANGELOG)
+
+**J'avais releve les deux registres AVANT de numeroter** — et huit minutes plus tard le Lead avait
+inscrit les deux entrees, dont la mienne, en reponse au signalement que je venais de lui envoyer.
+*Un numero libre a l'instant du releve ne l'est plus a l'instant du commit quand on vient de demander
+a quelqu'un d'ecrire dans le meme registre.* Troisieme collision de la session.
+
+Renumerote en **E-345**, conformement a `PARITE.md`, qui est le registre autoritaire. Le E-344 du Lead
+n'est pas touche : renumeroter l'entree d'un autre pour sauver la sienne serait exactement l'inverse
+du bon geste.
+
+Et le Lead a **verifie** le defaut de cle de session que j'avais signale sans conclure : il est
+**FAIL-CLOSED**. Ma reserve — « le fait etabli est que la cle n'est jamais posee ; la consequence par
+page reste a mesurer » — etait la bonne : la conclusion alarmante que je n'ai pas tiree aurait ete
+fausse.
 
 #### Aucune route backend : le legacy ecrit en PDO direct
 
