@@ -14636,3 +14636,81 @@ mesure ce qu'on a pris la peine d'y écrire — c'est-à-dire ce qu'on jugeait d
 
 **Aucune règle nouvelle** — ce serait la cinquième occurrence d'E-290. Le fait est noté pour que le
 compte d'écarts ne soit jamais présenté comme un bilan.
+
+## E-298 — le courriel CVE : le discriminant n'est pas la TÂCHE, c'est le CHEMIN — et ma rétractation était trop large
+
+Vérifié ligne par ligne après signalement de la session 8.
+
+    mail_utils.py:194   send_cve_report(...)              un VRAI courriel SMTP, rapport HTML
+    routes/cve.py:75    elif event['type']=='done' and all_findings:   <- CONDITIONNE
+    routes/cve.py:77        send_cve_report(...)
+    routes/groups.py:269    from routes.cve import _stream_cve_scan
+    routes/groups.py:278        for _line in _stream_cve_scan([mid], min_cvss)   <- DONC courriel
+    scheduler.py:234    scan_server(...) direct    + notify_cve_scan  <- AUCUN courriel
+
+    MAIL_ENABLED = true   dans l'environnement SERVI (mesure dans le conteneur)
+
+| chemin | courriel |
+|---|---|
+| route `/cve/…` | **oui**, un par machine **à résultats** |
+| **action groupée `cve_scan`** | **oui** — `groups.py` importe le flux de `routes.cve` |
+| scheduler | **non** — un webhook unique |
+
+**Ma rétractation était juste pour E-281 (le scheduler) et fausse dès qu'on la sortait de là.** La
+session 8 allait faire corriger cinq documents sur la foi de ma phrase : **deux étaient exacts.**
+`MODULE-GROUPS.md:357` dit *« un vrai courriel par machine à résultats »* — **exact au mot près, et le
+« à résultats » compte**, l'appel étant conditionné à `all_findings`. *Ce document avait mesuré ; c'est
+en recopiant ma phrase hors de son contexte qu'elle devenait fausse.*
+
+> **Une rétractation se propage plus vite et avec moins de résistance qu'une affirmation** — personne
+> ne conteste quelqu'un qui reconnaît une erreur. **C'est exactement ce qui la rend dangereuse quand
+> elle est trop large.** Une rétractation juste, l'autorité qui va avec, et deux documents corrects
+> auraient été corrigés vers le faux.
+
+Ce qui l'a arrêtée n'est pas de la prudence : **chercher toutes les occurrences avant de corriger la
+première.** *Le soupçon ne se déclenche jamais du bon côté ; seule l'habitude le fait.*
+
+### ⚠ ET L'INVERSION EST LE VRAI RÉSULTAT
+
+> **Les deux chemins qui ont un humain devant l'écran envoient un courriel. Le seul qui tourne sans
+> personne est muet.**
+>
+> *Nous cherchions tous quelle tâche fait le plus de bruit. C'est celle qu'on regarde. Celle qu'on ne
+> regarde pas est silencieuse.*
+
+### ⚠ CONSÉQUENCE IMMÉDIATE POUR LE PORTAGE DE `groups` R2
+
+**L'action groupée `cve_scan` envoie de vrais courriels**, un par machine à résultats, et
+`MAIL_ENABLED` vaut `true` en service. Le panneau de R2 doit le dire, et **l'interdiction permanente
+de ce chantier sur les actions de masse de `groups/` est confirmée par la mesure** — elle reposait
+jusqu'ici sur une prudence, elle repose maintenant sur une chaîne d'appels lue.
+
+### Documents à trancher, PAR LEUR AUTEUR
+
+    PLAN-DE-MIGRATION.md:4045      FAUX — attribue le courriel au repli du SCHEDULER
+    AUDIT-BRANCHE-BACKEND-CVE:184  a verifier — s'il parle du scheduler, faux
+    PLAN-DE-MIGRATION.md:1747      a verifier — parle de S7b ; si S7b passe par la ROUTE, c'est VRAI
+    MODULE-GROUPS.md:178, 357      ✅ JUSTE — ne pas y toucher
+
+*Une correction de masse remplace une erreur par une autre.* La session 8 a nommé le discriminant et
+n'a corrigé aucun texte hors de son périmètre : **c'est la bonne conduite, et je la reprends.** Je
+corrige les deux lignes du `PLAN-DE-MIGRATION.md`, qui est à moi.
+
+## E-299 — un scan planifié ne peut JAMAIS notifier en `critical` ni en `high`
+
+Candidat de la session 8, **recoupé par une lecture indépendante** — elle a lu l'appel, j'ai lu
+l'appel **et** la logique d'aiguillage :
+
+    scheduler.py:252   notify_cve_scan(f"Scan planifie: …", total_findings, 0, 0, 0, scanned)
+    webhooks.py:162    def notify_cve_scan(machine_name, total_cves, critical, high, medium, packages_scanned)
+    webhooks.py:165    if   critical > 0:  event, severity = 'cve_critical', 'critical'
+    webhooks.py:168    elif high > 0:      …
+
+**`critical`, `high` et `medium` sont passés en dur à `0`.** Les deux premières branches sont donc
+**mortes par construction** : quoi que le scan trouve, la notification tombe au dernier cas.
+
+**Et ça compose avec E-298 de la pire façon** : le seul chemin qui tourne sans personne devant l'écran
+n'envoie pas de courriel, **et sa seule notification ne peut pas porter la sévérité qui justifierait
+qu'on la regarde.** *Le total est transmis ; ce qui décide de l'alerte ne l'est pas.*
+
+Non corrigé — **arbitrage exploitant**, et de toute façon inerte sous E-238.
