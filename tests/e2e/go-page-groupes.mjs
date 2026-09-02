@@ -15,6 +15,15 @@
  * ║  vide **sans jamais toucher la propriete** — le vert par absence, sur la ║
  * ║  seule chose qui compte.                                                 ║
  * ║                                                                          ║
+ * ║  ⚠ **R2 (`5a0ff0b`, 2026-09-02 18:42:58) A LIVRE LA CREATION**, et son   ║
+ * ║  message dit E-274 « ferme PAR CONSTRUCTION ». Ce cadre reste vrai sur   ║
+ * ║  le point qui compte : **cette suite ne cree toujours aucun groupe.**    ║
+ * ║  Elle va desormais jusqu'au panneau d'ANNONCE et s'y arrete — la         ║
+ * ║  confirmation n'est jamais prise. Ce qu'elle ne couvre donc PAS : le     ║
+ * ║  parc affiche par un groupe dynamique REELLEMENT cree. Le refus de       ║
+ * ║  fixture ci-dessous n'a pas bouge, parce que `srv-zabbix` est toujours   ║
+ * ║  active — verifier avant de le lever.                                    ║
+ * ║                                                                          ║
  * ║  ── POURQUOI LA FIXTURE EST REFUSEE, ET NON REPORTEE ──                  ║
  * ║                                                                          ║
  * ║      machines vivantes : 3, dont  id 1  srv-zabbix  active               ║
@@ -116,6 +125,13 @@ const COMPTES = {
  */
 const INTERDITS = /\/groups(\/|\?|$)/;
 const TEMOIN = '/temoin-e2e-inexistant';
+/*
+ * Le nom saisi dans le formulaire pour obtenir l'ANNONCE. Il n'est jamais
+ * confirme, donc jamais ecrit — mais il est choisi distinctif expres : si un
+ * groupe portant ce nom apparaissait un jour en base, on saurait d'ou il vient
+ * et quelle suite l'a laisse passer. Un temoin anonyme ne se remonte pas.
+ */
+const TEMOIN_NOM = 'e2e-annonce-non-confirmee';
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;
 
 const C = CIBLE === 'laravel'
@@ -123,14 +139,22 @@ const C = CIBLE === 'laravel'
         liste: '[data-rw="groupes-liste"]',
         chargement: '[data-rw="groupes-chargement"]',
         nouveau: '[data-rw="groupes-nouveau"]',
+        formulaire: '[data-rw="groupes-formulaire"]',
+        champNom: '[data-rw="groupes-nom"]',
+        enregistrer: '[data-rw="groupes-enregistrer"]',
+        annuler: '[data-rw="groupes-annuler"]',
+        formMessage: '[data-rw="groupes-form-message"]',
         panneau: '[data-rw="groupes-panneau"]',
         panneauEffets: '[data-rw="groupes-panneau-effets"]',
         panneauFermer: '[data-rw="groupes-panneau-fermer"]',
+        panneauConfirmer: '[data-rw="groupes-panneau-confirmer"]',
         portee: '[data-rw="groupes-portee"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', page: '/groups/',
-        liste: null, chargement: null, nouveau: null, panneau: null,
-        panneauEffets: null, panneauFermer: null, portee: null,
+        liste: null, chargement: null, nouveau: null, formulaire: null,
+        champNom: null, enregistrer: null, annuler: null, formMessage: null,
+        panneau: null, panneauEffets: null, panneauFermer: null,
+        panneauConfirmer: null, portee: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]' };
 
 let echecs = 0;
@@ -143,6 +167,25 @@ function verifie(l, ok, d, toujours) {
     if (! ok) echecs += 1;
 }
 function constate(l, v) { note(`INFO  ${l} : ${v}`); }
+/*
+ * L'ETAT INITIAL DE LA TABLE, HISSE HORS DU `try`.
+ *
+ * Il est releve dans le `try` et relu dans le `finally` : deux BLOCS, donc un
+ * `const` local n'y survit pas (`nGroupes is not defined`, mesure du 2026-09-02
+ * 19:56). `node --check` avait dit OK — **un controle de syntaxe ne verifie
+ * aucune portee**, et c'est la seule facon dont ce defaut pouvait passer.
+ *
+ * `null` signifie « jamais releve » et NON « zero » : l'assertion de fin doit
+ * alors se declarer SANS OBJET plutot que de comparer a une valeur absente.
+ */
+let groupesAvant = null;
+/*
+ * Le nom a-t-il REELLEMENT ete saisi ? Sur legacy, le garde de cible sort avant
+ * la saisie : « le nom n'est pas en base » y serait vrai A VIDE, et un PASS
+ * decerne a une verification qui n'a pas eu lieu vaut moins que rien — il
+ * ANNONCE une couverture. Le drapeau distingue les deux cas.
+ */
+let nomSaisi = false;
 function verifiePortage(l, ok, d) {
     if (CIBLE === 'laravel') return verifie(l, ok, ok ? '' : d);
     constate(l, ok ? 'verifie sur le legacy aussi' : `ecart assume du legacy — ${d}`);
@@ -249,6 +292,7 @@ try {
      * existera, la relecture de ce journal dira que la couverture peut changer.
      */
     const nGroupes = compteEnBase('SELECT COUNT(*) FROM rootwarden.machine_groups');
+    groupesAvant = nGroupes;
     const nVivantes = compteEnBase(
         "SELECT COUNT(*) FROM rootwarden.machines "
         + "WHERE lifecycle_status IS NULL OR lifecycle_status <> 'archived'");
@@ -350,78 +394,160 @@ try {
     });
 
     // ══ 3. LE PANNEAU S'OUVRE, ET RIEN NE PART ═══════════════════════════
-    await etape('le clic ouvre un panneau et ne declenche rien', async () => {
+    await etape('le clic revele le formulaire, et l\'annonce precede l\'ecriture', async () => {
         /*
-         * L'EN-TETE L'ANNONÇAIT ET LE CODE NE LE FAISAIT PAS.
+         * ══ CETTE ETAPE A DEFENDU UNE PROPRIETE QUE LE PORTAGE A DEPASSEE ═══
          *
-         * `panneau`, `panneauEffets` et `panneauFermer` etaient declares dans la
-         * table et JAMAIS lus — trois cles mortes. C'est la quatrieme fois que
-         * ce signal me montre l'ecart entre ce que l'en-tete promet et ce que le
-         * code mesure : **une intention ecrite en commentaire n'est pas une
-         * mesure**, et c'est exactement ce qui a laisse E-244 vivre quatre jours.
+         * Ecrite le 2026-09-02 a 08:29, elle affirmait que `groupes-nouveau`
+         * ouvrait un panneau explicatif — celui du « pas encore porte ». R2
+         * (`5a0ff0b`, le MEME JOUR a 18:42:58, dix heures plus tard) a livre la
+         * creation : le bouton revele desormais `groupes-formulaire`.
          *
-         * La propriete : le clic OUVRE un panneau — geste local — et **aucune
-         * requete ne part**. On mesure les deux, et le compte de requetes est
-         * releve AVANT et APRES le clic : dire « aucune ecriture » sur le total
-         * de la suite ne dirait pas que le CLIC n'a rien declenche.
+         * Rendu avant correction : 3 FAIL. **Elle est tombee ROUGE, pas
+         * silencieusement verte** — et ce n'etait pas acquis : `groupes-panneau`
+         * EXISTE toujours. Si le panneau s'etait trouve visible pour une autre
+         * raison, l'assertion aurait passe en mesurant autre chose que le geste.
+         *
+         * ⚠ ET LE PANNEAU N'A PAS ETE « REAFFECTE » : il a ete DEPLACE. Il
+         * s'ouvre maintenant sur `groupes-enregistrer` (`groupes.js:250`,
+         * `ouvrePanneau(..., porteeAnnoncee())`) au lieu de remplacer le geste.
+         * La propriete d'aujourd'hui est donc PLUS FORTE que celle d'hier :
+         * **le portage annonce ce qu'il va ecrire AVANT de l'ecrire, et
+         * l'annonce ne coute aucune requete.**
+         *
+         * SURETE — lu dans le code, pas suppose (`groupes.js:242`) :
+         * `demandeEnregistrement` valide le nom, ouvre le panneau, montre le
+         * bouton de confirmation, et N'EMET RIEN. Seul `enregistre()`, sur la
+         * CONFIRMATION, appelle `ecris('/groups', ...)`. Cette suite va donc
+         * jusqu'au panneau et **ne confirme JAMAIS**. Trois filets derriere :
+         * le motif INTERDITS avorte tout non-GET vers `/groups`, l'assertion de
+         * fermeture par l'absence, et le comptage final des groupes.
+         */
+        /*
+         * ⚠ LE GARDE DE CIBLE, QUE J'AVAIS SUPPRIME EN REECRIVANT (2026-09-02
+         * 20:01). Sur legacy, `C.nouveau` vaut `null` et `page.$(null)` leve
+         * « Cannot read properties of null (reading 'startsWith') » — 1 FAIL.
+         *
+         * **QUATRIEME occurrence de ce defaut sur ce banc** (apres accueil,
+         * audit-ssh, cle-plateforme) — et la premiere ou je l'ai RETIRE au lieu
+         * de l'oublier : le garde etait present, la reecriture l'a emporte.
+         * Une reecriture ne repart pas d'une page blanche : elle DOIT rendre
+         * compte de ce que l'ancien code protegeait.
          */
         if (CIBLE !== 'laravel') {
-            constate('panneau explicatif', 'SANS OBJET — ancres du legacy non relevees');
+            constate('formulaire de creation',
+                'SANS OBJET — les ancres du legacy ne sont pas relevees, et la creation'
+                + ' legacy n\'est pas le sujet de cette suite');
 
             return;
         }
         const avant = passees.length;
         const bouton = await page.$(C.nouveau);
         if (! bouton) {
-            verifie('le clic ouvre un panneau et ne declenche rien', false,
+            verifie('le clic revele le formulaire de creation', false,
                 'le bouton de creation est absent : rien a cliquer');
 
             return;
         }
-        await bouton.click();
-        await dors(700);
 
+        // ── a. le clic revele le formulaire, et ne coute rien ────────────
+        const cache = await page.$eval(C.formulaire, (n) => n.hidden).catch(() => null);
+        await bouton.click();
+        await dors(500);
         const vu = await page.evaluate((sel) => {
-            const p = document.querySelector(sel.panneau);
-            const e = document.querySelector(sel.panneauEffets);
-            const f = document.querySelector(sel.panneauFermer);
+            const form = document.querySelector(sel.formulaire);
+            const nom = document.querySelector(sel.champNom);
 
             return {
-                ouvert: p !== null && p.offsetParent !== null,
-                effets: e ? [...e.querySelectorAll('li, p')].map((x) => (x.innerText || '').trim())
-                    .filter(Boolean) : [],
-                fermer: f !== null,
+                visible: form !== null && form.offsetParent !== null,
+                champ: nom !== null,
+                focus: nom !== null && document.activeElement === nom,
             };
         }, C);
-        constate('panneau', vu.ouvert
-            ? `ouvert, ${vu.effets.length} effet(s) enumere(s)` : 'NON ouvert');
+        constate('formulaire avant le clic', cache === null ? 'ancre absente' : (cache ? 'masque' : 'DEJA visible'));
+        verifiePortage('le clic revele le formulaire de creation',
+            cache === true && vu.visible,
+            cache !== true ? 'le formulaire n\'etait pas masque avant le clic : le clic ne prouve rien'
+                : 'le formulaire ne devient pas visible');
+        verifiePortage('le formulaire porte un champ de nom, et le curseur y va',
+            vu.champ && vu.focus,
+            ! vu.champ ? 'aucun champ de nom' : 'le champ existe mais ne recoit pas le curseur');
 
-        verifiePortage('le clic ouvre le panneau explicatif',
-            vu.ouvert && vu.fermer,
-            ! vu.ouvert ? 'le panneau ne s\'ouvre pas' : 'aucun moyen de le fermer');
+        // ── b. sans nom, le formulaire REFUSE et n'ouvre rien ────────────
+        const enr = await page.$(C.enregistrer);
+        if (enr) {
+            await enr.click();
+            await dors(400);
+            const refus = await page.evaluate((sel) => {
+                const m = document.querySelector(sel.formMessage);
+                const p = document.querySelector(sel.panneau);
 
-        /*
-         * ON EXIGE QUE LES EFFETS SOIENT ENUMERES ET NON VIDES. Un panneau
-         * ouvert mais vide satisferait « le panneau s'ouvre » — c'est le piege
-         * d'une assertion qui mesure la presence au lieu du contenu.
-         */
-        verifiePortage('le panneau enumere ce que le geste engage',
-            vu.ouvert && vu.effets.length >= 1
-                && vu.effets.every((x) => x.length > 0 && ! /:[a-z_]{3,}/.test(x)),
-            ! vu.ouvert ? 'le panneau ne s\'ouvre pas'
-                : `${vu.effets.length} effet(s) — attendu au moins 1, non vide et sans jeton`);
+                return {
+                    message: m ? (m.innerText || m.textContent || '').trim() : '',
+                    panneau: p !== null && p.offsetParent !== null,
+                };
+            }, C);
+            constate('sans nom', `message « ${refus.message || '(aucun)'} », panneau ${refus.panneau ? 'OUVERT' : 'ferme'}`);
+            verifiePortage('un nom vide est REFUSE, et rien n\'est annonce',
+                refus.message.length > 0 && ! /:[a-z_]{3,}/.test(refus.message) && ! refus.panneau,
+                ! refus.message ? 'aucun message de refus'
+                    : refus.panneau ? 'le panneau s\'ouvre malgre le refus'
+                        : `message non traduit : ${refus.message}`);
+        } else {
+            constate('refus sur nom vide', 'SANS OBJET — pas de bouton d\'enregistrement');
+        }
 
-        // AU RESEAU : le clic est LOCAL, donc rien ne doit partir.
+        // ── c. avec un nom, l'ANNONCE — et on ne confirme pas ────────────
+        let ann = { ouvert: false, effets: [], confirmer: false };
+        if (enr && vu.champ) {
+            await page.type(C.champNom, TEMOIN_NOM, { delay: 20 });
+            nomSaisi = true;
+            await enr.click();
+            await dors(600);
+            ann = await page.evaluate((sel) => {
+                const p = document.querySelector(sel.panneau);
+                const e = document.querySelector(sel.panneauEffets);
+                const c = document.querySelector(sel.panneauConfirmer);
+
+                return {
+                    ouvert: p !== null && p.offsetParent !== null,
+                    effets: e ? [...e.querySelectorAll('li, p')].map((x) => (x.innerText || '').trim())
+                        .filter(Boolean) : [],
+                    confirmer: c !== null && c.offsetParent !== null,
+                };
+            }, C);
+            constate('annonce', ann.ouvert
+                ? `panneau ouvert, ${ann.effets.length} effet(s), confirmation ${ann.confirmer ? 'offerte' : 'absente'}`
+                : 'panneau NON ouvert');
+            verifiePortage('enregistrer ANNONCE la portee avant d\'ecrire',
+                ann.ouvert && ann.effets.length >= 1
+                    && ann.effets.every((x) => x.length > 0 && ! /:[a-z_]{3,}/.test(x)),
+                ! ann.ouvert ? 'le panneau d\'annonce ne s\'ouvre pas'
+                    : `${ann.effets.length} effet(s) — attendu au moins 1, non vide et sans jeton`);
+            /*
+             * La confirmation doit etre OFFERTE et non exercee : c'est la
+             * reprise de main qui separe l'annonce de l'ecriture. Un panneau
+             * qui annonce sans offrir de confirmer aurait deja ecrit.
+             */
+            verifiePortage('la confirmation est OFFERTE, et cette suite ne la prend pas',
+                ann.ouvert && ann.confirmer,
+                ! ann.ouvert ? 'pas de panneau' : 'aucun bouton de confirmation : le geste serait deja parti');
+        }
+
+        // ── d. AU RESEAU : tout ce qui precede est LOCAL ─────────────────
         const parties = passees.slice(avant);
-        constate('requetes emises par le clic', parties.length
+        constate('requetes emises par la sequence', parties.length
             ? parties.map((p) => `${p.methode} ${p.route}`).join(' | ') : '(aucune)');
-        verifie('le clic n\'a declenche AUCUNE requete',
+        verifie('reveler, refuser et ANNONCER n\'a coute AUCUNE requete',
             parties.length === 0,
             parties.map((p) => `${p.methode} ${p.route}`).join(' | '),
-            'aucune');
+            `${parties.length} requete(s)`);
 
+        // ── e. on referme, sans jamais confirmer ─────────────────────────
         const fermer = await page.$(C.panneauFermer);
         if (fermer) { await fermer.click(); await dors(400); }
+        const annuler = await page.$(C.annuler);
+        if (annuler) { await annuler.click(); await dors(400); }
     });
 
     // ══ 4. LE TEMOIN, PUIS LA FERMETURE PAR L'ABSENCE ════════════════════
@@ -487,11 +613,51 @@ try {
         }
     } catch (e) { note(`FAIL  controle de surete : ${e.message}`); echecs += 1; }
     try {
-        // AUCUN GROUPE N'A ETE CREE : c'est la contrepartie du refus de fixture.
+        /*
+         * AUCUN GROUPE N'A ETE CREE. C'est la contrepartie du refus de fixture,
+         * et depuis R2 c'est le filet qui compte le plus : la suite SAISIT
+         * desormais un nom et va jusqu'au panneau d'annonce. Elle ne confirme
+         * pas — mais c'est ici qu'on le VERIFIE, pas dans le code du portage.
+         *
+         * ⚠ COMPARE A L'ETAT INITIAL, PAS A ZERO. `apres === 0` etait juste
+         * tant que la creation n'existait pas ; R2 l'a livree, donc un groupe
+         * legitime cree par ailleurs ferait rougir cette suite pour un geste
+         * qui n'est pas le sien. La propriete a mesurer est « la suite n'a rien
+         * ajoute », et elle se mesure par une DIFFERENCE.
+         */
         const apres = compteEnBase('SELECT COUNT(*) FROM rootwarden.machine_groups');
-        verifie('aucun groupe n\'a ete cree par cette suite', apres === 0,
-            `${apres} groupe(s) en base — un groupe SANS FILTRE viserait srv-zabbix`,
-            `${apres} groupe(s)`);
+        if (groupesAvant === null) {
+            constate('aucun groupe cree',
+                `SANS OBJET — l'etat initial n'a jamais ete releve, ${apres} en base : une`
+                + ' difference est incalculable et « 0 ajoute » serait une affirmation gratuite');
+        } else {
+            verifie('aucun groupe n\'a ete cree par cette suite', apres === groupesAvant,
+                `${groupesAvant} groupe(s) avant, ${apres} apres : ${apres - groupesAvant} ajoute(s)`
+                + ' — un groupe SANS FILTRE viserait srv-zabbix',
+                `${apres} groupe(s), inchange`);
+        }
+        /*
+         * ET LE TEMOIN NOMME : si `TEMOIN_NOM` apparaissait, on saurait que
+         * l'annonce a ete confirmee. Le compte seul ne le dirait pas si un
+         * groupe legitime etait cree et le temoin aussi.
+         */
+        const fuite = compteEnBase(
+            `SELECT COUNT(*) FROM rootwarden.machine_groups WHERE name = '${TEMOIN_NOM}'`);
+        if (! nomSaisi) {
+            /*
+             * Le nom n'a pas ete saisi : l'absence ne prouve rien de CETTE
+             * execution. On rend quand meme le compte, parce qu'un residu
+             * signalerait une AUTRE execution qui, elle, aurait confirme.
+             */
+            constate('le nom temoin en base', fuite === 0
+                ? `SANS OBJET — le nom n'a pas ete saisi ici ; 0 residu d'une autre execution`
+                : `⚠ ${fuite} residu(s) « ${TEMOIN_NOM} » — PAS de cette execution,`
+                  + ' donc une autre a confirme l\'annonce');
+        } else {
+            verifie('le nom saisi par cette suite n\'est PAS en base', fuite === 0,
+                `${fuite} groupe(s) nomme(s) « ${TEMOIN_NOM} » : l'annonce a ete confirmee`,
+                `0 « ${TEMOIN_NOM} »`);
+        }
         const zabbix = litEnBase("SELECT CONCAT(name,'|',ip) FROM rootwarden.machines WHERE id = 1");
         verifie('srv-zabbix est intacte', zabbix.length === 1 && /^srv-zabbix\|/.test(zabbix[0]),
             zabbix[0] || '(absente)', zabbix[0] || '');
