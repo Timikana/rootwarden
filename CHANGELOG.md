@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.158** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.159** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,32 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.159 — le rôle 2 n'a été exercé que 10 fois en trois semaines
+
+**E-313.** `active_sessions` n'étant jamais nettoyée, elle est **un journal de la couverture par rôle sur
+trois semaines** : rôle 3 → **3 202**, rôle 1 → **1 265**, **rôle 2 → 10** — et les dix datent **de cette
+nuit**, des suites de la session 7. *Avant cette nuit, aucune connexion en rôle 2 depuis le 12 août.*
+
+**Le rôle 2 est le seul qui sépare « admis par la permission » de « admis par le rôle »** (`role_id >= 3`
+court-circuite `require_permission`). **E-296 était une inférence sur du code ; c'est maintenant un fait
+mesuré.** *Si l'on cherche où une garde peut être retirée sans que rien ne rougisse, la réponse est
+mesurée.* Et **68 suites NOMMENT `rw-test-admin`** sans jamais ouvrir de session avec lui — *mesurer les
+mentions n'est pas mesurer les connexions.*
+
+Deux facteurs pour deux objets, notés **avant** qu'ils produisent un faux désaccord : **258×** par compte,
+**320×** par rôle.
+
+**Le recoupement a trouvé une session orpheline** (4 478 lignes, 4 477 rattachées) — une session dont
+l'utilisateur n'existe plus, donc **irrévocable par son propriétaire**. À traiter dans E-203 : *« ne rien
+afficher » la rendrait invisible plutôt qu'inoffensive.*
+
+**E-314 — une question déclarée non tranchée, close par un écart d'horloge.** `MAX(created_at)` semblait
+figé : `created_at` est en **UTC**, les horodatages de suite en **CEST**, deux heures d'écart. Le
+« silence » était la dernière exécution elle-même. *Une valeur hors de toute plage physique est un défaut
+d'instrument ; une valeur **plausible** et fausse ne se signale pas d'elle-même.* Ce que le refus de
+conclure a évité : au même moment, un intergiciel consultant cette table à chaque page était en test —
+**une cause inventée aurait envoyé son autrice chercher un défaut inexistant dans son propre code.**
 
 ### v1.38.158 — j'annonçais CINQ signatures, il y en a ONZE — et mon chiffre soulageait
 

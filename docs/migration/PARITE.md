@@ -15198,3 +15198,82 @@ les arbitrages à part des signatures.
 
 **Le compte à lui rendre est donc ONZE**, et il se rend **avec les onze objets** — jamais avec un
 nombre nu.
+
+## E-313 — le rôle 2 n'a été exercé que 10 fois en trois semaines : E-296 cesse d'être une inférence
+
+Relevé par la session 7, **remesuré par moi** — `active_sessions` n'est jamais nettoyée, elle est donc
+sans l'avoir voulu **un journal de la couverture par rôle sur trois semaines**.
+
+    par ROLE                             par COMPTE
+      role 3   3 202                       rw-test-super   2 583   15/08 -> 02/09
+      role 1   1 265                       rw-test-user    1 265   15/08 -> 02/09
+      role 2      10                       superadmin        619   12/08 -> 20/08
+                                           rw-test-admin      10   02/09 -> 02/09
+
+**Les dix connexions du rôle 2 datent TOUTES de cette nuit**, et viennent des suites de la session 7.
+**Avant cette nuit, aucune connexion en rôle 2 depuis le 12 août.**
+
+### Deux facteurs, deux objets — et il faut dire lequel
+
+    par compte   2 583 / 10  =  258 x       <- ce que la session 7 a annonce
+    par role     3 202 / 10  =  320 x       <- ma mesure
+
+**Aucun n'est faux ; ils ne comptent pas la même chose.** *Un nombre sans son objet invite au faux
+désaccord* — je le note **avant** qu'il en produise un, ce qui est la première fois de la nuit.
+
+### Pourquoi ce chiffre vaut plus que les trois références posées
+
+**Le rôle 2 est le seul qui sépare « admis par la permission » de « admis par le rôle »** — `role_id >= 3`
+court-circuite `require_permission` (`helpers.py:338`), et le rôle 1 n'atteint rien.
+
+> **E-296 disait qu'une garde à deux voies exercée par une seule voie est SUPPOSÉE, pas mesurée. C'était
+> une inférence sur du code. C'est maintenant un fait mesuré sur trois semaines de connexions.**
+>
+> *Si tu cherches où une garde peut être retirée sans que rien ne rougisse, la réponse est mesurée.*
+
+**Et l'écart entre le dit et le fait est net : 68 suites du dépôt NOMMENT `rw-test-admin`** — elles le
+citent dans une table de comptes ou un commentaire, **sans jamais ouvrir de session avec lui**. *Mesurer
+les mentions n'est pas mesurer les connexions* : le même motif qu'E-277, sur une population de tests.
+
+**Les trois pages posées cette nuit sont précisément celles qui en dépendent** : `/audit-ssh` (rôle 2
+admis par la permission **seule**), `/groupes` (rôle 2 **refusé** faute de permission — le chemin
+discriminant), `/documentation` (rôle 2 = seuil interne).
+
+### Une session ORPHELINE, trouvée par le recoupement
+
+    total de la table                   4 478
+    somme des connexions par compte     4 477
+    jointure LEFT : user_id sans user       1
+
+**Le recoupement a servi.** Une ligne d'`active_sessions` référence un utilisateur qui n'existe plus —
+donc **une session que le portage ne pourra jamais révoquer par son propriétaire**, puisqu'il n'a plus de
+propriétaire. À prendre en compte dans E-203 : *la liste de révocation doit décider quoi faire d'une
+session sans compte, et « ne rien afficher » la rendrait invisible plutôt qu'inoffensive.*
+
+## E-314 — une question déclarée NON TRANCHÉE, close par un écart d'horloge
+
+La session 7 avait signalé que `MAX(created_at)` valait 01:20 alors qu'elle avait joué six exécutions
+depuis — **sans fabriquer d'explication.** Cause mesurée par la session 3 :
+
+    hote           03:36:47 CEST (+0200)
+    conteneur db   01:36:48 UTC          <- deux heures d'ecart
+
+`created_at` est en **UTC**, les horodatages de suite en **CEST**. Le « silence » était sa propre
+dernière exécution. Contre-épreuve : 36 lignes entre 00:38 et 01:20 UTC — **la fenêtre exacte de ses
+trois suites.**
+
+**Et la session 3 avait eu le même piège le même soir sur un autre outil** : `find … -newermt "… UTC"`
+rendant `0`, et elle a failli rapporter « aucun module postérieur » **en contredisant une mesure juste**.
+
+> **Une valeur hors de toute plage physique est un défaut d'instrument ; une valeur PLAUSIBLE et fausse
+> ne se signale pas d'elle-même.** Un `0` crédible et un silence crédible : deux instruments, même cause.
+
+### Ce que le fait de NE PAS conclure a évité
+
+Au moment du signalement, la session 3 testait **un intergiciel qui consulte cette table à chaque page**,
+dont le mode de panne est *« personne ne peut plus rester connecté »*. **Une explication fabriquée
+l'aurait envoyée chercher dans son code**, sur un défaut qui n'existait pas, pendant qu'elle écrivait le
+correctif d'E-203.
+
+*Déclarer une question non tranchée coûte une ligne ; une cause inventée coûte le temps de celui qui la
+croit.*
