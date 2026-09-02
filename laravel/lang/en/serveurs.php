@@ -68,8 +68,10 @@ return [
     'vide_aide' => 'Until a machine is declared, neither vulnerability scans nor key deployments have a target.',
 
     // What D6a does not carry yet
-    'reste_titre' => "Three capabilities of this tab are not ported yet.",
-    'reste_texte' => "Lifecycle, connection test and CSV file import go through separate entry points on the legacy portal. They still work there.",
+    // The count was two-thirds wrong for seven days — removed, not
+    // corrected: the enumeration is the only source. See fr.
+    'reste_titre' => "What this tab cannot do yet",
+    'reste_texte' => "Importing servers from a CSV file is still done from the legacy portal. The lifecycle and the connection test are ported here.",
     'reste_lien' => 'Open the legacy portal',
 
     // Outcomes
