@@ -165,6 +165,13 @@
         </div>
     </div>
 
+    {{-- L'ANNONCE DU GESTE — region live PRESENTE DES LE CHARGEMENT, et vide.
+         Une region `aria-live` ajoutee au DOM au moment du message n'est pas
+         annoncee : elle doit etre dans l'arbre AVANT l'insertion. Idiome de
+         `comptes` et de vingt-cinq autres vues, repris tel quel plutot que
+         reinvente. --}}
+    <p class="rw-annonce" data-rw="groupes-annonce" role="status" aria-live="polite"></p>
+
     {{-- La liste est remplie par le script. L'etat de depart est un texte de
          chargement et non une grille vide : une grille vide se lit « aucun
          groupe » avant meme que la requete soit partie. --}}

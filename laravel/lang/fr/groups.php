@@ -53,8 +53,42 @@ return [
     'np_supprimer'  => 'La suppression de groupe n’est pas encore portée sur cette interface.',
     'np_supprimer_detail' => "La suppression ne touche que le groupe : les serveurs qu'il rassemble ne sont pas modifiés.",
 
-    'np_derive'     => "Le scan de dérive de masse n'est pas encore porté sur cette interface.",
-    'np_derive_detail' => "Ce geste n'ouvre AUCUNE session SSH : il relit des données déjà en base et met à jour le relevé de dérive de chaque membre. Le planificateur fait déjà le même travail toutes les heures sur l'ensemble du parc.",
+    // ══ R3 — LE SCAN DE DERIVE DE MASSE, PORTE ══════════════════════════
+    //
+    // `np_derive` et `np_derive_detail` sont RETIREES : la premiere declarait
+    // une absence qui n'existe plus, la seconde decrivait le geste pour
+    // expliquer pourquoi on renvoyait ailleurs. Son contenu reste — il est
+    // exact et il rassure a bon droit — mais sous un nom qui ne dit plus
+    // « pas porte ».
+    //
+    // `np_cve` et ses satellites NE BOUGENT PAS : le scan CVE ouvre une
+    // session SSH par machine et envoie un courriel par machine a resultats.
+    // Il reste hors de cette interface, et cette declaration reste vraie.
+    'der_titre'  => 'Lancer un scan de dérive',
+    'der_texte'  => "Ce geste n'ouvre AUCUNE session SSH : il relit des données déjà en base et met à jour le relevé de dérive de chaque membre. Le planificateur fait déjà le même travail toutes les heures sur l'ensemble du parc.",
+    'der_lancer' => 'Lancer le scan de dérive',
+
+    // LE NOMBRE ANNONCE EST LE NOMBRE RESOLU, jamais le nombre attendu. Un
+    // groupe dont TOUS les filtres ont ete rejetes par `_sanitize_filters` se
+    // stocke en `{}` — le meme objet qu'un groupe sans critere, donc `1=1`,
+    // donc le parc entier. Seul le nombre resolu distingue « je scanne mes
+    // trois serveurs de test » de « je scanne tout ».
+    //
+    // Ces trois libelles disent la meme chose que `np_cve_membres`,
+    // `np_cve_prod` et `np_cve_derive`. Ils sont VOLONTAIREMENT distincts :
+    // unifier demanderait de toucher le panneau du scan CVE, qui doit rester
+    // en place. A unifier quand ce panneau sera porte — il sera reecrit.
+    'resolu_nombre'   => "Ce groupe résout :n serveur(s) aujourd'hui.",
+    'resolu_prod'     => "⚠ La production en fait partie : :noms.",
+    'resolu_reresolu' => "Le nombre affiché est celui d'aujourd'hui. Un groupe dynamique est ré-résolu au moment du lancement : une machine ajoutée au parc entre-temps entrerait dans le geste sans avoir jamais été affichée ici.",
+
+    // ⚠ SANS PORTEE ANNONCEE, PAS DE CONFIRMATION OFFERTE. Un panneau qui ne
+    // sait pas sur combien de machines il porte ne peut pas faire consentir :
+    // le bouton reste absent, et la raison est dite.
+    'der_illisible' => "La portée n'a pas pu être lue : impossible de dire sur combien de serveurs ce scan porterait. Le lancement n'est donc pas proposé.",
+    'der_vide'      => "Ce groupe ne résout aucun serveur aujourd'hui : un scan ne relèverait rien.",
+    'der_lance'     => ':n serveur(s) mis en file. Le suivi se fait dans le centre de tâches.',
+    'der_echoue'    => "Le scan de dérive n'a pas pu être lancé. :message",
 
     'np_cve'        => "Le scan CVE de masse n'est pas encore porté sur cette interface.",
     // ⚠ LE PANNEAU LE PLUS IMPORTANT DU MODULE. Un clic, N machines, et pour
@@ -72,7 +106,7 @@ return [
     // Elle est devenue fausse au moment ou R2 l'a portee — le meme mecanisme
     // que `pare-feu`, `superv` et l'encart des CGU, et je l'aurais livre.
     // Un libelle se relit avec le code qu'il decrit, dans le MEME commit.
-    'portee_texte' => "La lecture des groupes, de leurs membres et la création sont portées. La suppression et les deux actions de masse passent encore par l'ancien portail — chaque bouton explique ce qu'il engage avant d'y renvoyer.",
+    'portee_texte' => "La lecture des groupes, de leurs membres, la création et le scan de dérive de masse sont portés. La suppression et le scan CVE de masse passent encore par l'ancien portail — chaque bouton explique ce qu'il engage avant d'y renvoyer.",
     'parc_entier'  => "Un rôle administrateur peut viser l'ensemble du parc : aucune attribution de machine ne borne les actions de masse.",
 
     // ══ R2 — LA CREATION D'UN GROUPE ═════════════════════════════════════

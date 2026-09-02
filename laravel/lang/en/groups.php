@@ -43,8 +43,25 @@ return [
     'np_supprimer'  => 'Deleting a group is not ported to this interface yet.',
     'np_supprimer_detail' => 'Deletion only affects the group: the servers it gathers are not modified.',
 
-    'np_derive'     => 'The bulk drift scan is not ported to this interface yet.',
-    'np_derive_detail' => 'This action opens NO SSH session: it re-reads data already in the database and updates each member\'s drift record. The scheduler already does the same work every hour across the whole fleet.',
+    // R3: the bulk drift scan is PORTED — see the note in `lang/fr/groups.php`.
+    // `np_cve` and its satellites do NOT move: the CVE scan opens one SSH
+    // session per machine and sends one email per machine with results.
+    'der_titre'  => 'Run a drift scan',
+    'der_texte'  => 'This action opens NO SSH session: it re-reads data already in the database and updates each member\'s drift record. The scheduler already does the same work every hour across the whole fleet.',
+    'der_lancer' => 'Run the drift scan',
+
+    // The number shown is the RESOLVED one, never the expected one: a group
+    // whose filters were all rejected stores as `{}` — the same object as a
+    // group with no criteria, hence `1=1`, hence the whole fleet.
+    'resolu_nombre'   => 'This group resolves to :n server(s) today.',
+    'resolu_prod'     => '⚠ Production is among them: :noms.',
+    'resolu_reresolu' => 'The number shown is today\'s. A dynamic group is re-resolved when the action starts: a machine added to the fleet in between would enter the action without ever having been shown here.',
+
+    // No announced scope, no confirmation offered.
+    'der_illisible' => 'The scope could not be read: there is no way to say how many servers this scan would cover. Running it is therefore not offered.',
+    'der_vide'      => 'This group resolves to no server today: a scan would record nothing.',
+    'der_lance'     => ':n server(s) queued. Follow them in the task centre.',
+    'der_echoue'    => 'The drift scan could not be started. :message',
 
     'np_cve'        => 'The bulk CVE scan is not ported to this interface yet.',
     'np_cve_detail' => 'This action opens a real SSH session on EVERY member of the group, and each machine whose scan completes triggers a report sent by email. This is not a read: it is as many connections and as many sends as the group has servers.',
@@ -54,7 +71,7 @@ return [
 
     'portee_titre' => 'What this page can do today',
     // R2: creation IS ported now — see fr.
-    'portee_texte' => 'Reading groups, their members and creation are ported. Deletion and the two bulk actions still go through the old portal — each button explains what it engages before sending you there.',
+    'portee_texte' => 'Reading groups, their members, creation and the bulk drift scan are ported. Deletion and the bulk CVE scan still go through the old portal — each button explains what it engages before sending you there.',
     'parc_entier'  => 'An administrator role can target the whole fleet: no machine assignment bounds bulk actions.',
 
     // R2 — creating a group. E-274 closed by construction: saving goes through
