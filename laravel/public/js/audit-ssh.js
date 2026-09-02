@@ -122,6 +122,29 @@
     brancher('audit-ssh-parc', t('np_parc'), t('np_parc_detail'), false);
     brancher('audit-ssh-planif-creer', t('np_planif_creer'), t('np_planif_detail'), false);
 
+    /*
+     * ══ A LIRE PAR QUI PORTERA LA CREATION DE PLANIFICATION ══════════════
+     *
+     * Ce panneau sera remplace par un formulaire. Une contrainte doit voyager
+     * avec ce remplacement, sans quoi elle se perdra :
+     *
+     * Un correctif backend en attente fera REFUSER une planification `tag`
+     * dont le champ de portee est vide, au lieu de la faire tomber sur le
+     * parc entier (E-280). C'est la bonne correction — **mais le refus sera
+     * SILENCIEUX si l'interface ne le rend pas.** L'exploitant aura demande
+     * un relevé par tag, laisse la case blanche, et n'aura ni relevé ni
+     * message.
+     *
+     * Donc : **un champ de portee vide se refuse A L'ECRAN, avec la raison,
+     * avant que la requete parte.** Et pas par un `required` muet — le
+     * premier garde vit dans le NAVIGATEUR, le second dans le serveur, et
+     * les deux doivent dire la MEME chose. Un `required` seul rendrait une
+     * soumission bloquee sans texte, ce qui est le meme silence deplace d'un
+     * cran.
+     *
+     * Ce n'est pas au correctif backend de le dire : un refus qui n'a pas
+     * d'ecran se lit comme une panne.
+     */
     // Le panneau de planification porte en plus l'ambiguite d'E-280.
     var bPlanif = document.querySelector('[data-rw="audit-ssh-planif-creer"]');
     if (bPlanif) {
