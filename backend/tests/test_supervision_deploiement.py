@@ -264,9 +264,23 @@ class TestZabbixDeploy:
 
         _, flux = deploie(client, admin_headers)
 
-        assert 'WARN: Depot Zabbix : code 127' in flux
-        assert 'SUCCESS_MACHINE::2::' in flux
-        assert len(banc['inventaire'].ecritures) == 1
+        # ══ CE ROUGE-CI VOUDRAIT DIRE « L'ARBITRAGE A CHANGE » ══════════════
+        #
+        # Les trois assertions ci-dessous verrouillent une DECISION, pas une
+        # propriete evidente : le depot est deliberement NON decisif. Si
+        # quelqu'un decide l'inverse — ce qui se defend — ce test rougira sur un
+        # code AMELIORE.
+        #
+        # *Une phrase fausse se corrige ; une assertion fausse RESISTE, parce
+        # qu'elle rougit quand on repare.* Le message doit donc dire quoi faire :
+        # rouvrir l'arbitrage et remplacer ce test, jamais le contourner.
+        _si_rouge = ("le depot Zabbix n'est plus traite comme NON decisif. Ce "
+                     "n'est pas forcement un defaut : c'etait un ARBITRAGE, "
+                     "ecrit dans `zabbix_deploy`. S'il a ete rouvert, remplace "
+                     "ce test par la regle retenue — ne le contourne pas.")
+        assert 'WARN: Depot Zabbix : code 127' in flux, _si_rouge
+        assert 'SUCCESS_MACHINE::2::' in flux, _si_rouge
+        assert len(banc['inventaire'].ecritures) == 1, _si_rouge
 
     def test_un_code_inconnu_compte_comme_un_echec(self, client, admin_headers,
                                                    mock_db, banc):
