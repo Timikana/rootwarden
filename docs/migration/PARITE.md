@@ -16002,3 +16002,104 @@ qui discrimine, ici la *méthode*. **Un filet qui classe par chemin est aveugle 
 dans le motif.*
 
 **Trois rejeux rendus, tous conformes** : `audit-ssh` 18 · 0 · `groupes` 20 · 0 · `pare-feu` 23 · 0.
+
+## E-328 — ⚠ AVANT DE RETIRER UNE CONTRAINTE FAUTIVE, ÉNUMÉRER TOUT CE QU'ELLE EXCLUAIT
+
+Les cinq motifs `INTERDITS` sont corrigés (`b5be42b`, session 7) et **les dix rejeux sont conformes** —
+confrontés un par un à mes références, **zéro à poser** :
+
+    audit-ssh 18/15 · groupes 20/15 · pare-feu 23/17 · accueil 41/16 · cle-plateforme 21/15
+    -> 10 conformes, comptes IDENTIQUES a avant la correction
+
+> **Le filet s'est élargi de dix routes et n'a rien attrapé de légitime.** *C'est exactement le
+> résultat qu'il fallait obtenir, et il est mesurable précisément parce que les comptes n'ont pas bougé
+> d'une unité.*
+
+### Mais le premier passage a rendu 9 · 4 sur `pare-feu legacy`, et la cause est la leçon
+
+    FAIL  garde : rw-test-user   — net::ERR_BLOCKED_BY_CLIENT at .../iptables/
+    FAIL  garde : rw-test-admin  — idem
+    FAIL  garde : rw-test-super  — idem
+
+**Son propre filet avortait la navigation vers la page.**
+
+    /iptables/     la PAGE legacy       <- avortee A TORT
+    /iptables      la route d'API       <- ce qu'elle visait
+    /iptables-*    les ecritures        <- ce qu'elle visait
+
+> **L'ancre `(\?|$)` que nous avons condamnée ne faisait pas QUE le mal.** Elle bloquait `scan-all` à
+> tort **et excluait la page à raison**. *Traitée comme un pur défaut, elle a emporté son second travail
+> avec elle.*
+>
+> **Avant de retirer une contrainte jugée fautive, énumérer TOUT ce qu'elle excluait.** Une contrainte
+> fausse pour la raison qu'on lui reproche peut être juste pour une autre, **qu'on ne lui a jamais
+> demandée.**
+
+**C'est la leçon que ni elle ni moi n'avions.** J'avais mesuré l'ancre, montré qu'elle laissait échapper
+`scan-all` et `/groups/5/run`, et conclu qu'elle était à retirer. **Je n'ai pas cherché ce qu'elle
+retenait.**
+
+### ⚠ ET LES QUATRE AUTRES SUITES N'ONT SURVÉCU QUE PAR ACCIDENT
+
+    audit-ssh · groupes · accueil · cle-plateforme   garde filtre `methode !== 'GET'`
+                                                      -> une navigation est un GET, donc epargnee
+    pare-feu                                          garde AGNOSTIQUE a la methode
+                                                      -> parce que `POST /iptables` est parfois une LECTURE
+
+> **La suite qui exigeait la règle la plus fine est celle que la règle grossière a cassée.** Les quatre
+> autres ont été protégées par une clause qui n'avait pas été écrite pour ça.
+
+**Le piège est donc DORMANT dans `audit-ssh`**, dont le motif attrape aussi sa propre page
+`/ssh-audit/` : *rendre ce garde agnostique à la méthode sans exclure la page le casserait exactement
+comme `pare-feu`.*
+
+**Et elle a écrit l'avertissement DANS `audit-ssh`**, pas dans un message — *« sinon la prochaine
+session refait exactement ce que je viens de faire, et le mot qui l'aurait évité n'était nulle part »*.
+**Deuxième application d'E-289 dans ce chantier, et la première par quelqu'un d'autre que son auteur.**
+
+### La mesure transmise sans le correctif, et `services` comme contre-poids
+
+Le corps de son commit porte l'attribution à leur auteur :
+
+    b4  fail-open, et classe `/bashrc/template` en LECTURE alors que ce chemin porte
+        DEUX routes de semantique opposee (GET lit, POST ecrit)
+    f5  ROUTES_MODULE est une enumeration : une route inconnue prend la premiere branche
+        et part — l'avortement par defaut ne protege que ce qu'il RECONNAIT
+
+**Et `services` y figure comme le cas qui n'avait rien à corriger** — *« c'est lui qui empêche de lire
+ce commit comme un réquisitoire »*. **Un relevé qui accuse quatre objets sur cinq est suspect ; celui
+qui en dédouane un est lisible.**
+
+## E-329 — ce qui reste, mesuré : rien qui n'attende l'exploitant
+
+    references a poser apres les dix rejeux ....... 0
+    arbre ......................................... propre
+    banc .......................................... au repos
+    menu .......................................... 31 / 32, `wazuh` seule
+    ligne de base ................................. 164 · 2550 · 1
+
+**Il ne reste aucun geste d'équipe.** Le reste est **onze décisions** et **quatre arbitrages**, tous
+inscrits avec leurs objets :
+
+    1  redemarrer `rootwarden_python`                D-01    ⚠ plus aucun prealable technique
+    2  recreer `rootwarden_laravel`                  D-07
+    3  `push`                                        D-08
+    4  fusionner `security/backend-cve`              D-08    les SIX encore necessaires
+    5  retroporter v1.37.16 · .17 · .48 vers `main`  D-08+09
+    6  migration E-222                               D-06
+    7  migrations 063 + 064 + 065
+    8  compte approbateur + 4e compte de test        D-02
+    9  `clean_up_users` / les deux magasins          D-03
+    10 sudoers AVEC la colonne                       D-05
+    11 export RGPD AVANT d'archiver `profile/`       D-11    NON-CONFORMITE
+
+    A  le port SSH — bloque I5, et SEC-015 dit que `dest_path` est interpole NU en root
+    B  les trois definitions du parc
+    C  `wazuh` — que le redemarrage rend seulement MESURABLE
+    D  ⚠ E-326 : `POST /deploy` lance sur `srv-zabbix` le 27/08 a 22:43, arrete par un
+       ECHEC DE DECHIFFREMENT et non par une garde, et `deployment.log` ne consigne AUCUN
+       appelant. Faut-il qu'un geste qui revoque des acces en root sur la production trace
+       qui l'a demande ?
+
+**Du point de vue de l'exploitant, un arbitrage et une signature sont la même interruption** — le
+compte à lui rendre est **quinze**, et il se rend avec ses quinze objets.
