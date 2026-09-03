@@ -709,7 +709,23 @@ declare -A REF_LARAVEL=(
   # La fermeture par l'absence est mesuree AVEC son temoin : `POST /temoin-e2e-
   # inexistant` VU par le collecteur, puis les 6 requetes du module toutes en GET.
   # Sans le temoin la suite rend SANS OBJET, jamais un vert.
-  [go-page-audit-ssh]=18
+  # 18 -> 25 le 2026-09-03 02:12 (`35a3a5e`), arbre propre, rejeu PAR LE RUNNER sur les
+  # deux cibles. legacy INCHANGEE a 15.
+  # A3 (`bcc5d13`) porte la lecture de `sshd_config`. ⚠ SON AUTEUR DECLARE LUI-MEME QUE
+  # LA MOITIE N'EST PAS EPROUVEE — le rendu du fichier, la separation des trois issues,
+  # le cas du fichier vide — faute du mot de l'exploitant pour joindre une machine.
+  # CETTE SUITE NE LES COUVRE PAS NON PLUS, et le dire vaut mieux que laisser 25
+  # assertions vertes le recouvrir. *Une reference elevee sur un sous-lot a moitie
+  # eprouve se lit comme une couverture si personne n'ecrit la moitie manquante.*
+  # Ce qu'elle couvre est le PANNEAU, qui ne joint personne :
+  #     sans serveur choisi -> confirmation MASQUEE, la raison est dite
+  #     avec un serveur     -> le panneau NOMME sa cible, confirmation libellee
+  #     et AUCUN appel a /ssh-audit/config n'est parti
+  # ⚠ La branche FAIL-CLOSED vaut le detour : elle existe parce que son auteur l'a
+  # voulue — *un panneau qui demande de confirmer une lecture « sur le serveur choisi »
+  # alors qu'aucun ne l'est ferait consentir a rien de nommable.* RIEN NE LA MESURAIT, et
+  # c'est le genre d'invariant qu'une simplification emporte sans bruit.
+  [go-page-audit-ssh]=25
   # go-page-documentation — 24 PASS / 0 FAIL, 03:09:49 -> 03:11:32 CEST (acfec36).
   # REJOUEE apres correction : le fichier avait bouge depuis la premiere mesure,
   # *une reference prise sur un fichier qui a change n'est plus une mesure.*
