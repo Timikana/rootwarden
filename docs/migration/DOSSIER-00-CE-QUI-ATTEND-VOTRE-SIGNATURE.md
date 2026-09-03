@@ -111,6 +111,73 @@ vous-même. *Rien d'incohérent ne partirait — le Lead confirme que rien de lu
 
 ---
 
+## ⚠ RÉTRACTATION DU 2026-09-03, 08:52 — l'axe « ce qui EMPIRE avec la bascule » était FAUX
+
+**Ce document a porté pendant sept minutes une section qui renversait son ordre de priorité. Elle est
+retirée, et voici pourquoi.**
+
+**L'argument était** : *`security/backend-cve` est le seul point qui empire avec la bascule, parce que
+les migrations bloquent et se signalent, tandis que six correctifs absents ne signalent rien.*
+
+**Mesuré, il ne tient pas :**
+
+    les 6 correctifs   touchent `backend/` UNIQUEMENT
+                       cve.py · helpers.py · scheduler.py · cve_enrich.py
+
+    la bascule         deplace `www/` vers `legacy/` et met Laravel devant
+                       -> le backend Python est servi par les DEUX portails,
+                          AVANT comme APRES
+
+**Leur exposition ne change pas d'un iota.** *Ils manquent aujourd'hui et manqueront exactement autant
+après.* **Le Lead a formulé l'argument, l'a vérifié après l'avoir envoyé, et l'a retiré lui-même.**
+
+### Et ma tentative de le rattraper échoue aussi
+
+**J'ai cherché un second mécanisme** — *si le backend bouge sous la branche, elle devient plus dure à
+fusionner.* **Mesuré :**
+
+    fusion a sec              PROPRE, zero conflit
+    fichiers touches par les deux    helpers.py · scheduler.py
+    mais les REGIONS sont disjointes :
+      security  helpers.py @@ -321..-335   (corps de require_machine_access)
+      fusion    helpers.py @@ -348..       (ajoute resolve_ssh_creds APRES)
+      security  scheduler  @@ -189         ·   fusion  @@ -666
+
+> **Il n'y a pas de second mécanisme.** *J'ai formé l'hypothèse parce que je voulais sauver un axe qui
+> venait d'être retiré — et c'est exactement le mouvement contre lequel ce registre met en garde :
+> chercher un défaut par sa forme après avoir perdu son objet.*
+
+### Ce qui reste vrai, et ce n'est pas un argument de bascule
+
+    migration 065 absente   ->  le code suppose une contrainte inexistante
+                                ça CASSE, donc ça SE SIGNALE
+    6 correctifs dehors     ->  6 defauts en production
+                                ça ne casse rien, donc RIEN ne le signale
+
+**L'asymétrie tient — elle est INTEMPORELLE.** *Un blocage se signale de lui-même ; une garde manquante
+attend, avant comme après.* **Elle ne classe pas la bascule ; elle classe l'urgence, tout court.**
+
+**Le seul lien réel avec la bascule est social, et il se dit comme tel** : *une bascule lue comme « v2.0
+est livrée » déplace l'attention, et une branche dehors depuis douze jours y reste plus longtemps.*
+**C'est un argument de conduite, pas de mesure.**
+
+### Et un chiffre à moi qui a été relayé avant d'être vérifié
+
+**J'ai écrit « quatre de ses six correctifs mordent sur un portail servi ». Le Lead l'a relayé, puis
+mesuré que les SIX touchent du backend servi.**
+
+*Les deux énoncés sont vrais et portent sur des OBJETS différents* : **mon « quatre » compte les
+correctifs dont la garde peut MORDRE aujourd'hui** (les deux autres sont inertes par données et par
+absence de porteur — `DOSSIER-15`) ; **son « six » compte les fichiers SERVIS.** *Ni l'un ni l'autre ne
+réfute son voisin — et c'est le sixième faux désaccord de ce chantier où les deux parties ont raison sur
+des objets distincts.*
+
+**Ce qui reste une faute est de ma part** : *un chiffre dont le prédicat n'est pas écrit à côté de lui se
+fait relayer avec un autre prédicat.* **« Quatre » ne voulait rien dire sans « dont la garde peut mordre
+aujourd'hui ».*
+
+---
+
 ## ⚠ AJOUT DU 2026-09-03, 08:45 — un axe qui manquait : ce qui EMPIRE avec la bascule
 
 **Relevé par le Lead, et il renverse l'ordre que ce document proposait.**
