@@ -41,10 +41,48 @@ supérieur ou égal au sien (`:156`).
     api/toggle_sudo.php:26   checkAuth([ROLE_SUPERADMIN])   // Superadmin uniquement
                        :47   refuse meme de modifier SON PROPRE sudo
 
-**`users.sudo` est la précondition du repli `NOPASSWD: ALL` du module `ssh/`.**
+**⚠ CORRECTION 10:05 — la phrase qui portait la sévérité d'E-130 est périmée.** *Le plan et la première
+version de ce dossier écrivaient : « `users.sudo` est la précondition du repli `NOPASSWD: ALL` ». C'est
+**vrai du schéma et faux du chemin.** Relevé par la session 3, chaîne revérifiée par moi maillon par
+maillon.*
 
-> **Un rôle 2 porteur de `can_admin_portal` obtient par un fichier ce que le geste dédié réserve au rôle
-> 3 — et que ce geste refuse même de s'accorder à lui-même.**
+    configure_servers.py:1050  if  policy && preset && preset != 'none'  -> add_to_sudoers(policy)
+                        :1052  elif policy && preset == 'none'           -> REMOVE_from_sudoers
+                        :1054  elif sudo                                 -> add_to_sudoers()  # NOPASSWD ALL
+                        :1057  else                                      -> remove_from_sudoers
+
+    ssh_utils.py:956-959   le MEME `if mid:` remplit allowed_servers ET sudo_policies[mid]
+                           'preset': record.get('sudo_preset') or 'none'   -> JAMAIS None
+    configure_servers:932  UN SEUL appelant de configure_user, garde par
+                           `if mid in user.get('allowed_servers', [])`
+    configure_servers:1230 UN SEUL instanciateur de production ; all_users vient de
+                           load_data_from_db (:1197), source unique
+
+**Donc `mid ∈ allowed_servers` ⟹ `sudo_policies[mid]` existe ⟹ la troisième branche ne tire JAMAIS.**
+
+### Et le fait réel est plus net que « inerte » : le déploiement RETIRE le sudo
+
+**Avec `preset = 'none'`, c'est la DEUXIÈME branche qui tire — `remove_from_sudoers`.**
+
+> **Un compte importé avec `sudo = 1` et sans ligne de préréglage ne se voit pas seulement refuser
+> `NOPASSWD: ALL` : il se voit RETIRER le sudo à chaque déploiement.** *La base dit « accordé », la page
+> l'affiche accordé, et la machine ne l'a pas.*
+
+**Ce que ça retire à E-130** : *aucune règle `sudoers` n'atteint une machine aujourd'hui depuis un
+`sudo=1` importé.* **L'urgence tombe.**
+
+**Ce que ça ajoute** : *un privilège **accordé en base, contredit par le déploiement, et montré comme
+accordé à l'écran**. Aucun test ne l'exerce, aucun écran ne dit qu'il ne fait rien — et il redevient
+effectif au premier changement de la branche ou du collecteur.*
+
+> **Un privilège inerte est pire qu'un privilège visible : rien ne le mesure.** *E-130 reste un défaut de
+> moindre privilège et d'INTÉGRITÉ — ce n'est pas un chemin d'escalade vivant.*
+
+**Réserve de cette mesure, à dire** : *elle est établie par LECTURE de la chaîne, sans l'exercer.* **Le
+seul point de doute est un désaccord de type entre la clé `mid` de `sudo_policies` (issue de
+`record.get('machine_id')`, une requête) et `self.machine['id']` (une autre).** *Les deux viennent d'un
+`cursor(dictionary=True)` sur des colonnes INT, donc ils s'accordent — mais c'est une lecture, pas un
+clic.*
 
 ### Les trois issues, telles que le plan les a écrites
 
@@ -56,11 +94,29 @@ supérieur ou égal au sien (`:156`).
 contrat. »* **Une session précédente avait déjà refusé de trancher, et j'ai failli le faire par omission
 en demandant un panneau.**
 
-### Ma recommandation, à contredire
+### Ma recommandation, à contredire — et sa FORME n'est pas tranchée
 
 **(a) — exiger le rôle 3 pour cette colonne.** *Elle aligne l'import sur le geste dédié sans retirer la
-colonne du format, donc sans casser un contrat documenté. (b) casserait le contrat ; (c) laisse une
-escalade par fichier.*
+colonne du format, donc sans casser un contrat documenté. (b) casserait le contrat ; (c) laisse accorder
+un privilège que le déploiement contredit.*
+
+**⚠ Mais « exiger le rôle 3 » ne dit pas ce qu'un rôle 2 OBTIENT, et le legacy a déjà choisi la moins
+bonne forme pour `role_id` :**
+
+    ce que fait role_id   :156  if ($myRole < 3 && $roleId >= $myRole) { $roleId = 1; }
+                                coercition SILENCIEUSE — l'importeur n'apprend RIEN
+    ce qui existe deja    :143  $results['errors'][] = "Ligne $lineNum ($name) : doublon ignore"
+                                un canal PAR LIGNE, deja utilise
+
+**Forme recommandée, relevée par la session 3 : coercer `sudo` à 0 ET rendre compte par ligne**, avec la
+machinerie qui existe déjà.
+
+> **Un importeur qui croit avoir accordé `sudo` et ne l'a pas accordé prendra la décision suivante sur une
+> croyance fausse.**
+
+**Et un second arbitrage, plus petit, qui n'est pas dans ce dossier et qu'il faut ne pas perdre** : *la
+coercition de `role_id` est correcte et MUETTE.* **Elle a le même angle mort. Je ne propose pas de la
+changer ici ; je la nomme pour qu'elle ne se perde pas.**
 
 ---
 
