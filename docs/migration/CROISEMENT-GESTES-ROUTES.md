@@ -147,6 +147,53 @@ aux appels, et l'enumeration a rendu 28 cles pour 0 manquante.
 *Ne pas conclure « appelee » ni « non appelee » sur ces 22-la sans avoir ouvert le
 fichier.*
 
+## ✅ LES 22 INDECIDABLES SONT RESOLUS — 19 appelees, 3 non appelees
+
+**Methode : enumerer les valeurs que la variable prend AU SITE D'APPEL.** C'est celle qui a marche
+sur `cle-plateforme` (28 cles composees, 0 manquante), et elle demande d'ouvrir le fichier — aucune
+expression reguliere ne la remplace.
+
+    base                        variable    valeurs LITTERALES trouvees          verdict
+    /policy/sudo/               geste       deploy · remove                      2 appelees
+    /policy/sftp/               geste       deploy · remove                      2 appelees
+    /graylog/                   geste       deploy · test · uninstall            3 appelees
+                                            (`graylog.js:318-320`, table fermee)
+    /graylog/templates/         nom         suffixe direct (`:376`, `:467`)       1 appelee
+    /groups/                    id          + `/members` · + `/run` · nu          2 appelees
+                                            (`groupes.js:391,478,521,575,619`)
+    /maintenance/windows/       f.id        suffixe direct (`:351`, `:362`)       1 appelee
+    /approvals/                 action      approve (`:178`) · reject (`:126`)    2 appelees
+    /services/                  geste       stop · restart · start · disable
+                                            · enable  (`services.js:216-224`,
+                                            table fermee)                        5 appelees
+    /supervision/machines/…     mid         `url_profil` (controleur)             1 appelee
+
+### ⚠ Les TROIS que la resolution rend NON APPELEES
+
+    /approvals/stats     seule la base `/approvals/*` la faisait concorder — et cette
+                         base ne produit que `approve` et `reject`
+    /services/logs       aucune occurrence dans tout le portage
+    /services/status     idem — la page lit `/services/list`, un LITTERAL, pour l'etat
+
+*TEMOIN de ce dernier releve : la base `'/services/'` est trouvee une fois dans `services.js`, donc
+l'instrument voit bien ce fichier.* **Sans ce temoin, « aucune occurrence » et « je n'ai pas su
+chercher » auraient ete la meme sortie.**
+
+**Aucune de ces trois ne contredit une declaration** : `services` et `approbations` ne declarent
+aucune absence. Ce sont des capacites du backend que le portage n'emploie pas — et personne n'a
+affirme le contraire.
+
+### Le compte final
+
+    exacte, litteral        87
+    exacte, apres lecture   19
+    non appelee             97
+    ---
+    total                  203
+
+*Le troisieme etat a donc bien servi : il portait 19 appels que la matrice ne pouvait pas prouver
+seule, et 3 absences qu'elle aurait pu dedouaner.*
+
 ## Ce que ce croisement ne dit PAS
 
     une route appelee                 ne dit pas que la page l'OFFRE (elle peut etre
