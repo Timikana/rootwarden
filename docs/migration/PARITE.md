@@ -18076,3 +18076,46 @@ pas — mais marqués DOUBLONS, non-autoritaires, et l'autorité est
 `DOSSIER-00`.** *Ce qui subsiste de propre à ces deux entrées : rien. C'est la
 première fois aujourd'hui qu'un de mes apports est nul plutôt que faux, et c'est
 un progrès, pas une consolation.*
+
+
+## E-376 — CORRECTION : ce n'était pas une « version douce ». Le message était FAUX pour l'un des deux états
+
+**Corrigé par la session 3, vérifié par moi le 2026-09-03 12:20.** J'avais classé
+ce défaut comme *« la première en version DOUCE — le message n'est pas faux, il
+est insuffisamment discriminant »*. **Le libellé le réfute :**
+
+    fr  'apercu_vide' => 'Cochez au moins un compte pour voir ce qui changerait.'
+    en  'apercu_vide' => 'Tick at least one account to see what would change.'
+
+**Il ne parle que des COMPTES.** Quand la cause était la MACHINE — plusieurs
+cochées, donc `mid === null` — il disait *« cochez un compte »* à quelqu'un qui en
+avait peut-être déjà coché.
+
+> **Il n'envoyait pas seulement chercher ailleurs : il désignait un endroit PRÉCIS
+> et FAUX.** *Un message vrai pour deux états laisse chercher ; un message faux
+> pour l'un des deux **prescrit le mauvais remède**.* La huitième occurrence de la
+> famille n'est donc pas la plus douce — elle est de plein droit.
+
+⚠ **Et le sens de mon erreur est neuf** : mes huit précédentes de la journée
+sous-estimaient un risque ou **surestimaient mon apport**. Celle-ci
+**sous-estime un défaut d'autrui**. *Le biais n'a donc pas une direction unique
+« vers ce qui m'arrange » : il va vers **ce qui clôt la question** — et minorer la
+gravité d'un défaut déjà inscrit la clôt aussi bien que l'exagérer.*
+
+### Le correctif, et il ne coûte aucune clé
+
+Mesuré : **0 fichier de langue touché** par `69f8f58`. `mid === null` réunissait
+lui-même deux états, donc il y en a **trois**, et les trois libellés existaient
+déjà et étaient exacts :
+
+    0 machine cochee      -> textes.choisir            (bashrc.comptes_choisir)
+    plusieurs cochees     -> textes.plusieurs_cochees  (bashrc.comptes_plusieurs)
+    1 machine, 0 compte   -> textes.apercu_vide        (bashrc.apercu_vide)
+
+**Le correctif applique au fichier sa propre convention** — celle qu'il tenait
+déjà vingt lignes plus haut — et ne touche aucun catalogue. Parité 70 = 70,
+**inchangée par construction** plutôt que vérifiée après coup, ce qui est mieux.
+
+*Ma consigne « mesure avant d'ajouter » a donc évité les deux clés que j'annonçais
+comme nécessaires : je m'étais trompée sur le coût dans le sens qui gonfle le
+travail.*
